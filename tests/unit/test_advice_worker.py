@@ -1502,6 +1502,36 @@ def test_a_word_not_solved_for_one_member_is_named_not_a_generic_failure(
 # --- the member menu's switches, through the real solver ---------------------------------
 
 
+def test_disabled_central_injuries_cannot_reach_advice_or_cache(running, monkeypatch):
+    from tests.unit.test_official_injuries import report
+
+    backend = running["backend"]
+    identity = backend.contexts.identity()
+    held = backend.contexts.capture(identity.context)
+    assert held is not None
+    held = replace(held, switches=replace(held.switches, official_injuries=report()))
+    monkeypatch.setattr(backend.contexts, "capture", lambda _: held)
+    monkeypatch.setattr(
+        worker_module,
+        "advise_menu_entry",
+        lambda *_a, **_k: pytest.fail("Disabled input must refuse before planning"),
+    )
+    client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
+    route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
+    request = {"strategy": COMPUTED_MODE, "window": COMPUTED_WINDOW}
+    accepted = client.post(route, json=request)
+    assert accepted.status_code == 202, accepted.text
+    compute = build_advice_compute(backend.contexts, backend.job_specs, cache=backend.cache)
+    queued = backend.queue.load(accepted.json()["job_id"])
+    assert queued is not None
+    with pytest.raises(ValueError, match="central official injury source is disabled"):
+        compute(queued)
+    failed = run_advice_worker_once(backend.queue, backend.cache, compute, at_utc=_now_stamp())
+    assert failed is not None and failed.status == "failed"
+    assert failed.error is not None and failed.error.code == "ADVICE_FAILED"
+    assert client.get(route, params=request).status_code == 404
+
+
 def _served_bytes(backend: Any, advice: dict[str, Any], captured_at_utc: str) -> bytes:
     document = {
         "contract_version": "provisional_league_ui_v1",
@@ -2079,3 +2109,23 @@ def test_accepted_chip_with_artifacts_does_not_prepare_a_projection(
     )
     assert response.status_code == 202, response.text
     assert backend.contexts._context is None
+
+
+def test_the_injury_facts_asked_for_are_the_members_own_players_first() -> None:
+    """The source answers fifty identities at most; the squad is never the part left out."""
+
+    own_ids = list(range(9001, 9016))
+    advice = {
+        "starting_xi": [{"player_id": i} for i in own_ids[:11]],
+        "bench": [{"player_id": i} for i in own_ids[11:]],
+        "captain": {"player_id": own_ids[0]},
+        "vice_captain": {"player_id": own_ids[1]},
+        "moves": [{"player_out": {"player_id": own_ids[2]}, "player_in": {"player_id": 9050}}],
+        # A rival eleven and plan weeks naming sixty players with lower ids than the squad.
+        "rival_lineup": [{"player_id": i} for i in range(1, 61)],
+    }
+    asked = worker_module._injury_fact_ids(advice)
+    assert len(asked) == 50
+    assert set(own_ids) <= set(asked) and 9050 in asked
+    assert asked[: len(own_ids) + 1] == [*own_ids, 9050]
+    assert asked[len(own_ids) + 1 :] == list(range(1, 50 - len(own_ids)))

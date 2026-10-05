@@ -17,7 +17,7 @@ import styles from "./DecisionWorkbench.module.css";
 /** The solver's two published statuses in the Turkish page's words; any other stays as sent. */
 const SOLVER_STATUS_TR: Record<string, string> = {
   OPTIMAL: "en iyisi kanıtlandı",
-  FEASIBLE: "bulundu, en iyisi kanıtlanmadı",
+  FEASIBLE: "bulundu",
 };
 
 /** A personal choice among computed plans, never an automatic model promotion. */
@@ -64,8 +64,8 @@ function DecisionWorkbenchContent({ request, selected, squad, loading = false }:
       </p>
       <p>
         {tr
-          ? "Tercihin FPL hesabında transfer yapmaz veya çip kullanmaz. Planlar ve notun yalnız bu tarayıcı sekmesinde tutulur; kadro veya veri çekimi değişirse sıfırlanır."
-          : "Your preference does not make transfers or play chips in FPL. Plans and your note stay in this browser tab only and reset when the squad or data snapshot changes."}
+          ? "Planlar ve notun bu tarayıcı sekmesinde tutulur; kadro veya veri çekimi değişirse sıfırlanır."
+          : "Plans and your note stay in this browser tab and reset when the squad or data snapshot changes."}
       </p>
       <button
         type="button"
@@ -95,8 +95,8 @@ function DecisionWorkbenchContent({ request, selected, squad, loading = false }:
       )}
       <p className={styles.comparisonNote}>
         {tr
-          ? "Net puan transfer cezası düşülmüş beklentidir. Farklı modellerin veya farklı uzunluktaki pencerelerin yüksek puanı, daha iyi plan olduğunu kanıtlamaz. Eksik ölçüm — ile gösterilir."
-          : "Net points subtract transfer hits. Higher scores from different models or different horizons do not prove a better plan. Missing measurements are shown as —."}
+          ? "Net puan transfer cezası düşülmüş beklentidir. Eksik değer tire ile gösterilir."
+          : "Net points subtract transfer hits. A missing value is shown as a dash."}
       </p>
       <div className={styles.grid}>
         {board.candidates.map((c, i) => {
@@ -192,24 +192,13 @@ function DecisionWorkbenchContent({ request, selected, squad, loading = false }:
                       ? (SOLVER_STATUS_TR[p.solver_status ?? ""] ?? p.solver_status)
                       : p.solver_status}
                   </dd>
-                  <dt>{tr ? "Kanıtın açık bıraktığı fark" : "Objective bound gap"}</dt>
-                  <dd>{number(p.optimality_gap)}</dd>
                 </dl>
               </details>
-              <p>
-                {p.solver_status === "FEASIBLE"
-                  ? tr
-                    ? "Geçerli plan bulundu; en iyi çözüm olduğu kanıtlanmadı."
-                    : "A feasible plan was found; optimality is not proved."
-                  : tr
-                    ? "Seçilen model ve kısıtlar altında optimum; gerçek puan garantisi değil."
-                    : "Optimal under the selected model and constraints, not guaranteed actual points."}
-              </p>
               {m.gain != null && m.gain < 0 && (
                 <p role="note">
                   {tr
-                    ? "Bu plan ilk hafta transfer yapmamaktan daha düşük net puan bekliyor; sonraki haftaların gerekçesini incele."
-                    : "This plan expects fewer net points than holding this week; review the justification over later weeks."}
+                    ? "Bu plan ilk hafta transfer yapmamaktan daha düşük net puan bekliyor."
+                    : "This plan expects fewer net points than holding this week."}
                 </p>
               )}
               <p>
@@ -225,18 +214,6 @@ function DecisionWorkbenchContent({ request, selected, squad, loading = false }:
                       )
                       .join("; ")}
               </p>
-              {!!p.stated_limits?.length && (
-                <details>
-                  <summary className={styles.summary}>
-                    {tr ? "Planın varsayımları" : "Plan assumptions"}
-                  </summary>
-                  <ul>
-                    {p.stated_limits.map((limit, j) => (
-                      <li key={j}>{messages.leagueMembers.statedLimits[limit] ?? limit}</li>
-                    ))}
-                  </ul>
-                </details>
-              )}
               {c.envelope.source_kind === "example" && <p>{tr ? "Örnek veri" : "Example data"}</p>}
               <label>
                 <input
@@ -303,8 +280,8 @@ function DecisionWorkbenchContent({ request, selected, squad, loading = false }:
           </li>
           <li>
             {tr
-              ? "Transfer önümüzdeki 3–5 haftada, kaptan seçenekleriyle birlikte değer katıyor mu?"
-              : "Does the transfer add value across 3–5 weeks, including captain options?"}
+              ? "Transfer önümüzdeki 3 ile 5 haftada, kaptan seçenekleriyle birlikte değer katıyor mu?"
+              : "Does the transfer add value across 3 to 5 weeks, including captain options?"}
           </li>
           <li>
             {tr
@@ -322,11 +299,6 @@ function DecisionWorkbenchContent({ request, selected, squad, loading = false }:
               : "Which manager update or lineup news could change this decision?"}
           </li>
         </ul>
-        <p>
-          {tr
-            ? "Bu sorular karar çerçevesidir; başarı garantisi veya test edilmiş yeni bir tahmin modeli değildir."
-            : "These questions frame the decision; they are not a guarantee of success or a validated new prediction model."}
-        </p>
         <a href="https://www.premierleague.com/en/news/4322002">
           {tr ? "FPL uzmanlarının değerlendirmeleri" : "FPL experts' lessons"}
         </a>

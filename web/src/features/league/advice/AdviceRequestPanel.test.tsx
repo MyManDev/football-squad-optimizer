@@ -8,12 +8,13 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { mockEntryAdviceEnvelope } from "../../../fixtures/league";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { MESSAGES, type Language } from "../../../i18n/messages";
 import { AdviceRequestPanel, type ComputeService } from "./AdviceRequestPanel";
 import type { AdviceRequest } from "./adviceClient";
 import { COMPUTE_COPY } from "./computeCopy";
-import type { AdviceJob, ComputePhase } from "./useAdviceJob";
+import type { AdviceJob, ComputePhase, EarlierAnswer } from "./useAdviceJob";
 
 afterEach(cleanup);
 
@@ -88,6 +89,88 @@ describe("with no compute service", () => {
     expect(
       renderPanel({ state: { phase: "failed", request: REQUEST } }).container,
     ).toHaveTextContent(messages.computeFailed);
+  });
+});
+
+describe("with the selection's earlier answer kept on the page", () => {
+  const earlier: EarlierAnswer = {
+    envelope: mockEntryAdviceEnvelope(REQUEST.entryId, REQUEST.strategy, REQUEST.window),
+    source: "api-cache",
+  };
+  const published = mockEntryAdviceEnvelope(REQUEST.entryId, "saf-puan", 1);
+
+  it("says the earlier answer stays while this computes, not that a published plan shows", () => {
+    const { container } = renderPanel({
+      service: "ready",
+      computable: true,
+      state: {
+        phase: "waiting",
+        request: REQUEST,
+        jobId: "job-1",
+        status: "running",
+        fallback: published,
+        earlier,
+      },
+    });
+    expect(container).toHaveTextContent(tr.waitingWithEarlier);
+    expect(container).not.toHaveTextContent(messages.computeWaitingWithFallback);
+    expect(container).not.toHaveTextContent(messages.computeWaiting);
+  });
+
+  it.each(["SERVICE_UNREACHABLE", "CHIP_NOT_HELD", null] as const)(
+    "says it stays after a failure (%s)",
+    (reason) => {
+      const { container } = renderPanel({
+        service: "ready",
+        computable: true,
+        state: { phase: "failed", request: REQUEST, reason, earlier },
+      });
+      expect(container).toHaveTextContent(tr.earlierRemains);
+      expect(container).not.toHaveTextContent(tr.publishedRemains);
+      expect(container).not.toHaveTextContent(messages.computeFailed);
+      if (reason) expect(container).toHaveTextContent(tr.failures[reason]!);
+    },
+  );
+
+  it("names the wait a rate limit asked for and still says it stays", () => {
+    const { container } = renderPanel({
+      service: "ready",
+      computable: true,
+      state: {
+        phase: "failed",
+        request: REQUEST,
+        reason: "RATE_LIMITED",
+        retryAfterSeconds: 45,
+        earlier,
+      },
+    });
+    expect(container).toHaveTextContent(tr.rateLimitedFor(45));
+    expect(container).toHaveTextContent(tr.earlierRemains);
+  });
+
+  it("says it stays when the service is unavailable, with or without a reason", () => {
+    const { container } = renderPanel({
+      state: { phase: "unavailable", request: REQUEST, earlier },
+    });
+    expect(container).toHaveTextContent(messages.computeUnavailable);
+    expect(container).toHaveTextContent(tr.earlierRemains);
+    cleanup();
+    const second = renderPanel({
+      state: { phase: "unavailable", request: REQUEST, reason: "ADVICE_BACKEND_DISABLED", earlier },
+    });
+    expect(second.container).toHaveTextContent(tr.failures.ADVICE_BACKEND_DISABLED!);
+    expect(second.container).toHaveTextContent(tr.earlierRemains);
+    expect(second.container).not.toHaveTextContent(tr.publishedRemains);
+  });
+
+  it("says the published plan remains when no earlier answer is kept", () => {
+    const { container } = renderPanel({
+      service: "ready",
+      computable: true,
+      state: { phase: "failed", request: REQUEST, reason: "SERVICE_UNREACHABLE", earlier: null },
+    });
+    expect(container).toHaveTextContent(tr.publishedRemains);
+    expect(container).not.toHaveTextContent(tr.earlierRemains);
   });
 });
 

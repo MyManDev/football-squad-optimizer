@@ -141,9 +141,12 @@ for (const [window, top100, width] of [
       });
     });
     await page.goto(
-      `/league/members/35249001?mode=saf-puan&window=${window}&top100=${top100}&model=football`,
+      `/league/352490/members/35249001?mode=saf-puan&window=${window}&top100=${top100}&model=football`,
     );
     await expect(page.getByTestId("new-information-notice")).toContainText(
+      "karar girdileri değişmiş",
+    );
+    await expect(page.getByTestId("new-information-notice")).not.toContainText(
       "kendiliğinden değiştirilmedi",
     );
     const facts = page.getByTestId("official-information");
@@ -154,7 +157,9 @@ for (const [window, top100, width] of [
     expect(submitted).toBe(0);
     const evidence = page.getByTestId("participation-evidence");
     await evidence.locator(":scope > summary").click();
-    await expect(evidence).toContainText("Bu tahmine uygulanmış hoca açıklaması yok");
+    // Zero statements read is said as that, not as "none applied".
+    await expect(evidence).toContainText("Bu hafta değerlendirilecek hoca açıklaması okunmadı.");
+    await expect(evidence).not.toContainText("Bu tahmine uygulanmış hoca açıklaması yok");
     await page.getByRole("button", { name: "Hesapla", exact: true }).click();
     await expect(page.getByTestId("new-information-notice")).toHaveCount(0);
     await expect(page.getByTestId("statement-outcomes")).toContainText(

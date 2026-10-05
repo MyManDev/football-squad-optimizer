@@ -168,13 +168,19 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\start_backend_at_log
 Require `READY`, matching capture/tree checks, and successful public health before
 accepting recovery. Missing metrics are unknown, not zero. `-Register` writes the
 current user's Startup shortcut with `-Watch`; it starts at the next logon, not now.
+The shortcut starts a watcher only at logon; the scheduled task in
+[backend free hosting](backend_free_hosting.md) (`SquadOptBackendWatch`) replaces it and
+re-arms a watcher that ends. Use one or the other, not both.
 The PC must remain awake and logged in. Watch behavior is covered by mocked tests;
 replacement-PC startup and logon persistence are **never exercised**.
 `-Register` has **never been exercised on any machine**.
 
 ## 6. Prove what the member can read
 
-Use the exact `generated_at_utc` from `web/public/data/league/members.json` in the accepted
+Use the exact value of the publication's `generated_at_utc`: on a site with the league directory, the one in
+`data/leagues.json` (written last, after every league; each league's `members.json` is
+stamped after its own solves and may be older, never newer), and on a site from before
+the directory, the one in `data/league/members.json`, in the accepted
 publication tree. The verifier requires equality, including for a same-tag re-dispatch.
 Do not use the recovery time (restoring a PC does not republish the site):
 

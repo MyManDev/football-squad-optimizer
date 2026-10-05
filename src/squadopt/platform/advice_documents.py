@@ -25,7 +25,9 @@ from typing import Any, Final
 import jsonschema
 
 from squadopt.application.advice_capabilities import MEMBER_WINDOWS, PREDICTION_MODELS
+from squadopt.contracts.football_explanations import policy_comparison_schema, role_forecast_schema
 from squadopt.contracts.information import decision_information_schema, official_information_schema
+from squadopt.contracts.injuries import official_injuries_schema
 from squadopt.contracts.league import LEAGUE_VIEW_CONTRACT_VERSION
 from squadopt.contracts.preferences import preferences_schema
 from squadopt.planning.chip_strategy import CHIP_STRATEGY_VERSION
@@ -202,7 +204,7 @@ def information_review_schema() -> dict[str, Any]:
     return {
         "type": "object",
         "additionalProperties": False,
-        "properties": fields,
+        "properties": {**fields, "comparison": policy_comparison_schema()},
         "required": list(fields),
     }
 
@@ -272,7 +274,14 @@ def advice_read_schema() -> dict[str, Any]:
                 "type": "object",
                 "properties": {
                     "id": {"const": "football"},
-                    "version": {"enum": ["football_team_share_v1", "football_contextual_v3"]},
+                    "version": {
+                        "enum": [
+                            "football_team_share_v1",
+                            "football_contextual_v3",
+                            "football_joint_role_minutes_v1",
+                            "football_joint_role_retained_history_v1",
+                        ]
+                    },
                     "experimental": {"const": True},
                     "fingerprint": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
                 },
@@ -435,7 +444,9 @@ def advice_read_schema() -> dict[str, Any]:
             "expected_own_points": nullable_number,
             "lineup_expectation": lineup_expectation_schema(),
             "participation_evidence": participation_evidence_schema(),
+            "role_forecast": role_forecast_schema(),
             "official_information": official_information_schema(),
+            "official_injuries": official_injuries_schema(),
             "decision_information": decision_information_schema(),
             # Null where the comparison against holding could not be walked, which is
             # not the same fact as a plan that gains nothing.
@@ -723,20 +734,3 @@ def validate_league_capabilities(document: dict[str, object]) -> None:
         raise AdviceDocumentError(
             f"The capabilities violate league_capabilities_v1: {errors[0].message}"
         )
-
-
-def write_public_read_schemas() -> tuple[Path, ...]:
-    """Commit the read schemas, the same way the other wire contracts are committed."""
-
-    for path, schema in (
-        (ADVICE_READ_SCHEMA_PATH, advice_read_schema()),
-        (LEAGUE_STATE_SCHEMA_PATH, league_state_schema()),
-        (LEAGUE_CAPABILITIES_SCHEMA_PATH, league_capabilities_schema()),
-    ):
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(
-            json.dumps(schema, indent=2, sort_keys=True) + "\n",
-            encoding="utf-8",
-            newline="\n",
-        )
-    return ADVICE_READ_SCHEMA_PATH, LEAGUE_STATE_SCHEMA_PATH, LEAGUE_CAPABILITIES_SCHEMA_PATH

@@ -246,3 +246,76 @@ def test_invalid_directory_is_not_ready_instead_of_disconnected(
     assert not directory.readable()
     with pytest.raises(AdviceBackendNotReadyError):
         store.league_state(LEAGUE_ID)
+
+
+def _publish_directory(root: Path, *leagues: int) -> None:
+    """A site with a directory: each league's tree under ``leagues/<id>/``, with one
+    human entry rendered from the same capture."""
+
+    rows = []
+    for league_id in leagues:
+        tree = root / "leagues" / str(league_id)
+        _publish_members(root, league_id)
+        tree.parent.mkdir(parents=True, exist_ok=True)
+        (root / "league").rename(tree)
+        entries = tree / "entries"
+        entries.mkdir(exist_ok=True)
+        for entry_id in (313686, 2199732):
+            (entries / f"{entry_id}.json").write_text(
+                json.dumps({"payload": {"source_snapshot_id": CONTEXT.capture_snapshot_id}}),
+                encoding="utf-8",
+            )
+        rows.append(
+            {
+                "league_id": league_id,
+                "league_name": "Test League",
+                "season": "2026-27",
+                "gameweek": 3,
+                "path": f"leagues/{league_id}",
+            }
+        )
+    (root / "leagues.json").write_text(
+        json.dumps({"contract_version": "league_directory_v1", "payload": {"leagues": rows}}),
+        encoding="utf-8",
+    )
+
+
+def test_a_site_with_a_directory_serves_each_listed_league_from_its_own_tree(
+    tmp_path: Path,
+) -> None:
+    site = tmp_path / "site"
+    _publish_directory(site, LEAGUE_ID, 7)
+    directory = FileLeagueDirectory(site)
+    assert directory.readable()
+    assert directory.matches(CONTEXT)
+    assert (directory.league(LEAGUE_ID) or {})["league_id"] == LEAGUE_ID
+    assert (directory.league(7) or {})["league_id"] == 7
+    assert directory.league(999999) is None
+    # Every league's human entries name the one capture the publication rendered from.
+    assert directory.published_snapshot_id() == (CONTEXT.capture_snapshot_id, "2026-27", 3)
+    assert directory.published_capture_unusable_reason is None
+
+    # A league rendered from another capture, or for another week, is not one publication.
+    other = site / "leagues" / "7" / "entries" / "313686.json"
+    other.write_text(
+        json.dumps({"payload": {"source_snapshot_id": "fpl-live-20260826T090000Z-ffffffffffff"}}),
+        encoding="utf-8",
+    )
+    assert directory.published_snapshot_id() is None
+    assert "disagree on the capture" in str(directory.published_capture_unusable_reason)
+    members = site / "leagues" / "7" / "members.json"
+    document = json.loads(members.read_text(encoding="utf-8"))
+    document["payload"]["gameweek"] = 2
+    members.write_text(json.dumps(document), encoding="utf-8")
+    assert not directory.matches(CONTEXT)
+
+
+def test_a_directory_that_cannot_be_read_is_not_ready(tmp_path: Path) -> None:
+    site = tmp_path / "site"
+    _publish_members(site)
+    (site / "leagues.json").write_text("{", encoding="utf-8")
+    directory = FileLeagueDirectory(site)
+    assert not directory.readable()
+    assert not directory.matches(CONTEXT)
+    with pytest.raises(AdviceBackendNotReadyError):
+        directory.league(LEAGUE_ID)

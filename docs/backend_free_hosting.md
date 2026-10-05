@@ -150,6 +150,37 @@ Three things to know before relying on it:
   and planned starts, without starting anything or writing logs. `-ConnectorLabel`
   and `-Port` allow isolated checks. Running without `-Watch` retains one-time startup.
   The shortcut does not make sleeping or logged-off Windows serve requests.
+- **A task re-arms a watcher that ends.** The shortcut runs only at logon, so a watcher
+  that ends (its window closed, the process killed, an error) stays gone until the next
+  logon; on 2026-10-04 the API and its workers stopped between 13:42Z and 17:51Z with no
+  watcher running, from a logon session of 2026-09-21. A Task Scheduler task started at
+  logon and again every five minutes re-arms it: `-MultipleInstances IgnoreNew` starts
+  nothing while the task's watcher still runs, so the repeat costs one check and writes
+  no log, and starts a new watcher only after the last one ended. The task replaces the
+  shortcut (two starters would each log a contended start), runs at normal priority
+  (Task Scheduler's default, 7, is below normal and the solver workers would inherit it),
+  with no time limit (the default ends a task after 72 hours) and on battery. Registering
+  it is the owner's act. End a watcher already running first (close its window, or end the
+  hidden `powershell.exe` whose command line holds `start_backend_at_logon.ps1` and `-Watch`):
+  while another watcher holds the mutex, each five-minute start finds it held, writes a
+  `startup-<stamp>.log` and exits. Replace `<repo>` with the main checkout's path:
+
+  ```powershell
+  powershell -ExecutionPolicy Bypass -File <repo>\scripts\start_backend_at_logon.ps1 -Unregister
+  $watch = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument '-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "<repo>\scripts\start_backend_at_logon.ps1" -RepoRoot "<repo>" -Workers 6 -Port 8000 -TunnelName squadopt-api -Watch -ConnectorLabel squadopt-logon'
+  $atLogon = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
+  $every5 = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 5)
+  $settings = New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew -ExecutionTimeLimit ([TimeSpan]::Zero) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -Priority 5
+  Register-ScheduledTask -TaskName 'SquadOptBackendWatch' -Action $watch -Trigger $atLogon, $every5 -Settings $settings
+  ```
+
+  A repetition with no duration repeats indefinitely. If registering is refused for lack
+  of rights, run the same lines in an elevated PowerShell; the task still runs as the
+  owner, only while the owner is logged on. `Unregister-ScheduledTask -TaskName
+  SquadOptBackendWatch` removes it; moving the connector off the PC disables it first (ADR
+  0009's tunnel move). The watcher still probes loopback `/health` only, so an
+  API that answers while every worker is dead looks healthy to it; the uptime workflow's
+  `/ready` probe sees that case, and watch mode still never kills.
   The PC must not sleep while members are expected; that is a Windows power setting
   for the owner to change.
 - **The answer's identity includes the commit.** Publication and a backend code rollout
@@ -553,7 +584,7 @@ implementations drifting.
 
 ## Recommendation
 
-The `Backend uptime` workflow asks for public `/health` and `/ready` on a `*/15` schedule, each with a 10-second timeout, and repeats both once after 20 seconds. **It does not run every fifteen minutes, and the gap is not small.** Measured over the workflow's whole life to 2026-09-24, 111.1 hours from its first run, 31 scheduled runs landed where `*/15` asks for 444: a rate of 7%. No interval came close to fifteen minutes. The shortest was 1 hour 55 minutes, the median 3 hours 33, and the longest 6 hours 52; 30 of the 30 intervals exceeded an hour and 18 of them exceeded three. GitHub deprioritises high-frequency `schedule` triggers on shared runners and drops what it cannot place, so the real time to detection is hours, and so is the time to notice a recovery. A failed check (`/health` not 200, or `/ready` not 200 with `ready: true`) opens one `backend-down` issue naming which probe failed and which readiness checks were false; a continuing failure comments on that issue only when what failed changes, and recovery comments on and closes it. Subscribe to repository issue notifications to receive the alert. Manual dispatch defaults to `dry_run=true`, which prints the proposed transition without changing issues; an optional `health_url` is accepted only in that mode for controlled tests. Issue text includes time, status and the names of the false readiness checks, never a URL or a response body. Scheduled Actions can be delayed and are not an exact uptime guarantee, which the numbers above put a size on rather than leaving as a caveat. Standard hosted-runner minutes are free for this public repository; private copies use their plan's allowance ([GitHub billing](https://docs.github.com/en/billing/concepts/product-billing/github-actions)). No backend restart or notification service is involved.
+The `Backend uptime` workflow asks for public `/health` and `/ready` on a `*/15` schedule, each with a 10-second timeout, and repeats both once after 20 seconds. **It does not run every fifteen minutes, and the gap is not small.** Measured over the workflow's whole life to 2026-09-24, 111.1 hours from its first run, 31 scheduled runs landed where `*/15` asks for 444: a rate of 7%. No interval came close to fifteen minutes. The shortest was 1 hour 55 minutes, the median 3 hours 33, and the longest 6 hours 52; 30 of the 30 intervals exceeded an hour and 18 of them exceeded three. GitHub deprioritises high-frequency `schedule` triggers on shared runners and drops what it cannot place, so the real time to detection is hours, and so is the time to notice a recovery. A failed check (`/health` not 200, or `/ready` not 200 with `ready: true`) opens one `backend-down` issue naming which probe failed and which readiness checks were false; a continuing failure comments on that issue only when what failed changes, and recovery comments on and closes it. **Who it reaches:** the run that opens an incident, and each run that records a change in what fails, ends red, and GitHub mails a failed scheduled run to whoever last edited the schedule (the owner's account, which wrote the `cron` line). A continuing outage whose failure does not change stays green, so one outage mails once, not once a run. With the repository variable `BACKEND_ALERT_ASSIGNEE` set to a login with push access, the new issue is also assigned to it, which notifies that login as a participant in every later comment; repository issue notifications reach anyone else who subscribes. On 2026-10-04 the alarm opened #963 at 17:52Z and reached nobody: the issue had no assignee and the runs ended green. After the backend is restarted, `gh workflow run backend-uptime.yml -f dry_run=false` runs the real check at once and closes the incident through its recovery path, without waiting hours for a schedule slot; closing it by hand would cut the outage record. Manual dispatch defaults to `dry_run=true`, which prints the proposed transition without changing issues; an optional `health_url` is accepted only in that mode for controlled tests. Issue text includes time, status and the names of the false readiness checks, never a URL or a response body. Scheduled Actions can be delayed and are not an exact uptime guarantee, which the numbers above put a size on rather than leaving as a caveat. Standard hosted-runner minutes are free for this public repository; private copies use their plan's allowance ([GitHub billing](https://docs.github.com/en/billing/concepts/product-billing/github-actions)). No backend restart or notification service is involved.
 
 **Current route: (a).** Keep the PC awake and logged in, use the logon watch script, and
 coordinate publication with the backend code revision. The existing tunnel hostname is

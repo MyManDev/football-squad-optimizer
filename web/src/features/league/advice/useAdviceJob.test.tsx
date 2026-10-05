@@ -12,6 +12,7 @@ import type {
   AdviceRequestResult,
 } from "./adviceClient";
 import { StaticOnlyAdviceClient } from "./adviceClient";
+import { exampleTree } from "../../../testSupport/league";
 import { sameAdviceRequest, useAdviceJob, type ComputePhase } from "./useAdviceJob";
 import { AdviceResponseError } from "./adviceResponse";
 import type { RequestOptions } from "../../../data/request";
@@ -31,6 +32,12 @@ const REQUEST: AdviceRequest = {
 
 class ScriptedClient implements AdviceClient {
   statuses: AdviceJobStatus["status"][] = [];
+  // The published baseline is the example tree's document, as the static client reads it.
+  private readonly published = new StaticOnlyAdviceClient(exampleTree.entryAdvice);
+
+  readPublished(request: AdviceRequest, options?: RequestOptions): Promise<AdviceReadResult> {
+    return this.published.readPublished(request, options);
+  }
 
   async readAdvice(request: AdviceRequest): Promise<AdviceReadResult> {
     return {

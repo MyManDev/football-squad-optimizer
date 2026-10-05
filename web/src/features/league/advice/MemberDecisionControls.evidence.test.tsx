@@ -49,7 +49,7 @@ function renderControls(
 
 describe("the manager's word switch", () => {
   it("is disabled with the reason when the publish read no club news", () => {
-    renderControls(`/league/members/${ENTRY}?mode=saf-puan&window=1`, {
+    renderControls(`/league/352490/members/${ENTRY}?mode=saf-puan&window=1`, {
       available: false,
       reason: "no_evidence_this_run",
     });
@@ -60,7 +60,10 @@ describe("the manager's word switch", () => {
   });
 
   it("switches the URL on and off where the producer solved it, and says it is example data", () => {
-    const { container } = renderControls(`/league/members/${ENTRY}?mode=saf-puan&window=1`, SOLVED);
+    const { container } = renderControls(
+      `/league/352490/members/${ENTRY}?mode=saf-puan&window=1`,
+      SOLVED,
+    );
     const box = screen.getByRole("checkbox", { name: /Kulübün sayfasının dediğini/ });
     expect(box).toBeEnabled();
     expect(box).not.toBeChecked();
@@ -75,7 +78,7 @@ describe("the manager's word switch", () => {
 
   it("is disabled on a longer window with the note, in English too", () => {
     const { container } = renderControls(
-      `/league/members/${ENTRY}?mode=saf-puan&window=3&llm=on`,
+      `/league/352490/members/${ENTRY}?mode=saf-puan&window=3&llm=on`,
       SOLVED,
       "en",
     );
@@ -88,7 +91,7 @@ describe("the manager's word switch", () => {
   it("carries no probability wording in either language", () => {
     for (const language of ["tr", "en"] as const) {
       const { container, unmount } = renderControls(
-        `/league/members/${ENTRY}?mode=saf-puan&window=1&llm=on`,
+        `/league/352490/members/${ENTRY}?mode=saf-puan&window=1&llm=on`,
         SOLVED,
         language,
       );
@@ -100,7 +103,7 @@ describe("the manager's word switch", () => {
 
 describe("the manager's word switch, source and reason", () => {
   it("translates a member-level failure instead of printing the producer's text", () => {
-    const { container } = renderControls(`/league/members/${ENTRY}?mode=saf-puan&window=1`, {
+    const { container } = renderControls(`/league/352490/members/${ENTRY}?mode=saf-puan&window=1`, {
       available: false,
       reason: "not_solved_for_member",
     });
@@ -113,7 +116,7 @@ describe("the manager's word switch, source and reason", () => {
   it("labels any source other than a club-news capture as example data", () => {
     const fixtureFile = { ...SOLVED, source_kind: "fixture_file" } as EntryAdviceIndex["evidence"];
     const { container, unmount } = renderControls(
-      `/league/members/${ENTRY}?mode=saf-puan&window=1`,
+      `/league/352490/members/${ENTRY}?mode=saf-puan&window=1`,
       fixtureFile,
     );
     expect(container.textContent).toContain(MESSAGES.tr.leagueMembers.exampleData);
@@ -121,7 +124,7 @@ describe("the manager's word switch, source and reason", () => {
     unmount();
 
     const capture = { ...SOLVED, source_kind: "club_news_capture" } as EntryAdviceIndex["evidence"];
-    const real = renderControls(`/league/members/${ENTRY}?mode=saf-puan&window=1`, capture);
+    const real = renderControls(`/league/352490/members/${ENTRY}?mode=saf-puan&window=1`, capture);
     expect(real.container.textContent).not.toContain(MESSAGES.tr.leagueMembers.exampleData);
     expect(real.container.textContent).toContain(EVIDENCE_COPY.tr.sourceCapture);
   });

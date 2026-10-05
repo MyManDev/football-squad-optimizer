@@ -47,6 +47,7 @@ from squadopt.optimization.optimizer import (
 )
 from squadopt.optimization.validation import validate_players
 from squadopt.planning.acquisition import AcquisitionSales
+from squadopt.planning.chip_tail import ChipTailTable
 from squadopt.planning.models import (
     ChipAvailability,
     FirstWeekExclusion,
@@ -107,6 +108,7 @@ class _PlanArtifacts:
     hit_cost_scaled: int
     chip_vars: list[dict[str, cp_model.IntVar]]
     chips: ChipAvailability
+    chip_tail: ChipTailTable | None
 
 
 def _validated_week_tables(
@@ -189,6 +191,7 @@ def _validate_integer_bounds(
     hit_cost_scaled: int,
     banked_value_scaled: int,
     chips: ChipAvailability,
+    chip_tail: ChipTailTable | None = None,
 ) -> int:
     objective_bound = 0
     bank_bound = initial_state.bank_tenths
@@ -234,6 +237,14 @@ def _validate_integer_bounds(
         for name in chips.available
         for p in chips.windows_for(name)
     )
+    if chip_tail is not None:
+        objective_bound += discount_weights[-1] * max(
+            (
+                scale_expected_points(value, optimization_config.expected_points_scale)
+                for _, _, value in chip_tail.values
+            ),
+            default=0,
+        )
     if objective_bound > CP_SAT_SAFE_INTEGER_MAX:
         raise SolverExecutionError(
             "Transfer-plan objective exceeds the safe CP-SAT integer range; reduce the horizon, "
@@ -253,6 +264,7 @@ def _build_model(
     optimization_config: OptimizationConfig,
     transfer_config: TransferPlanningConfig,
     chips: ChipAvailability,
+    chip_tail: ChipTailTable | None = None,
 ) -> _PlanArtifacts:
     model = cp_model.CpModel()
     player_count = len(players_by_week[0])
@@ -303,6 +315,7 @@ def _build_model(
         hit_cost_scaled,
         banked_value_scaled,
         chips,
+        chip_tail,
     )
 
     squad_vars: list[list[cp_model.IntVar]] = []
@@ -466,16 +479,13 @@ def _build_model(
             optimization_config.squad_size,
             f"paid_transfers_gw{gameweek}",
         )
-        # Inequality form: paid transfers carry a negative objective weight, so the
-        # solver takes the smallest value the bounds allow — max(count - free, 0)
-        # without a wildcard, zero under one.
-        if rebuild_vars:
-            model.add(
-                paid_transfers
-                >= transfer_count - free_before - optimization_config.squad_size * rebuild
-            )
-        else:
-            model.add(paid_transfers >= transfer_count - free_before)
+        # Accounting must be exact even with a zero hit weight or a merely feasible
+        # incumbent. A rebuild makes the expression nonpositive because the number
+        # of transfers is bounded by squad_size, so WC/FH always pay zero hits.
+        model.add_max_equality(
+            paid_transfers,
+            [transfer_count - free_before - optimization_config.squad_size * rebuild, 0],
+        )
 
         bank_after = model.new_int_var(0, bank_bound, f"bank_after_gw{gameweek}")
         bank_before: cp_model.LinearExpr | int
@@ -589,6 +599,36 @@ def _build_model(
             held = 1 - cp_model.LinearExpr.sum(plays)
             objective_terms.append(discount_weights[-1] * holding_scaled * held)
     primary_objective = cp_model.LinearExpr.sum(objective_terms)
+    if chip_tail is not None:
+        # Each row is an exact joint future assignment for the used-right subset.
+        # The FH boundary bit prevents adjacent uses across the horizon boundary.
+        used_vars = []
+        for i, (name, dates) in enumerate(chip_tail.rights):
+            used = model.new_bool_var(f"tail_right_used_{i}")
+            model.add(
+                used
+                == cp_model.LinearExpr.sum(
+                    [
+                        week[name]
+                        for gw, week in zip(horizon_gameweeks, chip_vars, strict=True)
+                        if name in week and gw in dates
+                    ]
+                )
+            )
+            used_vars.append(used)
+        last_fh = chip_vars[-1].get("freehit")
+        if last_fh is None:
+            last_fh = model.new_bool_var("tail_last_fh")
+            model.add(last_fh == 0)
+        rows = [
+            [int(bool(mask & (1 << i))) for i in range(len(used_vars))]
+            + [fh, scale_expected_points(value, optimization_config.expected_points_scale)]
+            for mask, fh, value in chip_tail.values
+        ]
+        maximum = max((row[-1] for row in rows), default=0)
+        tail_value = model.new_int_var(0, maximum, "joint_chip_tail_value")
+        model.add_allowed_assignments([*used_vars, last_fh, tail_value], rows)
+        primary_objective += discount_weights[-1] * tail_value
     model.maximize(primary_objective)
     return _PlanArtifacts(
         model=model,
@@ -609,6 +649,7 @@ def _build_model(
         hit_cost_scaled=hit_cost_scaled,
         chip_vars=chip_vars,
         chips=chips,
+        chip_tail=chip_tail,
     )
 
 
@@ -893,6 +934,10 @@ def _extract_plan(
         for period in artifacts.chips.windows_for(name)
         if not any(played == name and gw in period.gameweeks for gw, played in chips_played.items())
     )
+    if artifacts.chip_tail is not None:
+        holding_value = artifacts.chip_tail.value(chips_played)
+        diagnostics["chip_tail_source_fingerprint"] = artifacts.chip_tail.source_fingerprint
+        diagnostics["chip_tail_fingerprint"] = artifacts.chip_tail.fingerprint
     diagnostics["terminal_chip_holding_value"] = holding_value * last_discount
     total_objective += holding_value * last_discount
     return TransferPlanResult(
@@ -1158,6 +1203,7 @@ def optimize_transfer_plan(
     fixed_week_squads: Mapping[int, tuple[object, ...]] | None = None,
     incumbent_plan: TransferPlanResult | None = None,
     protect_incumbent: bool = False,
+    chip_tail: ChipTailTable | None = None,
 ) -> TransferPlanResult:
     """Optimize squads and transfers over one deterministic projection horizon.
 
@@ -1239,6 +1285,17 @@ def optimize_transfer_plan(
     if incumbent_plan is not None and protect_hold:
         raise TransferPlanningValidationError("Incumbent and hold hints cannot be combined.")
     verified_horizon = horizon.validated_copy()
+    if chip_tail is not None and (
+        chip_tail.horizon_end != verified_horizon.gameweeks[-1]
+        or chip_tail.availability_fingerprint != availability.availability_fingerprint
+        or settings.chip_holding_value_points
+        or any(
+            p.holding_value_points not in (None, 0)
+            for n in availability.available
+            for p in availability.windows_for(n)
+        )
+    ):
+        raise TransferPlanningValidationError("Joint chip tail does not match unpriced rights.")
     players_by_week = _validated_week_tables(verified_horizon, optimization_config)
     initial_ids = _validate_initial_state(
         initial_state,
@@ -1253,6 +1310,7 @@ def optimize_transfer_plan(
         optimization_config,
         settings,
         availability,
+        chip_tail,
     )
     _fix_week_squads(artifacts, players_by_week, fixed_week_squads, optimization_config.squad_size)
     _forbid_squads(artifacts, players_by_week[0], excluded_squads, optimization_config.squad_size)

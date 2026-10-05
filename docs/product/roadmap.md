@@ -24,7 +24,7 @@ decision), released to `main` in #805 and first deployed as `site-2026-27-gw06-f
 36201155016), whose tree is `develop` at `ea2f0840`, with the published data unchanged.
 
 **Published with the week**, for every member, in the static tree
-(`web/public/data/league/advice/<entry>/index.json`; the GW6 decision was built from
+(`web/public/data/leagues/<league id>/advice/<entry>/index.json`; the GW6 decision was built from
 capture `fpl-live-20260922T214539Z-364991a4f832`):
 
 - The pure-points plan (`saf-puan`) at one, three and five weeks. Window plans are solved

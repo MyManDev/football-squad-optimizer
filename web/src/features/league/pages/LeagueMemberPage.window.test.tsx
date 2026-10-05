@@ -20,6 +20,7 @@ import { MESSAGES } from "../../../i18n/messages";
 import type { EntryAdvice, LeagueViewEnvelope } from "../types";
 import { LeagueMemberView } from "./LeagueMemberPage";
 import { isAdvicePayload } from "../advice/adviceShape";
+import { withLeague } from "../../../testSupport/league";
 
 afterEach(cleanup);
 
@@ -28,12 +29,16 @@ const ENTRY = 35249001;
 function renderAdvice(advice: LeagueViewEnvelope<EntryAdvice>, language: "tr" | "en" = "tr") {
   return render(
     <LanguageProvider initialLanguage={language}>
-      <MemoryRouter initialEntries={[`/league/members/${ENTRY}?window=${advice.payload.window}`]}>
-        <LeagueMemberView
-          index={mockEntryAdviceIndex(ENTRY).payload}
-          squad={mockEntrySquadEnvelopes[ENTRY]}
-          advice={advice}
-        />
+      <MemoryRouter
+        initialEntries={[`/league/352490/members/${ENTRY}?window=${advice.payload.window}`]}
+      >
+        {withLeague(
+          <LeagueMemberView
+            index={mockEntryAdviceIndex(ENTRY).payload}
+            squad={mockEntrySquadEnvelopes[ENTRY]}
+            advice={advice}
+          />,
+        )}
       </MemoryRouter>
     </LanguageProvider>,
   );
@@ -56,34 +61,36 @@ describe("the advice card shows a window week by week", () => {
     // The paid transfer's hit points and the last week's chip are on their rows.
     expect(within(rows[2]!).getByText("4")).toBeInTheDocument();
     expect(within(rows[3]!).getByText("Bench Boost")).toBeInTheDocument();
-    // What the window assumes is its own region now, beside every other plan's.
-    expect(screen.getByRole("region", { name: "Bu pencerenin varsaydıkları" })).toBeInTheDocument();
+    // What the window assumes is not listed on the page.
+    expect(screen.queryByRole("region", { name: "Bu pencerenin varsaydıkları" })).toBeNull();
     // The first week's moves and lineup still render above, unchanged in shape: the
     // eleven on the pitch, and the same week as a list one toggle away.
     expect(screen.getByRole("list", { name: MESSAGES.tr.squad.pitchLabel })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: MESSAGES.tr.leagueMembers.viewList }));
     expect(screen.getByRole("region", { name: "Bu haftaki kadron" })).toBeInTheDocument();
-    expect(screen.getByText("Kanıt tamamlanamadı")).toBeInTheDocument();
+    // The plan is FEASIBLE, and the page no longer says so.
+    expect(screen.queryByText("Kanıt tamamlanamadı")).toBeNull();
   });
 
-  it.each(["tr", "en"] as const)("translates each known published limit in %s", (language) => {
-    const advice = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 5);
-    const copy = MESSAGES[language].leagueMembers;
-    for (const sentence of WINDOW_STATED_LIMITS) {
-      expect(Object.hasOwn(copy.statedLimits, sentence), sentence).toBe(true);
-    }
-    renderAdvice(advice, language);
-    const section = screen.getByRole("region", { name: copy.windowTitle(5) });
-    const limits = screen.getByRole("region", { name: copy.windowLimitsLabel });
-    const items = within(limits).getAllByRole("listitem");
-    expect(items.map((item) => item.textContent)).toEqual(
-      WINDOW_STATED_LIMITS.map((sentence) => copy.statedLimits[sentence]),
-    );
-    expect(
-      within(section).getByRole("columnheader", { name: copy.windowHits }),
-    ).toBeInTheDocument();
-    if (language === "tr") expect(section).not.toHaveTextContent(/capture|\bhit\b/i);
-  });
+  it.each(["tr", "en"] as const)(
+    "lists none of the published limits on the page in %s",
+    (language) => {
+      const advice = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 5);
+      const copy = MESSAGES[language].leagueMembers;
+      const { container } = renderAdvice(advice, language);
+      const section = screen.getByRole("region", { name: copy.windowTitle(5) });
+      expect(container).not.toHaveTextContent(
+        /What this (?:plan|window) assumes|Bu (?:planın|pencerenin) varsaydıkları/,
+      );
+      for (const sentence of WINDOW_STATED_LIMITS) {
+        expect(container).not.toHaveTextContent(sentence);
+      }
+      expect(
+        within(section).getByRole("columnheader", { name: copy.windowHits }),
+      ).toBeInTheDocument();
+      if (language === "tr") expect(section).not.toHaveTextContent(/capture|\bhit\b/i);
+    },
+  );
 
   it.each([3, 5] as const)("expands each distinct planned lineup across %s weeks", (window) => {
     const advice = mockEntryAdviceEnvelope(ENTRY, "saf-puan", window);
@@ -118,7 +125,7 @@ describe("the advice card shows a window week by week", () => {
   });
 
   it.each(["tr", "en"] as const)(
-    "keeps unknown and inherited published limits neutral in %s",
+    "prints no published limit it has never seen in %s",
     (language) => {
       const base = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 3);
       const raw = [
@@ -132,19 +139,18 @@ describe("the advice card shows a window week by week", () => {
         ...base,
         payload: { ...base.payload, stated_limits: [...published] },
       };
-      renderAdvice(advice, language);
+      const { container } = renderAdvice(advice, language);
       const copy = MESSAGES[language].leagueMembers;
       const section = screen.getByRole("region", { name: copy.windowTitle(3) });
-      const limits = screen.getByRole("region", { name: copy.windowLimitsLabel });
-      const items = within(limits).getAllByRole("listitem");
-      expect(items.map((item) => item.textContent)).toEqual([
-        copy.statedLimits[WINDOW_STATED_LIMITS[0]!],
-        ...raw.map(() => copy.statedLimitUnknown),
-      ]);
-      for (const sentence of raw) expect(limits).not.toHaveTextContent(sentence);
+      expect(container).not.toHaveTextContent(
+        /What this (?:plan|window) assumes|Bu (?:planın|pencerenin) varsaydıkları/,
+      );
+      for (const sentence of [raw[0]!, raw[3]!]) {
+        expect(container).not.toHaveTextContent(sentence);
+      }
+      expect(container).not.toHaveTextContent(/No translated explanation|çevrilmiş bir açıklama/);
       expect(advice.payload.stated_limits).toEqual(published);
       expect(within(section).getByText(copy.windowWeekOf(2))).toBeInTheDocument();
-      expect(within(limits).getByText(copy.windowLimitsLabel)).toBeInTheDocument();
     },
   );
 
@@ -154,21 +160,17 @@ describe("the advice card shows a window week by week", () => {
   });
 
   it.each(["tr", "en"] as const)(
-    "still says the one-week plan was never offered a chip in %s",
+    "shows no assumptions under a one-week plan whose only limit is the chip one in %s",
     (language) => {
       const advice = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1);
-      const copy = MESSAGES[language].leagueMembers;
       expect(advice.payload.stated_limits).toEqual([NO_CHIP_STATED_LIMIT]);
       renderAdvice(advice, language);
 
-      // A one-week document names the plan, not a window nobody can see.
-      const limits = screen.getByRole("region", { name: copy.planLimitsLabel });
-      expect(
-        within(limits)
-          .getAllByRole("listitem")
-          .map((item) => item.textContent),
-      ).toEqual([copy.statedLimits[NO_CHIP_STATED_LIMIT]]);
-      expect(screen.queryByRole("region", { name: copy.windowLimitsLabel })).toBeNull();
+      // The sentence is still in the document; the page leaves it, and the empty heading, out.
+      expect(document.body).not.toHaveTextContent(
+        /What this (?:plan|window) assumes|Bu (?:planın|pencerenin) varsaydıkları/,
+      );
+      expect(document.body).not.toHaveTextContent(NO_CHIP_STATED_LIMIT);
     },
   );
 });

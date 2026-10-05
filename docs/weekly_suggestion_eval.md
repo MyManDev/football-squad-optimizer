@@ -90,7 +90,7 @@ The browser retains its identity and arithmetic checks in addition to this shape
 Both the legacy history fixture and the optional rows are covered on both sides.
 
 The existing league publisher writes derived JSON under
-`data/league/history/{entry_id}.json` with contract `weekly_suggestion_history_v1`.
+`data/leagues/<league id>/history/{entry_id}.json` with contract `weekly_suggestion_history_v1`.
 `history_record_root` allows preview runs to read existing records without writing
 new private advice records. Normal weekly publication supplies the same configured
 record root. This adds no API, solver job, model, scheduler or infrastructure service.

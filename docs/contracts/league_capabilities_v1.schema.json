@@ -32,7 +32,7 @@
           "additionalProperties": false,
           "properties": {
             "version": {
-              "const": "model_opportunity_reservation_v2"
+              "const": "dated_joint_opportunity_v3"
             },
             "windows": {
               "items": {

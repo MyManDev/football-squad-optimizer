@@ -7,6 +7,12 @@ import { MESSAGES } from "../src/i18n/messages";
 import { installLeagueMocks } from "./leagueMocks";
 import { mockSuggestionOverview } from "../src/fixtures/weeklySuggestionOverview";
 
+// Every test reads the example league, never the shipped tree: the history it routes is
+// read through the tree the gate finds, which moves when the site publishes a directory.
+test.beforeEach(async ({ page }) => {
+  await installLeagueMocks(page);
+});
+
 for (const language of ["tr", "en"] as const) {
   test(`recorded settings expand without inventing settled scores in ${language}`, async ({
     page,
@@ -42,7 +48,7 @@ for (const language of ["tr", "en"] as const) {
       route.fulfill({ json: historyDocument }),
     );
     await page.setViewportSize({ width: 375, height: 667 });
-    await page.goto("/league/members/101/history");
+    await page.goto("/league/352490/members/101/history");
     await page.getByRole("combobox").selectOption("4");
     const copy = MESSAGES[language].suggestionHistory;
     const details = page
@@ -79,14 +85,13 @@ for (const language of ["tr", "en"] as const) {
 test("member can open recorded history and inspect the Python-scored result on mobile", async ({
   page,
 }, testInfo) => {
-  await installLeagueMocks(page);
   const historyDocument = structuredClone(fixture);
   historyDocument.payload.entry_id = 35249001;
   await page.route("**/data/league/history/35249001.json", (route) =>
     route.fulfill({ json: historyDocument }),
   );
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/league/members/35249001");
+  await page.goto("/league/352490/members/35249001");
   await page.getByRole("link", { name: "Haftalık öneri geçmişi" }).click();
   await expect(page).toHaveURL(/\/35249001\/history$/);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Haftalık öneri geçmişi");
@@ -121,7 +126,7 @@ test("unsettled, missing and invalid publications never display an invented comp
     outcome_captured_at_utc: null,
   });
   await page.route("**/data/league/history/101.json", (route) => route.fulfill({ json: pending }));
-  await page.goto("/league/members/101/history");
+  await page.goto("/league/352490/members/101/history");
   await page.getByRole("combobox", { name: "Kayıtlı hafta" }).selectOption("4");
   await expect(page.getByText("Sonuç kesinleşmedi", { exact: true })).toBeVisible();
   await expect(page.getByRole("table")).toHaveCount(0);
@@ -147,7 +152,7 @@ test("overview accumulates weeks, preserves totals while scrolling and opens wee
   await page.route("**/data/league/history/101.json", (route) =>
     route.fulfill({ json: mockSuggestionOverview() }),
   );
-  await page.goto("/league/members/101/history");
+  await page.goto("/league/352490/members/101/history");
   const overview = page.getByRole("region", { name: "Genel bakış" });
   await expect(overview.getByRole("row", { name: /^Toplam/ })).toContainText("624,0");
   await expect(overview.getByRole("row", { name: /^Toplam/ })).toContainText("610,0");

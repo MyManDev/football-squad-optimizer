@@ -28,6 +28,7 @@ import type {
   LeagueViewEnvelope,
 } from "../types";
 import { LeagueMemberView } from "./LeagueMemberPage";
+import { withLeague } from "../../../testSupport/league";
 
 afterEach(cleanup);
 
@@ -101,13 +102,15 @@ function renderPage(
 ) {
   return render(
     <LanguageProvider initialLanguage={language}>
-      <MemoryRouter initialEntries={[`/league/members/${ENTRY}?${query}`]}>
-        <LeagueMemberView
-          squad={mockEntrySquadEnvelopes[ENTRY]}
-          advice={advice}
-          members={mockLeagueMembersEnvelope.payload.members}
-          index={INDEX}
-        />
+      <MemoryRouter initialEntries={[`/league/352490/members/${ENTRY}?${query}`]}>
+        {withLeague(
+          <LeagueMemberView
+            squad={mockEntrySquadEnvelopes[ENTRY]}
+            advice={advice}
+            members={mockLeagueMembersEnvelope.payload.members}
+            index={INDEX}
+          />,
+        )}
       </MemoryRouter>
     </LanguageProvider>,
   );
@@ -182,9 +185,9 @@ describe("the manager's word on the advice card", () => {
       expected_points_cost: 1.5,
     });
     delete advice.payload.expected_points_cost_ceiling;
-    for (const [language, price, gap] of [
-      ["en", "1.5", "2.5"],
-      ["tr", "1,5", "2,5"],
+    for (const [language, price] of [
+      ["en", "1.5"],
+      ["tr", "1,5"],
     ] as const) {
       const { container, unmount } = renderPage(language, advice);
       const section = sectionText(container);
@@ -193,7 +196,10 @@ describe("the manager's word on the advice card", () => {
       expect(section).not.toContain(EVIDENCE_COPY[language].changed);
       expect(text).not.toContain(EVIDENCE_COPY[language].cost(price));
       expect(text).not.toContain(EVIDENCE_COPY[language].costAtMost(price));
-      expect(text).toContain(MESSAGES[language].leagueMembers.controlUnprovenBody(gap));
+      // The page no longer explains the missing price with the control's proof gap.
+      expect(text).not.toMatch(
+        language === "en" ? /was not proven optimal/ : /en iyi diye kanıtlanamadı/,
+      );
       unmount();
     }
   });
@@ -296,7 +302,8 @@ describe("the manager's word on the advice card", () => {
     const { container } = renderPage("en", advice);
     const text = container.textContent ?? "";
     expect(text).toContain(EVIDENCE_COPY.en.moveReason);
-    expect(text).toContain(MESSAGES.en.leagueMembers.pointsGainReason);
+    // The move chosen for points alone carries no caption; the word's move keeps its own.
+    expect(container.querySelectorAll('[class*="reason"]')).toHaveLength(1);
     expect(text.split(EVIDENCE_COPY.en.moveReason).length - 1).toBe(1);
     expect(text).not.toMatch(AS_A_CHANCE);
   });

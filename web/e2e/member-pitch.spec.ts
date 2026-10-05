@@ -109,7 +109,7 @@ async function open(page: Page, width: number, height: number, plan = PLAN, live
     );
   await page.route("**/api/v1/**", (route) => route.abort("connectionrefused"));
   await page.addInitScript(() => localStorage.setItem("squadopt.language", "tr"));
-  await page.goto(`/league/members/${ENTRY}`);
+  await page.goto(`/league/352490/members/${ENTRY}`);
   await expect(
     page.getByRole("heading", { name: copy.leagueMembers.squadAfterTitle }),
   ).toBeVisible();
@@ -364,16 +364,15 @@ test("the plan link reveals a compact phone decision with its stamp beside the t
   };
   await page.getByRole("link", { name: copy.leagueMembers.viewPlan, exact: true }).click();
   await expect(page).toHaveURL(/#entry-advice-title$/);
-  // After the explicit jump, transfer facts and caveats still fit one phone viewport.
+  // After the explicit jump, the boards and the transfer facts still fit one phone viewport.
   expect(await bottom(boards.nth(1))).toBeLessThanOrEqual(548);
-  // The captain line is the paragraph that names the vice-captain too (the gain's caption
-  // also says 'kaptan').
+  // The captain line is the paragraph that names the vice-captain too (a gain sentence
+  // can also say 'kaptan').
   const captain = decision.locator("p").filter({
     has: page.getByText(copy.leagueMembers.viceCaptainLabel, { exact: true }),
   });
   expect(await bottom(captain)).toBeLessThanOrEqual(548);
   const stamp = decision.getByText(copy.leagueMembers.stampOptimal, { exact: true });
-  const caption = decision.getByText(copy.leagueMembers.stampOptimalCaption, { exact: true });
   // When a runner draws the page taller than this machine does, say where: the bottom of
   // every block above the stamp, so a failure names the block that grew.
   const layout = await page.evaluate(() => {
@@ -390,7 +389,7 @@ test("the plan link reveals a compact phone decision with its stamp beside the t
       : [];
     return { phoneBar: at("body header"), topBar: at("main header"), blocks };
   });
-  expect(await bottom(caption), JSON.stringify(layout)).toBeLessThanOrEqual(664);
+  expect(await bottom(stamp), JSON.stringify(layout)).toBeLessThanOrEqual(664);
   expect(await bottom(page.locator('[data-mark="honesty"]'))).toBeLessThanOrEqual(844);
   // The stamp stands beside the week's transfer facts, as the artboard draws it, after the
   // captain line and the gain figure.
@@ -406,6 +405,31 @@ test("the plan link reveals a compact phone decision with its stamp beside the t
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: testInfo.outputPath("member-390.png") });
 });
+
+for (const width of [320, 360, 375]) {
+  test(`under 390 px the transfer facts take the row under the stamp at ${width}`, async ({
+    page,
+  }) => {
+    await open(page, width, 800, twoMoves(), true);
+    const decision = page.locator('[data-mark="decision"]');
+    const stamp = decision.locator("p[data-stamp]");
+    const facts = decision.locator("ul").filter({ hasText: copy.leagueMembers.hitPointsFact("0") });
+    const stampBox = (await stamp.boundingBox())!;
+    const factsBox = (await facts.boundingBox())!;
+    // Beside the stamp there is no room for a fact on one line, so the facts sit under it.
+    expect(factsBox.y).toBeGreaterThanOrEqual(stampBox.y + stampBox.height);
+    const items = facts.locator("li");
+    await expect(items).not.toHaveCount(0);
+    for (const item of await items.all()) {
+      // One 16 px line each: nothing wraps inside a fact.
+      expect((await item.boundingBox())!.height).toBeLessThanOrEqual(17);
+    }
+    expect(stampBox.x + stampBox.width).toBeLessThanOrEqual(width);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+  });
+}
 
 for (const [width, height] of [
   [1440, 900],

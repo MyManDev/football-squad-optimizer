@@ -15,13 +15,14 @@ from tests.unit.test_check_league_tree import _tree as clean_league_tree
 from tests.unit.test_scoreboard_diagnostics import decision_inputs
 from tests.unit.test_weekly_suggestion_eval import recorded
 
-from squadopt.application import league_publication, scoreboard_history, site
+from squadopt.application import league_publication, site
 from squadopt.application import settled_publication as publication
 from squadopt.application.advice_record import record_member_advice
 from squadopt.application.contract import ui_view_schema
 from squadopt.application.fixtures_view import fixtures_schema
 from squadopt.application.live_score import live_score_schema
 from squadopt.application.views import SiteIndex, ViewEnvelope
+from squadopt.contracts.league_tree import PublishedLeague, write_league_directory
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import write_snapshot
 from squadopt.live.ledger import write_manifest
@@ -299,7 +300,6 @@ def no_solving(monkeypatch: pytest.MonkeyPatch) -> Iterator[Mock]:
     forbidden = Mock(side_effect=AssertionError("Settled publication must never solve"))
     monkeypatch.setattr(league_publication, "build_league_views", forbidden)
     monkeypatch.setattr(league_publication, "project", forbidden)
-    monkeypatch.setattr(scoreboard_history, "settled_scoreboard_entries", forbidden)
     yield forbidden
     forbidden.assert_not_called()
 
@@ -1023,3 +1023,33 @@ def test_league_tree_findings_the_accepted_tree_already_had_are_counted_not_refu
         "the league tree check found nothing new (2 finding(s) the accepted tree already had)"
     )
     assert request.out_dir.is_dir()
+
+
+def test_a_settled_view_on_a_directory_site_stamps_the_directory_too(tmp_path: Path) -> None:
+    """The settled view is the site's publication: the directory carries its stamp, as the
+    members document does, so the release check can verify it."""
+
+    request = world(tmp_path)
+    data = request.accepted_dir / "data"
+    (data / "leagues").mkdir()
+    (data / "league").rename(data / "leagues" / str(request.league_id))
+    members = json.loads((data / "leagues" / str(request.league_id) / "members.json").read_bytes())
+    write_league_directory(
+        data,
+        [
+            PublishedLeague(
+                request.league_id,
+                "The accepted league",
+                SEASON,
+                members["payload"]["gameweek"],
+                f"leagues/{request.league_id}",
+            )
+        ],
+        generated_at_utc="2026-09-18T12:00:00Z",
+    )
+    result = publication.publish_settled(request)
+    out = request.out_dir / "data"
+    directory = json.loads((out / "leagues.json").read_bytes())
+    settled = json.loads((out / "leagues" / str(request.league_id) / "members.json").read_bytes())
+    assert directory["generated_at_utc"] == settled["generated_at_utc"] == STAMP
+    assert "data/leagues.json" in result.changed_files

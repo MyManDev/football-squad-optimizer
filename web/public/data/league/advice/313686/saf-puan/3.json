@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-22T22:04:06Z",
+  "generated_at_utc": "2026-10-02T16:56:19Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "saf-puan",
     "window": 3,
-    "source_snapshot_id": "fpl-live-20260922T214539Z-364991a4f832",
+    "source_snapshot_id": "fpl-live-20261002T104314Z-8b70515b9b31",
     "moves": [
       {
         "move_id": "gw06-1",
@@ -38,7 +38,7 @@
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
     "wall_clock_stopped_the_search": false,
-    "expected_own_points": 55.530565924738845,
+    "expected_own_points": 55.61573888016367,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
@@ -53,7 +53,7 @@
       "short_name": "Fernandes",
       "position": "MID",
       "team": "Man Utd",
-      "expected_points": 6.34884146494046
+      "expected_points": 6.348841464940458
     },
     "starting_xi": [
       {
@@ -62,7 +62,7 @@
         "short_name": "Verbruggen",
         "position": "GK",
         "team": "Brighton",
-        "expected_points": 2.7749400703238445
+        "expected_points": 2.7749400703238383
       },
       {
         "player_id": 466075,
@@ -70,7 +70,7 @@
         "short_name": "Calafiori",
         "position": "DEF",
         "team": "Arsenal",
-        "expected_points": 3.5501706966178403
+        "expected_points": 3.5501706966178355
       },
       {
         "player_id": 465730,
@@ -78,7 +78,7 @@
         "short_name": "Cuyper",
         "position": "DEF",
         "team": "Brighton",
-        "expected_points": 3.3044915452412056
+        "expected_points": 3.347197728858024
       },
       {
         "player_id": 108416,
@@ -86,7 +86,7 @@
         "short_name": "Egan",
         "position": "DEF",
         "team": "Hull City",
-        "expected_points": 2.8021451627567417
+        "expected_points": 2.802145162756736
       },
       {
         "player_id": 141746,
@@ -94,7 +94,7 @@
         "short_name": "Fernandes",
         "position": "MID",
         "team": "Man Utd",
-        "expected_points": 6.34884146494046
+        "expected_points": 6.348841464940458
       },
       {
         "player_id": 223340,
@@ -102,7 +102,7 @@
         "short_name": "Saka",
         "position": "MID",
         "team": "Arsenal",
-        "expected_points": 5.325630193013578
+        "expected_points": 5.3256301930135725
       },
       {
         "player_id": 222531,
@@ -110,7 +110,7 @@
         "short_name": "Gibbs-White",
         "position": "MID",
         "team": "Nott'm Forest",
-        "expected_points": 4.355573252110645
+        "expected_points": 4.3555732521106405
       },
       {
         "player_id": 60307,
@@ -118,7 +118,7 @@
         "short_name": "Gro\u00df",
         "position": "MID",
         "team": "Brighton",
-        "expected_points": 4.118277294857414
+        "expected_points": 4.1182772948574105
       },
       {
         "player_id": 424876,
@@ -126,7 +126,7 @@
         "short_name": "Szoboszlai",
         "position": "MID",
         "team": "Liverpool",
-        "expected_points": 3.901377512814318
+        "expected_points": 3.9013775128143147
       },
       {
         "player_id": 223094,
@@ -142,7 +142,7 @@
         "short_name": "Barry",
         "position": "FWD",
         "team": "Everton",
-        "expected_points": 3.0513783243690957
+        "expected_points": 3.0938450961771364
       }
     ],
     "bench": [
@@ -152,7 +152,7 @@
         "short_name": "Palmer",
         "position": "GK",
         "team": "Ipswich Town",
-        "expected_points": 0.10027015579447168
+        "expected_points": 0.10027015579447286
       },
       {
         "player_id": 199798,
@@ -160,7 +160,7 @@
         "short_name": "Ngoyo",
         "position": "DEF",
         "team": "Arsenal",
-        "expected_points": 2.6329333748184625
+        "expected_points": 2.6329333748184527
       },
       {
         "player_id": 551210,
@@ -168,7 +168,7 @@
         "short_name": "Hato",
         "position": "DEF",
         "team": "Chelsea",
-        "expected_points": 1.3889801344805965
+        "expected_points": 1.3889801344806005
       },
       {
         "player_id": 631786,
@@ -176,7 +176,7 @@
         "short_name": "Kusi-Asare",
         "position": "FWD",
         "team": "Fulham",
-        "expected_points": 0.10433696207867839
+        "expected_points": 0.10433696207867905
       }
     ],
     "chip": null,
@@ -205,7 +205,7 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 55.530565924738845
+        "expected_points": 55.61573888016366
       },
       {
         "gameweek": 7,
@@ -220,18 +220,18 @@
         ],
         "transfers_out": [
           {
-            "player_id": 112520,
-            "name": "Alex Palmer",
-            "short_name": "Palmer",
+            "player_id": 489639,
+            "name": "Bart Verbruggen",
+            "short_name": "Verbruggen",
             "position": "GK",
-            "team": "Ipswich Town"
+            "team": "Brighton"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 56.095903553133525
+        "expected_points": 56.22424373934216
       },
       {
         "gameweek": 8,
@@ -257,7 +257,7 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 56.50700032144087
+        "expected_points": 56.6353405076495
       }
     ],
     "stated_limits": [
@@ -265,7 +265,8 @@
       "Availability is applied once, from the capture: injuries, rotation and suspensions after it are not seen.",
       "Every week inside the window, the first included, is capped at one transfer (a wildcard week excepted); the one-week plan has no such cap.",
       "Prices are held at the captured values; no price change is modelled.",
-      "No chip is offered inside the window. A finite window counts nothing for holding a chip back, so a planner that could reach one would spend it; chip timing is a season-long decision this window cannot price."
+      "No chip is offered inside the window. A finite window counts nothing for holding a chip back, so a planner that could reach one would spend it; chip timing is a season-long decision this window cannot price.",
+      "The current model was trained on seasons that awarded no defensive-contribution (DEFCON) points, so it does not forecast those points."
     ],
     "data_quality": "partial",
     "missing_fields": [

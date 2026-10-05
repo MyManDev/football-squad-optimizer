@@ -18,7 +18,9 @@ directory and read back through the store.
 
 import hashlib
 import json
+from dataclasses import replace
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 import pytest
@@ -35,10 +37,11 @@ from tests.fixtures.synthetic_rotation_capture import (
 
 from squadopt.application.rotation_export import (
     RotationExportRequest,
+    _inputs_from_capture,
     export_rotation_evidence,
 )
 from squadopt.data.errors import DataError, DataSourceError, InvalidValueError
-from squadopt.data.snapshots import write_snapshot
+from squadopt.data.snapshots import read_snapshot, write_snapshot
 from squadopt.data.sources.club_news import (
     ClaimResponse,
     ClubNewsError,
@@ -317,16 +320,16 @@ def test_the_manifest_lists_every_response_the_capture_held(tmp_path: Path) -> N
     assert manifest["response_sha256s"] == sorted(manifest["response_sha256s"])
 
 
-def test_a_claim_on_a_club_with_no_recorded_response_refuses_the_week(tmp_path: Path) -> None:
-    """R07's wrong club/player case, from the capture side.
-
-    The capture codes Arsenal only, while the response it stores places claims on Man Utd
-    players too. A disposition whose response cannot be named is traceable to no bytes, so
-    the week refuses rather than borrowing Arsenal's digest for a United player.
-    """
-
-    with pytest.raises(DataSourceError, match="Man Utd"):
-        _export(tmp_path, from_capture=True, coded=_coded(("Arsenal",)))
+def test_a_claim_on_a_club_with_no_recorded_response_costs_only_that_claim(
+    tmp_path: Path,
+) -> None:
+    """An Arsenal response cannot borrow United's held documents or discard Arsenal's claims."""
+    table = _export(tmp_path, from_capture=True, coded=_coded(("Arsenal",))).set_index("player_id")
+    assert table.loc[list(_players_of("Arsenal")), "rotation_claim_observed"].any()
+    united = table.loc[list(_players_of("Man Utd"))]
+    assert not united.rotation_claim_observed.any()
+    assert not united.rotation_claim_unresolved.any()
+    assert united.model_response_sha256.isna().all()
 
 
 # --- the refusals -----------------------------------------------------------
@@ -563,6 +566,138 @@ def test_a_format_breach_still_refuses_the_whole_response(tmp_path: Path) -> Non
         _export(tmp_path, from_capture=True, coded=coded)
 
 
+def test_one_claim_the_parser_refuses_costs_that_claim_and_not_the_week(tmp_path: Path) -> None:
+    """The same rule one step later: the quote locates, and the parser refuses the claim.
+
+    A label the response's contract does not have is refused for that claim. Before, it
+    refused the whole response, and every club it coded lost its week of evidence.
+    """
+
+    name, player_id = _claimed_player()
+    fixture = json.loads(CodingFixture(CODING_FIXTURE).response().text)
+    (claim,) = (entry for entry in fixture["claims"] if entry["player_name"] == name)
+    claim["disposition"] = "stated_full_match_unavailable"
+    response = ClaimResponse(
+        text=json.dumps(fixture, ensure_ascii=False),
+        model_identifier="synthetic-stub",
+        model_version="fixture-1",
+    )
+    coded = tuple(
+        CodedClub(
+            club=club,
+            response=response,
+            prompt_contract_version=LEGACY_ROTATION_CLAIM_CODING_CONTRACT_VERSION,
+            prompt_sha256=coding_prompt_sha256(
+                contract_version=LEGACY_ROTATION_CLAIM_CODING_CONTRACT_VERSION
+            ),
+        )
+        for club in FixtureClubNewsProvider(FIXTURE).clubs_covered()
+    )
+
+    whole = _export(tmp_path / "whole", from_capture=True).set_index("player_id")
+    damaged = _export(tmp_path / "damaged", from_capture=True, coded=coded).set_index("player_id")
+
+    row = damaged.loc[player_id]
+    assert bool(row["rotation_claim_unresolved"]) is True
+    assert bool(row["rotation_claim_observed"]) is False
+    assert pd.isna(row["rotation_disposition"])
+    columns = [*CLAIM_COLUMNS[1:-1], "rotation_claim_unresolved"]
+    pd.testing.assert_frame_equal(
+        damaged.drop(index=player_id)[columns], whole.drop(index=player_id)[columns]
+    )
+
+
+def _one_call_per_club(damage: dict[str, object] | None = None) -> tuple[CodedClub, ...]:
+    """Arsenal and Man Utd each answered by their own call, Arsenal's optionally damaged."""
+
+    responses = {club: json.loads(_response_for(club).text) for club in ("Arsenal", "Man Utd")}
+    if damage is not None:
+        responses["Arsenal"].update(damage)
+    return tuple(
+        CodedClub(
+            club=club,
+            response=ClaimResponse(
+                text=json.dumps(responses[club], ensure_ascii=False),
+                model_identifier="synthetic-stub",
+                model_version="fixture-1",
+            ),
+            prompt_contract_version=LEGACY_ROTATION_CLAIM_CODING_CONTRACT_VERSION,
+            prompt_sha256=coding_prompt_sha256(
+                contract_version=LEGACY_ROTATION_CLAIM_CODING_CONTRACT_VERSION
+            ),
+        )
+        for club in ("Arsenal", "Man Utd")
+    )
+
+
+def _summary(tmp_path: Path, coded: tuple[CodedClub, ...]) -> tuple[Any, pd.DataFrame, Any]:
+    root = tmp_path / "snapshots"
+    decision = _decision(root)
+    news = _news_capture(root, coded=coded)
+    summary = export_rotation_evidence(
+        RotationExportRequest(
+            SEASON,
+            TARGET_GAMEWEEK,
+            DEADLINE,
+            decision,
+            root,
+            None,
+            tmp_path / "out",
+            club_news_snapshot=news,
+            table_name="table",
+        ),
+        repository_commit=COMMIT,
+    )
+    table = pd.read_csv(tmp_path / "out" / "table.csv").set_index("player_id")
+    manifest = json.loads((tmp_path / "out" / "table.manifest.json").read_text(encoding="utf-8"))
+    return summary, table, manifest
+
+
+def test_one_club_answer_the_reader_refuses_costs_that_club_and_not_the_week(
+    tmp_path: Path,
+) -> None:
+    """Two claims about one player refuse the response; with a call per club that is one club.
+
+    The parser has no rule for choosing between two answers about a player, so it refuses
+    the response they came in. That used to end the export, and United's readable answer
+    was lost with Arsenal's. Now Arsenal leaves the covered list, United's rows are exactly
+    what they are in a clean week, and the refusal is returned with its reason.
+    """
+
+    clean_summary, clean, _ = _summary(tmp_path / "clean", _one_call_per_club())
+    arsenal = json.loads(_response_for("Arsenal").text)
+    twice = [*arsenal["claims"], dict(arsenal["claims"][0])]
+
+    summary, table, manifest = _summary(tmp_path / "damaged", _one_call_per_club({"claims": twice}))
+
+    assert clean_summary["responses_refused"] == []
+    (refusal,) = summary["responses_refused"]
+    assert refusal["clubs"] == ["Arsenal"]
+    assert "twice" in refusal["reason"]
+    assert manifest["clubs_covered"] == ["Man Utd"]
+    assert "Arsenal" in manifest["clubs_declared"]
+    arsenal_rows = table.loc[list(_players_of("Arsenal"))]
+    assert not arsenal_rows.club_source_covered.any()
+    assert not arsenal_rows.rotation_claim_observed.any()
+    united = list(_players_of("Man Utd"))
+    # Everything a claim puts in a row, and the coverage flags. The capture's own id is in
+    # other columns and differs between the two weeks by construction.
+    columns = [*CLAIM_COLUMNS[1:-1], "rotation_claim_unresolved", "club_source_covered"]
+    pd.testing.assert_frame_equal(table.loc[united, columns], clean.loc[united, columns])
+    assert table.loc[united, "rotation_claim_observed"].any()
+
+
+def test_a_week_whose_every_answer_is_refused_is_still_refused(tmp_path: Path) -> None:
+    """With nothing left to narrow, the reader's own refusal is raised as it was."""
+
+    arsenal = json.loads(_response_for("Arsenal").text)
+    twice = [*arsenal["claims"], dict(arsenal["claims"][0])]
+    (only_arsenal, _united) = _one_call_per_club({"claims": twice})
+
+    with pytest.raises(ClubNewsError, match="twice"):
+        _summary(tmp_path, (only_arsenal,))
+
+
 def test_a_club_whose_every_claim_lost_its_citation_is_no_longer_covered(
     tmp_path: Path,
 ) -> None:
@@ -607,3 +742,116 @@ def test_a_club_whose_every_claim_lost_its_citation_is_no_longer_covered(
     flagged = set(table.index[table["rotation_claim_unresolved"].fillna(False)])
     assert flagged, "the club's claims all failed, so somebody must be flagged"
     assert flagged <= set(_players_of(club))
+
+
+def _coded_responses(responses: dict[str, dict]) -> tuple[CodedClub, ...]:
+    return tuple(
+        replace(
+            entry,
+            response=ClaimResponse(
+                text=json.dumps(responses[entry.club], ensure_ascii=False),
+                model_identifier="synthetic-stub",
+                model_version="fixture-1",
+            ),
+        )
+        for entry in _coded()
+    )
+
+
+def test_opponent_unlocatable_mention_cannot_remove_a_quiet_clubs_coverage(tmp_path: Path):
+    responses = {club: json.loads(_response_for(club).text) for club in ("Arsenal", "Man Utd")}
+    mention = dict(responses["Man Utd"]["claims"][0])
+    mention["source_url"] = responses["Arsenal"]["claims"][0]["source_url"]
+    mention["quote"] = "This opponent quote does not occur in the held document."
+    responses["Arsenal"]["claims"].append(mention)
+    responses["Man Utd"]["claims"] = []
+
+    table = _export(tmp_path, from_capture=True, coded=_coded_responses(responses)).set_index(
+        "player_id"
+    )
+    united = table.loc[list(_players_of("Man Utd"))]
+    assert united.club_source_covered.all()
+    assert not united.rotation_claim_observed.any()
+    assert not united.rotation_claim_unresolved.any()
+    assert table.loc[list(_players_of("Arsenal")), "rotation_claim_observed"].any()
+    manifest = json.loads((tmp_path / "out" / "table.manifest.json").read_text(encoding="utf-8"))
+    assert "Man Utd" in manifest["clubs_covered"]
+
+
+@pytest.mark.parametrize("quiet", [False, True])
+def test_per_club_response_cannot_borrow_another_calls_real_citation(tmp_path: Path, quiet):
+    responses = {club: json.loads(_response_for(club).text) for club in ("Arsenal", "Man Utd")}
+    borrowed = dict(responses["Man Utd"]["claims"][0])
+    borrowed["disposition"] = "stated_expected_absent"
+    if quiet:
+        responses["Man Utd"]["claims"] = []
+    baseline = _export(
+        tmp_path / "baseline", from_capture=True, coded=_coded_responses(responses)
+    ).set_index("player_id")
+    # The copied URL, quote and dateline are all genuine held United evidence; only the
+    # producing response is wrong. They must never acquire United's unrelated response hash.
+    responses["Arsenal"]["claims"].append(borrowed)
+    responses["Arsenal"]["documents"].extend(responses["Man Utd"]["documents"])
+    coded = _coded_responses(responses)
+    table = _export(tmp_path / "borrowed", from_capture=True, coded=coded).set_index("player_id")
+    columns = [*CLAIM_COLUMNS[1:], "rotation_claim_unresolved"]
+    pd.testing.assert_frame_equal(table[columns], baseline[columns])
+    united = table.loc[list(_players_of("Man Utd"))]
+    assert united.club_source_covered.all()
+    if quiet:
+        assert united.model_response_sha256.isna().all()
+    else:
+        own = next(entry for entry in coded if entry.club == "Man Utd")
+        expected = hashlib.sha256(own.response.text.encode("utf-8")).hexdigest()
+        assert set(united.model_response_sha256.dropna()) == {expected}
+
+
+@pytest.mark.parametrize("citation", ["unknown", "foreign"])
+@pytest.mark.parametrize("response_club", ["Arsenal", "Man Utd"])
+def test_bad_citation_diagnostics_follow_the_responding_club(
+    tmp_path: Path, citation: str, response_club: str
+) -> None:
+    responses = {club: json.loads(_response_for(club).text) for club in ("Arsenal", "Man Utd")}
+    mention = dict(responses["Arsenal"]["claims"][0])
+    mention["source_url"] = (
+        "https://example.invalid/not-fetched"
+        if citation == "unknown"
+        else responses["Man Utd"]["claims"][0]["source_url"]
+    )
+    mention["quote"] = "This quote does not occur in any held document."
+    for response in responses.values():
+        response["claims"] = []
+    responses[response_club]["claims"] = [mention]
+
+    table = _export(tmp_path, from_capture=True, coded=_coded_responses(responses)).set_index(
+        "player_id"
+    )
+    own_response = response_club == "Arsenal"
+    arsenal = table.loc[list(_players_of("Arsenal"))]
+    united = table.loc[list(_players_of("Man Utd"))]
+    assert int(arsenal.rotation_claim_unresolved.sum()) == int(own_response)
+    assert arsenal.club_source_covered.eq(not own_response).all()
+    assert united.club_source_covered.all()
+    assert not united.rotation_claim_unresolved.any()
+    assert not table.rotation_claim_observed.any()
+    assert table.rotation_disposition.isna().all()
+    manifest = json.loads((tmp_path / "out" / "table.manifest.json").read_text(encoding="utf-8"))
+    assert ("Arsenal" in manifest["clubs_covered"]) is not own_response
+    assert "Man Utd" in manifest["clubs_covered"]
+
+
+def test_response_binding_preserves_the_actual_failed_citation(tmp_path: Path) -> None:
+    responses = {club: json.loads(_response_for(club).text) for club in ("Arsenal", "Man Utd")}
+    claim = responses["Arsenal"]["claims"][0]
+    unknown_url = "https://example.invalid/actual-failed-url"
+    claim["source_url"] = unknown_url
+    responses["Arsenal"]["claims"] = [claim]
+    snapshot_id = _news_capture(tmp_path, coded=_coded_responses(responses))
+
+    inputs = _inputs_from_capture(read_snapshot(tmp_path, snapshot_id))
+
+    (dropped,) = inputs.unverifiable
+    assert dropped.source_url == unknown_url
+    assert unknown_url in dropped.why
+    assert "not among the fetched documents" in dropped.why
+    assert inputs.unverifiable_response_clubs == {dropped: frozenset({"Arsenal"})}

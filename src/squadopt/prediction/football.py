@@ -23,9 +23,13 @@ from sklearn.pipeline import make_pipeline  # type: ignore[import-untyped]
 from sklearn.preprocessing import StandardScaler  # type: ignore[import-untyped]
 
 from squadopt.prediction.football_features import FEATURES, TEAM_FEATURES
+from squadopt.prediction.football_minutes_role import JointRoleMinutes, RetainedHistoryRoleMinutes
 
 FOOTBALL_MODEL_VERSION = "football_team_share_v1"
 ROLE_MODEL_VERSION = "football_team_share_role_transition_v2"
+JOINT_ROLE_MODEL_VERSION = "football_joint_role_minutes_v1"
+JOINT_ROLE_RETAINED_HISTORY_MODEL_VERSION = "football_joint_role_retained_history_v1"
+JOINT_ROLE_MODEL_VERSIONS = (JOINT_ROLE_MODEL_VERSION, JOINT_ROLE_RETAINED_HISTORY_MODEL_VERSION)
 Array = npt.NDArray[np.float64]
 
 
@@ -224,3 +228,107 @@ class FixtureFootballModel:
             raise ValueError("Nonfinite football forecast.")
         result["model_version"] = ROLE_MODEL_VERSION if role_steps else FOOTBALL_MODEL_VERSION
         return result
+
+
+class JointRoleFootballModel(FixtureFootballModel):
+    """Explicit candidate: one role-minute law drives every existing scoring head.
+
+    The frozen v1 path above is unchanged. Its appearance, team-strength, per-90
+    attacking and defensive, and per-appearance residual heads are retained; only
+    the conditional exposure distribution changes. Captured eligibility is not
+    applied here and remains a single later reader operation, like the v1 model.
+    """
+
+    model_version = JOINT_ROLE_MODEL_VERSION
+    role_minutes_type = JointRoleMinutes
+
+    def __init__(self, train: pd.DataFrame, history: pd.DataFrame, *, cutoff: pd.Timestamp):
+        super().__init__(train, history, cutoff=cutoff)
+        self.role_minutes = self.role_minutes_type(train, cutoff=cutoff)
+
+    @property
+    def role_metadata(self) -> dict[str, object]:
+        return self.role_minutes.metadata
+
+    def predict(self, target: pd.DataFrame, *, role_steps: int = 0) -> pd.DataFrame:
+        if role_steps:
+            raise ValueError("Joint role minutes do not apply the rejected role transition.")
+        result = super().predict(target)
+        baseline = result[[f"minute_probability_{b}" for b in range(4)]].to_numpy(float)
+        state = self.role_minutes.predict(
+            target, baseline_probabilities=baseline, baseline_minutes=self.minute_means
+        )
+        if state.supported:
+            probabilities, means = state.collapsed()
+            minutes = state.expected_minutes
+            result["expected_minutes"] = minutes
+            result["appearance_probability"] = state.appearance
+            result["p60"] = state.p60
+            for b in range(4):
+                result[f"minute_probability_{b}"] = probabilities[:, b]
+                result[f"minute_value_{b}"] = means[:, b]
+            for head, column, fraction in (
+                ("goals", "expected_goals_rate", self.scored_fraction),
+                ("assists", "expected_assists_rate", self.scored_fraction * self.assist_fraction),
+            ):
+                weight = np.maximum(target[column].to_numpy(float), 1e-6) * minutes / 90
+                groups = target[["fixture", "club"]].assign(weight=weight)
+                total = groups.groupby(["fixture", "club"]).weight.transform("sum").to_numpy()
+                share = np.divide(weight, total, out=np.zeros(len(target)), where=total > 0)
+                result[head + "_share"] = share
+                result[head] = share * result.team_goal_rate.to_numpy(float) * fraction
+            # Evaluate nonlinear survival/tail functions over the joint support,
+            # never at a start/cameo mixture's mean duration (Jensen's inequality).
+            long = state.bins >= 2
+            opponent = result.opponent_goal_rate.to_numpy(float)
+            result["clean_sheet_probability"] = (
+                state.probabilities[:, long]
+                * np.exp(-opponent[:, None] * state.minutes[:, long] / 90)
+            ).sum(axis=1)
+            rate = result.defcon_rate90.to_numpy(float)
+            size = result.defcon_dispersion.to_numpy(float)
+            threshold = np.where(target.position.eq("DEF"), 10, 12)
+            mu = np.maximum(rate[:, None] * state.minutes[:, 1:] / 90, 1e-12)
+            dc = (
+                state.probabilities[:, 1:]
+                * nbinom.sf(
+                    threshold[:, None] - 1, size[:, None], size[:, None] / (size[:, None] + mu)
+                )
+            ).sum(axis=1)
+            dc[target.position.eq("GK").to_numpy()] = 0
+            result["defcon_probability"] = dc
+            season = str(target.season.iloc[0])
+            goal = target.position.map(
+                {"GK": 10 if season >= "2024-25" else 6, "DEF": 6, "MID": 5, "FWD": 4}
+            ).to_numpy(float)
+            clean = target.position.map({"GK": 4, "DEF": 4, "MID": 1, "FWD": 0}).to_numpy(float)
+            raw = (
+                result.appearance_probability
+                + result.p60
+                + goal * result.goals
+                + 3 * result.assists
+                + clean * result.clean_sheet_probability
+                + result.appearance_probability * result.residual_if_appearance
+            )
+            if season >= "2025-26":
+                raw = raw + 2 * dc
+            result["raw_expected_points"] = raw
+            result["expected_points"] = np.maximum(raw, 0)
+        # This is native, unscaled appearance. One shared eligibility state per
+        # player-week is still applied by the reader, including double gameweeks.
+        result["availability_multiplier"] = 1.0
+        result["model_version"] = self.model_version
+        fields = self.role_minutes.fields(state, index=target.index)
+        return pd.concat([result, fields], axis=1)
+
+
+class RetainedHistoryRoleFootballModel(JointRoleFootballModel):
+    """Opt-in retained-history role variant; the original joint default is unchanged.
+
+    The inherited constructor fits the existing appearance and component heads
+    once, and directly fits this variant's binary role head once. This class does
+    not itself enable a CLI, artifact reader, public family or live publication.
+    """
+
+    model_version = JOINT_ROLE_RETAINED_HISTORY_MODEL_VERSION
+    role_minutes_type = RetainedHistoryRoleMinutes

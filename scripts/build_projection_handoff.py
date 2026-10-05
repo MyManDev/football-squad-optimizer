@@ -69,6 +69,13 @@ def main() -> int:
     )
     parser.add_argument("--dry-run", action="store_true", help="report, write nothing")
     parser.add_argument(
+        "--training-season",
+        action="append",
+        dest="training_seasons",
+        help="Explicit prospective inputs; repeat allowed archive seasons and 2026-27 for "
+        "captured current history. Restricts component and fallback reads before opening files.",
+    )
+    parser.add_argument(
         "--development-only",
         action="store_true",
         help=(
@@ -112,6 +119,11 @@ def main() -> int:
         evidence_manifest_path=arguments.evidence_manifest,
         control_only=arguments.control_only,
         development_only=arguments.development_only,
+        **(
+            {"training_seasons": tuple(arguments.training_seasons)}
+            if arguments.training_seasons is not None
+            else {}
+        ),
         dry_run=arguments.dry_run,
         writer=publish_retained_handoff,
     )

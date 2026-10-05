@@ -3,8 +3,9 @@ import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { MESSAGES, type Language } from "../../../i18n/messages";
-import { AS_A_CHANCE } from "../../../testSupport/honesty";
+import { AS_A_CAVEAT, AS_A_CHANCE } from "../../../testSupport/honesty";
 import { LiveSeriesCard } from "./LiveSeriesCard";
+import { withLeague } from "../../../testSupport/league";
 
 afterEach(cleanup);
 describe.each<Language>(["en", "tr"])("live record in %s", (language) => {
@@ -28,7 +29,9 @@ describe.each<Language>(["en", "tr"])("live record in %s", (language) => {
       const { container } = render(
         <MemoryRouter>
           <LanguageProvider initialLanguage={language}>
-            <LiveSeriesCard series={series} remaining={remaining} unavailableMembers={1} />
+            {withLeague(
+              <LiveSeriesCard series={series} remaining={remaining} unavailableMembers={1} />,
+            )}
           </LanguageProvider>
         </MemoryRouter>,
       );
@@ -42,9 +45,12 @@ describe.each<Language>(["en", "tr"])("live record in %s", (language) => {
       expect(screen.getByText(copy.missing(1))).toBeInTheDocument();
       expect(screen.getByRole("link", { name: "101" })).toHaveAttribute(
         "href",
-        "/league/members/101/history",
+        "/league/352490/members/101/history",
       );
       expect(container.textContent).not.toMatch(AS_A_CHANCE);
+      // The record states what it holds, never what it does or does not prove.
+      expect(container.textContent).not.toMatch(AS_A_CAVEAT);
+      expect(container.textContent).not.toMatch(/prove|establish|göstermez|göstermiyor/i);
     },
   );
   it.each([2.5, -2.5, -0.04, 0.04, 0])(
@@ -64,7 +70,7 @@ describe.each<Language>(["en", "tr"])("live record in %s", (language) => {
       const { container } = render(
         <MemoryRouter>
           <LanguageProvider initialLanguage={language}>
-            <LiveSeriesCard series={series} remaining={null} unavailableMembers={0} />
+            {withLeague(<LiveSeriesCard series={series} remaining={null} unavailableMembers={0} />)}
           </LanguageProvider>
         </MemoryRouter>,
       );

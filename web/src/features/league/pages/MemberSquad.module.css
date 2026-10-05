@@ -113,14 +113,6 @@
   display: none;
 }
 
-.note {
-  margin: var(--space-2) 0 0;
-  max-width: var(--measure);
-  color: var(--color-text-muted);
-  font-size: var(--step--2);
-  line-height: 16px;
-}
-
 /* ---- The held squad, in its closed section ---- */
 
 .held {

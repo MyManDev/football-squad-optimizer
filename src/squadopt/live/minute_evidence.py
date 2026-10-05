@@ -22,7 +22,17 @@ from numpy.typing import ArrayLike
 from scipy.stats import nbinom
 
 from squadopt.live.football_artifact import ARTIFACT_CONTRACT, forecast_digest
-from squadopt.prediction.football import FOOTBALL_MODEL_VERSION
+from squadopt.prediction.football import (
+    FOOTBALL_MODEL_VERSION,
+    JOINT_ROLE_MODEL_VERSIONS,
+    JOINT_ROLE_RETAINED_HISTORY_MODEL_VERSION,
+)
+from squadopt.prediction.football_components import role_component_record
+from squadopt.prediction.football_minutes_role import (
+    RETAINED_HISTORY_ROLE_FEATURE_VERSION,
+    ROLE_COMPONENT_COLUMNS,
+    RoleMinuteDistribution,
+)
 
 # A JSON protocol boundary, not an import dependency on the unmerged producer.
 # This reader names only the fields needed to prove and recompute its intervention.
@@ -163,21 +173,71 @@ class ExplicitMinuteEvidence:
         object.__setattr__(self, "span_end", int(self.span_end))
 
 
+def _joint_minutes(frame: pd.DataFrame) -> RoleMinuteDistribution | None:
+    if not frame.attrs.get("joint_role", False):
+        return None
+    if frame.minute_role_status.nunique() != 1:
+        raise ValueError("One fitted model must have one role-support status.")
+    if frame.minute_role_status.iloc[0] != "fitted_known_start_labels":
+        return None  # Explicit unknown-role fallback uses the retained four-bin law.
+    p = np.column_stack(
+        [
+            frame.zero_probability.to_numpy(float),
+            *(
+                frame[f"{role}_minute_probability_{b}"].to_numpy(float)
+                for role in ("start", "cameo")
+                for b in (1, 2, 3)
+            ),
+        ]
+    )
+    m = np.column_stack(
+        [
+            np.zeros(len(frame)),
+            *(
+                frame[f"{role}_minute_value_{b}"].to_numpy(float)
+                for role in ("start", "cameo")
+                for b in (1, 2, 3)
+            ),
+        ]
+    )
+    return RoleMinuteDistribution(p, m, np.array([0, 1, 2, 3, 1, 2, 3]), True)
+
+
 def _score_components(frame: pd.DataFrame) -> pd.DataFrame:
     """Recompute the v1 producer's deterministic component identities, without refitting."""
     out = frame.copy(deep=True)
-    p = out[[f"minute_probability_{b}" for b in range(4)]].to_numpy(float)
-    m = out[[f"minute_value_{b}" for b in range(4)]].to_numpy(float)
+    joint = _joint_minutes(out)
+    if joint is None:
+        p = out[[f"minute_probability_{b}" for b in range(4)]].to_numpy(float)
+        m = out[[f"minute_value_{b}" for b in range(4)]].to_numpy(float)
+        bins = np.arange(4)
+    else:
+        p, m, bins = joint.probabilities, joint.minutes, joint.bins
+        marginal, means = joint.collapsed()
+        for b in range(4):
+            out[f"minute_probability_{b}"] = marginal[:, b]
+            out[f"minute_value_{b}"] = means[:, b]
+        out["start_probability"] = p[:, 1:4].sum(axis=1)
+        out["cameo_probability"] = p[:, 4:7].sum(axis=1)
     out["expected_minutes"] = (p * m).sum(axis=1)
     out["appearance_probability"] = 1 - p[:, 0]
-    out["p60"] = p[:, 2:].sum(axis=1)
+    out["p60"] = p[:, bins >= 2].sum(axis=1)
+    if "minute_role_status" in out:
+        out["expected_minutes_if_appearance"] = np.divide(
+            out.expected_minutes.to_numpy(float),
+            out.appearance_probability.to_numpy(float),
+            out=np.zeros(len(out)),
+            where=out.appearance_probability.to_numpy(float) > 0,
+        )
     opponent = out.opponent_goal_rate.to_numpy(float)
-    out["clean_sheet_probability"] = sum(p[:, b] * np.exp(-opponent * m[:, b] / 90) for b in (2, 3))
+    out["clean_sheet_probability"] = sum(
+        p[:, b] * np.exp(-opponent * m[:, b] / 90) for b in np.flatnonzero(bins >= 2)
+    )
     rate = out.defcon_rate90.to_numpy(float)
     size = out.defcon_dispersion.to_numpy(float)
     threshold = np.where(out.position.eq("DEF"), 10, 12)
     dc = np.zeros(len(out))
-    for b in (1, 2, 3):
+    for b in range(1, p.shape[1]):
         mu = np.maximum(rate * m[:, b] / 90, 1e-12)
         dc += p[:, b] * nbinom.sf(threshold - 1, size, size / (size + mu))
     dc[out.position.eq("GK").to_numpy()] = 0
@@ -202,9 +262,13 @@ def _score_components(frame: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-def _validate_components(frame: pd.DataFrame, season: str) -> None:
+def _validate_components(frame: pd.DataFrame, season: str, *, joint_role: bool = False) -> None:
     if not set(COMPONENT_COLUMNS) <= set(frame):
         raise ValueError("The companion is missing a required scoring component.")
+    if joint_role:
+        for record in frame.to_dict("records"):
+            role_component_record({str(key): value for key, value in record.items()})
+    frame.attrs["joint_role"] = joint_role
     if frame.duplicated(["fixture", "player_code"]).any():
         raise ValueError("Repeated player-fixture component rows.")
     if not frame.position.isin(("GK", "DEF", "MID", "FWD")).all():
@@ -337,16 +401,27 @@ class FixtureComponentBasis:
         if (
             served.get("contract_version") != ARTIFACT_CONTRACT
             or companion.get("contract_version") != FIXTURE_COMPONENTS_CONTRACT
-            or served.get("model_version") != FOOTBALL_MODEL_VERSION
-            or companion.get("model_version") != FOOTBALL_MODEL_VERSION
+            or served.get("model_version")
+            not in (FOOTBALL_MODEL_VERSION, *JOINT_ROLE_MODEL_VERSIONS)
+            or companion.get("model_version") != served.get("model_version")
         ):
             raise ValueError("Only the PR912 v1 fixture component contract is supported.")
+        role_metadata = served.get("role_metadata")
+        if served["model_version"] == JOINT_ROLE_RETAINED_HISTORY_MODEL_VERSION and (
+            not isinstance(role_metadata, dict)
+            or role_metadata.get("role_feature_version") != RETAINED_HISTORY_ROLE_FEATURE_VERSION
+        ):
+            raise ValueError(
+                "Retained-history components require their explicit role feature identity."
+            )
         if companion.get("forecast_fingerprint") != served["fingerprint"]:
             raise ValueError("Companion belongs to a different forecast.")
         if any(companion.get(key) != served.get(key) or key not in served for key in _ID_FIELDS):
             raise ValueError("Companion source, cutoff or training binding differs.")
         if companion.get("training_selection") != served.get("training_selection"):
             raise ValueError("Companion training selection differs from the served forecast.")
+        if companion.get("role_metadata") != served.get("role_metadata"):
+            raise ValueError("Companion role-minute metadata differs from the served forecast.")
         weekly = pd.DataFrame(cast(list[dict[str, object]], served["rows"]))
         required = {
             "gameweek",
@@ -445,7 +520,11 @@ class FixtureComponentBasis:
         if not actual_identity.equals(expected_identity):
             raise ValueError("Fixture rows do not exactly cover the captured calendar and roster.")
         # Validate the externally supplied JSON before doing any arithmetic with it.
-        _validate_components(rows, str(served["season"]))
+        _validate_components(
+            rows,
+            str(served["season"]),
+            joint_role=served["model_version"] in JOINT_ROLE_MODEL_VERSIONS,
+        )
         aggregate = _weekly_from_fixture_rows(weekly, rows, dict.fromkeys(players, 1.0))
         for col in ("expected_points", "appearance_probability"):
             _close(weekly[col], aggregate[col], "served weekly " + col)
@@ -472,6 +551,7 @@ class FixtureComponentBasis:
     def fixture_rows(self) -> pd.DataFrame:
         frame = pd.DataFrame(cast(list[dict[str, object]], self.companion["rows"]))
         frame.attrs["season"] = str(self.served["season"])
+        frame.attrs["joint_role"] = self.served["model_version"] in JOINT_ROLE_MODEL_VERSIONS
         return frame
 
     @property
@@ -542,7 +622,23 @@ def apply_explicit_minute_evidence(
             shorter = p[1] + p[2]
             if 1 - p[0] <= 0 or (p[3] > 0 and shorter <= 0):
                 raise ValueError("No learned positive sub-90 support for this intervention.")
-            if p[3] > 0:
+            joint = _joint_minutes(adjusted.loc[[index]])
+            if joint is not None:
+                # A statement excluding a full match changes exposure, not the
+                # starting role. Never invent a starter-to-cameo transition to
+                # obtain shorter support when that role has none in the fit.
+                for role in ("start", "cameo"):
+                    columns = [f"{role}_minute_probability_{b}" for b in (1, 2, 3)]
+                    values = adjusted.loc[index, columns].to_numpy(float)
+                    support = float(values[:2].sum())
+                    if values[2] > 0 and support <= 0:
+                        raise ValueError(
+                            "No learned positive sub-90 support within the starting role."
+                        )
+                    if values[2] > 0:
+                        adjusted.loc[index, columns[:2]] = values[:2] * (1 + values[2] / support)
+                        adjusted.at[index, columns[2]] = 0.0
+            elif p[3] > 0:
                 adjusted.loc[index, ["minute_probability_1", "minute_probability_2"]] = p[1:3] * (
                     1 + p[3] / shorter
                 )
@@ -587,7 +683,12 @@ def apply_explicit_minute_evidence(
             side[head + "_share"] = share
             side[head] = float(before[head].sum()) * share
         side = _score_components(side)
-        adjusted.loc[mask, list(COMPONENT_COLUMNS)] = side[list(COMPONENT_COLUMNS)].to_numpy()
+        updated_columns = [*COMPONENT_COLUMNS]
+        if "minute_role_status" in side:
+            updated_columns.extend(
+                name for name in ROLE_COMPONENT_COLUMNS if name not in updated_columns
+            )
+        adjusted.loc[mask, updated_columns] = side[updated_columns].to_numpy()
         changed_players.update(int(p) for p in side.player_code)
     if evidence:
         multipliers = _availability_multipliers(basis.companion)

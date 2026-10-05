@@ -107,7 +107,6 @@ export function SystemKarne({ state, leagueId }: { state: ScoreboardState; leagu
               </li>
             ))}
           </ol>
-          <p className={styles.caption}>{copy.karneCaption}</p>
           {weeks.some((week) => week.ours !== null && week.namedEleven) ? (
             <p className={styles.caption}>{copy.karneNamedEleven}</p>
           ) : null}

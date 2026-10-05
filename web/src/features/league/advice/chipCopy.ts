@@ -28,28 +28,19 @@ export interface ChipCopy {
   title: string;
   chosen: (name: string) => string;
   gain: (points: string) => string;
-  honesty: string;
-  unproven: string;
   freeHit: string;
   basis: Record<MemberChip, string>;
   expectedOwnPoints: (points: string, basis: string) => string;
   moveRowsBasis: (basis: string) => string;
   gainCaption: (basis: string) => string;
   gainCaptionBeforeCost: (cost: string, basis: string) => string;
-  limits: Record<string, string>;
 }
-
-/** The producer's two chip sentences, as `application/advice_chips.py` states them. */
-const CHIP_CHOICE_LIMIT =
-  "The chip is in this plan because the member chose it; the planner did not weigh it. The gain stated is this gameweek's only: what the chip would be worth in a later gameweek is not measured, so this is not advice to play it now.";
-const FREE_HIT_LIMIT =
-  "A Free Hit squad is held for this gameweek only; the squad held before it returns at the next deadline.";
 
 const en: ChipCopy = {
   legend: "Chip",
   none: "None",
-  help: "Choosing a chip shows your one-week plan with that chip played this gameweek, and what that week is expected to score above your own plan without it. The planner never chooses a chip itself: what a chip would be worth in a later gameweek is not measured, so nothing here says this is the gameweek to play it.",
-  plain: "No chip is selected; the published plan plays none.",
+  help: "Choosing a chip shows your one-week plan with that chip played this gameweek, and what that week is expected to score above your own plan without it.",
+  plain: "No chip is selected; the plan plays none.",
   onlyBaseline: "One-week pure-points plan only.",
   blockedBySwitches:
     "A chip plan is solved on the plain one-week plan only. Switch the manager's word off and set the Top 100 influence to 0 to choose a chip.",
@@ -76,10 +67,6 @@ const en: ChipCopy = {
   chosen: (name) => `${name} is played this gameweek because you chose it.`,
   gain: (points) =>
     `~${points} expected points this gameweek against your own plan without the chip, hits included.`,
-  honesty:
-    "This is one gameweek's difference. What the chip would be worth in a later gameweek is not measured, so this is not advice to play it now.",
-  unproven:
-    "The solver found at least one of the two plans without finishing its proof, so the difference is between the plans it found.",
   freeHit:
     "A Free Hit squad is for this gameweek only; the squad you hold now returns at the next deadline.",
   basis: {
@@ -95,19 +82,13 @@ const en: ChipCopy = {
     `expected points against keeping the squad you hold and playing the same chip, for ${basis}`,
   gainCaptionBeforeCost: (cost, basis) =>
     `expected points against keeping the squad you hold and playing the same chip, for ${basis}, before this week's transfer cost of ${cost}`,
-  limits: {
-    [CHIP_CHOICE_LIMIT]:
-      "The chip is in this plan because you chose it; the planner did not weigh it. The gain stated is this gameweek's only: what the chip would be worth in a later gameweek is not measured, so this is not advice to play it now.",
-    [FREE_HIT_LIMIT]:
-      "A Free Hit squad is held for this gameweek only; the squad held before it returns at the next deadline.",
-  },
 };
 
 const tr: ChipCopy = {
   legend: "Çip",
   none: "Yok",
-  help: "Bir çip seçersen bir haftalık planın, o çip bu hafta oynanmış haliyle gösterilir; yanında da o haftanın çipsiz kendi planına göre beklenen puan farkı yazar. Planlayıcı çipi hiçbir zaman kendisi seçmez: bir çipin sonraki bir haftada kaç puan getireceği ölçülmedi, bu yüzden buradaki hiçbir şey çipi oynama haftasının bu hafta olduğunu söylemez.",
-  plain: "Çip seçili değil; yayınlanan plan çip oynamaz.",
+  help: "Bir çip seçersen bir haftalık planın, o çip bu hafta oynanmış haliyle gösterilir; yanında da o haftanın çipsiz kendi planına göre beklenen puan farkı yazar.",
+  plain: "Çip seçili değil; plan çip oynamaz.",
   onlyBaseline: "Yalnız bir haftalık saf puan planında.",
   blockedBySwitches:
     "Çipli plan yalnız sade bir haftalık plan üzerinde çözülür. Çip seçmek için hocanın sözünü kapat ve Top 100 etkisini 0 yap.",
@@ -132,10 +113,6 @@ const tr: ChipCopy = {
   title: "Çip seçimi",
   chosen: (name) => `${name} bu hafta oynanıyor, çünkü sen seçtin.`,
   gain: (points) => `Çipsiz kendi planına göre bu hafta ~${points} beklenen puan, cezalar dahil.`,
-  honesty:
-    "Bu yalnız bu haftanın farkıdır. Çipin sonraki bir haftada kaç puan getireceği ölçülmedi; bu yüzden bu, çipi şimdi oyna tavsiyesi değildir.",
-  unproven:
-    "Çözücü iki plandan en az birini ispatını bitirmeden buldu; fark, bulduğu planlar arasındaki farktır.",
   freeHit:
     "Free Hit kadrosu yalnız bu hafta içindir; bir sonraki haftada şimdiki kadron geri gelir.",
   basis: {
@@ -151,12 +128,6 @@ const tr: ChipCopy = {
     `beklenen puan, mevcut kadronu koruyup aynı çipi oynamaya göre (${basis})`,
   gainCaptionBeforeCost: (cost, basis) =>
     `beklenen puan, mevcut kadronu koruyup aynı çipi oynamaya göre (${basis}); bu haftanın ${cost} transfer maliyeti düşülmeden önce`,
-  limits: {
-    [CHIP_CHOICE_LIMIT]:
-      "Çip bu planda, çünkü sen seçtin; planlayıcı çipi tartmadı. Yazan kazanç yalnız bu haftanındır: çipin sonraki bir haftada kaç puan getireceği ölçülmedi, bu yüzden bu, çipi şimdi oyna tavsiyesi değildir.",
-    [FREE_HIT_LIMIT]:
-      "Free Hit kadrosu yalnız bu hafta tutulur; ondan önceki kadro bir sonraki haftada geri gelir.",
-  },
 };
 
 export const CHIP_COPY: Record<Language, ChipCopy> = { tr, en };
@@ -177,11 +148,6 @@ export function chipReason(copy: ChipCopy, reason: string | undefined): string {
       ? copy.chipReasons[reason]
       : undefined) ?? copy.chipReasons.unknown
   );
-}
-
-/** A producer sentence the chip documents added, in the member's language; null for any other. */
-export function chipLimit(copy: ChipCopy, sentence: string): string | null {
-  return Object.hasOwn(copy.limits, sentence) ? copy.limits[sentence]! : null;
 }
 
 /** Whether a chip week scores on another basis than the eleven with the captain doubled. */

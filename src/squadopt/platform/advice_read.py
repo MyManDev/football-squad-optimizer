@@ -34,6 +34,11 @@ from squadopt.application.advice_capabilities import (
 )
 from squadopt.application.entries import EntryError
 from squadopt.contracts.league import LEAGUE_VIEW_CONTRACT_VERSION
+from squadopt.contracts.league_tree import (
+    LeagueDirectoryError,
+    find_league_tree,
+    published_league_trees,
+)
 from squadopt.contracts.preferences import NO_PREFERENCES, DecisionPreferences
 from squadopt.planning.chip_strategy import CHIP_STRATEGY_VERSION
 from squadopt.platform.advice_cache import AdviceCacheRepository, advice_cache_key
@@ -189,8 +194,21 @@ class FileLeagueDirectory:
         self._root = Path(site_data_root)
         self.published_capture_unusable_reason: str | None = None
 
-    def _read(self) -> Mapping[str, object] | None:
-        path = self._root / "league" / "members.json"
+    def _trees(self, league_id: int | None = None) -> list[Path]:
+        # The site's directory says where each league's tree is; a site from before the
+        # directory has the one tree. A directory the site cannot read is not ready.
+        try:
+            if league_id is None:
+                return published_league_trees(self._root)
+            tree = find_league_tree(self._root, league_id)
+            return [] if tree is None else [tree]
+        except (LeagueDirectoryError, ValueError, OSError) as error:
+            raise AdviceBackendNotReadyError(
+                "The published league directory is unreadable."
+            ) from error
+
+    def _read(self, tree: Path) -> Mapping[str, object] | None:
+        path = tree / "members.json"
         try:
             raw = path.read_text(encoding="utf-8")
         except FileNotFoundError:
@@ -241,12 +259,26 @@ class FileLeagueDirectory:
         return payload
 
     def league(self, league_id: int) -> Mapping[str, object] | None:
-        payload = self._read()
+        trees = self._trees(league_id)
+        if not trees:
+            return None
+        payload = self._read(trees[0])
         return payload if payload is not None and payload["league_id"] == league_id else None
+
+    def _published(self) -> list[Mapping[str, object]]:
+        """The member payload of every published tree; a listed tree with no members
+        document is not published."""
+
+        published = []
+        for tree in self._trees():
+            payload = self._read(tree)
+            if payload is not None:
+                published.append(payload)
+        return published
 
     def readable(self) -> bool:
         try:
-            return self._read() is not None
+            return bool(self._published())
         except (AdviceBackendNotReadyError, OSError, UnicodeError):
             return False
 
@@ -255,22 +287,34 @@ class FileLeagueDirectory:
 
         self.published_capture_unusable_reason = None
         try:
-            payload = self._read()
-            if payload is None:
-                return None
+            # One publication renders every league from one capture, for one week: the
+            # human entries of every tree must agree on all three.
             identifiers = set()
-            for entry_id in _member_entry_ids(payload):
-                path = self._root / "league" / "entries" / f"{entry_id}.json"
-                document = json.loads(path.read_text(encoding="utf-8"))
-                identifier = document["payload"]["source_snapshot_id"]
-                if not isinstance(identifier, str) or not re.fullmatch(
-                    r"fpl-live-[A-Za-z0-9_-]+", identifier
-                ):
-                    raise ValueError(f"Entry {entry_id} has no usable source_snapshot_id.")
-                identifiers.add(identifier)
+            weeks: set[tuple[str, int]] = set()
+            published = False
+            for tree in self._trees():
+                payload = self._read(tree)
+                if payload is None:
+                    continue
+                published = True
+                weeks.add((str(payload["season"]), int(str(payload["gameweek"]))))
+                for entry_id in _member_entry_ids(payload):
+                    path = tree / "entries" / f"{entry_id}.json"
+                    document = json.loads(path.read_text(encoding="utf-8"))
+                    identifier = document["payload"]["source_snapshot_id"]
+                    if not isinstance(identifier, str) or not re.fullmatch(
+                        r"fpl-live-[A-Za-z0-9_-]+", identifier
+                    ):
+                        raise ValueError(f"Entry {entry_id} has no usable source_snapshot_id.")
+                    identifiers.add(identifier)
+            if not published:
+                return None
             if len(identifiers) != 1:
                 raise ValueError("Published human entries are empty or disagree on the capture.")
-            return identifiers.pop(), str(payload["season"]), int(str(payload["gameweek"]))
+            if len(weeks) != 1:
+                raise ValueError("Published leagues disagree on the season or the gameweek.")
+            ((season, gameweek),) = weeks
+            return identifiers.pop(), season, gameweek
         except (
             AdviceBackendNotReadyError,
             OSError,
@@ -288,10 +332,12 @@ class FileLeagueDirectory:
         if context is None:
             return False
         try:
-            payload = self._read()
+            published = self._published()
         except (AdviceBackendNotReadyError, OSError, UnicodeError):
             return False
-        return payload is not None and league_tree_matches(payload, context)
+        # One publication renders every league for one week; a tree of another week is
+        # the previous publication's, whichever league it is.
+        return bool(published) and all(league_tree_matches(p, context) for p in published)
 
 
 def _member_entry_ids(payload: Mapping[str, object]) -> frozenset[int]:

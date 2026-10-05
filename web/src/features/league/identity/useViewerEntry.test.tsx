@@ -8,6 +8,7 @@ import { mockLeagueMembersEnvelope } from "../../../fixtures/league";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { LeagueMembersView } from "../pages/LeagueMembersPage";
 import { readViewerEntry, writeViewerEntry } from "./useViewerEntry";
+import { withLeague } from "../../../testSupport/league";
 
 afterEach(cleanup);
 beforeEach(() => {
@@ -18,8 +19,8 @@ beforeEach(() => {
 function renderMembers() {
   return render(
     <LanguageProvider initialLanguage="tr">
-      <MemoryRouter initialEntries={["/league/members"]}>
-        <LeagueMembersView envelope={mockLeagueMembersEnvelope} />
+      <MemoryRouter initialEntries={["/league/352490/members"]}>
+        {withLeague(<LeagueMembersView envelope={mockLeagueMembersEnvelope} />)}
       </MemoryRouter>
     </LanguageProvider>,
   );
@@ -64,6 +65,20 @@ describe("the viewer claim", () => {
     expect(readViewerEntry()).toBeNull();
     expect(claimedRow()).toBeNull();
     expect(document.body).not.toHaveTextContent("· sen");
+  });
+
+  it("a claim made in another league is nobody here", () => {
+    writeViewerEntry({ leagueId: 7, entryId: 35249001 });
+    renderMembers();
+    expect(claimedRow()).toBeNull();
+    expect(document.body).not.toHaveTextContent("· sen");
+    // The claim itself stands, for the league it was made in.
+    expect(readViewerEntry()).toEqual({
+      leagueId: 7,
+      entryId: 35249001,
+      verified: false,
+      source: "self-selected",
+    });
   });
 
   it("previous stored selections are ignored", () => {

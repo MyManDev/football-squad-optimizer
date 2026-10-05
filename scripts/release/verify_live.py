@@ -1,10 +1,12 @@
-"""Verify the live site after a deployment: the ten smoke checks, then the content.
+"""Verify the live site after a deployment: the smoke checks, the assets, then the content.
 
 The checks mirror SMOKE_CHECKS in web/scripts/smoke-deployment.mjs, and a test holds the two
-lists equal so that adding a route there cannot leave this verifier behind. Seven routes must
-return 200 carrying the SPA document, two documents must return 200 and parse as JSON, and one
-document must be ABSENT (404), because entry 0 does not exist and a 200 there means the
-absent-document rule has been lost. Reading that last check as "must be 200" inverts it.
+lists equal so that adding a route there cannot leave this verifier behind. The site's league
+directory (``/data/leagues.json``) says which league trees it publishes; a site from before
+the directory publishes the one legacy tree. The routes must return 200 carrying the SPA
+document, the documents must return 200 and parse as JSON, and each tree's entry 0 must be
+ABSENT (404), because entry 0 does not exist and a 200 there means the absent-document rule
+has been lost. Reading that last check as "must be 200" inverts it.
 
 Then the content. Two things can be wrong there and only one of them used to fail the run:
 the publication must be the one just deployed rather than the previous one, and it must be
@@ -24,6 +26,7 @@ import argparse
 import http.client
 import json
 import re
+import secrets
 import sys
 import urllib.error
 import urllib.request
@@ -39,12 +42,27 @@ ROUTES = [
     "/moves",
     "/rivals",
     "/league",
+    # A nested client-side route is the first thing a path-scoped not-found rule would
+    # break; the address from before the league number is served on every site.
     "/league/members/0",
     "/status",
     "/fixtures",
 ]
-DOCUMENTS = ["/data/index.json", "/data/league/members.json"]
-ABSENT = "/data/league/entries/0.json"
+DOCUMENTS = ["/data/index.json"]
+DIRECTORY = "/data/leagues.json"
+#: A name no build produces (web/scripts/smoke-deployment.mjs ABSENT_ASSET): a missing
+#: asset must answer 404, not the shell an edge would keep for that name. New on every run,
+#: so a run against a deployment from before assets/404.html poisons a name nothing will
+#: ask for again.
+ABSENT_ASSET_PREFIX = "/assets/smoke-absent-"
+ABSENT_ASSET = f"{ABSENT_ASSET_PREFIX}{secrets.token_hex(4)}.js"
+#: An asset name inside the shell or a chunk, as the build emits it under assets/.
+ASSET_NAME = re.compile(
+    rb"""(?:/assets/|["'`]assets/|\./)([A-Za-z0-9_.-]+-[A-Za-z0-9_-]{8}\.(?:js|css|wasm|woff2?))(?![A-Za-z0-9_.-])"""
+)
+MAX_ASSETS = 400
+#: The one tree a site from before the directory publishes.
+LEGACY_TREE = "league"
 SEASON = re.compile(r"^\d{4}-\d{2}$")
 
 
@@ -113,16 +131,148 @@ def _objects(payload: dict[str, Any] | None, key: str, path: str) -> list[dict[s
     return None
 
 
+#: A league tree the site publishes: its id (None for the legacy tree, which carries no
+#: directory line) and its path under data/.
+Tree = tuple[int | None, str]
+LEGACY: Tree = (None, LEGACY_TREE)
+
+
+def published_trees() -> tuple[list[Tree], bool, str | None]:
+    """The league trees the site publishes, whether the directory could be read, and the
+    directory's own stamp (None on a site from before the directory).
+
+    One tree per directory line; the legacy tree alone where the site publishes no directory.
+    A directory that cannot be read or lists no league is a failure, and the legacy tree is
+    checked in its place so the rest of the run still reports.
+    """
+
+    status, body = fetch(DIRECTORY)
+    if status == 404:
+        return [LEGACY], True, None
+    document: object = None
+    if status == 200:
+        try:
+            document = json.loads(body)
+        except (ValueError, RecursionError):
+            document = None
+    rows = (
+        document.get("payload", {}).get("leagues")
+        if isinstance(document, dict) and isinstance(document.get("payload"), dict)
+        else None
+    )
+    if not isinstance(rows, list):
+        print(f"  BAD {status} {DIRECTORY} is not a league directory")
+        return [LEGACY], False, None
+    trees: list[Tree] = []
+    for row in rows:
+        if isinstance(row, dict) and isinstance(row.get("path"), str):
+            league_id = row.get("league_id")
+            trees.append((league_id if isinstance(league_id, int) else None, row["path"]))
+    if not trees:
+        print(f"  BAD {DIRECTORY} lists no league")
+        return [LEGACY], False, None
+    stamp = document.get("generated_at_utc") if isinstance(document, dict) else None
+    return trees, True, stamp if isinstance(stamp, str) else ""
+
+
+def _tree_capture(tree: str, members: list[dict[str, Any]] | None) -> str | None:
+    """The capture a tree was rendered from: the source_snapshot_id of the first human
+    member whose entry was published (a member who was not rendered keeps a row and has no
+    entry document). None when the tree names no human member; "" when none of their
+    entries can be read."""
+
+    humans = [
+        member["entry_id"]
+        for member in members or []
+        if member.get("member_kind") == "human" and isinstance(member.get("entry_id"), int)
+    ]
+    if not humans:
+        return None
+    for entry_id in humans:
+        status, body = fetch(f"/data/{tree}/entries/{entry_id}.json")
+        if status != 200:
+            continue
+        try:
+            capture = json.loads(body)["payload"]["source_snapshot_id"]
+        except (ValueError, RecursionError, KeyError, TypeError):
+            continue
+        if isinstance(capture, str) and capture:
+            return capture
+    return ""
+
+
+def check_assets() -> int:
+    """Every asset the live shell reaches answers as itself, never as the HTML shell.
+
+    Run from the operator's machine, so it reads the edge members near the operator reach:
+    an asset name an edge cached as the shell before the deploy built it is served as HTML
+    there while the deployment's own smoke, run elsewhere, sees the real file. Returns the
+    number of failures; each is printed.
+    """
+
+    status, shell = fetch("/")
+    queue = [name.decode() for name in ASSET_NAME.findall(shell)] if status == 200 else []
+    if not queue:
+        print(f"  BAD {status} the shell names no asset")
+        return 1
+    seen: set[str] = set()
+    failures = 0
+    while queue:
+        batch = sorted({name for name in queue if name not in seen})
+        seen.update(batch)
+        if len(seen) > MAX_ASSETS:
+            print(f"  BAD more than {MAX_ASSETS} assets reached")
+            return failures + 1
+        queue = []
+        for name in batch:
+            status, body = fetch(f"/assets/{name}")
+            served_shell = body.lstrip()[:15].lower().startswith(b"<!doctype html")
+            if status != 200 or served_shell:
+                failures += 1
+                print(
+                    f"  BAD {status} asset /assets/{name}"
+                    + ("  (the HTML shell)" if served_shell else "")
+                )
+                continue
+            if name.endswith((".js", ".css")):
+                queue.extend(found.decode() for found in ASSET_NAME.findall(body))
+    if not failures:
+        print(f"  ok  {len(seen)} assets, each served as itself")
+    return failures
+
+
+def smoke_checks(trees: list[Tree]) -> tuple[list[str], list[str], list[str]]:
+    """The routes, documents and absent documents the smoke checks for these trees.
+
+    Each listed league adds its member page by its numbered address, and every tree adds
+    its members document and the entry 0 document it must refuse.
+    """
+
+    routes = [*ROUTES]
+    documents = [*DOCUMENTS]
+    absent: list[str] = []
+    for league_id, tree in trees:
+        if league_id is not None:
+            routes.append(f"/league/{league_id}/members/0")
+        documents.append(f"/data/{tree}/members.json")
+        absent.append(f"/data/{tree}/entries/0.json")
+    return routes, documents, absent
+
+
 def main(accepted_generated_at: str, settled_gameweek: int | None = None) -> int:
     failures = 0
 
-    print(f"== {len(ROUTES) + len(DOCUMENTS) + 1} smoke checks ==")
-    for path in ROUTES:
+    trees, directory_ok, directory_stamp = published_trees()
+    failures += not directory_ok
+    routes, documents, absent_documents = smoke_checks(trees)
+    absent_documents = [ABSENT_ASSET, *absent_documents]
+    print(f"== {len(routes) + len(documents) + len(absent_documents) + 1} smoke checks ==")
+    for path in routes:
         status, body = fetch(path)
         ok = status == 200 and b'id="root"' in body
         failures += not ok
         print(f"  {'ok ' if ok else 'BAD'} {status} html   {path}")
-    for path in DOCUMENTS:
+    for path in documents:
         status, body = fetch(path)
         try:
             json.loads(body)
@@ -132,48 +282,87 @@ def main(accepted_generated_at: str, settled_gameweek: int | None = None) -> int
         ok = status == 200 and parsed
         failures += not ok
         print(f"  {'ok ' if ok else 'BAD'} {status} json   {path}")
-    status, body = fetch(ABSENT)
-    ok = status == 404 and b'id="root"' not in body
-    failures += not ok
-    print(f"  {'ok ' if ok else 'BAD'} {status} absent {ABSENT}  (must be 404, not the shell)")
+    for absent in absent_documents:
+        status, body = fetch(absent)
+        ok = status == 404 and b'id="root"' not in body
+        failures += not ok
+        print(f"  {'ok ' if ok else 'BAD'} {status} absent {absent}  (must be 404, not the shell)")
+
+    failures += check_assets()
 
     print("\n== content ==")
     # Every nested read below is type-checked: a document of the wrong shape inside is a
     # counted failure, where it used to end the run in an AttributeError.
-    path = "/data/league/members.json"
-    document = _document(path)
-    read = _payload(document, path)
-    members = _objects(read, "members", path)
-    failures += members is None
-    payload = read or {}
-    generated = (document or {}).get("generated_at_utc", "")
-    matches = generated == accepted_generated_at
-    failures += not matches
-    print(
-        f"  {'ok ' if matches else 'BAD'} generated_at_utc {generated}"
-        f"  (must equal accepted {accepted_generated_at})"
-    )
-    print(
-        f"  gameweek={payload.get('gameweek')} scored_gameweek={payload.get('scored_gameweek')}"
-        f" members={None if members is None else len(members)}"
-    )
-    movement: dict[str, int] = {}
-    for member in members or []:
-        value = member.get("movement")
-        # A value that is not text is shown as written, and cannot fail as a dictionary key.
-        key = value if isinstance(value, str) else repr(value)
-        movement[key] = movement.get(key, 0) + 1
-    print(f"  movement={movement}")
+    # A site from before the directory is the one tree, whose members.json carries the
+    # accepted stamp. A directory site's publication is the directory: it is written last,
+    # after every league, and carries the accepted stamp; each league is stamped after its
+    # own solves, so no tree may be newer than the directory, and every tree must name the
+    # one capture the publication rendered. The week claims are read from each tree.
+    if directory_stamp is not None:
+        matches = directory_stamp == accepted_generated_at
+        failures += not matches
+        print(
+            f"  {'ok ' if matches else 'BAD'} {DIRECTORY} generated_at_utc {directory_stamp}"
+            f"  (must equal accepted {accepted_generated_at})"
+        )
+    payloads: list[dict[str, Any]] = []
+    settled_by_tree: list[list[Any]] = []
+    captures: dict[str, str] = {}
+    stamps: list[str] = []
+    for _league_id, tree in trees:
+        if len(trees) > 1:
+            print(f"  -- {tree}")
+        path = f"/data/{tree}/members.json"
+        document = _document(path)
+        read = _payload(document, path)
+        members = _objects(read, "members", path)
+        failures += members is None
+        payload = read or {}
+        payloads.append(payload)
+        generated = (document or {}).get("generated_at_utc", "")
+        if directory_stamp is None:
+            matches = generated == accepted_generated_at
+            rule = f"must equal accepted {accepted_generated_at}"
+        else:
+            matches = (
+                isinstance(generated, str)
+                and bool(generated)
+                and generated <= accepted_generated_at
+            )
+            rule = f"must not be newer than the publication {accepted_generated_at}"
+            capture = _tree_capture(tree, members)
+            if capture == "":
+                failures += 1
+                print(f"  BAD no human member's entry document of {tree} can be read")
+            elif capture is not None:
+                captures[tree] = capture
+            if matches:
+                stamps.append(generated)
+        failures += not matches
+        print(f"  {'ok ' if matches else 'BAD'} generated_at_utc {generated}  ({rule})")
+        print(
+            f"  gameweek={payload.get('gameweek')} scored_gameweek={payload.get('scored_gameweek')}"
+            f" members={None if members is None else len(members)}"
+        )
+        movement: dict[str, int] = {}
+        for member in members or []:
+            value = member.get("movement")
+            # A value that is not text is shown as written, and cannot fail as a dictionary
+            # key.
+            key = value if isinstance(value, str) else repr(value)
+            movement[key] = movement.get(key, 0) + 1
+        print(f"  movement={movement}")
 
-    path = "/data/league/scoreboard.json"
-    weeks = _objects(_payload(_document(path), path), "gameweeks", path)
-    failures += weeks is None
-    settled = [
-        week.get("gameweek")
-        for week in weeks or []
-        if week.get("finished") and week.get("data_checked")
-    ]
-    print(f"  scoreboard gameweeks={None if weeks is None else len(weeks)} settled={settled}")
+        path = f"/data/{tree}/scoreboard.json"
+        weeks = _objects(_payload(_document(path), path), "gameweeks", path)
+        failures += weeks is None
+        settled = [
+            week.get("gameweek")
+            for week in weeks or []
+            if week.get("finished") and week.get("data_checked")
+        ]
+        settled_by_tree.append(settled)
+        print(f"  scoreboard gameweeks={None if weeks is None else len(weeks)} settled={settled}")
 
     # The season is the one the site index names as latest, so the status document is found
     # again when the season turns over instead of being read from last season's path.
@@ -200,10 +389,13 @@ def main(accepted_generated_at: str, settled_gameweek: int | None = None) -> int
         # Printing the settled weeks is not checking them: before this, a release that
         # published an unsettled week returned ALL GOOD.
         for label, ok in (
-            (f"scoreboard settles gameweek {settled_gameweek}", settled_gameweek in settled),
+            (
+                f"scoreboard settles gameweek {settled_gameweek}",
+                all(settled_gameweek in settled for settled in settled_by_tree),
+            ),
             (
                 f"members.json scored_gameweek is {settled_gameweek}",
-                payload.get("scored_gameweek") == settled_gameweek,
+                all(payload.get("scored_gameweek") == settled_gameweek for payload in payloads),
             ),
             (
                 f"status moved past gameweek {settled_gameweek}",
@@ -214,6 +406,16 @@ def main(accepted_generated_at: str, settled_gameweek: int | None = None) -> int
             failures += not ok
             print(f"  {'ok ' if ok else 'BAD'} {label}")
 
+    # The directory is written by the last league the publication rendered, from that
+    # league's own stamp, so one tree carries it; every tree older is a stale publication.
+    if directory_stamp is not None and stamps and max(stamps) != directory_stamp:
+        failures += 1
+        print(
+            f"  BAD no tree carries the publication stamp {directory_stamp} (newest {max(stamps)})"
+        )
+    if len(set(captures.values())) > 1:
+        failures += 1
+        print(f"  BAD the trees name more than one capture: {captures}")
     print(f"\n{'ALL GOOD' if failures == 0 else str(failures) + ' FAILURE(S)'}")
     return 1 if failures else 0
 
@@ -224,7 +426,8 @@ def _arguments(argv: list[str]) -> argparse.Namespace:
         "accepted_generated_at",
         help=(
             "the live publication's generated_at_utc must equal this accepted candidate stamp. "
-            "Read the exact value from web/public/data/league/members.json in the accepted "
+            "Read the exact value from data/leagues.json (on a site from before the "
+            "directory, from data/league/members.json) in the accepted "
             "publication tree, not from the clock or the previous live site."
         ),
     )

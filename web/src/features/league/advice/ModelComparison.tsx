@@ -1,3 +1,4 @@
+import { useLeague } from "../useLeague";
 import { useEffect, useMemo } from "react";
 import { Card } from "../../../design/components/Card";
 import { useLanguage } from "../../../i18n/context";
@@ -27,7 +28,8 @@ export function ModelComparison({
   const tr = language === "tr";
   // The Top 100 setting is a weight on the selection, never a share of anything.
   const weight = messages.leagueMembers.top100Weight(request.top100Weight ?? 0);
-  const transport = useMemo(() => client ?? createAdviceClient(), [client]);
+  const { tree } = useLeague();
+  const transport = useMemo(() => client ?? createAdviceClient(tree.entryAdvice), [client, tree]);
   const {
     leagueId,
     entryId,
@@ -36,6 +38,7 @@ export function ModelComparison({
     rivalEntryId,
     top100Weight,
     managersWord,
+    preferences,
     chip,
     season,
     gameweek,
@@ -50,6 +53,7 @@ export function ModelComparison({
       rivalEntryId,
       top100Weight,
       managersWord,
+      preferences,
       chip,
       season,
       gameweek,
@@ -63,6 +67,7 @@ export function ModelComparison({
       rivalEntryId,
       top100Weight,
       managersWord,
+      preferences,
       chip,
       season,
       gameweek,
@@ -125,11 +130,6 @@ export function ModelComparison({
           </tr>
         </tbody>
       </table>
-      <p>
-        {tr
-          ? "Puanlar her modelin kendi tahminidir; yüksek sayı daha başarılı model demek değildir. Başarı, ileride gerçekleşen sonuçlarla ölçülecek."
-          : "Each score is its model's estimate; a larger number does not prove greater accuracy. Success needs future observed outcomes."}
-      </p>
       {!counterpart && (
         <button
           type="button"

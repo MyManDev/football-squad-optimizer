@@ -111,7 +111,8 @@ export function checkedCapabilities(value: unknown, leagueId: number): AdviceCap
       if (
         !record(strategy) ||
         (strategy.version !== "model_opportunity_reservation_v1" &&
-          strategy.version !== "model_opportunity_reservation_v2") ||
+          strategy.version !== "model_opportunity_reservation_v2" &&
+          strategy.version !== "dated_joint_opportunity_v3") ||
         !Array.isArray(strategy.windows) ||
         !strategy.windows.every(isWindow)
       )

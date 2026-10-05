@@ -94,7 +94,6 @@ export function MemberSquad({
       <div className={styles.pitchView} hidden={hasList && view !== "pitch"}>
         <MemberPitch players={onPitch.eleven} codes={codes} />
         <MemberBench players={onPitch.bench} codes={codes} />
-        {planned ? null : <p className={styles.note}>{copy.heldViceCaptainUnavailable}</p>}
       </div>
       {hasList ? (
         <div className={styles.listView} hidden={view !== "list"}>
@@ -168,7 +167,6 @@ export function HeldSquad({ squad, codes }: { squad: EntrySquad; codes: ClubCode
           </ol>
         </>
       ) : null}
-      <p className={styles.note}>{copy.heldViceCaptainUnavailable}</p>
     </div>
   );
 }
