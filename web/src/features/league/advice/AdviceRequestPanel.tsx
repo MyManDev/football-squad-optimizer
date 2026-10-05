@@ -10,6 +10,10 @@
  * The job itself belongs to the page: the panel asks for a computation and reports its
  * state, and the page hands the finished answer to the advice card beside it.
  *
+ * Beside it, where the publisher wrote the member's inputs, a second button asks the
+ * member's own device for the plain one-week plan (`device`); its states are the same
+ * kind of sentence, and the two buttons wait for each other, one answer at a time.
+ *
  * A build with no compute service renders exactly what it always has. With one, the page
  * passes `service`: what may be computed is then the capabilities' word (`computable`),
  * a selection nobody published says so and offers the computation with about how long it
@@ -30,7 +34,8 @@ import { useViewerEntry } from "../identity/useViewerEntry";
 import type { AdviceRequest } from "./adviceClient";
 import { canComputeAdvice } from "./adviceSelection";
 import { COMPUTE_COPY, failureSentence } from "./computeCopy";
-import type { AdviceJob } from "./useAdviceJob";
+import { deviceEndedWithoutPlan, type DevicePlan } from "../device/useDevicePlan";
+import type { AdviceJob, EarlierAnswer } from "./useAdviceJob";
 import styles from "./AdviceRequestPanel.module.css";
 
 /**
@@ -39,6 +44,41 @@ import styles from "./AdviceRequestPanel.module.css";
  * answering (`unreachable`), or answering from another data capture (`other-capture`).
  */
 export type ComputeService = "static" | "ready" | "unreachable" | "other-capture";
+
+/** What stays on the page after an attempt: the earlier answer when one is kept. */
+function kept(earlier: EarlierAnswer | null | undefined): "published" | "earlier" {
+  return earlier ? "earlier" : "published";
+}
+
+/** Where the device solve stands; nothing while nothing was asked of it. */
+function DeviceState({ state }: { state: DevicePlan["state"] }) {
+  const { locale, messages } = useLanguage();
+  const copy = messages.leagueMembers;
+  if (state.phase === "idle") return null;
+  const text =
+    state.phase === "loading"
+      ? copy.deviceLoading
+      : state.phase === "solving"
+        ? copy.deviceSolving
+        : state.phase === "done"
+          ? copy.deviceDone(
+              new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(state.seconds),
+            )
+          : state.phase === "refused"
+            ? copy.deviceRefused
+            : state.phase === "other-capture"
+              ? copy.deviceOtherCapture
+              : state.phase === "unpublished"
+                ? copy.deviceUnpublished
+                : copy.deviceFailed;
+  return (
+    <p className={styles.state} data-device-state={state.phase}>
+      {state.phase === "done" ? <Badge tone="good">{copy.computeDone}</Badge> : null}
+      {state.phase === "done" ? " " : null}
+      {text}
+    </p>
+  );
+}
 
 export function AdviceRequestPanel({
   request,
@@ -51,9 +91,12 @@ export function AdviceRequestPanel({
   pending = false,
   deadlinePassed = false,
   dockClassName,
+  device,
 }: {
   request: AdviceRequest;
   job: AdviceJob;
+  /** A solve on the member's own device, offered where the publisher wrote its inputs. */
+  device?: DevicePlan;
   selectionAvailable?: boolean;
   service?: ComputeService;
   /** With a ready service: whether it can answer this exact selection now. */
@@ -63,8 +106,10 @@ export function AdviceRequestPanel({
   /** A chip computation has no measured duration to display. */
   chipChosen?: boolean;
   /**
-   * A service is configured and has not said yet what it computes. The static build's
-   * sentence about what Compute supports would be wrong a moment later, so it waits.
+   * The page has not learned yet what can be computed here: a configured service has not
+   * said what it computes, or the rivals' documents the device needs are still being read.
+   * A sentence about what Compute supports or what was published would be wrong a moment
+   * later, so the notes wait.
    */
   pending?: boolean;
   /**
@@ -78,7 +123,7 @@ export function AdviceRequestPanel({
   const { language, locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
   const computeCopy = COMPUTE_COPY[language];
-  const { viewer } = useViewerEntry();
+  const { viewer } = useViewerEntry(request.leagueId);
   const { state, compute } = job;
   const isSelf = viewer !== null && viewer.entryId === request.entryId;
   const supported =
@@ -86,6 +131,23 @@ export function AdviceRequestPanel({
     (service === "ready"
       ? computable
       : service !== "other-capture" && selectionAvailable && canComputeAdvice(request));
+  // The member's device solves this selection: no note calls it unsupported, and until it
+  // has run the notes offer it rather than send the member to a published option. Once it
+  // has answered there is nothing to add; after a run that ended without a plan the notes
+  // say what they would say without it, beside the device's own sentence.
+  const deviceOffered = device?.available === true && !deadlinePassed;
+  const deviceAnswered = deviceOffered && device.state.phase === "done";
+  const deviceStillOffered = deviceOffered && !deviceEndedWithoutPlan(device.state);
+  const unreachableNote =
+    published === true
+      ? computeCopy.serviceUnreachablePublished
+      : published === false
+        ? deviceAnswered
+          ? null
+          : deviceStillOffered
+            ? computeCopy.serviceUnreachableDevice
+            : computeCopy.serviceUnreachableAbsent
+        : computeCopy.serviceUnreachable;
 
   return (
     <>
@@ -104,6 +166,24 @@ export function AdviceRequestPanel({
           {copy.computeButton}
         </button>
 
+        {device?.available && !deadlinePassed ? (
+          <button
+            type="button"
+            className={styles.compute}
+            data-device-compute
+            disabled={
+              device.state.phase === "loading" ||
+              device.state.phase === "solving" ||
+              state.phase === "requesting" ||
+              state.phase === "waiting"
+            }
+            onClick={device.run}
+          >
+            {copy.deviceButton}
+          </button>
+        ) : null}
+        {device?.available ? <DeviceState state={device.state} /> : null}
+
         {state.phase === "requesting" ? (
           <p className={styles.state}>{copy.computeRequesting}</p>
         ) : null}
@@ -112,7 +192,11 @@ export function AdviceRequestPanel({
             <Badge tone="accent">
               {state.status === "queued" ? copy.computeQueued : copy.computeRunning}
             </Badge>{" "}
-            {state.fallback !== null ? copy.computeWaitingWithFallback : copy.computeWaiting}
+            {state.earlier
+              ? computeCopy.waitingWithEarlier
+              : state.fallback !== null
+                ? copy.computeWaitingWithFallback
+                : copy.computeWaiting}
           </p>
         ) : null}
         {state.phase === "done" ? (
@@ -130,15 +214,22 @@ export function AdviceRequestPanel({
         {state.phase === "unavailable" ? (
           <p className={styles.state}>
             {state.reason == null
-              ? copy.computeUnavailable
-              : failureSentence(computeCopy, state.reason)}
+              ? state.earlier
+                ? `${copy.computeUnavailable} ${computeCopy.earlierRemains}`
+                : copy.computeUnavailable
+              : failureSentence(computeCopy, state.reason, null, kept(state.earlier))}
           </p>
         ) : null}
         {state.phase === "failed" ? (
           <p className={styles.state}>
-            {state.reason == null
+            {state.reason == null && !state.earlier
               ? copy.computeFailed
-              : failureSentence(computeCopy, state.reason, state.retryAfterSeconds)}
+              : failureSentence(
+                  computeCopy,
+                  state.reason,
+                  state.retryAfterSeconds,
+                  kept(state.earlier),
+                )}
           </p>
         ) : null}
       </div>
@@ -150,7 +241,11 @@ export function AdviceRequestPanel({
             {computeCopy.deadlinePassedCompute}
           </p>
         ) : null}
-        {!deadlinePassed && !supported && !pending && service !== "other-capture" ? (
+        {!deadlinePassed &&
+        !supported &&
+        !pending &&
+        !deviceOffered &&
+        service !== "other-capture" ? (
           <p role="note" className={styles.note}>
             {service !== "ready"
               ? copy.computeUnsupportedSelection
@@ -159,13 +254,9 @@ export function AdviceRequestPanel({
                 : computeCopy.notComputable}
           </p>
         ) : null}
-        {!deadlinePassed && service === "unreachable" ? (
+        {!deadlinePassed && !pending && service === "unreachable" && unreachableNote !== null ? (
           <p role="note" className={styles.note}>
-            {published === true
-              ? computeCopy.serviceUnreachablePublished
-              : published === false
-                ? computeCopy.serviceUnreachableAbsent
-                : computeCopy.serviceUnreachable}
+            {unreachableNote}
           </p>
         ) : null}
         {!deadlinePassed && service === "other-capture" ? (
@@ -173,19 +264,18 @@ export function AdviceRequestPanel({
             {computeCopy.otherCapture}
           </p>
         ) : null}
-        {service === "ready" && supported ? (
+        {service === "ready" && supported && (published === false || !chipChosen) ? (
           <p role="note" className={styles.note}>
-            {published === false ? <>{computeCopy.notPrecomputed} </> : null}
-            {chipChosen ? (
-              computeCopy.chipDurationUnknown
-            ) : (
+            {published === false ? computeCopy.notPrecomputed : null}
+            {published === false && !chipChosen ? " " : null}
+            {chipChosen ? null : (
               <>
                 {computeCopy.duration[request.window]} {computeCopy.durationNote}
               </>
             )}
           </p>
         ) : null}
-        <p className={styles.note}>{isSelf ? copy.computeBodySelf : copy.computeBodyOther}</p>
+        {isSelf ? <p className={styles.note}>{copy.computeBodySelf}</p> : null}
       </div>
     </>
   );

@@ -25,13 +25,23 @@ const COPY = {
     },
     unknown: "Kaynakta farklı durum kodu var",
     cleared: "Önceki haber metni temizlenmiş.",
-    note: "Bu değerler FPL kaydından gelir; ilk 11’de başlama garantisi veya ayrı bir dakika tahmini değildir. Kontrol tarihi, haberin yayın tarihi değildir.",
-    age: "Sunucunun çalışıyor olması, bu bilgilerin şimdi güncellendiği anlamına gelmez.",
+    note: "Bu değerler FPL kaydından gelir.",
     noFlags: "Bu plandaki oyuncular için gösterilecek FPL uyarısı yok.",
     changed:
-      "Bu plan hesaplandıktan sonra karar girdileri değişmiş. Yeni bilgilerle hesaplamak için Hesapla düğmesini kullanabilirsin. Gösterilen eski plan kendiliğinden değiştirilmedi.",
+      "Bu plan hesaplandıktan sonra karar girdileri değişmiş. Yeni bilgilerle hesaplamak için Hesapla düğmesini kullanabilirsin.",
     needsCheck:
       "Bu plan bilgi sürümünü taşımıyor. Güncel girdilerle hesaplayarak yeni sonucu karşılaştırabilirsin.",
+    bindings: "Önceki ve güncel kaynak bağlantıları",
+    binding: "Bilgi",
+    previous: "Gösterilen plan",
+    latest: "Güncel girdiler",
+    checkTime: "FPL kontrol zamanı",
+    coachBinding: "Hoca haber kaynağı",
+    minuteBinding: "Dakika ve puan bileşenleri",
+    bound: "Bağlı",
+    unbound: "Bağlı değil",
+    notRecorded: "Kaydedilmemiş",
+    sameBindings: "Bilgi sürümü değişmiş, ancak bu özet alanları aynı.",
   },
   en: {
     title: "FPL information and this plan",
@@ -53,13 +63,23 @@ const COPY = {
     },
     unknown: "Another source status code",
     cleared: "The earlier news text was cleared.",
-    note: "These values come from FPL; they do not guarantee a start or provide a separate minute forecast. The check time is not the publication time.",
-    age: "A healthy server does not mean this information was refreshed just now.",
+    note: "These values come from FPL.",
     noFlags: "No FPL alerts to show for the players in this plan.",
     changed:
-      "Decision inputs changed after this plan was calculated. Use Calculate to request a result with the new information. The displayed earlier plan has not been changed automatically.",
+      "Decision inputs changed after this plan was calculated. Use Calculate to request a result with the new information.",
     needsCheck:
       "This plan has no information revision. Calculate with the current inputs to compare a new result.",
+    bindings: "Previous and latest source bindings",
+    binding: "Information",
+    previous: "Displayed plan",
+    latest: "Latest inputs",
+    checkTime: "FPL check time",
+    coachBinding: "Coach news source",
+    minuteBinding: "Minute and point components",
+    bound: "Bound",
+    unbound: "Not bound",
+    notRecorded: "Not recorded",
+    sameBindings: "The information revision changed, but these summary fields are unchanged.",
   },
 };
 
@@ -70,7 +90,7 @@ export function NewInformationNotice({
   view: EntryAdvice;
   latest?: DecisionInformation;
 }) {
-  const { language } = useLanguage();
+  const { language, locale } = useLanguage();
   if (
     view.prediction_model?.id !== "football" ||
     !latest ||
@@ -78,13 +98,61 @@ export function NewInformationNotice({
     latest.revision === view.decision_information?.revision
   )
     return null;
+  const copy = COPY[language];
+  const previous = view.decision_information;
+  const stamp = (value: string | null | undefined) =>
+    value ? <time dateTime={value}>{utcShort(value, locale)}</time> : copy.notRecorded;
+  const binding = (value: boolean | undefined) =>
+    value === undefined ? copy.notRecorded : value ? copy.bound : copy.unbound;
+  const sameBindings =
+    previous &&
+    previous.observed_at === latest.observed_at &&
+    previous.coach_news_bound === latest.coach_news_bound &&
+    previous.minute_components_bound === latest.minute_components_bound;
   return (
-    <p role="status" className={styles.honesty} data-testid="new-information-notice">
-      {view.decision_information ? COPY[language].changed : COPY[language].needsCheck}
-    </p>
+    <div data-testid="new-information-notice">
+      <p role="status" className={styles.honesty}>
+        {previous ? copy.changed : copy.needsCheck}
+      </p>
+      <details className={styles.adviceSection} data-testid="information-binding-differences">
+        <summary>{copy.bindings}</summary>
+        {sameBindings && <p>{copy.sameBindings}</p>}
+        <table style={{ width: "100%", tableLayout: "fixed", overflowWrap: "anywhere" }}>
+          <thead>
+            <tr>
+              <th scope="col">{copy.binding}</th>
+              <th scope="col">{copy.previous}</th>
+              <th scope="col">{copy.latest}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">{copy.checkTime}</th>
+              <td>{stamp(previous?.observed_at)}</td>
+              <td>{stamp(latest.observed_at)}</td>
+            </tr>
+            <tr>
+              <th scope="row">{copy.coachBinding}</th>
+              <td>{binding(previous?.coach_news_bound)}</td>
+              <td>{binding(latest.coach_news_bound)}</td>
+            </tr>
+            <tr>
+              <th scope="row">{copy.minuteBinding}</th>
+              <td>{binding(previous?.minute_components_bound)}</td>
+              <td>{binding(latest.minute_components_bound)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </details>
+    </div>
   );
 }
 
+/**
+ * The central league injury source is disabled in production (the producer's
+ * ``OFFICIAL_INJURY_SOURCE_ENABLED`` is False, with no override). The page mirrors that:
+ * a payload's `official_injuries` is validated and never drawn, whoever built it.
+ */
 export function OfficialInformationCard({ view }: { view: EntryAdvice }) {
   const { language, locale } = useLanguage();
   const feed = view.official_information;
@@ -107,9 +175,7 @@ export function OfficialInformationCard({ view }: { view: EntryAdvice }) {
         {copy.observed}:{" "}
         <time dateTime={feed.observed_at}>{utcShort(feed.observed_at, locale)}</time>
       </p>
-      <p className={styles.muted}>
-        {copy.note} {copy.age}
-      </p>
+      <p className={styles.muted}>{copy.note}</p>
       <a href={feed.source_url} target="_blank" rel="noreferrer">
         {copy.source}
       </a>

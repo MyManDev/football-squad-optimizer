@@ -467,7 +467,7 @@ def test_a_truncated_unavailable_word_file_is_still_a_file(tmp_path, capsys):
 
 def test_invalid_json_and_wrong_root_name_the_problem(tmp_path, capsys):
     assert main([str(tmp_path)]) == 1
-    assert "directory containing league/" in capsys.readouterr().out
+    assert "pass the site's data directory" in capsys.readouterr().out
     _tree(tmp_path)
     path = tmp_path / "league/advice/1/saf-puan/1/top100-5.json"
     path.write_text("{")
@@ -498,7 +498,49 @@ def test_local_word_figure_hit_is_reported_once(tmp_path, capsys):
     document["payload"]["note"] = "80%"
     path.write_text(json.dumps(document))
     assert main([str(tmp_path)]) == 1
-    assert capsys.readouterr().out.count("league/advice/1/saf-puan/1/hoca-sozu.json") == 1
+    assert capsys.readouterr().out.count("advice/1/saf-puan/1/hoca-sozu.json") == 1
+
+
+def test_a_site_with_a_directory_is_checked_tree_by_tree(tmp_path, capsys):
+    """Each listed tree is checked under its own path; the legacy tree is not asked for."""
+
+    _tree(tmp_path)
+    (tmp_path / "leagues").mkdir()
+    (tmp_path / "league").rename(tmp_path / "leagues" / "9")
+    directory = {
+        "contract_version": "league_directory_v1",
+        "payload": {
+            "leagues": [
+                {
+                    "league_id": 9,
+                    "league_name": "Nine",
+                    "season": "2026-27",
+                    "gameweek": 1,
+                    "path": "leagues/9",
+                }
+            ]
+        },
+    }
+    (tmp_path / "leagues.json").write_text(json.dumps(directory), encoding="utf-8")
+    assert main([str(tmp_path)]) == 0
+    output = capsys.readouterr().out
+    assert "== leagues/9" in output
+    assert output.count("ALL GOOD") == 3
+
+    # A second listed league whose tree is missing names the tree, not the legacy path.
+    directory["payload"]["leagues"].append(
+        {
+            "league_id": 10,
+            "league_name": "Ten",
+            "season": "2026-27",
+            "gameweek": 1,
+            "path": "leagues/10",
+        }
+    )
+    (tmp_path / "leagues.json").write_text(json.dumps(directory), encoding="utf-8")
+    assert main([str(tmp_path)]) == 1
+    output = capsys.readouterr().out
+    assert "leagues" in output and "10" in output and "members.json" in output
 
 
 @pytest.mark.parametrize(

@@ -23,6 +23,7 @@ import { TOP100_WEIGHTS, top100Path } from "../advice/top100";
 import { TOP100_COPY } from "../advice/top100Copy";
 import type { EntryAdvice, EntryAdviceIndex, LeagueViewEnvelope } from "../types";
 import { LeagueMemberView } from "./LeagueMemberPage";
+import { withLeague } from "../../../testSupport/league";
 
 afterEach(cleanup);
 
@@ -70,13 +71,15 @@ function weighted(
 function renderPage(language: Language, advice: LeagueViewEnvelope<EntryAdvice>, query: string) {
   return render(
     <LanguageProvider initialLanguage={language}>
-      <MemoryRouter initialEntries={[`/league/members/${ENTRY}?${query}`]}>
-        <LeagueMemberView
-          squad={mockEntrySquadEnvelopes[ENTRY]}
-          advice={advice}
-          members={mockLeagueMembersEnvelope.payload.members}
-          index={INDEX}
-        />
+      <MemoryRouter initialEntries={[`/league/352490/members/${ENTRY}?${query}`]}>
+        {withLeague(
+          <LeagueMemberView
+            squad={mockEntrySquadEnvelopes[ENTRY]}
+            advice={advice}
+            members={mockLeagueMembersEnvelope.payload.members}
+            index={INDEX}
+          />,
+        )}
       </MemoryRouter>
     </LanguageProvider>,
   );
@@ -110,13 +113,12 @@ describe("a Top 100 weighted plan on the advice card", () => {
     const text = section(container);
     expect(text).toContain(TOP100_COPY.tr.weightLine(20));
     expect(text).toContain(TOP100_COPY.tr.changed);
-    expect(text).toContain(TOP100_COPY.tr.honesty);
-    expect(text).toContain(TOP100_COPY.tr.notStart);
+    // The setting, what it did and its price; no caveat under them and no limit listed.
+    expect(text).not.toMatch(/tercihin bedelidir|ölçümü değildir/);
     const page = container.textContent ?? "";
     expect(page).toContain(TOP100_COPY.tr.cost("0,4"));
     expect(page).not.toContain(TOP100_COPY.tr.costAtMost("0,4"));
-    expect(page).toContain(TOP100_COPY.tr.limit(20));
-    expect(page).not.toContain(MESSAGES.tr.leagueMembers.statedLimitUnknown);
+    expect(page).not.toContain(TOP100_COPY.tr.limit(20));
   });
 
   it("says an unchanged plan is unchanged, in English", () => {
@@ -133,7 +135,7 @@ describe("a Top 100 weighted plan on the advice card", () => {
     expect(container.textContent).toContain(TOP100_COPY.en.cost("0.0"));
   });
 
-  it("states only the ceiling when a proof is missing, and says why", () => {
+  it("states only the ceiling when a proof is missing, without saying why", () => {
     const { container } = renderPage(
       "en",
       weighted(30, false, {
@@ -147,8 +149,7 @@ describe("a Top 100 weighted plan on the advice card", () => {
     const page = container.textContent ?? "";
     expect(page).toContain(TOP100_COPY.en.costAtMost("1.7"));
     expect(page).not.toContain(TOP100_COPY.en.cost("1.7"));
-    expect(page).toContain(TOP100_COPY.en.unproven);
-    expect(page).not.toContain(MESSAGES.en.leagueMembers.unprovenPlanGapUnknown);
+    expect(page).not.toMatch(/finish(ing)? its proof|proof is incomplete|Proof incomplete/i);
   });
 
   it("states no price when the plan it is measured against is unproven", () => {
@@ -168,19 +169,19 @@ describe("a Top 100 weighted plan on the advice card", () => {
       "mode=saf-puan&window=1&top100=30",
     );
     const page = container.textContent ?? "";
+    expect(page).toContain("Your gameweek");
     expect(page).not.toContain(TOP100_COPY.en.costAtMost("2.7"));
     expect(page).not.toContain(TOP100_COPY.en.cost("0.2"));
-    expect(page).not.toContain(TOP100_COPY.en.unproven);
-    expect(page).toContain(MESSAGES.en.leagueMembers.unprovenPlanGapUnknown);
-    expect(page).toContain(MESSAGES.en.leagueMembers.controlUnprovenBody("2.5"));
+    expect(page).not.toMatch(/finish(ing)? its proof|proof is incomplete|Proof incomplete/i);
+    expect(page).not.toMatch(/was not proven optimal/);
   });
 
   it.each([
-    ["en", "0.2", "2.5"],
-    ["tr", "0,2", "2,5"],
+    ["en", "0.2"],
+    ["tr", "0,2"],
   ] as const)(
     "does not point at a price it does not print when the setting changed the plan, in %s",
-    (language, price, gap) => {
+    (language, price) => {
       const advice = weighted(30, false, {
         control_solver_status: "FEASIBLE",
         control_optimality_gap: 2.5,
@@ -195,7 +196,9 @@ describe("a Top 100 weighted plan on the advice card", () => {
       const page = container.textContent ?? "";
       expect(page).not.toContain(TOP100_COPY[language].cost(price));
       expect(page).not.toContain(TOP100_COPY[language].costAtMost(price));
-      expect(page).toContain(MESSAGES[language].leagueMembers.controlUnprovenBody(gap));
+      expect(page).not.toMatch(
+        language === "tr" ? /en iyi diye kanıtlanamadı/ : /was not proven optimal/,
+      );
     },
   );
 
@@ -243,7 +246,7 @@ describe("a Top 100 weighted plan on the advice card", () => {
     expect(container.textContent).toContain(TOP100_COPY.en.moveReason);
   });
 
-  it("prices a strategy and the setting together, and reads the window's limits back", () => {
+  it("prices a strategy and the setting together, and lists no limits", () => {
     const base = mockEntryAdviceIndex(ENTRY).payload;
     const rival = base.default_rival_entry_id!;
     const target = { strategy: "ortak-koru", window: 3, rivalEntryId: rival };
@@ -285,25 +288,26 @@ describe("a Top 100 weighted plan on the advice card", () => {
     const { container } = render(
       <LanguageProvider initialLanguage="tr">
         <MemoryRouter
-          initialEntries={[`/league/members/${ENTRY}?mode=ortak-koru&window=3&top100=20`]}
+          initialEntries={[`/league/352490/members/${ENTRY}?mode=ortak-koru&window=3&top100=20`]}
         >
-          <LeagueMemberView
-            squad={mockEntrySquadEnvelopes[ENTRY]}
-            advice={advice}
-            members={mockLeagueMembersEnvelope.payload.members}
-            index={index}
-          />
+          {withLeague(
+            <LeagueMemberView
+              squad={mockEntrySquadEnvelopes[ENTRY]}
+              advice={advice}
+              members={mockLeagueMembersEnvelope.payload.members}
+              index={index}
+            />,
+          )}
         </MemoryRouter>
       </LanguageProvider>,
     );
     const page = container.textContent ?? "";
     expect(page).toContain(TOP100_COPY.tr.strategyCostAtMost("12,5"));
     expect(page).not.toContain(TOP100_COPY.tr.strategyCost("12,5"));
-    expect(page).toContain(TOP100_COPY.tr.limit(20));
-    for (const sentence of Object.values(TOP100_COPY.tr.variantLimits)) {
-      expect(page).toContain(sentence);
+    expect(page).not.toContain(TOP100_COPY.tr.limit(20));
+    for (const sentence of advice.payload.stated_limits ?? []) {
+      expect(page).not.toContain(sentence);
     }
-    expect(page).not.toContain(MESSAGES.tr.leagueMembers.statedLimitUnknown);
     expect(section(container)).toContain(TOP100_COPY.tr.weightLine(20));
     expect(page).not.toMatch(AS_A_CHANCE);
   });

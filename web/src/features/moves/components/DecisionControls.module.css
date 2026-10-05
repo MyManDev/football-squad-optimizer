@@ -142,7 +142,6 @@
 
 /* A state statement is a line with its tag, not a tinted card with a coloured stripe: the
    tag (Badge) carries the tone. */
-.diagnostic,
 .horizonStatus {
   display: flex;
   align-items: flex-start;
@@ -184,7 +183,6 @@
     text-align: left;
   }
 
-  .diagnostic,
   .horizonStatus {
     flex-direction: column;
   }

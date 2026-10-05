@@ -504,5 +504,5 @@ def test_a_byte_span_cutting_through_utf8_is_not_verified():
     documents, _, _ = documents_from_source(FIXTURE)
     source = replace(documents[0], content="é".encode(), readable="é".encode(), byte_length=2)
     digest = hashlib.sha256(source.readable).hexdigest()
-    document, words = module._resolve((source,), digest, 0, 1)
-    assert document == source and words is None
+    document, words, whole_sentence = module._resolve((source,), digest, 0, 1)
+    assert document == source and words is None and whole_sentence is False

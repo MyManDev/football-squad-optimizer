@@ -8,15 +8,14 @@
  * producer chose is the default and is labelled as such. Where it named no default, no
  * rival is shown as chosen — the request would name none, and a control that displayed
  * one would demand a choice the member appeared to have made. Windows are enabled only
- * where the index lists them — pure points at three and five weeks when this publish
- * solved them — and the note says what a longer window assumes; a rival strategy stays at
- * one week, and a window nobody computed is shown disabled rather than hidden. A window
- * carried in from another strategy falls back to one the index lists, and says it did.
+ * where the index lists them (pure points at three and five weeks when this publish
+ * solved them); a rival strategy stays at one week, and a window nobody computed is
+ * shown disabled rather than hidden. A window carried in from another strategy falls
+ * back to one the index lists.
  *
  * One option may carry the producer's declared rule as a label: the rule reads the
  * member's points gap to their rival and the gameweeks left, and names one of the three.
- * It marks, it does not choose — the checked option is still whatever the URL says — and
- * the note beside it says the rule is written down rather than measured.
+ * It marks, it does not choose: the checked option is still whatever the URL says.
  *
  * The Top 100 influence is a row of weights beside the manager's word. Each one is a
  * file the producer solved for this member on the one-week pure-points plan; a weight
@@ -57,7 +56,11 @@ import {
 import { CHIP_NAMES } from "../chipShape";
 import { DisclosureIcon } from "../components/memberIcons";
 import type { AdviceCapabilities } from "./adviceCapabilities";
-import { EVIDENCE_PARAMETER, resolvePublishedAdvice } from "./adviceSelection";
+import {
+  type DeviceComputable,
+  EVIDENCE_PARAMETER,
+  resolvePublishedAdvice,
+} from "./adviceSelection";
 import { AUTOMATIC_CHIP_OFFERED, CHIP_PARAMETER } from "./chipChoice";
 import { CHIP_COPY, chipReason, chipsUnavailable } from "./chipCopy";
 import { COMPUTE_COPY } from "./computeCopy";
@@ -74,12 +77,15 @@ export function MemberDecisionControls({
   members,
   index,
   capabilities = null,
+  onDevice,
   part,
 }: {
   entryId: number;
   members: EntryView[];
   index: EntryAdviceIndex | null;
   capabilities?: AdviceCapabilities | null;
+  /** What the member's device computes from this publish's inputs, beside the service. */
+  onDevice?: DeviceComputable;
   part?: DecisionControlsPart;
 }) {
   const { language, locale, messages } = useLanguage();
@@ -94,6 +100,7 @@ export function MemberDecisionControls({
       index,
       undefined,
       capabilities,
+      onDevice,
     );
   const selection = resolve(searchParams);
   // What the service adds to the published menu; nothing at all on a static build.
@@ -104,33 +111,69 @@ export function MemberDecisionControls({
     (member) => member.member_kind === "human" && member.entry_id !== entryId,
   );
   const rivalIds = [
-    ...new Set([...selection.rivals.map((rival) => rival.entryId), ...(computable?.rivals ?? [])]),
+    ...new Set([
+      ...selection.rivals.map((rival) => rival.entryId),
+      ...(computable?.rivals ?? []),
+      ...(onDevice?.rivals ?? []),
+    ]),
   ];
   const defaultRival = index?.default_rival_entry_id ?? null;
-  const windows = [...new Set([...selection.windows, ...(computable?.windows ?? [])])];
-  const strategies = [...new Set([...selection.strategies, ...(computable?.strategies ?? [])])];
-  // A rival can be chosen where its file was published or, for a window the service
-  // computes, against any member it lists.
+  const windows = [
+    ...new Set([
+      ...selection.windows,
+      ...(computable?.windows ?? []),
+      ...(onDevice && isMemberStrategy(strategy) && onDevice.strategies.includes(strategy)
+        ? onDevice.windows
+        : []),
+    ]),
+  ];
+  const strategies = [
+    ...new Set([
+      ...selection.strategies,
+      ...(computable?.strategies ?? []),
+      ...(onDevice?.strategies ?? []),
+    ]),
+  ];
+  // The rival a link names stays the choice while the device cannot judge them yet: the
+  // rivals' documents are still being read, or theirs could not be.
+  const rivalHeld = (rivalId: number) =>
+    rivalId === chosenRival &&
+    (onDevice?.loading === true || onDevice?.unreadRivals?.includes(rivalId) === true);
+  const rivalsUnread = (onDevice?.unreadRivals?.length ?? 0) > 0;
+  // A rival can be chosen where its file was published or, for a window the service or
+  // the device computes, against any member either lists.
   const rivalSelectable = (rivalId: number) =>
     !!selection.rivals.find((rival) => rival.entryId === rivalId)?.path ||
     (!!computable &&
       computable.windows.includes(windowSize) &&
       computable.rivals.includes(rivalId) &&
       // A pair the producer declared impossible stays off: the service solves the same band.
+      !selection.rivals.find((rival) => rival.entryId === rivalId)?.reason) ||
+    (!!onDevice &&
+      isMemberStrategy(strategy) &&
+      onDevice.strategies.includes(strategy) &&
+      onDevice.windows.includes(windowSize) &&
+      (onDevice.rivals.includes(rivalId) || rivalHeld(rivalId)) &&
       !selection.rivals.find((rival) => rival.entryId === rivalId)?.reason);
 
   function strategySelection(slug: string) {
     const next = new URLSearchParams(searchParams);
     next.set("mode", slug);
     const offered = resolve(next);
-    const offeredWindows = [...offered.windows, ...(offered.computable?.windows ?? [])];
+    const offeredWindows = [
+      ...offered.windows,
+      ...(offered.computable?.windows ?? []),
+      ...(offered.onDevice && isMemberStrategy(slug) && offered.onDevice.strategies.includes(slug)
+        ? offered.onDevice.windows
+        : []),
+    ];
     if (!offeredWindows.includes(offered.request.window) && offeredWindows[0]) {
       next.set("window", String(offeredWindows[0]));
     }
     return { next, offered: resolve(next) };
   }
 
-  /** A strategy is offered where the publish solved it or the service computes it. */
+  /** A strategy is offered where the publish solved it, the service or the device computes it. */
   function strategyOffered(slug: string): boolean {
     const { offered } = strategySelection(slug);
     const publishedHere =
@@ -140,7 +183,14 @@ export function MemberDecisionControls({
       !!offered.computable &&
       offered.computable.windows.length > 0 &&
       (!strategyNeedsRival(slug) || offered.computable.rivals.length > 0);
-    return publishedHere || computedHere;
+    const onDeviceHere =
+      !!offered.onDevice &&
+      isMemberStrategy(slug) &&
+      offered.onDevice.strategies.includes(slug) &&
+      (!strategyNeedsRival(slug) ||
+        offered.onDevice.rivals.length > 0 ||
+        offered.onDevice.loading === true);
+    return publishedHere || computedHere || onDeviceHere;
   }
 
   function update(changes: Record<string, string | null>): void {
@@ -175,10 +225,15 @@ export function MemberDecisionControls({
   // A setting exists wherever the producer solved one: every pure-points window, and a
   // strategy's windows against the default rival.
   const top100Applies = top100.available && top100.offered.length > 1;
-  const top100Computable = (computable?.top100Weights.length ?? 0) > 1;
+  const top100Service = (computable?.top100Weights.length ?? 0) > 1;
+  // The device solves a weight for the one-week pure-points plan only.
+  const top100Device =
+    strategy === "saf-puan" && windowSize === 1 && (onDevice?.top100Weights.length ?? 0) > 1;
+  const top100Computable = top100Service || top100Device;
   const weightSelectable = (weight: number) =>
     (top100Applies && top100.weights.some((offered) => offered === weight)) ||
-    (top100Computable && computable!.top100Weights.some((offered) => offered === weight));
+    (top100Service && computable!.top100Weights.some((offered) => offered === weight)) ||
+    (top100Device && onDevice!.top100Weights.some((offered) => offered === weight));
   // Legacy published chips exclude both switches. The live chip strategy permits Top100,
   // but still excludes the manager's word; explain only the applicable restriction.
   const chipCopy = CHIP_COPY[language];
@@ -219,7 +274,7 @@ export function MemberDecisionControls({
   const top100Note =
     chipChosen && !chipStrategy
       ? chipCopy.switchesOff
-      : top100Computable && TOP100_WEIGHTS.some((weight) => !top100.weights.includes(weight))
+      : top100Service && TOP100_WEIGHTS.some((weight) => !top100.weights.includes(weight))
         ? computeCopy.top100Computable
         : !top100.available
           ? top100Unavailable(top100Copy, top100.reason)
@@ -291,7 +346,14 @@ export function MemberDecisionControls({
       {needsRival ? (
         <div className={styles.field}>
           {rivalIds.length === 0 ? (
-            <p className={styles.line}>{copy.rivalNone}</p>
+            // Absent squads are said to be unpublished only once every read has answered.
+            <p className={styles.line}>
+              {onDevice?.loading
+                ? copy.rivalsLoading
+                : rivalsUnread
+                  ? copy.rivalsUnreadable
+                  : copy.rivalNone}
+            </p>
           ) : (
             <label className={styles.rivalField}>
               <span className={styles.label}>{copy.rivalLabel}</span>
@@ -320,6 +382,9 @@ export function MemberDecisionControls({
           )}
           {rivalIds.length > 0 && chosenRival === null ? (
             <p className={styles.line}>{copy.rivalNoDefault}</p>
+          ) : null}
+          {rivalIds.length > 0 && rivalsUnread ? (
+            <p className={styles.line}>{copy.rivalsUnreadable}</p>
           ) : null}
         </div>
       ) : null}
@@ -399,18 +464,11 @@ export function MemberDecisionControls({
         ) : null}
         {needsRival ? (
           <>
-            <p>{copy.rivalNote}</p>
             {windows.length > 1 ? <p>{top100Copy.rivalWindows}</p> : null}
             {(computable?.rivals.length ?? 0) > 0 ? <p>{computeCopy.rivalComputable}</p> : null}
           </>
         ) : null}
-        <p>
-          {selection.request.model === "football"
-            ? copy.modelWindowNote
-            : windows.length > 1
-              ? copy.windowLimits
-              : copy.windowNotComputed}
-        </p>
+        {selection.request.model === "football" ? <p>{copy.modelWindowNote}</p> : null}
         {showModel ? <p>{copy.modelNote}</p> : null}
         {computable && computable.strategies.length > 0 ? <p>{computeCopy.controlsNote}</p> : null}
       </div>
@@ -443,7 +501,17 @@ export function MemberDecisionControls({
         ))}
       </div>
       <p className={styles.note}>{top100Note}</p>
-      {top100Applies || top100Computable ? <p className={styles.note}>{top100Copy.help}</p> : null}
+      {/* The arithmetic of the weight is for the member who wants it. It waits closed so the
+          card reads as a choice of settings and not as a paragraph to get through first. */}
+      {top100Applies || top100Computable ? (
+        <details className={styles.notes}>
+          <summary>
+            <DisclosureIcon className={styles.notesIcon} />
+            {top100Copy.helpTitle}
+          </summary>
+          <p className={styles.note}>{top100Copy.help}</p>
+        </details>
+      ) : null}
     </fieldset>
   );
 

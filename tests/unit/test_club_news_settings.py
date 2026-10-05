@@ -157,7 +157,8 @@ def test_offline_check_does_not_build_a_client_read_a_roster_or_fetch(
     def forbidden(*args: object, **kwargs: object) -> object:
         raise AssertionError("Offline preflight crossed an external boundary")
 
-    monkeypatch.setattr(club_news_acquire, "build_coding_provider", forbidden)
+    monkeypatch.setattr(club_news_acquire, "resolve_provider_config", forbidden)
+    monkeypatch.setattr(club_news_acquire, "bind_coding_provider", forbidden)
     monkeypatch.setattr(club_news_acquire, "load_club_sources", forbidden)
     monkeypatch.setattr(club_news_acquire, "read_snapshot", forbidden)
     monkeypatch.setattr(club_news_provider.importlib.util, "find_spec", lambda _: object())

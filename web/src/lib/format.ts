@@ -86,6 +86,18 @@ export function utcShort(iso: string, locale = "en-GB"): string {
   );
 }
 
+/** A calendar day (`YYYY-MM-DD`), said as a day: no clock is invented for it. */
+export function dayShort(day: string, locale = "en-GB"): string {
+  const date = new Date(`${day}T00:00:00Z`);
+  if (Number.isNaN(date.getTime())) return day;
+  return date.toLocaleDateString(locale, {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}
+
 export function local(iso: string, locale = "en-GB"): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;

@@ -28,6 +28,13 @@ from typing import Final
 import numpy as np
 import pandas as pd
 
+from squadopt.prediction.football import JOINT_ROLE_MODEL_VERSIONS
+from squadopt.prediction.football_minutes_role import (
+    ROLE_COMPONENT_COLUMNS,
+    ROLE_METADATA_COLUMNS,
+    ROLE_MINUTE_VERSION,
+)
+
 FIXTURE_COMPONENTS_CONTRACT: Final = "football_fixture_components_v1"
 
 #: How ``captured_availability`` is applied: once per player and week, never per fixture.
@@ -112,6 +119,108 @@ POSITIONS: Final[tuple[str, ...]] = ("GK", "DEF", "MID", "FWD")
 MINUTE_CEILING: Final = 120.0
 
 
+def _role_number(value: object) -> float:
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, (int, float, np.integer, np.floating))
+        or not math.isfinite(float(value))
+    ):
+        raise ValueError("A joint-role component is not a finite number.")
+    return float(value)
+
+
+def role_component_record(record: Mapping[str, object]) -> dict[str, object]:
+    """Validate optional joint-role columns without changing frozen v1 records."""
+    missing = set((*ROLE_COMPONENT_COLUMNS, *ROLE_METADATA_COLUMNS)) - record.keys()
+    if missing:
+        raise ValueError("Joint-role components lack their declared minute fields.")
+    result: dict[str, object] = {}
+    for name in ROLE_COMPONENT_COLUMNS:
+        raw = record[name]
+        if (
+            raw is None
+            or raw is pd.NA
+            or (isinstance(raw, (float, np.floating)) and math.isnan(float(raw)))
+        ):
+            result[name] = None
+        else:
+            result[name] = _role_number(raw)
+    for name in ("known_start_label_rows", "unknown_start_label_rows"):
+        value = record[name]
+        if isinstance(value, bool) or not isinstance(value, (int, np.integer)) or value < 0:
+            raise ValueError("Role training counts must be nonnegative integers.")
+        result[name] = int(value)
+    result.update(
+        {
+            name: record[name]
+            for name in ("minute_role_version", "minute_role_status", "minute_prior_rows")
+        }
+    )
+    if result["minute_role_version"] != ROLE_MINUTE_VERSION or result["minute_prior_rows"] != 10.0:
+        raise ValueError("Unknown joint-role minute version or fixed prior.")
+    q = _role_number(record["appearance_probability"])
+    zero = result["zero_probability"]
+    unknown = result["unknown_role_probability"]
+    conditional = result["expected_minutes_if_appearance"]
+    if zero is None or unknown is None or conditional is None:
+        raise ValueError("Joint-role zero, unknown and conditional minutes must be declared.")
+    if not np.isclose(_role_number(zero), 1 - q) or not 0 <= _role_number(unknown) <= 1:
+        raise ValueError("Joint-role zero or unknown probability is inconsistent.")
+    if not np.isclose(q * _role_number(conditional), _role_number(record["expected_minutes"])):
+        raise ValueError("Joint-role conditional and expected minutes disagree.")
+    role_fields = [name for name in ROLE_COMPONENT_COLUMNS if name.startswith(("start_", "cameo_"))]
+    if result["minute_role_status"] == "unavailable_no_known_start_labels":
+        if (
+            result["known_start_label_rows"] != 0
+            or not np.isclose(_role_number(unknown), q)
+            or any(result[name] is not None for name in role_fields)
+        ):
+            raise ValueError("Unknown starting roles must remain null, not inferred from minutes.")
+        return result
+    if (
+        result["minute_role_status"] != "fitted_known_start_labels"
+        or result["known_start_label_rows"] == 0
+        or unknown != 0
+        or any(result[name] is None for name in role_fields)
+    ):
+        raise ValueError("Joint-role fitted status disagrees with its training or fields.")
+    total = 0.0
+    expected_minutes = 0.0
+    p60 = 0.0
+    marginal = np.zeros(3)
+    weighted_minutes = np.zeros(3)
+    for role in ("start", "cameo"):
+        probabilities = np.array(
+            [result[f"{role}_minute_probability_{b}"] for b in (1, 2, 3)], float
+        )
+        minutes = np.array([result[f"{role}_minute_value_{b}"] for b in (1, 2, 3)], float)
+        if ((probabilities < 0) | (probabilities > 1)).any() or not (
+            0 < minutes[0] < 60 and 60 <= minutes[1] < 90 and 90 <= minutes[2] <= 120
+        ):
+            raise ValueError("Joint-role probability or minute support is invalid.")
+        if not np.isclose(probabilities.sum(), _role_number(result[role + "_probability"])):
+            raise ValueError("Starting role mass disagrees with its minute bins.")
+        total += float(probabilities.sum())
+        expected_minutes += float(probabilities @ minutes)
+        p60 += float(probabilities[1:].sum())
+        marginal += probabilities
+        weighted_minutes += probabilities * minutes
+    if (
+        not np.isclose(total, q)
+        or not np.isclose(expected_minutes, _role_number(record["expected_minutes"]))
+        or not np.isclose(p60, _role_number(record["p60"]))
+    ):
+        raise ValueError("Joint-role marginals disagree with the scoring components.")
+    for b in (1, 2, 3):
+        probability = _role_number(record[f"minute_probability_{b}"])
+        value = _role_number(record[f"minute_value_{b}"])
+        if not np.isclose(probability, marginal[b - 1]) or not np.isclose(
+            probability * value, weighted_minutes[b - 1]
+        ):
+            raise ValueError("Collapsed minute bins disagree with the joint support.")
+    return result
+
+
 def _refuse_inconsistent_sides(frame: pd.DataFrame) -> None:
     """Every fixture has one home and one away club, each the other's opponent and goal rate."""
 
@@ -158,7 +267,11 @@ def component_rows(
         raise ValueError(f"Fixture components hold rows of another model than {model_version}.")
     if not components.position.isin(POSITIONS).all():
         raise ValueError("A fixture component names an unknown position.")
-    frame = components.loc[:, [*IDENTITY_COLUMNS, *COMPONENT_COLUMNS]].sort_values(
+    joint_role = model_version in JOINT_ROLE_MODEL_VERSIONS
+    extras = [*ROLE_COMPONENT_COLUMNS, *ROLE_METADATA_COLUMNS] if joint_role else []
+    if joint_role and not set(extras) <= set(components):
+        raise ValueError("Joint-role components lack their declared minute fields.")
+    frame = components.loc[:, [*IDENTITY_COLUMNS, *COMPONENT_COLUMNS, *extras]].sort_values(
         ["GW", "kickoff", "fixture", "player_code"], kind="stable"
     )
     values = frame.loc[:, list(COMPONENT_COLUMNS)].to_numpy(dtype=float)
@@ -204,6 +317,11 @@ def component_rows(
                 "player_code": player,
                 "position": str(record["position"]),
                 **{name: float(record[name]) for name in COMPONENT_COLUMNS},
+                **(
+                    role_component_record({str(key): value for key, value in record.items()})
+                    if joint_role
+                    else {}
+                ),
             }
         )
     return rows

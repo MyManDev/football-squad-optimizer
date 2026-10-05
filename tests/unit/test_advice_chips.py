@@ -539,17 +539,16 @@ def test_without_an_index_to_name_them_no_chip_is_solved_or_written(
 # -- the sentences the site keys its copy by ----------------------------------------------
 
 
-def test_the_site_holds_the_producers_chip_sentences_word_for_word() -> None:
-    """The page translates a stated limit by looking the producer's sentence up; a sentence
-    that drifted would fall through as "unknown" on the card and every other test stays
-    green."""
+def test_the_site_carries_the_producers_chip_sentences_without_showing_them() -> None:
+    """The fixture carries the producer's sentences, as the contract does; the page keeps
+    no translation of them, because a stated limit is not drawn on a member page."""
 
     web = Path(__file__).resolve().parents[2] / "web" / "src"
     fixture = (web / "fixtures" / "league.ts").read_text(encoding="utf-8")
     copy = (web / "features" / "league" / "advice" / "chipCopy.ts").read_text(encoding="utf-8")
     for sentence in (CHIP_CHOICE_LIMIT, FREE_HIT_LIMIT):
         assert json.dumps(sentence) in fixture
-        assert json.dumps(sentence) in copy
+        assert json.dumps(sentence) not in copy
 
 
 def test_a_history_the_windows_cannot_place_offers_no_chip_and_keeps_the_member(

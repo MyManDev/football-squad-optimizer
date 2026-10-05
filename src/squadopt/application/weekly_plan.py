@@ -94,12 +94,13 @@ class WeekPlan:
 
     season: str
     gameweek: int
-    league_id: int
+    league_ids: tuple[int, ...]
     steps: tuple[str, ...]
     reasons: dict[str, str] = field(default_factory=dict)
 
     def describe(self) -> str:
-        lines = [f"week plan: {self.season} gameweek {self.gameweek}, league {self.league_id}"]
+        leagues = ", ".join(str(league_id) for league_id in self.league_ids)
+        lines = [f"week plan: {self.season} gameweek {self.gameweek}, leagues {leagues}"]
         for step in STEPS:
             state = "run" if step in self.steps else f"skip ({self.reasons.get(step, 'not asked')})"
             lines.append(f"  {step:<8} {state}")
@@ -110,7 +111,9 @@ class WeekPlan:
 class WeeklyRequest:
     season: str
     gameweek: int
-    league_id: int
+    #: Every league the run renders, in the order the operator listed them; the capture
+    #: reads each one's standings and the site's directory lists them all.
+    league_ids: tuple[int, ...]
     snapshot_id: str | None = None
     cohort_snapshot: str | None = None
     elite_snapshot: str | None = None
@@ -127,8 +130,10 @@ class WeeklyRequest:
     rotation_capture: str | None = None
 
     def plan(self) -> WeekPlan:
-        if self.workers < 1 or self.league_id < 1:
-            raise WeekError("League id and worker count must be positive.")
+        if self.workers < 1 or not self.league_ids or min(self.league_ids) < 1:
+            raise WeekError("At least one positive league id and a positive worker count.")
+        if len(set(self.league_ids)) != len(self.league_ids):
+            raise WeekError("A league is listed once.")
         if self.projection not in {"component", "component-only"}:
             raise WeekError("Unknown weekly projection selection.")
         if self.rotation_capture is not None and not self.rotation:
@@ -158,7 +163,7 @@ class WeeklyRequest:
         return plan_week(
             season=self.season,
             gameweek=self.gameweek,
-            league_id=self.league_id,
+            league_ids=self.league_ids,
             snapshot_id=self.snapshot_id,
             cohort_snapshot=self.cohort_snapshot,
             elite_snapshot=self.elite_snapshot,
@@ -214,6 +219,7 @@ def prepare_week(
             season=request.season,
             gameweek=request.gameweek,
             snapshot_id=rotation_source_capture(request.snapshot_id, request.rotation_capture),
+            decision_snapshot_id=request.snapshot_id,
         )
     skip = None
     if request.decide:
@@ -231,7 +237,7 @@ def plan_week(
     *,
     season: str,
     gameweek: int,
-    league_id: int,
+    league_ids: tuple[int, ...],
     snapshot_id: str | None,
     cohort_snapshot: str | None,
     elite_snapshot: str | None,
@@ -295,7 +301,7 @@ def plan_week(
         steps.append("publish")
     else:
         reasons["publish"] = "pass --publish to open the site PR"
-    return WeekPlan(season, gameweek, league_id, tuple(steps), reasons)
+    return WeekPlan(season, gameweek, league_ids, tuple(steps), reasons)
 
 
 def evidence_artifact(
@@ -331,7 +337,12 @@ def rotation_source_capture(decision_snapshot: str, club_news_snapshot: str | No
 
 
 def rotation_artifact(
-    root: Path, season: str, gameweek: int, snapshot_id: str
+    root: Path,
+    season: str,
+    gameweek: int,
+    snapshot_id: str,
+    *,
+    decision_snapshot_id: str | None = None,
 ) -> tuple[Path, Path]:
     """The rotation table and manifest one capture's export writes.
 
@@ -349,6 +360,9 @@ def rotation_artifact(
     # bump would leave this looking for last version's file while the export writes the new
     # one, and the reuse check would silently stop finding anything.
     name = f"{ROTATION_EVIDENCE_CONTRACT_VERSION}_{season}_gw{gameweek:02d}_{snapshot_id[-12:]}"
+    if decision_snapshot_id is not None and decision_snapshot_id != snapshot_id:
+        _require_capture_name(decision_snapshot_id, "decision_snapshot_id")
+        name += f"_decision_{decision_snapshot_id[-12:]}"
     return root / f"{name}.csv", root / f"{name}.manifest.json"
 
 
@@ -376,12 +390,17 @@ def rotation_pair_is_readable(table: Path, manifest: Path) -> bool:
 
 
 def check_rotation_for_reused_capture(
-    rotation_root: Path, *, season: str, gameweek: int, snapshot_id: str
+    rotation_root: Path,
+    *,
+    season: str,
+    gameweek: int,
+    snapshot_id: str,
+    decision_snapshot_id: str | None = None,
 ) -> None:
     """Refuse a reused live capture whose rotation export is not already on disk.
 
     The same shape as :func:`check_evidence_for_reused_capture` and the same argument, from
-    this artifact's own contract rather than from Phase B's. ``rotation_evidence_v2`` records
+    this artifact's own contract rather than from Phase B's. The rotation manifest records
     ``generated_at_utc``, and the lane's ordering constraint is that the claim chain is frozen
     before the decision capture: re-exporting now for a capture already taken stamps the
     artifact after it, always, and no amount of promptness escapes that. Said here, before
@@ -392,7 +411,13 @@ def check_rotation_for_reused_capture(
     and then fail at the read.
     """
 
-    table, manifest = rotation_artifact(rotation_root, season, gameweek, snapshot_id)
+    table, manifest = rotation_artifact(
+        rotation_root,
+        season,
+        gameweek,
+        snapshot_id,
+        decision_snapshot_id=decision_snapshot_id,
+    )
     if rotation_pair_is_readable(table, manifest):
         return
     if table.is_file() and manifest.is_file():

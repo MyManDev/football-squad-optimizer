@@ -84,7 +84,11 @@ function serve(body: string, status = 200) {
 const published = (view: FixturesPayload) =>
   JSON.stringify({ contract_version: "fixtures_v1", generated_at_utc: "now", payload: view });
 
-function surface(node: React.ReactNode, language: Language = "en", path = "/league/members/1") {
+function surface(
+  node: React.ReactNode,
+  language: Language = "en",
+  path = "/league/352490/members/1",
+) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return (
     <LanguageProvider initialLanguage={language}>
@@ -274,5 +278,17 @@ describe("the fixture document", () => {
     (broken.gameweeks[0]!.fixtures[0] as { home_score: unknown }).home_score = "3";
     serve(published(broken));
     expect(await loadFixtures()).toBeNull();
+  });
+
+  it("is absent when not published, and reads the 404's body so the request ends", async () => {
+    const response = new Response("<!doctype html><p>No document is published.</p>", {
+      status: 404,
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => response),
+    );
+    expect(await loadFixtures()).toBeNull();
+    expect(response.bodyUsed).toBe(true);
   });
 });

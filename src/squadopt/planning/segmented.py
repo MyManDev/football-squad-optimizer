@@ -49,6 +49,10 @@ def _segment_rights(rights: ChipAvailability, last: int) -> ChipAvailability:
                 if reserved
                 else period.gameweeks
             )
+            # A renewed Free Hit right still cannot follow this segment's final
+            # week. The forced use may belong to a different dated right.
+            if name == "freehit" and rights.forced.get(last + 1) == "freehit":
+                dates = dates - {last}
             if dates:
                 periods.append(ChipUseWindow(dates, period.holding_value_points))
         if periods:

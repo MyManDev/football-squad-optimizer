@@ -11,10 +11,13 @@ from typing import Final
 
 import pandas as pd
 
+from squadopt.data._long_paths import addressable
 from squadopt.data.atomic import write_document_once
+from squadopt.data.claim_identity import normalise_claim_name
 from squadopt.data.errors import DataError, InvalidValueError
 from squadopt.data.snapshots import CapturedSnapshot, read_snapshot
 from squadopt.data.sources.club_news import (
+    ClubNewsError,
     FixtureClubNewsProvider,
     RawDocument,
 )
@@ -83,11 +86,15 @@ class _ClubNewsInputs:
     clubs_declared: tuple[str, ...]
     clubs_covered: tuple[str, ...]
     unverifiable: tuple[UnlocatableClaim, ...] = ()
+    unverifiable_response_clubs: Mapping[UnlocatableClaim, frozenset[str]] | None = None
     #: Covered clubs at least one of whose registered pages was not read. A narrowing of
     #: coverage, never a substitute for it -- every name here is also in ``clubs_covered``.
     clubs_partially_covered: tuple[str, ...] = ()
     capture_id: str | None = None
     captured_at_utc: str | None = None
+    #: Responses the reader refused whole, each with the clubs it answered for and why.
+    #: Those clubs are not in ``clubs_covered``: nothing they said survives into evidence.
+    refused_responses: tuple[tuple[tuple[str, ...], str], ...] = ()
 
 
 def _club_news_inputs(request: RotationExportRequest) -> _ClubNewsInputs:
@@ -124,9 +131,18 @@ def _inputs_from_capture(snapshot: CapturedSnapshot) -> _ClubNewsInputs:
     **Responses are de-duplicated by their text before parsing.** One response can cover
     several clubs -- the fixture answers once for all of them -- and parsing the same
     response once per club would produce the same claim twice and refuse the week for a
-    duplication this function created. The provenance mapping still has an entry per club,
-    because that is a statement about which response coded which club and not about how
-    many distinct answers there were.
+    duplication this function created. Each distinct response is located only against the
+    documents of its associated clubs; a per-club answer cannot borrow another call's sources.
+    A legacy combined response retains every club explicitly associated with its stored text.
+    The provenance mapping still has an entry per club.
+
+    **A response the reader refuses whole costs the clubs it answered for, and not the
+    week.** The parser refuses a response for a format breach, and for two claims about one
+    player, because it has no rule for choosing between them. With one call per club that is
+    one club's answer, and the other clubs' answers are still readable: they are kept, the
+    refused club leaves the covered list, so its players read as not covered rather than as
+    silent, and the refusal is returned with its reason. When no response survives there is
+    no week to export, and the reader's own refusal is raised as before.
     """
 
     documents, coded, clubs_declared, clubs_covered, partially_covered = read_club_news_capture(
@@ -140,27 +156,73 @@ def _inputs_from_capture(snapshot: CapturedSnapshot) -> _ClubNewsInputs:
         )
 
     claims: list[ParsedClaim] = []
+    coverage_claims: list[ParsedClaim] = []
     unverifiable: list[UnlocatableClaim] = []
-    for text in dict.fromkeys(entry.response.text for entry in coded):
-        response = next(entry.response for entry in coded if entry.response.text == text)
-        located, dropped = locate_claims_reporting(response, documents)
-        claims.extend(parse_claim_response(located, documents))
-        unverifiable.extend(dropped)
+    unverifiable_response_clubs: dict[UnlocatableClaim, frozenset[str]] = {}
+    refused: list[tuple[tuple[str, ...], str]] = []
+    refusals: list[ClubNewsError] = []
+    texts = tuple(dict.fromkeys(entry.response.text for entry in coded))
+    for text in texts:
+        associated = [entry for entry in coded if entry.response.text == text]
+        response_clubs = {entry.club for entry in associated}
+        response_documents = tuple(doc for doc in documents if doc.club in response_clubs)
+        source_clubs: dict[str, set[str]] = {}
+        for document in response_documents:
+            for url in {document.requested_url, document.final_url}:
+                source_clubs.setdefault(url, set()).add(normalise_claim_name(document.club))
+        try:
+            located, dropped = locate_claims_reporting(associated[0].response, response_documents)
+            parsed = parse_claim_response(located, response_documents)
+        except ClubNewsError as error:
+            refusals.append(error)
+            refused.append((tuple(entry.club for entry in associated), str(error)))
+            continue
+        claims.extend(parsed)
+        # The table still counts resolved opponent mentions as refused claims. Coverage
+        # and unresolved-player flags, however, describe only a club's own statements.
+        coverage_claims.extend(
+            claim
+            for claim in parsed
+            if source_clubs.get(claim.source_url) == {normalise_claim_name(claim.team_name)}
+        )
+        # A failed citation cannot establish source ownership. The stored response can:
+        # its own-player error stays unresolved even if the cited URL was never fetched
+        # or belongs to another club. An opponent response cannot flag that player.
+        response_club_names = {normalise_claim_name(club) for club in response_clubs}
+        for claim in dropped:
+            if normalise_claim_name(claim.team_name) not in response_club_names:
+                continue
+            unverifiable.append(claim)
+            unverifiable_response_clubs[claim] = unverifiable_response_clubs.get(
+                claim, frozenset()
+            ) | frozenset(response_clubs)
 
-    covered = _clubs_still_covered(clubs_covered, claims=claims, unverifiable=unverifiable)
+    if len(refusals) == len(texts):
+        # Nothing the capture holds could be read, so there is no week left to narrow.
+        raise refusals[0]
+    without_answer = {club for clubs, _reason in refused for club in clubs}
+    covered = _clubs_still_covered(
+        tuple(club for club in clubs_covered if club not in without_answer),
+        claims=coverage_claims,
+        unverifiable=unverifiable,
+    )
     # A club dropped from coverage above is no longer partly read either: it is unread, and
     # carrying its name in both lists would say two things about it at once.
     partial = tuple(club for club in partially_covered if club in set(covered))
     return _ClubNewsInputs(
         documents=documents,
         claims=tuple(claims),
-        model=_provenance_from_capture(coded),
+        model=_provenance_from_capture(
+            tuple(entry for entry in coded if entry.club not in without_answer)
+        ),
         clubs_declared=clubs_declared,
         clubs_covered=covered,
         unverifiable=tuple(unverifiable),
+        unverifiable_response_clubs=unverifiable_response_clubs,
         clubs_partially_covered=partial,
         capture_id=snapshot.metadata.snapshot_id,
         captured_at_utc=snapshot.metadata.captured_at_utc,
+        refused_responses=tuple(refused),
     )
 
 
@@ -179,11 +241,15 @@ def _clubs_still_covered(
     list exists to carry -- so only clubs that lost claims are reconsidered here.
     """
 
-    lost = {claim.team_name for claim in unverifiable}
+    lost = {normalise_claim_name(claim.team_name) for claim in unverifiable}
     if not lost:
         return tuple(clubs_covered)
-    kept = {claim.team_name for claim in claims}
-    return tuple(club for club in clubs_covered if club not in lost or club in kept)
+    kept = {normalise_claim_name(claim.team_name) for claim in claims}
+    return tuple(
+        club
+        for club in clubs_covered
+        if normalise_claim_name(club) not in lost or normalise_claim_name(club) in kept
+    )
 
 
 def _provenance_from_capture(coded: Sequence[CodedClub]) -> ClubModelProvenance:
@@ -253,19 +319,29 @@ def _inputs_from_fixture(fixture_path: Path) -> _ClubNewsInputs:
     )
 
 
-def _artifact_name(*, season: str, target_gameweek: int, distinguishing_snapshot: str) -> str:
+def _artifact_name(
+    *,
+    season: str,
+    target_gameweek: int,
+    distinguishing_snapshot: str,
+    decision_snapshot_id: str | None = None,
+) -> str:
     """The stem, built so a rehearsal is a different artifact from the real run.
 
     The digest is the capture the *claims* came from, because that is what a second run
     within one week actually changes. While the fixture stands in for a live source the
     claims are fixed, so the decision capture is what varies and is used instead; either
-    way the manifest records both, so which one named the file is never a guess.
+    way the manifest records both. When news and decision captures differ, a decision
+    suffix prevents reusing that news for a later capture from colliding with this pair.
     """
 
-    return (
+    name = (
         f"{CONTRACT_VERSION}_{season}_gw{target_gameweek:02d}"
         f"_{distinguishing_snapshot[-_NAME_DIGEST_CHARACTERS:]}"
     )
+    if decision_snapshot_id is not None and decision_snapshot_id != distinguishing_snapshot:
+        name += f"_decision_{decision_snapshot_id[-_NAME_DIGEST_CHARACTERS:]}"
+    return name
 
 
 def _publish_once(payload: bytes, destination: Path) -> str:
@@ -277,19 +353,19 @@ def _publish_once(payload: bytes, destination: Path) -> str:
     same, and the player evidence and settled outcomes exports publish through it.
     """
 
-    destination.parent.mkdir(parents=True, exist_ok=True)
+    Path(addressable(destination.parent)).mkdir(parents=True, exist_ok=True)
     temporary = destination.with_name(
         f".{destination.name}.tmp-{os.getpid()}-{secrets.token_hex(8)}"
     )
     try:
-        with temporary.open("xb") as handle:
+        with Path(addressable(temporary)).open("xb") as handle:
             handle.write(payload)
             handle.flush()
             os.fsync(handle.fileno())
         try:
-            os.link(temporary, destination)
+            os.link(addressable(temporary), addressable(destination))
         except FileExistsError:
-            if destination.read_bytes() == payload:
+            if Path(addressable(destination)).read_bytes() == payload:
                 return "replay"
             raise DataError(
                 f"{destination} already exists with different content; an artifact is never "
@@ -297,7 +373,7 @@ def _publish_once(payload: bytes, destination: Path) -> str:
             ) from None
         return "written"
     finally:
-        temporary.unlink(missing_ok=True)
+        Path(addressable(temporary)).unlink(missing_ok=True)
 
 
 def _manifest_identity(document: Mapping[str, object]) -> dict[str, object]:
@@ -348,6 +424,7 @@ def _manifest(
         "roster_size": attrs["roster_size"],
         "roster_snapshot_id": attrs["roster_snapshot_id"],
         "source_snapshot_ids": list(attrs["source_snapshot_ids"]),
+        "club_news_source_kind": "capture" if news_capture_id is not None else "fixture",
         "clubs_declared": list(attrs["clubs_declared"]),
         "clubs_covered": list(attrs["clubs_covered"]),
         "clubs_partially_covered": list(attrs["clubs_partially_covered"]),
@@ -360,6 +437,7 @@ def _manifest(
         "response_sha256s": list(attrs["response_sha256s"]),
         "claims_coded": attrs["claims_coded"],
         "claims_ambiguous": attrs["claims_ambiguous"],
+        "players_with_conflicting_claims": list(attrs.get("players_with_conflicting_claims", ())),
         "players_not_addressed": attrs["players_not_addressed"],
         **(
             {
@@ -396,12 +474,14 @@ def _export(arguments: RotationExportRequest, *, repository_commit: str) -> Mapp
         clubs_partially_covered=club_news.clubs_partially_covered,
         model=club_news.model,
         unverifiable_claims=club_news.unverifiable,
+        unverifiable_response_clubs=club_news.unverifiable_response_clubs,
         club_news_snapshot_id=arguments.club_news_snapshot,
     )
     name = arguments.table_name or _artifact_name(
         season=arguments.season,
         target_gameweek=arguments.target_gameweek,
         distinguishing_snapshot=arguments.club_news_snapshot or decision.metadata.snapshot_id,
+        decision_snapshot_id=decision.metadata.snapshot_id,
     )
     table_path = arguments.output_dir / f"{name}.csv"
     manifest_path = arguments.output_dir / f"{name}.manifest.json"
@@ -435,4 +515,10 @@ def _export(arguments: RotationExportRequest, *, repository_commit: str) -> Mapp
         "rows": len(table),
         "claims_coded": manifest["claims_coded"],
         "players_not_addressed": manifest["players_not_addressed"],
+        # Not in the manifest, whose keys are the artifact contract's. The clubs are
+        # absent from its covered list, which is what a reader of the table acts on.
+        "responses_refused": [
+            {"clubs": list(clubs), "reason": reason}
+            for clubs, reason in club_news.refused_responses
+        ],
     }

@@ -12,6 +12,7 @@ import { mockSuggestionOverview } from "../../../fixtures/weeklySuggestionOvervi
 import { TOP100_COPY } from "../advice/top100Copy";
 import { mockMembers } from "../../../fixtures/league";
 import type { EntryView } from "../types";
+import { withLeague } from "../../../testSupport/league";
 
 afterEach(cleanup);
 it.each<Language>(["tr", "en"])(
@@ -126,7 +127,7 @@ function show(value = history(), language: Language = "tr", members: EntryView[]
   return render(
     <LanguageProvider initialLanguage={language}>
       <MemoryRouter>
-        <LeagueMemberHistoryView history={value} members={members} />
+        {withLeague(<LeagueMemberHistoryView history={value} members={members} />)}
       </MemoryRouter>
     </LanguageProvider>,
   );

@@ -61,7 +61,7 @@ describe.each(["tr", "en"] as const)("failure sentences in %s", (language) => {
 
   it.each([...SERVICE_CODES, ...PAGE_CODES])("%s has a sentence of its own", (code) => {
     const sentence = failureSentence(copy, code);
-    expect(sentence).toBe(copy.failures[code]);
+    expect(sentence.startsWith(copy.failures[code]!)).toBe(true);
     expect(sentence.length).toBeGreaterThan(15);
     expect(sentence).not.toMatch(/[A-Z]{2,}_[A-Z_]+/); // never the raw code
     expect(sentence).not.toMatch(AS_A_CHANCE);
@@ -69,7 +69,7 @@ describe.each(["tr", "en"] as const)("failure sentences in %s", (language) => {
 
   it("says only that it did not complete for a code it does not know", () => {
     for (const code of ["SOMETHING_NEW", "", "constructor", "__proto__", null, undefined]) {
-      expect(failureSentence(copy, code)).toBe(copy.failures.unknown);
+      expect(failureSentence(copy, code)).toBe(`${copy.failures.unknown} ${copy.publishedRemains}`);
     }
     expect(copy.failures.unknown).not.toContain("SOMETHING_NEW");
   });
@@ -83,11 +83,47 @@ describe.each(["tr", "en"] as const)("failure sentences in %s", (language) => {
     expect(failureSentence(copy, "RATE_LIMITED")).not.toMatch(/\d/);
   });
 
-  it("words every duration as about, and none as a promise", () => {
+  it("says what remains on the page: the published plan after the failures that leave only it", () => {
+    for (const code of [
+      "SERVICE_UNREACHABLE",
+      "ADVICE_FAILED",
+      "PLAN_NOT_FOUND",
+      "INTERNAL_ERROR",
+    ]) {
+      expect(failureSentence(copy, code)).toBe(`${copy.failures[code]} ${copy.publishedRemains}`);
+    }
+    for (const code of [
+      "CHIP_NOT_HELD",
+      "RATE_LIMITED",
+      "CONTEXT_UNAVAILABLE",
+      ANSWER_OTHER_CAPTURE,
+    ]) {
+      expect(failureSentence(copy, code)).toBe(copy.failures[code]);
+    }
+  });
+
+  it("says the earlier answer stays, after every failure, when it is kept", () => {
+    for (const code of [...SERVICE_CODES, ...PAGE_CODES, "SOMETHING_NEW", null]) {
+      const sentence = failureSentence(copy, code, null, "earlier");
+      expect(sentence.endsWith(` ${copy.earlierRemains}`)).toBe(true);
+      expect(sentence).not.toContain(copy.publishedRemains);
+    }
+    expect(failureSentence(copy, "RATE_LIMITED", 60, "earlier")).toBe(
+      `${copy.rateLimitedFor(60)} ${copy.earlierRemains}`,
+    );
+    for (const text of [copy.earlierRemains, copy.waitingWithEarlier, copy.publishedRemains]) {
+      expect(text).not.toMatch(AS_A_CHANCE);
+    }
+  });
+
+  it("words every duration as about, without a promise or a measurement caveat", () => {
     expect(copy.duration[3]).toMatch(language === "tr" ? /yaklaşık/ : /about/);
     expect(copy.duration[5]).toMatch(language === "tr" ? /yaklaşık/ : /about/);
     expect(copy.duration[1]).not.toMatch(/\d/);
-    expect(copy.durationNote).toMatch(language === "tr" ? /söz değildir/ : /not a promise/);
+    expect(copy.durationNote).not.toMatch(/söz|promise/i);
+    for (const text of Object.values(copy.duration)) {
+      expect(text).not.toMatch(/ölçülmedi|not measured/i);
+    }
     for (const text of [...Object.values(copy.duration), copy.durationNote, copy.leaveOpen]) {
       expect(text).not.toMatch(/guarantee|always|never more|garanti|kesin|mutlaka/i);
     }

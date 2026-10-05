@@ -1,3 +1,5 @@
+import { membersAddress } from "../../../lib/leagueAddresses";
+import { useLeagueId } from "../useLeague";
 import { Link } from "react-router";
 
 import { useLanguage } from "../../../i18n/context";
@@ -109,12 +111,13 @@ export function MemberWho({
   leagueName?: string;
 }) {
   const { messages } = useLanguage();
+  const leagueId = useLeagueId();
   const copy = messages.leagueMembers;
   const entry = squad.payload.entry;
   return (
     <div className={styles.who}>
       <p className={styles.whoLeague}>{leagueName ?? copy.leagueNumber(squad.payload.league_id)}</p>
-      <Link to="/league/members" className={styles.whoLink}>
+      <Link to={membersAddress(leagueId)} className={styles.whoLink}>
         <span className={styles.whoText}>
           <span className={styles.whoTeam}>{entry.team_name ?? copy.unknownTeam}</span>
           <span className={styles.whoManager}>

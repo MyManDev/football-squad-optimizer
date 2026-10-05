@@ -1,5 +1,5 @@
 import { execFileSync, spawnSync } from "node:child_process";
-import { cp, readFile } from "node:fs/promises";
+import { cp, readFile, rm } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
@@ -54,9 +54,13 @@ test("member selections compute, reload uses cache, and a stopped backend leaves
   test.setTimeout(120_000);
   // These are the Python fixture's captured squad and member documents. No route,
   // including the API, is intercepted; Chromium enforces the cross-origin request.
-  await cp(context.siteRoot, `node_modules/.cache/${context.buildName}/data`, {
-    recursive: true,
-  });
+  const built = `node_modules/.cache/${context.buildName}/data`;
+  await cp(context.siteRoot, built, { recursive: true });
+  // The fixture publishes one league as the legacy tree, which is what its backend reads.
+  // The build also carries the committed site, whose league directory would send the page
+  // to another league's tree, so the page is left with the fixture's alone.
+  await rm(`${built}/leagues.json`, { force: true });
+  await rm(`${built}/leagues`, { recursive: true, force: true });
   const route =
     `${context.apiOrigin}/api/v1/leagues/${context.leagueId}` +
     `/entries/${context.entryId}/advice`;
@@ -77,13 +81,16 @@ test("member selections compute, reload uses cache, and a stopped backend leaves
   const findLeague = page.getByRole("button", { name: "Ligi bul", exact: true });
   await leagueField.fill("123");
   await findLeague.click();
-  await expect(page.getByRole("status")).toHaveText(
-    "Şimdilik yalnız 352490 numaralı lig destekleniyor.",
-  );
-  expect(leagueRequests).toEqual([]);
+  await expect(page.getByRole("status")).toHaveText("Bu site 123 numaralı ligi yayımlamıyor.");
+  // Only the directory was read (the absent list, then the legacy tree's record); nothing
+  // of league 123, and nothing of the backend, was asked for.
+  expect(leagueRequests).toEqual([
+    `${context.webOrigin}/data/leagues.json`,
+    `${context.webOrigin}/data/league/members.json`,
+  ]);
   await leagueField.fill(String(context.leagueId));
   await findLeague.click();
-  await expect(page).toHaveURL("/league/members");
+  await expect(page).toHaveURL("/league/352490/members");
   // The member page asks the service what it computes, once, and says about how long.
   const capabilities = page.waitForResponse(
     (response) =>
@@ -91,7 +98,7 @@ test("member selections compute, reload uses cache, and a stopped backend leaves
   );
   await page
     .getByRole("row")
-    .filter({ has: page.locator(`a[href="/league/members/${context.entryId}"]`) })
+    .filter({ has: page.locator(`a[href="/league/352490/members/${context.entryId}"]`) })
     .getByRole("button", { name: "Bu benim" })
     .click();
   expect(await (await capabilities).json()).toMatchObject({
@@ -112,7 +119,7 @@ test("member selections compute, reload uses cache, and a stopped backend leaves
   await expect(
     page.getByText("Bir haftalık planın hesabı birkaç saniye ile yarım dakika arasında sürer"),
   ).toBeVisible();
-  await expect(page).toHaveURL(`/league/members/${context.entryId}`);
+  await expect(page).toHaveURL(`/league/352490/members/${context.entryId}`);
   expect(await page.evaluate(() => localStorage.getItem("squadopt.viewer"))).toBeNull();
   await expect(page.getByRole("button", { name: "Seçimi Kaldır" })).toBeVisible();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Browser smoke team");
@@ -210,7 +217,7 @@ test("member selections compute, reload uses cache, and a stopped backend leaves
       payload: { mode: "saf-puan", chip_choice: { chip: "bboost" } },
     },
   ]) {
-    await page.goto(`/league/members/${context.entryId}?${selection.query}`);
+    await page.goto(`/league/352490/members/${context.entryId}?${selection.query}`);
     await expect(compute).toBeEnabled();
     const queued = page.waitForResponse(
       (response) => response.url().startsWith(route) && response.request().method() === "POST",
@@ -285,7 +292,7 @@ test("member selections compute, reload uses cache, and a stopped backend leaves
       }
     })
     .toBe(true);
-  await page.goto(`/league/members/${context.entryId}`);
+  await page.goto(`/league/352490/members/${context.entryId}`);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Browser smoke team");
   await expect(page.getByRole("list", { name: "Pozisyona göre ilk on bir" })).toBeVisible();
   await expect(page.getByText(COMPUTE_COPY.tr.serviceUnreachablePublished)).toBeVisible();

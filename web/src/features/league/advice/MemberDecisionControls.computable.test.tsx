@@ -60,7 +60,7 @@ function renderControls(
 ) {
   return render(
     <LanguageProvider initialLanguage="tr">
-      <MemoryRouter initialEntries={[`/league/members/${ENTRY}?${search}`]}>
+      <MemoryRouter initialEntries={[`/league/352490/members/${ENTRY}?${search}`]}>
         <MemberDecisionControls
           entryId={ENTRY}
           members={MEMBERS}
@@ -102,19 +102,17 @@ describe("the controls with the service's capabilities", () => {
         ...WHOLE_MENU,
         models: ["current", "football"],
       });
-      expect(container).toHaveTextContent(MESSAGES.tr.leagueMembers.windowLimits);
+      const modelWindowNote = "Her haftanın tahmini o haftanın fikstürlerinden hesaplanır";
+      expect(container).not.toHaveTextContent(modelWindowNote);
       fireEvent.click(inputs("prediction-model").find((input) => input.value === "football")!);
-      expect(container).toHaveTextContent(
-        "Her haftanın tahmini o haftanın fikstürlerinden hesaplanır",
-      );
-      expect(container).not.toHaveTextContent(MESSAGES.tr.leagueMembers.windowLimits);
+      expect(container).toHaveTextContent(modelWindowNote);
       expect(query().get("model")).toBe("football");
       expect(query().get("window")).toBe(String(window));
       expect(query().get("top100")).toBe("20");
       expect(enabledValues("window")).toEqual(["1", "3", "5"]);
       expect(enabledValues("top100")).toEqual(TOP100_WEIGHTS.map(String));
       fireEvent.click(inputs("prediction-model").find((input) => input.value === "current")!);
-      expect(container).toHaveTextContent(MESSAGES.tr.leagueMembers.windowLimits);
+      expect(container).not.toHaveTextContent(modelWindowNote);
       expect(query().get("model")).not.toBe("football");
       expect(query().get("top100")).toBe("20");
     },

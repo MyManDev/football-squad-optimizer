@@ -1,6 +1,6 @@
 # Member week horizon v1
 
-This optional publication lives at `data/league/series-horizon.json`, beside the
+This optional publication lives at `data/leagues/<league id>/series-horizon.json`, beside the
 scoreboard. It is a standalone JSON object, not a `provisional_league_ui_v1`
 envelope. Validate it with [the schema](member_week_horizon_v1.schema.json).
 The Python measurement producer owns the estimate; the browser only validates its

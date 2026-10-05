@@ -30,6 +30,7 @@ from squadopt.optimization import (
 )
 from squadopt.planning import ChipAvailability
 from squadopt.planning.chip_strategy import CHIP_STRATEGY_VERSION
+from squadopt.planning.chip_tail import ChipTailForecast
 
 
 def advise_chip_strategy(
@@ -44,7 +45,10 @@ def advise_chip_strategy(
     horizon_builder: HorizonBuilder | None,
     counts: Top100Counts | None = None,
     preferences: DecisionPreferences = NO_PREFERENCES,
+    chip_tail_forecast: ChipTailForecast | None = None,
 ) -> dict[str, object]:
+    if chip_tail_forecast is not None and chip != "auto":
+        raise EntryError("A dated chip tail requires the automatic chip strategy.")
     if request.strategy != "saf-puan" or horizon_builder is None:
         raise EntryError("Chip strategy requires the pure-points forecast horizon.")
     if top100_weight and counts is None:
@@ -91,6 +95,7 @@ def advise_chip_strategy(
         ),
         chips=rights,
         chip_strategy=automatic,
+        chip_tail_forecast=chip_tail_forecast,
         linearization_level=WINDOW_LINEARIZATION_LEVEL,
         preferences=preferences,
     )

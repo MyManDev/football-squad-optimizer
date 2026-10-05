@@ -3,3 +3,4 @@ node_modules
 .wrangler
 public/data
 src/data/schema.ts
+src/fixtures/device-plan/instances.json

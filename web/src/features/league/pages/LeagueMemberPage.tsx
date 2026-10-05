@@ -1,3 +1,5 @@
+import { membersAddress } from "../../../lib/leagueAddresses";
+import { useLeagueId } from "../useLeague";
 import { Link, useParams, useSearchParams } from "react-router";
 
 import { Badge } from "../../../design/components/Badge";
@@ -18,6 +20,7 @@ export type { AdviceIssue } from "./memberPageTypes";
 
 export function LeagueMemberPage() {
   const { messages } = useLanguage();
+  const leagueId = useLeagueId();
   const copy = messages.leagueMembers;
   const entryParam = useParams().entryId;
   const [searchParams] = useSearchParams();
@@ -32,6 +35,7 @@ export function LeagueMemberPage() {
     adviceEnabled,
     advice,
     rival,
+    deviceRivals,
     windowControl,
     client,
     capabilities,
@@ -63,7 +67,7 @@ export function LeagueMemberPage() {
               : reason}
           </p>
         ))}
-        <Link to="/league/members">{copy.backToMembers}</Link>{" "}
+        <Link to={membersAddress(leagueId)}>{copy.backToMembers}</Link>{" "}
         {!missing ? (
           <button type="button" onClick={() => void squad.refetch()}>
             {copy.retryPublishedRead}
@@ -92,6 +96,7 @@ export function LeagueMemberPage() {
       squad={squad.data}
       advice={adviceEnabled && !advice.isError ? (advice.data ?? null) : null}
       rivalSquad={rival.data ?? null}
+      deviceRivals={deviceRivals}
       windowControl={windowControl.isError ? null : (windowControl.data ?? null)}
       adviceIssue={adviceIssue}
       adviceLoading={indexQuery.isPending || (adviceEnabled && advice.isPending)}
@@ -128,10 +133,11 @@ export function LeagueMemberPage() {
 
 function SystemLeagueMemberPage() {
   const { messages } = useLanguage();
+  const leagueId = useLeagueId();
   const copy = messages.leagueMembers;
   return (
     <div className={styles.systemPage}>
-      <Link className={styles.back} to="/league/members">
+      <Link className={styles.back} to={membersAddress(leagueId)}>
         {copy.backToMembers}
       </Link>
       <Card

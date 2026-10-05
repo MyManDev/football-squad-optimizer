@@ -41,7 +41,7 @@ import signal
 import threading
 import time
 import traceback
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from contextlib import ExitStack
 from datetime import UTC, datetime
 from types import FrameType
@@ -56,6 +56,8 @@ from squadopt.application.advice_menu import (
     advise_menu_entry,
 )
 from squadopt.application.football_participation import INHERITED_ZERO_LIMIT, participation_summary
+from squadopt.application.football_roles import role_forecast_summary
+from squadopt.contracts.injuries import require_official_injury_source
 from squadopt.contracts.league import LEAGUE_VIEW_CONTRACT_VERSION
 from squadopt.contracts.preferences import DecisionPreferences
 from squadopt.live.football_artifact import SHARES_BEFORE_AVAILABILITY_LIMIT
@@ -97,7 +99,7 @@ from squadopt.platform.worker_heartbeat import (
     prune_stale_heartbeats,
 )
 from squadopt.platform.worker_metrics import serve_worker_metrics
-from squadopt.prediction.football import FOOTBALL_MODEL_VERSION
+from squadopt.prediction.football import FOOTBALL_MODEL_VERSION, JOINT_ROLE_MODEL_VERSIONS
 
 __all__ = [
     "DEFAULT_ARCHIVE_EVERY_SECONDS",
@@ -137,6 +139,27 @@ def _advice_player_ids(value: object) -> set[int]:
         for item in value:
             found.update(_advice_player_ids(item))
     return found
+
+
+#: What the central injury source will publish facts for at most.
+_INJURY_FACT_LIMIT = 50
+
+#: The parts of an advice document that name the member's own decision players.
+_OWN_DECISION_FIELDS = ("starting_xi", "bench", "captain", "vice_captain", "moves")
+
+
+def _injury_fact_ids(advice: Mapping[str, object]) -> list[int]:
+    """The players to ask the central injury source about, the member's own first.
+
+    The source answers at most fifty identities. A document can name more than that
+    once rival elevens and plan weeks are counted, and taking the fifty lowest ids
+    could leave out the member's own squad, which is what the card is for. So the
+    member's decision players come first, then the rest in id order, up to the limit.
+    """
+
+    own = _advice_player_ids({field: advice.get(field) for field in _OWN_DECISION_FIELDS})
+    rest = _advice_player_ids(advice) - own
+    return [*sorted(own), *sorted(rest)][:_INJURY_FACT_LIMIT]
 
 
 def _utc_now() -> datetime:
@@ -313,6 +336,8 @@ def build_advice_compute(
                 f"{spec.context.capture_snapshot_id}) is no longer the one this backend "
                 "answers from; ask again to be answered from the current one.",
             )
+        if capture.switches.official_injuries is not None:
+            require_official_injury_source()
         request = _menu_request(spec, capture)
         football = capture.switches.football if MODEL_SWITCH in spec.switches else None
         projection = football.projection if football is not None else capture.projection
@@ -370,6 +395,13 @@ def build_advice_compute(
             participation = participation_summary(projection.diagnostics)
             if participation is not None:
                 advice["participation_evidence"] = participation
+            roles = role_forecast_summary(
+                projection.diagnostics,
+                _advice_player_ids(advice),
+                model_version=football.horizon.model_version,
+            )
+            if roles is not None:
+                advice["role_forecast"] = roles
             participation_assumptions = (
                 participation.get("assumptions", []) if participation is not None else []
             )
@@ -386,7 +418,8 @@ def build_advice_compute(
                 # Only the version that splits attacking shares before availability.
                 *(
                     [SHARES_BEFORE_AVAILABILITY_LIMIT]
-                    if football.horizon.model_version == FOOTBALL_MODEL_VERSION
+                    if football.horizon.model_version
+                    in (FOOTBALL_MODEL_VERSION, *JOINT_ROLE_MODEL_VERSIONS)
                     else []
                 ),
             ]
@@ -395,6 +428,11 @@ def build_advice_compute(
             # those public decisions before selecting the matching official facts.
             advice["official_information"] = capture.inputs.official_information.public_record(
                 _advice_player_ids(advice)
+            )
+        if capture.switches.official_injuries is not None:
+            require_official_injury_source()
+            advice["official_injuries"] = capture.switches.official_injuries.public_record(
+                _injury_fact_ids(advice)
             )
         document = {
             "contract_version": LEAGUE_VIEW_CONTRACT_VERSION,

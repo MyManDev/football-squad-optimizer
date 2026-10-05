@@ -7,6 +7,7 @@ import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { MESSAGES } from "../../../i18n/messages";
 import { readViewerEntry, writeViewerEntry } from "../identity/useViewerEntry";
 import { LeagueMemberView } from "./LeagueMemberPage";
+import { withLeague } from "../../../testSupport/league";
 
 afterEach(cleanup);
 beforeEach(() => {
@@ -19,22 +20,24 @@ describe.each(["tr", "en"] as const)("selected member controls in %s", (language
     const claimed = 35249001;
     const viewed = 35249002;
     const copy = MESSAGES[language].leagueMembers;
-    writeViewerEntry(claimed);
+    writeViewerEntry({ leagueId: 352490, entryId: claimed });
     render(
       <LanguageProvider initialLanguage={language}>
-        <MemoryRouter initialEntries={[`/league/members/${viewed}`]}>
-          <Routes>
-            <Route
-              path="/league/members/:entryId"
-              element={
-                <LeagueMemberView
-                  squad={mockEntrySquadEnvelopes[viewed]!}
-                  advice={mockEntryAdviceEnvelope(viewed, "saf-puan", 1)}
-                />
-              }
-            />
-            <Route path="/league/members" element={<h1>{copy.title}</h1>} />
-          </Routes>
+        <MemoryRouter initialEntries={[`/league/352490/members/${viewed}`]}>
+          {withLeague(
+            <Routes>
+              <Route
+                path="/league/:leagueId/members/:entryId"
+                element={
+                  <LeagueMemberView
+                    squad={mockEntrySquadEnvelopes[viewed]!}
+                    advice={mockEntryAdviceEnvelope(viewed, "saf-puan", 1)}
+                  />
+                }
+              />
+              <Route path="/league/:leagueId/members" element={<h1>{copy.title}</h1>} />
+            </Routes>,
+          )}
         </MemoryRouter>
       </LanguageProvider>,
     );
@@ -42,7 +45,7 @@ describe.each(["tr", "en"] as const)("selected member controls in %s", (language
     expect(screen.getByText(copy.viewerBody)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: copy.viewerChange })).toHaveAttribute(
       "href",
-      "/league/members",
+      "/league/352490/members",
     );
     fireEvent.click(screen.getByRole("button", { name: copy.viewerClear }));
     expect(readViewerEntry()).toBeNull();

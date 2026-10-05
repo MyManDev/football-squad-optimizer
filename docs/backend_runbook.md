@@ -94,12 +94,49 @@ SQUADOPT_BACKEND_MAX_OPEN_JOBS_PER_CLIENT=4  # queued + running, per address per
 # The repository's artifacts/ directory. The Top 100 settings read the week's export from
 # phase_b/player_evidence_v1_<season>_gw<NN>_top100_<hash12>.csv (newest generated one that
 # passes the handoff's own gate for the current capture); the manager's word reads
-# rotation/rotation_evidence_v2_<season>_gw<NN>_<capture hash12>.csv, each with its manifest.
+# rotation/rotation_evidence_v4_<season>_gw<NN>_<news hash12>_decision_<decision hash12>.csv,
+# with its manifest. Fixture-backed evidence uses only <decision hash12> after gw<NN>.
 SQUADOPT_BACKEND_ARTIFACT_ROOT=<path to artifacts/>
 # What the rotation table was coded from: the committed fixture file, or a club-news capture
 # directory under the snapshot root. Needed for the manager's word only.
 SQUADOPT_BACKEND_CLUB_NEWS_SOURCE=<path to data/sample/club_news_v1.fixture.json>
 ```
+
+### Persistent native Windows artifact selection
+
+The native launcher can retain a separately prepared immutable artifact root across
+standard restarts and logon launches. The operator may create
+`<RepoRoot>/artifacts/backend-artifact-root.json` with exactly one string field:
+
+```json
+{"artifact_root": "artifacts/football-retained-gw06-fix14"}
+```
+
+The directory must already exist. Relative paths resolve from `RepoRoot`, not the caller's
+working directory. An explicit `-ArtifactRoot` wins without reading the file. With no
+selection file, the existing `<RepoRoot>/artifacts` default remains. An empty, malformed,
+unknown-field or missing-directory selection refuses before any processes start; it never
+silently chooses the old root. `-Stop` and `-Status` do not read this file, so an invalid
+selection cannot prevent process control. The allowed PID registry records the artifact
+root actually passed to the API and every worker; status labels old registries as unrecorded.
+The launcher does not create or rewrite the selection file.
+
+Prepare and validate the bundle before selecting it, then use the normal idle-queue,
+release-code and capture checks before restart. Validate the selection before using the
+restart helper; its `-DryRun` previews stop only. The existing logon watcher and standard
+restart helper already invoke this launcher; no shortcut, scheduled task or tunnel change
+is needed. For a reviewed rollback, change the selection to the previous retained root
+(or pass it explicitly for a single start), then perform the same safe restart. Preserve
+all immutable artifacts and the prior selection in the release record.
+
+This file does not redirect the weekly producer. Its Top 100 and rotation stages still
+write under the weekly workspace's `artifacts/`. For a new deadline, retain the exact
+validated Top 100 CSV/manifest pair from that run in the selected root, preserving its
+bytes and provenance; build the football forecast with `--artifact-root <selected-root>`
+and seal the new capture's bundle there with `scripts.prepare_football_bundle`. Keep the
+existing news/rotation, capture, handoff and publication ordering. Use the existing producer
+and bundle validation path; do not overwrite an older capture's immutable files or assume
+that changing this selection generates a new forecast.
 
 Both processes need the same two values: the api uses them to refuse early and to address the
 cache, the worker to compute. With an artifact root set, the api projects the capture once per
@@ -108,6 +145,12 @@ switch, because the Top 100 gate needs the projected table. An export or rotatio
 lands later is picked up by both without a restart. The Top 100 menu needs a handoff built
 without the uplift (`--projection component-only`), as the weekly runbook says; otherwise the
 gate refuses every export and the setting stays off.
+
+Current V4 rotation manifests declare whether the source is a captured reading or a fixture,
+and list players whose conflicting claims were withheld. A captured reading must retain its
+news snapshot and completion time even when it yielded no claims. Each conflicting player
+must belong to the roster, remain unresolved, and carry no observed claim. Historical V2/V3
+pairs retain their earlier manifest semantics; they do not acquire V4 provenance on read.
 
 The backend follows the capture named consistently by the published human entry documents
 under `league/entries/`, when that capture and its matching handoff are readable. It uses the
@@ -183,7 +226,7 @@ publicly beside `/health`:
 | Check | False when |
 | --- | --- |
 | `capture_context` | no capture, no handoff for it, or the pair cannot be read |
-| `league_tree` | ops has published no `league/members.json` under the site data root |
+| `league_tree` | ops has published no league tree under the site data root (`leagues.json` and the trees it lists, or `league/members.json` on a site from before the directory) |
 | `league_tree_matches_capture` | `members.json` is for another season or gameweek than the one the current capture targets (or names no gameweek, or there is no context to compare with) |
 | `cache_store` | the store probe has not passed on this path — a root that does not exist counts, which is the common shape of a forgotten volume, though not proof of one |
 | `worker_heartbeat` | no advice worker has rewritten its heartbeat under `workers/` in the store for 120 s (60 idle waits of 2 s), or `workers/` could not be listed |
@@ -474,7 +517,7 @@ answers 503 until the handoff lands.
 So publish in this order, always:
 
 1. **Site data** — `<inputs>/site/data`. Independent of the pair below, but
-   `league/members.json` is what makes the league connected at all.
+   the league's tree (`leagues.json` names it) is what makes the league connected at all.
 2. **The handoff** — `<inputs>/handoffs/<season>-gw<NN>.json`. Before the capture it belongs
    to, so it is already there the moment the capture becomes visible.
 3. **The capture** — `<inputs>/snapshots/<snapshot_id>/`: the payloads first, then

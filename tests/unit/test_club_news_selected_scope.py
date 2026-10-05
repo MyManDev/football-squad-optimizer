@@ -52,7 +52,11 @@ def test_selected_club_reaches_one_model_and_separate_capture_root(
             return super().code(documents, roster)
 
     config = CodingProviderConfig("gemini", "synthetic-model", "synthetic-key")
-    monkeypatch.setattr(acquisition, "build_coding_provider", lambda *a, **k: (Provider(), config))
+    monkeypatch.setattr(acquisition, "resolve_provider_config", lambda *a, **k: config)
+    monkeypatch.setattr(acquisition, "validate_provider_config", lambda resolved: None)
+    monkeypatch.setattr(
+        acquisition, "bind_coding_provider", lambda resolved, context: (Provider(), config)
+    )
     result = acquisition.main(
         [
             "--roster-snapshot",
@@ -98,7 +102,8 @@ def test_unknown_club_refuses_before_roster_provider_or_network(
         raise AssertionError("Selection must be checked first.")
 
     monkeypatch.setattr(acquisition, "read_snapshot", forbidden)
-    monkeypatch.setattr(acquisition, "build_coding_provider", forbidden)
+    monkeypatch.setattr(acquisition, "resolve_provider_config", forbidden)
+    monkeypatch.setattr(acquisition, "bind_coding_provider", forbidden)
     assert (
         acquisition.main(
             ["--roster-snapshot", "not-read", "--registry", str(registry), "--club", "Missing"],
@@ -124,7 +129,8 @@ def test_invalid_roster_scope_refuses_before_provider_or_fetch(
         raise AssertionError("No provider setup or request before the roster is valid.")
 
     monkeypatch.setattr(acquisition, "team_names", lambda bootstrap: teams)
-    monkeypatch.setattr(acquisition, "build_coding_provider", forbidden)
+    monkeypatch.setattr(acquisition, "resolve_provider_config", forbidden)
+    monkeypatch.setattr(acquisition, "bind_coding_provider", forbidden)
     assert (
         acquisition.main(
             [

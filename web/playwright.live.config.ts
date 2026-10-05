@@ -1,5 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
+import { rememberedLeague } from "./e2e/leagueState";
+
 const baseURL = process.env.LIVE_BASE_URL;
 if (!baseURL || process.env.CI) throw new Error("Set LIVE_BASE_URL for this manual, non-CI check.");
 if (!/^https?:$/.test(new URL(baseURL).protocol)) throw new Error("LIVE_BASE_URL must be HTTP(S).");
@@ -11,7 +13,11 @@ export default defineConfig({
   workers: 1,
   retries: 0,
   reporter: "list",
-  use: { baseURL, trace: "retain-on-failure" },
+  use: {
+    baseURL,
+    storageState: rememberedLeague(new URL(baseURL).origin),
+    trace: "retain-on-failure",
+  },
   projects: [
     { name: "live-desktop", use: { ...devices["Desktop Chrome"] } },
     {

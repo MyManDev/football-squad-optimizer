@@ -1,4 +1,5 @@
 import { isDecisionInformation, isOfficialInformation } from "./informationFacts";
+import { isOfficialInjuryFacts } from "./officialInjuryFacts";
 /** Runtime counterpart of docs/contracts/advice_read_v1.schema.json. */
 import { checkedPreferences } from "./decisionPreferences";
 
@@ -27,7 +28,12 @@ const predictionModel: Predicate = (value) =>
   Object.keys(value).length === 4 &&
   fields(value, {
     id: oneOf("football"),
-    version: oneOf("football_team_share_v1", "football_contextual_v3"),
+    version: oneOf(
+      "football_team_share_v1",
+      "football_contextual_v3",
+      "football_joint_role_minutes_v1",
+      "football_joint_role_retained_history_v1",
+    ),
     experimental: oneOf(true),
     fingerprint: (digest) => typeof digest === "string" && /^[a-f0-9]{64}$/.test(digest),
   });
@@ -51,6 +57,20 @@ function fields(
     record(value) &&
     Object.entries(required).every(([key, check]) => check(value[key])) &&
     Object.entries(optional).every(([key, check]) => !(key in value) || check(value[key]))
+  );
+}
+
+function closedFields(
+  value: unknown,
+  required: Record<string, Predicate>,
+  optional: Record<string, Predicate> = {},
+): boolean {
+  return (
+    record(value) &&
+    Object.keys(value).every(
+      (key) => Object.hasOwn(required, key) || Object.hasOwn(optional, key),
+    ) &&
+    fields(value, required, optional)
   );
 }
 
@@ -202,7 +222,11 @@ const chipChoice: Predicate = (value) =>
 
 const chipStrategy: Predicate = (value) =>
   fields(value, {
-    version: oneOf("model_opportunity_reservation_v1", "model_opportunity_reservation_v2"),
+    version: oneOf(
+      "model_opportunity_reservation_v1",
+      "model_opportunity_reservation_v2",
+      "dated_joint_opportunity_v3",
+    ),
     mode: oneOf("auto", "manual"),
     requested_chip: oneOf("auto", "bboost", "3xc", "wildcard", "freehit"),
     selected_chip: chip,
@@ -224,54 +248,125 @@ const chipStrategy: Predicate = (value) =>
     limits: array(text),
   });
 
-const informationReview: Predicate = (value) =>
-  fields(value, {
-    version: oneOf("football_information_review_v1"),
-    status: oneOf("compared", "baseline_retained"),
-    reason: text,
-    source_snapshot_id: text,
-    captured_at_utc: text,
-    player_name: nullable(text),
-    source_playing_chance_percent: oneOf(null, 25, 50, 75),
-    information_gameweek: nullable(identity),
-    candidates: array((candidate) =>
-      fields(
-        candidate,
+const probability: Predicate = (value) => finite(value) && Number(value) >= 0 && Number(value) <= 1;
+const nonnegative: Predicate = (value) => finite(value) && Number(value) >= 0;
+const rolePointComponents: Predicate = (value) =>
+  closedFields(value, {
+    appearance: nonnegative,
+    goals: nonnegative,
+    assists: nonnegative,
+    clean_sheet: nonnegative,
+    defcon: nonnegative,
+    other: finite,
+    clipping: nonnegative,
+    total: nonnegative,
+  });
+const roleForecast: Predicate = (value) =>
+  closedFields(value, {
+    version: oneOf("football_role_forecast_v1"),
+    model_version: oneOf(
+      "football_joint_role_minutes_v1",
+      "football_joint_role_retained_history_v1",
+    ),
+    calibration: oneOf("not_independently_verified"),
+    scope: oneOf("current_gameweek_fixtures"),
+    rows: array((row) =>
+      closedFields(
+        row,
         {
-          selected: oneOf(true, false),
-          baseline: oneOf(true, false),
-          transfers_in: array(text),
-          transfers_out: array(text),
-          chip,
-          expected_net_points: nullable(finite),
-          branches: array((branch) =>
-            fields(branch, {
-              state: oneOf("eligible", "unavailable"),
-              expected_net_points: nullable(finite),
-              hit_points: finite,
-              weeks: array((week) =>
-                fields(
-                  week,
-                  {
-                    gameweek: identity,
-                    transfers_in: array(text),
-                    transfers_out: array(text),
-                    chip,
-                    bank_tenths: integer,
-                    free_transfers: integer,
-                  },
-                  { lineup: lineup(text) },
-                ),
-              ),
-            }),
-          ),
+          player_id: identity,
+          name: text,
+          fixture_id: identity,
+          gameweek: identity,
+          kickoff: text,
+          status: oneOf("fitted_known_start_labels", "unavailable_no_known_start_labels"),
+          expected_minutes: (v) => finite(v) && Number(v) >= 0 && Number(v) <= 120,
+          captured_eligibility_multiplier: probability,
+          news_applied: oneOf(true, false),
         },
-        {
-          first_lineup: lineup(text),
-        },
+        { point_components: rolePointComponents },
       ),
     ),
   });
+
+const policyComparison: Predicate = (value) =>
+  closedFields(value, {
+    version: oneOf("completed_policy_comparison_v1"),
+    basis: oneOf("expected_own_points"),
+    baseline_index: integer,
+    scenario_ids: array(text),
+    news_arrival_probability: oneOf(null),
+    scope: oneOf("supplied_conditional_scenarios_only"),
+    terminal_resource_value_added: oneOf(false),
+    candidates: array((row) =>
+      closedFields(row, {
+        index: integer,
+        action_kind: oneOf("hold", "move", "chip"),
+        first_state: (state) =>
+          closedFields(state, { bank_tenths: integer, free_transfers: integer }),
+        scenario_min: finite,
+        scenario_max: finite,
+        branch_gaps_vs_baseline: (gaps) => record(gaps) && Object.values(gaps).every(finite),
+        minimum_gap_vs_baseline: finite,
+        maximum_gap_vs_baseline: finite,
+        dominates_baseline: oneOf(true, false),
+        dominated_by: array(integer),
+      }),
+    ),
+  });
+
+const informationReview: Predicate = (value) =>
+  fields(
+    value,
+    {
+      version: oneOf("football_information_review_v1"),
+      status: oneOf("compared", "baseline_retained"),
+      reason: text,
+      source_snapshot_id: text,
+      captured_at_utc: text,
+      player_name: nullable(text),
+      source_playing_chance_percent: oneOf(null, 25, 50, 75),
+      information_gameweek: nullable(identity),
+      candidates: array((candidate) =>
+        fields(
+          candidate,
+          {
+            selected: oneOf(true, false),
+            baseline: oneOf(true, false),
+            transfers_in: array(text),
+            transfers_out: array(text),
+            chip,
+            expected_net_points: nullable(finite),
+            branches: array((branch) =>
+              fields(branch, {
+                state: oneOf("eligible", "unavailable"),
+                expected_net_points: nullable(finite),
+                hit_points: finite,
+                weeks: array((week) =>
+                  fields(
+                    week,
+                    {
+                      gameweek: identity,
+                      transfers_in: array(text),
+                      transfers_out: array(text),
+                      chip,
+                      bank_tenths: integer,
+                      free_transfers: integer,
+                    },
+                    { lineup: lineup(text) },
+                  ),
+                ),
+              }),
+            ),
+          },
+          {
+            first_lineup: lineup(text),
+          },
+        ),
+      ),
+    },
+    { comparison: policyComparison },
+  );
 
 export function isAdvicePayload(value: unknown): boolean {
   return fields(
@@ -291,9 +386,11 @@ export function isAdvicePayload(value: unknown): boolean {
       source_snapshot_id: nullable(text),
       prediction_model: predictionModel,
       information_review: informationReview,
+      role_forecast: roleForecast,
       lineup_expectation: lineupExpectation,
       participation_evidence: participationEvidence,
       official_information: isOfficialInformation,
+      official_injuries: isOfficialInjuryFacts,
       decision_information: isDecisionInformation,
       preferences,
       preferences_scope: oneOf("all_selected_weeks"),

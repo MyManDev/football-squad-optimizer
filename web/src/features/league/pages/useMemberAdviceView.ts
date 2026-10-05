@@ -1,16 +1,27 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useLeague } from "../useLeague";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 
-import { createAdviceClient } from "../advice/adviceClient";
+import { createAdviceClient, type AdviceRequest } from "../advice/adviceClient";
 import { adviceRequestKey } from "../advice/adviceJobStore";
-import { canComputeAdvice, resolvePublishedAdvice } from "../advice/adviceSelection";
+import { canComputeAdvice } from "../advice/adviceSelection";
 import { AdviceContextError, checkedAdvice } from "../advice/adviceResponse";
 import {
   ANSWER_OTHER_CAPTURE,
   sameAdviceRequest,
   useAdviceJob,
   type AdviceJob,
+  type ComputePhase,
 } from "../advice/useAdviceJob";
-import type { EntryAdvice, LeagueViewEnvelope } from "../types";
+import { NO_DEVICE_RIVALS } from "../device/computable";
+import { useDevicePlan, type DevicePlan } from "../device/useDevicePlan";
+import { deviceRequestFor, memberSelection } from "./memberSelection";
+
+/** The same attempt, without the earlier answer it carried. */
+function withoutEarlier(state: ComputePhase): ComputePhase {
+  if (state.phase === "idle" || state.phase === "done") return state;
+  return { ...state, earlier: null };
+}
+import { strategyNeedsRival, type EntryAdvice, type LeagueViewEnvelope } from "../types";
 import type { LeagueMemberViewProps, ShownAdvice } from "./memberPageTypes";
 
 /** Select/reset advice for the current URL while rejecting stale publication context. */
@@ -25,25 +36,38 @@ export function useMemberAdviceView(
     client,
     capabilities = null,
     computeService = "static",
+    deviceDependencies,
+    deviceRivals = NO_DEVICE_RIVALS,
   }: LeagueMemberViewProps,
   searchParams: URLSearchParams,
 ) {
   const view = squad.payload;
-  const adviceClient = useMemo(() => client ?? createAdviceClient(), [client]);
-  const leagueId = view.league_id;
+  const { tree } = useLeague();
+  const adviceClient = useMemo(
+    () => client ?? createAdviceClient(tree.entryAdvice),
+    [client, tree],
+  );
   const entryId = view.entry.entry_id;
-  const resolve = (params: URLSearchParams) =>
-    resolvePublishedAdvice(
-      params,
-      leagueId,
-      entryId,
-      members,
-      index,
-      { season: view.season, gameweek: view.gameweek },
-      capabilities,
-    );
+  // What the member's own device can compute from this publish's inputs, stated beside
+  // the service's capabilities so the controls offer it the same way. The page's reads
+  // resolve through the same function from the same inputs.
+  const { onDevice, resolve } = memberSelection({
+    squad: view,
+    members,
+    index,
+    capabilities,
+    deviceRivals,
+  });
   const selection = resolve(searchParams);
   const { request } = selection;
+  // A rival strategy nobody published, that the service does not answer, waits for the
+  // rivals' documents the device's statement is made from: until they are read the page
+  // cannot say whether the device answers it, so it reads as loading, not as unlisted.
+  const rivalsLoading =
+    onDevice?.loading === true &&
+    strategyNeedsRival(request.strategy) &&
+    selection.status === "not-listed" &&
+    selection.computable?.selection !== true;
   const indexReadable = adviceIssue !== "index-missing" && adviceIssue !== "index-error";
   const selectionAvailable = !adviceLoading && indexReadable && selection.status === "ready";
   // What Hesapla may be asked for. A static build computes the plain plan of a published
@@ -68,6 +92,15 @@ export function useMemberAdviceView(
     request.model !== "football" &&
     resolve(new URLSearchParams("mode=saf-puan&window=1")).status === "ready";
   const job = useAdviceJob(adviceClient, baselineAvailable, view.source_snapshot_id);
+  // The chip the page shows is the selection's; without the service's capabilities the
+  // request carries none, so the device is asked for the selection, chip included. A rival
+  // strategy is offered only against a rival the device's statement names.
+  const deviceJob = useDevicePlan(
+    view,
+    deviceRequestFor(selection),
+    deviceDependencies,
+    onDevice?.rivals ?? [],
+  );
   const requestKey = [
     adviceRequestKey(request),
     selection.status,
@@ -85,10 +118,12 @@ export function useMemberAdviceView(
   useEffect(() => {
     resumable.current = request;
   });
+  const { reset: resetDevice, run: runOnDevice } = deviceJob;
   useEffect(() => {
     reset();
+    resetDevice();
     if (computeAvailable) resume?.(resumable.current);
-  }, [requestKey, computeAvailable, reset, resume]);
+  }, [requestKey, computeAvailable, reset, resetDevice, resume]);
   useEffect(() => {
     if (readOnOpen) readCached?.(resumable.current);
   }, [requestKey, readOnOpen, readCached]);
@@ -108,21 +143,36 @@ export function useMemberAdviceView(
   const plainOnly = selection.computable
     ? true
     : !evidenceOn && selection.top100.weight === 0 && selection.chip.chip === null;
-  const finished = plainOnly && current?.phase === "done" ? current : null;
+  // The answer this same selection already received stays on the page while a later
+  // attempt runs, and after one that fails or is refused: a second request that does not
+  // succeed is not a reason to take the first answer away.
+  const finished =
+    plainOnly && current?.phase === "done"
+      ? { envelope: current.envelope, source: current.source }
+      : null;
+  const earlier =
+    plainOnly && current && current.phase !== "done" ? (current.earlier ?? null) : null;
   const waiting = plainOnly && current?.phase === "waiting" ? current : null;
   let published: LeagueViewEnvelope<EntryAdvice> | null = null;
   // A computed answer is held to the squad on screen exactly as a published one is: a
   // plan solved from another capture is not shown beside this one's squad.
-  const computedSnapshot = finished?.envelope.payload.source_snapshot_id;
-  const computedElsewhere =
-    // Only a build with a compute service holds its answers to the capture; a static
-    // build has none to hold, and its injected clients answer as they always have.
-    (computeService !== "static" || selection.computable !== undefined) &&
-    finished != null &&
-    computedSnapshot != null &&
-    view.source_snapshot_id != null &&
-    computedSnapshot !== view.source_snapshot_id;
-  const computed = computedElsewhere ? null : finished;
+  // Only a build with a compute service holds its answers to the capture; a static
+  // build has none to hold, and its injected clients answer as they always have.
+  const heldToCapture = computeService !== "static" || selection.computable !== undefined;
+  const fromOtherCapture = (answer: { envelope: LeagueViewEnvelope<EntryAdvice> } | null) => {
+    const snapshot = answer?.envelope.payload.source_snapshot_id;
+    return (
+      heldToCapture &&
+      snapshot != null &&
+      view.source_snapshot_id != null &&
+      snapshot !== view.source_snapshot_id
+    );
+  };
+  const computedElsewhere = fromOtherCapture(finished);
+  // An earlier answer from another capture is dropped, not reported: the attempt that
+  // is running is what the panel describes.
+  const earlierKept = earlier !== null && !fromOtherCapture(earlier) ? earlier : null;
+  const computed = computedElsewhere ? null : (finished ?? earlierKept);
   let rejectedContext = false;
   let rejectedUnreadable = false;
   if (advice && selectionAvailable) {
@@ -165,10 +215,31 @@ export function useMemberAdviceView(
     }
   }
   rejectedContext = rejectedContext || computedElsewhere;
-  // The panel must not announce a plan the card refuses to show.
+  // The panel must not announce a plan the card refuses to show, and it must not carry
+  // an earlier selection's state for the one render before the reset lands.
   const panelJob: AdviceJob = computedElsewhere
     ? { ...job, state: { phase: "failed", request, reason: ANSWER_OTHER_CAPTURE } }
-    : job;
+    : job.state.phase !== "idle" && !sameAdviceRequest(job.state.request, request)
+      ? { ...job, state: { phase: "idle" } }
+      : earlier !== null && earlierKept === null
+        ? { ...job, state: withoutEarlier(job.state) }
+        : job;
+  // One answer at a time: asking the service drops the device's answer, and asking the
+  // device drops the service's, so what the card shows is what was asked for last.
+  const { reset: resetJob, compute: computeOnService } = job;
+  const runOnDeviceAndDropJob = useCallback(() => {
+    resetJob();
+    runOnDevice();
+  }, [resetJob, runOnDevice]);
+  const device: DevicePlan = { ...deviceJob, run: runOnDeviceAndDropJob };
+  const computeAndDropDevice = useCallback(
+    (asked: AdviceRequest) => {
+      resetDevice();
+      computeOnService(asked);
+    },
+    [resetDevice, computeOnService],
+  );
+  const jobForPanel: AdviceJob = { ...panelJob, compute: computeAndDropDevice };
   let shown: ShownAdvice | null = null;
   if (computed) {
     shown = {
@@ -176,6 +247,9 @@ export function useMemberAdviceView(
       origin: computed.source === "api-cache" ? "computed" : "published",
       source: computed.source,
     };
+  } else if (deviceJob.state.phase === "done") {
+    // The device's state is keyed by the selection it answered, chip included.
+    shown = { envelope: deviceJob.state.envelope, origin: "computed", source: "device" };
   } else if (published) {
     shown = { envelope: published, origin: waiting ? "published-while-computing" : "published" };
   } else if (waiting?.fallback) {
@@ -189,11 +263,12 @@ export function useMemberAdviceView(
     indexReadable,
     selectionAvailable,
     computeAvailable,
-    job: panelJob,
+    job: jobForPanel,
+    device,
+    onDevice,
+    rivalsLoading,
     request,
     shown,
-    computedForecast:
-      computed?.source === "api-cache" ? computed.envelope.payload.chip_forecast : undefined,
     rejectedContext,
     rejectedUnreadable,
   };

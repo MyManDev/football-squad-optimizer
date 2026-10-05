@@ -4,28 +4,42 @@ import { useMemo } from "react";
 import type { ComputeService } from "../advice/AdviceRequestPanel";
 import { capabilitiesForPage } from "../advice/adviceCapabilities";
 import { createAdviceClient } from "../advice/adviceClient";
-import { resolvePublishedAdvice } from "../advice/adviceSelection";
+import { resolvePublishedAdvice, rivalCandidates } from "../advice/adviceSelection";
 import { checkedAdvice } from "../advice/adviceResponse";
+import type { DeviceRivalReads } from "../device/computable";
+import { offeredDeviceSelection } from "../device/selection";
+import { isDevicePlanEntry } from "../device/types";
+import type { EntryView } from "../types";
+import { useLeague } from "../useLeague";
 import {
-  loadEntryAdvice,
-  loadEntryAdviceChip,
-  loadEntryAdviceEvidence,
-  loadEntryAdviceIndex,
-  loadEntryAdviceTop100,
-} from "../data";
-import { CAPABILITIES_READ, LEAGUE_READ, useEntrySquad, useLeagueMembers } from "../queries";
+  CAPABILITIES_READ,
+  LEAGUE_READ,
+  leagueKeys,
+  useEntrySquad,
+  useEntrySquads,
+  useLeagueMembers,
+} from "../queries";
+import { deviceRequestFor, memberSelection } from "./memberSelection";
+
+/** The other human members' entry ids: the rivals a rival strategy may name. */
+function rivalCandidateIds(members: EntryView[], entryId: number): number[] {
+  return rivalCandidates(members, entryId)
+    .map((member) => member.entry_id)
+    .filter((id): id is number => typeof id === "number");
+}
 
 /** Read only the publication authorized by the current member index and URL. */
 export function useLeagueMemberData(entryParam: string | undefined, searchParams: URLSearchParams) {
   const entryId = Number(entryParam);
   const validEntryId = Number.isSafeInteger(entryId) && entryId > 0;
+  const { league, tree } = useLeague();
   const squad = useEntrySquad(entryId, validEntryId);
   const membersQuery = useLeagueMembers();
   // The index says which (strategy, rival) files the producer wrote for this member; a
   // missing or unreadable index cannot authorize a guessed baseline read.
   const indexQuery = useQuery({
-    queryKey: ["provisional-entry-advice-index", entryId],
-    queryFn: () => loadEntryAdviceIndex(entryId),
+    queryKey: leagueKeys.adviceIndex(league.leagueId, entryId),
+    queryFn: () => tree.entryAdviceIndex(entryId),
     enabled: validEntryId,
     ...LEAGUE_READ,
   });
@@ -35,7 +49,7 @@ export function useLeagueMemberData(entryParam: string | undefined, searchParams
   // never runs: the page is the static site. With one, what it computes right now is read
   // on entry and again on focus once stale. A service that is down, slow or answering
   // for another capture leaves the page on the published tree with a notice, never an error.
-  const client = useMemo(() => createAdviceClient(), []);
+  const client = useMemo(() => createAdviceClient(tree.entryAdvice), [tree]);
   const leagueId = squad.data?.payload.league_id;
   const canAsk = client.readCapabilities !== undefined;
   const capabilitiesQuery = useQuery({
@@ -61,26 +75,43 @@ export function useLeagueMemberData(entryParam: string | undefined, searchParams
         : capabilities
           ? "ready"
           : "other-capture";
-  const selection = resolvePublishedAdvice(
-    searchParams,
-    squad.data?.payload.league_id ?? 0,
-    entryId,
-    members,
-    index,
-    squad.data
-      ? {
-          season: squad.data.payload.season,
-          gameweek: squad.data.payload.gameweek,
-        }
-      : undefined,
-    capabilities,
+  // The other members' entry documents, read where the publish wrote this member's device
+  // inputs: the device offers a rival strategy only against a rival whose document it can
+  // use, and the view is handed the same documents to make the same statement from.
+  const ownSquad = squad.data?.payload;
+  const deviceInputs = isDevicePlanEntry(ownSquad?.device_plan) && !!ownSquad?.source_snapshot_id;
+  const rivalReads = useEntrySquads(
+    ownSquad ? rivalCandidateIds(members, ownSquad.entry.entry_id) : [],
+    deviceInputs,
   );
+  // Until the member list and those documents are read, the device's statement is not
+  // final: the view keeps the rival a link names and reads as loading meanwhile.
+  const deviceRivals: DeviceRivalReads = {
+    squads: rivalReads.squads,
+    loading: deviceInputs && (membersQuery.isPending || rivalReads.pending),
+    unreadable: rivalReads.unreadable,
+  };
+  // One resolver for the page's reads and its view, so the rival read here is the rival
+  // the view selects and the device solves against.
+  const resolved = ownSquad
+    ? memberSelection({ squad: ownSquad, members, index, capabilities, deviceRivals })
+    : null;
+  const selection = resolved
+    ? resolved.resolve(searchParams)
+    : resolvePublishedAdvice(searchParams, 0, entryId, members, index);
   const { request } = selection;
+  // The rival a device solve of this selection is played against, where the device's
+  // statement offers the selection; the card compares the plan with that rival's squad.
+  const deviceSolve =
+    ownSquad && resolved?.onDevice
+      ? offeredDeviceSelection(deviceRequestFor(selection), ownSquad, resolved.onDevice.rivals)
+      : null;
   const adviceEnabled = validEntryId && !!squad.data && selection.status === "ready";
 
   const advice = useQuery({
     queryKey: [
       "provisional-entry-advice",
+      league.leagueId,
       entryId,
       request.strategy,
       request.window,
@@ -99,9 +130,9 @@ export function useLeagueMemberData(entryParam: string | undefined, searchParams
     // does a chip the member chose.
     queryFn: ({ signal }) =>
       selection.chip.chip !== null && selection.path
-        ? loadEntryAdviceChip(entryId, selection.path, selection.chip.chip, { signal })
+        ? tree.entryAdviceChip(entryId, selection.path, selection.chip.chip, { signal })
         : selection.top100.weight !== 0 && selection.path
-          ? loadEntryAdviceTop100(
+          ? tree.entryAdviceTop100(
               entryId,
               selection.path,
               selection.top100.weight,
@@ -114,8 +145,8 @@ export function useLeagueMemberData(entryParam: string | undefined, searchParams
               },
             )
           : selection.evidence.on && selection.path
-            ? loadEntryAdviceEvidence(entryId, selection.path, { signal })
-            : loadEntryAdvice(
+            ? tree.entryAdviceEvidence(entryId, selection.path, { signal })
+            : tree.entryAdvice(
                 entryId,
                 request.strategy,
                 request.window,
@@ -139,6 +170,7 @@ export function useLeagueMemberData(entryParam: string | undefined, searchParams
   const windowControl = useQuery({
     queryKey: [
       "published-window-control",
+      league.leagueId,
       entryId,
       request.window,
       request.season,
@@ -148,7 +180,7 @@ export function useLeagueMemberData(entryParam: string | undefined, searchParams
     ],
     queryFn: async ({ signal }) =>
       checkedAdvice(
-        await loadEntryAdvice(entryId, "saf-puan", request.window, null, { signal }),
+        await tree.entryAdvice(entryId, "saf-puan", request.window, null, { signal }),
         controlSelection.request,
       ),
     enabled:
@@ -162,10 +194,13 @@ export function useLeagueMemberData(entryParam: string | undefined, searchParams
     ...LEAGUE_READ,
   });
 
-  // A rival the service can be asked about is shown beside the computed plan as well.
+  // A rival the service can be asked about, or the device solves against, is shown beside
+  // the computed plan as well.
   const rival = useEntrySquad(
     request.rivalEntryId,
-    adviceEnabled || (!!squad.data && selection.computable?.selection === true),
+    adviceEnabled ||
+      (!!squad.data && selection.computable?.selection === true) ||
+      deviceSolve?.kind === "rival",
   );
 
   return {
@@ -179,6 +214,7 @@ export function useLeagueMemberData(entryParam: string | undefined, searchParams
     adviceEnabled,
     advice,
     rival,
+    deviceRivals,
     windowControl,
     client,
     capabilities,

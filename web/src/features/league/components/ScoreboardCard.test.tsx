@@ -8,6 +8,7 @@ import { AS_A_CHANCE } from "../../../testSupport/honesty";
 import { textByNode } from "../../../testSupport/textByNode";
 import type { LeagueViewEnvelope, Scoreboard } from "../types";
 import { ScoreboardCard, ScoreboardSection } from "./ScoreboardCard";
+import { withLeague } from "../../../testSupport/league";
 
 afterEach(() => {
   cleanup();
@@ -169,7 +170,7 @@ function weekHeaders(): string[] {
 function renderCard(envelope: LeagueViewEnvelope<Scoreboard>, language: Language = "en") {
   return render(
     <LanguageProvider initialLanguage={language}>
-      <ScoreboardCard envelope={envelope} />
+      {withLeague(<ScoreboardCard envelope={envelope} />)}
     </LanguageProvider>,
   );
 }
@@ -178,9 +179,7 @@ function renderSection(language: Language = "en") {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <LanguageProvider initialLanguage={language}>
-      <QueryClientProvider client={client}>
-        <ScoreboardSection />
-      </QueryClientProvider>
+      <QueryClientProvider client={client}>{withLeague(<ScoreboardSection />)}</QueryClientProvider>
     </LanguageProvider>,
   );
 }

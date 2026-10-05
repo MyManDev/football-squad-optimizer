@@ -35,6 +35,20 @@ describe("nested published advice", () => {
       },
     };
     expect(checkedAdvice(contextual, { ...request, model: "football" })).toBe(contextual);
+    for (const version of [
+      "football_joint_role_minutes_v1",
+      "football_joint_role_retained_history_v1",
+    ]) {
+      const joint = {
+        ...football,
+        payload: {
+          ...football.payload,
+          prediction_model: { ...football.payload.prediction_model, version },
+        },
+      };
+      expect(checkedAdvice(joint, { ...request, model: "football" })).toBe(joint);
+      expect(() => checkedAdvice(joint, request)).toThrow(AdviceResponseError);
+    }
     for (const patch of [{ fingerprint: "" }, { experimental: false }, { version: "other" }]) {
       expect(() =>
         checkedAdvice(

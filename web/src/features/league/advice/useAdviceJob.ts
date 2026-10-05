@@ -21,7 +21,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { WindowSize } from "../../../lib/decisionVocabulary";
 import type { AdviceClient, AdviceRequest, AdviceSource } from "./adviceClient";
-import { AdviceApiError, StaticOnlyAdviceClient, newIdempotencyKey } from "./adviceClient";
+import { AdviceApiError, newIdempotencyKey } from "./adviceClient";
 import {
   adviceRequestKey,
   forgetJob,
@@ -51,15 +51,27 @@ export const ANSWER_UNREADABLE = "ANSWER_UNREADABLE";
 export const ANSWER_MISMATCH = "ANSWER_MISMATCH";
 export const ANSWER_OTHER_CAPTURE = "ANSWER_OTHER_CAPTURE";
 
+/**
+ * The answer a selection already received, carried by a later attempt for that same
+ * selection while it runs and after it fails or is refused. Pressing Compute again replaces
+ * the state with the new attempt, and an attempt with no answer of its own would otherwise
+ * take the plan off the page because a second request did not succeed.
+ */
+export interface EarlierAnswer {
+  envelope: LeagueViewEnvelope<EntryAdvice>;
+  source: AdviceSource;
+}
+
 export type ComputePhase =
   | { phase: "idle" }
-  | { phase: "requesting"; request: AdviceRequest }
+  | { phase: "requesting"; request: AdviceRequest; earlier?: EarlierAnswer | null }
   | {
       phase: "waiting";
       request: AdviceRequest;
       jobId: string;
       status: "queued" | "running";
       fallback: LeagueViewEnvelope<EntryAdvice> | null;
+      earlier?: EarlierAnswer | null;
     }
   | {
       phase: "done";
@@ -67,13 +79,19 @@ export type ComputePhase =
       envelope: LeagueViewEnvelope<EntryAdvice>;
       source: AdviceSource;
     }
-  | { phase: "unavailable"; request: AdviceRequest; reason?: string | null }
+  | {
+      phase: "unavailable";
+      request: AdviceRequest;
+      reason?: string | null;
+      earlier?: EarlierAnswer | null;
+    }
   | {
       phase: "failed";
       request: AdviceRequest;
       /** A service code or one of the page's own; the panel turns it into a sentence. */
       reason?: string | null;
       retryAfterSeconds?: number | null;
+      earlier?: EarlierAnswer | null;
     };
 
 export interface AdviceJob {
@@ -104,6 +122,22 @@ export function sameAdviceRequest(left: AdviceRequest, right: AdviceRequest): bo
   );
 }
 
+/**
+ * The next state of an attempt, carrying the answer the same selection already had.
+ *
+ * A finished state is its own answer and an idle one has no selection. Any other state
+ * keeps the answer of the state it replaces, when that state was for the same request.
+ */
+function carrying(previous: ComputePhase, next: ComputePhase): ComputePhase {
+  if (next.phase === "idle" || next.phase === "done" || previous.phase === "idle") return next;
+  if (!sameAdviceRequest(previous.request, next.request)) return next;
+  const earlier =
+    previous.phase === "done"
+      ? { envelope: previous.envelope, source: previous.source }
+      : (previous.earlier ?? null);
+  return earlier ? { ...next, earlier } : next;
+}
+
 function failure(error: unknown): { reason: string | null; retryAfterSeconds: number | null } {
   if (error instanceof AdviceApiError) {
     return { reason: error.code, retryAfterSeconds: error.retryAfterSeconds };
@@ -121,9 +155,20 @@ export function useAdviceJob(
   allowPublishedBaseline = true,
   expectedSnapshotId?: string | null,
 ): AdviceJob {
-  const [state, setState] = useState<ComputePhase>({ phase: "idle" });
+  const [state, replaceState] = useState<ComputePhase>({ phase: "idle" });
+  // Every transition goes through `carrying`, so no call site can drop the earlier answer.
+  const setState = useCallback(
+    (next: ComputePhase | ((previous: ComputePhase) => ComputePhase)) =>
+      replaceState((previous) =>
+        carrying(previous, typeof next === "function" ? next(previous) : next),
+      ),
+    [],
+  );
   const generation = useRef(0);
   const active = useRef<AbortController | null>(null);
+  // The request a Compute press is still being answered for. A second press for the same
+  // selection, before the button has had a render to disable itself, is the same click.
+  const submitting = useRef<AdviceRequest | null>(null);
 
   useEffect(() => {
     return () => {
@@ -136,8 +181,9 @@ export function useAdviceJob(
     generation.current += 1;
     active.current?.abort();
     active.current = null;
+    submitting.current = null;
     setState({ phase: "idle" });
-  }, []);
+  }, [setState]);
 
   const readCached = useCallback(
     (request: AdviceRequest) => {
@@ -168,7 +214,7 @@ export function useAdviceJob(
           if (active.current === controller) active.current = null;
         });
     },
-    [client, expectedSnapshotId],
+    [client, expectedSnapshotId, setState],
   );
 
   const start = useCallback(
@@ -236,7 +282,7 @@ export function useAdviceJob(
           let fallback: LeagueViewEnvelope<EntryAdvice> | null = null;
           try {
             const published = allowPublishedBaseline
-              ? await new StaticOnlyAdviceClient().readAdvice(
+              ? await client.readPublished(
                   {
                     ...request,
                     strategy: "saf-puan",
@@ -334,13 +380,21 @@ export function useAdviceJob(
         })
         .finally(() => {
           if (active.current === controller) active.current = null;
+          if (generation.current === run) submitting.current = null;
           if (readAfterMissingJob && generation.current === run) readCached(request);
         });
     },
-    [client, allowPublishedBaseline, readCached],
+    [client, allowPublishedBaseline, readCached, setState],
   );
 
-  const compute = useCallback((request: AdviceRequest) => start(request, null), [start]);
+  const compute = useCallback(
+    (request: AdviceRequest) => {
+      if (submitting.current && sameAdviceRequest(submitting.current, request)) return;
+      submitting.current = request;
+      start(request, null);
+    },
+    [start],
+  );
 
   const resume = useCallback(
     (request: AdviceRequest) => {

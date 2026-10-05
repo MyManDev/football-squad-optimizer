@@ -18,7 +18,7 @@ test.beforeEach(async ({ page }) => {
 
 /** Say "this is me" on the first member's row, then come back to the table in the same visit. */
 async function claimFirstAndReturn(page: Page) {
-  await page.goto("/league/members");
+  await page.goto("/league/352490/members");
   await page
     .getByRole("row")
     .filter({ has: page.getByRole("link", { name: first.manager_name!, exact: true }) })
@@ -54,7 +54,8 @@ test("at 1440 the table, the system's record and the viewer's chips share one sc
   const karneBox = (await karne.boundingBox())!;
   expect(karneBox.x).toBeGreaterThanOrEqual(tableBox.x + tableBox.width);
   expect(karneBox.y).toBeLessThan(tableBox.y + tableBox.height);
-  await expect(karne.getByText(copy.karneCaption)).toBeVisible();
+  await expect(karne.getByText(copy.karneLede)).toBeVisible();
+  await expect(karne.getByText(/senin kadron değil/)).toHaveCount(0);
   // The full scoreboard is a wide table: closed, and once opened it reads across both
   // columns without scrolling sideways instead of squeezing into the record's column.
   const full = page.locator("main details", { hasText: copy.karneFull });
@@ -89,7 +90,7 @@ test("at 1440 the table, the system's record and the viewer's chips share one sc
 
 test("a cold visitor sees no lime row, no score bug and no chips", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto("/league/members");
+  await page.goto("/league/352490/members");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(copy.title);
   await expect(page.locator('#league-member-list tr[aria-current="true"]')).toHaveCount(0);
   await expect(page.locator("main header dl")).toHaveCount(0);
@@ -105,7 +106,7 @@ for (const width of [390, 820, 1179]) {
     page,
   }) => {
     await page.setViewportSize({ width, height: 900 });
-    await page.goto("/league/members");
+    await page.goto("/league/352490/members");
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(copy.title);
     for (const button of await page.getByRole("button", { name: copy.viewerSelect }).all()) {
       const box = (await button.boundingBox())!;

@@ -50,9 +50,11 @@ from squadopt.application.weekly_plan import (
     rotation_source_capture,
 )
 from squadopt.contracts.preferences import NO_PREFERENCES, DecisionPreferences
+from squadopt.data._long_paths import addressable
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import METADATA_FILENAME, PAYLOAD_DIRECTORY, read_snapshot
 from squadopt.data.sources.fpl_information import FplInformation
+from squadopt.data.sources.premier_league_injuries import OfficialInjuryReport
 from squadopt.data.timestamps import as_instant, normalize_utc_timestamp
 from squadopt.live import Projection, RecommendationInputs
 from squadopt.live.football_artifact import (
@@ -62,10 +64,12 @@ from squadopt.live.football_artifact import (
 )
 from squadopt.planning.chip_strategy import CHIP_STRATEGY_VERSION
 from squadopt.planning.observed import OBSERVED_WINDOW_VERSION
+from squadopt.platform.football_bundle import football_bundle_path, read_football_bundle
 from squadopt.platform.football_minute_basis import (
     football_components_path,
     load_football_minute_basis,
 )
+from squadopt.prediction.football import JOINT_ROLE_MODEL_VERSIONS
 
 __all__ = [
     "CHIP_SWITCH",
@@ -115,6 +119,8 @@ class AdviceSwitchInputs:
     football_components_sha256: str | None = None
     official_information: FplInformation | None = None
     football_components_bound: bool = False
+    football_bundle_sha256: str | None = None
+    official_injuries: OfficialInjuryReport | None = None
 
     def decision_information(self, snapshot_id: str) -> dict[str, object] | None:
         if self.football is None:
@@ -126,7 +132,13 @@ class AdviceSwitchInputs:
             "components_bound": self.football_components_bound,
             "news": self.rotation_table_sha256,
             "participation": FOOTBALL_PARTICIPATION_VERSION,
+            "ready_bundle": self.football_bundle_sha256,
         }
+        if self.rotation_table_sha256 is not None:
+            # The same news read under a different rule is different information: a plan
+            # shown under the old rule must be told it is stale. Only where news is bound,
+            # so a revision with no news does not move.
+            identity["news_rule"] = MANAGERS_WORD_RULE_VERSION
         revision = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
         return {
             "version": "football_decision_information_v1",
@@ -176,7 +188,13 @@ def switch_identity(
             "planner_version": OBSERVED_WINDOW_VERSION,
             "participation_version": FOOTBALL_PARTICIPATION_VERSION,
             "rotation_table_sha256": inputs.rotation_table_sha256,
+            "ready_bundle_sha256": inputs.football_bundle_sha256,
         }
+        if inputs.rotation_table_sha256 is not None:
+            # Which statements bind is the reader's rule, and the same table read under a
+            # different rule is a different input. Named only where news is bound, so a
+            # football answer with no news keeps the key it was written under.
+            identity[MODEL_SWITCH]["news_rule_version"] = MANAGERS_WORD_RULE_VERSION
     if chip is not None:
         identity[CHIP_SWITCH] = {
             "chip": chip,
@@ -232,18 +250,25 @@ def _generated_at(table: Path) -> str:
 
 def _stat(path: Path) -> tuple[str, int, int]:
     try:
-        status = path.stat()
+        status = Path(addressable(path)).stat()
     except OSError:
         return (path.name, -1, -1)
     return (path.name, status.st_size, status.st_mtime_ns)
 
 
 def _rotation_candidates(
-    root: Path, season: str, gameweek: int, source_id: str
+    root: Path,
+    season: str,
+    gameweek: int,
+    source_id: str,
+    *,
+    decision_snapshot_id: str | None = None,
 ) -> tuple[tuple[Path, Path], ...]:
     """Prefer the current writer, then supported V3/V2; never mask an invalid new table."""
-    current = rotation_artifact(root, season, gameweek, source_id)
-    legacy = []
+    current = rotation_artifact(
+        root, season, gameweek, source_id, decision_snapshot_id=decision_snapshot_id
+    )
+    legacy = [rotation_artifact(root, season, gameweek, source_id)]
     for version in (3, 2):
         stem = f"rotation_evidence_v{version}_{season}_gw{gameweek:02d}_{source_id[-12:]}"
         legacy.append((root / f"{stem}.csv", root / f"{stem}.manifest.json"))
@@ -271,6 +296,12 @@ def _rotation_manifest_binding(
     expected = {inputs.snapshot_id}
     binding_fields = ("club_news_snapshot_id", "club_news_captured_at_utc")
     explicitly_bound = any(key in document for key in binding_fields)
+    if (
+        news_capture_id is not None
+        and document.get("contract_version") == "rotation_evidence_v4"
+        and not explicitly_bound
+    ):
+        raise ValueError("V4 evidence must bind the configured news capture time.")
     if explicitly_bound:
         recorded_time = document.get("club_news_captured_at_utc")
         if (
@@ -322,6 +353,7 @@ def discovery_signature(
     season: str,
     gameweek: int,
     capture_snapshot_id: str,
+    snapshot_root: Path | None = None,
 ) -> tuple[object, ...]:
     """A cheap reading of what ``load_switch_inputs`` would look at, to notice a change.
 
@@ -336,6 +368,51 @@ def discovery_signature(
     found: list[tuple[str, int, int]] = []
     found.append(_stat(football_artifact_path(artifact_root, capture_snapshot_id)))
     found.append(_stat(football_components_path(artifact_root, capture_snapshot_id)))
+    marker = football_bundle_path(artifact_root, capture_snapshot_id)
+    found.append(_stat(marker))
+    # A ready marker is written last. Sealed files are immutable, but stat their
+    # small directory too so accidental corruption invalidates held contexts.
+    sealed = marker.with_suffix("")
+    reachable_sealed = Path(addressable(sealed))
+    if reachable_sealed.is_dir():
+        found.extend(
+            _stat(sealed / path.relative_to(reachable_sealed))
+            for path in sorted(reachable_sealed.rglob("*"))
+            if path.is_file()
+        )
+    if snapshot_root is not None and Path(addressable(marker)).is_file():
+        # Invalidation only; load_switch_inputs performs the authoritative digest,
+        # clock and roster checks before using any bytes from these captures.
+        try:
+            if Path(addressable(marker)).stat().st_size > 2 * 1024 * 1024:
+                raise ValueError("Ready marker exceeds the discovery size bound.")
+            record = json.loads(Path(addressable(marker)).read_bytes())
+            root = snapshot_root.resolve()
+            for key in ("decision", "news", "official_injuries"):
+                entry = record.get(key)
+                name = entry.get("snapshot_id") if isinstance(entry, dict) else None
+                if (
+                    not isinstance(name, str)
+                    or not name
+                    or any(
+                        ch not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-"
+                        for ch in name
+                    )
+                ):
+                    continue
+                source = root / name
+                if source.resolve() != source:
+                    continue
+                found.extend((_stat(source), _stat(source / METADATA_FILENAME)))
+                payloads = source / PAYLOAD_DIRECTORY
+                if payloads.is_dir() and payloads.resolve() == payloads:
+                    found.extend(
+                        _stat(path)
+                        for path in sorted(payloads.iterdir())
+                        if path.is_file() and not path.is_symlink()
+                    )
+        except (OSError, ValueError, TypeError, AttributeError):
+            pass
     for table in _evidence_candidates(artifact_root, season, gameweek):
         found.extend((_stat(table), _stat(top100_manifest_path(table))))
     if club_news_source is not None:
@@ -346,7 +423,11 @@ def discovery_signature(
             capture_snapshot_id, source.name if source.is_dir() else None
         )
         for pair in _rotation_candidates(
-            artifact_root / ROTATION_DIRECTORY, season, gameweek, source_id
+            artifact_root / ROTATION_DIRECTORY,
+            season,
+            gameweek,
+            source_id,
+            decision_snapshot_id=capture_snapshot_id,
         ):
             found.extend(_stat(path) for path in pair)
         found.append(_stat(source))
@@ -393,6 +474,29 @@ def load_switch_inputs(
         break
     if not candidates:
         notes.append(f"top100: no export for {season} gameweek {gameweek}")
+    bundle = None
+    invalid_bundle = False
+    marker = football_bundle_path(artifact_root, inputs.snapshot_id)
+    if Path(addressable(marker)).exists():
+        try:
+            bundle = read_football_bundle(
+                artifact_root=artifact_root,
+                snapshot_root=snapshot_root,
+                snapshot_id=inputs.snapshot_id,
+            )
+            if (
+                projection.diagnostics.get("projection_handoff_fingerprint")
+                != bundle.handoff_fingerprint
+            ):
+                raise ValueError("Ready bundle handoff differs from the served baseline handoff.")
+            club_news_source = (
+                snapshot_root / bundle.news_capture_id if bundle.news_capture_id else None
+            )
+        except (DataError, OSError, ValueError, KeyError, TypeError) as error:
+            bundle = None
+            invalid_bundle = True
+            club_news_source = None
+            notes.append(f"football bundle refused: {error}")
     words: ManagerWords | None = None
     digest: str | None = None
     if club_news_source is None:
@@ -402,17 +506,28 @@ def load_switch_inputs(
             source = Path(club_news_source)
             news_id = club_news_capture_id(source, snapshot_root=snapshot_root)
             source_id = rotation_source_capture(inputs.snapshot_id, news_id)
-            pairs = _rotation_candidates(
-                Path(artifact_root) / ROTATION_DIRECTORY, season, gameweek, source_id
+            pairs = (
+                ((bundle.files["rotation_table"], bundle.files["rotation_manifest"]),)
+                if bundle is not None
+                else _rotation_candidates(
+                    Path(artifact_root) / ROTATION_DIRECTORY,
+                    season,
+                    gameweek,
+                    source_id,
+                    decision_snapshot_id=inputs.snapshot_id,
+                )
             )
             # V2 is used only when the current pair is absent. A present but invalid
             # current artifact must not silently fall back to an older interpretation.
-            selected = next((pair for pair in pairs if any(path.exists() for path in pair)), None)
+            selected = next(
+                (pair for pair in pairs if any(Path(addressable(path)).exists() for path in pair)),
+                None,
+            )
             if selected is None:
                 notes.append(f"managers_word: no rotation table {pairs[0][0].name}")
             else:
                 table, manifest = selected
-                document = json.loads(manifest.read_text(encoding="utf-8"))
+                document = json.loads(Path(addressable(manifest)).read_text(encoding="utf-8"))
                 news_completed = None
                 if (
                     isinstance(document, dict)
@@ -455,9 +570,17 @@ def load_switch_inputs(
     components_sha256 = None
     components_bound = False
     try:
+        if bundle is not None and bundle.news_capture_id is not None and words is None:
+            raise ValueError(
+                "The sealed news input cannot be resolved; refusing the football bundle."
+            )
+        if invalid_bundle:
+            raise ValueError("The ready bundle is invalid; no partial football inputs are served.")
         football = read_football_forecast(
             football_artifact_path(artifact_root, inputs.snapshot_id), inputs
         )
+        if football.horizon.model_version in JOINT_ROLE_MODEL_VERSIONS and bundle is None:
+            raise ValueError("The joint-role model requires a complete ready bundle.")
         minute_input = load_football_minute_basis(
             artifact_root=artifact_root,
             snapshot_root=snapshot_root,
@@ -466,6 +589,10 @@ def load_switch_inputs(
         )
         components_sha256 = minute_input.components_sha256
         components_bound = minute_input.basis is not None
+        if bundle is not None and not components_bound:
+            raise ValueError(
+                "The sealed component basis is unavailable; no partial bundle is served."
+            )
         football = bind_football_participation(
             football,
             inputs,
@@ -476,6 +603,9 @@ def load_switch_inputs(
         )
     except (OSError, ValueError, KeyError, TypeError) as error:
         notes.append(f"football: {error}")
+        football = None
+        components_sha256 = None
+        components_bound = False
     return AdviceSwitchInputs(
         top100_counts=counts,
         manager_words=words,
@@ -484,5 +614,7 @@ def load_switch_inputs(
         football=football,
         football_components_sha256=components_sha256,
         football_components_bound=components_bound,
+        football_bundle_sha256=bundle.fingerprint if bundle is not None else None,
+        official_injuries=bundle.official_injuries if bundle is not None else None,
         official_information=inputs.official_information,
     )

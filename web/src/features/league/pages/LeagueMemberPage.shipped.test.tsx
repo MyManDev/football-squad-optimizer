@@ -4,8 +4,10 @@
  * Every other member-page test reads example documents, and the one test that reads the
  * real tree (`shippedTree.test.ts`) runs validators without drawing anything. A component
  * that throws on a real document shape the examples never carry would reach a member
- * first. This draws the page as the site does, for every member in
- * `public/data/league/members.json` and in both languages: the real loaders, the real
+ * first. This draws the page as the site does, for every member of the first tree the
+ * site lists (`testSupport/shippedTrees.ts`; `shippedTree.test.ts` holds every tree to the
+ * validators) and in both languages: the real gate (which reads the
+ * directory, and the one legacy tree as the directory of one), the real loaders, the real
  * validators, the shell and the route's error boundary, with each request answered from
  * `public/` on disk. Nothing leaves the process, and a request outside `data/` fails the
  * test.
@@ -27,6 +29,7 @@ import { PageShell } from "../../../design/components/PageShell";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { MESSAGES, type Language } from "../../../i18n/messages";
 import { isRefusedMemberIndex, refusedMemberIndex } from "../../../testSupport/refusedMember";
+import { PUBLIC_ROOT as PUBLIC, shippedTrees } from "../../../testSupport/shippedTrees";
 import { resolvePublishedAdvice } from "../advice/adviceSelection";
 import type {
   EntryAdvice,
@@ -35,20 +38,21 @@ import type {
   LeagueMembers,
   LeagueViewEnvelope,
 } from "../types";
+import { memberAddress } from "../../../lib/leagueAddresses";
+import { LeagueGate } from "./LeagueGate";
 import { LeagueMemberPage } from "./LeagueMemberPage";
 
-const PUBLIC = join(__dirname, "../../../../public");
-const LEAGUE = "data/league";
+// The member pages of one tree are drawn. A site that lists more fails here, so a
+// second league's pages are never reported as drawn when they were not.
+const TREES = shippedTrees();
+const LEAGUE = TREES[0]!.path;
 
 function readPublished<T>(relative: string): T {
   return JSON.parse(readFileSync(join(PUBLIC, relative), "utf-8")) as T;
 }
 
-const shipped = existsSync(join(PUBLIC, LEAGUE, "members.json"));
-const league = shipped
-  ? readPublished<LeagueViewEnvelope<LeagueMembers>>(`${LEAGUE}/members.json`).payload
-  : null;
-const humans = (league?.members ?? []).flatMap((member) =>
+const league = readPublished<LeagueViewEnvelope<LeagueMembers>>(`${LEAGUE}/members.json`).payload;
+const humans = league.members.flatMap((member) =>
   member.member_kind === "human" ? [member.entry_id] : [],
 );
 
@@ -140,11 +144,18 @@ function openMemberPage(entryId: number, language: Language) {
   return render(
     <QueryClientProvider client={client}>
       <LanguageProvider initialLanguage={language}>
-        <MemoryRouter initialEntries={[`/league/members/${entryId}`]}>
+        <MemoryRouter initialEntries={[memberAddress(league.league_id, entryId)]}>
           <PageShell>
             <RouteErrorBoundary>
               <Routes>
-                <Route path="/league/members/:entryId" element={<LeagueMemberPage />} />
+                <Route
+                  path="/league/:leagueId/members/:entryId"
+                  element={
+                    <LeagueGate>
+                      <LeagueMemberPage />
+                    </LeagueGate>
+                  }
+                />
               </Routes>
             </RouteErrorBoundary>
           </PageShell>
@@ -210,9 +221,9 @@ function refuseMember(entryId: number, reason: string) {
   const refused: LeagueViewEnvelope<EntryAdviceIndex> = {
     ...members,
     payload: refusedMemberIndex({
-      leagueId: league!.league_id,
-      season: league!.season,
-      gameweek: league!.gameweek,
+      leagueId: league.league_id,
+      season: league.season,
+      gameweek: league.gameweek,
       entryId,
       rivalEntryIds: humans.filter((id) => id !== entryId).slice(0, 1),
       reason,
@@ -256,7 +267,7 @@ async function expectMemberDrawn(entryId: number, language: Language) {
     new URLSearchParams(),
     squad.league_id,
     entryId,
-    league!.members,
+    league.members,
     index,
     { season: squad.season, gameweek: squad.gameweek },
   );
@@ -304,7 +315,7 @@ async function expectBreakageNoticed(entryId: number) {
     new URLSearchParams(),
     squad.payload.league_id,
     entryId,
-    league!.members,
+    league.members,
     index,
     { season: squad.payload.season, gameweek: squad.payload.gameweek },
   );
@@ -326,9 +337,13 @@ async function expectBreakageNoticed(entryId: number) {
   expect(() => expectNoFailure("en")).toThrow();
 }
 
-const FREE_HIT = `Entry ${humans[0]} played a Free Hit in gameweek ${(league?.gameweek ?? 1) - 1}.`;
+const FREE_HIT = `Entry ${humans[0]} played a Free Hit in gameweek ${league.gameweek - 1}.`;
 
-describe.skipIf(!shipped)("every member page, from the published tree", () => {
+describe("every member page, from the published tree", () => {
+  it("is drawn for the one tree the site lists", () => {
+    expect(TREES.map((tree) => tree.path)).toEqual([LEAGUE]);
+  });
+
   describe.each(["tr", "en"] as const)("in %s", (language) => {
     it.each(humans)("draws member %i with its heading and its decision", async (entryId) => {
       await expectMemberDrawn(entryId, language);

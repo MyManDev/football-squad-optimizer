@@ -1,12 +1,10 @@
 /**
  * The football model's `football_team_share_v1` forecast splits each club's goals and
  * assists before availability is applied, and the backend says so beside every answer that
- * forecast decided. The page translates that sentence like every other limit, so the
- * Turkish page never shows the producer's English and neither page shows the neutral
- * "no translation" line in its place.
+ * forecast decided. The member page does not list a plan's limits.
  */
 
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, render } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -19,10 +17,10 @@ import {
   mockEntrySquadEnvelopes,
 } from "../../../fixtures/league";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
-import { MESSAGES } from "../../../i18n/messages";
 import { AS_A_CHANCE } from "../../../testSupport/honesty";
 import type { EntryAdvice, LeagueViewEnvelope } from "../types";
 import { LeagueMemberView } from "./LeagueMemberPage";
+import { withLeague } from "../../../testSupport/league";
 
 afterEach(cleanup);
 
@@ -36,55 +34,40 @@ function withLimits(window: 1 | 3, limits: string[]): LeagueViewEnvelope<EntryAd
 function renderAdvice(advice: LeagueViewEnvelope<EntryAdvice>, language: "tr" | "en") {
   return render(
     <LanguageProvider initialLanguage={language}>
-      <MemoryRouter initialEntries={[`/league/members/${ENTRY}?window=${advice.payload.window}`]}>
-        <LeagueMemberView
-          index={mockEntryAdviceIndex(ENTRY).payload}
-          squad={mockEntrySquadEnvelopes[ENTRY]}
-          advice={advice}
-        />
+      <MemoryRouter
+        initialEntries={[`/league/352490/members/${ENTRY}?window=${advice.payload.window}`]}
+      >
+        {withLeague(
+          <LeagueMemberView
+            index={mockEntryAdviceIndex(ENTRY).payload}
+            squad={mockEntrySquadEnvelopes[ENTRY]}
+            advice={advice}
+          />,
+        )}
       </MemoryRouter>
     </LanguageProvider>,
   );
 }
 
-function listed(region: HTMLElement): (string | null)[] {
-  return within(region)
-    .getAllByRole("listitem")
-    .map((item) => item.textContent);
+function expectNoAssumptions(container: HTMLElement, published: readonly string[]) {
+  expect(container).not.toHaveTextContent(
+    /What this (?:plan|window) assumes|Bu (?:planın|pencerenin) varsaydıkları/,
+  );
+  expect(container).not.toHaveTextContent(AS_A_CHANCE);
+  for (const sentence of published) {
+    expect(container).not.toHaveTextContent(sentence);
+  }
 }
 
 describe("the plan states that football v1 splits attacking shares before availability", () => {
-  it.each(["tr", "en"] as const)("holds a reviewed %s sentence for it", (language) => {
-    const copy = MESSAGES[language].leagueMembers;
-    expect(Object.hasOwn(copy.statedLimits, FOOTBALL_SHARE_STATED_LIMIT)).toBe(true);
-    const sentence = copy.statedLimits[FOOTBALL_SHARE_STATED_LIMIT]!;
-    expect(sentence).not.toBe(copy.statedLimitUnknown);
-    // A stated mechanism, not a size: no number and no chance wording in either language.
-    expect(sentence).not.toMatch(AS_A_CHANCE);
-    expect(sentence).not.toMatch(/\d/);
-  });
-
-  it.each(["tr", "en"] as const)("renders it under a one-week plan in %s", (language) => {
-    const copy = MESSAGES[language].leagueMembers;
-    renderAdvice(withLimits(1, [NO_CHIP_STATED_LIMIT, FOOTBALL_SHARE_STATED_LIMIT]), language);
-
-    const limits = screen.getByRole("region", { name: copy.planLimitsLabel });
-    expect(listed(limits)).toEqual([
-      copy.statedLimits[NO_CHIP_STATED_LIMIT],
-      copy.statedLimits[FOOTBALL_SHARE_STATED_LIMIT],
-    ]);
-    expect(limits).not.toHaveTextContent(copy.statedLimitUnknown);
-    if (language === "tr") expect(limits).not.toHaveTextContent(FOOTBALL_SHARE_STATED_LIMIT);
-  });
-
-  it.each(["tr", "en"] as const)("renders it after a window's own limits in %s", (language) => {
-    const copy = MESSAGES[language].leagueMembers;
-    const published = [...WINDOW_STATED_LIMITS, FOOTBALL_SHARE_STATED_LIMIT];
-    renderAdvice(withLimits(3, published), language);
-
-    const limits = screen.getByRole("region", { name: copy.windowLimitsLabel });
-    expect(listed(limits)).toEqual(published.map((sentence) => copy.statedLimits[sentence]));
-    if (language === "tr") expect(limits).not.toHaveTextContent(FOOTBALL_SHARE_STATED_LIMIT);
+  it.each(["tr", "en"] as const)("is not listed on the member page in %s", (language) => {
+    const week = [NO_CHIP_STATED_LIMIT, FOOTBALL_SHARE_STATED_LIMIT];
+    const one = renderAdvice(withLimits(1, week), language);
+    expectNoAssumptions(one.container, week);
+    cleanup();
+    const window = [...WINDOW_STATED_LIMITS, FOOTBALL_SHARE_STATED_LIMIT];
+    const three = renderAdvice(withLimits(3, window), language);
+    expectNoAssumptions(three.container, window);
   });
 });
 
@@ -95,18 +78,10 @@ describe("captured football forecast limits", () => {
     "Earlier football forecasts may already carry an absence into later weeks. This update does not restore those values without a known conditional forecast.",
   ];
 
-  it.each(["tr", "en"] as const)("explains all three published limits in %s", (language) => {
-    const copy = MESSAGES[language].leagueMembers;
+  it.each(["tr", "en"] as const)("lists none on the page in %s", (language) => {
     const advice = withLimits(3, [...limits]);
-    renderAdvice(advice, language);
-
-    const region = screen.getByRole("region", { name: copy.windowLimitsLabel });
-    for (const sentence of limits) {
-      expect(Object.hasOwn(copy.statedLimits, sentence), sentence).toBe(true);
-      if (language === "tr") expect(region).not.toHaveTextContent(sentence);
-    }
-    expect(listed(region)).toEqual(limits.map((sentence) => copy.statedLimits[sentence]));
-    expect(region).not.toHaveTextContent(copy.statedLimitUnknown);
+    const { container } = renderAdvice(advice, language);
+    expectNoAssumptions(container, limits);
     expect(advice.payload.stated_limits).toEqual(limits);
   });
 });
@@ -117,12 +92,8 @@ describe("experimental football construction limits", () => {
     "This experimental plan compares a week-by-week starting plan with a full-window search, retaining the starting plan only after full-window validation. Future performance is not established.",
     "The week-by-week starting plan could not be completed; this result uses the standard full-window search with the remaining budget.",
   ];
-  it.each(["tr", "en"] as const)("renders the chosen method and fallback in %s", (language) => {
-    const copy = MESSAGES[language].leagueMembers;
-    renderAdvice(withLimits(3, limits), language);
-    const region = screen.getByRole("region", { name: copy.windowLimitsLabel });
-    expect(listed(region)).toEqual(limits.map((limit) => copy.statedLimits[limit]));
-    expect(region).not.toHaveTextContent(copy.statedLimitUnknown);
-    if (language === "tr") expect(region).not.toHaveTextContent(limits[0]!);
+  it.each(["tr", "en"] as const)("lists none on the page in %s", (language) => {
+    const { container } = renderAdvice(withLimits(3, limits), language);
+    expectNoAssumptions(container, limits);
   });
 });

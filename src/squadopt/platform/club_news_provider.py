@@ -57,6 +57,11 @@ from squadopt.data.sources.club_news_coding import (
     coding_prompt_sha256,
     require_requested_coding_contract,
 )
+from squadopt.data.sources.club_news_selection import (
+    SELECTION_POLICY_VERSION,
+    DocumentSelection,
+    select_coding_documents,
+)
 
 # Eager, and the laziness that matters is kept where it belongs. Registration needs the name
 # when this module is imported, so deferring the class while importing its constants would
@@ -307,6 +312,18 @@ def check_coding_provider(
     """Offline configuration/dependency check; never authenticates or creates a client."""
     config = resolve_provider_config(environ, settings_file=settings_file)
     validate_provider_config(config)
+    require_provider_dependency(config)
+    return config
+
+
+def require_provider_dependency(config: CodingProviderConfig) -> None:
+    """Refuse a provider whose client library is not installed, without importing it.
+
+    The adapters refuse the same thing when they are built. This is the check for a caller
+    that builds its adapter later than it wants the refusal: the acquisition command builds
+    after the pages are read, and a missing library is a reason to read none of them.
+    """
+
     dependency = {
         DEFAULT_PROVIDER: "anthropic",
         GEMINI_PROVIDER: "httpx2",
@@ -317,7 +334,6 @@ def check_coding_provider(
         raise ClubNewsProviderError(
             "The selected provider needs the project's llm extra installed."
         )
-    return config
 
 
 def build_coding_provider(
@@ -333,9 +349,32 @@ def build_coding_provider(
     """
 
     config = resolve_provider_config(environ, settings_file=settings_file)
+    return bind_coding_provider(config, target_context)
+
+
+def bind_coding_provider(
+    config: CodingProviderConfig, target_context: Mapping[str, object] | None
+) -> tuple[ClubNewsProvider, CodingProviderConfig]:
+    """Build the provider for an already-resolved configuration and one target context.
+
+    Resolution and binding are separate so the acquisition command can refuse a bad
+    configuration before any page is fetched and still build the adapter afterwards, once
+    the instant the coding observes from is known. The adapter keeps the context it is built
+    with, so a provider built before the fetch would tell the model an earlier time than the
+    one the documents were selected at.
+    """
+
     config = replace(config, target_context=target_context)
     validate_provider_config(config)
     return _FACTORIES[config.provider](config), config
+
+
+def coding_as_of(config: CodingProviderConfig) -> str | None:
+    """The instant the coding observes from, or ``None`` when no target was declared."""
+
+    if config.target_context and "as_of" in config.target_context:
+        return str(config.target_context["as_of"])
+    return None
 
 
 def coding_input_fingerprint(
@@ -353,6 +392,7 @@ def coding_input_fingerprint(
     value = {
         "provider": config.provider,
         "model": config.model_identifier,
+        "selection_policy": SELECTION_POLICY_VERSION,
         "prompt": coding_prompt_sha256(config.model_identifier),
         "target": target,
         "instrument": {
@@ -378,6 +418,39 @@ def coding_input_fingerprint(
     return hashlib.sha256(json.dumps(value, sort_keys=True).encode()).hexdigest()
 
 
+@dataclass(frozen=True, slots=True)
+class WeekCoding:
+    """One week's coding: the answers, the refusals, and how many requests were sent.
+
+    ``calls_attempted`` counts calls to the provider that were begun, whether they came
+    back as an answer or as an error. A reused answer, a club stopped by the budget and a
+    club refused before its call began attempted none.
+
+    ``refusal_kinds`` names, club by club and in the order of ``refused``, which of four
+    different things a refusal was. The sentence in ``refused`` is for a person; the kind is
+    for a report that must not mix them.
+    """
+
+    coded: tuple[CodedClub, ...]
+    refused: tuple[tuple[str, str], ...]
+    calls_attempted: int
+    refusal_kinds: tuple[tuple[str, str], ...]
+
+    def __post_init__(self) -> None:
+        if [club for club, _ in self.refusal_kinds] != [club for club, _ in self.refused]:
+            raise ValueError("Each refusal has its kind, in the order the refusals are listed.")
+
+
+#: No document of the club was selected for coding, so there was nothing to ask about.
+REFUSAL_NOTHING_SELECTED: Final = "nothing_selected"
+#: The run's call budget was spent before this club's turn. No call was attempted.
+REFUSAL_BUDGET: Final = "budget_stopped"
+#: The club's input was refused before any call was attempted.
+REFUSAL_BEFORE_CALL: Final = "refused_before_call"
+#: A call was attempted and did not produce a usable answer.
+REFUSAL_CALL_FAILED: Final = "call_failed"
+
+
 def code_week_by_club(
     provider: ClubNewsProvider,
     config: CodingProviderConfig,
@@ -386,8 +459,38 @@ def code_week_by_club(
     *,
     max_calls: int | None = None,
     previous: Sequence[CodedClub] = (),
+    selection: DocumentSelection | None = None,
 ) -> tuple[tuple[CodedClub, ...], tuple[tuple[str, str], ...]]:
+    """What :func:`code_week` coded and refused, without its count of requests."""
+
+    week = code_week(
+        provider,
+        config,
+        documents,
+        roster,
+        max_calls=max_calls,
+        previous=previous,
+        selection=selection,
+    )
+    return week.coded, week.refused
+
+
+def code_week(
+    provider: ClubNewsProvider,
+    config: CodingProviderConfig,
+    documents: Sequence[RawDocument],
+    roster: Sequence[RosterPlayer],
+    *,
+    max_calls: int | None = None,
+    previous: Sequence[CodedClub] = (),
+    selection: DocumentSelection | None = None,
+) -> WeekCoding:
     """Code a week one club at a time, returning what was coded and why the rest was not.
+
+    ``selection`` is the caller's own selection of these documents, when it has already made
+    one. Passing it means the documents that are coded and the documents the caller reports
+    as selected are one result and cannot drift apart; left out, the selection is made here
+    from the configuration's own ``as_of``.
 
     **The request unit is one club, and that is a decision about failure rather than about
     tidiness.** ``MAX_OUTPUT_TOKENS`` and ``REQUEST_TIMEOUT_SECONDS`` are each justified in
@@ -422,16 +525,27 @@ def code_week_by_club(
         isinstance(max_calls, bool) or not isinstance(max_calls, int) or max_calls < 0
     ):
         raise ClubNewsProviderError("Call budget must be a nonnegative integer.")
+    selected = (
+        selection
+        if selection is not None
+        else select_coding_documents(documents, as_of=coding_as_of(config))
+    )
     by_club: dict[str, list[RawDocument]] = {}
-    for document in documents:
+    for document in selected.documents:
         by_club.setdefault(document.club, []).append(document)
 
     prompt_sha256 = coding_prompt_sha256(config.model_identifier)
     coded: list[CodedClub] = []
-    refused: list[tuple[str, str]] = []
+    refused: list[tuple[str, str]] = [
+        (club, "No current first-team document selected for coding.")
+        for club in dict.fromkeys(d.club for d in documents)
+        if club not in by_club
+    ]
+    kinds: list[tuple[str, str]] = [(club, REFUSAL_NOTHING_SELECTED) for club, _ in refused]
     previous_by_club = {item.club: item for item in previous}
     attempted = 0
     for club, club_documents in by_club.items():
+        called = False
         try:
             fingerprint = coding_input_fingerprint(config, club_documents, roster)
             held = previous_by_club.get(club)
@@ -443,17 +557,34 @@ def code_week_by_club(
                 and held.prompt_sha256 == prompt_sha256
                 and held.response.model_identifier == config.model_identifier
             ):
+                # A held answer that no longer meets the contract is refused with no call
+                # attempted, like an input refused before its question is built.
                 require_requested_coding_contract(held.response)
                 coded.append(held)
                 continue
             if max_calls is not None and attempted >= max_calls:
                 refused.append((club, "Call budget exhausted; no model request was sent."))
+                kinds.append((club, REFUSAL_BUDGET))
                 continue
             attempted += 1
-            response = provider.code(club_documents, roster)
+            called = True
+            try:
+                response = provider.code(club_documents, roster)
+            except ClubNewsError:
+                raise
+            except Exception as error:
+                # An adapter turns the failures it knows into its own refusal, with the
+                # text it has made safe. Anything else is an error nobody prepared: its
+                # message can quote the request, headers included, so only its type is
+                # kept, and it costs this club's call like any other failed call.
+                raise ClubNewsError(
+                    f"The provider call failed with {type(error).__name__}. Its message is "
+                    "withheld, because an unprepared error can quote the request."
+                ) from None
             require_requested_coding_contract(response)
         except ClubNewsError as error:
             refused.append((club, str(error)))
+            kinds.append((club, REFUSAL_CALL_FAILED if called else REFUSAL_BEFORE_CALL))
             continue
         coded.append(
             CodedClub(
@@ -480,7 +611,7 @@ def code_week_by_club(
                 ),
             )
         )
-    return tuple(coded), tuple(refused)
+    return WeekCoding(tuple(coded), tuple(refused), attempted, tuple(kinds))
 
 
 def _anthropic(config: CodingProviderConfig) -> ClubNewsProvider:
@@ -531,14 +662,23 @@ __all__ = [
     "KEY_ENVIRONMENT_VARIABLE",
     "MODEL_ENVIRONMENT_VARIABLE",
     "PROVIDER_ENVIRONMENT_VARIABLE",
+    "REFUSAL_BEFORE_CALL",
+    "REFUSAL_BUDGET",
+    "REFUSAL_CALL_FAILED",
+    "REFUSAL_NOTHING_SELECTED",
     "VENDOR_KEY_VARIABLES",
     "ClubNewsProviderError",
     "CodingProviderConfig",
+    "WeekCoding",
+    "bind_coding_provider",
     "build_coding_provider",
     "check_coding_provider",
+    "code_week",
     "code_week_by_club",
+    "coding_as_of",
     "register_provider",
     "registered_providers",
+    "require_provider_dependency",
     "resolve_provider_config",
     "validate_provider_config",
 ]
