@@ -253,6 +253,8 @@ def test_a_span_that_cuts_a_character_in_half_is_not_a_sentence():
         'Arteta said: "Saka is out." Is he fit? No\u2026 Timber is.\nCoach: (Saka is out)!',
         "It is not true that Saka is out, he said... Really?! \u201cYes.\u201d\r\nEnd: [no] ",
         "Şaka?\tOut!  Out. 'In'.. ok",
+        # Club pages write single quotes and the apostrophe as &rsquo;, which reads as U+2019.
+        "Coach: \u2018Saka is out.\u2019 Timber\u2019s fine!\u2026 Wait\u2026\n\u2018Out\u2019",
     ],
 )
 def test_the_parser_and_the_reader_hold_one_definition_of_a_whole_sentence(text):

@@ -104,6 +104,10 @@ finite English source check requires explicit unconditional wording. Absence, fu
 inability and rotation-risk restrictions must name the player and the relevant predicate
 in the same complete cited clause. Unsupported aliases, pronouns, training-only wording,
 other competitions, past matches and uncertain statements do not authorize those changes.
+The cited span must also be a whole sentence of the held source, by the same rule the
+manager-word reader applies: a quote cut from inside a longer sentence keeps its scope
+label but not `scope_verified`. A colon may introduce the sentence; a question mark or an
+ellipsis does not end one.
 
 The builder also checks the captured club calendar: the target week must have one dated
 fixture still ahead of the decision, and it must be the first club fixture after the exact
