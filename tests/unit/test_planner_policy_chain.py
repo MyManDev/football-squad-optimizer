@@ -36,8 +36,8 @@ from squadopt.application.football_participation import FOOTBALL_PARTICIPATION_V
 from squadopt.application.lineup_publication import lineup_fields
 from squadopt.application.weekly_suggestion_eval import score_recorded_advice
 from squadopt.data.atomic import write_document_once
-from squadopt.data.errors import ConflictingBytesError
-from squadopt.live import plan_transfer_horizon
+from squadopt.data.errors import ConflictingBytesError, DataError
+from squadopt.live import InSeasonProjection, plan_transfer_horizon, write_projection_handoff
 from squadopt.live import transfers as live_transfers
 from squadopt.live.football_artifact import football_artifact_path, forecast_digest
 from squadopt.live.recommendation import read_inputs
@@ -46,9 +46,11 @@ from squadopt.optimization import OptimizationConfig, SolverStatus
 from squadopt.planning import PlanningHorizon
 from squadopt.planning.guarded import GUARDED_PLANNER_VERSION
 from squadopt.planning.horizon import APPEARANCE_HORIZON_CONTRACT_VERSION
+from squadopt.planning.models import TransferPlanningValidationError
 from squadopt.planning.optimizer import optimize_transfer_plan
 from squadopt.planning.pricing import sell_price_tenths
-from squadopt.platform.football_bundle import seal_football_bundle
+from squadopt.platform.football_bundle import football_bundle_path, seal_football_bundle
+from squadopt.platform.football_minute_basis import football_components_path
 from squadopt.prediction.football import (
     FOOTBALL_MODEL_VERSION,
     JOINT_ROLE_MODEL_VERSION,
@@ -351,8 +353,11 @@ def test_the_merge_identities_are_the_commits_on_the_line_they_were_merged_into(
 # Rules 6 to 8: the served forecast, read once and never rebuilt
 
 
-def _served(tmp_path: Path, *, written_before_deadline: bool = True) -> tuple[Path, Path, str]:
-    """A synthetic capture with its served v1 artifact, written at a chosen instant."""
+def _served(
+    tmp_path: Path, *, written_before_deadline: bool = True, handoff: bool = True
+) -> tuple[Path, Path, str]:
+    """A synthetic capture with its served v1 artifact, written at a chosen instant, and the
+    served baseline handoff for that capture under ``_handoffs(tmp_path)``."""
 
     snapshots = tmp_path / "snapshots"
     bootstrap = json.loads(_bootstrap().decode("utf-8"))
@@ -367,14 +372,36 @@ def _served(tmp_path: Path, *, written_before_deadline: bool = True) -> tuple[Pa
     deadline = chain._instant(inputs.deadline.deadline_utc)
     written = deadline + (timedelta(hours=-1) if written_before_deadline else timedelta(0))
     os.utime(path, (written.timestamp(), written.timestamp()))
+    if handoff:
+        gameweek = int(inputs.deadline.gameweek)
+        alias = handoff_path_for(_handoffs(tmp_path), chain.SEASON, gameweek)
+        alias.parent.mkdir(parents=True, exist_ok=True)
+        write_projection_handoff(
+            alias,
+            InSeasonProjection(
+                chain.SEASON,
+                gameweek,
+                capture.metadata.snapshot_id,
+                "synthetic",
+                "synthetic-v1",
+                "synthetic",
+                {int(player): 2.0 for player in inputs.players.player_id},
+            ),
+        )
     return snapshots, artifacts, capture.metadata.snapshot_id
+
+
+def _handoffs(tmp_path: Path) -> Path:
+    """Where ``_served`` writes the capture's served baseline handoff."""
+
+    return tmp_path / "handoffs"
 
 
 def test_a_served_forecast_written_before_the_deadline_is_read_with_its_receipt(
     tmp_path: Path,
 ) -> None:
     snapshots, artifacts, snapshot_id = _served(tmp_path)
-    week = chain.week_inputs(snapshots, artifacts, snapshot_id)
+    week = chain.week_inputs(snapshots, artifacts, snapshot_id, handoff_root=_handoffs(tmp_path))
     assert isinstance(week, chain.WeekInputs)
     path = football_artifact_path(artifacts, snapshot_id)
     assert week.artifact_bytes == path.read_bytes()
@@ -387,6 +414,7 @@ def test_a_served_forecast_written_before_the_deadline_is_read_with_its_receipt(
     assert receipt["artifact_modified_utc"] == modified.isoformat()
     assert receipt["deadline_utc"] == week.inputs.deadline.deadline_utc
     assert receipt["reason"] is None
+    assert (receipt["artifact_root"], receipt["handoff_root"]) == ("artifacts", "handoffs")
 
 
 def test_a_capture_without_its_served_forecast_is_a_missing_week(tmp_path: Path) -> None:
@@ -440,7 +468,9 @@ def test_the_admitted_versions_are_the_protocols_and_the_contextual_version_is_n
     for version in chain.ADMITTED_MODEL_VERSIONS:
         assert f"`{version}`" in PROTOCOL_TEXT
     assert "football_contextual_v3" not in chain.ADMITTED_MODEL_VERSIONS
-    assert "`football_contextual_v3`, which that reader also accepts, was never" in PROTOCOL_TEXT
+    assert "`football_contextual_v3`, which that reader also accepts, is not admitted" in (
+        PROTOCOL_TEXT
+    )
 
 
 @pytest.mark.parametrize("version", ["football_contextual_v3", "football_nobody_v9"])
@@ -472,10 +502,12 @@ def test_a_served_week_plans_on_the_forecast_the_service_binds(tmp_path: Path) -
     """Rules 6 and 36: a v1 week without a bundle is bound as served, and the receipt says so."""
 
     snapshots, artifacts, snapshot_id = _served(tmp_path)
-    week = chain.week_inputs(snapshots, artifacts, snapshot_id)
+    week = chain.week_inputs(snapshots, artifacts, snapshot_id, handoff_root=_handoffs(tmp_path))
     assert isinstance(week, chain.WeekInputs)
     receipt = week.receipt
-    assert receipt["ready_bundle_sha256"] is None and receipt["handoff_fingerprint"] is None
+    assert receipt["ready_bundle_sha256"] is None and len(str(receipt["handoff_fingerprint"])) == 64
+    assert receipt["ready_bundle_modified_utc"] is None
+    assert receipt["components_modified_utc"] is None
     assert receipt["rotation_table_sha256"] is None and receipt["components_bound"] is False
     assert receipt["participation_version"] == FOOTBALL_PARTICIPATION_VERSION
     information = receipt["decision_information"]
@@ -498,15 +530,63 @@ def bundle_case(publication_case: dict[str, Any], request: pytest.FixtureRequest
     return request.getfixturevalue("case")
 
 
+#: The league directory #959 publishes; GW6's bundle is the first sealed from it (#968).
+LEAGUE_DIRECTORY = {
+    "contract_version": "league_directory_v1",
+    "generated_at_utc": "2026-09-22T13:00:00Z",
+    "payload": {
+        "leagues": [
+            {
+                "league_id": 1,
+                "league_name": "Synthetic",
+                "season": "2026-27",
+                "gameweek": 6,
+                "path": "leagues/1",
+            }
+        ]
+    },
+}
+
+
+def _with_training_selection(case: dict[str, Any], selection: dict[str, object]) -> None:
+    """Give the pair a training selection, as the producer writes one, before it is sealed."""
+
+    forecast_path = football_artifact_path(case["artifact_root"], case["snapshot_id"])
+    components_path = football_components_path(case["artifact_root"], case["snapshot_id"])
+    served = json.loads(forecast_path.read_bytes())
+    companion = json.loads(components_path.read_bytes())
+    served["training_selection"] = companion["training_selection"] = selection
+    served["fingerprint"] = forecast_digest(served)
+    companion["forecast_fingerprint"] = served["fingerprint"]
+    companion["fingerprint"] = forecast_digest(companion)
+    forecast_path.write_text(json.dumps(served), encoding="utf-8")
+    components_path.write_text(json.dumps(companion), encoding="utf-8")
+
+
+@pytest.mark.parametrize("layout", ["league", "leagues/1"])
 @pytest.mark.parametrize("version", JOINT_ROLE_MODEL_VERSIONS)
 def test_a_joint_week_is_read_by_the_real_reader_and_bound_only_under_a_ready_bundle(
-    bundle_case: dict[str, Any], tmp_path: Path, version: str
+    bundle_case: dict[str, Any],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    version: str,
+    layout: str,
 ) -> None:
     """Rule 6: a joint forecast is admitted under its own name, through the reader and the
     service's own binding, so it needs the ready bundle the service needs, sealed against the
-    served handoff."""
+    served handoff before the deadline, from the legacy tree or from the league directory."""
 
     make_joint_pair(bundle_case, version=version)
+    selection: dict[str, object] = {
+        "allowed_seasons": ["2022-23", "2023-24", "2024-25"],
+        "captured_history": True,
+    }
+    _with_training_selection(bundle_case, selection)
+    if layout != "league":
+        site = bundle_case["site_data_root"]
+        (site / "leagues").mkdir()
+        (site / "league").rename(site / layout)
+        (site / "leagues.json").write_text(json.dumps(LEAGUE_DIRECTORY), encoding="utf-8")
     roots = (
         bundle_case["snapshot_root"],
         bundle_case["artifact_root"],
@@ -515,10 +595,14 @@ def test_a_joint_week_is_read_by_the_real_reader_and_bound_only_under_a_ready_bu
     handoffs = tmp_path / "handoffs"
     handoffs.mkdir()
     shutil.copy(bundle_case["handoff_path"], handoff_path_for(handoffs, chain.SEASON, 6))
-    artifact = football_artifact_path(bundle_case["artifact_root"], bundle_case["snapshot_id"])
+    artifact = football_artifact_path(roots[1], roots[2])
+    components = football_components_path(roots[1], roots[2])
+    marker = football_bundle_path(roots[1], roots[2])
     inputs = read_inputs(chain.read_snapshot(roots[0], roots[2]), season=chain.SEASON)
-    before = (chain._instant(inputs.deadline.deadline_utc) - timedelta(hours=1)).timestamp()
-    os.utime(artifact, (before, before))
+    deadline = chain._instant(inputs.deadline.deadline_utc)
+    before = (deadline - timedelta(hours=1)).timestamp()
+    for path in (artifact, components):
+        os.utime(path, (before, before))
 
     reason, receipt = chain.week_inputs(*roots, handoff_root=handoffs)  # type: ignore[misc]
     assert reason == receipt["reason"] == "served_binding_refused"
@@ -526,27 +610,57 @@ def test_a_joint_week_is_read_by_the_real_reader_and_bound_only_under_a_ready_bu
     assert any("requires a complete ready bundle" in note for note in receipt["binding_notes"])
 
     ready = seal_football_bundle(**bundle_case)
-    os.utime(artifact, (before, before))
+    if layout != "league":
+        assert json.loads(marker.read_bytes())["files"]["site_members"]["path"].endswith(
+            ".bundle/site/leagues/1/members.json"
+        )
+    for path in (artifact, components, marker):
+        os.utime(path, (before, before))
     week = chain.week_inputs(*roots, handoff_root=handoffs)
     assert isinstance(week, chain.WeekInputs)
     assert week.receipt["reason"] is None
     assert week.receipt["model_version"] == version == week.forecast.horizon.model_version
     assert week.receipt["ready_bundle_sha256"] == ready.fingerprint
     assert week.receipt["handoff_fingerprint"] == ready.handoff_fingerprint
+    stamp = datetime.fromtimestamp(before, tz=UTC).isoformat()
+    assert week.receipt["ready_bundle_modified_utc"] == stamp
+    assert week.receipt["components_modified_utc"] == stamp
     assert week.receipt["components_bound"] is True
     assert week.receipt["decision_information"]["minute_components_bound"] is True
-    assert week.receipt["forecast_role_metadata"]["version"]
+    role = json.loads(artifact.read_bytes())["role_metadata"]
+    assert week.receipt["forecast_role_metadata"] == {
+        "version": role["version"],
+        "role_feature_version": role.get("role_feature_version"),
+    }
+    assert week.receipt["forecast_training_selection"] == selection
     assert week.forecast.projection.diagnostics["fixture_role_estimates"]
 
+    # Rule 6: a marker or a components file written at the deadline was not there to be served.
+    at = deadline.timestamp()
+    late_files = ((marker, "ready_bundle_modified_utc"), (components, "components_modified_utc"))
+    for late, field in late_files:
+        os.utime(late, (at, at))
+        reason, receipt = chain.week_inputs(*roots, handoff_root=handoffs)  # type: ignore[misc]
+        assert reason == receipt["reason"] == "binding_input_written_at_or_after_deadline"
+        assert receipt[field] == deadline.isoformat()
+        os.utime(late, (before, before))
+
+    # Rules 6 and 21: no served handoff is no served week; a bundle sealed against another
+    # handoff is one the service refuses.
     reason, receipt = chain.week_inputs(*roots)  # type: ignore[misc]
+    assert reason == "no_served_handoff"
+    monkeypatch.setattr(chain, "handoff_fingerprint_for", lambda *arguments: "e" * 64)
+    reason, receipt = chain.week_inputs(*roots, handoff_root=handoffs)  # type: ignore[misc]
     assert reason == "served_binding_refused"
     assert any("served baseline handoff" in note for note in receipt["binding_notes"])
 
 
-def test_the_binding_is_asked_with_the_capture_the_handoff_and_the_configured_source(
+def test_the_binding_is_asked_with_the_capture_the_served_handoff_and_no_news_source(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Rules 6 and 8: the service is asked as it was asked when serving, and its answer is kept."""
+    """Rules 6, 8 and 36: the service is asked with the capture, the served handoff's
+    fingerprint and no configured club-news source, and its answer is kept; its notes are kept
+    without the Top 100 ones and without file paths, and the receipt names both roots."""
 
     snapshots, artifacts, snapshot_id = _served(tmp_path)
     inputs = read_inputs(chain.read_snapshot(snapshots, snapshot_id), season=chain.SEASON)
@@ -561,7 +675,12 @@ def test_the_binding_is_asked_with_the_capture_the_handoff_and_the_configured_so
             rotation_table_sha256="r" * 64,
             football_components_sha256="c" * 64,
             football_components_bound=True,
-            notes=("top100: none",),
+            notes=(
+                "top100: no export for 2026-27 gameweek 1",
+                "football bundle refused: [Errno 2] No such file or directory: "
+                "'C:\\data\\x.bundle\\site\\leagues\\352490\\entries\\7.json'",
+                "managers_word: no club-news source configured",
+            ),
             decision_information=lambda snapshot: {
                 "version": "football_decision_information_v1",
                 "revision": "d" * 64,
@@ -575,17 +694,10 @@ def test_the_binding_is_asked_with_the_capture_the_handoff_and_the_configured_so
         "handoff_fingerprint_for",
         lambda root, season, gameweek, snapshot: f"{root.name}:{season}:{gameweek}:{snapshot}",
     )
-    source = tmp_path / "club-news-source.json"
-    week = chain.week_inputs(
-        snapshots,
-        artifacts,
-        snapshot_id,
-        handoff_root=tmp_path / "handoffs",
-        club_news_source=source,
-    )
+    week = chain.week_inputs(snapshots, artifacts, snapshot_id, handoff_root=_handoffs(tmp_path))
     assert isinstance(week, chain.WeekInputs)
     assert asked["artifact_root"] == artifacts and asked["snapshot_root"] == snapshots
-    assert asked["club_news_source"] == source
+    assert asked["club_news_source"] is None
     assert asked["inputs"].snapshot_id == snapshot_id
     fingerprint = f"handoffs:{chain.SEASON}:{inputs.deadline.gameweek}:{snapshot_id}"
     assert asked["projection"].diagnostics == {"projection_handoff_fingerprint": fingerprint}
@@ -594,16 +706,134 @@ def test_the_binding_is_asked_with_the_capture_the_handoff_and_the_configured_so
     assert week.receipt["rotation_table_sha256"] == "r" * 64
     assert week.receipt["components_sha256"] == "c" * 64
     assert week.receipt["components_bound"] is True
-    assert week.receipt["binding_notes"] == ["top100: none"]
+    assert week.receipt["binding_notes"] == [
+        "football bundle refused: [Errno 2] No such file or directory: '<path>'",
+        "managers_word: no club-news source configured",
+    ]
     assert week.receipt["decision_information"]["revision"] == "d" * 64
+    assert (week.receipt["artifact_root"], week.receipt["handoff_root"]) == (
+        "artifacts",
+        "handoffs",
+    )
 
 
-def test_the_command_line_names_the_handoff_root(tmp_path: Path) -> None:
-    """Rules 6 and 8: the served handoff's root is an input, read for its fingerprint only."""
+def test_the_command_line_names_the_handoff_root_and_takes_no_club_news_source(
+    tmp_path: Path,
+) -> None:
+    """Rules 6 and 8: the served handoff's root is an input, used for its fingerprint only, and
+    no club-news source is: only news a ready bundle seals binds."""
 
-    with pytest.raises(SystemExit) as refused:
-        chain.main(["check", "--snapshot-root", str(tmp_path), "--artifact-root", str(tmp_path)])
-    assert refused.value.code == 2
+    roots = ["--snapshot-root", str(tmp_path), "--artifact-root", str(tmp_path)]
+    for extra in ([], ["--handoff-root", str(tmp_path), "--club-news-source", str(tmp_path)]):
+        with pytest.raises(SystemExit) as refused:
+            chain.main(["check", *roots, *extra])
+        assert refused.value.code == 2
+
+
+def test_a_capture_without_its_served_handoff_is_a_missing_week(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Rules 6 and 21: the backend serves no capture it holds no baseline handoff for."""
+
+    snapshots, artifacts, snapshot_id = _served(tmp_path, handoff=False)
+
+    def never(**kwargs: object) -> object:
+        pytest.fail("the service was asked about a capture it does not serve")
+
+    monkeypatch.setattr(chain, "load_switch_inputs", never)
+    for root in (_handoffs(tmp_path), None):
+        reason, receipt = chain.week_inputs(  # type: ignore[misc]
+            snapshots, artifacts, snapshot_id, handoff_root=root
+        )
+        assert reason == receipt["reason"] == "no_served_handoff"
+        assert receipt["model_version"] == FOOTBALL_MODEL_VERSION
+        assert len(str(receipt["forecast_fingerprint"])) == 64
+
+
+def test_a_service_that_raises_makes_the_week_missing_as_the_backend_does(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Rule 6: the backend turns a raise into no football input, and so does the chain."""
+
+    snapshots, artifacts, snapshot_id = _served(tmp_path)
+
+    def raising(**kwargs: object) -> object:
+        raise DataError("the participation adapter refused")
+
+    monkeypatch.setattr(chain, "load_switch_inputs", raising)
+    reason, receipt = chain.week_inputs(  # type: ignore[misc]
+        snapshots, artifacts, snapshot_id, handoff_root=_handoffs(tmp_path)
+    )
+    assert reason == receipt["reason"] == "served_binding_refused"
+    assert receipt["binding_notes"] == [
+        "switch inputs unreadable: DataError: the participation adapter refused"
+    ]
+    assert receipt["decision_information"] is None
+
+
+def test_a_forecast_its_horizon_refuses_is_unreadable_and_stops_nothing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Rule 21: a forecast the reader's horizon rejects does not bind to the capture."""
+
+    snapshots, artifacts, snapshot_id = _served(tmp_path)
+
+    def refused(path: object, inputs: object) -> object:
+        raise TransferPlanningValidationError("an appearance probability above one")
+
+    monkeypatch.setattr(chain, "read_football_forecast", refused)
+    reason, _ = chain.week_inputs(  # type: ignore[misc]
+        snapshots, artifacts, snapshot_id, handoff_root=_handoffs(tmp_path)
+    )
+    assert reason == "artifact_unreadable_or_unbound"
+
+
+def test_the_recorded_notes_leave_out_top100_and_every_file_path() -> None:
+    """Rules 36 and 38: a recorded note names no file, and so no league and no entry."""
+
+    notes = (
+        "top100 top100.csv: top100_inputs_refused: 'expected_points' not in index",
+        "football bundle refused: [Errno 2] No such file or directory: 'C:\\x\\entries\\7.json'",
+        "football bundle refused: Bundle role has an unexpected filename: site/leagues/9/a.json",
+        "football: The joint-role model requires a complete ready bundle.",
+    )
+    assert chain.binding_notes(notes) == [
+        "football bundle refused: [Errno 2] No such file or directory: '<path>'",
+        "football bundle refused: Bundle role has an unexpected filename: <path>",
+        "football: The joint-role model requires a complete ready bundle.",
+    ]
+
+
+def test_a_root_that_holds_nothing_the_chain_reads_is_refused_before_any_week(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Rule 6: a root that is not the backend's would make every week missing for good."""
+
+    snapshots, artifacts, _ = _served(tmp_path)
+    handoffs = _handoffs(tmp_path)
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    chain.refuse_roots(snapshots, artifacts, handoffs)
+    for roots, words in (
+        ((tmp_path / "absent", artifacts, handoffs), "capture root"),
+        ((snapshots, empty, handoffs), "holds no football forecasts"),
+        ((snapshots, artifacts, empty), "holds no 2026-27 handoff"),
+    ):
+        with pytest.raises(chain.ChainError, match=words):
+            chain.refuse_roots(*roots)
+    with pytest.raises(chain.ChainError, match="holds no 2026-27 handoff"):
+        chain.check(snapshots, artifacts, handoff_root=empty)
+    output = tmp_path / "chain-output"
+    monkeypatch.setattr(chain, "OUTPUT_ROOT", output)
+    monkeypatch.setattr(chain, "FIRST_COMPUTATION", T0 - timedelta(days=30))
+
+    def identity() -> object:
+        pytest.fail("the source identity was read before the roots were checked")
+
+    monkeypatch.setattr(chain, "source_identity", identity)
+    with pytest.raises(chain.ChainError, match="holds no 2026-27 handoff"):
+        chain.decide(snapshots, artifacts, output, 6, "issuecomment-1", handoff_root=empty, now=T0)
+    assert not output.exists()
 
 
 def test_a_forecast_that_changed_while_it_was_read_is_a_missing_week(
@@ -1496,7 +1726,10 @@ def test_one_decision_step_runs_at_a_time(tmp_path: Path) -> None:
 def ROOTS(tmp_path: Path) -> tuple[Path, Path]:
     """A capture root and a football artifact root apart from the chain's own output."""
 
-    return tmp_path / "snapshots", tmp_path / "football"
+    snapshots, artifacts = tmp_path / "snapshots", tmp_path / "football"
+    snapshots.mkdir(exist_ok=True)
+    football_artifact_path(artifacts, "chain").parent.mkdir(parents=True, exist_ok=True)
+    return snapshots, artifacts
 
 
 def _chain_world(
@@ -1624,13 +1857,18 @@ def test_check_labels_each_week_pending_or_final_and_writes_nothing(
         ),
     )
     lines: list[str] = []
-    chain.check(tmp_path, tmp_path, now=T0 + timedelta(hours=1), emit=lines.append)
+    snapshots, artifacts = ROOTS(tmp_path)
+    chain.check(snapshots, artifacts, now=T0 + timedelta(hours=1), emit=lines.append)
     assert lines[:3] == [
         "GW06 final capture-gw6 ready",
         "GW07 pending capture-gw7 no_artifact",
         "GW08 pending missing no_own_target_capture",
     ]
-    assert list(tmp_path.iterdir()) == []
+    assert sorted(path.relative_to(tmp_path).as_posix() for path in tmp_path.rglob("*")) == [
+        "football",
+        "football/football",
+        "snapshots",
+    ]
 
 
 # Review 4: post-season captures, the real artifact root, the inventory, the lapse, the receipt
@@ -1725,7 +1963,7 @@ def test_the_receipt_names_the_archive_seasons_and_training_rows(tmp_path: Path)
     document["fingerprint"] = forecast_digest(document)
     path.write_text(json.dumps(document), encoding="utf-8")
     os.utime(path, (stamp, stamp))
-    week = chain.week_inputs(snapshots, artifacts, snapshot_id)
+    week = chain.week_inputs(snapshots, artifacts, snapshot_id, handoff_root=_handoffs(tmp_path))
     assert isinstance(week, chain.WeekInputs)
     assert week.receipt["forecast_archive_seasons"] == ["2022-23", "2025-26"]
     assert week.receipt["forecast_training_rows"] == 1234
