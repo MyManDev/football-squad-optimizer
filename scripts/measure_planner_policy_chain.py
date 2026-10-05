@@ -11,14 +11,21 @@ It writes nothing.
 yet decided, in order, from the frozen source. Neither command reads an outcome; the scorer is a
 separate script, run only at the protocol's readings.
 
-Run from a clean checkout of the runner's merge commit, with S the capture root, A and H the
-artifact root and the handoff root the backend served the weeks from (rule 6) and U the #632
-comment that answers Question PC1:
+Run from a clean, locked worktree of the runner's merge commit, with S the capture root, A and
+H the artifact root and the handoff root the backend served the weeks from (rule 6), E a
+directory outside the checkout and outside every root above for the copies of each week's
+evidence (rule 39), and U the #632 comment that answers Question PC1:
 
+    git worktree lock --reason "planner policy chain evidence"
     python -m scripts.measure_planner_policy_chain check --snapshot-root S --artifact-root A
         --handoff-root H
     python -m scripts.measure_planner_policy_chain decide --snapshot-root S --artifact-root A
-        --handoff-root H --output artifacts/planner_policy_chain --through-gameweek N --answer U
+        --handoff-root H --output artifacts/planner_policy_chain --evidence-copy-root E
+        --through-gameweek N --answer U
+
+The evidence under ``artifacts/`` is ignored and uncommitted until the final reading, and
+``git worktree remove`` deletes ignored files, so ``decide`` refuses an unlocked worktree and
+copies every decided week to E.
 """
 
 from __future__ import annotations
