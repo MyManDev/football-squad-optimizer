@@ -267,10 +267,11 @@ def label_pair(
 
     A proof certifies the solver's rounded objective, not the unrounded rescore the deltas
     are taken on. Two paths can tie on the first and differ on the second, by at most the
-    rounding envelope: ``ROUNDING_PER_WEEK`` for each path in every forecast week. So a
-    proved lookahead below a proved control within that envelope is a tie, and only a
-    shortfall beyond it is a code defect. The solver's bound is likewise on its rounded
-    objective, so the gain's upper bound on the rescore adds the lookahead's own envelope.
+    tie envelope: ``ROUNDING_PER_WEEK`` for each path in every forecast week. The control
+    path is feasible for the lookahead's model whatever its own proof says, so a proved
+    lookahead below any control within that envelope is a tie, and a proved lookahead
+    beyond it is a code defect. The solver's bound is likewise on its rounded objective, so
+    the gain's upper bound on the rescore adds the lookahead's own envelope.
     """
     arms = (window, continuation, lookahead)
     if not all(arm.get("valid") for arm in arms):
@@ -282,14 +283,14 @@ def label_pair(
     envelope = 2 * ROUNDING_PER_WEEK * weeks
     labels = []
     controls_proved = window["status"] == "OPTIMAL" and continuation["status"] == "OPTIMAL"
-    proved = controls_proved and lookahead["status"] == "OPTIMAL"
-    if delta < -envelope and proved:
+    lookahead_proved = lookahead["status"] == "OPTIMAL"
+    if delta < -envelope and lookahead_proved:
         raise ValueError(
-            "A proved lookahead below a proved feasible path beyond the rounding envelope "
-            "is a code defect."
+            "A proved lookahead below a feasible path beyond the rounding envelope is a code "
+            "defect."
         )
     if delta < -1e-6:
-        labels.append("tie_within_rounding" if proved else "unproved_shortfall")
+        labels.append("tie_within_rounding" if lookahead_proved else "unproved_shortfall")
     changed = window["first_action"]["squad"] != lookahead["first_action"]["squad"]
     if changed:
         labels.append("first_week_changed")
@@ -307,7 +308,7 @@ def label_pair(
         "lookahead_total": total,
         "delta": delta if "gain_defined" in labels else None,
         "delta_unread": None if "gain_defined" in labels else delta,
-        "rounding_envelope": envelope,
+        "tie_envelope": envelope,
         "rounded_bound_minus_control": None if bound is None else float(bound) - control_total,
         "gain_upper_bound": (
             None if bound is None else float(bound) + ROUNDING_PER_WEEK * weeks - control_total

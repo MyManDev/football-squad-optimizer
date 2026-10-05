@@ -538,13 +538,13 @@
           "free_next_lookahead_window_end": 1,
           "hits_control": 0.0,
           "hits_lookahead": 0.0,
-          "rounding_envelope": 0.06,
           "rounded_bound_minus_control": 2.1302602883849318,
           "gain_upper_bound": 2.1602602883849316,
           "labels": [
             "hold_equal",
             "gain_defined"
-          ]
+          ],
+          "tie_envelope": 0.06
         }
       },
       {
@@ -998,13 +998,13 @@
           "free_next_lookahead_window_end": 4,
           "hits_control": 0.0,
           "hits_lookahead": 0.0,
-          "rounding_envelope": 0.168,
           "rounded_bound_minus_control": 24.568581540161176,
           "gain_upper_bound": 24.652581540161176,
           "labels": [
             "unproved_shortfall",
             "hold_equal"
-          ]
+          ],
+          "tie_envelope": 0.168
         }
       },
       {
@@ -1466,13 +1466,13 @@
           "free_next_lookahead_window_end": 5,
           "hits_control": 0.0,
           "hits_lookahead": 0.0,
-          "rounding_envelope": 0.168,
           "rounded_bound_minus_control": 24.070044166543767,
           "gain_upper_bound": 24.154044166543766,
           "labels": [
             "unproved_shortfall",
             "hold_equal"
-          ]
+          ],
+          "tie_envelope": 0.168
         }
       },
       {
@@ -1764,13 +1764,13 @@
           "free_next_lookahead_window_end": 1,
           "hits_control": 0.0,
           "hits_lookahead": 0.0,
-          "rounding_envelope": 0.06,
           "rounded_bound_minus_control": 0.5901658060501518,
           "gain_upper_bound": 0.6201658060501518,
           "labels": [
             "hold_equal",
             "gain_defined"
-          ]
+          ],
+          "tie_envelope": 0.06
         }
       },
       {
@@ -2234,13 +2234,13 @@
           "free_next_lookahead_window_end": 3,
           "hits_control": 0.0,
           "hits_lookahead": 0.0,
-          "rounding_envelope": 0.168,
           "rounded_bound_minus_control": 27.623473382593147,
           "gain_upper_bound": 27.707473382593147,
           "labels": [
             "unproved_shortfall",
             "hold_equal"
-          ]
+          ],
+          "tie_envelope": 0.168
         }
       },
       {
@@ -2712,13 +2712,13 @@
           "free_next_lookahead_window_end": 5,
           "hits_control": 0.0,
           "hits_lookahead": 0.0,
-          "rounding_envelope": 0.168,
           "rounded_bound_minus_control": 18.414533316977213,
           "gain_upper_bound": 18.498533316977213,
           "labels": [
             "unproved_shortfall",
             "hold_equal"
-          ]
+          ],
+          "tie_envelope": 0.168
         }
       }
     ],
@@ -3250,7 +3250,7 @@
   },
   "measured_source": {
     "commit": "d9e92745",
-    "note": "The protocol's source hashes are of that commit. After the run the compaction was widened to keep each path's per-week moves in this record and the table prints the bound column to three decimals; the forecast_documents block and this measured_source block were added by hand from the run's own served and extended documents, fingerprints cross-checked against the protocol, and the runner's compact.json does not carry them. No solve, input or number changed and the local results' sha256 above is unchanged."
+    "note": "The protocol's source hashes are of that commit. After the run the compaction was widened to keep each path's per-week moves in this record and the table prints the bound column to three decimals; the forecast_documents block and this measured_source block were added by hand from the run's own served and extended documents, fingerprints cross-checked against the protocol, and the runner's compact.json does not carry them. No solve, input, delta, status or label changed, and the local results' sha256 above is unchanged; the review corrections of 2026-10-02 (review_corrections) rewrote every pair's gain_upper_bound by the lookahead's rounding envelope and added the tie_envelope and rounded_bound_minus_control fields, and the corrections of 2026-10-05 (review_corrections_2) changed wording and the field's name only."
   },
   "review_corrections": {
     "review": "#904 review of 2026-10-02 on head 5a34fdd5",
@@ -3277,5 +3277,16 @@
       "gain_upper_bound": "The solver's bound on its rounded objective, plus the lookahead's own envelope, less the control's rescore. rounded_bound_minus_control keeps the earlier figure.",
       "labels_changed": "None. No lookahead solve proved optimal, so the proof rule never applied, and every delta, status and label is as measured."
     }
+  },
+  "review_corrections_2": {
+    "review": "#904 review of 2026-10-05 on head 0b4ef830",
+    "reversals": "The record counts player reversals: one for each incoming player this path sold earlier and one for each outgoing player it bought earlier, so a swap back counts two. The markdown read them as a share of the transfers; it now says player reversals and gives the transfers that reverse at least one player (8 of 14 and 8 of 13 for the rolling control), recounted from the per-week moves in this record.",
+    "post_measurement_wording": "The post-measurement note said no number changed; 345912fd had rewritten gain_upper_bound and added fields, as review_corrections says. Both sentences now name what changed.",
+    "field_renamed": {
+      "rounding_envelope": "tie_envelope",
+      "reason": "The field holds the two-path tie threshold (0.060 over five weeks, 0.168 over fourteen); the one-path envelope the markdown calls the rounding envelope (0.030 and 0.084) is half of it."
+    },
+    "label_pair_defect_check": "The defect check now fires on a proved lookahead below any control beyond the envelope, whatever the controls' proofs, because the control path is feasible for the lookahead's model either way. No lookahead of this run proved optimal, so no label moved.",
+    "declared_section_edit": "f785d5a0 added the measured 0.0021 figure (the rounded bound against the rescore on the four proved solves) to the reading rule's text after the run; the post-measurement section now lists it."
   }
 }

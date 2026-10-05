@@ -162,7 +162,7 @@ def test_a_pair_is_read_by_the_declared_rule():
     assert pair["delta"] == pytest.approx(1.5)
     assert pair["rounded_bound_minus_control"] == pytest.approx(5.0)
     assert pair["gain_upper_bound"] == pytest.approx(5.0 + 2 * ROUNDING_PER_WEEK)
-    assert pair["rounding_envelope"] == pytest.approx(4 * ROUNDING_PER_WEEK)
+    assert pair["tie_envelope"] == pytest.approx(4 * ROUNDING_PER_WEEK)
     assert pair["labels"] == ["first_week_changed", "gain_defined"]
     flagged = label_pair(control, continuation, ahead, frozenset({16}))
     assert flagged["labels"] == ["first_week_changed", AVAILABILITY_LABEL, "gain_defined"]
@@ -218,8 +218,18 @@ def test_two_proved_paths_tied_on_the_rounded_objective_are_a_tie_not_a_defect()
     beyond = _arm("OPTIMAL", 300.0 - 4 * ROUNDING_PER_WEEK - 1e-4, range(1, 16), incoming=())
     with pytest.raises(ValueError, match="beyond the rounding envelope"):
         label_pair(control, continuation, beyond, frozenset())
+    # The control path is feasible whatever its own proof, so a proved lookahead is still read
+    # against it: within the envelope a tie, beyond it a defect; the gain stays undefined.
     unproved = label_pair(control, _arm("FEASIBLE", 200.0, range(1, 16)), tied, frozenset())
-    assert unproved["labels"] == ["unproved_shortfall", "hold_equal"]
+    assert unproved["labels"] == ["tie_within_rounding", "hold_equal"]
+    assert unproved["delta"] is None
+    with pytest.raises(ValueError, match="beyond the rounding envelope"):
+        label_pair(control, _arm("FEASIBLE", 200.0, range(1, 16)), beyond, frozenset())
+    behind = _arm("FEASIBLE", 300.0 - 4 * ROUNDING_PER_WEEK - 1e-4, range(1, 16), incoming=())
+    assert label_pair(control, continuation, behind, frozenset())["labels"] == [
+        "unproved_shortfall",
+        "hold_equal",
+    ]
 
 
 def test_a_real_two_week_solve_is_recorded_and_handed_on_with_its_end_state():

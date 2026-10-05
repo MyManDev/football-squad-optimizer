@@ -105,8 +105,9 @@ make, measured at a quarter to a third of a point over five weeks on this captur
 **The expiry tail is unsolved at the production rate, and the record says so rather
 than reading it.** Every nine-, eleven- and fourteen-week solve returned FEASIBLE with
 its budget exhausted and relative gaps of 3.8 to 8.2 percent. The fourteen-week
-lookahead made one transfer in fourteen weeks for squad 1000 and six, five of them
-reversals, for squad 900; the continuations made none or one. The hold plan's own value is not
+lookahead made one transfer in fourteen weeks for squad 1000 and six for squad 900, with five
+player reversals among the six (a player sold and bought back, or bought and sold again, counts
+once each time); the continuations made none or one. The hold plan's own value is not
 in the record, so the margin over it is not stated; what is recorded is that a bounded
 search at this rate found almost no transfer structure in fourteen weeks. The four differences (-4.0 to -13.2) are unproved shortfalls and
 are not read; the upper bounds (+18 to +28) say only that nothing is proved.
@@ -120,9 +121,9 @@ each starter-week coefficient to 0.001 points, so the comparison is made on the 
 the finding of the expiry arm: at twenty units a forecast week, the tail's value cannot
 be read from one long solve, because the long solve does not reach paths the short
 solves find. The rolling control also shows what a one-week policy does on a forecast
-that varies by fixture: 14 and 13 transfers, none paid, of which 10 and 12 are
-reversals, a player bought and sold again or sold and bought back as the fixtures
-turn. In-forecast that churn
+that varies by fixture: 14 and 13 transfers, none paid, with 10 and 12 player reversals among them: a player bought
+and sold again, or sold and bought back, as the fixtures turn. A reversal is counted per player,
+so one swap back counts two; 8 of the 14 and 8 of the 13 transfers reverse at least one player. In-forecast that churn
 is free; what it costs in realized points is not measured here.
 
 **First-week change: 0 of 6, the declared primary finding.** A squad constructed as the
@@ -199,9 +200,11 @@ inside its solve's share and records its usage, so a future run spends equal tot
 each player-week's points to 0.001 once; with no bench weight a week's lineup carries
 eleven starter terms and the captain's again, so a path's scaled objective and its
 unrounded rescore differ by at most 0.006 points a week. Two paths tied on the first
-can differ on the second. A proved lookahead within twice that, per forecast week, of
-a proved control is now `tie_within_rounding`, and only a shortfall beyond it is a code
-defect. No lookahead here proved optimal, so no label moves. The gain's upper bound in
+can differ on the second. A proved lookahead within twice that, per forecast week, of its control is now
+`tie_within_rounding`, and only a shortfall beyond it is a code defect; the control path is
+feasible for the lookahead's model whatever its own proof, so the check reads the lookahead's
+proof alone. That two-path threshold is the JSON's `tie_envelope` (0.060 over five weeks,
+0.168 over fourteen). No lookahead here proved optimal, so no label moves. The gain's upper bound in
 the table is now the solver's bound plus the lookahead's own envelope (0.030 over five
 weeks, 0.084 over fourteen) less the control's rescore; the earlier figure, bound less
 rescore, is kept as `rounded_bound_minus_control`.
@@ -214,8 +217,14 @@ and the table prints the bound column to three decimals. The `forecast_documents
 (both rebuilt documents' headers) and the `measured_source` block were added to the
 committed JSON by hand from the run's own served and extended documents, their
 fingerprints cross-checked against the protocol; the runner's `compact.json` does not
-carry them. No solve, input or number changed, and the local results' sha256 in the
-record is unchanged.
+carry them. No solve, input, delta, status or label changed, and the local results' sha256 in
+the record is unchanged. Two later edits changed numbers that are not measurements: the review
+corrections of 2 October (345912fd, the Corrections section above) rewrote every pair's
+`gain_upper_bound` by the lookahead's rounding envelope and added `tie_envelope` and
+`rounded_bound_minus_control`; and f785d5a0 added the measured 0.0021 figure to the reading
+rule's text. The corrections of 5 October changed wording, renamed `rounding_envelope` to
+`tie_envelope` and widened the runner's defect check to any proved lookahead; no label of this
+run moved, because none of its lookaheads proved optimal.
 
 Reproduce with `python -m scripts.measure_explicit_lookahead --snapshot-root <captures>
 --archive-root <vaastav archive> --snapshot-id fpl-live-20260922T205533Z-7ff2c68eac7f
