@@ -178,9 +178,15 @@ Three things to know before relying on it:
   of rights, run the same lines in an elevated PowerShell; the task still runs as the
   owner, only while the owner is logged on. `Unregister-ScheduledTask -TaskName
   SquadOptBackendWatch` removes it; moving the connector off the PC disables it first (ADR
-  0009's tunnel move). The watcher still probes loopback `/health` only, so an
-  API that answers while every worker is dead looks healthy to it; the uptime workflow's
-  `/ready` probe sees that case, and watch mode still never kills.
+  0009's tunnel move). The watcher also reads loopback `/ready` when `/health` answers.
+  What it sees but must not repair (an API that answers while `/ready` has not been
+  ready for three checks, a silent API whose recorded processes are alive, a backend a
+  launch did not bring back) it reports by asking GitHub to run the uptime workflow now
+  (`gh workflow run backend-uptime.yml`), so the incident opens within minutes instead
+  of at the schedule's next slot. It asks once per episode and once more when the
+  backend is ready again, so the incident closes; a refused request is logged and the
+  watch goes on. `-GitHubCli` names the CLI when it is neither on PATH nor in its
+  default folder. Watch mode still never kills or restarts a running backend.
   The PC must not sleep while members are expected; that is a Windows power setting
   for the owner to change.
 - **The answer's identity includes the commit.** Publication and a backend code rollout
