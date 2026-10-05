@@ -599,9 +599,9 @@ def _located_entries(
     The line between the two outcomes is what can still be *said* about the failure. A claim
     whose quote is absent or ambiguous, which cites a document nobody fetched, or which leaves
     another text field empty, can be named -- the player, the club, the URL -- so it can be
-    dropped and recorded. A claim missing a
-    required field cannot: there is no identity to report, and a response shaped like that is
-    a broken answer rather than one bad citation, so it refuses the whole response either way.
+    dropped and recorded. A claim missing a required field cannot: there is no identity to
+    report, and a response shaped like that is a broken answer rather than one bad citation, so
+    it refuses the whole response either way.
     """
 
     located: list[dict[str, object]] = []
