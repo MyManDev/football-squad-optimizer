@@ -90,17 +90,18 @@ intervals to include zero. These are stated priors, and no clause reads them.
 
 1. The protocol is `planner_policy_chain_v1`, for season 2026-27, from its first chain week
    through GW38.
-2. It binds from the commit that merges it. The first chain week is the first gameweek whose
-   deadline falls after the later of two merges: this document's, and that of the runner
-   `scripts/measure_planner_policy_chain.py`. A merge is the commit on develop's first-parent
-   line that added the file, compared with its first parent: the squash commit, or a merge
-   commit, never the feature commit that wrote it. Its instant is that commit's committer
-   instant. The target is GW6, whose deadline the bootstrap of
+2. It binds from the commit that merges it. Two merges set the first chain week: this
+   document's, and that of the runner `scripts/measure_planner_policy_chain.py`. A merge is the
+   commit on develop's first-parent line that added the file, compared with its first parent:
+   the squash commit, or a merge commit, never the feature commit that wrote it. Its instant is
+   that commit's committer instant. The target is GW6, whose deadline the bootstrap of
    capture `fpl-live-20260922T214539Z-364991a4f832` puts at 2026-10-10T10:00:00Z. The owner's
    answer on #632 (5948324329) holds GW6 to two dates: this document merged by 6 October and the
    runner by 8 October, each by the end of that day in UTC (before 2026-10-07T00:00:00Z and
-   2026-10-09T00:00:00Z). If either misses its date, the first chain week is GW7, or the first
-   deadline after the later merge when that is later still. The reading dates do not move, so a
+   2026-10-09T00:00:00Z). The dates govern: the first chain week is GW6 when both are met. If
+   either misses its date, the first chain week is GW7, or the first gameweek whose deadline
+   falls after the later of two merges: this document's, and that of the runner, when that is
+   later still. The general rule only moves the start later, never earlier than the dates allow. The reading dates do not move, so a
    later start leaves fewer weeks to read. A first chain week fixed before any of its inputs
    exist cannot be chosen after its outcome is seen, and an earlier week is never relabelled as
    the start.
@@ -111,8 +112,17 @@ intervals to include zero. These are stated priors, and no clause reads them.
    architecture, and the installed OR-Tools, numpy and pandas versions. A later run on a
    different commit, document, runner, interpreter, platform or package version is refused.
    Each reading states, for each of its weeks, whether the live release carried the same
-   planner source, and the same binding source (`load_switch_inputs` and the modules it calls,
-   rule 6), as the frozen commit.
+   planner source and the same binding source as the frozen commit. The planner source is
+   `src/squadopt/planning/`, `src/squadopt/live/transfers.py` and
+   `src/squadopt/application/advice.py`. The binding source is
+   `src/squadopt/platform/advice_switches.py`, `src/squadopt/platform/football_bundle.py`,
+   `src/squadopt/platform/football_minute_basis.py`, `src/squadopt/platform/capture_context.py`,
+   `src/squadopt/application/football_participation.py`,
+   `src/squadopt/application/manager_words.py`, `src/squadopt/live/football_artifact.py` and
+   `src/squadopt/prediction/football.py`. The test is fixed here: `git diff --quiet <release
+   tag> <frozen commit> -- <those paths>`, run by the scorer for the release tag live at the
+   week's deadline; a non-empty diff means the release differed, and the week is reported
+   under that label. No reader decides the list or the test after seeing the data.
 4. A fault found in the runner after it binds is fixed in its own pull request, which changes
    only the runner or the scorer. The fixed runner runs from the frozen commit with only that
    file replaced, recomputes the last week already decided and must reproduce it exactly before
@@ -125,11 +135,18 @@ intervals to include zero. These are stated priors, and no clause reads them.
 ## 2. What each week reads
 
 5. The decision capture of gameweek g is the last `fpl-live` capture, by capture instant, whose
-   own target is g: `read_inputs(snapshot, season="2026-27")` in
-   `src/squadopt/live/recommendation.py` returns a deadline whose gameweek is g. Two captures at
-   the same latest instant make the week missing. This is the rule
+   own target is g and that the backend could have served: `read_inputs(snapshot,
+   season="2026-27")` in `src/squadopt/live/recommendation.py` returns a deadline whose gameweek
+   is g, and the handoff root holds a served baseline handoff for it (`handoff_fingerprint_for`,
+   rule 6). A capture without one was never served; it is passed over and listed in the receipt
+   as unserved, so a rehearsal or a manual capture taken into the live snapshot root after the
+   week's publication does not displace the served capture. The backend serves the capture the
+   published site names, and this protocol does not read the site: when two captures for g both
+   have a served handoff, the later wins here even if the site named the earlier, and the
+   receipt lists both so the reading can say so. Two captures at the same latest instant make
+   the week missing. Apart from the handoff condition, this is the rule
    `scripts/check_football_prospective_inputs.py` applies for `docs/football_prospective_prereg.md`,
-   so both protocols read the same capture each week. Which capture is the last is known only
+   so both protocols read the same capture whenever the last own-target capture was served. Which capture is the last is known only
    once the deadline has passed, so the runner decides gameweek g only after its deadline,
    refuses an earlier decision, and decides weeks in order, each once. A capture taken after
    every published deadline has closed targets no gameweek and is left out. Each week's receipt
@@ -165,9 +182,20 @@ intervals to include zero. These are stated priors, and no clause reads them.
    must fall before the deadline. So must the modification times of the ready bundle's marker
    (`football_bundle_path` in `src/squadopt/platform/football_bundle.py`) and of the components
    file beside the artifact (`football_components_path` in
-   `src/squadopt/platform/football_minute_basis.py`), where either exists: the service could
-   not have bound a file written later, so a week where either was written at or after the
-   deadline is missing.
+   `src/squadopt/platform/football_minute_basis.py`), where either exists: the service could not have bound a file written later, so a week where
+   either was written at or after the deadline is missing. The served baseline handoff is held
+   to the same rule. The backend can republish a corrected handoff for a capture it already
+   serves, and `handoff_fingerprint_for` reads the handoff as it is when the chain runs, so the
+   runner reads the handoff file itself (the gameweek alias `<season>-gw<NN>.json` under the
+   handoff root, else the one retained copy under `by-capture/<capture>/` that matches the
+   capture) and refuses one written at or after the deadline: that week is missing, and the
+   receipt records the handoff file's modification time. The ready bundle and the components
+   file are read as they are when the chain runs, and the service requires a complete ready
+   bundle only for the joint versions. So a `football_team_share_v1` week whose marker or
+   components file is gone when the chain runs binds without them, exactly as the service would
+   bind a week served without them, and the record cannot tell the two apart; the receipt
+   records the marker and the components file as absent, and each reading reports such weeks
+   apart (rule 29). A joint week whose bundle is gone is missing, because the service refuses it.
    The runner reads the file's bytes first, records their sha256, the fingerprint and the
    modification time, and copies those bytes into the chain's evidence; the reader and the
    service read the file again, and a file whose fingerprint changes between those reads makes
@@ -282,8 +310,9 @@ intervals to include zero. These are stated priors, and no clause reads them.
 21. A week is missing when there is no own-target capture, a tie at the latest instant, no
     served baseline handoff for the capture, no artifact, an artifact of another model version,
     one that fails its fingerprint, changes while it is read or does not bind to the capture,
-    one written at or after the deadline, a ready bundle marker or components file written at
-    or after the deadline, or a binding the service refuses or raises on (rule 6). In a missing
+    one written at or after the deadline, a served baseline handoff, ready bundle marker or
+    components file written at or after the deadline, or a binding the service refuses or raises
+    on (rule 6). In a missing
     week every arm
     holds: no transfer, free transfers of min(f + 1, the maximum in the season rules of the last
     capture the chain read), and purchase prices and bank unchanged. The week is not scored and
@@ -420,9 +449,10 @@ intervals to include zero. These are stated priors, and no clause reads them.
     is committed. Per week it holds the capture id, fingerprint, capture instant and deadline, the artifact's
     sha256, fingerprint, model version and modification time, and the binding the service at the
     frozen commit made (rule 6): the names of the artifact and handoff roots it was given,
-    `ready_bundle_sha256` and the marker's modification time, `handoff_fingerprint`,
-    `rotation_table_sha256`, `components_sha256` and the components file's modification time,
-    whether the components bound, the decision information (`football_decision_information_v1`,
+    `ready_bundle_sha256` and the marker's modification time, `handoff_fingerprint` and the
+    handoff file's modification time, `rotation_table_sha256`, `components_sha256` and the
+    components file's modification time, whether the marker and the components file were
+    present, whether the components bound, the decision information (`football_decision_information_v1`,
     with its revision, which the participation version enters, and whether the news and the
     components bound) and the service's notes on the football binding, without its Top 100
     notes (the chain's call carries no projected table, and rule 15 sets that weight to 0) and
@@ -450,21 +480,28 @@ intervals to include zero. These are stated priors, and no clause reads them.
 39. The decision step runs once after each deadline, as one heavy job at a time, never on a
     Tuesday or Friday and never during a weekly run or a rehearsal. It reads captures and
     football artifacts read-only and writes only under `artifacts/planner_policy_chain/`. It
-    never writes under `data/` or elsewhere under `artifacts/`, never starts, stops or calls
-    the backend or port 8000, and never opens a live store or `data/runtime`. The operator
-    announces each run on the tracking issue.
+    never writes under `data/` or elsewhere under `artifacts/`, never starts, stops or calls the backend or port 8000, and never opens a live store or
+    `data/runtime`. The evidence is uncommitted until the final reading and `artifacts/` is
+    ignored, so a `git worktree remove` would delete it: the runner refuses to run unless its
+    worktree is locked (`git worktree lock --reason "planner policy chain evidence"`), and after
+    each decided week it copies that week's directory to the evidence copy root the operator
+    names outside the checkout (`--evidence-copy-root`), checks that the copy reproduces the
+    digest of the week's files the manifest records, and logs the copy. The operator announces
+    each run on the tracking issue.
 40. Who runs the decision step and the scorer, and on which machine, was asked on #632 as
     Question PC1. The owner answered on 2026-10-02 (5948324329): the owner runs both on the
     owner's machine, which writes the football artifacts and keeps the captures. No decision is
     computed before 2026-10-11T10:00:00Z, the end of the 9 to 11 October freeze: the runner
-    refuses an earlier run before it takes its lock, reads its inventory, writes or solves. The
-    first computation reads GW6's decision capture and served forecast and no match outcome.
+    refuses an earlier run before it takes its lock, reads its inventory, writes or solves. The first computation reads the first chain week's decision capture (rule 2) and served forecast and no match outcome.
     Another operator or machine needs a new Answer, and
     silence is not one; any other machine copies its inputs as rule 6 says. However late a
     decision is computed, the chain starts at its first chain week and decides weeks in order,
-    each from its own capture and artifact, and the ready bundle and components file the
-    service binds, if they are still on disk with a write time before that week's deadline; a
-    week whose inputs are gone is missing. Each decision is a function of the
+    each from its own capture, artifact and served handoff, and the ready bundle and components
+    file the service binds, if they are still on disk with a write time before that week's
+    deadline. A week whose capture, artifact or served handoff is gone is missing; a joint week
+    whose ready bundle is gone is missing because the service refuses it; a
+    `football_team_share_v1` week whose marker or components file is gone binds without them
+    (rule 6) and is reported apart. Each decision is a function of the
     frozen source and of inputs written before its week's deadline, so when it is computed does
     not change it. If no chain has started by gameweek 21's deadline, the runner refuses to start
     one, nothing is read and the protocol lapses unrun.
@@ -484,6 +521,8 @@ its final choice on expected lineup utility, while `hold` and the one-week path 
 points. So neither contrast separates the search from that choice. Where a week is served under
 a ready bundle, every arm plans on the forecast as the service at the frozen commit binds it,
 sealed news and participation evidence included; the chain does not separate the planner from
-that binding. A week without a ready bundle is bound with no configured club-news source (rule
-6), so news the backend bound from its own configuration in such a week is not in the chain's
-forecast.
+that binding. A week without a ready bundle is bound with no configured club-news source (rule 6), so news
+the backend bound from its own configuration in such a week is not in the chain's forecast. A
+`football_team_share_v1` week whose ready bundle marker or components file was removed before
+the chain ran is bound without them and cannot be told apart from a week served without them;
+the record reports such weeks apart and claims nothing about what their members were served.

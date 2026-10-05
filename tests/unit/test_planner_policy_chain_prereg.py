@@ -2,8 +2,10 @@
 
 ``docs/research/planner_policy_chain_prereg.md`` binds from the moment it merges, so a rule it
 states wrongly cannot be corrected later. These tests pin the sentences the runner and the
-scorer must honour, check that every function, field and policy the protocol names exists under
-that name, and recompute the expectation it declares from the two committed records it cites.
+scorer must honour, check that every function the protocol names exists under that name, that
+the model versions it names are the code's constants and the provenance fields the producer
+writes, that the state fields and policies it binds exist, and recompute the expectation it
+declares from the two committed records it cites.
 They pin no value of a constant in another owner's module: the runner checks those at its first
 run, and its own tests hold the behaviour.
 """
@@ -12,6 +14,7 @@ from __future__ import annotations
 
 import ast
 import dataclasses
+import inspect
 import json
 import re
 import statistics
@@ -19,7 +22,7 @@ from pathlib import Path
 
 import pytest
 
-from squadopt.application import advice, lineup_publication, weekly_suggestion_eval
+from squadopt.application import advice, football_live, lineup_publication, weekly_suggestion_eval
 from squadopt.data import atomic, snapshots
 from squadopt.data.sources import fpl_live
 from squadopt.evaluation import live_series, promotion
@@ -34,6 +37,9 @@ from squadopt.platform import (
     football_bundle,
     football_minute_basis,
 )
+from squadopt.prediction import football_minutes_role
+from squadopt.prediction.football import FOOTBALL_MODEL_VERSION, JOINT_ROLE_MODEL_VERSIONS
+from squadopt.prediction.football_contextual import CONTEXTUAL_MODEL_VERSION
 
 REPOSITORY = Path(__file__).resolve().parents[2]
 PROTOCOL = REPOSITORY / "docs" / "research" / "planner_policy_chain_prereg.md"
@@ -101,15 +107,39 @@ def _protocol() -> str:
         "reaches every arm alike",
         "no served baseline handoff for the capture",
         "changes while it is read",
-        "a ready bundle marker or components file written at or after the deadline",
+        "a served baseline handoff, ready bundle marker or components file written at or after the"
+        " deadline",
         "a binding the service refuses or raises on (rule 6)",
         "the names of the artifact and handoff roots it was given",
-        "`ready_bundle_sha256` and the marker's modification time, `handoff_fingerprint`,"
-        " `rotation_table_sha256`, `components_sha256` and the components file's modification"
-        " time",
+        "`ready_bundle_sha256` and the marker's modification time, `handoff_fingerprint` and the"
+        " handoff file's modification time, `rotation_table_sha256`, `components_sha256` and the"
+        " components file's modification time, whether the marker and the components file were"
+        " present",
         "without its Top 100 notes",
         "with every file path replaced (rule 38)",
-        "and the same binding source (`load_switch_inputs` and the modules it calls, rule 6)",
+        "The planner source is `src/squadopt/planning/`, `src/squadopt/live/transfers.py` and"
+        " `src/squadopt/application/advice.py`.",
+        "The binding source is `src/squadopt/platform/advice_switches.py`,"
+        " `src/squadopt/platform/football_bundle.py`,",
+        "`git diff --quiet <release tag> <frozen commit> -- <those paths>`",
+        "No reader decides the list or the test after seeing the data.",
+        "The dates govern: the first chain week is GW6 when both are met.",
+        "The general rule only moves the start later, never earlier than the dates allow.",
+        "and that the backend could have served",
+        "A capture without one was never served; it is passed over and listed in the receipt as"
+        " unserved",
+        "when two captures for g both have a served handoff, the later wins here even if the site"
+        " named the earlier",
+        "The served baseline handoff is held to the same rule.",
+        "refuses one written at or after the deadline: that week is missing, and the receipt"
+        " records the handoff file's modification time",
+        "a `football_team_share_v1` week whose marker or components file is gone when the chain"
+        " runs binds without them",
+        "the record cannot tell the two apart",
+        "A joint week whose bundle is gone is missing, because the service refuses it.",
+        "the runner refuses to run unless its worktree is locked",
+        "checks that the copy reproduces the digest of the week's files the manifest records",
+        "The first computation reads the first chain week's decision capture (rule 2)",
         "about later releases whose planner or binding source differs from the frozen commit",
         "A week without a ready bundle is bound with no configured club-news source (rule 6)",
         "and the ready bundle and components file the service binds, if they are still on disk",
@@ -244,6 +274,38 @@ def test_every_rule_the_protocol_cites_by_number_exists() -> None:
 )
 def test_every_name_the_protocol_cites_exists(module: object, name: str) -> None:
     assert hasattr(module, name), f"{getattr(module, '__name__', module)}.{name}"
+
+
+def test_the_versions_the_protocol_names_are_the_codes_and_the_reader_knows_them() -> None:
+    """Rule 6: three admitted versions and one not admitted, each the constant the code carries."""
+
+    text = _protocol()
+    assert FOOTBALL_MODEL_VERSION == "football_team_share_v1"
+    assert set(JOINT_ROLE_MODEL_VERSIONS) == {
+        "football_joint_role_minutes_v1",
+        "football_joint_role_retained_history_v1",
+    }
+    assert CONTEXTUAL_MODEL_VERSION == "football_contextual_v3"
+    for version in (FOOTBALL_MODEL_VERSION, *JOINT_ROLE_MODEL_VERSIONS, CONTEXTUAL_MODEL_VERSION):
+        assert f"`{version}`" in text, version
+    reader = inspect.getsource(football_artifact.read_football_forecast)
+    for name in ("FOOTBALL_MODEL_VERSION", "CONTEXTUAL_MODEL_VERSION", "JOINT_ROLE_MODEL_VERSIONS"):
+        assert name in reader, name
+
+
+def test_the_provenance_fields_the_protocol_names_are_the_producers() -> None:
+    """Rule 38: the receipt copies fields the producer writes, under the producer's names."""
+
+    producer = inspect.getsource(football_live)
+    for field in (
+        "archive_hashes",
+        "training_rows",
+        "training_latest_kickoff",
+        "training_selection",
+        "role_metadata",
+    ):
+        assert f'"{field}"' in producer, field
+    assert "role_feature_version" in producer + inspect.getsource(football_minutes_role)
 
 
 def test_the_week_fields_the_state_carries_exist() -> None:
