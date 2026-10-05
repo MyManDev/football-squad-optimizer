@@ -28,12 +28,13 @@ Windows under the current model keep the full-window solver,
 `optimize_transfer_plan(..., protect_hold=True)` in `src/squadopt/planning/optimizer.py`. That
 is also the path a football window took before #907.
 
-These routes changed with each of #907, #909, #911, #915 and #919, and the expected route
-again with #948 (`expected_lineup_window_v2` at develop 260f174e). The model the option
-serves changed too: `football_joint_role_minutes_v1` landed with #924 and
-`football_joint_role_retained_history_v1` with #948, and `site-2026-27-gw06-fix14` serves
-the latter. So the arm this protocol calls `served` is whatever `plan_transfer_horizon`
-routes to at the frozen commit (rule 3), and its records name the version.
+These routes changed with each of #907, #909, #911, #915 and #919, and the expected route again
+with #948 (`expected_lineup_window_v2` at develop 260f174e). The model the option serves changed
+too: `football_joint_role_minutes_v1` landed with #924 and
+`football_joint_role_retained_history_v1` with #948, and since `site-2026-27-gw06-fix14` the
+option serves the latter. So the arm this protocol calls `served` is whatever
+`plan_transfer_horizon` routes to at the frozen commit (rule 3), and its records name the
+version.
 
 The evidence for the two routes is in-forecast. #907 shipped functional checks and no
 measurement. #909's record, `docs/research/football_information_windows.md`, is a four-case
@@ -110,7 +111,8 @@ intervals to include zero. These are stated priors, and no clause reads them.
    architecture, and the installed OR-Tools, numpy and pandas versions. A later run on a
    different commit, document, runner, interpreter, platform or package version is refused.
    Each reading states, for each of its weeks, whether the live release carried the same
-   planner source as the frozen commit.
+   planner source, and the same binding source (`load_switch_inputs` and the modules it calls,
+   rule 6), as the frozen commit.
 4. A fault found in the runner after it binds is fixed in its own pull request, which changes
    only the runner or the scorer. The fixed runner runs from the frozen commit with only that
    file replaced, recomputes the last week already decided and must reproduce it exactly before
@@ -138,21 +140,39 @@ intervals to include zero. These are stated priors, and no clause reads them.
    capture's own inputs and the fingerprint of the served baseline handoff for that capture
    (`handoff_fingerprint_for` in `src/squadopt/platform/capture_context.py`), once
    `read_football_forecast` in `src/squadopt/live/football_artifact.py` has read the file with
-   those inputs. So a ready bundle, the news it seals and the participation evidence apply to the
-   chain's forecast exactly as they applied to the served one, and a week the service refuses to
-   bind (a ready bundle whose handoff is not the served one, a joint model without a complete
-   ready bundle, sealed news that cannot be resolved, a sealed component basis that is
-   unavailable) is missing for the reason the service states, which the receipt records. The
-   artifact's model version must be one this protocol admits, `football_team_share_v1`,
-   `football_joint_role_minutes_v1` or `football_joint_role_retained_history_v1`, and one the
-   reader at the frozen commit accepts; `football_contextual_v3`, which that reader also accepts,
-   was never served and is not admitted. The version is read from the artifact's own
-   `model_version` field before any reader runs, so a week of any other version is missing as
-   that and never as unreadable. Its fingerprint must verify, and its file's modification time,
-   as the file system reports it, must fall before the deadline.
-   The runner reads the file's bytes once, records their sha256, the fingerprint and the
-   modification time, and copies those bytes into the chain's evidence. The artifact is never
-   rebuilt, never borrowed from another capture and never written to. Inputs read on a machine
+   those inputs. The runner is given the artifact root and the handoff root the backend served
+   the week from (`SQUADOPT_BACKEND_ARTIFACT_ROOT`, which `artifacts/backend-artifact-root.json`
+   selects, and `SQUADOPT_BACKEND_HANDOFF_ROOT`), and each receipt names both. One run decides
+   only weeks served from the same two roots: where the backend's roots changed between weeks,
+   the operator decides through the last week of the old ones (`--through-gameweek`) and
+   continues with the new. The runner binds with no configured club-news source, so the only
+   news in the chain's forecast is what a ready bundle seals. So a ready bundle, the news it
+   seals and the participation evidence apply to the chain's forecast as the service at the
+   frozen commit applies them, which is how they applied to the served one in a week whose live
+   release carried the same binding source (rule 3). A capture with no served baseline handoff
+   is not served, so its week is missing. A week the service refuses to bind (for example a
+   ready bundle that fails its checks or whose handoff is not the served one, a joint model
+   without a complete ready bundle, sealed news that cannot be resolved, a sealed component
+   basis that is unavailable), or on which it raises, is missing for the reason the service
+   states or the error it raises, as the backend serves no football input for either; the
+   receipt records which. The artifact's model version must be one this protocol admits,
+   `football_team_share_v1`, `football_joint_role_minutes_v1` or
+   `football_joint_role_retained_history_v1`, and one the reader at the frozen commit accepts;
+   `football_contextual_v3`, which that reader also accepts, is not admitted. The version is
+   read from the artifact's own `model_version` field before any reader runs, so a week of any
+   other version whose fingerprint verifies is missing as that and never as unreadable. Its
+   fingerprint must verify, and its file's modification time, as the file system reports it,
+   must fall before the deadline. So must the modification times of the ready bundle's marker
+   (`football_bundle_path` in `src/squadopt/platform/football_bundle.py`) and of the components
+   file beside the artifact (`football_components_path` in
+   `src/squadopt/platform/football_minute_basis.py`), where either exists: the service could
+   not have bound a file written later, so a week where either was written at or after the
+   deadline is missing.
+   The runner reads the file's bytes first, records their sha256, the fingerprint and the
+   modification time, and copies those bytes into the chain's evidence; the reader and the
+   service read the file again, and a file whose fingerprint changes between those reads makes
+   the week missing. The artifact is never rebuilt, never borrowed from another capture and
+   never written to. Inputs read on a machine
    other than the one that wrote them are copied with their modification times kept (for
    example `robocopy /COPY:DAT /DCOPY:T` or `rsync -t`); a copy that loses them makes the week
    missing, and that is never repaired. A producer change that keeps the version name is
@@ -161,13 +181,15 @@ intervals to include zero. These are stated priors, and no clause reads them.
    no two are ever relabelled as one (rule 29).
 7. The season rules are `read_season_rules` in `src/squadopt/live/rules.py`, on the same
    capture.
-8. The decision step uses no archive, no member or entry payload, and nothing captured after
-   the week's deadline enters a decision. The served baseline handoff is read only for its
-   fingerprint, which a ready bundle must match as it must when served (rule 6); no handoff
-   projection enters a decision. Later captures are read only for the deadlines they state
-   (rule 5) and for the inventory each receipt lists; no outcome they carry is read.
-   `read_snapshot` verifies every payload of a capture, including entry picks and earlier live
-   payloads a capture may carry; the decision step reads none of them. What the served
+8. No archive, no member or entry payload and nothing captured after the week's deadline
+   enters a decision. The served baseline handoff is used only for its fingerprint, which a
+   ready bundle must match as it must when served (rule 6); no handoff projection enters a
+   decision. Later captures are read only for the deadlines they state (rule 5) and for the
+   inventory each receipt lists; no outcome they carry is read. `read_snapshot` verifies every
+   payload of a capture, including entry picks and earlier live payloads a capture may carry,
+   and the service's check of a ready bundle (rule 6) reads every file the bundle seals,
+   including its copy of the handoff and the league site's member and entry documents; the
+   decision step reads none of them for a decision, and no record names them. What the served
    forecast's producer fitted on differs by version and is recorded from the artifact (rule
    38); this protocol asserts nothing about it, and the chain neither fits nor reads that
    history.
@@ -258,9 +280,11 @@ intervals to include zero. These are stated priors, and no clause reads them.
 ## 6. Missing weeks and failures
 
 21. A week is missing when there is no own-target capture, a tie at the latest instant, no
-    artifact, an artifact of another model version, one that fails its fingerprint or does not
-    bind to the capture, one the service refuses to bind (rule 6), or one written at or after
-    the deadline. In a missing week every arm
+    served baseline handoff for the capture, no artifact, an artifact of another model version,
+    one that fails its fingerprint, changes while it is read or does not bind to the capture,
+    one written at or after the deadline, a ready bundle marker or components file written at
+    or after the deadline, or a binding the service refuses or raises on (rule 6). In a missing
+    week every arm
     holds: no transfer, free transfers of min(f + 1, the maximum in the season rules of the last
     capture the chain read), and purchase prices and bank unchanged. The week is not scored and
     is listed with its reason. It is never filled from another capture or from a forecast built
@@ -394,12 +418,16 @@ intervals to include zero. These are stated priors, and no clause reads them.
 36. The evidence (input receipts, forecast copies, each arm's decision records and the weekly
     manifests) stays uncommitted under `artifacts/planner_policy_chain/` until the final reading
     is committed. Per week it holds the capture id, fingerprint, capture instant and deadline, the artifact's
-    sha256, fingerprint, model version and modification time, and the binding the service made
-    (rule 6): `ready_bundle_sha256`, `handoff_fingerprint`, `rotation_table_sha256`,
-    `components_sha256`, whether each bound, the decision information revision
-    (`football_decision_information_v1`, which the participation version enters) and the
-    service's notes on what it refused or left out, each recorded as absent when the service
-    had none. Per arm it
+    sha256, fingerprint, model version and modification time, and the binding the service at the
+    frozen commit made (rule 6): the names of the artifact and handoff roots it was given,
+    `ready_bundle_sha256` and the marker's modification time, `handoff_fingerprint`,
+    `rotation_table_sha256`, `components_sha256` and the components file's modification time,
+    whether the components bound, the decision information (`football_decision_information_v1`,
+    with its revision, which the participation version enters, and whether the news and the
+    components bound) and the service's notes on the football binding, without its Top 100
+    notes (the chain's call carries no projected table, and rule 15 sets that weight to 0) and
+    with every file path replaced (rule 38), each recorded as absent when the service had none.
+    Per arm it
     holds the route and its outcome, the solver status, the configuration and configured and
     actual work, the hits, the lineup, the state after and the decision commit. Each reading
     commits `docs/research/planner_policy_chain_gw20.json` or
@@ -434,8 +462,9 @@ intervals to include zero. These are stated priors, and no clause reads them.
     Another operator or machine needs a new Answer, and
     silence is not one; any other machine copies its inputs as rule 6 says. However late a
     decision is computed, the chain starts at its first chain week and decides weeks in order,
-    each from its own capture and artifact if both are still on disk with a write time before
-    that week's deadline; a week whose inputs are gone is missing. Each decision is a function of the
+    each from its own capture and artifact, and the ready bundle and components file the
+    service binds, if they are still on disk with a write time before that week's deadline; a
+    week whose inputs are gone is missing. Each decision is a function of the
     frozen source and of inputs written before its week's deadline, so when it is computed does
     not change it. If no chain has started by gameweek 21's deadline, the runner refuses to start
     one, nothing is read and the protocol lapses unrun.
@@ -445,13 +474,16 @@ intervals to include zero. These are stated priors, and no clause reads them.
 The chain uses constructed squads, not members' squads, over one season. A difference between
 arms is a difference between these policies on these squads under the served football forecast.
 It is not a forecast of any member's result. It is not evidence about windows under the current
-model, about later releases whose planner source differs from the frozen commit, about truncated
-windows, or about whether the forecast's chances of playing are calibrated. It does not test chip
-timing, the Top 100 weight, the manager's word or the preferences. In contrast B the one-week
-planning table carries no appearance probability while the windows' tables do, and
-`lineup_fields` orders the bench by it when it is present, so the two arms' bench orders follow
-different rules. Where the observed or expected route applies, `served` also makes its final
-choice on expected lineup utility, while `hold` and the one-week path choose on points. So
-neither contrast separates the search from that choice. Where a week is served under a ready
-bundle, every arm plans on the forecast as the service bound it, sealed news and participation
-evidence included; the chain does not separate the planner from that binding.
+model, about later releases whose planner or binding source differs from the frozen commit,
+about truncated windows, or about whether the forecast's chances of playing are calibrated. It
+does not test chip timing, the Top 100 weight, the manager's word or the preferences. In
+contrast B the one-week planning table carries no appearance probability while the windows'
+tables do, and `lineup_fields` orders the bench by it when it is present, so the two arms' bench
+orders follow different rules. Where the observed or expected route applies, `served` also makes
+its final choice on expected lineup utility, while `hold` and the one-week path choose on
+points. So neither contrast separates the search from that choice. Where a week is served under
+a ready bundle, every arm plans on the forecast as the service at the frozen commit binds it,
+sealed news and participation evidence included; the chain does not separate the planner from
+that binding. A week without a ready bundle is bound with no configured club-news source (rule
+6), so news the backend bound from its own configuration in such a week is not in the chain's
+forecast.
