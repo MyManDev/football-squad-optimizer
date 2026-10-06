@@ -10,14 +10,17 @@ and ``plan_transfers`` hand it. Nothing here times a solve.
 
 from __future__ import annotations
 
+import copy
 import json
 import shutil
 from collections.abc import Callable
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
 import numpy as np
+import pandas as pd
 import pytest
 from ortools.sat.python import cp_model
 from scipy.optimize import Bounds, LinearConstraint, milp
@@ -29,6 +32,7 @@ from squadopt.application.advice import solve_window_plan, window_horizon
 from squadopt.application.device_plan import device_plan_entry, device_plan_table
 from squadopt.application.entries import held_squad_from_picks
 from squadopt.live import transfers as live_transfers
+from squadopt.live.horizon import _gameweek_rows
 from squadopt.live.transfers import plan_transfers
 
 window_world = window_world_fixture  # re-register the shared window world here
@@ -130,9 +134,34 @@ def _scaled(scaling: float, offset: float) -> Callable[[], cp_model.CpModel]:
     return build
 
 
+def _lin_max_pushed_up() -> cp_model.CpModel:
+    """The objective wants the maximum above its arguments, so only the upper rows hold it,
+    as the free-transfer bank's maximum is held in the planner (more banked, fewer paid)."""
+
+    model = cp_model.CpModel()
+    x = model.new_int_var(0, 5, "x")
+    y = model.new_int_var(0, 4, "y")
+    t = model.new_int_var(0, 20, "t")
+    model.add_max_equality(t, [x - 2, y - 1, 1])
+    model.maximize(5 * t - 2 * x - 3 * y)
+    return model
+
+
+def _lin_min_pushed_down() -> cp_model.CpModel:
+    model = cp_model.CpModel()
+    x = model.new_int_var(0, 6, "x")
+    y = model.new_int_var(0, 6, "y")
+    t = model.new_int_var(-9, 9, "t")
+    model.add_min_equality(t, [x + 1, 6 - y, 4])
+    model.maximize(x + y - 3 * t)
+    return model
+
+
 MODELS: dict[str, Callable[[], cp_model.CpModel]] = {
     "lin_max": _lin_max,
+    "lin_max_pushed_up": _lin_max_pushed_up,
     "lin_min": _lin_min,
+    "lin_min_pushed_down": _lin_min_pushed_down,
     "element_constant": _element_constant,
     "element_variable": _element_variable,
     "enforcement": _enforcement,
@@ -597,6 +626,63 @@ def test_the_window_call_is_the_one_solve_window_plan_makes(
     assert call.linearization_level == 2 and call.protect_hold is True
 
 
+def test_the_later_weeks_follow_the_horizon_s_calendar_rule() -> None:
+    """A double, a blank and a flat club: the runner's weeks are ``live/horizon.py``'s rows.
+
+    The committed calendar is flat, so this moves it: one club plays twice in the second
+    week and another not at all in the third, and each week's points must be the ones the
+    horizon builder's own row function gives the same base and calendar.
+    """
+
+    inputs = runner.load_inputs()
+    first = inputs.gameweek
+    counts = {week: dict(clubs) for week, clubs in inputs.fixture_counts.items()}
+    counts[first + 1]["Arsenal"] = 2
+    counts[first + 2]["Chelsea"] = 0
+    moved = runner.PublishedInputs(inputs.table, inputs.members, counts, inputs.league_dir)
+    call = runner.window_call(moved, sorted(inputs.members)[0], 5)
+    players = inputs.table["players"]
+    codes = {club: code for code, club in enumerate(sorted({p["team"] for p in players}), 1)}
+    base = pd.DataFrame(
+        {
+            "player_id": [int(p["id"]) for p in players],
+            "name": [p["name"] for p in players],
+            "team_id": [p["team"] for p in players],
+            "position": [p["position"] for p in players],
+            "price_tenths": [int(p["buy_tenths"]) for p in players],
+            "expected_points": [float(p["expected_points"]) for p in players],
+        }
+    )
+    base["team_code"] = base["team_id"].map(codes).astype("int64")
+    calendar = pd.DataFrame(
+        [
+            {
+                "gameweek": week,
+                "team_id": codes[club],
+                "fixture_count": count,
+                "home_fixture_count": 0,
+            }
+            for week in range(first, first + 5)
+            for club, count in counts[week].items()
+        ]
+    )
+    decision = {codes[club]: count for club, count in counts[first].items()}
+    table = call.horizon.table
+    changed = 0
+    for week in range(first, first + 5):
+        expected = _gameweek_rows(
+            base,
+            calendar,
+            week,
+            preserve_expected_points=week == first,
+            decision_fixture_counts=decision,
+        ).set_index("player_id")["expected_points"]
+        ours = table.loc[table["gameweek"] == week].set_index("player_id")["expected_points"]
+        assert ours.sort_index().tolist() == expected.sort_index().tolist(), week
+        changed += int((ours.sort_index() != base.set_index("player_id")["expected_points"]).sum())
+    assert changed > 0
+
+
 def test_the_one_week_call_is_the_one_plan_transfers_makes(
     window_world: dict[str, Any], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -662,6 +748,21 @@ def test_a_window_whose_extra_constraint_is_not_the_floor_is_refused(
     swapped = [solves.primary, solves.hold]
     with pytest.raises(runner.ProtocolRefusal):
         runner.identify_window_solves(swapped, 3)
+
+
+def test_a_floor_at_another_value_than_the_hold_probe_s_is_refused(
+    world_instance: runner.Instance,
+) -> None:
+    solves = world_instance.solves
+    forged = copy.deepcopy(solves.primary.proto)
+    floor = forged.constraints[solves.base_constraints].linear.domain
+    floor[0] = int(floor[0]) + 5
+    primary = replace(solves.primary, proto=forged)
+    with pytest.raises(runner.ProtocolRefusal, match="not the hold probe's value"):
+        runner.identify_window_solves([solves.hold, primary], 3)
+    unfloored = replace(solves.primary, proto=runner.proto_prefix(forged, solves.base_constraints))
+    with pytest.raises(runner.ProtocolRefusal, match="does not follow"):
+        runner.identify_window_solves([solves.hold, unfloored], 3)
 
 
 def test_the_world_window_exports_and_passes_check_one(world_instance: runner.Instance) -> None:
