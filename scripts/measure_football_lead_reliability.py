@@ -48,7 +48,8 @@ LAST_GAMEWEEK: Final = 38
 DECISION_BEFORE_KICKOFF: Final = pd.Timedelta(minutes=90)
 SETTLED_AFTER_KICKOFF: Final = pd.Timedelta(hours=3)
 ROSTER_WEEKS_BEFORE: Final = 2
-#: Below this many target gameweeks a lead's interval is reported and marked thin.
+#: Below this many target gameweeks over the two seasons a lead is marked thin and gets its
+#: point estimate with no interval.
 THIN_UNITS: Final = 6
 TOP_FORECASTS: Final = 10
 KEYS: Final = ["season", "fixture", "player_code"]
@@ -75,7 +76,7 @@ REQUIRED_COLUMNS: Final[Mapping[str, tuple[str, ...]]] = {
 POLICY: Final = PromotionPolicy(
     confidence_level=0.90,
     bootstrap_resamples=5000,
-    moving_block_length=4,
+    moving_block_length=1,
     deterministic_seed=0,
 )
 REPOSITORY_ROOT: Final = Path(__file__).resolve().parents[1]
@@ -169,7 +170,7 @@ def irregular_weeks(calendar: pd.DataFrame) -> list[int]:
     """The gameweeks in which some club plays other than once: a blank or a double."""
     counts = calendar.groupby(["GW", "club"]).size().unstack(fill_value=0)
     counts = counts.reindex(columns=sorted(calendar.club.unique()), fill_value=0)
-    return sorted(int(week) for week, row in counts.iterrows() if bool((row != 1).any()))
+    return sorted(int(str(week)) for week, row in counts.iterrows() if bool((row != 1).any()))
 
 
 def forecast_origin(
@@ -222,48 +223,79 @@ def _irregular(frame: pd.DataFrame, irregular: Mapping[str, Sequence[int]]) -> p
     )
 
 
+def _pairs(labelled: pd.DataFrame, *, measured: Sequence[int]) -> pd.DataFrame:
+    """Each matched lead-k forecast of a measured origin beside the same lead-1 forecast."""
+    matched = labelled.loc[labelled.error.notna()]
+    later = matched.loc[matched.origin.isin(measured) & matched.lead.ge(2)]
+    first = matched.loc[matched.lead.eq(1), [*KEYS, "error"]].rename(columns={"error": "error_1"})
+    pairs = later.merge(first, on=KEYS, how="inner", validate="many_to_one")
+    pairs["difference"] = pairs.error**2 - pairs.error_1**2
+    return pairs
+
+
 def paired_differences(
     labelled: pd.DataFrame,
     *,
     measured: Sequence[int],
     irregular: Mapping[str, Sequence[int]],
 ) -> pd.DataFrame:
-    """Each matched lead-k forecast of a measured origin beside the same lead-1 forecast.
+    """The primary's pairs: a target gameweek with a blank or a double is kept apart."""
+    pairs = _pairs(labelled, measured=measured)
+    return pairs.loc[~_irregular(pairs, irregular)].copy()
 
-    A target gameweek with a blank or a double for any club is kept apart, so it is not
-    paired here.
+
+def kept_apart(
+    labelled: pd.DataFrame,
+    *,
+    measured: Sequence[int],
+    irregular: Mapping[str, Sequence[int]],
+) -> dict[str, dict[str, Any]]:
+    """By lead from 2 to 14, the blank and double target gameweeks with at least one pair.
+
+    For each lead: those gameweeks, the pairs, and the mean paired difference over the pairs,
+    descriptive and with no interval. They enter neither the primary nor the secondaries.
     """
-    matched = labelled.loc[labelled.error.notna()]
-    later = matched.loc[matched.origin.isin(measured) & matched.lead.ge(2)]
-    first = matched.loc[matched.lead.eq(1), [*KEYS, "error"]].rename(columns={"error": "error_1"})
-    pairs = later.merge(first, on=KEYS, how="inner", validate="many_to_one")
-    pairs = pairs.loc[~_irregular(pairs, irregular)].copy()
-    pairs["difference"] = pairs.error**2 - pairs.error_1**2
-    return pairs
+    pairs = _pairs(labelled, measured=measured)
+    pairs = pairs.loc[_irregular(pairs, irregular)]
+    return {
+        str(int(str(lead))): {
+            "units": int(rows.groupby(["season", "GW"]).ngroups),
+            "pairs": len(rows),
+            "mean_difference": _number(rows.difference.mean()),
+        }
+        for lead, rows in pairs.groupby("lead", sort=True)
+    }
 
 
 def lead_figures(pairs: pd.DataFrame, *, policy: PromotionPolicy = POLICY) -> list[dict[str, Any]]:
     """Per lead: the mean over target gameweeks of the mean paired difference, and its interval.
 
-    The units of each season are ordered by target gameweek, because the interval resamples
-    blocks of neighbouring units within a season.
+    The units of each season are ordered by target gameweek, as the protocol states; with
+    blocks of 1 the interval resamples every unit within its season. A lead with fewer than
+    six units over the two seasons is thin: its point estimate, and no interval. The means of
+    e_k^2 and e_1^2 are taken as the figure is, so the figure is their difference.
     """
     figures: list[dict[str, Any]] = []
     for lead in range(2, MAX_LEAD + 1):
         rows = pairs.loc[pairs.lead.eq(lead)]
-        units = rows.groupby(["season", "GW"], sort=True).difference.mean().reset_index()
+        units = (
+            rows.assign(squared=rows.error**2, squared_1=rows.error_1**2)
+            .groupby(["season", "GW"], sort=True)[["difference", "squared", "squared_1"]]
+            .mean()
+            .reset_index()
+        )
+        thin = len(units) < THIN_UNITS
         entry: dict[str, Any] = {
             "lead": lead,
             "pairs": len(rows),
             "units": len(units),
-            "thin": len(units) < THIN_UNITS,
-            "mean_squared_error": _number((rows.error**2).mean()) if len(rows) else None,
-            "mean_squared_error_lead_1": _number((rows.error_1**2).mean()) if len(rows) else None,
-            "mean_difference": None,
+            "thin": thin,
+            "mean_squared_error": _number(units.squared.mean()) if len(units) else None,
+            "mean_squared_error_lead_1": _number(units.squared_1.mean()) if len(units) else None,
+            "mean_difference": _number(units.difference.mean()) if len(units) else None,
             "interval": None,
         }
-        if len(units):
-            entry["mean_difference"] = _number(units.difference.mean())
+        if not thin:
             low, high = season_aware_moving_block_interval(
                 [(str(s), float(v)) for s, v in zip(units.season, units.difference, strict=True)],
                 policy=policy,
@@ -274,38 +306,77 @@ def lead_figures(pairs: pd.DataFrame, *, policy: PromotionPolicy = POLICY) -> li
     return figures
 
 
-def descriptive(labelled: pd.DataFrame, *, measured: Sequence[int]) -> list[dict[str, Any]]:
-    """By lead, over the measured origins' matched forecasts; no figure here is a gate."""
+def _secondary(group: pd.DataFrame) -> dict[str, Any]:
+    """The descriptive figures of one lead's matched forecasts; none of them is a gate."""
+    forecast, realized = group.expected_points, group.total_points
+    variance = float(forecast.var(ddof=0)) if len(group) else 0.0
+    slope = (
+        _number(((forecast - forecast.mean()) * (realized - realized.mean())).mean() / variance)
+        if variance > 0
+        else None
+    )
+    # The ten are chosen among the matched forecasts; a tie at the tenth place goes to the
+    # lower player code.
+    top = (
+        group.sort_values(
+            ["expected_points", "player_code"], ascending=[False, True], kind="stable"
+        )
+        .groupby(["season", "origin", "GW", "position"], sort=True)
+        .head(TOP_FORECASTS)
+    )
+    return {
+        "mean_signed_error": _number(group.error.mean()) if len(group) else None,
+        "slope_realized_on_forecast": slope,
+        "spearman_by_position": {
+            str(position): (
+                _number(part.expected_points.corr(part.total_points, method="spearman"))
+                if len(part) > 1
+                else None
+            )
+            for position, part in group.groupby("position", sort=True)
+        },
+        "top_ten_optimism": (
+            _number((top.expected_points - top.total_points).mean()) if len(top) else None
+        ),
+    }
+
+
+def descriptive(
+    labelled: pd.DataFrame,
+    pairs: pd.DataFrame,
+    *,
+    measured: Sequence[int],
+    irregular: Mapping[str, Sequence[int]],
+) -> list[dict[str, Any]]:
+    """By lead from 1 to 14, over the measured origins' matched forecasts in the lead's units.
+
+    At leads 2 to 14 the units are the primary's: the target gameweeks with at least one pair
+    (``pairs`` holds the primary's pairs, blank and double weeks already kept apart). At lead
+    1, which has no primary, they are the measured origins' own gameweeks. Blank and double
+    gameweeks enter no lead. The counts are taken in the same units; lead 1 has no pair.
+    """
+    own = labelled.loc[labelled.origin.isin(measured)]
+    own = own.loc[~_irregular(own, irregular)]
     rows: list[dict[str, Any]] = []
-    frame = labelled.loc[labelled.error.notna() & labelled.origin.isin(measured)]
-    for lead, group in frame.groupby("lead", sort=True):
-        forecast, realized = group.expected_points, group.total_points
-        variance = float(forecast.var(ddof=0))
-        slope = (
-            _number(((forecast - forecast.mean()) * (realized - realized.mean())).mean() / variance)
-            if variance > 0
-            else None
-        )
-        top = (
-            group.sort_values("expected_points", ascending=False, kind="stable")
-            .groupby(["season", "origin", "GW", "position"], sort=True)
-            .head(TOP_FORECASTS)
-        )
+    for lead in range(1, MAX_LEAD + 1):
+        forecasts = own.loc[own.lead.eq(lead)]
+        paired: int | None = None
+        if lead > 1:
+            at_lead = pairs.loc[pairs.lead.eq(lead)]
+            units = set(zip(at_lead.season, at_lead.GW, strict=True))
+            forecasts = forecasts.loc[
+                [(s, g) in units for s, g in zip(forecasts.season, forecasts.GW, strict=True)]
+            ]
+            paired = len(at_lead)
+        matched = forecasts.loc[forecasts.error.notna()]
         rows.append(
             {
-                "lead": int(str(lead)),
-                "matched": len(group),
-                "mean_signed_error": _number(group.error.mean()),
-                "slope_realized_on_forecast": slope,
-                "spearman_by_position": {
-                    str(position): (
-                        _number(part.expected_points.corr(part.total_points, method="spearman"))
-                        if len(part) > 1
-                        else None
-                    )
-                    for position, part in group.groupby("position", sort=True)
-                },
-                "top_ten_optimism": _number((top.expected_points - top.total_points).mean()),
+                "lead": lead,
+                "forecast": len(forecasts),
+                "matched": len(matched),
+                "unmatched": len(forecasts) - len(matched),
+                "paired": paired,
+                **_secondary(matched),
             }
         )
     return rows
@@ -385,8 +456,6 @@ def measure_frames(
         )
     irregular = {season: irregular_weeks(calendars[season]) for season in seasons}
     pairs = paired_differences(labelled, measured=measured, irregular=irregular)
-    later = labelled.loc[labelled.origin.isin(measured) & labelled.lead.ge(2)]
-    kept_apart = later.loc[_irregular(later, irregular)]
     record: dict[str, Any] = {
         "contract_version": CONTRACT_VERSION,
         "protocol": PROTOCOL,
@@ -413,10 +482,8 @@ def measure_frames(
         "origins": origins,
         "failed_origins": failures,
         "primary": lead_figures(pairs),
-        "kept_apart_irregular": {
-            str(lead): int(size) for lead, size in kept_apart.groupby("lead").size().items()
-        },
-        "secondary": descriptive(labelled, measured=measured),
+        "kept_apart_irregular": kept_apart(labelled, measured=measured, irregular=irregular),
+        "secondary": descriptive(labelled, pairs, measured=measured, irregular=irregular),
         "counts": counts(labelled, pairs),
     }
     return record, labelled
