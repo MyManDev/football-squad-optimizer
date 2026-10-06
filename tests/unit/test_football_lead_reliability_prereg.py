@@ -175,6 +175,29 @@ def test_the_binding_clauses_of_the_primary_quantity_are_pinned() -> None:
     assert "less 90 minutes" in instant
 
 
+def test_the_secondaries_and_the_kept_apart_report_name_their_units() -> None:
+    """6 October, before the runner: the readings the runner would otherwise have to choose."""
+
+    quantities = _section("Quantities")
+    for clause in (
+        "each taken as the figure is: a mean over each unit's player-fixtures, then a mean over"
+        " the units. The figure is their difference.",
+        "by lead from 1 to 14, over the measured origins' matched forecasts in the lead's units",
+        "At lead k from 2 to 14 the units are the primary's: the target gameweeks with at least"
+        " one pair at lead k",
+        "At lead 1, which has no primary, the units are the measured origins' own gameweeks.",
+        "Blank and double gameweeks are excluded at every lead",
+        "among the matched forecasts, a tie at the tenth place going to the lower player code",
+        "paired player-fixtures in the lead's units; lead 1 has no pair.",
+    ):
+        assert clause in quantities, clause
+    apart = _section("Kept apart")
+    assert (
+        "by lead from 2 to 14: the number of such target gameweeks with at least one pair at that"
+        " lead, the number of pairs, and the mean paired difference e_k^2 - e_1^2 over those pairs"
+    ) in apart
+
+
 def test_the_interval_policy_resamples_the_smallest_lead() -> None:
     """Review of 5 October: with blocks of 4 a season of four units could not resample."""
 

@@ -125,9 +125,16 @@ lead.
   estimate and no interval, marked thin. Counts are read over both seasons: with the measured
   origins, leads 13 and 14 have four units in each season, eight in total, and the blank and
   double exclusion can lower any lead's count.
-- The record also reports the mean of e_k^2 and the mean of e_1^2 behind each difference.
+- The record also reports the mean of e_k^2 and the mean of e_1^2 behind the figure, each
+  taken as the figure is: a mean over each unit's player-fixtures, then a mean over the units.
+  The figure is their difference.
 
-**Secondary,** descriptive, by lead, over the measured origins' forecasts:
+**Secondary,** descriptive, by lead from 1 to 14, over the measured origins' matched forecasts
+in the lead's units. At lead k from 2 to 14 the units are the primary's: the target gameweeks
+with at least one pair at lead k, so a target gameweek whose lead-1 forecast is missing is a
+unit at no such lead. At lead 1, which has no primary, the units are the measured origins' own
+gameweeks. Blank and double gameweeks are excluded at every lead ("Kept apart"). The
+quantities:
 
 - the mean signed error;
 - the slope of realized on forecast points, by ordinary least squares;
@@ -136,16 +143,20 @@ lead.
   origins, target gameweeks and seasons;
 - top-ten optimism: the mean, over player-fixtures, of forecast less realized points among each
   position's ten highest forecasts at each origin and target gameweek (the ten are chosen per
-  origin, target gameweek and position; the mean pools them, by lead);
-- counts of forecast, matched, unmatched and paired player-fixtures.
+  origin, target gameweek and position among the matched forecasts, a tie at the tenth place
+  going to the lower player code; the mean pools them, by lead);
+- counts of forecast, matched, unmatched and paired player-fixtures in the lead's units; lead
+  1 has no pair. The counts by origin and lead over every origin ("What is forecast and
+  matched") are reported as well.
 
 ## Kept apart
 
 - Target gameweeks in which any club has a blank or a double in the final calendar are
   reported separately and do not enter the primary quantity or the secondary quantities, which
-  are computed over the same units as the primary. What is reported for them, by lead: the
-  number of such units and the mean paired difference e_k^2 - e_1^2 over their player-fixtures,
-  descriptive, with no interval. The final calendar knows them in hindsight.
+  are computed over the same units as the primary. What is reported for them, by lead from 2
+  to 14: the number of such target gameweeks with at least one pair at that lead, the number
+  of pairs, and the mean paired difference e_k^2 - e_1^2 over those pairs, descriptive, with no
+  interval. The final calendar knows them in hindsight.
 - A fixture moved after an origin cannot be told apart. `archive_history` reads only
   `team_h` and `team_a` from `fixtures.csv`, and that file carries final values, so the
   primary quantity may contain such fixtures. The record says so.
