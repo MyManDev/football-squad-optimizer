@@ -182,6 +182,9 @@ def test_explicit_upcoming_full_match_limit_remains_categorical_and_cited(quote:
         "Saka cannot complete the full match.",
         "If he is injured, Saka cannot complete the full upcoming league match.",
         "It is not true that Saka cannot complete the full upcoming league match.",
+        # "fixture" names the league match only after the league qualifier.
+        "Saka cannot complete the full fixture list before the next league match.",
+        "Saka cannot play the full fixture in the next league match.",
     ],
 )
 def test_vague_past_wrong_competition_and_conditional_quotes_do_not_authorize_new_label(

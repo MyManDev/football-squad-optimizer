@@ -159,6 +159,16 @@ def test_missing_invalid_ambiguous_or_updated_metadata_cannot_invent_a_dateline(
         "Saka misses the next Premier League match after the cup match.",
         "Timber is sidelined for the next Premier League match.",
         "Saka is not sidelined for the next Premier League match.",
+        # The new wordings negated, and said by another player about another player.
+        "Saka is available for the next Premier League match.",
+        "Saka will play a part in the next Premier League match.",
+        "Saka won't miss the next Premier League match.",
+        "Saka will not be sidelined for the next Premier League match.",
+        "Saka says Timber misses the next Premier League match.",
+        "Saka says Timber is sidelined for the next Premier League match.",
+        "Saka says Timber will play no part in the next Premier League match.",
+        "Saka says Timber is not available for the next Premier League match.",
+        "Saka says Timber isn't available for the next Premier League match.",
     ],
 )
 def test_absence_scope_refuses_other_competitions_past_and_ambiguous_words(quote):

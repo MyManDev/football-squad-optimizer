@@ -266,8 +266,11 @@ def _require_explicit_full_match_limit(quote: bytes) -> None:
     inability = re.search(
         r"\b(?:cannot|can't|will not(?: be able to)?|won't(?: be able to)?|is unable to) "
         r"(?:complete|finish|play|last) (?:the )?"
-        r"(?:(?:full|whole|entire) (?:(?:upcoming|next) )?(?:(?:premier )?league )?"
-        r"(?:match|game|fixture)|(?:full )?(?:90|ninety) minutes)\b",
+        # "fixture" names the league match only after the league qualifier, as the scope rule
+        # reads it; a bare "full fixture" is the schedule, not a match.
+        r"(?:(?:full|whole|entire) (?:(?:upcoming|next) )?"
+        r"(?:(?:(?:premier )?league )?(?:match|game)|(?:premier )?league fixture)"
+        r"|(?:full )?(?:90|ninety) minutes)\b",
         text,
     )
     if scope is None or inability is None or uncertainty is not None:
