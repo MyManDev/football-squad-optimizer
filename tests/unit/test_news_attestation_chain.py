@@ -19,6 +19,7 @@ from tests.fixtures.synthetic_rotation_capture import (
 from tests.unit.test_club_news_coding_versions import _document, _response
 from tests.unit.test_rotation_export_from_capture import _decision
 
+from squadopt.application import manager_words
 from squadopt.application.manager_words import (
     ManagerWordsError,
     _is_whole_sentence,
@@ -29,11 +30,13 @@ from squadopt.application.manager_words import (
 from squadopt.application.rotation_export import RotationExportRequest, export_rotation_evidence
 from squadopt.data.errors import DataValidationError
 from squadopt.data.snapshots import write_snapshot
+from squadopt.data.sources import club_news_scope
 from squadopt.data.sources.club_news_capture import CodedClub, write_club_news_capture
 from squadopt.data.sources.club_news_coding import (
     ROTATION_CLAIM_CODING_CONTRACT_VERSION,
     coding_prompt_sha256,
 )
+from squadopt.data.sources.club_news_scope import is_whole_sentence
 from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD
 from squadopt.features.rotation_evidence_artifact import read_rotation_evidence_artifact
 
@@ -140,23 +143,22 @@ def test_replayed_legacy_evidence_never_silently_acquires_attestation(tmp_path, 
 
 ABSENCE = "Saka will miss the next Premier League match."
 
+CUT_QUOTES = [
+    (f"It is not true that {ABSENCE}", ABSENCE),
+    ("Neither Timber nor Saka will miss the next Premier League match.", ABSENCE),
+    (f"Arteta denied that {ABSENCE}", ABSENCE),
+    (f"Reports that {ABSENCE[:-1]} are wrong.", ABSENCE[:-1]),
+    (f"{ABSENCE[:-1]} if he fails a late test.", ABSENCE[:-1]),
+    (f"{ABSENCE[:-1]}, according to one report the club rejects.", ABSENCE[:-1]),
+    (f"Arteta said {ABSENCE}", ABSENCE),
+    # A question is not a statement, whichever side of the quote its mark falls.
+    (f"{ABSENCE[:-1]}? Not at all, said Arteta.", ABSENCE[:-1]),
+    # An ellipsis is not the end of anything.
+    (f"{ABSENCE[:-1]}... if he fails a late test.", ABSENCE[:-1]),
+]
 
-@pytest.mark.parametrize(
-    ("body", "quote"),
-    [
-        (f"It is not true that {ABSENCE}", ABSENCE),
-        ("Neither Timber nor Saka will miss the next Premier League match.", ABSENCE),
-        (f"Arteta denied that {ABSENCE}", ABSENCE),
-        (f"Reports that {ABSENCE[:-1]} are wrong.", ABSENCE[:-1]),
-        (f"{ABSENCE[:-1]} if he fails a late test.", ABSENCE[:-1]),
-        (f"{ABSENCE[:-1]}, according to one report the club rejects.", ABSENCE[:-1]),
-        (f"Arteta said {ABSENCE}", ABSENCE),
-        # A question is not a statement, whichever side of the quote its mark falls.
-        (f"{ABSENCE[:-1]}? Not at all, said Arteta.", ABSENCE[:-1]),
-        # An ellipsis is not the end of anything.
-        (f"{ABSENCE[:-1]}... if he fails a late test.", ABSENCE[:-1]),
-    ],
-)
+
+@pytest.mark.parametrize(("body", "quote"), CUT_QUOTES)
 def test_a_quote_cut_from_inside_a_sentence_carries_no_authority(tmp_path, body, quote):
     """The quote's own wording passes the scope rule; the sentence it was cut from says more.
 
@@ -167,8 +169,37 @@ def test_a_quote_cut_from_inside_a_sentence_carries_no_authority(tmp_path, body,
     table_path, manifest_path, source = _pair(tmp_path, quote=quote, body=body)
     row = read_rotation_evidence_artifact(table_path, manifest_path)
     observed = row.loc[row.rotation_claim_observed].iloc[0]
-    # The table accepts it: its rule reads the quote alone.
-    assert bool(observed.rotation_claim_scope_verified)
+    # The table refuses it too: the parser asks the reader's question of the cited bytes.
+    # The label keeps what the quote's own wording says; only the flag is withheld.
+    assert not bool(observed.rotation_claim_scope_verified)
+    assert observed.rotation_claim_fixture_scope == "upcoming_premier_league"
+
+    (word,) = load_manager_words(table_path, club_news_source=source).words
+
+    assert word.words == quote and word.publication_verified
+    assert not word.scope_verified and word.role is None
+
+
+@pytest.mark.parametrize(("body", "quote"), CUT_QUOTES)
+def test_a_table_written_before_the_parser_asked_for_a_sentence_is_refused_by_the_reader(
+    tmp_path, body, quote
+):
+    """A pair exported before the parser checked sentences still says True for a cut quote.
+
+    Such a pair is reused as it is, and no manifest records the parse contract, so the
+    reader's own whole-sentence check is what keeps the claim from taking a role.
+    """
+
+    table_path, manifest_path, source = _pair(tmp_path, quote=quote, body=body)
+    _rewrite(
+        table_path,
+        manifest_path,
+        lambda frame: frame.loc.__setitem__(
+            (frame.rotation_claim_observed, "rotation_claim_scope_verified"), True
+        ),
+    )
+    row = read_rotation_evidence_artifact(table_path, manifest_path)
+    assert bool(row.loc[row.rotation_claim_observed].iloc[0].rotation_claim_scope_verified)
 
     (word,) = load_manager_words(table_path, club_news_source=source).words
 
@@ -187,7 +218,9 @@ def test_a_quote_cut_from_inside_a_sentence_carries_no_authority(tmp_path, body,
     ],
 )
 def test_a_quote_that_is_a_whole_sentence_of_the_source_still_binds(tmp_path, body, quote):
-    table_path, _, source = _pair(tmp_path, quote=quote, body=body)
+    table_path, manifest_path, source = _pair(tmp_path, quote=quote, body=body)
+    row = read_rotation_evidence_artifact(table_path, manifest_path)
+    assert bool(row.loc[row.rotation_claim_observed].iloc[0].rotation_claim_scope_verified)
 
     (word,) = load_manager_words(table_path, club_news_source=source).words
 
@@ -230,12 +263,62 @@ def test_a_quote_that_is_a_whole_sentence_of_the_source_still_binds(tmp_path, bo
 def test_whole_sentence_boundaries(text, quote, expected):
     encoded = text.encode("utf-8")
     first = encoded.index(quote.encode("utf-8"))
-    assert _is_whole_sentence(encoded, first, first + len(quote.encode("utf-8"))) is expected
+    last = first + len(quote.encode("utf-8"))
+    assert _is_whole_sentence(encoded, first, last) is expected
+    # The parser's copy, which sets the table's flag, answers the same.
+    assert is_whole_sentence(encoded, first, last) is expected
 
 
 def test_a_span_that_cuts_a_character_in_half_is_not_a_sentence():
     encoded = "Şaka is out.".encode()
     assert _is_whole_sentence(encoded, 1, len(encoded)) is False
+    assert is_whole_sentence(encoded, 1, len(encoded)) is False
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        'Arteta said: "Saka is out." Is he fit? No\u2026 Timber is.\nCoach: (Saka is out)!',
+        "It is not true that Saka is out, he said... Really?! \u201cYes.\u201d\r\nEnd: [no] ",
+        "Şaka?\tOut!  Out. 'In'.. ok",
+        # Club pages write single quotes and the apostrophe as &rsquo;, which reads as U+2019.
+        "Coach: \u2018Saka is out.\u2019 Timber\u2019s fine!\u2026 Wait\u2026\n\u2018Out\u2019",
+        # A tab before a line break, a semicolon and a no-break space.
+        "Team news\nSaka is out\t\nTimber is fit; Saka is out.\u00a0Odegaard\u00a0is out",
+    ],
+)
+def test_the_parser_and_the_reader_hold_one_definition_of_a_whole_sentence(text):
+    """The parser sets the table's flag and the reader refuses a claim by its own copy.
+
+    Every span of each text gets the same answer from both. A few texts cannot show that
+    the copies agree everywhere; the next test holds the code itself.
+    """
+
+    encoded = text.encode("utf-8")
+    for first in range(len(encoded)):
+        for last in range(first + 1, len(encoded) + 1):
+            assert is_whole_sentence(encoded, first, last) is _is_whole_sentence(
+                encoded, first, last
+            ), (first, last)
+
+
+def test_the_parser_and_the_reader_run_the_same_code_for_a_whole_sentence():
+    """The two copies are the same function: the same constants and the same code.
+
+    Only the docstrings differ. A change to one copy alone fails here, whatever text it
+    would take to show the answers apart.
+    """
+
+    for name in ("_SPACE", "_MARKS", "_SENTENCE_END", "_BOUNDARY", "_OPENING", "_STATEMENT_END"):
+        assert getattr(club_news_scope, name) == getattr(manager_words, name), name
+    parser, reader = is_whole_sentence, _is_whole_sentence
+    ours, theirs = parser.__code__, reader.__code__
+    assert ours.co_code == theirs.co_code
+    assert ours.co_names == theirs.co_names
+    assert ours.co_varnames == theirs.co_varnames
+    assert [value for value in ours.co_consts if value != parser.__doc__] == [
+        value for value in theirs.co_consts if value != reader.__doc__
+    ]
 
 
 def _rewrite(table_path, manifest_path, change):
