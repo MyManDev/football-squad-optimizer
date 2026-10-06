@@ -164,7 +164,9 @@ No run substitutes for another.
 
 ## Deliberate exclusions
 
-- No tie-break solve and no plan identity.
+- No tie-break is measured or compared, and no plan identity. The planner's own tie-break
+  still runs inside each CP-SAT run of an instance; its status is recorded, and its time
+  counts in no run's time.
 - No football window route.
 - No other gameweek.
 - No other solver settings: no CP-SAT worker count other than one, and no HiGHS presolve
