@@ -242,6 +242,42 @@ def test_a_claim_the_parser_refuses_alone_is_set_aside_and_the_rest_kept(
         parse_claim_response(locate_claim_response(response, documents), documents)
 
 
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("paraphrase", ""),
+        ("paraphrase", "   "),
+        ("paraphrase", None),
+        ("disposition", ""),
+        ("speaker", ""),
+        ("fixture_scope", ""),
+    ],
+)
+def test_a_claim_with_an_empty_text_field_is_set_aside_and_the_rest_kept(
+    field: str, value: object
+) -> None:
+    """A claim that names its player, club and page can be dropped and recorded, whatever other
+    text it leaves empty; only the strict locator still refuses the response for it."""
+
+    documents = (_document(f"{QUOTE}\n{GOOD}"),)
+    beside = _beside_a_good_claim(_response())
+    document = json.loads(beside.text)
+    document["claims"][0][field] = value
+    response = ClaimResponse(
+        text=json.dumps(document),
+        model_identifier=beside.model_identifier,
+        model_version=beside.model_version,
+    )
+    located, dropped = locate_claims_reporting(response, documents)
+    (claim,) = parse_claim_response(located, documents)
+    assert claim.player_name == "Odegaard"
+    (refused,) = dropped
+    assert (refused.player_name, refused.team_name, refused.source_url) == ("Saka", "Arsenal", URL)
+    assert f"field {field!r} must be non-empty text" in refused.why
+    with pytest.raises(ClubNewsError, match="must be non-empty text"):
+        locate_claim_response(response, documents)
+
+
 def test_a_fault_of_the_whole_response_still_refuses_it_rather_than_every_claim() -> None:
     document = json.loads(_beside_a_good_claim(_response()).text)
     document["documents"][0]["published_at_utc"] = None
