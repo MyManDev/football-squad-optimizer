@@ -898,3 +898,40 @@ def test_response_binding_preserves_the_actual_failed_citation(tmp_path: Path) -
     assert unknown_url in dropped.why
     assert "not among the fetched documents" in dropped.why
     assert inputs.unverifiable_response_clubs == {dropped: frozenset({"Arsenal"})}
+
+
+def test_a_quote_that_is_not_valid_text_costs_that_claim_and_not_the_export(
+    tmp_path: Path,
+) -> None:
+    """A lone surrogate in one quote, escaped in the stored JSON, used to raise out of the
+    locator and stop the whole export. It is now one unlocatable claim like any other."""
+
+    name, player_id = _claimed_player()
+    fixture = json.loads(CodingFixture(CODING_FIXTURE).response().text)
+    (claim,) = (entry for entry in fixture["claims"] if entry["player_name"] == name)
+    claim["quote"] = claim["quote"] + "\ud800"
+    response = ClaimResponse(
+        text=json.dumps(fixture), model_identifier="synthetic-stub", model_version="fixture-1"
+    )
+    coded = tuple(
+        CodedClub(
+            club=club,
+            response=response,
+            prompt_contract_version=LEGACY_ROTATION_CLAIM_CODING_CONTRACT_VERSION,
+            prompt_sha256=coding_prompt_sha256(
+                contract_version=LEGACY_ROTATION_CLAIM_CODING_CONTRACT_VERSION
+            ),
+        )
+        for club in FixtureClubNewsProvider(FIXTURE).clubs_covered()
+    )
+
+    whole = _export(tmp_path / "whole", from_capture=True).set_index("player_id")
+    damaged = _export(tmp_path / "damaged", from_capture=True, coded=coded).set_index("player_id")
+
+    row = damaged.loc[player_id]
+    assert bool(row["rotation_claim_unresolved"]) is True
+    assert bool(row["rotation_claim_observed"]) is False
+    columns = [*CLAIM_COLUMNS[1:-1], "rotation_claim_unresolved"]
+    pd.testing.assert_frame_equal(
+        damaged.drop(index=player_id)[columns], whole.drop(index=player_id)[columns]
+    )
