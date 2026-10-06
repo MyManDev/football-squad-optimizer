@@ -1405,6 +1405,18 @@ def test_a_history_row_carries_its_bank_when_it_states_one() -> None:
     assert history.weeks[2].bank is None
 
 
+@pytest.mark.parametrize("bank", [None, "5", 5.0, True])
+def test_a_history_bank_that_is_not_an_integer_is_read_as_none_stated(bank: object) -> None:
+    """Never required, so a null or malformed bank is none stated: the rows still answer
+    the banking model, and the rebuild refuses for want of a bank (it says which week)."""
+
+    history = entry_transfer_history(
+        _history_payload(current=[{**_row(1), "bank": 5}, {**_row(2, transfers=1), "bank": bank}]),
+        entry_id=11,
+    )
+    assert (history.weeks[2].transfers, history.weeks[2].bank) == (1, None)
+
+
 def test_the_parser_reports_the_worth_less_the_bank_and_no_purchase_prices() -> None:
     """The parser's field is ``value - bank``, a market value; the application provider
     replaces it where the purchase prices are rebuilt."""

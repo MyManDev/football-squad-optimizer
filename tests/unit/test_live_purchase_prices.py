@@ -96,6 +96,7 @@ def _rebuild(
         "active_chip": active_chip,
         "held_squad": held,
         "held_bank_tenths": bank,
+        "sell_on_fee": 0.5,
     }
     arguments.update(overrides)
     return rebuild_purchase_prices(transfers, **arguments)
@@ -286,6 +287,107 @@ def test_rows_made_at_one_instant_apply_in_any_order_when_none_crosses_another()
     assert result.known is True and result.applied == 2
 
 
+def test_rows_at_one_instant_apply_in_the_order_the_holdings_allow() -> None:
+    """Listed selling 201 before buying him: a player not held is bought before he is sold,
+    and the buy states the price of the instant, so the sale is checked against it."""
+
+    rows = (_transfer(2, 201, 47, 202, 47), _transfer(2, 101, 45, 201, 47))
+    result = _rebuild(rows, {1: (0, 5), 2: (2, 3)}, held=_swap(OPENING, (101,), (202,)), bank=3)
+    assert result.known is True
+    assert (result.applied, result.sales_checked) == (2, 1)
+    assert result.prices[202] == 47 and 201 not in result.prices
+
+
+# 108, bought for 12.0 at the opening, is sold and bought back at one instant in GW2: the
+# buy states the instant's price, 12.5, and at 12.5 the rule gives 12.2. 113 leaves for
+# 11.0 to pay for it, and 201 comes in at 4.7. The bank goes 5 + 122 - 47 + 110 - 125 = 65.
+REBUY_HELD = _swap(OPENING, (113,), (201,))
+
+
+def test_a_sale_bought_back_at_the_same_instant_is_checked_against_the_rule() -> None:
+    rows = (_transfer(2, 113, 110, 108, 125), _transfer(2, 108, 122, 201, 47))
+    result = _rebuild(rows, {1: (0, 5), 2: (2, 65)}, held=REBUY_HELD, bank=65)
+    assert result.known is True
+    assert (result.applied, result.sales_checked) == (2, 1)
+    assert result.prices[108] == 125 and result.prices[201] == 47
+
+
+def test_a_buy_back_at_another_instant_does_not_price_the_sale() -> None:
+    """The same rows a day apart, with 108 risen to 12.7 overnight. The sale's price is not
+    known, so the 12.2 it raised is not checked against the 12.3 the rule would give at
+    12.7; the replay is trusted on its other checks."""
+
+    rows = (
+        _transfer(2, 108, 122, 201, 47, minutes=60),
+        _transfer(2, 113, 110, 108, 127, minutes=1500),
+    )
+    result = _rebuild(rows, {1: (0, 5), 2: (2, 63)}, held=REBUY_HELD, bank=63)
+    assert result.known is True
+    assert (result.applied, result.sales_checked) == (2, 0)
+    assert result.prices[108] == 127
+
+
+def test_a_free_hit_weeks_rows_are_checked_on_a_copy_and_let_go() -> None:
+    """The chip week sells 108 and buys him back at one instant, which is checked, then
+    sells 201, whom only the chip week bought. None of it survives the week: GW4 sells 101
+    from the squad held before the chip, and 108 is still held at his opening price."""
+
+    rows = (
+        _transfer(3, 108, 122, 201, 47),
+        _transfer(3, 113, 110, 108, 125),
+        _transfer(3, 201, 47, 202, 60, minutes=90),
+        FREE_HIT[2],
+    )
+    result = _rebuild(rows, FREE_HIT_WEEKS, held=FREE_HIT_HELD, bank=3, chips={"freehit": [3]})
+    assert result.known is True
+    assert (result.applied, result.free_hit_skipped, result.sales_checked) == (1, 3, 1)
+    assert result.prices[108] == START[108] and result.prices[113] == START[113]
+    assert not {201, 202} & set(result.prices)
+
+
+def test_a_second_free_hit_in_the_season_is_set_aside_like_the_first() -> None:
+    """The game allows one of each chip in each half of the season; the synthetic history
+    puts the second at gameweek 5 to stay short. Both chip weeks' rows revert."""
+
+    rows = (
+        _transfer(3, 101, 45, 201, 50),
+        _transfer(4, 102, 40, 202, 41),
+        _transfer(5, 101, 45, 203, 60),
+        _transfer(5, 103, 55, 204, 30, minutes=61),
+    )
+    result = _rebuild(
+        rows,
+        {1: (0, 5), 2: (0, 5), 3: (0, 5), 4: (1, 4), 5: (0, 4)},
+        held=_swap(OPENING, (102,), (202,)),
+        bank=4,
+        chips={"freehit": [3, 5]},
+    )
+    assert result.known is True
+    assert (result.applied, result.free_hit_skipped) == (1, 3)
+    assert result.prices[101] == START[101] and result.prices[202] == 41
+
+
+def test_a_second_wildcard_in_the_season_is_kept_like_the_first() -> None:
+    """Two Wildcards, at gameweeks 3 and 5 as above, whose history counts no transfers in
+    either week. The bank goes 5 + 0 - 2 = 3, then 3 + 5 - 2 = 6."""
+
+    rows = (
+        _transfer(3, 101, 45, 201, 45),
+        _transfer(3, 102, 40, 202, 42, minutes=61),
+        _transfer(5, 103, 55, 203, 50),
+        _transfer(5, 104, 50, 204, 52, minutes=61),
+    )
+    result = _rebuild(
+        rows,
+        {1: (0, 5), 2: (0, 5), 3: (0, 3), 4: (0, 3), 5: (0, 6)},
+        held=_swap(OPENING, range(101, 105), range(201, 205)),
+        bank=6,
+        chips={"wildcard": [3, 5]},
+    )
+    assert result.known is True and result.applied == 4
+    assert [result.prices[element] for element in range(201, 205)] == [45, 42, 50, 52]
+
+
 # --- what is refused, and why --------------------------------------------------------
 
 
@@ -380,7 +482,8 @@ def test_a_row_for_the_opening_gameweek_is_refused() -> None:
 
 
 def test_a_row_outside_its_own_gameweeks_window_is_refused() -> None:
-    """A GW3 row stamped before the GW2 deadline is not where its gameweek says it is."""
+    """A GW3 row stamped before the GW2 deadline, or a GW2 row stamped after it, is not
+    where its gameweek says it is."""
 
     early = EntryTransfer(
         event=3,
@@ -394,14 +497,109 @@ def test_a_row_outside_its_own_gameweeks_window_is_refused() -> None:
         _rebuild([early], {1: (0, 5), 2: (0, 5), 3: (1, 3)}, held=OPENING, bank=3),
         "outside its window",
     )
-
-
-def test_rows_at_one_instant_that_cross_are_refused_because_their_order_decides() -> None:
-    rows = (_transfer(2, 101, 45, 201, 47), _transfer(2, 201, 47, 202, 47))
+    late = EntryTransfer(
+        event=2,
+        element_in=201,
+        element_in_cost=47,
+        element_out=101,
+        element_out_cost=45,
+        time_utc=_at(3),
+    )
     _refused(
-        _rebuild(rows, {1: (0, 5), 2: (2, 3)}, held=_swap(OPENING, (101,), (202,)), bank=3),
+        _rebuild(
+            [late],
+            {1: (0, 5), 2: (1, 3), 3: (0, 3)},
+            held=_swap(OPENING, (101,), (201,)),
+            bank=3,
+        ),
+        f"made at {_at(3)}, outside its window from {DEADLINES[1]} to {DEADLINES[2]}",
+    )
+
+
+def test_rows_at_one_instant_that_repeat_an_element_are_refused() -> None:
+    """201 is bought twice at one instant: which purchase the sale is reckoned from, and
+    which one stands, is an order no holding fixes and the document does not state."""
+
+    rows = (
+        _transfer(2, 101, 45, 201, 47),
+        _transfer(2, 201, 47, 202, 47),
+        _transfer(2, 102, 40, 201, 47),
+    )
+    _refused(
+        _rebuild(rows, {1: (0, 5), 2: (3, 3)}, held=_swap(OPENING, (101, 102), (201, 202)), bank=3),
         "one instant",
-        "201",
+        "201 more than once",
+    )
+
+
+def test_a_sale_the_rule_does_not_give_at_a_known_price_is_refused() -> None:
+    """108, bought for 12.0, is sold for 12.3 and bought back at 12.5 at the same instant:
+    at 12.5 the rule gives 12.2, so the row is not a sale the game made."""
+
+    rows = (_transfer(2, 113, 110, 108, 125), _transfer(2, 108, 123, 201, 47))
+    _refused(
+        _rebuild(rows, {1: (0, 5), 2: (2, 66)}, held=_swap(OPENING, (113,), (201,)), bank=66),
+        "transfer of element 108 for element 201 raised 123 tenths",
+        "the 125 tenths a buy of element 108 at the same instant paid",
+        "bought for 120 sells for 122",
+    )
+
+
+def test_a_free_hit_row_that_does_not_apply_to_the_squad_before_the_chip_is_refused() -> None:
+    """The chip week's rows are checked on a copy of the squad held before it: a sale of a
+    player it does not hold, a buy of one it holds, or a sale the rule does not give at a
+    known price is a refusal, as in any other week."""
+
+    weeks, chips = FREE_HIT_WEEKS, {"freehit": [3]}
+    for first, fragments in (
+        (_transfer(3, 301, 45, 201, 50), ("element 301 for element 201", "does not hold")),
+        (_transfer(3, 101, 45, 102, 50), ("element 101 for element 102", "already holds")),
+    ):
+        rows = (first, FREE_HIT[2])
+        _refused(_rebuild(rows, weeks, held=FREE_HIT_HELD, bank=3, chips=chips), *fragments)
+    rebuy = (
+        _transfer(3, 108, 123, 201, 47),
+        _transfer(3, 113, 110, 108, 125),
+        FREE_HIT[2],
+    )
+    _refused(
+        _rebuild(rebuy, weeks, held=FREE_HIT_HELD, bank=3, chips=chips),
+        "transfer of element 108 for element 201 raised 123 tenths",
+    )
+
+
+def test_a_pending_row_that_does_not_apply_to_the_held_squad_is_refused() -> None:
+    """A row for the next deadline was made from the squad held now: one selling a player
+    that squad does not hold, or buying one it holds, is not a row of this member's."""
+
+    weeks, held = {1: (0, 5), 2: (1, 3)}, _swap(OPENING, (101,), (201,))
+    for pending, fragments in (
+        (_transfer(3, 101, 45, 202, 41), ("element 101 for element 202", "held squad does not")),
+        (_transfer(3, 102, 40, 201, 47), ("element 102 for element 201", "already holds")),
+    ):
+        rows = (_transfer(2, 101, 45, 201, 47), pending)
+        _refused(_rebuild(rows, weeks, held=held, bank=3), *fragments)
+    rebuy = (
+        _transfer(2, 101, 45, 201, 47),
+        _transfer(3, 108, 123, 202, 41),
+        _transfer(3, 113, 110, 108, 125),
+    )
+    _refused(_rebuild(rebuy, weeks, held=held, bank=3), "raised 123 tenths")
+
+
+def test_a_wildcard_weeks_bank_is_still_read_against_the_history() -> None:
+    """A Wildcard week counts no transfers, but its rows persist, so its bank is checked:
+    the six rows leave 7 and a history stating 8 is refused."""
+
+    _refused(
+        _rebuild(
+            WILDCARD,
+            {1: (0, 5), 2: (0, 5), 3: (0, 8)},
+            held=WILDCARD_HELD,
+            bank=7,
+            chips={"wildcard": [3]},
+        ),
+        "after gameweek 3 the replayed bank is 7 tenths and the history states 8",
     )
 
 
@@ -582,6 +780,7 @@ def _real(member: dict[str, Any]) -> RebuiltPurchasePrices:
         active_chip=None,
         held_squad=tuple(member["held"]),
         held_bank_tenths=member["bank"],
+        sell_on_fee=0.5,
     )
 
 

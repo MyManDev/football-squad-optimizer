@@ -266,6 +266,7 @@ class CapturePicksProvider:
             active_chip=record.active_chip,
             held_squad=basis.squad,
             held_bank_tenths=basis.bank_tenths,
+            sell_on_fee=reads.sell_on_fee,
         )
         if not rebuilt.known:
             return _PricedSquad(rebuilt)

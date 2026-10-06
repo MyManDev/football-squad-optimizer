@@ -82,7 +82,7 @@ def _picks(squad: list[int], *, bank: int, value: int, chip: str | None = None) 
 
 
 def _history(
-    weeks: dict[int, tuple[int, int]], chips: list[tuple[str, int]] | None = None
+    weeks: dict[int, tuple[int, int | None]], chips: list[tuple[str, int]] | None = None
 ) -> bytes:
     return payload_module._history_payload(
         chips=[{"name": name, "event": event} for name, event in chips or []],
@@ -132,9 +132,9 @@ def _provider(payloads: dict[str, bytes]) -> CapturePicksProvider:
     return CapturePicksProvider(SimpleNamespace(payloads=payloads), "fpl-live-20261005T141457Z")
 
 
-def _rule_sum(paid: dict[int, int]) -> int:
+def _rule_sum(paid: dict[int, int], fee: float = 0.5) -> int:
     return sum(
-        sell_price_tenths(NOW[element], price, sell_on_fee=0.5) for element, price in paid.items()
+        sell_price_tenths(NOW[element], price, sell_on_fee=fee) for element, price in paid.items()
     )
 
 
@@ -166,6 +166,53 @@ def test_both_documents_rebuild_the_prices_and_the_selling_value_under_the_rule(
     assert picks.bank_tenths == 4
     result = _provider(_payloads()).purchase_prices_for(ENTRY, SEASON, 3)
     assert (result.known, result.applied, result.reason) == (True, 1, None)
+
+
+def test_the_bootstraps_sell_on_fee_is_the_one_the_selling_value_is_reckoned_with() -> None:
+    """At a fee of 0.25 the member keeps three quarters of a rise: 108 sells for 12.3, 113
+    for 11.2 and 201 for 4.8, 100.1 in all. The fee read as the share kept instead would
+    give 99.6, and the published 0.5 gives 99.9."""
+
+    payloads = _payloads(**{BOOTSTRAP_PAYLOAD: _bootstrap(transfers_sell_on_fee=0.25)})
+    picks = _provider(payloads).picks(ENTRY, SEASON, 3)
+    paid = {**{element: START[element] for element in OPENING[1:]}, 201: 47}
+    assert picks.purchase_prices_known is True
+    assert picks.squad_sell_value_tenths == _rule_sum(paid, fee=0.25) == 1001
+    assert _rule_sum(paid, fee=0.75) == 996 and _rule_sum(paid) == 999
+
+
+def test_the_rebuild_checks_a_known_sale_under_the_bootstraps_fee() -> None:
+    """Gameweek 2 also sells 108, bought for 12.0, for 12.3 and buys him back at 12.4 at the
+    same instant, with 202 bought and sold in between. At 12.4 a fee of 0.25 gives 12.3 and
+    the published 0.5 gives 12.2, so the same rows rebuild under the one fee and are refused
+    under the other. The bank goes 5 + 46 - 47 + 123 - 60 + 60 - 124 = 3."""
+
+    rows = [*TRANSFERS, _transfer(2, 108, 123, 202, 60), _transfer(2, 202, 60, 108, 124)]
+    common = {
+        f"entry-{ENTRY}-transfers.json": json.dumps(rows).encode("utf-8"),
+        f"entry-{ENTRY}-history.json": _history({1: (0, 5), 2: (3, 3), 3: (0, 3)}),
+        f"entry-{ENTRY}-picks-gw03.json": _picks(HELD, bank=3, value=1008),
+    }
+    quarter = _payloads(**common, **{BOOTSTRAP_PAYLOAD: _bootstrap(transfers_sell_on_fee=0.25)})
+    result = _provider(quarter).purchase_prices_for(ENTRY, SEASON, 3)
+    assert (result.known, result.applied, result.sales_checked) == (True, 3, 2)
+    assert _provider(quarter).picks(ENTRY, SEASON, 3).purchase_prices[1108] == 124
+    half = _payloads(**common)
+    _fallback(half)
+    reason = str(_provider(half).purchase_prices_for(ENTRY, SEASON, 3).reason)
+    assert "raised 123 tenths" in reason and "sells for 122" in reason
+
+
+def test_a_history_bank_stated_as_null_keeps_the_stated_worth() -> None:
+    """The parser reads a null bank as none stated, so the member's picks still parse and
+    the rebuild refuses with its own reason rather than the history failing to read."""
+
+    payloads = _payloads(
+        **{f"entry-{ENTRY}-history.json": _history({1: (0, 5), 2: (1, None), 3: (0, 4)})}
+    )
+    _fallback(payloads)
+    reason = _provider(payloads).purchase_prices_for(ENTRY, SEASON, 3).reason
+    assert "states no bank for gameweek 2" in str(reason)
 
 
 def test_without_the_transfers_list_the_picks_are_the_parsers_byte_for_byte() -> None:

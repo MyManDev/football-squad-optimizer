@@ -1857,7 +1857,8 @@ class EntryTransferWeek:
     transfers: int
     cost: int
     bank: int | None = None
-    """The bank after the week's transfers, in tenths, or None when the row states none.
+    """The bank after the week's transfers, in tenths, or None when the row states none
+    or states it as anything but an integer.
 
     Read when present and never required, so a history without it still answers the
     banking model; the purchase-price rebuild needs it and says so when it is absent. In a
@@ -1900,10 +1901,13 @@ def entry_transfer_history(history: bytes, *, entry_id: int) -> EntryTransferHis
             raise DuplicateRecordsError(
                 f"Entry {identifier} history lists gameweek {event} more than once."
             )
+        # Never required, so a null or malformed bank leaves the purchase-price rebuild to
+        # refuse with its reason rather than making the whole history unreadable.
+        bank = record.get("bank")
         by_week[event] = EntryTransferWeek(
             transfers=_integer(record, "event_transfers", "Entry history"),
             cost=_integer(record, "event_transfers_cost", "Entry history"),
-            bank=_integer(record, "bank", "Entry history") if "bank" in record else None,
+            bank=bank if isinstance(bank, int) and not isinstance(bank, bool) else None,
         )
     return EntryTransferHistory(
         entry_id=identifier,
