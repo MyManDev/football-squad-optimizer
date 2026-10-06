@@ -35,7 +35,7 @@ served from the site's own assets) in a Web Worker:
 | `strategies/top100.ts` | A Top 100 weight: `advice.advise_with_top100` restated. |
 | `deviceAdvice.ts` | The answer as the advice document the page already reads. |
 | `useDevicePlan.ts` | Reads the documents when the member asks, holds them to the capture on screen, runs the worker. |
-| `deviceSolver.worker.ts` | The solve off the page's thread: one request in; an answer, a refusal or a failure out. |
+| `deviceSolver.worker.ts` | The solve off the page's thread: a ready signal once loaded, then one request in; an answer, a refusal or a failure out. |
 
 ## The shared document
 
@@ -55,7 +55,7 @@ served from the site's own assets) in a Web Worker:
 | `rules.hit_charged_scaled` | The same charge on the objective's integer scale: the rival price tag's anchor is solved at the charge, not at the margin. Absent on documents from before the field; a device then scales `hit_points_charged` itself. |
 | `rules.expected_points_scale` | The integer scale; the objective divided by it is in points. |
 | `rules.strategies` | Each rival strategy's overlap band on the decided week, by slug: `overlap_floor` or `overlap_ceiling` (the other null), from the strategy catalogue. Absent on documents from before the field; a device then uses the catalogue's values as it knows them (`ortak-koru` a floor of nine, `fark-yarat` a ceiling of five). |
-| `rules.top100` | Present where the week has Top 100 counts: the `weights` the menu offers, the `cohort_size` the counts are out of, and the counts' source record (`cohort_snapshot_id`, `picks_snapshot_id`, `table_sha256`, `picks_gameweek`). Absent where the week has none; a device then solves no weight. |
+| `rules.top100` | Present where the week has Top 100 counts: the non-zero `weights` the menu offers, the `cohort_size` the counts are out of, and the counts' source record (`cohort_snapshot_id`, `picks_snapshot_id`, `table_sha256`, `picks_gameweek`). Absent where the week has none; a device then solves no weight. |
 | `players[]` | The table in solver order: `id`, `name`, `short_name`, `team`, `position`, `buy_tenths`, `expected_points`, and `coefficients` as `[squad, starter, captain]`, the server's exact integers. With `rules.top100`: `top100_count`, how many of the cohort started him, and `top100_scaled`, his weighted points on the integer scale by weight (as text keys), scaled exactly as the server scales them; the device derives the bench coefficient from the integer by the server's rounding rule. |
 
 `players` is sorted by id, the order the planner sorts its own table into before it
@@ -64,8 +64,8 @@ rank in that order, and a device that reorders the table resolves the same tie
 differently. The device sorts the table by id itself before it solves, whatever order the
 document arrived in. With the best value held, three more solves minimise in turn the
 captain's rank, the starters' rank sum and the squad's rank sum, as the server settles a
-tie; the value of a fifteen taken as given is read on the same objective, its eleven
-settled to the lower rank.
+tie; the value of a fifteen taken as given is the week's points of the eleven and captain
+chosen for it on the same objective, a tie settled to the lower rank.
 
 The bench is ordered by the goalkeeper first and then by descending expected points, the
 document's order on a tie. That is what the server publishes for this plan: the one-week
@@ -75,13 +75,19 @@ vice-captain is the eleven's next-highest expected points after the captain, the
 on a tie. The move rows are paired as the server pairs them, by position with both lists
 in id order and any leftover paired in id order at the end; each row's gain is what the
 value of the fifteen moves by when that swap is applied after the rows above it, so the
-rows add up to the gain against holding, and every row is null where the chain does not
-end at the plan's own points.
+rows add up to the gain against holding, and every row, with the gain against holding, is
+null where the chain does not end at the plan's own points.
 
-Two things the device model takes as given: a player not held has no sale price (the
-planner fills the buy price, which a one-week answer never uses, since a player not held
-cannot be sold), and no per-week transfer cap applies under the member policy except the
-one a rival strategy sets on itself (the free transfers the member holds, at least one).
+Three things the device model takes as given:
+
+- A player not held has no sale price. The planner fills the buy price, which a one-week
+  answer never uses, since a player not held cannot be sold.
+- No per-week transfer cap applies under the member policy, except the one a rival strategy
+  sets on itself: the member's free transfers, at most `rules.max_free_transfers` and at
+  least one.
+- Every held player is in the table with a sale price. The producer writes a null block
+  otherwise. A held id the table does not carry would be left out of the model, and a held
+  player with no sale price would be priced at the buy price.
 
 ## What the device answers
 
@@ -91,9 +97,9 @@ shared document is from:
 | Selection | What the device solves |
 | --- | --- |
 | The pure-points plan (`saf-puan`) | The one-week model above. |
-| A chip: `wildcard`, `freehit`, `bboost`, `3xc` | The same week with the chip played, for a chip the entry document's chip block shows with a half still available whose window holds the decided gameweek. A Bench Boost scores all fifteen and a Triple Captain counts the captain once more, each only where the coefficient is positive; a Wildcard or a Free Hit pays no hits. Beside it the member's own no-chip plan, and `gain_vs_no_chip`: the chip week net of hits less that plan net of hits. |
+| A chip: `wildcard`, `freehit`, `bboost`, `3xc` | The same week with the chip played. The page offers a chip only where the entry document's chip block shows it with a half still available whose window holds the decided gameweek; the solver itself does not check that. In the objective, a Bench Boost adds the bench and a Triple Captain counts the captain once more, each only where the coefficient is positive. The points stated count all fifteen under a Bench Boost and the captain three times under a Triple Captain. A Wildcard or a Free Hit pays no hits. The move rows and the gain against holding are on the chip week's basis, holding meaning the held fifteen with the chip played. Beside it the member's own no-chip plan, and `gain_vs_no_chip`: the chip week net of hits less that plan net of hits. |
 | A rival strategy: `ortak-koru`, `fark-yarat` | The section below, against a rival whose entry document is on the same capture and marks a captain in their eleven. |
-| A Top 100 weight | The pure-points plan chosen on `top100_scaled` at a weight the member block names: the captain's coefficient is that integer, the bench's a tenth of it rounded half up and the starter's the rest. Everything stated (the points, the rows, the gain against holding) is on the base points with the eleven the weighted choice fields. The price is the member's own pure-points plan net of hits less the weighted plan net of hits, floored at zero; `changed` says whether a move, the eleven or the captain differs from that plan; a row is `points_gain` where that plan makes the same move and the base points do not score it below zero, `top100_preference` otherwise. |
+| A Top 100 weight | The pure-points plan chosen on `top100_scaled` at a weight the member block names: the captain's coefficient is that integer, the bench's a tenth of it rounded half up and the starter's the rest. Everything stated (the points, the rows, the gain against holding) is on the base points with the eleven the weighted choice fields. The price is the member's own pure-points plan net of hits less the weighted plan net of hits, floored at zero; `changed` says whether a move, the eleven or the captain differs from that plan. A row is `points_gain` where that plan also sells the row's outgoing player and buys its incoming one and the base points do not score it below zero, and `top100_preference` otherwise. A weight of zero is the plain plan; the server publishes no document of its own for it. |
 
 ## A rival strategy on the device
 
@@ -101,7 +107,7 @@ A rival strategy needs one more published input: the rival's eleven and captain,
 the rival's own entry document (`starting_xi` and the player it marks `is_captain`). The
 band is the strategy's in `rules.strategies`, or the catalogue's. The device then restates
 `advice._advise_against_rival`: two candidates under the band, the strictest level a cap
-of the member's free transfers (at least one) reaches, a floor relaxed downward to one and
+of the member's free transfers (at most `rules.max_free_transfers`, at least one) reaches, a floor relaxed downward to one and
 a ceiling upward to eleven, and the declared target with no cap and hits allowed; the one
 with the higher net expected points is the plan (the capped one on a tie) and the other the
 alternative. The price is the member's own pure-points plan solved at the game's charge,
@@ -111,11 +117,15 @@ same table, each captain doubled, net of the plan's hits.
 
 ## What the device refuses
 
-`requests.ts` refuses two combinations before any solve, since the server combines them
-with nothing: a Top 100 weight beside a chip or a rival strategy, and a chip beside a rival
-strategy. A solve that ends other than optimal, at the plan, the tie-break or the hold
-stage, is refused, so a plan that was not proved is never shown; only a rival band's level
-may prove infeasible, and the next level is then tried. So are a rival whose eleven names a
+`requests.ts` refuses two combinations before any solve: a Top 100 weight beside a chip or
+a rival strategy, and a chip beside a rival strategy. The server's one-week chip combines
+with nothing. A rival strategy at a Top 100 weight the server does publish
+(`advice_variants.advise_rival_with_top100`), and the device declines it by contract.
+
+A solve that ends other than optimal, at the plan, the tie-break or the hold stage, is
+refused, so a plan that was not proved is never shown. Only a rival candidate may prove
+infeasible: a capped level then tries the next level, and an infeasible uncapped target
+drops out of the comparison. So are a rival whose eleven names a
 player the table does not carry or whose captain is not in it, a strategy with no band, a
 band neither candidate can meet, a pricing plan with no solution, a weight the shared
 document does not carry and a player with no weighted points at it. Each is a
@@ -127,7 +137,8 @@ rival strategy only against a named rival, without a chip, and only against a ri
 statement names; a weight only on the pure-points plan and only one the member block
 names. It answers without a plan where the shared document is not published, where it or
 the rival's entry document is from another capture, and where the rival's eleven marks no
-captain. The manager's word, preferences, the football model, the windows beyond one week,
+captain. It fails where the shared document is not the expected shape or the rival's entry
+document cannot be read. The manager's word, preferences, the football model, the windows beyond one week,
 the multi-week model and the lineup expectation step stay with the service.
 
 ## The member block
