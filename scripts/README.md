@@ -71,6 +71,7 @@ Date is the file's last commit (`git log -1 --format=%as -- scripts/<name>.py`).
 | `measure_strategy_bench.py` | measurement runner | `docs/strategy_bench.json` | 2026-09-10 |
 | `measure_strategy_screening.py` | measurement runner | `docs/strategy_screening.json` | 2026-08-31 |
 | `measure_template_rival.py` | measurement runner | `docs/template_rival_strength.json` (+ per-season variants) | 2026-08-19 |
+| `measure_window_solver_highs.py` | measurement runner | `docs/research/window_solver_highs.json`, `docs/research/window_solver_highs.md`; `check` writes only `artifacts/window_solver_highs/`; protocol `docs/window_solver_highs_prereg.md` | 2026-10-06 |
 | `measure_windowed_rank.py` | measurement runner | `docs/windowed_rank.json` | 2026-08-20 |
 | `record_preseason_difficulty.py` | measurement runner | `docs/preseason_fixture_difficulty.json`; also `docs/gw1_run_sheet.md` | 2026-09-07 |
 | `run_candidate_gate.py` | measurement runner | `docs/issue43_candidate_declaration.json` (reads and judges); `docs/candidate_gate_spec.md` | 2026-08-19 |
