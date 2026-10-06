@@ -16,8 +16,10 @@ bounds taken from the model's own domains, and two checks hold the exporter to t
 ``check`` builds the instances, runs the one-week rebuild gate, writes the MPS files under
 ``artifacts/window_solver_highs/`` with their sha256 and runs check 1. It makes no timing
 claim. ``measure`` runs the declared solves and refuses unless the heavy-test slot is held,
-both HiGHS builds report core 1.15.3, Node is 22 and the UTC date is not 9 or 10 October; it
-writes ``docs/research/window_solver_highs.json`` and its markdown twin only at the end.
+both HiGHS builds report core 1.15.3 and Node is 22; it writes
+``docs/research/window_solver_highs.json`` and its markdown twin only at the end. In both
+commands no solve starts on 9 or 10 October (UTC), nor one whose wall stops could carry it
+into either day.
 
     python -m scripts.measure_window_solver_highs check [--member ENTRY_ID]
     python -m scripts.measure_window_solver_highs measure --i-have-the-slot --node <node22>
@@ -38,7 +40,7 @@ import sys
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, field, replace
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 from time import perf_counter
@@ -68,6 +70,7 @@ from squadopt.planning import (
     TransferPlanResult,
     optimize_transfer_plan,
 )
+from squadopt.planning.optimizer import PLAN_WALL_CEILING_SECONDS
 
 CONTRACT_VERSION: Final = "window_solver_highs_v1"
 PROTOCOL: Final = "docs/window_solver_highs_prereg.md"
@@ -91,6 +94,16 @@ MIP_ABS_GAP: Final = 0.5
 BLOCKED_DAYS: Final = ((10, 9), (10, 10))
 #: Check 2 fixes every variable, so CP-SAT only propagates; this is a stop, not a budget.
 FIXED_CHECK_SECONDS: Final = 120.0
+#: The hold probe's wall stop: ``planning/optimizer.py`` configures it with
+#: ``min(wall_limit, 30.0)``.
+HOLD_PROBE_WALL_SECONDS: Final = 30.0
+#: Time beyond the solvers' own wall stops that a solve may take: the model build, the
+#: process start, the MPS read and the answer's write.
+SOLVE_MARGIN_SECONDS: Final = 900.0
+#: A driver's stop on the toy model it must prove before any timed run.
+PREFLIGHT_TIMEOUT_SECONDS: Final = 900.0
+#: Both HiGHS builds are set to this many threads.
+HIGHS_THREADS: Final = 1
 
 LEAGUE_DIR: Final = REPOSITORY_ROOT / "web" / "public" / "data" / "league"
 FIXTURES_PATH: Final = REPOSITORY_ROOT / "web" / "public" / "data" / "fixtures.json"
@@ -149,6 +162,16 @@ READINGS: Final = (
     "exactly at the same rounded point; the objective HiGHS reports is recorded beside them.",
     "The sell-on fee is the game's 0.5. The three input documents do not publish it; at the "
     "flat captured prices it does not enter the model.",
+    "CP-SAT's primary starts from its hold solution: the planner floors the primary at the "
+    "hold value and also hints every variable with the probe's solution "
+    "(planning/optimizer.py). Each HiGHS primary gets the floor row only and no starting "
+    "solution, because the protocol declares the floor and not a start. Every HiGHS time "
+    "stands beside that difference.",
+    "CP-SAT's model build time is the planner call's wall time less every captured solve, the "
+    "tie-break's included, and less the capture's own model copies; it also holds the "
+    "planner's reading of its answer. The tie-break's time counts in no run's time.",
+    "Both HiGHS builds are set to one thread. Each solve records the thread count its build "
+    "reports back, or none where the build's API reports none.",
 )
 
 
@@ -454,10 +477,33 @@ def objective_divisor(call: PlannerCall) -> int:
     return int(call.policy.objective_weight_scale) * int(call.settings.expected_points_scale)
 
 
+def cp_sat_wall_bound(call: PlannerCall) -> float:
+    """The longest the planner's CP-SAT solves of ``call`` can run by their wall stops.
+
+    The hold probe stops at 30 s or the ceiling; the primary and the tie-break each stop at
+    the ceiling, which the planner raises to its own default when the caller sets no
+    deterministic budget (``planning/optimizer.py``).
+    """
+
+    wall = float(call.settings.solver_time_limit_seconds)
+    if call.settings.solver_deterministic_time_limit is None:
+        wall = max(wall, float(PLAN_WALL_CEILING_SECONDS))
+    hold = min(wall, HOLD_PROBE_WALL_SECONDS) if call.protect_hold else 0.0
+    return hold + 2.0 * wall
+
+
+def refuse_blocked_day_for(call: PlannerCall) -> None:
+    """Refuse a CP-SAT run of ``call`` that could start on or run into a blocked day."""
+
+    refuse_blocked_date(datetime.now(UTC), cp_sat_wall_bound(call) + SOLVE_MARGIN_SECONDS)
+
+
 def rebuild_check(inputs: PublishedInputs, entry_id: int) -> dict[str, Any]:
     """Solve the rebuilt one-week problem and hold it to the published ``saf-puan/1.json``."""
 
-    plan = one_week_call(inputs, entry_id).solve()
+    call = one_week_call(inputs, entry_id)
+    refuse_blocked_day_for(call)
+    plan = call.solve()
     published = published_advice(inputs, entry_id, 1)
     week = plan.weeks[0]
     ours = {
@@ -507,6 +553,8 @@ class CapturedSolve:
     solution: tuple[int, ...]
     seconds: float
     deterministic_time: float
+    #: The capture's own copy of the model before the solve, outside ``seconds``.
+    copy_seconds: float = 0.0
 
     @property
     def has_solution(self) -> bool:
@@ -538,6 +586,7 @@ def capture_cp_sat_solves() -> Iterator[list[CapturedSolve]]:
     def recording(
         solver: cp_model.CpSolver, model: cp_model.CpModel, solution_callback: Any = None
     ) -> Any:
+        copied = perf_counter()
         proto = copy.deepcopy(model.proto)
         parameters = _parameters(solver)
         parameters_text = str(solver.parameters)
@@ -559,6 +608,7 @@ def capture_cp_sat_solves() -> Iterator[list[CapturedSolve]]:
                 solution=tuple(int(v) for v in response.solution) if found else (),
                 seconds=seconds,
                 deterministic_time=float(response.deterministic_time),
+                copy_seconds=started - copied,
             )
         )
         return status
@@ -1025,6 +1075,14 @@ class _Exporter:
             self.columns.append(Column(f"x{index}", lower, upper))
         variables = len(self.columns)
         objective, offset, maximize = user_objective(proto)
+        for var, coeff in objective.items():
+            # A coefficient is written as it is and read by HiGHS as a double, so it is
+            # held to the same limit as every row coefficient, bound and domain.
+            if abs(coeff) >= EXACT_LIMIT:
+                raise ExportRefused(
+                    f"The objective coefficient of variable {var} is {coeff}, beyond what a "
+                    "double holds exactly."
+                )
         for index, constraint in enumerate(proto.constraints):
             self.constraint(index, constraint)
         return Milp(
@@ -1430,15 +1488,34 @@ class Instance:
     primary_mps: Path | None = None
     primary_proto: Any = None
     export: dict[str, Any] = field(default_factory=dict)
+    #: The planner call's wall time, its solves and the capture's copies included.
+    call_seconds: float | None = None
+
+    @property
+    def model_build_seconds(self) -> float | None:
+        """The call's time outside its captured solves and the capture's model copies."""
+
+        if self.call_seconds is None:
+            return None
+        solves = self.solves
+        captured = [solves.hold, solves.primary]
+        if solves.tiebreak is not None:
+            captured.append(solves.tiebreak)
+        return self.call_seconds - sum(solve.seconds + solve.copy_seconds for solve in captured)
 
 
 def solve_instance(inputs: PublishedInputs, entry_id: int, window: int) -> Instance:
     """Run the planner's own path on one window and name its solves."""
 
     call = window_call(inputs, entry_id, window)
+    refuse_blocked_day_for(call)
     with capture_cp_sat_solves() as solves:
+        started = perf_counter()
         plan = call.solve()
-    return Instance(entry_id, window, call, plan, identify_window_solves(solves, window))
+        call_seconds = perf_counter() - started
+    instance = Instance(entry_id, window, call, plan, identify_window_solves(solves, window))
+    instance.call_seconds = call_seconds
+    return instance
 
 
 def cp_sat_record(instance: Instance, *, with_time: bool) -> dict[str, Any]:
@@ -1475,7 +1552,17 @@ def cp_sat_record(instance: Instance, *, with_time: bool) -> dict[str, Any]:
         record["hold_seconds"] = solves.hold.seconds
         record["primary_seconds"] = primary.seconds
         record["seconds"] = solves.hold.seconds + primary.seconds
+        record["model_build_seconds"] = instance.model_build_seconds
     return record
+
+
+def wall_matched_budget(cp_sat: Mapping[str, Any]) -> float:
+    """The wall-matched HiGHS budget: CP-SAT's hold and primary time on the reference run,
+    or the 1,800 s ceiling when the wall ceiling stopped CP-SAT (the protocol's "Time")."""
+
+    if cp_sat["stopped_by_wall_ceiling"]:
+        return float(WINDOW_WALL_CEILING_SECONDS)
+    return float(cp_sat["seconds"])
 
 
 def export_instance(instance: Instance, out_dir: Path) -> dict[str, Any]:
@@ -1621,14 +1708,25 @@ def published_plan_value(call: PlannerCall, published: Mapping[str, Any]) -> dic
 # Guards.
 
 
-def refuse_blocked_date(now: datetime) -> None:
-    """No solve runs on 9 or 10 October (UTC)."""
+def refuse_blocked_date(now: datetime, seconds: float = 0.0) -> None:
+    """No solve runs on 9 or 10 October (UTC): none starts on either day, and none starts
+    whose ``seconds`` of wall stops could carry it into either."""
 
-    moment = now.astimezone(UTC)
-    if (moment.month, moment.day) in BLOCKED_DAYS:
-        raise ProtocolRefusal(
-            f"It is {moment.date().isoformat()} UTC; the protocol runs no solve on 9 or 10 October."
-        )
+    start = now.astimezone(UTC)
+    end = start + timedelta(seconds=max(float(seconds), 0.0))
+    day = start.date()
+    while day <= end.date():
+        if (day.month, day.day) in BLOCKED_DAYS:
+            if day == start.date():
+                raise ProtocolRefusal(
+                    f"It is {day.isoformat()} UTC; the protocol runs no solve on 9 or 10 October."
+                )
+            raise ProtocolRefusal(
+                f"A solve started at {start.isoformat(timespec='seconds')} may run until "
+                f"{end.isoformat(timespec='seconds')}, into {day.isoformat()} UTC; the "
+                "protocol runs no solve on 9 or 10 October."
+            )
+        day += timedelta(days=1)
 
 
 def native_core_version() -> str:
@@ -1686,13 +1784,21 @@ def measure_guards(
 # HiGHS runs: native in a child Python process, wasm in Node. Neither takes CP-SAT's value.
 
 
-def highs_options(time_limit: float) -> dict[str, float | bool]:
+def highs_options(time_limit: float) -> dict[str, float | bool | int]:
     return {
         "output_flag": False,
+        "threads": HIGHS_THREADS,
         "mip_rel_gap": MIP_REL_GAP,
         "mip_abs_gap": MIP_ABS_GAP,
         "time_limit": max(float(time_limit), 0.0),
     }
+
+
+def _option_value(highs: Any, name: str) -> Any:
+    """An option as the native build reports it (older bindings return a status first)."""
+
+    value = highs.getOptionValue(name)
+    return value[-1] if isinstance(value, tuple) else value
 
 
 def _native_solve(
@@ -1703,7 +1809,8 @@ def _native_solve(
 ) -> dict[str, Any]:
     numpy = importlib.import_module("numpy")
     highs = highspy.Highs()
-    highs.setOptionValue("threads", 1)
+    # Set before anything runs: the native build starts its scheduler on the first run.
+    highs.setOptionValue("threads", HIGHS_THREADS)
     started = perf_counter()
     read_status = int(highs.readModel(path))
     read_seconds = perf_counter() - started
@@ -1734,6 +1841,7 @@ def _native_solve(
         "seconds": seconds,
         "primal_solution_status": primal,
         "bound": float(info.mip_dual_bound),
+        "threads": int(_option_value(highs, "threads")),
     }
     if primal == HIGHS_PRIMAL_FEASIBLE:
         result["objective"] = float(info.objective_function_value)
@@ -1750,11 +1858,11 @@ def floor_value(solution: Sequence[float], costs: Mapping[int, int | float]) -> 
 def native_run(job: Mapping[str, Any]) -> dict[str, Any]:
     """One native HiGHS run of one instance: the hold model, then the floored primary."""
 
-    refuse_blocked_date(datetime.now(UTC))
+    budget = float(job["budget_seconds"])
+    refuse_blocked_date(datetime.now(UTC), budget)
     started = perf_counter()
     highspy = importlib.import_module("highspy")
     load_seconds = perf_counter() - started
-    budget = float(job["budget_seconds"])
     costs = {int(j): cost for j, cost in job["objective"].items()}
     hold = _native_solve(highspy, str(job["hold_mps"]), budget, None)
     result: dict[str, Any] = {
@@ -1810,6 +1918,15 @@ function info(model, name) {
   try { return Number(model.info.get(name)); } catch { return null; }
 }
 
+function option(model, name) {
+  try {
+    const value = Number(model.options.get(name));
+    return Number.isFinite(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
 function solve(path, budget, floor) {
   const text = readFileSync(path, "utf8");
   const model = highs.createModel();
@@ -1836,6 +1953,7 @@ function solve(path, budget, floor) {
       seconds,
       primal_solution_status: info(model, "primal_solution_status"),
       bound: info(model, "mip_dual_bound"),
+      threads: option(model, "threads"),
     };
     if (out.primal_solution_status === 2) {
       out.objective = model.getObjectiveValue();
@@ -1951,6 +2069,32 @@ def solve_job(
     }
 
 
+#: What a HiGHS driver reports about itself on every run, kept in the run's record.
+REPORTED_KEYS: Final = ("build", "core_version", "package_version", "node_version")
+
+
+def require_run_version(build: str, raw: Mapping[str, Any], versions: Mapping[str, Any]) -> None:
+    """A run's own report of its build must be the one the guards read before any run."""
+
+    if build == "native":
+        expected = {"core_version": versions["native_core"]}
+    else:
+        wasm = versions["wasm"]
+        expected = {key: wasm.get(key) for key in REPORTED_KEYS[1:]}
+    for key, value in expected.items():
+        if raw.get(key) != value:
+            raise ProtocolRefusal(
+                f"The {build} run reports {key} {raw.get(key)!r}, not the {value!r} the guards "
+                "read; no verdict."
+            )
+
+
+def child_timeout(budget: float) -> float:
+    """A HiGHS child's stop: twice its budget and the margin; it is killed there."""
+
+    return 2.0 * float(budget) + SOLVE_MARGIN_SECONDS
+
+
 def interpret_run(
     instance: Instance, raw: Mapping[str, Any] | None, error: str | None
 ) -> dict[str, Any]:
@@ -1970,6 +2114,7 @@ def interpret_run(
     seconds = float(hold.get("seconds", 0.0)) + float((primary or {}).get("seconds", 0.0))
     hold["model_status_name"] = HIGHS_MODEL_STATUS.get(int(hold.get("model_status", -1)))
     record: dict[str, Any] = {
+        "reported": {key: raw[key] for key in REPORTED_KEYS if key in raw},
         "load_seconds": raw.get("load_seconds"),
         "hold": hold,
         "floor": raw.get("floor"),
@@ -2232,7 +2377,7 @@ def _highs_run(
     job = solve_job(
         instance.hold_mps, instance.primary_mps, instance.primary_milp.objective, budget
     )
-    timeout = 2.0 * budget + 900.0
+    timeout = child_timeout(budget)
     try:
         if build == "native":
             return _run_native_child(job, timeout=timeout), None
@@ -2246,13 +2391,19 @@ def run_measure(node: str, versions: Mapping[str, Any], out_dir: Path) -> dict[s
 
     inputs = load_inputs()
     members = sorted(inputs.members)
-    refuse_blocked_date(datetime.now(UTC))
-    preflight_driver(lambda job: _run_native_child(job, timeout=900.0), "native")
-    preflight_driver(lambda job: _run_wasm_driver(node, job, WEB_DIR, timeout=900.0), "wasm")
-    rebuild = []
-    for entry in members:
-        refuse_blocked_date(datetime.now(UTC))
-        rebuild.append(rebuild_check(inputs, entry))
+    preflight_horizon = PREFLIGHT_TIMEOUT_SECONDS + SOLVE_MARGIN_SECONDS
+    refuse_blocked_date(datetime.now(UTC), preflight_horizon)
+    preflight_driver(
+        lambda job: _run_native_child(job, timeout=PREFLIGHT_TIMEOUT_SECONDS), "native"
+    )
+    refuse_blocked_date(datetime.now(UTC), preflight_horizon)
+    preflight_driver(
+        lambda job: _run_wasm_driver(node, job, WEB_DIR, timeout=PREFLIGHT_TIMEOUT_SECONDS),
+        "wasm",
+    )
+    # ``rebuild_check`` and ``solve_instance`` each refuse a CP-SAT run that could reach a
+    # blocked day; the HiGHS runs are guarded here, up to their child's stop.
+    rebuild = [rebuild_check(inputs, entry) for entry in members]
     if not all(row["passed"] for row in rebuild):
         raise ProtocolRefusal("The one-week rebuild differs from the publication; no verdict.")
     progress = out_dir / "progress.jsonl"
@@ -2261,9 +2412,7 @@ def run_measure(node: str, versions: Mapping[str, Any], out_dir: Path) -> dict[s
     instances: list[dict[str, Any]] = []
     for entry in members:
         for window in WINDOWS:
-            refuse_blocked_date(datetime.now(UTC))
             reference = solve_instance(inputs, entry, window)
-            refuse_blocked_date(datetime.now(UTC))
             repeat = solve_instance(inputs, entry, window)
             first = cp_sat_record(reference, with_time=True)
             second = cp_sat_record(repeat, with_time=True)
@@ -2275,20 +2424,18 @@ def run_measure(node: str, versions: Mapping[str, Any], out_dir: Path) -> dict[s
             export = export_instance(reference, out_dir)
             if not export["check_1_passed"]:
                 raise ProtocolRefusal(f"Check 1 failed on {entry} w{window}; no verdict.")
-            matched = (
-                WINDOW_WALL_CEILING_SECONDS
-                if first["stopped_by_wall_ceiling"]
-                else first["seconds"]
-            )
+            matched = wall_matched_budget(first)
             runs: dict[str, dict[str, Any]] = {}
             for build in ("native", "wasm"):
                 runs[build] = {}
                 for name, budget in (
                     ("wall_matched", matched),
-                    ("ceiling", WINDOW_WALL_CEILING_SECONDS),
+                    ("ceiling", float(WINDOW_WALL_CEILING_SECONDS)),
                 ):
-                    refuse_blocked_date(datetime.now(UTC))
+                    refuse_blocked_date(datetime.now(UTC), child_timeout(budget))
                     raw, error = _highs_run(build, reference, budget, node)
+                    if raw is not None:
+                        require_run_version(build, raw, versions)
                     run = interpret_run(reference, raw, error)
                     run["budget_seconds"] = budget
                     if not run.get("check_2_passed", True):
@@ -2332,7 +2479,7 @@ def run_measure(node: str, versions: Mapping[str, Any], out_dir: Path) -> dict[s
             "cp_sat_linearization_level": WINDOW_LINEARIZATION_LEVEL,
             "highs_mip_rel_gap": MIP_REL_GAP,
             "highs_mip_abs_gap": MIP_ABS_GAP,
-            "highs_threads": 1,
+            "highs_threads_set": HIGHS_THREADS,
             "agreement_units": AGREEMENT_UNITS,
         },
         "readings": list(READINGS),
@@ -2452,14 +2599,20 @@ def main(argv: Sequence[str] | None = None) -> int:
         write_json(RECORD_JSON, record)
         write_text(RECORD_MARKDOWN, markdown(record))
         return 0
-    except ProtocolRefusal as refusal:
+    except (ProtocolRefusal, DriverFailed, ExportRefused) as refusal:
+        # A driver that fails its version report or its toy model, or a model the exporter
+        # does not translate, stops the run as a refusal does: no verdict, and a reason.
         if arguments.command == "measure" and arguments.have_slot:
             # A run that stopped leaves its reason beside its evidence, never in docs/.
             write_json(
                 ARTIFACT_DIR / "stopped.json",
-                {"reason": str(refusal), "at_utc": datetime.now(UTC).isoformat()},
+                {
+                    "kind": type(refusal).__name__,
+                    "reason": str(refusal),
+                    "at_utc": datetime.now(UTC).isoformat(),
+                },
             )
-        print(f"refused: {refusal}", file=sys.stderr)
+        print(f"refused ({type(refusal).__name__}): {refusal}", file=sys.stderr)
         return 2
 
 
