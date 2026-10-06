@@ -49,10 +49,10 @@ class RebuiltPurchasePrices:
     ``known``. ``reason`` says why not, for the operator: a member's page carries the flag
     and nothing else. ``applied`` counts the rows the replay used, ``free_hit_skipped`` the
     Free Hit rows it checked on a copy and set aside, and ``pending`` the rows for a
-    deadline after the captured week, which it checks on a copy and leaves out because the
-    captured squad does not hold them yet. ``sales_checked`` counts the sales, among all
-    three, whose market price a buy at the same instant states and which were checked
-    against the rule.
+    deadline after the captured week, which it leaves out because the captured squad does
+    not hold them yet (those for the next deadline it checks on a copy first).
+    ``sales_checked`` counts the sales, among the rows it checked, whose market price a buy
+    at the same instant states and which were checked against the rule.
     """
 
     prices: Mapping[int, int] = field(default_factory=lambda: MappingProxyType({}))
@@ -185,8 +185,11 @@ def rebuild_purchase_prices(
       the captured week, whose row was not among the weeks the source was read against
       (the history reported the bank from before the chip for both earlier Free Hits on
       2026-10-05).
-    * The replay must end on the held squad and the held bank, and the pending rows,
-      replayed on a copy of that end, are held to the same as a week's.
+    * The replay must end on the held squad and the held bank, and the rows for the next
+      deadline, replayed on a copy of that end, are held to the same as a week's. Rows for
+      a deadline after that, which a capture carries only when its picks trail its
+      transfers list, were made from whatever the weeks between left (a Free Hit among
+      them reverts), so they are counted and not replayed.
     """
 
     through = int(through_gameweek)
@@ -321,8 +324,11 @@ def rebuild_purchase_prices(
         )
     # The rows for the next deadline were made from the held squad, so they must apply to
     # it; they are checked on a copy, because the captured squad does not hold them yet.
+    # A later deadline's rows were made from the squad the weeks between left, which a
+    # Free Hit among them reverts, so they are only counted.
+    upcoming = [transfer for transfer in pending if transfer.event == through + 1]
     replayed = _replay(
-        pending, dict(prices), bank, sell_on_fee=sell_on_fee, holder="the held squad"
+        upcoming, dict(prices), bank, sell_on_fee=sell_on_fee, holder="the held squad"
     )
     if isinstance(replayed, str):
         return _refused(replayed)

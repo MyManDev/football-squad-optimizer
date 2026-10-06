@@ -279,6 +279,39 @@ def test_a_row_for_a_later_deadline_is_pending_and_left_out() -> None:
     assert 102 in result.prices and 202 not in result.prices
 
 
+def test_a_sale_bought_back_at_the_next_deadline_is_checked_and_left_out() -> None:
+    """GW3 is the next deadline: 108, bought for 12.0, is sold for 12.2 and bought back at
+    12.5 at one instant, which is checked on a copy. The held prices do not move."""
+
+    rows = (
+        _transfer(2, 101, 45, 201, 47),
+        _transfer(3, 108, 122, 202, 41),
+        _transfer(3, 113, 110, 108, 125),
+    )
+    result = _rebuild(rows, {1: (0, 5), 2: (1, 3)}, held=_swap(OPENING, (101,), (201,)), bank=3)
+    assert result.known is True
+    assert (result.applied, result.pending, result.sales_checked) == (1, 2, 1)
+    assert result.prices[108] == START[108] and result.prices[113] == START[113]
+    assert 202 not in result.prices
+
+
+def test_rows_for_a_deadline_after_the_next_are_counted_and_not_replayed() -> None:
+    """Picks of GW3 read from a capture whose list runs to GW6, where GW5 was a Free Hit:
+    GW6 sells 102 again from the squad the chip reverted to, which a replay of every
+    pending row on one copy would call a player not held."""
+
+    rows = (
+        _transfer(4, 101, 45, 201, 45),
+        _transfer(5, 102, 40, 202, 40),
+        _transfer(6, 102, 40, 203, 40),
+    )
+    weeks = {1: (0, 5), 2: (0, 5), 3: (0, 5)}
+    result = _rebuild(rows, weeks, held=OPENING, bank=5, chips={"freehit": [5]})
+    assert result.known is True
+    assert (result.applied, result.pending, result.sales_checked) == (0, 3, 0)
+    assert dict(result.prices) == START
+
+
 def test_rows_made_at_one_instant_apply_in_any_order_when_none_crosses_another() -> None:
     rows = (_transfer(2, 101, 45, 201, 47), _transfer(2, 102, 40, 202, 40))
     result = _rebuild(
@@ -482,8 +515,8 @@ def test_a_row_for_the_opening_gameweek_is_refused() -> None:
 
 
 def test_a_row_outside_its_own_gameweeks_window_is_refused() -> None:
-    """A GW3 row stamped before the GW2 deadline, or a GW2 row stamped after it, is not
-    where its gameweek says it is."""
+    """A GW3 row stamped before the GW2 deadline, or a GW2 row stamped after it or at
+    either of its deadlines, is not where its gameweek says it is."""
 
     early = EntryTransfer(
         event=3,
@@ -514,6 +547,25 @@ def test_a_row_outside_its_own_gameweeks_window_is_refused() -> None:
         ),
         f"made at {_at(3)}, outside its window from {DEADLINES[1]} to {DEADLINES[2]}",
     )
+    # The window is open at both ends, so a row stamped at a deadline itself is outside.
+    for stamp in (DEADLINES[1], DEADLINES[2]):
+        on_deadline = EntryTransfer(
+            event=2,
+            element_in=201,
+            element_in_cost=47,
+            element_out=101,
+            element_out_cost=45,
+            time_utc=stamp,
+        )
+        _refused(
+            _rebuild(
+                [on_deadline],
+                {1: (0, 5), 2: (1, 3), 3: (0, 3)},
+                held=_swap(OPENING, (101,), (201,)),
+                bank=3,
+            ),
+            f"made at {stamp}, outside its window",
+        )
 
 
 def test_rows_at_one_instant_that_repeat_an_element_are_refused() -> None:
