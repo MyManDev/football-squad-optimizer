@@ -27,6 +27,7 @@ import {
   STANDINGS_URL,
   TARGETS,
   USER_AGENT,
+  VERDICT_EXPECTED_PROBES,
   VERDICT_MIN_PROBES,
   metadataFor,
   nowGate,
@@ -112,9 +113,10 @@ function fplAnswers({ standings }) {
   };
 }
 
-function record(at, status, json = status === 200, trigger = "cron") {
+function record(at, status, json = status === 200, trigger = "cron", slot = undefined) {
   return {
     at,
+    slot: slot === undefined ? (trigger === "cron" ? at : null) : slot,
     trigger,
     target: STANDINGS_URL,
     status,
@@ -136,7 +138,8 @@ describe("a record of one answer", () => {
   it("keeps a 200 JSON answer's size and nothing of its body", () => {
     const body = JSON.stringify({ standings: { results: [{ entry_name: "PRIVATE-MARKER" }] } });
     const result = recordFrom({
-      at: "2026-10-05T12:00:00.000Z",
+      at: "2026-10-05T12:00:00.317Z",
+      slot: "2026-10-05T12:00:00.000Z",
       trigger: "cron",
       target: STANDINGS_URL,
       colo: "LHR",
@@ -147,7 +150,8 @@ describe("a record of one answer", () => {
     });
 
     assert.deepEqual(result, {
-      at: "2026-10-05T12:00:00.000Z",
+      at: "2026-10-05T12:00:00.317Z",
+      slot: "2026-10-05T12:00:00.000Z",
       trigger: "cron",
       target: STANDINGS_URL,
       status: 200,
@@ -192,6 +196,7 @@ describe("a record of one answer", () => {
   it("records a timeout as no answer at all", () => {
     const result = recordFrom({
       at: "2026-10-05T12:00:00.000Z",
+      slot: "2026-10-05T12:00:00.000Z",
       trigger: "cron",
       target: EVENT_STATUS_URL,
       colo: null,
@@ -201,6 +206,7 @@ describe("a record of one answer", () => {
 
     assert.deepEqual(result, {
       at: "2026-10-05T12:00:00.000Z",
+      slot: "2026-10-05T12:00:00.000Z",
       trigger: "cron",
       target: EVENT_STATUS_URL,
       status: null,
@@ -332,6 +338,50 @@ describe("the verdict", () => {
     assert.equal(summarize(spread(151)).verdict.outcome, "not served");
   });
 
+  it("places a probe by its cron slot, so a fetch that starts late cannot leave the window", () => {
+    // 145 half-hourly slots; each fetch starts a little after its slot. The last one starts
+    // 750 ms late, past the first slot plus 72 hours: by `at` it would fall out of the window.
+    const jitter = (index) => (index === 144 ? 750 : (index * 37) % 900);
+    const late = Array.from({ length: 145 }, (_, index) => {
+      const slot = hoursAfter(start, index / 2);
+      const at = new Date(Date.parse(slot) + jitter(index)).toISOString();
+      return record(at, 200, true, "cron", slot);
+    });
+    const verdict = summarize(late).verdict;
+    assert.equal(verdict.window_from, start);
+    assert.equal(verdict.window_to, hoursAfter(start, 72));
+    assert.equal(verdict.window_probes, VERDICT_EXPECTED_PROBES);
+    assert.equal(verdict.outcome, "served");
+    assert.equal(verdict.unslotted, 0);
+    // The same slots fetched on time give the same verdict: jitter moves nothing.
+    assert.deepEqual(verdict, summarize(halfHourly(145)).verdict);
+  });
+
+  it("closes on the slot at the window's end even when the first fetch started late", () => {
+    // By `at` the window would run from the first fetch, 900 ms after its slot, and the last
+    // fetch, on time, would never reach its end: the verdict would stay pending.
+    const early = Array.from({ length: 145 }, (_, index) => {
+      const slot = hoursAfter(start, index / 2);
+      const at = new Date(Date.parse(slot) + (index === 0 ? 900 : 0)).toISOString();
+      return record(at, 200, true, "cron", slot);
+    });
+    const verdict = summarize(early).verdict;
+    assert.equal(verdict.window_from, start);
+    assert.equal(verdict.outcome, "served");
+    assert.equal(verdict.window_probes, VERDICT_EXPECTED_PROBES);
+  });
+
+  it("counts a scheduled record without a slot nowhere, and says how many there are", () => {
+    const unplaced = record(hoursAfter(start, 10), 403, false, "cron", null);
+    const verdict = summarize([...halfHourly(145), unplaced]).verdict;
+    assert.equal(verdict.window_probes, 145);
+    assert.equal(verdict.window_served, 145);
+    assert.equal(verdict.unslotted, 1);
+    assert.equal(verdict.outcome, "served");
+    assert.equal(summarize([unplaced]).verdict.outcome, "pending");
+    assert.equal(summarize([unplaced]).verdict.unslotted, 1);
+  });
+
   it("reads only the scheduled probes: live probes cannot move it", () => {
     // 20 refusals among 145 scheduled probes, then 300 served live probes in one stretch.
     const scheduled = halfHourly(145, (index) => (index % 7 === 0 && index < 140 ? 403 : 200));
@@ -436,8 +486,9 @@ describe("the worker", () => {
       fplAnswers({ standings: () => new Response("<html>denied</html>", { status: 403 }) }),
     );
     const env = probeEnv();
+    const scheduledTime = Date.parse("2026-10-05T12:30:00.000Z");
 
-    await createWorker().scheduled({ cron: "*/30 * * * *", scheduledTime: Date.now() }, env);
+    await createWorker().scheduled({ cron: "*/30 * * * *", scheduledTime }, env);
 
     const probes = fetch.mock.calls.filter((call) => TARGETS.includes(String(call.arguments[0])));
     assert.deepEqual(
@@ -462,6 +513,7 @@ describe("the worker", () => {
       assert.equal(stored.metadata.target, TARGETS[index]);
       assert.equal(stored.metadata.trigger, "cron");
       assert.equal(stored.metadata.colo, "LHR");
+      assert.equal(stored.metadata.slot, "2026-10-05T12:30:00.000Z");
     }
     assert.equal(env.PROBE.entries.get(keys[1]).metadata.status, 403);
     assert.equal(env.PROBE.entries.get(keys[1]).metadata.head, "<html>denied</html>");
@@ -585,7 +637,10 @@ describe("the worker", () => {
     assert.equal(fetch.mock.callCount(), 2, "a live probe needs no trace");
     const records = [...env.PROBE.entries].filter(([key]) => key.startsWith("r:"));
     assert.equal(records.length, 2);
-    for (const [, stored] of records) assert.equal(stored.metadata.colo, null);
+    for (const [, stored] of records) {
+      assert.equal(stored.metadata.colo, null);
+      assert.equal(stored.metadata.slot, null);
+    }
     assert.equal(env.PROBE.counts.put, 3, "one gate write and two records");
     const gate = env.PROBE.entries.get(NOW_GATE_KEY);
     assert.equal(gate.expirationTtl, NOW_GATE_TTL_SECONDS);

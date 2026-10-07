@@ -67,6 +67,7 @@ days.
 | Field | Meaning |
 | --- | --- |
 | `at` | When this request started (ISO, UTC). |
+| `slot` | For a scheduled record, the cron's own time for the run (`scheduledTime`, ISO, UTC), which places it in the verdict's window; `null` for a live probe. |
 | `trigger` | `cron` for the schedule, `now` for a live probe. |
 | `target` | The URL asked. |
 | `status` | The HTTP status, or `null` when no answer arrived. |
@@ -117,7 +118,8 @@ and `summary`:
   (`length`, `from`, `to`) and `longest_gap_minutes` between two probes.
 - `summary.verdict`: the rule below applied to the scheduled standings probes: the window
   (`window_from`, `window_to`), the probes in it (`window_probes`, `window_served`, `share`),
-  `min_probes`, and `outcome`, one of `pending`, `served`, `not served` or `too few probes`.
+  `min_probes`, `unslotted` (scheduled standings records without a slot, which count nowhere),
+  and `outcome`, one of `pending`, `served`, `not served` or `too few probes`.
 
 A refusal reads as a run of `403` (or `429`) records whose `head` shows the block page. An FPL
 outage reads differently: `5xx` or timeouts on both targets, usually brief. Workers Logs for
@@ -132,18 +134,22 @@ curl -s -H "x-squadopt-probe: now" https://squadopt.mymandev.com/api/v1/fpl-prob
 ## The verdict rule, fixed before any data
 
 **Cloudflare egress counts as served when at least 95 percent of the scheduled standings probes
-in the first 72 hours from the first of them answer 200 JSON, and that window holds at least
-130 of its 145 expected probes. Otherwise the forwarder is not built on Cloudflare.**
+whose cron slots fall in the first 72 hours from the first slot answer 200 JSON, and that window
+holds at least 130 of its 145 expected probes. Otherwise the forwarder is not built on
+Cloudflare.**
 
 - The standings probes are the scheduled records (`trigger` `cron`) whose target is the
   standings URL. Live probes never count: a caller of `/now` chooses when and from which data
   centre they run, so they are reported apart (`summary.live`) as context. The event-status
   probes are context for reading an outage, not part of the rule.
-- The window is fixed before any data: from the first scheduled standings probe to exactly 72
-  hours later, both ends included, which is 145 probes at one every 30 minutes. Probes after it
-  never count, so the verdict does not depend on when it is read.
-- The outcome is `pending` until a scheduled standings probe exists at or after the window's
-  end. Then it is final: `too few probes` when the window holds fewer than 130, otherwise
+- The window is fixed before any data and counted in cron slots: from the first scheduled
+  standings probe's slot to exactly 72 hours later, both ends included, which is 145 slots at
+  one every 30 minutes. A probe is placed by its slot (`slot`, the cron's scheduled time), never
+  by when its fetch started, so a run that starts late cannot move a probe in or out. Probes
+  after it never count, so the verdict does not depend on when it is read. A scheduled record
+  without a slot is not placed, and the verdict reports how many there are (`unslotted`).
+- The outcome is `pending` until a scheduled standings probe exists whose slot is at or after
+  the window's end. Then it is final: `too few probes` when the window holds fewer than 130, otherwise
   `served` or `not served`. `too few probes` is not a verdict; the question gets a new probe.
 - A probe that timed out or failed counts against the share like a refusal. Times are compared
   in whole milliseconds and the share exactly, so 152 of 160 is served and 151 of 160 is not.

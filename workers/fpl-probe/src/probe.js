@@ -68,8 +68,8 @@ export const METADATA_LIMIT_BYTES = 1024;
 
 /**
  * The verdict rule, fixed before any data (docs/fpl_forwarder_probe.md): the scheduled standings
- * probes in the first 72 hours from the first of them, both ends included, which is 145 probes at
- * one every 30 minutes. Fewer than VERDICT_MIN_PROBES of them is no verdict.
+ * probes whose cron slot falls in the first 72 hours from the first slot, both ends included,
+ * which is 145 slots at one every 30 minutes. Fewer than VERDICT_MIN_PROBES of them is no verdict.
  */
 export const VERDICT_PERCENT = 95;
 export const VERDICT_HOURS = 72;
@@ -219,14 +219,15 @@ function bodyBytes(body) {
 /**
  * One fetch outcome as the small record the probe stores.
  *
- * The outcome is { at, target, trigger, colo, ms } plus either `error` (the thrown value) or
- * `status`, `contentType` and `body`. The body is read here and dropped: a record keeps its
+ * The outcome is { at, slot, target, trigger, colo, ms } plus either `error` (the thrown
+ * value) or `status`, `contentType` and `body`. The body is read here and dropped: a record keeps its
  * size, whether it parsed as JSON, and, for an answer that is not JSON, the first
  * HEAD_CHARACTERS characters of its text. A JSON answer keeps nothing of its body.
  */
 export function recordFrom(outcome) {
   const base = {
     at: outcome.at,
+    slot: typeof outcome.slot === "string" ? outcome.slot : null,
     trigger: outcome.trigger ?? null,
     target: outcome.target,
   };
@@ -345,19 +346,28 @@ function byTarget(records) {
 }
 
 /**
- * The rule fixed in docs/fpl_forwarder_probe.md, applied to the scheduled standings probes in
- * time order. The window is the first VERDICT_HOURS from the first of them, both ends included,
- * so reading later never moves it. Until a scheduled standings probe exists at or after the
- * window's end the outcome is "pending"; then it is "too few probes" when the window holds
- * fewer than VERDICT_MIN_PROBES, and otherwise "served" or "not served", and it stays so.
- * Times are compared in whole milliseconds and the share in integers, so nothing rounds.
+ * The rule fixed in docs/fpl_forwarder_probe.md, applied to the scheduled standings probes placed
+ * by their cron slot (`slot`, the cron's scheduledTime), never by when each fetch started, so the
+ * jitter of a run's start cannot move a probe in or out. The window is the first VERDICT_HOURS
+ * from the first slot, both ends included, so reading later never moves it. Until a scheduled
+ * standings probe's slot is at or after the window's end the outcome is "pending"; then it is
+ * "too few probes" when the window holds fewer than VERDICT_MIN_PROBES, and otherwise "served"
+ * or "not served", and it stays so. A scheduled record without a slot cannot be placed: it
+ * counts nowhere and is reported as `unslotted`. Times are compared in whole milliseconds and
+ * the share in integers, so nothing rounds.
  */
 export function verdictFor(scheduledStandings) {
   const rule =
-    `served when at least ${VERDICT_PERCENT} percent of the scheduled standings probes in the ` +
-    `first ${VERDICT_HOURS} hours from the first of them answer 200 JSON, with at least ` +
-    `${VERDICT_MIN_PROBES} of the ${VERDICT_EXPECTED_PROBES} expected probes in that window`;
-  if (scheduledStandings.length === 0) {
+    `served when at least ${VERDICT_PERCENT} percent of the scheduled standings probes whose ` +
+    `cron slot falls in the first ${VERDICT_HOURS} hours from the first slot answer 200 JSON, ` +
+    `with at least ${VERDICT_MIN_PROBES} of the ${VERDICT_EXPECTED_PROBES} expected probes in ` +
+    `that window`;
+  const slotOf = (record) => (typeof record.slot === "string" ? Date.parse(record.slot) : NaN);
+  const placed = scheduledStandings
+    .filter((record) => Number.isFinite(slotOf(record)))
+    .sort((left, right) => slotOf(left) - slotOf(right));
+  const unslotted = scheduledStandings.length - placed.length;
+  if (placed.length === 0) {
     return {
       rule,
       window_from: null,
@@ -366,14 +376,15 @@ export function verdictFor(scheduledStandings) {
       window_served: 0,
       share: null,
       min_probes: VERDICT_MIN_PROBES,
+      unslotted,
       outcome: "pending",
     };
   }
-  const fromMs = Date.parse(scheduledStandings[0].at);
+  const fromMs = slotOf(placed[0]);
   const toMs = fromMs + VERDICT_WINDOW_MS;
-  const inWindow = scheduledStandings.filter((record) => Date.parse(record.at) <= toMs);
+  const inWindow = placed.filter((record) => slotOf(record) <= toMs);
   const served = inWindow.filter(isServed).length;
-  const closed = scheduledStandings.some((record) => Date.parse(record.at) >= toMs);
+  const closed = placed.some((record) => slotOf(record) >= toMs);
 
   let outcome = "pending";
   if (closed && inWindow.length < VERDICT_MIN_PROBES) outcome = "too few probes";
@@ -388,6 +399,7 @@ export function verdictFor(scheduledStandings) {
     window_served: served,
     share: Math.round((served / inWindow.length) * 10_000) / 10_000,
     min_probes: VERDICT_MIN_PROBES,
+    unslotted,
     outcome,
   };
 }

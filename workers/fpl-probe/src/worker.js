@@ -75,8 +75,11 @@ async function traceColo() {
   }
 }
 
-/** One request to one target. `cacheTtl: 0` keeps Cloudflare's cache from hiding a refusal. */
-async function probeOne(target, trigger, colo) {
+/**
+ * One request to one target. `cacheTtl: 0` keeps Cloudflare's cache from hiding a refusal.
+ * `slot` is the cron's own time for a scheduled run, and null for a live probe.
+ */
+async function probeOne(target, trigger, colo, slot) {
   const at = new Date().toISOString();
   const started = Date.now();
   try {
@@ -89,6 +92,7 @@ async function probeOne(target, trigger, colo) {
     const body = await response.arrayBuffer();
     return recordFrom({
       at,
+      slot,
       trigger,
       target,
       colo,
@@ -98,7 +102,7 @@ async function probeOne(target, trigger, colo) {
       body,
     });
   } catch (error) {
-    return recordFrom({ at, trigger, target, colo, ms: Date.now() - started, error });
+    return recordFrom({ at, slot, trigger, target, colo, ms: Date.now() - started, error });
   }
 }
 
@@ -117,12 +121,12 @@ async function store(env, key, record) {
 }
 
 /** Every target once, in order, one after another; each record is stored as it arrives. */
-async function probeAll(env, trigger, colo) {
+async function probeAll(env, trigger, colo, slot = null) {
   const runAt = new Date().toISOString();
   const records = [];
   let stored = true;
   for (const [index, target] of TARGETS.entries()) {
-    const record = await probeOne(target, trigger, colo);
+    const record = await probeOne(target, trigger, colo, slot);
     log("probe", record);
     records.push(record);
     stored = (await store(env, recordKey(runAt, index), record)) && stored;
@@ -252,7 +256,12 @@ export function createWorker() {
         return;
       }
       const colo = await traceColo();
-      await probeAll(env, "cron", colo);
+      // The cron's own slot, not the moment a fetch starts: the verdict's window is counted
+      // in slots, so a run that starts late cannot move its probes in or out of it.
+      const slot = Number.isFinite(controller?.scheduledTime)
+        ? new Date(controller.scheduledTime).toISOString()
+        : null;
+      await probeAll(env, "cron", colo, slot);
     },
 
     async fetch(request, env) {
