@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Week live v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contract_version", "season", "gameweek", "source_time", "fixtures", "elements"],
+  "properties": {
+    "contract_version": {"const": "week_live_v1"},
+    "season": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}$"},
+    "gameweek": {"$ref": "#/$defs/gameweek"},
+    "source_time": {"type": "string", "format": "date-time", "pattern": "Z$"},
+    "fixtures": {"type": "array", "items": {"$ref": "#/$defs/fixture"}},
+    "elements": {"type": "array", "items": {"$ref": "#/$defs/element"}},
+    "members": {"type": "array", "items": {"$ref": "#/$defs/memberWeek"}}
+  },
+  "$defs": {
+    "id": {"type": "integer", "minimum": 1, "maximum": 9007199254740991},
+    "gameweek": {"type": "integer", "minimum": 1, "maximum": 38},
+    "fixture": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "home_club", "away_club", "finished"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "home_club": {"$ref": "#/$defs/id"},
+        "away_club": {"$ref": "#/$defs/id"},
+        "finished": {"type": "boolean"}
+      }
+    },
+    "element": {
+      "type": "object", "additionalProperties": false,
+      "required": ["element_id", "points", "minutes", "card_shown"],
+      "properties": {
+        "element_id": {"$ref": "#/$defs/id"},
+        "points": {"type": "integer"},
+        "minutes": {"type": "integer", "minimum": 0},
+        "card_shown": {"type": "boolean"},
+        "position": {"enum": ["GK", "DEF", "MID", "FWD"]},
+        "club": {"$ref": "#/$defs/id"}
+      }
+    },
+    "memberWeek": {
+      "type": "object", "additionalProperties": false,
+      "required": ["entry_id", "gameweek", "pick_order", "captain", "vice", "active_chip", "transfer_cost"],
+      "properties": {
+        "entry_id": {"$ref": "#/$defs/id"},
+        "gameweek": {"$ref": "#/$defs/gameweek"},
+        "pick_order": {
+          "type": "array", "minItems": 15, "maxItems": 15, "uniqueItems": true,
+          "items": {"$ref": "#/$defs/id"}
+        },
+        "captain": {"$ref": "#/$defs/id"},
+        "vice": {"$ref": "#/$defs/id"},
+        "active_chip": {"enum": [null, "3xc", "bboost", "freehit", "wildcard"]},
+        "transfer_cost": {"type": "integer", "minimum": 0},
+        "entry_history_points": {"type": "integer"}
+      }
+    }
+  }
+}
