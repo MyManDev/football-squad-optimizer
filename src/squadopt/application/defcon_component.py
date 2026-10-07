@@ -8,7 +8,12 @@ from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from typing import Any
 
-from squadopt.data.snapshots import CapturedSnapshot, payload_checksum
+from squadopt.data.snapshots import (
+    CapturedSnapshot,
+    build_snapshot_id,
+    payload_checksum,
+    snapshot_fingerprint,
+)
 from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD, live_payload
 from squadopt.data.timestamps import as_instant
 from squadopt.live.recommendation import InSeasonProjection, infer_season, read_inputs
@@ -59,6 +64,26 @@ def payload(snapshot: CapturedSnapshot, name: str) -> Any:
 def identity(snapshot: CapturedSnapshot) -> tuple[dict[str, Any], dict[int, dict[str, Any]]]:
     if snapshot.metadata.source != "fpl-live":
         raise DefconInputError("Only fpl-live input is admitted.")
+    metadata = snapshot.metadata
+    fingerprint = snapshot_fingerprint(
+        source=metadata.source,
+        captured_at_utc=metadata.captured_at_utc,
+        schema_version=metadata.schema_version,
+        checksums=metadata.checksums,
+    )
+    if (
+        metadata.schema_version != "snapshot_v1"
+        or metadata.fingerprint != fingerprint
+        or (
+            metadata.snapshot_id
+            != build_snapshot_id(
+                source=metadata.source,
+                captured_at_utc=metadata.captured_at_utc,
+                fingerprint=fingerprint,
+            )
+        )
+    ):
+        raise DefconInputError("The decision capture metadata fails its identity binding.")
     bootstrap = payload(snapshot, BOOTSTRAP_PAYLOAD)
     if infer_season(snapshot) != DEFCON_SEASON:
         raise DefconInputError("Only 2026-27 is admitted; 2025-26 input is forbidden.")

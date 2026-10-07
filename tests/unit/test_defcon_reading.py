@@ -602,6 +602,17 @@ def test_invalid_roster_and_payload_tampering_are_refused(tmp_path: Path) -> Non
         runner.partial_snapshot(path.parents[1])
 
 
+def test_pure_component_refuses_forged_capture_time_before_reading_payloads(tmp_path: Path) -> None:
+    snapshot = capture(tmp_path)
+    forged = replace(snapshot.metadata, captured_at_utc="2026-09-25T15:00:00Z")
+    with pytest.raises(DefconInputError, match="identity binding"):
+        candidate_handoff(
+            CapturedSnapshot(forged, {}),
+            base(snapshot),
+            declaration_sha256=runner.DECLARATION_SHA256,
+        )
+
+
 def test_missing_settled_fixture_count_marks_whole_week_missing(tmp_path: Path) -> None:
     decision = capture(tmp_path / "decision", double=True)
     outcome = capture(tmp_path / "outcome", final=True)
