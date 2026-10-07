@@ -278,6 +278,94 @@ def test_a_claim_with_an_empty_text_field_is_set_aside_and_the_rest_kept(
         locate_claim_response(response, documents)
 
 
+TWIN = "Saka will miss the next Premier League match."
+
+
+def _with_a_twin(**damage: object) -> ClaimResponse:
+    """Saka's claim and Odegaard's, then a second claim about Saka, changed as given."""
+
+    document = json.loads(_beside_a_good_claim(_response()).text)
+    document["claims"].append(
+        {
+            **document["claims"][0],
+            "disposition": "stated_expected_absent",
+            "quote": TWIN,
+            "fixture_scope": "upcoming_premier_league",
+            **damage,
+        }
+    )
+    return ClaimResponse(
+        text=json.dumps(document), model_identifier="synthetic-stub", model_version="fixture-2"
+    )
+
+
+@pytest.mark.parametrize(
+    "damage,why",
+    [
+        ({"paraphrase": ""}, "must be non-empty text"),
+        ({"speaker": "pundit"}, "outside the closed vocabulary"),
+        ({"quote": "Saka was never quoted saying this."}, "does not appear in the document"),
+    ],
+)
+def test_a_set_aside_claim_takes_its_twin_and_leaves_the_rest(
+    damage: dict[str, object], why: str
+) -> None:
+    """Once one of two claims about a player is set aside, the parser's refusal of a player
+    coded twice no longer sees the pair, so the other would carry his disposition alone. It is
+    set aside too, whichever way its twin went; the club's other claim stays."""
+
+    documents = (_document(f"{QUOTE}\n{GOOD}\n{TWIN}"),)
+    located, dropped = locate_claims_reporting(_with_a_twin(**damage), documents)
+    (claim,) = parse_claim_response(located, documents)
+    assert claim.player_name == "Odegaard"
+    damaged, twin = dropped
+    assert (damaged.player_name, twin.player_name) == ("Saka", "Saka")
+    assert why in damaged.why
+    assert "Another claim about the same player in this response was set aside" in twin.why
+    assert twin.source_url == URL
+
+
+def test_two_kept_claims_about_one_player_still_refuse_the_response() -> None:
+    """Nothing was set aside, so the parser's own rule decides, as before."""
+
+    documents = (_document(f"{QUOTE}\n{GOOD}\n{TWIN}"),)
+    located, dropped = locate_claims_reporting(_with_a_twin(), documents)
+    assert dropped == ()
+    with pytest.raises(ClubNewsError, match="twice"):
+        parse_claim_response(located, documents)
+
+
+def test_a_twin_is_matched_by_the_parser_s_key_not_by_exact_text() -> None:
+    """The parser compares names stripped and casefolded, so the twin rule does too."""
+
+    documents = (_document(f"{QUOTE}\n{GOOD}\n{TWIN}"),)
+    response = _with_a_twin(player_name=" SAKA ", team_name="arsenal", paraphrase="")
+    located, dropped = locate_claims_reporting(response, documents)
+    (claim,) = parse_claim_response(located, documents)
+    assert claim.player_name == "Odegaard"
+    assert [entry.player_name for entry in dropped] == [" SAKA ", "Saka"]
+
+
+def test_a_quote_that_is_not_valid_text_is_set_aside_and_the_rest_kept() -> None:
+    """A lone surrogate decodes from the stored JSON but cannot be encoded, so it can be in no
+    page. It costs that claim; before, it raised out of the locator and took the export."""
+
+    documents = (_document(f"{QUOTE}\n{GOOD}"),)
+    document = json.loads(_beside_a_good_claim(_response()).text)
+    document["claims"][0]["quote"] = QUOTE[:-1] + "\ud800."
+    response = ClaimResponse(
+        text=json.dumps(document), model_identifier="synthetic-stub", model_version="fixture-2"
+    )
+    located, dropped = locate_claims_reporting(response, documents)
+    (claim,) = parse_claim_response(located, documents)
+    assert claim.player_name == "Odegaard"
+    (refused,) = dropped
+    assert refused.player_name == "Saka"
+    assert "not valid Unicode" in refused.why
+    with pytest.raises(ClubNewsError, match="not valid Unicode"):
+        locate_claim_response(response, documents)
+
+
 def test_a_fault_of_the_whole_response_still_refuses_it_rather_than_every_claim() -> None:
     document = json.loads(_beside_a_good_claim(_response()).text)
     document["documents"][0]["published_at_utc"] = None

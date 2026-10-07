@@ -47,7 +47,8 @@ export function solveRequest(
   now: () => number = () => performance.now(),
 ): DevicePlanAnswer {
   if (top100Weight !== 0) {
-    // The weight applies to the one-week pure-points plan only, as on the server.
+    // The device takes a weight on the one-week pure-points plan only. The server also
+    // publishes a rival strategy at a weight; the device declines that by contract.
     if (chip !== null || strategy !== null) {
       throw new DevicePlanRefused("a weight with a chip or a rival strategy", "plan");
     }

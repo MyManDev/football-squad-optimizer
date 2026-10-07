@@ -45,13 +45,17 @@ from squadopt.data.sources.club_news import (
     RawDocument,
 )
 from squadopt.data.sources.club_news_metadata import PublicationMetadata, publication_metadata
-from squadopt.data.sources.club_news_scope import FIXTURE_SCOPES, verified_fixture_scope
+from squadopt.data.sources.club_news_scope import (
+    FIXTURE_SCOPES,
+    is_whole_sentence,
+    verified_fixture_scope,
+)
 from squadopt.data.timestamps import normalize_utc_timestamp
 
 #: This parser's own contract, separate from the response format's. The response format is
 #: what a model is asked to produce; this is what the parser produces from it, and the two
 #: can move independently.
-CLAIM_PARSE_CONTRACT_VERSION: Final = "rotation_claim_parse_v3"
+CLAIM_PARSE_CONTRACT_VERSION: Final = "rotation_claim_parse_v4"
 
 #: Keys a claim must carry. ``paraphrase`` is required and then discarded -- see the module
 #: docstring. A response missing any of these is a different format, not a sparse one.
@@ -397,7 +401,14 @@ def parse_claim_response(
             scope, checked = verified_fixture_scope(
                 content[span_start:span_end], disposition, player_name=player_name
             )
-            scope_verified = checked and scope == declared_scope
+            # The scope rule reads the quote alone, so the span must also be a whole
+            # sentence of the bytes it indexes, or the source may say something else. The
+            # label keeps what the quote's wording says; only the flag is withheld.
+            scope_verified = (
+                checked
+                and scope == declared_scope
+                and is_whole_sentence(content, span_start, span_end)
+            )
             if scope != declared_scope:
                 scope = "ambiguous"
             metadata = publications[source_url]

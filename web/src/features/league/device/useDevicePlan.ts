@@ -3,8 +3,8 @@
  *
  * Offered for the selections the published inputs describe (`selection.ts`): this
  * member's plain pure-points plan over one week, from the fifteen the page shows, with a
- * chip the member still holds played that week, or a rival strategy against a named rival
- * whose entry document gives their eleven. The shared document (and the rival's) is read
+ * chip the member still holds played that week, a rival strategy against a named rival
+ * whose entry document gives their eleven, or a Top 100 weight the member block names. The shared document (and the rival's) is read
  * when the member asks, the solve runs in a worker, and the answer is shown as the advice
  * document the page already reads. A new selection starts clean.
  */
