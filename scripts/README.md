@@ -58,6 +58,7 @@ Date is the file's last commit (`git log -1 --format=%as -- scripts/<name>.py`).
 | `measure_capture_lead_time.py` | measurement runner | `docs/capture_lead_time.json`; also `docs/weekly_runbook.md` | 2026-09-08 |
 | `measure_capture_season_phase.py` | measurement runner | `docs/capture_season_phase.json` | 2026-09-08 |
 | `measure_component_fidelity.py` | measurement runner | `docs/phase_d_component_fidelity.json` | 2026-09-07 |
+| `measure_defcon_component.py` | measurement runner | outcome-free identity check; one owner-authorized `docs/research/defcon_component_reading.{json,md}` record under #1000 | 2026-10-08 |
 | `measure_double_reduction.py` | measurement runner | `docs/double_reduction.json`, `docs/double_reduction.md` | 2026-09-25 |
 | `measure_export_precision.py` | measurement runner | `docs/export_precision.json` | 2026-08-16 |
 | `measure_in_season_blend.py` | measurement runner | `docs/in_season_blend_benchmark.json` | 2026-08-23 |
