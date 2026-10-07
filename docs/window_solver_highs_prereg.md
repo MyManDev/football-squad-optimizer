@@ -39,6 +39,12 @@ solves should move from CP-SAT to HiGHS.
   deterministic budget. It also exported both windows' hold and primary models as MPS, and
   the exporter's first check passed on all four. No threshold changed after it, and no
   HiGHS solve of any instance has run.
+- After that check and before any HiGHS solve, on 7 October, the readings the runner
+  would otherwise have chosen were written into this protocol: the hold floor, a run's
+  time and budget, CP-SAT's model build time, the thread count, the sell-on fee, check
+  2's comparison, a run with no solution and CP-SAT's proofs. One adds to what HiGHS
+  gets: each HiGHS primary starts from its own hold solution, as the planner starts
+  CP-SAT's. None changes a threshold.
 
 ## Instances
 
@@ -61,6 +67,10 @@ solves should move from CP-SAT to HiGHS.
   `fixture_football_candidate`, as for the published member-menu windows, whose stated
   limits repeat the first week's projection. The football windows' guarded, expected and
   observed route is not measured. The planner code is read, never changed.
+- **Sell-on fee:** the three inputs do not publish it, so the runner sets the game's 0.5.
+  At the flat captured prices it does not enter the model: each held player's selling
+  price is in the member's `device_plan` block, and a player bought inside the window
+  sells for what was paid, whatever the fee.
 - **Rebuild check:** before any timing, the runner rebuilds each member's one-week problem
   from the same inputs and solves it on CP-SAT. The moves, the eleven and the captain must
   equal the published `saf-puan/1.json` for all 15 members, or the run stops with no
@@ -81,19 +91,35 @@ solves should move from CP-SAT to HiGHS.
 - **HiGHS wasm**, the `highs` 1.15.3 package `web/package.json` pins, under Node 22, one
   thread, loaded as the device's tests load it.
 - **Versions:** the HiGHS core version each build reports at run time is recorded, and the
-  native and wasm runs count as one version only if the two reports match.
+  native and wasm runs count as one version only if the two reports match. Each solve
+  also records the thread count its build reports back, or none where the build's API
+  reports none.
 - **Gaps:** both HiGHS builds use `mip_rel_gap` 0 and `mip_abs_gap` 0.5 on the objective's
   integer scale (below one millionth of a point). On an integer objective this is the same
   proof as the device's own setting of 0.
-- **Hold floor:** each solver computes the hold model's optimum itself, inside its timed
-  budget, and floors the primary at it, as CP-SAT's hold probe does. No solver takes
-  another's value or hint.
+- **Hold floor and start:** each solver computes the hold model's optimum itself, inside
+  its timed budget, and floors the primary at it, as CP-SAT's hold probe does. No solver
+  takes another's value or hint.
+  - A HiGHS run floors its primary at the primary objective of its own hold solution,
+    rounded to integers and recomputed exactly.
+  - It also starts its primary from that whole solution, as the planner hints CP-SAT's
+    primary with the probe's solution. The hold and primary MPS share their columns, the
+    auxiliary ones included.
+  - When its hold solve returns no solution, its primary runs with no floor and no start.
 - **Two runs per build:** each instance runs twice on each HiGHS build. One run is limited
   to the wall time CP-SAT spent on that instance; the other has the 1,800 s ceiling.
 - **Time:** time is `perf_counter` around the solve calls of the hold model and the primary,
   excluding the model build, the MPS read and the module load, each recorded apart. For
   CP-SAT that is the hold probe and the primary solve of the reference run. A CP-SAT run
   stopped by the wall ceiling counts as not proved, and HiGHS then gets 1,800 s.
+  - A run's time is its hold solve plus its primary solve. The floor row and the start
+    are set before the primary's clock starts, and their time is recorded apart.
+  - The wall-matched budget is CP-SAT's hold probe plus primary solve time on the
+    reference run. A HiGHS primary gets what its own hold solve left of the budget, and
+    a run whose hold solve spends it all has no primary.
+  - CP-SAT's model build time is the planner call's wall time less every captured solve,
+    the tie-break's included, and less the capture's own model copies. It also holds the
+    planner's reading of its answer.
 - **Primary only:** the primary solve is measured, not the tie-break. CP-SAT's tie-break
   weights rank sums at magnitudes no floating-point MILP holds exactly, so plans are
   compared by their primary value, never by identity.
@@ -114,6 +140,8 @@ Before any timing counts:
    feasible there and gives the same primary value.
 
 If either check fails on any run, the exporter is wrong and the run stops with no verdict.
+Check 2 compares CP-SAT's objective at the fixed point with the MPS objective evaluated
+exactly at the same rounded point; the objective HiGHS reports is recorded beside them.
 
 Values are compared after rounding a HiGHS solution to integers and recomputing the
 primary exactly; two values agree when they differ by at most 1,000 units (0.001 points).
@@ -156,7 +184,16 @@ crash counts as not proved.
 
   Otherwise "the server stays on CP-SAT".
 
-No run substitutes for another.
+No run substitutes for another. The conditions read the runs this way:
+
+- CP-SAT proves an instance when the reference run's primary solve is OPTIMAL. The
+  five-week instances CP-SAT's rerun leaves FEASIBLE are those whose reference plan is
+  FEASIBLE.
+- A HiGHS run whose primary returns no solution, or that has no primary, keeps its own
+  hold plan's value, as the planner keeps CP-SAT's hold plan, and is not proved.
+- In the server's third condition, a value is below CP-SAT's when it is lower by more
+  than the 1,000 units of agreement. A HiGHS native run that ends with no value, through
+  no solution, an error or a crash, counts as below.
 
 ## What a result licenses
 
