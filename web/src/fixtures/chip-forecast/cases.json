@@ -1,11 +1,6 @@
 {
   "constants": {
-    "chip_names": [
-      "wildcard",
-      "freehit",
-      "bboost",
-      "3xc"
-    ],
+    "chip_names": ["wildcard", "freehit", "bboost", "3xc"],
     "holding_values": {
       "bboost": 20.0,
       "3xc": 18.0,
@@ -308,12 +303,7 @@
               "gameweek": 7,
               "estimated_gain": 8.0,
               "threshold": 2.857142857142857,
-              "player_ids": [
-                112,
-                113,
-                114,
-                115
-              ]
+              "player_ids": [112, 113, 114, 115]
             },
             "structured_gameweeks": null
           },
@@ -333,9 +323,7 @@
               "gameweek": 7,
               "estimated_gain": 8.0,
               "threshold": 2.5714285714285716,
-              "player_ids": [
-                101
-              ]
+              "player_ids": [101]
             },
             "structured_gameweeks": null
           }
@@ -586,9 +574,7 @@
         "threshold_policy": "decaying",
         "reserve": false,
         "later_week_basis": "this_week_projection_scaled_by_relative_fixture_count_v1",
-        "players_without_fixture_this_week": [
-          101
-        ],
+        "players_without_fixture_this_week": [101],
         "chips": [
           {
             "name": "wildcard",
@@ -642,12 +628,7 @@
               "gameweek": 7,
               "estimated_gain": 8.0,
               "threshold": 2.857142857142857,
-              "player_ids": [
-                112,
-                113,
-                114,
-                115
-              ]
+              "player_ids": [112, 113, 114, 115]
             },
             "structured_gameweeks": null
           },
@@ -667,9 +648,7 @@
               "gameweek": 7,
               "estimated_gain": 4.0,
               "threshold": 2.5714285714285716,
-              "player_ids": [
-                102
-              ]
+              "player_ids": [102]
             },
             "structured_gameweeks": null
           }
@@ -968,12 +947,7 @@
               "gameweek": 8,
               "estimated_gain": 8.0,
               "threshold": 0.0,
-              "player_ids": [
-                112,
-                113,
-                114,
-                115
-              ]
+              "player_ids": [112, 113, 114, 115]
             },
             "structured_gameweeks": null
           },
@@ -993,9 +967,7 @@
               "gameweek": 7,
               "estimated_gain": 8.0,
               "threshold": 2.5714285714285716,
-              "player_ids": [
-                101
-              ]
+              "player_ids": [101]
             },
             "structured_gameweeks": null
           }
@@ -1294,12 +1266,7 @@
               "gameweek": 8,
               "estimated_gain": 8.0,
               "threshold": 0.0,
-              "player_ids": [
-                112,
-                113,
-                114,
-                115
-              ]
+              "player_ids": [112, 113, 114, 115]
             },
             "structured_gameweeks": null
           },
@@ -1319,9 +1286,7 @@
               "gameweek": 7,
               "estimated_gain": 8.0,
               "threshold": 2.5714285714285716,
-              "player_ids": [
-                101
-              ]
+              "player_ids": [101]
             },
             "structured_gameweeks": null
           }
@@ -1900,9 +1865,7 @@
               "gameweek": 7,
               "estimated_gain": 24.0,
               "threshold": 18.0,
-              "player_ids": [
-                101
-              ]
+              "player_ids": [101]
             },
             "structured_gameweeks": null
           }
@@ -2819,12 +2782,7 @@
               "gameweek": 7,
               "estimated_gain": 8.0,
               "threshold": 2.857142857142857,
-              "player_ids": [
-                112,
-                113,
-                114,
-                115
-              ]
+              "player_ids": [112, 113, 114, 115]
             },
             "structured_gameweeks": null
           },
@@ -2844,9 +2802,7 @@
               "gameweek": 7,
               "estimated_gain": 8.0,
               "threshold": 2.5714285714285716,
-              "player_ids": [
-                101
-              ]
+              "player_ids": [101]
             },
             "structured_gameweeks": null
           }
@@ -3097,12 +3053,7 @@
         "threshold_policy": "decaying",
         "reserve": false,
         "later_week_basis": "this_week_projection_scaled_by_relative_fixture_count_v1",
-        "players_without_fixture_this_week": [
-          112,
-          113,
-          114,
-          115
-        ],
+        "players_without_fixture_this_week": [112, 113, 114, 115],
         "chips": [
           {
             "name": "wildcard",
@@ -3165,9 +3116,7 @@
               "gameweek": 7,
               "estimated_gain": 8.0,
               "threshold": 2.5714285714285716,
-              "player_ids": [
-                101
-              ]
+              "player_ids": [101]
             },
             "structured_gameweeks": null
           }
@@ -3725,12 +3674,7 @@
               "gameweek": 7,
               "estimated_gain": 8.0,
               "threshold": 2.857142857142857,
-              "player_ids": [
-                112,
-                113,
-                114,
-                115
-              ]
+              "player_ids": [112, 113, 114, 115]
             },
             "structured_gameweeks": null
           },
@@ -3750,9 +3694,7 @@
               "gameweek": 7,
               "estimated_gain": 8.0,
               "threshold": 2.5714285714285716,
-              "player_ids": [
-                101
-              ]
+              "player_ids": [101]
             },
             "structured_gameweeks": null
           }
@@ -4360,12 +4302,7 @@
               "gameweek": 7,
               "estimated_gain": 8.0,
               "threshold": 2.857142857142857,
-              "player_ids": [
-                112,
-                113,
-                114,
-                115
-              ]
+              "player_ids": [112, 113, 114, 115]
             },
             "structured_gameweeks": null
           },
@@ -4385,9 +4322,7 @@
               "gameweek": 7,
               "estimated_gain": 8.0,
               "threshold": 2.5714285714285716,
-              "player_ids": [
-                101
-              ]
+              "player_ids": [101]
             },
             "structured_gameweeks": null
           }
