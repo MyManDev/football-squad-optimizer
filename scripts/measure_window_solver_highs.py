@@ -37,6 +37,7 @@ import os
 import platform
 import subprocess
 import sys
+import uuid
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, field, replace
@@ -162,8 +163,9 @@ READINGS: Final = (
     "CP-SAT proves an instance when the reference run's primary solve is OPTIMAL. The "
     "five-week instances CP-SAT's rerun leaves FEASIBLE are those whose reference plan is "
     "FEASIBLE.",
-    "A HiGHS native run that ends the 1,800 s run with no solution counts, for the server's "
-    "third condition, as ending below CP-SAT's value.",
+    "In the server's third condition, a value is below CP-SAT's when it is lower by more "
+    "than the 1,000 units of agreement. A HiGHS native run that ends with no value, through "
+    "no solution, an error or a crash, counts as below.",
     "Check 2 compares CP-SAT's objective at the fixed point with the MPS objective evaluated "
     "exactly at the same rounded point; the objective HiGHS reports is recorded beside them.",
     "The sell-on fee is the game's 0.5. The three input documents do not publish it; at the "
@@ -179,6 +181,20 @@ READINGS: Final = (
     "Both HiGHS builds run on one thread: the native build is set to one, and the wasm build "
     "is single-threaded and refuses a thread option. Each solve records the thread count its "
     "build reports back, or none where the build's API reports none.",
+)
+
+
+#: The runner file this process loaded; a native child must report the same digest.
+RUNNER_SHA256: Final = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+#: Driver failures that mean the solve never started, which stop the run rather than
+#: scoring as a HiGHS error.
+SETUP_FAILURES: Final = (
+    "ModuleNotFoundError",
+    "ImportError",
+    "ERR_MODULE_NOT_FOUND",
+    "Cannot find module",
+    "FileNotFoundError",
+    "ENOENT",
 )
 
 
@@ -246,6 +262,11 @@ def load_inputs(
     """Read the three committed inputs, refusing any from another capture."""
 
     plan_path = league_dir / "device-plan.json"
+    if not plan_path.is_file():
+        raise ProtocolRefusal(
+            f"{plan_path} is missing: the committed tree has moved past {CAPTURE}. Measure "
+            "from the runner's merge commit, whose tree holds it."
+        )
     table = _payload(plan_path)
     require_capture(plan_path, table)
     members: dict[int, Mapping[str, Any]] = {}
@@ -1586,7 +1607,8 @@ def export_instance(instance: Instance, out_dir: Path) -> dict[str, Any]:
     ):
         milp = export_milp(proto, f"{stem}-{part}")
         path = out_dir / f"{stem}-{part}.mps"
-        path.write_text(write_mps(milp), encoding="utf-8")
+        # LF on every platform, so the sha256 in the record is reproducible anywhere.
+        path.write_bytes(write_mps(milp).encode("utf-8"))
         parsed = read_mps(path.read_text(encoding="utf-8"))
         if not solve.has_solution or solve.objective_value is None:
             check: dict[str, Any] = {"passed": False, "reason": "CP-SAT returned no solution"}
@@ -1816,6 +1838,13 @@ def _option_value(highs: Any, name: str) -> Any:
     return value[-1] if isinstance(value, tuple) else value
 
 
+def _finite(value: float) -> float | None:
+    """A bound HiGHS has not computed is infinite; the record holds None, as the wasm
+    build's JSON does."""
+
+    return value if math.isfinite(value) else None
+
+
 def _native_solve(
     highspy: Any,
     path: str,
@@ -1868,7 +1897,7 @@ def _native_solve(
         "start_status": start_status,
         "seconds": seconds,
         "primal_solution_status": primal,
-        "bound": float(info.mip_dual_bound),
+        "bound": _finite(float(info.mip_dual_bound)),
         "threads": int(_option_value(highs, "threads")),
     }
     if primal == HIGHS_PRIMAL_FEASIBLE:
@@ -1895,6 +1924,8 @@ def native_run(job: Mapping[str, Any]) -> dict[str, Any]:
     hold = _native_solve(highspy, str(job["hold_mps"]), budget, None)
     result: dict[str, Any] = {
         "build": "native",
+        "nonce": job.get("nonce"),
+        "runner_sha256": RUNNER_SHA256,
         "core_version": _native_version(highspy),
         "load_seconds": load_seconds,
         "hold": {key: value for key, value in hold.items() if key != "solution"},
@@ -1939,6 +1970,7 @@ const load = (await import(entry)).default;
 const highs = await load({ wasmBinary });
 const result = {
   build: "wasm",
+  nonce: job.nonce ?? null,
   package_version: manifest.version,
   core_version: highs.version.string,
   node_version: process.version,
@@ -2038,7 +2070,9 @@ class DriverFailed(Exception):
     """A HiGHS child process ended without an answer: an error or a crash, not a proof."""
 
 
-def _child(command: Sequence[str], out_path: Path, *, timeout: float) -> dict[str, Any]:
+def _child(
+    command: Sequence[str], out_path: Path, *, timeout: float, nonce: str | None = None
+) -> dict[str, Any]:
     out_path.unlink(missing_ok=True)
     try:
         completed = subprocess.run(
@@ -2057,6 +2091,11 @@ def _child(command: Sequence[str], out_path: Path, *, timeout: float) -> dict[st
         result: dict[str, Any] = json.loads(out_path.read_text(encoding="utf-8"))
     except ValueError as error:
         raise DriverFailed(f"unreadable answer: {error}") from error
+    if nonce is not None and result.get("nonce") != nonce:
+        raise ProtocolRefusal(
+            f"{out_path.name} is not this run's answer (nonce {result.get('nonce')!r}); another "
+            "process is using this artifact directory. No verdict."
+        )
     return result
 
 
@@ -2070,7 +2109,7 @@ def _run_wasm_driver(
     out_path = ARTIFACT_DIR / "wasm_result.json"
     job_path.write_text(json.dumps(job), encoding="utf-8")
     command = [node, str(driver), str(web_dir), str(job_path), str(out_path)]
-    return _child(command, out_path, timeout=timeout)
+    return _child(command, out_path, timeout=timeout, nonce=job.get("nonce"))
 
 
 def _run_native_child(job: Mapping[str, Any], *, timeout: float) -> dict[str, Any]:
@@ -2088,7 +2127,13 @@ def _run_native_child(job: Mapping[str, Any], *, timeout: float) -> dict[str, An
         "--out",
         str(out_path),
     ]
-    return _child(command, out_path, timeout=timeout)
+    result = _child(command, out_path, timeout=timeout, nonce=job.get("nonce"))
+    if result.get("runner_sha256") != RUNNER_SHA256:
+        raise ProtocolRefusal(
+            "The native child ran another runner file than this run started with; the "
+            "runner changed on disk during the run. No verdict."
+        )
+    return result
 
 
 def solve_job(
@@ -2102,6 +2147,7 @@ def solve_job(
 
     return {
         "mode": "solve",
+        "nonce": uuid.uuid4().hex,
         "hold_mps": str(hold_mps),
         "primary_mps": str(primary_mps),
         "budget_seconds": float(budget),
@@ -2243,7 +2289,7 @@ def preflight_driver(build: Callable[[Mapping[str, Any]], Mapping[str, Any]], na
     for part, hold in (("hold", True), ("primary", False)):
         milps[part] = export_milp(_toy_model(hold).proto, f"preflight-{part}")
         paths[part] = ARTIFACT_DIR / f"preflight-{part}.mps"
-        paths[part].write_text(write_mps(milps[part]), encoding="utf-8")
+        paths[part].write_bytes(write_mps(milps[part]).encode("utf-8"))
     primary = _toy_model(False)
     solver = cp_model.CpSolver()
     solver.parameters.num_search_workers = 1
@@ -2427,12 +2473,59 @@ def _highs_run(
             return _run_native_child(job, timeout=timeout), None
         return _run_wasm_driver(node, job, WEB_DIR, timeout=timeout), None
     except DriverFailed as error:
+        if any(marker in str(error) for marker in SETUP_FAILURES):
+            raise ProtocolRefusal(
+                f"The {build} driver could not start its solve, so nothing was measured: {error}"
+            ) from error
         return None, str(error)
 
 
-def run_measure(node: str, versions: Mapping[str, Any], out_dir: Path) -> dict[str, Any]:
-    """The declared runs, in order, one solve at a time; the record is returned, not written."""
+def require_code_from_this_tree() -> None:
+    """Refuse unless the planner measured is this tree's. The venv's editable install may
+    point at another checkout, and only PYTHONPATH puts this tree's ``src`` first."""
 
+    found = Path(importlib.import_module("squadopt").__file__ or "").resolve()
+    src = (REPOSITORY_ROOT / "src").resolve()
+    if not found.is_relative_to(src):
+        raise ProtocolRefusal(
+            f"squadopt is imported from {found.parent}, not from {src}. Put this tree's "
+            "src first on PYTHONPATH."
+        )
+
+
+def run_measure(node: str, versions: Mapping[str, Any], out_dir: Path) -> dict[str, Any]:
+    """The declared runs, in order, one solve at a time; the record is returned, not written.
+
+    One measure at a time: a lock file in the artifact directory refuses a second.
+    """
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    lock = out_dir / "measure.lock"
+    try:
+        lock.open("x", encoding="utf-8").close()
+    except FileExistsError as error:
+        raise ProtocolRefusal(
+            f"{lock} exists: another measure is running here, or one stopped without "
+            "removing it. Remove it only when no measure is running."
+        ) from error
+    try:
+        return _measure_locked(node, versions, out_dir)
+    finally:
+        lock.unlink(missing_ok=True)
+
+
+def _stamp(moment: datetime) -> str:
+    return moment.isoformat(timespec="seconds")
+
+
+def _measure_locked(node: str, versions: Mapping[str, Any], out_dir: Path) -> dict[str, Any]:
+    started = datetime.now(UTC)
+    require_code_from_this_tree()
+    revision, dirty = _git_revision()
+    if dirty:
+        raise ProtocolRefusal(
+            "The working tree has uncommitted changes; measure runs only from a clean commit."
+        )
     inputs = load_inputs()
     members = sorted(inputs.members)
     preflight_horizon = PREFLIGHT_TIMEOUT_SECONDS + SOLVE_MARGIN_SECONDS
@@ -2450,12 +2543,12 @@ def run_measure(node: str, versions: Mapping[str, Any], out_dir: Path) -> dict[s
     rebuild = [rebuild_check(inputs, entry) for entry in members]
     if not all(row["passed"] for row in rebuild):
         raise ProtocolRefusal("The one-week rebuild differs from the publication; no verdict.")
-    progress = out_dir / "progress.jsonl"
-    out_dir.mkdir(parents=True, exist_ok=True)
-    progress.unlink(missing_ok=True)
+    # Named by the run's start, so a later run never deletes an earlier one's rows.
+    progress = out_dir / f"progress-{started:%Y%m%dT%H%M%SZ}.jsonl"
     instances: list[dict[str, Any]] = []
     for entry in members:
         for window in WINDOWS:
+            instance_started = datetime.now(UTC)
             reference = solve_instance(inputs, entry, window)
             repeat = solve_instance(inputs, entry, window)
             first = cp_sat_record(reference, with_time=True)
@@ -2490,6 +2583,7 @@ def run_measure(node: str, versions: Mapping[str, Any], out_dir: Path) -> dict[s
             row: dict[str, Any] = {
                 "entry_id": entry,
                 "window": window,
+                "started_at_utc": _stamp(instance_started),
                 "cp_sat": {**first, "repeat": second},
                 "export": export,
                 "highs": runs,
@@ -2500,10 +2594,11 @@ def run_measure(node: str, versions: Mapping[str, Any], out_dir: Path) -> dict[s
                     None if first["value"] is None else first["value"] - published["value"]
                 )
                 row["published"] = published
+            row["finished_at_utc"] = _stamp(datetime.now(UTC))
             instances.append(row)
             with progress.open("a", encoding="utf-8") as handle:
                 handle.write(json.dumps(row, default=str) + "\n")
-    revision, dirty = _git_revision()
+    head_at_end, dirty_at_end = _git_revision()
     return {
         "contract_version": CONTRACT_VERSION,
         "protocol": PROTOCOL,
@@ -2511,6 +2606,11 @@ def run_measure(node: str, versions: Mapping[str, Any], out_dir: Path) -> dict[s
         "capture": CAPTURE,
         "repository_commit": revision,
         "working_tree_dirty": dirty,
+        "head_at_end": head_at_end,
+        "dirty_at_end": dirty_at_end,
+        "started_at_utc": _stamp(started),
+        "finished_at_utc": _stamp(datetime.now(UTC)),
+        "runner_sha256": RUNNER_SHA256,
         "machine": machine_record(),
         "versions": {
             "ortools": importlib.import_module("ortools").__version__,

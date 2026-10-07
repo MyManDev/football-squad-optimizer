@@ -41,6 +41,25 @@ from squadopt.live.transfers import plan_transfers
 window_world = window_world_fixture  # re-register the shared window world here
 
 
+def _the_tree_is_the_protocols() -> bool:
+    """Whether the committed site tree is still the capture the protocol measures."""
+
+    plan = runner.LEAGUE_DIR / "device-plan.json"
+    if not plan.is_file():
+        return False
+    document = json.loads(plan.read_text(encoding="utf-8"))
+    return document.get("payload", document).get("source_snapshot_id") == runner.CAPTURE
+
+
+#: A later publish replaces the committed tree; the measurement reads it at the runner's
+#: merge commit, and these tests have nothing left to read.
+READS_THE_TREE = pytest.mark.skipif(
+    not _the_tree_is_the_protocols(),
+    reason=f"The committed site tree is no longer capture {runner.CAPTURE}; the measurement "
+    "reads it at the runner's merge commit.",
+)
+
+
 # --------------------------------------------------------------------------------------
 # Synthetic models, one per constraint kind the exporter translates.
 
@@ -656,7 +675,7 @@ class _FakeHighs:
         found = self.answer is not None
         return SimpleNamespace(
             primal_solution_status=runner.HIGHS_PRIMAL_FEASIBLE if found else 0,
-            mip_dual_bound=0.0,
+            mip_dual_bound=0.0 if found else math.inf,
             objective_function_value=0.0,
         )
 
@@ -708,6 +727,9 @@ def test_a_native_primary_without_a_hold_solution_has_no_floor_and_no_start(
     assert log == [("read", "h.mps"), ("run",), ("read", "p.mps"), ("run",)]
     assert result["floor"] is None
     assert result["primary"]["start_status"] is None
+    # An infinite bound is recorded as None, as the wasm build's JSON writes it.
+    assert result["hold"]["bound"] is None
+    assert result["primary"]["bound"] == 0.0
 
 
 def test_the_wasm_primary_starts_from_its_own_rounded_hold_solution() -> None:
@@ -736,6 +758,7 @@ def test_both_builds_are_set_to_one_thread_and_report_what_they_use() -> None:
 # The committed inputs and the capture.
 
 
+@READS_THE_TREE
 def test_the_committed_inputs_are_the_protocol_s_capture() -> None:
     inputs = runner.load_inputs()
     assert len(inputs.members) == 15
@@ -761,6 +784,7 @@ def _restamp(path: Path, capture: str) -> None:
     path.write_text(json.dumps(document), encoding="utf-8")
 
 
+@READS_THE_TREE
 @pytest.mark.parametrize("which", ["device-plan", "entry", "fixtures"])
 def test_an_input_from_another_capture_is_refused(tmp_path: Path, which: str) -> None:
     league, fixtures = _copy_inputs(tmp_path)
@@ -775,6 +799,7 @@ def test_an_input_from_another_capture_is_refused(tmp_path: Path, which: str) ->
         runner.load_inputs(league, fixtures)
 
 
+@READS_THE_TREE
 def test_published_advice_from_another_capture_is_refused(tmp_path: Path) -> None:
     league, fixtures = _copy_inputs(tmp_path)
     inputs = runner.load_inputs(league, fixtures)
@@ -797,6 +822,7 @@ def _solved(call: runner.PlannerCall) -> Any:
     raise _Stop
 
 
+@READS_THE_TREE
 def test_the_cp_sat_wall_bounds_are_the_planner_s_stops() -> None:
     inputs = runner.load_inputs()
     entry = sorted(inputs.members)[0]
@@ -806,6 +832,7 @@ def test_the_cp_sat_wall_bounds_are_the_planner_s_stops() -> None:
     assert runner.cp_sat_wall_bound(runner.window_call(inputs, entry, 5)) == 3630.0
 
 
+@READS_THE_TREE
 @pytest.mark.parametrize("hour", [23, 9])
 def test_no_cp_sat_run_starts_that_could_reach_a_blocked_day(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, hour: int
@@ -826,6 +853,7 @@ def test_no_cp_sat_run_starts_that_could_reach_a_blocked_day(
         runner.run_check(entry, tmp_path)
 
 
+@READS_THE_TREE
 def test_a_cp_sat_run_that_ends_before_the_blocked_days_starts(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -909,6 +937,7 @@ def test_the_window_call_is_the_one_solve_window_plan_makes(
     assert call.linearization_level == 2 and call.protect_hold is True
 
 
+@READS_THE_TREE
 def test_the_later_weeks_follow_the_horizon_s_calendar_rule() -> None:
     """A double, a blank and a flat club: the runner's weeks are ``live/horizon.py``'s rows.
 
@@ -1102,6 +1131,9 @@ def test_the_world_window_exports_and_passes_check_one(world_instance: runner.In
     assert export["hold"]["rows"] > export["primary"]["rows"]
     assert export["primary"]["check_1"]["solution_from"] == "primary"
     assert {"linear", "lin_max"} <= set(export["primary"]["constraint_kinds"])
+    assert world_instance.hold_mps is not None and world_instance.primary_mps is not None
+    for mps in (world_instance.hold_mps, world_instance.primary_mps):
+        assert b"\r\n" not in mps.read_bytes(), mps  # the sha256 is the same everywhere
 
 
 def _milp_point(instance: runner.Instance, solution: tuple[int, ...], proto: Any) -> list[float]:
@@ -1346,6 +1378,7 @@ def _measure(
     inputs = runner.PublishedInputs({}, {1: {}, 2: {}}, {}, Path("unused"))
     monkeypatch.setattr(runner, "load_inputs", lambda: inputs)
     monkeypatch.setattr(runner, "datetime", _clock(moment))
+    monkeypatch.setattr(runner, "_git_revision", lambda: ("a" * 40, False))
     monkeypatch.setattr(
         runner, "preflight_driver", lambda build, name: seen.preflights.append(name)
     )
@@ -1411,7 +1444,134 @@ def test_the_measure_runs_each_instance_in_the_declared_order_and_budgets(
     assert rows[(1, 3)]["highs"]["native"]["wall_matched"]["budget_seconds"] == 12.5
     assert "published" in rows[(1, 3)] and "published" not in rows[(1, 5)]
     assert record["budgets"]["highs_threads_set"] == 1
-    assert len((tmp_path / "progress.jsonl").read_text(encoding="utf-8").splitlines()) == 4
+    (progress,) = tmp_path.glob("progress-*.jsonl")
+    assert len(progress.read_text(encoding="utf-8").splitlines()) == 4
+    assert record["repository_commit"] == "a" * 40 and record["working_tree_dirty"] is False
+    assert record["head_at_end"] == "a" * 40 and record["dirty_at_end"] is False
+    assert record["started_at_utc"] and record["finished_at_utc"]
+    assert record["runner_sha256"] == runner.RUNNER_SHA256
+    assert all(row["started_at_utc"] and row["finished_at_utc"] for row in record["instances"])
+    assert not (tmp_path / "measure.lock").exists()
+
+
+def test_a_later_run_keeps_an_earlier_run_s_progress(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    earlier = tmp_path / "progress-20261007T150000Z.jsonl"
+    earlier.write_text("{}\n", encoding="utf-8")
+    _measure(monkeypatch)
+    runner.run_measure("node", GOOD_VERSIONS, tmp_path)
+    assert earlier.read_text(encoding="utf-8") == "{}\n"
+    assert len(list(tmp_path.glob("progress-*.jsonl"))) == 2
+
+
+def test_the_measure_refuses_a_tree_with_uncommitted_changes(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    seen = _measure(monkeypatch)
+    monkeypatch.setattr(runner, "_git_revision", lambda: ("a" * 40, True))
+    with pytest.raises(runner.ProtocolRefusal, match="uncommitted"):
+        runner.run_measure("node", GOOD_VERSIONS, tmp_path)
+    assert seen.preflights == [] and seen.cp_sat_runs == []
+    assert not (tmp_path / "measure.lock").exists()
+
+
+def test_a_second_measure_in_the_same_directory_is_refused(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    seen = _measure(monkeypatch)
+    (tmp_path / "measure.lock").write_text("", encoding="utf-8")
+    with pytest.raises(runner.ProtocolRefusal, match="another measure"):
+        runner.run_measure("node", GOOD_VERSIONS, tmp_path)
+    assert seen.preflights == [] and seen.cp_sat_runs == []
+    assert (tmp_path / "measure.lock").exists()  # the other run's lock stays
+
+
+def test_the_measure_refuses_a_planner_from_another_tree(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    seen = _measure(monkeypatch)
+    monkeypatch.setattr(runner, "REPOSITORY_ROOT", tmp_path / "another-checkout")
+    with pytest.raises(runner.ProtocolRefusal, match="squadopt is imported from"):
+        runner.run_measure("node", GOOD_VERSIONS, tmp_path)
+    assert seen.preflights == [] and seen.cp_sat_runs == []
+
+
+def test_a_missing_site_tree_is_a_refusal_that_names_the_commit(tmp_path: Path) -> None:
+    with pytest.raises(runner.ProtocolRefusal, match="merge commit"):
+        runner.load_inputs(tmp_path / "league", tmp_path / "fixtures.json")
+
+
+def _instance_for_runs() -> Any:
+    return SimpleNamespace(
+        hold_mps=Path("h.mps"),
+        primary_mps=Path("p.mps"),
+        primary_milp=SimpleNamespace(objective={0: 1}),
+    )
+
+
+def test_a_driver_that_could_not_start_stops_the_run(monkeypatch: pytest.MonkeyPatch) -> None:
+    def missing(job: Any, *, timeout: float) -> Any:
+        raise runner.DriverFailed("exit 1: ModuleNotFoundError: No module named 'highspy'")
+
+    monkeypatch.setattr(runner, "_run_native_child", missing)
+    with pytest.raises(runner.ProtocolRefusal, match="could not start its solve"):
+        runner._highs_run("native", _instance_for_runs(), 10.0, "node")
+
+
+def test_a_driver_that_crashes_mid_solve_scores_as_an_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def crash(job: Any, *, timeout: float) -> Any:
+        raise runner.DriverFailed("exit 3221225477: ")
+
+    monkeypatch.setattr(runner, "_run_native_child", crash)
+    raw, error = runner._highs_run("native", _instance_for_runs(), 10.0, "node")
+    assert raw is None and error == "exit 3221225477: "
+
+
+def test_an_answer_without_this_run_s_nonce_is_refused(tmp_path: Path) -> None:
+    out = tmp_path / "answer.json"
+    write = "import json, sys; open(sys.argv[1], 'w').write(json.dumps({'nonce': 'another-run'}))"
+    with pytest.raises(runner.ProtocolRefusal, match="not this run's answer"):
+        runner._child([sys.executable, "-c", write, str(out)], out, timeout=60.0, nonce="this-run")
+    answer = runner._child([sys.executable, "-c", write, str(out)], out, timeout=60.0)
+    assert answer == {"nonce": "another-run"}  # a version report carries no nonce
+
+
+def test_every_solve_job_carries_its_own_nonce_and_both_drivers_echo_it() -> None:
+    first = runner.solve_job(Path("h.mps"), Path("p.mps"), {0: 3}, 10.0)
+    second = runner.solve_job(Path("h.mps"), Path("p.mps"), {0: 3}, 10.0)
+    assert first["nonce"] and first["nonce"] != second["nonce"]
+    assert "nonce: job.nonce ?? null," in runner.WASM_DRIVER
+
+
+def test_a_native_child_that_ran_another_runner_file_is_refused(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def answer(command: Any, out_path: Path, *, timeout: float, nonce: Any = None) -> Any:
+        return {"nonce": nonce, "runner_sha256": "0" * 64}
+
+    monkeypatch.setattr(runner, "_child", answer)
+    job = runner.solve_job(Path("h.mps"), Path("p.mps"), {0: 3}, 10.0)
+    with pytest.raises(runner.ProtocolRefusal, match="another runner file"):
+        runner._run_native_child(job, timeout=60.0)
+
+
+def test_the_native_answer_carries_the_nonce_and_the_runner_digest(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _native_with(monkeypatch, [[1.0, 2.0, 0.0], [1.0, 2.0, 0.0]])
+    job = {"hold_mps": "h.mps", "primary_mps": "p.mps", "budget_seconds": 60.0}
+    result = runner.native_run({**job, "objective": {"0": 3}, "nonce": "n1"})
+    assert result["nonce"] == "n1"
+    assert result["runner_sha256"] == runner.RUNNER_SHA256
+
+
+def test_the_third_server_reading_is_the_protocol_s() -> None:
+    reading = runner.READINGS[4]
+    assert "lower by more than the 1,000 units of agreement" in reading
+    assert "through no solution, an error or a crash, counts as below" in reading
 
 
 def test_the_measure_stops_when_the_one_week_rebuild_differs(
