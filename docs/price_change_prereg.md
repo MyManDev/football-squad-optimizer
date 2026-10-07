@@ -9,7 +9,7 @@ clauses. No alternative is selected. Nothing enters a planner under this protoco
 ## Scope and reading
 
 The declared archive seasons are `2020-21`, `2021-22`, `2022-23`, `2023-24` and
-`2024-25`, pinned to `ARCHIVE_COMMIT` in `data/sources/vaastav.py`. The first is
+`2024-25`, pinned to `ARCHIVE_COMMIT` in `src/squadopt/data/sources/vaastav.py`. The first is
 training only. Each of the other four is held out once; its training set contains
 2020-21 and the other three development seasons. All transforms and fitted
 parameters for a fold use only its training seasons. A final live fit uses the
@@ -27,7 +27,8 @@ No candidate association or score has been computed for this protocol. The surve
 in #1013 counted observed moves and described fields. The committed
 `terminal_value_study` and its note were read as existing negative evidence about
 wallet-state prediction, not re-scored. The relevant implementations reviewed were
-`experiments/terminal_value.py`, `season_chain.py` and `multi_gw_rehearsal.py`;
+`src/squadopt/experiments/terminal_value.py`, `src/squadopt/experiments/season_chain.py`
+and `src/squadopt/experiments/multi_gw_rehearsal.py`;
 their planner, price and acquisition behaviour is unchanged here.
 
 ## Identity, horizons and price labels
