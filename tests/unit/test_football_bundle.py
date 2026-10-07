@@ -29,6 +29,44 @@ def dump(path, value):
     path.write_text(json.dumps(value), encoding="utf-8")
 
 
+@pytest.mark.parametrize("role", ["capture", "handoff", "forecast", "components"])
+def test_resumed_preparation_refuses_each_changed_writer_input(case, monkeypatch, role):
+    original = bundle.write_bytes_once
+
+    def fail_copy(raw, path, **kwargs):
+        if path.name == "handoff.json":
+            raise OSError("synthetic copy interruption")
+        return original(raw, path, **kwargs)
+
+    monkeypatch.setattr(bundle, "write_bytes_once", fail_copy)
+    with pytest.raises(OSError, match="synthetic copy"):
+        bundle.seal_football_bundle(**case)
+    marker = bundle.football_bundle_path(case["artifact_root"], case["snapshot_id"])
+    assert not marker.exists()
+    preparation_path = marker.with_suffix(".preparation.json")
+    preparation = json.loads(preparation_path.read_bytes())
+    assert set(preparation["inputs"]) == {"capture", "handoff", "forecast", "components"}
+    held = preparation_path.read_bytes()
+    path = {
+        "capture": case["snapshot_root"] / case["snapshot_id"] / "metadata.json",
+        "handoff": case["handoff_path"],
+        "forecast": bundle.football_artifact_path(case["artifact_root"], case["snapshot_id"]),
+        "components": bundle.football_components_path(case["artifact_root"], case["snapshot_id"]),
+    }[role]
+    before = path.read_bytes()
+    # Even a whitespace-only replacement changes the normal writer's byte identity.
+    path.write_bytes(before + b"\n")
+    monkeypatch.setattr(bundle, "write_bytes_once", original)
+    with pytest.raises(ValueError, match=f"input {role} changed; resume refused"):
+        bundle.seal_football_bundle(**case)
+    assert not marker.exists()
+    assert preparation_path.read_bytes() == held
+    path.write_bytes(before)
+    ready = bundle.seal_football_bundle(**case)
+    assert ready.snapshot_id == case["snapshot_id"]
+    assert preparation_path.read_bytes() == held
+
+
 @pytest.fixture
 def case(publication_case, tmp_path):
     source = publication_case
@@ -287,7 +325,7 @@ def test_changed_ready_inputs_cannot_replace_previous_marker(case):
     handoff = json.loads(case["handoff_path"].read_bytes())
     handoff["diagnostics"]["new"] = True
     dump(case["handoff_path"], handoff)
-    with pytest.raises(ValueError, match="different ready bundle"):
+    with pytest.raises(ValueError, match="input handoff changed; resume refused"):
         bundle.seal_football_bundle(**case)
     assert marker(case).read_bytes() == before
     assert read(case).snapshot_id == case["snapshot_id"]

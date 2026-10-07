@@ -32,6 +32,7 @@ from squadopt.live.football_artifact import football_artifact_path, read_footbal
 from squadopt.platform.football_minute_basis import _basis_from_snapshot, football_components_path
 from squadopt.platform.official_injury_capture import REPORT_PAYLOAD, read_official_injury_capture
 from squadopt.platform.projection_retention import _safe
+from squadopt.platform.weekly_journal import WeeklyJournalError, fingerprint_paths
 
 CONTRACT_VERSION = "football_ready_bundle_v1"
 _REQUIRED = frozenset({"forecast", "components", "handoff", "site_members"})
@@ -56,6 +57,43 @@ def _object(raw: bytes) -> dict[str, Any]:
 
 def _digest(raw: bytes) -> str:
     return hashlib.sha256(raw).hexdigest()
+
+
+def _preparation_inputs(
+    snapshot_root: Path, snapshot_id: str, files: Mapping[str, Path]
+) -> dict[str, Any]:
+    paths = {
+        "capture": snapshot_root / snapshot_id,
+        **{role: files[role] for role in ("handoff", "forecast", "components")},
+    }
+    inputs = {}
+    for role, path in paths.items():
+        try:
+            artifacts = fingerprint_paths([path])
+        except WeeklyJournalError as error:
+            raise ValueError(f"Invalid football preparation input {role}.") from error
+        inputs[role] = {
+            "path": str(path.resolve()),
+            "sha256": _digest(document_bytes({"artifacts": artifacts})),
+        }
+    return {
+        "contract_version": "football_preparation_v1",
+        "snapshot_id": snapshot_id,
+        "inputs": inputs,
+    }
+
+
+def _check_preparation(prior: Mapping[str, Any], current: Mapping[str, Any]) -> None:
+    if prior.get("contract_version") != "football_preparation_v1":
+        raise ValueError("Invalid football preparation contract; resume refused.")
+    prior_inputs = prior.get("inputs")
+    if not isinstance(prior_inputs, Mapping):
+        raise ValueError("Invalid football preparation inputs; resume refused.")
+    for role in ("capture", "handoff", "forecast", "components"):
+        if prior_inputs.get(role) != current["inputs"][role]:
+            raise ValueError(f"Football preparation input {role} changed; resume refused.")
+    if prior != current:
+        raise ValueError("Football preparation identity changed; resume refused.")
 
 
 def _source(snapshot_root: Path, capture_id: str) -> CapturedSnapshot:
@@ -423,16 +461,21 @@ def seal_football_bundle(
     existing = (
         Path(addressable(marker)).read_bytes() if Path(addressable(marker)).exists() else None
     )
-    if existing is not None:
-        read_football_bundle(
-            artifact_root=artifact_root, snapshot_root=snapshot_root, snapshot_id=snapshot_id
-        )
     files = {
         "forecast": football_artifact_path(artifact_root, snapshot_id),
         "components": football_components_path(artifact_root, snapshot_id),
         "handoff": handoff_path,
         **_site_files(single_league_tree(site_data_root, league_id)),
     }
+    preparation_path = marker.with_suffix(".preparation.json")
+    _safe(Path(addressable(preparation_path)))
+    preparation = _preparation_inputs(snapshot_root, snapshot_id, files)
+    if Path(addressable(preparation_path)).exists():
+        _check_preparation(_object(Path(addressable(preparation_path)).read_bytes()), preparation)
+    if existing is not None:
+        read_football_bundle(
+            artifact_root=artifact_root, snapshot_root=snapshot_root, snapshot_id=snapshot_id
+        )
     if rotation_table_path is not None:
         files.update(
             rotation_table=rotation_table_path,
@@ -452,6 +495,10 @@ def seal_football_bundle(
         news_capture_id=news_capture_id,
         official_injury_capture_id=official_injury_capture_id,
     )
+    _check_preparation(preparation, _preparation_inputs(snapshot_root, snapshot_id, files))
+    # Record normal writers' inputs before copies. A retry must keep all four identities.
+    # This receipt is never a ready marker and is ignored by active bundle readers.
+    write_bytes_once(document_bytes(preparation), preparation_path)
     folder = marker.parent / (snapshot_id + ".bundle")
     destinations = dict(files)
     destinations["handoff"] = folder / "handoff.json"
