@@ -278,6 +278,18 @@ def test_missing_award_means_zero_and_unmapped_history_is_excluded(tmp_path: Pat
     assert candidate.diagnostics["defcon_component"]["unmapped_history"]["1"] == [999]
 
 
+def test_development_threshold_crosschecks_zero_award_without_creating_a_label(
+    tmp_path: Path,
+) -> None:
+    def change(documents: dict[str, Any]) -> None:
+        entry = documents[live_payload(1)]["elements"][1]
+        entry["explain"][0]["stats"] = entry["explain"][0]["stats"][:1]
+
+    snapshot = capture(tmp_path, change=change)
+    with pytest.raises(DefconMissingInputs, match="count and awarded"):
+        candidate_handoff(snapshot, base(snapshot), declaration_sha256=runner.DECLARATION_SHA256)
+
+
 def test_outcome_free_checker_never_opens_any_event_live_payload(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

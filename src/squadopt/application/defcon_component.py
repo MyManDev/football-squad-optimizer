@@ -168,6 +168,7 @@ def history_week(
         if not isinstance(entry.get("explain"), list):
             raise DefconMissingInputs("Fixture explanations are absent.")
         explained_minutes = 0
+        total_awarded = 0
         local: set[int] = set()
         for explanation in entry["explain"]:
             fixture_id = integer(explanation["fixture"], minimum=1)
@@ -214,6 +215,7 @@ def history_week(
                             "The development award schema cross-check failed."
                         )
                     crosschecks += 1
+            total_awarded += points
             rows.append(
                 FixtureAppearance(
                     DEFCON_SEASON,
@@ -232,6 +234,14 @@ def history_week(
             )
         if total_minutes > 0 and not local:
             raise DefconMissingInputs("Positive gameweek minutes have no fixture explanation.")
+        if week <= 5 and total_minutes > 0 and len(local) == 1 and position != "GK":
+            # A single fixture lets the GW count cross-check both positive and zero
+            # awards. A double's aggregate count must never be split into fixture labels.
+            count = integer(entry["stats"]["defensive_contribution"])
+            threshold = 10 if position == "DEF" else 12
+            if (count >= threshold) != (total_awarded > 0):
+                raise DefconMissingInputs("The development count and awarded label disagree.")
+            crosschecks += 1
     return ParsedHistory(tuple(rows), tuple(sorted(unmapped)), crosschecks)
 
 
