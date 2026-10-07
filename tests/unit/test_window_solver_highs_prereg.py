@@ -70,7 +70,13 @@ def test_the_solver_versions_are_the_pinned_ones() -> None:
     assert "ortools==9.15.6755" in pins
     budgets = _section("Solvers and budgets")
     assert "`ortools` as `constraints.txt` pins it (9.15.6755)" in budgets
-    assert "`highspy` 1.15.3" in budgets
+    assert "`highspy` 1.15.1 pinned" in budgets
+    assert "both builds carry HiGHS core 1.15.1 (git 04024d7)" in budgets
+    assert "`highspy` 1.15.3" not in budgets
+    assert "The build is single-threaded and refuses a thread option" in budgets
+    read = _section("What has been read")
+    assert "corrected to `highspy` 1.15.1" in read
+    assert "each also solved the runner's toy model, which is not an instance" in read
     assert "the `highs` 1.15.3 package `web/package.json` pins" in budgets
     assert "`mip_rel_gap` 0 and `mip_abs_gap` 0.5" in budgets
 
@@ -187,6 +193,43 @@ def test_the_one_check_solved_after_the_thresholds_is_disclosed() -> None:
     assert "solved one member, 8883467, on CP-SAT at the production budget" in read
     assert "the exporter's first check passed on all four" in read
     assert "No threshold changed after it, and no HiGHS solve of any instance has run." in read
+
+
+def test_the_readings_are_fixed_before_any_highs_solve() -> None:
+    """Each choice the protocol left the runner is written here before any HiGHS solve,
+    with the start each HiGHS primary takes from its own hold solution, as the planner
+    gives CP-SAT's primary the probe's solution."""
+
+    source = inspect.getsource(planning_optimizer)
+    assert "artifacts.model.add_hint(variable, probe.value(variable))" in source
+    read = _section("What has been read")
+    assert "each HiGHS primary starts from its own hold solution" in read
+    assert "None changes a threshold." in read
+    budgets = _section("Solvers and budgets")
+    for clause in (
+        "rounded to integers and recomputed exactly",
+        "It also starts its primary from that whole solution",
+        "The hold and primary MPS share their columns",
+        "its primary runs with no floor and no start",
+        "A run's time is its hold solve plus its primary solve.",
+        "A HiGHS primary gets what its own hold solve left of the budget",
+        "the thread count its build reports back",
+        "less the capture's own model copies",
+    ):
+        assert clause in budgets, clause
+    assert "the runner sets the game's 0.5" in _section("Instances")
+    check = _section("The exporter and its checks")
+    assert "the MPS objective evaluated exactly at the same rounded point" in check
+    verdicts = _section("Verdicts")
+    for clause in (
+        "CP-SAT proves an instance when the reference run's primary solve is OPTIMAL.",
+        "or that has no primary, keeps its own hold plan's value, as the planner keeps "
+        "CP-SAT's hold plan, and is not proved",
+        "lower by more than the 1,000 units of agreement",
+        "A HiGHS native run that ends with no value, through no solution, an error or a "
+        "crash, counts as below.",
+    ):
+        assert clause in verdicts, clause
 
 
 def test_the_verdicts_and_their_checks_are_fixed_before_any_solve() -> None:
