@@ -43,6 +43,7 @@ a time, after every page of the week had already been read.
 import json
 import re
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any, Final, Protocol
 
@@ -61,6 +62,8 @@ from squadopt.platform.club_news_model import MAX_OUTPUT_TOKENS, REQUEST_TIMEOUT
 
 #: The provider name this adapter is selected by, through ``SQUADOPT_LLM_PROVIDER``.
 GEMINI_PROVIDER: Final = "gemini"
+
+MAX_RESPONSE_BYTES: Final = 2 * 1024 * 1024
 
 #: The day the lists below were read from the provider's documentation. No call was made to
 #: build them: they are what the pages said, and they age from this date.
@@ -185,6 +188,56 @@ class Reply(Protocol):
     def text(self) -> str: ...
 
     def json(self) -> object: ...
+
+
+@dataclass(frozen=True, slots=True)
+class _BoundedReply:
+    status_code: int
+    body: bytes
+
+    @property
+    def text(self) -> str:
+        return self.body.decode("utf-8", errors="replace")
+
+    def json(self) -> object:
+        return json.loads(self.body)
+
+
+class _BoundedTransport:
+    """Retain at most 2 MiB before any success or error JSON is parsed."""
+
+    def __init__(self, client: Any) -> None:
+        self._client = client
+
+    def close(self) -> None:
+        self._client.close()
+
+    def post(
+        self, url: str, *, headers: Mapping[str, str], json: Mapping[str, object], timeout: float
+    ) -> Reply:
+        with self._client.stream(
+            "POST",
+            url,
+            headers={**headers, "Accept-Encoding": "identity"},
+            json=json,
+            timeout=timeout,
+        ) as response:
+            if response.headers.get("content-encoding", "identity").lower() != "identity":
+                raise ClubNewsGeminiError("Compressed coding responses are not accepted.")
+            declared = response.headers.get("content-length")
+            if declared is not None:
+                try:
+                    length = int(declared)
+                except ValueError:
+                    raise ClubNewsGeminiError("Invalid coding response length.") from None
+                if not 0 <= length <= MAX_RESPONSE_BYTES:
+                    raise ClubNewsGeminiError("Coding response exceeds the 2 MiB byte limit.")
+            body = bytearray()
+            for chunk in response.iter_raw():
+                if len(body) + len(chunk) > MAX_RESPONSE_BYTES:
+                    raise ClubNewsGeminiError("Coding response exceeds the 2 MiB byte limit.")
+                body.extend(chunk)
+            return _BoundedReply(response.status_code, bytes(body))
 
 
 def gemini_schema(schema: Mapping[str, object]) -> dict[str, object]:
@@ -339,7 +392,7 @@ class GeminiClubNewsProvider:
                 f"constraints.txt -e '.[llm]'): {error}"
             ) from error
 
-        self._transport = httpx2.Client(timeout=timeout)
+        self._transport = _BoundedTransport(httpx2.Client(timeout=timeout))
 
     def close(self) -> None:
         """Release the HTTP client this provider built, if it built one.

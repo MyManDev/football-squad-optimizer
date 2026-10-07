@@ -8,6 +8,7 @@ facts rather than collapsing into "no claims this week".
 
 import json
 from collections.abc import Mapping
+from dataclasses import replace
 from typing import Any
 
 import pytest
@@ -22,12 +23,14 @@ from squadopt.data.sources.club_news_coding import (
     locate_claim_response,
     response_schema,
 )
+from squadopt.platform import club_news_gemini as adapter
 from squadopt.platform.club_news_gemini import (
     DEFAULT_GEMINI_MODEL,
     DOCUMENTATION_READ_ON,
     DOCUMENTED_MODELS,
     GEMINI_PROVIDER,
     KEY_HEADER,
+    MAX_RESPONSE_BYTES,
     MODELS_PAGE,
     ClubNewsGeminiError,
     GeminiClubNewsProvider,
@@ -113,6 +116,108 @@ def _provider(reply: _Reply) -> tuple[GeminiClubNewsProvider, _Transport]:
 
     transport = _Transport(reply)
     return GeminiClubNewsProvider(api_key=SENTINEL_KEY, transport=transport), transport
+
+
+@pytest.mark.parametrize("declared", [True, False])
+def test_default_transport_refuses_oversized_reply_for_only_that_club(
+    monkeypatch: pytest.MonkeyPatch, declared: bool
+) -> None:
+    import httpx2
+
+    body_marker = b"sentinel-private-response-body"
+    read_chunks: list[int] = []
+    closed: list[int] = []
+    current_answer = json.dumps(
+        {"contract_version": ROTATION_CLAIM_CODING_CONTRACT_VERSION, "documents": [], "claims": []}
+    )
+    good_body = _answered(current_answer)._body
+    responses = iter([False, True])
+
+    class Response:
+        status_code = 200
+
+        def __init__(self, good: bool) -> None:
+            self.good = good
+            self.headers = (
+                {"content-length": str(MAX_RESPONSE_BYTES + 1)} if declared and not good else {}
+            )
+
+        def __enter__(self) -> "Response":
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            closed.append(self.status_code)
+
+        def iter_raw(self) -> Any:
+            if self.good:
+                yield json.dumps(good_body).encode()
+                return
+            for index, chunk in enumerate(
+                [body_marker + SENTINEL_KEY.encode(), b"x" * MAX_RESPONSE_BYTES, b"never-read"]
+            ):
+                read_chunks.append(index)
+                yield chunk
+
+    class Client:
+        def __init__(self, **options: object) -> None:
+            pass
+
+        def stream(self, *args: object, **options: Any) -> Response:
+            assert options["headers"]["Accept-Encoding"] == "identity"
+            return Response(next(responses))
+
+        def close(self) -> None:
+            closed.append(0)
+
+    monkeypatch.setattr(httpx2, "Client", Client)
+    provider = GeminiClubNewsProvider(api_key=SENTINEL_KEY)
+    config = CodingProviderConfig(
+        provider=GEMINI_PROVIDER, model_identifier=DEFAULT_GEMINI_MODEL, api_key=SENTINEL_KEY
+    )
+    other_document = replace(DOCUMENTS[0], club="Chelsea")
+    coded, refused = code_week_by_club(provider, config, (*DOCUMENTS, other_document), ROSTER)
+    provider.close()
+
+    assert [item.club for item in coded] == ["Chelsea"]
+    assert [club for club, _ in refused] == ["Arsenal"]
+    assert "2 MiB" in refused[0][1]
+    assert SENTINEL_KEY not in refused[0][1]
+    assert body_marker.decode() not in refused[0][1]
+    assert read_chunks == ([] if declared else [0, 1])
+    assert closed == [200, 200, 0]
+
+
+def test_bounded_transport_accepts_exact_limit_and_bounds_error_bodies() -> None:
+    class Response:
+        def __init__(self, status: int, body: bytes) -> None:
+            self.status_code = status
+            self.body = body
+            self.headers = {"content-length": str(len(body))}
+
+        def __enter__(self) -> "Response":
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            pass
+
+        def iter_raw(self) -> Any:
+            yield self.body
+
+    responses = iter(
+        [
+            Response(200, b"{}" + b" " * (MAX_RESPONSE_BYTES - 2)),
+            Response(403, b"x" * (MAX_RESPONSE_BYTES + 1)),
+        ]
+    )
+
+    class Client:
+        def stream(self, *args: object, **options: object) -> Response:
+            return next(responses)
+
+    transport = adapter._BoundedTransport(Client())
+    assert transport.post("https://example.invalid", headers={}, json={}, timeout=1).json() == {}
+    with pytest.raises(ClubNewsGeminiError, match="2 MiB"):
+        transport.post("https://example.invalid", headers={}, json={}, timeout=1)
 
 
 # --- what a good answer looks like ------------------------------------------
