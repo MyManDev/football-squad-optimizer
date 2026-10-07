@@ -64,7 +64,11 @@ from squadopt.live.football_artifact import (
 )
 from squadopt.planning.chip_strategy import CHIP_STRATEGY_VERSION
 from squadopt.planning.observed import OBSERVED_WINDOW_VERSION
-from squadopt.platform.football_bundle import football_bundle_path, read_football_bundle
+from squadopt.platform.football_bundle import (
+    football_bundle_path,
+    football_bundle_stage_paths,
+    read_football_bundle,
+)
 from squadopt.platform.football_minute_basis import (
     football_components_path,
     load_football_minute_basis,
@@ -370,6 +374,9 @@ def discovery_signature(
     found.append(_stat(football_components_path(artifact_root, capture_snapshot_id)))
     marker = football_bundle_path(artifact_root, capture_snapshot_id)
     found.append(_stat(marker))
+    found.extend(
+        _stat(path) for path in football_bundle_stage_paths(artifact_root, capture_snapshot_id)
+    )
     # A ready marker is written last. Sealed files are immutable, but stat their
     # small directory too so accidental corruption invalidates held contexts.
     sealed = marker.with_suffix("")
@@ -477,6 +484,13 @@ def load_switch_inputs(
     bundle = None
     invalid_bundle = False
     marker = football_bundle_path(artifact_root, inputs.snapshot_id)
+    if not Path(addressable(marker)).exists() and any(
+        Path(addressable(path)).exists()
+        for path in football_bundle_stage_paths(artifact_root, inputs.snapshot_id)
+    ):
+        invalid_bundle = True
+        club_news_source = None
+        notes.append("football bundle incomplete: publication started without a ready marker")
     if Path(addressable(marker)).exists():
         try:
             bundle = read_football_bundle(

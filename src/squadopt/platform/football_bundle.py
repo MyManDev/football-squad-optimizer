@@ -47,6 +47,19 @@ def football_bundle_path(artifact_root: Path, snapshot_id: str) -> Path:
     return football_artifact_path(artifact_root, snapshot_id).with_suffix(".bundle.json")
 
 
+def football_bundle_stage_paths(artifact_root: Path, snapshot_id: str) -> tuple[Path, ...]:
+    forecast = football_artifact_path(artifact_root, snapshot_id)
+    return tuple(
+        forecast.with_suffix(suffix)
+        for suffix in (
+            ".bundle.started.json",
+            ".bundle.preparation.json",
+            ".bundle.production.json",
+            ".bundle",
+        )
+    )
+
+
 def _object(raw: bytes) -> dict[str, Any]:
     result = json.loads(raw)
     if not isinstance(result, dict):
@@ -427,6 +440,16 @@ def seal_football_bundle(
         read_football_bundle(
             artifact_root=artifact_root, snapshot_root=snapshot_root, snapshot_id=snapshot_id
         )
+    # A failed preparation has no ready marker or copied folder yet. Record the
+    # attempt before either, so older v1 readers cannot serve its loose artifacts.
+    started = football_bundle_stage_paths(artifact_root, snapshot_id)[0]
+    _safe(Path(addressable(started)))
+    write_bytes_once(
+        document_bytes(
+            {"contract_version": "football_bundle_attempt_v1", "snapshot_id": snapshot_id}
+        ),
+        started,
+    )
     files = {
         "forecast": football_artifact_path(artifact_root, snapshot_id),
         "components": football_components_path(artifact_root, snapshot_id),
