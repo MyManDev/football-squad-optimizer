@@ -16,14 +16,18 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from squadopt.application.advice_record import load_member_advice_record, record_directory
+from squadopt.application.advice_record import (
+    league_record_root,
+    league_record_roots,
+    load_member_advice_record,
+    record_directory,
+)
 from squadopt.application.commands import DecideRequest, decide
 from squadopt.application.entries import EntryRegistry
 from squadopt.application.evidence_io import write_json
 from squadopt.application.league_publication import (
     LeaguePublicationRequest,
     publish_league,
-    records_advice_for,
     remove_unlisted_trees,
     settle_legacy_tree,
 )
@@ -133,16 +137,20 @@ def package_fingerprint() -> str:
     return digest.hexdigest()
 
 
-def recorded_capture_directories(root: Path, season: str) -> list[Path]:
+def recorded_capture_directories(root: Path, season: str, league_ids: Sequence[int]) -> list[Path]:
     """The advice records the season's history documents read, as the run found them.
 
-    One directory per member, week and capture. A hidden sibling is a writer's staging
-    directory, never a record, and the week this run records itself is its own output.
+    One directory per league, member, week and capture, under each listed league's own
+    root in the store (``advice_record.league_record_root``): the store's root for the
+    league it has always held, ``leagues/<id>/`` for every other. A hidden sibling is a
+    writer's staging directory, never a record, and the week this run records itself is
+    its own output.
     """
 
     return sorted(
         path
-        for path in (root / season).glob("gw[0-9][0-9]/entry-*/*")
+        for league_root in league_record_roots(root, league_ids)
+        for path in (league_root / season).glob("gw[0-9][0-9]/entry-*/*")
         if path.is_dir() and not path.name.startswith(".")
     )
 
@@ -153,6 +161,7 @@ _ENTRY_DIRECTORY = re.compile(r"entry-([1-9][0-9]*)")
 def recorded_commits(root: Path, season: str, gameweek: int, snapshot_id: str) -> dict[int, object]:
     """The commit each member's record of one capture names, by entry id.
 
+    ``root`` is one league's root in the store (``advice_record.league_record_root``).
     Only members with a record of this capture appear. Each record is read the way every
     reader of the store reads one, through its manifest, so a record that fails its own
     digests is refused here rather than at the end of the league stage. A record that names
@@ -229,7 +238,9 @@ class WeeklyOperations:
             self.stages.append("publish")
         self.rule_snapshot = request.snapshot_id or latest_live_snapshot(paths.snapshots)
         self.ledger_inputs = sorted((paths.ledger / request.season).glob("gw*"))
-        self.record_inputs = recorded_capture_directories(paths.records, request.season)
+        self.record_inputs = recorded_capture_directories(
+            paths.records, request.season, request.league_ids
+        )
         if resume:
             prior = read_run_request(paths.journal, run_id)
             # Derived reads belong to the original preflight, even after this run captures
@@ -331,26 +342,35 @@ class WeeklyOperations:
         refuses to record the same capture again from any other commit, and it finds out only
         at its end, after every member has been solved (``advice_record._reconciled``). A
         capture this run takes itself has no records yet, and a run that records nothing
-        cannot conflict, so only a reused capture this run would record is read. A record
-        that names no commit is not refused here: the record writer matches an unknown commit
-        against a known one rather than refusing it.
+        cannot conflict, so only a reused capture this run would record is read, under the
+        root of every league the run records. A record that names no commit is not refused
+        here: the record writer matches an unknown commit against a known one rather than
+        refusing it.
         """
 
         capture = self.request.snapshot_id
         if capture is None or not self.records_advice:
             return
-        recorded = recorded_commits(
-            self.paths.records, self.request.season, self.request.gameweek, capture
-        )
-        by_commit: dict[str, list[int]] = {}
-        for entry_id, commit in sorted(recorded.items()):
-            if commit is not None and commit != self.repository_commit:
-                by_commit.setdefault(str(commit), []).append(entry_id)
+        leagues = self.request.league_ids
+        by_commit: dict[str, list[str]] = {}
+        for league_id in leagues:
+            recorded = recorded_commits(
+                league_record_root(self.paths.records, league_id),
+                self.request.season,
+                self.request.gameweek,
+                capture,
+            )
+            for entry_id, commit in sorted(recorded.items()):
+                if commit is not None and commit != self.repository_commit:
+                    # A run over one league names the entry, as it always has; over several,
+                    # the league as well, since one member may be in more than one of them.
+                    by_commit.setdefault(str(commit), []).append(
+                        f"{entry_id}" if len(leagues) == 1 else f"{entry_id} in league {league_id}"
+                    )
         if not by_commit:
             return
         named = "; ".join(
-            f"{commit} ({'entry' if len(entries) == 1 else 'entries'} "
-            f"{', '.join(str(entry) for entry in entries)})"
+            f"{commit} ({'entry' if len(entries) == 1 else 'entries'} {', '.join(entries)})"
             for commit, entries in sorted(by_commit.items())
         )
         raise WeekError(
@@ -747,9 +767,10 @@ class WeeklyOperations:
         for league_id in self.request.league_ids:
             # Each league is stamped after its own solves (the stamp is when the advice
             # was published, read against the deadline); the directory the last league
-            # writes carries the latest stamp, and the release check reads that one.
-            recorded = record and records_advice_for(league_id)
-            request = self._league_request(league_id, recorded)
+            # writes carries the latest stamp, and the release check reads that one. Each
+            # league records under its own root in the store, so a member of two leagues
+            # is recorded once in each.
+            request = self._league_request(league_id, record)
             with league_mapper(request, self.request.workers) as mapper:
                 result = publish_league(request, mapper=mapper, beside=beside)
             if result.published is not None:
@@ -757,7 +778,8 @@ class WeeklyOperations:
             gameweek = result.gameweek
             outputs.extend(result.output_paths)
             leagues[str(league_id)] = {
-                "advice_recorded": recorded,
+                # Read from the request the league was published with, not from the switch.
+                "advice_recorded": request.record_root is not None,
                 # What the build told the operator about individual members (a name it
                 # changed, a mode or the manager's word it could not solve) and the files
                 # it removed from the tree, so a run is not "completed" in silence.
@@ -770,23 +792,18 @@ class WeeklyOperations:
                 # Empty when the Top 100 menu was offered or never asked for.
                 "top100_note": result.top100_note,
             }
-        # Whether this run recorded advice at all, which the publish stage requires: a run
-        # asked to record whose leagues the record does not name recorded nothing, and
-        # says so where the status page reads.
-        recorded_any = any(bool(row["advice_recorded"]) for row in leagues.values())
-        if record and not recorded_any and getattr(self, "log", None) is not None:
-            self.log.event(
-                "tick.week.advice_record.skipped",
-                reason="no league of the list is the one the advice record names",
-                leagues=list(self.request.league_ids),
-                capture=self._capture_id(),
-            )
+        # Whether this run recorded the advice of every league it rendered, which the
+        # publish stage requires: a publication whose record misses a league could not be
+        # reviewed for that league's members.
+        recorded_all = bool(leagues) and all(
+            row["advice_recorded"] is True for row in leagues.values()
+        )
         return WeeklyStageResult(
             tuple(sorted(set(outputs))),
             {
                 "snapshot_id": self._capture_id(),
                 "gameweek": gameweek,
-                "advice_recorded": recorded_any,
+                "advice_recorded": recorded_all,
                 # A tree from before the league directory, and what became of it.
                 "legacy_tree": (
                     None if legacy is None else {"outcome": legacy[0], "league_id": legacy[1]}

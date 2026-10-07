@@ -302,6 +302,7 @@ def test_the_history_counts_only_the_captures_the_published_trees_carried(
         )
     unproven = review.select_record(
         request.record_root,
+        league_id=request.league_id,
         season=request.season,
         gameweek=1,
         entry_id=entry_id,
@@ -342,6 +343,124 @@ def _standings_page(league_id: int, *entries: int) -> bytes:
             "standings": {"has_next": False, "results": rows},
         }
     ).encode("utf-8")
+
+
+def test_a_member_of_two_leagues_is_recorded_in_each_and_has_a_history_in_each(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Every league records and renders its histories. League 352490 keeps the store's root
+    and another league records under ``leagues/<id>/``, so one member's two records of one
+    capture never meet at one address and neither refuses the other."""
+
+    monkeypatch.setenv("SQUADOPT_REPOSITORY_COMMIT", "c" * 40)
+    request = publication_world(tmp_path)
+    assert request.record_root is not None
+    store, entry_id = request.record_root, member_fixture.ENTRY_ID
+    snapshot = read_snapshot(request.snapshot_root, request.snapshot_id)
+    payloads = dict(snapshot.payloads)
+    for league_id in (352490, 9):
+        payloads[f"league-{league_id}-standings.json"] = _standings_page(league_id, entry_id)
+    capture = write_snapshot(
+        request.snapshot_root,
+        source="fpl-live",
+        captured_at_utc=snapshot.metadata.captured_at_utc,
+        payloads=payloads,
+    ).snapshot_id
+    request = replace(
+        request,
+        snapshot_id=capture,
+        handoff_path=handoff_fixture._handoff(tmp_path / "recaptured-handoffs", capture),
+    )
+
+    results = {
+        league_id: publish_league(replace(request, league_id=league_id))
+        for league_id in (352490, 9)
+    }
+
+    where = {
+        352490: store / "2026-27/gw02" / f"entry-{entry_id}" / capture,
+        9: store / "leagues/9/2026-27/gw02" / f"entry-{entry_id}" / capture,
+    }
+    assert sorted(store.rglob("advice.json")) == sorted(
+        directory / "advice.json" for directory in where.values()
+    )
+    for league_id, directory in where.items():
+        record = json.loads((directory / "advice.json").read_text(encoding="utf-8"))
+        assert record["league_id"] == league_id and record["entry_id"] == entry_id
+        assert directory / "advice.json" in results[league_id].output_paths
+        tree = request.out_dir / "data/leagues" / str(league_id)
+        history = json.loads((tree / "history" / f"{entry_id}.json").read_text(encoding="utf-8"))
+        assert history["payload"]["league_id"] == league_id
+        assert [
+            (week["gameweek"], week["advice_snapshot_id"]) for week in history["payload"]["weeks"]
+        ] == [(2, capture)]
+
+
+def test_a_history_is_not_republished_with_fewer_weeks_than_the_tree_it_replaces(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Absent is not zero. A week the replaced history showed a member, whose record the
+    store no longer holds, refuses the publication before any member is solved. A week whose
+    status changes is not a drop, and a member who left keeps a file nothing compares."""
+
+    monkeypatch.setenv("SQUADOPT_REPOSITORY_COMMIT", "c" * 40)
+    request = publication_world(tmp_path)
+    assert request.record_root is not None and request.season is not None
+    entry_id = member_fixture.ENTRY_ID
+    tree = request.out_dir / "data/leagues/352490"
+    (tree / "history").mkdir(parents=True)
+
+    def history(member: int, status: str) -> dict[str, object]:
+        week = {"gameweek": 1, "status": status, "advice_snapshot_id": "gw1"}
+        return {
+            "contract_version": review.CONTRACT_VERSION,
+            "payload": {
+                "league_id": 352490,
+                "entry_id": member,
+                "season": request.season,
+                "weeks": [week],
+            },
+        }
+
+    shown = history(entry_id, "unavailable")
+    (tree / "history" / f"{entry_id}.json").write_text(json.dumps(shown), encoding="utf-8")
+    departed = json.dumps(history(999, "unsettled"))
+    (tree / "history" / "999.json").write_text(departed, encoding="utf-8")
+
+    def solved(*args: object, **kwargs: object) -> None:
+        raise AssertionError("A member was solved before the dropped week was refused.")
+
+    build = league_publication.build_league_views
+    monkeypatch.setattr(league_publication, "build_league_views", solved)
+    with pytest.raises(
+        review.SuggestionEvaluationError, match=rf"entry {entry_id}: gameweek\(s\) 1\)"
+    ):
+        publish_league(request)
+    assert not request.record_root.exists()
+    assert json.loads((tree / "history" / f"{entry_id}.json").read_bytes()) == shown
+
+    # With the week's record back in the store, the week is a row again, whatever it now says.
+    bootstrap = json.loads(
+        read_snapshot(request.snapshot_root, request.snapshot_id).payloads["bootstrap-static.json"]
+    )
+    deadline_utc = next(event["deadline_time"] for event in bootstrap["events"] if event["id"] == 1)
+    deadline = datetime.fromisoformat(deadline_utc.replace("Z", "+00:00"))
+    record_member_advice(
+        request.record_root,
+        recorded(
+            gameweek=1,
+            entry_id=entry_id,
+            captured=(deadline - timedelta(hours=48)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            published=(deadline - timedelta(hours=47)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            name="gw1",
+        ),
+    )
+    monkeypatch.setattr(league_publication, "build_league_views", build)
+    publish_league(request)
+    rows = json.loads((tree / "history" / f"{entry_id}.json").read_bytes())["payload"]["weeks"]
+    assert [row["gameweek"] for row in rows] == [2, 1]
+    assert rows[1]["status"] != "unavailable"
+    assert (tree / "history" / "999.json").read_text(encoding="utf-8") == departed
 
 
 def test_a_league_renders_the_members_its_standings_page_names(tmp_path: Path) -> None:

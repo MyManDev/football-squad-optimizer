@@ -12,7 +12,7 @@ from datetime import datetime
 from pathlib import Path, PurePosixPath
 
 from squadopt.application.advice import member_horizon_builder
-from squadopt.application.advice_record import record_directory
+from squadopt.application.advice_record import league_record_root, record_directory
 from squadopt.application.capture_entries import CapturePicksProvider
 from squadopt.application.chip_forecast_publication import forecast_source
 from squadopt.application.entries import EntryRegistration, EntryRegistry
@@ -31,10 +31,11 @@ from squadopt.application.top100_weight import (
     load_top100_counts,
 )
 from squadopt.application.weekly_suggestion_eval import (
-    SUPPORTED_LEAGUE_ID,
     publish_suggestion_histories,
     published_advice_captures,
+    published_history_weeks,
     published_page_captures,
+    refuse_dropped_history_weeks,
 )
 from squadopt.contracts.league_tree import (
     LEAGUES_ROOT,
@@ -83,9 +84,14 @@ class LeaguePublicationRequest:
     gameweek: int | None = None
     handoff_path: Path | None = None
     mode_residuals: Path | None = None
+    #: The advice record store this publication records into; None records nothing. The
+    #: store holds every league, each under its own root (``advice_record.league_record_root``),
+    #: which the publication derives from this and the league.
     record_root: Path | None = None
     rival_menu: bool = True
     now: datetime | None = None
+    #: The store the member histories read, when it is not ``record_root``: a preview reads
+    #: the records without writing one. The league's own root in it is derived the same way.
     history_record_root: Path | None = None
     #: The week's rotation evidence table (its manifest beside it) and the club-news
     #: source it was coded from: the fixture file, or a capture directory. Both or
@@ -352,19 +358,6 @@ def adopt_legacy_tree(site_data_root: Path, league_id: int) -> tuple[str, Path] 
     return ("adopted", target)
 
 
-def records_advice_for(league_id: int) -> bool:
-    """Whether a publication of ``league_id`` may write the advice record.
-
-    The record is keyed by season, gameweek, entry and capture, not by league, and the
-    member histories read it for one league (``weekly_suggestion_eval``). A member of two
-    leagues would otherwise be recorded twice for one capture with different documents,
-    which the record refuses. Until the record carries the league, the other leagues are
-    rendered and published without one.
-    """
-
-    return league_id == SUPPORTED_LEAGUE_ID
-
-
 def settle_legacy_tree(
     site_data_root: Path, league_ids: Sequence[int]
 ) -> tuple[str, int | None] | None:
@@ -528,12 +521,34 @@ def publish_prepared_league(
             f"{int(inputs.deadline.gameweek)}. Refused before any member is solved."
         )
     top100_counts, top100_reason, top100_note = load_publication_top100(request, inputs, projection)
-    history_root = request.history_record_root or request.record_root
-    if request.league_id != SUPPORTED_LEAGUE_ID:
-        history_root = None
+    # This league's own root in the record store, derived once: the record is written there,
+    # the histories read it, and the outputs list it. Every league records and renders its
+    # histories; the league the store has always held keeps the store's root.
+    record_root = (
+        league_record_root(request.record_root, request.league_id)
+        if request.record_root is not None
+        else None
+    )
+    history_store = request.history_record_root or request.record_root
+    history_root = (
+        league_record_root(history_store, request.league_id) if history_store is not None else None
+    )
     # Read before the build below rewrites the tree: the tree this publication replaces is
-    # the only place that says which capture each earlier week showed each member.
+    # the only place that says which capture each earlier week showed each member, and
+    # which weeks each member's history already showed.
     shown = published_advice_captures(out_dir) if history_root is not None else {}
+    carried = published_history_weeks(out_dir, season=season) if history_root is not None else {}
+    if history_root is not None:
+        # Histories that would show a member fewer weeks than the tree they replace are
+        # refused here, before any member is solved; the histories are held to it again
+        # when they are written.
+        refuse_dropped_history_weeks(
+            history_root,
+            league_id=request.league_id,
+            season=season,
+            entry_ids=[entry.entry_id for entry in prepared.registrations],
+            replaced=carried,
+        )
     report = build_league_views(
         CapturePicksProvider(snapshot, request.snapshot_id),
         prepared.registrations,
@@ -556,7 +571,7 @@ def publish_prepared_league(
             panel=panel,
             in_season=in_season,
         ),
-        advice_record_root=request.record_root,
+        advice_record_root=record_root,
         now=request.now,
         manager_words=manager_words,
         top100_counts=top100_counts,
@@ -577,13 +592,14 @@ def publish_prepared_league(
                 entry_ids=[entry.entry_id for entry in prepared.registrations],
                 out_dir=out_dir,
                 published=shown,
+                replaced=carried,
             )
         )
-    if request.record_root is not None:
+    if record_root is not None:
         for member in report.members:
             if member.rendered:
                 directory = record_directory(
-                    request.record_root,
+                    record_root,
                     season,
                     report.gameweek,
                     member.entry_id,

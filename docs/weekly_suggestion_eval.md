@@ -1,8 +1,9 @@
 # Weekly suggestion evaluation
 
 The first version compares a member's recorded one-week pure-points suggestion with
-their actual weekly result. It is limited to league **352490**. The implementation is
-on `feat/weekly-suggestion-eval`, based on enterprise review commit `4b55253f`.
+their actual weekly result. It was limited to league **352490**; every league now has its
+own records and histories (below). The implementation is on `feat/weekly-suggestion-eval`,
+based on enterprise review commit `4b55253f`.
 
 ## Evidence and selection
 
@@ -22,7 +23,8 @@ on `feat/weekly-suggestion-eval`, based on enterprise review commit `4b55253f`.
   advice's build time.
 - The measurement readers (`scripts/measure_live_price_honesty.py`,
   `scripts/measure_top100_effect.py`) hold no published tree and still take the latest
-  record by its stamp. No member-facing document is built that way.
+  record by its stamp. They read league 352490's records only. No member-facing document
+  is built that way.
 - Reject ambiguous or corrupt evidence instead of substituting an older result.
 - Show only weeks with an actual member record directory. An empty archive is an
   empty history; no earlier recommendations are reconstructed or solved again.
@@ -90,10 +92,18 @@ The browser retains its identity and arithmetic checks in addition to this shape
 Both the legacy history fixture and the optional rows are covered on both sides.
 
 The existing league publisher writes derived JSON under
-`data/leagues/<league id>/history/{entry_id}.json` with contract `weekly_suggestion_history_v1`.
+`data/leagues/<league id>/history/{entry_id}.json` with contract `weekly_suggestion_history_v1`,
+for every league it publishes; the document's `league_id` is that league, any positive
+integer. Each league reads its own root in the record store
+(`advice_record.league_record_root`): league 352490, whose records predate per-league
+storage, at the store's root, and every other league under `leagues/<league id>/`. A record
+there that names another league is refused like any other identity mismatch.
 `history_record_root` allows preview runs to read existing records without writing
 new private advice records. Normal weekly publication supplies the same configured
-record root. This adds no API, solver job, model, scheduler or infrastructure service.
+record store. A publication refuses, before any member is solved, histories that would
+drop a gameweek row the histories it replaces carried for a member it renders, naming each
+member and week; a week whose status changes is not a drop. This adds no API, solver job,
+model, scheduler or infrastructure service.
 
 The member page links to `/league/members/{entry_id}/history`. The Turkish/English
 page provides a recorded-week selector, score comparison, player details and expandable

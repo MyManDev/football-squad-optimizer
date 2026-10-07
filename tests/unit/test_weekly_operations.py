@@ -108,7 +108,8 @@ def test_a_run_over_several_leagues_renders_each_tree_and_lists_them_all(
 ) -> None:
     """Every league of the list is rendered from the one capture into its own tree, with
     its own scoreboard; the site's directory names them all and carries the publication
-    stamp; a member of both leagues is recorded once, for the league the record names."""
+    stamp; a member of both leagues is recorded once in each league, 352490 at the store's
+    root and the other under ``leagues/<id>/``, and has a history in each tree."""
 
     operation = world(
         tmp_path,
@@ -124,13 +125,21 @@ def test_a_run_over_several_leagues_renders_each_tree_and_lists_them_all(
     league = stages["league"]
     assert sorted(league["leagues"]) == ["352490", "7"]
     assert league["leagues"]["352490"]["advice_recorded"] is True
-    assert league["leagues"]["7"]["advice_recorded"] is False
+    assert league["leagues"]["7"]["advice_recorded"] is True
     assert league["advice_recorded"] is True
     assert sorted(stages["scoreboard"]["ours_kept_from_published"]) == ["352490", "7"]
-    records = sorted(operation.paths.records.rglob("advice.json"))
-    assert len(records) == 1
-    assert json.loads(records[0].read_bytes())["league_id"] == 352490
+    store, capture = operation.paths.records, operation._capture_id()
+    where = {
+        352490: store / "2026-27/gw02/entry-101" / capture / "advice.json",
+        7: store / "leagues/7/2026-27/gw02/entry-101" / capture / "advice.json",
+    }
+    assert sorted(store.rglob("advice.json")) == sorted(where.values())
+    for league_id, path in where.items():
+        assert json.loads(path.read_bytes())["league_id"] == league_id
     data = operation.paths.out / "data"
+    for league_id in TWO:
+        history = data / "leagues" / str(league_id) / "history" / "101.json"
+        assert json.loads(history.read_bytes())["payload"]["league_id"] == league_id
     directory = json.loads((data / "leagues.json").read_bytes())
     assert [row["league_id"] for row in directory["payload"]["leagues"]] == [7, 352490]
     assert [row["path"] for row in directory["payload"]["leagues"]] == [
@@ -152,7 +161,7 @@ def test_a_run_over_several_leagues_renders_each_tree_and_lists_them_all(
     assert not (data / "league").exists()
 
 
-def test_a_list_without_the_league_the_record_names_records_nothing_and_says_so(
+def test_a_list_without_the_store_root_league_records_under_its_own_league_root(
     tmp_path: Path,
 ) -> None:
     operation = world(
@@ -160,12 +169,71 @@ def test_a_list_without_the_league_the_record_names_records_nothing_and_says_so(
     )
     doc = json.loads(operation.execute().read_bytes())
     league = {stage["name"]: stage["value"] for stage in doc["stages"]}["league"]
-    assert league["advice_recorded"] is False
-    assert list(operation.paths.records.rglob("advice.json")) == []
+    assert league["advice_recorded"] is True
+    store = operation.paths.records
+    assert [path.relative_to(store).parts[:5] for path in store.rglob("advice.json")] == [
+        ("leagues", "7", "2026-27", "gw02", "entry-101")
+    ]
+    history = operation.paths.out / "data/leagues/7/history/101.json"
+    assert json.loads(history.read_bytes())["payload"]["league_id"] == 7
     log = "".join(
         path.read_text(encoding="utf-8") for path in operation.paths.log_root.rglob("*.jsonl")
     )
-    assert "tick.week.advice_record.skipped" in log
+    assert "tick.week.advice_record.skipped" not in log
+
+
+def test_the_receipt_says_advice_was_recorded_only_when_every_league_was(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    operation = world(tmp_path, league_ids=TWO, record_advice=True)
+    operation.values["capture"] = {"snapshot_id": operation.request.snapshot_id}
+    operation.values["handoff"] = {"path": str(operation.supplied_handoff)}
+
+    def publish(request: Any, **kwargs: Any) -> SimpleNamespace:
+        return SimpleNamespace(
+            output_paths=(),
+            gameweek=2,
+            report=SimpleNamespace(members=(), removed=()),
+            top100_note="",
+            published=None,
+        )
+
+    monkeypatch.setattr(weekly, "publish_league", publish)
+    value = operation._league().value
+    assert [value["leagues"][str(league)]["advice_recorded"] for league in TWO] == [True, True]
+    assert value["advice_recorded"] is True
+    # One league published without a record: the run did not record the advice it renders.
+    league_request = operation._league_request
+
+    def without_record_for_seven(league_id: int, record: bool) -> Any:
+        return league_request(league_id, record and league_id != 7)
+
+    monkeypatch.setattr(operation, "_league_request", without_record_for_seven)
+    value = operation._league().value
+    assert [value["leagues"][str(league)]["advice_recorded"] for league in TWO] == [True, False]
+    assert value["advice_recorded"] is False
+
+
+def test_the_run_reads_the_records_of_each_of_its_leagues_in_both_layouts(
+    tmp_path: Path,
+) -> None:
+    store = tmp_path / "records"
+    found = [
+        store / "2026-27/gw02/entry-101/fpl-live-a",
+        store / "leagues/7/2026-27/gw02/entry-101/fpl-live-a",
+        store / "leagues/7/2026-27/gw03/entry-202/fpl-live-b",
+    ]
+    ignored = [
+        # A league the run does not render, a staging sibling, and another season.
+        store / "leagues/9/2026-27/gw02/entry-101/fpl-live-a",
+        store / "leagues/7/2026-27/gw02/entry-101/.fpl-live-c.staging-1-abcd",
+        store / "2025-26/gw02/entry-101/fpl-live-z",
+    ]
+    for directory in (*found, *ignored):
+        directory.mkdir(parents=True)
+    assert weekly.recorded_capture_directories(store, "2026-27", TWO) == sorted(found)
+    assert weekly.recorded_capture_directories(store, "2026-27", (352490,)) == found[:1]
+    assert weekly.recorded_capture_directories(store, "2026-27", (7,)) == found[1:]
 
 
 @pytest.mark.parametrize(
@@ -1079,6 +1147,37 @@ def test_the_preflight_compares_a_reused_captures_records_with_this_runs_commit(
     assert capture in message and "a" * 40 + " (entry 101)" in message and "b" * 40 in message
     assert "c" * 40 not in message
     assert "--no-advice-record" in message and "drop --snapshot-id" in message
+
+
+def test_the_preflight_reads_the_reused_captures_records_under_every_leagues_root(
+    tmp_path: Path,
+) -> None:
+    """A league other than 352490 records under ``leagues/<id>/``, so a reused capture it
+    recorded from another commit is found there; a league the run does not render is not."""
+
+    base = world(tmp_path, league_ids=TWO)
+    capture = base.request.snapshot_id or ""
+    store = base.paths.records
+    _stored_record(store, capture, 101, "b" * 40)
+    _stored_record(store / "leagues" / "7", capture, 101, "a" * 40)
+    _stored_record(store / "leagues" / "9", capture, 202, "c" * 40)
+    operation = weekly.WeeklyOperations(
+        base.request,
+        base.paths,
+        run_id="recording",
+        repository_commit="b" * 40,
+        handoff=base.supplied_handoff,
+        record_advice=True,
+    )
+    with pytest.raises(WeekError) as refusal:
+        operation._refuse_a_record_from_another_commit()
+    message = str(refusal.value)
+    assert "a" * 40 + " (entry 101 in league 7)" in message
+    assert "c" * 40 not in message
+    assert operation.record_inputs == [
+        store / "2026-27/gw02/entry-101" / capture,
+        store / "leagues/7/2026-27/gw02/entry-101" / capture,
+    ]
 
 
 def test_a_reused_capture_recorded_from_another_commit_refuses_before_any_solve(

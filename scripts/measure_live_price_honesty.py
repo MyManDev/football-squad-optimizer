@@ -27,6 +27,7 @@ from scripts._experiment_cli import (
     write_text,
 )
 
+from squadopt.application.advice_record import STORE_ROOT_LEAGUE_ID, league_record_root
 from squadopt.application.live_price_honesty import (
     LIVE_PRICE_HONESTY_CONTRACT_VERSION,
     MINIMUM_GAMEWEEKS_FOR_INTERVAL,
@@ -34,7 +35,7 @@ from squadopt.application.live_price_honesty import (
     pairs_for_record,
     reading,
 )
-from squadopt.application.weekly_suggestion_eval import SUPPORTED_LEAGUE_ID, review_member_weeks
+from squadopt.application.weekly_suggestion_eval import review_member_weeks
 from squadopt.data.snapshots import list_snapshot_ids, read_snapshot
 from squadopt.data.sources import BOOTSTRAP_PAYLOAD, FPL_LIVE_SOURCE
 from squadopt.data.sources.fpl_live import live_event_outcomes, live_payload
@@ -56,7 +57,9 @@ def _parse_arguments(argv: Sequence[str] | None = None) -> argparse.Namespace:
 
 
 def measure(data_root: Path, season: str, through_gameweek: int | None) -> dict[str, Any]:
-    record_root, snapshot_root = data_root / "advice_records", data_root / "snapshots"
+    # The league this measurement has always read, at its own root in the record store.
+    record_root = league_record_root(data_root / "advice_records", STORE_ROOT_LEAGUE_ID)
+    snapshot_root = data_root / "snapshots"
     captures = [
         read_snapshot(snapshot_root, identifier)
         for identifier in list_snapshot_ids(snapshot_root, source=FPL_LIVE_SOURCE)
@@ -78,7 +81,7 @@ def measure(data_root: Path, season: str, through_gameweek: int | None) -> dict[
         snapshot_root=snapshot_root,
         as_of_snapshot=anchor,
         season=season,
-        league_id=SUPPORTED_LEAGUE_ID,
+        league_id=STORE_ROOT_LEAGUE_ID,
         entry_ids=entries,
         selected_records=selected,
     )

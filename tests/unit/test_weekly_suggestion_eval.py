@@ -6,7 +6,7 @@ import hashlib
 import json
 import math
 import re
-from collections.abc import Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import asdict
 from pathlib import Path
 from statistics import NormalDist
@@ -33,6 +33,8 @@ from squadopt.evaluation.live_series import (
 from squadopt.evaluation.models import EvaluationValidationError
 
 SEASON = "2026-27"
+# The league every synthetic record here names.
+LEAGUE = 352490
 DEADLINE = "2026-09-12T10:00:00Z"
 CAPTURED = "2026-09-09T09:00:00Z"
 PUBLISHED = "2026-09-09T10:00:00Z"
@@ -107,7 +109,7 @@ def points() -> pd.DataFrame:
 
 def choose(root: Path) -> dict[str, Any] | None:
     return review.select_record(
-        root, season=SEASON, gameweek=4, entry_id=101, deadline_utc=DEADLINE
+        root, league_id=LEAGUE, season=SEASON, gameweek=4, entry_id=101, deadline_utc=DEADLINE
     )
 
 
@@ -154,7 +156,13 @@ def snapshot(
 
 def evaluate(root: Path, captures: list[CapturedSnapshot]) -> review.WeekReview:
     return review.evaluate_week(
-        root, season=SEASON, gameweek=4, entry_id=101, deadline_utc=DEADLINE, captures=captures
+        root,
+        league_id=LEAGUE,
+        season=SEASON,
+        gameweek=4,
+        entry_id=101,
+        deadline_utc=DEADLINE,
+        captures=captures,
     )
 
 
@@ -224,7 +232,13 @@ def test_no_records_and_only_late_record_are_honest(tmp_path: Path) -> None:
 
 def shown_by_tree(root: Path, tree: dict[tuple[int, int], str]) -> dict[str, Any] | None:
     return review.select_record(
-        root, season=SEASON, gameweek=4, entry_id=101, deadline_utc=DEADLINE, published=tree
+        root,
+        league_id=LEAGUE,
+        season=SEASON,
+        gameweek=4,
+        entry_id=101,
+        deadline_utc=DEADLINE,
+        published=tree,
     )
 
 
@@ -249,6 +263,7 @@ def test_a_record_from_a_run_that_never_published_is_not_what_the_member_was_tol
     assert shown_by_tree(records, tree) == shown
     week = review.evaluate_week(
         records,
+        league_id=LEAGUE,
         season=SEASON,
         gameweek=4,
         entry_id=101,
@@ -274,6 +289,7 @@ def test_a_week_whose_records_the_published_tree_does_not_name_is_refused_not_sc
         shown_by_tree(tmp_path, tree)
     result = review.evaluate_week(
         tmp_path,
+        league_id=LEAGUE,
         season=SEASON,
         gameweek=4,
         entry_id=101,
@@ -530,19 +546,130 @@ def test_publication_is_bounded_by_capture_and_never_mutates_inputs(tmp_path: Pa
     assert before == digests()
 
 
-def test_other_leagues_are_rejected(tmp_path: Path) -> None:
+@pytest.mark.parametrize("league_id", [0, -1, True])
+def test_a_league_that_is_not_a_positive_integer_is_refused(
+    tmp_path: Path, league_id: object
+) -> None:
     capture = snapshot(tmp_path / "snapshots")
-    with pytest.raises(review.SuggestionEvaluationError, match="Only league"):
+    with pytest.raises(review.SuggestionEvaluationError, match="positive integer"):
         review.publish_suggestion_histories(
             record_root=tmp_path / "records",
             snapshot_root=tmp_path / "snapshots",
             as_of_snapshot=capture,
             season=SEASON,
-            league_id=123,
+            league_id=league_id,  # type: ignore[arg-type]
             entry_ids=[101],
             out_dir=tmp_path / "out",
             published={},
         )
+    assert not (tmp_path / "out").exists()
+
+
+def test_each_league_reads_the_records_that_name_it_and_no_other(tmp_path: Path) -> None:
+    """Any league is read, and a record is held to the league whose root it is under."""
+
+    other_league = recorded()
+    other_league["league_id"] = 7
+    record_member_advice(tmp_path / "seven", other_league)
+    record_member_advice(tmp_path / "root", recorded())
+
+    def read(root: Path, league_id: int) -> dict[str, Any] | None:
+        return review.select_record(
+            root,
+            league_id=league_id,
+            season=SEASON,
+            gameweek=4,
+            entry_id=101,
+            deadline_utc=DEADLINE,
+        )
+
+    assert read(tmp_path / "seven", 7) == other_league
+    assert read(tmp_path / "root", LEAGUE) == recorded()
+    for root, league_id in ((tmp_path / "seven", LEAGUE), (tmp_path / "root", 7)):
+        with pytest.raises(review.SuggestionEvaluationError, match="Record identity"):
+            read(root, league_id)
+    history = review.publish_suggestion_histories(
+        record_root=tmp_path / "seven",
+        snapshot_root=tmp_path / "snapshots",
+        as_of_snapshot=snapshot(tmp_path / "snapshots"),
+        season=SEASON,
+        league_id=7,
+        entry_ids=[101],
+        out_dir=tmp_path / "out",
+        published={(101, 4): "capture-a"},
+    )[0]
+    document = json.loads(history.read_text(encoding="utf-8"))
+    assert document["payload"]["league_id"] == 7
+    assert document["payload"]["weeks"][0]["status"] == "available"
+
+
+def test_the_replaced_tree_names_each_members_weeks_of_this_season(tmp_path: Path) -> None:
+    league = tmp_path / "league"
+    put(
+        league / "history/101.json",
+        {
+            "payload": {
+                "entry_id": 101,
+                "season": SEASON,
+                "weeks": [{"gameweek": 4}, {"gameweek": 3}, {"gameweek": "2"}, {"gameweek": 0}],
+            }
+        },
+    )
+    put(league / "history/202.json", {"payload": {"entry_id": 202, "season": "2025-26"}})
+    put(league / "history/303.json", {"payload": {"entry_id": 404, "season": SEASON}})
+    (league / "history/505.json").write_text("{not json", encoding="utf-8")
+    put(league / "history/606.json", {"payload": {"entry_id": 606, "season": SEASON}})
+    assert review.published_history_weeks(league, season=SEASON) == {
+        101: frozenset({3, 4}),
+        606: frozenset(),
+    }
+    assert review.published_history_weeks(tmp_path / "no-tree", season=SEASON) == {}
+
+
+def test_a_history_that_would_drop_a_week_its_predecessor_carried_is_refused(
+    tmp_path: Path,
+) -> None:
+    """Absent is not zero: a week the replaced history showed, whose record the store no
+    longer holds, refuses the whole publication rather than vanishing from the page."""
+
+    records, out = tmp_path / "records", tmp_path / "out"
+    record_member_advice(records, recorded())
+    settled = snapshot(tmp_path / "snapshots")
+
+    def publish(replaced: Mapping[int, Collection[int]]) -> tuple[Path, ...]:
+        return review.publish_suggestion_histories(
+            record_root=records,
+            snapshot_root=tmp_path / "snapshots",
+            as_of_snapshot=settled,
+            season=SEASON,
+            league_id=LEAGUE,
+            entry_ids=[101, 202],
+            out_dir=out,
+            published={(101, 4): "capture-a"},
+            replaced=replaced,
+        )
+
+    with pytest.raises(review.SuggestionEvaluationError) as refusal:
+        publish({101: {3, 4}, 202: {2}})
+    message = str(refusal.value)
+    assert "entry 101: gameweek(s) 3" in message and "entry 202: gameweek(s) 2" in message
+    assert not out.exists()
+    # A week whose status changes is still a row, not a drop. A member this publication does
+    # not render (909) keeps the file they had, which is neither compared nor rewritten.
+    unsettled = {
+        "entry_id": 101,
+        "season": SEASON,
+        "weeks": [{"gameweek": 4, "status": "unsettled"}],
+    }
+    put(out / "history/101.json", {"payload": unsettled})
+    departed = {"entry_id": 909, "season": SEASON, "weeks": [{"gameweek": 1}]}
+    put(out / "history/909.json", {"payload": departed})
+    written = publish(review.published_history_weeks(out, season=SEASON))
+    weeks = json.loads(written[0].read_text(encoding="utf-8"))["payload"]["weeks"]
+    assert [(week["gameweek"], week["status"]) for week in weeks] == [(4, "available")]
+    assert json.loads((out / "history/909.json").read_text(encoding="utf-8")) == {
+        "payload": departed
+    }
 
 
 def test_later_other_strategy_does_not_displace_the_pure_points_record(tmp_path: Path) -> None:

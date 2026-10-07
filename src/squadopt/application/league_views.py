@@ -1307,7 +1307,9 @@ def build_league_views(
     what a member was told for a given week. The record is written here, by the same call
     that writes the published bytes, from the same picks, projection and payloads; a runner
     around this could only guess. The weekly run passes it for the preview it will publish,
-    since that preview's tree is what its publish stage commits, without solving again.
+    since that preview's tree is what its publish stage commits, without solving again. It is
+    this league's own root in the record store (``advice_record.league_record_root``), so a
+    member of two leagues is recorded once under each.
 
     The record is keyed by ``inputs``' capture, so the mid-week publish and the one taken
     shortly before the deadline each write their own and neither refuses the other. A

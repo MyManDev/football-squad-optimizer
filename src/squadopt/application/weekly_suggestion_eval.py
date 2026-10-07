@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 import math
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
@@ -58,7 +58,6 @@ from squadopt.evaluation.scoring import score_frozen_squad_decision
 from squadopt.live.recommendation import infer_season
 
 CONTRACT_VERSION = "weekly_suggestion_history_v1"
-SUPPORTED_LEAGUE_ID = 352490
 
 # The horizon handoff, specified in docs/contracts/member_week_horizon_v1.md. The reader
 # rejects the whole document when any one of these disagrees with the scoreboard it is shown
@@ -146,6 +145,14 @@ def _identifier(value: object) -> int:
     return value
 
 
+def _league(value: object) -> int:
+    """The league a review reads, refused before any record is opened when it is not one."""
+
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        raise SuggestionEvaluationError(f"The league must be a positive integer, got {value!r}.")
+    return value
+
+
 def _ids(value: object) -> tuple[int, ...]:
     if not isinstance(value, list):
         raise SuggestionEvaluationError("Missing recorded lineup.")
@@ -216,9 +223,34 @@ def published_advice_captures(league_dir: Path) -> dict[tuple[int, int], str]:
     return carried
 
 
+def published_history_weeks(league_dir: Path, *, season: str) -> dict[int, frozenset[int]]:
+    """Every gameweek row each member's published history carries for ``season``.
+
+    Read from the tree a publication replaces, before it is rewritten, so the histories
+    that replace it can be held to every week it showed (:func:`publish_suggestion_histories`).
+    A history of another season, one filed under a member it does not name, or one that
+    cannot be read names no week here, as :func:`published_advice_captures` reads them.
+    """
+    carried: dict[int, frozenset[int]] = {}
+    for path in sorted((league_dir / "history").glob("*.json")):
+        payload = _published_payload(path)
+        if payload is None or not path.stem.isdigit() or payload.get("entry_id") != int(path.stem):
+            continue
+        if payload.get("season") != season:
+            continue
+        rows = payload.get("weeks")
+        carried[int(path.stem)] = frozenset(
+            row["gameweek"]
+            for row in (rows if isinstance(rows, list) else ())
+            if isinstance(row, dict) and type(row.get("gameweek")) is int and row["gameweek"] > 0
+        )
+    return carried
+
+
 def select_record(
     root: Path,
     *,
+    league_id: int,
     season: str,
     gameweek: int,
     entry_id: int,
@@ -239,8 +271,13 @@ def select_record(
     member was shown the plan, so no member-facing document is built from it:
     :func:`publish_suggestion_histories` requires the map.
 
+    ``root`` is the league's own root in the record store
+    (``advice_record.league_record_root``), and a record there that names another league
+    is refused like any other identity that does not match.
+
     An unreadable candidate is refused instead of silently falling back to an older one.
     """
+    league_id = _league(league_id)
     deadline = as_instant(normalize_utc_timestamp(deadline_utc, label="deadline_utc"))
     candidates: list[tuple[datetime, str, dict[str, Any]]] = []
     for capture in recorded_captures(root, season, gameweek, entry_id):
@@ -250,7 +287,7 @@ def select_record(
             or record.get("season") != season
             or _identifier(record.get("gameweek")) != gameweek
             or _identifier(record.get("entry_id")) != entry_id
-            or _identifier(record.get("league_id")) != SUPPORTED_LEAGUE_ID
+            or _identifier(record.get("league_id")) != league_id
             or record.get("player_id_space") != "fpl_element_code"
         ):
             raise SuggestionEvaluationError("Record identity does not match the requested member.")
@@ -395,6 +432,7 @@ def _advice(record: Mapping[str, Any]) -> Mapping[str, Any]:
 def evaluate_week(
     root: Path,
     *,
+    league_id: int,
     season: str,
     gameweek: int,
     entry_id: int,
@@ -407,6 +445,7 @@ def evaluate_week(
     try:
         record = select_record(
             root,
+            league_id=league_id,
             season=season,
             gameweek=gameweek,
             entry_id=entry_id,
@@ -494,6 +533,54 @@ def evaluate_week(
     )
 
 
+def recorded_weeks(record_root: Path, season: str, entry_id: int) -> tuple[int, ...]:
+    """The gameweeks the store holds a member's record directory for, newest first.
+
+    A member's history has one row for each of these weeks and for no other
+    (:func:`review_member_weeks`), whatever each row then says about it.
+    """
+    return tuple(
+        int(directory.name[2:])
+        for directory in sorted((record_root / season).glob("gw[0-9][0-9]"), reverse=True)
+        if (directory / f"entry-{entry_id}").is_dir()
+    )
+
+
+def refuse_dropped_history_weeks(
+    record_root: Path,
+    *,
+    league_id: int,
+    season: str,
+    entry_ids: Sequence[int],
+    replaced: Mapping[int, Collection[int]],
+) -> None:
+    """Refuse histories that would drop a week the histories they replace carried.
+
+    ``replaced`` is what the replaced tree's histories carry (:func:`published_history_weeks`).
+    A week carried there that the store holds no record directory for would vanish from the
+    member's history: the store cannot answer for it, which is an absence, not a week that
+    never happened, so nothing is published with fewer weeks and the refusal names each
+    member and week. A week whose status or score changes is still a row and is not a drop.
+    Only ``entry_ids`` are compared: a member this publication does not render keeps the
+    file they had, which is never rewritten.
+    """
+    named = []
+    for entry_id in dict.fromkeys(entry_ids):
+        dropped = sorted(
+            set(replaced.get(entry_id, ())) - set(recorded_weeks(record_root, season, entry_id))
+        )
+        if dropped:
+            named.append(f"entry {entry_id}: gameweek(s) {', '.join(map(str, dropped))}")
+    if named:
+        raise SuggestionEvaluationError(
+            f"League {league_id}'s {season} histories would drop weeks the published "
+            f"histories they replace carry ({'; '.join(named)}). No record of those weeks "
+            f"is under {record_root}. A week the store cannot answer for is absent, not a "
+            "week that never happened, so nothing is published with fewer weeks. Restore "
+            "the records, or check which record root this league reads."
+        )
+
+
 def review_member_weeks(
     *,
     record_root: Path,
@@ -510,9 +597,13 @@ def review_member_weeks(
     This is the body the publisher serializes, so the document and any later reading of the
     same weeks are the same reviews rather than two walks that could drift apart.
     ``published`` is passed to :func:`select_record` for every week.
+
+    ``record_root`` is ``league_id``'s own root in the record store
+    (``advice_record.league_record_root``); every record read is held to that league.
     """
-    if league_id != SUPPORTED_LEAGUE_ID or not re.fullmatch(r"\d{4}-\d{2}", season):
-        raise SuggestionEvaluationError("Only league 352490 and a valid season are supported.")
+    league_id = _league(league_id)
+    if not re.fullmatch(r"\d{4}-\d{2}", season):
+        raise SuggestionEvaluationError(f"A season is spelled like 2026-27, got {season!r}.")
     if infer_season(as_of_snapshot) != season:
         raise SuggestionEvaluationError("The publication anchor belongs to another season.")
     cutoff = as_instant(as_of_snapshot.metadata.captured_at_utc)
@@ -534,16 +625,14 @@ def review_member_weeks(
         if entry_id in reviews:
             continue
         weeks = []
-        for directory in sorted((record_root / season).glob("gw[0-9][0-9]"), reverse=True):
-            if not (directory / f"entry-{entry_id}").is_dir():
-                continue
-            week = int(directory.name[2:])
+        for week in recorded_weeks(record_root, season, entry_id):
             if week not in deadlines:
                 weeks.append(WeekReview(week, "unavailable", "missing_deadline"))
             else:
                 weeks.append(
                     evaluate_week(
                         record_root,
+                        league_id=league_id,
                         season=season,
                         gameweek=week,
                         entry_id=entry_id,
@@ -814,6 +903,7 @@ def publish_suggestion_histories(
     out_dir: Path,
     published: PublishedCaptures,
     policy: DetectionPolicy = DEFAULT_DETECTION_POLICY,
+    replaced: Mapping[int, Collection[int]] | None = None,
 ) -> tuple[Path, ...]:
     """Publish member-safe derived documents from existing verified, bounded captures.
 
@@ -826,7 +916,20 @@ def publish_suggestion_histories(
     ``published`` is what the tree these documents join says each member was shown
     (:func:`published_advice_captures`), and it is required: a history shows a week as what
     the member was told only when its record is the capture that tree names.
+
+    ``replaced`` is the gameweeks each member's history carried in the tree these documents
+    replace (:func:`published_history_weeks`); with it, histories that would drop one of
+    those weeks are refused before any document is written
+    (:func:`refuse_dropped_history_weeks`).
     """
+    if replaced is not None:
+        refuse_dropped_history_weeks(
+            record_root,
+            league_id=league_id,
+            season=season,
+            entry_ids=entry_ids,
+            replaced=replaced,
+        )
     selected_records: dict[tuple[int, int], dict[str, Any]] = {}
     reviews = review_member_weeks(
         record_root=record_root,
