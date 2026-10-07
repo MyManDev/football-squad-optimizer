@@ -84,6 +84,12 @@ HIGHS_CORE_VERSION: Final = "1.15.1"
 #: The npm package's own version, as ``web/package.json`` pins it; it wraps core 1.15.1.
 HIGHS_PACKAGE_VERSION: Final = "1.15.3"
 NODE_MAJOR: Final = 22
+#: The settings ``plan_transfers`` builds for a member's one-week plan when given none,
+#: named rather than inherited (#590): no deterministic limit, so the ten wall-clock
+#: seconds of ``OptimizationConfig`` bind. The one-week rebuild must reproduce the published
+#: plan, which was solved under them, so it is a gate and not a measured number; the window
+#: solves name both of their limits (``window_call``).
+PRODUCTION_ONE_WEEK_SETTINGS: Final = OptimizationConfig(solver_deterministic_time_limit=None)
 #: The game's sell-on fee. The three input documents do not publish it, and at the flat
 #: captured prices it does not enter the model: a lot bought inside the window sells at its
 #: buy price for any fee, so the fee reaches only the configuration fingerprint.
@@ -184,8 +190,11 @@ READINGS: Final = (
 )
 
 
-#: The runner file this process loaded; a native child must report the same digest.
-RUNNER_SHA256: Final = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+#: The runner file this process loaded, with LF line ends so the digest is the committed
+#: file's on every checkout; a native child must report the same digest.
+RUNNER_SHA256: Final = hashlib.sha256(
+    Path(__file__).read_bytes().replace(b"\r\n", b"\n")
+).hexdigest()
 #: Driver failures that mean the solve never started, which stop the run rather than
 #: scoring as a HiGHS error.
 SETUP_FAILURES: Final = (
@@ -331,7 +340,7 @@ def _policy_number(name: str) -> float:
 def require_rules(table: Mapping[str, Any]) -> None:
     """The published rules and coefficients are the ones this code would solve with."""
 
-    settings = OptimizationConfig()
+    settings = PRODUCTION_ONE_WEEK_SETTINGS
     rules = table["rules"]
     expected: dict[str, object] = {
         "squad_size": settings.squad_size,
@@ -430,7 +439,7 @@ def one_week_call(inputs: PublishedInputs, entry_id: int) -> PlannerCall:
     return PlannerCall(
         horizon=PlanningHorizon(horizon),
         state=_state(block, policy),
-        settings=OptimizationConfig(),
+        settings=PRODUCTION_ONE_WEEK_SETTINGS,
         policy=policy,
         linearization_level=None,
         protect_hold=False,
@@ -1685,7 +1694,7 @@ def _best_lineup(rows: Sequence[tuple[str, int, int]], settings: OptimizationCon
 def published_plan_value(call: PlannerCall, published: Mapping[str, Any]) -> dict[str, Any]:
     """The published plan's transfers, valued under the measured model's objective."""
 
-    settings = OptimizationConfig()
+    settings = PRODUCTION_ONE_WEEK_SETTINGS
     table = call.horizon.table
     weeks = sorted(int(week) for week in table["gameweek"].unique())
     plan_weeks = published["plan_weeks"]
@@ -2523,8 +2532,16 @@ def _measure_locked(node: str, versions: Mapping[str, Any], out_dir: Path) -> di
     require_code_from_this_tree()
     revision, dirty = _git_revision()
     if dirty:
+        changed = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=REPOSITORY_ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        ).stdout.strip()
         raise ProtocolRefusal(
-            "The working tree has uncommitted changes; measure runs only from a clean commit."
+            "The working tree has uncommitted changes; measure runs only from a clean "
+            f"commit. Write logs outside the tree. git status: {changed[:500]}"
         )
     inputs = load_inputs()
     members = sorted(inputs.members)
@@ -2643,6 +2660,9 @@ def markdown(record: Mapping[str, Any]) -> str:
         f"Protocol `{record['protocol']}`, issue #{record['issue']}, capture "
         f"`{record['capture']}`, commit `{record['repository_commit']}`. One week of one "
         "season with a flat calendar; nothing here claims more.",
+        "",
+        f"Run from {record.get('started_at_utc')} to {record.get('finished_at_utc')}; head at "
+        f"the end `{record.get('head_at_end')}`, runner sha256 `{record.get('runner_sha256')}`.",
         "",
         "## Verdicts",
         "",

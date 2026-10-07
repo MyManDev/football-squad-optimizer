@@ -11,6 +11,7 @@ and ``plan_transfers`` hand it. Nothing here times a solve.
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import math
 import shutil
@@ -1547,8 +1548,10 @@ def test_every_solve_job_carries_its_own_nonce_and_both_drivers_echo_it() -> Non
 
 
 def test_a_native_child_that_ran_another_runner_file_is_refused(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
+    monkeypatch.setattr(runner, "ARTIFACT_DIR", tmp_path)
+
     def answer(command: Any, out_path: Path, *, timeout: float, nonce: Any = None) -> Any:
         return {"nonce": nonce, "runner_sha256": "0" * 64}
 
@@ -1566,6 +1569,20 @@ def test_the_native_answer_carries_the_nonce_and_the_runner_digest(
     result = runner.native_run({**job, "objective": {"0": 3}, "nonce": "n1"})
     assert result["nonce"] == "n1"
     assert result["runner_sha256"] == runner.RUNNER_SHA256
+
+
+def test_the_runner_digest_is_the_committed_file_s_on_every_checkout() -> None:
+    source = Path(runner.__file__).read_bytes().replace(b"\r\n", b"\n")
+    assert hashlib.sha256(source).hexdigest() == runner.RUNNER_SHA256
+
+
+def test_the_dirty_tree_refusal_names_what_is_dirty(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _measure(monkeypatch)
+    monkeypatch.setattr(runner, "_git_revision", lambda: ("a" * 40, True))
+    with pytest.raises(runner.ProtocolRefusal, match=r"Write logs outside the tree. git status"):
+        runner.run_measure("node", GOOD_VERSIONS, tmp_path)
 
 
 def test_the_third_server_reading_is_the_protocol_s() -> None:
