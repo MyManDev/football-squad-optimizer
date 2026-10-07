@@ -47,6 +47,10 @@ const REASONS: Record<string, [string, string]> = {
     "Duplicate source evidence was not applied together.",
   ],
   ambiguous_fixture_scope: ["Hangi maça ait olduğu belirsiz.", "The target fixture is ambiguous."],
+  ambiguous_current_week_fixture: [
+    "Bu hafta birden çok lig maçı.",
+    "Multiple league fixtures this week.",
+  ],
   missing_components: [
     "Gerekli maç bileşenleri bulunmuyor.",
     "Required fixture components are missing.",

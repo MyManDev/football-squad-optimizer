@@ -518,6 +518,50 @@ def claim_targets_next_fixture(
     published_at_utc: str | None,
     published_precision: str,
 ) -> bool:
+    """Bind a weekly claim only to one next club fixture in the target gameweek."""
+    return _claim_targets_next_fixture(
+        fixtures,
+        team_code=team_code,
+        target_gameweek=target_gameweek,
+        captured_at_utc=captured_at_utc,
+        published_at_utc=published_at_utc,
+        published_precision=published_precision,
+        multiple=False,
+    )
+
+
+def claim_has_only_multiple_fixture_failure(
+    fixtures: pd.DataFrame,
+    *,
+    team_code: int,
+    target_gameweek: int,
+    captured_at_utc: str,
+    published_at_utc: str | None,
+    published_precision: str,
+) -> bool:
+    """A next-match claim otherwise binds, but its target week has multiple fixtures."""
+    target = fixtures.loc[fixtures.team_id.eq(team_code) & fixtures.gameweek.eq(target_gameweek)]
+    return len(target) > 1 and _claim_targets_next_fixture(
+        fixtures,
+        team_code=team_code,
+        target_gameweek=target_gameweek,
+        captured_at_utc=captured_at_utc,
+        published_at_utc=published_at_utc,
+        published_precision=published_precision,
+        multiple=True,
+    )
+
+
+def _claim_targets_next_fixture(
+    fixtures: pd.DataFrame,
+    *,
+    team_code: int,
+    target_gameweek: int,
+    captured_at_utc: str,
+    published_at_utc: str | None,
+    published_precision: str,
+    multiple: bool,
+) -> bool:
     """Bind 'next league match' to the first club fixture after the source instant.
 
     A lexical next-match label cannot skip a game already played since publication.
@@ -536,10 +580,13 @@ def claim_targets_next_fixture(
     if club.loc[possibly_before_target, "kickoff_time_utc"].isna().any():
         return False
     target = club.loc[club.gameweek.eq(target_gameweek)]
-    if len(target) != 1 or target.kickoff_time_utc.isna().any():
+    if target.empty or (not multiple and len(target) != 1) or target.kickoff_time_utc.isna().any():
         return False
     try:
-        kickoff = as_instant(str(target.iloc[0].kickoff_time_utc))
+        target_times = [as_instant(str(value)) for value in target.kickoff_time_utc]
+        if any(value.tzinfo is None for value in target_times):
+            return False
+        kickoff = min(target_times)
     except (TypeError, ValueError):
         return False
     if kickoff.tzinfo is None or kickoff <= cutoff:

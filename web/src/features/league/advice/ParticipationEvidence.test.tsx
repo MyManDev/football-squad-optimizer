@@ -5,6 +5,7 @@ import { mockEntryAdviceEnvelope } from "../../../fixtures/league";
 import type { AdviceParticipationEvidence } from "../types";
 import { ParticipationEvidence } from "./ParticipationEvidence";
 import { isAdvicePayload } from "./adviceShape";
+import { StatementOutcomes } from "./StatementOutcomes";
 
 afterEach(cleanup);
 const evidence: AdviceParticipationEvidence = {
@@ -17,6 +18,39 @@ const evidence: AdviceParticipationEvidence = {
   manager_statement_count: 3,
   assumptions: ["source_eligibility_only", "no_start_or_minutes_reestimate"],
 };
+
+it.each(["tr", "en"] as const)("names the multiple-fixture outcome in %s", (language) => {
+  const view = {
+    ...mockEntryAdviceEnvelope(101, "saf-puan", 3).payload,
+    participation_evidence: {
+      ...evidence,
+      statement_outcomes: [
+        {
+          player_id: 1,
+          disposition: "stated_expected_absent",
+          applied: false,
+          reason: "ambiguous_current_week_fixture",
+          source_url: null,
+          source_published_at: null,
+        },
+      ],
+    },
+  };
+  expect(isAdvicePayload(view)).toBe(true);
+  render(
+    <LanguageProvider initialLanguage={language}>
+      <StatementOutcomes view={view} />
+    </LanguageProvider>,
+  );
+  const detail = screen.getByTestId("statement-outcomes");
+  expect(detail).toHaveTextContent(
+    language === "tr" ? "Bu hafta birden çok lig maçı." : "Multiple league fixtures this week.",
+  );
+  expect(detail).not.toHaveTextContent("ambiguous_current_week_fixture");
+  expect(detail).not.toHaveTextContent(
+    language === "tr" ? "gerekli koşulları sağlamadığı" : "did not meet the requirements",
+  );
+});
 
 it.each(["tr", "en"] as const)(
   "accepts and explains source-specific outcomes in %s",
