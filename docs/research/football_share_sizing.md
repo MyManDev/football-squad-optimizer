@@ -2,8 +2,9 @@
 
 ## Frozen before the run
 
-This is forecast sizing for issue #1009 part (a), not an accuracy reading. No
-settled outcome, live outcome payload or archive result is read. The served model
+This is forecast sizing for issue #1009 part (a), not an accuracy reading. The
+declared existing-companion run reads no settled outcome, live outcome payload
+or archive result. The served model
 and the v1 shadow are unchanged.
 
 The declared population is the existing retained-history companion for capture
@@ -39,7 +40,8 @@ includes per-club S1, available-player count, maximum S2, threshold count and go
 For a missing companion, the runner rebuilds into its own evidence directory
 using the served forecast's exact gameweeks and training-season selection, with
 `role_minutes=True`, `retained_role_history=True`, and no contextual or manager
-inputs. The rebuilt forecast must have the served fingerprint. It never writes
+inputs. That explicit fallback fits only the served historical training inputs;
+it does not score target outcomes. The rebuilt forecast must have the served fingerprint. It never writes
 to the input artifact root or to `data/`.
 
 The binary club-total assertion needs an owner clarification for the all-absent
