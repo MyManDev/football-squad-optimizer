@@ -111,6 +111,7 @@ Date is the file's last commit (`git log -1 --format=%as -- scripts/<name>.py`).
 
 | Script | Class | Record it writes, or what names it | Last commit |
 | --- | --- | --- | --- |
+| `build_football_shadow.py` | artifact-only runner | `artifacts/shadow/football_team_share_v1/{football,receipts}/<capture>.json`; `docs/football_prospective_shadow_note.md`, #999 | 2026-10-07 |
 | `compare_component_oof_development.py` | artifact-only runner | `--output-dir` (`comparison.json`, `comparison.md`) | 2026-09-07 |
 | `export_component_oof.py` | artifact-only runner | `artifacts/phase_c/` | 2026-09-07 |
 | `export_decided_appearance.py` | artifact-only runner | `artifacts/double_reduction/`; the `--fitted` input of `measure_double_reduction.py` | 2026-09-25 |
