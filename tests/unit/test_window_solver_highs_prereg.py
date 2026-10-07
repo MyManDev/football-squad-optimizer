@@ -18,6 +18,7 @@ from squadopt.application import advice
 from squadopt.application.advice import solve_window_plan
 from squadopt.live.transfers import plan_transfer_horizon
 from squadopt.optimization.optimizer import configure_solver
+from squadopt.planning import optimizer as planning_optimizer
 
 REPOSITORY = Path(__file__).resolve().parents[2]
 PROTOCOL = REPOSITORY / "docs" / "window_solver_highs_prereg.md"
@@ -165,6 +166,27 @@ def test_the_model_is_the_path_the_published_member_windows_take() -> None:
     assert "The football windows' guarded, expected and observed route is not measured." in (
         instances
     )
+
+
+def test_the_tie_break_exclusion_says_when_the_planner_still_solves_it() -> None:
+    """The planner solves its tie-break only after a primary it proves with budget left."""
+
+    source = inspect.getsource(planning_optimizer)
+    assert "if primary_status is SolverStatus.OPTIMAL and deterministic_budget_available:" in (
+        source
+    )
+    exclusions = _section("Deliberate exclusions")
+    assert "No tie-break is measured or compared, and no plan identity." in exclusions
+    assert "a CP-SAT run whose primary it proves with deterministic budget left" in exclusions
+
+
+def test_the_one_check_solved_after_the_thresholds_is_disclosed() -> None:
+    read = _section("What has been read")
+    assert "After the thresholds below were committed (5d64cf22)" in read
+    assert "one run of the runner's `check` command" in read
+    assert "solved one member, 8883467, on CP-SAT at the production budget" in read
+    assert "the exporter's first check passed on all four" in read
+    assert "No threshold changed after it, and no HiGHS solve of any instance has run." in read
 
 
 def test_the_verdicts_and_their_checks_are_fixed_before_any_solve() -> None:
