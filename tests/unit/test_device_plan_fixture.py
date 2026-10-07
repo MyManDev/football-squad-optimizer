@@ -46,6 +46,45 @@ def test_the_recorded_answers_are_the_planner_s() -> None:
         assert differences == [], (fresh["entry_id"], differences)
     assert _same(rebuilt["chips"], recorded["chips"], "chips") == []
     assert _same(rebuilt["rivals"], recorded["rivals"], "rivals") == []
+    assert _same(rebuilt["preferences"], recorded["preferences"], "preferences") == []
+
+
+def test_preferences_hold_every_constraint_and_prove_the_infeasible_case() -> None:
+    recorded = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    cases = recorded["preferences"]["cases"]
+    assert {case["name"] for case in cases} == {
+        "keep-held",
+        "avoid-held",
+        "avoid-not-held",
+        "no-hits-zero-free",
+        "no-hits-wildcard",
+        "no-hits-freehit",
+        "save-chips",
+        "keep-freehit",
+        "avoid-top100",
+        "infeasible-no-hits-sale",
+    }
+    for case in cases:
+        preferences, reference = case["preferences"], case["reference"]
+        if case["name"] == "infeasible-no-hits-sale":
+            assert reference == {"refused": True, "solver_status": "INFEASIBLE"}
+            continue
+        assert reference["refused"] is False
+        assert reference["solver_status"] == "OPTIMAL"
+        assert set(preferences["keep_players"]) <= set(reference["squad"])
+        assert not set(preferences["avoid_players"]) & set(reference["squad"])
+        if preferences["no_hits"]:
+            assert reference["transfer_hit_points"] == 0
+        if case["name"] == "no-hits-zero-free":
+            assert reference["transfers_in"] == reference["transfers_out"] == []
+        if case["name"] in {"no-hits-wildcard", "no-hits-freehit"}:
+            assert case["entry"]["free_transfers"] == 0
+            assert len(reference["transfers_in"]) > 0
+    weighted = next(case for case in cases if case["name"] == "avoid-top100")
+    assert weighted["top100_weight"] == 20
+    assert all(
+        "20" in player["top100_scaled"] for player in recorded["preferences"]["document"]["players"]
+    )
 
 
 def test_the_fixture_covers_a_paid_transfer_and_every_free_transfer_count() -> None:

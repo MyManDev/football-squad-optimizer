@@ -28,6 +28,7 @@ from __future__ import annotations
 import json
 import random
 import tempfile
+from copy import deepcopy
 from pathlib import Path
 from typing import Any, Final
 
@@ -48,8 +49,10 @@ from squadopt.application.lineup_publication import (
     best_eleven_points,
     best_lineup_points_with_chip,
 )
-from squadopt.application.top100_weight import Top100Counts
+from squadopt.application.top100_weight import Top100Counts, weighted_projection
 from squadopt.contracts.players import order_outfield_bench
+from squadopt.contracts.preferences import DecisionPreferences
+from squadopt.live import Projection
 from squadopt.live.transfers import MEMBER_PLANNING_POLICY
 from squadopt.optimization import OptimizationConfig
 from squadopt.optimization.coefficients import objective_coefficients, scale_expected_points
@@ -212,8 +215,15 @@ def _reference(
     free: int,
     settings: OptimizationConfig,
     chip: str | None = None,
+    preferences: DecisionPreferences | None = None,
+    top100_counts: dict[int, int] | None = None,
+    top100_weight: int = 0,
 ) -> dict[str, Any]:
     horizon_table = table.copy()
+    if top100_weight:
+        horizon_table = weighted_projection(
+            Projection(horizon_table, (), {}), top100_counts or {}, top100_weight
+        ).table
     horizon_table["sell_price_tenths"] = [
         sell.get(int(player), int(price))
         for player, price in zip(table["player_id"], table["buy_price_tenths"], strict=True)
@@ -238,7 +248,10 @@ def _reference(
         settings,
         transfer,
         chips=chips,
+        preferences=preferences,
     )
+    if preferences is not None and plan.solver_status.value == "INFEASIBLE":
+        return {"refused": True, "solver_status": "INFEASIBLE"}
     if plan.solver_status.value != "OPTIMAL":
         raise RuntimeError(f"The reference solve was not proved: {plan.solver_status.value}.")
     week = plan.weeks[0]
@@ -246,6 +259,11 @@ def _reference(
         raise RuntimeError(f"The forced {chip!r} plan came back playing {week.chip!r}.")
     captain = int(week.captain["player_id"])
     eligible = week.starting_xi.loc[week.starting_xi.player_id.ne(captain)]
+    if top100_weight:
+        eligible = eligible.copy()
+        eligible["expected_points"] = eligible.player_id.map(
+            table.set_index("player_id").expected_points
+        )
     vice = int(
         eligible.sort_values(["expected_points", "player_id"], ascending=[False, True])
         .iloc[0]
@@ -647,7 +665,79 @@ def build_fixture() -> dict[str, Any]:
         "members": members,
         "chips": chips,
         "rivals": build_rival_fixture(),
+        "preferences": build_preference_fixture(table, document, members, settings),
     }
+
+
+def build_preference_fixture(
+    table: pd.DataFrame,
+    document: dict[str, Any],
+    members: list[dict[str, Any]],
+    settings: OptimizationConfig,
+) -> dict[str, Any]:
+    """The window-one planner reference for the device's explicit preferences."""
+    member = next(row for row in members if row["entry_id"] == 2)
+    entry = member["entry"]
+    held = list(entry["held"])
+    not_held = min(set(table.player_id) - set(held))
+    specifications = [
+        ("keep-held", DecisionPreferences(keep_players=(held[0],)), None, 2, 0),
+        ("avoid-held", DecisionPreferences(avoid_players=(held[0],)), None, 2, 0),
+        ("avoid-not-held", DecisionPreferences(avoid_players=(int(not_held),)), None, 2, 0),
+        ("no-hits-zero-free", DecisionPreferences(no_hits=True), None, 0, 0),
+        ("no-hits-wildcard", DecisionPreferences(no_hits=True), "wildcard", 0, 0),
+        ("no-hits-freehit", DecisionPreferences(no_hits=True), "freehit", 0, 0),
+        ("save-chips", DecisionPreferences(save_chips=True), None, 2, 0),
+        ("keep-freehit", DecisionPreferences(keep_players=(held[0],)), "freehit", 2, 0),
+        ("avoid-top100", DecisionPreferences(avoid_players=(held[0],)), None, 2, 20),
+        (
+            "infeasible-no-hits-sale",
+            DecisionPreferences(avoid_players=(held[0],), no_hits=True),
+            None,
+            0,
+            0,
+        ),
+    ]
+    counts = {int(code): int(code) * 37 % 101 for code in table.player_id}
+    weighted = weighted_projection(Projection(table, (), {}), counts, 20).table
+    weighted_points = weighted.set_index("player_id").expected_points.to_dict()
+    preference_document = deepcopy(document)
+    preference_document["rules"]["top100"] = {"weights": [20], "cohort_size": 100}
+    for player in preference_document["players"]:
+        player["top100_count"] = counts[player["id"]]
+        player["top100_scaled"] = {
+            "20": scale_expected_points(
+                weighted_points[player["id"]], settings.expected_points_scale
+            )
+        }
+    cases = []
+    for name, preferences, chip, free, weight in specifications:
+        preferences.validate_selection("saf-puan", False, chip)
+        selected_entry = {**deepcopy(entry), "free_transfers": free, "top100_weights": [20]}
+        reference = _reference(
+            table,
+            held,
+            {int(k): int(v) for k, v in entry["sell_tenths"].items()},
+            int(entry["bank_tenths"]),
+            free,
+            settings,
+            chip=chip,
+            preferences=preferences,
+            top100_counts=counts,
+            top100_weight=weight,
+        )
+        cases.append(
+            {
+                "name": name,
+                "entry_id": member["entry_id"],
+                "entry": selected_entry,
+                "preferences": preferences.payload(),
+                "chip": chip,
+                "top100_weight": weight,
+                "reference": {"refused": False, **reference},
+            }
+        )
+    return {"document": preference_document, "cases": cases}
 
 
 def main() -> int:
