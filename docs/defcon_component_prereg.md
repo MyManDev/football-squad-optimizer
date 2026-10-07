@@ -212,7 +212,7 @@ reading changes the default. On `failed` or `insufficient_evidence`, leave the
 promotion set unchanged, link the reading record on #1000 and close only after
 the issue's other finish conditions hold.
 
-The component and runner are a separate PR after the GW6 publish, before
+The component and runner are a separate PR merged after the GW6 publish, before
 2026-10-23T17:30:00Z, with İbo's review. The input checks wait for the GW7 and
 GW10 publishes. This declaration may merge before the GW6 run or after its
 publish is complete, never during a weekly run. No PR is enqueued by this work.
