@@ -12,11 +12,14 @@ from __future__ import annotations
 
 import copy
 import json
+import math
 import shutil
+import sys
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, Self
 
 import numpy as np
@@ -452,7 +455,7 @@ def test_a_solve_that_ends_before_9_october_may_start(moment: datetime, seconds:
 
 
 GOOD_DAY = datetime(2026, 10, 7, 12, 0, tzinfo=UTC)
-GOOD_WASM = {"core_version": "1.15.3", "node_version": "v22.23.3", "package_version": "1.15.3"}
+GOOD_WASM = {"core_version": "1.15.1", "node_version": "v22.23.3", "package_version": "1.15.3"}
 
 
 def _never() -> Any:
@@ -471,9 +474,11 @@ def test_measuring_without_the_slot_is_refused_before_any_version_is_read() -> N
     [
         ("1.15.2", GOOD_WASM, "highspy reports HiGHS 1.15.2"),
         ("1.12.0", GOOD_WASM, "highspy reports HiGHS 1.12.0"),
-        ("1.15.3", {**GOOD_WASM, "core_version": "1.15.2"}, "package reports HiGHS 1.15.2"),
-        ("1.15.3", {**GOOD_WASM, "node_version": "v24.1.0"}, "Node is v24.1.0"),
-        ("1.15.3", {"core_version": "1.15.3"}, "Node is unknown"),
+        ("1.15.1", {**GOOD_WASM, "core_version": "1.15.2"}, "package reports HiGHS 1.15.2"),
+        ("1.15.1", {**GOOD_WASM, "node_version": "v24.1.0"}, "Node is v24.1.0"),
+        ("1.15.1", {"core_version": "1.15.1"}, "Node is unknown"),
+        ("1.15.3", GOOD_WASM, "highspy reports HiGHS 1.15.3; the protocol pins 1.15.1"),
+        ("1.15.1", {**GOOD_WASM, "package_version": "1.15.1"}, "highs package is 1.15.1"),
     ],
 )
 def test_measuring_with_another_version_is_refused(
@@ -499,10 +504,10 @@ def test_the_guards_pass_the_versions_through_when_everything_holds() -> None:
     versions = runner.measure_guards(
         have_slot=True,
         now=GOOD_DAY,
-        native_version=lambda: "1.15.3",
+        native_version=lambda: "1.15.1",
         wasm_version=lambda: GOOD_WASM,
     )
-    assert versions == {"native_core": "1.15.3", "wasm": GOOD_WASM}
+    assert versions == {"native_core": "1.15.1", "wasm": GOOD_WASM}
 
 
 def test_the_measure_command_refuses_without_the_flag(
@@ -554,7 +559,7 @@ def test_a_driver_that_fails_its_version_report_stops_the_run_with_a_reason(
     def broken(node: str) -> dict[str, Any]:
         raise runner.DriverFailed("exit 1: model.readModel is not a function")
 
-    monkeypatch.setattr(runner, "native_core_version", lambda: "1.15.3")
+    monkeypatch.setattr(runner, "native_core_version", lambda: "1.15.1")
     monkeypatch.setattr(runner, "wasm_report", broken)
     monkeypatch.setattr(runner, "run_measure", lambda *a, **k: _never())
     monkeypatch.setattr(runner, "datetime", _FixedDateTime)
@@ -572,7 +577,7 @@ def test_a_model_the_exporter_refuses_stops_the_run_with_a_reason(
     def refused(*args: Any, **kwargs: Any) -> dict[str, Any]:
         raise runner.ExportRefused("Constraint 7 is a table constraint, which is not handled.")
 
-    monkeypatch.setattr(runner, "native_core_version", lambda: "1.15.3")
+    monkeypatch.setattr(runner, "native_core_version", lambda: "1.15.1")
     monkeypatch.setattr(runner, "wasm_report", lambda node: GOOD_WASM)
     monkeypatch.setattr(runner, "run_measure", refused)
     monkeypatch.setattr(runner, "datetime", _FixedDateTime)
@@ -584,7 +589,7 @@ def test_a_model_the_exporter_refuses_stops_the_run_with_a_reason(
     assert not (tmp_path / "never.json").exists()
 
 
-GOOD_VERSIONS: dict[str, Any] = {"native_core": "1.15.3", "wasm": {**GOOD_WASM, "build": "wasm"}}
+GOOD_VERSIONS: dict[str, Any] = {"native_core": "1.15.1", "wasm": {**GOOD_WASM, "build": "wasm"}}
 
 
 @pytest.mark.parametrize(
@@ -606,15 +611,122 @@ def test_a_run_reporting_another_build_than_the_guards_read_is_refused(
 
 def test_a_run_reporting_the_guards_build_goes_on() -> None:
     runner.require_run_version(
-        "native", {"build": "native", "core_version": "1.15.3"}, GOOD_VERSIONS
+        "native", {"build": "native", "core_version": "1.15.1"}, GOOD_VERSIONS
     )
     runner.require_run_version("wasm", {"build": "wasm", **GOOD_WASM}, GOOD_VERSIONS)
+
+
+class _FakeHighs:
+    """The calls a native solve makes, in order, with a hold or primary answer to give."""
+
+    log: list[tuple[Any, ...]]
+    answers: list[list[float] | None]
+
+    def __init__(self) -> None:
+        self.options: dict[str, Any] = {}
+        self.answer: list[float] | None = None
+
+    def setOptionValue(self, name: str, value: Any) -> None:
+        self.options[name] = value
+
+    def getOptionValue(self, name: str) -> Any:
+        return self.options[name]
+
+    def readModel(self, path: str) -> int:
+        self.log.append(("read", path))
+        self.answer = self.answers.pop(0)
+        return 0
+
+    def addRow(self, lower: float, upper: float, count: int, indices: Any, values: Any) -> int:
+        self.log.append(("floor", lower))
+        return 0
+
+    def setSolution(self, count: int, indices: Any, values: Any) -> int:
+        assert list(indices) == list(range(count))
+        self.log.append(("start", [float(value) for value in values]))
+        return 0
+
+    def run(self) -> None:
+        self.log.append(("run",))
+
+    def getModelStatus(self) -> int:
+        return runner.HIGHS_OPTIMAL if self.answer is not None else 13
+
+    def getInfo(self) -> Any:
+        found = self.answer is not None
+        return SimpleNamespace(
+            primal_solution_status=runner.HIGHS_PRIMAL_FEASIBLE if found else 0,
+            mip_dual_bound=0.0,
+            objective_function_value=0.0,
+        )
+
+    def getSolution(self) -> Any:
+        return SimpleNamespace(col_value=self.answer)
+
+    def version(self) -> str:
+        return runner.HIGHS_CORE_VERSION
+
+
+def _native_with(
+    monkeypatch: pytest.MonkeyPatch, answers: list[list[float] | None]
+) -> list[tuple[Any, ...]]:
+    log: list[tuple[Any, ...]] = []
+    fake = type("Highs", (_FakeHighs,), {"log": log, "answers": answers})
+    monkeypatch.setitem(sys.modules, "highspy", SimpleNamespace(Highs=fake, kHighsInf=math.inf))
+    monkeypatch.setattr(runner, "datetime", _clock(GOOD_DAY))
+    return log
+
+
+def test_a_native_primary_starts_from_its_own_rounded_hold_solution(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """As the planner hints CP-SAT's primary with the probe's solution, after the floor."""
+
+    log = _native_with(monkeypatch, [[0.9999997, 2.0000002, 0.0], [1.0, 2.0, 0.0]])
+    job = {"hold_mps": "h.mps", "primary_mps": "p.mps", "budget_seconds": 60.0}
+    result = runner.native_run({**job, "objective": {"0": 3, "1": 5}})
+    assert log == [
+        ("read", "h.mps"),
+        ("run",),
+        ("read", "p.mps"),
+        ("floor", 13.0),
+        ("start", [1.0, 2.0, 0.0]),
+        ("run",),
+    ]
+    assert result["floor"] == 13
+    assert result["primary"]["start_status"] == 0
+    assert result["primary"]["start_seconds"] >= 0.0
+    assert result["hold"]["start_status"] is None
+
+
+def test_a_native_primary_without_a_hold_solution_has_no_floor_and_no_start(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    log = _native_with(monkeypatch, [None, [1.0, 2.0, 0.0]])
+    job = {"hold_mps": "h.mps", "primary_mps": "p.mps", "budget_seconds": 60.0}
+    result = runner.native_run({**job, "objective": {"0": 3, "1": 5}})
+    assert log == [("read", "h.mps"), ("run",), ("read", "p.mps"), ("run",)]
+    assert result["floor"] is None
+    assert result["primary"]["start_status"] is None
+
+
+def test_the_wasm_primary_starts_from_its_own_rounded_hold_solution() -> None:
+    driver = runner.WASM_DRIVER
+    assert "start = result.hold_solution.map((value) => Math.round(value));" in driver
+    assert "floor += cost * start[Number(j)];" in driver
+    assert "solve(job.hold_mps, budget, null, null)" in driver
+    assert "solve(job.primary_mps, remaining, floor, start)" in driver
+    body = driver[driver.index("function solve(") :]
+    assert body.index("model.addRow(") < body.index("model.setSolution({ colValue: start })")
+    assert body.index("model.setSolution({ colValue: start })") < body.index("model.run();")
+    assert body.index("model.setSolution(") > body.index("if (start !== null)")
 
 
 def test_both_builds_are_set_to_one_thread_and_report_what_they_use() -> None:
     assert runner.highs_options(10.0)["threads"] == 1
     job = runner.solve_job(Path("hold.mps"), Path("primary.mps"), {0: 3}, 10.0)
-    assert job["options"]["threads"] == 1
+    # The wasm build is single-threaded and refuses the option; the native build sets it.
+    assert "threads" not in job["options"]
     assert "time_limit" not in job["options"]
     assert "...job.options" in runner.WASM_DRIVER
     assert 'threads: option(model, "threads")' in runner.WASM_DRIVER
@@ -1005,7 +1117,7 @@ def test_a_highs_answer_is_read_on_the_integer_scale(world_instance: runner.Inst
     hold = _milp_point(world_instance, solves.hold.solution, solves.hold.proto)
     raw = {
         "build": "native",
-        "core_version": "1.15.3",
+        "core_version": "1.15.1",
         "load_seconds": 0.1,
         "hold": {"model_status": 7, "seconds": 0.5, "objective": solves.hold.objective_value},
         "hold_solution": hold,
@@ -1014,7 +1126,7 @@ def test_a_highs_answer_is_read_on_the_integer_scale(world_instance: runner.Inst
         "primary_solution": primary,
     }
     run = runner.interpret_run(world_instance, raw, None)
-    assert run["reported"] == {"build": "native", "core_version": "1.15.3"}
+    assert run["reported"] == {"build": "native", "core_version": "1.15.1"}
     assert run["status"] == "proved_optimal"
     assert run["value"] == solves.primary_value
     assert run["agrees_with_cp_sat"] is True
@@ -1199,7 +1311,7 @@ def _side(*, seconds: float = 12.5, stopped: bool = False, value: int = 100_000)
 
 
 REPORTED: dict[str, dict[str, Any]] = {
-    "native": {"build": "native", "core_version": "1.15.3"},
+    "native": {"build": "native", "core_version": "1.15.1"},
     "wasm": {"build": "wasm", **GOOD_WASM},
 }
 

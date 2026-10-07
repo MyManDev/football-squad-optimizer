@@ -16,7 +16,7 @@ bounds taken from the model's own domains, and two checks hold the exporter to t
 ``check`` builds the instances, runs the one-week rebuild gate, writes the MPS files under
 ``artifacts/window_solver_highs/`` with their sha256 and runs check 1. It makes no timing
 claim. ``measure`` runs the declared solves and refuses unless the heavy-test slot is held,
-both HiGHS builds report core 1.15.3 and Node is 22; it writes
+both HiGHS builds report core 1.15.1, the wasm package is 1.15.3 and Node is 22; it writes
 ``docs/research/window_solver_highs.json`` and its markdown twin only at the end. In both
 commands no solve starts on 9 or 10 October (UTC), nor one whose wall stops could carry it
 into either day.
@@ -78,7 +78,10 @@ ISSUE: Final = 984
 #: The one capture every input must carry (the protocol's "Instances").
 CAPTURE: Final = "fpl-live-20261002T104314Z-8b70515b9b31"
 WINDOWS: Final = (3, 5)
-HIGHS_CORE_VERSION: Final = "1.15.3"
+#: The HiGHS core both builds carry: ``highspy`` 1.15.1, and the npm package below.
+HIGHS_CORE_VERSION: Final = "1.15.1"
+#: The npm package's own version, as ``web/package.json`` pins it; it wraps core 1.15.1.
+HIGHS_PACKAGE_VERSION: Final = "1.15.3"
 NODE_MAJOR: Final = 22
 #: The game's sell-on fee. The three input documents do not publish it, and at the flat
 #: captured prices it does not enter the model: a lot bought inside the window sells at its
@@ -102,7 +105,8 @@ HOLD_PROBE_WALL_SECONDS: Final = 30.0
 SOLVE_MARGIN_SECONDS: Final = 900.0
 #: A driver's stop on the toy model it must prove before any timed run.
 PREFLIGHT_TIMEOUT_SECONDS: Final = 900.0
-#: Both HiGHS builds are set to this many threads.
+#: The native build is set to this many threads. The wasm build is single-threaded and
+#: refuses a thread option, so its job leaves it out.
 HIGHS_THREADS: Final = 1
 
 LEAGUE_DIR: Final = REPOSITORY_ROOT / "web" / "public" / "data" / "league"
@@ -146,13 +150,15 @@ HIGHS_PRIMAL_FEASIBLE: Final = 2
 #: the result so a reader can see them beside the numbers.
 READINGS: Final = (
     "The primary MPS omits CP-SAT's hold floor. Each HiGHS run floors its own primary at the "
-    "value of its own hold solution, rounded to integers and recomputed exactly, when its hold "
-    "solve returned a solution; without one its primary runs unfloored.",
+    "value of its own hold solution, rounded to integers and recomputed exactly, and starts "
+    "the primary from that rounded solution, when its hold solve returned a solution; "
+    "without one its primary runs with no floor and no start.",
     "A run's time is its hold solve plus its primary solve. The wall-matched budget is "
     "CP-SAT's hold probe plus primary solve time on the reference run, and a HiGHS primary "
-    "gets what its own hold solve left of the budget.",
-    "A HiGHS run whose primary returns no solution keeps its own hold plan as its value, as "
-    "the planner keeps CP-SAT's hold plan, and is not proved.",
+    "gets what its own hold solve left of the budget. The floor row and the start are set "
+    "before the primary's clock starts, and their time is recorded apart.",
+    "A HiGHS run whose primary returns no solution, or that has no primary, keeps its own "
+    "hold plan as its value, as the planner keeps CP-SAT's hold plan, and is not proved.",
     "CP-SAT proves an instance when the reference run's primary solve is OPTIMAL. The "
     "five-week instances CP-SAT's rerun leaves FEASIBLE are those whose reference plan is "
     "FEASIBLE.",
@@ -164,14 +170,15 @@ READINGS: Final = (
     "flat captured prices it does not enter the model.",
     "CP-SAT's primary starts from its hold solution: the planner floors the primary at the "
     "hold value and also hints every variable with the probe's solution "
-    "(planning/optimizer.py). Each HiGHS primary gets the floor row only and no starting "
-    "solution, because the protocol declares the floor and not a start. Every HiGHS time "
-    "stands beside that difference.",
+    "(planning/optimizer.py). Each HiGHS primary gets both from its own hold solution: the "
+    "floor row and the rounded solution as a start (setSolution). Neither build takes "
+    "CP-SAT's.",
     "CP-SAT's model build time is the planner call's wall time less every captured solve, the "
     "tie-break's included, and less the capture's own model copies; it also holds the "
     "planner's reading of its answer. The tie-break's time counts in no run's time.",
-    "Both HiGHS builds are set to one thread. Each solve records the thread count its build "
-    "reports back, or none where the build's API reports none.",
+    "Both HiGHS builds run on one thread: the native build is set to one, and the wasm build "
+    "is single-threaded and refuses a thread option. Each solve records the thread count its "
+    "build reports back, or none where the build's API reports none.",
 )
 
 
@@ -1766,17 +1773,25 @@ def measure_guards(
     refuse_blocked_date(now)
     native = native_version()
     if native != HIGHS_CORE_VERSION:
-        raise ProtocolRefusal(f"highspy reports HiGHS {native}; the protocol pins 1.15.3.")
+        raise ProtocolRefusal(
+            f"highspy reports HiGHS {native}; the protocol pins {HIGHS_CORE_VERSION}."
+        )
     wasm = dict(wasm_version())
     if wasm.get("core_version") != HIGHS_CORE_VERSION:
         raise ProtocolRefusal(
-            f"The highs package reports HiGHS {wasm.get('core_version')}; the protocol pins 1.15.3."
+            f"The highs package reports HiGHS {wasm.get('core_version')}; the protocol pins "
+            f"{HIGHS_CORE_VERSION}."
         )
     if wasm.get("core_version") != native:
         raise ProtocolRefusal("The native and wasm builds report different HiGHS versions.")
     node_version = str(wasm.get("node_version", ""))
     if not node_version.startswith(f"v{NODE_MAJOR}."):
         raise ProtocolRefusal(f"Node is {node_version or 'unknown'}; the protocol runs Node 22.")
+    if wasm.get("package_version") != HIGHS_PACKAGE_VERSION:
+        raise ProtocolRefusal(
+            f"The highs package is {wasm.get('package_version')}; the protocol pins "
+            f"{HIGHS_PACKAGE_VERSION}."
+        )
     return {"native_core": native, "wasm": wasm}
 
 
@@ -1806,6 +1821,7 @@ def _native_solve(
     path: str,
     budget: float,
     floor: tuple[int, Mapping[int, int | float]] | None,
+    start: Sequence[int] | None = None,
 ) -> dict[str, Any]:
     numpy = importlib.import_module("numpy")
     highs = highspy.Highs()
@@ -1828,6 +1844,16 @@ def _native_solve(
         floor_seconds = perf_counter() - started
         if added < 0:
             raise RuntimeError("HiGHS refused the hold floor row.")
+    start_seconds = 0.0
+    start_status: int | None = None
+    if start is not None:
+        started = perf_counter()
+        columns = numpy.arange(len(start), dtype=numpy.int32)
+        values = numpy.array([float(value) for value in start], dtype=numpy.float64)
+        start_status = int(highs.setSolution(len(start), columns, values))
+        start_seconds = perf_counter() - started
+        if start_status < 0:
+            raise RuntimeError("HiGHS refused the hold solution as a start.")
     started = perf_counter()
     highs.run()
     seconds = perf_counter() - started
@@ -1838,6 +1864,8 @@ def _native_solve(
         "model_status": status,
         "read_seconds": read_seconds,
         "floor_seconds": floor_seconds,
+        "start_seconds": start_seconds,
+        "start_status": start_status,
         "seconds": seconds,
         "primal_solution_status": primal,
         "bound": float(info.mip_dual_bound),
@@ -1875,13 +1903,15 @@ def native_run(job: Mapping[str, Any]) -> dict[str, Any]:
         "primary": None,
         "primary_solution": None,
     }
+    start: list[int] | None = None
     if hold.get("solution") is not None:
         result["floor"] = floor_value(hold["solution"], costs)
+        start = [round(value) for value in hold["solution"]]
     remaining = budget - float(hold["seconds"])
     if remaining <= 0:
         return result
     floor = None if result["floor"] is None else (int(result["floor"]), costs)
-    primary = _native_solve(highspy, str(job["primary_mps"]), remaining, floor)
+    primary = _native_solve(highspy, str(job["primary_mps"]), remaining, floor, start)
     result["primary"] = {key: value for key, value in primary.items() if key != "solution"}
     result["primary_solution"] = primary.get("solution")
     return result
@@ -1890,7 +1920,8 @@ def native_run(job: Mapping[str, Any]) -> dict[str, Any]:
 #: The wasm driver. It loads the package from ``web/node_modules`` as the device's parity
 #: tests do (the ESM entry and the wasm binary the package exports), reads each MPS through
 #: the persistent API so the read is timed apart from the run, and floors the primary at
-#: its own hold solution. It prints nothing; its answer is the JSON file it writes.
+#: its own hold solution and starts it there. It prints nothing; its answer is the JSON
+#: file it writes.
 WASM_DRIVER: Final = r"""
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -1927,7 +1958,7 @@ function option(model, name) {
   }
 }
 
-function solve(path, budget, floor) {
+function solve(path, budget, floor, start) {
   const text = readFileSync(path, "utf8");
   const model = highs.createModel();
   try {
@@ -1943,6 +1974,12 @@ function solve(path, budget, floor) {
       model.addRow(floor, highs.infinity, { indices: columns, values });
       floorSeconds = (performance.now() - clock) / 1000;
     }
+    let startSeconds = 0;
+    if (start !== null) {
+      clock = performance.now();
+      model.setSolution({ colValue: start });
+      startSeconds = (performance.now() - clock) / 1000;
+    }
     clock = performance.now();
     model.run();
     const seconds = (performance.now() - clock) / 1000;
@@ -1950,6 +1987,8 @@ function solve(path, budget, floor) {
       model_status: model.getModelStatus(),
       read_seconds: readSeconds,
       floor_seconds: floorSeconds,
+      start_seconds: startSeconds,
+      start_set: start !== null,
       seconds,
       primal_solution_status: info(model, "primal_solution_status"),
       bound: info(model, "mip_dual_bound"),
@@ -1967,15 +2006,17 @@ function solve(path, budget, floor) {
 
 if (job.mode === "solve") {
   const budget = job.budget_seconds;
-  const hold = solve(job.hold_mps, budget, null);
+  const hold = solve(job.hold_mps, budget, null, null);
   result.hold_solution = hold.solution ?? null;
   delete hold.solution;
   result.hold = hold;
   let floor = null;
+  let start = null;
   if (result.hold_solution !== null) {
+    start = result.hold_solution.map((value) => Math.round(value));
     floor = 0;
     for (const [j, cost] of Object.entries(job.objective)) {
-      floor += cost * Math.round(result.hold_solution[Number(j)]);
+      floor += cost * start[Number(j)];
     }
   }
   result.floor = floor;
@@ -1983,7 +2024,7 @@ if (job.mode === "solve") {
   result.primary_solution = null;
   const remaining = budget - hold.seconds;
   if (remaining > 0) {
-    const primary = solve(job.primary_mps, remaining, floor);
+    const primary = solve(job.primary_mps, remaining, floor, start);
     result.primary_solution = primary.solution ?? null;
     delete primary.solution;
     result.primary = primary;
@@ -2064,7 +2105,10 @@ def solve_job(
         "hold_mps": str(hold_mps),
         "primary_mps": str(primary_mps),
         "budget_seconds": float(budget),
-        "options": {k: v for k, v in highs_options(budget).items() if k != "time_limit"},
+        # Only the wasm driver reads these, and its build refuses a thread option.
+        "options": {
+            k: v for k, v in highs_options(budget).items() if k not in ("time_limit", "threads")
+        },
         "objective": {str(j): c for j, c in sorted(objective.items())},
     }
 
