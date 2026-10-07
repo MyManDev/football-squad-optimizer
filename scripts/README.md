@@ -140,8 +140,14 @@ Date is the file's last commit (`git log -1 --format=%as -- scripts/<name>.py`).
 | Script | Class | Record it writes, or what names it | Last commit |
 | --- | --- | --- | --- |
 | `generate_club_news_coding_fixture.py` | fixture generator | committed coding fixture; `docs/rotation_claim_coding.md` | 2026-09-10 |
+| `export_official_scoring_vectors.py` | fixture generator | `web/src/features/liveScore/officialScoring.vectors.json`; synthetic official finished-week scores for #1008 | 2026-10-07 |
 | `generate_club_news_fixture.py` | fixture generator | committed club-news fixture | 2026-09-08 |
 | `generate_sample_data.py` | fixture generator | `data/sample/`; `docs/data_pipeline.md` | 2026-08-11 |
+
+After exporting official scoring vectors, run
+`npx prettier --write src/features/liveScore/officialScoring.vectors.json` from
+`web`. The drift test compares parsed JSON, preserving the Python answers while
+allowing the web formatter's layout.
 
 ## Imported helpers
 
