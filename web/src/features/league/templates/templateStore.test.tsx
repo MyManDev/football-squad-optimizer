@@ -68,7 +68,7 @@ describe("the picker", () => {
   it("shows one builtin per member strategy and applies through the URL", () => {
     renderPicker();
 
-    fireEvent.click(screen.getByRole("button", { name: /Ortak çekirdeği koru/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Farkı koru/ }));
 
     // The standings neighbour is the producer's default: no rival parameter.
     expect(screen.getByTestId("selection").textContent).toBe("ortak-koru/1/-");
@@ -87,7 +87,7 @@ describe("the picker", () => {
       rival: 42,
     });
 
-    fireEvent.click(screen.getByRole("button", { name: /Saf puan/ }));
+    fireEvent.click(screen.getByRole("button", { name: /En çok puan/ }));
     expect(screen.getByTestId("selection").textContent).toBe("saf-puan/1/-");
     fireEvent.click(screen.getByRole("button", { name: /Derbi.*#42/ }));
     expect(screen.getByTestId("selection").textContent).toBe("fark-yarat/1/42");

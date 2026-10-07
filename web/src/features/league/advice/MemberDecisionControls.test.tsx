@@ -86,7 +86,7 @@ describe("member decision controls", () => {
     expect(screen.getByDisplayValue("saf-puan")).toBeChecked();
     expect(screen.queryByRole("combobox")).toBeNull();
 
-    fireEvent.click(screen.getByRole("radio", { name: /Ortak çekirdeği koru/ }));
+    fireEvent.click(screen.getByRole("radio", { name: /Farkı koru/ }));
 
     expect(screen.getByTestId("selection").textContent).toBe("ortak-koru/-/-");
     expect(screen.getByRole("combobox", { name: "Karşısında oynadığın üye" })).toBeInTheDocument();
@@ -139,13 +139,13 @@ describe("member decision controls", () => {
   });
 
   it("writes a strategy change with a listed window into the shareable URL", () => {
-    // Pure points solved five weeks, so the radio is clickable; every rival strategy is
+    // Most points solved five weeks, so the radio is clickable; every rival strategy is
     // published at one week only. The window must not survive the change and leave the
     // control showing a checked radio it has just disabled.
     renderControls(`/league/352490/members/${ENTRY}?window=5`);
     expect(screen.getByRole("radio", { name: /5 hafta/ })).toBeChecked();
 
-    fireEvent.click(screen.getByRole("radio", { name: /Ortak çekirdeği koru/ }));
+    fireEvent.click(screen.getByRole("radio", { name: /Farkı koru/ }));
 
     expect(screen.getByRole("radio", { name: /1 hafta/ })).toBeChecked();
     expect(screen.getByRole("radio", { name: /5 hafta/ })).not.toBeChecked();
@@ -220,7 +220,7 @@ describe("member decision controls", () => {
     };
     renderControls(`/league/352490/members/${ENTRY}`, index, "en");
 
-    const marked = screen.getByRole("radio", { name: /Create a gap.*The rule's pick/s });
+    const marked = screen.getByRole("radio", { name: /Close the gap.*The rule's pick/s });
     expect(marked).not.toBeChecked();
     // The rule marks; the URL still chooses. Nothing was selected on the member's behalf.
     expect(screen.getByDisplayValue("saf-puan")).toBeChecked();
@@ -362,7 +362,7 @@ describe("member decision controls", () => {
     for (const name of ["llm", "top100", "chip"]) expect(count(plan.container, name)).toBe(0);
     // The plan names the choice it shows, and the chosen strategy in one short line.
     expect(screen.getByRole("heading", { name: "Plan ayarları" })).toBeInTheDocument();
-    expect(screen.getByText("şu an: Fark yarat · 1 hafta")).toBeInTheDocument();
+    expect(screen.getByText("şu an: Farkı kapat · 1 hafta")).toBeInTheDocument();
     expect(
       screen.getByText(MESSAGES.tr.leagueMembers.strategies["fark-yarat"].short),
     ).toBeInTheDocument();
@@ -471,7 +471,7 @@ describe("the device's statement beside the publish", () => {
         </MemoryRouter>
       </LanguageProvider>,
     );
-    const differential = screen.getByRole("radio", { name: /Fark yarat/ });
+    const differential = screen.getByRole("radio", { name: /Farkı kapat/ });
     expect(differential).toBeEnabled();
     fireEvent.click(differential);
     // The window stays at the default one week, which the device offers.
@@ -522,7 +522,7 @@ describe("the device's statement beside the publish", () => {
       </LanguageProvider>,
     );
     // The publish solved pure points only, so no rival strategy is on the page at all.
-    expect(screen.queryByRole("radio", { name: /Fark yarat/ })).toBeNull();
-    expect(screen.queryByRole("radio", { name: /Ortak çekirdeği koru/ })).toBeNull();
+    expect(screen.queryByRole("radio", { name: /Farkı kapat/ })).toBeNull();
+    expect(screen.queryByRole("radio", { name: /Farkı koru/ })).toBeNull();
   });
 });
