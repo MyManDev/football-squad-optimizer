@@ -117,6 +117,7 @@ Date is the file's last commit (`git log -1 --format=%as -- scripts/<name>.py`).
 | `measure_availability_transitions.py` | artifact-only runner | a fresh `--output` directory the operator names (`record.json`, `summary.md`); refuses the snapshot root and the repository's `data/` and `docs/`; protocol `docs/availability_transitions_prereg.md` | 2026-10-01 |
 | `measure_football_lead_reliability.py` | artifact-only runner | a fresh `--output` directory the operator names (`record.json`, `summary.md`, `forecasts.csv`); refuses the archive and the repository's `data/` and `docs/`; protocol `docs/football_lead_reliability_prereg.md` | 2026-10-06 |
 | `measure_instrument.py` | artifact-only runner | caller-selected `--output`; replay in `docs/measurement_instrument.md` | 2026-09-13 |
+| `measure_published_difficulty_live.py` | artifact-only runner | private JSON/CSV under ignored `artifacts/`; usage in `docs/research/published_difficulty_live_runner.md`; one reading after settled GW20 | 2026-10-08 |
 | `plan_transfer_horizon.py` | artifact-only runner | `data/handoffs/`; `docs/projection_horizon_contract.md` | 2026-08-31 |
 | `probe_phase_e_runtime.py` | artifact-only runner | checkpoints via `_phase_e_checkpoints`; prereg `docs/phase_e_candidate_selection_prereg.md` | 2026-09-07 |
 | `run_baseline_bayesopt.py` | artifact-only runner | `artifacts/bayesopt/` | 2026-08-15 |

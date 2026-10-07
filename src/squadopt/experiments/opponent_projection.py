@@ -532,11 +532,23 @@ def _bootstrap(values: np.ndarray, *, resamples: int, seed: int) -> tuple[float,
 
 
 def _squad(
-    block: pd.DataFrame, prediction: np.ndarray, optimization: OptimizationConfig
+    block: pd.DataFrame,
+    prediction: np.ndarray,
+    optimization: OptimizationConfig,
+    *,
+    diagnostics: dict[str, object] | None = None,
 ) -> tuple[tuple[int, ...], int]:
     projection = block.loc[:, ["player_id", "name", "team_id", "position", "price_tenths"]].copy()
     projection["expected_points"] = np.clip(np.nan_to_num(prediction, nan=0.0), 0.0, None)
     result = optimize_squad(projection, optimization)
+    if diagnostics is not None:
+        diagnostics.update(
+            solver_status=str(result.solver_status),
+            squad=[int(value) for value in result.selected_squad.get("player_id", [])],
+            starting_xi=[int(value) for value in result.starting_xi.get("player_id", [])],
+            captain=int(result.captain["player_id"]) if result.captain is not None else None,
+            total_cost_tenths=result.total_cost_tenths,
+        )
     if not result.has_solution or result.captain is None:
         raise ExperimentExecutionError("A fold's squad could not be built.")
     starters = tuple(int(value) for value in result.starting_xi["player_id"])

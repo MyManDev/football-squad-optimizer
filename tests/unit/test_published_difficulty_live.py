@@ -1,0 +1,480 @@
+"""Synthetic coefficient, pairing, date, solver and once-only checks for #1009(b)."""
+
+from __future__ import annotations
+
+import json
+import os
+import sys
+from dataclasses import replace
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
+from typing import Any
+
+import numpy as np
+import pandas as pd
+import pytest
+from scripts import measure_published_difficulty_live as runner
+from tests.unit.test_season_rules import _chips, _rules, _scoring
+
+from squadopt.data.snapshots import CapturedSnapshot, read_snapshot, write_snapshot
+from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD, live_payload
+from squadopt.experiments import published_difficulty_live as study
+from squadopt.experiments.opponent_projection import _squad
+from squadopt.live.recommendation import InSeasonProjection, write_projection_handoff
+
+START = datetime(2026, 8, 25, 18, tzinfo=UTC)
+
+
+def stamp(value: datetime) -> str:
+    return value.isoformat().replace("+00:00", "Z")
+
+
+def captured(
+    root: Path, *, target: int = 7, final: bool = False, offset: int = 0, change: Any = None
+) -> CapturedSnapshot:
+    positions = [1] * 2 + [2] * 6 + [3] * 6 + [4] * 4
+    events = [
+        {
+            "id": w,
+            "deadline_time": stamp(START + timedelta(weeks=w - 1)),
+            "finished": final or w < target,
+            "data_checked": final or w < target,
+        }
+        for w in range(1, 21)
+    ]
+    players = [
+        {
+            "id": i,
+            "code": 1000 + i,
+            "element_type": p,
+            "team": 1 + (i - 1) % 10,
+            "first_name": "Synthetic",
+            "second_name": str(i),
+            "now_cost": 50,
+            "status": "d" if i == 3 else "a",
+            "chance_of_playing_next_round": 50 if i == 3 else None,
+            "news_added": None,
+        }
+        for i, p in enumerate(positions, 1)
+    ]
+    bootstrap = {
+        "events": events,
+        "elements": players,
+        "teams": [{"id": i, "name": f"Club {i}"} for i in range(1, 11)],
+        "game_config": {"rules": _rules(), "scoring": _scoring()},
+        "chips": _chips(),
+    }
+    fixtures = [
+        {
+            "id": w * 10 + i,
+            "event": w,
+            "team_h": i * 2 - 1,
+            "team_a": i * 2,
+            "team_h_difficulty": 2,
+            "team_a_difficulty": 4,
+            "kickoff_time": stamp(START + timedelta(weeks=w - 1, hours=2)),
+            "finished": final or w < target,
+            "finished_provisional": final or w < target,
+        }
+        for w in range(1, 21)
+        for i in range(1, 6)
+    ]
+    documents = {BOOTSTRAP_PAYLOAD: bootstrap, FIXTURES_PAYLOAD: fixtures}
+    if final:
+        for w in range(1, 21):
+            documents[live_payload(w)] = {
+                "elements": [
+                    {"id": i, "stats": {"total_points": i % 8, "minutes": 0 if i % 8 == 0 else 90}}
+                    for i in range(1, 19)
+                ]
+            }
+    if change:
+        change(documents)
+    instant = START + timedelta(
+        weeks=19 if final else target - 1, hours=8 if final else -1, seconds=offset
+    )
+    metadata = write_snapshot(
+        root,
+        source="fpl-live",
+        captured_at_utc=stamp(instant),
+        payloads={key: json.dumps(value).encode() for key, value in documents.items()},
+    )
+    return read_snapshot(root, metadata.snapshot_id)
+
+
+def handoff(
+    root: Path,
+    snapshot: CapturedSnapshot,
+    *,
+    target: int = 7,
+    filename: str = "base.json",
+    delta: float = 0,
+) -> InSeasonProjection:
+    base = InSeasonProjection(
+        study.SEASON,
+        target,
+        snapshot.metadata.snapshot_id,
+        "component",
+        "phase_c_control_components_v1",
+        "phase_c_component_form_window_v1",
+        {1000 + i: float(i % 6 + 1) + delta for i in range(1, 19)},
+    )
+    path = root / "by-capture" / snapshot.metadata.snapshot_id / filename
+    write_projection_handoff(path, base)
+    instant = datetime.fromisoformat(snapshot.metadata.captured_at_utc).timestamp()
+    os.utime(path, (instant, instant))
+    return base
+
+
+def frame() -> pd.DataFrame:
+    positions = ["GK"] * 2 + ["DEF"] * 6 + ["MID"] * 6 + ["FWD"] * 4
+    return pd.DataFrame(
+        {
+            "player_id": range(1, 19),
+            "name": [f"Player {i}" for i in range(1, 19)],
+            "team_id": [f"Club {i % 10}" for i in range(18)],
+            "position": positions,
+            "price_tenths": [50] * 18,
+            "predicted_points": np.linspace(1, 8, 18),
+            "realized_points": [i % 8 for i in range(18)],
+            "fixture_count": [1] * 18,
+            "published_signal": [-2.0] * 18,
+        }
+    )
+
+
+def test_recorded_coefficients_are_pinned_by_hash_and_values(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    content = (runner.ROOT / "docs/opponent_projection_study.json").read_bytes()
+    study.verify_coefficients(content)
+    with pytest.raises(study.DifficultyInputError, match="hash"):
+        study.verify_coefficients(content + b" ")
+    document = json.loads(content)
+    candidate = next(
+        item for item in document["candidates"] if item["candidate"] == "P_published_rating"
+    )
+    candidate["coefficients"]["DEF"]["slope"] += 0.01
+    changed = json.dumps(document).encode()
+    monkeypatch.setattr(
+        study, "COEFFICIENT_FILE_SHA256", runner.hashlib.sha256(changed).hexdigest()
+    )
+    with pytest.raises(study.DifficultyInputError, match="values"):
+        study.verify_coefficients(changed)
+
+
+def test_multiplier_is_hand_computed_and_blank_has_no_calendar_double_counting() -> None:
+    rows = frame()
+    rows.loc[0, "fixture_count"] = 0
+    rows.loc[0, "published_signal"] = np.nan
+    rows.loc[1, "fixture_count"] = 2
+    adjusted, multiplier = study.adjusted_points(rows)
+    assert multiplier[0] == 1
+    slope, centre = study.COEFFICIENTS["GK"]
+    assert multiplier[1] == pytest.approx(1 + slope * (-2 - centre))
+    assert adjusted[1] == pytest.approx(rows.loc[1, "predicted_points"] * multiplier[1])
+    assert adjusted[0] == rows.loc[0, "predicted_points"]
+
+
+@pytest.mark.parametrize(
+    "corruption", ["duplicate", "position", "nonfinite", "rating", "count", "blank"]
+)
+def test_invalid_adjustment_inputs_refuse(corruption: str) -> None:
+    rows = frame()
+    if corruption == "duplicate":
+        rows.loc[0, "player_id"] = rows.loc[1, "player_id"]
+    if corruption == "position":
+        rows.loc[0, "position"] = "UNKNOWN"
+    if corruption == "nonfinite":
+        rows.loc[0, "predicted_points"] = np.inf
+    if corruption == "rating":
+        rows.loc[0, "published_signal"] = -9
+    if corruption == "count":
+        rows["fixture_count"] = rows["fixture_count"].astype(float)
+        rows.loc[0, "fixture_count"] = 0.5
+    if corruption == "blank":
+        rows.loc[0, "fixture_count"] = 0
+    with pytest.raises(study.DifficultyInputError):
+        study.adjusted_points(rows)
+
+
+def test_reused_squad_records_the_same_actual_solve_and_default_answer() -> None:
+    rows = frame()
+    trace: dict[str, object] = {}
+    expected = _squad(rows, rows["predicted_points"].to_numpy(), study.optimization_config())
+    actual = _squad(
+        rows, rows["predicted_points"].to_numpy(), study.optimization_config(), diagnostics=trace
+    )
+    assert expected == actual
+    assert trace["solver_status"] == "OPTIMAL"
+    assert len(trace["squad"]) == 15
+    assert len(trace["starting_xi"]) == 11
+    assert trace["captain"] == actual[1]
+
+
+def test_week_reads_mse_mae_ordering_and_realized_starters_plus_captain() -> None:
+    rows = frame()
+    measured, evidence = study.measure_week(
+        rows, season=study.SEASON, gameweek=7, handoff_version="base"
+    )
+    assert measured.comparator_mse == pytest.approx(
+        np.mean((rows.predicted_points - rows.realized_points) ** 2)
+    )
+    assert measured.candidate_mse == pytest.approx(
+        np.mean((evidence.candidate_points - rows.realized_points) ** 2)
+    )
+    totals = dict(zip(rows.player_id, rows.realized_points, strict=True))
+    trace = measured.candidate_decision
+    expected = sum(totals[p] for p in trace["starting_xi"]) + totals[trace["captain"]]
+    assert measured.candidate_realized_points == expected
+    assert measured.squared_error_improvement == measured.comparator_mse - measured.candidate_mse
+
+
+def test_gate_weights_whole_weeks_equally_and_keeps_versions() -> None:
+    measured, _ = study.measure_week(
+        frame(), season=study.SEASON, gameweek=7, handoff_version="old"
+    )
+    weeks = tuple(
+        replace(
+            measured,
+            gameweek=7 + i,
+            players=1 if i == 0 else 1000,
+            handoff_version="old" if i < 4 else "new",
+            squared_error_improvement=float(i + 1),
+            rank_improvement=0,
+            decision_difference=0,
+            identical_decision=True,
+        )
+        for i in range(8)
+    )
+    report = study.summarize(weeks)
+    assert report["verdict"] == "passed"
+    assert report["squared_error_improvement"] == 4.5
+    assert report["by_handoff_version"]["old"]["weeks"] == 4
+    assert report["identical_decisions"] == 8
+    assert study.summarize(weeks[:7])["verdict"] == "insufficient_evidence"
+    assert (
+        study.summarize(tuple(replace(w, rank_improvement=-0.001) for w in weeks))["verdict"]
+        == "failed"
+    )
+    assert (
+        study.summarize(tuple(replace(w, decision_difference=-0.001) for w in weeks))["verdict"]
+        == "failed"
+    )
+    assert (
+        study.summarize(tuple(replace(w, squared_error_improvement=0) for w in weeks))["verdict"]
+        == "failed"
+    )
+
+
+def test_locked_season_is_refused_before_inventory_loader(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def forbidden(*args: Any, **kwargs: Any) -> Any:
+        raise AssertionError("loader was called")
+
+    monkeypatch.setattr(runner, "partial_snapshot", forbidden)
+    with pytest.raises(study.DifficultyInputError, match="2025-26"):
+        runner.inventory(tmp_path, season="2025-26", as_of="2027-01-20T00:00:00Z")
+    monkeypatch.setattr(runner, "frozen_declaration", forbidden)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "runner",
+            "--season",
+            "2025-26",
+            "--snapshot-root",
+            str(tmp_path),
+            "--handoff-root",
+            str(tmp_path),
+            "--as-of",
+            "2027-01-20T00:00:00Z",
+            "--output-directory",
+            str(tmp_path),
+            "--claim-directory",
+            str(tmp_path),
+        ],
+    )
+    assert runner.main() == 1
+
+
+def test_unmerged_declaration_refuses_before_any_input(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        runner, "command", lambda *args: json.dumps({"state": "OPEN", "mergedAt": None})
+    )
+    with pytest.raises(study.DifficultyInputError, match="merge"):
+        runner.frozen_declaration()
+
+
+def test_pairing_refuses_multiple_fingerprints_and_missing_latest(tmp_path: Path) -> None:
+    snapshot = captured(tmp_path / "captures")
+    base = handoff(tmp_path / "handoffs", snapshot)
+    paired, _ = runner.paired_handoff(tmp_path / "handoffs", snapshot, 7)
+    assert paired.fingerprint == base.fingerprint
+    handoff(tmp_path / "handoffs", snapshot, filename="other.json", delta=1)
+    with pytest.raises(study.DifficultyMissingInputs, match="exactly one"):
+        runner.paired_handoff(tmp_path / "handoffs", snapshot, 7)
+    later = captured(tmp_path / "captures", offset=1)
+    selected = runner.decision_capture({s.metadata.snapshot_id: s for s in (snapshot, later)}, 7)
+    assert selected.metadata.snapshot_id == later.metadata.snapshot_id
+    with pytest.raises(study.DifficultyMissingInputs):
+        runner.paired_handoff(tmp_path / "handoffs", selected, 7)
+
+
+def test_early_reading_refuses_before_any_outcome_bytes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    decision = captured(tmp_path / "captures")
+
+    def forbidden(*args: Any, **kwargs: Any) -> Any:
+        raise AssertionError("outcome opened")
+
+    monkeypatch.setattr(runner, "partial_snapshot", forbidden)
+    with pytest.raises(study.DifficultyMissingInputs, match="GW20"):
+        runner.reading(
+            {decision.metadata.snapshot_id: decision},
+            snapshot_root=tmp_path / "captures",
+            handoff_root=tmp_path / "handoffs",
+            declaration={"merged_at": "2026-10-01T00:00:00Z"},
+            as_of="2026-10-07T00:00:00Z",
+            output_directory=tmp_path / "artifacts/study",
+            claim_directory=tmp_path / "claims",
+            owner_approved=True,
+            weekly_run_idle=True,
+        )
+
+
+def test_inventory_never_opens_event_payloads_and_skips_future_capture(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    captured(tmp_path, final=True)
+    original = Path.read_bytes
+
+    def checked(path: Path) -> bytes:
+        if path.name.startswith("event-"):
+            raise AssertionError("outcome opened during inventory")
+        return original(path)
+
+    monkeypatch.setattr(Path, "read_bytes", checked)
+    assert runner.inventory(tmp_path, season=study.SEASON, as_of="2026-10-01T00:00:00Z") == {}
+    assert len(runner.inventory(tmp_path, season=study.SEASON, as_of="2027-01-20T00:00:00Z")) == 1
+
+
+def test_join_keeps_zero_minutes_and_drops_missing_rows_with_availability_once(
+    tmp_path: Path,
+) -> None:
+    decision = captured(tmp_path / "captures")
+    base = handoff(tmp_path / "handoffs", decision)
+
+    def change(docs: dict[str, Any]) -> None:
+        docs[live_payload(7)]["elements"] = [
+            e for e in docs[live_payload(7)]["elements"] if e["id"] != 2
+        ]
+
+    outcome = captured(tmp_path / "captures", final=True, change=change)
+    rows, dropped = runner.joined_rows(decision, base, outcome, 7)
+    assert dropped == [1002]
+    assert 1008 in set(rows.player_id)
+    assert rows.set_index("player_id").loc[1008, "realized_points"] == 0
+    assert (
+        rows.set_index("player_id").loc[1003, "predicted_points"]
+        == base.expected_points[1003] * 0.5
+    )
+
+
+def test_binding_start_excludes_deadline_equal_to_merge_and_settlement_is_earliest(
+    tmp_path: Path,
+) -> None:
+    first = captured(tmp_path, final=True)
+    later = captured(tmp_path, final=True, offset=1)
+    selected = runner.first_settled({s.metadata.snapshot_id: s for s in (later, first)})
+    assert selected.metadata.snapshot_id == first.metadata.snapshot_id
+    assert runner.eligible_weeks(first, stamp(START + timedelta(weeks=6))) == tuple(range(8, 21))
+
+
+def test_once_only_claim_survives_across_output_directories(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = tmp_path / "captures"
+    decision = captured(root)
+    outcome = captured(root, final=True)
+    handoff(tmp_path / "handoffs", decision)
+    snapshots = runner.inventory(root, season=study.SEASON, as_of="2027-01-20T00:00:00Z")
+    monkeypatch.setattr(runner, "ROOT", tmp_path)
+    monkeypatch.setattr(runner, "command", lambda *args: "")
+    kwargs = dict(
+        snapshot_root=root,
+        handoff_root=tmp_path / "handoffs",
+        declaration={"merged_at": "2026-10-01T00:00:00Z", "sha256": runner.DECLARATION_SHA256},
+        as_of="2027-01-20T00:00:00Z",
+        claim_directory=tmp_path / "claims",
+        owner_approved=True,
+        weekly_run_idle=True,
+    )
+    report = runner.reading(snapshots, output_directory=tmp_path / "artifacts/one", **kwargs)
+    assert report["reading_capture"] == outcome.metadata.snapshot_id
+    assert report["valid_weeks"] == 1
+    assert report["verdict"] == "insufficient_evidence"
+    assert (tmp_path / "artifacts/one/gw07-players.csv").is_file()
+
+    def forbidden(*args: Any, **kwargs: Any) -> Any:
+        raise AssertionError("second outcome read")
+
+    monkeypatch.setattr(runner, "partial_snapshot", forbidden)
+    with pytest.raises(study.DifficultyInputError, match="single reading"):
+        runner.reading(snapshots, output_directory=tmp_path / "artifacts/two", **kwargs)
+
+
+@pytest.mark.parametrize("unfinished", ["data_checked", "fixture", "future_kickoff"])
+def test_settlement_refuses_unfinished_or_future_fixtures(tmp_path: Path, unfinished: str) -> None:
+    def change(docs: dict[str, Any]) -> None:
+        if unfinished == "data_checked":
+            docs[BOOTSTRAP_PAYLOAD]["events"][-1]["data_checked"] = False
+        else:
+            fixture = docs[FIXTURES_PAYLOAD][-1]
+            if unfinished == "fixture":
+                fixture["finished"] = False
+            else:
+                fixture["kickoff_time"] = "2027-01-20T00:00:00Z"
+
+    snapshot = captured(tmp_path, final=True, change=change)
+    with pytest.raises(study.DifficultyMissingInputs, match="GW20"):
+        runner.first_settled({snapshot.metadata.snapshot_id: snapshot})
+
+
+def test_settled_blank_week_needs_no_nonexistent_fixture(tmp_path: Path) -> None:
+    def change(docs: dict[str, Any]) -> None:
+        docs[FIXTURES_PAYLOAD] = [f for f in docs[FIXTURES_PAYLOAD] if f["event"] != 20]
+
+    snapshot = captured(tmp_path, final=True, change=change)
+    assert runner.first_settled({snapshot.metadata.snapshot_id: snapshot}) == snapshot
+
+
+def test_candidate_solve_failure_retains_both_traces(monkeypatch: pytest.MonkeyPatch) -> None:
+    original = study._squad
+    calls = 0
+
+    def solve(*args: Any, **kwargs: Any) -> Any:
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            kwargs["diagnostics"].update({"solver_status": "UNKNOWN", "squad": []})
+            raise study.ExperimentExecutionError("synthetic solve failure")
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(study, "_squad", solve)
+    with pytest.raises(study.DifficultySolveFailure) as failure:
+        study.measure_week(frame(), season=study.SEASON, gameweek=7, handoff_version="base")
+    assert failure.value.decisions["comparator"]["solver_status"] == "OPTIMAL"
+    assert failure.value.decisions["candidate"]["solver_status"] == "UNKNOWN"
+    assert calls == 2
+
+
+def test_coefficient_identity_is_identical_on_windows_and_linux() -> None:
+    content = (runner.ROOT / "docs/opponent_projection_study.json").read_bytes()
+    lf = content.replace(b"\r\n", b"\n")
+    study.verify_coefficients(lf)
+    study.verify_coefficients(lf.replace(b"\n", b"\r\n"))
