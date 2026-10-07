@@ -1,16 +1,27 @@
 """Forecast-only attacking-share sizing; never changes a model or reads outcomes."""
 
-from typing import Any, cast
+from typing import Any, Protocol, cast
 
 import numpy as np
 import pandas as pd
 
-from squadopt.live.minute_evidence import FixtureComponentBasis
-
 GO_THRESHOLD = 0.2
 
 
-def size_attacking_shares(basis: FixtureComponentBasis) -> tuple[dict[str, Any], pd.DataFrame]:
+class ShareSizingBasis(Protocol):
+    """Validated input supplied by the command, without importing the live layer."""
+
+    @property
+    def served(self) -> dict[str, object]: ...
+
+    @property
+    def companion(self) -> dict[str, object]: ...
+
+    @property
+    def fixture_rows(self) -> pd.DataFrame: ...
+
+
+def size_attacking_shares(basis: ShareSizingBasis) -> tuple[dict[str, Any], pd.DataFrame]:
     """Apply the frozen #1009 readings to a validated, unapplied fixture basis."""
     served, companion = basis.served, basis.companion
     if served["season"] != "2026-27":

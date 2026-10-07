@@ -85,6 +85,8 @@ def main() -> None:
 
         # Only this explicit fallback fits historical training data. It never scores outcomes.
         selection = served["training_selection"]["allowed_seasons"]
+        if "2025-26" in selection:
+            parser.error("The locked 2025-26 holdout cannot be a rebuild input.")
         rebuilt_forecast, companion = produce_football_components(
             read_snapshot(args.snapshot_root, args.snapshot_id),
             args.archive_root,
