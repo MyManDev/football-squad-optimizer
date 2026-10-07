@@ -41,7 +41,7 @@ def _read(path: Path) -> dict[str, object]:
     unsupported = set(values) - {*_FIELDS, "api_key_env"}
     if unsupported:
         field = sorted(unsupported)[0]
-        raise ClubNewsError(f"The [llm] setting {field!r} is unsupported.")
+        raise ClubNewsError(f"The [llm] table has an unsupported setting {field!r}.")
     if not isinstance(values.get("provider"), str) or not str(values["provider"]).strip():
         raise ClubNewsError("The [llm] table must explicitly name its provider.")
     for field, value in values.items():
