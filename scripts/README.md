@@ -54,6 +54,7 @@ Date is the file's last commit (`git log -1 --format=%as -- scripts/<name>.py`).
 | `freeze_route_a_declaration.py` | measurement runner | `docs/route_a_declaration.json` | 2026-08-23 |
 | `measure_anchored_calibration.py` | measurement runner | `docs/anchored_calibration.json` | 2026-08-23 |
 | `measure_benchmark_v2.py` | measurement runner | `docs/benchmark_v2.json` | 2026-09-01 |
+| `read_benchmark_v2_live.py` | measurement runner | `<record-root>/benchmark-v2-live-2026-27.json` and its Markdown twin | 2026-10-08 |
 | `measure_candidate_runtime.py` | measurement runner | `docs/candidate_runtime.json` | 2026-08-16 |
 | `measure_capture_lead_time.py` | measurement runner | `docs/capture_lead_time.json`; also `docs/weekly_runbook.md` | 2026-09-08 |
 | `measure_capture_season_phase.py` | measurement runner | `docs/capture_season_phase.json` | 2026-09-08 |
