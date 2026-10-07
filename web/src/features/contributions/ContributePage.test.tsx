@@ -1,13 +1,46 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { App } from "../../app/App";
 import { LanguageProvider } from "../../i18n/LanguageProvider";
 import { ContributePage } from "./ContributePage";
 
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
+  window.history.replaceState(null, "", "/");
+});
+beforeEach(() => vi.stubEnv("VITE_ADVICE_API_ORIGIN", "https://squadopt-api.example"));
+
+function mountRoute() {
+  window.history.replaceState(null, "", "/contribute");
+  vi.stubGlobal("matchMedia", () => ({
+    matches: false,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+  }));
+  render(<App />);
+}
+
+it("serves the site's not-found page without an origin and makes no contribution request", async () => {
+  vi.stubEnv("VITE_ADVICE_API_ORIGIN", "");
+  const requests = serve();
+  mountRoute();
+  expect(await screen.findByText(/Burada bir sayfa yok\.|There is no page here\./)).toBeVisible();
+  expect(screen.queryByRole("link", { name: /Katkı|Contribute/ })).toBeNull();
+  expect(requests).not.toHaveBeenCalled();
+});
+
+it("keeps the contribution route and navigation with a configured origin", async () => {
+  const requests = serve();
+  mountRoute();
+  expect(await screen.findByLabelText("Takım")).toBeVisible();
+  expect(screen.getByRole("link", { name: /Katkı/ })).toHaveAttribute("href", "/contribute");
+  expect(requests.mock.calls[0]?.[0]).toBe(
+    "https://squadopt-api.example/api/v1/contributions/players",
+  );
 });
 function mount() {
   render(

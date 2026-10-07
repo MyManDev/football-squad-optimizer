@@ -5,9 +5,11 @@ for (const language of ["tr", "en"] as const) {
   test(`mobile moderated contribution journey (${language})`, async ({ page }, testInfo) => {
     const tr = language === "tr";
     let posts = 0;
+    let requests = 0;
     await page.setViewportSize({ width: 375, height: 812 });
     await page.addInitScript((lang) => localStorage.setItem("squadopt.language", lang), language);
     await page.route("**/api/v1/contributions**", async (route) => {
+      requests++;
       const request = route.request();
       if (request.method() === "POST") {
         posts++;
@@ -28,6 +30,14 @@ for (const language of ["tr", "en"] as const) {
       });
     });
     await page.goto("/contribute");
+    if (!process.env.VITE_ADVICE_API_ORIGIN) {
+      await expect(
+        page.getByText(tr ? "Burada bir sayfa yok." : "There is no page here.", { exact: true }),
+      ).toBeVisible();
+      await expect(page.locator('#sidebar a[href="/contribute"]')).toHaveCount(0);
+      expect(requests).toBe(0);
+      return;
+    }
     await expect(
       page.getByRole("combobox", { name: tr ? "Pozisyon" : "Position", exact: true }),
     ).toBeDisabled();

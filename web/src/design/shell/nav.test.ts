@@ -1,9 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { memberAt, memberInContext, navItems, type Place } from "./nav";
 
 const LEAGUE = 352490;
 const MEMBERS = `/league/${LEAGUE}/members`;
+
+beforeEach(() => vi.stubEnv("VITE_ADVICE_API_ORIGIN", "https://squadopt-api.example"));
+afterEach(() => vi.unstubAllEnvs());
 
 const at = (pathname: string, search = "", hash = ""): Place => ({ pathname, search, hash });
 
@@ -14,6 +17,15 @@ const hrefs = (
 ) => navItems(place, member, chosenLeagueId).map((item) => [item.key, item.to, item.active]);
 
 describe("the sidebar's navigation", () => {
+  it("omits Contribute with an empty origin, including on its old address", () => {
+    vi.stubEnv("VITE_ADVICE_API_ORIGIN", "");
+    for (const pathname of ["/", "/contribute", "/contribute/"]) {
+      const items = navItems(at(pathname), null);
+      expect(items.map((item) => item.key)).toEqual(["thisWeek", "league", "fixtures"]);
+      expect(items.some((item) => item.to === "/contribute")).toBe(false);
+    }
+  });
+
   it("opens the league entry page as 'Bu hafta' when no member is in context", () => {
     expect(hrefs(at("/"), null)).toEqual([
       ["thisWeek", "/", true],
