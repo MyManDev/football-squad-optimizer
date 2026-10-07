@@ -309,6 +309,9 @@ def first_settled(
         ):
             continue
         selected = [f for f in fixtures.values() if f.get("event") in weeks]
+        if not selected:
+            # The reading must follow an actual match in its declared window.
+            continue
         if any(
             not isinstance(f.get("kickoff_time"), str)
             or as_instant(f["kickoff_time"]) >= as_instant(snapshot.metadata.captured_at_utc)

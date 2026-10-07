@@ -620,6 +620,28 @@ def test_missing_settled_fixture_count_marks_whole_week_missing(tmp_path: Path) 
         runner.paired_week(decision, base(decision), outcome)
 
 
+def test_finished_blank_week_keeps_paired_players_with_zero_component(tmp_path: Path) -> None:
+    def blank(documents: dict[str, Any]) -> None:
+        documents[FIXTURES_PAYLOAD] = [f for f in documents[FIXTURES_PAYLOAD] if f["event"] != 6]
+        if live_payload(6) in documents:
+            for entry in documents[live_payload(6)]["elements"]:
+                entry["stats"]["minutes"] = 0
+                entry["stats"]["total_points"] = 0
+                entry["explain"] = []
+
+    decision = capture(tmp_path / "decision", change=blank)
+    original = replace(base(decision), appearance_probability=None)
+    outcome = capture(tmp_path / "outcome", final=True, change=blank)
+    candidate = candidate_handoff(decision, original, declaration_sha256=runner.DECLARATION_SHA256)
+    assert candidate.expected_points == original.expected_points
+    rows, dropped, _ = runner.paired_week(decision, original, outcome)
+    assert len(rows) == 3
+    assert dropped == []
+    assert all(
+        row.term_unconditional == 0 and row.term_decided == 0 and row.realized == 0 for row in rows
+    )
+
+
 def test_crashed_claim_refuses_before_any_outcome_file_is_opened(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

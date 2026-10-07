@@ -141,13 +141,9 @@ def settled(
     if len(events) != 1:
         raise DefconInputError("A required event is duplicated.")
     played = [fixture for fixture in fixtures.values() if fixture.get("event") == week]
-    return (
-        bool(played)
-        and events[0].get("finished") is True
-        and all(
-            fixture.get("finished") is True and fixture.get("finished_provisional") is True
-            for fixture in played
-        )
+    return events[0].get("finished") is True and all(
+        fixture.get("finished") is True and fixture.get("finished_provisional") is True
+        for fixture in played
     )
 
 
