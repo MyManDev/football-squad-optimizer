@@ -40,7 +40,11 @@ from squadopt.data._long_paths import addressable
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import CapturedSnapshot, read_snapshot
 from squadopt.data.sources.club_news import CLUB_NEWS_SOURCE, FixtureClubNewsProvider, RawDocument
-from squadopt.data.sources.club_news_capture import read_captured_documents
+from squadopt.data.sources.club_news_capture import read_captured_documents, read_captured_responses
+from squadopt.data.sources.club_news_coding import (
+    ROTATION_CLAIM_CODING_CONTRACT_VERSION,
+    coding_prompt_sha256,
+)
 from squadopt.data.sources.club_news_metadata import PUBLICATION_SOURCES, publication_metadata
 from squadopt.data.sources.club_news_scope import FIXTURE_SCOPES, verified_fixture_scope
 from squadopt.data.sources.fpl_live import (
@@ -438,6 +442,48 @@ def _require_the_coded_documents(
     return SOURCE_CHECK_CITED_DOCUMENTS_HELD
 
 
+def _coding_attested(
+    table: pd.DataFrame, source_kind: str, source_label: str, snapshot_root: Path | None
+) -> bool:
+    """Check the bound responses before retaining any capture-backed attestation."""
+    news_id = table.attrs.get("club_news_snapshot_id")
+    if source_kind != SOURCE_CLUB_NEWS_CAPTURE and news_id is None:
+        return True
+    if (
+        source_kind != SOURCE_CLUB_NEWS_CAPTURE
+        or snapshot_root is None
+        or not isinstance(news_id, str)
+        or news_id != source_label
+    ):
+        return False
+    try:
+        snapshot = _club_news_snapshot(snapshot_root / news_id, snapshot_root)
+        if snapshot.metadata.captured_at_utc != table.attrs.get("club_news_captured_at_utc"):
+            return False
+        responses = read_captured_responses(snapshot)
+        if not responses:
+            return False
+        for entry in responses:
+            expected = coding_prompt_sha256(entry.response.model_identifier)
+            if (
+                entry.prompt_contract_version != ROTATION_CLAIM_CODING_CONTRACT_VERSION
+                or entry.prompt_sha256 != expected
+                or entry.response.model_identifier != table.attrs.get("model_identifier")
+                or table.attrs.get("prompt_sha256") != expected
+                or json.loads(entry.response.text).get("contract_version")
+                != ROTATION_CLAIM_CODING_CONTRACT_VERSION
+            ):
+                return False
+        digests = tuple(
+            sorted(
+                {hashlib.sha256(entry.response.text.encode()).hexdigest() for entry in responses}
+            )
+        )
+        return digests == table.attrs.get("response_sha256s")
+    except (DataError, KeyError, ValueError, OSError, AttributeError):
+        return False
+
+
 def manager_words_from_artifact(
     table_path: Path,
     manifest_path: Path,
@@ -459,6 +505,7 @@ def manager_words_from_artifact(
         )
     clubs = _covered(table, table_path)
     source_check = _require_the_coded_documents(table, table_path, documents, source_label)
+    coding_attested = _coding_attested(table, source_kind, source_label, snapshot_root)
     target_basis = _decision_fixture_basis(table, snapshot_root)
     words: list[ManagerWord] = []
     for row in table.to_dict(orient="records"):
@@ -484,7 +531,8 @@ def manager_words_from_artifact(
             else ("unspecified", False)
         )
         scope_verified = (
-            row.get("rotation_claim_scope_verified") is True
+            coding_attested
+            and row.get("rotation_claim_scope_verified") is True
             and checked_scope == (scope, True)
             # The table's flag and the quote's own wording are not enough: the quote must
             # be a whole sentence of the source, or the source may say something else.
@@ -502,7 +550,8 @@ def manager_words_from_artifact(
             else None
         )
         publication_verified = (
-            row.get("rotation_claim_publication_verified") is True
+            coding_attested
+            and row.get("rotation_claim_publication_verified") is True
             and metadata is not None
             and metadata.verified
             and metadata.published_at_utc == _text(row.get("rotation_claim_published_at_utc"))

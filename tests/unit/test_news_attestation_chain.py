@@ -49,6 +49,7 @@ def _pair(
     extra_fixture=None,
     disposition="stated_expected_absent",
     body=None,
+    prompt_model="synthetic-stub",
 ):
     root = tmp_path / "snapshots"
     if extra_fixture is None:
@@ -74,7 +75,7 @@ def _pair(
                 "Arsenal",
                 _response(quote=quote, label=disposition, version=version),
                 version,
-                coding_prompt_sha256(contract_version=version),
+                coding_prompt_sha256(prompt_model, contract_version=version),
             ),
         ),
         clubs_declared=("Arsenal",),
@@ -139,6 +140,55 @@ def test_replayed_legacy_evidence_never_silently_acquires_attestation(tmp_path, 
     assert word.words is not None
     assert not word.scope_verified and not word.publication_verified
     assert word.role is None
+
+
+def test_forged_legacy_attestation_is_withheld_after_manifest_is_resealed(tmp_path):
+    control_path, _, _ = _pair(tmp_path / "control")
+    control = pd.read_csv(control_path)
+    columns = [
+        "rotation_claim_fixture_scope",
+        "rotation_claim_scope_verified",
+        "rotation_claim_publication_verified",
+        "rotation_claim_publication_source",
+        "rotation_claim_publication_source_sha256",
+    ]
+    table_path, manifest_path, source = _pair(
+        tmp_path / "legacy", version="rotation_claim_coding_v2"
+    )
+
+    def forge(frame):
+        frame[columns] = control[columns]
+        frame["prompt_sha256"] = coding_prompt_sha256("synthetic-stub")
+
+    _rewrite(table_path, manifest_path, forge)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["prompt_sha256"] = coding_prompt_sha256("synthetic-stub")
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    table = read_rotation_evidence_artifact(table_path, manifest_path)
+    observed = table.loc[table.rotation_claim_observed].iloc[0]
+    assert bool(observed.rotation_claim_scope_verified)
+    assert bool(observed.rotation_claim_publication_verified)
+    (word,) = load_manager_words(table_path, club_news_source=source).words
+    assert word.words is not None
+    assert not word.scope_verified and not word.publication_verified
+    assert word.role is None
+
+
+def test_response_index_prompt_digest_must_match_its_recorded_model(tmp_path):
+    table_path, _, source = _pair(tmp_path, prompt_model="different-synthetic-model")
+    (word,) = load_manager_words(table_path, club_news_source=source).words
+    assert word.words is not None
+    assert not word.scope_verified and not word.publication_verified
+
+
+def test_manifest_response_digests_must_match_bound_capture(tmp_path):
+    table_path, manifest_path, source = _pair(tmp_path)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["response_sha256s"] = ["f" * 64]
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    (word,) = load_manager_words(table_path, club_news_source=source).words
+    assert word.words is not None
+    assert not word.scope_verified and not word.publication_verified
 
 
 ABSENCE = "Saka will miss the next Premier League match."
@@ -386,7 +436,7 @@ def test_reader_without_the_exact_decision_snapshot_withholds_target_attestation
         source_label=label,
     )
     (word,) = words.words
-    assert word.publication_verified
+    assert not word.publication_verified
     assert not word.scope_verified and word.role is None
 
 
