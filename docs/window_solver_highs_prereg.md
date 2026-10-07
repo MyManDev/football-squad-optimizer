@@ -32,6 +32,13 @@ solves should move from CP-SAT to HiGHS.
   only, on capture `fpl-live-20260922T214539Z-364991a4f832`: the npm package `highs` 1.15.3
   matched the server on 15 of 15 members, and the spike lists 3 and 5 week windows as not
   measured.
+- After the thresholds below were committed (5d64cf22), on 6 October, one run of the
+  runner's `check` command, on its unmerged branch, solved one member, 8883467, on CP-SAT at
+  the production budget. Its one-week rebuild matched `saf-puan/1.json`, its 3-week window
+  was proved at the published value, and its 5-week window ended FEASIBLE on the
+  deterministic budget. It also exported both windows' hold and primary models as MPS, and
+  the exporter's first check passed on all four. No threshold changed after it, and no
+  HiGHS solve of any instance has run.
 
 ## Instances
 
@@ -164,9 +171,9 @@ No run substitutes for another.
 
 ## Deliberate exclusions
 
-- No tie-break is measured or compared, and no plan identity. The planner's own tie-break
-  still runs inside each CP-SAT run of an instance; its status is recorded, and its time
-  counts in no run's time.
+- No tie-break is measured or compared, and no plan identity. The planner still solves its
+  tie-break inside a CP-SAT run whose primary it proves with deterministic budget left;
+  its status is recorded, and its time counts in no run's time.
 - No football window route.
 - No other gameweek.
 - No other solver settings: no CP-SAT worker count other than one, and no HiGHS presolve

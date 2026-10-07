@@ -543,7 +543,15 @@ def locate_quote(content: bytes, quote: str, label: str) -> tuple[int, int]:
     one match length.
     """
 
-    needle = quote.encode("utf-8")
+    try:
+        needle = quote.encode("utf-8")
+    except UnicodeEncodeError:
+        # A lone surrogate decodes from JSON but is not text any page can hold, so the quote
+        # cannot locate; refusing it here costs that claim, not the whole export.
+        raise ClubNewsError(
+            f"{label} quotes text that is not valid Unicode (a lone surrogate); it cannot "
+            "appear in the document it cites."
+        ) from None
     if not needle:
         raise ClubNewsError(f"{label} carries an empty quote; there is nothing to locate.")
     starts: list[int] = []
@@ -578,8 +586,13 @@ class UnlocatableClaim:
     very different fact from "his club was never read". Collapsing the three is what this
     whole lane exists to prevent, and until this type existed the first one had nowhere to go.
 
-    A quote that located but whose claim the parser refuses on its own is carried here too;
-    ``why`` says which of the two happened.
+    Four kinds of claim are carried here, and ``why`` says which happened:
+
+    - its quote did not locate, or it cites a document nobody fetched;
+    - it left another text field empty, null or not text;
+    - it located, but the parser refuses it on its own;
+    - another claim about the same player in the same response was set aside, so this one
+      would have stood alone where the parser refuses a player coded twice.
     """
 
     player_name: str
@@ -598,10 +611,10 @@ def _located_entries(
 
     The line between the two outcomes is what can still be *said* about the failure. A claim
     whose quote is absent or ambiguous, which cites a document nobody fetched, or which leaves
-    another text field empty, can be named -- the player, the club, the URL -- so it can be
-    dropped and recorded. A claim missing a required field cannot: there is no identity to
-    report, and a response shaped like that is a broken answer rather than one bad citation, so
-    it refuses the whole response either way.
+    another text field empty, null or not text, can be named -- the player, the club, the
+    URL -- so it can be dropped and recorded. A claim missing a required field cannot: there
+    is no identity to report, and a response shaped like that is a broken answer rather than
+    one bad citation, so it refuses the whole response either way.
     """
 
     located: list[dict[str, object]] = []
@@ -731,6 +744,11 @@ def locate_claims_reporting(
     parser's reason: a full-match label its quote does not carry, say, or a value outside a
     closed vocabulary. Its player and team are known, so it can be named, and refusing the
     response for it would cost every other claim exactly as an unlocatable quote did.
+
+    A claim set aside still names its player, and the parser refuses a response that codes one
+    player twice. Once a twin is set aside it no longer counts there, so the other twin would
+    carry the player's disposition alone, a choice between two statements no rule declares.
+    The kept twin is set aside too, with its own reason; the club's other claims stay.
     """
 
     document, available = _coding_document(response, documents)
@@ -745,8 +763,34 @@ def locate_claims_reporting(
         )
         for index, why in refused.items()
     )
-    kept = [entry for index, entry in enumerate(located) if index not in refused]
+    # The parser's key for "codes one player twice": name and club, stripped and casefolded.
+    gone = {_player_key(claim.player_name, claim.team_name) for claim in dropped}
+    twins = {
+        index
+        for index, entry in enumerate(located)
+        if index not in refused
+        and _player_key(str(entry["player_name"]), str(entry["team_name"])) in gone
+    }
+    dropped.extend(
+        UnlocatableClaim(
+            player_name=str(located[index]["player_name"]),
+            team_name=str(located[index]["team_name"]),
+            source_url=str(located[index]["source_url"]),
+            why=(
+                "Another claim about the same player in this response was set aside, so this "
+                "one would stand alone where the parser refuses a player coded twice."
+            ),
+        )
+        for index in sorted(twins)
+    )
+    kept = [
+        entry for index, entry in enumerate(located) if index not in refused and index not in twins
+    ]
     return _response_of(document, kept, response), tuple(dropped)
+
+
+def _player_key(player_name: str, team_name: str) -> tuple[str, str]:
+    return player_name.strip().casefold(), team_name.strip().casefold()
 
 
 def _refused_alone(
