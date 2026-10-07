@@ -4,6 +4,11 @@ The protocol is written before any solve, so its numbers are claims about the re
 it stands: the production budget, the pinned solver versions, the capture and the published
 statuses. A later change to any of them fails here rather than quietly moving the
 measurement's ground.
+
+The site tree is the exception. The GW6 decision publish, and every week after it, replaces
+the committed tree with a later capture; the protocol's inputs are then the tree at its own
+merge commit, 43dd78d2. From that publish on, the checks that read the tree skip and say
+so, and the checks of the protocol's text and of the code keep running.
 """
 
 from __future__ import annotations
@@ -13,6 +18,8 @@ import json
 import re
 from pathlib import Path
 from typing import Any
+
+import pytest
 
 from squadopt.application import advice
 from squadopt.application.advice import solve_window_plan
@@ -42,6 +49,20 @@ def _payload(path: Path) -> dict[str, Any]:
     payload = document.get("payload", document)
     assert isinstance(payload, dict)
     return payload
+
+
+def _the_tree_is_the_protocols() -> bool:
+    """Whether the committed site tree is still the capture the protocol measures."""
+
+    plan = LEAGUE / "device-plan.json"
+    return plan.is_file() and _payload(plan).get("source_snapshot_id") == CAPTURE
+
+
+READS_THE_TREE = pytest.mark.skipif(
+    not _the_tree_is_the_protocols(),
+    reason=f"The committed site tree is no longer capture {CAPTURE}; the protocol's inputs "
+    "are the tree at its merge commit, 43dd78d2.",
+)
 
 
 def test_the_cp_sat_budget_is_the_production_one() -> None:
@@ -81,6 +102,7 @@ def test_the_solver_versions_are_the_pinned_ones() -> None:
     assert "`mip_rel_gap` 0 and `mip_abs_gap` 0.5" in budgets
 
 
+@READS_THE_TREE
 def test_the_instances_are_the_committed_gw6_inputs() -> None:
     plan = _payload(LEAGUE / "device-plan.json")
     assert plan["source_snapshot_id"] == CAPTURE
@@ -88,6 +110,9 @@ def test_the_instances_are_the_committed_gw6_inputs() -> None:
     entries = sorted((LEAGUE / "entries").glob("*.json"))
     assert len(entries) == 15
     assert all(_payload(entry).get("device_plan") for entry in entries)
+
+
+def test_the_instances_section_names_the_capture_and_the_members() -> None:
     instances = _section("Instances")
     assert f"`{CAPTURE}`" in instances
     assert "the 15 members of league 352490 at GW6" in instances
@@ -95,6 +120,7 @@ def test_the_instances_are_the_committed_gw6_inputs() -> None:
     assert "No gitignored store is read." in instances
 
 
+@READS_THE_TREE
 def test_the_published_window_statuses_are_as_stated() -> None:
     counts: dict[int, dict[str, int]] = {}
     for window in (3, 5):
@@ -103,6 +129,9 @@ def test_the_published_window_statuses_are_as_stated() -> None:
             counts.setdefault(window, {}).setdefault(status, 0)
             counts[window][status] += 1
     assert counts == {3: {"OPTIMAL": 15}, 5: {"OPTIMAL": 2, "FEASIBLE": 13}}
+
+
+def test_the_published_window_statuses_are_stated() -> None:
     read = _section("What has been read")
     assert "15 three-week plans, all OPTIMAL" in read
     assert "15 five-week plans, 2 OPTIMAL and 13 FEASIBLE" in read
@@ -117,9 +146,12 @@ def test_every_path_the_protocol_names_exists() -> None:
     }
     named = re.findall(r"`((?:docs|src|scripts|web|tests)/[\w/.{},*-]+)`", _text())
     assert named
+    tree = _the_tree_is_the_protocols()
     for path in named:
         if path in later or "*" in path or "{" in path:
             continue
+        if path.startswith("web/public/data/") and not tree:
+            continue  # a later publish replaced the tree; see the module's docstring
         assert (REPOSITORY / path).exists(), path
     for module in (
         "live/horizon.py",
@@ -132,6 +164,7 @@ def test_every_path_the_protocol_names_exists() -> None:
         assert (REPOSITORY / "src" / "squadopt" / module).is_file(), module
 
 
+@READS_THE_TREE
 def test_the_calendar_is_flat_and_every_input_is_the_same_capture() -> None:
     fixtures = _payload(REPOSITORY / "web" / "public" / "data" / "fixtures.json")
     assert fixtures["source_snapshot_id"] == CAPTURE
@@ -152,6 +185,9 @@ def test_the_calendar_is_flat_and_every_input_is_the_same_capture() -> None:
         payload = _payload(path)
         assert payload["source_snapshot_id"] == CAPTURE, path
         assert payload["league_id"] == 352490, path
+
+
+def test_the_flat_calendar_is_stated() -> None:
     assert "every club has one fixture in each of GW6 to GW10" in _section("Instances")
 
 
@@ -163,15 +199,21 @@ def test_the_model_is_the_path_the_published_member_windows_take() -> None:
     horizon_source = inspect.getsource(plan_transfer_horizon)
     assert "protect_hold=True" in horizon_source
     assert 'projection_horizon.model_name == "fixture_football_candidate"' in horizon_source
-    for path in (LEAGUE / "advice").glob("*/saf-puan/[35].json"):
-        limits = " ".join(str(limit) for limit in _payload(path)["stated_limits"])
-        assert "The first week's projection is repeated over the later weeks" in limits, path
     instances = _section("Instances")
     assert "`optimize_transfer_plan`" in instances
     assert "with `protect_hold=True`, linearization level 2" in instances
     assert "The football windows' guarded, expected and observed route is not measured." in (
         instances
     )
+
+
+@READS_THE_TREE
+def test_the_published_member_windows_repeat_the_first_week() -> None:
+    windows = sorted((LEAGUE / "advice").glob("*/saf-puan/[35].json"))
+    assert len(windows) == 30
+    for path in windows:
+        limits = " ".join(str(limit) for limit in _payload(path)["stated_limits"])
+        assert "The first week's projection is repeated over the later weeks" in limits, path
 
 
 def test_the_tie_break_exclusion_says_when_the_planner_still_solves_it() -> None:
