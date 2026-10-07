@@ -1,10 +1,13 @@
 """The command refuses early, repeated and holdout readings before capture access."""
 
 import json
+from types import SimpleNamespace
 
 import pytest
 from scripts import read_benchmark_v2_live as cli
+from tests.unit.test_benchmark_v2_live import week
 
+from squadopt.data.snapshots import write_snapshot
 from squadopt.experiments.benchmark_v2_live import CLAIM_FILE
 
 
@@ -45,3 +48,78 @@ def test_command_refusal_opens_no_capture(tmp_path, monkeypatch, refusal):
         )
         == 1
     )
+
+
+def test_command_reads_eight_real_format_synthetic_capture_ids(tmp_path, monkeypatch):
+    store = tmp_path / "store"
+    rows = []
+    for gameweek in range(6, 14):
+        candidate = week(gameweek)
+        captures = {}
+        for role in ("decision", "cohort"):
+            snapshot = getattr(candidate, role)
+            captures[role] = write_snapshot(
+                store,
+                source=snapshot.metadata.source,
+                captured_at_utc=snapshot.metadata.captured_at_utc,
+                payloads=snapshot.payloads,
+            )
+        frozen = json.loads(candidate.freeze.payloads["system-decision.json"])
+        frozen["snapshot_id"] = captures["decision"].snapshot_id
+        frozen_raw = json.dumps(frozen).encode()
+        binding = json.loads(candidate.freeze.payloads["benchmark.json"])
+        binding.update(
+            decision_snapshot_id=captures["decision"].snapshot_id,
+            decision_fingerprint=captures["decision"].fingerprint,
+            cohort_snapshot_id=captures["cohort"].snapshot_id,
+            system_decision_sha256=cli.hashlib.sha256(frozen_raw).hexdigest(),
+        )
+        captures["freeze"] = write_snapshot(
+            store,
+            source=candidate.freeze.metadata.source,
+            captured_at_utc=candidate.freeze.metadata.captured_at_utc,
+            payloads={
+                **candidate.freeze.payloads,
+                "benchmark.json": json.dumps(binding).encode(),
+                "system-decision.json": frozen_raw,
+            },
+        )
+        picked = json.loads(candidate.picks.payloads["benchmark.json"])
+        picked["cohort_snapshot_id"] = captures["cohort"].snapshot_id
+        captures["picks"] = write_snapshot(
+            store,
+            source=candidate.picks.metadata.source,
+            captured_at_utc=candidate.picks.metadata.captured_at_utc,
+            payloads={**candidate.picks.payloads, "benchmark.json": json.dumps(picked).encode()},
+        )
+        captures["outcome"] = write_snapshot(
+            store,
+            source=candidate.outcome.metadata.source,
+            captured_at_utc=candidate.outcome.metadata.captured_at_utc,
+            payloads=candidate.outcome.payloads,
+        )
+        rows.append(
+            {
+                "gameweek": gameweek,
+                **{role + "_snapshot_id": value.snapshot_id for role, value in captures.items()},
+            }
+        )
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text(json.dumps({"season": "2026-27", "weeks": rows}), encoding="utf-8")
+    replies = iter([SimpleNamespace(stdout="a" * 40), SimpleNamespace(stdout="")])
+    monkeypatch.setattr(cli.subprocess, "run", lambda *a, **k: next(replies))
+    assert (
+        cli.main(
+            [
+                "--manifest",
+                str(manifest),
+                "--snapshot-root",
+                str(store),
+                "--record-root",
+                str(tmp_path / "record"),
+            ]
+        )
+        == 0
+    )
+    record = json.loads((tmp_path / "record" / cli.READING_FILE).read_bytes())
+    assert record["paired_gameweeks"] == 8 and record["locked_holdout_accessed"] is False

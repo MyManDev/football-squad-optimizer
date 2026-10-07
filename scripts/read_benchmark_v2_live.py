@@ -20,7 +20,7 @@ from squadopt.experiments.benchmark_v2_live import (
 )
 
 ROOT = Path(__file__).resolve().parents[1]
-_CAPTURE = re.compile(r"fpl-[a-z-]+-(\d{8})T\d{6}Z-[0-9a-f]+")
+_CAPTURE = re.compile(r"fpl-[a-z0-9-]+-(\d{8})T\d{6}Z-[0-9a-f]+")
 
 
 def main(argv: list[str] | None = None) -> int:
