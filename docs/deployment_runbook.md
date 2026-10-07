@@ -177,6 +177,11 @@ canonical at GW2.
 
 ### Which days those two land on
 
+The owner runs the Tuesday settle and the Friday publish through GW20, whose deadline is
+2027-01-05T18:00:00Z, including the midweek GW13, GW18 and GW20 decision runs. A delegated
+stage requires the owner's approval for that run. After GW20 the weekly run moves off
+the owner's PC, tracked in #1010. This operator decision was recorded in #1005.
+
 The agreed rhythm is **twice a week, settled on Tuesday and decision on Friday**. Tuesday
 because the week's own results are the thing a member comes back for and they are not final
 until the last fixture is checked; Friday because that is where the next deadline usually sits.
