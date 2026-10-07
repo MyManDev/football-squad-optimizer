@@ -48,3 +48,27 @@ The binary club-total assertion needs an owner clarification for the all-absent
 case: with every m = 0, applying m once credits zero, even with a positive club
 forecast. Sizing follows the stated formula; candidate implementation waits for
 that clarification. No shipping decision follows from this forecast-only sizing.
+
+## Result
+
+The declared capture loses **14.678791716983769 attacking expected points** in
+S1 across its 20 clubs. Of 487 available players with decision-week fixtures,
+four gain at least 0.2 points under S2. The maximum is
+**0.21821737796427154 points**. The frozen go rule therefore returns **go**.
+This permits a prospective protocol, not a live accuracy or shipping claim.
+
+The existing companion was used without rebuilding. The clean measurement code
+revision is `6c68ec2e838733eb6d27f4be5ecb87c1755b354d`; the earlier protocol
+commit is `53cb3de1`. The JSON record contains both input hashes and all per-club
+S1 totals. The full player-fixture table remains ignored at
+`artifacts/football-share-sizing-gw06/player-fixtures.csv` and is bound by its
+SHA256 in the record. No outcome payload or archive was opened in this run.
+
+To reproduce from the same immutable capture and existing companion:
+
+```powershell
+python -m scripts.measure_football_shares --snapshot-root <captures> `
+  --snapshot-id fpl-live-20261002T104314Z-8b70515b9b31 `
+  --artifact-root <retained-history-artifact-root> `
+  --evidence-root artifacts/football-share-sizing-gw06
+```

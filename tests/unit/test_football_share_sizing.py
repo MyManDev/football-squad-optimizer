@@ -1,8 +1,12 @@
 from copy import deepcopy
+from pathlib import Path
 
 import pandas as pd
 import pytest
+from scripts.measure_football_shares import _forecast_source
 
+from squadopt.data.snapshots import write_snapshot
+from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD
 from squadopt.experiments.football_share_sizing import size_attacking_shares
 
 
@@ -91,3 +95,27 @@ def test_zero_channel_and_exact_threshold():
     record, evidence = size_attacking_shares(basis)
     assert record["go"] is False
     assert evidence.gain.eq(0).all()
+
+
+def test_source_reader_does_not_open_outcome_payload(tmp_path, monkeypatch):
+    metadata = write_snapshot(
+        tmp_path,
+        source="fpl-live",
+        captured_at_utc="2026-10-02T10:00:00Z",
+        payloads={BOOTSTRAP_PAYLOAD: b"{}", FIXTURES_PAYLOAD: b"[]", "outcomes.json": b"{}"},
+    )
+    original = Path.read_bytes
+    opened = []
+
+    def tracked(path):
+        assert path.name != "outcomes.json"
+        opened.append(path.name)
+        return original(path)
+
+    monkeypatch.setattr(Path, "read_bytes", tracked)
+    source = _forecast_source(tmp_path, metadata.snapshot_id)
+    assert set(source.payloads) == {BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD}
+    assert set(opened) == {BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD}
+    (tmp_path / metadata.snapshot_id / "payloads" / FIXTURES_PAYLOAD).write_bytes(b"[1]")
+    with pytest.raises(ValueError, match="checksum"):
+        _forecast_source(tmp_path, metadata.snapshot_id)

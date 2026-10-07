@@ -292,6 +292,12 @@ was written.
 | [planning_shortlist](research/planning_shortlist.md) ([record](research/planning_shortlist.json)) | Fixed forecast shortlist on one reused capture; restricted proof, five-week recourse still unproved; no production activation. | - |
 | `incumbent_refinement_measurement` ([report](research/incumbent_refinement_measurement.md), [record](research/incumbent_refinement_measurement.json)) | Certified hints versus the same adjacent-pair repair under fixed budgets: 16/16 valid pairs, identical complete paths, zero utility or raw-point gains. Each arm proves 34 restricted optima and accepts 15 repairs; the candidate exercises 34 certified hints. The predeclared improvement screen fails. Reused GW6 capture and constructed squads; no independent future-performance evidence or served activation. | #901 |
 
+## Football share sizing
+
+| Artifact | Finding | PR |
+| --- | --- | --- |
+| `research/football_share_sizing` | Forecast-only retained-history capture `fpl-live-20261002T104314Z-8b70515b9b31`, GW6: 14.678791716983769 attacking expected points uncredited across 20 clubs; four available players gain at least 0.2, maximum 0.21821737796427154. Frozen sizing rule returns go. No outcome read and no served model changed. | Issue #1009 |
+
 ## Process references
 
 `handoff_acceptance_checklist.md` · `candidate_declaration_review.md` ·

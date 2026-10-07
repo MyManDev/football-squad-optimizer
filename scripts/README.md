@@ -42,6 +42,7 @@ Date is the file's last commit (`git log -1 --format=%as -- scripts/<name>.py`).
 
 | Script | Class | Record it writes, or what names it | Last commit |
 | --- | --- | --- | --- |
+| `measure_football_shares.py` | measurement runner | `docs/research/football_share_sizing.md` and `.json`; forecast-only S1 and S2 | 2026-10-07 |
 | `append_weekly_scorecard.py` | measurement runner | `docs/weekly_scorecard.md` (Markdown record) | 2026-08-23 |
 | `build_mode_price_list.py` | measurement runner | `docs/mode_price_list.json` | 2026-08-20 |
 | `build_opponent_signal.py` | measurement runner | `docs/opponent_signal.json` | 2026-08-23 |
