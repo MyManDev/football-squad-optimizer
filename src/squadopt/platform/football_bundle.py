@@ -15,9 +15,11 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any
 
+from squadopt.application.league_tree_identity import check_tree_identity, protected_files
 from squadopt.application.manager_words import load_manager_words
 from squadopt.contracts.injuries import require_official_injury_source
 from squadopt.contracts.league import LEAGUE_VIEW_CONTRACT_VERSION
+from squadopt.contracts.league_publication_identity import IDENTITY_FILE, publication_path
 from squadopt.contracts.league_tree import single_league_tree
 from squadopt.data._long_paths import addressable
 from squadopt.data.atomic import document_bytes, write_bytes_once
@@ -101,7 +103,7 @@ def _validate(
         require_official_injury_source()
     extras = files.keys() - (_REQUIRED | _OPTIONAL)
     if not files.keys() >= _REQUIRED or any(
-        not re.fullmatch(r"site_entry_[1-9][0-9]*", role) for role in extras
+        not re.fullmatch(r"site_entry_[1-9][0-9]*|site_tree_[0-9a-f]{64}", role) for role in extras
     ):
         raise ValueError("Bundle file roles are incomplete or unsupported.")
     has_rotation = files.keys() >= _OPTIONAL
@@ -138,6 +140,8 @@ def _validate(
         raise ValueError("Bundle site files differ from its declared human members.")
     generated = set()
     for role, path in site_files.items():
+        if role.startswith("site_tree_"):
+            continue
         document = _object(Path(addressable(path)).read_bytes())
         payload = document["payload"]
         if (
@@ -283,6 +287,18 @@ def _site_files(tree: Path) -> dict[str, Path]:
         result[role] = path
     if len(result) == 1:
         raise ValueError("A ready site requires at least one human member capture.")
+    identity = check_tree_identity(tree)
+    retained = {
+        name: path
+        for name, path in protected_files(tree).items()
+        if name != "members.json" and not name.startswith("entries/")
+    }
+    if retained and identity is None:
+        raise ValueError("Retained league history requires a publication identity record.")
+    if identity is not None:
+        retained[IDENTITY_FILE] = tree / IDENTITY_FILE
+    for name, path in retained.items():
+        result["site_tree_" + _digest(name.encode())] = path
     return result
 
 
@@ -322,6 +338,15 @@ def _relative_files(marker: Path, snapshot_id: str, records: object) -> dict[str
         }.get(role)
         if re.fullmatch(r"site_entry_[1-9][0-9]*", role):
             expected = site + "entries/" + role.removeprefix("site_entry_") + ".json"
+        if re.fullmatch(r"site_tree_[0-9a-f]{64}", role):
+            if not isinstance(relative, str) or not relative.startswith(site):
+                raise ValueError("Retained league file is outside its sealed tree.")
+            name = relative.removeprefix(site)
+            if (name != IDENTITY_FILE and not publication_path(name)) or role != (
+                "site_tree_" + _digest(name.encode())
+            ):
+                raise ValueError("Retained league file has an unexpected role or path.")
+            expected = relative
         if expected is None:
             if (
                 role not in _OPTIONAL

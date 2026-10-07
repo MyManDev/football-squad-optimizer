@@ -22,6 +22,10 @@ from pathlib import Path
 from typing import Any
 
 from squadopt.application.strategies.catalog import FORBIDDEN_FIELD_PATTERN, FORBIDDEN_TEXT_PATTERN
+from squadopt.contracts.league_publication_identity import (
+    publication_path,
+    verify_publication_identity,
+)
 from squadopt.contracts.league_tree import (
     LEAGUE_DIRECTORY_CONTRACT_VERSION,
     LEAGUE_DIRECTORY_FILE,
@@ -733,6 +737,7 @@ def run_checks(tree: Tree) -> list[str]:
     """Run the three checks on ``tree`` and return every finding; an empty list passes."""
     findings: list[str] = []
     checks: tuple[tuple[str, Callable[[], list[str]]], ...] = (
+        ("publication identity", lambda: check_publication(tree)),
         ("variants", lambda: check_variants(tree.read)),
         ("top100", lambda: check_top100(tree.read)),
         ("word", lambda: check_word(tree)),
@@ -745,6 +750,20 @@ def run_checks(tree: Tree) -> list[str]:
             findings.append(f"{name}: unreadable tree: {error}")
             print(findings[-1])
     return findings
+
+
+def check_publication(tree: Tree) -> list[str]:
+    names = (
+        None
+        if tree.live
+        else (
+            path.relative_to(tree.directory).as_posix()
+            for path in tree.directory.rglob("*.json")
+            if publication_path(path.relative_to(tree.directory).as_posix())
+        )
+    )
+    verify_publication_identity(tree.read, names=names)
+    return []
 
 
 def published_trees(root: str) -> list[str]:

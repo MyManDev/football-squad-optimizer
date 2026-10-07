@@ -16,6 +16,7 @@ from squadopt.application.advice_record import record_directory
 from squadopt.application.capture_entries import CapturePicksProvider
 from squadopt.application.chip_forecast_publication import forecast_source
 from squadopt.application.entries import EntryRegistration, EntryRegistry
+from squadopt.application.league_tree_identity import check_tree_identity, record_tree_identity
 from squadopt.application.league_views import (
     LeagueViewsReport,
     MemberMapper,
@@ -517,6 +518,7 @@ def publish_prepared_league(
     # or writes the league's path, so its histories carry over.
     legacy = settle_legacy_tree(site_data, (request.league_id,))
     out_dir = league_tree_dir(site_data, request.league_id)
+    check_tree_identity(out_dir)
     manager_words = load_publication_manager_words(request)
     if manager_words is not None and (manager_words.season, manager_words.gameweek) != (
         season,
@@ -605,6 +607,10 @@ def publish_prepared_league(
         generated_at_utc=report.generated_at_utc,
     )
     outputs.append(directory)
+    # The scoreboard stage completes and journals this record after its own write.
+    # Keeping its intermediate bytes among the league outputs would invalidate the
+    # completed journal when that later stage updates the retained scoreboard.
+    record_tree_identity(out_dir, source_snapshot_id=request.snapshot_id)
     return LeaguePublicationResult(
         snapshot_id=request.snapshot_id,
         season=season,
