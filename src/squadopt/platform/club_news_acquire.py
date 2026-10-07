@@ -359,10 +359,6 @@ def _parse_arguments(argv: list[str] | None = None) -> argparse.Namespace:
     return arguments
 
 
-def _utc_now() -> str:
-    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
-
-
 def _raw_claim_count(entry: CodedClub) -> int | None:
     """How many claims one coded answer states, before any is checked against its source.
 
@@ -591,13 +587,33 @@ def main(
         print("Dry run: nothing written.")
         return 0
 
+    try:
+        captured_at = _instant_text(now())
+        if week.coding_observed_at is not None and as_instant(captured_at) < as_instant(
+            week.coding_observed_at
+        ):
+            raise ClubNewsError("The clock moved backwards after coding. Nothing was captured.")
+        still_open = next_open_deadline(deadlines, as_of_utc=captured_at)
+        if (
+            still_open.gameweek != deadline.gameweek
+            or still_open.deadline_utc != deadline.deadline_utc
+        ):
+            raise DataError("The coding deadline is no longer the next open deadline.")
+    except (ClubNewsError, DataError, ValueError):
+        print(
+            f"Refused: gameweek {deadline.gameweek} deadline {deadline.deadline_utc} "
+            "is no longer open for this coding observation, or the clock moved backwards. "
+            "Nothing was captured."
+        )
+        return 1
+
     metadata = write_club_news_capture(
         arguments.capture_root or arguments.snapshot_root,
         documents=week.documents,
         coded=week.coded,
         clubs_declared=week.clubs_declared,
         clubs_covered=week.clubs_covered,
-        captured_at_utc=_utc_now(),
+        captured_at_utc=captured_at,
         clubs_partially_covered=week.clubs_partially_covered,
     )
     # The id is the point of the command: the weekly runner takes it next.
