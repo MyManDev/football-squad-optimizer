@@ -45,6 +45,10 @@ solves should move from CP-SAT to HiGHS.
   2's comparison, a run with no solution and CP-SAT's proofs. One adds to what HiGHS
   gets: each HiGHS primary starts from its own hold solution, as the planner starts
   CP-SAT's. None changes a threshold.
+- The text first named `highspy` 1.15.3, which was never released. On 7 October, before
+  any HiGHS solve, it was corrected to `highspy` 1.15.1, the native build of the core
+  the wasm package carries (see "Versions"). Both versions were read by loading the two
+  builds, and each also solved the runner's toy model, which is not an instance.
 
 ## Instances
 
@@ -86,12 +90,15 @@ solves should move from CP-SAT to HiGHS.
   deterministic units per week with the hold probe's extra unit, and the 1,800 s wall
   ceiling (`WINDOW_DETERMINISTIC_UNITS_PER_WEEK`, `WINDOW_WALL_CEILING_SECONDS`,
   `WINDOW_LINEARIZATION_LEVEL` in `application/advice.py`). This rerun is the reference.
-- **HiGHS native**, `highspy` 1.15.3 pinned in the runner's environment only (the project's
+- **HiGHS native**, `highspy` 1.15.1 pinned in the runner's environment only (the project's
   scipy carries HiGHS 1.12.0, which is not used), one thread.
-- **HiGHS wasm**, the `highs` 1.15.3 package `web/package.json` pins, under Node 22, one
-  thread, loaded as the device's tests load it.
-- **Versions:** the HiGHS core version each build reports at run time is recorded, and the
-  native and wasm runs count as one version only if the two reports match. Each solve
+- **HiGHS wasm**, the `highs` 1.15.3 package `web/package.json` pins, under Node 22, loaded
+  as the device's tests load it. The build is single-threaded and refuses a thread option,
+  so it runs on one thread without being set.
+- **Versions:** both builds carry HiGHS core 1.15.1 (git 04024d7). The npm package's own
+  version, 1.15.3, is its wrapper's, and `highspy` 1.15.1 is the native build of the same
+  core. The core version each build reports at run time is recorded, and the native and
+  wasm runs count as one version only if the two reports match. Each solve
   also records the thread count its build reports back, or none where the build's API
   reports none.
 - **Gaps:** both HiGHS builds use `mip_rel_gap` 0 and `mip_abs_gap` 0.5 on the objective's

@@ -70,7 +70,13 @@ def test_the_solver_versions_are_the_pinned_ones() -> None:
     assert "ortools==9.15.6755" in pins
     budgets = _section("Solvers and budgets")
     assert "`ortools` as `constraints.txt` pins it (9.15.6755)" in budgets
-    assert "`highspy` 1.15.3" in budgets
+    assert "`highspy` 1.15.1 pinned" in budgets
+    assert "both builds carry HiGHS core 1.15.1 (git 04024d7)" in budgets
+    assert "`highspy` 1.15.3" not in budgets
+    assert "The build is single-threaded and refuses a thread option" in budgets
+    read = _section("What has been read")
+    assert "corrected to `highspy` 1.15.1" in read
+    assert "each also solved the runner's toy model, which is not an instance" in read
     assert "the `highs` 1.15.3 package `web/package.json` pins" in budgets
     assert "`mip_rel_gap` 0 and `mip_abs_gap` 0.5" in budgets
 
