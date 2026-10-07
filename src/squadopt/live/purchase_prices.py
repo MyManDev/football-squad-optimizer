@@ -21,11 +21,19 @@ application provider that builds a member's picks calls it.
 A sale is checked against the rule only where the market price at its moment is known.
 The sale price is the rule applied to that price, and for any purchase price some market
 price reproduces any sale price, so a sale alone validates nothing. The member's own list
-states the price in one case: a buy of the same element at the same instant, an identical
-``time``, whose ``element_in_cost`` is that instant's market price. Nothing wider counts as
-known: the game moves prices once a day at a moment no captured document states, so a buy
-a minute later may already be at another price. ``sales_checked`` says how often the check
-ran.
+would state the price in one case: a buy of the same element at the same instant, an
+identical ``time``, whose ``element_in_cost`` is that instant's market price. Nothing wider
+counts as known: the game moves prices once a day at a moment no captured document states,
+so a buy a minute later may already be at another price.
+
+In the lists FPL publishes that case does not occur. No two rows of a list share a
+``time``: each row is stamped to the microsecond and the rows of one confirmation are
+spread over milliseconds, and no confirmation sells and buys the same element. So the
+check never runs on a member's real list, with or without the guard on repeated
+elements, and it is no protection the rebuild relies on. ``sales_checked`` says how
+often it ran: 0 for every member of the 7 October captures. It also counts a player not
+held who is bought and then sold at one instant, a check that only compares the list
+with itself.
 """
 
 from collections.abc import Mapping, Sequence
@@ -52,7 +60,9 @@ class RebuiltPurchasePrices:
     deadline after the captured week, which it leaves out because the captured squad does
     not hold them yet (those for the next deadline it checks on a copy first).
     ``sales_checked`` counts the sales, among the rows it checked, whose market price a buy
-    at the same instant states and which were checked against the rule.
+    at the same instant states and which were checked against the rule. It is 0 on FPL's
+    own lists, whose rows never share an instant, and it also counts a player not held who
+    is bought and then sold at one instant, whose check compares the list with itself.
     """
 
     prices: Mapping[int, int] = field(default_factory=lambda: MappingProxyType({}))
@@ -96,7 +106,8 @@ def _replay(
     for _, tied in groupby(rows, key=lambda row: as_instant(row.time_utc)):
         waiting = list(tied)
         # A buy states the market price of its own instant, so it prices a sale of the same
-        # element at that instant and no other (the module docstring says why).
+        # element at that instant and no other. FPL's lists never put two rows at one
+        # instant, so on them this prices nothing (the module docstring says why).
         stated = {row.element_in: row.element_in_cost for row in waiting}
         while waiting:
             ready = next(
