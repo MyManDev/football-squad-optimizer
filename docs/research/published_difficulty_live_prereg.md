@@ -60,8 +60,8 @@ with candidate `P_published_rating`. The exact frozen values are:
 | FWD | 0.07265969217343048 | -2.8343133137337255 |
 
 They are the last judged season's fit already recorded in
-`docs/opponent_projection_study.json`. File SHA256:
-`f184110399883877ab9095698f4a316982f05a90e0f3b70272d9b3eb7a31729b`.
+`docs/opponent_projection_study.json`. File SHA256 after normalizing CRLF to LF:
+`063fa112506b2bfd27e7d189f62adf7fdc5d091f8968ebfd811c9a7f08d2f326`.
 The runner pins both values and hash and refuses a mismatch. There is no refit,
 coefficient selection, new archive reading or development MSE recomputation.
 The fixed function of fingerprinted pre-deadline inputs is computed at verdict
