@@ -569,103 +569,6 @@ def test_a_row_outside_its_own_gameweeks_window_is_refused() -> None:
         )
 
 
-# --- FPL's own timing: rows stamped to the microsecond -------------------------------
-#
-# Every same instant case above stamps its rows identically through ``_at``, which FPL
-# never does: no two rows of a real list share a ``time``, and the rows of one
-# confirmation are spread over milliseconds. These cases use FPL's timing.
-
-
-def _stamped(
-    event: int, out: int, out_cost: int, into: int, in_cost: int, *, microseconds: int
-) -> EntryTransfer:
-    """A row ``microseconds`` after the instant ``_at(event)`` names, as FPL stamps one."""
-
-    moment = _FIRST_DEADLINE + timedelta(weeks=event - 2, minutes=60, microseconds=microseconds)
-    return EntryTransfer(
-        event=event,
-        element_in=into,
-        element_in_cost=in_cost,
-        element_out=out,
-        element_out_cost=out_cost,
-        time_utc=_iso(moment),
-    )
-
-
-def test_a_sale_and_its_buy_back_microseconds_apart_rebuild_unchecked_or_refuse() -> None:
-    """108, bought for 12.0, is sold for 12.2 and bought back at 12.5 300 microseconds
-    later, 113 leaving for 11.0 to pay for him. With the sale first the member is rebuilt
-    and no sale is checked, because no buy shares the sale's instant. With the buy back
-    listed first, 108 is still held when he is bought, and the member is refused."""
-
-    sale = _stamped(2, 108, 122, 201, 47, microseconds=0)
-    buy_back = _stamped(2, 113, 110, 108, 125, microseconds=300)
-    rebuilt = _rebuild((sale, buy_back), {1: (0, 5), 2: (2, 65)}, held=REBUY_HELD, bank=65)
-    assert rebuilt.known is True
-    assert (rebuilt.applied, rebuilt.sales_checked) == (2, 0)
-    assert rebuilt.prices[108] == 125 and rebuilt.prices[201] == 47
-
-    early = _stamped(2, 113, 110, 108, 125, microseconds=0)
-    late_sale = _stamped(2, 108, 122, 201, 47, microseconds=300)
-    _refused(
-        _rebuild((early, late_sale), {1: (0, 5), 2: (2, 65)}, held=REBUY_HELD, bank=65),
-        "transfer of element 113 for element 108",
-        "already holds",
-    )
-
-
-def test_a_wrong_sale_price_microseconds_before_its_buy_back_is_not_caught() -> None:
-    """The same pair with the sale at 12.4 where the rule gives 12.2 at 12.5. At FPL's
-    timing no buy shares the sale's instant, so the rule cannot be applied and the rebuild
-    takes the stated 12.4. This pins down that the check is no protection on real lists:
-    the identically stamped case above refuses the same rows."""
-
-    sale = _stamped(2, 108, 124, 201, 47, microseconds=0)
-    buy_back = _stamped(2, 113, 110, 108, 125, microseconds=300)
-    result = _rebuild((sale, buy_back), {1: (0, 5), 2: (2, 67)}, held=REBUY_HELD, bank=67)
-    assert result.known is True
-    assert (result.applied, result.sales_checked) == (2, 0)
-    assert sell_price_tenths(125, 120, sell_on_fee=0.5) == 122
-
-
-def test_every_listing_order_of_a_chain_at_one_instant_gives_one_result() -> None:
-    """101 leaves for 201, 201 for 202 and 202 for 203, with 102 leaving for 204, all at
-    one instant. Whatever order the list gives them in, the replay applies them in the one
-    order the holdings allow, so all 24 orders give the same prices, bank and checks. The
-    two sales of a player bought at that instant are checked against his own buy, which
-    only compares the list with itself."""
-
-    chain = (
-        _transfer(2, 101, 45, 201, 47),
-        _transfer(2, 201, 47, 202, 47),
-        _transfer(2, 202, 47, 203, 47),
-        _transfer(2, 102, 40, 204, 40),
-    )
-    held = _swap(OPENING, (101, 102), (203, 204))
-    results = {
-        order: _rebuild(order, {1: (0, 5), 2: (4, 3)}, held=held, bank=3)
-        for order in permutations(chain)
-    }
-    assert len(results) == 24
-    outcomes = {
-        (r.known, tuple(sorted(r.prices.items())), r.applied, r.sales_checked, r.reason)
-        for r in results.values()
-    }
-    assert len(outcomes) == 1
-    ((known, prices, applied, checked, reason),) = outcomes
-    assert known is True and reason is None
-    assert (applied, checked) == (4, 2)
-    assert dict(prices)[203] == 47 and dict(prices)[204] == 40
-
-
-def test_a_swap_of_two_held_players_at_one_instant_is_refused() -> None:
-    """101 leaves for 102 and 102 for 101 at one instant: each row buys a player who is
-    still held, so no order applies and the member is refused."""
-
-    rows = (_transfer(2, 101, 45, 102, 40), _transfer(2, 102, 40, 101, 45))
-    _refused(_rebuild(rows, {1: (0, 5), 2: (2, 5)}, held=OPENING, bank=5), "already holds")
-
-
 def test_rows_at_one_instant_that_repeat_an_element_are_refused() -> None:
     """201 is bought twice at one instant: which purchase the sale is reckoned from, and
     which one stands, is an order no holding fixes and the document does not state."""
@@ -764,6 +667,113 @@ def test_an_opening_player_without_a_start_price_is_refused() -> None:
 def test_a_gameweek_before_the_first_is_an_error_not_a_refusal() -> None:
     with pytest.raises(ValueError, match="positive"):
         _rebuild([], {1: (0, 5)}, held=OPENING, bank=5, through_gameweek=0)
+
+
+# --- one instant, and FPL's own timing -----------------------------------------------
+#
+# Every same instant case above stamps its rows identically through ``_at``, which FPL
+# never does: no two rows of a real list share a ``time``, and the rows of one
+# confirmation are spread over milliseconds. The first two cases below use FPL's
+# timing, rows stamped microseconds apart through ``_stamped``. The last two stamp
+# every row at one instant through ``_at`` on purpose: they pin down the order the
+# replay gives an instant's rows, which only rows that share an instant reach.
+
+
+def _stamped(
+    event: int, out: int, out_cost: int, into: int, in_cost: int, *, microseconds: int
+) -> EntryTransfer:
+    """A row ``microseconds`` after the instant ``_at(event)`` names, as FPL stamps one."""
+
+    moment = _FIRST_DEADLINE + timedelta(weeks=event - 2, minutes=60, microseconds=microseconds)
+    return EntryTransfer(
+        event=event,
+        element_in=into,
+        element_in_cost=in_cost,
+        element_out=out,
+        element_out_cost=out_cost,
+        time_utc=_iso(moment),
+    )
+
+
+def test_a_sale_and_its_buy_back_microseconds_apart_rebuild_unchecked_or_refuse() -> None:
+    """108, bought for 12.0, is sold for 12.2 and bought back at 12.5 300 microseconds
+    later, 113 leaving for 11.0 to pay for him. With the sale first the member is rebuilt
+    and no sale is checked, because no buy shares the sale's instant. With the buy back
+    listed first, 108 is still held when he is bought, and the member is refused."""
+
+    sale = _stamped(2, 108, 122, 201, 47, microseconds=0)
+    buy_back = _stamped(2, 113, 110, 108, 125, microseconds=300)
+    rebuilt = _rebuild((sale, buy_back), {1: (0, 5), 2: (2, 65)}, held=REBUY_HELD, bank=65)
+    assert rebuilt.known is True
+    assert (rebuilt.applied, rebuilt.sales_checked) == (2, 0)
+    assert rebuilt.prices[108] == 125 and rebuilt.prices[201] == 47
+
+    early = _stamped(2, 113, 110, 108, 125, microseconds=0)
+    late_sale = _stamped(2, 108, 122, 201, 47, microseconds=300)
+    _refused(
+        _rebuild((early, late_sale), {1: (0, 5), 2: (2, 65)}, held=REBUY_HELD, bank=65),
+        "transfer of element 113 for element 108",
+        "already holds",
+    )
+
+
+def test_a_wrong_sale_price_microseconds_before_its_buy_back_is_not_caught() -> None:
+    """The same pair with the sale at 12.4 where the rule gives 12.2 at 12.5. At FPL's
+    timing no buy shares the sale's instant, so the rule cannot be applied and the rebuild
+    takes the stated 12.4. This pins down that the check is no protection on real lists:
+    the identically stamped case above refuses the same rows."""
+
+    sale = _stamped(2, 108, 124, 201, 47, microseconds=0)
+    buy_back = _stamped(2, 113, 110, 108, 125, microseconds=300)
+    result = _rebuild((sale, buy_back), {1: (0, 5), 2: (2, 67)}, held=REBUY_HELD, bank=67)
+    assert result.known is True
+    assert (result.applied, result.sales_checked) == (2, 0)
+    assert sell_price_tenths(125, 120, sell_on_fee=0.5) == 122
+
+
+def test_every_listing_order_of_a_chain_at_one_instant_gives_one_result() -> None:
+    """101 leaves for 201, 201 for 202 and 202 for 203, with 102 leaving for 204; 108,
+    bought for 12.0, is sold for 12.2 to buy 205, and 114 is sold to buy him back at
+    12.5. All six rows are at one instant. Whatever order the list gives them in, the
+    replay applies them in the one order the holdings allow, so all 720 orders give the
+    same prices, bank and checks. 108 is sold before he is bought back, so his sale is
+    checked against the 12.0 he was bought for, and the 12.5 of the buy back stands. If a
+    buy of a held player were let through, some orders would reprice 108 before his sale
+    is checked. The two sales of a player bought at that instant are checked against his
+    own buy, which only compares the list with itself. The bank goes 5 - 2 + 75 - 45 = 33."""
+
+    chain = (
+        _transfer(2, 101, 45, 201, 47),
+        _transfer(2, 201, 47, 202, 47),
+        _transfer(2, 202, 47, 203, 47),
+        _transfer(2, 102, 40, 204, 40),
+        _transfer(2, 108, 122, 205, 47),
+        _transfer(2, 114, 80, 108, 125),
+    )
+    held = _swap(OPENING, (101, 102, 114), (203, 204, 205))
+    results = {
+        order: _rebuild(order, {1: (0, 5), 2: (6, 33)}, held=held, bank=33)
+        for order in permutations(chain)
+    }
+    assert len(results) == 720
+    outcomes = {
+        (r.known, tuple(sorted(r.prices.items())), r.applied, r.sales_checked, r.reason)
+        for r in results.values()
+    }
+    assert len(outcomes) == 1
+    ((known, prices, applied, checked, reason),) = outcomes
+    assert known is True and reason is None
+    assert (applied, checked) == (6, 3)
+    assert dict(prices)[203] == 47 and dict(prices)[204] == 40
+    assert dict(prices)[108] == 125 and dict(prices)[205] == 47
+
+
+def test_a_swap_of_two_held_players_at_one_instant_is_refused() -> None:
+    """101 leaves for 102 and 102 for 101 at one instant: each row buys a player who is
+    still held, so no order applies and the member is refused."""
+
+    rows = (_transfer(2, 101, 45, 102, 40), _transfer(2, 102, 40, 101, 45))
+    _refused(_rebuild(rows, {1: (0, 5), 2: (2, 5)}, held=OPENING, bank=5), "already holds")
 
 
 # --- two real members ------------------------------------------------------------------
