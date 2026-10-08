@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+from copy import deepcopy
 from dataclasses import replace
 from datetime import UTC, datetime
 
@@ -16,7 +17,13 @@ from squadopt.live.football_artifact import (
     forecast_digest,
     read_football_forecast,
 )
-from squadopt.prediction.football import FOOTBALL_MODEL_VERSION
+from squadopt.planning.horizon import APPEARANCE_HORIZON_CONTRACT_VERSION
+from squadopt.prediction.football import (
+    FOOTBALL_MODEL_VERSION,
+    JOINT_ROLE_RETAINED_HISTORY_MODEL_VERSION,
+)
+from squadopt.prediction.football_contextual import CONTEXTUAL_MODEL_VERSION
+from squadopt.prediction.football_minutes_role import RETAINED_HISTORY_ROLE_FEATURE_VERSION
 
 
 def tree(root):
@@ -190,23 +197,120 @@ def test_refusal_precedes_archive_or_fit_and_changes_nothing(case, tmp_path, mon
     assert tree(tmp_path) == before
 
 
-def test_inventory_uses_every_own_target_capture_and_marks_an_older_build(case):
+@pytest.mark.parametrize("older_build", [False, True])
+def test_inventory_uses_every_own_target_capture_and_marks_an_older_build(
+    case, monkeypatch, older_build
+):
     later = write_snapshot(
         case["snapshot_root"],
+        source="fpl-live",
+        captured_at_utc="2026-09-22T23:00:00Z" if older_build else "2026-09-22T10:00:00Z",
+        payloads=case["snapshot"].payloads,
+    )
+    wrong_week = write_snapshot(
+        case["snapshot_root"],
+        source="fpl-live",
+        captured_at_utc="2026-09-22T19:00:00Z",
+        payloads=case["snapshot"].payloads,
+    )
+    wrong_season = write_snapshot(
+        case["snapshot_root"],
+        source="fpl-live",
+        captured_at_utc="2026-09-22T20:00:00Z",
+        payloads=case["snapshot"].payloads,
+    )
+    monkeypatch.setattr(
+        shadow,
+        "infer_season",
+        lambda snapshot: (
+            "2025-26"
+            if snapshot.metadata.snapshot_id == wrong_season.snapshot_id
+            else case["inputs"].season
+        ),
+    )
+    original_inputs = shadow.read_inputs
+    monkeypatch.setattr(
+        shadow,
+        "read_inputs",
+        lambda snapshot, **kwargs: replace(
+            original_inputs(snapshot, **kwargs),
+            deadline=replace(case["inputs"].deadline, gameweek=5)
+            if snapshot.metadata.snapshot_id == wrong_week.snapshot_id
+            else case["inputs"].deadline,
+        ),
+    )
+    # Deliberately unsorted enumeration makes the capture-order assertion meaningful.
+    monkeypatch.setattr(
+        shadow,
+        "list_snapshot_ids",
+        lambda *args, **kwargs: [
+            later.snapshot_id,
+            wrong_season.snapshot_id,
+            case["inputs"].snapshot_id,
+            wrong_week.snapshot_id,
+        ],
+    )
+    receipt = build(case)
+    assert receipt["newest_for_gameweek"] is (not older_build)
+    expected = [case["inputs"].snapshot_id, later.snapshot_id]
+    if not older_build:
+        expected.reverse()
+    assert [row["snapshot_id"] for row in receipt["gameweek_captures"]] == expected
+    assert (
+        read_snapshot(case["snapshot_root"], later.snapshot_id).metadata.captured_at_utc
+        == receipt["gameweek_captures"][1 if older_build else 0]["captured_at_utc"]
+    )
+
+
+def test_inventory_refuses_when_decision_capture_is_missing(case, tmp_path):
+    missing_root = tmp_path / "inventory-without-decision"
+    write_snapshot(
+        missing_root,
         source="fpl-live",
         captured_at_utc="2026-09-22T23:00:00Z",
         payloads=case["snapshot"].payloads,
     )
-    receipt = build(case)
-    assert receipt["newest_for_gameweek"] is False
-    assert [row["snapshot_id"] for row in receipt["gameweek_captures"]] == [
-        case["inputs"].snapshot_id,
-        later.snapshot_id,
-    ]
-    assert (
-        read_snapshot(case["snapshot_root"], later.snapshot_id).metadata.captured_at_utc
-        == receipt["gameweek_captures"][1]["captured_at_utc"]
-    )
+    before = tree(tmp_path)
+    with pytest.raises(ValueError, match="decision capture is absent"):
+        shadow._gameweek_captures(missing_root, case["inputs"])
+    assert tree(tmp_path) == before
+
+
+@pytest.mark.parametrize(
+    "version", [JOINT_ROLE_RETAINED_HISTORY_MODEL_VERSION, CONTEXTUAL_MODEL_VERSION]
+)
+@pytest.mark.parametrize("guard", ["producer", "reader"])
+def test_both_v1_guards_refuse_valid_other_versions_without_changes(
+    case, tmp_path, monkeypatch, version, guard
+):
+    document = deepcopy(case["document"])
+    document["model_version"] = version
+    if version == JOINT_ROLE_RETAINED_HISTORY_MODEL_VERSION:
+        document["role_metadata"] = {"role_feature_version": RETAINED_HISTORY_ROLE_FEATURE_VERSION}
+    else:
+        document["availability_application"] = "before_team_shares_v1"
+        document["projection_contract"] = APPEARANCE_HORIZON_CONTRACT_VERSION
+    document["fingerprint"] = forecast_digest(document)
+    valid_other = tmp_path / "valid-other-version.json"
+    valid_other.write_text(json.dumps(document), encoding="utf-8")
+    other_forecast = read_football_forecast(valid_other, case["inputs"])
+    assert other_forecast.horizon.model_version == version
+    if guard == "producer":
+        case["document"] = document
+    else:
+        # Existing valid v1 bytes let publication replay without changing the tree.
+        shadow.publish_football_artifacts(
+            artifact_root=case["shadow_root"],
+            snapshot=case["snapshot"],
+            inputs=case["inputs"],
+            document=case["document"],
+            companion=None,
+        )
+        monkeypatch.setattr(shadow, "read_football_forecast", lambda *args: other_forecast)
+    before = tree(tmp_path)
+    with pytest.raises(ValueError, match=f"shadow {guard} must return football_team_share_v1"):
+        build(case)
+    assert tree(tmp_path) == before
 
 
 def test_deadline_crossed_during_fit_publishes_nothing(case, tmp_path, monkeypatch):
