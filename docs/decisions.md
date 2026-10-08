@@ -41,8 +41,8 @@ Source: [PR #716](https://github.com/MyManDev/football-squad-optimizer/pull/716)
 Decision:
 
 1. The owner runs the Tuesday settle and the Friday publish through GW20. Each
-   delegated stage requires his approval for that run, as do the PC1 decide step
-   and the C2 pair check. After GW20 the weekly run moves off his PC (#1010).
+   delegated stage requires his approval for that run. Until the owner says
+   otherwise, the PC1 decide step and the C2 pair check run the same way. After GW20 the weekly run moves off his PC (#1010).
 2. League 352490 keeps the full server menu through GW20. The price honesty
    readings at GW9 and GW15 and the Top 100 plan readings at GW12 and GW20 retain
    their records; #981 step 8 waits until then.
@@ -51,7 +51,8 @@ Decision:
 4. The second league for #981 is a classic league in which the owner or İbo plays,
    with about 20 to 50 members. It must be named on #981.
 5. The manager's word stays as it is until #524 widens club-news coverage. There
-   is no weekly club-news stage; #930 items 4 and 10 wait for #1006.
+   is no weekly club-news stage; #930 items 4 and 10 (steps 7 and 8 of #1006)
+   wait until #524 closes as done.
 6. Price changes are measured before entering the planner internally. Members
    see no price forecast. #1013 fixes the measurement and the two pass conditions.
 7. The forum is out of scope this season. The terminal value duplicate, copula
