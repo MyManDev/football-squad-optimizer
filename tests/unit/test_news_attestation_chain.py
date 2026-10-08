@@ -56,6 +56,9 @@ def _pair(
     extra_fixture=None,
     disposition="stated_expected_absent",
     body=None,
+    declared_scope="upcoming_premier_league",
+    coded_name="Saka",
+    published_at="2026-09-12T13:00:00Z",
 ):
     root = tmp_path / "snapshots"
     if extra_fixture is None:
@@ -72,16 +75,26 @@ def _pair(
                 FIXTURES_PAYLOAD: json.dumps(fixtures).encode(),
             },
         ).snapshot_id
+    document = _document(quote if body is None else body)
+    content = document.content.replace(b"2026-09-12T13:00:00Z", published_at.encode())
+    document = replace(document, content=content, readable=content, byte_length=len(content))
+    response = _response(quote=quote, label=disposition, version=version)
+    response_body = json.loads(response.text)
+    response_body["documents"][0]["published_at_utc"] = published_at
+    response_body["claims"][0]["player_name"] = coded_name
+    if version == ROTATION_CLAIM_CODING_CONTRACT_VERSION:
+        response_body["claims"][0]["fixture_scope"] = declared_scope
+    response = replace(response, text=json.dumps(response_body))
     news = write_club_news_capture(
         root,
         # ``body`` is what the club published, when that is more than the quote itself.
-        documents=(_document(quote if body is None else body),),
+        documents=(document,),
         coded=(
             CodedClub(
                 "Arsenal",
-                _response(quote=quote, label=disposition, version=version),
+                response,
                 version,
-                coding_prompt_sha256(contract_version=version),
+                coding_prompt_sha256("synthetic-stub", contract_version=version),
             ),
         ),
         clubs_declared=("Arsenal",),
@@ -122,32 +135,8 @@ def test_real_export_and_reader_bind_scope_publication_and_role(tmp_path):
     )
 
 
-@pytest.mark.parametrize("double", [False, True])
-def test_page_table_reader_and_both_consumers_report_double_fixture_reason(tmp_path, double):
-    bootstrap = json.loads(bootstrap_payload())
-    club = next(team["id"] for team in bootstrap["teams"] if team["name"] == "Arsenal")
-    opponent = next(team["id"] for team in bootstrap["teams"] if team["name"] == "Fulham")
-    extra = {
-        "id": 403,
-        "event": TARGET_GAMEWEEK,
-        "team_h": club,
-        "team_a": opponent,
-        "team_h_difficulty": 3,
-        "team_a_difficulty": 3,
-        "kickoff_time": "2026-09-13T19:00:00Z",
-        "finished": False,
-        "provisional_start_time": False,
-    }
-    table_path, manifest_path, source = _pair(tmp_path, extra_fixture=extra if double else None)
-    table = read_rotation_evidence_artifact(table_path, manifest_path)
-    row = table.loc[table.rotation_claim_observed].iloc[0]
-    assert bool(row.rotation_claim_scope_verified) is not double
-    words = load_manager_words(table_path, club_news_source=source)
-    (word,) = words.words
-    assert word.publication_verified
-    assert word.scope_verified is not double
-    assert word.fixture_binding_reason == ("ambiguous_current_week_fixture" if double else None)
-
+def _consumer_reading(table, words, club, double):
+    word = words.words[0]
     forecast, inputs, _ = _world()
     ids = {1: word.player_id, 2: 900002}
 
@@ -184,7 +173,7 @@ def test_page_table_reader_and_both_consumers_report_double_fixture_reason(tmp_p
             "club": [club, club] if double else [club],
             "GW": [TARGET_GAMEWEEK] * (2 if double else 1),
             "kickoff": [pd.Timestamp("2026-09-12T19:00:00Z")]
-            + ([pd.Timestamp(extra["kickoff_time"])] if double else []),
+            + ([pd.Timestamp("2026-09-13T19:00:00Z")] if double else []),
         }
     )
     context, audit = bind_football_context(
@@ -196,6 +185,36 @@ def test_page_table_reader_and_both_consumers_report_double_fixture_reason(tmp_p
         manager_words=words,
         fixture_calendar=fixtures,
     )
+    return reason, context, audit, result, forecast
+
+
+@pytest.mark.parametrize("double", [False, True])
+def test_page_table_reader_and_both_consumers_report_double_fixture_reason(tmp_path, double):
+    bootstrap = json.loads(bootstrap_payload())
+    club = next(team["id"] for team in bootstrap["teams"] if team["name"] == "Arsenal")
+    opponent = next(team["id"] for team in bootstrap["teams"] if team["name"] == "Fulham")
+    extra = {
+        "id": 403,
+        "event": TARGET_GAMEWEEK,
+        "team_h": club,
+        "team_a": opponent,
+        "team_h_difficulty": 3,
+        "team_a_difficulty": 3,
+        "kickoff_time": "2026-09-13T19:00:00Z",
+        "finished": False,
+        "provisional_start_time": False,
+    }
+    table_path, manifest_path, source = _pair(tmp_path, extra_fixture=extra if double else None)
+    table = read_rotation_evidence_artifact(table_path, manifest_path)
+    row = table.loc[table.rotation_claim_observed].iloc[0]
+    assert bool(row.rotation_claim_scope_verified) is not double
+    words = load_manager_words(table_path, club_news_source=source)
+    (word,) = words.words
+    assert word.publication_verified
+    assert word.scope_verified is not double
+    assert word.fixture_binding_reason == ("ambiguous_current_week_fixture" if double else None)
+
+    reason, context, audit, result, forecast = _consumer_reading(table, words, club, double)
     if double:
         assert reason == audit[0]["reason"] == "ambiguous_current_week_fixture"
         assert_frame_equal(result.horizon.table, forecast.horizon.table, check_exact=True)
@@ -258,6 +277,77 @@ def test_double_fixture_label_does_not_replace_another_scope_failure(tmp_path, q
     (word,) = load_manager_words(table_path, club_news_source=source).words
     assert not word.scope_verified
     assert word.fixture_binding_reason is None
+
+
+@pytest.mark.parametrize(
+    "case,double,options",
+    [
+        ("declared-ambiguous", True, {"declared_scope": "ambiguous"}),
+        ("declared-unspecified", True, {"declared_scope": "unspecified"}),
+        ("coded-full-name", True, {"coded_name": "Bukayo Saka"}),
+        ("single-fixture-name-failure", False, {"coded_name": "Bukayo Saka"}),
+        ("single-table-scope-refusal", False, {}),
+        (
+            "negated-source",
+            True,
+            {"body": "It is not true that Saka will miss the next Premier League match."},
+        ),
+        ("stale-source", True, {"published_at": "2026-09-05T14:30:00Z"}),
+        (
+            "minutes-name-failure",
+            True,
+            {
+                "coded_name": "Bukayo Saka",
+                "disposition": "stated_minutes_limited",
+                "quote": "Saka will be limited in the next Premier League match.",
+            },
+        ),
+        (
+            "single-minutes-name-failure",
+            False,
+            {
+                "coded_name": "Bukayo Saka",
+                "disposition": "stated_minutes_limited",
+                "quote": "Saka will be limited in the next Premier League match.",
+            },
+        ),
+    ],
+)
+def test_another_failure_never_becomes_a_double_fixture_reason(tmp_path, case, double, options):
+    bootstrap = json.loads(bootstrap_payload())
+    club = next(team["id"] for team in bootstrap["teams"] if team["name"] == "Arsenal")
+    opponent = next(team["id"] for team in bootstrap["teams"] if team["name"] == "Fulham")
+    extra = {
+        "id": 403,
+        "event": TARGET_GAMEWEEK,
+        "team_h": club,
+        "team_a": opponent,
+        "team_h_difficulty": 3,
+        "team_a_difficulty": 3,
+        "kickoff_time": "2026-09-13T19:00:00Z",
+        "finished": False,
+        "provisional_start_time": False,
+    }
+    table_path, manifest_path, source = _pair(
+        tmp_path, extra_fixture=extra if double else None, **options
+    )
+    if case == "single-table-scope-refusal":
+        _rewrite(
+            table_path,
+            manifest_path,
+            lambda frame: frame.loc.__setitem__(
+                (frame.rotation_claim_observed, "rotation_claim_scope_verified"), False
+            ),
+        )
+    table = read_rotation_evidence_artifact(table_path, manifest_path)
+    words = load_manager_words(table_path, club_news_source=source)
+    (word,) = words.words
+    assert not word.scope_verified
+    assert word.fixture_binding_reason is None, case
+    reason, context, audit, result, forecast = _consumer_reading(table, words, club, double)
+    assert reason == audit[0]["reason"] == "upcoming_league_scope_unverified", case
+    assert_frame_equal(result.horizon.table, forecast.horizon.table, check_exact=True)
+    assert context.availability_probability.tolist() == [0.75, 1.0]
 
 
 @pytest.mark.parametrize(

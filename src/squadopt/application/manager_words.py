@@ -525,7 +525,13 @@ def manager_words_from_artifact(
         if (
             not scope_verified
             and publication_verified
-            and checked_scope == ("upcoming_premier_league", True)
+            and disposition
+            in (
+                "stated_expected_absent",
+                "stated_full_match_unavailable",
+                "stated_rotation_risk",
+            )
+            and checked_scope == (scope, True)
             and whole_sentence
             and target_basis is not None
             and _targets_decision(row, document, target_basis, only_multiple=True)
