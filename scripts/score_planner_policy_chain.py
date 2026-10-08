@@ -8,14 +8,20 @@ outcome captures, once per reading, and writes the record the protocol names.
 A reading refuses to start before its gameweek settles, refuses a reading the protocol does not
 name, refuses a reading taken twice, and runs only from its own merge commit (rule 37). It
 fetches origin before it reads any history, so that its merge commit, the readings already
-taken and the release tags are read as origin holds them. The interim reading records no
-verdict (rule 32). Run from a clean checkout of the scorer's merge commit, in a clone that is
-not shallow and can reach origin, with E the runner's evidence directory, S the capture root it
-decided from, R the receipts the operator posted on the chain's tracking issue (rule 24), in
-the shape ``read_receipts`` states, and P the producer changes that keep a version name as the
-operator declared them there (rule 6), in the shape ``read_producer_changes`` states, or the
-word none. R and P are kept outside the checkout, because an untracked file leaves the tree
-unclean and the reading is refused:
+taken, the release tags and the interim record are read as origin holds them. The interim
+reading records no verdict (rule 32). The final reading reads the interim record from origin's
+develop, as the commit that first added it holds it, so the interim record is merged before the
+final reading is taken, and it lists each interim week whose outcome capture changed with both
+scores (rule 25). Everything a reading writes is rendered before the first write, the twin and
+the index row from the record's own bytes (rule 36).
+
+Run from a clean checkout of the scorer's merge commit, in a clone that is not shallow and can
+reach origin, with E the runner's evidence directory, S the capture root it decided from, R the
+receipts the operator posted on the chain's tracking issue (rule 24), in the shape
+``read_receipts`` states, and P the producer changes that keep a version name as the operator
+declared them there (rule 6), in the shape ``read_producer_changes`` states, or the word none.
+R and P are kept outside the checkout, because an untracked file leaves the tree unclean and
+the reading is refused:
 
     python -m scripts.score_planner_policy_chain --evidence E --snapshot-root S --receipts R
         --producer-changes P --reading gw20
@@ -31,7 +37,7 @@ import re
 import statistics
 import subprocess
 import sys
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from importlib import metadata as package_metadata
@@ -44,7 +50,7 @@ from squadopt.application.weekly_suggestion_eval import (
     SuggestionEvaluationError,
     score_recorded_advice,
 )
-from squadopt.data.atomic import write_document_once
+from squadopt.data.atomic import document_bytes, write_bytes_once, write_document_once
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import CapturedSnapshot, list_snapshot_ids, read_snapshot
 from squadopt.data.sources.fpl_live import (
@@ -79,6 +85,8 @@ TRACKING = f"refs/remotes/{REMOTE}"
 DEVELOP = f"{TRACKING}/develop"
 #: Rule 28: the two readings and the gameweek each one waits for.
 READINGS: dict[str, int] = {"gw20": 20, "gw38": 38}
+#: Rule 25: the reading whose record the final reading compares its weeks with.
+INTERIM_READING = "gw20"
 ARMS: tuple[str, ...] = ("served_3", "served_5", "hold_3", "hold_5", "one_week")
 #: Rule 14: each arm's window in weeks, and the last gameweek a window may reach.
 WINDOW_WEEKS: dict[str, int] = {
@@ -113,6 +121,11 @@ SECONDARY_PAIRS: dict[str, tuple[tuple[str, str], ...]] = {
     "B_window_3": (("served_3", "one_week"),),
     "B_window_5": (("served_5", "one_week"),),
     "hold_minus_one_week": (("hold_3", "one_week"), ("hold_5", "one_week")),
+}
+#: Rules 29 and 35: the pairings each squad is reported for, and the paired totals are given for.
+REPORTED_PAIRS: dict[str, tuple[tuple[str, str], ...]] = {
+    **CONTRASTS,
+    "hold_minus_one_week": SECONDARY_PAIRS["hold_minus_one_week"],
 }
 #: Rule 30: the interval's policy, stated here so a later default cannot change it.
 POLICY = PromotionPolicy(
@@ -180,11 +193,25 @@ RELEASE_UNKNOWN: Mapping[str, object] = {
 #: it; stated in each record.
 ONCE_RULE = (
     "A reading is refused as taken when its record or its twin exists in the checkout or in any "
-    "other worktree of this repository, or was touched by any commit reachable from any ref or "
-    "reflog once the scorer has fetched every branch from origin. A reading written in a "
-    "separate clone is seen only once it is committed there and pushed to a branch on origin."
+    "other worktree of this repository, when the checkout's measurements index already links its "
+    "record, or when either file was touched by any commit reachable from any ref or reflog once "
+    "the scorer has fetched every branch from origin. A reading written in a separate clone is "
+    "seen only once it is committed there and pushed to a branch on origin."
 )
 PINNED_PACKAGES: tuple[str, ...] = ("ortools", "numpy", "pandas")
+#: Rules 3 and 28: the fields of the runner's protocol.json that each record repeats. Both
+#: readings read one chain, so the final reading refuses an interim record that differs in any.
+FROZEN_SOURCE_FIELDS: tuple[str, ...] = (
+    "repository_commit",
+    "protocol_sha256",
+    "runner_sha256",
+    "binding_commits",
+    "first_chain_week",
+    "bound_week",
+    "skipped_weeks",
+    "dropped_profiles",
+    "answer",
+)
 #: Rules 2 and 3, as each record states it: what the scorer reads again from git at the frozen
 #: commit.
 FROZEN_SOURCE_CHECK = (
@@ -232,12 +259,14 @@ END_PRICES_RULE = (
     "is stated and the reason is recorded. A chain that holds a player the capture does not "
     "price gets no sale value (rule 23)."
 )
-#: Rule 31, stated beside every interval.
+#: Rule 31, stated beside every interval: how often the check's interval covered zero, and how
+#: often its upper bound fell below zero, the rate that bears on the `worse` clause.
 COVERAGE_NOTE = (
     "At these counts the interval is narrower than its level: in the protocol's synthetic check "
     "(400 replicates, standard deviation 11.6, true difference zero) it covered zero in 58, 76 "
-    "and 82 per cent of replicates at 7, 15 and 31 weeks, and 54, 74 and 78 per cent at a lag-one "
-    "autocorrelation of 0.2."
+    "and 82 per cent of replicates at 7, 15 and 31 weeks, and its upper bound fell below zero in "
+    "20, 12 and 12 per cent. At a lag-one autocorrelation of 0.2 it covered zero in 54, 74 and 78 "
+    "per cent, and fell below zero in 26, 15 and 10 per cent."
 )
 #: Where the protocol leaves the scorer a choice, the narrowest reading, stated in every record.
 CHOICES: dict[str, str] = {
@@ -274,6 +303,48 @@ CHOICES: dict[str, str] = {
         "from its first week up to the next change declared for that version. A declared first "
         "week before the chain's first week, or one this reading decided under another version, "
         "refuses the reading."
+    ),
+    "without_failed_weeks": (
+        "Rule 22 calls one squad's failed arm in one gameweek a failed week, so each contrast "
+        "without failed weeks leaves out every pair in which either arm failed and keeps that "
+        "gameweek's other pairs; a gameweek leaves that series only when no pair is left. Every "
+        "block counts its pairs in which an arm failed, and the series without failed weeks "
+        "counts the ones it left out."
+    ),
+    "by_squad": (
+        "Rule 29 names each squad and no contrast, so each squad is reported for contrast A, "
+        "contrast B and hold minus one_week, each on that squad's own pairs under the series rule "
+        "every other block uses."
+    ),
+    "proved_share": (
+        "Rule 20's share is taken over the plans each arm played: its decided records whose "
+        "solver.proved is true, over its decided records, in every week of the reading, "
+        "truncated weeks included. The runner records an observed comparison, published "
+        "FEASIBLE, as not proved. A failed arm played its held team and no plan, so its failed "
+        "weeks are counted beside the share and not in it."
+    ),
+    "blocked_chains": (
+        "Rule 23: a blocked chain is listed in every week of the reading from the week it was "
+        "blocked in, with that week and the reason its record states. Rule 22: each failed arm "
+        "is listed in its week, with the reason its record states."
+    ),
+    "model_versions": (
+        "Rules 6 and 29: each contrast is also reported for each model version a week that is "
+        "not missing was served under, on that version's scored weeks, from the first such week. "
+        "A version whose weeks were all unscored keeps a block with no weeks, so its first week "
+        "stays recorded. A missing week opens no block, whatever version its receipt names."
+    ),
+    "changed_outcome_captures": (
+        "Rule 25: each reading keeps, for each week, the weekly difference of contrasts A and B "
+        "beside its outcome capture id, as the paired differences rule 35 allows at the interim. "
+        "The final reading reads the interim record from origin's develop, as the first commit on "
+        "develop's first-parent line that added it holds it (rule 24: the first record stands). "
+        "That record must name this scorer's merge commit, every protocol.json field this reading "
+        "records, the same weeks and, for each, the decision capture, the missing reason and the "
+        "manifest sha256 this reading holds it to. Every interim week that is not missing and "
+        "whose outcome capture id differs, to or from none included, is listed with both ids and "
+        "both weekly differences. A week whose outcome capture did not change must give the "
+        "differences the interim recorded, or the reading is refused."
     ),
 }
 
@@ -472,6 +543,166 @@ def written_reading(reading: str) -> str | None:
             if (root / path).exists():
                 return str(root / path)
     return None
+
+
+# Rule 25: the interim record, read again at the final reading
+
+
+@dataclass(frozen=True)
+class InterimRecord:
+    """The interim record as develop on origin holds it: its document, the commit on develop's
+    first-parent line that first added it, the develop commit it was read at and the sha256 of
+    its bytes."""
+
+    record: Mapping[str, Any]
+    added_commit: str
+    develop_commit: str
+    sha256: str
+
+
+def interim_reading() -> InterimRecord:
+    """Rule 25: the interim record, read from develop as origin holds it.
+
+    Read after ``source_identity`` has fetched origin. The scorer runs from its own merge
+    commit, which the interim record postdates, so the record is read from develop's history and
+    never from the checkout. Rule 24's first record stands: the record is read as the first
+    commit on develop's first-parent line that added it holds it, so a later edit on develop is
+    never read in its place, and a record on a branch develop has not taken is not read at all.
+    """
+
+    path, _ = record_paths(INTERIM_READING)
+    develop = _git("rev-parse", "--verify", f"{DEVELOP}^{{commit}}")
+    added = _git(
+        "log",
+        "--first-parent",
+        "--diff-merges=first-parent",
+        "--diff-filter=A",
+        "--reverse",
+        "--no-patch",
+        "--format=%H",
+        develop,
+        "--",
+        path,
+    ).split()
+    if not added:
+        raise ScorerError(
+            "The final reading lists each week whose outcome capture changed since the interim "
+            f"(rule 25), and develop on origin holds no {path}: the interim reading is merged "
+            "before the final one is taken."
+        )
+    # The trailing "--" names the argument a revision, so git never looks for it on disk.
+    raw = _git_bytes("show", f"{added[0]}:{path}", "--")
+    try:
+        record = json.loads(raw.decode("utf-8"))
+    except ValueError as error:
+        raise ScorerError(f"{path} as {added[0]} added it is not JSON: {error}") from error
+    if not isinstance(record, dict):
+        raise ScorerError(f"{path} as {added[0]} added it is not a record.")
+    return InterimRecord(record, added[0], develop, hashlib.sha256(raw).hexdigest())
+
+
+def _mapping(value: object) -> Mapping[str, Any]:
+    return cast(Mapping[str, Any], value) if isinstance(value, Mapping) else {}
+
+
+def _canonical(value: object) -> str:
+    return json.dumps(value, sort_keys=True)
+
+
+def _week_score(week: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        "outcome_capture": week.get("outcome_capture"),
+        "unscored_reason": week.get("unscored_reason"),
+        "differences": week.get("differences"),
+    }
+
+
+def changed_since_interim(
+    interim: InterimRecord,
+    weeks: Sequence[Mapping[str, Any]],
+    identity: Mapping[str, object],
+    frozen_source: Mapping[str, Any],
+    manifests: Mapping[str, Mapping[str, Any]],
+) -> dict[str, Any]:
+    """Rule 25: each interim week whose outcome capture changed by this reading, listed with
+    both capture ids and both weekly differences of each primary contrast.
+
+    The interim record must be this protocol's interim reading of the same chain: scored from
+    this scorer's merge commit (rule 37), on the protocol.json fields this reading records
+    (rule 3), over the same weeks, each with the decision capture, the missing reason and the
+    manifest sha256 this reading holds it to (rule 24). A week whose outcome capture did not
+    change must give the differences the interim recorded. ``weeks`` are this reading's listed
+    weeks and ``manifests`` the receipts it held them to.
+    """
+
+    earlier = interim.record
+    path, _ = record_paths(INTERIM_READING)
+    named = (earlier.get("protocol"), earlier.get("season"), earlier.get("reading"))
+    if named != (PROTOCOL_ID, SEASON, INTERIM_READING):
+        raise ScorerError(f"{path} on develop is not this protocol's interim record.")
+    scorer = _mapping(earlier.get("identity")).get("scorer_merge_commit")
+    if scorer != identity.get("scorer_merge_commit"):
+        raise ScorerError(
+            f"The interim record was scored from {scorer}, and this reading runs from "
+            f"{identity.get('scorer_merge_commit')}: rule 37 runs both from one merge commit."
+        )
+    source = _mapping(earlier.get("frozen_source"))
+    differing = [key for key in FROZEN_SOURCE_FIELDS if source.get(key) != frozen_source.get(key)]
+    if differing:
+        raise ScorerError(
+            "The interim record was read from another frozen source (rule 3): its "
+            f"{', '.join(differing)} differ from this reading's."
+        )
+    before_weeks = earlier.get("weeks")
+    if not isinstance(before_weeks, list) or not all(
+        isinstance(week, Mapping) for week in before_weeks
+    ):
+        raise ScorerError(f"{path} on develop lists no weeks.")
+    now = {int(week["gameweek"]): week for week in weeks}
+    through = READINGS[INTERIM_READING]
+    if [week.get("gameweek") for week in before_weeks] != sorted(g for g in now if g <= through):
+        raise ScorerError(
+            f"The interim record lists other weeks than this reading's through GW{through}."
+        )
+    posted = _mapping(_mapping(earlier.get("receipts")).get("manifests"))
+    changed: list[dict[str, Any]] = []
+    for before in before_weeks:
+        gameweek = int(before["gameweek"])
+        after = now[gameweek]
+        name = f"gw{gameweek:02d}"
+        same = (
+            before.get("decision_capture") == after.get("decision_capture")
+            and before.get("missing_reason") == after.get("missing_reason")
+            and _mapping(posted.get(name)).get("sha256")
+            == _mapping(manifests.get(name)).get("sha256")
+        )
+        if not same:
+            raise ScorerError(
+                f"GW{gameweek:02d}: the interim record was read from other decisions than this "
+                "reading's (rule 24)."
+            )
+        if after.get("missing_reason") is not None:
+            continue
+        if before.get("outcome_capture") == after.get("outcome_capture"):
+            if _canonical(before.get("differences")) != _canonical(after.get("differences")):
+                raise ScorerError(
+                    f"GW{gameweek:02d}: the interim read the same outcome capture and recorded "
+                    "other differences."
+                )
+            continue
+        changed.append(
+            {"gameweek": gameweek, "interim": _week_score(before), "final": _week_score(after)}
+        )
+    return {
+        "record": path,
+        "read_from": DEVELOP,
+        "develop_commit": interim.develop_commit,
+        "added_commit": interim.added_commit,
+        "sha256": interim.sha256,
+        "scorer_merge_commit": scorer,
+        "interim_weeks": len(before_weeks),
+        "changed_weeks": changed,
+    }
 
 
 # Rule 3: the release live at each deadline
@@ -1454,9 +1685,114 @@ def _block(rows: Sequence[Mapping[str, Any]], candidate_id: str, *, final: bool)
     return {
         **summary,
         "exact_zero_pairs": sum(int(row["exact_zero_pairs"]) for row in rows),
+        # Rule 22: a failed arm's pairs stay in the pairs, and each block counts them.
+        "failed_pairs": sum(int(row["failed_pairs"]) for row in rows),
         "pairs": sum(int(row["pairs"]) for row in rows),
         "weeks_listed": [int(row["gameweek"]) for row in rows],
         "verdict": verdict(summary, final=final),
+    }
+
+
+def _week_row(row: Mapping[str, Any] | None) -> dict[str, Any] | None:
+    """A week's row of a primary series, as that week's entry keeps it (rule 25)."""
+
+    if row is None:
+        return None
+    return {key: row[key] for key in ("difference", "pairs", "exact_zero_pairs", "failed_pairs")}
+
+
+def _model_versions(weeks: Sequence[WeekScores]) -> dict[str, int]:
+    """Rules 6 and 29: each model version a week that is not missing was served under, with the
+    first such week.
+
+    A missing week bound no forecast, so the version its receipt names, which may be one rule 6
+    does not admit, opens no block. An unscored week was served under its version, so it can be
+    a version's first week.
+    """
+
+    first: dict[str, int] = {}
+    for week in weeks:
+        if week.missing_reason is None and week.model_version:
+            first.setdefault(week.model_version, week.gameweek)
+    return dict(sorted(first.items()))
+
+
+# Rules 20, 22 and 23: what each chain did besides its points
+
+
+def _by_budget(profiles: Iterable[str]) -> list[str]:
+    """Squads in the protocol's order, the largest budget first (rule 9)."""
+
+    named = set(profiles)
+    return [p for p in PROFILES if p in named] + sorted(named - set(PROFILES))
+
+
+def _chain_order(chain: tuple[str, str]) -> tuple[int, str, int, str]:
+    profile, arm = chain
+    return (
+        PROFILES.index(profile) if profile in PROFILES else len(PROFILES),
+        profile,
+        ARMS.index(arm) if arm in ARMS else len(ARMS),
+        arm,
+    )
+
+
+def chain_statuses(
+    evidence: Sequence[WeekEvidence],
+) -> dict[int, dict[str, list[dict[str, Any]]]]:
+    """Rules 22 and 23: for each week, every chain blocked by then, with the week it was blocked
+    from, and every arm that failed that week, each with the reason its record states. Chains
+    are listed by budget, then in the order of ARMS."""
+
+    blocked_from: dict[tuple[str, str], int] = {}
+    listed: dict[int, dict[str, list[dict[str, Any]]]] = {}
+    for week in evidence:
+        blocked: list[dict[str, Any]] = []
+        failed: list[dict[str, Any]] = []
+        for chain in sorted(week.records, key=_chain_order):
+            record = week.records[chain]
+            if record.get("status") == "blocked":
+                first = blocked_from.setdefault(chain, week.gameweek)
+                blocked.append(
+                    {
+                        "profile": chain[0],
+                        "arm": chain[1],
+                        "blocked_from": first,
+                        "reason": record.get("reason"),
+                    }
+                )
+            elif record.get("status") == "failed":
+                failed.append(
+                    {"profile": chain[0], "arm": chain[1], "reason": record.get("reason")}
+                )
+        listed[week.gameweek] = {"blocked_chains": blocked, "failed_chains": failed}
+    return listed
+
+
+def proved_plans(evidence: Sequence[WeekEvidence]) -> dict[str, dict[str, Any]]:
+    """Rule 20: for each arm, its decided plans that its own search proved OPTIMAL, over its
+    decided plans, in every week of the reading. The runner records an observed comparison,
+    published FEASIBLE, as not proved. A failed week is no plan the arm played, so it is counted
+    beside the share and not in it."""
+
+    tallies = {arm: {"decided": 0, "proved": 0, "failed": 0} for arm in ARMS}
+    for week in evidence:
+        for (_profile, arm), record in week.records.items():
+            tally = tallies.get(arm)
+            if tally is None:
+                continue
+            if record.get("status") == "decided":
+                tally["decided"] += 1
+                if _mapping(record.get("solver")).get("proved") is True:
+                    tally["proved"] += 1
+            elif record.get("status") == "failed":
+                tally["failed"] += 1
+    return {
+        arm: {
+            **tally,
+            "proved_share": tally["proved"] / tally["decided"] if tally["decided"] else None,
+        }
+        for arm, tally in tallies.items()
     }
 
 
@@ -1590,10 +1926,7 @@ def _paired_totals(totals: Mapping[str, Mapping[str, Any]]) -> dict[str, dict[st
     only as paired differences between arms."""
 
     paired = {}
-    for label, pairs in {
-        **CONTRASTS,
-        "hold_minus_one_week": SECONDARY_PAIRS["hold_minus_one_week"],
-    }.items():
+    for label, pairs in REPORTED_PAIRS.items():
         differences: dict[str, Any] = {}
         for key in (
             "gross_points",
@@ -1740,9 +2073,19 @@ def reading_record(
     receipts: Mapping[str, Any],
     tags: Sequence[ReleaseTag] = (),
     producer_changes: Mapping[str, Any] = NO_PRODUCER_CHANGES,
+    interim: InterimRecord | None = None,
 ) -> dict[str, Any]:
+    """One reading's record. The final reading takes ``interim``, the interim record as develop
+    holds it, and lists each interim week whose outcome capture changed (rule 25)."""
+
     final = reading == "gw38"
+    if final and interim is None:
+        raise ScorerError(
+            "The final reading lists each week whose outcome capture changed since the interim "
+            "(rule 25), so it reads the interim record first."
+        )
     frozen = str(protocol.get("repository_commit", ""))
+    statuses = chain_statuses(evidence)
     weeks: list[WeekScores] = []
     listed: list[dict[str, Any]] = []
     for week in evidence:
@@ -1771,27 +2114,38 @@ def reading_record(
                     for (profile, arm), split in sorted(scored.served_splits.items())
                 },
                 "release": release,
+                **statuses[week.gameweek],
             }
         )
     declared = [dict(change) for change in producer_changes["changes"]]
     after_change = producer_change_weeks(weeks, declared, _first_chain_week(protocol))
     for entry in listed:
         entry["producer_change"] = after_change.get(int(entry["gameweek"]))
+    versions = _model_versions(weeks)
+    weekly: dict[str, dict[int, Mapping[str, Any]]] = {}
     contrasts = {}
     for label, pairs in CONTRASTS.items():
         candidate = f"{PROTOCOL_ID}:{label}"
+        rows = _series(weeks, pairs)
+        weekly[label] = {int(row["gameweek"]): row for row in rows}
+        primary = _block(rows, candidate, final=final)
+        without = _block(_series(weeks, pairs, without_failed=True), candidate, final=False)
+        # Rule 22: the series without failed weeks leaves out exactly the failed pairs the
+        # primary keeps, a gameweek whose every pair failed included.
+        without["failed_pairs"] = primary["failed_pairs"]
         contrasts[label] = {
-            "primary": _block(_series(weeks, pairs), candidate, final=final),
-            "without_failed_weeks": _block(
-                _series(weeks, pairs, without_failed=True), candidate, final=False
-            ),
+            "primary": primary,
+            "without_failed_weeks": without,
             "by_model_version": {
-                version: _block(
-                    _series(weeks, pairs, keep=lambda w, v=version: w.model_version == v),
-                    candidate,
-                    final=False,
-                )
-                for version in sorted({w.model_version for w in weeks if w.model_version})
+                version: {
+                    "first_week": first_week,
+                    **_block(
+                        _series(weeks, pairs, keep=lambda w, v=version: w.model_version == v),
+                        candidate,
+                        final=False,
+                    ),
+                }
+                for version, first_week in versions.items()
             },
             "team_share_without_marker_or_components": _block(
                 _series(weeks, pairs, keep=lambda w: w.team_share_apart), candidate, final=False
@@ -1805,12 +2159,24 @@ def reading_record(
                 for name in sorted({producer_change_name(change) for change in declared})
             },
         }
+    # Rule 25: each week keeps the weekly difference each primary contrast pooled, beside its
+    # outcome capture, so the final reading can list a week whose capture changed with both
+    # scores. Rule 35 allows paired differences at the interim.
+    for entry in listed:
+        gameweek = int(entry["gameweek"])
+        entry["differences"] = {
+            label: _week_row(weekly[label].get(gameweek)) for label in CONTRASTS
+        }
     by_route = _route_blocks(weeks)
     secondary = {
         name: _block(_series(weeks, pairs), f"{PROTOCOL_ID}:{name}", final=False)
         for name, pairs in SECONDARY_PAIRS.items()
     }
-    by_squad = _squad_blocks(weeks, CONTRASTS["A"], f"{PROTOCOL_ID}:A")
+    # Rule 29: each squad, for each pairing it is reported for, on its own pairs.
+    by_squad = {
+        label: _squad_blocks(weeks, pairs, f"{PROTOCOL_ID}:{label}")
+        for label, pairs in REPORTED_PAIRS.items()
+    }
     truncated = {
         label: _block(
             _series(weeks, pairs, truncated_pairs=True), f"{PROTOCOL_ID}:{label}", final=False
@@ -1819,6 +2185,11 @@ def reading_record(
     }
     end = end_prices(weeks, READINGS[reading])
     totals = arm_totals(weeks, evidence, end.prices, end.fee)
+    frozen_source = {key: protocol.get(key) for key in FROZEN_SOURCE_FIELDS}
+    manifests = {
+        f"gw{week.gameweek:02d}": dict(receipts["manifests"][f"gw{week.gameweek:02d}"])
+        for week in evidence
+    }
     return {
         "protocol": PROTOCOL_ID,
         "season": SEASON,
@@ -1833,23 +2204,9 @@ def reading_record(
             "file_sha256": receipts["file_sha256"],
             "tracking_issue": receipts["tracking_issue"],
             "frozen_commit": dict(receipts["frozen_commit"]),
-            "manifests": {
-                f"gw{week.gameweek:02d}": dict(receipts["manifests"][f"gw{week.gameweek:02d}"])
-                for week in evidence
-            },
+            "manifests": manifests,
         },
-        "frozen_source": {
-            "repository_commit": protocol.get("repository_commit"),
-            "protocol_sha256": protocol.get("protocol_sha256"),
-            "runner_sha256": protocol.get("runner_sha256"),
-            "binding_commits": protocol.get("binding_commits"),
-            "first_chain_week": protocol.get("first_chain_week"),
-            "bound_week": protocol.get("bound_week"),
-            "skipped_weeks": protocol.get("skipped_weeks"),
-            "dropped_profiles": protocol.get("dropped_profiles"),
-            "answer": protocol.get("answer"),
-            "checked": FROZEN_SOURCE_CHECK,
-        },
+        "frozen_source": {**frozen_source, "checked": FROZEN_SOURCE_CHECK},
         "interval_policy": {
             "confidence_level": POLICY.confidence_level,
             "bootstrap_resamples": POLICY.bootstrap_resamples,
@@ -1872,11 +2229,17 @@ def reading_record(
             ),
         },
         "weeks": listed,
+        "proved_plans": proved_plans(evidence),
         "contrasts": contrasts,
         "contrast_a_by_served_route": by_route,
         "secondary": secondary,
         "by_squad": by_squad,
         "truncated_weeks": truncated,
+        "changed_since_interim": (
+            changed_since_interim(interim, listed, identity, frozen_source, manifests)
+            if final and interim is not None
+            else None
+        ),
         "totals": {
             "end_state_prices": {
                 "rule": END_PRICES_RULE,
@@ -1955,8 +2318,103 @@ def _priced_note(end: Mapping[str, Any]) -> str:
     return note
 
 
+def _difference(row: Mapping[str, Any] | None) -> str:
+    return "none" if row is None else _shown(float(row["difference"]))
+
+
+def _share(value: object) -> str:
+    return "none" if value is None else f"{float(cast(float, value)):.3f}"
+
+
+def _capture(side: Mapping[str, Any]) -> str:
+    if side["outcome_capture"] is not None:
+        return str(side["outcome_capture"])
+    return f"none ({side['unscored_reason']})" if side["unscored_reason"] else "none"
+
+
+def _chain_lines(record: Mapping[str, Any]) -> list[str]:
+    """Rules 20, 22 and 23: the blocked chains, the failed arms and each arm's proved plans."""
+
+    blocked: dict[tuple[str, str], tuple[int, str]] = {}
+    failed: list[str] = []
+    for week in record["weeks"]:
+        for chain in week["blocked_chains"]:
+            key = (str(chain["profile"]), str(chain["arm"]))
+            blocked.setdefault(key, (int(chain["blocked_from"]), _shown(chain["reason"])))
+        for chain in week["failed_chains"]:
+            failed.append(
+                _row(week["gameweek"], chain["profile"], chain["arm"], _shown(chain["reason"]))
+            )
+    lines = ["", "## Blocked chains and failed arms", ""]
+    if not blocked and not failed:
+        lines.append("No chain was blocked and no arm failed.")
+    for (profile, arm), (first, reason) in blocked.items():
+        lines.append(
+            f"- `{profile}` `{arm}`: blocked from GW{first:02d} ({reason}); no decision and no "
+            "pair from then on (rule 23)."
+        )
+    if failed:
+        lines += ([""] if blocked else []) + [*_header("GW", "Squad", "Arm", "Failure"), *failed]
+    lines += [
+        "",
+        "## Plans proved OPTIMAL",
+        "",
+        "Each arm's decided plans that its own search proved OPTIMAL, over its decided plans. An "
+        "observed comparison is published FEASIBLE and is not counted as proved (rule 20). A "
+        "failed week played the held team and no plan, so it is counted beside the share.",
+        "",
+        *_header("Arm", "Decided plans", "Proved", "Share", "Failed weeks"),
+    ]
+    for arm in ARMS:
+        tally = record["proved_plans"][arm]
+        lines.append(
+            _row(
+                arm,
+                tally["decided"],
+                tally["proved"],
+                _share(tally["proved_share"]),
+                tally["failed"],
+            )
+        )
+    return lines
+
+
+def _changed_lines(changed: Mapping[str, Any]) -> list[str]:
+    """Rule 25: each interim week whose outcome capture changed, with both captures and both
+    weekly differences of each primary contrast."""
+
+    lines = [
+        "## Weeks whose outcome capture changed since the interim",
+        "",
+        f"The interim record `{changed['record']}` was read from `{changed['read_from']}` at "
+        f"`{changed['develop_commit']}`, as commit `{changed['added_commit']}` added it (sha256 "
+        f"`{changed['sha256']}`). It was scored from `{changed['scorer_merge_commit']}`, as this "
+        f"reading was, over {changed['interim_weeks']} weeks.",
+        "",
+    ]
+    if not changed["changed_weeks"]:
+        return [*lines, "No interim week's outcome capture changed.", ""]
+    names = [f"{label} {side}" for label in CONTRASTS for side in ("interim", "final")]
+    lines += _header("GW", "Interim capture", "Final capture", *names)
+    for week in changed["changed_weeks"]:
+        interim, final = week["interim"], week["final"]
+        cells = [
+            _difference((side["differences"] or {}).get(label))
+            for label in CONTRASTS
+            for side in (interim, final)
+        ]
+        lines.append(_row(week["gameweek"], _capture(interim), _capture(final), *cells))
+    return [*lines, ""]
+
+
 def render_markdown(record: Mapping[str, Any]) -> str:
-    """The record's twin, rendered from the JSON and nothing else."""
+    """The record's twin, rendered from the JSON and nothing else (rule 36).
+
+    Every mapping is walked in the protocol's order (CONTRASTS, the secondary pairings, the
+    reported pairings, squads by budget and ARMS) or in sorted order, never in the order its keys
+    were stored, so the twin is the same whether it is rendered from the record in memory or from
+    its JSON, whose keys are sorted.
+    """
 
     final = bool(record["final"])
     frozen = record["frozen_source"]["repository_commit"]
@@ -1980,6 +2438,7 @@ def render_markdown(record: Mapping[str, Any]) -> str:
             "Outcome capture",
             "Model version",
             "Scored chains",
+            *CONTRASTS,
             "Release tag",
             "Planner same",
             "Binding same",
@@ -1995,6 +2454,7 @@ def render_markdown(record: Mapping[str, Any]) -> str:
                 week["outcome_capture"] or "none",
                 week["model_version"] or "none",
                 week["scored_chains"],
+                *(_difference(week["differences"][label]) for label in CONTRASTS),
                 release.get("release_tag") or "none",
                 _shown(release.get("planner_source_same")),
                 _shown(release.get("binding_source_same")),
@@ -2019,6 +2479,7 @@ def render_markdown(record: Mapping[str, Any]) -> str:
         "Producer changes that keep a version name (rule 6): "
         + (f"{declared}, declared at {changes['source']}." if declared else "none declared."),
     ]
+    lines += _chain_lines(record)
     lines += [
         "",
         "## Primary contrasts",
@@ -2032,11 +2493,12 @@ def render_markdown(record: Mapping[str, Any]) -> str:
             "Blocks of 8",
             "Detectable effect",
             "Zero pairs",
+            "Failed pairs",
             "Verdict",
         ),
     ]
-    for label, block in record["contrasts"].items():
-        primary = block["primary"]
+    for label in CONTRASTS:
+        primary = record["contrasts"][label]["primary"]
         lines.append(
             _row(
                 label,
@@ -2047,19 +2509,30 @@ def render_markdown(record: Mapping[str, Any]) -> str:
                 _shown(primary["interval_blocks_of_8"]),
                 _shown(primary["detectable_effect"]),
                 primary["exact_zero_pairs"],
+                primary["failed_pairs"],
                 primary["verdict"] if final else "none (interim)",
             )
         )
     lines += ["", record["contrasts"]["A"]["primary"]["coverage_note"], ""]
+    if record["changed_since_interim"] is not None:
+        lines += _changed_lines(record["changed_since_interim"])
     lines += [
         "## Secondary, descriptive",
         "",
         *_header("Series", "Weeks", "Mean", "SD", "Interval"),
     ]
-    for label, block in record["contrasts"].items():
+    for label in CONTRASTS:
+        block = record["contrasts"][label]
         lines.append(_stats_row(f"{label} without failed weeks", block["without_failed_weeks"]))
-        for version, vblock in block["by_model_version"].items():
-            lines.append(_stats_row(f"{label} on `{version}` weeks", vblock))
+        versions = block["by_model_version"]
+        for version in sorted(versions):
+            vblock = versions[version]
+            lines.append(
+                _stats_row(
+                    f"{label} on `{version}` weeks, from GW{int(vblock['first_week']):02d}",
+                    vblock,
+                )
+            )
         lines.append(
             _stats_row(
                 f"{label} on team share weeks without marker or components",
@@ -2069,15 +2542,21 @@ def render_markdown(record: Mapping[str, Any]) -> str:
         after = block["after_producer_change"]
         for name in sorted(after):
             lines.append(_stats_row(f"{label} after the producer change of `{name}`", after[name]))
-    for name, block in record["secondary"].items():
-        lines.append(_stats_row(name, block))
-    for profile, block in record["by_squad"].items():
-        lines.append(_stats_row(f"A, squad {profile}", block))
+    for name in SECONDARY_PAIRS:
+        lines.append(_stats_row(name, record["secondary"][name]))
+    for label in REPORTED_PAIRS:
+        squads = record["by_squad"][label]
+        for profile in _by_budget(squads):
+            lines.append(_stats_row(f"{label}, squad {profile}", squads[profile]))
     routes = record["contrast_a_by_served_route"]
     for label in sorted(routes):
         lines.append(_stats_row(f"A where served is `{label}`", routes[label]))
-    for label, block in record["truncated_weeks"].items():
-        lines.append(_stats_row(f"{label}, truncated weeks", block, interval=False))
+    for label in CONTRASTS:
+        lines.append(
+            _stats_row(
+                f"{label}, truncated weeks", record["truncated_weeks"][label], interval=False
+            )
+        )
     lines += [
         "",
         "## Points, hits, free transfers, bank and sale value",
@@ -2088,7 +2567,8 @@ def render_markdown(record: Mapping[str, Any]) -> str:
             "Pair", "Gross", "Hits", "Net", "Free transfers", "Bank (tenths)", "Sale (tenths)"
         ),
     ]
-    for label, diffs in record["totals"]["paired_differences"].items():
+    for label in REPORTED_PAIRS:
+        diffs = record["totals"]["paired_differences"][label]
         lines.append(
             _row(
                 label,
@@ -2105,7 +2585,8 @@ def render_markdown(record: Mapping[str, Any]) -> str:
             "",
             *_header("Arm", "Gross", "Hits", "Net", "Scored chain weeks", "Free", "Bank", "Sale"),
         ]
-        for arm, totals in record["totals"]["by_arm"].items():
+        for arm in ARMS:
+            totals = record["totals"]["by_arm"][arm]
             lines.append(
                 _row(
                     arm,
@@ -2169,21 +2650,35 @@ def score(
     """Rules 24, 28 and 37: take one reading, once, from the scorer's own merge commit, on
     evidence held to the receipts posted for it and on a frozen source git still holds.
 
-    These come before the first capture is read: the reading's name, its record in the
-    checkout, the scorer's identity after a fetch of origin, its record in committed history or
-    in another worktree, the release tags and the receipts file. The evidence, the frozen
-    source, each record's truncation (rule 14) and the producer changes declared (rule 6) are
-    checked once the gameweek has settled, before anything is written. ``producer_changes`` is
-    the declaration as ``read_producer_changes`` returns it. ``records_dir`` and ``index_file``
-    are for tests; the command line writes only where rule 36 names.
+    These come before the first capture is read: the reading's name, its record, its twin and
+    its row in the measurements index in the checkout, the scorer's identity after a fetch of
+    origin, its record in committed history or in another worktree, the release tags, the
+    receipts file and, for the final reading, the interim record on develop (rule 25). The
+    evidence, the frozen source, each record's truncation (rule 14) and the producer changes
+    declared (rule 6) are checked once the gameweek has settled. Everything the reading writes
+    is rendered before the first write: the record's bytes, the twin rendered from those bytes
+    (rule 36) and the index row. The record is then written once, the twin once, and the index
+    row is appended last, so a failure before the writes leaves nothing behind. A failure
+    between them leaves a reading a retry refuses as taken, naming what exists. Returns the
+    record as written. ``producer_changes`` is the declaration as ``read_producer_changes``
+    returns it. ``records_dir`` and ``index_file`` are for tests; the command line writes only
+    where rule 36 names.
     """
 
     if reading not in READINGS:
         raise ScorerError(f"The protocol names no reading {reading!r}; it names gw20 and gw38.")
-    target = records_dir / f"planner_policy_chain_{reading}.json"
+    name = f"planner_policy_chain_{reading}"
+    target = records_dir / f"{name}.json"
     twin = target.with_suffix(".md")
-    if target.exists() or twin.exists():
-        raise ScorerError(f"The {reading} reading was taken already: {target} exists.")
+    try:
+        index_text = index_file.read_text(encoding="utf-8") if index_file.exists() else ""
+    except (OSError, ValueError) as error:
+        raise ScorerError(f"{index_file} cannot be read: {error}") from error
+    taken = [f"{path} exists" for path in (target, twin) if path.exists()]
+    if f"research/{name}.json" in index_text:
+        taken.append(f"{index_file} links its record")
+    if taken:
+        raise ScorerError(f"The {reading} reading was taken already: {'; '.join(taken)}.")
     identity = source_identity()
     committed = committed_reading(reading)
     if committed is not None:
@@ -2191,11 +2686,12 @@ def score(
             f"The {reading} reading was taken already: its record is in committed history at "
             f"{committed}."
         )
-    written = written_reading(reading)
-    if written is not None:
-        raise ScorerError(f"The {reading} reading was taken already: {written} exists.")
+    elsewhere = written_reading(reading)
+    if elsewhere is not None:
+        raise ScorerError(f"The {reading} reading was taken already: {elsewhere} exists.")
     tags = release_tags()
     posted = read_receipts(receipts)
+    interim = interim_reading() if reading == "gw38" else None
     captures = _captures(snapshot_root)
     gameweek = READINGS[reading]
     if not settled(captures, gameweek):
@@ -2214,19 +2710,20 @@ def score(
         receipts=posted,
         tags=tags,
         producer_changes=producer_changes,
+        interim=interim,
     )
+    # write_document_once writes document_bytes(record), so the twin and the row are rendered
+    # from the bytes the record is written as, whatever order its keys were built in.
+    payload = document_bytes(record)
+    written = cast(dict[str, Any], json.loads(payload))
+    twin_bytes = render_markdown(written).encode("utf-8")
+    row = index_row(written)
     records_dir.mkdir(parents=True, exist_ok=True)
     write_document_once(record, target)
-    twin.write_text(render_markdown(record), encoding="utf-8")
-    index_text = index_file.read_text(encoding="utf-8") if index_file.exists() else ""
-    if f"planner_policy_chain_{reading}" not in index_text:
-        with index_file.open("a", encoding="utf-8") as handle:
-            handle.write(
-                ("" if index_text.endswith("\n") or not index_text else "\n")
-                + index_row(record)
-                + "\n"
-            )
-    return record
+    write_bytes_once(twin_bytes, twin)
+    with index_file.open("a", encoding="utf-8") as handle:
+        handle.write(("" if index_text.endswith("\n") or not index_text else "\n") + row + "\n")
+    return written
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -2262,8 +2759,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "contrast_A_mean": primary["mean"],
                 "contrast_B_mean": record["contrasts"]["B"]["primary"]["mean"],
                 "verdicts": {
-                    label: block["primary"]["verdict"]
-                    for label, block in record["contrasts"].items()
+                    label: record["contrasts"][label]["primary"]["verdict"] for label in CONTRASTS
                 },
             }
         )
