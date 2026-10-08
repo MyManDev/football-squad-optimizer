@@ -18,7 +18,7 @@ from dataclasses import replace
 from datetime import timedelta
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from scripts import measure_planner_policy_chain as chain
@@ -237,25 +237,36 @@ def _world(
     *,
     through: int = 20,
     missing: tuple[int, ...] = (),
-    truncated_in: tuple[int, ...] = (),
     failing: tuple[tuple[str, int], ...] = (),
+    receipt_fields: dict[int, dict[str, object]] | None = None,
 ) -> tuple[Path, Path, Path]:
-    """A decided chain from GW6 through ``through``: served arms pay one transfer a week.
+    """A decided chain from GW6 through ``through``: served arms pay one transfer a week, and
+    each window, failed or not, is truncated by the runner's own rule (rule 14).
 
     The runner starts the chain before GW21's deadline, as rule 40 requires, and decides any
     later week in a second run. The operator posts the frozen commit and every manifest sha256
-    the runner prints, written to ``tmp_path / RECEIPTS`` (rule 24).
+    the runner prints, written to ``tmp_path / RECEIPTS`` (rule 24). ``receipt_fields`` adds
+    fields to a week's receipt.json, by gameweek.
     """
 
     weeks: dict[int, object] = {}
     for gameweek in range(6, through + 1):
+        fields = (receipt_fields or {}).get(gameweek, {})
         if gameweek in missing:
-            weeks[gameweek] = ("no_artifact", {"snapshot_id": None, "reason": "no_artifact"})
+            weeks[gameweek] = (
+                "no_artifact",
+                {"snapshot_id": None, "reason": "no_artifact", **fields},
+            )
         else:
             decided = _week(gameweek)
             # Rule 36: a decided week's receipt carries the deadline its capture states.
             weeks[gameweek] = replace(
-                decided, receipt={**decided.receipt, "deadline_utc": _stamp(_deadline(gameweek))}
+                decided,
+                receipt={
+                    **decided.receipt,
+                    "deadline_utc": _stamp(_deadline(gameweek)),
+                    **fields,
+                },
             )
     evidence, _ = _chain_world(tmp_path, monkeypatch, weeks)
     monkeypatch.setattr(chain, "source_identity", lambda: dict(IDENTITY))
@@ -267,13 +278,13 @@ def _world(
 
     def arm(name: str, week: chain.WeekInputs, held: object) -> chain.ArmOutcome:
         gameweek = int(week.inputs.deadline.gameweek)
+        truncated = len(chain.window_weeks(name, gameweek)) < chain._width(name)
         if (name, gameweek) in failing:
-            return _outcome(None, failure="raised_ValueError")
+            failed = _outcome(None, failure="raised_ValueError")
+            failed.truncated = truncated
+            return failed
         return _arm_outcome(
-            name,
-            gameweek,
-            paid=1 if name.startswith("served") else 0,
-            truncated=gameweek in truncated_in,
+            name, gameweek, paid=1 if name.startswith("served") else 0, truncated=truncated
         )
 
     monkeypatch.setattr(chain, "run_arm", arm)
@@ -370,11 +381,13 @@ def test_the_interim_reading_scores_every_week_and_pairs_the_arms(
         2 * 15 * 3 * 4.0
     )
     assert "by_arm" not in record["totals"]
+    assert record["choices"] == scorer.CHOICES
     written = json.loads((records / "planner_policy_chain_gw20.json").read_text(encoding="utf-8"))
     assert written == record
     twin = (records / "planner_policy_chain_gw20.md").read_text(encoding="utf-8")
     assert "+4.000" in twin and "+5.000" in twin and "none (interim)" in twin
     assert scorer.RELEASE_RULE in twin
+    assert all(f"- `{name}`: {text}" in twin for name, text in scorer.CHOICES.items())
     index_text = index.read_text(encoding="utf-8")
     assert index_text.count("- [Planner policy chain, gw20 reading]") == 1
     assert index_text.startswith("# Measurements Index")
@@ -484,13 +497,12 @@ def test_a_failed_arm_is_scored_on_its_held_team_and_the_pair_is_also_reported_w
     assert week7["scored_chains"] == 15
 
 
-def test_a_missing_week_is_not_scored_and_a_truncated_week_enters_no_primary(
+def test_a_missing_week_is_listed_with_its_reason_and_enters_no_series(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Rules 14 and 21: missing weeks are listed with their reason; truncated weeks are played,
-    scored and reported apart."""
+    """Rule 21: a missing week is not scored and is listed with its reason."""
 
-    evidence, snapshots, records = _world(tmp_path, monkeypatch, missing=(8,), truncated_in=(9,))
+    evidence, snapshots, records = _world(tmp_path, monkeypatch, missing=(8,))
     _identity(monkeypatch)
     record = scorer.score(
         evidence,
@@ -503,10 +515,141 @@ def test_a_missing_week_is_not_scored_and_a_truncated_week_enters_no_primary(
     week8 = next(week for week in record["weeks"] if week["gameweek"] == 8)
     assert week8["missing_reason"] == "no_artifact" and week8["scored_chains"] == 0
     primary = record["contrasts"]["A"]["primary"]
-    assert primary["weeks"] == 13 and 8 not in primary["weeks_listed"]
-    assert 9 not in primary["weeks_listed"]
-    truncated = record["truncated_weeks"]["A"]
-    assert truncated["weeks_listed"] == [9] and truncated["mean"] == pytest.approx(4.0)
+    assert primary["weeks"] == 14 and 8 not in primary["weeks_listed"]
+    assert all(8 not in block["weeks_listed"] for block in record["secondary"].values())
+    assert all(8 not in block["weeks_listed"] for block in record["by_squad"].values())
+    assert record["truncated_weeks"]["A"]["weeks"] == 0
+
+
+def test_a_truncated_pair_leaves_the_primary_and_its_week_stays_on_the_other_pairs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Rules 14 and 29: at GW35 and GW36 only the five-week windows are truncated, so each
+    contrast keeps those weeks on its three-week pairs and scores at most GW6 to GW36. The
+    truncated block takes the truncated pairs only, and every other series takes the rest."""
+
+    evidence, snapshots, records = _world(
+        tmp_path, monkeypatch, through=38, missing=tuple(range(7, 34))
+    )
+    _identity(monkeypatch)
+    record = scorer.score(
+        evidence,
+        snapshots,
+        "gw38",
+        receipts=tmp_path / RECEIPTS,
+        records_dir=records,
+        index_file=tmp_path / "index.md",
+    )
+    truncated = {week["gameweek"]: week["truncated_arms"] for week in record["weeks"]}
+    assert truncated[34] == []
+    assert truncated[35] == truncated[36] == ["hold_5", "served_5"]
+    assert truncated[37] == truncated[38] == ["hold_3", "hold_5", "served_3", "served_5"]
+    secondary = record["secondary"]
+    for label, mean in (("A", 4.0), ("B", 5.0)):
+        contrast = record["contrasts"][label]
+        for block in (contrast["primary"], contrast["without_failed_weeks"]):
+            assert block["weeks_listed"] == [6, 34, 35, 36]
+            assert block["pairs"] == 6 + 6 + 3 + 3
+            assert block["mean"] == pytest.approx(mean)
+        beside = record["truncated_weeks"][label]
+        assert beside["weeks_listed"] == [35, 36, 37, 38]
+        assert beside["pairs"] == 3 + 3 + 6 + 6
+        assert beside["mean"] == pytest.approx(mean)
+        assert secondary[f"{label}_window_3"]["weeks_listed"] == [6, 34, 35, 36]
+        assert secondary[f"{label}_window_5"]["weeks_listed"] == [6, 34]
+    hold_minus_one_week = secondary["hold_minus_one_week"]
+    assert hold_minus_one_week["weeks_listed"] == [6, 34, 35, 36]
+    assert hold_minus_one_week["pairs"] == 6 + 6 + 3 + 3
+    assert set(record["by_squad"]) == {"p1000", "p950", "p900"}
+    for block in record["by_squad"].values():
+        assert block["weeks_listed"] == [6, 34, 35, 36] and block["pairs"] == 2 + 2 + 1 + 1
+    (split,) = record["contrast_a_by_served_route"].values()
+    assert split["weeks_listed"] == [6, 34, 35, 36] and split["pairs"] == 6 + 6 + 3 + 3
+    assert {
+        "truncation",
+        "served_route",
+        "team_share_without_marker_or_components",
+        "producer_changes",
+    } <= set(record["choices"])
+    assert record["choices"]["truncation"] == scorer.CHOICES["truncation"]
+
+
+@pytest.mark.parametrize(
+    ("arm", "gameweek", "truncated"),
+    [
+        ("served_5", 34, False),
+        ("hold_5", 35, True),
+        ("served_3", 36, False),
+        ("hold_3", 37, True),
+        ("served_3", 38, True),
+        ("one_week", 38, False),
+    ],
+)
+def test_rule_14_truncates_five_week_windows_from_gw35_and_three_week_ones_from_gw37(
+    arm: str, gameweek: int, truncated: bool
+) -> None:
+    assert scorer.truncated_by_rule_14(arm, gameweek) is truncated
+    assert truncated is (len(chain.window_weeks(arm, gameweek)) < chain._width(arm))
+
+
+def test_a_record_whose_truncation_is_not_rule_14s_refuses_the_reading(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Rule 14 fixes which windows are truncated, so a record that says otherwise is refused
+    rather than moved into or out of the primary contrasts."""
+
+    original = chain._chain_record
+
+    def mislabelled(key: tuple[str, str], *rest: Any) -> chain.ChainRecord:
+        """The runner's own record, with GW7's p950 one_week window stated as truncated; the
+        runner then seals and posts it as it stands."""
+
+        record = original(key, *rest)
+        if key == ("p950", "one_week") and rest[1] == 7:
+            cast(dict[str, object], record.document["policy"])["truncated"] = True
+        return record
+
+    monkeypatch.setattr(chain, "_chain_record", mislabelled)
+    evidence, snapshots, records = _world(tmp_path, monkeypatch, missing=tuple(range(8, 21)))
+    _identity(monkeypatch)
+    with pytest.raises(scorer.ScorerError, match="GW07 p950 one_week: the record's truncation"):
+        scorer.score(
+            evidence,
+            snapshots,
+            "gw20",
+            receipts=tmp_path / RECEIPTS,
+            records_dir=records,
+            index_file=tmp_path / "index.md",
+        )
+    assert not records.exists()
+
+
+def test_a_record_must_state_the_truncation_rule_14_gives_in_both_directions() -> None:
+    """Rule 14: a five-week window decided at GW35 is truncated, so a record that says it is not
+    is refused, as is a one-week record that says it is, and a decided or failed record that
+    states no truncation. Held and blocked records carry no window."""
+
+    def week(arm: str, policy: object, status: str = "decided") -> scorer.WeekEvidence:
+        record = {"profile": "p1000", "arm": arm, "status": status, "policy": policy}
+        return scorer.WeekEvidence(35, {}, {"missing_reason": None}, {("p1000", arm): record})
+
+    unscored = scorer.Outcome(35, None, None, "not_settled")
+    differs = "'s truncation is {}, and rule 14 says {}"
+    for arm, policy, status, message in (
+        ("served_5", {"truncated": False}, "decided", differs.format(False, True)),
+        ("one_week", {"truncated": True}, "decided", differs.format(True, False)),
+        ("one_week", {}, "decided", " states no truncation"),
+        ("hold_5", None, "failed", " states no truncation"),
+        ("served_3", {"truncated": 0}, "failed", " states no truncation"),
+    ):
+        with pytest.raises(scorer.ScorerError, match=f"GW35 p1000 {arm}: the record{message}"):
+            scorer.score_week(week(arm, policy, status), unscored)
+    scored = scorer.score_week(week("served_5", {"truncated": True}), unscored)
+    assert scored.truncated == frozenset({("p1000", "served_5")}) and scored.scores == {}
+    for status in ("held", "blocked"):
+        assert scorer.score_week(week("hold_5", None, status), unscored).truncated == frozenset()
+    with pytest.raises(scorer.ScorerError, match="not one of the protocol's arms"):
+        scorer.truncated_by_rule_14("served_4", 10)
 
 
 def test_exact_zero_pairs_are_counted_when_both_arms_played_the_same_team(
@@ -541,6 +684,282 @@ def test_exact_zero_pairs_are_counted_when_both_arms_played_the_same_team(
     primary = record["contrasts"]["A"]["primary"]
     assert primary["pairs"] == 6 and primary["exact_zero_pairs"] == 6
     assert primary["mean"] == pytest.approx(0.0)
+
+
+# Rules 6, 13 and 29: what each reading also reports apart
+
+
+def test_contrast_a_is_split_by_each_pairs_own_served_chain(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Rules 13 and 29: each squad and window pair goes under its own served chain's route and
+    outcome. The chosen proposal and whether the guarded construction completed are part of the
+    label, a failed served chain is labelled by its failure, and a pair whose hold chain failed
+    stays under its served chain's label (rule 22)."""
+
+    observed = "expected_lineup_observed_window_v4"
+    expected = "expected_lineup_window_v2"
+    guarded = "sequential_certified_window_v1"
+    took: dict[tuple[str, str], tuple[str, str, dict[str, object]]] = {
+        ("p1000", "served_3"): (
+            "observed",
+            observed,
+            {"observed_window_status": "compared", "seed_completed": None},
+        ),
+        ("p1000", "served_5"): (
+            "expected",
+            expected,
+            {
+                "expected_window_status": "compared",
+                "expected_window_chosen": "zero_bonus_proposal",
+                "seed_completed": True,
+            },
+        ),
+        ("p950", "served_3"): ("guarded", guarded, {"seed_completed": False}),
+        ("p950", "served_5"): ("guarded", guarded, {"seed_completed": False}),
+        ("p900", "served_3"): ("guarded", guarded, {"seed_completed": True}),
+        ("p900", "served_5"): ("guarded", guarded, {"seed_completed": True}),
+    }
+    original = chain._chain_record
+
+    def routed(key: tuple[str, str], *rest: Any) -> chain.ChainRecord:
+        """In GW6 each served chain names its route; all but p1000's served_3 play hold's team
+        without a paid transfer, so only that pair is not an exact zero. The runner then seals
+        and posts each record as it stands."""
+
+        record = original(key, *rest)
+        if rest[1] == 6 and key in took:
+            route, version, solver = took[key]
+            document = record.document
+            cast(dict[str, object], document["policy"]).update(route=route, route_version=version)
+            cast(dict[str, object], document["solver"]).update(solver)
+            if key != ("p1000", "served_3"):
+                document["advice"] = _lineup(CAPTAINS["hold"])
+                plan = cast(dict[str, list[dict[str, object]]], document["plan"])
+                plan["weeks"][0]["paid_transfer_count"] = 0
+        return record
+
+    monkeypatch.setattr(chain, "_chain_record", routed)
+    evidence, snapshots, records = _world(
+        tmp_path,
+        monkeypatch,
+        missing=tuple(range(8, 21)),
+        failing=(("served_5", 7), ("hold_3", 7)),
+    )
+    _identity(monkeypatch)
+    record = scorer.score(
+        evidence,
+        snapshots,
+        "gw20",
+        receipts=tmp_path / RECEIPTS,
+        records_dir=records,
+        index_file=tmp_path / "index.md",
+    )
+    split = {
+        label: (block["weeks_listed"], block["pairs"], block["mean"], block["exact_zero_pairs"])
+        for label, block in record["contrast_a_by_served_route"].items()
+    }
+    stubbed = "route=served:version=none:seed_completed=none"
+    assert split == {
+        f"route=observed:version={observed}:observed=compared:seed_completed=none": (
+            [6],
+            1,
+            pytest.approx(4.0),
+            0,
+        ),
+        f"route=expected:version={expected}:expected=compared:chosen=zero_bonus_proposal:"
+        "seed_completed=true": ([6], 1, pytest.approx(0.0), 1),
+        f"route=guarded:version={guarded}:seed_completed=false": ([6], 2, pytest.approx(0.0), 2),
+        f"route=guarded:version={guarded}:seed_completed=true": ([6], 2, pytest.approx(0.0), 2),
+        # GW7's stubbed arms name no route of their own. Its served_3 chains are paired with
+        # failed hold_3 chains, which play their held team, hold's lineup of GW6 with no hit.
+        stubbed: ([7], 3, pytest.approx(4.0), 0),
+        # Its failed served_5 chains play their held team, the served lineup of GW6 (the record's
+        # advice was edited, the chain's state was not), with no hit.
+        "failed=raised_ValueError": ([7], 3, pytest.approx(8.0), 0),
+    }
+    week7 = next(week for week in record["weeks"] if week["gameweek"] == 7)
+    assert week7["served_routes"]["p950:served_5"] == "failed=raised_ValueError"
+    assert week7["served_routes"]["p950:served_3"] == stubbed
+    assert record["contrasts"]["A"]["primary"]["weeks_listed"] == [6, 7]
+    twin = (records / "planner_policy_chain_gw20.md").read_text(encoding="utf-8")
+    assert "| A where served is `failed=raised_ValueError` | 1 | +8.000 |" in twin
+
+
+def test_team_share_weeks_without_their_marker_or_components_are_reported_apart(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Rules 6 and 40: a team share week that bound while its receipt records its ready
+    bundle's marker or its components file as absent stays pooled and is also reported apart,
+    in each contrast. The twin, rendered from the JSON, claims nothing about what such a week's
+    members were served (section 11)."""
+
+    share: dict[str, object] = {
+        "model_version": "football_team_share_v1",
+        "ready_bundle_present": True,
+        "components_present": True,
+    }
+    fields: dict[int, dict[str, object]] = {
+        6: share,
+        7: share | {"ready_bundle_present": False},
+        8: share | {"components_present": False},
+        9: share | {"ready_bundle_present": False, "components_present": False},
+        # A missing week bound nothing, so it is not reported apart whatever its receipt says.
+        10: share | {"ready_bundle_present": False},
+    }
+    evidence, snapshots, records = _world(
+        tmp_path, monkeypatch, missing=tuple(range(10, 21)), receipt_fields=fields
+    )
+    _identity(monkeypatch)
+    record = scorer.score(
+        evidence,
+        snapshots,
+        "gw20",
+        receipts=tmp_path / RECEIPTS,
+        records_dir=records,
+        index_file=tmp_path / "index.md",
+    )
+    listed = {week["gameweek"]: week for week in record["weeks"]}
+    apart = [g for g, week in listed.items() if week["team_share_without_marker_or_components"]]
+    assert apart == [7, 8, 9]
+    assert (listed[7]["ready_bundle_present"], listed[7]["components_present"]) == (False, True)
+    assert (listed[11]["ready_bundle_present"], listed[11]["components_present"]) == (None, None)
+    for label in ("A", "B"):
+        block = record["contrasts"][label]
+        assert block["primary"]["weeks_listed"] == [6, 7, 8, 9]
+        assert block["team_share_without_marker_or_components"]["weeks_listed"] == [7, 8, 9]
+    twin = (records / "planner_policy_chain_gw20.md").read_text(encoding="utf-8")
+    assert "reported apart (rule 6): GW07, GW08, GW09." in twin
+    assert "claims nothing about what their members were served" in twin
+    written = json.loads((records / "planner_policy_chain_gw20.json").read_text(encoding="utf-8"))
+    assert scorer.render_markdown(written) == twin
+    # Only a team share week is reported apart, and a field its receipt lacks is not presence.
+    joint = share | {"model_version": "football_joint_role_minutes_v1", "components_present": False}
+    assert not scorer.team_share_apart(joint)
+    assert not scorer.team_share_apart(share)
+    assert scorer.team_share_apart({"model_version": "football_team_share_v1"})
+
+
+def test_a_declared_producer_change_is_reported_apart_and_a_reading_says_when_none_was(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Rule 6: a producer change that keeps its version name is taken as the operator declared
+    it, with its first week. Its weeks stay pooled and are also reported apart, each week under
+    the latest change of its version. With none declared the record says so, and a declaration
+    the evidence contradicts is refused before anything is written."""
+
+    share: dict[str, object] = {"model_version": "football_team_share_v1"}
+    present = {"ready_bundle_present": True, "components_present": True}
+    evidence, snapshots, records = _world(
+        tmp_path,
+        monkeypatch,
+        missing=tuple(range(10, 21)),
+        receipt_fields=dict.fromkeys(range(6, 10), share | present),
+    )
+    _identity(monkeypatch)
+    paths = {"receipts": tmp_path / RECEIPTS, "index_file": tmp_path / "index.md"}
+    undeclared = scorer.score(
+        evidence, snapshots, "gw20", records_dir=tmp_path / "undeclared", **paths
+    )
+    assert undeclared["producer_changes"] == {
+        "source": None,
+        "declared": [],
+        "statement": "No producer change that keeps a version name was declared, so no week is "
+        "reported apart for one.",
+    }
+    assert undeclared["contrasts"]["A"]["after_producer_change"] == {}
+    assert all(week["producer_change"] is None for week in undeclared["weeks"])
+    twin = (tmp_path / "undeclared" / "planner_policy_chain_gw20.md").read_text(encoding="utf-8")
+    assert "Producer changes that keep a version name (rule 6): none declared." in twin
+    first, second = share | {"first_week": 7}, share | {"first_week": 9}
+    path = tmp_path / "producer_changes.json"
+    declaration = {"source": "issuecomment-2", "changes": [second, first]}
+    path.write_text(json.dumps(declaration), encoding="utf-8")
+    declared = scorer.read_producer_changes(str(path))
+    assert declared == {"source": "issuecomment-2", "changes": [first, second]}
+    record = scorer.score(
+        evidence, snapshots, "gw20", records_dir=records, producer_changes=declared, **paths
+    )
+    names = ["football_team_share_v1 from GW07", "football_team_share_v1 from GW09"]
+    assert record["producer_changes"]["source"] == "issuecomment-2"
+    assert record["producer_changes"]["declared"] == [first, second]
+    # GW10 is missing and its receipt names no version, so no change reaches it.
+    assert [week["producer_change"] for week in record["weeks"][:5]] == [
+        None,
+        names[0],
+        names[0],
+        names[1],
+        None,
+    ]
+    for label in ("A", "B"):
+        contrast = record["contrasts"][label]
+        assert contrast["primary"]["weeks_listed"] == [6, 7, 8, 9]
+        after = contrast["after_producer_change"]
+        assert sorted(after) == names
+        assert [after[name]["weeks_listed"] for name in names] == [[7, 8], [9]]
+    twin = (records / "planner_policy_chain_gw20.md").read_text(encoding="utf-8")
+    assert f"{names[0]}, {names[1]}, declared at issuecomment-2." in twin
+    assert f"| A after the producer change of `{names[1]}` | 1 |" in twin
+    for contradicted, message in (
+        ({"model_version": "football_joint_role_minutes_v1", "first_week": 8}, "receipt states"),
+        (share | {"first_week": 5}, "precedes the chain's first week"),
+    ):
+        with pytest.raises(scorer.ScorerError, match=message):
+            scorer.score(
+                evidence,
+                snapshots,
+                "gw20",
+                records_dir=tmp_path / "refused",
+                producer_changes={"source": "issuecomment-3", "changes": [contradicted]},
+                **paths,
+            )
+    assert not (tmp_path / "refused").exists()
+    for document in (
+        [],
+        {"changes": []},
+        {"source": " ", "changes": []},
+        {"source": "x", "changes": [], "note": "free text"},
+        {"source": "x", "changes": {}},
+        {"source": "x", "changes": [{"model_version": "football_contextual_v3", "first_week": 8}]},
+        {"source": "x", "changes": [share | {"first_week": 39}]},
+        {"source": "x", "changes": [share | {"first_week": True}]},
+        {"source": "x", "changes": [share | {"first_week": "8"}]},
+        {"source": "x", "changes": [share]},
+        {"source": "x", "changes": [first, first]},
+    ):
+        with pytest.raises(scorer.ScorerError, match="producer change"):
+            scorer.declared_producer_changes(document)
+    assert scorer.read_producer_changes("none") == {"source": None, "changes": []}
+
+
+def test_a_producer_change_declaration_that_is_not_one_object_with_single_keys_is_refused(
+    tmp_path: Path,
+) -> None:
+    """Rule 6: a declaration file that is not one JSON object, or that gives a key twice, is
+    refused with a reason and never read as fewer changes. One written with a byte order mark,
+    as Windows PowerShell 5.1 writes UTF-8, is read."""
+
+    path = tmp_path / "producer_changes.json"
+    change = '{"model_version": "football_team_share_v1", "first_week": 8}'
+    twice = '{"model_version": "football_team_share_v1", "first_week": 8, "first_week": 9}'
+    for text in (
+        "[]",
+        '"none"',
+        '["source", "changes"]',
+        '{"source": "issuecomment-2", "changes": [' + change + '], "changes": []}',
+        '{"source": "issuecomment-2", "changes": [' + twice + "]}",
+    ):
+        path.write_text(text, encoding="utf-8")
+        with pytest.raises(scorer.ScorerError, match="producer change"):
+            scorer.read_producer_changes(str(path))
+    with pytest.raises(scorer.ScorerError, match="cannot be read"):
+        scorer.read_producer_changes(str(tmp_path / "absent.json"))
+    whole = '{"source": "issuecomment-2", "changes": [' + change + "]}"
+    path.write_bytes(b"\xef\xbb\xbf" + whole.encode("utf-8"))
+    assert scorer.read_producer_changes(str(path)) == {
+        "source": "issuecomment-2",
+        "changes": [{"model_version": "football_team_share_v1", "first_week": 8}],
+    }
 
 
 # Rules 28, 32 and 37: what the scorer refuses, and the verdict clauses
@@ -1103,15 +1522,25 @@ def test_the_command_line_refuses_with_a_reason_and_names_only_the_two_readings(
         )
     assert unreceipted.value.code == 2
     assert "required: --receipts" in capsys.readouterr().err
-    arguments = [
+    roots = [
         "--evidence",
         str(tmp_path),
         "--snapshot-root",
         str(tmp_path),
         "--receipts",
         str(tmp_path / RECEIPTS),
-        "--reading",
     ]
+    # Rule 6: the producer changes are stated, if only as none, or nothing is read.
+    with pytest.raises(SystemExit) as unstated:
+        scorer.main([*roots, "--reading", "gw20"])
+    assert unstated.value.code == 2
+    assert "required: --producer-changes" in capsys.readouterr().err
+    declaration = tmp_path / "producer_changes.json"
+    for text in ('{"source": "issuecomment-2"}', "[]"):
+        declaration.write_text(text, encoding="utf-8")
+        code = scorer.main([*roots, "--producer-changes", str(declaration), "--reading", "gw20"])
+        assert code == 2 and "refused: A producer change declaration" in capsys.readouterr().err
+    arguments = [*roots, "--producer-changes", "none", "--reading"]
     with pytest.raises(SystemExit) as refused:
         scorer.main([*arguments, "gw19"])
     assert refused.value.code == 2
@@ -1140,6 +1569,15 @@ def test_the_scorer_names_what_it_reads_as_the_runner_wrote_it() -> None:
     runner_profiles = tuple(f"p{budget}" for budget, _, _ in chain.PROFILES)
     assert runner_profiles == scorer.PROFILES
     assert scorer.ARMS == chain.ARMS
+    # Rules 6 and 14: the windows the runner truncates and the versions it admits.
+    assert {arm: chain._width(arm) for arm in chain.ARMS} == scorer.WINDOW_WEEKS
+    assert scorer.LAST_GAMEWEEK == chain.LAST_GAMEWEEK
+    for arm in chain.ARMS:
+        for gameweek in range(1, chain.LAST_GAMEWEEK + 1):
+            runner = len(chain.window_weeks(arm, gameweek)) < chain._width(arm)
+            assert scorer.truncated_by_rule_14(arm, gameweek) is runner
+    assert scorer.ADMITTED_MODEL_VERSIONS == chain.ADMITTED_MODEL_VERSIONS
+    assert scorer.TEAM_SHARE_VERSION == chain.FOOTBALL_MODEL_VERSION
     assert scorer.SEASON_OPENS == chain.SEASON_OPENS
     assert scorer.CAPTURE_INSTANT.pattern == chain.CAPTURE_INSTANT.pattern
 

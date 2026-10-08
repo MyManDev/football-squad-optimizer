@@ -11,11 +11,14 @@ fetches origin before it reads any history, so that its merge commit, the readin
 taken and the release tags are read as origin holds them. The interim reading records no
 verdict (rule 32). Run from a clean checkout of the scorer's merge commit, in a clone that is
 not shallow and can reach origin, with E the runner's evidence directory, S the capture root it
-decided from and R the receipts the operator posted on the chain's tracking issue (rule 24), in
-the shape ``read_receipts`` states:
+decided from, R the receipts the operator posted on the chain's tracking issue (rule 24), in
+the shape ``read_receipts`` states, and P the producer changes that keep a version name as the
+operator declared them there (rule 6), in the shape ``read_producer_changes`` states, or the
+word none. R and P are kept outside the checkout, because an untracked file leaves the tree
+unclean and the reading is refused:
 
     python -m scripts.score_planner_policy_chain --evidence E --snapshot-root S --receipts R
-        --reading gw20
+        --producer-changes P --reading gw20
 """
 
 from __future__ import annotations
@@ -28,7 +31,7 @@ import re
 import statistics
 import subprocess
 import sys
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from importlib import metadata as package_metadata
@@ -77,6 +80,25 @@ DEVELOP = f"{TRACKING}/develop"
 #: Rule 28: the two readings and the gameweek each one waits for.
 READINGS: dict[str, int] = {"gw20": 20, "gw38": 38}
 ARMS: tuple[str, ...] = ("served_3", "served_5", "hold_3", "hold_5", "one_week")
+#: Rule 14: each arm's window in weeks, and the last gameweek a window may reach.
+WINDOW_WEEKS: dict[str, int] = {
+    "served_3": 3,
+    "served_5": 5,
+    "hold_3": 3,
+    "hold_5": 5,
+    "one_week": 1,
+}
+LAST_GAMEWEEK = 38
+#: Rule 6: the model versions the protocol admits, and the one whose week may bind without its
+#: ready bundle's marker or its components file; each reading reports such weeks apart.
+ADMITTED_MODEL_VERSIONS: tuple[str, ...] = (
+    "football_team_share_v1",
+    "football_joint_role_minutes_v1",
+    "football_joint_role_retained_history_v1",
+)
+TEAM_SHARE_VERSION = "football_team_share_v1"
+#: Rule 6: what a reading reads when the operator declared no producer change.
+NO_PRODUCER_CHANGES: Mapping[str, Any] = {"source": None, "changes": ()}
 #: Rule 9: the three constructed squads, named as the runner names them, by budget in tenths.
 PROFILES: tuple[str, ...] = ("p1000", "p950", "p900")
 #: Rule 29: the primary contrasts, each pooled over the two windows.
@@ -217,6 +239,43 @@ COVERAGE_NOTE = (
     "and 82 per cent of replicates at 7, 15 and 31 weeks, and 54, 74 and 78 per cent at a lag-one "
     "autocorrelation of 0.2."
 )
+#: Where the protocol leaves the scorer a choice, the narrowest reading, stated in every record.
+CHOICES: dict[str, str] = {
+    "truncation": (
+        "Rule 14 is applied pair by pair. A squad and window pair either of whose arms was "
+        "truncated that week enters no series but the truncated block of contrast A or B, which "
+        "rule 14 keeps beside them, and a truncated pair of hold minus one_week enters none. A "
+        "week enters a series when one of its pairs does, so GW35 and GW36 enter contrasts A and "
+        "B on their three-week pairs. Every other series and squad takes the untruncated pairs "
+        "only. The totals count every played week, truncated ones included. A decided or failed "
+        "record whose truncation is not the one rule 14 gives refuses the reading."
+    ),
+    "served_route": (
+        "Contrast A by route and outcome gives each squad and window pair its own served chain's "
+        "label: the route and its version, the observed window's status on the observed route, "
+        "the expected window's status and chosen proposal on the expected route, and whether the "
+        "guarded construction completed (true, false, or none where the plan carries none). A "
+        "failed served chain played its held team, so it is labelled by its failure. A pair whose "
+        "hold chain failed stays under its served chain's label, as rule 22 keeps it in the "
+        "pairs. Only the untruncated pairs contrast A takes are split, and a label with none of "
+        "them gets no block."
+    ),
+    "team_share_without_marker_or_components": (
+        "A week that bound is reported apart for contrasts A and B under rule 6 when its receipt "
+        "states football_team_share_v1 and does not record both the ready bundle's marker and "
+        "the components file as present; a presence the receipt does not record counts as "
+        "absent. Such a week stays in every pooled series."
+    ),
+    "producer_changes": (
+        "A producer change that keeps its version name is taken only as the operator declares "
+        "it, with its version, its first week and the declaration's source, and the record "
+        "states when none was declared; the scorer infers no change from the receipts. Each "
+        "declared change is reported apart for contrasts A and B, over the weeks of its version "
+        "from its first week up to the next change declared for that version. A declared first "
+        "week before the chain's first week, or one this reading decided under another version, "
+        "refuses the reading."
+    ),
+}
 
 
 class ScorerError(RuntimeError):
@@ -660,10 +719,13 @@ def _load(path: Path) -> dict[str, Any]:
 
 
 def _unique_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    """An operator's JSON object, refused when it gives a key twice, so that no value is lost to
+    a later one of the same name."""
+
     names = [name for name, _ in pairs]
     repeated = sorted({name for name in names if names.count(name) > 1})
     if repeated:
-        raise ValueError(f"the receipts give {repeated} more than once")
+        raise ValueError(f"the file gives {repeated} more than once")
     return dict(pairs)
 
 
@@ -1103,30 +1165,93 @@ class WeekScores:
     gameweek: int
     outcome: Outcome
     scores: Mapping[tuple[str, str], ChainScore]
-    truncated: frozenset[str]
-    served_routes: Mapping[str, str]
+    #: Rule 14: the chains, as (profile, arm), whose window was truncated that week.
+    truncated: frozenset[tuple[str, str]]
+    #: Rule 13: each scored served chain's label, by (profile, arm).
+    served_splits: Mapping[tuple[str, str], str]
     model_version: str | None
     missing_reason: str | None
+    #: Rule 6: a team share week bound without its marker or its components file.
+    team_share_apart: bool = False
 
 
-def _route_label(record: Mapping[str, Any]) -> str:
-    policy = cast(Mapping[str, Any], record.get("policy", {}))
-    solver = cast(Mapping[str, Any], record.get("solver", {}))
-    route = str(policy.get("route", "none"))
-    outcome = (
-        solver.get("observed_window_status")
-        or solver.get("expected_window_status")
-        or ("seed_completed" if solver.get("seed_completed") else None)
-        or "none"
-    )
-    return f"{route}:{outcome}"
+def truncated_by_rule_14(arm: str, gameweek: int) -> bool:
+    """Rule 14: a window decided at the gameweek is truncated when it would reach past GW38."""
+
+    if arm not in WINDOW_WEEKS:
+        raise ScorerError(f"GW{gameweek:02d}: {arm!r} is not one of the protocol's arms.")
+    return gameweek + WINDOW_WEEKS[arm] - 1 > LAST_GAMEWEEK
+
+
+def _label_value(value: object) -> str:
+    if value is None:
+        return "none"
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    return str(value)
+
+
+def served_split(record: Mapping[str, Any]) -> str:
+    """Rule 13: the label contrast A is split by, read from one served chain's record.
+
+    A failed chain played its held team (rule 22), so it is labelled by its failure. Otherwise
+    the label names the route and its version, the observed window's status on the observed
+    route, the expected window's status and chosen proposal on the expected route, and whether
+    the guarded construction completed: true, false, or none where the plan carries none.
+    """
+
+    if record.get("status") == "failed":
+        return f"failed={_label_value(record.get('reason'))}"
+    policy = cast(Mapping[str, Any], record.get("policy") or {})
+    solver = cast(Mapping[str, Any], record.get("solver") or {})
+    route = _label_value(policy.get("route"))
+    parts = [f"route={route}", f"version={_label_value(policy.get('route_version'))}"]
+    if route == "observed":
+        parts.append(f"observed={_label_value(solver.get('observed_window_status'))}")
+    if route == "expected":
+        parts.append(f"expected={_label_value(solver.get('expected_window_status'))}")
+        parts.append(f"chosen={_label_value(solver.get('expected_window_chosen'))}")
+    parts.append(f"seed_completed={_label_value(solver.get('seed_completed'))}")
+    return ":".join(parts)
+
+
+def team_share_apart(receipt: Mapping[str, Any]) -> bool:
+    """Rule 6: a team share week whose receipt does not record both its ready bundle's marker
+    and its components file as present is reported apart."""
+
+    both = receipt.get("ready_bundle_present") is True and receipt.get("components_present") is True
+    return receipt.get("model_version") == TEAM_SHARE_VERSION and not both
 
 
 def score_week(week: WeekEvidence, outcome: Outcome) -> WeekScores:
+    """One week's scored chains, the chains rule 14 truncated, each scored served chain's
+    label (rule 13), and whether rule 6 reports the week apart.
+
+    Each decided or failed record's truncation is held to rule 14's, whether or not the week
+    is scored; held and blocked records carry no window.
+    """
+
     missing = week.manifest.get("missing_reason")
     scores: dict[tuple[str, str], ChainScore] = {}
-    truncated: set[str] = set()
-    routes: dict[str, str] = {}
+    truncated: set[tuple[str, str]] = set()
+    splits: dict[tuple[str, str], str] = {}
+    for chain, record in sorted(week.records.items()):
+        if record.get("status") in ("blocked", "held"):
+            continue
+        policy = record.get("policy")
+        stated = policy.get("truncated") if isinstance(policy, Mapping) else None
+        if not isinstance(stated, bool):
+            raise ScorerError(
+                f"GW{week.gameweek:02d} {chain[0]} {chain[1]}: the record states no truncation, "
+                "which rule 14 fixes."
+            )
+        if stated != truncated_by_rule_14(chain[1], week.gameweek):
+            raise ScorerError(
+                f"GW{week.gameweek:02d} {chain[0]} {chain[1]}: the record's truncation is "
+                f"{stated}, and rule 14 says {not stated}."
+            )
+        if stated:
+            truncated.add(chain)
     if outcome.snapshot is not None and missing is None:
         outcomes = live_event_outcomes(
             outcome.snapshot.payloads[live_payload(week.gameweek)],
@@ -1135,28 +1260,38 @@ def score_week(week: WeekEvidence, outcome: Outcome) -> WeekScores:
         )
         for chain, record in sorted(week.records.items()):
             scored = score_chain_week(record, outcomes)
-            if scored is not None:
-                scores[chain] = scored
-            policy = cast(Mapping[str, Any], record.get("policy", {}))
-            if policy.get("truncated"):
-                truncated.add(chain[1])
-            if chain[1].startswith("served_") and record.get("status") == "decided":
-                routes[chain[0] + ":" + chain[1]] = _route_label(record)
+            if scored is None:
+                continue
+            scores[chain] = scored
+            if chain[1].startswith("served_"):
+                splits[chain] = served_split(record)
     return WeekScores(
-        week.gameweek,
-        outcome,
-        scores,
-        frozenset(truncated),
-        routes,
-        cast(str | None, week.receipt.get("model_version")),
-        cast(str | None, missing),
+        gameweek=week.gameweek,
+        outcome=outcome,
+        scores=scores,
+        truncated=frozenset(truncated),
+        served_splits=splits,
+        model_version=cast(str | None, week.receipt.get("model_version")),
+        missing_reason=cast(str | None, missing),
+        team_share_apart=missing is None and team_share_apart(week.receipt),
     )
 
 
 def week_difference(
-    week: WeekScores, pairs: Sequence[tuple[str, str]], *, without_failed: bool = False
+    week: WeekScores,
+    pairs: Sequence[tuple[str, str]],
+    *,
+    truncated_pairs: bool = False,
+    without_failed: bool = False,
+    keep_pair: Callable[..., bool] | None = None,
 ) -> dict[str, Any] | None:
-    """Rule 27: the mean over the squad and window pairs both arms scored that week."""
+    """Rule 27: the mean over the squad and window pairs both arms scored that week.
+
+    Rule 14 is applied pair by pair: a pair either of whose arms was truncated that week is
+    taken only when ``truncated_pairs`` asks for the truncated pairs, and then only such pairs
+    are taken. ``keep_pair`` narrows the pairs further, by the week, the profile and the pair's
+    left arm.
+    """
 
     differences = []
     zero_pairs = 0
@@ -1166,6 +1301,11 @@ def week_difference(
         for left, right in pairs:
             first, second = week.scores.get((profile, left)), week.scores.get((profile, right))
             if first is None or second is None:
+                continue
+            truncated = bool({(profile, left), (profile, right)} & week.truncated)
+            if truncated != truncated_pairs:
+                continue
+            if keep_pair is not None and not keep_pair(week, profile, left):
                 continue
             failed = "failed" in (first.status, second.status)
             if failed:
@@ -1252,26 +1392,60 @@ def _series(
     weeks: Sequence[WeekScores],
     pairs: Sequence[tuple[str, str]],
     *,
-    include_truncated: bool = False,
-    only_truncated: bool = False,
+    truncated_pairs: bool = False,
     without_failed: bool = False,
-    keep: Any = None,
+    keep: Callable[..., bool] | None = None,
+    keep_pair: Callable[..., bool] | None = None,
 ) -> list[dict[str, Any]]:
+    """One row for each week that ``keep`` takes and in which at least one pair remains.
+
+    ``keep`` and ``keep_pair`` are typed loosely because their lambdas bind loop values through
+    default arguments.
+    """
+
     rows = []
     for week in weeks:
-        truncated = bool(
-            week.truncated & {left for left, _ in pairs} | week.truncated & {r for _, r in pairs}
-        )
-        if only_truncated and not truncated:
-            continue
-        if not include_truncated and not only_truncated and truncated:
-            continue
         if keep is not None and not keep(week):
             continue
-        row = week_difference(week, pairs, without_failed=without_failed)
+        row = week_difference(
+            week,
+            pairs,
+            truncated_pairs=truncated_pairs,
+            without_failed=without_failed,
+            keep_pair=keep_pair,
+        )
         if row is not None:
             rows.append(row)
     return rows
+
+
+def _squad_blocks(
+    weeks: Sequence[WeekScores], pairs: Sequence[tuple[str, str]], candidate_id: str
+) -> dict[str, dict[str, Any]]:
+    """Rule 29: one block for each squad, over the same pairs as the contrast it splits."""
+
+    blocks = {}
+    for profile in sorted({profile for week in weeks for profile, _ in week.scores}):
+        rows = _series(weeks, pairs, keep_pair=lambda _week, p, _left, want=profile: p == want)
+        blocks[profile] = _block(rows, candidate_id, final=False)
+    return blocks
+
+
+def _route_blocks(weeks: Sequence[WeekScores]) -> dict[str, dict[str, Any]]:
+    """Rules 13 and 29: contrast A split by each pair's own served chain's label."""
+
+    blocks = {}
+    for split in sorted({split for week in weeks for split in week.served_splits.values()}):
+        rows = _series(
+            weeks,
+            CONTRASTS["A"],
+            keep_pair=lambda week, profile, left, s=split: (
+                week.served_splits.get((profile, left)) == s
+            ),
+        )
+        if rows:
+            blocks[split] = _block(rows, f"{PROTOCOL_ID}:A", final=False)
+    return blocks
 
 
 def _block(rows: Sequence[Mapping[str, Any]], candidate_id: str, *, final: bool) -> dict[str, Any]:
@@ -1441,6 +1615,117 @@ def _paired_totals(totals: Mapping[str, Mapping[str, Any]]) -> dict[str, dict[st
     return paired
 
 
+# Rule 6: the producer changes that keep a version name, as the operator declares them
+
+
+def declared_producer_changes(document: object) -> dict[str, Any]:
+    """Rule 6: a declaration names its source and, for each change, an admitted model version
+    and the first week it served; anything else refuses the reading before it starts."""
+
+    if (
+        not isinstance(document, Mapping)
+        or set(document) != {"source", "changes"}
+        or not isinstance(document["source"], str)
+        or not document["source"].strip()
+        or not isinstance(document["changes"], list)
+    ):
+        raise ScorerError(
+            "A producer change declaration holds its source and a list of changes, and nothing "
+            "else."
+        )
+    checked: list[dict[str, Any]] = []
+    for change in document["changes"]:
+        if not isinstance(change, Mapping) or set(change) != {"model_version", "first_week"}:
+            raise ScorerError(
+                "Each declared producer change names its model_version and first_week."
+            )
+        version, first = change["model_version"], change["first_week"]
+        if version not in ADMITTED_MODEL_VERSIONS:
+            raise ScorerError(
+                f"A declared producer change names {version!r}, not a rule 6 version."
+            )
+        if isinstance(first, bool) or not isinstance(first, int) or not 1 <= first <= LAST_GAMEWEEK:
+            raise ScorerError(f"A declared producer change names {first!r}, which is no gameweek.")
+        entry = {"model_version": version, "first_week": first}
+        if entry in checked:
+            raise ScorerError(
+                f"The producer change of {version} from GW{first:02d} is declared twice."
+            )
+        checked.append(entry)
+    return {
+        "source": document["source"],
+        "changes": sorted(checked, key=lambda c: (int(c["first_week"]), str(c["model_version"]))),
+    }
+
+
+def read_producer_changes(value: str) -> dict[str, Any]:
+    """Rule 6: the producer changes the operator declared on the chain's tracking issue,
+    transcribed into one JSON file, or the word ``none`` when none was declared:
+
+        {"source": "<comment URL>",
+         "changes": [{"model_version": "<admitted version>", "first_week": <gameweek>}, ...]}
+
+    A key given twice is refused, so that no declared change is lost to a later key. A byte
+    order mark, which Windows PowerShell 5.1 writes with UTF-8, is read past.
+    """
+
+    if value == "none":
+        return {"source": None, "changes": []}
+    path = Path(value)
+    try:
+        raw = path.read_bytes()
+        document = json.loads(raw.decode("utf-8-sig"), object_pairs_hook=_unique_keys)
+    except (OSError, ValueError) as error:
+        raise ScorerError(
+            f"The producer change declaration {path} cannot be read: {error}"
+        ) from error
+    return declared_producer_changes(document)
+
+
+def producer_change_name(change: Mapping[str, Any]) -> str:
+    """Rule 6: a declared change, named by its version and its first week."""
+
+    return f"{change['model_version']} from GW{int(change['first_week']):02d}"
+
+
+def producer_change_weeks(
+    weeks: Sequence[WeekScores], changes: Sequence[Mapping[str, Any]], first_week: int
+) -> dict[int, str]:
+    """Rule 6: each week that follows a declared producer change of its own version, named by
+    that change; a week belongs to the latest change of its version at or before it.
+
+    A declared first week before the chain's first week, or one this reading decided under
+    another version, contradicts the evidence and refuses the reading.
+    """
+
+    by_week = {week.gameweek: week for week in weeks}
+    for change in changes:
+        first, version = int(change["first_week"]), str(change["model_version"])
+        if first < first_week:
+            raise ScorerError(
+                f"The producer change declared from GW{first:02d} precedes the chain's first "
+                f"week, GW{first_week:02d}."
+            )
+        week = by_week.get(first)
+        if week is not None and week.missing_reason is None and week.model_version != version:
+            raise ScorerError(
+                f"The producer change declared from GW{first:02d} names {version}, and that "
+                f"week's receipt states {week.model_version}."
+            )
+    named: dict[int, str] = {}
+    for week in weeks:
+        own = [
+            change
+            for change in changes
+            if change["model_version"] == week.model_version
+            and int(change["first_week"]) <= week.gameweek
+        ]
+        if own:
+            latest = max(own, key=lambda change: int(change["first_week"]))
+            named[week.gameweek] = producer_change_name(latest)
+    return named
+
+
 # The reading
 
 
@@ -1454,6 +1739,7 @@ def reading_record(
     binding: Any,
     receipts: Mapping[str, Any],
     tags: Sequence[ReleaseTag] = (),
+    producer_changes: Mapping[str, Any] = NO_PRODUCER_CHANGES,
 ) -> dict[str, Any]:
     final = reading == "gw38"
     frozen = str(protocol.get("repository_commit", ""))
@@ -1475,12 +1761,22 @@ def reading_record(
                 "outcome_capture": outcome.snapshot_id,
                 "unscored_reason": None if scored.missing_reason else outcome.reason,
                 "model_version": scored.model_version,
+                "ready_bundle_present": week.receipt.get("ready_bundle_present"),
+                "components_present": week.receipt.get("components_present"),
+                "team_share_without_marker_or_components": scored.team_share_apart,
                 "scored_chains": len(scored.scores),
-                "truncated_arms": sorted(scored.truncated),
-                "served_routes": dict(scored.served_routes),
+                "truncated_arms": sorted({arm for _, arm in scored.truncated}),
+                "served_routes": {
+                    f"{profile}:{arm}": split
+                    for (profile, arm), split in sorted(scored.served_splits.items())
+                },
                 "release": release,
             }
         )
+    declared = [dict(change) for change in producer_changes["changes"]]
+    after_change = producer_change_weeks(weeks, declared, _first_chain_week(protocol))
+    for entry in listed:
+        entry["producer_change"] = after_change.get(int(entry["gameweek"]))
     contrasts = {}
     for label, pairs in CONTRASTS.items():
         candidate = f"{PROTOCOL_ID}:{label}"
@@ -1497,41 +1793,27 @@ def reading_record(
                 )
                 for version in sorted({w.model_version for w in weeks if w.model_version})
             },
-        }
-    served_route_labels = sorted({label for w in weeks for label in w.served_routes.values()})
-    by_route = {}
-    for label in served_route_labels:
-        by_route[label] = _block(
-            _series(
-                weeks, CONTRASTS["A"], keep=lambda w, lab=label: lab in w.served_routes.values()
+            "team_share_without_marker_or_components": _block(
+                _series(weeks, pairs, keep=lambda w: w.team_share_apart), candidate, final=False
             ),
-            f"{PROTOCOL_ID}:A",
-            final=False,
-        )
+            "after_producer_change": {
+                name: _block(
+                    _series(weeks, pairs, keep=lambda w, n=name: after_change.get(w.gameweek) == n),
+                    candidate,
+                    final=False,
+                )
+                for name in sorted({producer_change_name(change) for change in declared})
+            },
+        }
+    by_route = _route_blocks(weeks)
     secondary = {
         name: _block(_series(weeks, pairs), f"{PROTOCOL_ID}:{name}", final=False)
         for name, pairs in SECONDARY_PAIRS.items()
     }
-    by_squad = {}
-    for profile in sorted({profile for w in weeks for profile, _ in w.scores}):
-        rows = []
-        for week in weeks:
-            kept = WeekScores(
-                week.gameweek,
-                week.outcome,
-                {chain: score for chain, score in week.scores.items() if chain[0] == profile},
-                week.truncated,
-                week.served_routes,
-                week.model_version,
-                week.missing_reason,
-            )
-            row = week_difference(kept, CONTRASTS["A"]) if not kept.truncated else None
-            if row is not None:
-                rows.append(row)
-        by_squad[profile] = _block(rows, f"{PROTOCOL_ID}:A", final=False)
+    by_squad = _squad_blocks(weeks, CONTRASTS["A"], f"{PROTOCOL_ID}:A")
     truncated = {
         label: _block(
-            _series(weeks, pairs, only_truncated=True), f"{PROTOCOL_ID}:{label}", final=False
+            _series(weeks, pairs, truncated_pairs=True), f"{PROTOCOL_ID}:{label}", final=False
         )
         for label, pairs in CONTRASTS.items()
     }
@@ -1579,6 +1861,16 @@ def reading_record(
             "detection": {"confidence_level": DETECTION.confidence_level, "power": DETECTION.power},
         },
         "outcome_captures": {"rule": CAPTURE_SET_RULE, "read": len(captures)},
+        "producer_changes": {
+            "source": producer_changes["source"],
+            "declared": declared,
+            "statement": (
+                "Each declared producer change is reported apart for each primary contrast."
+                if declared
+                else "No producer change that keeps a version name was declared, so no week is "
+                "reported apart for one."
+            ),
+        },
         "weeks": listed,
         "contrasts": contrasts,
         "contrast_a_by_served_route": by_route,
@@ -1603,6 +1895,7 @@ def reading_record(
         "release_rule": RELEASE_RULE,
         "release_tags": [tag.to_json() for tag in tags],
         "once_rule": ONCE_RULE,
+        "choices": dict(CHOICES),
         "planner_source": list(PLANNER_SOURCE),
         "binding_source": list(BINDING_SOURCE),
     }
@@ -1711,6 +2004,21 @@ def render_markdown(record: Mapping[str, Any]) -> str:
     lines += ["", record["release_rule"]]
     captures = record["outcome_captures"]
     lines += ["", f"{captures['rule']} This reading read {captures['read']} captures."]
+    apart = [
+        f"GW{week['gameweek']:02d}"
+        for week in record["weeks"]
+        if week["team_share_without_marker_or_components"]
+    ]
+    changes = record["producer_changes"]
+    declared = ", ".join(producer_change_name(change) for change in changes["declared"])
+    lines += [
+        "",
+        "Team share weeks bound without their ready bundle's marker or components file, "
+        f"reported apart (rule 6): {', '.join(apart) or 'none'}.",
+        "",
+        "Producer changes that keep a version name (rule 6): "
+        + (f"{declared}, declared at {changes['source']}." if declared else "none declared."),
+    ]
     lines += [
         "",
         "## Primary contrasts",
@@ -1752,12 +2060,22 @@ def render_markdown(record: Mapping[str, Any]) -> str:
         lines.append(_stats_row(f"{label} without failed weeks", block["without_failed_weeks"]))
         for version, vblock in block["by_model_version"].items():
             lines.append(_stats_row(f"{label} on `{version}` weeks", vblock))
+        lines.append(
+            _stats_row(
+                f"{label} on team share weeks without marker or components",
+                block["team_share_without_marker_or_components"],
+            )
+        )
+        after = block["after_producer_change"]
+        for name in sorted(after):
+            lines.append(_stats_row(f"{label} after the producer change of `{name}`", after[name]))
     for name, block in record["secondary"].items():
         lines.append(_stats_row(name, block))
     for profile, block in record["by_squad"].items():
         lines.append(_stats_row(f"A, squad {profile}", block))
-    for label, block in record["contrast_a_by_served_route"].items():
-        lines.append(_stats_row(f"A where served took {label}", block))
+    routes = record["contrast_a_by_served_route"]
+    for label in sorted(routes):
+        lines.append(_stats_row(f"A where served is `{label}`", routes[label]))
     for label, block in record["truncated_weeks"].items():
         lines.append(_stats_row(f"{label}, truncated weeks", block, interval=False))
     lines += [
@@ -1800,15 +2118,20 @@ def render_markdown(record: Mapping[str, Any]) -> str:
                     _shown(totals["sale_value_tenths_at_end"]),
                 )
             )
+    lines += ["", "## Choices the protocol leaves to the scorer", ""]
+    lines += [f"- `{name}`: {record['choices'][name]}" for name in sorted(record["choices"])]
     lines += [
         "",
         "## What this reading does not claim",
         "",
         "A difference between arms is a difference between these policies on constructed squads "
         "under the served football forecast; it is not a forecast of any member's result, nor "
-        "evidence about windows under the current model or about releases whose planner or "
-        "binding source differs from the frozen commit (the Release columns above say which weeks "
-        "those were). No verdict switches anything (rule 34).",
+        "evidence about windows under the current model, about truncated windows or about "
+        "releases whose planner or binding source differs from the frozen commit (the Release "
+        "columns above say which weeks those were). A football_team_share_v1 week bound without "
+        "its ready bundle's marker or components file cannot be told apart from a week served "
+        "without them; such weeks are reported apart, and this reading claims nothing about what "
+        "their members were served. No verdict switches anything (rule 34).",
         "",
     ]
     return "\n".join(lines)
@@ -1841,16 +2164,18 @@ def score(
     receipts: Path,
     records_dir: Path = RECORDS_DIR,
     index_file: Path = INDEX_FILE,
+    producer_changes: Mapping[str, Any] = NO_PRODUCER_CHANGES,
 ) -> dict[str, Any]:
     """Rules 24, 28 and 37: take one reading, once, from the scorer's own merge commit, on
     evidence held to the receipts posted for it and on a frozen source git still holds.
 
     These come before the first capture is read: the reading's name, its record in the
     checkout, the scorer's identity after a fetch of origin, its record in committed history or
-    in another worktree, the release tags and the receipts file. The evidence and the frozen
-    source are checked once the gameweek has settled, before anything is written.
-    ``records_dir`` and ``index_file`` are for tests; the command line writes only where rule 36
-    names.
+    in another worktree, the release tags and the receipts file. The evidence, the frozen
+    source, each record's truncation (rule 14) and the producer changes declared (rule 6) are
+    checked once the gameweek has settled, before anything is written. ``producer_changes`` is
+    the declaration as ``read_producer_changes`` returns it. ``records_dir`` and ``index_file``
+    are for tests; the command line writes only where rule 36 names.
     """
 
     if reading not in READINGS:
@@ -1888,6 +2213,7 @@ def score(
         binding=lambda deadline, frozen: release_binding(deadline, frozen, tags),
         receipts=posted,
         tags=tags,
+        producer_changes=producer_changes,
     )
     records_dir.mkdir(parents=True, exist_ok=True)
     write_document_once(record, target)
@@ -1909,6 +2235,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--snapshot-root", type=Path, required=True)
     # Rule 24: the frozen commit and each week's manifest sha256 as posted on the tracking issue.
     parser.add_argument("--receipts", type=Path, required=True)
+    # Rule 6: the producer changes that keep a version name, as the operator declared them on
+    # the tracking issue, in a JSON file; the word none states that none was declared.
+    parser.add_argument("--producer-changes", required=True)
     parser.add_argument("--reading", choices=sorted(READINGS), required=True)
     arguments = parser.parse_args(argv)
     try:
@@ -1919,6 +2248,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             arguments.snapshot_root,
             arguments.reading,
             receipts=arguments.receipts,
+            producer_changes=read_producer_changes(arguments.producer_changes),
         )
     except ScorerError as error:
         print(f"refused: {error}", file=sys.stderr)
