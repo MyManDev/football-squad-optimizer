@@ -302,14 +302,12 @@ describe("member decision controls", () => {
     }
   });
 
-  it("does not tell a member the pure-points plan has the highest expected points", () => {
-    // A superlative nothing enforces. `expected_own_points` — the figure the member's
-    // card shows — is the eleven plus the captain; the solve maximises the eleven, the
-    // captain and the bench together, so the two have different maximisers. On the
-    // 2026-27 GW4 capture entry 3832237's pure-points plan publishes 46.5454 with a
-    // 7.1846 bench and its ortak-koru plan publishes 46.7016 with a 4.3379 bench: the
-    // banded plan is higher on the number that is printed and lower on the one that was
-    // optimised. The card may say what the plan is chosen on; it may not rank it.
+  it("uses the approved plan aim without ranking the published expected-points figure", () => {
+    // The approved name states an aim. The description must not rank the published
+    // figure: the solve also values the bench, while expected_own_points counts eleven
+    // plus captain. On 2026-27 GW4, entry 3832237's plan publishes 46.5454 with a
+    // 7.1846 bench and its ortak-koru plan publishes 46.7016 with a 4.3379 bench, both
+    // OPTIMAL and free of hits. The description guard preserves that distinction.
     const SUPERLATIVE = /highest|most expected|en yüksek|en iyi puan/i;
     for (const language of ["tr", "en"] as const) {
       const { description } = MESSAGES[language].leagueMembers.strategies["saf-puan"];

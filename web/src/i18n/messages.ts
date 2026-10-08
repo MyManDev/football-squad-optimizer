@@ -581,12 +581,10 @@ const en = {
     strategies: {
       "saf-puan": {
         name: "Most points",
-        // Not "the highest expected points": the solve maximises the eleven, the captain
-        // and the bench together, and the figure below the card is the eleven and the
-        // captain only. A banded plan that keeps a weaker bench can read higher on that
-        // figure. Measured on the 2026-27 GW4 capture: entry 3832237's pure-points plan
-        // publishes 46.5454 against its ortak-koru plan's 46.7016, both OPTIMAL, both
-        // free of hits.
+        // The owner-approved name states the plan's aim, rather than ranking the
+        // published figure. The solve includes the bench; the card counts eleven plus
+        // captain. On 2026-27 GW4, entry 3832237's plan publishes 46.5454 against its
+        // ortak-koru plan's 46.7016, both OPTIMAL and free of hits.
         description: "Points alone, no rival in the equation.",
         short: "Points alone, no rival in the equation.",
       },
