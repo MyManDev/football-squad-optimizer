@@ -105,7 +105,7 @@ Date is the file's last commit (`git log -1 --format=%as -- scripts/<name>.py`).
 | `run_team_rating_study.py` | measurement runner | `docs/team_rating_study.json` | 2026-08-19 |
 | `run_terminal_value_study.py` | measurement runner | `docs/terminal_value_study.json` | 2026-08-20 |
 | `run_transfer_discipline_seasons.py` | measurement runner | `docs/transfer_discipline.json` (+ rolling variants) | 2026-08-18 |
-| `score_planner_policy_chain.py` | measurement runner | `docs/research/planner_policy_chain_gw20.json` and `planner_policy_chain_gw38.json` with their markdown twins, each once, from the chain runner's evidence and the season's outcome captures; protocol `docs/research/planner_policy_chain_prereg.md`, rules 25 to 37 | 2026-10-06 |
+| `score_planner_policy_chain.py` | measurement runner | `docs/research/planner_policy_chain_gw20.json` and `planner_policy_chain_gw38.json` with their markdown twins, each once, from the chain runner's evidence, the receipts posted on the tracking issue (`--receipts`, `--producer-changes`) and the season's outcome captures; needs a clean, non-shallow clone that reaches origin; protocol `docs/research/planner_policy_chain_prereg.md`, rules 2, 3, 6, 13, 14 and 20 to 37 | 2026-10-08 |
 
 ## Artifact-only runners
 
