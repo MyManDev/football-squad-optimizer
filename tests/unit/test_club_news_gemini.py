@@ -189,10 +189,10 @@ def test_default_transport_refuses_oversized_reply_for_only_that_club(
 
 def test_bounded_transport_accepts_exact_limit_and_bounds_error_bodies() -> None:
     class Response:
-        def __init__(self, status: int, body: bytes) -> None:
+        def __init__(self, status: int, body: bytes, headers: dict[str, str] | None = None) -> None:
             self.status_code = status
             self.body = body
-            self.headers = {"content-length": str(len(body))}
+            self.headers = headers if headers is not None else {"content-length": str(len(body))}
 
         def __enter__(self) -> "Response":
             return self
@@ -201,12 +201,16 @@ def test_bounded_transport_accepts_exact_limit_and_bounds_error_bodies() -> None
             pass
 
         def iter_raw(self) -> Any:
+            if "content-encoding" in self.headers or self.headers.get("content-length") == "abc":
+                raise AssertionError("Invalid response headers must refuse before a body read.")
             yield self.body
 
     responses = iter(
         [
             Response(200, b"{}" + b" " * (MAX_RESPONSE_BYTES - 2)),
             Response(403, b"x" * (MAX_RESPONSE_BYTES + 1)),
+            Response(200, b"", {"content-encoding": "gzip"}),
+            Response(200, b"", {"content-length": "abc"}),
         ]
     )
 
@@ -218,6 +222,20 @@ def test_bounded_transport_accepts_exact_limit_and_bounds_error_bodies() -> None
     assert transport.post("https://example.invalid", headers={}, json={}, timeout=1).json() == {}
     with pytest.raises(ClubNewsGeminiError, match="2 MiB"):
         transport.post("https://example.invalid", headers={}, json={}, timeout=1)
+    with pytest.raises(ClubNewsGeminiError, match="Compressed"):
+        transport.post("https://example.invalid", headers={}, json={}, timeout=1)
+    with pytest.raises(ClubNewsGeminiError, match="Invalid coding response length"):
+        transport.post("https://example.invalid", headers={}, json={}, timeout=1)
+
+
+@pytest.mark.parametrize("status, message", [(200, "not JSON"), (503, "answered 503")])
+def test_deep_json_is_a_safe_adapter_refusal_preserving_error_status(
+    status: int, message: str
+) -> None:
+    reply = adapter._BoundedReply(status, b"[" * 200000 + b"]" * 200000)
+    with pytest.raises(ClubNewsGeminiError, match=message) as refused:
+        adapter._claim_response(reply, asked_for=DEFAULT_GEMINI_MODEL)
+    assert "RecursionError" not in str(refused.value)
 
 
 # --- what a good answer looks like ------------------------------------------

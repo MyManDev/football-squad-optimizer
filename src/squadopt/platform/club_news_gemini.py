@@ -505,7 +505,7 @@ def _why(reply: Reply) -> str:
 
     try:
         document = reply.json()
-    except (ValueError, json.JSONDecodeError):
+    except (ValueError, json.JSONDecodeError, RecursionError):
         return ""
     error = document.get("error") if isinstance(document, Mapping) else None
     if not isinstance(error, Mapping):
@@ -532,7 +532,7 @@ def _payload(reply: Reply) -> Mapping[str, Any]:
         raise ClubNewsGeminiError(f"The service answered {status} rather than 200{_why(reply)}.")
     try:
         document = reply.json()
-    except (ValueError, json.JSONDecodeError):
+    except (ValueError, json.JSONDecodeError, RecursionError):
         # The body is not quoted. A gateway can echo the request it rejected, headers and all,
         # and a refusal that pasted the first bytes of that into a log would defeat the point
         # of keeping the key out of the URL.
