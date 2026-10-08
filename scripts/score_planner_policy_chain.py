@@ -8,11 +8,12 @@ outcome captures, once per reading, and writes the record the protocol names.
 A reading refuses to start before its gameweek settles, refuses a reading the protocol does not
 name, refuses a reading taken twice, and runs only from its own merge commit (rule 37). It
 fetches origin before it reads any history, so that its merge commit, the readings already
-taken, the release tags and the interim record are read as origin holds them. The interim
-reading records no verdict (rule 32). The final reading reads the interim record from origin's
-develop, as the commit that first added it holds it, so the interim record is merged before the
-final reading is taken, and it lists each interim week whose outcome capture changed with both
-scores (rule 25). Everything a reading writes is rendered before the first write, the twin and
+taken, the release tags and the interim record are read as origin holds them. Every refusal
+that needs no outcome comes before the first outcome is scored. The interim reading records no
+verdict (rule 32). The final reading reads the interim record from origin's develop, as the
+commit that first added it holds it, so the interim record is merged before the final reading
+is taken, and it lists each interim week whose outcome capture changed with both scores
+(rule 25). Everything a reading writes is rendered before the first write, the twin and
 the index row from the record's own bytes (rule 36).
 
 Run from a clean checkout of the scorer's merge commit, in a clone that is not shallow and can
@@ -329,10 +330,12 @@ CHOICES: dict[str, str] = {
         "is listed in its week, with the reason its record states."
     ),
     "model_versions": (
-        "Rules 6 and 29: each contrast is also reported for each model version a week that is "
-        "not missing was served under, on that version's scored weeks, from the first such week. "
-        "A version whose weeks were all unscored keeps a block with no weeks, so its first week "
-        "stays recorded. A missing week opens no block, whatever version its receipt names."
+        "Rules 6 and 29: each contrast is also reported for each model version a scored week "
+        "was served under, on that version's scored weeks, from the first week that is not "
+        "missing served under it, scored or not. Versions are built from scored weeks only: a "
+        "version served only in weeks that were not scored opens no block, nor does a missing "
+        "week, whatever version its receipt names. Each listed week states its own version, so "
+        "every version a week was served under stays recorded with its weeks."
     ),
     "changed_outcome_captures": (
         "Rule 25: each reading keeps, for each week, the weekly difference of contrasts A and B "
@@ -635,6 +638,51 @@ def changed_since_interim(
     weeks and ``manifests`` the receipts it held them to.
     """
 
+    path, _ = record_paths(INTERIM_READING)
+    before_weeks = check_interim(interim, weeks, identity, frozen_source, manifests)
+    now = {int(week["gameweek"]): week for week in weeks}
+    changed: list[dict[str, Any]] = []
+    for before in before_weeks:
+        gameweek = int(before["gameweek"])
+        after = now[gameweek]
+        if after.get("missing_reason") is not None:
+            continue
+        if before.get("outcome_capture") == after.get("outcome_capture"):
+            if _canonical(before.get("differences")) != _canonical(after.get("differences")):
+                raise ScorerError(
+                    f"GW{gameweek:02d}: the interim read the same outcome capture and recorded "
+                    "other differences."
+                )
+            continue
+        changed.append(
+            {"gameweek": gameweek, "interim": _week_score(before), "final": _week_score(after)}
+        )
+    return {
+        "record": path,
+        "read_from": DEVELOP,
+        "develop_commit": interim.develop_commit,
+        "added_commit": interim.added_commit,
+        "sha256": interim.sha256,
+        "scorer_merge_commit": _mapping(interim.record.get("identity")).get("scorer_merge_commit"),
+        "interim_weeks": len(before_weeks),
+        "changed_weeks": changed,
+    }
+
+
+def check_interim(
+    interim: InterimRecord,
+    weeks: Sequence[Mapping[str, Any]],
+    identity: Mapping[str, object],
+    frozen_source: Mapping[str, Any],
+    manifests: Mapping[str, Mapping[str, Any]],
+) -> list[Mapping[str, Any]]:
+    """Rules 3, 24, 25 and 37: the interim record is this protocol's interim reading of the same
+    chain, scored from this scorer's merge commit, on the protocol.json fields this reading
+    records, over the same weeks, each with the decision capture, the missing reason and the
+    manifest sha256 this reading holds it to. Returns its weeks. ``weeks`` need only each
+    week's gameweek, decision capture and missing reason, so the final reading checks this
+    before any outcome is scored."""
+
     earlier = interim.record
     path, _ = record_paths(INTERIM_READING)
     named = (earlier.get("protocol"), earlier.get("season"), earlier.get("reading"))
@@ -665,7 +713,6 @@ def changed_since_interim(
             f"The interim record lists other weeks than this reading's through GW{through}."
         )
     posted = _mapping(_mapping(earlier.get("receipts")).get("manifests"))
-    changed: list[dict[str, Any]] = []
     for before in before_weeks:
         gameweek = int(before["gameweek"])
         after = now[gameweek]
@@ -681,28 +728,7 @@ def changed_since_interim(
                 f"GW{gameweek:02d}: the interim record was read from other decisions than this "
                 "reading's (rule 24)."
             )
-        if after.get("missing_reason") is not None:
-            continue
-        if before.get("outcome_capture") == after.get("outcome_capture"):
-            if _canonical(before.get("differences")) != _canonical(after.get("differences")):
-                raise ScorerError(
-                    f"GW{gameweek:02d}: the interim read the same outcome capture and recorded "
-                    "other differences."
-                )
-            continue
-        changed.append(
-            {"gameweek": gameweek, "interim": _week_score(before), "final": _week_score(after)}
-        )
-    return {
-        "record": path,
-        "read_from": DEVELOP,
-        "develop_commit": interim.develop_commit,
-        "added_commit": interim.added_commit,
-        "sha256": interim.sha256,
-        "scorer_merge_commit": scorer,
-        "interim_weeks": len(before_weeks),
-        "changed_weeks": changed,
-    }
+    return cast(list[Mapping[str, Any]], before_weeks)
 
 
 # Rule 3: the release live at each deadline
@@ -1274,17 +1300,27 @@ def week_deadline(
     states none, one with no decision capture, takes the newest capture's. A receipt deadline
     that is not an instant refuses the reading."""
 
-    stated = week.receipt.get("deadline_utc")
+    stated = receipt_deadline(week)
     if stated is not None:
-        if not isinstance(stated, str):
-            raise ScorerError(f"GW{week.gameweek:02d}'s receipt states no readable deadline.")
-        try:
-            _instant(stated)
-        except ScorerError as error:
-            raise ScorerError(f"GW{week.gameweek:02d}'s receipt: {error}") from error
         return stated, "receipt"
     newest = _deadline(captures, week.gameweek)
     return newest, None if newest is None else "newest_capture"
+
+
+def receipt_deadline(week: WeekEvidence) -> str | None:
+    """The deadline the week's receipt states, or None when it states none. One that is not an
+    instant refuses the reading. No capture is read."""
+
+    stated = week.receipt.get("deadline_utc")
+    if stated is None:
+        return None
+    if not isinstance(stated, str):
+        raise ScorerError(f"GW{week.gameweek:02d}'s receipt states no readable deadline.")
+    try:
+        _instant(stated)
+    except ScorerError as error:
+        raise ScorerError(f"GW{week.gameweek:02d}'s receipt: {error}") from error
+    return stated
 
 
 def settled(captures: Sequence[CapturedSnapshot], gameweek: int) -> bool:
@@ -1454,18 +1490,15 @@ def team_share_apart(receipt: Mapping[str, Any]) -> bool:
     return receipt.get("model_version") == TEAM_SHARE_VERSION and not both
 
 
-def score_week(week: WeekEvidence, outcome: Outcome) -> WeekScores:
-    """One week's scored chains, the chains rule 14 truncated, each scored served chain's
-    label (rule 13), and whether rule 6 reports the week apart.
+def rule_14_truncated(week: WeekEvidence) -> frozenset[tuple[str, str]]:
+    """Rule 14: the week's chains, as (profile, arm), whose window was truncated.
 
-    Each decided or failed record's truncation is held to rule 14's, whether or not the week
-    is scored; held and blocked records carry no window.
+    Each decided or failed record's truncation is held to rule 14's, and one that states none
+    or another refuses the reading; held and blocked records carry no window. No outcome is
+    read.
     """
 
-    missing = week.manifest.get("missing_reason")
-    scores: dict[tuple[str, str], ChainScore] = {}
     truncated: set[tuple[str, str]] = set()
-    splits: dict[tuple[str, str], str] = {}
     for chain, record in sorted(week.records.items()):
         if record.get("status") in ("blocked", "held"):
             continue
@@ -1483,6 +1516,21 @@ def score_week(week: WeekEvidence, outcome: Outcome) -> WeekScores:
             )
         if stated:
             truncated.add(chain)
+    return frozenset(truncated)
+
+
+def score_week(week: WeekEvidence, outcome: Outcome) -> WeekScores:
+    """One week's scored chains, the chains rule 14 truncated, each scored served chain's
+    label (rule 13), and whether rule 6 reports the week apart.
+
+    Each decided or failed record's truncation is held to rule 14's, whether or not the week
+    is scored; held and blocked records carry no window.
+    """
+
+    missing = week.manifest.get("missing_reason")
+    scores: dict[tuple[str, str], ChainScore] = {}
+    truncated = rule_14_truncated(week)
+    splits: dict[tuple[str, str], str] = {}
     if outcome.snapshot is not None and missing is None:
         outcomes = live_event_outcomes(
             outcome.snapshot.payloads[live_payload(week.gameweek)],
@@ -1500,7 +1548,7 @@ def score_week(week: WeekEvidence, outcome: Outcome) -> WeekScores:
         gameweek=week.gameweek,
         outcome=outcome,
         scores=scores,
-        truncated=frozenset(truncated),
+        truncated=truncated,
         served_splits=splits,
         model_version=cast(str | None, week.receipt.get("model_version")),
         missing_reason=cast(str | None, missing),
@@ -1701,18 +1749,21 @@ def _week_row(row: Mapping[str, Any] | None) -> dict[str, Any] | None:
     return {key: row[key] for key in ("difference", "pairs", "exact_zero_pairs", "failed_pairs")}
 
 
-def _model_versions(weeks: Sequence[WeekScores]) -> dict[str, int]:
-    """Rules 6 and 29: each model version a week that is not missing was served under, with the
-    first such week.
+def _scored_versions(weeks: Sequence[WeekScores]) -> dict[str, int]:
+    """Rules 6 and 29: each model version a scored week was served under, with the first week
+    that is not missing served under it.
 
-    A missing week bound no forecast, so the version its receipt names, which may be one rule 6
-    does not admit, opens no block. An unscored week was served under its version, so it can be
-    a version's first week.
+    The versions are built from scored weeks only. A missing week bound no forecast, so the
+    version its receipt names, which may be one rule 6 does not admit, opens no block, and
+    neither does a version served only in weeks that were not scored; each listed week states
+    its own version. An unscored week was served under its version, so it can still be a
+    version's first week, as rule 6 records a change with its first week.
     """
 
+    scored = {week.model_version for week in weeks if week.scores and week.model_version}
     first: dict[str, int] = {}
     for week in weeks:
-        if week.missing_reason is None and week.model_version:
+        if week.missing_reason is None and week.model_version in scored:
             first.setdefault(week.model_version, week.gameweek)
     return dict(sorted(first.items()))
 
@@ -1936,7 +1987,7 @@ def _paired_totals(totals: Mapping[str, Mapping[str, Any]]) -> dict[str, dict[st
             "bank_tenths_at_end",
             "sale_value_tenths_at_end",
         ):
-            values = []
+            values: list[float] = []
             for left, right in pairs:
                 a, b = totals[left][key], totals[right][key]
                 if a is None or b is None:
@@ -2021,6 +2072,28 @@ def producer_change_name(change: Mapping[str, Any]) -> str:
     return f"{change['model_version']} from GW{int(change['first_week']):02d}"
 
 
+def refuse_contradicted_changes(
+    decided: Mapping[int, str | None], changes: Sequence[Mapping[str, Any]], first_week: int
+) -> None:
+    """Rule 6: a declared producer change whose first week precedes the chain's first week, or
+    falls on a week this reading decided under another version, contradicts the evidence and
+    refuses the reading. ``decided`` maps each week that is not missing to the version its
+    receipt states. No outcome is read."""
+
+    for change in changes:
+        first, version = int(change["first_week"]), str(change["model_version"])
+        if first < first_week:
+            raise ScorerError(
+                f"The producer change declared from GW{first:02d} precedes the chain's first "
+                f"week, GW{first_week:02d}."
+            )
+        if first in decided and decided[first] != version:
+            raise ScorerError(
+                f"The producer change declared from GW{first:02d} names {version}, and that "
+                f"week's receipt states {decided[first]}."
+            )
+
+
 def producer_change_weeks(
     weeks: Sequence[WeekScores], changes: Sequence[Mapping[str, Any]], first_week: int
 ) -> dict[int, str]:
@@ -2031,20 +2104,11 @@ def producer_change_weeks(
     another version, contradicts the evidence and refuses the reading.
     """
 
-    by_week = {week.gameweek: week for week in weeks}
-    for change in changes:
-        first, version = int(change["first_week"]), str(change["model_version"])
-        if first < first_week:
-            raise ScorerError(
-                f"The producer change declared from GW{first:02d} precedes the chain's first "
-                f"week, GW{first_week:02d}."
-            )
-        week = by_week.get(first)
-        if week is not None and week.missing_reason is None and week.model_version != version:
-            raise ScorerError(
-                f"The producer change declared from GW{first:02d} names {version}, and that "
-                f"week's receipt states {week.model_version}."
-            )
+    refuse_contradicted_changes(
+        {week.gameweek: week.model_version for week in weeks if week.missing_reason is None},
+        changes,
+        first_week,
+    )
     named: dict[int, str] = {}
     for week in weeks:
         own = [
@@ -2060,6 +2124,69 @@ def producer_change_weeks(
 
 
 # The reading
+
+
+def _frozen_source(protocol: Mapping[str, Any]) -> dict[str, Any]:
+    """Rule 3: the protocol.json fields each record states and the final reading compares."""
+
+    return {key: protocol.get(key) for key in FROZEN_SOURCE_FIELDS}
+
+
+def _posted_manifests(
+    receipts: Mapping[str, Any], evidence: Sequence[WeekEvidence]
+) -> dict[str, dict[str, Any]]:
+    """Rule 24: each week's manifest receipt as posted, by week."""
+
+    return {
+        f"gw{week.gameweek:02d}": dict(receipts["manifests"][f"gw{week.gameweek:02d}"])
+        for week in evidence
+    }
+
+
+def refuse_before_outcomes(
+    *,
+    protocol: Mapping[str, Any],
+    evidence: Sequence[WeekEvidence],
+    receipts: Mapping[str, Any],
+    identity: Mapping[str, object],
+    producer_changes: Mapping[str, Any],
+    interim: InterimRecord | None,
+) -> None:
+    """Every refusal of the evidence that needs no outcome, run before the first outcome is
+    scored, so a reading one of them refuses has scored nothing (rules 28 and 37): each week's
+    receipt deadline, each record's truncation (rule 14), the producer changes declared
+    (rule 6) and, for the final reading, the interim record's identity (rule 25). Each runs
+    again where the record is built. Only the comparison of an unchanged outcome capture's
+    differences with the interim's needs the outcomes, so it alone comes after scoring."""
+
+    for week in evidence:
+        receipt_deadline(week)
+        rule_14_truncated(week)
+    refuse_contradicted_changes(
+        {
+            week.gameweek: cast(str | None, week.receipt.get("model_version"))
+            for week in evidence
+            if week.manifest.get("missing_reason") is None
+        },
+        producer_changes["changes"],
+        _first_chain_week(protocol),
+    )
+    if interim is not None:
+        decisions = [
+            {
+                "gameweek": week.gameweek,
+                "decision_capture": week.receipt.get("snapshot_id"),
+                "missing_reason": week.manifest.get("missing_reason"),
+            }
+            for week in evidence
+        ]
+        check_interim(
+            interim,
+            decisions,
+            identity,
+            _frozen_source(protocol),
+            _posted_manifests(receipts, evidence),
+        )
 
 
 def reading_record(
@@ -2121,7 +2248,7 @@ def reading_record(
     after_change = producer_change_weeks(weeks, declared, _first_chain_week(protocol))
     for entry in listed:
         entry["producer_change"] = after_change.get(int(entry["gameweek"]))
-    versions = _model_versions(weeks)
+    versions = _scored_versions(weeks)
     weekly: dict[str, dict[int, Mapping[str, Any]]] = {}
     contrasts = {}
     for label, pairs in CONTRASTS.items():
@@ -2185,11 +2312,8 @@ def reading_record(
     }
     end = end_prices(weeks, READINGS[reading])
     totals = arm_totals(weeks, evidence, end.prices, end.fee)
-    frozen_source = {key: protocol.get(key) for key in FROZEN_SOURCE_FIELDS}
-    manifests = {
-        f"gw{week.gameweek:02d}": dict(receipts["manifests"][f"gw{week.gameweek:02d}"])
-        for week in evidence
-    }
+    frozen_source = _frozen_source(protocol)
+    manifests = _posted_manifests(receipts, evidence)
     return {
         "protocol": PROTOCOL_ID,
         "season": SEASON,
@@ -2654,8 +2778,11 @@ def score(
     its row in the measurements index in the checkout, the scorer's identity after a fetch of
     origin, its record in committed history or in another worktree, the release tags, the
     receipts file and, for the final reading, the interim record on develop (rule 25). The
-    evidence, the frozen source, each record's truncation (rule 14) and the producer changes
-    declared (rule 6) are checked once the gameweek has settled. Everything the reading writes
+    evidence, the frozen source, each week's receipt deadline, each record's truncation
+    (rule 14), the producer changes declared (rule 6) and, for the final reading, the interim
+    record's identity are checked once the gameweek has settled and before the first outcome
+    is scored; only an unchanged outcome capture's differences are compared with the interim's
+    after scoring. Everything the reading writes
     is rendered before the first write: the record's bytes, the twin rendered from those bytes
     (rule 36) and the index row. The record is then written once, the twin once, and the index
     row is appended last, so a failure before the writes leaves nothing behind. A failure
@@ -2700,6 +2827,14 @@ def score(
         )
     protocol, weeks = read_evidence(evidence, gameweek, posted)
     check_frozen_source(protocol)
+    refuse_before_outcomes(
+        protocol=protocol,
+        evidence=weeks,
+        receipts=posted,
+        identity=identity,
+        producer_changes=producer_changes,
+        interim=interim,
+    )
     record = reading_record(
         reading=reading,
         protocol=protocol,

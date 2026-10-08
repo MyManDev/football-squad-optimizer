@@ -1644,9 +1644,9 @@ def eventful_interim(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]
     """One interim reading of a chain whose arms did more than score. hold_3 fails in GW7 for
     every squad, and in GW8 both hold arms fail for every squad; served_3's GW8 plans are
     FEASIBLE and not proved; GW9 is missing as an artifact of a version rule 6 does not admit.
-    The team share version serves through GW12 and the retained history version from GW13, but
-    GW19 is decided under the minutes version and no capture holds its live payload. Every
-    chain is blocked in GW20."""
+    The team share version serves through GW12 and the retained history version from GW13,
+    whose live payload no capture holds. GW19 is decided under the minutes version, and no
+    capture holds its live payload either. Every chain is blocked in GW20."""
 
     tmp_path = tmp_path_factory.mktemp("eventful_interim")
     share: dict[str, object] = {
@@ -1669,7 +1669,7 @@ def eventful_interim(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]
             receipt_fields=fields,
             unproved=(("served_3", 8),),
             blocked_from=20,
-            without_live=(19,),
+            without_live=(13, 19),
         )
         _identity(monkeypatch)
         record = scorer.score(
@@ -1779,33 +1779,36 @@ def test_each_block_counts_the_pairs_in_which_an_arm_failed(
     assert "| 0 | 9 | none (interim) |" in twin and "| 0 | 0 | none (interim) |" in twin
 
 
-def test_each_model_version_is_reported_from_its_first_decided_week(
+def test_each_model_version_is_reported_from_its_scored_weeks_with_its_first_week(
     eventful_interim: dict[str, Any],
 ) -> None:
-    """Rules 6 and 29, as the record states them: each contrast is reported for each version a
-    decided week was served under, on its scored weeks, from its first decided week. A version
-    whose decided weeks are all unscored keeps an empty block and its first week; a missing
-    week opens no block, though its receipt names a version rule 6 does not admit."""
+    """Rules 6 and 29, as the record states them: versions are built from scored weeks only, and
+    each contrast is reported for each of them on its scored weeks, from the first week served
+    under it, scored or not. A version served only in unscored weeks opens no block, and a
+    missing week opens none, though its receipt names a version rule 6 does not admit; each
+    week still states its own version in the record and in the twin."""
 
     record, twin = eventful_interim["record"], eventful_interim["twin"]
     weeks = {week["gameweek"]: week for week in record["weeks"]}
     assert weeks[9]["model_version"] == NOT_ADMITTED
     assert weeks[9]["missing_reason"] == "artifact_of_another_model_version"
+    assert weeks[13]["model_version"] == RETAINED
+    assert weeks[13]["unscored_reason"] == "missing_outcomes"
     assert weeks[19]["model_version"] == MINUTES
     assert weeks[19]["unscored_reason"] == "missing_outcomes"
     for label in scorer.CONTRASTS:
         blocks = record["contrasts"][label]["by_model_version"]
-        assert set(blocks) == {TEAM_SHARE, MINUTES, RETAINED}
+        assert set(blocks) == {TEAM_SHARE, RETAINED}
         assert blocks[TEAM_SHARE]["weeks_listed"] == [6, 7, 8, 10, 11, 12]
         assert blocks[TEAM_SHARE]["first_week"] == 6
-        # GW20 was decided under the retained version, but every chain was blocked in it.
-        assert blocks[RETAINED]["weeks_listed"] == list(range(13, 19))
+        # GW13 was served under the retained version and is its first week, though unscored;
+        # GW20 was decided under it too, but every chain was blocked in it.
+        assert blocks[RETAINED]["weeks_listed"] == list(range(14, 19))
         assert blocks[RETAINED]["first_week"] == 13
-        assert blocks[MINUTES]["first_week"] == 19 and blocks[MINUTES]["weeks"] == 0
-        assert blocks[MINUTES]["weeks_listed"] == [] and blocks[MINUTES]["mean"] is None
         assert all(block["verdict"] is None for block in blocks.values())
     assert f"| A on `{TEAM_SHARE}` weeks, from GW06 | 6 | +4.000 |" in twin
-    assert f"| B on `{MINUTES}` weeks, from GW19 | 0 | none |" in twin
+    assert f"| B on `{RETAINED}` weeks, from GW13 | 5 | +5.000 |" in twin
+    assert f"`{MINUTES}` weeks" not in twin
     assert f"`{NOT_ADMITTED}` weeks" not in twin
     # GW19 is listed with its reason and no difference, never as a zero (rule 25).
     row = next(line for line in twin.splitlines() if line.startswith("| 19 |"))
@@ -2393,6 +2396,82 @@ def test_no_capture_is_read_before_the_refusals_that_need_no_outcome(
     assert read == [tmp_path] and not (tmp_path / "records").exists()
 
 
+def test_the_refusals_that_need_no_outcome_come_before_the_first_outcome_is_scored(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Rules 6, 14, 25, 28 and 37: a receipt deadline that is not an instant, a record whose
+    truncation is not rule 14's, a declared producer change the evidence contradicts and an
+    interim record of other decisions or another scorer each refuse the reading before any
+    week's outcome capture is chosen. A reading they refuse has scored no outcome, so the run
+    after the correction is the first to read one. Each case falls on GW07, which the scorer
+    would otherwise reach only after scoring GW06."""
+
+    evidence, snapshots, records = _world(tmp_path, monkeypatch, through=7)
+    _identity(monkeypatch)
+    _outcome_capture(snapshots, 38, settled_through=38, live=False)
+    _read_through(monkeypatch, 7)
+    chosen: list[int] = []
+    choose = scorer.outcome_capture
+
+    def spied(captures: Any, gameweek: int, deadline: str | None = None) -> scorer.Outcome:
+        chosen.append(gameweek)
+        return choose(captures, gameweek, deadline)
+
+    monkeypatch.setattr(scorer, "outcome_capture", spied)
+    receipts = tmp_path / RECEIPTS
+    paths = {"receipts": receipts, "records_dir": records, "index_file": tmp_path / "index.md"}
+    week = evidence / "gw07"
+    kept = {path: path.read_bytes() for path in [*week.rglob("*"), receipts] if path.is_file()}
+
+    def unreadable_deadline() -> None:
+        _rewrite(week / "receipt.json", lambda receipt: receipt.update(deadline_utc="Friday"))
+        _reseal(evidence, 7)
+        _repost(receipts, evidence, 7)
+
+    def truncated() -> None:
+        _rewrite_week(evidence, receipts, 7, lambda record: record["policy"].update(truncated=True))
+
+    contradicted = {
+        "source": "issuecomment-3",
+        "changes": [{"model_version": MINUTES, "first_week": 7}],
+    }
+    for change, producer_changes, message in (
+        (unreadable_deadline, scorer.NO_PRODUCER_CHANGES, "GW07's receipt: "),
+        (truncated, scorer.NO_PRODUCER_CHANGES, "GW07 p1000 hold_3: the record's truncation"),
+        (lambda: None, contradicted, f"from GW07 names {MINUTES}, and that week's receipt"),
+    ):
+        change()
+        with pytest.raises(scorer.ScorerError, match=message):
+            scorer.score(evidence, snapshots, "gw20", producer_changes=producer_changes, **paths)
+        assert chosen == [] and not records.exists()
+        for path, raw in kept.items():
+            path.write_bytes(raw)
+    scorer.score(evidence, snapshots, "gw20", **paths)
+    assert chosen == [6, 7]
+    chosen.clear()
+    interim = _on_develop(monkeypatch, records)
+
+    def other_scorer(record: dict[str, Any]) -> None:
+        record["identity"]["scorer_merge_commit"] = "9" * 40
+
+    def other_decision(record: dict[str, Any]) -> None:
+        record["weeks"][1]["decision_capture"] = "capture-elsewhere"
+
+    for change, message in (
+        (other_scorer, "rule 37 runs both from one merge commit"),
+        (other_decision, "GW07: the interim record was read from other decisions"),
+    ):
+        record = json.loads(json.dumps(interim.record))
+        change(record)
+        monkeypatch.setattr(scorer, "interim_reading", lambda r=record: replace(interim, record=r))
+        with pytest.raises(scorer.ScorerError, match=message):
+            scorer.score(evidence, snapshots, "gw38", **paths)
+        assert chosen == [] and not (records / "planner_policy_chain_gw38.json").exists()
+    monkeypatch.setattr(scorer, "interim_reading", lambda: interim)
+    scorer.score(evidence, snapshots, "gw38", **paths)
+    assert chosen == [6, 7]
+
+
 @pytest.mark.parametrize(
     ("weeks", "interval", "mean", "final", "expected"),
     [
@@ -2788,7 +2867,24 @@ def test_a_reading_writes_nothing_until_its_twin_and_index_row_are_rendered(
     with pytest.raises(scorer.ScorerError, match=r"taken already: [^;]*gw20\.json exists\.$"):
         scorer.score(evidence, snapshots, "gw20", **paths)
     target.unlink()
-    record = scorer.score(evidence, snapshots, "gw20", **paths)
+    seen: dict[str, Any] = {}
+
+    def spy(name: str, render: Callable[[Any], str]) -> Callable[[Any], str]:
+        def spied(record: Any) -> str:
+            seen[name] = record
+            return render(record)
+
+        return spied
+
+    with pytest.MonkeyPatch.context() as patched:
+        patched.setattr(scorer, "render_markdown", spy("twin", scorer.render_markdown))
+        patched.setattr(scorer, "index_row", spy("row", scorer.index_row))
+        record = scorer.score(evidence, snapshots, "gw20", **paths)
+    # Rule 36: the twin and the row are rendered from the record as written, whose keys
+    # document_bytes sorts, and never from the record as reading_record built it.
+    written = json.loads(target.read_bytes())
+    for name in ("twin", "row"):
+        assert seen[name] == written and list(seen[name]) == sorted(seen[name]), name
     assert twin.read_bytes() == scorer.render_markdown(record).encode("utf-8")
     assert index.read_text(encoding="utf-8") == (
         "# Measurements Index\n" + scorer.index_row(record) + "\n"
