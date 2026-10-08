@@ -9,6 +9,10 @@ An amended declaration needs review of the runner before any real input check.
 The component uses only settled 2026-27 fixture appearances in each published
 decision capture. It adds its unconditional term to a copy of that capture's
 published base handoff. Both arms use production `project` for availability.
+A present base appearance mapping may omit `direct_control` players; they stay
+in both arms with zero term and recorded codes/counts. A legacy absent mapping
+remains missing input. Invalid fit fixtures are excluded from both rate counts
+with their identity and reason recorded.
 Both candidate versions remain outside the promotion set. There is no weekly
 operations integration or member output in this PR.
 
@@ -19,8 +23,9 @@ existing `by-capture/<snapshot-id>/*.json` layout, and member advice records wit
 `2026-27/gwNN/entry-<id>/<snapshot-id>/advice.json`. The last pre-deadline
 publication selects the exact handoff fingerprint. An absent last capture or
 handoff is missing input, never a reason to select an older publication.
-The handoff must retain a file write time before its target deadline. A copied
-file with a later write time does not establish the required existence proof.
+Deadline proof is the retained publication's `generated_at_utc`, capture identity
+and exact handoff fingerprint. Restoring a file with a later modification time
+does not invalidate that content proof.
 
 The inventory is restricted to capture identifiers in the 2026-27 season date
 range. The bootstrap verifies the season before any event-live file is opened.
@@ -34,8 +39,10 @@ Use `scripts/measure_defcon_component.py --check-inputs --check-through 7`
 after the GW7 publish, and `--check-through 10` after the GW10 publish. Both
 require `--snapshot-root`, `--handoff-root`, `--publication-root` and an explicit
 UTC `--as-of`. They print the selected identities, inventory checksums and
-missing fixed inputs. They never open an event-live file, calculate a candidate
-error, rank players or produce a gate verdict. Post each output on #1000.
+missing fixed inputs. They may parse only GW1 to GW5 development event-live
+files, reporting excluded fit fixtures and schema disagreements. They never open
+a GW6 or later event-live file, calculate candidate error, rank players or
+produce a gate verdict. Later fit validity is checked at the single reading. Post each output on #1000.
 
 ## The single reading
 
@@ -51,8 +58,12 @@ The command writes the fixed markdown and JSON twins and a row in the existing
 measurements index table. The JSON records the code and declaration identity,
 every opened input's captured checksum, publication and handoff identities,
 weekly pairing or missing reasons, dropped players, all fixed gate constants,
-rank groups and diagnostics. A validation refusal after claiming is recorded in
-the private claim directory. No output promotes either candidate.
+rank groups and diagnostics. The index's Season record table is validated before
+claiming or opening outcomes. Validation confined to one week makes that week
+missing with a named reason. A stopped reading after outcome access saves a
+completed `insufficient_evidence` record with error type and message, while its
+private claim prevents a rerun. Unreadable capture metadata is skipped and its
+identity and reason are included in the report. No output promotes either candidate.
 
 Submit these records as step 4 within seven days of the first settled capture.
 Only a passed verdict can support the separate step 5 wiring PR and its required

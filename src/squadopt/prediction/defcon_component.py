@@ -155,9 +155,10 @@ def expected_defcon_term(
         raise DefconComponentError("The target row has an unknown position.")
     if position == "GK" or fixture_count == 0:
         return 0.0
+    if appearance_probability is None:
+        return 0.0
     if (
-        appearance_probability is None
-        or isinstance(appearance_probability, bool)
+        isinstance(appearance_probability, bool)
         or not math.isfinite(appearance_probability)
         or not 0.0 <= appearance_probability <= 1.0
     ):

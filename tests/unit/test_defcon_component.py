@@ -117,8 +117,8 @@ def test_missing_required_position_refuses_instead_of_zero_imputation() -> None:
         _fit((_row(),), frozenset({"DEF", "MID"}))
 
 
-@pytest.mark.parametrize("value", [None, -0.1, 1.1, float("nan"), float("inf"), True])
-def test_nonblank_term_refuses_invalid_or_absent_appearance(value: float | None) -> None:
+@pytest.mark.parametrize("value", [-0.1, 1.1, float("nan"), float("inf"), True])
+def test_nonblank_term_refuses_invalid_appearance(value: float | None) -> None:
     with pytest.raises(DefconComponentError, match="published appearance"):
         _term(_fit((_row(),)), appearance_probability=value)
 
@@ -137,3 +137,7 @@ def test_position_rates_are_separate_and_counts_are_read_only() -> None:
     assert rates.rate(102, "MID") == 0
     with pytest.raises(TypeError):
         rates.position_appearances["DEF"] = 100  # type: ignore[index]
+
+
+def test_omitted_direct_control_appearance_has_zero_term() -> None:
+    assert _term(_fit((_row(),)), appearance_probability=None) == 0

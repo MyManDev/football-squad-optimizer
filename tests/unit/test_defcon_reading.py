@@ -53,6 +53,7 @@ def capture(
             "id": w,
             "deadline_time": stamp(START + timedelta(weeks=w - 1)),
             "finished": final or w < target,
+            "data_checked": final or w < target,
         }
         for w in range(1, 14)
     ]
@@ -226,9 +227,7 @@ def test_pure_augmentation_preserves_base_and_applies_availability_once(tmp_path
         read_projection_handoff(path)
 
 
-@pytest.mark.parametrize(
-    "corruption", ["modification", "minutes", "fixture", "duplicate", "late", "season"]
-)
+@pytest.mark.parametrize("corruption", ["duplicate", "season"])
 def test_bad_fit_inputs_are_refused(tmp_path: Path, corruption: str) -> None:
     def change(documents: dict[str, Any]) -> None:
         entry = documents[live_payload(1)]["elements"][1]
@@ -286,11 +285,16 @@ def test_development_threshold_crosschecks_zero_award_without_creating_a_label(
         entry["explain"][0]["stats"] = entry["explain"][0]["stats"][:1]
 
     snapshot = capture(tmp_path, change=change)
-    with pytest.raises(DefconMissingInputs, match="count and awarded"):
-        candidate_handoff(snapshot, base(snapshot), declaration_sha256=runner.DECLARATION_SHA256)
+    candidate = candidate_handoff(
+        snapshot, base(snapshot), declaration_sha256=runner.DECLARATION_SHA256
+    )
+    component = candidate.diagnostics["defcon_component"]
+    assert component["rates"]["player_appearances"]["102"] == 5
+    assert component["rates"]["player_awards"]["102"] == 4
+    assert component["development_schema_disagreements"][0]["reason"] == "count_award_disagreement"
 
 
-def test_outcome_free_checker_never_opens_any_event_live_payload(
+def test_checker_parses_only_development_payloads_and_never_scored_outcomes(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     snapshot = capture(tmp_path / "snapshots")
@@ -299,7 +303,7 @@ def test_outcome_free_checker_never_opens_any_event_live_payload(
     opened = []
 
     def checked(path: Path) -> bytes:
-        assert not re_event(path.name)
+        assert not re_event(path.name) or int(path.name[8:10]) <= 5
         opened.append(path.name)
         return original(path)
 
@@ -311,6 +315,7 @@ def test_outcome_free_checker_never_opens_any_event_live_payload(
         handoffs=tmp_path / "handoffs",
         weeks=(6,),
         as_of="2026-12-01T00:00:00Z",
+        snapshot_root=tmp_path / "snapshots",
     )
     assert report["outcomes_read"] is False
     assert report["weeks"][0]["status"] == "identity_and_inventory_ready"
@@ -431,7 +436,7 @@ def test_single_reading_writes_hashes_twins_and_refuses_repetition(
     root = tmp_path / "repo"
     (root / "docs" / "research").mkdir(parents=True)
     (root / "docs" / "measurements_index.md").write_text(
-        "| Artifact | Finding | PR |\n| --- | --- | --- |\n"
+        "## Season record\n\n| Artifact | Finding | PR |\n| --- | --- | --- |\n"
     )
     monkeypatch.setattr(runner, "ROOT", root)
     monkeypatch.setattr(runner, "command", lambda *args: "")
@@ -549,6 +554,7 @@ def test_checker_reports_missing_appearance_without_reading_outcomes(tmp_path: P
         handoffs=tmp_path / "handoffs",
         weeks=(6,),
         as_of="2026-12-01T00:00:00Z",
+        snapshot_root=tmp_path / "snapshots",
     )
     assert result["weeks"][0]["status"] == "missing"
     assert result["weeks"][0]["absent_player_codes"] == [102, 103, 104]
@@ -613,10 +619,10 @@ def test_pure_component_refuses_forged_capture_time_before_reading_payloads(tmp_
         )
 
 
-def test_missing_settled_fixture_count_marks_whole_week_missing(tmp_path: Path) -> None:
+def test_no_population_after_fixture_count_drops_marks_week_missing(tmp_path: Path) -> None:
     decision = capture(tmp_path / "decision", double=True)
     outcome = capture(tmp_path / "outcome", final=True)
-    with pytest.raises(DefconMissingInputs, match="counts disagree"):
+    with pytest.raises(DefconMissingInputs, match="population is empty"):
         runner.paired_week(decision, base(decision), outcome)
 
 
@@ -669,3 +675,287 @@ def test_crashed_claim_refuses_before_any_outcome_file_is_opened(
             owner_approved=True,
             weekly_run_idle=True,
         )
+
+
+@pytest.mark.parametrize("code", [102, 103, 104])
+def test_direct_control_omission_stays_paired_with_zero_term(tmp_path: Path, code: int) -> None:
+    decision = capture(tmp_path / "snapshots")
+    original = base(decision)
+    appearance = dict(original.appearance_probability or {})
+    del appearance[code]
+    original = replace(original, appearance_probability=appearance)
+    publication(tmp_path, decision, original)
+    outcome = capture(tmp_path / "outcome", final=True)
+    audit: dict[str, Any] = {}
+    rows, dropped, _ = runner.paired_week(decision, original, outcome, audit=audit)
+    row = next(row for row in rows if row.player_code == code)
+    assert row.candidate == row.comparator
+    assert row.term_unconditional == row.term_decided == 0
+    assert dropped == []
+    assert audit["zero_term_player_codes"] == [code]
+    assert audit["zero_term_player_count"] == 1
+    checked = runner.check_inputs(
+        runner.inventory(tmp_path / "snapshots", as_of="2026-12-01T00:00:00Z"),
+        publications=tmp_path / "publications",
+        handoffs=tmp_path / "handoffs",
+        weeks=(6,),
+        as_of="2026-12-01T00:00:00Z",
+        snapshot_root=tmp_path / "snapshots",
+    )
+    assert checked["weeks"][0]["status"] == "identity_and_inventory_ready"
+    assert checked["weeks"][0]["zero_term_player_codes"] == [code]
+
+
+def test_paired_week_applies_half_availability_to_the_whole_candidate(tmp_path: Path) -> None:
+    decision = capture(tmp_path / "decision")
+    outcome = capture(tmp_path / "outcome", final=True)
+    rows, _, _ = runner.paired_week(decision, base(decision), outcome)
+    row = next(row for row in rows if row.player_code == 102)
+    assert row.comparator == pytest.approx(1.5)
+    assert row.candidate == pytest.approx(2.3)
+    assert row.term_unconditional == pytest.approx(1.6)
+    assert row.term_decided == pytest.approx(0.8)
+
+
+@pytest.mark.parametrize("corruption", ["modification", "award", "minutes", "fixture"])
+def test_invalid_fit_fixture_is_excluded_from_both_counts(tmp_path: Path, corruption: str) -> None:
+    def change(documents: dict[str, Any]) -> None:
+        entry = documents[live_payload(1)]["elements"][1]
+        if corruption == "modification":
+            entry["explain"][0]["stats"][1]["points_modification"] = 1
+        elif corruption == "award":
+            entry["explain"][0]["stats"][1]["points"] = 1
+        elif corruption == "minutes":
+            entry["explain"][0]["stats"] = entry["explain"][0]["stats"][1:]
+        else:
+            entry["explain"][0]["fixture"] = 2
+
+    decision = capture(tmp_path / "snapshots", change=change)
+    original = base(decision)
+    candidate = candidate_handoff(decision, original, declaration_sha256=runner.DECLARATION_SHA256)
+    component = candidate.diagnostics["defcon_component"]
+    assert component["rates"]["player_appearances"]["102"] == 4
+    assert component["rates"]["player_awards"]["102"] == 4
+    assert component["excluded_fit_rows"][0]["player_code"] == 102
+    assert component["excluded_fit_rows"][0]["gameweek"] == 1
+    publication(tmp_path, decision, original)
+    checked = runner.check_inputs(
+        runner.inventory(tmp_path / "snapshots", as_of="2026-12-01T00:00:00Z"),
+        publications=tmp_path / "publications",
+        handoffs=tmp_path / "handoffs",
+        weeks=(6,),
+        as_of="2026-12-01T00:00:00Z",
+        snapshot_root=tmp_path / "snapshots",
+    )
+    assert checked["weeks"][0]["excluded_development_fit_rows"] == component["excluded_fit_rows"]
+
+
+def test_post_deadline_publication_is_ignored_and_restore_mtime_is_not_proof(
+    tmp_path: Path,
+) -> None:
+    early = capture(tmp_path / "snapshots")
+    late = capture(tmp_path / "snapshots", instant_offset=10)
+    publication(tmp_path, early, base(early))
+    publication(tmp_path, late, base(late), generated_offset=7200)
+    handoff_path = (
+        tmp_path / "handoffs" / "by-capture" / early.metadata.snapshot_id / "default.json"
+    )
+    after_deadline = (START + timedelta(weeks=6)).timestamp()
+    os.utime(handoff_path, (after_deadline, after_deadline))
+    captures = runner.inventory(tmp_path / "snapshots", as_of="2026-12-01T00:00:00Z")
+    selected, _, _ = runner.published_pair(
+        tmp_path / "publications", tmp_path / "handoffs", captures, 6, as_of="2026-12-01T00:00:00Z"
+    )
+    assert selected.metadata.snapshot_id == early.metadata.snapshot_id
+
+
+def test_fixture_count_mismatch_drops_only_the_affected_club_players(tmp_path: Path) -> None:
+    def change(documents: dict[str, Any]) -> None:
+        documents[BOOTSTRAP_PAYLOAD]["elements"][3]["team"] = 2
+        documents[BOOTSTRAP_PAYLOAD]["teams"].append({"id": 3, "name": "Other"})
+        documents[FIXTURES_PAYLOAD][5]["team_a"] = 3
+
+    decision = capture(tmp_path / "decision", change=change)
+    outcome = capture(tmp_path / "outcome", final=True)
+    audit: dict[str, Any] = {}
+    rows, dropped, _ = runner.paired_week(decision, base(decision), outcome, audit=audit)
+    assert [row.player_code for row in rows] == [102, 103]
+    assert dropped == [104]
+    assert audit["fixture_count_mismatches"] == [
+        {"player_code": 104, "decided_count": 0, "settled_count": 1}
+    ]
+
+
+def test_rank_means_use_player_count_weights_when_group_ranks_differ() -> None:
+    rows = tuple(paired(6, i, "DEF", float(i), float(-i), float(i)) for i in range(1, 4))
+    rows += tuple(paired(7, i, "DEF", float(i), float(i), float(-i)) for i in range(1, 6))
+    ranks = summarize(rows, scored_weeks=tuple(range(6, 13)))["ranks"]["DEF"]
+    assert ranks["comparator"] == pytest.approx((3 - 5) / 8)
+    assert ranks["candidate"] == pytest.approx((-3 + 5) / 8)
+    assert ranks["players"] == 8
+
+
+@pytest.mark.parametrize("merged", ["2026-10-17T10:00:00Z", "2026-10-18T00:00:00Z"])
+def test_late_declaration_requires_a_new_window(merged: str) -> None:
+    with pytest.raises(DefconInputError, match="new declaration"):
+        runner.window({"merged_at": merged})
+
+
+def test_finished_but_unchecked_event_is_not_settled(tmp_path: Path) -> None:
+    def change(documents: dict[str, Any]) -> None:
+        documents[BOOTSTRAP_PAYLOAD]["events"][0]["data_checked"] = False
+
+    decision = capture(tmp_path / "decision", change=change)
+    with pytest.raises(DefconMissingInputs, match="not settled"):
+        candidate_handoff(decision, base(decision), declaration_sha256=runner.DECLARATION_SHA256)
+
+    def unchecked_outcome(documents: dict[str, Any]) -> None:
+        documents[BOOTSTRAP_PAYLOAD]["events"][9]["data_checked"] = False
+
+    capture(tmp_path / "snapshots", final=True, change=unchecked_outcome)
+    captures = runner.inventory(tmp_path / "snapshots", as_of="2026-12-01T00:00:00Z")
+    with pytest.raises(DefconMissingInputs, match="not yet"):
+        runner.first_settled(captures, tuple(range(6, 13)))
+
+
+def reading_fixture(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *, change: Any = None
+) -> tuple[Any, dict[str, Any]]:
+    # Use the committed index with all its tables, rather than an unrepresentative single table.
+    contents = (runner.ROOT / "docs/measurements_index.md").read_text(encoding="utf-8")
+    root = tmp_path / "repo"
+    (root / "docs/research").mkdir(parents=True)
+    (root / "docs/measurements_index.md").write_text(contents, encoding="utf-8")
+    monkeypatch.setattr(runner, "ROOT", root)
+    monkeypatch.setattr(runner, "command", lambda *args: "")
+    capture(tmp_path / "snapshots", final=True, change=change)
+    for week in range(6, 13):
+        decision = capture(tmp_path / "snapshots", target=week)
+        publication(tmp_path, decision, base(decision, target=week))
+    captures = runner.inventory(tmp_path / "snapshots", as_of="2026-12-01T00:00:00Z")
+    return captures, dict(
+        snapshot_root=tmp_path / "snapshots",
+        publications=tmp_path / "publications",
+        handoffs=tmp_path / "handoffs",
+        declaration={
+            "merged_at": "2026-10-09T00:00:00Z",
+            "sha256": runner.DECLARATION_SHA256,
+            "code_commit": "a" * 40,
+        },
+        as_of="2026-12-01T00:00:00Z",
+        claim_directory=tmp_path / "claims",
+        owner_approved=True,
+        weekly_run_idle=True,
+    )
+
+
+def test_real_index_has_multiple_tables_and_records_in_season_section(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    captures, kwargs = reading_fixture(tmp_path, monkeypatch)
+    index = runner.ROOT / "docs/measurements_index.md"
+    before = index.read_text(encoding="utf-8")
+    assert before.count("| --- | --- | --- |") > 1
+    report = runner.reading(captures, **kwargs)
+    after = index.read_text(encoding="utf-8")
+    assert report["valid_weeks"] == 7
+    assert (
+        "defcon_component_reading.md" in after.split("## Season record", 1)[1].split("\n## ", 1)[0]
+    )
+    assert after[: after.index("## Season record")] == before[: before.index("## Season record")]
+
+
+def test_bad_index_shape_refuses_before_claim_or_outcome_access(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    captures, kwargs = reading_fixture(tmp_path, monkeypatch)
+    (runner.ROOT / "docs/measurements_index.md").write_text("No table", encoding="utf-8")
+
+    def forbidden(*args: Any, **kwargs: Any) -> Any:
+        pytest.fail("No outcome may be opened before index validation")
+
+    monkeypatch.setattr(runner, "partial_snapshot", forbidden)
+    with pytest.raises(DefconInputError, match="index section"):
+        runner.reading(captures, **kwargs)
+    assert not list((tmp_path / "claims").glob("*.json"))
+
+
+def test_one_duplicate_outcome_week_is_missing_with_named_validation_reason(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def change(documents: dict[str, Any]) -> None:
+        documents[live_payload(10)]["elements"].append(documents[live_payload(10)]["elements"][0])
+
+    captures, kwargs = reading_fixture(tmp_path, monkeypatch, change=change)
+    report = runner.reading(captures, **kwargs)
+    assert report["valid_weeks"] == 6
+    missing = [w for w in report["week_identities"] if w["status"] == "missing"]
+    assert len(missing) == 1
+    assert missing[0]["gameweek"] == 10
+    assert missing[0]["reason"] == "input_validation"
+    assert "duplicated" in missing[0]["detail"]
+
+
+def test_unexpected_error_after_outcome_access_saves_completed_verdict_and_no_rerun(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    captures, kwargs = reading_fixture(tmp_path, monkeypatch)
+
+    def broken(*args: Any, **kwargs: Any) -> Any:
+        raise RuntimeError("synthetic programming fault")
+
+    monkeypatch.setattr(runner, "paired_week", broken)
+    report = runner.reading(captures, **kwargs)
+    assert report["verdict"] == "insufficient_evidence"
+    assert report["stop_reason"] == {
+        "reason": "RuntimeError",
+        "detail": "synthetic programming fault",
+    }
+    assert json.loads((runner.ROOT / (runner.RECORD + ".json")).read_text()) == report
+    with pytest.raises(DefconInputError, match="another gate"):
+        runner.reading(captures, **kwargs)
+
+
+def test_inventory_skips_unreadable_metadata_and_records_its_identity(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    good = capture(tmp_path)
+    bad = tmp_path / "fpl-live-20260925T163001Z-000000000000"
+    bad.mkdir()
+    original = Path.read_bytes
+
+    def unreadable(path: Path) -> bytes:
+        if path == bad / "metadata.json":
+            raise PermissionError("synthetic unreadable metadata")
+        return original(path)
+
+    monkeypatch.setattr(Path, "read_bytes", unreadable)
+    captures = runner.inventory(tmp_path, as_of="2026-12-01T00:00:00Z")
+    assert list(captures) == [good.metadata.snapshot_id]
+    assert captures.skipped == [
+        {
+            "snapshot_id": bad.name,
+            "reason": "PermissionError",
+            "detail": "synthetic unreadable metadata",
+        }
+    ]
+
+
+def test_summary_failure_saves_completed_verdict_without_retrying_summary(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    captures, kwargs = reading_fixture(tmp_path, monkeypatch)
+    calls = []
+
+    def broken(*args: Any, **kwargs: Any) -> Any:
+        calls.append(1)
+        raise RuntimeError("synthetic summary fault")
+
+    monkeypatch.setattr(runner, "summarize", broken)
+    report = runner.reading(captures, **kwargs)
+    assert calls == [1]
+    assert report["verdict"] == "insufficient_evidence"
+    assert report["valid_weeks"] == 7
+    assert report["gate_completed"] is False
+    assert report["constants"]["bootstrap_seed"] == 20261007
+    assert json.loads((runner.ROOT / (runner.RECORD + ".json")).read_text()) == report

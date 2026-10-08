@@ -1,7 +1,8 @@
 """Offline #1000 input inventory and the single preregistered DEFCON reading.
 
-The input check verifies metadata and publication identities without opening any
-event-live payload. The owner authorizes the reading outside weekly operations.
+The input check verifies metadata, publication identities and GW1 to GW5
+development history, without opening any GW6 or later event-live payload.
+The owner authorizes the reading outside weekly operations.
 No mode fetches FPL, trains a base model, publishes or promotes a candidate.
 """
 
@@ -13,7 +14,7 @@ import json
 import re
 import subprocess
 from collections.abc import Mapping
-from datetime import UTC, datetime
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -40,7 +41,11 @@ from squadopt.data.snapshots import (
 )
 from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD, live_payload
 from squadopt.data.timestamps import as_instant, normalize_utc_timestamp
-from squadopt.experiments.defcon_component_reading import PairedDefconRow, summarize
+from squadopt.experiments.defcon_component_reading import (
+    PairedDefconRow,
+    reading_constants,
+    summarize,
+)
 from squadopt.live.recommendation import project, read_inputs, read_projection_handoff
 from squadopt.live.rules import read_season_rules
 from squadopt.prediction.defcon_component import (
@@ -51,9 +56,10 @@ from squadopt.prediction.defcon_component import (
 
 ROOT = Path(__file__).resolve().parents[1]
 DECLARATION = "docs/defcon_component_prereg.md"
-DECLARATION_SHA256 = "1c8b409cd3f49ccc7fd1de3364cce64828fbd827d607135a1c108856c2839afc"
+DECLARATION_SHA256 = "49f53d6b1625d960101b449b6be2e046e09052242a3977f3e4769099acdefd80"
 RECORD = "docs/research/defcon_component_reading"
 MERGE_BOUNDARY = "2026-10-12T19:00:00Z"
+FALLBACK_BOUNDARY = "2026-10-17T10:00:00Z"
 CAPTURE_NAME = re.compile(r"fpl-live-(?:2026(?:0[89]|1[012])|20270[1-5])\d{2}T\d{6}Z-[0-9a-f]{12}")
 HASH = re.compile(r"[0-9a-f]{64}")
 
@@ -116,6 +122,10 @@ def frozen_declaration() -> dict[str, str]:
 
 
 def window(declaration: Mapping[str, str]) -> tuple[int, ...]:
+    if as_instant(declaration["merged_at"]) >= as_instant(FALLBACK_BOUNDARY):
+        raise DefconInputError(
+            "The declaration missed its final merge boundary; a new declaration is required."
+        )
     start = 6 if as_instant(declaration["merged_at"]) < as_instant(MERGE_BOUNDARY) else 7
     return tuple(range(start, start + 7))
 
@@ -174,11 +184,27 @@ def partial_snapshot(
     return snapshot
 
 
-def inventory(root: Path, *, as_of: str) -> dict[str, CapturedSnapshot]:
-    result = {}
+class CaptureInventory(dict[str, CapturedSnapshot]):
+    def __init__(self) -> None:
+        super().__init__()
+        self.skipped: list[dict[str, str]] = []
+
+
+def inventory(root: Path, *, as_of: str) -> CaptureInventory:
+    result = CaptureInventory()
     for directory in sorted(safe_path(root).iterdir()):
         if directory.is_dir() and CAPTURE_NAME.fullmatch(directory.name):
-            snapshot = partial_snapshot(directory)
+            try:
+                snapshot = partial_snapshot(directory)
+            except (OSError, json.JSONDecodeError) as error:
+                result.skipped.append(
+                    {
+                        "snapshot_id": directory.name,
+                        "reason": type(error).__name__,
+                        "detail": str(error),
+                    }
+                )
+                continue
             if as_instant(snapshot.metadata.captured_at_utc) <= as_instant(as_of):
                 result[directory.name] = snapshot
     return result
@@ -263,13 +289,6 @@ def published_pair(
                 or handoff.model_version not in DEFCON_CANDIDATE_VERSIONS
             ):
                 raise DefconMissingInputs("The publication's handoff is not the declared default.")
-            deadline = read_inputs(
-                capture, season=DEFCON_SEASON, gameweek=week
-            ).deadline.deadline_utc
-            if datetime.fromtimestamp(path.stat().st_mtime, UTC) >= as_instant(deadline):
-                raise DefconMissingInputs(
-                    "The retained handoff has no pre-deadline existence proof."
-                )
             matches.append((handoff, payload_checksum(content)))
     if len(matches) != 1:
         raise DefconMissingInputs("The final published default handoff is absent or ambiguous.")
@@ -331,6 +350,7 @@ def check_inputs(
     handoffs: Path,
     weeks: tuple[int, ...],
     as_of: str,
+    snapshot_root: Path,
 ) -> dict[str, Any]:
     rows = []
     for week in weeks:
@@ -349,7 +369,7 @@ def check_inputs(
                 and counts[element["code"]]
                 and element["code"] not in (base.appearance_probability or {})
             ]
-            if absent_appearance:
+            if absent_appearance and base.appearance_probability is None:
                 row.update(
                     reason="published_appearance_inputs_missing",
                     identity=proof,
@@ -357,7 +377,7 @@ def check_inputs(
                 )
                 rows.append(row)
                 continue
-            # Only the inventory is consulted. No prior or scored event-live bytes are read.
+            # GW6 and later payloads are never opened by this development-history check.
             absent = [
                 w
                 for w in range(1, week)
@@ -371,17 +391,52 @@ def check_inputs(
                     identity=proof,
                 )
             else:
-                read_season_rules(capture, season=DEFCON_SEASON)
+                rules = read_season_rules(capture, season=DEFCON_SEASON)
+                awards = {
+                    ("GK" if p == "GKP" else p): value
+                    for p, value in rules.scoring.defensive_contribution.items()
+                }
+                development = partial_snapshot(
+                    safe_path(snapshot_root) / capture.metadata.snapshot_id,
+                    (
+                        BOOTSTRAP_PAYLOAD,
+                        FIXTURES_PAYLOAD,
+                        *(live_payload(w) for w in range(1, min(week, 6))),
+                    ),
+                )
+                histories = [
+                    history_week(
+                        development,
+                        week=w,
+                        bootstrap=bootstrap,
+                        elements=elements,
+                        fixtures=fixtures,
+                        award_points=awards,
+                        deadline_utc=read_inputs(
+                            capture, season=DEFCON_SEASON, gameweek=week
+                        ).deadline.deadline_utc,
+                    )
+                    for w in range(1, min(week, 6))
+                ]
                 row.update(
                     status="identity_and_inventory_ready",
                     identity=proof,
                     prior_history_weeks=list(range(1, week)),
                     appearance_field_present=base.appearance_probability is not None,
+                    zero_term_player_codes=sorted(absent_appearance),
+                    zero_term_player_count=len(absent_appearance),
+                    excluded_development_fit_rows=[
+                        item for h in histories for item in h.excluded_rows
+                    ],
+                    development_schema_disagreements=[
+                        item for h in histories for item in h.schema_disagreements
+                    ],
                 )
-        except (DefconMissingInputs, DataError, OSError, KeyError, TypeError) as error:
-            row["reason"] = type(error).__name__
-            if isinstance(error, DefconMissingInputs):
-                row["detail"] = str(error)
+        except (DefconMissingInputs, DefconComponentError, DataError, DefconInputError) as error:
+            row["reason"] = (
+                "input_validation" if isinstance(error, DefconInputError) else type(error).__name__
+            )
+            row["detail"] = str(error)
         rows.append(row)
     return {
         "contract_version": "defcon_component_inputs_v1",
@@ -389,12 +444,18 @@ def check_inputs(
         "as_of": as_of,
         "weeks": rows,
         "outcomes_read": False,
+        "development_history_weeks_read": list(range(1, 6)),
+        "skipped_captures": getattr(captures, "skipped", []),
         "promotion": False,
     }
 
 
 def paired_week(
-    decision: CapturedSnapshot, base: Any, outcome: CapturedSnapshot
+    decision: CapturedSnapshot,
+    base: Any,
+    outcome: CapturedSnapshot,
+    *,
+    audit: dict[str, Any] | None = None,
 ) -> tuple[tuple[PairedDefconRow, ...], list[int], str]:
     candidate = candidate_handoff(decision, base, declaration_sha256=DECLARATION_SHA256)
     inputs = read_inputs(decision, season=DEFCON_SEASON, gameweek=base.gameweek)
@@ -439,6 +500,7 @@ def paired_week(
     settled_counts = fixture_counts(out_fixtures, elements, base.gameweek)
     rows = []
     dropped = []
+    mismatches = []
     for element in elements.values():
         code = element["code"]
         position = {1: "GK", 2: "DEF", 3: "MID", 4: "FWD"}[element["element_type"]]
@@ -448,7 +510,15 @@ def paired_week(
             dropped.append(code)
             continue
         if settled_counts[code] != component["fixture_counts"][str(code)]:
-            raise DefconMissingInputs("Decided and settled target fixture counts disagree.")
+            dropped.append(code)
+            mismatches.append(
+                {
+                    "player_code": code,
+                    "decided_count": component["fixture_counts"][str(code)],
+                    "settled_count": settled_counts[code],
+                }
+            )
+            continue
         comparator = float(control_table.loc[code, "expected_points"])
         decided_candidate = float(candidate_table.loc[code, "expected_points"])
         rows.append(
@@ -465,9 +535,31 @@ def paired_week(
                 component["prior_minutes"][str(code)],
             )
         )
+    if audit is not None:
+        audit.update(
+            zero_term_player_codes=component["zero_term_player_codes"],
+            zero_term_player_count=len(component["zero_term_player_codes"]),
+            excluded_fit_rows=component["excluded_fit_rows"],
+            development_schema_disagreements=component["development_schema_disagreements"],
+            fixture_count_mismatches=mismatches,
+        )
     if not rows:
         raise DefconMissingInputs("The paired population is empty.")
     return tuple(rows), sorted(dropped), candidate.fingerprint
+
+
+def measurement_index() -> tuple[Path, str, str]:
+    index = ROOT / "docs/measurements_index.md"
+    contents = index.read_text(encoding="utf-8")
+    heading = "## Season record\n"
+    if contents.count(heading) != 1:
+        raise DefconInputError("The season record index section needs review before recording.")
+    section = contents.split(heading, 1)[1].split("\n## ", 1)[0]
+    header = "| Artifact | Finding | PR |\n| --- | --- | --- |"
+    if section.count(header) != 1:
+        raise DefconInputError("The season record index table needs review before recording.")
+    offset = contents.index(heading) + len(heading) + section.index(header) + len(header)
+    return index, contents[:offset], contents[offset:]
 
 
 def reading(
@@ -500,6 +592,11 @@ def reading(
     claim.parent.mkdir(parents=True, exist_ok=True)
     if claim.exists():
         raise DefconInputError("This declaration already claimed its single gate reading.")
+    index, index_before, index_after = measurement_index()
+    partial_snapshot(
+        safe_path(snapshot_root) / selected.metadata.snapshot_id,
+        (BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD),
+    )
     # The claim survives crashes and failed inputs. It is never removed by the command.
     claimed = write_document_once(
         {
@@ -511,13 +608,9 @@ def reading(
     )
     if claimed != WRITTEN:
         raise DefconInputError("Another process already claimed this single reading.")
+    all_rows: list[PairedDefconRow] = []
+    audit: list[dict[str, Any]] = []
     try:
-        outcome = partial_snapshot(
-            safe_path(snapshot_root) / selected.metadata.snapshot_id,
-            (BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD, *(live_payload(w) for w in weeks)),
-        )
-        all_rows: list[PairedDefconRow] = []
-        audit = []
         for week in weeks:
             proof: dict[str, Any] = {}
             try:
@@ -532,7 +625,14 @@ def reading(
                         *(live_payload(w) for w in range(1, week)),
                     ),
                 )
-                paired, dropped, fingerprint = paired_week(decision, base, outcome)
+                outcome = partial_snapshot(
+                    safe_path(snapshot_root) / selected.metadata.snapshot_id,
+                    (BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD, live_payload(week)),
+                )
+                week_audit: dict[str, Any] = {}
+                paired, dropped, fingerprint = paired_week(
+                    decision, base, outcome, audit=week_audit
+                )
                 all_rows.extend(paired)
                 audit.append(
                     {
@@ -542,24 +642,24 @@ def reading(
                         "dropped_players": dropped,
                         "dropped_player_count": len(dropped),
                         "candidate_fingerprint": fingerprint,
+                        **week_audit,
                     }
                 )
             except (
                 DefconMissingInputs,
                 DefconComponentError,
                 DataError,
-                OSError,
-                KeyError,
-                TypeError,
+                DefconInputError,
+                json.JSONDecodeError,
             ) as error:
                 audit.append(
                     {
                         "gameweek": week,
                         "status": "missing",
-                        "reason": type(error).__name__,
-                        "detail": str(error)
-                        if isinstance(error, (DefconMissingInputs, DefconComponentError))
-                        else None,
+                        "reason": "input_validation"
+                        if isinstance(error, (DefconInputError, json.JSONDecodeError))
+                        else type(error).__name__,
+                        "detail": str(error),
                         "identity": proof,
                     }
                 )
@@ -575,16 +675,36 @@ def reading(
             "week_identities": audit,
             **summarize(tuple(all_rows), scored_weeks=weeks),
         }
-    except (DefconInputError, DataError, OSError, ValueError, KeyError, TypeError):
+    except Exception as error:
+        report = {
+            "contract_version": "defcon_component_reading_v1",
+            "season": DEFCON_SEASON,
+            "declaration": dict(declaration),
+            "as_of": as_of,
+            "reading_capture": selected.metadata.snapshot_id,
+            "reading_capture_fingerprint": selected.metadata.fingerprint,
+            "reading_input_hashes": dict(selected.metadata.checksums),
+            "scored_window": list(weeks),
+            "week_identities": audit,
+            "promotion": False,
+            "valid_weeks": sum(item["status"] == "scored" for item in audit),
+            "paired_rows_before_stop": len(all_rows),
+            "gate_completed": False,
+            "constants": reading_constants(),
+            "verdict": "insufficient_evidence",
+            "stop_reason": {"reason": type(error).__name__, "detail": str(error)},
+        }
         write_document_once(
             {
-                "status": "input_validation_refused",
+                "status": "reading_stopped",
+                "reason": type(error).__name__,
+                "detail": str(error),
                 "reading_capture": selected.metadata.snapshot_id,
                 "declaration": dict(declaration),
             },
             claim.with_name(claim.stem + "-refused.json"),
         )
-        raise
+    report["skipped_captures"] = getattr(captures, "skipped", [])
     write_document_once(report, ROOT / (RECORD + ".json"))
     markdown = "# DEFCON component reading\n\nVerdict: `" + report["verdict"] + "`.\n\n"
     markdown += (
@@ -597,7 +717,6 @@ def reading(
     path = ROOT / (RECORD + ".md")
     with path.open("x", encoding="utf-8", newline="\n") as stream:
         stream.write(markdown)
-    index = ROOT / "docs/measurements_index.md"
     row = (
         "| [DEFCON component](research/defcon_component_reading.md) / "
         "[record](research/defcon_component_reading.json) | "
@@ -606,11 +725,7 @@ def reading(
         + str(report["valid_weeks"])
         + " paired weeks; fixed whole-week gate, no promotion. | This change |"
     )
-    contents = index.read_text(encoding="utf-8")
-    header = "| --- | --- | --- |"
-    if contents.count(header) != 1:
-        raise DefconInputError("The measurements index table needs review before recording.")
-    index.write_text(contents.replace(header, header + "\n" + row, 1), encoding="utf-8")
+    index.write_text(index_before + "\n" + row + index_after, encoding="utf-8")
     return report
 
 
@@ -639,6 +754,7 @@ def main() -> int:
                 handoffs=args.handoff_root,
                 weeks=weeks,
                 as_of=as_of,
+                snapshot_root=args.snapshot_root,
             )
             report["declaration"] = declaration
         else:
@@ -657,13 +773,21 @@ def main() -> int:
             )
         print(json.dumps(report, indent=2, sort_keys=True, allow_nan=False))
         return 0
-    except (ValueError, DataError, OSError, KeyError, TypeError, subprocess.CalledProcessError):
+    except (
+        ValueError,
+        DataError,
+        OSError,
+        KeyError,
+        TypeError,
+        subprocess.CalledProcessError,
+    ) as error:
         print(
             json.dumps(
                 {
                     "status": "refused",
                     "promotion": False,
-                    "reason": "fixed_input_identity_or_reading_gate_failed",
+                    "reason": type(error).__name__,
+                    "detail": str(error),
                 }
             )
         )

@@ -141,9 +141,13 @@ def settled(
     if len(events) != 1:
         raise DefconInputError("A required event is duplicated.")
     played = [fixture for fixture in fixtures.values() if fixture.get("event") == week]
-    return events[0].get("finished") is True and all(
-        fixture.get("finished") is True and fixture.get("finished_provisional") is True
-        for fixture in played
+    return (
+        events[0].get("finished") is True
+        and events[0].get("data_checked") is True
+        and all(
+            fixture.get("finished") is True and fixture.get("finished_provisional") is True
+            for fixture in played
+        )
     )
 
 
@@ -152,6 +156,8 @@ class ParsedHistory:
     rows: tuple[FixtureAppearance, ...]
     unmapped_elements: tuple[int, ...]
     schema_crosschecks: int
+    excluded_rows: tuple[dict[str, Any], ...] = ()
+    schema_disagreements: tuple[dict[str, Any], ...] = ()
 
 
 def history_week(
@@ -164,7 +170,7 @@ def history_week(
     award_points: Mapping[str, int],
     deadline_utc: str | None = None,
 ) -> ParsedHistory:
-    """Use awarded fixture points, never infer a DGW label from a GW count."""
+    """Read awarded labels and exclude invalid fit fixtures from both counts."""
     if not settled(bootstrap, fixtures, week):
         raise DefconMissingInputs("A required prior or realized week is not settled.")
     if deadline_utc is not None and as_instant(snapshot.metadata.captured_at_utc) >= as_instant(
@@ -173,6 +179,8 @@ def history_week(
         raise DefconMissingInputs("Fit settlement was captured at or after the target deadline.")
     rows: list[FixtureAppearance] = []
     unmapped: list[int] = []
+    excluded: list[dict[str, Any]] = []
+    disagreements: list[dict[str, Any]] = []
     seen: set[int] = set()
     crosschecks = 0
     for entry in payload(snapshot, live_payload(week))["elements"]:
@@ -184,86 +192,130 @@ def history_week(
             unmapped.append(element_id)
             continue
         element = elements[element_id]
+        code = element["code"]
         position = {1: "GK", 2: "DEF", 3: "MID", 4: "FWD"}[element["element_type"]]
-        total_minutes = integer(entry["stats"]["minutes"])
-        if not isinstance(entry.get("explain"), list):
-            raise DefconMissingInputs("Fixture explanations are absent.")
-        explained_minutes = 0
-        total_awarded = 0
         local: set[int] = set()
+        player_rows: list[FixtureAppearance] = []
+        player_excluded = False
+        try:
+            total_minutes = integer(entry["stats"]["minutes"])
+            if not isinstance(entry.get("explain"), list):
+                raise DefconMissingInputs("Fixture explanations are absent.")
+            if total_minutes > 0 and not entry["explain"]:
+                raise DefconMissingInputs("Positive gameweek minutes have no fixture explanation.")
+        except (DefconMissingInputs, KeyError, TypeError) as error:
+            if deadline_utc is None:
+                raise DefconMissingInputs("Realized fixture minutes are invalid.") from error
+            excluded.append(
+                {"gameweek": week, "player_code": code, "fixture": None, "reason": str(error)}
+            )
+            continue
         for explanation in entry["explain"]:
-            fixture_id = integer(explanation["fixture"], minimum=1)
-            if fixture_id in local:
-                raise DefconInputError("A player-fixture explanation is duplicated.")
-            local.add(fixture_id)
-            fixture = fixtures.get(fixture_id)
-            if fixture is None or fixture.get("event") != week:
-                raise DefconMissingInputs("An explanation names an inconsistent fixture.")
-            kickoff = fixture.get("kickoff_time")
-            if not isinstance(kickoff, str):
-                raise DefconMissingInputs("A required fixture kickoff is absent.")
-            if as_instant(kickoff) >= as_instant(snapshot.metadata.captured_at_utc):
-                raise DefconMissingInputs("A settled fixture does not precede its capture.")
-            if deadline_utc is not None and as_instant(kickoff) >= as_instant(deadline_utc):
-                raise DefconMissingInputs("A fit fixture is at or after the target deadline.")
-            stats: dict[str, dict[str, Any]] = {}
-            for stat in explanation["stats"]:
-                key = stat["identifier"]
-                if key in stats:
-                    raise DefconInputError("An explanation statistic is duplicated.")
-                stats[key] = stat
-            if "minutes" not in stats:
-                raise DefconMissingInputs("A fixture minutes explanation is absent.")
-            minutes = integer(stats["minutes"]["value"])
-            explained_minutes += minutes
-            award = stats.get("defensive_contribution")
-            points = 0
-            if award is not None:
-                points = integer(award["points"])
-                value = integer(award["value"])
-                if (
-                    integer(award["points_modification"]) != 0
-                    or points not in (0, award_points[position])
-                    or (points > 0 and minutes == 0)
-                ):
-                    raise DefconMissingInputs(
-                        "An award is modified or differs from captured rules."
-                    )
-                if week <= 5 and position != "GK":
-                    threshold = 10 if position == "DEF" else 12
-                    if (value >= threshold) != (points > 0):
+            fixture_id = explanation.get("fixture")
+            try:
+                fixture_id = integer(fixture_id, minimum=1)
+                if fixture_id in local:
+                    raise DefconInputError("A player-fixture explanation is duplicated.")
+                local.add(fixture_id)
+                fixture = fixtures.get(fixture_id)
+                if fixture is None or fixture.get("event") != week:
+                    raise DefconMissingInputs("An explanation names an inconsistent fixture.")
+                kickoff = fixture.get("kickoff_time")
+                if not isinstance(kickoff, str):
+                    raise DefconMissingInputs("A required fixture kickoff is absent.")
+                if as_instant(kickoff) >= as_instant(snapshot.metadata.captured_at_utc):
+                    raise DefconMissingInputs("A settled fixture does not precede its capture.")
+                if deadline_utc is not None and as_instant(kickoff) >= as_instant(deadline_utc):
+                    raise DefconMissingInputs("A fit fixture is at or after the target deadline.")
+                stats: dict[str, dict[str, Any]] = {}
+                for stat in explanation["stats"]:
+                    key = stat["identifier"]
+                    if key in stats:
+                        raise DefconInputError("An explanation statistic is duplicated.")
+                    stats[key] = stat
+                if "minutes" not in stats:
+                    raise DefconMissingInputs("A fixture minutes explanation is absent.")
+                minutes = integer(stats["minutes"]["value"])
+                award = stats.get("defensive_contribution")
+                points = 0
+                if award is not None:
+                    points = integer(award["points"])
+                    value = integer(award["value"])
+                    if (
+                        integer(award["points_modification"]) != 0
+                        or points not in (0, award_points[position])
+                        or (points > 0 and minutes == 0)
+                    ):
                         raise DefconMissingInputs(
-                            "The development award schema cross-check failed."
+                            "An award is modified or differs from captured rules."
                         )
-                    crosschecks += 1
-            total_awarded += points
-            rows.append(
-                FixtureAppearance(
-                    DEFCON_SEASON,
-                    week,
-                    fixture_id,
-                    element["code"],
-                    position,
-                    kickoff,
-                    minutes,
-                    points,
+                    if week <= 5 and position != "GK":
+                        threshold = 10 if position == "DEF" else 12
+                        crosschecks += 1
+                        if (value >= threshold) != (points > 0):
+                            disagreements.append(
+                                {
+                                    "gameweek": week,
+                                    "player_code": code,
+                                    "fixture": fixture_id,
+                                    "reason": "award_value_threshold_disagreement",
+                                }
+                            )
+                player_rows.append(
+                    FixtureAppearance(
+                        DEFCON_SEASON, week, fixture_id, code, position, kickoff, minutes, points
+                    )
                 )
+            except (DefconMissingInputs, KeyError, TypeError) as error:
+                if deadline_utc is None:
+                    raise DefconMissingInputs("Realized fixture explanation is invalid.") from error
+                player_excluded = True
+                excluded.append(
+                    {
+                        "gameweek": week,
+                        "player_code": code,
+                        "fixture": fixture_id,
+                        "reason": str(error),
+                    }
+                )
+        if not player_excluded and sum(row.minutes for row in player_rows) != total_minutes:
+            if deadline_utc is None:
+                raise DefconMissingInputs(
+                    "Fixture minutes do not sum to the reported gameweek minutes."
+                )
+            excluded.extend(
+                {
+                    "gameweek": week,
+                    "player_code": code,
+                    "fixture": row.fixture,
+                    "reason": "fixture_minutes_total_mismatch",
+                }
+                for row in player_rows
             )
-        if explained_minutes != total_minutes:
-            raise DefconMissingInputs(
-                "Fixture minutes do not sum to the reported gameweek minutes."
-            )
-        if total_minutes > 0 and not local:
-            raise DefconMissingInputs("Positive gameweek minutes have no fixture explanation.")
-        if week <= 5 and total_minutes > 0 and len(local) == 1 and position != "GK":
-            # A single fixture lets the GW count cross-check both positive and zero
-            # awards. A double's aggregate count must never be split into fixture labels.
+            player_rows = []
+        if (
+            week <= 5
+            and total_minutes > 0
+            and len(local) == 1
+            and not player_excluded
+            and position != "GK"
+        ):
             count = integer(entry["stats"]["defensive_contribution"])
             threshold = 10 if position == "DEF" else 12
-            if (count >= threshold) != (total_awarded > 0):
-                raise DefconMissingInputs("The development count and awarded label disagree.")
             crosschecks += 1
-    return ParsedHistory(tuple(rows), tuple(sorted(unmapped)), crosschecks)
+            if (count >= threshold) != (sum(row.awarded_points for row in player_rows) > 0):
+                disagreements.append(
+                    {
+                        "gameweek": week,
+                        "player_code": code,
+                        "fixture": next(iter(local)),
+                        "reason": "count_award_disagreement",
+                    }
+                )
+        rows.extend(player_rows)
+    return ParsedHistory(
+        tuple(rows), tuple(sorted(unmapped)), crosschecks, tuple(excluded), tuple(disagreements)
+    )
 
 
 def candidate_handoff(
@@ -301,6 +353,8 @@ def candidate_handoff(
     required = frozenset(
         positions[code] for code in codes if positions[code] != "GK" and counts[code]
     )
+    if required and base.appearance_probability is None:
+        raise DefconMissingInputs("The legacy handoff has no published appearance mapping.")
     histories = [
         history_week(
             snapshot,
@@ -373,6 +427,17 @@ def candidate_handoff(
                     for w, h in zip(range(1, base.gameweek), histories, strict=True)
                 },
                 "development_schema_crosschecks": sum(h.schema_crosschecks for h in histories),
+                "excluded_fit_rows": [row for h in histories for row in h.excluded_rows],
+                "development_schema_disagreements": [
+                    row for h in histories for row in h.schema_disagreements
+                ],
+                "zero_term_player_codes": sorted(
+                    code
+                    for code in codes
+                    if positions[code] != "GK"
+                    and counts[code]
+                    and code not in (base.appearance_probability or {})
+                ),
             },
         },
     )

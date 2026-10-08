@@ -192,13 +192,18 @@ def summarize(
         "excluded_rank_groups": excluded,
         "defcon_by_position": diagnostics,
         "prior_minutes_buckets": buckets,
-        "constants": {
-            "prior_fixture_appearances": 20,
-            "bootstrap_draws": BOOTSTRAP_DRAWS,
-            "bootstrap_seed": BOOTSTRAP_SEED,
-            "quantile_method": "linear",
-            "rank_boundary": RANK_BOUNDARY,
-            "minimum_weeks": MINIMUM_WEEKS,
-            "gameweek_weights": "equal",
-        },
+        "constants": reading_constants(),
+    }
+
+
+def reading_constants() -> dict[str, Any]:
+    """Keep constants available even if the numerical summary cannot complete."""
+    return {
+        "prior_fixture_appearances": 20,
+        "bootstrap_draws": BOOTSTRAP_DRAWS,
+        "bootstrap_seed": BOOTSTRAP_SEED,
+        "quantile_method": "linear",
+        "rank_boundary": RANK_BOUNDARY,
+        "minimum_weeks": MINIMUM_WEEKS,
+        "gameweek_weights": "equal",
     }
