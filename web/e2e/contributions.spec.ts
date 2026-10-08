@@ -2,14 +2,30 @@ import { expect, test } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
 for (const language of ["tr", "en"] as const) {
-  test(`mobile moderated contribution journey (${language})`, async ({ page }, testInfo) => {
+  test(`an origin-less build hides Contribute (${language})`, async ({ page }) => {
+    test.skip(!!process.env.VITE_ADVICE_API_ORIGIN, "The build has an advice origin");
     const tr = language === "tr";
-    let posts = 0;
     let requests = 0;
     await page.setViewportSize({ width: 375, height: 812 });
     await page.addInitScript((lang) => localStorage.setItem("squadopt.language", lang), language);
     await page.route("**/api/v1/contributions**", async (route) => {
       requests++;
+      await route.fulfill({ json: { comments: [] } });
+    });
+    await page.goto("/contribute");
+    await expect(
+      page.getByText(tr ? "Burada bir sayfa yok." : "There is no page here.", { exact: true }),
+    ).toBeVisible();
+    await expect(page.locator('#sidebar a[href="/contribute"]')).toHaveCount(0);
+    expect(requests).toBe(0);
+  });
+  test(`mobile moderated contribution journey (${language})`, async ({ page }, testInfo) => {
+    test.skip(!process.env.VITE_ADVICE_API_ORIGIN, "API build required");
+    const tr = language === "tr";
+    let posts = 0;
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.addInitScript((lang) => localStorage.setItem("squadopt.language", lang), language);
+    await page.route("**/api/v1/contributions**", async (route) => {
       const request = route.request();
       if (request.method() === "POST") {
         posts++;
@@ -30,14 +46,6 @@ for (const language of ["tr", "en"] as const) {
       });
     });
     await page.goto("/contribute");
-    if (!process.env.VITE_ADVICE_API_ORIGIN) {
-      await expect(
-        page.getByText(tr ? "Burada bir sayfa yok." : "There is no page here.", { exact: true }),
-      ).toBeVisible();
-      await expect(page.locator('#sidebar a[href="/contribute"]')).toHaveCount(0);
-      expect(requests).toBe(0);
-      return;
-    }
     await expect(
       page.getByRole("combobox", { name: tr ? "Pozisyon" : "Position", exact: true }),
     ).toBeDisabled();
