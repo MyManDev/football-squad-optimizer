@@ -7,9 +7,14 @@ or live store is touched.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
+import re
+import shutil
 import subprocess
+from collections.abc import Callable, Sequence
+from dataclasses import replace
 from datetime import timedelta
 from pathlib import Path
 from types import SimpleNamespace
@@ -18,7 +23,9 @@ from typing import Any
 import pytest
 from scripts import measure_planner_policy_chain as chain
 from scripts import score_planner_policy_chain as scorer
+from tests.unit.test_live_transfers import CHIPS, _game_config
 from tests.unit.test_planner_policy_chain import (
+    POSITIONS,
     SQUAD,
     T0,
     _chain_world,
@@ -40,6 +47,36 @@ ROSTER = (*SQUAD, 16, 17)
 CAPTAINS = {"served": 8, "hold": 10, "one_week": 11}
 #: Realized points: the served captain scores ten, hold's captain two, one_week's one.
 POINTS = {player: 2 for player in ROSTER} | {8: 10, 10: 2, 11: 1}
+#: The game's position codes in a bootstrap's elements.
+ELEMENT_TYPES = {"GK": 1, "DEF": 2, "MID": 3, "FWD": 4}
+#: Every outcome capture prices each player two tenths above the price the chains bought him at
+#: (rule 10), so under the captured fee of 0.5 a sale keeps one tenth of the rise (rule 18).
+RISE = 2
+#: The frozen commit the synthetic chain was decided from, as the operator posts it (rule 24).
+FROZEN = "b" * 40
+#: Rule 3: what the runner records at the frozen commit, as the chain's protocol.json carries it.
+IDENTITY: dict[str, object] = {
+    "protocol": scorer.PROTOCOL_ID,
+    "repository_commit": FROZEN,
+    "protocol_sha256": "1" * 64,
+    "runner_sha256": "2" * 64,
+    "binding_commits": {
+        "protocol": {
+            "commit": "a" * 40,
+            "committed_utc": "2026-10-06T12:00:00+00:00",
+            "line_position": "1",
+        },
+        "runner": {
+            "commit": FROZEN,
+            "committed_utc": "2026-10-08T09:00:00+00:00",
+            "line_position": "2",
+        },
+    },
+}
+#: The receipts file each world writes beside its evidence, as the operator transcribes it.
+RECEIPTS = "receipts.json"
+#: The line the runner prints for each week it decides, which the operator posts (rule 24).
+DECIDED = re.compile(r"GW(\d{2}) decided from .+; manifest sha256 ([0-9a-f]{64})")
 
 
 def _lineup(captain: int) -> dict[str, object]:
@@ -72,8 +109,32 @@ def _bootstrap(settled_through: int) -> bytes:
         }
         for gameweek in range(1, 39)
     ]
-    elements = [{"id": player + 100, "code": player, "now_cost": 50 + player} for player in ROSTER]
-    return json.dumps({"events": events, "elements": elements}).encode("utf-8")
+    # A whole roster, as a capture's bootstrap carries it: names, clubs, positions, prices and
+    # availability, so every reader of a capture reads these as it reads a real one.
+    elements = [
+        {
+            "id": player + 100,
+            "code": player,
+            "first_name": "Player",
+            "second_name": str(player),
+            "team": 1 + player % 5,
+            "element_type": ELEMENT_TYPES[POSITIONS[player]],
+            "now_cost": 50 + player + RISE,
+            "status": "a",
+            "chance_of_playing_next_round": None,
+            "news_added": None,
+        }
+        for player in ROSTER
+    ]
+    teams = [{"id": team, "name": f"Club {team}"} for team in range(1, 6)]
+    document = {
+        "events": events,
+        "teams": teams,
+        "elements": elements,
+        "game_config": _game_config(),
+        "chips": CHIPS,
+    }
+    return json.dumps(document).encode("utf-8")
 
 
 def _live(points: dict[int, int]) -> bytes:
@@ -122,6 +183,54 @@ def _arm_outcome(
     return outcome
 
 
+def _post(receipts: Path, lines: Sequence[str]) -> None:
+    """The operator's receipts (rule 24): the frozen commit, and each week's manifest sha256 as
+    the runner printed it, each named by the comment that carries it."""
+
+    manifests = {
+        f"gw{week}": {"sha256": digest, "posted": f"issuecomment-{week}"}
+        for line in lines
+        if (match := DECIDED.fullmatch(line))
+        for week, digest in [match.groups()]
+    }
+    document = {
+        "tracking_issue": "https://github.com/MyManDev/football-squad-optimizer/issues/1",
+        "frozen_commit": {"commit": FROZEN, "posted": "issuecomment-0"},
+        "manifests": manifests,
+    }
+    receipts.write_text(json.dumps(document), encoding="utf-8")
+
+
+def _rewrite(path: Path, change: Callable[[dict[str, Any]], object]) -> None:
+    document = json.loads(path.read_text(encoding="utf-8"))
+    change(document)
+    path.write_text(json.dumps(document), encoding="utf-8")
+
+
+def _repost(receipts: Path, evidence: Path, gameweek: int) -> None:
+    """Post a week's manifest sha256 again, as the manifest now stands on disk."""
+
+    name = f"gw{gameweek:02d}"
+    digest = hashlib.sha256((evidence / name / "manifest.json").read_bytes()).hexdigest()
+    _rewrite(receipts, lambda document: document["manifests"][name].update(sha256=digest))
+
+
+def _reseal(evidence: Path, gameweek: int) -> None:
+    """Rewrite a week's manifest over its files as they now stand, as a runner that wrote those
+    files would have: each listed record's digest and the week's evidence_digest."""
+
+    directory = evidence / f"gw{gameweek:02d}"
+
+    def seal(manifest: dict[str, Any]) -> None:
+        manifest["records"] = {
+            name: hashlib.sha256((directory / name).read_bytes()).hexdigest()
+            for name in manifest["records"]
+        }
+        manifest["evidence_digest"] = scorer.evidence_digest(directory)
+
+    _rewrite(directory / "manifest.json", seal)
+
+
 def _world(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -131,15 +240,25 @@ def _world(
     truncated_in: tuple[int, ...] = (),
     failing: tuple[tuple[str, int], ...] = (),
 ) -> tuple[Path, Path, Path]:
-    """A decided chain from GW6 through ``through``: served arms pay one transfer a week."""
+    """A decided chain from GW6 through ``through``: served arms pay one transfer a week.
+
+    The runner starts the chain before GW21's deadline, as rule 40 requires, and decides any
+    later week in a second run. The operator posts the frozen commit and every manifest sha256
+    the runner prints, written to ``tmp_path / RECEIPTS`` (rule 24).
+    """
 
     weeks: dict[int, object] = {}
     for gameweek in range(6, through + 1):
         if gameweek in missing:
             weeks[gameweek] = ("no_artifact", {"snapshot_id": None, "reason": "no_artifact"})
         else:
-            weeks[gameweek] = _week(gameweek)
+            decided = _week(gameweek)
+            # Rule 36: a decided week's receipt carries the deadline its capture states.
+            weeks[gameweek] = replace(
+                decided, receipt={**decided.receipt, "deadline_utc": _stamp(_deadline(gameweek))}
+            )
     evidence, _ = _chain_world(tmp_path, monkeypatch, weeks)
+    monkeypatch.setattr(chain, "source_identity", lambda: dict(IDENTITY))
     states = {f"p{budget}": _state(decided=5) for budget, _, _ in chain.PROFILES}
     for state in states.values():
         object.__setattr__(state, "lineup", _lineup(CAPTAINS["hold"]))
@@ -161,22 +280,26 @@ def _world(
     snapshots, artifacts = tmp_path / "snapshots", tmp_path / "football"
     (artifacts / "football").mkdir(parents=True)
     snapshots.mkdir()
-    chain.decide(
-        snapshots,
-        artifacts,
-        evidence,
-        through,
-        "issuecomment-1",
-        now=_deadline(through) + timedelta(hours=1),
-    )
+    printed: list[str] = []
+    for last in sorted({min(through, 20), through}):
+        chain.decide(
+            snapshots,
+            artifacts,
+            evidence,
+            last,
+            "issuecomment-1",
+            now=_deadline(last) + timedelta(hours=1),
+            emit=printed.append,
+        )
+    _post(tmp_path / RECEIPTS, printed)
     for gameweek in range(6, through + 1):
         _outcome_capture(snapshots, gameweek)
     return evidence, snapshots, tmp_path / "records"
 
 
 def _identity(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The scorer's identity, its checks for a reading taken already and origin's release tags,
-    stubbed: no git runs."""
+    """The scorer's identity, its checks for a reading taken already, origin's release tags and
+    the frozen source, stubbed: no git runs."""
 
     monkeypatch.setattr(
         scorer,
@@ -186,13 +309,15 @@ def _identity(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(scorer, "committed_reading", lambda reading: None)
     monkeypatch.setattr(scorer, "written_reading", lambda reading: None)
     monkeypatch.setattr(scorer, "release_tags", lambda: ())
+    # The frozen source is read again from git at the frozen commit; that has its own tests.
+    monkeypatch.setattr(scorer, "check_frozen_source", lambda protocol, **roots: None)
     monkeypatch.setattr(
         scorer,
         "release_binding",
         lambda deadline, frozen, tags: {
             "release_tag": "site-2026-27-gw06-fix16",
             "planner_source_same": True,
-            "binding_source_same": frozen == "b",
+            "binding_source_same": frozen == FROZEN,
         },
     )
 
@@ -207,7 +332,14 @@ def test_the_interim_reading_scores_every_week_and_pairs_the_arms(
     _identity(monkeypatch)
     index = tmp_path / "index.md"
     index.write_text("# Measurements Index\n\n- [other](x.json): a row.\n", encoding="utf-8")
-    record = scorer.score(evidence, snapshots, "gw20", records_dir=records, index_file=index)
+    record = scorer.score(
+        evidence,
+        snapshots,
+        "gw20",
+        receipts=tmp_path / RECEIPTS,
+        records_dir=records,
+        index_file=index,
+    )
     assert record["final"] is False and record["outcome_read"] is True
     assert record["locked_holdout_accessed"] is False
     assert record["once_rule"] == scorer.ONCE_RULE
@@ -281,22 +413,39 @@ def test_a_held_or_blocked_chain_scores_nothing_even_with_a_lineup_on_record() -
     assert scored is not None and scored.hits == 4.0 and scored.net == scored.gross - 4.0
 
 
-def test_a_record_that_changed_under_its_own_digest_is_refused_without_a_week_digest(
+def test_a_week_without_its_digest_is_refused_and_each_record_is_held_to_its_own(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Rule 36: each record is held to the digest its manifest lists, with or without the
-    week digest the runner adds."""
+    """Rule 36: the runner always writes a week's evidence_digest, so a manifest without one is
+    refused, and each record is held to the digest its manifest lists even where the week's
+    digest and the posted receipt agree with the files."""
 
     evidence, _, _ = _world(tmp_path, monkeypatch, through=6)
+    receipts = tmp_path / RECEIPTS
     manifest_path = evidence / "gw06" / "manifest.json"
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    manifest.pop("evidence_digest", None)
-    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
-    scorer.read_evidence(evidence, 6)
-    path = next((evidence / "gw06").glob("p1000-*.json"))
+    pristine = manifest_path.read_bytes()
+    _rewrite(manifest_path, lambda manifest: manifest.pop("evidence_digest"))
+    _repost(receipts, evidence, 6)
+    with pytest.raises(scorer.ScorerError, match="records no evidence_digest"):
+        scorer.read_evidence(evidence, 6, scorer.read_receipts(receipts))
+    manifest_path.write_bytes(pristine)
+    _repost(receipts, evidence, 6)
+    scorer.read_evidence(evidence, 6, scorer.read_receipts(receipts))
+    path = evidence / "gw06" / "p1000-served_3.json"
     path.write_text(path.read_text(encoding="utf-8") + " ", encoding="utf-8")
+    digest = scorer.evidence_digest(evidence / "gw06")
+    _rewrite(manifest_path, lambda manifest: manifest.update(evidence_digest=digest))
+    _repost(receipts, evidence, 6)
     with pytest.raises(scorer.ScorerError, match="does not match the digest"):
-        scorer.read_evidence(evidence, 6)
+        scorer.read_evidence(evidence, 6, scorer.read_receipts(receipts))
+
+    # A week's files that cannot be read are a refusal, never a traceback.
+    def unreadable(directory: Path) -> str:
+        raise PermissionError(f"{directory.name} cannot be opened")
+
+    monkeypatch.setattr(scorer, "evidence_digest", unreadable)
+    with pytest.raises(scorer.ScorerError, match="GW06: the week's evidence cannot be read"):
+        scorer.read_evidence(evidence, 6, scorer.read_receipts(receipts))
 
 
 def test_hits_are_charged_at_four_per_paid_transfer_from_the_played_week() -> None:
@@ -319,7 +468,12 @@ def test_a_failed_arm_is_scored_on_its_held_team_and_the_pair_is_also_reported_w
     evidence, snapshots, records = _world(tmp_path, monkeypatch, failing=(("hold_3", 7),))
     _identity(monkeypatch)
     record = scorer.score(
-        evidence, snapshots, "gw20", records_dir=records, index_file=tmp_path / "index.md"
+        evidence,
+        snapshots,
+        "gw20",
+        receipts=tmp_path / RECEIPTS,
+        records_dir=records,
+        index_file=tmp_path / "index.md",
     )
     primary = record["contrasts"]["A"]["primary"]
     without = record["contrasts"]["A"]["without_failed_weeks"]
@@ -339,7 +493,12 @@ def test_a_missing_week_is_not_scored_and_a_truncated_week_enters_no_primary(
     evidence, snapshots, records = _world(tmp_path, monkeypatch, missing=(8,), truncated_in=(9,))
     _identity(monkeypatch)
     record = scorer.score(
-        evidence, snapshots, "gw20", records_dir=records, index_file=tmp_path / "index.md"
+        evidence,
+        snapshots,
+        "gw20",
+        receipts=tmp_path / RECEIPTS,
+        records_dir=records,
+        index_file=tmp_path / "index.md",
     )
     week8 = next(week for week in record["weeks"] if week["gameweek"] == 8)
     assert week8["missing_reason"] == "no_artifact" and week8["scored_chains"] == 0
@@ -363,20 +522,21 @@ def test_exact_zero_pairs_are_counted_when_both_arms_played_the_same_team(
         document["advice"] = _lineup(CAPTAINS["served"])
         document["plan"]["weeks"][0]["paid_transfer_count"] = 0
         path.write_text(json.dumps(document), encoding="utf-8")
-    manifest_path = evidence / "gw06" / "manifest.json"
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    manifest["records"] = {
-        name: scorer.hashlib.sha256((evidence / "gw06" / name).read_bytes()).hexdigest()
-        for name in manifest["records"]
-    }
-    manifest["evidence_digest"] = scorer.evidence_digest(evidence / "gw06")
-    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    _reseal(evidence, 6)
+    _repost(tmp_path / RECEIPTS, evidence, 6)
     # The reading waits for GW20 in some capture.
     _outcome_capture(snapshots, 20, settled_through=20, live=False)
     read = scorer.read_evidence
-    monkeypatch.setattr(scorer, "read_evidence", lambda root, through: read(root, 6))
+    monkeypatch.setattr(
+        scorer, "read_evidence", lambda root, through, posted: read(root, 6, posted)
+    )
     record = scorer.score(
-        evidence, snapshots, "gw20", records_dir=records, index_file=tmp_path / "index.md"
+        evidence,
+        snapshots,
+        "gw20",
+        receipts=tmp_path / RECEIPTS,
+        records_dir=records,
+        index_file=tmp_path / "index.md",
     )
     primary = record["contrasts"]["A"]["primary"]
     assert primary["pairs"] == 6 and primary["exact_zero_pairs"] == 6
@@ -391,28 +551,32 @@ def test_the_reading_refuses_what_the_protocol_refuses(
 ) -> None:
     evidence, snapshots, records = _world(tmp_path, monkeypatch, through=10)
     _identity(monkeypatch)
-    index = tmp_path / "index.md"
+    paths = {
+        "receipts": tmp_path / RECEIPTS,
+        "records_dir": records,
+        "index_file": tmp_path / "index.md",
+    }
     with pytest.raises(scorer.ScorerError, match="names no reading"):
-        scorer.score(evidence, snapshots, "gw19", records_dir=records, index_file=index)
+        scorer.score(evidence, snapshots, "gw19", **paths)
     # GW20 has not settled: the captures reach GW10 only.
     with pytest.raises(scorer.ScorerError, match="has not settled"):
-        scorer.score(evidence, snapshots, "gw20", records_dir=records, index_file=index)
+        scorer.score(evidence, snapshots, "gw20", **paths)
     _outcome_capture(snapshots, 20, settled_through=20, live=False)
     # GW11 is not decided yet.
     with pytest.raises(scorer.ScorerError, match="GW11 is not decided"):
-        scorer.score(evidence, snapshots, "gw20", records_dir=records, index_file=index)
-    assert not records.exists() and not index.exists()
+        scorer.score(evidence, snapshots, "gw20", **paths)
+    assert not records.exists() and not paths["index_file"].exists()
     # A reading taken already is refused by name.
     records.mkdir()
     (records / "planner_policy_chain_gw20.json").write_text("{}", encoding="utf-8")
     with pytest.raises(scorer.ScorerError, match="taken already"):
-        scorer.score(evidence, snapshots, "gw20", records_dir=records, index_file=index)
+        scorer.score(evidence, snapshots, "gw20", **paths)
     (records / "planner_policy_chain_gw20.json").unlink()
     # Evidence that changed under its manifest is refused.
     path = next((evidence / "gw07").glob("p1000-*.json"))
     path.write_text(path.read_text(encoding="utf-8") + " ", encoding="utf-8")
     with pytest.raises(scorer.ScorerError, match=r"no longer match|does not match"):
-        scorer.read_evidence(evidence, 10)
+        scorer.read_evidence(evidence, 10, scorer.read_receipts(paths["receipts"]))
 
 
 def test_the_scorer_runs_only_from_its_own_merge_commit_on_a_clean_tree(
@@ -597,6 +761,7 @@ def test_a_reading_committed_after_the_merge_is_refused_as_taken_twice(
     checkout = _checkout(tmp_path, squash, monkeypatch)
     read: list[Path] = []
     monkeypatch.setattr(scorer, "_captures", lambda root: read.append(root) or [])
+    monkeypatch.setattr(scorer, "read_receipts", lambda path: {})
     records, index = checkout / "docs" / "research", checkout / "docs" / "measurements_index.md"
 
     def take(reading: str) -> None:
@@ -604,6 +769,7 @@ def test_a_reading_committed_after_the_merge_is_refused_as_taken_twice(
             tmp_path / "evidence",
             tmp_path / "snapshots",
             reading,
+            receipts=tmp_path / RECEIPTS,
             records_dir=records,
             index_file=index,
         )
@@ -663,11 +829,13 @@ def test_a_reading_written_in_another_worktree_is_refused_as_taken_twice(
     checkout = _checkout(tmp_path, squash, monkeypatch)
     read: list[Path] = []
     monkeypatch.setattr(scorer, "_captures", lambda root: read.append(root) or [])
+    monkeypatch.setattr(scorer, "read_receipts", lambda path: {})
     other = tmp_path / "other"
     _git_in(checkout, "worktree", "add", "--detach", str(other), squash)
     twin = other / "docs" / "research" / "planner_policy_chain_gw20.md"
     twin.write_text("# gw20\n", encoding="utf-8")
     paths = {
+        "receipts": tmp_path / RECEIPTS,
         "records_dir": checkout / "docs" / "research",
         "index_file": checkout / "docs" / "measurements_index.md",
     }
@@ -684,8 +852,9 @@ def test_a_reading_written_in_another_worktree_is_refused_as_taken_twice(
 def test_no_capture_is_read_before_the_refusals_that_need_no_outcome(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Rule 28: the reading's record in committed history, its record in another worktree and
-    origin's release tags are checked before the first capture is read, in that order."""
+    """Rules 24 and 28: the reading's record in committed history, its record in another
+    worktree, origin's release tags and the receipts file are checked before the first capture
+    is read, in that order."""
 
     read: list[Path] = []
     monkeypatch.setattr(scorer, "_captures", lambda root: read.append(root) or [])
@@ -695,7 +864,11 @@ def test_no_capture_is_read_before_the_refusals_that_need_no_outcome(
         raise scorer.ScorerError("a release tag differs from origin's")
 
     monkeypatch.setattr(scorer, "release_tags", tags_refused)
-    paths = {"records_dir": tmp_path / "records", "index_file": tmp_path / "index.md"}
+    paths = {
+        "receipts": tmp_path / RECEIPTS,
+        "records_dir": tmp_path / "records",
+        "index_file": tmp_path / "index.md",
+    }
     monkeypatch.setattr(scorer, "committed_reading", lambda reading: "a" * 40)
     monkeypatch.setattr(scorer, "written_reading", lambda reading: "elsewhere.md")
     with pytest.raises(scorer.ScorerError, match=r"committed history at a{40}"):
@@ -705,6 +878,10 @@ def test_no_capture_is_read_before_the_refusals_that_need_no_outcome(
         scorer.score(tmp_path, tmp_path, "gw20", **paths)
     monkeypatch.setattr(scorer, "written_reading", lambda reading: None)
     with pytest.raises(scorer.ScorerError, match="differs from origin's"):
+        scorer.score(tmp_path, tmp_path, "gw20", **paths)
+    # Rule 24: no receipts file has been transcribed, so the reading stops before any capture.
+    monkeypatch.setattr(scorer, "release_tags", lambda: ())
+    with pytest.raises(scorer.ScorerError, match=r"receipts file .* cannot be read"):
         scorer.score(tmp_path, tmp_path, "gw20", **paths)
     assert read == [] and not (tmp_path / "records").exists()
 
@@ -919,7 +1096,22 @@ def test_the_command_line_refuses_with_a_reason_and_names_only_the_two_readings(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     _identity(monkeypatch)
-    arguments = ["--evidence", str(tmp_path), "--snapshot-root", str(tmp_path), "--reading"]
+    # Rule 24: no reading is taken without the receipts posted on the tracking issue.
+    with pytest.raises(SystemExit) as unreceipted:
+        scorer.main(
+            ["--evidence", str(tmp_path), "--snapshot-root", str(tmp_path), "--reading", "gw20"]
+        )
+    assert unreceipted.value.code == 2
+    assert "required: --receipts" in capsys.readouterr().err
+    arguments = [
+        "--evidence",
+        str(tmp_path),
+        "--snapshot-root",
+        str(tmp_path),
+        "--receipts",
+        str(tmp_path / RECEIPTS),
+        "--reading",
+    ]
     with pytest.raises(SystemExit) as refused:
         scorer.main([*arguments, "gw19"])
     assert refused.value.code == 2
@@ -934,3 +1126,591 @@ def test_the_command_line_refuses_with_a_reason_and_names_only_the_two_readings(
     code = scorer.main([*arguments, "gw20"])
     assert code == 2 and "refused:" in capsys.readouterr().err
     assert not (tmp_path / "elsewhere").exists()
+
+
+# Rule 24: the receipts posted on the tracking issue, and rules 2 and 3: the frozen source
+
+
+def test_the_scorer_names_what_it_reads_as_the_runner_wrote_it() -> None:
+    """The scorer restates the runner's names for its files, squads, arms and capture set, and
+    reads nothing under any other name."""
+
+    assert (scorer.PROTOCOL_FILE, scorer.RUNNER_FILE) == (chain.PROTOCOL_FILE, chain.RUNNER_FILE)
+    assert (scorer.PROTOCOL_ID, scorer.SEASON) == (chain.PROTOCOL_ID, chain.SEASON)
+    runner_profiles = tuple(f"p{budget}" for budget, _, _ in chain.PROFILES)
+    assert runner_profiles == scorer.PROFILES
+    assert scorer.ARMS == chain.ARMS
+    assert scorer.SEASON_OPENS == chain.SEASON_OPENS
+    assert scorer.CAPTURE_INSTANT.pattern == chain.CAPTURE_INSTANT.pattern
+
+
+def test_the_receipts_file_is_refused_unless_every_value_is_whole_and_names_its_comment(
+    tmp_path: Path,
+) -> None:
+    """Rule 24: the receipts are the operator's transcription of what the tracking issue
+    carries, so each value must be whole, given once and tied to the comment that posted it."""
+
+    receipts = tmp_path / RECEIPTS
+    with pytest.raises(scorer.ScorerError, match="cannot be read"):
+        scorer.read_receipts(receipts)
+    whole = {
+        "tracking_issue": "https://github.com/MyManDev/football-squad-optimizer/issues/1",
+        "frozen_commit": {"commit": FROZEN, "posted": "issuecomment-0"},
+        "manifests": {"gw06": {"sha256": "e" * 64, "posted": "issuecomment-6"}},
+    }
+    receipts.write_text(json.dumps(whole), encoding="utf-8")
+    assert scorer.read_receipts(receipts) == {
+        **whole,
+        "file_sha256": hashlib.sha256(receipts.read_bytes()).hexdigest(),
+    }
+    # As Windows PowerShell 5.1 writes UTF-8: a byte order mark first, hashed with the rest.
+    marked = b"\xef\xbb\xbf" + json.dumps(whole).encode("utf-8")
+    receipts.write_bytes(marked)
+    assert scorer.read_receipts(receipts) == {
+        **whole,
+        "file_sha256": hashlib.sha256(marked).hexdigest(),
+    }
+    again = '"manifests": {"gw06": {"sha256": "' + "f" * 64 + '", "posted": "q"}, '
+    receipts.write_text(json.dumps(whole).replace('"manifests": {', again, 1), encoding="utf-8")
+    with pytest.raises(scorer.ScorerError, match="more than once"):
+        scorer.read_receipts(receipts)
+    for broken, message in (
+        ({**whole, "frozen_commit": {"commit": FROZEN[:12], "posted": "p"}}, "no full commit"),
+        ({**whole, "manifests": {"gw06": {"sha256": "e" * 63, "posted": "p"}}}, "no full sha256"),
+        ({**whole, "manifests": {"gw06": {"sha256": "e" * 64, "posted": " "}}}, "comment"),
+        ({**whole, "manifests": {"gw6": {"sha256": "e" * 64, "posted": "p"}}}, "no gameweek"),
+        ({**whole, "manifests": {"gw39": {"sha256": "e" * 64, "posted": "p"}}}, "no gameweek"),
+        ({**whole, "manifests": {"gw06": {"sha256": "e" * 64}}}, "exactly 'sha256'"),
+        (
+            {**whole, "manifests": {"gw06": {"sha256": "e" * 64, "posted": "p", "note": "n"}}},
+            "exactly 'sha256'",
+        ),
+        ({**whole, "frozen_commit": {"commit": FROZEN}}, "exactly 'commit'"),
+        ({**whole, "manifests": []}, "must map each gwNN"),
+        ({key: value for key, value in whole.items() if key != "tracking_issue"}, "exactly"),
+        ({**whole, "tracking_issue": " "}, "does not name the chain's tracking issue"),
+    ):
+        receipts.write_text(json.dumps(broken), encoding="utf-8")
+        with pytest.raises(scorer.ScorerError, match=message):
+            scorer.read_receipts(receipts)
+
+
+def _protocol(change: Callable[[dict[str, Any]], object]) -> Callable[[Path, Path], None]:
+    def tamper(evidence: Path, receipts: Path) -> None:
+        _rewrite(evidence / "protocol.json", change)
+
+    return tamper
+
+
+def _start_at_gw07(evidence: Path, receipts: Path) -> None:
+    _rewrite(evidence / "protocol.json", lambda p: p.update(bound_week=7, first_chain_week=7))
+
+
+def _start_at_gw07_without_gw06(evidence: Path, receipts: Path) -> None:
+    _start_at_gw07(evidence, receipts)
+    shutil.rmtree(evidence / "gw06")
+
+
+def _start_at_gw07_unposted(evidence: Path, receipts: Path) -> None:
+    # Every trace of GW06 removed, its receipt too: GW07's arms still hold diverged states.
+    _start_at_gw07_without_gw06(evidence, receipts)
+    _rewrite(receipts, lambda document: document["manifests"].pop("gw06"))
+
+
+def _record_rewritten_with_its_manifest(evidence: Path, receipts: Path) -> None:
+    _rewrite(evidence / "gw07" / "p1000-served_3.json", lambda r: r["advice"].update(captain=11))
+    _reseal(evidence, 7)
+
+
+def _receipt_not_posted(evidence: Path, receipts: Path) -> None:
+    _rewrite(receipts, lambda document: document["manifests"].pop("gw07"))
+
+
+def _chain_unlisted(evidence: Path, receipts: Path) -> None:
+    manifest = evidence / "gw07" / "manifest.json"
+    _rewrite(manifest, lambda document: document["records"].pop("p900-one_week.json"))
+    _repost(receipts, evidence, 7)
+
+
+def _record_deleted(evidence: Path, receipts: Path) -> None:
+    (evidence / "gw07" / "p900-one_week.json").unlink()
+    digest = scorer.evidence_digest(evidence / "gw07")
+    _rewrite(evidence / "gw07" / "manifest.json", lambda m: m.update(evidence_digest=digest))
+    _repost(receipts, evidence, 7)
+
+
+def _record_added(evidence: Path, receipts: Path) -> None:
+    week = evidence / "gw07"
+    shutil.copyfile(week / "p900-one_week.json", week / "p900-hold_4.json")
+    digest = scorer.evidence_digest(week)
+    _rewrite(week / "manifest.json", lambda m: m.update(evidence_digest=digest))
+    _repost(receipts, evidence, 7)
+
+
+def _records_swapped(evidence: Path, receipts: Path) -> None:
+    served, hold = (evidence / "gw07" / f"p1000-{arm}.json" for arm in ("served_3", "hold_3"))
+    first, second = served.read_bytes(), hold.read_bytes()
+    served.write_bytes(second)
+    hold.write_bytes(first)
+    _reseal(evidence, 7)
+    _repost(receipts, evidence, 7)
+
+
+def _decided_elsewhere(evidence: Path, receipts: Path) -> None:
+    _rewrite(
+        evidence / "gw07" / "p950-hold_5.json",
+        lambda record: record["provenance"].update(repository_commit="c" * 40),
+    )
+    _reseal(evidence, 7)
+    _repost(receipts, evidence, 7)
+
+
+def _receipt_rewritten(evidence: Path, receipts: Path) -> None:
+    # No record digest covers the receipt; only the week's evidence_digest does.
+    _rewrite(evidence / "gw07" / "receipt.json", lambda receipt: receipt.update(model_version="x"))
+
+
+def _receipt_of_another_week(evidence: Path, receipts: Path) -> None:
+    _rewrite(evidence / "gw07" / "receipt.json", lambda receipt: receipt.update(gameweek=8))
+    _reseal(evidence, 7)
+    _repost(receipts, evidence, 7)
+
+
+def _manifest_of_another_season(evidence: Path, receipts: Path) -> None:
+    _rewrite(evidence / "gw07" / "manifest.json", lambda manifest: manifest.update(season="x"))
+    _repost(receipts, evidence, 7)
+
+
+def _record_of_another_protocol(evidence: Path, receipts: Path) -> None:
+    _rewrite(evidence / "gw07" / "p1000-hold_3.json", lambda record: record.update(protocol="x"))
+    _reseal(evidence, 7)
+    _repost(receipts, evidence, 7)
+
+
+def _record_of_another_week(evidence: Path, receipts: Path) -> None:
+    # GW06's record of the same chain, sealed and posted under GW07.
+    name = "p1000-served_3.json"
+    shutil.copyfile(evidence / "gw06" / name, evidence / "gw07" / name)
+    _reseal(evidence, 7)
+    _repost(receipts, evidence, 7)
+
+
+def _record_unreadable(evidence: Path, receipts: Path) -> None:
+    # A record that is no JSON object, sealed and posted as it stands, is refused by name.
+    (evidence / "gw07" / "p950-served_5.json").write_text("[]", encoding="utf-8")
+    _reseal(evidence, 7)
+    _repost(receipts, evidence, 7)
+
+
+@pytest.mark.parametrize(
+    ("tamper", "message"),
+    [
+        (_protocol(lambda protocol: protocol.pop("protocol")), "not this protocol's"),
+        (
+            _protocol(lambda protocol: protocol.update(repository_commit="c" * 40)),
+            "names the frozen commit",
+        ),
+        (_protocol(lambda protocol: protocol.update(first_chain_week=7)), "does not follow"),
+        (_protocol(lambda protocol: protocol.update(bound_week=7)), "does not follow"),
+        (_protocol(lambda protocol: protocol.pop("first_chain_week")), "cannot state"),
+        (_start_at_gw07, r"\['gw06'\] lie before the first chain week"),
+        (_start_at_gw07_without_gw06, r"Receipts were posted for \['gw06'\]"),
+        (_start_at_gw07_unposted, "GW07 is not where squad p1000's chains start"),
+        (
+            _protocol(lambda protocol: protocol.update(dropped_profiles={"p900": "not proved"})),
+            "manifest's records are not the kept chains",
+        ),
+        (_protocol(lambda protocol: protocol.update(dropped_profiles={"p800": "x"})), "drops"),
+        (_record_rewritten_with_its_manifest, "not the one posted in issuecomment-07"),
+        (_receipt_not_posted, "GW07: no manifest sha256 was posted"),
+        (_chain_unlisted, r"manifest's records are not the kept chains: missing \['p900-one"),
+        (_record_deleted, r"records beside the manifest are not the kept chains: missing"),
+        (_record_added, r"records beside the manifest are not the kept chains: missing \[\], not"),
+        (_records_swapped, "not the chain and week its path names"),
+        (_record_of_another_week, r"records \('p1000', 'served_3', 6\), not the chain and week"),
+        (_decided_elsewhere, "not decided from the frozen commit"),
+        (_receipt_rewritten, "GW07: the week's files no longer match their manifest"),
+        (_receipt_of_another_week, r"receipt\.json names another gameweek"),
+        (_manifest_of_another_season, "names another gameweek, protocol or season"),
+        (_record_of_another_protocol, "p1000-hold_3.json is not this protocol's"),
+        (_record_unreadable, "p950-served_5.json is not a JSON object"),
+    ],
+)
+def test_evidence_that_its_receipts_or_its_protocol_record_do_not_vouch_for_is_refused(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    tamper: Callable[[Path, Path], None],
+    message: str,
+) -> None:
+    """Rules 3, 9, 10, 24 and 36: protocol.json names this protocol, the posted frozen commit
+    and a first chain week that follows its skipped weeks, where every arm of a squad starts
+    alike; each week's manifest is the one posted for it; and its records are exactly the kept
+    chains, each the chain and week its path names, each decided from the frozen commit. A
+    refusal is said as such, never as a traceback."""
+
+    evidence, _, _ = _world(tmp_path, monkeypatch, through=7)
+    receipts = tmp_path / RECEIPTS
+    scorer.read_evidence(evidence, 7, scorer.read_receipts(receipts))
+    tamper(evidence, receipts)
+    with pytest.raises(scorer.ScorerError, match=message):
+        scorer.read_evidence(evidence, 7, scorer.read_receipts(receipts))
+
+
+def test_the_frozen_source_is_read_again_from_git_at_the_frozen_commit(tmp_path: Path) -> None:
+    """Rule 3: protocol.json's sha256 of the protocol and of the runner, and the merges that
+    bound the chain, are what git holds at the frozen commit, read with the runner's own rule;
+    a later commit on the line is no frozen source."""
+
+    work = tmp_path / "work"
+    _git_in(tmp_path, "init", "-q", "-b", "develop", str(work))
+    # Committed at +03:00: the binding commits' instants are read in UTC, as the runner reads them.
+    _commit(work, {scorer.PROTOCOL_FILE: "protocol"}, "the protocol", "2026-10-06T15:00:00+03:00")
+    frozen = _commit(
+        work, {scorer.RUNNER_FILE: "runner"}, "the runner", "2026-10-08T12:00:00+03:00"
+    )
+    commits = chain.binding_commits(root=work)
+    assert chain.frozen_commit(commits) == frozen
+    assert commits["runner"]["committed_utc"] == "2026-10-08T09:00:00+00:00"
+    later = _commit(
+        work, {scorer.RUNNER_FILE: "runner, changed later"}, "later", "2026-10-09T12:00:00+03:00"
+    )
+    protocol = {
+        "repository_commit": frozen,
+        "protocol_sha256": hashlib.sha256(b"protocol").hexdigest(),
+        "runner_sha256": hashlib.sha256(b"runner").hexdigest(),
+        "binding_commits": commits,
+    }
+    scorer.check_frozen_source(protocol, root=work)
+    changed_runner = hashlib.sha256(b"runner, changed later").hexdigest()
+    moved = {**commits, "protocol": {**commits["protocol"], "commit": frozen}}
+    for changed, message in (
+        ({"protocol_sha256": "0" * 64}, "protocol_sha256 is not"),
+        ({"runner_sha256": changed_runner}, "runner_sha256 is not"),
+        ({"binding_commits": moved}, "binding_commits are not"),
+        ({"repository_commit": "f" * 40}, "git cannot read the frozen commit f{40}"),
+        ({"repository_commit": frozen[:12]}, "no full frozen commit"),
+        ({"repository_commit": later, "runner_sha256": changed_runner}, "not the later"),
+    ):
+        with pytest.raises(scorer.ScorerError, match=message):
+            scorer.check_frozen_source({**protocol, **changed}, root=work)
+
+
+def test_a_chain_decided_from_the_runners_feature_commit_is_refused(tmp_path: Path) -> None:
+    """Rules 2 and 3: the frozen source is the runner's merge on develop's first-parent line.
+    The runner run from the feature commit that wrote it names that commit its own merge, and
+    git holds the same bytes there; the scorer, run from develop, still refuses it."""
+
+    work = tmp_path / "work"
+    _git_in(tmp_path, "init", "-q", "-b", "develop", str(work))
+    _commit(work, {scorer.PROTOCOL_FILE: "protocol"}, "the protocol", "2026-10-06T15:00:00+03:00")
+    _git_in(work, "switch", "-q", "-c", "runner")
+    feature = _commit(
+        work, {scorer.RUNNER_FILE: "runner"}, "the runner", "2026-10-06T16:00:00+03:00"
+    )
+    _git_in(work, "switch", "-q", "--detach", feature)
+    from_feature = chain.binding_commits(root=work)
+    _git_in(work, "switch", "-q", "develop")
+    _git_in(
+        work, "merge", "-q", "--no-ff", "-m", "merge", "runner", when="2026-10-06T16:41:00+03:00"
+    )
+    merged = _git_in(work, "rev-parse", "HEAD")
+    from_develop = chain.binding_commits(root=work)
+    assert chain.frozen_commit(from_feature) == feature != merged
+    assert chain.frozen_commit(from_develop) == merged
+    shared = {
+        "protocol_sha256": hashlib.sha256(b"protocol").hexdigest(),
+        "runner_sha256": hashlib.sha256(b"runner").hexdigest(),
+    }
+    scorer.check_frozen_source(
+        {**shared, "repository_commit": merged, "binding_commits": from_develop}, root=work
+    )
+    with pytest.raises(scorer.ScorerError, match="a feature commit is never the frozen source"):
+        scorer.check_frozen_source(
+            {**shared, "repository_commit": feature, "binding_commits": from_feature}, root=work
+        )
+
+
+def test_a_reading_refuses_a_frozen_source_git_does_not_hold_before_it_writes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Rule 3: the reading reads the frozen source again before anything is written."""
+
+    evidence, snapshots, records = _world(tmp_path, monkeypatch, through=6)
+    _identity(monkeypatch)
+    _outcome_capture(snapshots, 20, settled_through=20, live=False)
+    read = scorer.read_evidence
+    monkeypatch.setattr(
+        scorer, "read_evidence", lambda root, through, posted: read(root, 6, posted)
+    )
+    checked: list[object] = []
+
+    def differs(protocol: dict[str, Any], **roots: Any) -> None:
+        checked.append(protocol["repository_commit"])
+        raise scorer.ScorerError("protocol.json's runner_sha256 is not the sha256 of the runner")
+
+    monkeypatch.setattr(scorer, "check_frozen_source", differs)
+    index = tmp_path / "index.md"
+    with pytest.raises(scorer.ScorerError, match="runner_sha256"):
+        scorer.score(
+            evidence,
+            snapshots,
+            "gw20",
+            receipts=tmp_path / RECEIPTS,
+            records_dir=records,
+            index_file=index,
+        )
+    assert checked == [FROZEN] and not records.exists() and not index.exists()
+
+
+# Rule 26: the end state's sale value, and the capture set and deadline rule 25 reads
+
+
+def test_each_reading_names_its_receipts_and_prices_its_end_state_at_its_own_outcome_capture(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Rules 24 and 26: each reading lists the receipts it held its weeks to, and values each
+    arm's end state at its own gameweek's outcome capture, with that capture's sell-on fee.
+
+    One chain through GW38 serves both readings; each reads only its own weeks."""
+
+    evidence, snapshots, records = _world(tmp_path, monkeypatch, through=38)
+    _identity(monkeypatch)
+    receipts = tmp_path / RECEIPTS
+    index = tmp_path / "index.md"
+    interim = scorer.score(
+        evidence, snapshots, "gw20", receipts=receipts, records_dir=records, index_file=index
+    )
+    final = scorer.score(
+        evidence, snapshots, "gw38", receipts=receipts, records_dir=records, index_file=index
+    )
+    for record, last in ((interim, 20), (final, 38)):
+        assert record["frozen_source"]["checked"] == scorer.FROZEN_SOURCE_CHECK
+        assert record["outcome_captures"] == {"rule": scorer.CAPTURE_SET_RULE, "read": 33}
+        posted = record["receipts"]
+        assert posted["rule"] == scorer.RECEIPTS_RULE
+        assert posted["file_sha256"] == hashlib.sha256(receipts.read_bytes()).hexdigest()
+        assert posted["tracking_issue"].endswith("/issues/1")
+        assert posted["frozen_commit"] == {"commit": FROZEN, "posted": "issuecomment-0"}
+        assert sorted(posted["manifests"]) == [f"gw{week:02d}" for week in range(6, last + 1)]
+        assert posted["manifests"]["gw06"]["posted"] == "issuecomment-06"
+        assert all(week["deadline_source"] == "receipt" for week in record["weeks"])
+        assert record["weeks"][-1]["gameweek"] == last
+        end = record["totals"]["end_state_prices"]
+        assert end == {
+            "rule": scorer.END_PRICES_RULE,
+            "gameweek": last,
+            "outcome_capture": record["weeks"][-1]["outcome_capture"],
+            "sell_on_fee": 0.5,
+            "reason": None,
+            "unpriced_chains": [],
+        }
+        assert end["outcome_capture"] is not None
+        # Every arm holds the same squads, so each pair's sale difference is a number: zero.
+        for pair in record["totals"]["paired_differences"].values():
+            assert pair["sale_value_tenths_at_end"] == 0.0
+        twin = (records / f"planner_policy_chain_gw{last}.md").read_text(encoding="utf-8")
+        assert f"Sale values are at the prices in `{end['outcome_capture']}`" in twin
+        assert posted["file_sha256"] in twin and scorer.CAPTURE_SET_RULE in twin
+    # Each held player was bought at 50 + id and is priced at 52 + id, and a sale keeps half
+    # the rise, 51 + id: a squad of players 1 to 15 sells for 885 tenths, three squads an arm.
+    assert {
+        arm: totals["sale_value_tenths_at_end"] for arm, totals in final["totals"]["by_arm"].items()
+    } == dict.fromkeys(scorer.ARMS, 3 * 885.0)
+
+
+def test_without_its_own_outcome_capture_a_reading_states_no_sale_value_and_says_why(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Rules 25 and 26: two distinct captures tie as GW20's latest, so GW20 is unscored and
+    listed with that reason, and no earlier week's capture prices the end state in its place."""
+
+    evidence, snapshots, records = _world(tmp_path, monkeypatch)
+    _identity(monkeypatch)
+    _outcome_capture(snapshots, 20, points={player: 3 for player in ROSTER})
+    record = scorer.score(
+        evidence,
+        snapshots,
+        "gw20",
+        receipts=tmp_path / RECEIPTS,
+        records_dir=records,
+        index_file=tmp_path / "index.md",
+    )
+    week20 = record["weeks"][-1]
+    assert week20["gameweek"] == 20 and week20["outcome_capture"] is None
+    assert week20["unscored_reason"] == "tied_outcome_captures"
+    assert record["weeks"][-2]["outcome_capture"] is not None
+    assert record["totals"]["end_state_prices"] == {
+        "rule": scorer.END_PRICES_RULE,
+        "gameweek": 20,
+        "outcome_capture": None,
+        "sell_on_fee": None,
+        "reason": "reading_week_unscored:tied_outcome_captures",
+        "unpriced_chains": [],
+    }
+    for pair in record["totals"]["paired_differences"].values():
+        assert pair["sale_value_tenths_at_end"] is None
+    twin = (records / "planner_policy_chain_gw20.md").read_text(encoding="utf-8")
+    assert "No sale value is stated: GW20's outcome capture gives no prices" in twin
+
+
+def test_a_held_player_the_pricing_capture_does_not_price_gets_no_sale(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Rules 23 and 26: no sale is invented. A chain whose end state holds a player its reading
+    gameweek's outcome capture does not price is listed, and its arm states no sale value."""
+
+    evidence, snapshots, _ = _world(tmp_path, monkeypatch, through=6)
+    receipts = tmp_path / RECEIPTS
+
+    def stranger(record: dict[str, Any]) -> None:
+        state = record["state_after"]
+        state["squad"][0] = 99
+        state["purchase_prices"]["99"] = state["purchase_prices"].pop("1")
+
+    _rewrite(evidence / "gw06" / "p950-hold_3.json", stranger)
+    _reseal(evidence, 6)
+    _repost(receipts, evidence, 6)
+    _, weeks = scorer.read_evidence(evidence, 6, scorer.read_receipts(receipts))
+    captures = scorer._captures(snapshots)
+    scored = [scorer.score_week(week, scorer.outcome_capture(captures, 6)) for week in weeks]
+    end = scorer.end_prices(scored, 6)
+    assert (end.capture, end.fee, end.reason) == (scored[0].outcome.snapshot_id, 0.5, None)
+    assert scorer.unpriced_chains(weeks, end) == ["p950:hold_3"]
+    totals = scorer.arm_totals(scored, weeks, end.prices, end.fee)
+    assert totals["hold_3"]["sale_value_tenths_at_end"] is None
+    assert totals["hold_5"]["sale_value_tenths_at_end"] == 3 * 885.0
+    priced = {
+        "gameweek": 6,
+        "outcome_capture": end.capture,
+        "sell_on_fee": end.fee,
+        "reason": end.reason,
+        "unpriced_chains": scorer.unpriced_chains(weeks, end),
+    }
+    assert scorer._priced_note(priced).endswith(
+        "No sale is invented for p950:hold_3: each holds an unpriced player."
+    )
+
+
+def test_the_end_state_is_priced_at_its_own_capture_s_fee_and_never_at_a_default(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Rules 7 and 26: the sell-on fee is the pricing capture's own, read with its prices; a
+    capture whose roster cannot be read prices nothing, and the reason is recorded."""
+
+    evidence, snapshots, _ = _world(tmp_path, monkeypatch, through=6)
+    _, weeks = scorer.read_evidence(evidence, 6, scorer.read_receipts(tmp_path / RECEIPTS))
+    week = scorer.score_week(weeks[0], scorer.outcome_capture(scorer._captures(snapshots), 6))
+
+    def priced_by(change: Callable[[dict[str, Any]], object]) -> scorer.EndPrices:
+        bootstrap = json.loads(_bootstrap(6))
+        change(bootstrap)
+        written = write_snapshot(
+            tmp_path / "pricing",
+            source="fpl-live",
+            captured_at_utc=_stamp(_deadline(6) + timedelta(hours=9)),
+            payloads={
+                BOOTSTRAP_PAYLOAD: json.dumps(bootstrap).encode("utf-8"),
+                live_payload(6): _live(POINTS),
+            },
+        )
+        capture = read_snapshot(tmp_path / "pricing", written.snapshot_id)
+        end = scorer.end_prices([replace(week, outcome=scorer.Outcome(6, None, capture, None))], 6)
+        assert end.capture == written.snapshot_id
+        return end
+
+    # Under rules that keep none of a rise, each held player sells at his price, 52 + id, and a
+    # squad of players 1 to 15 for 900 tenths.
+    feeless = priced_by(
+        lambda bootstrap: bootstrap["game_config"]["rules"].update(transfers_sell_on_fee=0.0)
+    )
+    assert (feeless.fee, feeless.reason) == (0.0, None)
+    totals = scorer.arm_totals([week], weeks, feeless.prices, feeless.fee)
+    assert totals["hold_5"]["sale_value_tenths_at_end"] == 3 * 900.0
+    unread = priced_by(lambda bootstrap: bootstrap.pop("teams"))
+    assert (unread.prices, unread.fee) == (None, None)
+    assert unread.reason is not None and unread.reason.startswith("prices_unreadable:")
+    totals = scorer.arm_totals([week], weeks, unread.prices, unread.fee)
+    assert all(arm["sale_value_tenths_at_end"] is None for arm in totals.values())
+
+
+def test_the_capture_set_is_this_seasons_as_the_runner_reads_it(tmp_path: Path) -> None:
+    """Rules 25 and 28 read only this season's captures: one named before the season opens is
+    never opened, one whose bootstrap names another season is left out, so neither can settle
+    a week; any other capture that cannot be read refuses the reading, as in the runner."""
+
+    root = tmp_path / "snapshots"
+    root.mkdir()
+    # In June the game still serves last season, every week of it settled.
+    last_season = json.loads(_bootstrap(38))
+    for event in last_season["events"]:
+        event["deadline_time"] = _stamp(_deadline(event["id"]) - timedelta(days=364))
+    write_snapshot(
+        root,
+        source="fpl-live",
+        captured_at_utc="2026-06-15T10:00:00Z",
+        payloads={BOOTSTRAP_PAYLOAD: json.dumps(last_season).encode("utf-8")},
+    )
+    named_earlier = write_snapshot(
+        root,
+        source="fpl-live",
+        captured_at_utc="2026-05-01T10:00:00Z",
+        payloads={BOOTSTRAP_PAYLOAD: _bootstrap(38)},
+    ).snapshot_id
+    (root / named_earlier / "payloads" / BOOTSTRAP_PAYLOAD).write_bytes(b"damaged")
+    assert scorer._captures(root) == []
+    ours = _outcome_capture(root, 20)
+    captures = scorer._captures(root)
+    assert [capture.metadata.snapshot_id for capture in captures] == [ours]
+    assert scorer.settled(captures, 20) and not scorer.settled(captures, 21)
+    damaged = _outcome_capture(root, 21)
+    (root / damaged / "payloads" / BOOTSTRAP_PAYLOAD).write_bytes(b"damaged")
+    with pytest.raises(scorer.ScorerError, match=f"Capture {damaged} cannot be read"):
+        scorer._captures(root)
+
+
+def test_a_weeks_deadline_is_the_one_its_receipt_records(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Rules 5 and 25: a decided week's deadline is the one its decision capture stated, as its
+    receipt records it, even where a later capture states another; a week whose receipt states
+    none takes the newest capture's."""
+
+    evidence, snapshots, records = _world(tmp_path, monkeypatch, through=8, missing=(8,))
+    _identity(monkeypatch)
+    # The capture GW20 settles in states GW7's deadline six hours later than GW7's own did.
+    moved = json.loads(_bootstrap(20))
+    moved["events"][6]["deadline_time"] = _stamp(_deadline(7) + timedelta(hours=6))
+    write_snapshot(
+        snapshots,
+        source="fpl-live",
+        captured_at_utc=_stamp(_deadline(20) + timedelta(hours=5)),
+        payloads={BOOTSTRAP_PAYLOAD: json.dumps(moved).encode("utf-8")},
+    )
+    read = scorer.read_evidence
+    monkeypatch.setattr(
+        scorer, "read_evidence", lambda root, through, posted: read(root, 8, posted)
+    )
+    record = scorer.score(
+        evidence,
+        snapshots,
+        "gw20",
+        receipts=tmp_path / RECEIPTS,
+        records_dir=records,
+        index_file=tmp_path / "index.md",
+    )
+    week7, week8 = record["weeks"][1], record["weeks"][2]
+    assert (week7["deadline_utc"], week7["deadline_source"]) == (_stamp(_deadline(7)), "receipt")
+    # Read from the receipt, GW7's own outcome capture, five hours after it, counts.
+    assert week7["outcome_capture"] is not None and week7["unscored_reason"] is None
+    assert week7["scored_chains"] == 15
+    assert (week8["deadline_utc"], week8["deadline_source"]) == (
+        _stamp(_deadline(8)),
+        "newest_capture",
+    )
+    # A receipt deadline that is no instant refuses the reading; none at all, with no capture
+    # that states one, leaves the week without a deadline.
+    for stated, message in (("2026-10-17T10:00:00", "names no time zone"), (7, "no readable")):
+        week = scorer.WeekEvidence(7, {"deadline_utc": stated}, {}, {})
+        with pytest.raises(scorer.ScorerError, match=f"GW07's receipt.*{message}"):
+            scorer.week_deadline([], week)
+    assert scorer.week_deadline([], scorer.WeekEvidence(7, {}, {}, {})) == (None, None)

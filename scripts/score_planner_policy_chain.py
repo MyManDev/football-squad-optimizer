@@ -10,10 +10,12 @@ name, refuses a reading taken twice, and runs only from its own merge commit (ru
 fetches origin before it reads any history, so that its merge commit, the readings already
 taken and the release tags are read as origin holds them. The interim reading records no
 verdict (rule 32). Run from a clean checkout of the scorer's merge commit, in a clone that is
-not shallow and can reach origin, with E the runner's evidence directory and S the capture root
-it decided from:
+not shallow and can reach origin, with E the runner's evidence directory, S the capture root it
+decided from and R the receipts the operator posted on the chain's tracking issue (rule 24), in
+the shape ``read_receipts`` states:
 
-    python -m scripts.score_planner_policy_chain --evidence E --snapshot-root S --reading gw20
+    python -m scripts.score_planner_policy_chain --evidence E --snapshot-root S --receipts R
+        --reading gw20
 """
 
 from __future__ import annotations
@@ -48,13 +50,14 @@ from squadopt.data.sources.fpl_live import (
     gameweek_deadlines,
     live_event_outcomes,
     live_payload,
+    player_snapshot,
     scored_gameweeks,
 )
 from squadopt.data.timestamps import as_instant
 from squadopt.evaluation.live_series import DetectionPolicy, detectable_effect
 from squadopt.evaluation.promotion import PromotionPolicy
 from squadopt.evaluation.statistics import season_aware_moving_block_interval
-from squadopt.live.recommendation import read_inputs
+from squadopt.live.recommendation import infer_season
 from squadopt.live.rules import read_season_rules
 from squadopt.planning.pricing import sell_price_tenths
 
@@ -62,6 +65,7 @@ REPOSITORY = Path(__file__).resolve().parents[1]
 PROTOCOL_ID = "planner_policy_chain_v1"
 SEASON = "2026-27"
 PROTOCOL_FILE = "docs/research/planner_policy_chain_prereg.md"
+RUNNER_FILE = "scripts/measure_planner_policy_chain.py"
 SCORER_FILE = "scripts/score_planner_policy_chain.py"
 RECORDS_DIR = REPOSITORY / "docs" / "research"
 INDEX_FILE = REPOSITORY / "docs" / "measurements_index.md"
@@ -73,6 +77,8 @@ DEVELOP = f"{TRACKING}/develop"
 #: Rule 28: the two readings and the gameweek each one waits for.
 READINGS: dict[str, int] = {"gw20": 20, "gw38": 38}
 ARMS: tuple[str, ...] = ("served_3", "served_5", "hold_3", "hold_5", "one_week")
+#: Rule 9: the three constructed squads, named as the runner names them, by budget in tenths.
+PROFILES: tuple[str, ...] = ("p1000", "p950", "p900")
 #: Rule 29: the primary contrasts, each pooled over the two windows.
 CONTRASTS: dict[str, tuple[tuple[str, str], ...]] = {
     "A": (("served_3", "hold_3"), ("served_5", "hold_5")),
@@ -157,6 +163,53 @@ ONCE_RULE = (
     "separate clone is seen only once it is committed there and pushed to a branch on origin."
 )
 PINNED_PACKAGES: tuple[str, ...] = ("ortools", "numpy", "pandas")
+#: Rules 2 and 3, as each record states it: what the scorer reads again from git at the frozen
+#: commit.
+FROZEN_SOURCE_CHECK = (
+    "protocol_sha256 and runner_sha256 are the sha256 of git show <frozen commit>:<file>. "
+    "binding_commits are the commits that added the protocol and the runner on the frozen "
+    "commit's first-parent line, and the frozen commit is the later of the two. The frozen "
+    "commit lies on the first-parent line of the commit the scorer ran from, so it is a merge on "
+    "develop and never a feature commit (rule 2)."
+)
+#: Rule 24, as each record states it: where the receipts came from and what was held to them.
+RECEIPTS_RULE = (
+    "The frozen commit and each week's manifest sha256, as the operator posted them on the "
+    "chain's tracking issue, are transcribed into a receipts file, recorded by its sha256. Each "
+    "value names the comment it was posted in. The scorer does not read the issue itself. It "
+    "held protocol.json's frozen commit, and the bytes of every manifest the reading reads, to "
+    "these values and refused any difference."
+)
+#: Rule 36: the files a week holds beside its records. Every other JSON document in a week's
+#: directory is a record. The atomic writer's temporaries carry another suffix, and the week's
+#: evidence_digest covers them like any other file.
+WEEK_FILES: frozenset[str] = frozenset({"manifest.json", "receipt.json", "forecast.json"})
+WEEK_DIRECTORY = re.compile(r"gw(\d{2})")
+FULL_COMMIT = re.compile(r"[0-9a-f]{40}")
+FULL_SHA256 = re.compile(r"[0-9a-f]{64}")
+#: Rule 25: the runner never opens a capture named before the season opens, and leaves out one
+#: whose bootstrap names another season (its SEASON_OPENS and capture_inventory). So does the
+#: scorer.
+SEASON_OPENS = datetime(2026, 6, 1, tzinfo=UTC)
+CAPTURE_INSTANT = re.compile(r"-(\d{8}T\d{6}Z)-")
+#: Rule 25, as each record states it: the captures a week's outcome capture is chosen from, and
+#: the deadline it is chosen against.
+CAPTURE_SET_RULE = (
+    "The outcome captures are read as the runner takes its inventory: every fpl-live capture "
+    f"under the snapshot root whose bootstrap names season {SEASON}. A capture named before "
+    f"{SEASON_OPENS:%Y-%m-%d} is never opened, and any other capture that cannot be read refuses "
+    "the reading. A week's deadline is the one its receipt records, which its decision capture "
+    "stated. Only a week whose receipt states none takes the deadline the newest capture states."
+)
+#: Rule 26, as each record states it: the capture the end state's sale value is read from, which
+#: the protocol does not name.
+END_PRICES_RULE = (
+    "The end state is valued at the prices and the sell-on fee of the reading gameweek's own "
+    "outcome capture (rule 25), each held player sold as rule 18 sells him. No earlier week's "
+    "capture stands in for it. When there is no such capture, or it cannot be read, no sale value "
+    "is stated and the reason is recorded. A chain that holds a player the capture does not "
+    "price gets no sale value (rule 23)."
+)
 #: Rule 31, stated beside every interval.
 COVERAGE_NOTE = (
     "At these counts the interval is narrower than its level: in the protocol's synthetic check "
@@ -486,6 +539,94 @@ def release_binding(
     }
 
 
+# Rules 2 and 3: the frozen source, read again from git
+
+
+def _binding_commits(frozen: str, *, root: Path | None = None) -> dict[str, dict[str, str]]:
+    """Rule 2 as the runner applied it at the frozen commit: the commits that added the protocol
+    and the runner on that commit's first-parent line, each compared with its first parent, each
+    with its committer instant in UTC and its place on the line."""
+
+    commits = {}
+    for name, path in (("protocol", PROTOCOL_FILE), ("runner", RUNNER_FILE)):
+        added = _git(
+            "log",
+            "--first-parent",
+            "--diff-merges=first-parent",
+            "--diff-filter=A",
+            "--no-patch",
+            "--format=%H %cI",
+            "-1",
+            frozen,
+            "--",
+            path,
+            cwd=root,
+        )
+        if not added:
+            raise ScorerError(f"{path} was never added on the line of the frozen commit {frozen}.")
+        sha, instant = added.split(" ", 1)
+        position = int(_git("rev-list", "--first-parent", "--count", sha, "--", cwd=root))
+        commits[name] = {
+            "commit": sha,
+            "committed_utc": _instant(instant).isoformat(),
+            "line_position": str(position),
+        }
+    return commits
+
+
+def _frozen_bytes(frozen: str, path: str, root: Path | None) -> bytes:
+    """A file's bytes at the frozen commit, as ``git show HEAD:<file>`` gave them to the runner
+    with HEAD at that commit. A commit or a file git does not hold refuses the reading."""
+
+    try:
+        # The trailing "--" names the argument a revision, so git never looks for it on disk.
+        return _git_bytes("show", f"{frozen}:{path}", "--", cwd=root)
+    except ScorerError as error:
+        raise ScorerError(f"git cannot read the frozen commit {frozen}: {error}") from error
+
+
+def check_frozen_source(protocol: Mapping[str, Any], *, root: Path | None = None) -> None:
+    """Rules 2 and 3: protocol.json's frozen source, read again from git at its own commit.
+
+    The runner recorded the sha256 of this protocol and of itself as ``git show HEAD:<file>``
+    with HEAD at the frozen commit, and the two merges that bound the chain on that commit's
+    first-parent line, the frozen commit being the later. The scorer reads all of it again from
+    the commit and refuses any difference, so protocol.json says nothing about its source that
+    the repository does not. A merge is a commit on develop's first-parent line, never the
+    feature commit that wrote the file, and a runner run from a feature commit would name that
+    commit its own merge. The scorer runs from its own merge commit on develop (rule 37), so the
+    frozen commit must lie on the first-parent line of the commit the scorer runs from.
+    """
+
+    frozen = str(protocol.get("repository_commit"))
+    if not FULL_COMMIT.fullmatch(frozen):
+        raise ScorerError(f"protocol.json names no full frozen commit: {frozen!r}.")
+    for key, path in (("protocol_sha256", PROTOCOL_FILE), ("runner_sha256", RUNNER_FILE)):
+        digest = hashlib.sha256(_frozen_bytes(frozen, path, root)).hexdigest()
+        if protocol.get(key) != digest:
+            raise ScorerError(
+                f"protocol.json's {key} is not the sha256 of {path} at the frozen commit."
+            )
+    commits = _binding_commits(frozen, root=root)
+    if protocol.get("binding_commits") != commits:
+        raise ScorerError(
+            "protocol.json's binding_commits are not the merges on the frozen commit's line."
+        )
+    later = max(
+        commits.values(),
+        key=lambda entry: (int(entry["line_position"]), _instant(entry["committed_utc"])),
+    )
+    if later["commit"] != frozen:
+        raise ScorerError(
+            f"The frozen commit {frozen} is not the later of the two merges that bound the chain."
+        )
+    if frozen not in _git("rev-list", "--first-parent", "HEAD", "--", cwd=root).split():
+        raise ScorerError(
+            f"The frozen commit {frozen} is not on the first-parent line the scorer runs from, "
+            "so it is no merge on develop: a feature commit is never the frozen source (rule 2)."
+        )
+
+
 # Rule 36: the runner's evidence
 
 
@@ -497,11 +638,92 @@ class WeekEvidence:
     records: Mapping[tuple[str, str], Mapping[str, Any]]
 
 
+def _document(raw: bytes, path: Path) -> dict[str, Any]:
+    try:
+        document = json.loads(raw.decode("utf-8"))
+    except ValueError as error:
+        raise ScorerError(f"{path} cannot be read: {error}") from error
+    if not isinstance(document, dict):
+        raise ScorerError(f"{path} is not a JSON object.")
+    return cast(dict[str, Any], document)
+
+
 def _load(path: Path) -> dict[str, Any]:
     try:
-        return cast(dict[str, Any], json.loads(path.read_text(encoding="utf-8")))
-    except (OSError, ValueError) as error:
+        raw = path.read_bytes()
+    except OSError as error:
         raise ScorerError(f"{path} cannot be read: {error}") from error
+    return _document(raw, path)
+
+
+# Rule 24: the receipts the operator posted
+
+
+def _unique_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    names = [name for name, _ in pairs]
+    repeated = sorted({name for name in names if names.count(name) > 1})
+    if repeated:
+        raise ValueError(f"the receipts give {repeated} more than once")
+    return dict(pairs)
+
+
+def _posted(entry: object, key: str, pattern: re.Pattern[str], label: str) -> dict[str, str]:
+    if not isinstance(entry, dict) or set(entry) != {key, "posted"}:
+        raise ScorerError(f"The receipt for {label} must hold exactly {key!r} and 'posted'.")
+    value, posted = entry[key], entry["posted"]
+    if not isinstance(value, str) or not pattern.fullmatch(value):
+        raise ScorerError(f"The receipt for {label} holds no full {key}: {value!r}.")
+    if not isinstance(posted, str) or not posted.strip():
+        raise ScorerError(f"The receipt for {label} does not name the comment it was posted in.")
+    return {key: value, "posted": posted}
+
+
+def read_receipts(path: Path) -> dict[str, Any]:
+    """Rule 24: the frozen commit and each week's manifest sha256, as the operator posted them
+    on the chain's tracking issue, transcribed into one JSON file:
+
+        {"tracking_issue": "<issue URL>",
+         "frozen_commit": {"commit": "<40 hex>", "posted": "<comment URL>"},
+         "manifests": {"gw06": {"sha256": "<64 hex>", "posted": "<comment URL>"}, ...}}
+
+    Each value names the comment it was posted in. The scorer does not read the issue itself:
+    it holds the evidence to these values and repeats them in the record, where a reader can
+    hold them to the issue. A key given twice, a value cut short or a missing comment is
+    refused. A byte order mark, which Windows PowerShell 5.1 writes with UTF-8, is read past;
+    the file's sha256 is of its bytes as they stand.
+    """
+
+    try:
+        raw = path.read_bytes()
+        document = json.loads(raw.decode("utf-8-sig"), object_pairs_hook=_unique_keys)
+    except (OSError, ValueError) as error:
+        raise ScorerError(f"The receipts file {path} cannot be read: {error}") from error
+    if not isinstance(document, dict) or set(document) != {
+        "tracking_issue",
+        "frozen_commit",
+        "manifests",
+    }:
+        raise ScorerError(
+            "The receipts file must hold exactly tracking_issue, frozen_commit and manifests."
+        )
+    issue = document["tracking_issue"]
+    if not isinstance(issue, str) or not issue.strip():
+        raise ScorerError("The receipts file does not name the chain's tracking issue.")
+    manifests = document["manifests"]
+    if not isinstance(manifests, dict):
+        raise ScorerError("The receipts file's manifests must map each gwNN to its receipt.")
+    checked: dict[str, dict[str, str]] = {}
+    for name, entry in sorted(manifests.items()):
+        week = WEEK_DIRECTORY.fullmatch(name)
+        if week is None or not 1 <= int(week.group(1)) <= READINGS["gw38"]:
+            raise ScorerError(f"The receipts name {name!r}, which is no gameweek directory.")
+        checked[name] = _posted(entry, "sha256", FULL_SHA256, name)
+    return {
+        "file_sha256": hashlib.sha256(raw).hexdigest(),
+        "tracking_issue": issue,
+        "frozen_commit": _posted(document["frozen_commit"], "commit", FULL_COMMIT, "the commit"),
+        "manifests": checked,
+    }
 
 
 def evidence_digest(directory: Path) -> str:
@@ -515,37 +737,182 @@ def evidence_digest(directory: Path) -> str:
     return digest.hexdigest()
 
 
-def read_evidence(evidence: Path, through: int) -> tuple[dict[str, Any], list[WeekEvidence]]:
-    """Every decided week from the first chain week through ``through``, checked against its
-    manifest; a week not yet decided refuses the reading."""
+def _first_chain_week(protocol: Mapping[str, Any]) -> int:
+    """Rules 2 and 9: the first chain week, held to the bound week and the weeks the protocol
+    record says were skipped from it."""
+
+    try:
+        first = int(protocol["first_chain_week"])
+        bound = int(protocol["bound_week"])
+        skipped = [int(entry["gameweek"]) for entry in protocol["skipped_weeks"]]
+    except (KeyError, TypeError, ValueError) as error:
+        raise ScorerError(f"protocol.json cannot state its first chain week: {error!r}") from error
+    if bound > first or skipped != list(range(bound, first)):
+        raise ScorerError(
+            f"protocol.json's first chain week GW{first:02d} does not follow its bound week "
+            f"GW{bound:02d} and the weeks it lists as skipped."
+        )
+    return first
+
+
+def _kept_records(protocol: Mapping[str, Any]) -> dict[str, tuple[str, str]]:
+    """Rule 9: every squad the protocol builds and the record does not drop, times every arm,
+    by the name the runner writes its record under."""
+
+    dropped = protocol.get("dropped_profiles")
+    if not isinstance(dropped, dict) or not set(dropped) <= set(PROFILES):
+        raise ScorerError(f"protocol.json drops {dropped!r}, which are not the protocol's squads.")
+    return {
+        f"{profile}-{arm}.json": (profile, arm)
+        for profile in PROFILES
+        if profile not in dropped
+        for arm in ARMS
+    }
+
+
+def _differ(found: set[str], kept: Mapping[str, object]) -> str:
+    return f"missing {sorted(set(kept) - found)}, not kept {sorted(found - set(kept))}"
+
+
+def _week_evidence(
+    evidence: Path,
+    gameweek: int,
+    receipt: Mapping[str, str] | None,
+    kept: Mapping[str, tuple[str, str]],
+    frozen: str,
+) -> WeekEvidence:
+    """One decided week, checked in order: its manifest's bytes against the sha256 posted for
+    it, the week's files against the manifest's evidence_digest, the records the manifest lists
+    and the records beside it against the kept chains, and each record against its own digest,
+    its path and the frozen commit it was decided from."""
+
+    label = f"GW{gameweek:02d}"
+    directory = evidence / f"gw{gameweek:02d}"
+    manifest_path = directory / "manifest.json"
+    if not manifest_path.is_file():
+        raise ScorerError(f"{label} is not decided; the reading waits for it.")
+    if receipt is None:
+        raise ScorerError(f"{label}: no manifest sha256 was posted for it (rule 24).")
+    try:
+        raw = manifest_path.read_bytes()
+        if hashlib.sha256(raw).hexdigest() != receipt["sha256"]:
+            raise ScorerError(
+                f"{label}: the manifest is not the one posted in {receipt['posted']}."
+            )
+        manifest = _document(raw, manifest_path)
+        named = (manifest.get("gameweek"), manifest.get("protocol"), manifest.get("season"))
+        if named != (gameweek, PROTOCOL_ID, SEASON):
+            raise ScorerError(f"{manifest_path} names another gameweek, protocol or season.")
+        recorded = manifest.get("evidence_digest")
+        if not isinstance(recorded, str):
+            raise ScorerError(f"{label}: the manifest records no evidence_digest.")
+        if evidence_digest(directory) != recorded:
+            raise ScorerError(f"{label}: the week's files no longer match their manifest.")
+        listed = manifest.get("records")
+        if not isinstance(listed, dict) or set(listed) != set(kept):
+            found = set(listed) if isinstance(listed, dict) else set()
+            raise ScorerError(
+                f"{label}: the manifest's records are not the kept chains: {_differ(found, kept)}."
+            )
+        beside = {
+            path.name
+            for path in directory.glob("*.json")
+            if path.is_file() and path.name not in WEEK_FILES
+        }
+        if beside != set(kept):
+            raise ScorerError(
+                f"{label}: the records beside the manifest are not the kept chains: "
+                f"{_differ(beside, kept)}."
+            )
+        records: dict[tuple[str, str], Mapping[str, Any]] = {}
+        for name, (profile, arm) in sorted(kept.items()):
+            path = directory / name
+            if hashlib.sha256(path.read_bytes()).hexdigest() != listed[name]:
+                raise ScorerError(f"{path} does not match the digest its manifest records.")
+            record = _load(path)
+            stated = (record.get("profile"), record.get("arm"), record.get("gameweek"))
+            if stated != (profile, arm, gameweek):
+                raise ScorerError(
+                    f"{path} records {stated}, not the chain and week its path names."
+                )
+            if (record.get("protocol"), record.get("season")) != (PROTOCOL_ID, SEASON):
+                raise ScorerError(f"{path} is not this protocol's.")
+            provenance = record.get("provenance")
+            if not isinstance(provenance, dict) or provenance.get("repository_commit") != frozen:
+                raise ScorerError(f"{path} was not decided from the frozen commit (rule 3).")
+            records[(profile, arm)] = record
+        week_receipt = _load(directory / "receipt.json")
+        if week_receipt.get("gameweek") != gameweek:
+            raise ScorerError(f"{directory / 'receipt.json'} names another gameweek.")
+    except (OSError, KeyError, TypeError, ValueError) as error:
+        raise ScorerError(f"{label}: the week's evidence cannot be read: {error!r}") from error
+    return WeekEvidence(gameweek, week_receipt, manifest, records)
+
+
+def _starts_alike(week: WeekEvidence) -> None:
+    """Rule 10: in the first chain week every arm of a squad plans from the same state. A week
+    reached after an earlier decided week holds the states the arms' own decisions left, which
+    differ wherever the arms did, so such a week is never named the first chain week (rules 2
+    and 9)."""
+
+    for profile in sorted({profile for profile, _ in week.records}):
+        states = {
+            json.dumps(week.records[(profile, arm)].get("state_before"), sort_keys=True)
+            for arm in ARMS
+        }
+        if len(states) != 1:
+            raise ScorerError(
+                f"GW{week.gameweek:02d} is not where squad {profile}'s chains start: its arms "
+                "plan from different states (rule 10)."
+            )
+
+
+def read_evidence(
+    evidence: Path, through: int, receipts: Mapping[str, Any]
+) -> tuple[dict[str, Any], list[WeekEvidence]]:
+    """Every decided week from the first chain week through ``through``, each held to the
+    receipts posted for it (rule 24) and to its own manifest (rule 36); a week not yet decided
+    refuses the reading.
+
+    protocol.json must name this protocol and season, and the frozen commit the operator
+    posted. Its first chain week must follow the skipped weeks it lists, and no week directory
+    or posted receipt may lie before it. Each week's records must be exactly the kept chains,
+    every squad not dropped times every arm, as the manifest lists them and as the documents
+    beside it, and each record must name the chain and week its path does. In the first chain
+    week every arm of a squad must hold the same state_before (rule 10).
+    """
 
     protocol_path = evidence / "protocol.json"
     if not protocol_path.is_file():
         raise ScorerError(f"{evidence} holds no protocol.json; the chain has not started.")
     protocol = _load(protocol_path)
-    if protocol.get("protocol", PROTOCOL_ID) != PROTOCOL_ID or protocol.get("season") != SEASON:
+    if protocol.get("protocol") != PROTOCOL_ID or protocol.get("season") != SEASON:
         raise ScorerError("The evidence is not this protocol's.")
-    first = int(protocol["first_chain_week"])
-    weeks: list[WeekEvidence] = []
-    for gameweek in range(first, through + 1):
-        directory = evidence / f"gw{gameweek:02d}"
-        manifest_path = directory / "manifest.json"
-        if not manifest_path.is_file():
-            raise ScorerError(f"GW{gameweek:02d} is not decided; the reading waits for it.")
-        manifest = _load(manifest_path)
-        if int(manifest.get("gameweek", -1)) != gameweek:
-            raise ScorerError(f"{manifest_path} names another gameweek.")
-        recorded = manifest.get("evidence_digest")
-        if recorded is not None and evidence_digest(directory) != recorded:
-            raise ScorerError(f"GW{gameweek:02d}: the week's files no longer match their manifest.")
-        records: dict[tuple[str, str], Mapping[str, Any]] = {}
-        for name, digest in cast(Mapping[str, str], manifest.get("records", {})).items():
-            path = directory / name
-            if hashlib.sha256(path.read_bytes()).hexdigest() != digest:
-                raise ScorerError(f"{path} does not match the digest its manifest records.")
-            record = _load(path)
-            records[(str(record["profile"]), str(record["arm"]))] = record
-        weeks.append(WeekEvidence(gameweek, _load(directory / "receipt.json"), manifest, records))
+    frozen = cast(Mapping[str, str], receipts["frozen_commit"])
+    if protocol.get("repository_commit") != frozen["commit"]:
+        raise ScorerError(
+            f"protocol.json names the frozen commit {protocol.get('repository_commit')!r}; "
+            f"{frozen['posted']} posted {frozen['commit']}."
+        )
+    first = _first_chain_week(protocol)
+    early = sorted(
+        path.name
+        for path in evidence.glob("gw*")
+        if (match := WEEK_DIRECTORY.fullmatch(path.name)) and int(match.group(1)) < first
+    )
+    if early:
+        raise ScorerError(f"{early} lie before the first chain week GW{first:02d}.")
+    posted = cast(Mapping[str, Mapping[str, str]], receipts["manifests"])
+    early = sorted(name for name in posted if int(name[2:]) < first)
+    if early:
+        raise ScorerError(f"Receipts were posted for {early}, before the first chain week.")
+    kept = _kept_records(protocol)
+    weeks = [
+        _week_evidence(evidence, gameweek, posted.get(f"gw{gameweek:02d}"), kept, frozen["commit"])
+        for gameweek in range(first, through + 1)
+    ]
+    if weeks:
+        _starts_alike(weeks[0])
     return protocol, weeks
 
 
@@ -564,13 +931,30 @@ class Outcome:
         return None if self.snapshot is None else self.snapshot.metadata.snapshot_id
 
 
+def _named_before_season(snapshot_id: str) -> bool:
+    match = CAPTURE_INSTANT.search(snapshot_id)
+    if match is None:
+        return False
+    named = datetime.strptime(match.group(1), "%Y%m%dT%H%M%SZ").replace(tzinfo=UTC)
+    return named < SEASON_OPENS
+
+
 def _captures(snapshot_root: Path) -> list[CapturedSnapshot]:
+    """The season's live captures, as the runner takes its inventory: a capture named before
+    the season opens is never opened, one whose bootstrap names another season is left out, and
+    any other that cannot be read refuses the reading, since it could be a week's latest."""
+
     captures = []
     for snapshot_id in list_snapshot_ids(snapshot_root, source=FPL_LIVE_SOURCE):
+        if _named_before_season(snapshot_id):
+            continue
         try:
-            captures.append(read_snapshot(snapshot_root, snapshot_id))
+            capture = read_snapshot(snapshot_root, snapshot_id)
+            if infer_season(capture) != SEASON:
+                continue
         except (DataError, ValueError, KeyError, TypeError) as error:
             raise ScorerError(f"Capture {snapshot_id} cannot be read: {error}") from error
+        captures.append(capture)
     return captures
 
 
@@ -589,6 +973,27 @@ def _deadline(captures: Sequence[CapturedSnapshot], gameweek: int) -> str | None
     return None
 
 
+def week_deadline(
+    captures: Sequence[CapturedSnapshot], week: WeekEvidence
+) -> tuple[str | None, str | None]:
+    """The week's deadline and where it was read. The receipt's is the deadline the decision
+    capture stated, which the runner decided after (rules 5 and 36). Only a week whose receipt
+    states none, one with no decision capture, takes the newest capture's. A receipt deadline
+    that is not an instant refuses the reading."""
+
+    stated = week.receipt.get("deadline_utc")
+    if stated is not None:
+        if not isinstance(stated, str):
+            raise ScorerError(f"GW{week.gameweek:02d}'s receipt states no readable deadline.")
+        try:
+            _instant(stated)
+        except ScorerError as error:
+            raise ScorerError(f"GW{week.gameweek:02d}'s receipt: {error}") from error
+        return stated, "receipt"
+    newest = _deadline(captures, week.gameweek)
+    return newest, None if newest is None else "newest_capture"
+
+
 def settled(captures: Sequence[CapturedSnapshot], gameweek: int) -> bool:
     """Rule 28: a gameweek has settled when a capture counts it in scored_gameweeks."""
 
@@ -601,11 +1006,15 @@ def settled(captures: Sequence[CapturedSnapshot], gameweek: int) -> bool:
     return False
 
 
-def outcome_capture(captures: Sequence[CapturedSnapshot], gameweek: int) -> Outcome:
+def outcome_capture(
+    captures: Sequence[CapturedSnapshot], gameweek: int, deadline: str | None = None
+) -> Outcome:
     """Rule 25: of the captures at or after the deadline whose bootstrap counts the week in
-    scored_gameweeks and that hold its live payload, the latest; a tie leaves the week unscored."""
+    scored_gameweeks and that hold its live payload, the latest; a tie leaves the week unscored.
+    ``deadline`` is the week's own (``week_deadline``); without one, the newest capture's."""
 
-    deadline = _deadline(captures, gameweek)
+    if deadline is None:
+        deadline = _deadline(captures, gameweek)
     if deadline is None:
         return Outcome(gameweek, None, None, "no_capture_states_the_deadline")
     settled_here = []
@@ -880,19 +1289,96 @@ def _block(rows: Sequence[Mapping[str, Any]], candidate_id: str, *, final: bool)
 # Totals (rules 26 and 35): gross points, hits, free transfers, bank and sale value
 
 
-def arm_totals(
-    weeks: Sequence[WeekScores],
-    evidence: Sequence[WeekEvidence],
-    prices: Mapping[int, int] | None,
-    fee: float,
-) -> dict[str, dict[str, Any]]:
-    totals: dict[str, dict[str, Any]] = {}
-    last_states: dict[tuple[str, str], Mapping[str, Any]] = {}
+@dataclass(frozen=True)
+class EndPrices:
+    """Rule 26: the prices and the fee the end state is valued at, and where they were read."""
+
+    gameweek: int
+    capture: str | None
+    prices: Mapping[int, int] | None
+    fee: float | None
+    reason: str | None
+
+
+def end_prices(weeks: Sequence[WeekScores], gameweek: int) -> EndPrices:
+    """Rule 26: the end state is valued at the prices and the sell-on fee of the reading
+    gameweek's own outcome capture (rule 25), the capture the reading closes on. No earlier
+    week's capture stands in for it: when there is none, or it cannot be read, no sale value is
+    stated and the reason is recorded."""
+
+    outcome = next((week.outcome for week in weeks if week.gameweek == gameweek), None)
+    if outcome is None:
+        return EndPrices(gameweek, None, None, None, "reading_week_not_read")
+    if outcome.snapshot is None:
+        return EndPrices(gameweek, None, None, None, f"reading_week_unscored:{outcome.reason}")
+    try:
+        players = player_snapshot(outcome.snapshot.payloads[BOOTSTRAP_PAYLOAD])
+        prices = {
+            int(player): int(price)
+            for player, price in zip(players["player_id"], players["price_tenths"], strict=True)
+        }
+        fee = float(read_season_rules(outcome.snapshot, season=SEASON).transfers.sell_on_fee)
+    except (DataError, ValueError, KeyError, TypeError) as error:
+        reason = f"prices_unreadable:{type(error).__name__}: {error}"
+        return EndPrices(gameweek, outcome.snapshot_id, None, None, reason)
+    return EndPrices(gameweek, outcome.snapshot_id, prices, fee, None)
+
+
+def _end_states(evidence: Sequence[WeekEvidence]) -> dict[tuple[str, str], Mapping[str, Any]]:
+    """Each chain's state at the end of the reading: its last week's state after, or the state
+    a blocked chain stays in (rule 23)."""
+
+    states: dict[tuple[str, str], Mapping[str, Any]] = {}
     for week in evidence:
         for chain, record in week.records.items():
             state = record.get("state_after") or record.get("state_before")
             if isinstance(state, Mapping):
-                last_states[chain] = state
+                states[chain] = state
+    return states
+
+
+def sale_value_tenths(
+    state: Mapping[str, Any], prices: Mapping[int, int], fee: float
+) -> int | None:
+    """Rule 18's sale price for each held player at these prices and this fee, summed; None
+    when a held player has no price (rule 23: no sale is invented)."""
+
+    purchase = {
+        int(k): int(v) for k, v in cast(Mapping[str, Any], state["purchase_prices"]).items()
+    }
+    total = 0
+    for player in cast(Sequence[int], state["squad"]):
+        current = prices.get(int(player))
+        if current is None:
+            return None
+        total += sell_price_tenths(current, purchase[int(player)], sell_on_fee=fee)
+    return total
+
+
+def unpriced_chains(evidence: Sequence[WeekEvidence], end: EndPrices) -> list[str]:
+    """The chains whose end state holds a player the pricing capture does not price."""
+
+    if end.prices is None or end.fee is None:
+        return []
+    return sorted(
+        f"{profile}:{arm}"
+        for (profile, arm), state in _end_states(evidence).items()
+        if sale_value_tenths(state, end.prices, end.fee) is None
+    )
+
+
+def arm_totals(
+    weeks: Sequence[WeekScores],
+    evidence: Sequence[WeekEvidence],
+    prices: Mapping[int, int] | None,
+    fee: float | None,
+) -> dict[str, dict[str, Any]]:
+    """Rules 26 and 35: each arm's realized points, and its chains' end state summed. The sale
+    value is None without prices or a fee, or when one of the arm's chains holds a player with
+    no price."""
+
+    totals: dict[str, dict[str, Any]] = {}
+    last_states = _end_states(evidence)
     for arm in ARMS:
         gross = hits = net = 0.0
         scored_weeks = 0
@@ -904,24 +1390,15 @@ def arm_totals(
                     net += score.net
                     scored_weeks += 1
         free = bank = 0
-        sale: float | None = 0.0
+        sale: float | None = None if prices is None or fee is None else 0.0
         for (_profile, name), state in last_states.items():
             if name != arm:
                 continue
             free += int(state.get("free_transfers", 0))
             bank += int(state.get("bank_tenths", 0))
-            if prices is None or sale is None:
-                sale = None
-                continue
-            purchase = {
-                int(k): int(v) for k, v in cast(Mapping[str, Any], state["purchase_prices"]).items()
-            }
-            for player in cast(Sequence[int], state["squad"]):
-                current = prices.get(int(player))
-                if current is None:
-                    sale = None
-                    break
-                sale += sell_price_tenths(current, purchase[int(player)], sell_on_fee=fee)
+            if sale is not None and prices is not None and fee is not None:
+                value = sale_value_tenths(state, prices, fee)
+                sale = None if value is None else sale + value
         totals[arm] = {
             "gross_points": gross,
             "hit_points": hits,
@@ -975,6 +1452,7 @@ def reading_record(
     captures: Sequence[CapturedSnapshot],
     identity: Mapping[str, object],
     binding: Any,
+    receipts: Mapping[str, Any],
     tags: Sequence[ReleaseTag] = (),
 ) -> dict[str, Any]:
     final = reading == "gw38"
@@ -982,16 +1460,17 @@ def reading_record(
     weeks: list[WeekScores] = []
     listed: list[dict[str, Any]] = []
     for week in evidence:
-        outcome = outcome_capture(captures, week.gameweek)
+        deadline, deadline_source = week_deadline(captures, week)
+        outcome = outcome_capture(captures, week.gameweek, deadline)
         scored = score_week(week, outcome)
         weeks.append(scored)
-        deadline = outcome.deadline_utc or cast(str | None, week.receipt.get("deadline_utc"))
         release = binding(as_instant(deadline), frozen) if deadline else dict(RELEASE_UNKNOWN)
         listed.append(
             {
                 "gameweek": week.gameweek,
                 "decision_capture": week.receipt.get("snapshot_id"),
                 "deadline_utc": deadline,
+                "deadline_source": deadline_source,
                 "missing_reason": scored.missing_reason,
                 "outcome_capture": outcome.snapshot_id,
                 "unscored_reason": None if scored.missing_reason else outcome.reason,
@@ -1056,24 +1535,8 @@ def reading_record(
         )
         for label, pairs in CONTRASTS.items()
     }
-    last_outcome = next(
-        (w.outcome for w in reversed(weeks) if w.outcome.snapshot is not None), None
-    )
-    prices: Mapping[int, int] | None = None
-    fee = 0.5
-    if last_outcome is not None and last_outcome.snapshot is not None:
-        try:
-            inputs = read_inputs(last_outcome.snapshot, season=SEASON)
-            prices = {
-                int(p): int(c)
-                for p, c in zip(inputs.players.player_id, inputs.players.price_tenths, strict=True)
-            }
-            fee = float(
-                read_season_rules(last_outcome.snapshot, season=SEASON).transfers.sell_on_fee
-            )
-        except (DataError, ValueError, KeyError, TypeError):
-            prices = None
-    totals = arm_totals(weeks, evidence, prices, fee)
+    end = end_prices(weeks, READINGS[reading])
+    totals = arm_totals(weeks, evidence, end.prices, end.fee)
     return {
         "protocol": PROTOCOL_ID,
         "season": SEASON,
@@ -1083,6 +1546,16 @@ def reading_record(
         "scored_on": RECORDED_ADVICE_SCORING_BASIS,
         "hit_points_charged": HIT_POINTS_CHARGED,
         "identity": dict(identity),
+        "receipts": {
+            "rule": RECEIPTS_RULE,
+            "file_sha256": receipts["file_sha256"],
+            "tracking_issue": receipts["tracking_issue"],
+            "frozen_commit": dict(receipts["frozen_commit"]),
+            "manifests": {
+                f"gw{week.gameweek:02d}": dict(receipts["manifests"][f"gw{week.gameweek:02d}"])
+                for week in evidence
+            },
+        },
         "frozen_source": {
             "repository_commit": protocol.get("repository_commit"),
             "protocol_sha256": protocol.get("protocol_sha256"),
@@ -1093,6 +1566,7 @@ def reading_record(
             "skipped_weeks": protocol.get("skipped_weeks"),
             "dropped_profiles": protocol.get("dropped_profiles"),
             "answer": protocol.get("answer"),
+            "checked": FROZEN_SOURCE_CHECK,
         },
         "interval_policy": {
             "confidence_level": POLICY.confidence_level,
@@ -1104,6 +1578,7 @@ def reading_record(
             "min_weeks_for_verdict": MIN_WEEKS_FOR_VERDICT,
             "detection": {"confidence_level": DETECTION.confidence_level, "power": DETECTION.power},
         },
+        "outcome_captures": {"rule": CAPTURE_SET_RULE, "read": len(captures)},
         "weeks": listed,
         "contrasts": contrasts,
         "contrast_a_by_served_route": by_route,
@@ -1111,6 +1586,14 @@ def reading_record(
         "by_squad": by_squad,
         "truncated_weeks": truncated,
         "totals": {
+            "end_state_prices": {
+                "rule": END_PRICES_RULE,
+                "gameweek": end.gameweek,
+                "outcome_capture": end.capture,
+                "sell_on_fee": end.fee,
+                "reason": end.reason,
+                "unpriced_chains": unpriced_chains(evidence, end),
+            },
             "paired_differences": _paired_totals(totals),
             **({"by_arm": totals} if final else {}),
         },
@@ -1153,6 +1636,32 @@ def _stats_row(label: str, block: Mapping[str, Any], *, interval: bool = True) -
     )
 
 
+def _receipts_note(receipts: Mapping[str, Any]) -> str:
+    frozen = receipts["frozen_commit"]
+    return (
+        f"The frozen commit and the {len(receipts['manifests'])} weekly manifests read here "
+        f"match the receipts transcribed from {receipts['tracking_issue']} (the commit from "
+        f"{frozen['posted']}) into a file whose sha256 is `{receipts['file_sha256']}`. The "
+        "scorer did not read the issue itself."
+    )
+
+
+def _priced_note(end: Mapping[str, Any]) -> str:
+    if end["reason"] is not None:
+        return (
+            f"No sale value is stated: GW{end['gameweek']}'s outcome capture gives no prices "
+            f"({end['reason']})."
+        )
+    note = (
+        f"Sale values are at the prices in `{end['outcome_capture']}`, GW{end['gameweek']}'s "
+        f"outcome capture, with its sell-on fee of {end['sell_on_fee']}."
+    )
+    unpriced = end["unpriced_chains"]
+    if unpriced:
+        note += f" No sale is invented for {', '.join(unpriced)}: each holds an unpriced player."
+    return note
+
+
 def render_markdown(record: Mapping[str, Any]) -> str:
     """The record's twin, rendered from the JSON and nothing else."""
 
@@ -1167,6 +1676,8 @@ def render_markdown(record: Mapping[str, Any]) -> str:
         f"scored on `{record['scored_on']}` with each paid transfer charged at "
         f"{record['hit_points_charged']:.0f} points. The frozen source is `{frozen}`; the scorer "
         f"ran from `{scorer}`.",
+        "",
+        _receipts_note(record["receipts"]),
         "",
         "## Weeks",
         "",
@@ -1198,6 +1709,8 @@ def render_markdown(record: Mapping[str, Any]) -> str:
             )
         )
     lines += ["", record["release_rule"]]
+    captures = record["outcome_captures"]
+    lines += ["", f"{captures['rule']} This reading read {captures['read']} captures."]
     lines += [
         "",
         "## Primary contrasts",
@@ -1250,6 +1763,8 @@ def render_markdown(record: Mapping[str, Any]) -> str:
     lines += [
         "",
         "## Points, hits, free transfers, bank and sale value",
+        "",
+        _priced_note(record["totals"]["end_state_prices"]),
         "",
         *_header(
             "Pair", "Gross", "Hits", "Net", "Free transfers", "Bank (tenths)", "Sale (tenths)"
@@ -1323,15 +1838,19 @@ def score(
     snapshot_root: Path,
     reading: str,
     *,
+    receipts: Path,
     records_dir: Path = RECORDS_DIR,
     index_file: Path = INDEX_FILE,
 ) -> dict[str, Any]:
-    """Rules 28 and 37: take one reading, once, from the scorer's own merge commit.
+    """Rules 24, 28 and 37: take one reading, once, from the scorer's own merge commit, on
+    evidence held to the receipts posted for it and on a frozen source git still holds.
 
-    Every refusal that needs no outcome comes before the first capture is read: the reading's
-    name, its record in the checkout, the scorer's identity after a fetch of origin, its record
-    in committed history or in another worktree, and the release tags. ``records_dir`` and
-    ``index_file`` are for tests; the command line writes only where rule 36 names.
+    These come before the first capture is read: the reading's name, its record in the
+    checkout, the scorer's identity after a fetch of origin, its record in committed history or
+    in another worktree, the release tags and the receipts file. The evidence and the frozen
+    source are checked once the gameweek has settled, before anything is written.
+    ``records_dir`` and ``index_file`` are for tests; the command line writes only where rule 36
+    names.
     """
 
     if reading not in READINGS:
@@ -1351,13 +1870,15 @@ def score(
     if written is not None:
         raise ScorerError(f"The {reading} reading was taken already: {written} exists.")
     tags = release_tags()
+    posted = read_receipts(receipts)
     captures = _captures(snapshot_root)
     gameweek = READINGS[reading]
     if not settled(captures, gameweek):
         raise ScorerError(
             f"GW{gameweek} has not settled in any capture; the {reading} reading waits."
         )
-    protocol, weeks = read_evidence(evidence, gameweek)
+    protocol, weeks = read_evidence(evidence, gameweek, posted)
+    check_frozen_source(protocol)
     record = reading_record(
         reading=reading,
         protocol=protocol,
@@ -1365,6 +1886,7 @@ def score(
         captures=captures,
         identity=identity,
         binding=lambda deadline, frozen: release_binding(deadline, frozen, tags),
+        receipts=posted,
         tags=tags,
     )
     records_dir.mkdir(parents=True, exist_ok=True)
@@ -1385,12 +1907,19 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
     parser.add_argument("--evidence", type=Path, required=True)
     parser.add_argument("--snapshot-root", type=Path, required=True)
+    # Rule 24: the frozen commit and each week's manifest sha256 as posted on the tracking issue.
+    parser.add_argument("--receipts", type=Path, required=True)
     parser.add_argument("--reading", choices=sorted(READINGS), required=True)
     arguments = parser.parse_args(argv)
     try:
         # Rules 36 and 37: the command line writes only where the protocol names, so a reading
         # cannot be taken again into another place.
-        record = score(arguments.evidence, arguments.snapshot_root, arguments.reading)
+        record = score(
+            arguments.evidence,
+            arguments.snapshot_root,
+            arguments.reading,
+            receipts=arguments.receipts,
+        )
     except ScorerError as error:
         print(f"refused: {error}", file=sys.stderr)
         return 2
