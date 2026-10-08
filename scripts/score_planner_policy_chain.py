@@ -6,9 +6,12 @@ decides the weeks and reads no outcome; this scorer reads the runner's evidence 
 outcome captures, once per reading, and writes the record the protocol names.
 
 A reading refuses to start before its gameweek settles, refuses a reading the protocol does not
-name, refuses a reading taken twice, and runs only from its own merge commit (rule 37). The
-interim reading records no verdict (rule 32). Run from a clean checkout of the scorer's merge
-commit, with E the runner's evidence directory and S the capture root it decided from:
+name, refuses a reading taken twice, and runs only from its own merge commit (rule 37). It
+fetches origin before it reads any history, so that its merge commit, the readings already
+taken and the release tags are read as origin holds them. The interim reading records no
+verdict (rule 32). Run from a clean checkout of the scorer's merge commit, in a clone that is
+not shallow and can reach origin, with E the runner's evidence directory and S the capture root
+it decided from:
 
     python -m scripts.score_planner_policy_chain --evidence E --snapshot-root S --reading gw20
 """
@@ -19,6 +22,7 @@ import argparse
 import hashlib
 import json
 import platform
+import re
 import statistics
 import subprocess
 import sys
@@ -61,6 +65,11 @@ PROTOCOL_FILE = "docs/research/planner_policy_chain_prereg.md"
 SCORER_FILE = "scripts/score_planner_policy_chain.py"
 RECORDS_DIR = REPOSITORY / "docs" / "research"
 INDEX_FILE = REPOSITORY / "docs" / "measurements_index.md"
+#: Rules 2 and 37: develop as origin holds it, read after the scorer's own fetch. The
+#: remote-tracking ref is named in full, so that no local branch or tag of that name is read.
+REMOTE = "origin"
+TRACKING = f"refs/remotes/{REMOTE}"
+DEVELOP = f"{TRACKING}/develop"
 #: Rule 28: the two readings and the gameweek each one waits for.
 READINGS: dict[str, int] = {"gw20": 20, "gw38": 38}
 ARMS: tuple[str, ...] = ("served_3", "served_5", "hold_3", "hold_5", "one_week")
@@ -116,6 +125,37 @@ BINDING_SOURCE: tuple[str, ...] = (
     "src/squadopt/prediction/football.py",
 )
 RELEASE_TAG_PREFIX = f"site-{SEASON}-gw"
+#: Rule 3: the tag shape the Pages workflow deploys (``.github/workflows/deploy-pages.yml``). A
+#: tag outside it, or a lightweight tag, which that workflow rejects, deployed nothing.
+RELEASE_TAG = re.compile(rf"{re.escape(RELEASE_TAG_PREFIX)}\d{{2}}-(?:decision|settled|fix\d+)")
+#: Rule 3: how this scorer reads "the release tag live at the week's deadline", which the
+#: protocol leaves to it; stated in each record.
+RELEASE_RULE = (
+    "The release live at a week's deadline is the latest annotated tag whose name has the shape "
+    f"the Pages workflow deploys ({RELEASE_TAG_PREFIX}NN-decision, -settled or -fixN) and whose "
+    "tagger instant falls strictly before the deadline. The tags read are origin's, as git "
+    "ls-remote lists them, each recorded with its object id, and this checkout must hold every "
+    "one of them under origin's object id. A tag of that shape that only this checkout holds is "
+    "recorded as not on origin, and a week whose latest tag it would be is left unknown, as is a "
+    "week with no such tag before its deadline or two at the latest instant. Only git is read: "
+    "whether and when the workflow deployed a tag, a refused or stopped dispatch, a manual "
+    "upload and a dashboard rollback are not."
+)
+#: Rule 3: a week whose release is unknown.
+RELEASE_UNKNOWN: Mapping[str, object] = {
+    "release_tag": None,
+    "release_tag_object": None,
+    "planner_source_same": None,
+    "binding_source_same": None,
+}
+#: Rules 28 and 37: what a reading taken twice is to this scorer, which the protocol leaves to
+#: it; stated in each record.
+ONCE_RULE = (
+    "A reading is refused as taken when its record or its twin exists in the checkout or in any "
+    "other worktree of this repository, or was touched by any commit reachable from any ref or "
+    "reflog once the scorer has fetched every branch from origin. A reading written in a "
+    "separate clone is seen only once it is committed there and pushed to a branch on origin."
+)
 PINNED_PACKAGES: tuple[str, ...] = ("ortools", "numpy", "pandas")
 #: Rule 31, stated beside every interval.
 COVERAGE_NOTE = (
@@ -134,29 +174,95 @@ class ScorerError(RuntimeError):
 
 
 def _git(*arguments: str, cwd: Path | None = None) -> str:
-    completed = subprocess.run(
-        ["git", *arguments],
-        cwd=REPOSITORY if cwd is None else cwd,
-        capture_output=True,
-        text=True,
-        check=True,
-    )
+    """A git command's output. A command git refuses refuses the reading, in git's words."""
+
+    try:
+        completed = subprocess.run(
+            ["git", *arguments],
+            cwd=REPOSITORY if cwd is None else cwd,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            check=True,
+        )
+    except subprocess.CalledProcessError as error:
+        raise ScorerError(f"git {arguments[0]} failed: {error.stderr.strip()}") from error
+    except (OSError, ValueError) as error:
+        raise ScorerError(f"git {arguments[0]} cannot be run or read: {error}") from error
     return completed.stdout.strip()
 
 
-def _git_bytes(*arguments: str) -> bytes:
-    return subprocess.run(
-        ["git", *arguments], cwd=REPOSITORY, capture_output=True, check=True
-    ).stdout
+def _git_bytes(*arguments: str, cwd: Path | None = None) -> bytes:
+    """A git command's bytes, such as a file at a commit. A command git refuses refuses the
+    reading, in git's words."""
+
+    try:
+        return subprocess.run(
+            ["git", *arguments],
+            cwd=REPOSITORY if cwd is None else cwd,
+            capture_output=True,
+            check=True,
+        ).stdout
+    except subprocess.CalledProcessError as error:
+        detail = error.stderr.decode("utf-8", "replace").strip()
+        raise ScorerError(f"git {arguments[0]} failed: {detail}") from error
+    except OSError as error:
+        raise ScorerError(f"git {arguments[0]} cannot be run: {error}") from error
+
+
+def _git_code(*arguments: str) -> int:
+    """The exit code of a git command that answers by it, such as ``merge-base --is-ancestor``."""
+
+    try:
+        return subprocess.run(["git", *arguments], cwd=REPOSITORY, capture_output=True).returncode
+    except OSError as error:
+        raise ScorerError(f"git {arguments[0]} cannot be run: {error}") from error
 
 
 def _instant(text: str) -> datetime:
-    moment = datetime.fromisoformat(text.replace("Z", "+00:00"))
-    return moment if moment.tzinfo else moment.replace(tzinfo=UTC)
+    """An instant git states, in UTC. One that is not an instant, or names no time zone, is
+    refused."""
+
+    try:
+        moment = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError as error:
+        raise ScorerError(f"The instant {text!r} cannot be read: {error}") from error
+    if moment.tzinfo is None:
+        raise ScorerError(f"The instant {text!r} names no time zone.")
+    return moment.astimezone(UTC)
+
+
+def fetch_origin() -> str:
+    """Rules 2, 3, 28 and 37: what origin holds now, fetched before any history is read.
+
+    A clean checkout of the scorer's merge commit cannot hold a commit made after it. So every
+    branch on origin is fetched into the remote-tracking refs, and the season's release tags into
+    the tags, before the merge commit, the readings already taken or the release tags are read.
+    A release tag held here under another object than origin's is not overwritten: the fetch
+    fails, and the reading is refused. Nothing is pruned, whatever the checkout's settings, so a
+    branch or tag that origin no longer holds stays readable. Returns the commit develop is at on
+    origin.
+    """
+
+    _git(
+        "fetch",
+        "--no-prune",
+        REMOTE,
+        f"+refs/heads/*:{TRACKING}/*",
+        f"refs/tags/{RELEASE_TAG_PREFIX}*:refs/tags/{RELEASE_TAG_PREFIX}*",
+    )
+    return _git("rev-parse", "--verify", f"{DEVELOP}^{{commit}}")
 
 
 def scorer_merge(root: Path | None = None) -> dict[str, str]:
-    """Rule 37: the commit on develop's first-parent line that added this scorer."""
+    """Rules 2 and 37: the commit on develop's first-parent line, as origin holds it, that added
+    this scorer.
+
+    Each commit is compared with its first parent, so a squash merge is found as the squash
+    commit and a normal merge as the merge commit, never as the feature commit that wrote the
+    file on its branch. The line is develop's, not HEAD's own, so a checkout of a branch that
+    develop never took finds no merge. The instant is the committer's, in UTC.
+    """
 
     added = _git(
         "log",
@@ -166,53 +272,182 @@ def scorer_merge(root: Path | None = None) -> dict[str, str]:
         "--no-patch",
         "--format=%H %cI",
         "-1",
+        DEVELOP,
         "--",
         SCORER_FILE,
         cwd=root,
     )
     if not added:
-        raise ScorerError(f"{SCORER_FILE} has no commit; the scorer has not merged.")
+        raise ScorerError(
+            f"{SCORER_FILE} has no commit on {DEVELOP}'s first-parent line; the scorer has "
+            "not merged."
+        )
     sha, instant = added.split(" ", 1)
     return {"commit": sha, "committed_utc": _instant(instant).isoformat()}
 
 
 def source_identity() -> dict[str, object]:
-    """Rule 37: a clean checkout at the scorer's merge commit, and the bytes it runs."""
+    """Rules 2 and 37: a clean checkout at the scorer's merge commit on develop, and the bytes it
+    runs.
+
+    Origin is fetched first, so develop is read as origin holds it now. A shallow clone is
+    refused: its last commit seems to add every file, and history before it cannot be read.
+    """
 
     if _git("status", "--porcelain"):
         raise ScorerError("The checkout is not clean; the scorer's source cannot be named.")
     if not Path(squadopt.__file__).resolve().is_relative_to(REPOSITORY / "src"):
         raise ScorerError("squadopt does not resolve into this checkout's src/.")
+    if _git("rev-parse", "--is-shallow-repository") != "false":
+        raise ScorerError(
+            "The checkout is a shallow clone; develop's line and the readings already taken "
+            "cannot be read whole."
+        )
+    develop = fetch_origin()
     merge = scorer_merge()
     head = _git("rev-parse", "HEAD")
     if head != merge["commit"]:
         raise ScorerError(f"Run from the scorer's merge commit {merge['commit']}; HEAD is {head}.")
+    if _git_code("merge-base", "--is-ancestor", head, DEVELOP) != 0:
+        raise ScorerError(
+            f"HEAD {head} is not an ancestor of {DEVELOP}; the scorer has not merged."
+        )
     return {
         "scorer_merge_commit": merge["commit"],
         "scorer_merged_utc": merge["committed_utc"],
         "scorer_sha256": hashlib.sha256(_git_bytes("show", f"HEAD:{SCORER_FILE}")).hexdigest(),
         "protocol_sha256": hashlib.sha256(_git_bytes("show", f"HEAD:{PROTOCOL_FILE}")).hexdigest(),
+        "develop_commit": develop,
         "python": platform.python_version(),
         "platform": {"system": platform.system(), "machine": platform.machine()},
         "versions": {name: package_metadata.version(name) for name in PINNED_PACKAGES},
     }
 
 
-def release_at(deadline: datetime) -> str | None:
-    """Rule 3: the release tag live at the deadline, read as the latest tag created before it."""
+# Rules 28, 31 and 37: a reading is taken once
 
+
+def record_paths(reading: str) -> tuple[str, str]:
+    """Rule 36: the record and the twin a reading commits, as paths in the repository."""
+
+    stem = f"docs/research/planner_policy_chain_{reading}"
+    return f"{stem}.json", f"{stem}.md"
+
+
+def committed_reading(reading: str) -> str | None:
+    """Rules 28 and 37: the newest commit on any ref or reflog that touched the reading's record
+    or twin.
+
+    Read after ``source_identity`` has fetched every branch from origin, so a reading committed
+    in another checkout and pushed to any branch is found, and so is one deleted later, or one
+    whose commit a later push dropped from its branch after this repository had fetched it.
+    """
+
+    return (
+        _git("log", "--all", "--reflog", "-1", "--format=%H", "--", *record_paths(reading)) or None
+    )
+
+
+def written_reading(reading: str) -> str | None:
+    """Rules 28 and 37: the reading's record or twin on disk in any worktree of this
+    repository, committed or not, so a reading written in one worktree is found from another."""
+
+    for line in _git("worktree", "list", "--porcelain").splitlines():
+        if not line.startswith("worktree "):
+            continue
+        root = Path(line.removeprefix("worktree "))
+        for path in record_paths(reading):
+            if (root / path).exists():
+                return str(root / path)
+    return None
+
+
+# Rule 3: the release live at each deadline
+
+
+@dataclass(frozen=True)
+class ReleaseTag:
+    """Rule 3: one release tag, as origin holds it, or as only this checkout holds it."""
+
+    name: str
+    object_id: str
+    commit: str
+    created: datetime
+    on_origin: bool = True
+
+    def to_json(self) -> dict[str, object]:
+        return {
+            "name": self.name,
+            "object_id": self.object_id,
+            "commit": self.commit,
+            "created_utc": self.created.isoformat(),
+            "on_origin": self.on_origin,
+        }
+
+
+def release_tags() -> tuple[ReleaseTag, ...]:
+    """Rule 3: the season's release tags, each with its object id, oldest first.
+
+    Origin names the tags and their objects (``git ls-remote``). The tagger instant and the
+    commit are read here from the same object, so a tag of origin's missing here, or held here
+    under another object, is refused. A tag of that shape that only this checkout holds is kept
+    and marked as not on origin: a deployed tag can go missing from origin
+    (docs/architecture/branching.md, "Tag namespaces"), and no week may read an older tag in its
+    place. A lightweight tag, or a name outside the shape the Pages workflow deploys, deployed
+    nothing and is left out.
+    """
+
+    origin: dict[str, str] = {}
+    annotated: set[str] = set()
+    listed = _git("ls-remote", "--tags", REMOTE, f"refs/tags/{RELEASE_TAG_PREFIX}*")
+    for line in listed.splitlines():
+        object_id, _, ref = line.partition("\t")
+        name = ref.removeprefix("refs/tags/")
+        if name.endswith("^{}"):
+            annotated.add(name.removesuffix("^{}"))
+        else:
+            origin[name] = object_id
+    here: dict[str, tuple[str, str, str]] = {}
     listing = _git(
         "for-each-ref",
-        "--sort=creatordate",
-        "--format=%(refname:short) %(creatordate:iso8601-strict)",
+        "--format=%(refname:strip=2)%09%(objectname)%09%(*objectname)"
+        "%09%(creatordate:iso8601-strict)",
         f"refs/tags/{RELEASE_TAG_PREFIX}*",
     )
-    live = None
     for line in listing.splitlines():
-        name, _, created = line.partition(" ")
-        if created and _instant(created) <= deadline:
-            live = name
-    return live
+        name, object_id, commit, created = line.split("\t")
+        here[name] = (object_id, commit, created)
+    tags: list[ReleaseTag] = []
+    for name, object_id in sorted(origin.items()):
+        if name not in annotated or not RELEASE_TAG.fullmatch(name):
+            continue
+        held = here.get(name)
+        if held is None or held[0] != object_id:
+            raise ScorerError(
+                f"Release tag {name} is {object_id} on origin and "
+                f"{held[0] if held else 'absent'} here; this checkout's tags must be origin's."
+            )
+        tags.append(ReleaseTag(name, object_id, held[1], _instant(held[2])))
+    # A lightweight tag has no object under it, so its commit field is empty and it is left out.
+    for name, (object_id, commit, created) in sorted(here.items()):
+        if name not in origin and commit and RELEASE_TAG.fullmatch(name):
+            tags.append(ReleaseTag(name, object_id, commit, _instant(created), on_origin=False))
+    return tuple(sorted(tags, key=lambda tag: (tag.created, tag.name)))
+
+
+def release_at(deadline: datetime, tags: Sequence[ReleaseTag]) -> ReleaseTag | None:
+    """Rule 3: the release tag live at the deadline, read as the latest tag created strictly
+    before it. None before the first tag, when two tags share that latest instant, or when the
+    latest is a tag origin does not list."""
+
+    before = [tag for tag in tags if tag.created < deadline]
+    if not before:
+        return None
+    latest = max(tag.created for tag in before)
+    at_latest = [tag for tag in before if tag.created == latest]
+    if len(at_latest) != 1 or not at_latest[0].on_origin:
+        return None
+    return at_latest[0]
 
 
 def _diff_quiet(left: str, right: str, paths: Sequence[str]) -> bool | None:
@@ -229,21 +464,25 @@ def _diff_quiet(left: str, right: str, paths: Sequence[str]) -> bool | None:
     return None
 
 
-def release_binding(deadline: datetime, frozen_commit: str) -> dict[str, object]:
+def release_binding(
+    deadline: datetime, frozen_commit: str, tags: Sequence[ReleaseTag]
+) -> dict[str, object]:
     """Rule 3: whether the live release carried the frozen commit's planner and binding source.
 
     The test is fixed by the protocol: ``git diff --quiet <release tag> <frozen commit> --
-    <paths>``. An empty diff means the same source; a non-empty one means the release
-    differed; no tag before the deadline, or a diff git cannot take, is recorded as unknown.
+    <paths>``, run on the tag's object as origin holds it. An empty diff means the same source;
+    a non-empty one means the release differed; no release known at the deadline, or a diff git
+    cannot take, is recorded as unknown.
     """
 
-    tag = release_at(deadline)
+    tag = release_at(deadline, tags)
     if tag is None:
-        return {"release_tag": None, "planner_source_same": None, "binding_source_same": None}
+        return dict(RELEASE_UNKNOWN)
     return {
-        "release_tag": tag,
-        "planner_source_same": _diff_quiet(tag, frozen_commit, PLANNER_SOURCE),
-        "binding_source_same": _diff_quiet(tag, frozen_commit, BINDING_SOURCE),
+        "release_tag": tag.name,
+        "release_tag_object": tag.object_id,
+        "planner_source_same": _diff_quiet(tag.object_id, frozen_commit, PLANNER_SOURCE),
+        "binding_source_same": _diff_quiet(tag.object_id, frozen_commit, BINDING_SOURCE),
     }
 
 
@@ -736,6 +975,7 @@ def reading_record(
     captures: Sequence[CapturedSnapshot],
     identity: Mapping[str, object],
     binding: Any,
+    tags: Sequence[ReleaseTag] = (),
 ) -> dict[str, Any]:
     final = reading == "gw38"
     frozen = str(protocol.get("repository_commit", ""))
@@ -746,7 +986,7 @@ def reading_record(
         scored = score_week(week, outcome)
         weeks.append(scored)
         deadline = outcome.deadline_utc or cast(str | None, week.receipt.get("deadline_utc"))
-        release = binding(as_instant(deadline), frozen) if deadline else {"release_tag": None}
+        release = binding(as_instant(deadline), frozen) if deadline else dict(RELEASE_UNKNOWN)
         listed.append(
             {
                 "gameweek": week.gameweek,
@@ -877,6 +1117,9 @@ def reading_record(
         "outcome_read": True,
         "locked_holdout_accessed": False,
         "binding_source_test": "git diff --quiet <release tag> <frozen commit> -- <paths>",
+        "release_rule": RELEASE_RULE,
+        "release_tags": [tag.to_json() for tag in tags],
+        "once_rule": ONCE_RULE,
         "planner_source": list(PLANNER_SOURCE),
         "binding_source": list(BINDING_SOURCE),
     }
@@ -954,6 +1197,7 @@ def render_markdown(record: Mapping[str, Any]) -> str:
                 week["missing_reason"] or week["unscored_reason"] or "",
             )
         )
+    lines += ["", record["release_rule"]]
     lines += [
         "",
         "## Primary contrasts",
@@ -1082,7 +1326,13 @@ def score(
     records_dir: Path = RECORDS_DIR,
     index_file: Path = INDEX_FILE,
 ) -> dict[str, Any]:
-    """Rules 28 and 37: take one reading, once, from the scorer's own merge commit."""
+    """Rules 28 and 37: take one reading, once, from the scorer's own merge commit.
+
+    Every refusal that needs no outcome comes before the first capture is read: the reading's
+    name, its record in the checkout, the scorer's identity after a fetch of origin, its record
+    in committed history or in another worktree, and the release tags. ``records_dir`` and
+    ``index_file`` are for tests; the command line writes only where rule 36 names.
+    """
 
     if reading not in READINGS:
         raise ScorerError(f"The protocol names no reading {reading!r}; it names gw20 and gw38.")
@@ -1091,6 +1341,16 @@ def score(
     if target.exists() or twin.exists():
         raise ScorerError(f"The {reading} reading was taken already: {target} exists.")
     identity = source_identity()
+    committed = committed_reading(reading)
+    if committed is not None:
+        raise ScorerError(
+            f"The {reading} reading was taken already: its record is in committed history at "
+            f"{committed}."
+        )
+    written = written_reading(reading)
+    if written is not None:
+        raise ScorerError(f"The {reading} reading was taken already: {written} exists.")
+    tags = release_tags()
     captures = _captures(snapshot_root)
     gameweek = READINGS[reading]
     if not settled(captures, gameweek):
@@ -1104,7 +1364,8 @@ def score(
         evidence=weeks,
         captures=captures,
         identity=identity,
-        binding=release_binding,
+        binding=lambda deadline, frozen: release_binding(deadline, frozen, tags),
+        tags=tags,
     )
     records_dir.mkdir(parents=True, exist_ok=True)
     write_document_once(record, target)
@@ -1125,17 +1386,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--evidence", type=Path, required=True)
     parser.add_argument("--snapshot-root", type=Path, required=True)
     parser.add_argument("--reading", choices=sorted(READINGS), required=True)
-    parser.add_argument("--records-dir", type=Path, default=RECORDS_DIR)
-    parser.add_argument("--index-file", type=Path, default=INDEX_FILE)
     arguments = parser.parse_args(argv)
     try:
-        record = score(
-            arguments.evidence,
-            arguments.snapshot_root,
-            arguments.reading,
-            records_dir=arguments.records_dir,
-            index_file=arguments.index_file,
-        )
+        # Rules 36 and 37: the command line writes only where the protocol names, so a reading
+        # cannot be taken again into another place.
+        record = score(arguments.evidence, arguments.snapshot_root, arguments.reading)
     except ScorerError as error:
         print(f"refused: {error}", file=sys.stderr)
         return 2

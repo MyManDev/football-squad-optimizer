@@ -8,9 +8,11 @@ or live store is touched.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from datetime import timedelta
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -173,15 +175,21 @@ def _world(
 
 
 def _identity(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The scorer's identity, its checks for a reading taken already and origin's release tags,
+    stubbed: no git runs."""
+
     monkeypatch.setattr(
         scorer,
         "source_identity",
         lambda: {"scorer_merge_commit": "c" * 40, "scorer_sha256": "d" * 64},
     )
+    monkeypatch.setattr(scorer, "committed_reading", lambda reading: None)
+    monkeypatch.setattr(scorer, "written_reading", lambda reading: None)
+    monkeypatch.setattr(scorer, "release_tags", lambda: ())
     monkeypatch.setattr(
         scorer,
         "release_binding",
-        lambda deadline, frozen: {
+        lambda deadline, frozen, tags: {
             "release_tag": "site-2026-27-gw06-fix16",
             "planner_source_same": True,
             "binding_source_same": frozen == "b",
@@ -202,6 +210,8 @@ def test_the_interim_reading_scores_every_week_and_pairs_the_arms(
     record = scorer.score(evidence, snapshots, "gw20", records_dir=records, index_file=index)
     assert record["final"] is False and record["outcome_read"] is True
     assert record["locked_holdout_accessed"] is False
+    assert record["once_rule"] == scorer.ONCE_RULE
+    assert record["release_rule"] == scorer.RELEASE_RULE and record["release_tags"] == []
     assert [week["gameweek"] for week in record["weeks"]] == list(range(6, 21))
     assert all(week["scored_chains"] == 15 for week in record["weeks"])
     assert all(week["release"]["binding_source_same"] is True for week in record["weeks"])
@@ -232,6 +242,7 @@ def test_the_interim_reading_scores_every_week_and_pairs_the_arms(
     assert written == record
     twin = (records / "planner_policy_chain_gw20.md").read_text(encoding="utf-8")
     assert "+4.000" in twin and "+5.000" in twin and "none (interim)" in twin
+    assert scorer.RELEASE_RULE in twin
     index_text = index.read_text(encoding="utf-8")
     assert index_text.count("- [Planner policy chain, gw20 reading]") == 1
     assert index_text.startswith("# Measurements Index")
@@ -407,17 +418,51 @@ def test_the_reading_refuses_what_the_protocol_refuses(
 def test_the_scorer_runs_only_from_its_own_merge_commit_on_a_clean_tree(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Rules 2 and 37: a clean tree, then a fetch of origin, then the add commit looked for on
+    origin's develop line; HEAD must equal it and be an ancestor of develop."""
+
+    asked: list[tuple[str, ...]] = []
+
     def git(*arguments: str, cwd: Path | None = None) -> str:
-        if arguments[:1] == ("status",):
+        asked.append(arguments)
+        if arguments[:1] in (("status",), ("fetch",)):
             return ""
+        if arguments[:2] == ("rev-parse", "--is-shallow-repository"):
+            return "false"
+        if arguments[:2] == ("rev-parse", "--verify"):
+            return "tip"
         if arguments[:2] == ("rev-parse", "HEAD"):
             return "head"
         if arguments[:1] == ("log",):
-            return "merge 2026-10-20T10:00:00+00:00"
+            return "merge 2026-10-20T13:00:00+03:00"
         raise AssertionError(arguments)
 
     monkeypatch.setattr(scorer, "_git", git)
+    monkeypatch.setattr(scorer, "_git_code", lambda *arguments: 0)
     with pytest.raises(scorer.ScorerError, match="merge commit merge; HEAD is head"):
+        scorer.source_identity()
+    commands = [arguments[0] for arguments in asked]
+    assert commands.index("fetch") < commands.index("log")
+    log = asked[commands.index("log")]
+    assert log[log.index("--") - 1] == scorer.DEVELOP == "refs/remotes/origin/develop"
+    # Rule 2: the committer instant, recorded in UTC whatever offset the commit carries.
+    assert scorer.scorer_merge()["committed_utc"] == "2026-10-20T10:00:00+00:00"
+
+    def at_merge(*arguments: str, cwd: Path | None = None) -> str:
+        if arguments[:1] == ("log",):
+            return "merge 2026-10-20T10:00:00Z"
+        if arguments[:2] == ("rev-parse", "--is-shallow-repository"):
+            return "false"
+        return "merge" if arguments[:1] == ("rev-parse",) else ""
+
+    monkeypatch.setattr(scorer, "_git", at_merge)
+    monkeypatch.setattr(scorer, "_git_code", lambda *arguments: 1)
+    with pytest.raises(scorer.ScorerError, match="not an ancestor of refs/remotes/origin/develop"):
+        scorer.source_identity()
+    monkeypatch.setattr(
+        scorer, "_git", lambda *a, **k: "true" if "--is-shallow-repository" in a else ""
+    )
+    with pytest.raises(scorer.ScorerError, match="shallow clone"):
         scorer.source_identity()
     monkeypatch.setattr(scorer, "_git", lambda *a, **k: "dirty" if a[:1] == ("status",) else "x")
     with pytest.raises(scorer.ScorerError, match="not clean"):
@@ -425,6 +470,243 @@ def test_the_scorer_runs_only_from_its_own_merge_commit_on_a_clean_tree(
     monkeypatch.setattr(scorer, "_git", lambda *a, **k: "")
     with pytest.raises(scorer.ScorerError, match="has not merged"):
         scorer.scorer_merge()
+
+
+# Rules 2, 28 and 37 on a real history: origin, a kept feature branch and develop's squash
+
+
+def _git_in(root: Path, *arguments: str, when: str | None = None) -> str:
+    """Git in a temporary repository, with a fixed identity, and with ``when`` as the author's,
+    the committer's and the tagger's instant."""
+
+    environment = dict(os.environ)
+    if when is not None:
+        environment |= {"GIT_AUTHOR_DATE": when, "GIT_COMMITTER_DATE": when}
+    return subprocess.run(
+        ["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", *arguments],
+        cwd=root,
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        env=environment,
+    ).stdout.strip()
+
+
+def _commit(work: Path, files: dict[str, str], message: str, when: str) -> str:
+    for path, text in files.items():
+        target = work / path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(text, encoding="utf-8")
+    _git_in(work, "add", "-A")
+    _git_in(work, "commit", "-q", "-m", message, when=when)
+    return _git_in(work, "rev-parse", "HEAD")
+
+
+def _repository(tmp_path: Path) -> Path:
+    """Origin holds develop with the protocol, and a kept branch whose feature commit added the
+    scorer, which develop has not taken yet. Returns the clone the history is written from."""
+
+    origin, work = tmp_path / "origin.git", tmp_path / "work"
+    _git_in(tmp_path, "init", "-q", "--bare", "-b", "develop", str(origin))
+    _git_in(tmp_path, "init", "-q", "-b", "develop", str(work))
+    _git_in(work, "remote", "add", "origin", str(origin))
+    _commit(
+        work,
+        {scorer.PROTOCOL_FILE: "protocol\n", "docs/measurements_index.md": "# Index\n"},
+        "the protocol",
+        "2026-10-01T09:00:00+03:00",
+    )
+    _git_in(work, "push", "-q", "origin", "develop")
+    _git_in(work, "switch", "-q", "-c", "scorer")
+    _commit(work, {scorer.SCORER_FILE: "scorer\n"}, "add the scorer", "2026-10-07T20:00:00+03:00")
+    _git_in(work, "push", "-q", "origin", "scorer")
+    _git_in(work, "switch", "-q", "develop")
+    return work
+
+
+def _squash(work: Path) -> str:
+    """Develop takes the kept branch as one squash commit, made at 21:30 in UTC+3."""
+
+    _git_in(work, "merge", "-q", "--squash", "scorer")
+    _git_in(work, "commit", "-q", "-m", "the scorer, squashed", when="2026-10-08T21:30:00+03:00")
+    _git_in(work, "push", "-q", "origin", "develop")
+    return _git_in(work, "rev-parse", "HEAD")
+
+
+def _checkout(tmp_path: Path, commit: str, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """A fresh clone of origin, clean at ``commit``, that the scorer runs from."""
+
+    checkout = tmp_path / "checkout"
+    _git_in(tmp_path, "clone", "-q", str(tmp_path / "origin.git"), str(checkout))
+    _git_in(checkout, "switch", "-q", "--detach", commit)
+    monkeypatch.setattr(scorer, "REPOSITORY", checkout)
+    package = checkout / "src" / "squadopt" / "__init__.py"
+    monkeypatch.setattr(scorer, "squadopt", SimpleNamespace(__file__=str(package)))
+    return checkout
+
+
+def test_the_merge_commit_is_develop_s_squash_commit_never_the_feature_commit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Rules 2 and 37 on a real history: the scorer's merge is the commit on origin's develop
+    first-parent line that added it. A clean checkout of the kept branch's feature commit is
+    refused before develop takes it and after; the squash commit runs, found by the scorer's own
+    fetch, and its instant is recorded in UTC."""
+
+    work = _repository(tmp_path)
+    feature = _git_in(work, "rev-parse", "scorer")
+    checkout = _checkout(tmp_path, feature, monkeypatch)
+    with pytest.raises(scorer.ScorerError, match="has not merged"):
+        scorer.source_identity()
+    squash = _squash(work)
+    with pytest.raises(scorer.ScorerError, match=f"merge commit {squash}; HEAD is {feature}"):
+        scorer.source_identity()
+    _git_in(checkout, "switch", "-q", "--detach", squash)
+    identity = scorer.source_identity()
+    assert identity["scorer_merge_commit"] == squash != feature
+    assert identity["scorer_merged_utc"] == "2026-10-08T18:30:00+00:00"
+    assert identity["develop_commit"] == squash
+    assert _git_in(checkout, "status", "--porcelain") == ""
+    # Origin out of reach refuses the reading: develop is never read stale.
+    _git_in(checkout, "remote", "set-url", "origin", str(tmp_path / "gone.git"))
+    with pytest.raises(scorer.ScorerError, match="git fetch failed"):
+        scorer.source_identity()
+    # A shallow clone of a later develop is refused: its one commit seems to add every file.
+    _commit(work, {"later.txt": "later\n"}, "a later change", "2026-10-09T09:00:00+03:00")
+    _git_in(work, "push", "-q", "origin", "develop")
+    shallow = tmp_path / "shallow"
+    origin = (tmp_path / "origin.git").as_uri()
+    _git_in(tmp_path, "clone", "-q", "--depth", "1", origin, str(shallow))
+    monkeypatch.setattr(scorer, "REPOSITORY", shallow)
+    package = shallow / "src" / "squadopt" / "__init__.py"
+    monkeypatch.setattr(scorer, "squadopt", SimpleNamespace(__file__=str(package)))
+    with pytest.raises(scorer.ScorerError, match="shallow clone"):
+        scorer.source_identity()
+
+
+def test_a_reading_committed_after_the_merge_is_refused_as_taken_twice(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Rules 28, 31 and 37: a clean checkout of the merge commit cannot hold a reading committed
+    after it. The scorer fetches origin and refuses a record found in committed history on any
+    branch, or in a reflog, before it reads any capture."""
+
+    work = _repository(tmp_path)
+    squash = _squash(work)
+    checkout = _checkout(tmp_path, squash, monkeypatch)
+    read: list[Path] = []
+    monkeypatch.setattr(scorer, "_captures", lambda root: read.append(root) or [])
+    records, index = checkout / "docs" / "research", checkout / "docs" / "measurements_index.md"
+
+    def take(reading: str) -> None:
+        scorer.score(
+            tmp_path / "evidence",
+            tmp_path / "snapshots",
+            reading,
+            records_dir=records,
+            index_file=index,
+        )
+
+    # Nothing is taken yet: the check passes, and the reading waits for its gameweek.
+    with pytest.raises(scorer.ScorerError, match="has not settled"):
+        take("gw20")
+    # gw20 is taken in another checkout and committed on develop after the scorer's merge.
+    taken = _commit(
+        work,
+        {
+            "docs/research/planner_policy_chain_gw20.json": "{}\n",
+            "docs/research/planner_policy_chain_gw20.md": "# gw20\n",
+        },
+        "the gw20 reading",
+        "2027-01-02T12:00:00+03:00",
+    )
+    _git_in(work, "push", "-q", "origin", "develop")
+    # gw38's twin alone is committed on a branch develop has not taken.
+    _git_in(work, "switch", "-q", "-c", "reading-gw38")
+    side = _commit(
+        work,
+        {"docs/research/planner_policy_chain_gw38.md": "# gw38\n"},
+        "the gw38 reading",
+        "2027-05-30T12:00:00+03:00",
+    )
+    _git_in(work, "push", "-q", "origin", "reading-gw38")
+    read.clear()
+    assert not (records / "planner_policy_chain_gw20.json").exists()
+    with pytest.raises(scorer.ScorerError, match=rf"gw20 reading was taken already: .* at {taken}"):
+        take("gw20")
+    with pytest.raises(scorer.ScorerError, match=rf"gw38 reading was taken already: .* at {side}"):
+        take("gw38")
+    # A reading commit that a later push drops from its branch is still found, once this
+    # repository has fetched it: the remote-tracking ref's reflog holds it.
+    _git_in(work, "push", "-q", "--force", "origin", f"{squash}:refs/heads/reading-gw38")
+    with pytest.raises(scorer.ScorerError, match=rf"gw38 reading was taken already: .* at {side}"):
+        take("gw38")
+    # With every reflog expired, as gc expires old entries between the two readings, a reading
+    # on a branch is still found from the branch itself.
+    _git_in(checkout, "reflog", "expire", "--expire=all", "--all")
+    with pytest.raises(scorer.ScorerError, match=rf"gw20 reading was taken already: .* at {taken}"):
+        take("gw20")
+    assert read == []
+    assert _git_in(checkout, "rev-parse", "HEAD") == squash
+    assert _git_in(checkout, "status", "--porcelain") == ""
+
+
+def test_a_reading_written_in_another_worktree_is_refused_as_taken_twice(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Rules 28 and 37: a reading written in one worktree of the repository and not committed
+    is found from another clean worktree of the merge commit, before any capture is read."""
+
+    work = _repository(tmp_path)
+    squash = _squash(work)
+    checkout = _checkout(tmp_path, squash, monkeypatch)
+    read: list[Path] = []
+    monkeypatch.setattr(scorer, "_captures", lambda root: read.append(root) or [])
+    other = tmp_path / "other"
+    _git_in(checkout, "worktree", "add", "--detach", str(other), squash)
+    twin = other / "docs" / "research" / "planner_policy_chain_gw20.md"
+    twin.write_text("# gw20\n", encoding="utf-8")
+    paths = {
+        "records_dir": checkout / "docs" / "research",
+        "index_file": checkout / "docs" / "measurements_index.md",
+    }
+    with pytest.raises(scorer.ScorerError, match=r"gw20 reading was taken already: .*other"):
+        scorer.score(tmp_path / "evidence", tmp_path / "snapshots", "gw20", **paths)
+    assert read == []
+    # Another reading's record is no bar: gw38 goes on to wait for its gameweek.
+    with pytest.raises(scorer.ScorerError, match="has not settled"):
+        scorer.score(tmp_path / "evidence", tmp_path / "snapshots", "gw38", **paths)
+    assert read == [tmp_path / "snapshots"]
+    assert _git_in(checkout, "status", "--porcelain") == ""
+
+
+def test_no_capture_is_read_before_the_refusals_that_need_no_outcome(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Rule 28: the reading's record in committed history, its record in another worktree and
+    origin's release tags are checked before the first capture is read, in that order."""
+
+    read: list[Path] = []
+    monkeypatch.setattr(scorer, "_captures", lambda root: read.append(root) or [])
+    monkeypatch.setattr(scorer, "source_identity", lambda: {})
+
+    def tags_refused() -> tuple[scorer.ReleaseTag, ...]:
+        raise scorer.ScorerError("a release tag differs from origin's")
+
+    monkeypatch.setattr(scorer, "release_tags", tags_refused)
+    paths = {"records_dir": tmp_path / "records", "index_file": tmp_path / "index.md"}
+    monkeypatch.setattr(scorer, "committed_reading", lambda reading: "a" * 40)
+    monkeypatch.setattr(scorer, "written_reading", lambda reading: "elsewhere.md")
+    with pytest.raises(scorer.ScorerError, match=r"committed history at a{40}"):
+        scorer.score(tmp_path, tmp_path, "gw20", **paths)
+    monkeypatch.setattr(scorer, "committed_reading", lambda reading: None)
+    with pytest.raises(scorer.ScorerError, match=r"taken already: elsewhere.md exists"):
+        scorer.score(tmp_path, tmp_path, "gw20", **paths)
+    monkeypatch.setattr(scorer, "written_reading", lambda reading: None)
+    with pytest.raises(scorer.ScorerError, match="differs from origin's"):
+        scorer.score(tmp_path, tmp_path, "gw20", **paths)
+    assert read == [] and not (tmp_path / "records").exists()
 
 
 @pytest.mark.parametrize(
@@ -491,15 +773,21 @@ def test_the_outcome_capture_is_the_latest_settled_one_with_the_live_payload(
 # Rule 3: the release tag live at the deadline, and the fixed diff test
 
 
-def test_the_release_binding_reads_the_tag_live_at_the_deadline(
+def test_the_release_binding_reads_the_tag_live_strictly_before_the_deadline(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    listing = (
-        "site-2026-27-gw06-fix15 2026-10-04T23:18:44+03:00\n"
-        "site-2026-27-gw06-fix16 2026-10-05T03:51:09+03:00\n"
-        "site-2026-27-gw07-fix1 2026-10-16T10:00:00+03:00\n"
+    """Rule 3: the latest release tag created strictly before the deadline, named with its
+    object id, on which the fixed diff test runs. None before it, a tie, or a latest tag origin
+    does not list, is unknown."""
+
+    def tag(name: str, digit: str, created: str) -> scorer.ReleaseTag:
+        return scorer.ReleaseTag(name, digit * 40, "c" * 40, scorer._instant(created))
+
+    tags = (
+        tag("site-2026-27-gw06-fix15", "1", "2026-10-04T23:18:44+03:00"),
+        tag("site-2026-27-gw06-fix16", "2", "2026-10-05T03:51:09+03:00"),
+        tag("site-2026-27-gw07-fix1", "3", "2026-10-10T13:00:00+03:00"),
     )
-    monkeypatch.setattr(scorer, "_git", lambda *a, **k: listing)
     asked: list[tuple[str, str, tuple[str, ...]]] = []
 
     def diff(left: str, right: str, paths) -> bool | None:
@@ -508,18 +796,111 @@ def test_the_release_binding_reads_the_tag_live_at_the_deadline(
 
     monkeypatch.setattr(scorer, "_diff_quiet", diff)
     deadline = scorer._instant("2026-10-10T10:00:00Z")
-    binding = scorer.release_binding(deadline, "frozen")
-    assert binding == {
+    # gw07-fix1 was made at the deadline instant itself, so it was not live at it.
+    assert scorer.release_binding(deadline, "frozen", tags) == {
         "release_tag": "site-2026-27-gw06-fix16",
+        "release_tag_object": "2" * 40,
         "planner_source_same": True,
         "binding_source_same": False,
     }
     assert asked == [
-        ("site-2026-27-gw06-fix16", "frozen", scorer.PLANNER_SOURCE),
-        ("site-2026-27-gw06-fix16", "frozen", scorer.BINDING_SOURCE),
+        ("2" * 40, "frozen", scorer.PLANNER_SOURCE),
+        ("2" * 40, "frozen", scorer.BINDING_SOURCE),
     ]
-    early = scorer.release_binding(scorer._instant("2026-09-01T10:00:00Z"), "frozen")
-    assert early["release_tag"] is None and early["planner_source_same"] is None
+    later = scorer.release_binding(deadline + timedelta(seconds=1), "frozen", tags)
+    assert later["release_tag"] == "site-2026-27-gw07-fix1"
+    early = scorer.release_binding(scorer._instant("2026-09-01T10:00:00Z"), "frozen", tags)
+    assert early == dict(scorer.RELEASE_UNKNOWN) and len(asked) == 4
+    tied = (*tags[:2], tag("site-2026-27-gw06-fix17", "4", "2026-10-05T00:51:09Z"))
+    assert scorer.release_at(deadline, tied) is None
+    # A tag origin no longer lists, as a deployed tag origin lost would be, decides no week.
+    gone = scorer.ReleaseTag(
+        "site-2026-27-gw07-fix2",
+        "5" * 40,
+        "c" * 40,
+        scorer._instant("2026-10-10T11:00:00Z"),
+        on_origin=False,
+    )
+    assert gone.to_json()["on_origin"] is False
+    assert scorer.release_at(deadline + timedelta(hours=2), (*tags, gone)) is None
+    assert scorer.release_at(deadline + timedelta(seconds=1), (*tags, gone)) == tags[2]
+    with pytest.raises(scorer.ScorerError, match="names no time zone"):
+        scorer._instant("2026-10-10T10:00:00")
+    with pytest.raises(scorer.ScorerError, match="cannot be read"):
+        scorer._instant("")
+
+
+def test_the_release_tags_are_origin_s_each_with_its_object_id(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Rule 3: the release tags are origin's, each with its object id. A lightweight tag, or a
+    name the Pages workflow does not deploy, is left out; a tag no branch holds is fetched; one
+    only this checkout holds is kept as not on origin; one held here under another object is
+    refused, and the fetch does not overwrite it."""
+
+    work = _repository(tmp_path)
+    squash = _squash(work)
+    for name, when in (
+        ("site-2026-27-gw06-fix15", "2026-10-09T10:00:00+03:00"),
+        ("site-2026-27-gw06-fix16", "2026-10-10T10:00:00+00:00"),
+        ("site-2026-27-gw04-settled-2", "2026-10-09T11:00:00+00:00"),
+    ):
+        _git_in(work, "tag", "-a", name, "-m", name, squash, when=when)
+    _git_in(work, "tag", "site-2026-27-gw06-fix14", squash)
+    _git_in(work, "push", "-q", "origin", "--tags")
+    checkout = _checkout(tmp_path, squash, monkeypatch)
+    listed = _git_in(checkout, "ls-remote", "--tags", "origin").splitlines()
+    origin = dict(reversed(line.split("\t")) for line in listed)
+    tags = scorer.release_tags()
+    assert [tag.name for tag in tags] == ["site-2026-27-gw06-fix15", "site-2026-27-gw06-fix16"]
+    assert [tag.object_id for tag in tags] == [origin[f"refs/tags/{tag.name}"] for tag in tags]
+    assert {tag.commit for tag in tags} == {squash}
+    assert tags[0].to_json()["created_utc"] == "2026-10-09T07:00:00+00:00"
+    # GW6's deadline is fix16's own instant, so fix15 is the release live at it.
+    assert scorer.release_at(scorer._instant("2026-10-10T10:00:00Z"), tags) == tags[0]
+    # A release tag on a commit no branch holds reaches this checkout only by the fetch.
+    _git_in(work, "switch", "-q", "--orphan", "hotfix")
+    lonely = _commit(work, {"hotfix": "hotfix\n"}, "a hotfix", "2026-10-09T12:00:00+00:00")
+    fix17 = "site-2026-27-gw06-fix17"
+    _git_in(work, "tag", "-a", fix17, "-m", fix17, lonely, when="2026-10-09T12:00:00+00:00")
+    _git_in(work, "push", "-q", "origin", f"refs/tags/{fix17}")
+    with pytest.raises(scorer.ScorerError, match=r"gw06-fix17 is \w+ on origin and absent"):
+        scorer.release_tags()
+    scorer.fetch_origin()
+    assert [tag.name for tag in scorer.release_tags()] == [
+        "site-2026-27-gw06-fix15",
+        "site-2026-27-gw06-fix17",
+        "site-2026-27-gw06-fix16",
+    ]
+    # A tag only this checkout holds, as a deployed tag origin lost would be, is kept by the
+    # fetch whatever the checkout's settings, read as not on origin, and decides no week.
+    _git_in(checkout, "config", "fetch.prune", "true")
+    _git_in(checkout, "config", "fetch.pruneTags", "true")
+    gw07 = "site-2026-27-gw07-fix1"
+    _git_in(checkout, "tag", "-a", gw07, "-m", "local", squash, when="2026-10-11T09:00:00+00:00")
+    # A lightweight tag only this checkout holds deployed nothing, and is left out.
+    _git_in(checkout, "tag", "site-2026-27-gw07-fix2", squash)
+    scorer.fetch_origin()
+    assert _git_in(checkout, "tag", "--list", "site-2026-27-gw07-*").split() == [
+        gw07,
+        "site-2026-27-gw07-fix2",
+    ]
+    tags = scorer.release_tags()
+    assert [tag.name for tag in tags if not tag.on_origin] == [gw07]
+    assert [(tag.name, tag.on_origin) for tag in tags[-2:]] == [
+        ("site-2026-27-gw06-fix16", True),
+        (gw07, False),
+    ]
+    assert scorer.release_at(scorer._instant("2026-10-11T08:00:00Z"), tags) == tags[-2]
+    assert scorer.release_at(scorer._instant("2026-10-11T10:00:00Z"), tags) is None
+    # A tag held here under another object is refused, and the fetch does not overwrite it.
+    fix15 = "site-2026-27-gw06-fix15"
+    moved = "2026-10-09T13:00:00+00:00"
+    _git_in(checkout, "tag", "-f", "-a", fix15, "-m", "moved", squash, when=moved)
+    with pytest.raises(scorer.ScorerError, match=r"fix15 is \w+ on origin and \w+ here"):
+        scorer.release_tags()
+    with pytest.raises(scorer.ScorerError, match="would clobber existing tag"):
+        scorer.fetch_origin()
 
 
 def test_the_diff_test_reads_git_exit_codes(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -537,24 +918,19 @@ def test_the_diff_test_reads_git_exit_codes(monkeypatch: pytest.MonkeyPatch) -> 
 def test_the_command_line_refuses_with_a_reason_and_names_only_the_two_readings(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
+    _identity(monkeypatch)
+    arguments = ["--evidence", str(tmp_path), "--snapshot-root", str(tmp_path), "--reading"]
     with pytest.raises(SystemExit) as refused:
-        scorer.main(
-            ["--evidence", str(tmp_path), "--snapshot-root", str(tmp_path), "--reading", "gw19"]
-        )
+        scorer.main([*arguments, "gw19"])
     assert refused.value.code == 2
-    monkeypatch.setattr(scorer, "source_identity", lambda: {})
-    code = scorer.main(
-        [
-            "--evidence",
-            str(tmp_path),
-            "--snapshot-root",
-            str(tmp_path),
-            "--reading",
-            "gw20",
-            "--records-dir",
-            str(tmp_path / "records"),
-            "--index-file",
-            str(tmp_path / "index.md"),
-        ]
-    )
+    # Rules 36 and 37: the command line writes only where the protocol names, so no reading
+    # can be taken again into another place.
+    for option in ("--records-dir", "--index-file"):
+        capsys.readouterr()
+        with pytest.raises(SystemExit) as elsewhere:
+            scorer.main([*arguments, "gw20", option, str(tmp_path / "elsewhere")])
+        assert elsewhere.value.code == 2
+        assert f"unrecognized arguments: {option}" in capsys.readouterr().err
+    code = scorer.main([*arguments, "gw20"])
     assert code == 2 and "refused:" in capsys.readouterr().err
+    assert not (tmp_path / "elsewhere").exists()
