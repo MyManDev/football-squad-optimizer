@@ -90,9 +90,12 @@ scores. Report this timing convention beside every archive figure.
 Candidate A has these six feature groups, fixed before data:
 
 1. Net transfers relative to ownership: `(transfers_in - transfers_out) /
-   max(selected, 1)` from the feature row. In live data use `transfers_in_event`,
+   max(selected, 6000)` from the feature row. In live data use `transfers_in_event`,
    `transfers_out_event`, and ownership count
-   `selected_by_percent * total_players / 100` from that same bootstrap.
+   `selected_by_percent * total_players / 100` from that same bootstrap, with the
+   same fixed 6000-manager denominator floor. This shared resolution prevents a
+   rounded live ownership of 0.0 from becoming a denominator of one. The floor is
+   fixed before fitting and is applied identically to archive and live rows.
 2. Last observed gameweek's price change: the feature row's value minus its
    preceding observed row's value. Live uses `cost_change_event`.
 3. Change since the season's beginning: the feature row's value minus that
@@ -137,19 +140,34 @@ a capture, call FPL, or read element-summary. Required later captures must be
 retained by the weekly operator in an authorized root.
 
 For origin g use the last pre-deadline `fpl-live` decision capture targeting g.
-Require its own season and deadline to match. Two distinct captures at the same
+Require its own season and deadline to match. For both origins and targets, the
+capture instant is the UTC time in `metadata.json`, not the directory name.
+Two distinct captures at the same
 latest instant refuse that origin; never choose by outcome. All features, P and
 candidate B fields come from this one origin capture.
 
-For target g+h, use the last capture taken strictly before its deadline and after
-the final nightly change before that deadline. Fix the nightly clock to 23:00Z,
-the nightly moment stated in #1013; take the latest such instant strictly before
-the target deadline. Validate that the target capture's three listed
-`game_config.settings.price_change_deadlines` are consecutive future nightly
-23:00Z instants. Its `price_change_last_updated` must be at or after the preceding
-nightly instant and no later than capture time. If that schedule or update check
-fails, the target deadline is missing; a changed nightly schedule needs a new
-protocol, not an inferred clock. Do not interpolate a gap or use an after-deadline price.
+For target g+h, select the latest `fpl-live` capture strictly before its deadline,
+then require its season and the following schedule and update checks to match.
+Two distinct captures at the same latest metadata instant refuse that target.
+If the selected capture fails, do not fall back to an earlier capture. Other
+capture kinds never supply T.
+
+The three `game_config.settings.price_change_deadlines` must be distinct UTC
+instants in increasing order, each exactly at 23:00Z or 00:00Z. Identify a night
+by the UTC calendar date after adding one hour to its instant: this gives the same
+night to 23:00Z and the following 00:00Z. These three night dates must be
+consecutive. The earliest listed instant must be after the target deadline.
+`game_config.status.price_change_last_updated` must be a UTC instant no later
+than the capture time and no more than 25 hours before that earliest instant.
+It identifies the final recorded nightly change before the target deadline;
+the capture follows it and the next scheduled change follows the deadline.
+
+This rule accepts a fixed UTC clock or London midnight, including the one-hour
+shift on 2026-10-25. That shift is not a changed schedule and needs no amendment.
+Apply the same night-date and update rule to every target; do not infer a clock
+from its price label. If a schedule, metadata, update or identity check fails,
+the target deadline is missing and counted. Do not interpolate a gap or use an
+after-deadline price.
 Use the selected target bootstrap's `now_cost` as T. The target capture may also
 serve as the next origin; its price is still read only as the earlier row's label.
 
@@ -183,7 +201,11 @@ the declared test, without extending or fitting the rule to the intervening nigh
 
 For B compare with the final training base rate on the same live rows, and also
 report A and flat-control scores on those exact rows. B needs at least six usable
-target deadlines for its interval gate. It never replaces A's archive fit or makes
+target deadlines for its interval gate. Since the GW3 origin is unavailable,
+six means every attainable h=1 target from GW5 through GW10, with no spare.
+A missing origin, qualifying target capture or usable B row that removes a
+deadline makes this gate insufficient; the required count is not lowered.
+It never replaces A's archive fit or makes
 step 2 eligible by itself. A later wiring PR may replace A's first deadline with B
 only if B passes the two live clauses below and the issue's other gates hold.
 
@@ -217,7 +239,8 @@ A passes only if all three hold:
 B passes its optional first-deadline replacement gate only if its live Brier
 difference has upper 95% endpoint strictly below zero, its mean named moves per
 usable target deadline is at least one, and at least half have the right sign.
-It needs the six target deadlines declared above. Missing required evidence is
+It needs all six attainable target deadlines GW5 through GW10 declared above.
+Missing required evidence is
 `insufficient`, never a pass. Report each clause's inputs and result individually.
 
 All other horizons, full price errors, confusion counts and per-position blocks
