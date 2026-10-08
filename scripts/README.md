@@ -71,6 +71,7 @@ Date is the file's last commit (`git log -1 --format=%as -- scripts/<name>.py`).
 | `measure_strategy_bench.py` | measurement runner | `docs/strategy_bench.json` | 2026-09-10 |
 | `measure_strategy_screening.py` | measurement runner | `docs/strategy_screening.json` | 2026-08-31 |
 | `measure_template_rival.py` | measurement runner | `docs/template_rival_strength.json` (+ per-season variants) | 2026-08-19 |
+| `measure_window_solver_highs.py` | measurement runner | `docs/research/window_solver_highs.json`, `docs/research/window_solver_highs.md`; `check` writes only `artifacts/window_solver_highs/`; protocol `docs/window_solver_highs_prereg.md` | 2026-10-06 |
 | `measure_windowed_rank.py` | measurement runner | `docs/windowed_rank.json` | 2026-08-20 |
 | `record_preseason_difficulty.py` | measurement runner | `docs/preseason_fixture_difficulty.json`; also `docs/gw1_run_sheet.md` | 2026-09-07 |
 | `run_candidate_gate.py` | measurement runner | `docs/issue43_candidate_declaration.json` (reads and judges); `docs/candidate_gate_spec.md` | 2026-08-19 |
@@ -115,6 +116,7 @@ Date is the file's last commit (`git log -1 --format=%as -- scripts/<name>.py`).
 | `export_component_oof.py` | artifact-only runner | `artifacts/phase_c/` | 2026-09-07 |
 | `export_decided_appearance.py` | artifact-only runner | `artifacts/double_reduction/`; the `--fitted` input of `measure_double_reduction.py` | 2026-09-25 |
 | `measure_availability_transitions.py` | artifact-only runner | a fresh `--output` directory the operator names (`record.json`, `summary.md`); refuses the snapshot root and the repository's `data/` and `docs/`; protocol `docs/availability_transitions_prereg.md` | 2026-10-01 |
+| `measure_football_lead_reliability.py` | artifact-only runner | a fresh `--output` directory the operator names (`record.json`, `summary.md`, `forecasts.csv`); refuses the archive and the repository's `data/` and `docs/`; protocol `docs/football_lead_reliability_prereg.md` | 2026-10-06 |
 | `measure_instrument.py` | artifact-only runner | caller-selected `--output`; replay in `docs/measurement_instrument.md` | 2026-09-13 |
 | `measure_planner_policy_chain.py` | artifact-only runner | `artifacts/planner_policy_chain/` (receipts, forecast copies, decision records, weekly manifests), each week copied to `--evidence-copy-root` outside the checkout; reads no outcome; protocol `docs/research/planner_policy_chain_prereg.md` | 2026-10-06 |
 | `plan_transfer_horizon.py` | artifact-only runner | `data/handoffs/`; `docs/projection_horizon_contract.md` | 2026-08-31 |
