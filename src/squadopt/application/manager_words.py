@@ -474,12 +474,21 @@ def _coding_attested(
                 != ROTATION_CLAIM_CODING_CONTRACT_VERSION
             ):
                 return False
-        digests = tuple(
-            sorted(
-                {hashlib.sha256(entry.response.text.encode()).hexdigest() for entry in responses}
-            )
+        clubs_by_digest: dict[str, set[str]] = {}
+        for entry in responses:
+            digest = hashlib.sha256(entry.response.text.encode()).hexdigest()
+            clubs_by_digest.setdefault(digest, set()).add(entry.club)
+        declared = table.attrs.get("response_sha256s")
+        if (
+            not declared
+            or tuple(sorted(set(declared))) != tuple(declared)
+            or not set(declared) <= set(clubs_by_digest)
+        ):
+            return False
+        covered = set(table.attrs.get("clubs_covered") or ())
+        return all(
+            digest in declared or not clubs & covered for digest, clubs in clubs_by_digest.items()
         )
-        return digests == table.attrs.get("response_sha256s")
     except (DataError, KeyError, ValueError, OSError, AttributeError):
         return False
 
