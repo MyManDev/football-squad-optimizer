@@ -12,6 +12,7 @@ import json
 import os
 import re
 import shutil
+import statistics
 import subprocess
 from collections.abc import Callable, Sequence
 from dataclasses import replace
@@ -40,6 +41,9 @@ from tests.unit.test_planner_policy_chain import (
 from squadopt.data.atomic import document_bytes
 from squadopt.data.snapshots import read_snapshot, write_snapshot
 from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, live_payload
+from squadopt.evaluation.live_series import DetectionPolicy, detectable_effect
+from squadopt.evaluation.promotion import PromotionPolicy
+from squadopt.evaluation.statistics import season_aware_moving_block_interval
 
 #: A legal eleven over the synthetic squad: one goalkeeper, four defenders, four midfielders,
 #: two forwards; the bench holds the second goalkeeper, a defender, a midfielder and a forward.
@@ -84,6 +88,19 @@ RETAINED = "football_joint_role_retained_history_v1"
 NOT_ADMITTED = "football_contextual_v3"
 #: The line the runner prints for each week it decides, which the operator posts (rule 24).
 DECIDED = re.compile(r"GW(\d{2}) decided from .+; manifest sha256 ([0-9a-f]{64})")
+#: Rule 30's numbers and rule 33's rates, built here rather than read from the scorer, so that a
+#: constant changed there cannot agree with itself.
+STATED_POLICY = PromotionPolicy(
+    min_mean_improvement=0.5,
+    confidence_level=0.90,
+    bootstrap_resamples=5000,
+    moving_block_length=4,
+    deterministic_seed=0,
+)
+STATED_DETECTION = DetectionPolicy(confidence_level=0.90, power=0.80)
+#: What a served window pays in paid transfers, week by week. Only the first week is played
+#: (rule 17), so only a scorer that charges a later week would see the two.
+SERVED_PAID = (1, 2, 0, 0, 0)
 
 
 def _lineup(captain: int) -> dict[str, object]:
@@ -178,15 +195,23 @@ def _outcome_capture(
     return metadata.snapshot_id
 
 
-def _arm_outcome(
-    name: str, gameweek: int, *, paid: int = 0, truncated: bool = False
-) -> chain.ArmOutcome:
-    week = _plan_week(gameweek=gameweek)
-    week.paid_transfer_count = paid
-    outcome = _outcome(_plan(week))
+def _arm_outcome(name: str, gameweek: int, *, paid: Sequence[int] = (0,)) -> chain.ArmOutcome:
+    """One arm's stubbed decision: a plan over the arm's whole window, cut at GW38 and labelled
+    truncated by the runner's own rule (rule 14), whose weeks pay ``paid`` transfers in turn and
+    none after. Only the first week is played (rule 17)."""
+
+    weeks = chain.window_weeks(name, gameweek)
+    first = _plan_week(gameweek=gameweek)
+    # Each later week keeps the first week's team, so it is built once.
+    planned = [SimpleNamespace(**{**vars(first), "gameweek": week}) for week in weeks]
+    for week, count in zip(planned, paid, strict=False):
+        week.paid_transfer_count = count
+    outcome = _outcome(_plan(planned[0]))
+    outcome.plan.weeks = tuple(planned)
+    outcome.weeks = weeks
     family = "one_week" if name == "one_week" else name.split("_")[0]
     outcome.lineup = _lineup(CAPTAINS[family])
-    outcome.truncated = truncated
+    outcome.truncated = len(weeks) < chain._width(name)
     return outcome
 
 
@@ -238,6 +263,28 @@ def _reseal(evidence: Path, gameweek: int) -> None:
     _rewrite(directory / "manifest.json", seal)
 
 
+def _rewrite_week(
+    evidence: Path, receipts: Path, gameweek: int, change: Callable[[dict[str, Any]], object]
+) -> None:
+    """Change every chain record of one decided week, then reseal its manifest and post its
+    sha256 again, so the week reads as one the runner wrote and the operator posted that way."""
+
+    for path in (evidence / f"gw{gameweek:02d}").glob("p*-*.json"):
+        _rewrite(path, change)
+    _reseal(evidence, gameweek)
+    _repost(receipts, evidence, gameweek)
+
+
+def _read_through(monkeypatch: pytest.MonkeyPatch, gameweek: int) -> None:
+    """A gw20 reading over the chain's first weeks only, through ``gameweek``, so a test need not
+    decide fifteen weeks."""
+
+    read = scorer.read_evidence
+    monkeypatch.setattr(
+        scorer, "read_evidence", lambda root, through, posted: read(root, gameweek, posted)
+    )
+
+
 def _world(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -249,17 +296,24 @@ def _world(
     unproved: tuple[tuple[str, int], ...] = (),
     blocked_from: int | None = None,
     without_live: tuple[int, ...] = (),
+    points: Callable[[int], dict[int, int]] | None = None,
+    settled_through: int | None = None,
 ) -> tuple[Path, Path, Path]:
-    """A decided chain from GW6 through ``through``: served arms pay one transfer a week, and
-    each window, failed or not, is truncated by the runner's own rule (rule 14).
+    """A decided chain from GW6 through ``through``: each served window pays one transfer in
+    its played first week and two in its second (``SERVED_PAID``), and each window, failed or
+    not, is cut at GW38 and truncated by the runner's own rule (rule 14).
 
     The runner starts the chain before GW21's deadline, as rule 40 requires, and decides any
     later week in a second run. The operator posts the frozen commit and every manifest sha256
     the runner prints, written to ``tmp_path / RECEIPTS`` (rule 24). ``receipt_fields`` adds
     fields to a week's receipt.json, by gameweek; a missing week's ``reason`` is its missing
-    reason. An ``unproved`` arm's plan that week is published FEASIBLE and not proved. From
-    ``blocked_from`` on the roster lacks player 15, whom every chain holds, so every chain is
-    blocked. A week in ``without_live`` gets an outcome capture without its live payload.
+    reason, and a decided week's ``model_version`` is also its forecast's, as the runner writes
+    it into each decided record. An ``unproved`` arm's plan that week is published FEASIBLE and
+    not proved. From ``blocked_from`` on the roster lacks player 15, whom every chain holds, so
+    every chain is blocked. An outcome capture is written for each week through
+    ``settled_through`` (``through`` when not given), with ``points`` of that gameweek as its
+    realized points (``POINTS`` when not given), and without its live payload in a week of
+    ``without_live``.
     """
 
     weeks: dict[int, object] = {}
@@ -272,6 +326,10 @@ def _world(
             blocked = blocked_from is not None and gameweek >= blocked_from
             roster = tuple(player for player in ROSTER if not (blocked and player == 15))
             decided = _week(gameweek, roster=roster)
+            forecast = decided.forecast
+            if "model_version" in fields:
+                horizon = SimpleNamespace(model_version=fields["model_version"])
+                forecast = SimpleNamespace(**{**vars(forecast), "horizon": horizon})
             # Rule 36: a decided week's receipt carries the deadline its capture states.
             weeks[gameweek] = replace(
                 decided,
@@ -280,6 +338,7 @@ def _world(
                     "deadline_utc": _stamp(_deadline(gameweek)),
                     **fields,
                 },
+                forecast=forecast,
             )
     evidence, _ = _chain_world(tmp_path, monkeypatch, weeks)
     monkeypatch.setattr(chain, "source_identity", lambda: dict(IDENTITY))
@@ -291,13 +350,14 @@ def _world(
 
     def arm(name: str, week: chain.WeekInputs, held: object) -> chain.ArmOutcome:
         gameweek = int(week.inputs.deadline.gameweek)
-        truncated = len(chain.window_weeks(name, gameweek)) < chain._width(name)
         if (name, gameweek) in failing:
+            # The runner gives a failing arm its own window and rule 14's truncation too.
             failed = _outcome(None, failure="raised_ValueError")
-            failed.truncated = truncated
+            failed.weeks = chain.window_weeks(name, gameweek)
+            failed.truncated = len(failed.weeks) < chain._width(name)
             return failed
         outcome = _arm_outcome(
-            name, gameweek, paid=1 if name.startswith("served") else 0, truncated=truncated
+            name, gameweek, paid=SERVED_PAID if name.startswith("served") else (0,)
         )
         if (name, gameweek) in unproved:
             outcome.status = {"solver_status": "FEASIBLE", "proved": False}
@@ -308,7 +368,7 @@ def _world(
     (artifacts / "football").mkdir(parents=True)
     snapshots.mkdir()
     printed: list[str] = []
-    for last in sorted({min(through, 20), through}):
+    for last in sorted({min(through, chain.LAPSE_GAMEWEEK - 1), through}):
         chain.decide(
             snapshots,
             artifacts,
@@ -319,8 +379,13 @@ def _world(
             emit=printed.append,
         )
     _post(tmp_path / RECEIPTS, printed)
-    for gameweek in range(6, through + 1):
-        _outcome_capture(snapshots, gameweek, live=gameweek not in without_live)
+    for gameweek in range(6, (through if settled_through is None else settled_through) + 1):
+        _outcome_capture(
+            snapshots,
+            gameweek,
+            live=gameweek not in without_live,
+            points=None if points is None else points(gameweek),
+        )
     return evidence, snapshots, tmp_path / "records"
 
 
@@ -384,6 +449,62 @@ def _correction(root: Path, through: int, corrected: dict[int, dict[int, int]]) 
         captured_at_utc=_stamp(_deadline(through) + timedelta(hours=30)),
         payloads=payloads,
     ).snapshot_id
+
+
+def _players() -> dict[str, dict[str, object]]:
+    """A record's players block over the synthetic roster, as score_recorded_advice reads it."""
+
+    return {
+        str(player): {"name": f"Player {player}", "position": position, "expected_points": 2.0}
+        for player, position in zip(
+            ROSTER,
+            ["GK", "GK", *["DEF"] * 5, *["MID"] * 5, *["FWD"] * 3, "MID", "DEF"],
+            strict=True,
+        )
+    }
+
+
+def _outcomes() -> Any:
+    """Every player of the roster scores two in ninety minutes."""
+
+    import pandas as pd
+
+    return pd.DataFrame(
+        {
+            "player_id": list(ROSTER),
+            "total_points": [2] * len(ROSTER),
+            "minutes": [90] * len(ROSTER),
+        }
+    )
+
+
+def _stated_interval(series: Sequence[float], candidate: str, *, blocks: int = 4) -> list[float]:
+    """Rule 30's interval on ``series``, computed here under the stated numbers."""
+
+    return list(
+        season_aware_moving_block_interval(
+            [("2026-27", value) for value in series],
+            policy=replace(STATED_POLICY, moving_block_length=blocks),
+            candidate_id=candidate,
+        )
+    )
+
+
+def _verdicts(node: object, path: tuple[str, ...] = ()) -> list[tuple[tuple[str, ...], object]]:
+    """Every verdict a record holds, by its path in the record."""
+
+    if isinstance(node, dict):
+        found = [(path, node["verdict"])] if "verdict" in node else []
+        for key, value in node.items():
+            found += _verdicts(value, (*path, str(key)))
+        return found
+    if isinstance(node, list):
+        return [
+            item
+            for index, value in enumerate(node)
+            for item in _verdicts(value, (*path, str(index)))
+        ]
+    return []
 
 
 @pytest.fixture(scope="module")
@@ -456,6 +577,19 @@ def test_the_interim_reading_scores_every_week_and_pairs_the_arms(
     assert primary_a["detectable_effect"] is None
     assert primary_a["exact_zero_pairs"] == 0
     assert primary_a["verdict"] is None and primary_b["verdict"] is None
+    # Rule 32: the interim records no verdict, in any block.
+    assert [value for _, value in _verdicts(record) if value is not None] == []
+    # Rule 30's numbers, stated here, so that a constant changed in the scorer cannot echo itself.
+    assert record["interval_policy"] == {
+        "confidence_level": 0.90,
+        "bootstrap_resamples": 5000,
+        "moving_block_length": 4,
+        "deterministic_seed": 0,
+        "min_mean_improvement": 0.5,
+        "min_weeks_for_interval": 6,
+        "min_weeks_for_verdict": 15,
+        "detection": {"confidence_level": 0.90, "power": 0.80},
+    }
     # This world's receipts name no model version, so no version block opens.
     assert record["contrasts"]["A"]["by_model_version"] == {}
     assert record["secondary"]["hold_minus_one_week"]["mean"] == pytest.approx(1.0)
@@ -499,23 +633,7 @@ def test_the_interim_reading_scores_every_week_and_pairs_the_arms(
 def test_a_held_or_blocked_chain_scores_nothing_even_with_a_lineup_on_record() -> None:
     """Rules 21 and 23: a missing week's hold and a blocked chain contribute no pair."""
 
-    import pandas as pd
-
-    outcomes = pd.DataFrame(
-        {
-            "player_id": list(ROSTER),
-            "total_points": [2] * len(ROSTER),
-            "minutes": [90] * len(ROSTER),
-        }
-    )
-    players = {
-        str(player): {"name": f"Player {player}", "position": position, "expected_points": 2.0}
-        for player, position in zip(
-            ROSTER,
-            ["GK", "GK", *["DEF"] * 5, *["MID"] * 5, *["FWD"] * 3, "MID", "DEF"],
-            strict=True,
-        )
-    }
+    outcomes, players = _outcomes(), _players()
     for status in ("held", "blocked"):
         record = {"status": status, "advice": _lineup(8), "players": players, "plan": {"weeks": []}}
         assert scorer.score_chain_week(record, outcomes) is None
@@ -574,6 +692,23 @@ def test_hits_are_charged_at_four_per_paid_transfer_from_the_played_week() -> No
         == 0.0
     )
     assert scorer.paid_hits({"status": "decided", "plan": {"weeks": []}}) == 0.0
+
+
+def test_only_the_played_first_week_of_a_longer_plan_is_charged() -> None:
+    """Rules 17 and 26: a three-week plan paying one, two and no transfers is charged the game's
+    four points for its first week's one paid transfer, never for a later week's."""
+
+    plan = {
+        "weeks": [
+            {"gameweek": 6 + offset, "paid_transfer_count": paid}
+            for offset, paid in enumerate((1, 2, 0))
+        ]
+    }
+    assert scorer.paid_hits({"status": "decided", "plan": plan}) == 4.0
+    decided = {"status": "decided", "advice": _lineup(8), "players": _players(), "plan": plan}
+    scored = scorer.score_chain_week(decided, _outcomes())
+    assert scored is not None and scored.hits == 4.0
+    assert scored.net == scored.gross - 4.0
 
 
 def test_a_failed_arm_is_scored_on_its_held_team_and_the_pair_is_also_reported_without_it(
@@ -771,27 +906,45 @@ def test_a_record_must_state_the_truncation_rule_14_gives_in_both_directions() -
         scorer.truncated_by_rule_14("served_4", 10)
 
 
-def test_exact_zero_pairs_are_counted_when_both_arms_played_the_same_team(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize(
+    ("hold_change", "served_paid", "zero_pairs_a", "mean_a"),
+    [
+        ({}, 0, 6, 0.0),
+        ({}, 1, 0, -4.0),
+        ({"bench": [2, 12, 7, 15]}, 0, 0, 0.0),
+        ({"captain": 4}, 0, 0, 0.0),
+        ({"vice_captain": 13}, 0, 0, 0.0),
+    ],
+    ids=["same_team", "only_hits", "only_bench_order", "only_captain", "only_vice"],
+)
+def test_a_pair_is_exactly_zero_only_when_the_whole_team_and_the_hits_agree(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    hold_change: dict[str, object],
+    served_paid: int,
+    zero_pairs_a: int,
+    mean_a: float,
 ) -> None:
-    """Rule 27: a pair is exactly zero only when fifteen, eleven, bench, captain, vice and hits
-    agree; no other pair is set to zero."""
+    """Rule 27: a pair is exactly zero only when the fifteen, the eleven, the bench order, the
+    captain, the vice and the hits all agree. A pair that differs only in its bench order or its
+    armband scores the same points here and is still not counted, and no other pair is set to
+    zero."""
 
     evidence, snapshots, records = _world(tmp_path, monkeypatch, through=6)
     _identity(monkeypatch)
-    for path in (evidence / "gw06").glob("p*-*.json"):
-        document = json.loads(path.read_text(encoding="utf-8"))
-        document["advice"] = _lineup(CAPTAINS["served"])
-        document["plan"]["weeks"][0]["paid_transfer_count"] = 0
-        path.write_text(json.dumps(document), encoding="utf-8")
-    _reseal(evidence, 6)
-    _repost(tmp_path / RECEIPTS, evidence, 6)
+
+    def one_team(document: dict[str, Any]) -> None:
+        # Players 3, 4, 9 and 13 all score two, so no armband here moves the points.
+        document["advice"] = _lineup(3)
+        if document["arm"].startswith("hold"):
+            document["advice"].update(hold_change)
+        served = document["arm"].startswith("served")
+        document["plan"]["weeks"][0]["paid_transfer_count"] = served_paid if served else 0
+
+    _rewrite_week(evidence, tmp_path / RECEIPTS, 6, one_team)
     # The reading waits for GW20 in some capture.
     _outcome_capture(snapshots, 20, settled_through=20, live=False)
-    read = scorer.read_evidence
-    monkeypatch.setattr(
-        scorer, "read_evidence", lambda root, through, posted: read(root, 6, posted)
-    )
+    _read_through(monkeypatch, 6)
     record = scorer.score(
         evidence,
         snapshots,
@@ -800,9 +953,124 @@ def test_exact_zero_pairs_are_counted_when_both_arms_played_the_same_team(
         records_dir=records,
         index_file=tmp_path / "index.md",
     )
-    primary = record["contrasts"]["A"]["primary"]
-    assert primary["pairs"] == 6 and primary["exact_zero_pairs"] == 6
-    assert primary["mean"] == pytest.approx(0.0)
+    primary_a = record["contrasts"]["A"]["primary"]
+    primary_b = record["contrasts"]["B"]["primary"]
+    assert primary_a["pairs"] == 6 and primary_a["exact_zero_pairs"] == zero_pairs_a
+    assert primary_a["mean"] == pytest.approx(mean_a)
+    # served and one_week played one team; only served's own hit can set them apart.
+    assert primary_b["pairs"] == 6 and primary_b["exact_zero_pairs"] == (0 if served_paid else 6)
+    assert primary_b["mean"] == pytest.approx(-4.0 * served_paid)
+
+
+#: Hold's captain's (player 10) and one_week's captain's (player 11) realized points from GW6 to
+#: GW38, drawn once and kept: on these weeks each contrast's interval moves with its candidate id.
+HOLD_CAPTAIN = [10, 15, 9, 12, 14, 8, 7, 14, 11, 15, 10, 10, 14, 15, 15, 14, 13]
+HOLD_CAPTAIN += [9, 10, 9, 15, 13, 7, 8, 9, 7, 11, 7, 11, 14, 13, 13, 13]
+ONE_WEEK_CAPTAIN = [5, 4, 3, 1, 2, 0, 0, 1, 3, 1, 2, 5, 3, 5, 2, 3, 4]
+ONE_WEEK_CAPTAIN += [3, 4, 2, 4, 4, 3, 4, 1, 2, 5, 0, 2, 4, 5, 5, 1]
+
+
+def _season_points(gameweek: int) -> dict[int, int]:
+    return POINTS | {10: HOLD_CAPTAIN[gameweek - 6], 11: ONE_WEEK_CAPTAIN[gameweek - 6]}
+
+
+@pytest.mark.slow
+def test_the_final_reading_covers_the_season_with_verdicts_and_each_arms_totals(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Rules 14 and 26 to 35 over GW6 to GW38, after the interim reading: the windows are cut
+    at GW38 as the runner cuts them, each contrast scores GW6 to GW36 on its own candidate id,
+    and only the final reading records verdicts, on its two primary contrasts alone, and each
+    arm's totals."""
+
+    evidence, snapshots, records = _world(tmp_path, monkeypatch, through=38, points=_season_points)
+    _identity(monkeypatch)
+    index = tmp_path / "index.md"
+    paths = {"receipts": tmp_path / RECEIPTS, "records_dir": records, "index_file": index}
+    interim = scorer.score(evidence, snapshots, "gw20", **paths)
+    assert interim["final"] is False and "by_arm" not in interim["totals"]
+    # Rule 25: the final reading reads the interim record as develop holds it once merged.
+    _on_develop(monkeypatch, records)
+    record = scorer.score(evidence, snapshots, "gw38", **paths)
+    assert record["final"] is True and record["reading_gameweek"] == 38
+    assert [week["gameweek"] for week in record["weeks"]] == list(range(6, 39))
+    assert all(week["scored_chains"] == 15 for week in record["weeks"])
+    # No capture changed between the readings.
+    assert record["changed_since_interim"]["changed_weeks"] == []
+    assert {
+        week["gameweek"]: week["truncated_arms"]
+        for week in record["weeks"]
+        if week["truncated_arms"]
+    } == {
+        35: ["hold_5", "served_5"],
+        36: ["hold_5", "served_5"],
+        37: ["hold_3", "hold_5", "served_3", "served_5"],
+        38: ["hold_3", "hold_5", "served_3", "served_5"],
+    }
+    # Every arm's eleven scores 26 plus hold's and one_week's captains' points, and its own
+    # captain's points again; served's captain scores ten and served pays four. So A is 6
+    # minus hold's captain's points and B is 6 minus one_week's, week by week.
+    expected = {
+        "A": [6.0 - _season_points(gameweek)[10] for gameweek in range(6, 37)],
+        "B": [6.0 - _season_points(gameweek)[11] for gameweek in range(6, 37)],
+    }
+    for label, other, verdict in (("A", "B", "worse"), ("B", "A", "better")):
+        block = record["contrasts"][label]
+        primary = block["primary"]
+        assert primary["weeks_listed"] == list(range(6, 37))
+        # GW35 and GW36 enter on their untruncated window-3 pairs only.
+        assert primary["pairs"] == 29 * 6 + 2 * 3
+        assert primary["mean"] == pytest.approx(statistics.fmean(expected[label]))
+        for blocks in (4, 8):
+            stated = _stated_interval(
+                expected[label], f"planner_policy_chain_v1:{label}", blocks=blocks
+            )
+            assert stated != _stated_interval(
+                expected[label], f"planner_policy_chain_v1:{other}", blocks=blocks
+            )
+            key = "interval" if blocks == 4 else "interval_blocks_of_8"
+            assert primary[key] == stated
+        assert primary["verdict"] == verdict
+        cut = record["truncated_weeks"][label]
+        assert cut["weeks_listed"] == [35, 36, 37, 38] and cut["pairs"] == 3 + 3 + 6 + 6
+    # Rules 29 and 32: only the two primary contrasts carry a verdict; every other block is
+    # descriptive.
+    assert {path: value for path, value in _verdicts(record) if value is not None} == {
+        ("contrasts", "A", "primary"): "worse",
+        ("contrasts", "B", "primary"): "better",
+    }
+    # Each window alone scores until its own truncation: GW36 for three weeks, GW34 for five.
+    assert record["secondary"]["A_window_3"]["weeks_listed"] == list(range(6, 37))
+    assert record["secondary"]["A_window_5"]["weeks_listed"] == list(range(6, 35))
+    by_arm = record["totals"]["by_arm"]
+    assert set(by_arm) == set(scorer.ARMS)
+    captain = {"served": 8, "hold": 10, "one": 11}
+    for arm in scorer.ARMS:
+        gross = sum(
+            26
+            + _season_points(gameweek)[10]
+            + _season_points(gameweek)[11]
+            + _season_points(gameweek)[captain[arm.split("_")[0]]]
+            for gameweek in range(6, 39)
+        )
+        totals = by_arm[arm]
+        # Truncated weeks are played (rule 14), so every week of every squad counts.
+        assert totals["scored_chain_weeks"] == 3 * 33
+        assert totals["gross_points"] == pytest.approx(3 * gross)
+        assert totals["hit_points"] == pytest.approx(
+            3 * 33 * 4.0 if arm.startswith("served") else 0.0
+        )
+        assert totals["net_points"] == pytest.approx(totals["gross_points"] - totals["hit_points"])
+    # Rule 3: one statement of how the release live at a deadline is read, in each record.
+    assert record["release_rule"] == interim["release_rule"] == scorer.RELEASE_RULE
+    assert "strictly before the deadline" in record["release_rule"]
+    twin = (records / "planner_policy_chain_gw38.md").read_text(encoding="utf-8")
+    assert "Final reading" in twin
+    assert "| A | 31 |" in twin and "| B | 31 |" in twin
+    index_text = index.read_text(encoding="utf-8")
+    assert index_text.count("- [Planner policy chain, gw20 reading]") == 1
+    assert index_text.count("- [Planner policy chain, gw38 reading]") == 1
+    assert "verdicts A worse, B better" in index_text
 
 
 # Rule 25: a week whose outcome capture changed between the readings
@@ -826,6 +1094,16 @@ def test_the_final_reading_lists_each_week_whose_outcome_capture_changed_with_bo
     assert before[15]["outcome_capture"] is None
     assert before[15]["unscored_reason"] == "tied_outcome_captures"
     assert before[15]["differences"] == {"A": None, "B": None}
+    # Two distinct captures tie as GW15's latest, so the interim twin lists the week with its
+    # reason and no difference, never as a zero (rule 25).
+    interim_twin = (two_readings["records_dir"] / "planner_policy_chain_gw20.md").read_text(
+        encoding="utf-8"
+    )
+    row = next(line for line in interim_twin.splitlines() if line.startswith("| 15 |"))
+    assert row.startswith("| 15 | capture-gw15 | none |")
+    assert row.endswith(
+        "| 0 | none | none | site-2026-27-gw06-fix16 | True | True | tied_outcome_captures |"
+    )
     changed = final["changed_since_interim"]
     assert changed["record"] == "docs/research/planner_policy_chain_gw20.json"
     assert changed["read_from"] == scorer.DEVELOP == "refs/remotes/origin/develop"
@@ -1529,6 +1807,9 @@ def test_each_model_version_is_reported_from_its_first_decided_week(
     assert f"| A on `{TEAM_SHARE}` weeks, from GW06 | 6 | +4.000 |" in twin
     assert f"| B on `{MINUTES}` weeks, from GW19 | 0 | none |" in twin
     assert f"`{NOT_ADMITTED}` weeks" not in twin
+    # GW19 is listed with its reason and no difference, never as a zero (rule 25).
+    row = next(line for line in twin.splitlines() if line.startswith("| 19 |"))
+    assert f"| {MINUTES} | 0 | none | none |" in row and row.endswith("| missing_outcomes |")
     assert record["choices"]["model_versions"] == scorer.CHOICES["model_versions"]
 
 
@@ -1607,6 +1888,71 @@ def test_the_reading_refuses_what_the_protocol_refuses(
     path.write_text(path.read_text(encoding="utf-8") + " ", encoding="utf-8")
     with pytest.raises(scorer.ScorerError, match=r"no longer match|does not match"):
         scorer.read_evidence(evidence, 10, scorer.read_receipts(paths["receipts"]))
+
+
+def test_a_reading_waits_until_its_own_gameweek_has_settled(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Rule 28: with GW20 decided and every week through GW19 settled, the gw20 reading still
+    waits, and a capture in which GW20 is finished but its data not yet checked does not settle
+    it."""
+
+    evidence, snapshots, records = _world(tmp_path, monkeypatch, settled_through=19)
+    _identity(monkeypatch)
+    assert (evidence / "gw20" / "manifest.json").is_file()
+    bootstrap = json.loads(_bootstrap(20))
+    next(event for event in bootstrap["events"] if event["id"] == 20)["data_checked"] = False
+    write_snapshot(
+        snapshots,
+        source="fpl-live",
+        captured_at_utc=_stamp(_deadline(20) + timedelta(hours=5)),
+        payloads={
+            BOOTSTRAP_PAYLOAD: json.dumps(bootstrap).encode("utf-8"),
+            live_payload(20): _live(POINTS),
+        },
+    )
+    index = tmp_path / "index.md"
+    with pytest.raises(scorer.ScorerError, match="GW20 has not settled in any capture"):
+        scorer.score(
+            evidence,
+            snapshots,
+            "gw20",
+            receipts=tmp_path / RECEIPTS,
+            records_dir=records,
+            index_file=index,
+        )
+    assert not records.exists() and not index.exists()
+
+
+def test_a_decided_record_the_scorer_cannot_score_refuses_the_reading_by_its_chain(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Rules 22 and 26: a decided chain's advice is scored or the reading stops, naming the
+    chain; it is never passed over as a week that chain did not play, nor scored as zero."""
+
+    evidence, snapshots, records = _world(tmp_path, monkeypatch, through=6)
+    _identity(monkeypatch)
+
+    def bench_vice(document: dict[str, Any]) -> None:
+        if (document["profile"], document["arm"]) == ("p950", "hold_5"):
+            document["advice"]["vice_captain"] = 2
+
+    _rewrite_week(evidence, tmp_path / RECEIPTS, 6, bench_vice)
+    _outcome_capture(snapshots, 20, settled_through=20, live=False)
+    _read_through(monkeypatch, 6)
+    index = tmp_path / "index.md"
+    with pytest.raises(
+        scorer.ScorerError, match=r"^p950 hold_5: Recorded vice-captain must start\.$"
+    ):
+        scorer.score(
+            evidence,
+            snapshots,
+            "gw20",
+            receipts=tmp_path / RECEIPTS,
+            records_dir=records,
+            index_file=index,
+        )
+    assert not records.exists() and not index.exists()
 
 
 def test_the_scorer_runs_only_from_its_own_merge_commit_on_a_clean_tree(
@@ -2057,6 +2403,12 @@ def test_no_capture_is_read_before_the_refusals_that_need_no_outcome(
         (15, [0.1, 0.6], 0.3, True, "not_separated"),
         (31, [-1.0, 1.0], 0.0, True, "not_separated"),
         (31, [0.2, 2.0], 1.0, False, None),
+        # Rule 32's boundaries: a mean of exactly 0.5 is "at least 0.5"; a bound of exactly 0
+        # is neither above nor below 0.
+        (15, [0.1, 0.9], 0.5, True, "better"),
+        (15, [0.1, 0.9], 0.49, True, "not_separated"),
+        (15, [0.0, 2.0], 1.0, True, "not_separated"),
+        (15, [-2.0, 0.0], -1.0, True, "not_separated"),
     ],
 )
 def test_the_verdict_is_the_first_clause_that_holds(
@@ -2079,6 +2431,52 @@ def test_summaries_carry_the_interval_only_from_six_weeks_and_the_detectable_eff
     assert scorer.summarize([], "planner_policy_chain_v1:B")["mean"] is None
 
 
+def test_six_scored_weeks_give_an_interval_on_blocks_of_four() -> None:
+    """Rules 30 and 33: exactly six scored weeks print an interval, on blocks of 4, and the
+    detectable effect at 0.90 and 0.80, each computed here. At six weeks on blocks of 4 the
+    resampled means take only nine values, and both bounds fall on the lowest and the highest
+    of them, so a level of 0.95, 1000 resamples or seed 1 gives the same interval; the
+    fifteen-week test below holds those."""
+
+    series, candidate = [3.0, -1.0, 4.0, 1.0, -5.0, 9.0], "planner_policy_chain_v1:A"
+    stated = _stated_interval(series, candidate)
+    for blocks in (3, 8):
+        assert _stated_interval(series, candidate, blocks=blocks) != stated
+    summary = scorer.summarize(series, candidate)
+    assert summary["weeks"] == 6 and summary["mean"] == pytest.approx(statistics.fmean(series))
+    assert summary["interval"] == stated
+    assert summary["interval_blocks_of_8"] == _stated_interval(series, candidate, blocks=8)
+    assert summary["detectable_effect"] == detectable_effect(
+        statistics.stdev(series), 6, policy=STATED_DETECTION
+    )
+
+
+def test_both_intervals_are_the_ones_the_protocol_states_on_fifteen_weeks() -> None:
+    """Rule 30: blocks of 4 and, beside them, blocks of 8, each at a level of 0.90 with 5000
+    resamples and seed 0. On these fifteen weeks every one of those numbers moves its interval,
+    so a changed constant in the scorer cannot pass."""
+
+    series = [3.4, -1.7, 4.9, 0.8, -5.3, 9.1, 2.6, -6.2, 5.5, 3.3, -2.8, 7.4, 0.1, -4.6, 8.2]
+    candidate = "planner_policy_chain_v1:B"
+    paired = [("2026-27", value) for value in series]
+    for blocks, others in ((4, (3, 8)), (8, (4, 7, 9))):
+        stated = _stated_interval(series, candidate, blocks=blocks)
+        policy = replace(STATED_POLICY, moving_block_length=blocks)
+        for changed in (
+            *(replace(policy, moving_block_length=other) for other in others),
+            replace(policy, confidence_level=0.95),
+            replace(policy, bootstrap_resamples=1000),
+            replace(policy, deterministic_seed=1),
+        ):
+            moved = season_aware_moving_block_interval(
+                paired, policy=changed, candidate_id=candidate
+            )
+            assert list(moved) != stated
+    summary = scorer.summarize(series, candidate)
+    assert summary["interval"] == _stated_interval(series, candidate)
+    assert summary["interval_blocks_of_8"] == _stated_interval(series, candidate, blocks=8)
+
+
 # Rule 25: the outcome capture
 
 
@@ -2099,13 +2497,30 @@ def test_the_outcome_capture_is_the_latest_settled_one_with_the_live_payload(
     bare = read_snapshot(root, _outcome_capture(root, 8, live=False))
     assert scorer.outcome_capture([bare], 8).reason == "missing_outcomes"
     assert scorer.outcome_capture([without_live], 7).reason is None
-    tied = read_snapshot(root, _outcome_capture(tmp_path / "other", 6, hours_after=9))
-    assert (
-        scorer.outcome_capture([later_capture := captures[2], tied], 6).reason
-        == "tied_outcome_captures"
-    )
-    assert later_capture is captures[2]
+    # A second capture at the latest instant with other points: two captures, not one twice.
+    rival = read_snapshot(root, _outcome_capture(root, 6, hours_after=9, points=POINTS | {8: 0}))
+    assert rival.metadata.snapshot_id != later
+    assert rival.metadata.captured_at_utc == captures[2].metadata.captured_at_utc
+    tied = scorer.outcome_capture([*captures, rival], 6)
+    assert tied.reason == "tied_outcome_captures" and tied.snapshot_id is None
     assert scorer.settled(captures, 6) and not scorer.settled(captures, 7)
+
+
+def test_a_capture_at_the_deadline_instant_is_read_and_one_before_it_never_is(
+    tmp_path: Path,
+) -> None:
+    """Rule 25: the outcome capture is chosen from the captures at or after the deadline, so
+    one taken at the instant itself is read, and one taken before it is not, whatever it
+    says."""
+
+    root = tmp_path / "snapshots"
+    root.mkdir()
+    at = read_snapshot(root, _outcome_capture(root, 6, hours_after=0))
+    before = read_snapshot(root, _outcome_capture(root, 6, hours_after=-0.5))
+    outcome = scorer.outcome_capture([before, at], 6)
+    assert outcome.deadline_utc == _stamp(_deadline(6))
+    assert outcome.snapshot_id == at.metadata.snapshot_id and outcome.reason is None
+    assert scorer.outcome_capture([before], 6).reason == "not_settled"
 
 
 # Rule 3: the release tag live at the deadline, and the fixed diff test
@@ -2343,10 +2758,7 @@ def test_a_reading_writes_nothing_until_its_twin_and_index_row_are_rendered(
     evidence, snapshots, records = _world(tmp_path, monkeypatch, through=6)
     _identity(monkeypatch)
     _outcome_capture(snapshots, 20, settled_through=20, live=False)
-    read = scorer.read_evidence
-    monkeypatch.setattr(
-        scorer, "read_evidence", lambda root, through, posted: read(root, 6, posted)
-    )
+    _read_through(monkeypatch, 6)
     index = tmp_path / "index.md"
     index.write_text("# Measurements Index\n", encoding="utf-8")
     paths = {"receipts": tmp_path / RECEIPTS, "records_dir": records, "index_file": index}
@@ -2713,10 +3125,7 @@ def test_a_reading_refuses_a_frozen_source_git_does_not_hold_before_it_writes(
     evidence, snapshots, records = _world(tmp_path, monkeypatch, through=6)
     _identity(monkeypatch)
     _outcome_capture(snapshots, 20, settled_through=20, live=False)
-    read = scorer.read_evidence
-    monkeypatch.setattr(
-        scorer, "read_evidence", lambda root, through, posted: read(root, 6, posted)
-    )
+    _read_through(monkeypatch, 6)
     checked: list[object] = []
 
     def differs(protocol: dict[str, Any], **roots: Any) -> None:
@@ -2901,6 +3310,25 @@ def test_the_end_state_is_priced_at_its_own_capture_s_fee_and_never_at_a_default
     assert all(arm["sale_value_tenths_at_end"] is None for arm in totals.values())
 
 
+def test_the_sale_value_at_the_end_follows_the_games_rule_from_each_purchase_price() -> None:
+    """Rules 10, 18 and 26: a player who fell is sold at his current price and one who rose
+    keeps half the rise, rounded down; current and purchase prices never trade places."""
+
+    state = {
+        "squad": [1, 2],
+        "purchase_prices": {"1": 50, "2": 60},
+        "free_transfers": 1,
+        "bank_tenths": 7,
+    }
+    records = {("p1000", arm): {"state_after": state} for arm in scorer.ARMS}
+    totals = scorer.arm_totals([], [scorer.WeekEvidence(6, {}, {}, records)], {1: 61, 2: 55}, 0.5)
+    for arm in scorer.ARMS:
+        # Player 1 rose from 50 to 61 and sells at 55; player 2 fell from 60 to 55 and sells at 55.
+        assert totals[arm]["sale_value_tenths_at_end"] == 110
+        assert totals[arm]["bank_tenths_at_end"] == 7
+        assert totals[arm]["free_transfers_at_end"] == 1
+
+
 def test_the_capture_set_is_this_seasons_as_the_runner_reads_it(tmp_path: Path) -> None:
     """Rules 25 and 28 read only this season's captures: one named before the season opens is
     never opened, one whose bootstrap names another season is left out, so neither can settle
@@ -2954,10 +3382,7 @@ def test_a_weeks_deadline_is_the_one_its_receipt_records(
         captured_at_utc=_stamp(_deadline(20) + timedelta(hours=5)),
         payloads={BOOTSTRAP_PAYLOAD: json.dumps(moved).encode("utf-8")},
     )
-    read = scorer.read_evidence
-    monkeypatch.setattr(
-        scorer, "read_evidence", lambda root, through, posted: read(root, 8, posted)
-    )
+    _read_through(monkeypatch, 8)
     record = scorer.score(
         evidence,
         snapshots,
