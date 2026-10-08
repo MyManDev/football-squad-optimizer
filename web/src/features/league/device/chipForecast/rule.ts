@@ -207,9 +207,24 @@ function preciseSum(values: number[]): number {
       value = high;
     }
     partials.length = index;
-    partials.push(value);
+    if (value !== 0) partials.push(value);
   }
-  return partials.reduce((sum, value) => sum + value, 0);
+  let high = partials.pop() ?? 0;
+  let residual = 0;
+  while (partials.length > 0) {
+    const part = partials.pop()!;
+    const rounded = high + part;
+    residual = part - (rounded - high);
+    high = rounded;
+    if (residual !== 0) break;
+  }
+  // Match fsum's final rounding when smaller partials resolve a halfway tie.
+  if (partials.length > 0 && Math.sign(residual) === Math.sign(partials.at(-1)!)) {
+    const adjustment = residual * 2;
+    const corrected = high + adjustment;
+    if (corrected - high === adjustment) high = corrected;
+  }
+  return high;
 }
 function estimate(
   chip: HeldChip,

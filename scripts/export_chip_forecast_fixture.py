@@ -90,6 +90,10 @@ def build_fixture() -> dict[str, Any]:
     raw["calendar"][0]["fixture_count_by_club"].update({"2": 2})
     add("reservation-allows-double", raw)
     raw = base_inputs()
+    raw["reserve"] = True
+    raw["calendar"][0]["fixture_count_by_club"]["20"] = 0
+    add("reservation-blank-only", raw)
+    raw = base_inputs()
     raw.update(decision_gameweek=8, calendar=raw["calendar"][-1:], reserve=True)
     add("reservation-lifted-at-last-week", raw)
     raw = base_inputs()
@@ -125,9 +129,20 @@ def build_fixture() -> dict[str, Any]:
     raw = base_inputs()
     raw["threshold"] = "fixed"
     raw["holding_values"]["bboost"] = 0.6
+    raw["chips"][2]["gain_this_week"] = None
     for row, points in zip(raw["squad"][-4:], (0.1, 0.2, 0.3, 0.0), strict=True):
         row["expected_points"] = points
     add("bench-sum-at-threshold", raw)
+    raw = base_inputs()
+    raw["threshold"] = "fixed"
+    raw["holding_values"]["bboost"] = 1.0
+    raw["chips"][2]["gain_this_week"] = None
+    for row, points in zip(raw["squad"][-4:], (1.0, 2**-53, 2**-106, 0.0), strict=True):
+        row["expected_points"] = points
+    add("bench-sum-half-even", raw)
+    raw = base_inputs()
+    raw["squad"][11]["expected_points"] = 9.0
+    add("triple-captain-best-on-bench", raw)
     raw = base_inputs()
     raw["squad"][1]["expected_points"] = raw["squad"][0]["expected_points"]
     raw["squad"].reverse()

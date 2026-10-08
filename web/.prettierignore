@@ -4,3 +4,4 @@ node_modules
 public/data
 src/data/schema.ts
 src/fixtures/device-plan/instances.json
+src/fixtures/chip-forecast/cases.json
