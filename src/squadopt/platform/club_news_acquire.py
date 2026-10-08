@@ -34,12 +34,16 @@ question, and a run that let one stand in for another would report a time nobody
   context and the target-deadline check all use. Taken before the fetch, as it used to be,
   it turned an article published while the pages were being read into one "published after
   the observation" although the page in hand already carried it.
-- *Capture completion*: when the capture was written, after coding.
+- *Capture completion*: when the capture was written, after coding and still before the
+  target deadline.
 
 The target gameweek is settled before any page is read, from the instant the run started.
 The coding observation must still fall before that same deadline. If the deadline passed
 while the pages were being read, the run stops: it does not code against a closed week, and
 it does not move to the next gameweek on its own.
+The same check runs again just before the capture is written. If the deadline passed while
+the model was answering, or the clock went back past the observation, the run stops with
+Refused and writes nothing; the calls it made are spent.
 """
 
 import argparse
@@ -587,6 +591,7 @@ def main(
         print("Dry run: nothing written.")
         return 0
 
+    captured_at = "unavailable"
     try:
         captured_at = _instant_text(now())
         if week.coding_observed_at is not None and as_instant(captured_at) < as_instant(
@@ -598,12 +603,14 @@ def main(
             still_open.gameweek != deadline.gameweek
             or still_open.deadline_utc != deadline.deadline_utc
         ):
-            raise DataError("The coding deadline is no longer the next open deadline.")
-    except (ClubNewsError, DataError, ValueError):
+            raise DataError(
+                "The coding deadline is no longer the next open deadline. "
+                f"Gameweek {still_open.gameweek} was not substituted; start a new run for it."
+            )
+    except (ClubNewsError, DataError, ValueError) as error:
         print(
             f"Refused: gameweek {deadline.gameweek} deadline {deadline.deadline_utc} "
-            "is no longer open for this coding observation, or the clock moved backwards. "
-            "Nothing was captured."
+            f"at capture completion {captured_at}: {error} Nothing was captured."
         )
         return 1
 

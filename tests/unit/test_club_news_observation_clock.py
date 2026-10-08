@@ -557,6 +557,15 @@ def test_capture_rechecks_deadline_after_model_answers(
         assert not capture_root.exists()
     elif expected_code:
         assert f"gameweek {TARGET_GAMEWEEK} deadline {DEADLINE}" in printed
+        assert f"capture completion {_text(clock.now)}:" in printed
+        if finish_offset == -601:
+            assert "clock moved backwards after coding" in printed
+            assert "no longer the next open deadline" not in printed
+        elif later_deadline is not None:
+            assert "was not substituted; start a new run for it" in printed
+            assert "clock moved backwards" not in printed
+        else:
+            assert "clock moved backwards" not in printed
         assert "Nothing was captured." in printed
         assert "Capture       " not in printed
         assert not capture_root.exists()
