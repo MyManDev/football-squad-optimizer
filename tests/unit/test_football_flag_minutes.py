@@ -185,6 +185,10 @@ def test_categories_learn_distinct_appearance_and_positive_roles(model: FlagMinu
     assert predictions[75].weekly_appearance > predictions[50].weekly_appearance
     assert predictions[50].weekly_appearance > predictions[0].weekly_appearance > 0
     assert predictions[75].weekly_appearance != pytest.approx(0.75)
+    assert predictions[75].weekly_appearance != pytest.approx(predictions[100].weekly_appearance)
+    assert predictions[75].fixture_probabilities[0][3] != pytest.approx(
+        predictions[100].fixture_probabilities[0][3]
+    )
     start75 = (
         math.fsum(predictions[75].fixture_probabilities[0][1:4]) / predictions[75].weekly_appearance
     )

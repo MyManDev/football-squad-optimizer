@@ -167,6 +167,9 @@ The original native basis is checked by the accepted component identities as wel
 the version/role/calendar/roster contracts. The adapter preserves full private metadata
 and resources and hashes all supplied and resulting frames, indexes and attributes.
 Downstream role selection refuses changed private outputs or resources.
+Every arm also requires the explicit native `availability_application="not_applied"`
+receipt. A missing marker cannot establish that the captured eligibility rule is
+still unapplied and therefore refuses, including control and disabled composition.
 
 ## XI and reserve decision scope
 
@@ -215,8 +218,9 @@ No real FPL outcome was read and no real model gain is claimed.
 
 ## Validation receipt
 
-440 distinct focused cases pass: 152 source, 57 model, 60 integration and 171 relevant
-existing regressions, with one existing optional research-bo skip. Source/model final
+The original preparation recorded 440 distinct focused passing cases: 152 source,
+57 model, 60 integration and 171 relevant existing regressions, with one existing
+optional research-bo skip. Source/model final
 checks have 209 cases; the integration union includes the initial 58 and two new
 bidirectional club mapping refusals, with overlapping inventory checks repeated after
 that guard. The initial integration run had a Windows pytest-cache teardown permission
@@ -228,6 +232,16 @@ weekly hurdle, zero-control confusion, old multiplier again, mean-duration CS, r
 minute exposure, contradictory row clock, altered frame receipts and altered resources.
 Their original-copy baselines pass; no setup/import failure is counted as fault evidence.
 Original source bytes remain unchanged by the probe harness.
+
+The review followup rechecks all 272 current source/model/integration cases: 152 source,
+57 model and 63 integration. `test_categories_learn_distinct_appearance_and_positive_roles`
+now directly separates 75 from 100 for both weekly appearance and full-start bin mass.
+`test_native_requires_explicit_unapplied_availability_marker` refuses a missing native
+marker in learned, control and disabled composition. The unused state-name constant
+is removed. Two further isolated copied-module faults, merging 75 into 100 and accepting
+the missing marker, cause four behavioral failures; the four corresponding baseline
+cases pass and both original module hashes remain unchanged. These checks use invented
+inputs and do not establish real label calibration or forecast gain.
 
 Ruff check/format passes all seven Python files, strict mypy passes the three source
 modules, and all six import contracts remain kept. Three invented 66-player samples

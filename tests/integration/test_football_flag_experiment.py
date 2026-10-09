@@ -616,6 +616,14 @@ def test_disabled_native_guard_is_not_masked_by_rebound_learned_input(damage):
         compose(case, enabled=False)
 
 
+@pytest.mark.parametrize("mode", ["learned", "control", "disabled"])
+def test_native_requires_explicit_unapplied_availability_marker(model, mode):
+    case = native_case()
+    del case.components.attrs["availability_application"]
+    with pytest.raises(ValueError, match="precede the captured eligibility"):
+        compose(case, model, enabled=mode != "disabled", control=mode == "control")
+
+
 @pytest.mark.parametrize("max_evaluations", [0, 129, True])
 def test_evaluation_budget_is_bounded_before_search(model, max_evaluations):
     result = compose(native_case(), model)

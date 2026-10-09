@@ -26,15 +26,6 @@ PROTECTED_SEASON = "2025-26"
 MAX_SOURCE_BYTES = 8 * 1024 * 1024
 MAX_WEEK_FIXTURES = 3
 MAX_CAPTURE_COUNT = 4096
-STATE_NAMES = (
-    "zero",
-    "start_short",
-    "start_60",
-    "start_full",
-    "cameo_short",
-    "cameo_60",
-    "cameo_full",
-)
 POSITIONS = ("GK", "DEF", "MID", "FWD")
 STATUSES = ("a", "d", "i", "s", "u", "n")
 LABELS = (0, 25, 50, 75, 100)

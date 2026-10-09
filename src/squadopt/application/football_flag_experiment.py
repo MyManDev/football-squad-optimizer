@@ -212,7 +212,7 @@ def _validate_basis(
         or tuple(native.attrs.get("covered_gameweeks", ())) != gameweeks
     ):
         raise ValueError("Native basis lacks its original cutoff or complete weekly coverage.")
-    if native.attrs.get("availability_application", "not_applied") != "not_applied":
+    if native.attrs.get("availability_application") != "not_applied":
         raise ValueError("Native basis must precede the captured eligibility rule.")
     legacy_config = native.attrs.get(
         "legacy_availability_config",
