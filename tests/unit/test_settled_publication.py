@@ -1080,8 +1080,12 @@ def test_settled_writer_refreshes_inherited_publication_identity(tmp_path, tampe
             for p in request.accepted_dir.rglob("*")
             if p.is_file()
         }
-        with pytest.raises(ValueError, match="inventory changed"):
+        with pytest.raises(
+            DataError, match=r"publication-identity\.json.*inventory changed"
+        ) as refused:
             publication.publish_settled(request)
+        assert type(refused.value) is DataError
+        assert isinstance(refused.value.__cause__, ValueError)
         assert before == {
             p.relative_to(request.accepted_dir).as_posix(): p.read_bytes()
             for p in request.accepted_dir.rglob("*")

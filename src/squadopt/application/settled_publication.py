@@ -568,7 +568,13 @@ def publish_settled(
     ``scripts.check_league_tree``, which this package cannot import.
     """
     accepted, members, snapshot, scores = _preflight(request)
-    prior_identity = check_tree_identity(request.accepted_dir / _tree_name(request))
+    accepted_tree = request.accepted_dir / _tree_name(request)
+    try:
+        prior_identity = check_tree_identity(accepted_tree)
+    except ValueError as error:
+        raise DataError(
+            f"Accepted publication identity {accepted_tree / IDENTITY_FILE} is invalid: {error}"
+        ) from error
     stamp = snapshot.metadata.captured_at_utc
     with TemporaryDirectory(prefix="settled-", dir=request.out_dir.parent) as temporary:
         root = Path(temporary)

@@ -444,7 +444,10 @@ def seal_football_bundle(
     publishes when it is not named.
 
     Copies may survive an interruption; only the final marker makes them ready.
-    Repeating the identical inputs completes that interruption or returns a replay.
+    Repeating identical inputs with all required identity records completes an
+    interruption or replay. A legacy ready marker replays its original copies.
+    Fresh seals or interrupted seals without a ready marker require an identity
+    record when they retain history. Surviving copies alone do not permit legacy replay.
     """
     if official_injury_capture_id is not None:
         require_official_injury_source()

@@ -12,6 +12,7 @@ from tests.unit.test_football_bundle import publication_case as publication_case
 
 from squadopt.application.league_tree_identity import check_tree_identity, record_tree_identity
 from squadopt.contracts.league_publication_identity import IDENTITY_FILE
+from squadopt.data.errors import DataError
 from squadopt.platform import football_bundle as bundle
 
 
@@ -116,6 +117,40 @@ def test_retained_history_without_record_never_seals(case):
     with pytest.raises(ValueError, match="Retained league history requires"):
         bundle.seal_football_bundle(**case)
     assert not bundle.football_bundle_path(case["artifact_root"], case["snapshot_id"]).exists()
+
+
+def test_markerless_interrupted_legacy_copies_do_not_admit_unrecorded_history(case, monkeypatch):
+    marker_path = bundle.football_bundle_path(case["artifact_root"], case["snapshot_id"])
+    original = bundle.write_bytes_once
+
+    def interrupt_at_marker(raw, target):
+        if target == marker_path:
+            raise OSError("synthetic interruption after copies")
+        return original(raw, target)
+
+    monkeypatch.setattr(bundle, "write_bytes_once", interrupt_at_marker)
+    with pytest.raises(OSError, match="after copies"):
+        bundle.seal_football_bundle(**case)
+    monkeypatch.setattr(bundle, "write_bytes_once", original)
+    assert not marker_path.exists()
+    copies = {
+        path.relative_to(case["artifact_root"]).as_posix(): path.read_bytes()
+        for path in case["artifact_root"].rglob("*")
+        if path.is_file()
+    }
+    assert any(name.endswith("site/league/members.json") for name in copies)
+    dump(
+        case["site_data_root"] / "league/scoreboard.json",
+        {"payload": {"as_of_snapshot_id": "previous"}},
+    )
+    with pytest.raises(ValueError, match="Retained league history requires"):
+        bundle.seal_football_bundle(**case)
+    assert not marker_path.exists()
+    assert copies == {
+        path.relative_to(case["artifact_root"]).as_posix(): path.read_bytes()
+        for path in case["artifact_root"].rglob("*")
+        if path.is_file()
+    }
 
 
 def test_legacy_ready_bundle_replays_after_source_gains_unrecorded_history(case):
@@ -241,6 +276,84 @@ def test_scoreboard_writer_resumes_and_records_completed_scoreboard(tmp_path, mo
     assert result.target.is_file()
     assert tree / IDENTITY_FILE in result.output_paths
     assert "scoreboard.json" in check_tree_identity(tree)["files"]
+
+
+@pytest.mark.parametrize(
+    "record",
+    [
+        [],
+        None,
+        "not-an-object",
+        {},
+        {"source_snapshot_id": None},
+        {"source_snapshot_id": ""},
+        {"source_snapshot_id": "   "},
+        {"source_snapshot_id": True},
+        {"source_snapshot_id": 3},
+    ],
+)
+def test_scoreboard_refuses_malformed_retained_identity_before_writing(tmp_path, record):
+    from dataclasses import replace
+
+    from tests.unit.test_publication_services import publication_world
+
+    from squadopt.application import scoreboard as writer
+    from squadopt.application.league_publication import publish_league
+
+    request = replace(publication_world(tmp_path), record_root=None)
+    publish_league(request)
+    tree = request.out_dir / "data/leagues/352490"
+    identity_path = tree / IDENTITY_FILE
+    dump(identity_path, record)
+    before = {path.name: path.read_bytes() for path in tree.iterdir() if path.is_file()}
+    board = writer.ScoreboardPublicationRequest(
+        snapshot_root=request.snapshot_root,
+        snapshot_id=request.snapshot_id,
+        registry_path=request.registry_path,
+        ledger_root=tmp_path / "empty-ledger",
+        out_dir=request.out_dir,
+        league_id=request.league_id,
+        season=request.season,
+        now_utc="2026-08-27T11:00:00Z",
+    )
+    with pytest.raises(DataError, match=r"publication-identity\.json") as refused:
+        writer.publish_scoreboard(board)
+    assert type(refused.value) is DataError
+    assert str(identity_path) in str(refused.value)
+    assert before == {path.name: path.read_bytes() for path in tree.iterdir() if path.is_file()}
+    assert not (tree / "scoreboard.json").exists()
+
+
+def test_retained_scoreboard_identity_reads_through_addressable_path(tmp_path, monkeypatch):
+    from squadopt.application import scoreboard as writer
+
+    tree = tmp_path / "league"
+    identity_path = tree / IDENTITY_FILE
+    redirected = tmp_path / "addressable-record.json"
+    dump(identity_path, {"source_snapshot_id": "wrong-unwrapped-capture"})
+    dump(redirected, {"source_snapshot_id": "wrapped-capture"})
+    calls = []
+
+    def addressable_record(path):
+        calls.append(path)
+        return str(redirected) if path == identity_path else str(path)
+
+    monkeypatch.setattr(writer, "addressable", addressable_record)
+    assert writer._retained_publication_capture(tree) == "wrapped-capture"
+    assert calls == [identity_path]
+
+
+def test_retained_scoreboard_identity_unreadable_json_has_named_data_error(tmp_path):
+    from squadopt.application import scoreboard as writer
+
+    tree = tmp_path / "league"
+    tree.mkdir()
+    identity_path = tree / IDENTITY_FILE
+    identity_path.write_bytes(b"{not-json")
+    with pytest.raises(DataError, match=r"publication-identity\.json") as refused:
+        writer._retained_publication_capture(tree)
+    assert type(refused.value) is DataError
+    assert isinstance(refused.value.__cause__, ValueError)
 
 
 def test_check_script_names_changed_identity_and_prints_success(tmp_path, capsys):

@@ -194,7 +194,7 @@ def _refuse(root: Path, entry: int, reason: str) -> None:
 
 
 @pytest.mark.parametrize("defect", [None, "variants", "top100", "word"])
-def test_the_three_checks_keep_their_clean_and_defective_outcomes(
+def test_the_four_checks_keep_their_clean_and_defective_outcomes(
     tmp_path: Path, defect: str | None, capsys: pytest.CaptureFixture[str]
 ) -> None:
     _tree(tmp_path)
@@ -212,7 +212,10 @@ def test_the_three_checks_keep_their_clean_and_defective_outcomes(
         _write(tmp_path, "advice/1/saf-puan/1/hoca-sozu.json", {})
     assert main([str(tmp_path)]) == (0 if defect is None else 1)
     output = capsys.readouterr().out
-    assert all(f"Checking {name}" in output for name in ("variants", "top100", "word"))
+    assert all(
+        f"Checking {name}" in output
+        for name in ("publication identity", "variants", "top100", "word")
+    )
     assert output.rstrip().endswith("FINAL: ALL GOOD" if defect is None else "FINAL: FAILURE(S)")
     if defect is None:
         assert output.splitlines().count("ALL GOOD") == 3
