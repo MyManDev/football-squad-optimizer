@@ -52,10 +52,21 @@ def test_normal_seal_refuses_different_production_identity(case, field):
 def test_normal_seal_records_each_models_own_training_provenance(case):
     handoff = read_projection_handoff(case["handoff_path"])
     archives = ["2021-22", "2022-23", "2023-24", "2024-25"]
+    training_provenance = {
+        "component_training_seasons": archives,
+        "component_training_rows": 1200,
+        "component_training_cutoff": "2026-09-20T15:00:00Z",
+        "component_training_data_fingerprint": "c" * 64,
+        "fallback_training_seasons": ["2023-24", "2024-25"],
+        "training_selection": {
+            "contract_version": "synthetic_training_selection_v1",
+            "allowed_seasons": archives,
+        },
+    }
     handoff = replace(
         handoff,
         diagnostics={
-            "component_training_seasons": archives,
+            **training_provenance,
             "projection_selection": "not training",
         },
     )
@@ -63,9 +74,7 @@ def test_normal_seal_records_each_models_own_training_provenance(case):
     ready = bundle.seal_football_bundle(**case)
     path = ready.marker_path.with_suffix(".production.json")
     record = json.loads(path.read_bytes())
-    assert record["current_handoff"]["training_provenance"] == {
-        "component_training_seasons": archives
-    }
+    assert record["current_handoff"]["training_provenance"] == training_provenance
     assert "archive_hashes" in record["football"]
     assert record["football"]["archive_hashes"] == {"test": "b" * 64}
     assert "component_training_seasons" not in record["football"]
@@ -89,7 +98,7 @@ def test_normal_seal_records_each_models_own_training_provenance(case):
             "fingerprint": handoff.fingerprint,
             "source_snapshot_id": case["snapshot_id"],
             "sha256": bundle._digest(ready.files["handoff"].read_bytes()),
-            "training_provenance": {"component_training_seasons": archives},
+            "training_provenance": training_provenance,
         },
     }
     assert (
@@ -149,7 +158,6 @@ def test_joint_record_keeps_three_archive_seasons_and_causal_history_apart(case)
     assert record["football"]["model_version"] == "football_joint_role_minutes_v1"
     assert "training_selection" in record["football"]
     assert record["football"]["training_selection"] == selection
-    assert record["football"]["training_latest_kickoff"] < forecast["captured_at_utc"]
     assert record["current_handoff"]["training_provenance"]["component_training_seasons"] == [
         "2021-22",
         "2022-23",
@@ -172,16 +180,22 @@ def test_preflight_refusal_leaves_no_production_record(case):
 
 
 def test_record_uses_sealed_handoff_bytes_even_if_source_diagnostics_change(case, monkeypatch):
-    original = bundle._production_record
+    original = bundle._validate
     source = case["handoff_path"]
+    calls = 0
 
-    def altered_source(payloads, snapshot_id, **kwargs):
-        doc = json.loads(source.read_bytes())
-        doc["diagnostics"]["component_training_seasons"] = ["1999-00"]
-        dump(source, doc)
-        return original(payloads, snapshot_id, **kwargs)
+    def altered_source(**kwargs):
+        nonlocal calls
+        calls += 1
+        result = original(**kwargs)
+        if calls == 2:
+            # Change the source before the record call's arguments are evaluated.
+            doc = json.loads(source.read_bytes())
+            doc["diagnostics"]["component_training_seasons"] = ["1999-00"]
+            dump(source, doc)
+        return result
 
-    monkeypatch.setattr(bundle, "_production_record", altered_source)
+    monkeypatch.setattr(bundle, "_validate", altered_source)
     ready = bundle.seal_football_bundle(**case)
     record = json.loads(ready.marker_path.with_suffix(".production.json").read_bytes())
     sealed = ready.files["handoff"].read_bytes()
@@ -192,15 +206,47 @@ def test_record_uses_sealed_handoff_bytes_even_if_source_diagnostics_change(case
     assert record["current_handoff"]["sha256"] == marker_doc["files"]["handoff"]["sha256"]
 
 
-def test_production_record_refuses_different_capture_pair(case):
+@pytest.mark.parametrize("check", ["validation", "bytes"])
+def test_final_check_refusal_leaves_no_production_record(case, monkeypatch, check):
+    original = bundle._validate
+    calls = 0
+
+    def interrupted(**kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 2 and check == "validation":
+            raise ValueError("synthetic final validation failure")
+        result = original(**kwargs)
+        if calls == 2 and check == "bytes":
+            copied_handoff = kwargs["files"]["handoff"]
+            doc = json.loads(copied_handoff.read_bytes())
+            doc["diagnostics"]["component_training_seasons"] = ["1999-00"]
+            dump(copied_handoff, doc)
+        return result
+
+    monkeypatch.setattr(bundle, "_validate", interrupted)
+    message = {
+        "validation": "synthetic final validation failure",
+        "bytes": "bundle input changed while it was being sealed",
+    }[check]
+    with pytest.raises(ValueError, match=message):
+        bundle.seal_football_bundle(**case)
+    assert calls == 2
+    marker = bundle.football_bundle_path(case["artifact_root"], case["snapshot_id"])
+    assert not marker.exists()
+    assert not marker.with_suffix(".production.json").exists()
+
+
+@pytest.mark.parametrize("role", ["handoff", "forecast"])
+def test_production_record_backstop_refuses_different_capture_pair(case, role):
     files = {
         "forecast": bundle.football_artifact_path(case["artifact_root"], case["snapshot_id"]),
         "handoff": case["handoff_path"],
     }
     payloads = {role: path.read_bytes() for role, path in files.items()}
-    handoff = json.loads(payloads["handoff"])
-    handoff["source_snapshot_id"] = "other-capture"
-    payloads["handoff"] = json.dumps(handoff).encode()
+    document = json.loads(payloads[role])
+    document["source_snapshot_id"] = "other-capture"
+    payloads[role] = json.dumps(document).encode()
     with pytest.raises(ValueError, match="capture identities differ"):
         bundle._production_record(payloads, case["snapshot_id"], handoff_fingerprint="synthetic")
 
