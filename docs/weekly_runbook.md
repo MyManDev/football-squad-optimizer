@@ -227,9 +227,23 @@ each line; the commands are in the table above and in the documents named.
    news document fetched at or after the decision capture, and the bundle refuses a news
    capture that completed after it.
 3. **The football forecast is built with its components from that capture**
-   (`scripts.build_football_forecast --with-components`), and **the projection handoff from
+   (`scripts.build_football_forecast --with-components --role-minutes --retained-role-history
+   --training-season 2022-23 --training-season 2023-24 --training-season 2024-25
+   --training-season 2026-27`), and **the projection handoff from
    the capture and the evidence** (`scripts.build_projection_handoff`). The bundle binds
    the forecast's and the handoff's fingerprints to the capture and refuses any other.
+   After these builds and before step 4, the owner runs
+   `python -m scripts.build_football_shadow --snapshot-root data/snapshots --snapshot-id <capture>
+   --archive-root data/raw/vaastav-fpl` from the week's commit. Its separate root is
+   `artifacts/shadow/football_team_share_v1`; never give it to the backend
+   (`artifacts/backend-artifact-root.json` or `-ArtifactRoot`), to
+   `scripts.prepare_football_bundle`, or to the planner chain runner and scorer (#923,
+   #992). Post the receipt's capture id, fingerprint and sha256 on #999 before the
+   deadline, then back up the artifact and receipt outside the repository preserving
+   modification times. Any later `fpl-live` capture targeting that week before the
+   deadline needs its own shadow build and handoff before the deadline, or the week is
+   missing. After the deadline, post the shadow input-check JSON with every season
+   capture on #999. See [the shadow note](football_prospective_shadow_note.md).
 4. **The weekly run**: rotation export, league tree, advice record, site, scoreboard,
    publish pull request (`platform.weekly_operations`). The journal refuses a stage whose
    predecessor did not complete; the league tree carries one `generated_at_utc`, which the
