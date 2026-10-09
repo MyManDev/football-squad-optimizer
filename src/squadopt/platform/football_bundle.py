@@ -449,6 +449,14 @@ def seal_football_bundle(
             artifact_root=artifact_root, snapshot_root=snapshot_root, snapshot_id=snapshot_id
         )
     site_tree = single_league_tree(site_data_root, league_id)
+    if (news_capture_id is not None) != (rotation_table_path is not None):
+        raise ValueError("News requires both exact rotation artifacts, or none of the three.")
+    if rotation_table_path is not None:
+        for path in (rotation_table_path, rotation_table_path.with_suffix(".manifest.json")):
+            if path.name in _RESERVED_FILENAMES:
+                raise ValueError("Reserved rotation artifact filename.")
+            if not _ROTATION_FILENAME.fullmatch(path.name):
+                raise ValueError("Invalid sealed rotation filename.")
     # A failed preparation has no ready marker or copied folder yet. Record the
     # attempt before either, so older v1 readers cannot serve its loose artifacts.
     started = football_bundle_stage_path(artifact_root, snapshot_id, FootballBundleStage.STARTED)

@@ -6,8 +6,8 @@ from datetime import datetime, timedelta
 
 import pytest
 from pandas.testing import assert_frame_equal
+from tests.unit.test_football_bundle import add_quiet_news, dump
 from tests.unit.test_football_bundle import case as case
-from tests.unit.test_football_bundle import dump
 from tests.unit.test_football_bundle import publication_case as publication_case
 from tests.unit.test_football_bundle_switches import baseline, load, signature
 
@@ -84,11 +84,14 @@ def test_failure_keeps_previous_ready_and_never_selects_partial(
     previous = bundle.seal_football_bundle(**case)
     previous_bytes = previous.marker_path.read_bytes()
     candidate = newer_case(case, tmp_path)
+    add_quiet_news(candidate, candidate["artifact_root"], table_name=None)
+    configured = candidate["snapshot_root"] / candidate["news_capture_id"]
     inputs, projection = baseline(candidate)
     baseline_bytes = projection.table.copy(deep=True)
     # Legacy v1 artifacts remain compatible until this particular publication starts.
-    assert load(candidate).football is not None
-    prior_signature = signature(candidate)
+    assert load(candidate, configured=configured).football is not None
+    assert load(candidate, configured=configured).manager_words is not None
+    prior_signature = signature(candidate, configured)
     real_site = bundle._site_files
     real_write = bundle.write_bytes_once
     real_validate = bundle._validate
@@ -135,10 +138,11 @@ def test_failure_keeps_previous_ready_and_never_selects_partial(
         bundle.football_bundle_stage_path(
             candidate["artifact_root"], candidate["snapshot_id"], bundle.FootballBundleStage.STARTED
         ).unlink()
-    assert signature(candidate) != prior_signature
-    selected = load(candidate, inputs=inputs, projection=projection)
+    assert signature(candidate, configured) != prior_signature
+    selected = load(candidate, configured=configured, inputs=inputs, projection=projection)
     assert selected.football is None and not selected.football_components_bound
     assert selected.football_bundle_sha256 is None
+    assert selected.manager_words is None and selected.rotation_table_sha256 is None
     assert any("bundle incomplete" in note for note in selected.notes)
     with pytest.raises(SwitchInputUnavailable):
         switch_identity(selected, model="football")
@@ -150,12 +154,30 @@ def test_failure_keeps_previous_ready_and_never_selects_partial(
         **{key: case[key] for key in ("artifact_root", "snapshot_root", "snapshot_id")}
     )
     assert held.fingerprint == previous.fingerprint
-    assert load(case).football_bundle_sha256 == previous.fingerprint
+    previous_selected = load(case)
+    assert previous_selected.football is not None and previous_selected.football_components_bound
+    assert previous_selected.football_bundle_sha256 == previous.fingerprint
+    assert (
+        switch_identity(previous_selected, model="football")["model"]["ready_bundle_sha256"]
+        == previous.fingerprint
+    )
     monkeypatch.setattr(bundle, "_site_files", real_site)
     monkeypatch.setattr(bundle, "write_bytes_once", real_write)
     monkeypatch.setattr(bundle, "_validate", real_validate)
     completed = bundle.seal_football_bundle(**candidate)
-    assert load(candidate).football_bundle_sha256 == completed.fingerprint
+    completed_selected = load(candidate, configured=configured)
+    assert completed_selected.football is not None and completed_selected.football_components_bound
+    assert completed_selected.football_bundle_sha256 == completed.fingerprint
+    assert (
+        switch_identity(completed_selected, model="football")["model"]["ready_bundle_sha256"]
+        == completed.fingerprint
+    )
+    assert completed_selected.manager_words is not None
+    assert completed_selected.manager_words.source_label == candidate["news_capture_id"]
+    assert (
+        completed_selected.rotation_table_sha256
+        == json.loads(completed.files["rotation_manifest"].read_bytes())["table_sha256"]
+    )
 
 
 @pytest.mark.parametrize(
@@ -193,6 +215,31 @@ def test_unresolved_league_argument_does_not_disable_legacy_inputs(case):
     assert load(case).football is not None
     with pytest.raises(LeagueDirectoryError, match="say which one"):
         bundle.seal_football_bundle(**case)
+    assert signature(case) == before
+    assert load(case).football is not None
+    assert not any(
+        path.exists()
+        for path in bundle.football_bundle_stage_paths(case["artifact_root"], case["snapshot_id"])
+    )
+
+
+@pytest.mark.parametrize(
+    "argument", ["bad_rotation_name", "news_without_rotation", "rotation_without_news"]
+)
+def test_unresolved_rotation_arguments_do_not_disable_legacy_inputs(case, argument):
+    before = signature(case)
+    altered = dict(case)
+    if argument == "bad_rotation_name":
+        altered.update(
+            news_capture_id="synthetic-news",
+            rotation_table_path=case["artifact_root"] / "bad.name.csv",
+        )
+    elif argument == "news_without_rotation":
+        altered["news_capture_id"] = "synthetic-news"
+    else:
+        altered["rotation_table_path"] = case["artifact_root"] / "rotation.csv"
+    with pytest.raises(ValueError, match="rotation"):
+        bundle.seal_football_bundle(**altered)
     assert signature(case) == before
     assert load(case).football is not None
     assert not any(
