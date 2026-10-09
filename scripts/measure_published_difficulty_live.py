@@ -310,25 +310,7 @@ def elements(snapshot: CapturedSnapshot) -> dict[int, dict[str, Any]]:
     return result
 
 
-def joined_rows(
-    decision: CapturedSnapshot, handoff: InSeasonProjection, outcome: CapturedSnapshot, week: int
-) -> tuple[pd.DataFrame, list[int]]:
-    decided = elements(decision)
-    realized_ids = elements(outcome)
-    projected = project(
-        read_inputs(decision, season=SEASON, gameweek=week), in_season=handoff
-    ).table
-    totals = {}
-    seen = set()
-    for item in decode(outcome.payloads[live_payload(week)])["elements"]:
-        if type(item["id"]) is not int or item["id"] in seen:
-            raise DifficultyInputError("A realized player identity is invalid or duplicated.")
-        seen.add(item["id"])
-        if item["id"] in realized_ids:
-            points = item["stats"]["total_points"]
-            if type(points) is not int:
-                raise DifficultyMissingInputs("A realized points row is invalid.")
-            totals[realized_ids[item["id"]]["code"]] = points
+def captured_club_ratings(decision: CapturedSnapshot, week: int) -> dict[int, list[float]]:
     held_fixtures = [f for f in fixtures(decision) if f.get("event") == week]
     clubs: dict[int, list[float]] = {}
     for fixture in held_fixtures:
@@ -343,6 +325,35 @@ def joined_rows(
                     "A captured fixture difficulty is missing or invalid."
                 )
             clubs.setdefault(fixture["team_" + side], []).append(float(rating))
+    return clubs
+
+
+def joined_rows(
+    decision: CapturedSnapshot,
+    handoff: InSeasonProjection,
+    outcome: CapturedSnapshot,
+    week: int,
+    *,
+    projected: pd.DataFrame | None = None,
+) -> tuple[pd.DataFrame, list[int]]:
+    decided = elements(decision)
+    realized_ids = elements(outcome)
+    if projected is None:
+        projected = project(
+            read_inputs(decision, season=SEASON, gameweek=week), in_season=handoff
+        ).table
+    totals = {}
+    seen = set()
+    for item in decode(outcome.payloads[live_payload(week)])["elements"]:
+        if type(item["id"]) is not int or item["id"] in seen:
+            raise DifficultyInputError("A realized player identity is invalid or duplicated.")
+        seen.add(item["id"])
+        if item["id"] in realized_ids:
+            points = item["stats"]["total_points"]
+            if type(points) is not int:
+                raise DifficultyMissingInputs("A realized points row is invalid.")
+            totals[realized_ids[item["id"]]["code"]] = points
+    clubs = captured_club_ratings(decision, week)
     code_to_club = {item["code"]: item["team"] for item in decided.values()}
     rows = projected.rename(columns={"expected_points": "predicted_points"}).copy()
     dropped = sorted(set(int(v) for v in rows["player_id"]) - set(totals))
@@ -368,7 +379,6 @@ def reading(
     declaration: Mapping[str, str],
     as_of: str,
     output_directory: Path,
-    claim_directory: Path,
     owner_approved: bool,
     weekly_run_idle: bool,
 ) -> dict[str, Any]:
@@ -390,10 +400,44 @@ def reading(
         "git", "log", "--all", "--format=%H", "--", "docs/research/published_difficulty_live.json"
     ):
         raise DifficultyInputError("A committed verdict record prevents another reading.")
-    output.mkdir(parents=True, exist_ok=True)
-    claims = safe_path(claim_directory)
-    claims.mkdir(parents=True, exist_ok=True)
+    claims = safe_path(
+        Path(command("git", "rev-parse", "--path-format=absolute", "--git-common-dir"))
+        / "research-claims/published-difficulty"
+    )
     claim = claims / (DECLARATION_SHA256 + "-claim.json")
+    if claim.exists():
+        raise DifficultyInputError("This declaration already claimed its single reading.")
+    if not safe_path(handoff_root).is_dir():
+        raise DifficultyMissingInputs("The handoff root is absent; no reading was claimed.")
+    prepared = {}
+    audit: list[dict[str, Any]] = []
+    for week in weeks:
+        proof: dict[str, Any] = {}
+        try:
+            decision = decision_capture(captures, week)
+            handoff, proof = paired_handoff(handoff_root, decision, week)
+            projected = project(
+                read_inputs(decision, season=SEASON, gameweek=week), in_season=handoff
+            ).table
+            elements(decision)
+            captured_club_ratings(decision, week)
+            prepared[week] = (decision, handoff, proof, projected)
+        except (DifficultyMissingInputs, DataError, OSError, KeyError, TypeError) as error:
+            audit.append(
+                {
+                    "gameweek": week,
+                    "status": "missing",
+                    "reason": type(error).__name__,
+                    "identity": proof,
+                    "solver_decisions": None,
+                }
+            )
+    if not prepared:
+        raise DifficultyMissingInputs(
+            "No week pairs with valid projection inputs; no reading was claimed."
+        )
+    output.mkdir(parents=True, exist_ok=True)
+    claims.mkdir(parents=True, exist_ok=True)
     if (
         write_document_once(
             {"capture": selected.metadata.snapshot_id, "declaration": dict(declaration)}, claim
@@ -402,14 +446,10 @@ def reading(
     ):
         raise DifficultyInputError("This declaration already claimed its single reading.")
     measured: list[DifficultyWeek] = []
-    audit = []
     evidence = []
     try:
-        for week in weeks:
-            proof: dict[str, Any] = {}
+        for week, (decision, handoff, proof, projected) in prepared.items():
             try:
-                decision = decision_capture(captures, week)
-                handoff, proof = paired_handoff(handoff_root, decision, week)
                 settled = partial_snapshot(
                     safe_path(snapshot_root) / selected.metadata.snapshot_id,
                     (BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD, live_payload(week)),
@@ -425,7 +465,7 @@ def reading(
                     raise DifficultyMissingInputs(
                         "The selected reading capture has no settled week."
                     )
-                rows, dropped = joined_rows(decision, handoff, settled, week)
+                rows, dropped = joined_rows(decision, handoff, settled, week, projected=projected)
                 measured_week, player_evidence = measure_week(
                     rows, season=SEASON, gameweek=week, handoff_version=handoff.model_version
                 )
@@ -473,7 +513,7 @@ def reading(
             "reading_fingerprint": selected.metadata.fingerprint,
             "reading_input_hashes": dict(selected.metadata.checksums),
             "eligible_weeks": list(weeks),
-            "week_identities": audit,
+            "week_identities": sorted(audit, key=lambda item: item["gameweek"]),
             **summarize(tuple(measured)),
         }
         if write_document_once(report, output / "reading.json") != WRITTEN:
@@ -498,7 +538,6 @@ def main() -> int:
     parser.add_argument("--handoff-root", type=Path, required=True)
     parser.add_argument("--as-of", required=True)
     parser.add_argument("--output-directory", type=Path, required=True)
-    parser.add_argument("--claim-directory", type=Path, required=True)
     parser.add_argument("--owner-approved", action="store_true")
     parser.add_argument("--weekly-run-idle", action="store_true")
     args = parser.parse_args()
@@ -516,7 +555,6 @@ def main() -> int:
             declaration=declaration,
             as_of=as_of,
             output_directory=args.output_directory,
-            claim_directory=args.claim_directory,
             owner_approved=args.owner_approved,
             weekly_run_idle=args.weekly_run_idle,
         )

@@ -27,10 +27,14 @@ inventory or outcome has been read while preparing this draft.
 After the first capture showing GW20 finished and data checked with its actual
 fixtures settled, invoke `python -m scripts.measure_published_difficulty_live`
 with `--snapshot-root`, `--handoff-root`, `--as-of`, `--output-directory`,
-`--claim-directory`, `--owner-approved` and `--weekly-run-idle`. Every instant is
+`--owner-approved` and `--weekly-run-idle`. Every instant is
 UTC. The output directory must be below this worktree's ignored `artifacts/`.
-Use one persistent private claim directory across worktrees and output folders.
-Retain it after a refusal or crash; the executable never removes the claim.
+The executable derives its persistent private claim directory from the Git common
+directory, shared by all worktrees; the operator cannot substitute another folder.
+Before claiming, it validates every decision capture, paired handoff and projection
+join input without opening an outcome. An absent handoff root or no valid paired
+week refuses without creating the claim or output. After any outcome reading
+begins, retain the claim after refusal or crash; the executable never removes it.
 An existing committed verdict record also prevents a second reading.
 
 No real-week comparison is produced before that settled-GW20 condition. The
@@ -60,3 +64,8 @@ The command writes no committed result or measurements-index row. Those are
 the separate step 3 PR after the single owner-approved reading. A passed
 verdict still requires the owner's yes and the separate ship PR. This runner
 adds no Friday operation, publication, promoted version or member-page text.
+
+The draft still waits for the owner-acknowledged #1033 solver and pairing wording
+to merge. Its existing digest pin remains unchanged and refuses an amended text.
+Alias preference and the final served-capture selection must follow that accepted
+protocol before an actual reading; no statistical method is guessed here.

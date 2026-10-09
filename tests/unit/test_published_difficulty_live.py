@@ -170,9 +170,8 @@ def test_multiplier_is_hand_computed_and_blank_has_no_calendar_double_counting()
     rows.loc[1, "fixture_count"] = 2
     adjusted, multiplier = study.adjusted_points(rows)
     assert multiplier[0] == 1
-    slope, centre = study.COEFFICIENTS["GK"]
-    assert multiplier[1] == pytest.approx(1 + slope * (-2 - centre))
-    assert adjusted[1] == pytest.approx(rows.loc[1, "predicted_points"] * multiplier[1])
+    assert multiplier[1] == pytest.approx(1.0823658724428682)
+    assert adjusted[1] == pytest.approx(rows.loc[1, "predicted_points"] * 1.0823658724428682)
     assert adjusted[0] == rows.loc[0, "predicted_points"]
 
 
@@ -292,8 +291,6 @@ def test_locked_season_is_refused_before_inventory_loader(
             "2027-01-20T00:00:00Z",
             "--output-directory",
             str(tmp_path),
-            "--claim-directory",
-            str(tmp_path),
         ],
     )
     assert runner.main() == 1
@@ -341,7 +338,6 @@ def test_early_reading_refuses_before_any_outcome_bytes(
             declaration={"merged_at": "2026-10-01T00:00:00Z"},
             as_of="2026-10-07T00:00:00Z",
             output_directory=tmp_path / "artifacts/study",
-            claim_directory=tmp_path / "claims",
             owner_approved=True,
             weekly_run_idle=True,
         )
@@ -404,13 +400,16 @@ def test_once_only_claim_survives_across_output_directories(
     handoff(tmp_path / "handoffs", decision)
     snapshots = runner.inventory(root, season=study.SEASON, as_of="2027-01-20T00:00:00Z")
     monkeypatch.setattr(runner, "ROOT", tmp_path)
-    monkeypatch.setattr(runner, "command", lambda *args: "")
+    monkeypatch.setattr(
+        runner,
+        "command",
+        lambda *args: str(tmp_path / "common") if "--git-common-dir" in args else "",
+    )
     kwargs = dict(
         snapshot_root=root,
         handoff_root=tmp_path / "handoffs",
         declaration={"merged_at": "2026-10-01T00:00:00Z", "sha256": runner.DECLARATION_SHA256},
         as_of="2027-01-20T00:00:00Z",
-        claim_directory=tmp_path / "claims",
         owner_approved=True,
         weekly_run_idle=True,
     )
@@ -424,8 +423,10 @@ def test_once_only_claim_survives_across_output_directories(
         raise AssertionError("second outcome read")
 
     monkeypatch.setattr(runner, "partial_snapshot", forbidden)
+    other_worktree = tmp_path / "other-worktree"
+    monkeypatch.setattr(runner, "ROOT", other_worktree)
     with pytest.raises(study.DifficultyInputError, match="single reading"):
-        runner.reading(snapshots, output_directory=tmp_path / "artifacts/two", **kwargs)
+        runner.reading(snapshots, output_directory=other_worktree / "artifacts/two", **kwargs)
 
 
 @pytest.mark.parametrize("unfinished", ["data_checked", "fixture", "future_kickoff"])
@@ -478,3 +479,134 @@ def test_coefficient_identity_is_identical_on_windows_and_linux() -> None:
     lf = content.replace(b"\r\n", b"\n")
     study.verify_coefficients(lf)
     study.verify_coefficients(lf.replace(b"\n", b"\r\n"))
+
+
+def test_join_reads_own_side_and_mean_of_double_and_blank(tmp_path):
+    def change(docs):
+        fixtures = docs[FIXTURES_PAYLOAD]
+        fixtures[:] = [f for f in fixtures if not (f["event"] == 7 and f["team_h"] == 9)]
+        extra = next(f.copy() for f in fixtures if f["event"] == 7 and f["team_h"] == 1)
+        extra.update(id=999, team_h_difficulty=4, team_a=4)
+        fixtures.append(extra)
+
+    decision = captured(tmp_path / "captures", change=change)
+    base = handoff(tmp_path / "handoffs", decision)
+    outcome = captured(tmp_path / "captures", final=True)
+    rows, _ = runner.joined_rows(decision, base, outcome, 7)
+    by_id = rows.set_index("player_id")
+    assert by_id.loc[1001, "published_signal"] == -3
+    assert by_id.loc[1002, "published_signal"] == -4
+    assert by_id.loc[1003, "published_signal"] == -2
+    assert by_id.loc[1004, "published_signal"] == -4
+    assert by_id.loc[1001, "fixture_count"] == 2
+    assert np.isnan(by_id.loc[1009, "published_signal"])
+    assert by_id.loc[1009, "fixture_count"] == 0
+    adjusted, multiplier = study.adjusted_points(rows)
+    offset = rows.index[rows.player_id.eq(1009)][0]
+    assert multiplier[offset] == 1
+    assert adjusted[offset] == by_id.loc[1009, "predicted_points"]
+
+
+def test_handoff_written_at_deadline_is_refused(tmp_path):
+    snapshot = captured(tmp_path / "captures")
+    root = tmp_path / "handoffs"
+    handoff(root, snapshot)
+    path = next((root / "by-capture" / snapshot.metadata.snapshot_id).glob("*.json"))
+    instant = (START + timedelta(weeks=6)).timestamp()
+    os.utime(path, (instant, instant))
+    with pytest.raises(study.DifficultyMissingInputs, match="exactly one"):
+        runner.paired_handoff(root, snapshot, 7)
+
+
+def test_admitted_name_with_locked_bootstrap_refuses_before_event_read(tmp_path, monkeypatch):
+    def change(docs):
+        for event in docs[BOOTSTRAP_PAYLOAD]["events"]:
+            event["deadline_time"] = stamp(
+                datetime.fromisoformat(event["deadline_time"]) - timedelta(days=365)
+            )
+
+    snapshot = captured(tmp_path, final=True, change=change)
+    original = Path.read_bytes
+    opened = []
+
+    def tracked(path):
+        opened.append(path.name)
+        assert not path.name.startswith("event-")
+        return original(path)
+
+    monkeypatch.setattr(Path, "read_bytes", tracked)
+    with pytest.raises(study.DifficultyInputError, match="2025-26"):
+        runner.partial_snapshot(tmp_path / snapshot.metadata.snapshot_id, (live_payload(7),))
+    assert BOOTSTRAP_PAYLOAD in opened
+
+
+def test_equal_latest_instants_make_week_missing(tmp_path):
+    one = captured(tmp_path)
+
+    def change(docs):
+        docs[BOOTSTRAP_PAYLOAD]["elements"][0]["first_name"] = "Different"
+
+    two = captured(tmp_path, change=change)
+    assert one.metadata.snapshot_id != two.metadata.snapshot_id
+    with pytest.raises(study.DifficultyMissingInputs, match="ambiguous"):
+        runner.decision_capture({s.metadata.snapshot_id: s for s in (one, two)}, 7)
+
+
+def reading_setup(tmp_path, monkeypatch, *, outcome_change=None):
+    root = tmp_path / "captures"
+    decision = captured(root)
+    captured(root, final=True, change=outcome_change)
+    handoff(tmp_path / "handoffs", decision)
+    snapshots = runner.inventory(root, season=study.SEASON, as_of="2027-01-20T00:00:00Z")
+    monkeypatch.setattr(runner, "ROOT", tmp_path)
+    monkeypatch.setattr(
+        runner,
+        "command",
+        lambda *args: str(tmp_path / "common") if "--git-common-dir" in args else "",
+    )
+    return snapshots, dict(
+        snapshot_root=root,
+        handoff_root=tmp_path / "handoffs",
+        declaration={"merged_at": "2026-10-01T00:00:00Z", "sha256": runner.DECLARATION_SHA256},
+        as_of="2027-01-20T00:00:00Z",
+        output_directory=tmp_path / "artifacts/one",
+        owner_approved=True,
+        weekly_run_idle=True,
+    )
+
+
+@pytest.mark.parametrize("bad_root", ["absent", "unpaired", "invalid_projection"])
+def test_outcome_free_preflight_does_not_spend_claim(tmp_path, monkeypatch, bad_root):
+    snapshots, kwargs = reading_setup(tmp_path, monkeypatch)
+    if bad_root == "absent":
+        kwargs["handoff_root"] = tmp_path / "typo"
+    if bad_root == "unpaired":
+        kwargs["handoff_root"] = tmp_path / "empty"
+        kwargs["handoff_root"].mkdir()
+    if bad_root == "invalid_projection":
+
+        def broken(*args, **kwargs):
+            raise runner.DataError("synthetic bad projection")
+
+        monkeypatch.setattr(runner, "project", broken)
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("outcome opened before preflight")
+
+    monkeypatch.setattr(runner, "partial_snapshot", forbidden)
+    with pytest.raises(study.DifficultyMissingInputs, match="no reading was claimed"):
+        runner.reading(snapshots, **kwargs)
+    assert not (tmp_path / "common/research-claims").exists()
+    assert not kwargs["output_directory"].exists()
+
+
+def test_unchecked_nonfinal_week_is_missing_in_single_reading(tmp_path, monkeypatch):
+    def change(docs):
+        docs[BOOTSTRAP_PAYLOAD]["events"][6]["data_checked"] = False
+
+    snapshots, kwargs = reading_setup(tmp_path, monkeypatch, outcome_change=change)
+    report = runner.reading(snapshots, **kwargs)
+    seven = next(w for w in report["week_identities"] if w["gameweek"] == 7)
+    assert seven["status"] == "missing"
+    assert report["valid_weeks"] == 0
+    assert not (kwargs["output_directory"] / "gw07-players.csv").exists()
