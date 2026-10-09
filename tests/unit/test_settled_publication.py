@@ -1053,3 +1053,25 @@ def test_a_settled_view_on_a_directory_site_stamps_the_directory_too(tmp_path: P
     settled = json.loads((out / "leagues" / str(request.league_id) / "members.json").read_bytes())
     assert directory["generated_at_utc"] == settled["generated_at_utc"] == STAMP
     assert "data/leagues.json" in result.changed_files
+
+
+def test_settled_writer_refreshes_inherited_publication_identity(tmp_path):
+    from squadopt.application.league_tree_identity import check_tree_identity, record_tree_identity
+
+    request = world(tmp_path)
+    tree = request.accepted_dir / "data/league"
+    members = json.loads((tree / "members.json").read_bytes())
+    for member in members["payload"]["members"]:
+        member["member_kind"] = "human"
+        path = tree / f"entries/{member['entry_id']}.json"
+        entry = json.loads(path.read_bytes())
+        entry["payload"].update(season=SEASON, league_id=request.league_id, entry=member.copy())
+        write(path, entry)
+    write(tree / "members.json", members)
+    record_tree_identity(tree, source_snapshot_id="capture-a")
+    result = publication.publish_settled(request)
+    identity = check_tree_identity(request.out_dir / "data/league")
+    assert identity is not None
+    assert identity["source_snapshot_id"] == "capture-a"
+    assert "scoreboard.json" in identity["files"]
+    assert result.out_dir == request.out_dir

@@ -66,7 +66,7 @@ from pathlib import Path
 from typing import Any, Final
 
 from squadopt.application.entries import EntryRegistry
-from squadopt.application.league_tree_identity import check_tree_identity, record_tree_identity
+from squadopt.application.league_tree_identity import record_tree_identity
 from squadopt.application.scoreboard_baselines import human_baseline_rows
 from squadopt.contracts.league import LEAGUE_VIEW_CONTRACT_VERSION
 from squadopt.contracts.league_publication_identity import IDENTITY_FILE
@@ -805,7 +805,10 @@ def publish_scoreboard(request: ScoreboardPublicationRequest) -> ScoreboardPubli
         site_data, request.league_id
     )
     target = tree / SCOREBOARD_FILE
-    prior_identity = check_tree_identity(tree)
+    # The inherited tree was verified when the weekly preview was seeded. A retry
+    # may already contain this stage's new scoreboard beside the previous record.
+    identity_path = tree / IDENTITY_FILE
+    prior_identity = json.loads(identity_path.read_bytes()) if identity_path.is_file() else None
     # An empty ledger root beside a scoreboard that already publishes our rows: the
     # decisions were made, their local record is what is missing. Keep the rows.
     published_ours = _published_ours(target, season) if not entries else {}

@@ -135,7 +135,10 @@ def _validate(
         or not set(handoff.expected_points) <= set(inputs.players.player_id)
     ):
         raise ValueError("Projection handoff differs from the decision capture or roster.")
-    site_files = _site_files(files["site_members"].parent)
+    site_files = _site_files(
+        files["site_members"].parent,
+        retain_history=any(role.startswith("site_tree_") for role in files),
+    )
     if {role: path for role, path in files.items() if role.startswith("site_")} != site_files:
         raise ValueError("Bundle site files differ from its declared human members.")
     generated = set()
@@ -237,7 +240,7 @@ def _validate(
     return identities, official_report
 
 
-def _site_files(tree: Path) -> dict[str, Path]:
+def _site_files(tree: Path, *, retain_history: bool = True) -> dict[str, Path]:
     """Read the existing member/entry envelopes of one league's tree, without importing
     runtime services."""
     member_path = tree / "members.json"
@@ -287,6 +290,8 @@ def _site_files(tree: Path) -> dict[str, Path]:
         result[role] = path
     if len(result) == 1:
         raise ValueError("A ready site requires at least one human member capture.")
+    if not retain_history:
+        return result
     identity = check_tree_identity(tree)
     retained = {
         name: path
@@ -452,11 +457,16 @@ def seal_football_bundle(
         read_football_bundle(
             artifact_root=artifact_root, snapshot_root=snapshot_root, snapshot_id=snapshot_id
         )
+    legacy_ready = existing is not None and not any(
+        role.startswith("site_tree_") for role in _object(existing)["files"]
+    )
     files = {
         "forecast": football_artifact_path(artifact_root, snapshot_id),
         "components": football_components_path(artifact_root, snapshot_id),
         "handoff": handoff_path,
-        **_site_files(single_league_tree(site_data_root, league_id)),
+        **_site_files(
+            single_league_tree(site_data_root, league_id), retain_history=not legacy_ready
+        ),
     }
     if rotation_table_path is not None:
         files.update(

@@ -1,4 +1,4 @@
-"""Check a published league tree using the three release checks from the tooling seed.
+"""Check a published league tree using the four release checks from the tooling seed.
 
 Each check expects what each member's advice index declares. An absence the index states
 in the producer's own shape, with a string reason (a menu this run left out, a window or
@@ -734,7 +734,7 @@ def check_word(tree: Tree) -> list[str]:
 
 
 def run_checks(tree: Tree) -> list[str]:
-    """Run the three checks on ``tree`` and return every finding; an empty list passes."""
+    """Run the four checks on ``tree`` and return every finding; an empty list passes."""
     findings: list[str] = []
     checks: tuple[tuple[str, Callable[[], list[str]]], ...] = (
         ("publication identity", lambda: check_publication(tree)),
@@ -762,7 +762,17 @@ def check_publication(tree: Tree) -> list[str]:
             if publication_path(path.relative_to(tree.directory).as_posix())
         )
     )
-    verify_publication_identity(tree.read, names=names)
+    try:
+        record = verify_publication_identity(tree.read, names=names)
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        problem = f"publication identity: {error}"
+        print(problem)
+        return [problem]
+    print(
+        "publication identity: verified"
+        if record is not None
+        else "publication identity: legacy tree"
+    )
     return []
 
 

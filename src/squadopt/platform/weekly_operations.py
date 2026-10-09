@@ -27,6 +27,7 @@ from squadopt.application.league_publication import (
     remove_unlisted_trees,
     settle_legacy_tree,
 )
+from squadopt.application.league_tree_identity import check_tree_identity
 from squadopt.application.player_evidence import PlayerEvidenceRequest, export_player_evidence
 from squadopt.application.projection_handoff import build as build_handoff
 from squadopt.application.rotation_export import RotationExportRequest, export_rotation_evidence
@@ -53,7 +54,12 @@ from squadopt.application.weekly_plan import (
     rotation_source_capture,
 )
 from squadopt.contracts.league_list import LEAGUE_LIST_FILE, LeagueListError, read_league_list
-from squadopt.contracts.league_tree import LeagueDirectoryError, PublishedLeague
+from squadopt.contracts.league_tree import (
+    LEGACY_TREE,
+    LeagueDirectoryError,
+    PublishedLeague,
+    read_league_directory,
+)
 from squadopt.contracts.run_logs import LOG_ROOT_NAME
 from squadopt.data.errors import DataError, SourceRevisionError
 from squadopt.data.snapshots import list_snapshot_ids, read_snapshot
@@ -862,6 +868,12 @@ class WeeklyOperations:
         source = self._published_tree()
         if target.exists() or not source.is_dir():
             return
+        # Check the inherited publication once, before any stage overlays the preview.
+        # Existing previews may hold interrupted writes and are resumed in place.
+        for league in read_league_directory(source):
+            check_tree_identity(source / league.path)
+        if (source / LEGACY_TREE).is_dir():
+            check_tree_identity(source / LEGACY_TREE)
         shutil.copytree(source, target)
 
     def _publish(self) -> WeeklyStageResult:

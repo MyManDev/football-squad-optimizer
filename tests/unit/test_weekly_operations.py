@@ -1401,3 +1401,15 @@ def test_a_league_the_registry_was_not_seeded_from_stops_a_one_league_run(
         operation.execute()
     # The seed command it names seeds exactly the run's leagues.
     assert "seed_entry_registry --league 7 --snapshot-id" in str(refused.value)
+
+
+def test_completed_preview_league_and_scoreboard_share_valid_identity(tmp_path):
+    from squadopt.application.league_tree_identity import check_tree_identity
+
+    operation = world(tmp_path)
+    operation.execute()
+    tree = operation.paths.out / "data/leagues/352490"
+    identity = check_tree_identity(tree)
+    assert identity is not None
+    assert "scoreboard.json" in identity["files"]
+    assert identity["source_snapshot_id"] == operation.request.snapshot_id
