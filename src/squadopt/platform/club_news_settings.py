@@ -38,8 +38,10 @@ def _read(path: Path) -> dict[str, object]:
     if set(document) != {"llm"} or not isinstance(document["llm"], dict):
         raise ClubNewsError("Private settings must contain exactly one [llm] table.")
     values: dict[str, object] = document["llm"]
-    if set(values) - {*_FIELDS, "api_key_env"}:
-        raise ClubNewsError("The [llm] table contains an unsupported setting.")
+    unsupported = set(values) - {*_FIELDS, "api_key_env"}
+    if unsupported:
+        field = sorted(unsupported)[0]
+        raise ClubNewsError(f"The [llm] table has an unsupported setting {field!r}.")
     if not isinstance(values.get("provider"), str) or not str(values["provider"]).strip():
         raise ClubNewsError("The [llm] table must explicitly name its provider.")
     for field, value in values.items():
@@ -50,7 +52,7 @@ def _read(path: Path) -> dict[str, object]:
         else:
             valid = isinstance(value, str) and bool(value.strip())
         if not valid:
-            raise ClubNewsError("A private LLM setting has the wrong type or is empty.")
+            raise ClubNewsError(f"The [llm] setting {field!r} has the wrong type or is empty.")
     if "api_key" in values and "api_key_env" in values:
         raise ClubNewsError("Choose either api_key or api_key_env in [llm], not both.")
     reference = values.get("api_key_env")
