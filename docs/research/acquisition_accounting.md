@@ -49,6 +49,8 @@ Hand-accounted tests cover rising and falling prices, three and five weeks,
 zero/full/half fees, original holdings, repurchases, Wildcard, Free Hit and a
 false affordability counterexample. Random horizons check that the two
 reductions refuse no legal sequence of moves and price none differently from
-the full lot, and that whole plans solve to the same value. This
-establishes accounting correctness;
+the full lot, and that whole plans solve to the same value. The same value
+need not mean the same plan: the tie-break does not separate every pair of
+plans, so which of two tied plans comes back depends on the search, and the
+encoding changes the search. This establishes accounting correctness;
 it does not establish higher realized FPL points or solve chip continuation value.

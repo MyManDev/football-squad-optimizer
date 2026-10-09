@@ -7,7 +7,8 @@ them, kept verbatim. One test asks CP-SAT for any legal sequence of moves the tw
 differently. That sees pricing only: a sequence the reduced encoding refuses drops out
 of its search. So a second test fixes legal sequences one at a time and requires the
 reduced encoding to accept each at the proceeds a numeric replay of the full lot gives.
-A third solves small horizons end to end under both.
+A third solves small horizons end to end under both, to the same value, and then each
+plan's squads again under the other encoding.
 """
 
 import copy
@@ -334,26 +335,6 @@ def _instance(seed):
     )
 
 
-def _moves(frame, column):
-    return tuple(sorted(zip(frame.player_id, frame[column], strict=True)))
-
-
-def _plan(result):
-    return [
-        (
-            tuple(sorted(week.selected_squad.player_id)),
-            tuple(sorted(week.starting_xi.player_id)),
-            week.captain.player_id,
-            week.chip,
-            _moves(week.transfers_in, "buy_price_tenths"),
-            _moves(week.transfers_out, "sell_price_tenths"),
-            week.bank_after_tenths,
-            week.paid_transfer_count,
-        )
-        for week in result.weeks
-    ]
-
-
 def _solved(monkeypatch, sales, horizon, state, config, settings, chips, **kwargs):
     monkeypatch.setattr(planning_optimizer, "AcquisitionSales", sales)
     result = optimize_transfer_plan(horizon, state, config, settings, chips=chips, **kwargs)
@@ -370,7 +351,7 @@ def _spy(built):
 
 
 @pytest.mark.parametrize("seed", range(12))
-def test_small_horizons_solve_to_the_same_plan_under_both_encodings(
+def test_small_horizons_solve_to_the_same_value_under_both_encodings(
     small_config, monkeypatch, seed
 ):
     horizon, state, settings, chips, expected = _instance(seed)
@@ -382,9 +363,10 @@ def test_small_horizons_solve_to_the_same_plan_under_both_encodings(
     value = reference.diagnostics["scaled_model_objective_value"]
     assert reduced.diagnostics["scaled_model_objective_value"] == value
     assert reduced.objective_value == pytest.approx(reference.objective_value)
-    if _plan(reduced) == _plan(reference):
-        return
-    # Two plans of one value: each must be feasible and optimal under the other encoding.
+    # One value is not one plan. The tie-break's rank sums can tie, and which tied plan
+    # comes back depends on the search, which the encoding changes. So each plan's squads,
+    # fixed, must reach the same value under the other encoding, whether the plans match
+    # or not.
     for sales, other in ((_spy([]), reference), (_Reference, reduced)):
         squads = {week.gameweek: tuple(week.selected_squad.player_id) for week in other.weeks}
         fixed = _solved(monkeypatch, sales, *solve, fixed_week_squads=squads)
