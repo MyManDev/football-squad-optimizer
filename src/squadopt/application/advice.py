@@ -460,7 +460,12 @@ def solve_member_control(
         for _, row in inputs.players.iterrows()
     }
     held = held_squad_from_picks(picks, current_prices=prices)
-    plan, decision, transfer_config = plan_transfers(inputs, projection, held, rules)
+    if projection.diagnostics.get("model_name") == "fixture_football_candidate":
+        plan, decision, transfer_config = plan_transfers(
+            inputs, projection, held, rules, expected_lineups=True
+        )
+    else:
+        plan, decision, transfer_config = plan_transfers(inputs, projection, held, rules)
     try:
         run_transfer_advice_diagnostic(
             plan,
@@ -478,8 +483,10 @@ def solve_member_control(
 
 
 def net_expected_points(plan: TransferPlanResult) -> float:
-    """A plan's expected points as the member would score them: the eleven's projected
-    points minus the hits the plan pays. A constraint that forces paid transfers is not
+    """A plan's expected points after the hits the plan pays.
+
+    Expected-lineup weeks include automatic substitutions and vice recovery;
+    legacy weeks retain the eleven and captain score. A constraint that forces paid transfers is not
     cheap because the gross projection barely moved.
 
     ``total_transfer_hit_points`` is counted at the game's charge, so this compares two
@@ -488,7 +495,11 @@ def net_expected_points(plan: TransferPlanResult) -> float:
     worth making at all; applying it again here would price the same caution twice.
     """
 
-    score = plan.total_projected_score
+    score = (
+        sum(expected_week_points(week) for week in plan.weeks)
+        if any(week.lineup_expectation is not None for week in plan.weeks)
+        else plan.total_projected_score
+    )
     hits = plan.total_transfer_hit_points
     if score is None or hits is None or not math.isfinite(score) or not math.isfinite(hits):
         raise EntryError("A solved plan must carry finite projected points and hit points.")
@@ -689,6 +700,11 @@ def build_advice_payload(
             choice=choice_points,
             expected_total=_published_total(lineup),
         )
+    if week is not None and week.lineup_expectation is not None:
+        # The held-XI comparator does not score automatic substitutions.
+        gain_vs_hold = None
+        for move in moves:
+            move["expected_points_delta"] = None
     missing = _missing_fields(picks)
     return {
         "season": picks.season,
@@ -1363,7 +1379,12 @@ def advise_with_managers_word(
     }
     held = held_squad_from_picks(picks, current_prices=prices)
     plan, decision, _config = plan_transfers_with_exclusion(
-        inputs, projection, held, rules, exclusion
+        inputs,
+        projection,
+        held,
+        rules,
+        exclusion,
+        expected_lineups=control_week.lineup_expectation is not None,
     )
     # Both plans are solved under the member planning policy, so the tag is what the rule
     # costs under the policy that chose the plan, not the policy's own caution on other
@@ -1515,7 +1536,12 @@ def solve_word_control(
     }
     held = held_squad_from_picks(control.picks, current_prices=prices)
     plan, decision, config = plan_transfers_with_exclusion(
-        inputs, projection, held, rules, exclusion
+        inputs,
+        projection,
+        held,
+        rules,
+        exclusion,
+        expected_lineups=control.plan.weeks[0].lineup_expectation is not None,
     )
     return MemberControl(picks=control.picks, plan=plan, decision=decision, transfer_config=config)
 
@@ -1682,7 +1708,12 @@ def advise_with_top100(
         held = held_squad_from_picks(picks, current_prices=prices)
         if exclusion is not None and binding:
             plan, decision, _config = plan_transfers_with_exclusion(
-                inputs, weighted, held, rules, exclusion
+                inputs,
+                weighted,
+                held,
+                rules,
+                exclusion,
+                expected_lineups=preferred_week.lineup_expectation is not None,
             )
         else:
             plan, decision = preferred.plan, preferred.decision
