@@ -69,6 +69,29 @@ def test_normal_seal_records_each_models_own_training_provenance(case):
     assert "archive_hashes" in record["football"]
     assert record["football"]["archive_hashes"] == {"test": "b" * 64}
     assert "component_training_seasons" not in record["football"]
+    forecast = json.loads(ready.files["forecast"].read_bytes())
+    assert record == {
+        "contract_version": "football_production_record_v1",
+        "snapshot_id": case["snapshot_id"],
+        "football": {
+            "model_version": forecast["model_version"],
+            "season": "2026-27",
+            "gameweek": 6,
+            "source_snapshot_id": case["snapshot_id"],
+            "source_fingerprint": forecast["source_fingerprint"],
+            "captured_at_utc": "2026-09-22T12:00:00Z",
+            "training_rows": 1000,
+            "training_latest_kickoff": "2026-09-20T15:00:00+00:00",
+            "archive_hashes": {"test": "b" * 64},
+        },
+        "current_handoff": {
+            "model_version": handoff.model_version,
+            "fingerprint": handoff.fingerprint,
+            "source_snapshot_id": case["snapshot_id"],
+            "sha256": bundle._digest(ready.files["handoff"].read_bytes()),
+            "training_provenance": {"component_training_seasons": archives},
+        },
+    }
     assert (
         bundle.read_football_bundle(
             artifact_root=case["artifact_root"],
@@ -180,3 +203,31 @@ def test_production_record_refuses_different_capture_pair(case):
     payloads["handoff"] = json.dumps(handoff).encode()
     with pytest.raises(ValueError, match="capture identities differ"):
         bundle._production_record(payloads, case["snapshot_id"], handoff_fingerprint="synthetic")
+
+
+def test_first_copy_failure_leaves_no_record_and_rebuilt_diagnostics_can_retry(case, monkeypatch):
+    original = bundle.write_bytes_once
+    marker = bundle.football_bundle_path(case["artifact_root"], case["snapshot_id"])
+
+    def interrupted(raw, path, **kwargs):
+        if path.name == "handoff.json":
+            raise OSError("synthetic first copy failed")
+        return original(raw, path, **kwargs)
+
+    monkeypatch.setattr(bundle, "write_bytes_once", interrupted)
+    with pytest.raises(OSError, match="first copy failed"):
+        bundle.seal_football_bundle(**case)
+    assert not marker.exists()
+    assert not marker.with_suffix(".production.json").exists()
+    handoff = replace(
+        read_projection_handoff(case["handoff_path"]),
+        diagnostics={"component_training_seasons": ["2021-22", "2022-23", "2023-24", "2024-25"]},
+    )
+    write_projection_handoff(case["handoff_path"], handoff)
+    monkeypatch.setattr(bundle, "write_bytes_once", original)
+    ready = bundle.seal_football_bundle(**case)
+    record = json.loads(marker.with_suffix(".production.json").read_bytes())
+    assert record["current_handoff"]["sha256"] == bundle._digest(
+        ready.files["handoff"].read_bytes()
+    )
+    assert record["current_handoff"]["training_provenance"] == handoff.diagnostics
