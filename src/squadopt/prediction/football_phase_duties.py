@@ -8,7 +8,6 @@ Separate goal and assist marginals are not a joint match-event generator.
 from __future__ import annotations
 
 import math
-import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
@@ -22,6 +21,7 @@ from scipy.special import logsumexp
 from squadopt.features.football_phase_inputs import (
     PHASE_DEFINITION_VERSION,
     PHASES,
+    POSITIONS,
     PhaseDutyCapture,
     PhaseObservation,
     PhasePlayer,
@@ -31,12 +31,12 @@ from squadopt.features.football_phase_inputs import (
     projection_digest,
     validate_observation,
     validate_observation_header,
+    validate_phase_season,
     validate_projection,
 )
 
 MODEL_VERSION: Final = "football_phase_duties_v1"
 FEATURE_VERSION: Final = "captured_phase_duty_exposure_features_v1"
-POSITIONS: Final = ("GK", "DEF", "MID", "FWD")
 POSITION_FEATURES: Final = tuple("position_" + position.lower() for position in POSITIONS)
 RANK_FEATURES: Final = (
     "published_rank",
@@ -320,18 +320,6 @@ class PhaseDutyModel:
             raise ValueError("Phase duty model must be fitted before metadata is available.")
         return fitted.metadata
 
-    @property
-    def _metadata(self) -> PhaseModelMetadata | None:
-        return None if self._fitted is None else self._fitted.metadata
-
-    @property
-    def _phase_shares(self) -> Mapping[str, Array]:
-        return MappingProxyType({}) if self._fitted is None else self._fitted.phase_shares
-
-    @property
-    def _coefficients(self) -> Mapping[tuple[str, str], Array]:
-        return MappingProxyType({}) if self._fitted is None else self._fitted.coefficients
-
     def fit(
         self,
         observations: tuple[PhaseObservation, ...],
@@ -343,13 +331,16 @@ class PhaseDutyModel:
     ) -> PhaseDutyModel:
         if not isinstance(observations, tuple) or not observations:
             raise ValueError("Phase fitting requires nonempty immutable observations.")
+        try:
+            validate_phase_season(target_season)
+        except ValueError as error:
+            raise ValueError(
+                "Phase fitting requires an admitted target season and gameweek."
+            ) from error
         if (
             isinstance(target_gameweek, bool)
             or not isinstance(target_gameweek, int)
             or not 1 <= target_gameweek <= 38
-            or not isinstance(target_season, str)
-            or not re.fullmatch(r"20\d{2}-\d{2}", target_season)
-            or int(target_season[-2:]) != (int(target_season[:4]) + 1) % 100
             or target_season == "2025-26"
         ):
             raise ValueError("Phase fitting requires an admitted target season and gameweek.")

@@ -185,7 +185,8 @@ def _time(value: object, label: str) -> str:
         raise ValueError(f"{label} must be a valid UTC timestamp.") from error
 
 
-def _season(value: object) -> str:
+def validate_phase_season(value: object) -> str:
+    """Return a complete consecutive season identity shared by phase consumers."""
     if not isinstance(value, str) or not re.fullmatch(r"20\d{2}-\d{2}", value):
         raise ValueError("A phase season must be a full season identity.")
     if int(value[-2:]) != (int(value[:4]) + 1) % 100:
@@ -215,7 +216,7 @@ def source_receipt(source: PhaseSource, *, cutoff: str, kind: str) -> dict[str, 
 
 
 def _context(value: PhaseObservation | PhaseProjection) -> None:
-    _season(value.season)
+    validate_phase_season(value.season)
     for name in ("gameweek", "fixture", "club", "opponent"):
         _id(getattr(value, name), name)
     if value.gameweek > 38 or value.club == value.opponent or type(value.home) is not bool:
@@ -294,7 +295,7 @@ def validate_observation_header(
     if len(set(allowed_seasons)) != len(allowed_seasons):
         raise ValueError("The phase season allowlist repeats a season.")
     for season in allowed_seasons:
-        _season(season)
+        validate_phase_season(season)
         if season == PROTECTED_SEASON:
             raise ValueError("The protected season is excluded from phase training.")
     if observation.season == PROTECTED_SEASON or observation.season not in allowed_seasons:
@@ -493,7 +494,7 @@ def read_phase_duties(
     model_use_evidence_ref: str,
 ) -> PhaseDutyCapture:
     """Read existing immutable bootstrap bytes; never fetch or infer a duty."""
-    _season(season)
+    validate_phase_season(season)
     if not isinstance(snapshot, CapturedSnapshot):
         raise ValueError("A verified captured bootstrap is required.")
     metadata = snapshot.metadata
@@ -598,7 +599,7 @@ def _header(document: dict[str, object]) -> _PhaseContext:
         if name not in document:
             raise ValueError("A private phase document lacks its fixture context.")
     return {
-        "season": _season(document["season"]),
+        "season": validate_phase_season(document["season"]),
         "gameweek": _id(document["gameweek"], "gameweek"),
         "fixture": _id(document["fixture"], "fixture"),
         "club": _id(document["club"], "club"),
@@ -638,7 +639,7 @@ def read_phase_observation(
     The caller passes independently admitted source season/GW headers before
     any payload decoding, so a protected or target outcome is not opened first.
     """
-    _season(season)
+    validate_phase_season(season)
     _id(gameweek, "gameweek")
     if (
         type(allowed_seasons) is not tuple
@@ -649,7 +650,7 @@ def read_phase_observation(
     if excluded_target == (season, gameweek):
         raise ValueError("The whole target gameweek is excluded before decoding outcomes.")
     for selected in allowed_seasons:
-        _season(selected)
+        validate_phase_season(selected)
         if selected == PROTECTED_SEASON:
             raise ValueError("The protected season cannot enter the phase source allowlist.")
     # Reject unavailable source headers before decoding any credited outcomes.

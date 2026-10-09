@@ -457,11 +457,13 @@ def test_insufficient_optimizer_iterations_are_not_silently_accepted():
         _fit(_rank_training("penalty"), max_iter=1)
 
 
-@pytest.mark.parametrize("name", ["_phase_shares", "_coefficients"])
+@pytest.mark.parametrize("name", ["phase_shares", "coefficients"])
 def test_fitted_parameter_maps_and_array_storage_are_immutable(name):
     model = _fit(_rank_training("penalty"))
     before = model.predict(_projection())
-    parameters = getattr(model, name)
+    fitted = model._fitted
+    assert fitted is not None
+    parameters = getattr(fitted, name)
     key, values = next(iter(parameters.items()))
     with pytest.raises(TypeError):
         parameters[key] = values.copy()
@@ -469,12 +471,12 @@ def test_fitted_parameter_maps_and_array_storage_are_immutable(name):
         values[0] = 99
     with pytest.raises(ValueError, match="WRITEABLE"):
         values.setflags(write=True)
-    with pytest.raises(AttributeError):
-        setattr(model, name, {})
+    with pytest.raises(FrozenInstanceError):
+        setattr(fitted, name, {})
     assert model.predict(_projection()) == before
 
 
-@pytest.mark.parametrize("name", ["alpha", "max_iter", "_metadata"])
+@pytest.mark.parametrize("name", ["alpha", "max_iter", "metadata"])
 def test_declared_fit_parameters_and_metadata_cannot_be_reassigned(name):
     model = _fit()
     before = model.predict(_projection())
@@ -486,10 +488,12 @@ def test_declared_fit_parameters_and_metadata_cannot_be_reassigned(name):
 def test_used_recipient_arrays_exactly_match_recorded_fitted_coefficients():
     model = _fit(_rank_training("penalty"))
     result = model.predict(_projection())
+    fitted = model._fitted
+    assert fitted is not None
     for head in result.metadata.recipient_heads:
-        assert tuple(model._coefficients[head.head, head.phase]) == head.coefficients
-    assert tuple(model._phase_shares["goals"]) == result.goal_phase_shares
-    assert tuple(model._phase_shares["assists"]) == result.assist_phase_shares
+        assert tuple(fitted.coefficients[head.head, head.phase]) == head.coefficients
+    assert tuple(fitted.phase_shares["goals"]) == result.goal_phase_shares
+    assert tuple(fitted.phase_shares["assists"]) == result.assist_phase_shares
     assert result.metadata.alpha == model.alpha
     assert result.metadata.max_iter == model.max_iter
 

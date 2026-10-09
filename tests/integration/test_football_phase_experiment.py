@@ -1,5 +1,6 @@
 """Invented raw duties through learned counts, weekly eligibility and official autosubs."""
 
+import json
 import math
 from itertools import product
 
@@ -7,6 +8,7 @@ import pandas as pd
 import pytest
 from tests.football_phase_fixtures import (
     BENCH,
+    DECISION,
     XI,
     fitted_model,
     native_case,
@@ -51,6 +53,94 @@ def _adjusted(native, model, *, changed=False, fixture=63, enabled=True):
         season="2026-27",
         enabled=enabled,
     )
+
+
+def test_native_components_without_decision_column_use_explicit_original_cutoff(model):
+    native, roster, calendar = native_case(dgw=True)
+    projections = _projections(native, changed=True)
+    columnless = native.drop(columns="decision_at")
+    adjusted = phase_fixture_components(
+        columnless, projections, model, season="2026-27", decision_at=DECISION
+    )
+    reference = _adjusted(native, model, changed=True)
+    assert "decision_at" not in adjusted
+    pd.testing.assert_frame_equal(adjusted, reference.drop(columns="decision_at"), check_exact=True)
+    document = json.loads(adjusted.attrs["phase_receipt_json"])
+    assert document["decision_at"] == DECISION
+    weekly = phase_weekly_forecast(
+        roster, adjusted, calendar, gameweek=6, eligibility=_eligibility(**{"6": 0.75})
+    )
+    expected = phase_weekly_forecast(
+        roster, reference, calendar, gameweek=6, eligibility=_eligibility(**{"6": 0.75})
+    )
+    pd.testing.assert_frame_equal(weekly, expected, check_exact=True)
+    decision = phase_fixed_fifteen_decision(weekly, XI, BENCH, 13, 8)
+    expected_decision = phase_fixed_fifteen_decision(expected, XI, BENCH, 13, 8)
+    assert decision.best == expected_decision.best
+    assert decision.best.expected_net_points == pytest.approx(
+        _official_expectation(weekly, decision.best), abs=1e-10
+    )
+
+
+def test_missing_native_decision_column_requires_explicit_cutoff(model):
+    native, _, _ = native_case()
+    with pytest.raises(ValueError, match="explicit decision cutoff"):
+        phase_fixture_components(
+            native.drop(columns="decision_at"), _projections(native), model, season="2026-27"
+        )
+
+
+def test_columnless_projection_cannot_replace_explicit_original_cutoff(model):
+    native, _, _ = native_case()
+    with pytest.raises(ValueError, match="explicit native decision cutoff"):
+        phase_fixture_components(
+            native.drop(columns="decision_at"),
+            _projections(native),
+            model,
+            season="2026-27",
+            decision_at="2026-09-22T11:59:59Z",
+        )
+
+
+def test_optional_native_decision_column_remains_binding(model):
+    native, _, _ = native_case()
+    projections = _projections(native)
+    native.loc[native.index[0], "decision_at"] = "2026-09-22T11:59:59Z"
+    with pytest.raises(ValueError, match="column differs from the explicit decision"):
+        phase_fixture_components(native, projections, model, season="2026-27", decision_at=DECISION)
+
+
+def test_equivalent_explicit_native_clock_preserves_canonical_receipt(model):
+    native, _, _ = native_case()
+    adjusted = phase_fixture_components(
+        native,
+        _projections(native),
+        model,
+        season="2026-27",
+        decision_at="2026-09-22T12:00:00+00:00",
+    )
+    assert json.loads(adjusted.attrs["phase_receipt_json"])["decision_at"] == DECISION
+
+
+@pytest.mark.parametrize("season", [None, "2026", "2026-99", "26-27", "abcd-ef", "2025-26"])
+def test_enabled_fixture_adapter_requires_full_consecutive_admitted_season(model, season):
+    native, _, _ = native_case()
+    with pytest.raises(ValueError, match="season"):
+        phase_fixture_components(native, _projections(native), model, season=season)
+
+
+def test_columnless_weekly_calendar_still_binds_original_projection_clock(model):
+    native, roster, calendar = native_case()
+    adjusted = phase_fixture_components(
+        native.drop(columns="decision_at"),
+        _projections(native),
+        model,
+        season="2026-27",
+        decision_at=DECISION,
+    )
+    calendar["decision_at"] = "2026-09-22T12:00:01Z"
+    with pytest.raises(ValueError, match="recorded decision"):
+        phase_weekly_forecast(roster, adjusted, calendar, gameweek=6, eligibility=_eligibility())
 
 
 def _eligibility(**overrides):

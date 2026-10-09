@@ -23,6 +23,7 @@ from squadopt.data.timestamps import as_instant, normalize_utc_timestamp
 from squadopt.features.football_phase_inputs import (
     PhaseProjection,
     projection_digest,
+    validate_phase_season,
     validate_projection,
 )
 from squadopt.prediction.football import (
@@ -145,13 +146,19 @@ def _raw_points(frame: pd.DataFrame, season: str) -> np.ndarray[Any, np.dtype[np
     )
 
 
-def _native(frame: pd.DataFrame, *, season: str) -> str:
+def _native(frame: pd.DataFrame, *, season: str, decision_at: str | None = None) -> str:
+    validate_phase_season(season)
     if not isinstance(frame, pd.DataFrame) or frame.empty:
         raise ValueError("A complete nonempty native fixture frame is required.")
-    if not set((*IDENTITY_COLUMNS, *COMPONENT_COLUMNS, "model_version", "decision_at")) <= set(
-        frame
-    ):
+    if not set((*IDENTITY_COLUMNS, *COMPONENT_COLUMNS, "model_version")) <= set(frame):
         raise ValueError("Native phase inputs lack fixture identity or scoring components.")
+    if "decision_at" not in frame and decision_at is None:
+        raise ValueError("Native phase inputs require an explicit decision cutoff.")
+    declared_decision = (
+        None
+        if decision_at is None
+        else as_instant(normalize_utc_timestamp(decision_at, label="native decision_at"))
+    )
     if frame.columns.duplicated().any() or frame.model_version.nunique() != 1:
         raise ValueError("Native phase inputs have ambiguous columns or model versions.")
     version = str(frame.model_version.iloc[0])
@@ -179,13 +186,16 @@ def _native(frame: pd.DataFrame, *, season: str) -> str:
         raise ValueError("A native phase frame names an invalid gameweek.")
     for kickoff in frame.kickoff:
         normalize_utc_timestamp(pd.Timestamp(kickoff).isoformat(), label="native kickoff")
-    for decision, kickoff in zip(frame.decision_at, frame.kickoff, strict=True):
+    decisions = frame.decision_at if "decision_at" in frame else [decision_at] * len(frame)
+    for decision, kickoff in zip(decisions, frame.kickoff, strict=True):
         decision_instant = as_instant(
             normalize_utc_timestamp(pd.Timestamp(decision).isoformat(), label="native decision_at")
         )
         kickoff_instant = as_instant(
             normalize_utc_timestamp(pd.Timestamp(kickoff).isoformat(), label="native kickoff")
         )
+        if declared_decision is not None and decision_instant != declared_decision:
+            raise ValueError("The native phase column differs from the explicit decision cutoff.")
         if decision_instant > kickoff_instant:
             raise ValueError("The native phase decision follows kickoff.")
     component_rows(frame, model_version=version, players=set(frame.player_code))
@@ -242,7 +252,13 @@ def _native(frame: pd.DataFrame, *, season: str) -> str:
     return version
 
 
-def _bind_projection(side: pd.DataFrame, projection: PhaseProjection, *, cutoff: str) -> None:
+def _bind_projection(
+    side: pd.DataFrame,
+    projection: PhaseProjection,
+    *,
+    cutoff: str,
+    decision_at: str | None = None,
+) -> None:
     validate_projection(projection, model_cutoff=cutoff)
     for field, expected_identity in (
         ("GW", projection.gameweek),
@@ -263,12 +279,16 @@ def _bind_projection(side: pd.DataFrame, projection: PhaseProjection, *, cutoff:
     decision = as_instant(
         normalize_utc_timestamp(projection.decision_at, label="projection decision_at")
     )
+    if decision_at is not None and decision != as_instant(
+        normalize_utc_timestamp(decision_at, label="native decision_at")
+    ):
+        raise ValueError("A phase projection has another explicit native decision cutoff.")
     if any(
         as_instant(
             normalize_utc_timestamp(pd.Timestamp(value).isoformat(), label="native decision_at")
         )
         != decision
-        for value in side.decision_at
+        for value in (side.decision_at if "decision_at" in side else ())
     ):
         raise ValueError("A phase projection has another native decision cutoff.")
     roster = side.set_index("player_code")
@@ -348,6 +368,7 @@ def phase_fixture_components(
     model: PhaseDutyModel,
     *,
     season: str,
+    decision_at: str | None = None,
     enabled: bool = True,
 ) -> pd.DataFrame:
     """Replace full-club attacking marginals; disabled returns an exact native copy."""
@@ -358,7 +379,12 @@ def phase_fixture_components(
     if any(key in native_components.attrs for key in _COMPONENT_RECEIPT_ATTRS):
         raise ValueError("Native inputs cannot already carry a phase allocation receipt.")
     native_attributes_sha = _attributes_sha(native_components)
-    version = _native(native_components, season=season)
+    declared_decision = (
+        None
+        if decision_at is None
+        else normalize_utc_timestamp(decision_at, label="native decision_at")
+    )
+    version = _native(native_components, season=season, decision_at=declared_decision)
     if not isinstance(model, PhaseDutyModel) or type(projections) is not tuple or not projections:
         raise ValueError(
             "An explicit fitted phase model and complete immutable projections are required."
@@ -384,7 +410,7 @@ def phase_fixture_components(
         side = native_components.loc[
             native_components.fixture.eq(key[0]) & native_components.club.eq(key[1])
         ]
-        _bind_projection(side, projection, cutoff=cutoff)
+        _bind_projection(side, projection, cutoff=cutoff, decision_at=declared_decision)
     # Every predecision GW uses one agreed deadline across all clubs/fixtures.
     for week in set(native_components.GW):
         deadlines = {
@@ -431,10 +457,11 @@ def phase_fixture_components(
         c for c in native_components.columns if c not in (*_SCORED_COLUMNS, "model_version")
     ]
     pd.testing.assert_frame_equal(native_components[invariant], result[invariant], check_exact=True)
-    _native(result.assign(model_version=version), season=season)
+    _native(result.assign(model_version=version), season=season, decision_at=declared_decision)
     receipt = {
         "contract_version": PHASE_COMPONENT_VERSION,
         "season": season,
+        "decision_at": declared_decision,
         "native_model_version": version,
         "native_frame_sha256": _frame_sha(native_components, keys=("fixture", "player_code")),
         "native_attributes_sha256": native_attributes_sha,
@@ -474,7 +501,9 @@ def _component_receipt(components: pd.DataFrame) -> dict[str, Any]:
     ) != {document["native_model_version"]}:
         raise ValueError("Private phase components changed their model identity.")
     _native(
-        components.assign(model_version=document["native_model_version"]), season=document["season"]
+        components.assign(model_version=document["native_model_version"]),
+        season=document["season"],
+        decision_at=document.get("decision_at"),
     )
     return document
 

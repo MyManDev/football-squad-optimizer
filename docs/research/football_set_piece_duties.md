@@ -43,6 +43,19 @@ native participation/mass basis. They contain an explicit complete distribution
 of states, capped at 1,024, whose weights sum to one. Marginal start estimates do
 not supply that distribution. Projected minute bins, appearance, 60-minute and
 expected-minute marginals must agree with the retained native components.
+Native fixture frames do not need an added decision column. An explicit
+`decision_at` keyword supplies the original served-header clock when that column
+is absent. When the column is present it remains binding; an explicit clock
+cannot override it. Projection, calendar and downstream receipts retain that
+same decision identity.
+
+The 1,024-state cap does not support independent four-bin draws for a complete
+25-player club. A later native producer must supply an admitted joint construction
+with the same player marginals. A quantile coupling can use at most `3*N+1` states,
+but choosing it imposes dependence and is not authorized by these synthetic tests.
+Step 2 needs the accepted joint-state/coupling decision and its version/receipt
+before real input construction. This version does not infer that coupling or
+discard combinations to fit the cap.
 
 The integration fixture contains 66 invented players across six source clubs.
 Allocation uses all those club rosters before selecting the owner's fifteen. This
@@ -175,6 +188,24 @@ values are +5 and -2 respectively. No additional phase correction is added.
 [Official scoring rules](https://www.premierleague.com/en/news/4661029)
 A future separate miss/save head must subtract the same observed scoring terms
 from residual training and update its version and consumers before adding them.
+
+The primary rule pages above were read again on 2026-10-09. Source attribution
+for the claims is explicit:
+
+| Claim | Primary page and publication |
+| --- | --- |
+| Captured taker categories | [FPL set-pieces guidance](https://www.premierleague.com/en/news/2231236), regularly updated guidance; historical ranks still require original captured bytes |
+| Penalty winner, handball, direct free-kick and no self-assist; penalty save +5 and miss -2 | [Official FPL rules](https://www.premierleague.com/en/news/4661029), published 18 May 2026, Scoring and Assists sections |
+| The 2025-26 assist-rule change | [Official announcement](https://www.premierleague.com/en/news/4362187), published 18 July 2025; historical observations retain their own rules version |
+| Review and finalization of assists | [Official process](https://www.premierleague.com/en/news/4499344), primary accreditation explanation |
+
+These rule sources are separate from implementation proof. The committed
+source/model/integration tests reconcile synthetic FPL credits, independent
+scoring arithmetic and whole-week eligibility; they do not validate the truth
+of a provider's future event feed. The private raw-point validator mirrors the
+accepted native rule law and refuses drift. Consolidating that law into an
+existing public prediction API needs a separate reviewed shared change after
+accepted merges, rather than changing the live core in this private step.
 
 Real source development remains gated by admitted licence/model-use evidence,
 authentic publication/capture/vintage, reviewed temporal FPL player/club mappings,
