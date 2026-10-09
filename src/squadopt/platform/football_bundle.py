@@ -72,10 +72,23 @@ def _preparation_inputs(
             artifacts = fingerprint_paths([path])
         except WeeklyJournalError as error:
             raise ValueError(f"Invalid football preparation input {role}.") from error
-        inputs[role] = {
-            "path": str(path.resolve()),
-            "sha256": _digest(document_bytes({"artifacts": artifacts})),
-        }
+        record = artifacts[0]
+        if role == "capture":
+            relative = {
+                "directories": record["directories"],
+                "files": [
+                    {
+                        "path": Path(item["path"]).relative_to(Path(record["path"])).as_posix(),
+                        "size": item["size"],
+                        "sha256": item["sha256"],
+                    }
+                    for item in record["files"]
+                ],
+            }
+            identity = {"sha256": _digest(document_bytes(relative))}
+        else:
+            identity = {"size": record["size"], "sha256": record["sha256"]}
+        inputs[role] = {"path": str(path.resolve()), **identity}
     return {
         "contract_version": "football_preparation_v1",
         "snapshot_id": snapshot_id,
@@ -90,9 +103,12 @@ def _check_preparation(prior: Mapping[str, Any], current: Mapping[str, Any]) -> 
     if not isinstance(prior_inputs, Mapping):
         raise ValueError("Invalid football preparation inputs; resume refused.")
     for role in ("capture", "handoff", "forecast", "components"):
-        if prior_inputs.get(role) != current["inputs"][role]:
+        prior_role = prior_inputs.get(role)
+        if not isinstance(prior_role, Mapping) or {
+            key: value for key, value in prior_role.items() if key != "path"
+        } != {key: value for key, value in current["inputs"][role].items() if key != "path"}:
             raise ValueError(f"Football preparation input {role} changed; resume refused.")
-    if prior != current:
+    if prior.get("snapshot_id") != current["snapshot_id"]:
         raise ValueError("Football preparation identity changed; resume refused.")
 
 
@@ -452,7 +468,10 @@ def seal_football_bundle(
     publishes when it is not named.
 
     Copies may survive an interruption; only the final marker makes them ready.
-    Repeating the identical inputs completes that interruption or returns a replay.
+    Repeating byte-identical inputs completes that interruption or returns a replay.
+    The first validated, copy-compatible attempt records capture, handoff, forecast
+    and components in a create-once preparation receipt. Retries must use those same
+    contents; changed inputs require a new capture. File locations are informational.
     """
     if official_injury_capture_id is not None:
         require_official_injury_source()
@@ -496,9 +515,6 @@ def seal_football_bundle(
         official_injury_capture_id=official_injury_capture_id,
     )
     _check_preparation(preparation, _preparation_inputs(snapshot_root, snapshot_id, files))
-    # Record normal writers' inputs before copies. A retry must keep all four identities.
-    # This receipt is never a ready marker and is ignored by active bundle readers.
-    write_bytes_once(document_bytes(preparation), preparation_path)
     folder = marker.parent / (snapshot_id + ".bundle")
     destinations = dict(files)
     destinations["handoff"] = folder / "handoff.json"
@@ -531,6 +547,10 @@ def seal_football_bundle(
             and Path(addressable(path)).read_bytes() != payloads[role]
         ):
             raise ValueError("A different immutable bundle artifact already exists.")
+    # Record normal writers' inputs before copies. A retry must keep all four identities.
+    # This receipt is never a ready marker and is ignored by active bundle readers.
+    if not Path(addressable(preparation_path)).exists():
+        write_bytes_once(document_bytes(preparation), preparation_path)
     for role, path in destinations.items():
         if path != files[role]:
             write_bytes_once(payloads[role], path)

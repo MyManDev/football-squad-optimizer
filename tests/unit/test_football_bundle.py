@@ -1,6 +1,7 @@
 """Offline ready-marker checks over real synthetic capture/pair/news/site readers."""
 
 import json
+import os
 import shutil
 from dataclasses import replace
 from pathlib import Path
@@ -563,3 +564,84 @@ def test_a_site_with_several_leagues_seals_the_league_it_is_told(case):
     record = json.loads(marker(case).read_bytes())
     assert record["files"]["site_members"]["path"].endswith(".bundle/site/leagues/1/members.json")
     assert read(case).fingerprint == result.fingerprint
+
+
+@pytest.mark.parametrize("partial", [False, True])
+def test_legacy_wrong_replay_does_not_pin_wrong_preparation(case, monkeypatch, partial):
+    original_writer = bundle.write_bytes_once
+    if partial:
+
+        def interrupted(raw, target):
+            if target == marker(case):
+                raise OSError("synthetic legacy interruption")
+            return original_writer(raw, target)
+
+        monkeypatch.setattr(bundle, "write_bytes_once", interrupted)
+        with pytest.raises(OSError, match="legacy interruption"):
+            bundle.seal_football_bundle(**case)
+        monkeypatch.setattr(bundle, "write_bytes_once", original_writer)
+    else:
+        bundle.seal_football_bundle(**case)
+    receipt = marker(case).with_suffix(".preparation.json")
+    receipt.unlink()
+    original_handoff = case["handoff_path"].read_bytes()
+    altered = json.loads(original_handoff)
+    altered["diagnostics"]["new"] = True
+    dump(case["handoff_path"], altered)
+    with pytest.raises(
+        ValueError,
+        match="different immutable bundle artifact" if partial else "different ready bundle",
+    ):
+        bundle.seal_football_bundle(**case)
+    assert not receipt.exists()
+    case["handoff_path"].write_bytes(original_handoff)
+    assert bundle.seal_football_bundle(**case).snapshot_id == case["snapshot_id"]
+    assert read(case).snapshot_id == case["snapshot_id"]
+
+
+def test_interrupted_preparation_resumes_from_identical_retained_handoff(case, monkeypatch):
+    original = bundle.write_bytes_once
+
+    def interrupted(raw, target):
+        if target.name == "handoff.json":
+            raise OSError("synthetic retained interruption")
+        return original(raw, target)
+
+    monkeypatch.setattr(bundle, "write_bytes_once", interrupted)
+    with pytest.raises(OSError, match="retained interruption"):
+        bundle.seal_football_bundle(**case)
+    receipt = marker(case).with_suffix(".preparation.json")
+    before = receipt.read_bytes()
+    retained = case["handoff_path"].parent / "by-capture" / case["snapshot_id"] / "original.json"
+    retained.parent.mkdir(parents=True)
+    retained.write_bytes(case["handoff_path"].read_bytes())
+    changed = {**case, "handoff_path": retained}
+    monkeypatch.setattr(bundle, "write_bytes_once", original)
+    assert bundle.seal_football_bundle(**changed).snapshot_id == case["snapshot_id"]
+    assert receipt.read_bytes() == before
+    assert read(case).snapshot_id == case["snapshot_id"]
+
+
+def test_capture_preparation_identity_is_relative_and_membership_bound(case, tmp_path):
+    files = {
+        "handoff": case["handoff_path"],
+        "forecast": bundle.football_artifact_path(case["artifact_root"], case["snapshot_id"]),
+        "components": bundle.football_components_path(case["artifact_root"], case["snapshot_id"]),
+    }
+    prior = bundle._preparation_inputs(case["snapshot_root"], case["snapshot_id"], files)
+    copied = tmp_path / "copy-captures"
+    shutil.copytree(case["snapshot_root"], copied)
+    current = bundle._preparation_inputs(copied, case["snapshot_id"], files)
+    bundle._check_preparation(prior, current)
+    (copied / case["snapshot_id"] / "unexpected.txt").write_text("extra")
+    changed = bundle._preparation_inputs(copied, case["snapshot_id"], files)
+    with pytest.raises(ValueError, match="input capture changed"):
+        bundle._check_preparation(prior, changed)
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows path casing")
+@pytest.mark.parametrize("role", ["snapshot_root", "artifact_root", "handoff_path"])
+def test_byte_identical_windows_path_casing_replays(case, role):
+    ready = bundle.seal_football_bundle(**case)
+    different_spelling = {**case, role: Path(str(case[role]).upper())}
+    assert bundle.seal_football_bundle(**different_spelling).fingerprint == ready.fingerprint
