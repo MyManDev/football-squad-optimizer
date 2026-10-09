@@ -852,6 +852,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"== {path}")
         if run_checks(tree):
             failed = True
+    print("\nFINAL: FAILURE(S)" if failed else "\nFINAL: ALL GOOD")
     return 1 if failed else 0
 
 

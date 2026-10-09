@@ -82,12 +82,18 @@ def verify_publication_identity(
     if any(not isinstance(name, str) or not publication_path(name) for name in files):
         raise ValueError("Unsafe league publication identity path.")
     if names is not None and set(names) != set(files):
-        raise ValueError("League publication file inventory changed.")
+        raise ValueError(
+            "League publication file inventory changed. "
+            "Approved protected-file edits must re-record the identity in the same commit."
+        )
     documents = {}
     for name, digest in files.items():
         document = read(name)
         if document is None or document_digest(document) != digest:
-            raise ValueError(f"League publication file changed: {name}.")
+            raise ValueError(
+                f"League publication file changed: {name}. "
+                "Approved protected-file edits must re-record the identity in the same commit."
+            )
         documents[name] = document
     if (
         publication_identity(documents, source_snapshot_id=record.get("source_snapshot_id"))

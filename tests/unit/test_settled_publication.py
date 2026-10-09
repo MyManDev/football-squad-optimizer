@@ -1055,7 +1055,8 @@ def test_a_settled_view_on_a_directory_site_stamps_the_directory_too(tmp_path: P
     assert "data/leagues.json" in result.changed_files
 
 
-def test_settled_writer_refreshes_inherited_publication_identity(tmp_path):
+@pytest.mark.parametrize("tamper", [False, True])
+def test_settled_writer_refreshes_inherited_publication_identity(tmp_path, tamper):
     from squadopt.application.league_tree_identity import check_tree_identity, record_tree_identity
 
     request = world(tmp_path)
@@ -1069,6 +1070,25 @@ def test_settled_writer_refreshes_inherited_publication_identity(tmp_path):
         write(path, entry)
     write(tree / "members.json", members)
     record_tree_identity(tree, source_snapshot_id="capture-a")
+    if tamper:
+        write(
+            tree / "history/9999.json",
+            {"payload": {"weeks": [], "as_of_snapshot_id": "substitute"}},
+        )
+        before = {
+            p.relative_to(request.accepted_dir).as_posix(): p.read_bytes()
+            for p in request.accepted_dir.rglob("*")
+            if p.is_file()
+        }
+        with pytest.raises(ValueError, match="inventory changed"):
+            publication.publish_settled(request)
+        assert before == {
+            p.relative_to(request.accepted_dir).as_posix(): p.read_bytes()
+            for p in request.accepted_dir.rglob("*")
+            if p.is_file()
+        }
+        assert not (request.out_dir / "data/league/scoreboard.json").exists()
+        return
     result = publication.publish_settled(request)
     identity = check_tree_identity(request.out_dir / "data/league")
     assert identity is not None

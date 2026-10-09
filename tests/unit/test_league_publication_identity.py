@@ -239,6 +239,7 @@ def test_scoreboard_writer_resumes_and_records_completed_scoreboard(tmp_path, mo
     monkeypatch.setattr(writer, "record_tree_identity", original)
     result = writer.publish_scoreboard(board)
     assert result.target.is_file()
+    assert tree / IDENTITY_FILE in result.output_paths
     assert "scoreboard.json" in check_tree_identity(tree)["files"]
 
 
@@ -251,3 +252,121 @@ def test_check_script_names_changed_identity_and_prints_success(tmp_path, capsys
     output = capsys.readouterr().out
     assert "publication identity: League publication file changed: scoreboard.json." in output
     assert "publication identity: unreadable tree" not in output
+    assert output.rstrip().endswith("FINAL: FAILURE(S)")
+
+
+def test_release_command_refuses_an_unrecorded_extra_history_file(tmp_path, capsys):
+    tree = release_tree(tmp_path, "decision", "settled")
+    dump(tree / "history/2.json", {"payload": {"as_of_snapshot_id": "extra"}})
+    assert main([str(tree.parent)]) == 1
+    output = capsys.readouterr().out
+    assert "inventory changed" in output
+    assert output.rstrip().endswith("FINAL: FAILURE(S)")
+
+
+def test_league_with_every_member_refused_still_records_writer_capture(tmp_path):
+    from dataclasses import replace
+
+    from tests.unit.test_backend_runtime import _handoff
+    from tests.unit.test_publication_services import publication_world
+
+    from squadopt.application.league_publication import publish_league
+    from squadopt.data.snapshots import read_snapshot, write_snapshot
+
+    request = publication_world(tmp_path)
+    previous = read_snapshot(request.snapshot_root, request.snapshot_id)
+    payloads = {k: v for k, v in previous.payloads.items() if not k.startswith("entry-")}
+    capture = write_snapshot(
+        request.snapshot_root,
+        source=previous.metadata.source,
+        captured_at_utc=previous.metadata.captured_at_utc,
+        payloads=payloads,
+    )
+    request = replace(
+        request,
+        snapshot_id=capture.snapshot_id,
+        record_root=None,
+        handoff_path=_handoff(tmp_path / "new-handoff", capture.snapshot_id),
+    )
+    publish_league(request)
+    tree = request.out_dir / "data/leagues/352490"
+    identity = check_tree_identity(tree)
+    assert identity["source_snapshot_id"] == request.snapshot_id
+    assert not any(name.startswith("entries/") for name in identity["files"])
+
+
+@pytest.mark.parametrize("stage", ["league", "scoreboard"])
+def test_same_weekly_run_resumes_interrupted_writers_and_completes(tmp_path, monkeypatch, stage):
+    import shutil
+    from dataclasses import replace
+
+    from tests.unit.test_publication_services import publication_world
+    from tests.unit.test_weekly_operations import world
+
+    from squadopt.application import league_publication, scoreboard
+    from squadopt.platform.weekly_journal import inspect_run
+    from squadopt.platform.weekly_operations import WeeklyOperations
+
+    prior = replace(publication_world(tmp_path / "previous"), record_root=None)
+    league_publication.publish_league(prior)
+    operation = world(tmp_path / "next")
+    source = operation._published_tree()
+    source.parent.mkdir(parents=True)
+    shutil.copytree(prior.out_dir / "data", source)
+    writer = league_publication if stage == "league" else scoreboard
+    name = "write_league_directory" if stage == "league" else "record_tree_identity"
+    original = getattr(writer, name)
+
+    def interrupted(*args, **kwargs):
+        raise OSError("synthetic completed files before identity")
+
+    monkeypatch.setattr(writer, name, interrupted)
+    with pytest.raises(OSError, match="completed files before identity"):
+        operation.execute()
+    failed = inspect_run(operation.paths.journal, operation.run_id)
+    assert next(s for s in failed["stages"] if s["name"] == stage)["status"] == "failed"
+    monkeypatch.setattr(writer, name, original)
+    resumed = WeeklyOperations(
+        operation.request,
+        operation.paths,
+        run_id=operation.run_id,
+        repository_commit=operation.repository_commit,
+        resume=True,
+        handoff=operation.supplied_handoff,
+    )
+    receipt = json.loads(resumed.execute().read_bytes())
+    assert receipt["status"] == "completed"
+    assert all(s["status"] == "completed" for s in receipt["stages"])
+    tree = operation.paths.out / "data/leagues/352490"
+    assert check_tree_identity(tree)["source_snapshot_id"] == operation.request.snapshot_id
+    assert "scoreboard.json" in check_tree_identity(tree)["files"]
+
+
+def test_deep_path_bundle_seals_and_reads_the_retained_tree(case, tmp_path):
+    from squadopt.data._long_paths import addressable
+
+    add_history(case)
+    deep = tmp_path.joinpath(*("deep-path-" + str(i) + "x" * 35 for i in range(5)))
+    assert (
+        len(str(deep / "football" / (case["snapshot_id"] + ".bundle/site/league") / IDENTITY_FILE))
+        > 260
+    )
+    artifact_root = deep / "artifacts"
+    for role in ("forecast", "components"):
+        current = (
+            bundle.football_artifact_path if role == "forecast" else bundle.football_components_path
+        )
+        source = current(case["artifact_root"], case["snapshot_id"])
+        target = current(artifact_root, case["snapshot_id"])
+        Path(addressable(target.parent)).mkdir(parents=True, exist_ok=True)
+        Path(addressable(target)).write_bytes(source.read_bytes())
+    ready = bundle.seal_football_bundle(**{**case, "artifact_root": artifact_root})
+    tree = ready.files["site_members"].parent
+    assert Path(addressable(tree / IDENTITY_FILE)).is_file()
+    assert check_tree_identity(tree) is not None
+    read = bundle.read_football_bundle(
+        artifact_root=artifact_root,
+        snapshot_root=case["snapshot_root"],
+        snapshot_id=case["snapshot_id"],
+    )
+    assert read.fingerprint == ready.fingerprint

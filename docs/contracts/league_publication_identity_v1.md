@@ -2,9 +2,9 @@
 
 `publication-identity.json` binds one league's current members and human entry files
 to its retained scoreboard, history and series-horizon set. It contains no forecasts
-or runtime paths. The normal league writer validates the inherited record before
-changing the tree, then records the completed set. The scoreboard writer validates
-that set before its update and records the final set afterwards. Its stage journals
+or runtime paths. Weekly preparation validates the inherited record once before
+copying a published tree into its preview. The league and scoreboard writers can
+resume interrupted writes in that preview, then record the completed set. The stage journals
 the final identity file. The GW5 settled writer follows the same rule on its scratch
 candidate, keeping the current decision capture distinct from the outcome capture.
 
@@ -32,3 +32,12 @@ Trees published before this record existed remain readable. The next normal leag
 publication establishes the record after validating and writing its current entries.
 A new bundle with retained historical documents requires that record; it cannot
 silently certify an unrecorded historical set. No fit or archive read is introduced.
+
+If an approved editing PR intentionally changes a protected document outside the
+normal writers, it must also re-record the identity in the same commit, using
+`record_tree_identity(tree, source_snapshot_id=<the retained decision capture>)`
+from `squadopt.application.league_tree_identity` after validating its complete set.
+Review the new record with that editing PR. A changed-file or changed-inventory
+refusal is not permission to remove or refresh a record on a served tree. A general
+stale-record recovery command requires the owner's decision. Normal retry of an
+interrupted preview uses the same run id and capture and finishes its own record.

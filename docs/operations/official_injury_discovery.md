@@ -114,3 +114,10 @@ bundle becomes ready. An identical rerun can finish or replay; conflicting bytes
 cannot replace a previous ready marker. The reader checks all digests and production
 source contracts again. This command performs no acquisition, fitting, site build,
 or runtime activation. Activation must separately select this validated bundle.
+
+New seals with retained scoreboard, history or series-horizon documents require
+`publication-identity.json`. The next normal league publication writes that record.
+It binds the current entries and the retained set together; it cannot be recreated
+by dropping a failed record. Existing ready bundles without retained-tree roles
+replay their original members and entries only. The complete rule is documented in
+`docs/contracts/league_publication_identity_v1.md`.

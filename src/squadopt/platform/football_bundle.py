@@ -119,7 +119,7 @@ def _validate(
     inputs = read_inputs(snapshot, season=infer_season(snapshot))
     if as_instant(inputs.captured_at_utc) >= as_instant(inputs.deadline.deadline_utc):
         raise ValueError("A ready decision capture must precede its deadline.")
-    forecast = read_football_forecast(files["forecast"], inputs)
+    forecast = read_football_forecast(Path(addressable(files["forecast"])), inputs)
     _basis_from_snapshot(
         _object(Path(addressable(files["forecast"])).read_bytes()),
         _object(Path(addressable(files["components"])).read_bytes()),
@@ -127,7 +127,7 @@ def _validate(
         inputs,
         forecast,
     )
-    handoff = read_projection_handoff(files["handoff"])
+    handoff = read_projection_handoff(Path(addressable(files["handoff"])))
     if (
         handoff.source_snapshot_id != snapshot_id
         or handoff.season != inputs.season
