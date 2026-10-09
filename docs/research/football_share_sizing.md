@@ -70,5 +70,23 @@ To reproduce from the same immutable capture and existing companion:
 python -m scripts.measure_football_shares --snapshot-root <captures> `
   --snapshot-id fpl-live-20261002T104314Z-8b70515b9b31 `
   --artifact-root <retained-history-artifact-root> `
-  --evidence-root artifacts/football-share-sizing-gw06
+  --evidence-root artifacts/football-share-sizing-gw06-lf
 ```
+
+## Deterministic evidence rerun
+
+The forecast-only rerun used clean code revision `6a9639daf7087ddfe1e84cfeccebeec26e8584a9` on 2026-10-09,
+the same declared capture and the same existing companion. S1, every per-club
+S1, every player gain, S2, the available-player count, the threshold count and
+the go result are bit-identical to the first run. No outcome payload or archive
+was opened, and no companion was rebuilt. Both input file hashes are unchanged.
+
+The evidence CSV and generated JSON now use explicit LF bytes on every platform.
+The new evidence SHA256 is `f301540cc2d04f042c5143073963413abcb2772248e370927ffdd01e2ca886f5`.
+The old CRLF evidence SHA256 was
+`c9784613370ad3599a283ef66d3397314babbba76de5ea8b28cfa5b9d0e6ab51`.
+The ignored evidence path is now
+`artifacts/football-share-sizing-gw06-lf/player-fixtures.csv`.
+The runner writes the committed small JSON record and ignored summary from the
+same record dictionary, with identical bytes. The frozen population, formulas
+and go rule above are unchanged.
