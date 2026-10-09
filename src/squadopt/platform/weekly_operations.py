@@ -769,6 +769,9 @@ class WeeklyOperations:
                 "removed": list(result.report.removed),
                 # Empty when the Top 100 menu was offered or never asked for.
                 "top100_note": result.top100_note,
+                # Whose purchase prices were rebuilt from the transfers list, and why not
+                # the rest; empty when the capture held no member's picks.
+                "purchase_prices_note": result.purchase_prices_note,
             }
         # Whether this run recorded advice at all, which the publish stage requires: a run
         # asked to record whose leagues the record does not name recorded nothing, and
