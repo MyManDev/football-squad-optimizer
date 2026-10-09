@@ -2,9 +2,13 @@
 
 import hashlib
 import json
+import os
+import platform
+import subprocess
 from copy import deepcopy
 from dataclasses import replace
 from datetime import UTC, datetime
+from importlib.metadata import version
 
 import pytest
 from scripts import build_football_forecast as ordinary
@@ -12,6 +16,7 @@ from scripts import build_football_shadow as shadow
 from tests.unit.test_football_publication import publication_case as publication_case
 
 from squadopt.data.snapshots import read_snapshot, write_snapshot
+from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD
 from squadopt.live.football_artifact import (
     football_artifact_path,
     forecast_digest,
@@ -102,17 +107,123 @@ def test_only_two_files_are_added_and_receipt_agrees_with_reader(case, tmp_path,
         artifact.stat().st_mtime, UTC
     )
     assert receipt["written_before_deadline"] is True
+    assert receipt["deadline_utc"] == case["inputs"].deadline.deadline_utc
+    assert receipt["captured_at_utc"] == case["inputs"].captured_at_utc
+    assert receipt["season"] == case["inputs"].season
     assert receipt["served"] is False
     assert receipt["repository_commit"] == "b" * 40
     assert receipt["repository_tree_clean"] is True
+    assert receipt["python_version"] == platform.python_version()
+    assert receipt["library_versions"] == {
+        name: version(name) for name in ("numpy", "scipy", "scikit-learn", "pandas")
+    }
     assert receipt["archive_hashes"] == case["document"]["archive_hashes"]
     assert receipt["wall_seconds"] >= 0
     assert receipt["gameweek"] == 6
     assert receipt["newest_for_gameweek"] is True
+    assert receipt["ambiguous_latest"] is False
+    assert receipt["skipped_captures"] == []
     assert receipt["gameweek_captures"] == [
         {"snapshot_id": capture, "captured_at_utc": case["inputs"].captured_at_utc}
     ]
     assert json.loads((case["shadow_root"] / "receipts" / artifact.name).read_bytes()) == receipt
+
+
+@pytest.mark.parametrize("seconds", [-1, 0, 1])
+def test_receipt_uses_strict_artifact_mtime_not_the_run_clock(case, monkeypatch, seconds):
+    deadline = datetime.fromisoformat(case["inputs"].deadline.deadline_utc)
+    monkeypatch.setattr(shadow, "_utc_now", lambda: datetime(2099, 10, 10, 9, tzinfo=UTC))
+    publisher = shadow.publish_football_artifacts
+
+    def publish(**kwargs):
+        publisher(**kwargs)
+        artifact = football_artifact_path(kwargs["artifact_root"], case["inputs"].snapshot_id)
+        stamp = deadline.timestamp() + seconds
+        os.utime(artifact, (stamp, stamp))
+
+    monkeypatch.setattr(shadow, "publish_football_artifacts", publish)
+    receipt = build(case)
+    assert receipt["written_before_deadline"] is (seconds < 0)
+    assert datetime.fromisoformat(receipt["artifact_write_utc"]).timestamp() == (
+        deadline.timestamp() + seconds
+    )
+
+
+@pytest.mark.parametrize("encoding", ["utf-8", "utf-8-sig"])
+@pytest.mark.parametrize("relative", [False, True])
+def test_backend_selection_accepts_another_existing_root(case, tmp_path, encoding, relative):
+    selected = tmp_path / "artifacts/served"
+    selected.mkdir(parents=True)
+    value = selected.relative_to(tmp_path) if relative else selected
+    selection = tmp_path / "artifacts/backend-artifact-root.json"
+    selection.write_text(json.dumps({"artifact_root": str(value)}), encoding=encoding)
+    receipt = build(case)
+    assert receipt["served"] is False
+    assert receipt["model_version"] == FOOTBALL_MODEL_VERSION
+
+
+@pytest.mark.parametrize("encoding", ["utf-8", "utf-8-sig"])
+def test_relative_selected_root_is_anchored_to_repository_not_working_directory(
+    case, tmp_path, monkeypatch, encoding
+):
+    selection = tmp_path / "artifacts/backend-artifact-root.json"
+    selection.parent.mkdir(exist_ok=True)
+    selection.write_text(
+        json.dumps({"artifact_root": str(case["shadow_root"].relative_to(tmp_path))}),
+        encoding=encoding,
+    )
+    sibling = tmp_path.parent / (tmp_path.name + "-sibling")
+    sibling.mkdir()
+    monkeypatch.chdir(sibling)
+    before = tree(tmp_path)
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("Selected-root refusal must precede archive reads and fitting")
+
+    monkeypatch.setattr(shadow, "produce_football_forecast", forbidden)
+    with pytest.raises(ValueError, match="shadow root"):
+        build(case)
+    assert tree(tmp_path) == before
+
+
+def test_real_repository_state_reports_clean_and_dirty_without_optional_locks(
+    tmp_path, monkeypatch
+):
+    repository = tmp_path / "repository"
+    repository.mkdir()
+
+    def git(*args):
+        return subprocess.check_output(["git", "-C", str(repository), *args], text=True).strip()
+
+    git("init", "--initial-branch=fixture")
+    (repository / "tracked.txt").write_text("invented repository\n", encoding="utf-8")
+    git("add", "tracked.txt")
+    git(
+        "-c",
+        "user.name=Fixture",
+        "-c",
+        "user.email=fixture@example.invalid",
+        "commit",
+        "-m",
+        "fixture",
+    )
+    expected_head = git("rev-parse", "HEAD")
+    monkeypatch.setattr(shadow, "REPOSITORY_ROOT", repository)
+    calls = []
+    original = subprocess.check_output
+
+    def checked(command, **kwargs):
+        calls.append(command)
+        return original(command, **kwargs)
+
+    monkeypatch.setattr(shadow.subprocess, "check_output", checked)
+    assert shadow._repository_state() == (expected_head, True)
+    (repository / "untracked.txt").write_text("new file\n", encoding="utf-8")
+    assert shadow._repository_state() == (expected_head, False)
+    assert len(calls) == 4
+    assert all(
+        command[:4] == ["git", "--no-optional-locks", "-C", str(repository)] for command in calls
+    )
 
 
 def test_bytes_equal_the_existing_command_without_flags(case, monkeypatch, capsys):
@@ -274,6 +385,89 @@ def test_inventory_refuses_when_decision_capture_is_missing(case, tmp_path):
     with pytest.raises(ValueError, match="decision capture is absent"):
         shadow._gameweek_captures(missing_root, case["inputs"])
     assert tree(tmp_path) == before
+
+
+@pytest.mark.parametrize("damage", ["missing-decision", "unreadable-capture"])
+def test_inventory_refusal_happens_before_fit_and_writes_nothing(
+    case, tmp_path, monkeypatch, damage
+):
+    other = write_snapshot(
+        case["snapshot_root"],
+        source="fpl-live",
+        captured_at_utc="2026-09-22T23:00:00Z",
+        payloads=case["snapshot"].payloads,
+    )
+    if damage == "missing-decision":
+        monkeypatch.setattr(
+            shadow, "list_snapshot_ids", lambda *args, **kwargs: [other.snapshot_id]
+        )
+    else:
+        read = shadow.read_snapshot
+
+        def unreadable(root, identifier):
+            if identifier == other.snapshot_id:
+                raise ValueError("synthetic unreadable capture")
+            return read(root, identifier)
+
+        monkeypatch.setattr(shadow, "read_snapshot", unreadable)
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("Inventory refusal must precede archive reads and fitting")
+
+    monkeypatch.setattr(shadow, "produce_football_forecast", forbidden)
+    before = tree(tmp_path)
+    with pytest.raises(ValueError, match=r"decision capture is absent|unreadable capture"):
+        build(case)
+    assert tree(tmp_path) == before
+
+
+def test_incomplete_capture_is_skipped_before_season_read_and_recorded(case, monkeypatch):
+    interrupted = write_snapshot(
+        case["snapshot_root"],
+        source="fpl-live",
+        captured_at_utc="2026-09-22T23:00:00Z",
+        payloads={"interrupted.json": b"{}"},
+    )
+    infer = shadow.infer_season
+    inferred = []
+
+    def complete_only(snapshot):
+        assert BOOTSTRAP_PAYLOAD in snapshot.payloads, "incomplete capture reached the parser"
+        inferred.append(snapshot.metadata.snapshot_id)
+        return infer(snapshot)
+
+    monkeypatch.setattr(shadow, "infer_season", complete_only)
+    receipt = build(case)
+    assert receipt["skipped_captures"] == [interrupted.snapshot_id]
+    assert interrupted.snapshot_id not in inferred
+    assert receipt["gameweek_captures"] == [
+        {
+            "snapshot_id": case["inputs"].snapshot_id,
+            "captured_at_utc": case["inputs"].captured_at_utc,
+        }
+    ]
+    assert receipt["newest_for_gameweek"] is True
+    assert receipt["ambiguous_latest"] is False
+
+
+@pytest.mark.parametrize("tie", ["decision-latest", "later-latest", "older-only"])
+def test_capture_ties_match_latest_selection_ambiguity(case, tie):
+    stamp = {
+        "decision-latest": case["inputs"].captured_at_utc,
+        "later-latest": "2026-09-22T23:00:00Z",
+        "older-only": "2026-09-22T10:00:00Z",
+    }[tie]
+    for variant in range(1 if tie == "decision-latest" else 2):
+        write_snapshot(
+            case["snapshot_root"],
+            source="fpl-live",
+            captured_at_utc=stamp,
+            payloads={**case["snapshot"].payloads, "tie.json": str(variant).encode()},
+        )
+    receipt = build(case)
+    assert receipt["ambiguous_latest"] is (tie != "older-only")
+    assert receipt["newest_for_gameweek"] is (tie == "older-only")
+    assert receipt["skipped_captures"] == []
 
 
 @pytest.mark.parametrize(

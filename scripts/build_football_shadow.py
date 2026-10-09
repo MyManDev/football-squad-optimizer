@@ -3,16 +3,18 @@
 import argparse
 import hashlib
 import json
+import platform
 import subprocess
 import time
 from datetime import UTC, datetime
+from importlib.metadata import version
 from pathlib import Path
 from typing import Any
 
 from squadopt.application.football_live import produce_football_forecast
 from squadopt.data.atomic import write_document_once
 from squadopt.data.snapshots import list_snapshot_ids, read_snapshot
-from squadopt.data.sources.fpl_live import FPL_LIVE_SOURCE
+from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FPL_LIVE_SOURCE
 from squadopt.data.timestamps import as_instant
 from squadopt.live import RecommendationInputs, infer_season, read_inputs
 from squadopt.live.football_artifact import football_artifact_path, read_football_forecast
@@ -34,7 +36,7 @@ def _check_root(shadow_root: Path) -> Path:
     forbidden = {artifacts.resolve()}
     selection = artifacts / "backend-artifact-root.json"
     if selection.exists():
-        document = json.loads(selection.read_text(encoding="utf-8"))
+        document = json.loads(selection.read_text(encoding="utf-8-sig"))
         if (
             not isinstance(document, dict)
             or set(document) != {"artifact_root"}
@@ -52,18 +54,24 @@ def _check_root(shadow_root: Path) -> Path:
 def _repository_state() -> tuple[str, bool]:
     def git(*args: str) -> str:
         return subprocess.check_output(
-            ["git", "-C", str(REPOSITORY_ROOT), *args], text=True
+            ["git", "--no-optional-locks", "-C", str(REPOSITORY_ROOT), *args], text=True
         ).strip()
 
     return git("rev-parse", "HEAD"), not git("status", "--porcelain")
 
 
-def _gameweek_captures(snapshot_root: Path, inputs: RecommendationInputs) -> list[dict[str, Any]]:
+def _gameweek_captures(
+    snapshot_root: Path, inputs: RecommendationInputs
+) -> tuple[list[dict[str, Any]], list[str]]:
     captures = []
+    skipped = []
     for snapshot_id in list_snapshot_ids(snapshot_root, source=FPL_LIVE_SOURCE):
         snapshot = read_snapshot(snapshot_root, snapshot_id)
         if snapshot.metadata.source != FPL_LIVE_SOURCE:
             raise ValueError("The live inventory contains a capture from another source.")
+        if BOOTSTRAP_PAYLOAD not in snapshot.payloads:
+            skipped.append(snapshot_id)
+            continue
         season = infer_season(snapshot)
         if season != inputs.season:
             continue
@@ -74,8 +82,9 @@ def _gameweek_captures(snapshot_root: Path, inputs: RecommendationInputs) -> lis
             )
     if inputs.snapshot_id not in {row["snapshot_id"] for row in captures}:
         raise ValueError("The decision capture is absent from the live inventory.")
-    return sorted(
-        captures, key=lambda row: (as_instant(row["captured_at_utc"]), row["snapshot_id"])
+    return (
+        sorted(captures, key=lambda row: (as_instant(row["captured_at_utc"]), row["snapshot_id"])),
+        sorted(skipped),
     )
 
 
@@ -100,6 +109,12 @@ def build_shadow(
     deadline = as_instant(inputs.deadline.deadline_utc)
     if run_instant >= deadline:
         raise ValueError("The capture's own deadline has closed; a shadow cannot be backfilled.")
+    captures, skipped = _gameweek_captures(snapshot_root, inputs)
+    latest = max(as_instant(row["captured_at_utc"]) for row in captures)
+    ambiguous_latest = sum(as_instant(row["captured_at_utc"]) == latest for row in captures) > 1
+    library_versions = {
+        name: version(name) for name in ("numpy", "scipy", "scikit-learn", "pandas")
+    }
     commit, clean = _repository_state()
     document = produce_football_forecast(
         snapshot,
@@ -110,7 +125,6 @@ def build_shadow(
     )
     if document.get("model_version") != FOOTBALL_MODEL_VERSION:
         raise ValueError("The shadow producer must return football_team_share_v1.")
-    captures = _gameweek_captures(snapshot_root, inputs)
     if _utc_now() >= deadline:
         raise ValueError("The deadline closed during fitting; no shadow will be published.")
     publish_football_artifacts(
@@ -139,10 +153,16 @@ def build_shadow(
         "written_before_deadline": written < deadline,
         "repository_commit": commit,
         "repository_tree_clean": clean,
+        "python_version": platform.python_version(),
+        "library_versions": library_versions,
         "wall_seconds": time.perf_counter() - started,
         "archive_hashes": document["archive_hashes"],
         "gameweek_captures": captures,
-        "newest_for_gameweek": captures[-1]["snapshot_id"] == snapshot_id,
+        "skipped_captures": skipped,
+        "ambiguous_latest": ambiguous_latest,
+        "newest_for_gameweek": (
+            not ambiguous_latest and as_instant(inputs.captured_at_utc) == latest
+        ),
         "served": False,
     }
     write_document_once(receipt, receipt_path)
