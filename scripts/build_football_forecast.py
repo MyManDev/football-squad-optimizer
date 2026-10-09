@@ -3,6 +3,7 @@
 import argparse
 import json
 from pathlib import Path
+from typing import Any
 
 from squadopt.application.football_live import (
     produce_football_components,
@@ -29,6 +30,11 @@ def main() -> None:
     )
     parser.add_argument("--contextual", action="store_true", help="Build football_contextual_v3.")
     parser.add_argument(
+        "--team-form",
+        action="store_true",
+        help="Build the separate football_team_form_v1 candidate from explicit training seasons.",
+    )
+    parser.add_argument(
         "--role-minutes",
         action="store_true",
         help="Fit joint starting/substitute minutes using the explicit training-season allowlist.",
@@ -47,6 +53,10 @@ def main() -> None:
     parser.add_argument("--rotation-evidence", type=Path)
     parser.add_argument("--club-news-source", type=Path)
     args = parser.parse_args()
+    if args.team_form and (args.contextual or args.role_minutes or not args.training_seasons):
+        parser.error(
+            "--team-form requires --training-season and excludes --contextual/--role-minutes"
+        )
     if args.role_minutes and (args.contextual or not args.training_seasons):
         parser.error("--role-minutes requires --training-season and excludes --contextual")
     if args.retained_role_history and not (args.role_minutes and args.with_components):
@@ -58,6 +68,10 @@ def main() -> None:
     if args.with_components and args.rotation_evidence:
         parser.error("--with-components does not accept contextual manager inputs")
     snapshot = read_snapshot(args.snapshot_root, args.snapshot_id)
+    variant_options: dict[str, Any] = {}
+    for name in ("role_minutes", "retained_role_history", "team_form"):
+        if getattr(args, name):
+            variant_options[name] = True
     words = (
         load_manager_words(
             args.rotation_evidence,
@@ -72,8 +86,7 @@ def main() -> None:
             snapshot,
             args.archive_root,
             training_seasons=args.training_seasons,
-            **({"role_minutes": True} if args.role_minutes else {}),
-            **({"retained_role_history": True} if args.retained_role_history else {}),
+            **variant_options,
         )
     else:
         document = produce_football_forecast(
@@ -82,8 +95,7 @@ def main() -> None:
             contextual=args.contextual,
             manager_words=words,
             training_seasons=args.training_seasons,
-            **({"role_minutes": True} if args.role_minutes else {}),
-            **({"retained_role_history": True} if args.retained_role_history else {}),
+            **variant_options,
         )
         companion = None
     publish_football_artifacts(

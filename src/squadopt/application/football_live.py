@@ -48,9 +48,20 @@ from squadopt.prediction.football_contextual import (
     ContextualFootballModel,
 )
 from squadopt.prediction.football_features import football_features
+from squadopt.prediction.football_team_form import (
+    TEAM_FORM_FEATURE_VERSION,
+    TEAM_FORM_MODEL_VERSION,
+    TeamFormFootballModel,
+    football_team_form_features,
+    team_form_metadata,
+)
 
 
-def causal_training(history: pd.DataFrame, *, prior_only_season: str | None = None) -> pd.DataFrame:
+def causal_training(
+    history: pd.DataFrame, *, prior_only_season: str | None = None, team_form: bool = False
+) -> pd.DataFrame:
+    if not isinstance(team_form, bool):
+        raise ValueError("team_form must be boolean.")
     prior_season = ARCHIVE_SEASONS[0] if prior_only_season is None else prior_only_season
     parts = []
     for (season, week), target in history.groupby(["season", "GW"], sort=True):
@@ -60,7 +71,11 @@ def causal_training(history: pd.DataFrame, *, prior_only_season: str | None = No
         cutoff = target.kickoff.min()
         earlier = (history.season < season) | (history.season.eq(season) & history.GW.lt(week))
         past = history.loc[earlier & (history.kickoff + pd.Timedelta(hours=3) < cutoff)]
-        features = football_features(past, target, cutoff)
+        features = (
+            football_team_form_features(past, target, cutoff)
+            if team_form
+            else football_features(past, target, cutoff)
+        )
         frame = pd.concat([target.drop(columns="home"), features], axis=1)
         goal = frame.position.map(
             {"GK": 10 if season >= "2024-25" else 6, "DEF": 6, "MID": 5, "FWD": 4}
@@ -139,6 +154,7 @@ def _forecast_and_components(
     training_seasons: Sequence[str] | None,
     role_minutes: bool = False,
     retained_role_history: bool = False,
+    team_form: bool = False,
 ) -> tuple[dict[str, Any], pd.DataFrame, RecommendationInputs]:
     """One producer call: the served document, the per-fixture components and the inputs."""
 
@@ -150,6 +166,10 @@ def _forecast_and_components(
         raise ValueError("retained_role_history must be boolean and requires role_minutes.")
     if role_minutes and training_seasons is None:
         raise ValueError("Joint role minutes require an explicit training-season allowlist.")
+    if not isinstance(team_form, bool) or (team_form and (contextual or role_minutes)):
+        raise ValueError("team_form must be boolean and excludes contextual/role_minutes.")
+    if team_form and training_seasons is None:
+        raise ValueError("Team form requires an explicit training-season allowlist.")
     if manager_words is not None and not contextual:
         raise ValueError("Manager context requires the contextual candidate.")
     season = infer_season(snapshot)
@@ -178,14 +198,20 @@ def _forecast_and_components(
             history = pd.concat([history, current], ignore_index=True)
     if history.empty:
         raise ValueError("The selected training seasons contain no usable history.")
-    prior_season = str(history.season.min()) if role_minutes else next(iter(ARCHIVE_SEASONS), "")
+    prior_season = (
+        str(history.season.min()) if role_minutes or team_form else next(iter(ARCHIVE_SEASONS), "")
+    )
     training = (
-        causal_training(history, prior_only_season=prior_season)
+        causal_training(history, prior_only_season=prior_season, team_form=True)
+        if team_form
+        else causal_training(history, prior_only_season=prior_season)
         if role_minutes
         else causal_training(history)
     )
     model = (
-        ContextualFootballModel(training, history, cutoff=cutoff)
+        TeamFormFootballModel(training, history, cutoff=cutoff)
+        if team_form
+        else ContextualFootballModel(training, history, cutoff=cutoff)
         if contextual
         else RetainedHistoryRoleFootballModel(training, history, cutoff=cutoff)
         if retained_role_history
@@ -273,7 +299,9 @@ def _forecast_and_components(
             hashes[f"{prior}/{name}"] = hashlib.sha256(path.read_bytes()).hexdigest()
     document = {
         "contract_version": ARTIFACT_CONTRACT,
-        "model_version": CONTEXTUAL_MODEL_VERSION
+        "model_version": TEAM_FORM_MODEL_VERSION
+        if team_form
+        else CONTEXTUAL_MODEL_VERSION
         if contextual
         else JOINT_ROLE_RETAINED_HISTORY_MODEL_VERSION
         if retained_role_history
@@ -308,6 +336,10 @@ def _forecast_and_components(
             "history_rows_by_season": _season_counts(history),
             "supervised_rows_by_season": _season_counts(training),
         }
+    if team_form:
+        document["feature_contract_version"] = TEAM_FORM_FEATURE_VERSION
+        document["team_form_metadata"] = team_form_metadata()
+        document["training_selection"]["prior_policy"] = "first_selected_usable_season_prior_only"
     if role_minutes:
         assert isinstance(model, JointRoleFootballModel)
         document["role_metadata"] = model.role_metadata
@@ -365,6 +397,7 @@ def produce_football_forecast(
     training_seasons: Sequence[str] | None = None,
     role_minutes: bool = False,
     retained_role_history: bool = False,
+    team_form: bool = False,
 ) -> dict[str, Any]:
     document, _components, _inputs = _forecast_and_components(
         snapshot,
@@ -375,6 +408,7 @@ def produce_football_forecast(
         training_seasons=training_seasons,
         role_minutes=role_minutes,
         retained_role_history=retained_role_history,
+        team_form=team_form,
     )
     return document
 
@@ -387,6 +421,7 @@ def produce_football_components(
     training_seasons: Sequence[str] | None = None,
     role_minutes: bool = False,
     retained_role_history: bool = False,
+    team_form: bool = False,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """The served football document and per-fixture components, from one producer call.
 
@@ -408,6 +443,7 @@ def produce_football_components(
         training_seasons=training_seasons,
         role_minutes=role_minutes,
         retained_role_history=retained_role_history,
+        team_form=team_form,
     )
     roster = [int(player) for player in inputs.players.player_id]
     unit = pd.DataFrame({"player_id": roster, "expected_points": [1.0] * len(roster)})
@@ -443,5 +479,8 @@ def produce_football_components(
         companion["training_selection"] = json.loads(json.dumps(document["training_selection"]))
     if "role_metadata" in document:
         companion["role_metadata"] = json.loads(json.dumps(document["role_metadata"]))
+    if "team_form_metadata" in document:
+        companion["team_form_metadata"] = json.loads(json.dumps(document["team_form_metadata"]))
+        companion["feature_contract_version"] = document["feature_contract_version"]
     companion["fingerprint"] = forecast_digest(companion)
     return document, companion
