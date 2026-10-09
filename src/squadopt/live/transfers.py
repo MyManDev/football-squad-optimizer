@@ -69,14 +69,18 @@ class HeldSquad:
     free_transfers: int
     chips_used: Mapping[str, tuple[int, ...]]
     squad_sell_value_tenths: int | None = None
-    """What the whole squad would raise if sold, when the source states it, in tenths.
+    """A cap on what the whole squad would raise if sold, when the source states one, in
+    tenths.
 
     None for our own squad, whose purchase prices are the ledger's own and whose sell
-    prices are therefore the rule's exact answer, player by player. It is set for a squad
-    read from the public entry endpoints, which publish no purchase price and so leave
+    prices are therefore the rule's exact answer, player by player, and None for a member
+    whose purchase prices were rebuilt from the transfers list, for the same reason. It is
+    set for a member whose purchase prices could not be rebuilt, which leaves
     ``purchase_prices`` holding current prices: those overstate every risen player's sale
     by half his rise. The planner takes the difference back out of the budget rather than
-    letting a plan spend it (``planning.pricing.spending_power``).
+    letting a plan spend it (``planning.pricing.spending_power``). The stated value is the
+    picks document's worth less its bank, a market value at that week's deadline, so it
+    takes back only the moves since that deadline and the cap still overstates.
     """
 
     def __post_init__(self) -> None:
