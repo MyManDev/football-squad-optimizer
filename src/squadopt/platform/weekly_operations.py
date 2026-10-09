@@ -42,6 +42,7 @@ from squadopt.application.weekly_plan import (
     MODE_RULE,
     WeekError,
     WeeklyRequest,
+    _require_capture_name,
     capture_deadline,
     decision_mode_for,
     evidence_artifact,
@@ -209,6 +210,8 @@ class WeeklyOperations:
         self.record_advice = record_advice
         self.no_advice_record = no_advice_record
         self.benchmark_freeze = benchmark_freeze
+        for identifier in benchmark_picks_freezes:
+            _require_capture_name(identifier, "--benchmark-picks-freeze")
         self.benchmark_picks_freezes = benchmark_picks_freezes
         self.publish_names = PublishNames(
             request.season, request.gameweek, "decision", publish_suffix
@@ -245,6 +248,12 @@ class WeeklyOperations:
             self.rule_snapshot = prior["rule_snapshot"]
             self.ledger_inputs = [Path(value) for value in prior["ledger_inputs"]]
             self.record_inputs = [Path(value) for value in prior["record_inputs"]]
+        decision_directory = paths.ledger / request.season / f"gw{request.gameweek:02d}"
+        if benchmark_freeze and not request.decide and decision_directory not in self.ledger_inputs:
+            raise WeekError(
+                "--benchmark-freeze requires --decide or an existing primary decision "
+                "(missing_decision)."
+            )
         declaration = {
             "request": asdict(request),
             "paths": {key: str(value) for key, value in asdict(paths).items()},
@@ -511,11 +520,17 @@ class WeeklyOperations:
         )
 
     def _benchmark_freeze(self) -> WeeklyStageResult:
-        """Research receipt only; an unavailable study input cannot block publication."""
+        """Record unavailable input codes without changing the publication tree."""
         try:
             cohort = self._cohort_id()
-            if self.request.season != benchmark_capture.SEASON or cohort is None:
-                raise DataError("Benchmark freeze requires this season's primary cohort.")
+            if self.request.season != benchmark_capture.SEASON:
+                raise benchmark_capture.BenchmarkCaptureRefused(
+                    "not_a_decision", "Benchmark freeze needs the live season."
+                )
+            if cohort is None:
+                raise benchmark_capture.BenchmarkCaptureRefused(
+                    "no_cohort", "Benchmark freeze needs a cohort."
+                )
             receipt = benchmark_capture.freeze_decision(
                 self.paths.snapshots,
                 decision_directory=self.paths.ledger
@@ -525,8 +540,11 @@ class WeeklyOperations:
                 gameweek=self.request.gameweek,
                 output_root=self._benchmark_root(),
             )
-        except (DataError, OSError, ValueError, KeyError, TypeError):
-            return self._receipt("benchmark-freeze", {"status": "unavailable"})
+        except (DataError, OSError, ValueError, KeyError, TypeError) as error:
+            return self._receipt(
+                "benchmark-freeze",
+                {"status": "unavailable", "reason": benchmark_capture.refusal_code(error)},
+            )
         frozen = read_snapshot(self._benchmark_root(), receipt.snapshot_id)
         binding = json.loads(frozen.payloads["benchmark.json"])
         return self._receipt(
@@ -536,13 +554,16 @@ class WeeklyOperations:
                 "snapshot_id": receipt.snapshot_id,
                 "fingerprint": receipt.fingerprint,
             },
-            tuple(
-                self._benchmark_root() / identifier
-                for identifier in (
-                    receipt.snapshot_id,
-                    binding["decision_snapshot_id"],
-                    binding["cohort_snapshot_id"],
-                )
+            (
+                *(
+                    self._benchmark_root() / identifier
+                    for identifier in (
+                        receipt.snapshot_id,
+                        binding["decision_snapshot_id"],
+                        binding["cohort_snapshot_id"],
+                    )
+                ),
+                benchmark_capture.freeze_claim_path(self._benchmark_root(), self.request.gameweek),
             ),
         )
 
@@ -554,13 +575,24 @@ class WeeklyOperations:
                 receipt = benchmark_capture.capture_settled_picks(
                     self._benchmark_root(), freeze_snapshot_id=identifier
                 )
-            except (DataError, OSError, ValueError, KeyError, TypeError):
-                outcomes.append({"freeze_snapshot_id": identifier, "status": "unavailable"})
+            except (DataError, OSError, ValueError, KeyError, TypeError) as error:
+                outcomes.append(
+                    {
+                        "freeze_snapshot_id": identifier,
+                        "status": "unavailable",
+                        "reason": benchmark_capture.refusal_code(error),
+                    }
+                )
                 continue
             captured = read_snapshot(self._benchmark_root(), receipt.snapshot_id)
-            outcome = json.loads(captured.payloads["benchmark.json"])["outcome_snapshot_id"]
+            binding = json.loads(captured.payloads["benchmark.json"])
+            outcome = binding["outcome_snapshot_id"]
             outputs.extend(
-                (self._benchmark_root() / receipt.snapshot_id, self._benchmark_root() / outcome)
+                (
+                    self._benchmark_root() / receipt.snapshot_id,
+                    self._benchmark_root() / outcome,
+                    benchmark_capture.picks_claim_path(self._benchmark_root(), identifier),
+                )
             )
             outcomes.append(
                 {
@@ -569,12 +601,15 @@ class WeeklyOperations:
                     "snapshot_id": receipt.snapshot_id,
                     "fingerprint": receipt.fingerprint,
                     "outcome_snapshot_id": outcome,
+                    "members_readable": binding["members_readable"],
+                    "members_unreadable": binding["members_unreadable"],
+                    "failure_counts": binding["failure_counts"],
                 }
             )
         return self._receipt("benchmark-picks", {"captures": outcomes}, tuple(outputs))
 
     def _benchmark_root(self) -> Path:
-        return self.paths.workspace / "artifacts" / "benchmark-v2-captures"
+        return self.paths.workspace / "data" / "benchmark_v2_captures"
 
     def _rotation_source(self) -> Path:
         """What the rotation stage reads from, as a path the journal can fingerprint.
@@ -972,7 +1007,13 @@ class WeeklyOperations:
 
         if name.startswith("benchmark_"):
             # These receipts stay private. Product status pages consume the run log.
-            return self.run.stage(name, inputs=inputs, operation=operation, repeatable=repeatable)
+            try:
+                return self.run.stage(
+                    name, inputs=inputs, operation=operation, repeatable=repeatable
+                )
+            except Exception:
+                self.log.event("tick.week.stage.failed", stage=name, error="research_stage_refused")
+                raise
 
         self.log.event("tick.week.stage.start", stage=name)
         try:
@@ -1330,6 +1371,12 @@ def main(argv: list[str] | None = None) -> int:
             args.rotation_capture,
         )
         print(request.plan().describe())
+        for identifier in args.benchmark_picks_freeze:
+            _require_capture_name(identifier, "--benchmark-picks-freeze")
+        if args.benchmark_freeze:
+            print("Private research stage: benchmark_freeze")
+        if args.benchmark_picks_freeze:
+            print("Private research stage: benchmark_picks")
         names = PublishNames(request.season, request.gameweek, "decision", args.publish_suffix)
         recording = (
             "False (--no-advice-record)"

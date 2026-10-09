@@ -10,7 +10,7 @@ python -m squadopt.platform.weekly_operations --season 2026-27 --gameweek 5 --le
 
 The optional private Benchmark V2 capture flags and the owner's settlement command
 are documented in [benchmark_v2_weekly_capture.md](benchmark_v2_weekly_capture.md).
-They require the owner's approval before merge and do not alter the published decision.
+Both flags default off and do not alter the published decision.
 
 `config/leagues.json` (`league_list_v1`) is the one place that says which classic leagues the
 site serves; `--league <id>`, repeatable, names them on the command line instead (the list

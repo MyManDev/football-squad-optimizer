@@ -1,52 +1,55 @@
 # Private weekly Benchmark V2 capture
 
-Issue #1016 step 1 adds explicit research capture options to the weekly command.
-Both are off unless the owner enables them. The owner must approve this PR before
-merge and run the collection himself under the weekly-operation rules in #1012.
+Both research flags default off. `--benchmark-freeze` requires `--decide` or an
+existing primary ledger entry before any weekly stage starts. It copies the
+verified decision bytes, exact decision-time pool and original pre-deadline
+Top 100 into the private immutable store `data/benchmark_v2_captures/`. That
+optional tree, including its binding claims, is covered by `scripts/backup_data.ps1`.
+It is ignored by git and kept separate from the product snapshot inventory.
 
-`--benchmark-freeze` copies the already frozen primary paper-squad ledger decision
-for the requested season/week, its exact decision-time `fpl-live` pool and the
-original pre-deadline `fpl-top100` cohort into the ignored private store
-`artifacts/benchmark-v2-captures`. It then writes an immutable
-`fpl-benchmark-decision` receipt before the deadline. It binds the original capture
-ids, fingerprints, system-decision digest, bench order, vice-captain and the current
-configured ownership-template budget of 1000 tenths, club limit 3 and scale 1000.
-It does not decide a squad, alter an existing decision, infer a late bench order,
-fit a projection or manufacture a missing paper decision. If the owner has not
-already made the primary decision, the receipt states unavailable.
+The freeze verifies the ledger manifest and decision digest, the live season,
+target deadline and scoring fields. The cohort must have been captured while
+that target gameweek was open. Exact retained source copies must agree. The
+receipt binds the decision and cohort ids and fingerprints, bench order,
+vice-captain and configured ownership-template budget, club limit and scaling.
+No decision or missing roster input is manufactured by this stage.
 
-The existing Friday Top-100 picks stage reads N-1 for projection evidence. It cannot
-serve as the benchmark's target-week picks. After settlement, the new
-`--benchmark-picks-freeze <freeze-id>` option collects target-week picks and histories
-only for the original 100 members of that explicit freeze. Repeat the option to
-collect several explicitly named pending weeks. No current standings are consulted,
-no member is replaced by rank 101, and unreadable members are counted as missing.
-The bootstrap must state finished and data_checked for that target deadline before
-any member's picks are fetched. The receipt also retains the target's official live
-event points and minutes in a separate `fpl-live` outcome capture in the same store.
-Collection does not calculate a benchmark score or admit a week to the live reading.
+One create-once claim per season and gameweek names its binding freeze. Repeated
+calls return that claimed id. A picks collection accepts only that claimed freeze;
+a caller cannot substitute another freeze for the week. Claims retain their exact
+receipt fingerprint and are included among the weekly stage's journalled outputs.
 
-The owner can perform this collection alongside the Tuesday settle without calling
-the publication workflow:
+The normal Friday Top-100 picks stage supplies N-1 projection evidence. The
+`--benchmark-picks-freeze <freeze-id>` option separately collects the original
+100 members' target-week picks and histories after the target is finished and
+`data_checked` at the frozen deadline. Repeat the option for distinct pending
+weeks. The outcome capture keeps the observed settled bootstrap and that target's
+official live event. It does not calculate a benchmark score.
+
+A member counts as unavailable only on HTTP 404. Any other failed read aborts
+without a completed picks receipt or claim, so the operator can retry. Completed
+receipts record readable and unreadable counts and failure codes, never entry ids
+in their diagnostics. The weekly stage value and standalone CLI show those counts.
+The first collection with no transport failures gets the immutable picks claim;
+later calls return that claimed id without another network collection. No rank-101
+replacement or selection of a later completed receipt is allowed.
+
+Collection can run alongside settlement without the publication workflow:
 
 ```powershell
-python -m squadopt.platform.benchmark_capture --snapshot-root <workspace>/artifacts/benchmark-v2-captures --freeze-snapshot <fpl-benchmark-decision-id>
+python -m squadopt.platform.benchmark_capture --snapshot-root <workspace>/data/benchmark_v2_captures --freeze-snapshot <fpl-benchmark-decision-id>
 ```
 
-Use the first successful completed collection for each frozen week. The weekly
-journal retains immutable output ids and hashes on resume. The reader's explicit
-manifest uses the retained original decision and cohort, the decision-freeze id,
-the picks id and the outcome id in the picks receipt. Do not select a later capture
-after inspecting results. No archive or locked-holdout store is enumerated or opened.
+The live reader's manifest must use the claimed freeze and picks ids, their exact
+original decision/cohort and the outcome id recorded in the picks receipt.
+Unclaimed receipt files left by an interrupted metadata transaction are not binding.
+No archive or holdout inventory is enumerated by these commands.
 
-Research receipts stay in their own store so they cannot change a product capture
-inventory or the earlier settled-outcomes stage's directory fingerprint. They are
-journalled privately and do not emit product run-log stage events. The published
-builders and their inputs are unchanged. An unavailable research input is recorded
-privately and does not stop the normal publication stages. The default weekly
-declaration and stage plan are unchanged when both options are omitted.
-
-The first finish box still needs the owner's merge approval and evidence from the
-next real weekly run. The GW6 Friday run is due on 2026-10-09; its target deadline
-is 2026-10-10T10:00:00Z. No real weekly run or FPL network request was made to develop
-this addition. The live reader and its eventual result PR are separate steps.
+Unavailable stage receipts carry fixed reason codes such as `missing_decision`,
+`not_a_decision`, `no_cohort`, `deadline_mismatch`, `late`, `not_settled`,
+`missing_freeze` and `transport_failure`. The CLI prints a code without private
+exception text. Successful research stages stay out of the member status feed;
+a journal refusal emits a generic `research_stage_refused` failure event and
+re-raises so a stopped resume is visible. Source or output drift still refuses
+resume and needs a new reviewed run. No research flag silently adds a decide step.
+The default stage declaration and product plan remain unchanged with both flags off.
