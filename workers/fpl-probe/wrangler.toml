@@ -1,0 +1,41 @@
+# The FPL probe: a low-rate Worker that measures whether FPL answers requests leaving
+# Cloudflare's network (docs/fpl_forwarder_probe.md). It is deployed and deleted only by
+# .github/workflows/deploy-fpl-probe.yml, which fills in the KV namespace id on the runner.
+# The Pages site is not part of this: it stays static, with no functions/ and no _worker.js.
+
+name = "squadopt-fpl-probe"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+
+# One address only: the route below. No workers.dev subdomain and no preview addresses.
+workers_dev = false
+preview_urls = false
+
+# A prefix route on the site's host: every path that starts with /api/v1/fpl-probe, with any
+# query string, reaches this Worker, and the Worker answers only its two paths (everything else
+# gets its 404). The site has nothing under that prefix, so its own paths never reach this
+# Worker. The zone's /api/v1/ rate-limit rule (50 requests per 10 s per IP) applies in front of
+# it. Publishing the route looks the zone up by name, so the token needs Zone Read on it.
+routes = [
+  { pattern = "squadopt.mymandev.com/api/v1/fpl-probe*", zone_name = "mymandev.com" },
+]
+
+# Two requests to FPL every 30 minutes: about 96 a day, until PROBE_UNTIL. That end is passed by
+# the deploy workflow (wrangler deploy --var PROBE_UNTIL:<deploy time + 7 days>) and is not set
+# here: without it the Worker asks FPL nothing.
+[triggers]
+crons = ["*/30 * * * *"]
+
+# The records. The deploy workflow finds or creates the namespace titled squadopt-fpl-probe
+# and replaces this placeholder with its id; the committed file never holds an account's id.
+[[kv_namespaces]]
+binding = "PROBE"
+id = "FILLED_IN_BY_THE_DEPLOY_WORKFLOW"
+
+# The Worker's own console lines (one per probe) are kept in Workers Logs; the per-request
+# invocation logs, which describe each caller's request, are not.
+[observability]
+enabled = true
+
+[observability.logs]
+invocation_logs = false

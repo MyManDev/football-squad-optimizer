@@ -59,6 +59,8 @@ tool in plaintext.
 
 3. In Cloudflare, create a token scoped to the selected account with only **Account →
    Cloudflare Pages → Edit**. Do not grant Zone, Workers, or unrelated account permissions.
+   The FPL probe's Workers token is a separate token in a separate environment,
+   `cloudflare-workers` ([FPL forwarder probe](fpl_forwarder_probe.md)); never widen this one.
 
 4. Add the account ID and replacement token as **Environment secrets**, then add the project
    name as a repository Actions variable. Each `gh secret set` command prompts securely; do not
