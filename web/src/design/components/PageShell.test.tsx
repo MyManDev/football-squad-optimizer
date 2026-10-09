@@ -17,6 +17,9 @@ const TR = MESSAGES.tr.shell;
 const LEAGUE = 352490;
 const MEMBERS = `/league/${LEAGUE}/members`;
 
+beforeEach(() => vi.stubEnv("VITE_ADVICE_API_ORIGIN", "https://squadopt-api.example"));
+afterEach(() => vi.unstubAllEnvs());
+
 function LocationProbe() {
   const location = useLocation();
   return (

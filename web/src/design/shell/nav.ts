@@ -113,7 +113,9 @@ export function navItems(
   items.push(
     { key: "league", to: leaguePath, active: leagueId !== null && pathname === leaguePath },
     { key: "fixtures", to: "/fixtures", active: pathname === "/fixtures" },
-    { key: "contribute", to: "/contribute", active: pathname === "/contribute" },
   );
+  if (import.meta.env.VITE_ADVICE_API_ORIGIN) {
+    items.push({ key: "contribute", to: "/contribute", active: pathname === "/contribute" });
+  }
   return items;
 }
