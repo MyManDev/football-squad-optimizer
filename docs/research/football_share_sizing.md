@@ -57,12 +57,14 @@ four gain at least 0.2 points under S2. The maximum is
 **0.21821737796427154 points**. The frozen go rule therefore returns **go**.
 This permits a prospective protocol, not a live accuracy or shipping claim.
 
-The existing companion was used without rebuilding. The clean measurement code
-revision is `6c68ec2e838733eb6d27f4be5ecb87c1755b354d`; the earlier protocol
-commit is `53cb3de1`. The JSON record contains both input hashes and all per-club
-S1 totals. The full player-fixture table remains ignored at
-`artifacts/football-share-sizing-gw06/player-fixtures.csv` and is bound by its
-SHA256 in the record. No outcome payload or archive was opened in this run.
+The existing companion was used without rebuilding. The first run used clean code
+revision `6c68ec2e838733eb6d27f4be5ecb87c1755b354d`; the earlier protocol commit is
+`53cb3de1`. Its CRLF evidence table is superseded. The JSON record binds the LF
+rerun from `6a9639daf7087ddfe1e84cfeccebeec26e8584a9`, including both input hashes
+and all per-club S1 totals. The full player-fixture table remains ignored at
+`artifacts/football-share-sizing-gw06-lf/player-fixtures.csv` and is bound by its
+SHA256 in the record; see Deterministic evidence rerun below. No outcome payload
+or archive was opened in either run.
 
 To reproduce from the same immutable capture and existing companion:
 
