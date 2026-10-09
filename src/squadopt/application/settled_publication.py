@@ -36,6 +36,7 @@ from jsonschema import Draft202012Validator
 from jsonschema.exceptions import best_match
 
 from squadopt.application.entries import EntryRegistry
+from squadopt.application.league_tree_identity import check_tree_identity, record_tree_identity
 from squadopt.application.league_views import MemberStanding, _rank_movement
 from squadopt.application.scoreboard import scoreboard_payload
 from squadopt.application.site import build_site
@@ -44,6 +45,7 @@ from squadopt.application.weekly_suggestion_eval import (
     published_advice_captures,
     review_member_weeks,
 )
+from squadopt.contracts.league_publication_identity import IDENTITY_FILE
 from squadopt.contracts.league_tree import LEAGUE_DIRECTORY_FILE, find_league_tree
 from squadopt.data.atomic import replace_retrying
 from squadopt.data.errors import DataError
@@ -146,6 +148,7 @@ def _allowed(name: str, request: SettledPublicationRequest) -> bool:
         f"{tree}/members.json",
         f"{tree}/scoreboard.json",
         f"{tree}/series-horizon.json",
+        f"{tree}/{IDENTITY_FILE}",
         "data/fixtures.json",
         f"data/{LEAGUE_DIRECTORY_FILE}",
     ):
@@ -565,6 +568,7 @@ def publish_settled(
     ``scripts.check_league_tree``, which this package cannot import.
     """
     accepted, members, snapshot, scores = _preflight(request)
+    prior_identity = check_tree_identity(request.accepted_dir / _tree_name(request))
     stamp = snapshot.metadata.captured_at_utc
     with TemporaryDirectory(prefix="settled-", dir=request.out_dir.parent) as temporary:
         root = Path(temporary)
@@ -639,6 +643,11 @@ def publish_settled(
             listed["generated_at_utc"] = stamp
             directory.write_text(
                 json.dumps(listed, indent=2) + "\n", encoding="utf-8", newline="\n"
+            )
+        if prior_identity is not None:
+            record_tree_identity(
+                candidate / _tree_name(request),
+                source_snapshot_id=prior_identity["source_snapshot_id"],
             )
         proposed = _files(candidate)
         changed = tuple(

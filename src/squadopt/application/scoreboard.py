@@ -66,8 +66,10 @@ from pathlib import Path
 from typing import Any, Final
 
 from squadopt.application.entries import EntryRegistry
+from squadopt.application.league_tree_identity import record_tree_identity
 from squadopt.application.scoreboard_baselines import human_baseline_rows
 from squadopt.contracts.league import LEAGUE_VIEW_CONTRACT_VERSION
+from squadopt.contracts.league_publication_identity import IDENTITY_FILE
 from squadopt.contracts.league_tree import (
     LEGACY_TREE,
     find_league_tree,
@@ -734,7 +736,8 @@ class ScoreboardPublicationResult:
 
     @property
     def output_paths(self) -> tuple[Path, ...]:
-        return (self.target,)
+        identity = self.target.with_name(IDENTITY_FILE)
+        return (self.target, identity) if identity.is_file() else (self.target,)
 
 
 def publish_scoreboard(request: ScoreboardPublicationRequest) -> ScoreboardPublicationResult:
@@ -802,6 +805,10 @@ def publish_scoreboard(request: ScoreboardPublicationRequest) -> ScoreboardPubli
         site_data, request.league_id
     )
     target = tree / SCOREBOARD_FILE
+    # The inherited tree was verified when the weekly preview was seeded. A retry
+    # may already contain this stage's new scoreboard beside the previous record.
+    identity_path = tree / IDENTITY_FILE
+    prior_identity = json.loads(identity_path.read_bytes()) if identity_path.is_file() else None
     # An empty ledger root beside a scoreboard that already publishes our rows: the
     # decisions were made, their local record is what is missing. Keep the rows.
     published_ours = _published_ours(target, season) if not entries else {}
@@ -854,6 +861,8 @@ def publish_scoreboard(request: ScoreboardPublicationRequest) -> ScoreboardPubli
         encoding="utf-8",
         newline="\n",
     )
+    if prior_identity is not None:
+        record_tree_identity(tree, source_snapshot_id=prior_identity["source_snapshot_id"])
     return ScoreboardPublicationResult(
         snapshot_id,
         season,

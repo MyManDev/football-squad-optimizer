@@ -15,9 +15,11 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any
 
+from squadopt.application.league_tree_identity import check_tree_identity, protected_files
 from squadopt.application.manager_words import load_manager_words
 from squadopt.contracts.injuries import require_official_injury_source
 from squadopt.contracts.league import LEAGUE_VIEW_CONTRACT_VERSION
+from squadopt.contracts.league_publication_identity import IDENTITY_FILE, publication_path
 from squadopt.contracts.league_tree import single_league_tree
 from squadopt.data._long_paths import addressable
 from squadopt.data.atomic import document_bytes, write_bytes_once
@@ -101,7 +103,7 @@ def _validate(
         require_official_injury_source()
     extras = files.keys() - (_REQUIRED | _OPTIONAL)
     if not files.keys() >= _REQUIRED or any(
-        not re.fullmatch(r"site_entry_[1-9][0-9]*", role) for role in extras
+        not re.fullmatch(r"site_entry_[1-9][0-9]*|site_tree_[0-9a-f]{64}", role) for role in extras
     ):
         raise ValueError("Bundle file roles are incomplete or unsupported.")
     has_rotation = files.keys() >= _OPTIONAL
@@ -117,7 +119,7 @@ def _validate(
     inputs = read_inputs(snapshot, season=infer_season(snapshot))
     if as_instant(inputs.captured_at_utc) >= as_instant(inputs.deadline.deadline_utc):
         raise ValueError("A ready decision capture must precede its deadline.")
-    forecast = read_football_forecast(files["forecast"], inputs)
+    forecast = read_football_forecast(Path(addressable(files["forecast"])), inputs)
     _basis_from_snapshot(
         _object(Path(addressable(files["forecast"])).read_bytes()),
         _object(Path(addressable(files["components"])).read_bytes()),
@@ -125,7 +127,7 @@ def _validate(
         inputs,
         forecast,
     )
-    handoff = read_projection_handoff(files["handoff"])
+    handoff = read_projection_handoff(Path(addressable(files["handoff"])))
     if (
         handoff.source_snapshot_id != snapshot_id
         or handoff.season != inputs.season
@@ -133,11 +135,16 @@ def _validate(
         or not set(handoff.expected_points) <= set(inputs.players.player_id)
     ):
         raise ValueError("Projection handoff differs from the decision capture or roster.")
-    site_files = _site_files(files["site_members"].parent)
+    site_files = _site_files(
+        files["site_members"].parent,
+        retain_history=any(role.startswith("site_tree_") for role in files),
+    )
     if {role: path for role, path in files.items() if role.startswith("site_")} != site_files:
         raise ValueError("Bundle site files differ from its declared human members.")
     generated = set()
     for role, path in site_files.items():
+        if role.startswith("site_tree_"):
+            continue
         document = _object(Path(addressable(path)).read_bytes())
         payload = document["payload"]
         if (
@@ -233,7 +240,7 @@ def _validate(
     return identities, official_report
 
 
-def _site_files(tree: Path) -> dict[str, Path]:
+def _site_files(tree: Path, *, retain_history: bool = True) -> dict[str, Path]:
     """Read the existing member/entry envelopes of one league's tree, without importing
     runtime services."""
     member_path = tree / "members.json"
@@ -283,6 +290,20 @@ def _site_files(tree: Path) -> dict[str, Path]:
         result[role] = path
     if len(result) == 1:
         raise ValueError("A ready site requires at least one human member capture.")
+    if not retain_history:
+        return result
+    identity = check_tree_identity(tree)
+    retained = {
+        name: path
+        for name, path in protected_files(tree).items()
+        if name != "members.json" and not name.startswith("entries/")
+    }
+    if retained and identity is None:
+        raise ValueError("Retained league history requires a publication identity record.")
+    if identity is not None:
+        retained[IDENTITY_FILE] = tree / IDENTITY_FILE
+    for name, path in retained.items():
+        result["site_tree_" + _digest(name.encode())] = path
     return result
 
 
@@ -322,6 +343,15 @@ def _relative_files(marker: Path, snapshot_id: str, records: object) -> dict[str
         }.get(role)
         if re.fullmatch(r"site_entry_[1-9][0-9]*", role):
             expected = site + "entries/" + role.removeprefix("site_entry_") + ".json"
+        if re.fullmatch(r"site_tree_[0-9a-f]{64}", role):
+            if not isinstance(relative, str) or not relative.startswith(site):
+                raise ValueError("Retained league file is outside its sealed tree.")
+            name = relative.removeprefix(site)
+            if (name != IDENTITY_FILE and not publication_path(name)) or role != (
+                "site_tree_" + _digest(name.encode())
+            ):
+                raise ValueError("Retained league file has an unexpected role or path.")
+            expected = relative
         if expected is None:
             if (
                 role not in _OPTIONAL
@@ -427,11 +457,16 @@ def seal_football_bundle(
         read_football_bundle(
             artifact_root=artifact_root, snapshot_root=snapshot_root, snapshot_id=snapshot_id
         )
+    legacy_ready = existing is not None and not any(
+        role.startswith("site_tree_") for role in _object(existing)["files"]
+    )
     files = {
         "forecast": football_artifact_path(artifact_root, snapshot_id),
         "components": football_components_path(artifact_root, snapshot_id),
         "handoff": handoff_path,
-        **_site_files(single_league_tree(site_data_root, league_id)),
+        **_site_files(
+            single_league_tree(site_data_root, league_id), retain_history=not legacy_ready
+        ),
     }
     if rotation_table_path is not None:
         files.update(

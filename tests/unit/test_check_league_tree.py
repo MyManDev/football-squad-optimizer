@@ -213,12 +213,13 @@ def test_the_three_checks_keep_their_clean_and_defective_outcomes(
     assert main([str(tmp_path)]) == (0 if defect is None else 1)
     output = capsys.readouterr().out
     assert all(f"Checking {name}" in output for name in ("variants", "top100", "word"))
+    assert output.rstrip().endswith("FINAL: ALL GOOD" if defect is None else "FINAL: FAILURE(S)")
     if defect is None:
-        assert output.count("ALL GOOD") == 3
+        assert output.splitlines().count("ALL GOOD") == 3
         assert "('ortak-koru', 3, True)" in output
         assert "non-binding keeps the captain" in output
     else:
-        assert output.count("ALL GOOD") == 2
+        assert output.splitlines().count("ALL GOOD") == 2
 
 
 def test_a_skip_top100_tree_with_a_refused_member_passes_and_names_both_absences(
@@ -229,7 +230,7 @@ def test_a_skip_top100_tree_with_a_refused_member_passes_and_names_both_absences
     _refuse(tmp_path, 3, "No current price for player 7.")
     assert main([str(tmp_path)]) == 0
     output = capsys.readouterr().out
-    assert output.count("ALL GOOD") == 3
+    assert output.splitlines().count("ALL GOOD") == 3
     # The variants and Top 100 checks each name both absences, and neither is a finding.
     assert output.count(f"1 member(s): Top 100 menu not published: {NO_TOP100_THIS_RUN} (1)") == 2
     assert output.count("1 member(s): no advice this week: No current price for player 7. (3)") == 2
@@ -269,7 +270,7 @@ def test_a_document_the_index_lists_and_the_tree_lacks_is_still_a_finding(
     assert main([str(tmp_path)]) == 1
     output = capsys.readouterr().out
     assert f"1: {missing} not published" in output
-    assert output.count("ALL GOOD") == 2
+    assert output.splitlines().count("ALL GOOD") == 2
 
 
 #: A Top 100 entry that is neither a menu nor an absence stated in the producer's shape.
@@ -434,7 +435,7 @@ def test_what_the_index_states_unavailable_is_satisfied_and_what_it_omits_is_not
     _write(tmp_path, "advice/1/index.json", index)
     assert main([str(tmp_path)]) == 0
     output = capsys.readouterr().out
-    assert output.count("ALL GOOD") == 3
+    assert output.splitlines().count("ALL GOOD") == 3
     assert "1 member(s): saf-puan window 5 not solved: not_solved (1)" in output
     assert "1 member(s): ortak-koru window 1 vs 2 not solved: not_solved (1)" in output
     assert "1 member(s): Top 100 plain 20 not solved: not_solved (1)" in output
@@ -462,7 +463,7 @@ def test_a_truncated_unavailable_word_file_is_still_a_file(tmp_path, capsys):
     assert main([str(tmp_path)]) == 1
     output = capsys.readouterr().out
     assert "BAD 1: unavailable" in output
-    assert output.count("ALL GOOD") == 2
+    assert output.splitlines().count("ALL GOOD") == 2
 
 
 def test_invalid_json_and_wrong_root_name_the_problem(tmp_path, capsys):
@@ -525,7 +526,7 @@ def test_a_site_with_a_directory_is_checked_tree_by_tree(tmp_path, capsys):
     assert main([str(tmp_path)]) == 0
     output = capsys.readouterr().out
     assert "== leagues/9" in output
-    assert output.count("ALL GOOD") == 3
+    assert output.splitlines().count("ALL GOOD") == 3
 
     # A second listed league whose tree is missing names the tree, not the legacy path.
     directory["payload"]["leagues"].append(
@@ -574,7 +575,7 @@ def test_a_ceiling_is_the_price_under_a_proven_control_and_absent_otherwise(
         path.write_text(json.dumps(document), encoding="utf-8")
     assert main([str(tmp_path)]) == (0 if clean else 1)
     output = capsys.readouterr().out
-    assert output.count("ALL GOOD") == (3 if clean else 1)
+    assert output.splitlines().count("ALL GOOD") == (3 if clean else 1)
 
 
 @pytest.mark.parametrize("status", ["FEASIBLE", "OPTIMAL"])
