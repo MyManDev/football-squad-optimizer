@@ -49,7 +49,9 @@ The fifteen positions must contain 2 GK, 5 DEF, 5 MID and 3 FWD. The named eleve
 must contain one GK and meet the official formation bounds: DEF 3 to 5, MID 2
 to 5 and FWD 1 to 3. The bench has the remaining goalkeeper and three outfield
 players. JSON Schema establishes the wire shape; the scorer establishes these
-cross-field and football identities.
+cross-field and football identities. The UTC timestamp pattern enforces its wire
+shape and field ranges without an optional format plugin. Consumers additionally
+parse it as a real calendar instant, rejecting impossible dates such as 31 February.
 
 ## Official scoring and progress
 
@@ -75,8 +77,10 @@ During an unfinished week:
    starter whose replacement keeps the nominal formation legal, exactly as the
    Python scorer does. A still-pending starter is not eligible to go off.
 4. Keep the captain's extra copy until his club is complete. If he then has zero
-   minutes, give it to the vice only if the vice has positive minutes and belongs
-   to the provisional counted eleven. If neither qualifies, add no extra copy.
+   minutes, give it to the vice if the vice belongs to the provisional counted
+   eleven. A vice with zero minutes and an incomplete club is the named pending
+   holder with zero extra points. A completed zero-minute vice, or a vice outside
+   the counted eleven, receives no extra copy and has no named holder.
    Negative armband points are still added with their sign.
 5. Triple Captain adds one further copy of the same eligible armband points.
    Bench Boost counts all fifteen plus the eligible captain copy; it does not
@@ -96,8 +100,10 @@ fixtures, bonus state, armband holder, substitutions already made and source tim
 Bonus state is confirmed only in the finished state, following the existing
 reader's `bonus_confirmed` rule. The numbers come from the live totals as provided; the
 card never adds bonus again. An unfinished captain can remain the named holder
-with zero points while fallback is pending; after completion, no eligible holder
-is represented by null.
+with zero points while fallback is pending. After a completed zero-minute captain,
+the vice is the named pending holder with zero extra points while his club remains
+incomplete, provided he is in the counted eleven. The holder is null only when
+that vice is outside the counted eleven or his club is complete with zero minutes.
 
 Read on page open or an explicit refresh only, without a timer. Source A's cache
 is 60 seconds for the current unfinished week and until the next deadline for a
@@ -114,4 +120,7 @@ gates in #1008. The system squad's `/gw` card and `live_score_v1` stay as they a
 document, with fifteen invented elements and a member block. They are offline
 schema examples, not published data or scoring observations. The schema test
 validates both documents, each member block separately and the trimmed source A
-form without member blocks.
+form without member blocks. Each squad respects the three-per-club limit and a
+legal starting formation. The in-progress example has completed absent starters,
+a pending first outfield reserve that stops the bench walk, and an absent captain
+whose vice is the pending holder. The finished example settles those same inputs.

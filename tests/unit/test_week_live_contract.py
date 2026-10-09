@@ -2,6 +2,7 @@
 
 import copy
 import json
+from collections import Counter
 from pathlib import Path
 
 import pytest
@@ -25,6 +26,15 @@ def test_progress_and_finished_examples_match_live_and_member_shapes(state):
         member_validator.validate(member)
         assert member["gameweek"] == example["gameweek"]
         assert set(member["pick_order"]) <= {item["element_id"] for item in example["elements"]}
+        picked = {item["element_id"]: item for item in example["elements"]}
+        assert (
+            max(Counter(picked[element]["club"] for element in member["pick_order"]).values()) <= 3
+        )
+        positions = Counter(picked[element]["position"] for element in member["pick_order"])
+        assert positions == {"GK": 2, "DEF": 5, "MID": 5, "FWD": 3}
+        eleven = Counter(picked[element]["position"] for element in member["pick_order"][:11])
+        assert eleven["GK"] == 1 and 3 <= eleven["DEF"] <= 5
+        assert 2 <= eleven["MID"] <= 5 and 1 <= eleven["FWD"] <= 3
     trimmed = copy.deepcopy(example)
     del trimmed["members"]
     for element in trimmed["elements"]:
@@ -38,6 +48,9 @@ def test_progress_and_finished_examples_match_live_and_member_shapes(state):
         lambda item: item.update(contract_version="live_score_v1"),
         lambda item: item.update(source_time="2026-10-10"),
         lambda item: item.update(source_time="2026-10-10T20:00:00+03:00"),
+        lambda item: item.update(source_time="garbageZ"),
+        lambda item: item.update(source_time="2026-13-45T99:99:99Z"),
+        lambda item: item.update(source_time="Z"),
         lambda item: item["fixtures"][0].update(finished="true"),
         lambda item: item["elements"][0].update(minutes=True),
         lambda item: item["elements"][0].update(points=1.5),
@@ -47,6 +60,14 @@ def test_progress_and_finished_examples_match_live_and_member_shapes(state):
         lambda item: item["members"][0].update(transfer_cost=-4),
         lambda item: item["members"][0]["pick_order"].pop(),
         lambda item: item["members"][0]["pick_order"].__setitem__(1, 1),
+        lambda item: item["members"][0].update(player_name="x"),
+        lambda item: item.update(private_field="x"),
+        lambda item: item["fixtures"][0].update(private_field="x"),
+        lambda item: item["elements"][0].update(minutes=-1),
+        lambda item: item["members"][0]["pick_order"].append(16),
+        lambda item: item["elements"][0].pop("card_shown"),
+        lambda item: item["members"][0].update(captain="7"),
+        lambda item: item.update(gameweek=39),
     ],
 )
 def test_wire_contract_refuses_malformed_or_unrequested_values(damage):
@@ -54,3 +75,27 @@ def test_wire_contract_refuses_malformed_or_unrequested_values(damage):
     damage(example)
     with pytest.raises(ValidationError):
         Draft202012Validator(SCHEMA, format_checker=FormatChecker()).validate(example)
+
+
+def test_progress_example_contains_absence_pending_bench_and_pending_vice():
+    example = EXAMPLES["in_progress"]
+    elements = {item["element_id"]: item for item in example["elements"]}
+    member = example["members"][0]
+
+    def complete(element):
+        return all(
+            fixture["finished"]
+            for fixture in example["fixtures"]
+            if element["club"] in (fixture["home_club"], fixture["away_club"])
+        )
+
+    absent = elements[2]
+    assert complete(absent) and absent["minutes"] == 0 and not absent["card_shown"]
+    first_reserve = elements[member["pick_order"][12]]
+    assert not complete(first_reserve)
+    assert first_reserve["minutes"] == 0 and not first_reserve["card_shown"]
+    assert elements[member["pick_order"][13]]["minutes"] > 0
+    captain, vice = elements[member["captain"]], elements[member["vice"]]
+    assert complete(captain) and captain["minutes"] == 0
+    assert not complete(vice) and vice["minutes"] == 0
+    assert member["vice"] in member["pick_order"][:11]
