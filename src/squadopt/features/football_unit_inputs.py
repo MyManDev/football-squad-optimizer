@@ -8,9 +8,11 @@ from __future__ import annotations
 
 import math
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
-from typing import Literal
+from types import MappingProxyType
+from typing import Literal, cast
 
 UNIT_INPUT_VERSION = "football_unit_inputs_v1"
 POSITIONS = ("GK", "DEF", "MID", "FWD")
@@ -137,13 +139,14 @@ class PlayerAttributes:
     values: tuple[tuple[str, float | None], ...]
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "values", tuple(sorted(tuple(x) for x in self.values)))
+        values = tuple(tuple(x) for x in self.values)
+        if len({name for name, _ in values}) != len(values):
+            raise ValueError("Duplicate numeric attribute.")
+        object.__setattr__(self, "values", tuple(sorted(values, key=lambda pair: pair[0])))
         if not all(
             isinstance(x, str) and x.strip() for x in (self.source_id, self.source_player_id)
         ):
             raise ValueError("Attributes require a source player identity.")
-        if len({name for name, _ in self.values}) != len(self.values):
-            raise ValueError("Duplicate numeric attribute.")
         for _, value in self.values:
             if value is not None:
                 finite_number(value, "numeric attribute")
@@ -256,6 +259,7 @@ class UnitInputCatalog:
         attr_keys = [(x.source_id, x.source_player_id) for x in self.player_attributes]
         if len(set(attr_keys)) != len(attr_keys):
             raise ValueError("Duplicate source player attribute snapshot.")
+        values: dict[tuple[str, int, str], float | None] = {}
         for snapshot in self.player_attributes:
             key = snapshot.source_id, snapshot.source_player_id
             active = [
@@ -273,33 +277,20 @@ class UnitInputCatalog:
                     snapshot_spec.minimum <= value <= snapshot_spec.maximum
                 ):
                     raise ValueError("Numeric attribute is outside its declared scale.")
+                values[snapshot.source_id, active[0].player_id, name] = value
+        # Derived immutable indexes are not dataclass fields. Canonical input
+        # serialization and source fingerprints retain only the supplied facts.
+        object.__setattr__(self, "_club_index", MappingProxyType(active_clubs))
+        object.__setattr__(self, "_value_index", MappingProxyType(values))
 
     def validate_unit(self, unit: ClubUnit) -> None:
-        active = {
-            x.player_id: x.club
-            for x in self.mappings
-            if x.valid_from <= self.decision_cutoff <= x.valid_until
-        }
+        active = cast(Mapping[int, int], self.__dict__["_club_index"])
         if any(active.get(x.player_id) != unit.club for x in unit.players):
             raise ValueError("Complete unit requires active persistent mappings for every player.")
 
     def value(self, player_id: int, spec: NumericAttributeSpec) -> float | None:
-        matching = [
-            x
-            for x in self.mappings
-            if x.player_id == player_id
-            and x.source_id == spec.source_id
-            and x.valid_from <= self.decision_cutoff <= x.valid_until
-        ]
-        if len(matching) > 1:
-            raise ValueError("Ambiguous persistent attribute mapping.")
-        if not matching:
-            return None
-        source_player = matching[0].source_player_id
-        for snapshot in self.player_attributes:
-            if snapshot.source_id == spec.source_id and snapshot.source_player_id == source_player:
-                return dict(snapshot.values).get(spec.name)
-        return None
+        values = cast(Mapping[tuple[str, int, str], float | None], self.__dict__["_value_index"])
+        return values.get((spec.source_id, player_id, spec.name))
 
 
 def validate_scope(

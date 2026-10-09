@@ -1,8 +1,10 @@
 """Read a private, explicitly mapped FM attribute export without inferring identities.
 
 The supplied source receipt must cover model development and the exact CSV bytes.
-Successful parsing does not prove provider permission. Only blanks mean unknown;
-first-family source preparation retains every declared UID, without a squad filter.
+Successful parsing does not prove provider permission. Only blanks mean unknown.
+This separately invoked preparer retains every declared UID. Native integration
+and the exact temporal catalog scope/filter remain the separately reviewed second
+step. No actual dataset admission is established by this reader.
 """
 
 from __future__ import annotations

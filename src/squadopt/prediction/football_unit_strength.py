@@ -94,8 +94,6 @@ class UnitStrengthResult:
     opponent: int
     own_goal_rate: float
     opponent_goal_rate: float
-    reference_own_goal_rate: float
-    reference_opponent_goal_rate: float
     causal_baseline_own_goal_rate: float
     causal_baseline_opponent_goal_rate: float
     state_rates: tuple[UnitStateRate, ...]
@@ -105,11 +103,11 @@ class UnitStrengthResult:
 
     @property
     def own_replacement_gap(self) -> float:
-        return self.own_goal_rate - self.reference_own_goal_rate
+        return self.own_goal_rate - self.causal_baseline_own_goal_rate
 
     @property
     def opponent_replacement_gap(self) -> float:
-        return self.opponent_goal_rate - self.reference_opponent_goal_rate
+        return self.opponent_goal_rate - self.causal_baseline_opponent_goal_rate
 
 
 class FootballUnitStrengthModel:
@@ -499,8 +497,6 @@ class FootballUnitStrengthModel:
             opponent=projection.reference_opponent.club,
             own_goal_rate=own_rate,
             opponent_goal_rate=opponent_rate,
-            reference_own_goal_rate=projection.causal_baseline_own_goal_rate,
-            reference_opponent_goal_rate=projection.causal_baseline_opponent_goal_rate,
             causal_baseline_own_goal_rate=projection.causal_baseline_own_goal_rate,
             causal_baseline_opponent_goal_rate=projection.causal_baseline_opponent_goal_rate,
             state_rates=state_rates,

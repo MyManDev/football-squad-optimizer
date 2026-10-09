@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import math
-from dataclasses import FrozenInstanceError, replace
+from dataclasses import FrozenInstanceError, asdict, replace
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -221,6 +221,33 @@ def test_reference_neutrality_with_changed_baseline_and_venue(model: FootballUni
     assert result.opponent_goal_rate == 0.3
 
 
+def test_fitted_model_cannot_be_used_before_its_fitting_cutoff():
+    fitted = FootballUnitStrengthModel(observations(), cutoff=T + timedelta(days=57))
+    with pytest.raises(ValueError, match="unavailable at the projection decision cutoff"):
+        fitted.predict(projection())
+
+
+def test_actual_away_observations_identify_venue_interaction_without_changing_baseline():
+    training = tuple(
+        replace(
+            observation(week, replacement=True),
+            home=week % 2 == 0,
+            own_goals=6 if week % 2 == 0 else 1,
+        )
+        for week in range(1, 7)
+    )
+    assert any(not row.home for row in training)
+    fitted = FootballUnitStrengthModel(training, cutoff=T + timedelta(days=50))
+    target = projection()
+    home = fitted.predict(target)
+    away = fitted.predict(replace(target, home=False))
+    assert home.own_goal_rate > away.own_goal_rate
+    assert home.causal_baseline_own_goal_rate == away.causal_baseline_own_goal_rate == 1.4
+    neutral = projection(replacement=False)
+    assert fitted.predict(neutral).own_goal_rate == 1.4
+    assert fitted.predict(replace(neutral, home=False)).own_goal_rate == 1.4
+
+
 def test_offset_fitting_uses_baseline_weighted_exposure(monkeypatch: pytest.MonkeyPatch):
     from squadopt.prediction import football_unit_strength as module
 
@@ -410,6 +437,51 @@ def test_mapping_to_two_clubs_and_unmapped_complete_unit_refused():
     )
     with pytest.raises(ValueError, match="active persistent"):
         replace(target, catalog=incomplete)
+
+
+def test_player_with_an_active_mapping_to_another_club_cannot_enter_complete_unit():
+    base = catalog()
+    changed = replace(
+        base,
+        mappings=tuple(replace(m, club=2) if m.player_id == 11 else m for m in base.mappings),
+    )
+    with pytest.raises(ValueError, match="active persistent mappings"):
+        changed.validate_unit(unit(1))
+
+
+@pytest.mark.parametrize(
+    "values", ((("finishing", None), ("finishing", 5.0)), (("finishing", 5.0), ("finishing", None)))
+)
+def test_duplicate_attribute_name_with_missing_value_has_declared_refusal(values):
+    with pytest.raises(ValueError, match="Duplicate numeric attribute"):
+        PlayerAttributes("synthetic", "1", values)
+
+
+def test_catalog_indexes_preserve_serialized_facts_and_explicit_missingness():
+    base = catalog(missing=True)
+    original = asdict(base)
+    assert "_club_index" not in original and "_value_index" not in original
+    assert base.value(12, base.attributes[0]) is None
+    assert base.value(999, base.attributes[0]) is None
+    with pytest.raises(TypeError):
+        base.__dict__["_value_index"]["synthetic", 12, "finishing"] = 10
+    with pytest.raises(TypeError):
+        base.__dict__["_club_index"][12] = 2
+    assert asdict(base) == original
+
+
+def test_catalog_lookups_do_not_rescan_source_snapshots_or_temporal_mappings():
+    class NoScan(tuple):
+        def __iter__(self):
+            raise AssertionError("A repeated lookup must not scan the original catalog.")
+
+    base = catalog()
+    object.__setattr__(base, "mappings", NoScan(base.mappings))
+    object.__setattr__(base, "player_attributes", NoScan(base.player_attributes))
+    base.validate_unit(unit(1))
+    assert base.value(12, base.attributes[0]) == 19.0
+    assert base.value(1, base.attributes[0]) == 8.0
+    assert base.value(999, base.attributes[0]) is None
 
 
 @pytest.mark.parametrize(

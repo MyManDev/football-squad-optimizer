@@ -32,6 +32,12 @@ persistent UID, preserves blank missing values and refuses ranges or ambiguous
 duplicate ratings. It returns source-keyed attributes, not a name-derived FPL
 crosswalk. The FM23 aliases, including `Nat.1` for Natural Fitness, are explicitly
 declared by the caller. Research downloads have not been passed into a fitted model.
+The owner's 2026-10-09 decision retains this adapter and the local datasets for
+private training preparation. No dataset rows or downloaded archives enter Git.
+The adapter remains separately invoked. A real export must be filtered to the
+explicit temporal mapped catalog scope before construction; that filtering,
+reviewed FPL crosswalk and admitted source receipts belong to step 2. The owner's
+choice does not establish unknown upstream rights or historical availability.
 
 Historical observations contain both actual eleven-player club units, exposure
 minutes, integer credited goal counts, a separate settled outcome receipt, and
@@ -76,7 +82,7 @@ before averaging:
 ```text
 lambda_own = sum_s w_s * lambda_own,s
 lambda_opponent = sum_s w_s * lambda_opponent,s
-replacement_gap = projected mean rate - contemporaneous reference rate
+replacement_gap = projected mean rate - supplied causal baseline rate
 ```
 
 `application.football_unit_experiment` explicitly composes the result with retained
@@ -126,6 +132,14 @@ inputs. No transfer, wildcard roster or multiweek action is added here. The exac
 fixed-fifteen option requires the actual merge of #1056. Native combined usage
 also waits for #1049, #1052 and #1055 as applicable; no unmerged implementation is
 copied into this PR.
+
+This first adapter spells out the raw goal, assist and clean-sheet point deltas
+before clipping once. The existing native private helper would recompute clean
+sheets from one Poisson mean, losing this adapter's nonlinear state mixture, and
+also owns clipping. It cannot be called unchanged for these raw deltas. A shared
+public raw-component scorer is a required separately reviewed native integration
+change in step 2, coordinated with the other families after their actual merges.
+This PR does not silently copy an unmerged shared API or redefine a served version.
 
 ## Source use cases, ANN and evaluation gates
 
@@ -177,6 +191,22 @@ mutated component rows and Boolean player identities have regression cases.
 Default native component and existing role-engine regressions remain part of the
 focused cumulative check. Final case, mutation and runtime counts are recorded
 in the implementation PR and issue comment after the final source handoff.
+
+The review follow-up passes 321 focused source/model/adapter cases, adding wrong
+club, postdecision fit, actual away-observation, duplicate missing-attribute and
+immutable indexed-lookup regressions. Five private copied-module faults cause
+six behavioral failures while original source hashes remain unchanged. Ruff and
+strict mypy pass. These checks supplement the original 404 distinct preparation
+cases; they are not an independently enlarged real-data evaluation population.
+
+The immutable derived catalog indexes retain original dataclass serialization and
+fingerprints. With 47 traits, 56,400 repeated lookups take 0.0329 seconds across
+5,024 snapshots, compared with 0.0337 seconds across 24 snapshots. The large
+catalog builds in 0.203 seconds. Full public prediction, including canonical
+receipt serialization, takes 0.591 seconds for one state and 4.536 seconds for
+1,024 states in this invented six-observation sample. Receipt serialization still
+scales with the supplied input size; these timings are implementation evidence,
+not a real-season throughput guarantee.
 
 No backend, live weekly run, public data, publication, queue, merge or deployment
 is invoked. The source and fixture adapters are explicitly called private Python

@@ -1,6 +1,8 @@
 # Football Manager source feasibility
 
-Research date: 2026-10-09. This records public source evidence and a research-only schema audit. No FPL history, protected outcomes, training data or fitted model was opened. The downloaded archives remain outside the repository's `data/` tree, in the owned worktree's `.codex-tmp/research/` directory. They are not forecast inputs.
+Research date: 2026-10-09. This records public source evidence and a schema audit. No FPL history or protected outcomes were opened and no real model was fitted. The initial archives remain in the owned worktree's `.codex-tmp/research/`; the expanded private catalog is in the project's ignored `.codex-tmp/datasets/` directory. Neither location is the repository's `data/` tree, a Git-tracked dataset or a public forecast artifact.
+
+The owner's 2026-10-09 decision retains the local datasets and FM adapter for private training preparation and keeps every dataset outside Git. Exact permitted source/model rights, authentic historical vintage, scoped temporal FPL mapping and the accepted evaluation protocol still determine which rows may actually train a forecast. This decision is recorded on #1057; no unknown license is inferred to be a training grant.
 
 Three publicly declared licensed datasets were downloaded through version-pinned public endpoints and streamed as CSV without extracting archives or executing provider code. No audited source establishes complete, correctly dated Premier League attribute coverage for every development season or the current 2026-27 season. There are useful candidates, but source rights, historical vintage and identity evidence still need acceptance before model ingestion.
 
@@ -60,9 +62,9 @@ FM20 has one row each for Atlas (ARG), Bolton, Coventry, Cruzeiro, Dundee Utd, F
 
 | Candidate | Provider evidence | Remaining work |
 | --- | --- | --- |
-| [Furkan Ulutas multi-edition bundle](https://www.kaggle.com/datasets/furkanuluta/football-manager-22-complete-player-dataset) | Public inventory lists FM20, FM21, FM22 and FM23 CSV/XLSX files; v4 updated 2023-07-10T18:55:20.693Z; license is `Unknown` | Obtain an actual data license and immutable per-file vintage; then inspect UID/DOB, real-player flags, exact PL roster and attribute coverage. No dataset download was made. |
+| [Furkan Ulutas multi-edition bundle](https://www.kaggle.com/datasets/furkanuluta/football-manager-22-complete-player-dataset) | v4 updated 2023-07-10T18:55:20.693Z; license is `Unknown`. Original bundle was downloaded and audited under the later owner request; structured FM21/22/23 workbooks yield 174,909/176,748/189,252 records with 47 native traits. | Bytes and schema are audited; obtain actual model-use rights, immutable historical vintage and reviewed temporal identities. Edition filenames and public upload time alone do not establish original predeadline availability. |
 | [Furkan Ulutas standalone FM21](https://www.kaggle.com/datasets/furkanuluta/football-manager-2021-dataset) | Advertised 165,000 players; v1 initial release 2022-08-14T18:24:32.38Z; `worldfmdata.csv`, 86,016,343 bytes; license is `Unknown` | No predeadline availability in 2020-21 or 2021-22 is established. Resolve rights, source vintage and exact identity/PL counts; metadata only was inspected. |
-| [Gabriel Abilleira FM22](https://www.kaggle.com/datasets/gabrielabilleira/football-manager-2022-player-data) | Declared CC0; v3 updated 2022-07-26T09:49:50.567Z; `variables.csv` listed | Verify earlier versions, attribute schema, in-game versus real observations, identities and PL counts. Metadata only was inspected. |
+| [Gabriel Abilleira FM22](https://www.kaggle.com/datasets/gabrielabilleira/football-manager-2022-player-data) | Declared CC0; v3 updated 2022-07-26T09:49:50.567Z. Later byte audit finds simulated match performance, zero of the 47 quality traits, and no UID/DOB/club/position. | Retained as a descriptive appendix; it cannot supply the requested quality vector or a real historical PL crosswalk. |
 | [Jin FM23](https://www.kaggle.com/datasets/platinum22/foot-ball-manager-2023-dataset) | 8,452 advertised players; v1 updated 2022-12-12; license is `Unknown` | Resolve data rights, vintage and filtered coverage. [GitHub mirror](https://github.com/ygtaltndg/FM23-Dataset-Clustering) has UID/trait headers but no verified data license. |
 | [FM26-Database repository](https://github.com/choehyeonjun741-debug/FM26-Database) | README calls it an FM26-style game database; [manifest](https://github.com/choehyeonjun741-debug/FM26-Database/blob/main/data/raw/PROCESSING_MANIFEST.json) reports 4,313 players and 1,010 PL rows | No LICENSE, official FM export proof or capture/patch date was found. Raw header includes `_source_uid` and outfield traits but no GK traits. Processed row-generated IDs do not establish persistent FM identity. Manifest counts are publisher claims, not our audited current PL completeness. |
 
@@ -70,16 +72,33 @@ The multi-edition bundle is a practical route to investigate older snapshots, bu
 
 ## Season and cutoff eligibility
 
+The later expanded catalog independently verifies 117 files and ten full tables
+with 814,096 source records; people repeated across editions are not unique
+people. Its FM26 candidate has 34,644 records and 35 of 47 native traits, with
+11 GK traits and Natural Fitness explicitly missing. Four small FM24 samples do
+not establish complete PL coverage. The 2025 fan patch privately downloaded from
+its creator is an FM24 editor delta, not a complete trait table. No game or editor
+was executed. A bounded additional FM26 search found no inspected full-PL
+replacement with established better traits, rights and vintage.
+
+The frozen private catalog manifest SHA256 is
+`95a8a2d2cac8ec17237118cb86f746791917c0652a35376d1836e47ae019490e`.
+An independent 25,433,204-cell native-trait audit has zero mismatches; final
+readback passes 68 checks, including source-admission refusals. This proves
+normalization and byte preservation, not permission or forecasting benefit.
+Exact expanded receipts and remaining gates are linked from #1057. No raw rows,
+private receipt files or trait-bearing player examples are committed here.
+
 An admissible earliest gameweek is the first target whose deadline follows the exact source version's established knowledge/capture cutoff, after the applicable source protocol and rights have been accepted. No gameweek number is inferred from an edition name. A retrospective public-release timestamp and a real predeadline capture are separate evidence fields; the experiment must declare which evidence its historical protocol accepts.
 
 | Project period | Evidence available now | Permitted conclusion |
 | --- | --- | --- |
 | 2020-21 | FM20 public v1 was published in July 2021, after the season; no earlier CSV snapshot is proved | No audited FM attribute source establishes predeadline development inputs for this season |
 | 2021-22 | FM20's immutable public version predates this season; FM21 bundle exists but rights/vintage are unverified | FM20 is a possible stale prior after identity, upstream permission and historical-source protocol approval; no complete FM21 snapshot is accepted |
-| 2022-23 | FM22 public v3 date is known; FM20 remains available; an FM23 candidate has unknown rights | Audit FM22 bytes and first-version timing before deciding targets; no full PL quality source is accepted |
-| 2023-24 and 2024-25 | Multi-edition bundle is publicly listed; audited FM24 file has no quality traits; audited Thakor FM23 first appeared in October 2025 | Older frozen priors are a hypothesis, not proof of matching seasonal attributes; complete dated FM24 traits remain missing |
+| 2022-23 | Broad FM22 bytes now preserve 47 traits; the separate CC0 performance dataset has none; FM20 remains available | Unknown bundle rights and unproved original publication/knowledge clocks remain admission gates; no full PL quality source is accepted |
+| 2023-24 and 2024-25 | Broad older FM21/22/23 bytes are audited; FM24 samples are partial; audited Thakor FM23 first appeared in October 2025 | Older frozen priors are a hypothesis, not proof of matching seasonal attributes; complete dated FM24 traits remain missing |
 | Protected 2025-26 | No outcomes or training inputs were opened | Remains excluded from fitting, threshold choice, preprocessing and model selection |
-| Current 2026-27 | Three archives were captured on 2026-10-09 for source audit; no verified full FM26 quality snapshot | Future source acceptance must precede prospective use; these downloads do not establish season-wide historical availability or current PL completeness |
+| Current 2026-27 | A 34,644-record FM26 candidate is audited with 35 traits; no verified complete, dated current PL quality snapshot | Source acceptance must precede prospective use; these downloads do not establish season-wide historical availability or current PL completeness |
 
 Using today's FM26 values for earlier seasons would introduce later knowledge. Using an old frozen snapshot after its known publication can be causally plausible, but requires explicit staleness/missingness and a reviewed identity mapping; it must not be silently relabeled as a newer edition. A modern upload of an old game edition does not prove that the same values were known before historical deadlines.
 
