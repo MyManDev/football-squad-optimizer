@@ -423,6 +423,46 @@ def test_the_entry_page_gets_the_members_own_squad_not_our_advice(
     assert payload["active_chip"] is None
 
 
+def test_a_member_with_rebuilt_purchase_prices_has_a_complete_entry_page(
+    world: dict[str, Any], tmp_path: Path
+) -> None:
+    """Rebuilt purchase prices and a derived free-transfer count leave nothing missing, and
+    the budget the page states is the rule's selling value plus the bank."""
+
+    inputs, projection, rules = _world_context(world)
+    picks = _member_picks(world, 101, _legal_squad(world))
+    paid = {player: 50 for player in picks.squad}
+    rebuilt = dataclasses.replace(
+        picks,
+        free_transfers_known=True,
+        purchase_prices=paid,
+        purchase_prices_known=True,
+        squad_sell_value_tenths=740,
+    )
+    build_league_views(
+        _Provider({101: rebuilt}),
+        (EntryRegistration(101, "member-a", "2026-08-23T00:00:00Z"),),
+        inputs,
+        projection,
+        rules,
+        league_id=352490,
+        league_name="Test League",
+        out_dir=tmp_path / "league",
+    )
+    payload = json.loads(
+        (tmp_path / "league" / "entries" / "101.json").read_text(encoding="utf-8")
+    )["payload"]
+    assert payload["purchase_prices_known"] is True
+    assert payload["missing_fields"] == []
+    assert payload["data_quality"] == "complete"
+    assert payload["squad_sell_value_tenths"] == 740
+    assert payload["spendable_budget_tenths"] == 740 + picks.bank_tenths
+    advice = json.loads(
+        (tmp_path / "league" / "advice" / "101" / "saf-puan" / "1.json").read_text(encoding="utf-8")
+    )["payload"]
+    assert "purchase_prices" not in advice["missing_fields"]
+
+
 def test_the_entry_page_states_which_squad_it_shows_after_a_free_hit(
     world: dict[str, Any], tmp_path: Path
 ) -> None:
