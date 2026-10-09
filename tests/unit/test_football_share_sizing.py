@@ -119,3 +119,65 @@ def test_source_reader_does_not_open_outcome_payload(tmp_path, monkeypatch):
     (tmp_path / metadata.snapshot_id / "payloads" / FIXTURES_PAYLOAD).write_bytes(b"[1]")
     with pytest.raises(ValueError, match="checksum"):
         _forecast_source(tmp_path, metadata.snapshot_id)
+
+
+def test_fractional_gains_are_per_player_and_opponents_do_not_share_mass():
+    basis = SyntheticBasis([1, 0.5, 0, 1, 1])
+    basis.fixture_rows = pd.DataFrame(
+        [
+            {
+                "GW": 6,
+                "fixture": 61,
+                "club": club,
+                "player_code": player,
+                "position": "MID",
+                "goals_share": share,
+                "assists_share": share,
+                "goals": goals,
+                "assists": assists,
+            }
+            for player, club, share, goals, assists in [
+                (1, 1, 1 / 3, 1, 0.5),
+                (2, 1, 1 / 3, 1, 0.5),
+                (3, 1, 1 / 3, 1, 0.5),
+                (4, 2, 0.5, 0.8, 0.4),
+                (5, 2, 0.5, 0.8, 0.4),
+            ]
+        ]
+    )
+    record, evidence = size_attacking_shares(basis)
+    assert evidence.set_index("player_code").gain.to_dict() == pytest.approx(
+        {1: 6.5, 2: 1.625, 3: 0, 4: 0, 5: 0}
+    )
+    assert record["s1_by_club"] == {"1": 9.75, "2": 0.0}
+    assert record["available_players_with_fixtures"] == 4
+
+
+@pytest.mark.parametrize("position, points", [("GK", 10), ("DEF", 6), ("MID", 5), ("FWD", 4)])
+def test_goal_points_by_position(position, points):
+    basis = SyntheticBasis([1, 0])
+    basis.fixture_rows["position"] = position
+    basis.fixture_rows["assists"] = 0.0
+    record, _ = size_attacking_shares(basis)
+    assert record["s1_total"] == points
+    assert record["s2_maximum"] == points
+
+
+def test_evidence_and_both_record_copies_use_identical_lf_bytes(tmp_path, monkeypatch):
+    import hashlib
+
+    from scripts import measure_football_shares as runner
+
+    monkeypatch.setattr(runner, "REPOSITORY_ROOT", tmp_path)
+    record, frame = size_attacking_shares(SyntheticBasis([1, 0.5]))
+    root = tmp_path / "artifacts/evidence"
+    runner._write_record(record, frame, root)
+    evidence = (root / "player-fixtures.csv").read_bytes()
+    summary = (root / "summary.json").read_bytes()
+    assert b"\r" not in evidence
+    assert b"\r" not in summary
+    assert record["evidence_sha256"] == hashlib.sha256(evidence).hexdigest()
+    assert summary == (tmp_path / "docs/research/football_share_sizing.json").read_bytes()
+    companion = root / "rebuilt.components.json"
+    runner._write_lf_json(companion, {"name": "synthetic", "rows": []})
+    assert companion.read_bytes() == b'{\n  "name": "synthetic",\n  "rows": []\n}\n'

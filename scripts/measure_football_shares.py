@@ -4,8 +4,10 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+from typing import Any
 
-from scripts._provenance import REPOSITORY_ROOT, _git_revision, write_json
+import pandas as pd
+from scripts._provenance import REPOSITORY_ROOT, _git_revision
 
 from squadopt.data.snapshots import (
     CapturedSnapshot,
@@ -19,6 +21,20 @@ from squadopt.experiments.football_share_sizing import size_attacking_shares
 from squadopt.live import read_inputs
 from squadopt.live.football_artifact import football_artifact_path, read_football_forecast
 from squadopt.platform.football_minute_basis import _basis_from_snapshot
+
+
+def _write_lf_json(path: Path, value: object) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes((json.dumps(value, indent=2, sort_keys=True) + "\n").encode("utf-8"))
+
+
+def _write_record(record: dict[str, Any], frame: pd.DataFrame, evidence_root: Path) -> None:
+    evidence_root.mkdir(parents=True, exist_ok=True)
+    evidence_path = evidence_root / "player-fixtures.csv"
+    frame.to_csv(evidence_path, index=False, lineterminator="\n")
+    record["evidence_sha256"] = hashlib.sha256(evidence_path.read_bytes()).hexdigest()
+    _write_lf_json(evidence_root / "summary.json", record)
+    _write_lf_json(REPOSITORY_ROOT / "docs/research/football_share_sizing.json", record)
 
 
 def _forecast_source(root: Path, identifier: str) -> CapturedSnapshot:
@@ -98,7 +114,7 @@ def main() -> None:
         if rebuilt_forecast["fingerprint"] != served["fingerprint"]:
             raise ValueError("Rebuilt forecast differs from the served build.")
         companion_path = evidence_root / "rebuilt.components.json"
-        write_json(companion_path, companion)
+        _write_lf_json(companion_path, companion)
     companion_bytes = companion_path.read_bytes()
     companion = json.loads(companion_bytes)
     football = read_football_forecast(path, inputs)
@@ -113,11 +129,7 @@ def main() -> None:
         working_tree_dirty=dirty,
         target_outcomes_read=False,
     )
-    evidence_root.mkdir(parents=True, exist_ok=True)
-    evidence_path = evidence_root / "player-fixtures.csv"
-    frame.to_csv(evidence_path, index=False)
-    record["evidence_sha256"] = hashlib.sha256(evidence_path.read_bytes()).hexdigest()
-    write_json(evidence_root / "summary.json", record)
+    _write_record(record, frame, evidence_root)
     print(json.dumps(record, indent=2, sort_keys=True))
 
 

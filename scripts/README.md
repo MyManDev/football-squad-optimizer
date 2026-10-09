@@ -42,7 +42,6 @@ Date is the file's last commit (`git log -1 --format=%as -- scripts/<name>.py`).
 
 | Script | Class | Record it writes, or what names it | Last commit |
 | --- | --- | --- | --- |
-| `measure_football_shares.py` | measurement runner | `docs/research/football_share_sizing.md` and `.json`; forecast-only S1 and S2 | 2026-10-07 |
 | `append_weekly_scorecard.py` | measurement runner | `docs/weekly_scorecard.md` (Markdown record) | 2026-08-23 |
 | `build_mode_price_list.py` | measurement runner | `docs/mode_price_list.json` | 2026-08-20 |
 | `build_opponent_signal.py` | measurement runner | `docs/opponent_signal.json` | 2026-08-23 |
@@ -61,6 +60,7 @@ Date is the file's last commit (`git log -1 --format=%as -- scripts/<name>.py`).
 | `measure_component_fidelity.py` | measurement runner | `docs/phase_d_component_fidelity.json` | 2026-09-07 |
 | `measure_double_reduction.py` | measurement runner | `docs/double_reduction.json`, `docs/double_reduction.md` | 2026-09-25 |
 | `measure_export_precision.py` | measurement runner | `docs/export_precision.json` | 2026-08-16 |
+| `measure_football_shares.py` | measurement runner | `docs/research/football_share_sizing.md` and `.json`; forecast-only S1 and S2 | 2026-10-09 |
 | `measure_in_season_blend.py` | measurement runner | `docs/in_season_blend_benchmark.json` | 2026-08-23 |
 | `measure_mode_plan_selection.py` | measurement runner | `docs/mode_plan_selection.json` | 2026-09-10 |
 | `measure_opening_prior_exposure.py` | measurement runner | `docs/opening_prior_exposure.json` | 2026-08-28 |
