@@ -255,6 +255,7 @@ def published_pair(
     week: int,
     *,
     as_of: str,
+    deadline_utc: str,
 ) -> tuple[CapturedSnapshot, Any, dict[str, Any]]:
     records: list[tuple[datetime, Any, CapturedSnapshot | None, str]] = []
     for path in sorted(
@@ -271,15 +272,15 @@ def published_pair(
             raise DefconMissingInputs("The publication identity contract is unsupported.")
         capture = captures.get(doc["capture"]["snapshot_id"])
         stamp = as_instant(doc["generated_at_utc"])
-        if stamp > as_instant(as_of):
+        if stamp >= as_instant(deadline_utc) or stamp > as_instant(as_of):
             continue
         if capture is None:
             # An absent last publication capture must not silently select an earlier one.
             records.append((stamp, doc, None, payload_checksum(content)))
             continue
         inputs = read_inputs(capture, season=DEFCON_SEASON, gameweek=week)
-        if stamp >= as_instant(inputs.deadline.deadline_utc) or stamp > as_instant(as_of):
-            continue
+        if as_instant(inputs.deadline.deadline_utc) != as_instant(deadline_utc):
+            raise DefconInputError("The retained captures disagree on the target deadline.")
         if doc["capture"]["captured_at_utc"] != capture.metadata.captured_at_utc or (
             as_instant(capture.metadata.captured_at_utc) > stamp
         ):
@@ -401,8 +402,14 @@ def check_inputs(
     for week in weeks:
         row: dict[str, Any] = {"gameweek": week, "status": "missing"}
         try:
+            deadline_capture = next(iter(captures.values()), None)
+            if deadline_capture is None:
+                raise DefconMissingInputs("No retained capture supplies the target deadline.")
+            deadline = read_inputs(
+                deadline_capture, season=DEFCON_SEASON, gameweek=week
+            ).deadline.deadline_utc
             capture, base, proof = published_pair(
-                publications, handoffs, captures, week, as_of=as_of
+                publications, handoffs, captures, week, as_of=as_of, deadline_utc=deadline
             )
             bootstrap, elements = identity(capture)
             fixtures = fixture_map(capture)
@@ -615,14 +622,22 @@ def paired_week(
 def measurement_index() -> tuple[Path, str, str]:
     index = ROOT / "docs/measurements_index.md"
     contents = index.read_text(encoding="utf-8")
-    heading = "## Season record\n"
+    heading = "## Deterministic policy\n"
     if contents.count(heading) != 1:
-        raise DefconInputError("The season record index section needs review before recording.")
+        raise DefconInputError(
+            "The deterministic policy index section needs review before recording."
+        )
     section = contents.split(heading, 1)[1].split("\n## ", 1)[0]
     header = "| Artifact | Finding | PR |\n| --- | --- | --- |"
     if section.count(header) != 1:
-        raise DefconInputError("The season record index table needs review before recording.")
-    offset = contents.index(heading) + len(heading) + section.index(header) + len(header)
+        raise DefconInputError(
+            "The deterministic policy index table needs review before recording."
+        )
+    anchor = "| [Direct DEFCON development](research/football_defcon_development.json)"
+    rows = [line for line in section.splitlines() if line.startswith(anchor)]
+    if len(rows) != 1 or section.index(rows[0]) < section.index(header):
+        raise DefconInputError("The direct DEFCON index row needs review before recording.")
+    offset = contents.index(heading) + len(heading) + section.index(rows[0]) + len(rows[0])
     return index, contents[:offset], contents[offset:]
 
 
@@ -644,6 +659,10 @@ def reading(
         )
     weeks = window(declaration)
     selected = first_settled(captures, weeks)
+    deadlines = {
+        week: read_inputs(selected, season=DEFCON_SEASON, gameweek=week).deadline.deadline_utc
+        for week in weeks
+    }
     if as_instant(as_of) < as_instant(selected.metadata.captured_at_utc):
         raise DefconMissingInputs("The reading instant precedes the declared settled capture.")
     for skipped in getattr(captures, "skipped", []):
@@ -658,7 +677,9 @@ def reading(
             raise DefconInputError(f"An earlier retained metadata file is unreadable: {name}.")
     for week in weeks:
         try:
-            published_pair(publications, handoffs, captures, week, as_of=as_of)
+            published_pair(
+                publications, handoffs, captures, week, as_of=as_of, deadline_utc=deadlines[week]
+            )
         except DefconForbiddenSeason:
             raise
         except (DefconInputError, DefconMissingInputs, DataError, json.JSONDecodeError):
@@ -697,7 +718,12 @@ def reading(
             proof: dict[str, Any] = {}
             try:
                 partial, base, proof = published_pair(
-                    publications, handoffs, captures, week, as_of=as_of
+                    publications,
+                    handoffs,
+                    captures,
+                    week,
+                    as_of=as_of,
+                    deadline_utc=deadlines[week],
                 )
                 decision = partial_snapshot(
                     safe_path(snapshot_root) / partial.metadata.snapshot_id,

@@ -348,7 +348,12 @@ def test_last_publication_is_used_and_missing_last_capture_is_not_repaired(tmp_p
     publication(tmp_path, latest, base(latest))
     captures = runner.inventory(tmp_path / "snapshots", as_of="2026-12-01T00:00:00Z")
     chosen, _, _ = runner.published_pair(
-        tmp_path / "publications", tmp_path / "handoffs", captures, 6, as_of="2026-12-01T00:00:00Z"
+        tmp_path / "publications",
+        tmp_path / "handoffs",
+        captures,
+        6,
+        as_of="2026-12-01T00:00:00Z",
+        deadline_utc=stamp(START + timedelta(weeks=5)),
     )
     assert chosen.metadata.snapshot_id == latest.metadata.snapshot_id
     del captures[latest.metadata.snapshot_id]
@@ -359,6 +364,7 @@ def test_last_publication_is_used_and_missing_last_capture_is_not_repaired(tmp_p
             captures,
             6,
             as_of="2026-12-01T00:00:00Z",
+            deadline_utc=stamp(START + timedelta(weeks=5)),
         )
 
 
@@ -436,7 +442,8 @@ def test_single_reading_writes_hashes_twins_and_refuses_repetition(
     root = tmp_path / "repo"
     (root / "docs" / "research").mkdir(parents=True)
     (root / "docs" / "measurements_index.md").write_text(
-        "## Season record\n\n| Artifact | Finding | PR |\n| --- | --- | --- |\n"
+        (runner.ROOT / "docs/measurements_index.md").read_text(encoding="utf-8"),
+        encoding="utf-8",
     )
     monkeypatch.setattr(runner, "ROOT", root)
     monkeypatch.setattr(runner, "command", lambda *args: "")
@@ -772,9 +779,94 @@ def test_post_deadline_publication_is_ignored_and_restore_mtime_is_not_proof(
     os.utime(handoff_path, (after_deadline, after_deadline))
     captures = runner.inventory(tmp_path / "snapshots", as_of="2026-12-01T00:00:00Z")
     selected, _, _ = runner.published_pair(
-        tmp_path / "publications", tmp_path / "handoffs", captures, 6, as_of="2026-12-01T00:00:00Z"
+        tmp_path / "publications",
+        tmp_path / "handoffs",
+        captures,
+        6,
+        as_of="2026-12-01T00:00:00Z",
+        deadline_utc=stamp(START + timedelta(weeks=5)),
     )
     assert selected.metadata.snapshot_id == early.metadata.snapshot_id
+
+
+@pytest.mark.parametrize("deadline_offset", [-1, 0, 1])
+def test_unknown_capture_publication_uses_independent_deadline_in_both_modes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, deadline_offset: int
+) -> None:
+    captures, kwargs = reading_fixture(tmp_path, monkeypatch)
+    publication_root = kwargs["publications"] / "2026-27/gw08"
+    earlier = next(publication_root.glob("entry-*/*/advice.json"))
+    document = json.loads(earlier.read_text(encoding="utf-8"))
+    expected_capture = document["capture"]["snapshot_id"]
+    document["capture"]["snapshot_id"] = "not-retained"
+    document["generated_at_utc"] = stamp(START + timedelta(weeks=7, seconds=deadline_offset))
+    unknown = publication_root / "entry-unknown/not-retained/advice.json"
+    unknown.parent.mkdir(parents=True)
+    unknown.write_text(json.dumps(document), encoding="utf-8")
+    checked = runner.check_inputs(
+        captures,
+        publications=kwargs["publications"],
+        handoffs=kwargs["handoffs"],
+        weeks=(8,),
+        as_of=kwargs["as_of"],
+        snapshot_root=kwargs["snapshot_root"],
+    )
+    report = runner.reading(captures, **kwargs)
+    row = next(row for row in report["week_identities"] if row["gameweek"] == 8)
+    if deadline_offset < 0:
+        assert checked["weeks"][0]["status"] == row["status"] == "missing"
+        assert "decision capture is absent" in row["detail"]
+        assert report["valid_weeks"] == 6
+    else:
+        assert checked["weeks"][0]["status"] == "identity_and_inventory_ready"
+        assert row["status"] == "scored"
+        assert row["identity"]["capture"] == expected_capture
+        assert report["valid_weeks"] == 7
+
+
+@pytest.mark.parametrize("duplicate", ["fixture", "statistic"])
+def test_duplicate_realized_explanation_excludes_diagnostics_and_keeps_week_scored(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, duplicate: str
+) -> None:
+    def change(documents: dict[str, Any]) -> None:
+        player = documents[live_payload(9)]["elements"][1]
+        if duplicate == "fixture":
+            player["explain"].append(player["explain"][0])
+        else:
+            stats = player["explain"][0]["stats"]
+            stats.append(stats[0])
+
+    captures, kwargs = reading_fixture(tmp_path, monkeypatch, change=change)
+    report = runner.reading(captures, **kwargs)
+    row = next(row for row in report["week_identities"] if row["gameweek"] == 9)
+    assert report["valid_weeks"] == 7
+    assert row["status"] == "scored"
+    assert row["dropped_players"] == []
+    assert row["excluded_realized_diagnostics"] == [
+        {"gameweek": 9, "player_code": 102, "fixture": 9, "reason": "duplicate_explanation_key"}
+    ]
+    decision = capture(tmp_path / "decision", target=9)
+    outcome = capture(tmp_path / "outcome", final=True, change=change)
+    paired_rows, _, _ = runner.paired_week(decision, base(decision, target=9), outcome)
+    retained = next(row for row in paired_rows if row.player_code == 102)
+    assert retained.realized == 2
+    assert retained.awarded_defcon == 0
+
+
+@pytest.mark.parametrize("duplicate", ["fixture", "statistic"])
+def test_duplicate_fit_explanation_still_refuses_input_validation(
+    tmp_path: Path, duplicate: str
+) -> None:
+    def change(documents: dict[str, Any]) -> None:
+        player = documents[live_payload(3)]["elements"][1]
+        if duplicate == "fixture":
+            player["explain"].append(player["explain"][0])
+        else:
+            player["explain"][0]["stats"].append(player["explain"][0]["stats"][0])
+
+    decision = capture(tmp_path, change=change)
+    with pytest.raises(DefconInputError, match="duplicated"):
+        candidate_handoff(decision, base(decision), declaration_sha256=runner.DECLARATION_SHA256)
 
 
 def test_fixture_count_mismatch_drops_only_the_affected_club_players(tmp_path: Path) -> None:
@@ -857,7 +949,7 @@ def reading_fixture(
     )
 
 
-def test_real_index_has_multiple_tables_and_records_in_season_section(
+def test_real_index_records_beside_direct_defcon_and_preserves_every_existing_row(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     captures, kwargs = reading_fixture(tmp_path, monkeypatch)
@@ -867,10 +959,13 @@ def test_real_index_has_multiple_tables_and_records_in_season_section(
     report = runner.reading(captures, **kwargs)
     after = index.read_text(encoding="utf-8")
     assert report["valid_weeks"] == 7
-    assert (
-        "defcon_component_reading.md" in after.split("## Season record", 1)[1].split("\n## ", 1)[0]
-    )
-    assert after[: after.index("## Season record")] == before[: before.index("## Season record")]
+    lines = after.splitlines(keepends=True)
+    inserted = [line for line in lines if "defcon_component_reading.md" in line]
+    assert len(inserted) == 1
+    at = lines.index(inserted[0])
+    assert lines[at - 1].startswith("| [Direct DEFCON development]")
+    assert after.split("## Deterministic policy", 1)[1].split("\n## ", 1)[0].count(inserted[0]) == 1
+    assert after.replace(inserted[0], "", 1) == before
 
 
 def test_bad_index_shape_refuses_before_claim_or_outcome_access(
@@ -1120,7 +1215,12 @@ def test_invalid_realized_diagnostic_does_not_remove_a_valid_scored_week(
     assert row["excluded_realized_diagnostics"][0]["reason"]
     selected = runner.first_settled(captures, tuple(range(6, 13)))
     decision, original, _ = runner.published_pair(
-        kwargs["publications"], kwargs["handoffs"], captures, 9, as_of=kwargs["as_of"]
+        kwargs["publications"],
+        kwargs["handoffs"],
+        captures,
+        9,
+        as_of=kwargs["as_of"],
+        deadline_utc=stamp(START + timedelta(weeks=8)),
     )
     full = runner.partial_snapshot(
         kwargs["snapshot_root"] / decision.metadata.snapshot_id,
@@ -1182,7 +1282,12 @@ def test_duplicate_copies_of_one_handoff_keep_the_pair_and_record_every_hash(
     (directory / "same-model.json").write_text(json.dumps(document, indent=2), encoding="utf-8")
     captures = runner.inventory(tmp_path / "snapshots", as_of="2026-12-01T00:00:00Z")
     _, handoff, proof = runner.published_pair(
-        tmp_path / "publications", tmp_path / "handoffs", captures, 6, as_of="2026-12-01T00:00:00Z"
+        tmp_path / "publications",
+        tmp_path / "handoffs",
+        captures,
+        6,
+        as_of="2026-12-01T00:00:00Z",
+        deadline_utc=stamp(START + timedelta(weeks=5)),
     )
     assert handoff.fingerprint == base(snapshot).fingerprint
     assert proof["matching_handoff_sha256"] == sorted(
@@ -1333,6 +1438,7 @@ def test_publication_identity_guards_are_reached(tmp_path: Path, damage: str) ->
             runner.inventory(tmp_path / "snapshots", as_of="2026-12-01T00:00:00Z"),
             6,
             as_of="2026-12-01T00:00:00Z",
+            deadline_utc=stamp(START + timedelta(weeks=5)),
         )
 
 
@@ -1560,9 +1666,35 @@ def test_index_heading_without_its_table_refuses_before_claim(
 ) -> None:
     captures, kwargs = reading_fixture(tmp_path, monkeypatch)
     (runner.ROOT / "docs/measurements_index.md").write_text(
-        "## Season record\n\nNo table\n", encoding="utf-8"
+        "## Deterministic policy\n\nNo table\n", encoding="utf-8"
     )
     with pytest.raises(DefconInputError, match="table"):
+        runner.reading(captures, **kwargs)
+    assert not list(kwargs["claim_directory"].glob("*.json"))
+
+
+@pytest.mark.parametrize("anchor_count", [0, 2])
+def test_index_defcon_anchor_must_be_unique_before_claim_or_outcome_access(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, anchor_count: int
+) -> None:
+    captures, kwargs = reading_fixture(tmp_path, monkeypatch)
+    path = runner.ROOT / "docs/measurements_index.md"
+    contents = path.read_text(encoding="utf-8")
+    anchor = next(
+        line
+        for line in contents.splitlines(keepends=True)
+        if line.startswith("| [Direct DEFCON development]")
+    )
+    path.write_text(contents.replace(anchor, anchor * anchor_count), encoding="utf-8")
+    original = runner.partial_snapshot
+
+    def guard(directory: Path, names: Any = None) -> Any:
+        if names is not None and any(re_event(name) for name in names):
+            pytest.fail("No outcome may open before index anchor validation")
+        return original(directory, names)
+
+    monkeypatch.setattr(runner, "partial_snapshot", guard)
+    with pytest.raises(DefconInputError, match="direct DEFCON index row"):
         runner.reading(captures, **kwargs)
     assert not list(kwargs["claim_directory"].glob("*.json"))
 

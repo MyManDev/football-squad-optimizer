@@ -5,6 +5,9 @@ This is the step 2 command for #1000. Its sole statistical specification is
 SHA-256, verifies #1017's actual GitHub merge time and merged document, and
 requires the merged declaration to be an ancestor of a clean committed worktree.
 An amended declaration needs review of the runner before any real input check.
+The authenticated GitHub CLI must be on the invoking shell's PATH. On the owner's
+Windows PC its executable is `C:\Program Files\GitHub CLI\gh.exe`; verify
+`Get-Command gh` in that shell before invoking this command.
 
 The component uses only settled 2026-27 fixture appearances in each published
 decision capture. It adds its unconditional term to a copy of that capture's
@@ -63,12 +66,15 @@ The command writes the fixed markdown and JSON twins and a row in the existing
 measurements index table. The JSON records the code and declaration identity,
 every opened input's captured checksum, publication and handoff identities,
 weekly pairing or missing reasons, dropped players, all fixed gate constants,
-rank groups and diagnostics. The index's Season record table is validated before
+rank groups and diagnostics. The index's Deterministic policy table and its
+Direct DEFCON development row are validated before
 claiming or opening outcomes. Validation confined to one week makes that week
 missing with a named reason. A stopped reading after outcome access saves a
 completed `insufficient_evidence` record with error type and message, while its
 private claim prevents a rerun. Unreadable capture metadata is skipped and its
 identity and reason are included in the report. No output promotes either candidate.
+The new reading row follows Direct DEFCON development, as selected on #1000,
+and every existing index row retains its order.
 
 If an unreadable metadata file exists at or before the selected reading capture,
 the reading refuses before its claim rather than substituting a later capture.

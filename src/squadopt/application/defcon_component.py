@@ -249,6 +249,8 @@ def history_week(
                 fixture_id = explanation.get("fixture")
                 fixture_id = integer(fixture_id, minimum=1)
                 if fixture_id in local:
+                    if deadline_utc is None:
+                        raise DefconMissingInputs("duplicate_explanation_key")
                     raise DefconInputError("A player-fixture explanation is duplicated.")
                 local.add(fixture_id)
                 fixture = fixtures.get(fixture_id)
@@ -265,6 +267,8 @@ def history_week(
                 for stat in explanation["stats"]:
                     key = stat["identifier"]
                     if key in stats:
+                        if deadline_utc is None:
+                            raise DefconMissingInputs("duplicate_explanation_key")
                         raise DefconInputError("An explanation statistic is duplicated.")
                     stats[key] = stat
                 if "minutes" not in stats:
@@ -310,6 +314,9 @@ def history_week(
                         "reason": str(error),
                     }
                 )
+                if str(error) == "duplicate_explanation_key":
+                    player_rows = []
+                    break
         if not player_excluded and sum(row.minutes for row in player_rows) != total_minutes:
             unexplained = {
                 f["id"]
