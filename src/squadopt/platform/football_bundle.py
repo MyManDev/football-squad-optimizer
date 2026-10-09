@@ -71,7 +71,7 @@ def _preparation_inputs(
         try:
             artifacts = fingerprint_paths([path])
         except WeeklyJournalError as error:
-            raise ValueError(f"Invalid football preparation input {role}.") from error
+            raise ValueError(f"Invalid football preparation input {role}: {error}") from error
         record = artifacts[0]
         if role == "capture":
             relative = {
@@ -97,11 +97,16 @@ def _preparation_inputs(
 
 
 def _check_preparation(prior: Mapping[str, Any], current: Mapping[str, Any]) -> None:
-    if prior.get("contract_version") != "football_preparation_v1":
+    if (
+        set(prior) != {"contract_version", "snapshot_id", "inputs"}
+        or prior.get("contract_version") != "football_preparation_v1"
+    ):
         raise ValueError("Invalid football preparation contract; resume refused.")
     prior_inputs = prior.get("inputs")
     if not isinstance(prior_inputs, Mapping):
         raise ValueError("Invalid football preparation inputs; resume refused.")
+    if set(prior_inputs) != set(current["inputs"]):
+        raise ValueError("Invalid football preparation input roles; resume refused.")
     for role in ("capture", "handoff", "forecast", "components"):
         prior_role = prior_inputs.get(role)
         if not isinstance(prior_role, Mapping) or {
@@ -524,6 +529,13 @@ def seal_football_bundle(
     for role in _OPTIONAL & files.keys():
         destinations[role] = folder / files[role].name
     payloads = {role: Path(addressable(path)).read_bytes() for role, path in files.items()}
+    # Bind the copy bytes to the receipt, including changes after the source recheck.
+    for role in ("handoff", "forecast", "components"):
+        raw = payloads[role]
+        if {"size": len(raw), "sha256": _digest(raw)} != {
+            key: value for key, value in preparation["inputs"][role].items() if key != "path"
+        }:
+            raise ValueError(f"Football preparation input {role} changed before copying.")
     record = {
         "contract_version": CONTRACT_VERSION,
         "snapshot_id": snapshot_id,

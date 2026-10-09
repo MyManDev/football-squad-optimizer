@@ -639,6 +639,55 @@ def test_capture_preparation_identity_is_relative_and_membership_bound(case, tmp
         bundle._check_preparation(prior, changed)
 
 
+def test_source_changed_after_identity_recheck_cannot_seal_a_different_receipt(case, monkeypatch):
+    original = bundle._preparation_inputs
+    calls = []
+
+    def changed_after_return(*args, **kwargs):
+        value = original(*args, **kwargs)
+        calls.append(True)
+        if len(calls) == 2:
+            document = json.loads(case["handoff_path"].read_bytes())
+            document["diagnostics"]["late_change"] = True
+            dump(case["handoff_path"], document)
+        return value
+
+    monkeypatch.setattr(bundle, "_preparation_inputs", changed_after_return)
+    with pytest.raises(ValueError, match="handoff changed before copying"):
+        bundle.seal_football_bundle(**case)
+    assert not marker(case).exists()
+    assert not marker(case).with_suffix(".preparation.json").exists()
+
+
+def test_missing_writer_role_names_the_missing_path(case):
+    case["handoff_path"].unlink()
+    with pytest.raises(ValueError) as error:
+        bundle.seal_football_bundle(**case)
+    assert "handoff" in str(error.value)
+    assert case["handoff_path"].name in str(error.value)
+    assert not marker(case).exists()
+
+
+@pytest.mark.parametrize("damage", ["inputs_list", "contract", "extra_role", "extra_key"])
+def test_malformed_preparation_receipt_refuses_before_new_writes(case, damage):
+    bundle.seal_football_bundle(**case)
+    receipt = marker(case).with_suffix(".preparation.json")
+    document = json.loads(receipt.read_bytes())
+    if damage == "inputs_list":
+        document["inputs"] = []
+    elif damage == "contract":
+        document["contract_version"] = "other"
+    elif damage == "extra_role":
+        document["inputs"]["unexpected"] = {}
+    else:
+        document["unexpected"] = True
+    dump(receipt, document)
+    held = marker(case).read_bytes()
+    with pytest.raises(ValueError, match="preparation"):
+        bundle.seal_football_bundle(**case)
+    assert marker(case).read_bytes() == held
+
+
 @pytest.mark.skipif(os.name != "nt", reason="Windows path casing")
 @pytest.mark.parametrize("role", ["snapshot_root", "artifact_root", "handoff_path"])
 def test_byte_identical_windows_path_casing_replays(case, role):
