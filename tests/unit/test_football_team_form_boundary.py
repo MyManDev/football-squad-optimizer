@@ -3,11 +3,13 @@
 import json
 from copy import deepcopy
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import pandas as pd
 import pytest
 from pandas.testing import assert_frame_equal
+from tests.unit.test_advice_read import _valid_advice_document
 from tests.unit.test_football_publication import publication_case as publication_case
 
 from squadopt.live.football_artifact import (
@@ -126,6 +128,84 @@ def test_form_conflict_preserves_the_previous_v1_pair(publication_case):
     assert (forecast_path.read_bytes(), companion_path.read_bytes()) == before
     assert read_football_forecast(forecast_path, legacy["inputs"]).horizon.model_version == (
         FOOTBALL_MODEL_VERSION
+    )
+
+
+def test_form_artifact_survives_worker_document_validation(publication_case, monkeypatch):
+    import squadopt.platform.advice_worker as worker
+    from squadopt.platform.advice_documents import validate_advice_document
+    from squadopt.platform.advice_job_spec import AdviceJobSpec
+    from squadopt.platform.advice_read import AdviceRequestContext
+    from squadopt.platform.advice_switches import AdviceSwitchInputs, switch_identity
+    from squadopt.platform.jobs_contract import AdviceJob
+
+    case = _form_case(publication_case)
+    forecast_path, _ = publish_football_artifacts(**case)
+    inputs = case["inputs"]
+    football = read_football_forecast(forecast_path, inputs)
+    switches = AdviceSwitchInputs(football=football)
+    context = AdviceRequestContext(
+        advice_contract_version="provisional_league_ui_v1",
+        capture_snapshot_id=inputs.snapshot_id,
+        season=inputs.season,
+        gameweek=inputs.deadline.gameweek,
+        projection_handoff_fingerprint="a" * 64,
+        repository_commit="b" * 40,
+        configuration_fingerprint="c" * 64,
+    )
+    spec = AdviceJobSpec(
+        league_id=352490,
+        entry_id=313686,
+        strategy="saf-puan",
+        window=1,
+        context=context,
+        switches=switch_identity(switches, model="football"),
+    )
+    # In-memory collaborators exercise the actual compute boundary without a backend
+    # or another planner solve. Only the plan result is fabricated.
+    capture = SimpleNamespace(
+        switches=switches,
+        inputs=inputs,
+        provider=SimpleNamespace(holds=lambda entry, week: True),
+        rules=None,
+        top100_counts=None,
+        manager_words=None,
+    )
+    contexts = SimpleNamespace(capture=lambda value: capture if value == context else None)
+    specs = SimpleNamespace(get=lambda key: spec if key == "d" * 64 else None)
+    produced = json.loads(_valid_advice_document(spec.entry_id))["payload"]
+    produced.update(season=inputs.season, gameweek=inputs.deadline.gameweek)
+    calls = []
+
+    def plan(request, **kwargs):
+        assert request.gameweek == inputs.deadline.gameweek
+        assert kwargs["projection"] is football.projection
+        assert kwargs["horizon_builder"].__self__ is football
+        calls.append(request)
+        return deepcopy(produced)
+
+    monkeypatch.setattr(worker, "advise_menu_entry", plan)
+    job = AdviceJob(
+        job_id="synthetic-team-form",
+        status="running",
+        request_fingerprint="e" * 64,
+        cache_key="d" * 64,
+        created_at_utc=inputs.captured_at_utc,
+        updated_at_utc=inputs.captured_at_utc,
+    )
+    raw = worker.build_advice_compute(contexts, specs)(job)
+    validate_advice_document(raw)
+    result = json.loads(raw)
+    assert len(calls) == 1
+    assert result["generated_at_utc"] == inputs.captured_at_utc
+    assert result["payload"]["prediction_model"] == {
+        "id": "football",
+        "version": TEAM_FORM_MODEL_VERSION,
+        "experimental": True,
+        "fingerprint": football.fingerprint,
+    }
+    assert result["payload"]["decision_information"] == switches.decision_information(
+        inputs.snapshot_id
     )
 
 
