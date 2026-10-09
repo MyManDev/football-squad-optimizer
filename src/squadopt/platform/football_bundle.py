@@ -58,10 +58,8 @@ def _digest(raw: bytes) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
-def _production_identity(
-    forecast: Mapping[str, Any], components: Mapping[str, Any]
-) -> dict[str, Any]:
-    """Match existing producer provenance without fitting or reading an archive."""
+def _production_identity(forecast: Mapping[str, Any]) -> dict[str, Any]:
+    """Extract provenance from a pair already validated by the fixture-basis reader."""
     fields = (
         "model_version",
         "season",
@@ -75,30 +73,41 @@ def _production_identity(
         "training_selection",
         "role_metadata",
     )
-    for field in fields:
-        if forecast.get(field) != components.get(field):
-            raise ValueError(f"Football production identity differs for {field}.")
-    if components.get("forecast_fingerprint") != forecast.get("fingerprint"):
-        raise ValueError("Football production identity differs for forecast_fingerprint.")
     return {field: forecast[field] for field in fields if field in forecast}
 
 
-def _production_record(files: Mapping[str, Path], snapshot_id: str) -> dict[str, Any]:
-    football = _production_identity(
-        _object(Path(addressable(files["forecast"])).read_bytes()),
-        _object(Path(addressable(files["components"])).read_bytes()),
+def _production_record(
+    payloads: Mapping[str, bytes], snapshot_id: str, *, handoff_fingerprint: str
+) -> dict[str, Any]:
+    """Record the exact sealed bytes after production validators have accepted them."""
+    football = _production_identity(_object(payloads["forecast"]))
+    handoff = _object(payloads["handoff"])
+    if (
+        handoff.get("source_snapshot_id") != snapshot_id
+        or football.get("source_snapshot_id") != snapshot_id
+    ):
+        raise ValueError("Production record capture identities differ.")
+    training_keys = (
+        "component_training_seasons",
+        "component_training_rows",
+        "component_training_cutoff",
+        "component_training_data_fingerprint",
+        "fallback_training_seasons",
+        "training_selection",
     )
-    handoff = read_projection_handoff(files["handoff"])
+    diagnostics = handoff.get("diagnostics") or {}
     return {
         "contract_version": "football_production_record_v1",
         "snapshot_id": snapshot_id,
         "football": football,
         "current_handoff": {
-            "model_version": handoff.model_version,
-            "fingerprint": handoff.fingerprint,
-            "source_snapshot_id": handoff.source_snapshot_id,
-            # Retain what this producer actually declared; never copy the football allowlist.
-            "training_provenance": dict(handoff.diagnostics),
+            "model_version": handoff["model_version"],
+            "fingerprint": handoff_fingerprint,
+            "source_snapshot_id": handoff["source_snapshot_id"],
+            "sha256": _digest(payloads["handoff"]),
+            "training_provenance": {
+                key: diagnostics[key] for key in training_keys if key in diagnostics
+            },
         },
     }
 
@@ -163,10 +172,6 @@ def _validate(
     if as_instant(inputs.captured_at_utc) >= as_instant(inputs.deadline.deadline_utc):
         raise ValueError("A ready decision capture must precede its deadline.")
     forecast = read_football_forecast(files["forecast"], inputs)
-    _production_identity(
-        _object(Path(addressable(files["forecast"])).read_bytes()),
-        _object(Path(addressable(files["components"])).read_bytes()),
-    )
     _basis_from_snapshot(
         _object(Path(addressable(files["forecast"])).read_bytes()),
         _object(Path(addressable(files["components"])).read_bytes()),
@@ -525,12 +530,6 @@ def seal_football_bundle(
     raw_marker = document_bytes(record)
     if existing is not None and existing != raw_marker:
         raise ValueError("A different ready bundle already exists for this capture.")
-    # A separate internal record keeps each model's declared training population intact.
-    # It changes no ready-marker schema and cannot activate a partially prepared bundle.
-    write_bytes_once(
-        document_bytes(_production_record(files, snapshot_id)),
-        marker.with_suffix(".production.json"),
-    )
     # Preflight every immutable destination before writing any copy.
     for role, path in destinations.items():
         _safe(Path(addressable(path)))
@@ -557,6 +556,15 @@ def seal_football_bundle(
         for role, path in destinations.items()
     ):
         raise ValueError("A bundle input changed while it was being sealed.")
+    # Write provenance only after the copied bytes and identities are verified.
+    write_bytes_once(
+        document_bytes(
+            _production_record(
+                payloads, snapshot_id, handoff_fingerprint=final_identity["handoff_fingerprint"]
+            )
+        ),
+        marker.with_suffix(".production.json"),
+    )
     write_bytes_once(raw_marker, marker)
     return read_football_bundle(
         artifact_root=artifact_root, snapshot_root=snapshot_root, snapshot_id=snapshot_id
