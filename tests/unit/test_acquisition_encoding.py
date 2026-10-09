@@ -4,9 +4,13 @@
 under frozen prices with no Free Hit it prices a held player's sale by one Boolean per
 week. Both are re-encodings, so the reference below is the class as it stood before
 them, kept verbatim. One test asks CP-SAT for any legal sequence of moves the two price
-differently; another solves small horizons end to end under both.
+differently. That sees pricing only: a sequence the reduced encoding refuses drops out
+of its search. So a second test fixes legal sequences one at a time and requires the
+reduced encoding to accept each at the proceeds a numeric replay of the full lot gives.
+A third solves small horizons end to end under both.
 """
 
+import copy
 import random
 from collections import Counter
 from dataclasses import replace
@@ -130,7 +134,9 @@ def _differs(tables, fee, held, known, free_hits):
 
     Every player moves freely: bought when not held, sold when held, and in a Free Hit
     week the next week starts from the holding this week started from. CP-SAT then looks
-    for any such sequence on which the two encodings disagree.
+    for any such sequence on which the two encodings disagree. Both encodings share one
+    model, so a sequence the reduced one refuses is never searched: this checks pricing
+    only, and `_accepted` checks that no legal sequence is refused.
     """
 
     model = cp_model.CpModel()
@@ -178,6 +184,101 @@ def test_no_legal_sequence_of_moves_sells_for_a_different_amount():
         encodings[encoding] += 1
     # Both encodings are exercised, the Boolean one on frozen prices alone.
     assert min(encodings["original_held"], encodings["acquisition_week"]) >= 40, encodings
+
+
+def _sequence(held, weeks, free_hits, bits):
+    """The legal moves one integer names: a toggle per player and week, then each chip.
+
+    A toggle buys a player not held and sells one held. A played Free Hit leaves the
+    next week starting from the holding this week started from.
+    """
+
+    count = len(held)
+    chips = sorted(free_hits)
+    holding = [int(h) for h in held]
+    moves = []
+    for week in range(weeks):
+        toggles = [bits >> (week * count + i) & 1 for i in range(count)]
+        played = int(week in free_hits and bits >> (weeks * count + chips.index(week)) & 1)
+        buys = [t & (1 - h) for t, h in zip(toggles, holding, strict=True)]
+        sells = [t & h for t, h in zip(toggles, holding, strict=True)]
+        moves.append((buys, sells, played))
+        if not played:
+            holding = [h ^ t for h, t in zip(holding, toggles, strict=True)]
+    return moves
+
+
+def _lot_prices(tables, fee):
+    """Each week's sale price of each player under each lot, as the full lot reads it."""
+
+    buy = [[int(p) for p in t.buy_price_tenths] for t in tables]
+    return [
+        [
+            [int(supplied)]
+            + [sell_price_tenths(buy[week][i], buy[w][i], sell_on_fee=fee) for w in range(week)]
+            for i, supplied in enumerate(tables[week].sell_price_tenths)
+        ]
+        for week in range(len(tables))
+    ]
+
+
+def _replayed(prices, moves):
+    """Each week's proceeds under the full lot, replayed with numbers alone."""
+
+    lots = [0] * len(prices[0])
+    totals = []
+    for week, (buys, sells, played) in enumerate(moves):
+        totals.append(sum(sells[i] * prices[week][i][lot] for i, lot in enumerate(lots)))
+        lots = [week + 1 if b and not played else lot for b, lot in zip(buys, lots, strict=True)]
+    return totals
+
+
+def _accepted(tables, fee, known, free_hits, sequences):
+    """Whether the reduced encoding accepts every sequence at its replayed proceeds.
+
+    Each sequence gets its own copy of one fresh `AcquisitionSales` on moves fixed in
+    advance, all in one model, so a single refused sequence makes it infeasible.
+    """
+
+    model = cp_model.CpModel()
+    count = len(tables[0])
+    prices = _lot_prices(tables, fee)
+    fresh = AcquisitionSales(tables, fee, held=known, free_hit_possible=bool(free_hits))
+    for moves in sequences:
+        sales = copy.deepcopy(fresh)
+        paid = _replayed(prices, moves)
+        for week, (buys, sells, played) in enumerate(moves):
+            fixed = []
+            for value in (*buys, *sells):
+                literal = model.new_bool_var(f"move_{week}_{len(fixed)}")
+                model.add(literal == value)
+                fixed.append(literal)
+            free_hit = None
+            if week in free_hits:
+                free_hit = model.new_bool_var(f"free_hit_{week}")
+                model.add(free_hit == played)
+            proceeds = sales.add_week(model, week, fixed[:count], fixed[count:], free_hit)
+            model.add(proceeds == paid[week])
+    solver = cp_model.CpSolver()
+    solver.parameters.num_workers = 1
+    return solver.solve(model) == cp_model.OPTIMAL
+
+
+def test_every_legal_sequence_of_moves_is_accepted_at_its_replayed_proceeds():
+    whole = Counter()
+    for seed in range(160):
+        tables, fee, held, known, free_hits = _scenario(seed)
+        bits = len(held) * len(tables) + len(free_hits)
+        # Every sequence of a horizon with at most 64, else 16 seeded ones.
+        names = range(2**bits) if bits <= 6 else random.Random(seed).sample(range(2**bits), 16)
+        whole[bits <= 6] += 1
+        sequences = [_sequence(held, len(tables), free_hits, n) for n in names]
+        assert _accepted(tables, fee, known, free_hits, sequences), (
+            seed,
+            next(s for s in sequences if not _accepted(tables, fee, known, free_hits, [s])),
+        )
+    # Both halves run: whole small horizons and samples of larger ones.
+    assert min(whole[True], whole[False]) >= 40, whole
 
 
 POSITIONS = ("GK", "DEF", "MID", "FWD")
