@@ -384,6 +384,8 @@ def improve_expected_lineup(
     The positive count cap includes the incumbent; duplicate scores
     and repeated autosub convolutions are cached. The XI/bench neighborhood remains
     bounded; no global lineup or transfer optimality is claimed.
+    Exactly equal point utility prefers the larger total effective XI appearance;
+    equal appearance totals retain the earlier complete action. No tolerance is used.
     locked_first freezes the entire action, including bench order and vice.
     """
     if (
@@ -397,6 +399,14 @@ def improve_expected_lineup(
     decision = _Decision(tuple(starting_xi), tuple(ordered_bench), captain_id, vice_captain_id)
     data = _prepare(squad, decision, chip, hit_points, not_starting, not_captain)
     incumbent = best = _score(data, decision)
+
+    def decision_key(score: ExpectedLineupScore) -> tuple[float, float]:
+        return (
+            score.expected_net_points,
+            math.fsum(data.chance[player] for player in score.starting_xi),
+        )
+
+    best_key = decision_key(best)
     cache = {decision: incumbent}
     evaluations, cache_hits = 1, 0
 
@@ -441,6 +451,8 @@ def improve_expected_lineup(
         scored = _score(data, candidate)
         cache[candidate] = scored
         evaluations += 1
-        if scored.expected_net_points > best.expected_net_points:
+        scored_key = decision_key(scored)
+        if scored_key > best_key:
             best = scored
+            best_key = scored_key
     return finish(False)

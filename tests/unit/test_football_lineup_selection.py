@@ -226,3 +226,55 @@ def test_locked_first_action_preserves_xi_captain_vice_and_bench_priority():
     assert result.best.ordered_bench == BENCH
     assert result.best.captain_id == 8
     assert result.best.vice_captain_id == 13
+
+
+@pytest.mark.parametrize("appearance", [0.0, 0.25, 0.5, 0.75])
+def test_exact_point_tie_benches_absent_or_doubtful_player_for_more_available_xi(appearance):
+    table = _squad()
+    # Both defenders have conditional value 5.0, so cover makes the scores identical.
+    _set(table, 6, points=5.0 * appearance, appearance=appearance)
+    starting = tuple(6 if player == 5 else player for player in XI)
+    bench = (2, 5, 7, 12)
+    result = improve_expected_lineup(table, starting, bench, CAPTAIN, VICE, max_evaluations=128)
+
+    assert result.best.expected_net_points == result.incumbent.expected_net_points
+    assert 5 in result.best.starting_xi
+    assert 6 in result.best.ordered_bench
+    chance = table.set_index("player_id").appearance_probability
+    assert math.fsum(chance.loc[list(result.best.starting_xi)]) > math.fsum(
+        chance.loc[list(result.incumbent.starting_xi)]
+    )
+    assert result.best.expected_net_points == pytest.approx(
+        _official_expectation(table, result.best)
+    )
+    assert result.evaluations <= 128
+
+
+def test_equal_point_and_appearance_totals_keep_incumbent_complete_action():
+    table = _squad()
+    _set(table, 6, points=5.0)
+    starting = tuple(6 if player == 5 else player for player in XI)
+    bench = (2, 5, 7, 12)
+    result = improve_expected_lineup(table, starting, bench, CAPTAIN, VICE, max_evaluations=128)
+
+    assert result.best == result.incumbent
+    assert result.best.starting_xi == starting
+    assert result.best.ordered_bench == bench
+    assert result.best.captain_id == CAPTAIN
+    assert result.best.vice_captain_id == VICE
+
+
+def test_more_available_xi_cannot_take_even_a_tiny_expected_point_loss():
+    table = _squad()
+    _set(table, 6, points=(5.0 + 1e-8) * 0.25, appearance=0.25)
+    starting = tuple(6 if player == 5 else player for player in XI)
+    bench = (2, 5, 7, 12)
+    result = improve_expected_lineup(table, starting, bench, CAPTAIN, VICE, max_evaluations=128)
+    more_available = expected_lineup_score(table, XI, BENCH, CAPTAIN, VICE)
+
+    assert more_available.expected_net_points < result.incumbent.expected_net_points
+    assert 6 in result.best.starting_xi
+    assert result.best.expected_net_points == result.incumbent.expected_net_points
+    assert result.best.expected_net_points == pytest.approx(
+        _official_expectation(table, result.best)
+    )
