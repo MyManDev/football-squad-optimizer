@@ -94,10 +94,6 @@ class TacticalExperiment:
     receipt_json: str
     resource_bundle_json: str
 
-    @property
-    def table(self) -> pd.DataFrame:
-        return self.weekly
-
 
 @dataclass(frozen=True)
 class TacticalFixedFifteenPlan:

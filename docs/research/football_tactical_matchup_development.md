@@ -136,6 +136,10 @@ the model does not substitute exp of an average opposition rate. Full-club goal
 and assist mass is checked against each state's credited totals. A player's
 combined G/A marginal cannot exceed the physical event intensity; an unsupported
 allocation refuses instead of producing incoherent points.
+This is an intended enabled-path refusal even when the native shares passed:
+learned recipient concentration can violate the individual physical event bound.
+No clipping or recipient renormalization is authorized by this version. Exact
+disabled/control composition remains available without that learned allocation.
 
 ## Fitting and receipts
 
@@ -185,13 +189,23 @@ roles, not squad acquisitions or the default transfer planner.
 
 ## Synthetic validation evidence
 
-135 source/model cases and 58 raw-source integration cases pass. An independent
+196 source/model and raw-source integration cases pass. An independent
 oracle reads original synthetic JSON, fits 12 observations with 54 goal and 18
 assist credits, verifies learned paired rates and recipient allocation, recomputes
 state-integrated clean sheets, and checks weekly expected points and legal role
 utility by independently enumerating the appearance worlds. Changed opposition
 defending traits change the selected XI, captain and ordered reserves under the
 supplied scoring contract. There is no measured real-data improvement.
+The committed unit tests now include a present outfield player at 75 minutes,
+an independent posterior-weight recipient refit for each head compared with a
+prior-weight refit, and a nonzero fitted model's zero-attacking-channel path.
+They pin the minute-sensitive clean-sheet exponent, fitted physical-pair
+posterior and actual replacement invocation rather than only a control shortcut.
+
+The synthetic native rows are constructed from the synthetic projection. This
+checks the binding contract and arithmetic, but does not prove that an actual
+independent native producer can supply a TacticalProjection. That producer remains
+a step 2 precondition with its own chronological basis and admitted source.
 
 Coverage includes malformed original bytes, identity/time/coverage refusals,
 forbidden/target labels before access, full fitted receipt immutability and failed
@@ -202,12 +216,13 @@ tampering, chips, hits and role restrictions. The independent audit found and
 fixed stale native decision acceptance, uncaptured requested gameweeks, differing
 historical same-GW decision clocks and admitted-roundoff state mass drift.
 
-Ten isolated copied-source faults cause 20 behavioral test failures: source hash,
+Private local audit observations reported ten copied-source faults causing 20
+behavioral test failures: source hash,
 strict final-source clock, historical common clock, weight normalization, assist
 fraction, shared-state nonlinear clean sheets, native control, DGW eligibility,
 frame/attrs receipts and resource bundle. All original source hashes remain
-unchanged. The probes do not patch or inject original paths. Their private logs
-and hashes remain under `.codex-tmp/tactical-private-probes`.
+unchanged. Their gitignored logs are not reviewable evidence in this PR. The
+committed source, model and integration tests supply the reproducible assertions.
 
 105 existing native component, fixture scoring, expected-lineup, forecast-week
 and publication cases pass, with one existing optional research-bo skip. Ruff
@@ -218,7 +233,8 @@ Three separately invoked synthetic timing samples cover 67-player full rosters,
 three or four paired fixtures and six or eight shared states. Fit takes
 0.370 to 0.440 seconds, component/weekly composition 0.131 to 0.170 seconds and
 fixed-fifteen roles 0.038 to 0.041 seconds, with 128 role evaluations per sample.
-The private runtime receipt binds unchanged source hashes. These small fixtures
+These are private local timing observations, unverified by committed artifacts.
+These small fixtures
 do not establish a production request budget or large-source training capacity.
 
 ## Provider and FM feasibility
@@ -246,15 +262,22 @@ events. The [open-data competition inventory](https://github.com/hudl/open-data/
 does not establish complete PL tactical coverage for our 2020-21 through 2024-25
 development seasons.
 
-The owner's descriptive catalog is privately stored at
-`.codex-tmp/datasets/football-manager-2020-2026`. It includes FM20/21/22/23 full
-47-trait tables, partial FM24 samples and 35-trait FM26. FM25 was
+The owner's descriptive FM catalog is private and is not a review artifact in
+this PR. Its reported counts, traits and loader results are not independently
+verifiable from the committed files here. FM25 was
 [officially cancelled](https://www.footballmanager.com/news/development-update-football-manager-25-1).
-The catalog has an independently verified 117-file manifest and 68 passing loader
-checks, but none of its tables is admitted for actual fitting. Missing FM26
+No actual catalog table is admitted for fitting in this PR. Missing
 goalkeeper traits cannot silently enable the aerial tactical channel. A version
 name, public upload date or current download date is not an authenticated
 historical database snapshot. No real FM rows or FPL outcomes are fitted here.
+
+The test fixture imports the accepted native scoring helper only to construct
+its synthetic native basis. Candidate scoring and role comparisons also have
+independent arithmetic/world oracles; this is not a public source producer.
+The private raw-point check mirrors the accepted native season law and refuses
+drift. Consolidating that law into an existing public prediction API needs a
+separate reviewed change after the accepted merges, rather than a silent shared
+runtime edit in this private-source step.
 
 ## Real source and evaluation gates
 

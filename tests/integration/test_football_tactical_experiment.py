@@ -29,6 +29,7 @@ from tests.football_tactical_fixtures import (
     world,
 )
 
+import squadopt.application.football_tactical_experiment as experiment
 from squadopt.application.football_tactical_experiment import (
     compose_tactical_candidate,
     plan_tactical_fixed_fifteen,
@@ -355,7 +356,8 @@ def test_joint_state_clean_sheets_are_not_exponentials_of_mean_rates(
     predicted = model.predict(w.projections[2])
     assert len({state.away_goal_rate for state in predicted.states}) == 2
     expected = math.fsum(
-        state.weight * math.exp(-state.away_goal_rate) for state in predicted.states
+        state.weight * math.exp(-state.away_goal_rate * minutes / 90)
+        for state, minutes in zip(predicted.states, (75, 90), strict=True)
     )
     assert row.clean_sheet_probability == pytest.approx(expected, rel=1e-12, abs=1e-13)
     assert not math.isclose(
@@ -483,13 +485,30 @@ def test_clipping_happens_at_fixture_before_weekly_eligibility(model: TacticalMa
     assert candidate.weekly.expected_points.eq(0).all()
 
 
-def test_zero_native_intensities_preserve_zero_attacking_channels() -> None:
+@pytest.mark.parametrize("zero_fit", [False, True])
+def test_zero_native_intensities_preserve_zero_attacking_channels(
+    monkeypatch: pytest.MonkeyPatch, zero_fit: bool
+) -> None:
     w = world(zero_rates=True)
-    model = fitted(zero=True)
+    model = fitted(zero=zero_fit)
+    if not zero_fit:
+        assert any((*model.metadata.beta, *model.metadata.goal_gamma, *model.metadata.assist_gamma))
+    original_replace = experiment._replace
+    calls = []
+
+    def record_replace(*arguments: Any, **keywords: Any) -> pd.DataFrame:
+        revised = original_replace(*arguments, **keywords)
+        calls.append(revised.copy(deep=True))
+        return revised
+
+    monkeypatch.setattr(experiment, "_replace", record_replace)
     candidate = compose(w, model)
+    assert len(calls) == 1
     assert candidate.components.goals.eq(0).all()
     assert candidate.components.assists.eq(0).all()
     assert candidate.components.clean_sheet_probability.eq(candidate.components.p60).all()
+    if not zero_fit:
+        pd.testing.assert_frame_equal(candidate.components, calls[0])
 
 
 @pytest.mark.parametrize(

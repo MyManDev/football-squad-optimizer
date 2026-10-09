@@ -152,6 +152,8 @@ def side(club: int, season: str, *, defense: int, present: bool) -> TacticalSide
         if code == 6000:
             attrs.update(heading=3, crossing=3, passing=3, vision=3)
         minutes = 90.0
+        if code == 5 and present:
+            minutes = 75.0
         if code == 6:
             minutes = 90.0 if present else 0.0
         if code == 6000:

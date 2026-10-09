@@ -9,6 +9,8 @@ from typing import Any
 
 import numpy as np
 import pytest
+from scipy.optimize import minimize
+from scipy.special import logsumexp
 
 import squadopt.prediction.football_tactical_matchup as tactical
 from squadopt.features.football_tactical_inputs import (
@@ -27,6 +29,8 @@ from squadopt.features.football_tactical_inputs import (
     TacticalStyleFixture,
     observation_digest,
     projection_digest,
+    recipient_features,
+    team_features,
 )
 from squadopt.prediction.football_tactical_matchup import TacticalMatchupModel
 
@@ -97,7 +101,9 @@ def _side(club: int, season: str, rate: float) -> TacticalSideState:
             f"{year + 1}-07-01T00:00:00Z",
             _source("traits", observed),
         )
-        players.append(TacticalPlayerState(profile, role, 90, goal, assist))
+        players.append(
+            TacticalPlayerState(profile, role, 75 if position == "DEF" else 90, goal, assist)
+        )
     return TacticalSideState(club, rate, 0.8, 0.5, tuple(players))
 
 
@@ -224,6 +230,7 @@ def test_control_preserves_native_rates_shares_and_nonlinear_clean_sheet(
     assert home[104].goals == pytest.approx(2 * 0.8 * 0.7)
     assert home[103].assists == pytest.approx(2 * 0.8 * 0.5 * 0.7)
     assert home[101].clean_sheet_probability == pytest.approx(math.exp(-1))
+    assert home[102].clean_sheet_probability == pytest.approx(math.exp(-75 / 90))
     assert sum(p.goals for p in result.home.players) == pytest.approx(1.6)
     assert sum(p.assists for p in result.home.players) == pytest.approx(0.8)
     assert result.projection_sha256 == projection_digest(projection)
@@ -268,6 +275,9 @@ def test_control_integrates_state_rate_times_share_and_clean_sheet_before_averag
         0.25 * math.exp(-0.5) + 0.75 * math.exp(-3)
     )
     assert abs(home[101].clean_sheet_probability - math.exp(-(0.25 * 0.5 + 0.75 * 3))) > 0.05
+    assert home[102].clean_sheet_probability == pytest.approx(
+        0.25 * math.exp(-0.5 * 75 / 90) + 0.75 * math.exp(-3 * 75 / 90)
+    )
 
 
 def test_native_share_is_already_conditioned_on_minutes_no_second_exposure_factor(
@@ -507,6 +517,121 @@ def test_training_only_scalers_use_prior_not_outcome_posterior() -> None:
     assert first.metadata.team_transform.means == pytest.approx(
         np.average(raw, axis=0, weights=(0.1, 0.1, 0.4, 0.4))
     )
+
+
+@pytest.mark.parametrize("head", ["goals", "assists"])
+def test_fitted_recipient_head_uses_physical_pair_posterior_not_prior(head: str) -> None:
+    observation = _observation()
+    original = observation.projection.states[0]
+    home = original.home
+    states = []
+    for identity, weight, rate, goals, assists in (
+        ("low", 0.8, 0.1, (0, 0.1, 0.1, 0.8), (0, 0.1, 0.2, 0.7)),
+        ("high", 0.2, 5.0, (0, 0.1, 0.7, 0.2), (0, 0.1, 0.8, 0.1)),
+    ):
+        players = tuple(
+            replace(player, native_goal_share=goal, native_assist_share=assist)
+            for player, goal, assist in zip(home.players, goals, assists, strict=True)
+        )
+        states.append(
+            replace(
+                original,
+                state_id=identity,
+                weight=weight,
+                home=replace(home, base_goal_rate=rate, players=players),
+            )
+        )
+    projection = replace(observation.projection, states=tuple(states))
+    observation = replace(observation, projection=projection)
+    metadata = _fit((observation,)).metadata
+    prior = np.array([state.weight for state in projection.states])
+    raw_team = np.array(
+        [
+            [team_features(projection, state, home=home_side) for home_side in (True, False)]
+            for state in projection.states
+        ]
+    )
+    scaled_team = (raw_team - metadata.team_transform.means) / metadata.team_transform.scales
+    base_rates = np.array(
+        [[state.home.base_goal_rate, state.away.base_goal_rate] for state in projection.states]
+    )
+    rates = base_rates * np.exp(scaled_team @ np.array(metadata.beta))
+    physical = np.array(observation.physical_goals)
+    pair_log_mass = np.log(prior) + (physical * np.log(rates) - rates).sum(axis=1)
+    posterior = np.exp(pair_log_mass - logsumexp(pair_log_mass))
+    assert abs(posterior[1] - prior[1]) > 0.1
+
+    transform = metadata.goal_transform if head == "goals" else metadata.assist_transform
+    counts = {row.player_code: getattr(row, head) for row in observation.credits}
+    groups = []
+    for home_side in (True, False):
+        lineups = [
+            tuple(
+                sorted(
+                    (state.home if home_side else state.away).players,
+                    key=lambda player: player.profile.player_code,
+                )
+            )
+            for state in projection.states
+        ]
+        raw = np.array(
+            [
+                [
+                    recipient_features(projection, state, player, home=home_side, head=head)
+                    for player in lineup
+                ]
+                for state, lineup in zip(projection.states, lineups, strict=True)
+            ]
+        )
+        features = (raw - transform.means) / transform.scales
+        shares = np.array(
+            [
+                [
+                    getattr(
+                        player, "native_goal_share" if head == "goals" else "native_assist_share"
+                    )
+                    for player in lineup
+                ]
+                for lineup in lineups
+            ]
+        )
+        labels = np.array([counts[player.profile.player_code] for player in lineups[0]])
+        groups.append((features, shares, labels))
+
+    def refit(weights: np.ndarray[Any, Any]) -> np.ndarray[Any, Any]:
+        def objective(gamma: np.ndarray[Any, Any]) -> tuple[float, np.ndarray[Any, Any]]:
+            value, gradient = metadata.alpha * float(gamma @ gamma) / 2, metadata.alpha * gamma
+            for features, shares, labels in groups:
+                log_shares = np.full(shares.shape, -np.inf)
+                positive = shares > 0
+                log_shares[positive] = np.log(shares[positive])
+                logits = log_shares + features @ gamma
+                log_probabilities = logits - logsumexp(logits, axis=1)[:, None]
+                credited = labels > 0
+                joint = np.log(weights) + (log_probabilities[:, credited] * labels[credited]).sum(
+                    axis=1
+                )
+                likelihood = logsumexp(joint)
+                responsibility = np.exp(joint - likelihood)
+                value -= float(likelihood)
+                residual = labels.sum() * np.exp(log_probabilities) - labels
+                gradient = gradient + np.einsum("s,sn,snd->d", responsibility, residual, features)
+            return value, gradient
+
+        result = minimize(
+            objective,
+            np.zeros(len(transform.features)),
+            jac=True,
+            method="L-BFGS-B",
+            options={"maxiter": 400, "ftol": 1e-12, "gtol": 1e-7},
+        )
+        assert result.success
+        return np.asarray(result.x)
+
+    fitted_gamma = np.array(metadata.goal_gamma if head == "goals" else metadata.assist_gamma)
+    posterior_gamma, prior_gamma = refit(posterior), refit(prior)
+    assert fitted_gamma == pytest.approx(posterior_gamma, rel=1e-5, abs=1e-6)
+    assert np.linalg.norm(fitted_gamma - prior_gamma) > 0.01
 
 
 def test_matchup_own_attacking_pace_and_opponent_defending_pace_are_learned_separately() -> None:
