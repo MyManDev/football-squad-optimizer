@@ -2,7 +2,10 @@
 
 import json
 
+import pytest
 from scripts.export_official_scoring_vectors import FIXTURE, build_vectors
+
+from squadopt.data.errors import DataError
 
 
 def test_committed_vectors_match_a_fresh_offline_export():
@@ -20,6 +23,9 @@ def test_vectors_cover_all_declared_finished_week_cases():
         "captain-and-vice-absent",
         "triple-captain-absent",
         "bench-boost",
+        "bench-boost-absent-starter",
+        "bench-boost-absent-captain",
+        "zero-minute-vice-card",
         "free-hit",
         "wildcard",
         "transfer-hit",
@@ -30,5 +36,22 @@ def test_vectors_cover_all_declared_finished_week_cases():
     assert cases["normal-week"]["expected"]["gross"] == 12
     assert cases["transfer-hit"]["expected"]["net"] == 8
     assert cases["bench-boost"]["expected"]["gross"] == 16
+    assert cases["bench-boost-absent-starter"]["expected"]["gross"] == 19
+    assert cases["bench-boost-absent-captain"]["expected"]["gross"] == 23
+    assert cases["zero-minute-vice-card"]["expected"]["gross"] == 11
     assert cases["negative-captain-points"]["expected"]["gross"] == 6
     assert cases["unknown-chip"]["expected"] == {"refused": True, "reason": "unsupported_chip"}
+
+
+def test_unknown_chip_does_not_hide_an_unrelated_scoring_refusal(monkeypatch):
+    from scripts import export_official_scoring_vectors as exporter
+
+    week = exporter._week()
+    week["members"][0]["active_chip"] = "unknown"
+
+    def refuse(*args, **kwargs):
+        raise DataError("points do not cover every selected player")
+
+    monkeypatch.setattr(exporter, "score_recorded_decision", refuse)
+    with pytest.raises(DataError, match="points do not cover"):
+        exporter._answer(week)

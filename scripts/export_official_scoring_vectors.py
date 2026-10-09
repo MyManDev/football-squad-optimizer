@@ -93,8 +93,8 @@ def _answer(week: dict[str, Any]) -> dict[str, object]:
     )
     try:
         scored = score_recorded_decision(decision, projections, outcomes)
-    except DataError:
-        if member["active_chip"] != "unknown":
+    except DataError as error:
+        if member["active_chip"] != "unknown" or "unsupported chip" not in str(error):
             raise
         return {"refused": True, "reason": "unsupported_chip"}
     return {
@@ -148,6 +148,12 @@ def build_vectors() -> dict[str, object]:
     case("captain-and-vice-absent", {7: absent, 13: absent, 11: {"points": 3}, 5: {"points": 4}})
     case("triple-captain-absent", captain_absent, chip="3xc")
     case("bench-boost", chip="bboost")
+    case("bench-boost-absent-starter", {8: absent, 11: {"points": 5}}, chip="bboost")
+    case("bench-boost-absent-captain", {7: absent, 13: {"points": 5}}, chip="bboost")
+    case(
+        "zero-minute-vice-card",
+        {7: absent, 13: {"minutes": 0, "points": -1, "card_shown": True}, 11: {"points": 3}},
+    )
     case("free-hit", chip="freehit")
     case("wildcard", chip="wildcard")
     case("transfer-hit", hit=4)
