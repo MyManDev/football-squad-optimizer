@@ -29,6 +29,12 @@ def main() -> None:
     )
     parser.add_argument("--contextual", action="store_true", help="Build football_contextual_v3.")
     parser.add_argument(
+        "--match-context",
+        action="store_true",
+        help="Build football_match_context_v1 with PL workload and venue defense; "
+        "requires an explicit permitted training-season allowlist.",
+    )
+    parser.add_argument(
         "--role-minutes",
         action="store_true",
         help="Fit joint starting/substitute minutes using the explicit training-season allowlist.",
@@ -47,6 +53,20 @@ def main() -> None:
     parser.add_argument("--rotation-evidence", type=Path)
     parser.add_argument("--club-news-source", type=Path)
     args = parser.parse_args()
+    if args.match_context and (
+        not args.training_seasons
+        or args.contextual
+        or args.role_minutes
+        or args.retained_role_history
+        or args.rotation_evidence
+        or args.club_news_source
+    ):
+        parser.error(
+            "--match-context requires --training-season "
+            "and excludes other candidates/manager inputs"
+        )
+    if args.match_context and "2025-26" in args.training_seasons:
+        parser.error("--match-context cannot read the locked 2025-26 outcome population")
     if args.role_minutes and (args.contextual or not args.training_seasons):
         parser.error("--role-minutes requires --training-season and excludes --contextual")
     if args.retained_role_history and not (args.role_minutes and args.with_components):
@@ -74,6 +94,7 @@ def main() -> None:
             training_seasons=args.training_seasons,
             **({"role_minutes": True} if args.role_minutes else {}),
             **({"retained_role_history": True} if args.retained_role_history else {}),
+            **({"match_context": True} if args.match_context else {}),
         )
     else:
         document = produce_football_forecast(
@@ -84,6 +105,7 @@ def main() -> None:
             training_seasons=args.training_seasons,
             **({"role_minutes": True} if args.role_minutes else {}),
             **({"retained_role_history": True} if args.retained_role_history else {}),
+            **({"match_context": True} if args.match_context else {}),
         )
         companion = None
     publish_football_artifacts(

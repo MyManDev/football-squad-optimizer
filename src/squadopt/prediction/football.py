@@ -62,6 +62,8 @@ class FixtureFootballModel:
     """Fit on precomputed causal features; predict each fixture from one information state."""
 
     model_version = FOOTBALL_MODEL_VERSION
+    minute_features: tuple[str, ...] = FEATURES
+    team_features: tuple[str, ...] = TEAM_FEATURES
 
     def __init__(self, train: pd.DataFrame, history: pd.DataFrame, *, cutoff: pd.Timestamp):
         if cutoff.tzinfo is None or train.empty or history.empty:
@@ -81,7 +83,7 @@ class FixtureFootballModel:
         self.train_rows = len(train)
         x = _matrix(train, FEATURES)
         self.minutes = _pipeline(LogisticRegression(C=1, max_iter=1000, random_state=0))
-        _fit(self.minutes, x, train.m_bin)
+        _fit(self.minutes, _matrix(train, self.minute_features), train.m_bin)
         self.minute_means: Array = (
             train.groupby("m_bin")
             .minutes.mean()
@@ -96,7 +98,7 @@ class FixtureFootballModel:
         team = train.drop_duplicates(["season", "fixture", "club"])
         self.team = _fit(
             _pipeline(PoissonRegressor(alpha=0.1, max_iter=1000)),
-            _matrix(team, TEAM_FEATURES),
+            _matrix(team, self.team_features),
             team.team_goals,
         )
         known = train.dc_event.notna() & train.position.ne("GK") & appeared
@@ -152,7 +154,9 @@ class FixtureFootballModel:
             raise ValueError("Duplicate player-fixture target.")
         x = _matrix(target, FEATURES)
         probabilities = np.zeros((len(target), 4), dtype=float)
-        probabilities[:, self.minutes[-1].classes_.astype(int)] = self.minutes.predict_proba(x)
+        probabilities[:, self.minutes[-1].classes_.astype(int)] = self.minutes.predict_proba(
+            _matrix(target, self.minute_features)
+        )
         if role_steps:
             for pos, transition in self.transitions.items():
                 mask = target.position.eq(pos).to_numpy()
@@ -162,13 +166,17 @@ class FixtureFootballModel:
         minutes = probabilities @ self.minute_means
         appeared = 1 - probabilities[:, 0]
         long = probabilities[:, 2:].sum(axis=1)
-        own = np.asarray(self.team.predict(_matrix(target, TEAM_FEATURES)), dtype=float)
-        other = target.loc[:, list(TEAM_FEATURES)].copy()
-        for label in ("gf", "ga", "xgf", "xga"):
-            other["own_" + label] = target["opp_" + label].to_numpy()
-            other["opp_" + label] = target["own_" + label].to_numpy()
+        own = np.asarray(self.team.predict(_matrix(target, self.team_features)), dtype=float)
+        other = target.loc[:, list(self.team_features)].copy()
+        for column in self.team_features:
+            if column.startswith("own_"):
+                opposite = "opp_" + column.removeprefix("own_")
+                if opposite not in self.team_features:
+                    raise ValueError("Team feature requires its opposing-side counterpart.")
+                other[column] = target[opposite].to_numpy()
+                other[opposite] = target[column].to_numpy()
         other["home"] = 1 - target.home.to_numpy()
-        opponent = np.asarray(self.team.predict(_matrix(other, TEAM_FEATURES)), dtype=float)
+        opponent = np.asarray(self.team.predict(_matrix(other, self.team_features)), dtype=float)
         output: dict[str, Any] = {
             "expected_minutes": minutes,
             "appearance_probability": appeared,
@@ -226,7 +234,7 @@ class FixtureFootballModel:
         result = pd.DataFrame(output, index=target.index)
         if not np.isfinite(result.to_numpy(dtype=float)).all():
             raise ValueError("Nonfinite football forecast.")
-        result["model_version"] = ROLE_MODEL_VERSION if role_steps else FOOTBALL_MODEL_VERSION
+        result["model_version"] = ROLE_MODEL_VERSION if role_steps else self.model_version
         return result
 
 

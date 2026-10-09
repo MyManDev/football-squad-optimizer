@@ -36,6 +36,7 @@ describe("nested published advice", () => {
     };
     expect(checkedAdvice(contextual, { ...request, model: "football" })).toBe(contextual);
     for (const version of [
+      "football_match_context_v1",
       "football_joint_role_minutes_v1",
       "football_joint_role_retained_history_v1",
     ]) {
