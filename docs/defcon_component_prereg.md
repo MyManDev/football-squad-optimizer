@@ -4,9 +4,11 @@ Status: declaration for #1000, owner decision B recorded on 2026-10-07. This is 
 record for #872. It authorizes a measurement, with promotion conditional on the rule
 below. It changes neither the default nor a member page.
 
-The author opened no capture taken after 2026-10-10T10:00:00Z. The only live payload
-inspection for this declaration was the GW1 to GW5 field structure in
-`fpl-live-20260922T214539Z-364991a4f832`. Those five weeks were already read and are
+The author opened no capture taken after 2026-10-10T10:00:00Z. The author's only live
+payload inspection for this declaration was the GW1 to GW5 field structure in
+`fpl-live-20260922T214539Z-364991a4f832`. The cross-check from the owner's review,
+recorded in section 1, read only the GW1 to GW5 payloads of
+`fpl-live-20261002T104314Z-8b70515b9b31`. Those five weeks were already read and are
 development data. No 2025-26 input was opened. No scored-week outcome was opened. The
 declaration, including all constants below, is frozen at merge.
 
@@ -150,8 +152,10 @@ handoff identity, retained publication identity and payload inventory and checks
 may parse only GW1 to GW5 development history in each decision capture, reporting
 excluded fit rows and schema diagnostics. It never opens a GW6 or later event-live
 payload or computes candidate errors, ranks or a verdict. Validity of later fit history
-is first examined during the single reading. The output identifies which weeks can be
-paired and which fixed inputs are absent. No reading mode runs before the declared
+and every outcome-side condition of section 5 are first examined during the single
+reading. The output reports input presence and identity only: which weeks have their
+fixed inputs present and which fixed inputs are absent. It does not decide that a week
+can be paired. No reading mode runs before the declared
 settled capture is available.
 
 ## 5. Population and missing-week rule
@@ -162,6 +166,11 @@ settled capture. Map by persistent player code; a player absent from that settle
 capture is dropped from both arms, with ids and counts recorded. Use the decision
 capture's position for both arms. Do not restrict to a selected squad, appearance,
 minutes bucket or Top 100 holding.
+
+In a scored week only `stats.total_points`, element identity and fixture membership
+decide pairing. A realized DEFCON award or explanation that fails the section 1 checks
+is left out of the section 8 diagnostic, with its identity and reason recorded, and
+never makes the week missing.
 
 A week is missing when its selected decision capture, published default handoff,
 publication identity or deadline proof is absent or inconsistent; its required
