@@ -99,7 +99,7 @@ def test_failure_keeps_previous_ready_and_never_selects_partial(
         return real_site(tree)
 
     def fail_record(raw, target):
-        if target.name == "handoff.json":
+        if target.name == "202.json" and any(part.endswith(".bundle") for part in target.parts):
             raise OSError("synthetic recording failure")
         return real_write(raw, target)
 
@@ -123,6 +123,18 @@ def test_failure_keeps_previous_ready_and_never_selects_partial(
     assert not bundle.football_bundle_path(
         candidate["artifact_root"], candidate["snapshot_id"]
     ).exists()
+    if failure == "recording":
+        folder = bundle.football_bundle_stage_path(
+            candidate["artifact_root"], candidate["snapshot_id"], bundle.FootballBundleStage.FOLDER
+        )
+        assert (folder / "handoff.json").read_bytes() == candidate["handoff_path"].read_bytes()
+        assert (folder / "site/league/members.json").is_file()
+        assert (folder / "site/league/entries/101.json").is_file()
+        assert not (folder / "site/league/entries/202.json").exists()
+        # Isolate the real partial-folder guard from the attempt guard in this test.
+        bundle.football_bundle_stage_path(
+            candidate["artifact_root"], candidate["snapshot_id"], bundle.FootballBundleStage.STARTED
+        ).unlink()
     assert signature(candidate) != prior_signature
     selected = load(candidate, inputs=inputs, projection=projection)
     assert selected.football is None and not selected.football_components_bound
@@ -146,13 +158,44 @@ def test_failure_keeps_previous_ready_and_never_selects_partial(
     assert load(candidate).football_bundle_sha256 == completed.fingerprint
 
 
-@pytest.mark.parametrize("index", [1, 2, 3])
-def test_preexisting_partial_stage_evidence_cannot_use_legacy_fallback(case, index):
-    path = bundle.football_bundle_stage_paths(case["artifact_root"], case["snapshot_id"])[index]
-    if index == 3:
+@pytest.mark.parametrize(
+    "stage",
+    [
+        bundle.FootballBundleStage.PREPARATION,
+        bundle.FootballBundleStage.PRODUCTION,
+        bundle.FootballBundleStage.FOLDER,
+    ],
+)
+def test_preexisting_partial_stage_evidence_cannot_use_legacy_fallback(case, stage):
+    path = bundle.football_bundle_stage_path(case["artifact_root"], case["snapshot_id"], stage)
+    if stage is bundle.FootballBundleStage.FOLDER:
         path.mkdir()
     else:
         path.write_text("{}", encoding="utf-8")
     selected = load(case)
     assert selected.football is None
     assert any("bundle incomplete" in note for note in selected.notes)
+
+
+def test_unresolved_league_argument_does_not_disable_legacy_inputs(case):
+    from squadopt.contracts.league_tree import (
+        LeagueDirectoryError,
+        PublishedLeague,
+        write_league_directory,
+    )
+
+    write_league_directory(
+        case["site_data_root"],
+        [PublishedLeague(i, f"Synthetic {i}", "2026-27", 6, f"leagues/{i}") for i in (9, 10)],
+        generated_at_utc="2026-10-08T00:00:00Z",
+    )
+    before = signature(case)
+    assert load(case).football is not None
+    with pytest.raises(LeagueDirectoryError, match="say which one"):
+        bundle.seal_football_bundle(**case)
+    assert signature(case) == before
+    assert load(case).football is not None
+    assert not any(
+        path.exists()
+        for path in bundle.football_bundle_stage_paths(case["artifact_root"], case["snapshot_id"])
+    )

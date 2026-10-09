@@ -11,6 +11,7 @@ import json
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any
@@ -47,16 +48,23 @@ def football_bundle_path(artifact_root: Path, snapshot_id: str) -> Path:
     return football_artifact_path(artifact_root, snapshot_id).with_suffix(".bundle.json")
 
 
+class FootballBundleStage(StrEnum):
+    STARTED = ".bundle.started.json"
+    PREPARATION = ".bundle.preparation.json"
+    PRODUCTION = ".bundle.production.json"
+    FOLDER = ".bundle"
+
+
+def football_bundle_stage_path(
+    artifact_root: Path, snapshot_id: str, stage: FootballBundleStage
+) -> Path:
+    return football_artifact_path(artifact_root, snapshot_id).with_suffix(stage.value)
+
+
 def football_bundle_stage_paths(artifact_root: Path, snapshot_id: str) -> tuple[Path, ...]:
-    forecast = football_artifact_path(artifact_root, snapshot_id)
     return tuple(
-        forecast.with_suffix(suffix)
-        for suffix in (
-            ".bundle.started.json",
-            ".bundle.preparation.json",
-            ".bundle.production.json",
-            ".bundle",
-        )
+        football_bundle_stage_path(artifact_root, snapshot_id, stage)
+        for stage in FootballBundleStage
     )
 
 
@@ -440,9 +448,10 @@ def seal_football_bundle(
         read_football_bundle(
             artifact_root=artifact_root, snapshot_root=snapshot_root, snapshot_id=snapshot_id
         )
+    site_tree = single_league_tree(site_data_root, league_id)
     # A failed preparation has no ready marker or copied folder yet. Record the
     # attempt before either, so older v1 readers cannot serve its loose artifacts.
-    started = football_bundle_stage_paths(artifact_root, snapshot_id)[0]
+    started = football_bundle_stage_path(artifact_root, snapshot_id, FootballBundleStage.STARTED)
     _safe(Path(addressable(started)))
     write_bytes_once(
         document_bytes(
@@ -454,7 +463,7 @@ def seal_football_bundle(
         "forecast": football_artifact_path(artifact_root, snapshot_id),
         "components": football_components_path(artifact_root, snapshot_id),
         "handoff": handoff_path,
-        **_site_files(single_league_tree(site_data_root, league_id)),
+        **_site_files(site_tree),
     }
     if rotation_table_path is not None:
         files.update(
@@ -475,7 +484,7 @@ def seal_football_bundle(
         news_capture_id=news_capture_id,
         official_injury_capture_id=official_injury_capture_id,
     )
-    folder = marker.parent / (snapshot_id + ".bundle")
+    folder = football_bundle_stage_path(artifact_root, snapshot_id, FootballBundleStage.FOLDER)
     destinations = dict(files)
     destinations["handoff"] = folder / "handoff.json"
     for role, path in files.items():
