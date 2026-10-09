@@ -68,6 +68,13 @@ def _preparation_inputs(
     }
     inputs = {}
     for role, path in paths.items():
+        target = Path(addressable(path))
+        expects_directory = role == "capture"
+        if target.exists() and not (target.is_dir() if expects_directory else target.is_file()):
+            kind = "directory" if expects_directory else "file"
+            raise ValueError(
+                f"Invalid football preparation input {role}: Expected a {kind} at {path}."
+            )
         try:
             artifacts = fingerprint_paths([path])
         except WeeklyJournalError as error:
@@ -115,6 +122,19 @@ def _check_preparation(prior: Mapping[str, Any], current: Mapping[str, Any]) -> 
             raise ValueError(f"Football preparation input {role} changed; resume refused.")
     if prior.get("snapshot_id") != current["snapshot_id"]:
         raise ValueError("Football preparation identity changed; resume refused.")
+
+
+def _preparation_replay_identity(raw: bytes) -> dict[str, Any]:
+    """Compare create-once receipts by content while keeping the first recorded paths."""
+    document = _object(raw)
+    _check_preparation(document, document)
+    return {
+        **document,
+        "inputs": {
+            role: {key: value for key, value in identity.items() if key != "path"}
+            for role, identity in document["inputs"].items()
+        },
+    }
 
 
 def _source(snapshot_root: Path, capture_id: str) -> CapturedSnapshot:
@@ -561,8 +581,9 @@ def seal_football_bundle(
             raise ValueError("A different immutable bundle artifact already exists.")
     # Record normal writers' inputs before copies. A retry must keep all four identities.
     # This receipt is never a ready marker and is ignored by active bundle readers.
-    if not Path(addressable(preparation_path)).exists():
-        write_bytes_once(document_bytes(preparation), preparation_path)
+    write_bytes_once(
+        document_bytes(preparation), preparation_path, parse=_preparation_replay_identity
+    )
     for role, path in destinations.items():
         if path != files[role]:
             write_bytes_once(payloads[role], path)

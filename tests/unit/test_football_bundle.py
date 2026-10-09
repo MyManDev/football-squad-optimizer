@@ -11,7 +11,8 @@ from tests.unit.test_club_news_coding_versions import _document, _response
 from tests.unit.test_football_publication import publication_case as publication_case
 
 from squadopt.application.rotation_export import RotationExportRequest, export_rotation_evidence
-from squadopt.data.errors import DataError
+from squadopt.data.atomic import document_bytes
+from squadopt.data.errors import ConflictingBytesError, DataError
 from squadopt.data.snapshots import read_snapshot, write_snapshot
 from squadopt.data.sources.club_news_capture import CodedClub, write_club_news_capture
 from squadopt.data.sources.club_news_coding import (
@@ -217,11 +218,11 @@ def test_ready_marker_is_last_and_replays_exact_bytes(case, monkeypatch):
     original = bundle.write_bytes_once
     calls = []
 
-    def write(raw, target):
+    def write(raw, target, **kwargs):
         calls.append(target)
         if target == marker(case):
             assert all(path.exists() for path in calls[:-1])
-        return original(raw, target)
+        return original(raw, target, **kwargs)
 
     monkeypatch.setattr(bundle, "write_bytes_once", write)
     result = bundle.seal_football_bundle(**case)
@@ -335,10 +336,10 @@ def test_changed_ready_inputs_cannot_replace_previous_marker(case):
 def test_interrupted_copy_is_not_ready_and_can_complete(case, monkeypatch):
     original = bundle.write_bytes_once
 
-    def write(raw, target):
+    def write(raw, target, **kwargs):
         if target == marker(case):
             raise OSError("synthetic interruption")
-        return original(raw, target)
+        return original(raw, target, **kwargs)
 
     monkeypatch.setattr(bundle, "write_bytes_once", write)
     with pytest.raises(OSError, match="interruption"):
@@ -571,10 +572,10 @@ def test_legacy_wrong_replay_does_not_pin_wrong_preparation(case, monkeypatch, p
     original_writer = bundle.write_bytes_once
     if partial:
 
-        def interrupted(raw, target):
+        def interrupted(raw, target, **kwargs):
             if target == marker(case):
                 raise OSError("synthetic legacy interruption")
-            return original_writer(raw, target)
+            return original_writer(raw, target, **kwargs)
 
         monkeypatch.setattr(bundle, "write_bytes_once", interrupted)
         with pytest.raises(OSError, match="legacy interruption"):
@@ -602,10 +603,10 @@ def test_legacy_wrong_replay_does_not_pin_wrong_preparation(case, monkeypatch, p
 def test_interrupted_preparation_resumes_from_identical_retained_handoff(case, monkeypatch):
     original = bundle.write_bytes_once
 
-    def interrupted(raw, target):
+    def interrupted(raw, target, **kwargs):
         if target.name == "handoff.json":
             raise OSError("synthetic retained interruption")
-        return original(raw, target)
+        return original(raw, target, **kwargs)
 
     monkeypatch.setattr(bundle, "write_bytes_once", interrupted)
     with pytest.raises(OSError, match="retained interruption"):
@@ -659,12 +660,109 @@ def test_source_changed_after_identity_recheck_cannot_seal_a_different_receipt(c
     assert not marker(case).with_suffix(".preparation.json").exists()
 
 
-def test_missing_writer_role_names_the_missing_path(case):
-    case["handoff_path"].unlink()
+@pytest.mark.parametrize("damage", ["missing_handoff", "handoff_directory", "capture_file"])
+def test_missing_writer_role_names_the_missing_path(case, tmp_path, capsys, damage):
+    from scripts.prepare_football_bundle import main
+
+    role = "handoff"
+    path = case["handoff_path"]
+    if damage == "capture_file":
+        role = "capture"
+        case = {**case, "snapshot_root": tmp_path / "wrong-captures"}
+        path = case["snapshot_root"] / case["snapshot_id"]
+        path.parent.mkdir()
+        path.write_bytes(b"synthetic file instead of a capture directory")
+    else:
+        path.unlink()
+        if damage == "handoff_directory":
+            path.mkdir()
     with pytest.raises(ValueError) as error:
         bundle.seal_football_bundle(**case)
-    assert "handoff" in str(error.value)
-    assert case["handoff_path"].name in str(error.value)
+    message = str(error.value)
+    assert f"Invalid football preparation input {role}:" in message
+    assert str(path) in message
+    if damage == "missing_handoff":
+        assert "Declared artifact is missing" in message
+    else:
+        assert f"Expected a {'directory' if role == 'capture' else 'file'}" in message
+    args = []
+    for key, flag in {
+        "artifact_root": "--artifact-root",
+        "snapshot_root": "--snapshot-root",
+        "snapshot_id": "--snapshot-id",
+        "handoff_path": "--handoff",
+        "site_data_root": "--site-data-root",
+    }.items():
+        args.extend([flag, str(case[key])])
+    assert main(args) == 1
+    assert capsys.readouterr().out.strip() == f"Refused: {message}"
+    assert not marker(case).exists()
+    assert not marker(case).with_suffix(".preparation.json").exists()
+    assert not (marker(case).parent / (case["snapshot_id"] + ".bundle")).exists()
+
+
+@pytest.mark.parametrize("changed_role", ["capture", "handoff", "forecast", "components", None])
+def test_concurrent_preparation_receipt_compares_content_before_any_copy(
+    case, monkeypatch, changed_role
+):
+    files = {
+        "handoff": case["handoff_path"],
+        "forecast": bundle.football_artifact_path(case["artifact_root"], case["snapshot_id"]),
+        "components": bundle.football_components_path(case["artifact_root"], case["snapshot_id"]),
+    }
+    competing = bundle._preparation_inputs(case["snapshot_root"], case["snapshot_id"], files)
+    if changed_role is None:
+        for identity in competing["inputs"].values():
+            identity["path"] += ".retained"
+    else:
+        competing["inputs"][changed_role]["sha256"] = "f" * 64
+    held = document_bytes(competing)
+    receipt = marker(case).with_suffix(".preparation.json")
+    original = bundle._validate
+    calls = 0
+
+    def another_writer_appears(*args, **kwargs):
+        nonlocal calls
+        value = original(*args, **kwargs)
+        calls += 1
+        if calls == 1:
+            bundle.write_bytes_once(held, receipt)
+        return value
+
+    monkeypatch.setattr(bundle, "_validate", another_writer_appears)
+    if changed_role is None:
+        ready = bundle.seal_football_bundle(**case)
+        assert read(case).fingerprint == ready.fingerprint
+    else:
+        with pytest.raises(ConflictingBytesError, match="different content"):
+            bundle.seal_football_bundle(**case)
+        assert not marker(case).exists()
+        assert not (marker(case).parent / (case["snapshot_id"] + ".bundle")).exists()
+    assert receipt.read_bytes() == held
+
+
+def test_interrupted_preparation_resumes_after_moving_all_artifacts(case, tmp_path, monkeypatch):
+    original = bundle.write_bytes_once
+
+    def interrupted(raw, target, **kwargs):
+        if target.name == "handoff.json":
+            raise OSError("synthetic moved-artifact interruption")
+        return original(raw, target, **kwargs)
+
+    monkeypatch.setattr(bundle, "write_bytes_once", interrupted)
+    with pytest.raises(OSError, match="moved-artifact interruption"):
+        bundle.seal_football_bundle(**case)
+    receipt = marker(case).with_suffix(".preparation.json")
+    held = receipt.read_bytes()
+    moved_root = tmp_path / "moved-artifacts"
+    shutil.copytree(case["artifact_root"], moved_root)
+    moved_case = {**case, "artifact_root": moved_root}
+    monkeypatch.setattr(bundle, "write_bytes_once", original)
+    ready = bundle.seal_football_bundle(**moved_case)
+    assert ready.snapshot_id == case["snapshot_id"]
+    assert read(moved_case).fingerprint == ready.fingerprint
+    assert marker(moved_case).with_suffix(".preparation.json").read_bytes() == held
+    assert receipt.read_bytes() == held
     assert not marker(case).exists()
 
 
