@@ -14,13 +14,15 @@ import json
 import re
 import subprocess
 from collections.abc import Mapping
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from squadopt.application.defcon_component import (
+    DefconForbiddenSeason,
     DefconInputError,
     DefconMissingInputs,
+    DefconUnreadableDocument,
     candidate_handoff,
     decode,
     fixture_counts,
@@ -28,6 +30,7 @@ from squadopt.application.defcon_component import (
     history_week,
     identity,
     integer,
+    require_field,
     settled,
 )
 from squadopt.data.atomic import WRITTEN, write_document_once
@@ -56,7 +59,7 @@ from squadopt.prediction.defcon_component import (
 
 ROOT = Path(__file__).resolve().parents[1]
 DECLARATION = "docs/defcon_component_prereg.md"
-DECLARATION_SHA256 = "49f53d6b1625d960101b449b6be2e046e09052242a3977f3e4769099acdefd80"
+DECLARATION_SHA256 = "7750f0a72106e7d6e3cedae0fe7bbbf69c16794d8ffe958235d56052b79063ee"
 RECORD = "docs/research/defcon_component_reading"
 MERGE_BOUNDARY = "2026-10-12T19:00:00Z"
 FALLBACK_BOUNDARY = "2026-10-17T10:00:00Z"
@@ -131,7 +134,10 @@ def window(declaration: Mapping[str, str]) -> tuple[int, ...]:
 
 
 def partial_snapshot(
-    directory: Path, names: tuple[str, ...] = (BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD)
+    directory: Path,
+    names: tuple[str, ...] = (BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD),
+    *,
+    observed: set[str] | None = None,
 ) -> CapturedSnapshot:
     """Verify the metadata binding, then read only named payloads, never all of them."""
     directory = safe_path(directory)
@@ -175,7 +181,14 @@ def partial_snapshot(
     for name in names:
         if name not in checksums:
             raise DefconMissingInputs("A required payload is not in the retained inventory.")
-        content = safe_path(directory / "payloads" / name).read_bytes()
+        try:
+            content = safe_path(directory / "payloads" / name).read_bytes()
+        except FileNotFoundError as error:
+            raise DefconMissingInputs(
+                "A required payload is absent in the retained capture."
+            ) from error
+        if observed is not None:
+            observed.add(name)
         if payload_checksum(content) != checksums[name]:
             raise DefconMissingInputs("A required payload differs from its captured checksum.")
         payloads[name] = content
@@ -190,13 +203,38 @@ class CaptureInventory(dict[str, CapturedSnapshot]):
         self.skipped: list[dict[str, str]] = []
 
 
+def publication_fields(document: Any) -> dict[str, Any]:
+    season = require_field(document, "season", str)
+    if season != DEFCON_SEASON:
+        raise DefconForbiddenSeason("A 2025-26 or other-season publication is forbidden.")
+    require_field(document, "gameweek", int)
+    require_field(document, "contract_version", str)
+    require_field(document, "player_id_space", str)
+    capture = require_field(document, "capture", dict)
+    require_field(capture, "snapshot_id", str, label="capture.snapshot_id")
+    require_field(capture, "captured_at_utc", str, label="capture.captured_at_utc")
+    provenance = require_field(document, "provenance", dict)
+    require_field(
+        provenance,
+        "projection_handoff_fingerprint",
+        str,
+        label="provenance.projection_handoff_fingerprint",
+    )
+    stamp = require_field(document, "generated_at_utc", str)
+    try:
+        normalized = normalize_utc_timestamp(stamp, label="generated_at_utc")
+    except (DataError, ValueError, TypeError) as error:
+        raise DefconInputError("Required field generated_at_utc is invalid.") from error
+    return {**document, "generated_at_utc": normalized}
+
+
 def inventory(root: Path, *, as_of: str) -> CaptureInventory:
     result = CaptureInventory()
     for directory in sorted(safe_path(root).iterdir()):
         if directory.is_dir() and CAPTURE_NAME.fullmatch(directory.name):
             try:
                 snapshot = partial_snapshot(directory)
-            except (OSError, json.JSONDecodeError) as error:
+            except (OSError, json.JSONDecodeError, DefconUnreadableDocument) as error:
                 result.skipped.append(
                     {
                         "snapshot_id": directory.name,
@@ -223,8 +261,8 @@ def published_pair(
         (safe_path(publications) / DEFCON_SEASON / f"gw{week:02d}").glob("entry-*/*/advice.json")
     ):
         content = safe_path(path).read_bytes()
-        doc = decode(content)
-        if doc["season"] != DEFCON_SEASON or integer(doc["gameweek"], minimum=1) != week:
+        doc = publication_fields(decode(content))
+        if integer(doc["gameweek"], minimum=1) != week:
             raise DefconInputError("The retained publication has an invalid season or target.")
         if (
             doc["contract_version"] != "member_advice_record_v2"
@@ -270,16 +308,19 @@ def published_pair(
         raise DefconMissingInputs(
             "The final publication capture has inconsistent default identities."
         )
-    matches = []
+    matches: dict[str, tuple[Any, list[str]]] = {}
     for path in sorted((safe_path(handoffs) / "by-capture" / identifier).glob("*.json")):
         content = safe_path(path).read_bytes()
         doc = decode(content)
-        if doc.get("season") != DEFCON_SEASON:
-            raise DefconInputError("A 2025-26 or other-season handoff is forbidden.")
-        keys = list(doc.get("expected_points", {}))
-        if any(not re.fullmatch(r"[1-9][0-9]*", key) for key in keys):
+        if require_field(doc, "season", str, label="handoff.season") != DEFCON_SEASON:
+            raise DefconForbiddenSeason("A 2025-26 or other-season handoff is forbidden.")
+        keys = list(require_field(doc, "expected_points", dict, label="handoff.expected_points"))
+        if any(not isinstance(key, str) or not re.fullmatch(r"[1-9][0-9]*", key) for key in keys):
             raise DefconInputError("The handoff roster keys are not canonical persistent codes.")
-        handoff = read_projection_handoff(path)
+        try:
+            handoff = read_projection_handoff(path)
+        except (ValueError, KeyError, TypeError) as error:
+            raise DefconInputError("The retained projection handoff is malformed.") from error
         if doc.get("fingerprint") != handoff.fingerprint:
             raise DefconInputError("The handoff lacks an exact recorded fingerprint.")
         if handoff.fingerprint == fingerprint:
@@ -289,10 +330,12 @@ def published_pair(
                 or handoff.model_version not in DEFCON_CANDIDATE_VERSIONS
             ):
                 raise DefconMissingInputs("The publication's handoff is not the declared default.")
-            matches.append((handoff, payload_checksum(content)))
+            if fingerprint not in matches:
+                matches[fingerprint] = (handoff, [])
+            matches[fingerprint][1].append(payload_checksum(content))
     if len(matches) != 1:
         raise DefconMissingInputs("The final published default handoff is absent or ambiguous.")
-    base, handoff_hash = matches[0]
+    base, handoff_hashes = matches[fingerprint]
     _, elements = identity(capture)
     if set(base.expected_points) != {element["code"] for element in elements.values()}:
         raise DefconInputError("The published default roster differs from its decision capture.")
@@ -302,7 +345,8 @@ def published_pair(
         {
             "capture": identifier,
             "handoff_fingerprint": fingerprint,
-            "handoff_sha256": handoff_hash,
+            "handoff_sha256": sorted(handoff_hashes)[0],
+            "matching_handoff_sha256": sorted(set(handoff_hashes)),
             "published_at_utc": selected[0].isoformat(),
             "publication_sha256": sorted(
                 item[3] for item in records if item[1]["capture"]["snapshot_id"] == identifier
@@ -353,6 +397,7 @@ def check_inputs(
     snapshot_root: Path,
 ) -> dict[str, Any]:
     rows = []
+    development_reads: set[str] = set()
     for week in weeks:
         row: dict[str, Any] = {"gameweek": week, "status": "missing"}
         try:
@@ -403,6 +448,7 @@ def check_inputs(
                         FIXTURES_PAYLOAD,
                         *(live_payload(w) for w in range(1, min(week, 6))),
                     ),
+                    observed=development_reads,
                 )
                 histories = [
                     history_week(
@@ -431,6 +477,11 @@ def check_inputs(
                     development_schema_disagreements=[
                         item for h in histories for item in h.schema_disagreements
                     ],
+                    unmapped_history={
+                        str(w): list(h.unmapped_elements)
+                        for w, h in zip(range(1, min(week, 6)), histories, strict=True)
+                    },
+                    unmapped_history_count=sum(len(h.unmapped_elements) for h in histories),
                 )
         except (DefconMissingInputs, DefconComponentError, DataError, DefconInputError) as error:
             row["reason"] = (
@@ -444,7 +495,11 @@ def check_inputs(
         "as_of": as_of,
         "weeks": rows,
         "outcomes_read": False,
-        "development_history_weeks_read": list(range(1, 6)),
+        "development_history_weeks_read": sorted(
+            int(match.group(1))
+            for name in development_reads
+            if (match := re.fullmatch(r"event-gw(\d{2})-live\.json", name))
+        ),
         "skipped_captures": getattr(captures, "skipped", []),
         "promotion": False,
     }
@@ -483,15 +538,21 @@ def paired_week(
         awarded[row.player_code] = awarded.get(row.player_code, 0) + row.awarded_points
     totals = {}
     seen = set()
-    for element in decode(outcome.payloads[live_payload(base.gameweek)])["elements"]:
-        identifier = integer(element["id"], minimum=1)
+    for element in require_field(
+        decode(outcome.payloads[live_payload(base.gameweek)]),
+        "elements",
+        list,
+        label="realized.elements",
+    ):
+        identifier = integer(require_field(element, "id", int, label="realized.id"), minimum=1)
         if identifier in seen:
             raise DefconInputError("A realized element is duplicated.")
         seen.add(identifier)
         if identifier in out_elements:
-            value = element["stats"]["total_points"]
-            if type(value) is not int:
-                raise DefconMissingInputs("Realized total points are absent or invalid.")
+            if out_elements[identifier]["element_type"] == 1:
+                continue
+            stats = require_field(element, "stats", dict, label="realized.stats")
+            value = require_field(stats, "total_points", int, label="stats.total_points")
             totals[out_elements[identifier]["code"]] = value
     component = candidate.diagnostics["defcon_component"]
     if not isinstance(component, dict):
@@ -542,6 +603,9 @@ def paired_week(
             excluded_fit_rows=component["excluded_fit_rows"],
             development_schema_disagreements=component["development_schema_disagreements"],
             fixture_count_mismatches=mismatches,
+            excluded_realized_diagnostics=list(observed.excluded_rows),
+            unmapped_history=component["unmapped_history"],
+            unmapped_history_count=sum(len(ids) for ids in component["unmapped_history"].values()),
         )
     if not rows:
         raise DefconMissingInputs("The paired population is empty.")
@@ -582,6 +646,24 @@ def reading(
     selected = first_settled(captures, weeks)
     if as_instant(as_of) < as_instant(selected.metadata.captured_at_utc):
         raise DefconMissingInputs("The reading instant precedes the declared settled capture.")
+    for skipped in getattr(captures, "skipped", []):
+        name = skipped["snapshot_id"]
+        named_at = datetime.strptime(
+            name[len("fpl-live-") : len("fpl-live-") + 16], "%Y%m%dT%H%M%SZ"
+        ).replace(tzinfo=UTC)
+        if (
+            named_at <= as_instant(selected.metadata.captured_at_utc)
+            and (safe_path(snapshot_root) / name / "metadata.json").exists()
+        ):
+            raise DefconInputError(f"An earlier retained metadata file is unreadable: {name}.")
+    for week in weeks:
+        try:
+            published_pair(publications, handoffs, captures, week, as_of=as_of)
+        except DefconForbiddenSeason:
+            raise
+        except (DefconInputError, DefconMissingInputs, DataError, json.JSONDecodeError):
+            # Week-confined problems are recorded in the reading loop below.
+            pass
     if (ROOT / (RECORD + ".json")).exists() or command(
         "git", "log", "--all", "--format=%H", "--", RECORD + ".json"
     ):
@@ -672,6 +754,7 @@ def reading(
             "reading_capture_fingerprint": selected.metadata.fingerprint,
             "reading_input_hashes": dict(selected.metadata.checksums),
             "scored_window": list(weeks),
+            "gate_completed": True,
             "week_identities": audit,
             **summarize(tuple(all_rows), scored_weeks=weeks),
         }

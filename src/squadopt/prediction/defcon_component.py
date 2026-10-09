@@ -148,7 +148,11 @@ def expected_defcon_term(
     award_points: int,
     rates: DefconRates,
 ) -> float:
-    """The published appearance estimate is used unchanged once per fixture."""
+    """Use a published finite estimate in [0, 1] once per fixture.
+
+    None means an omitted entry in a present mapping and supplies zero. The caller
+    must refuse an entirely absent published mapping for a nonblank population.
+    """
     _integer(fixture_count, "fixture count")
     _integer(award_points, "position award")
     if position not in POSITIONS:
@@ -162,5 +166,5 @@ def expected_defcon_term(
         or not math.isfinite(appearance_probability)
         or not 0.0 <= appearance_probability <= 1.0
     ):
-        raise DefconComponentError("A nonblank target needs its published appearance estimate.")
+        raise DefconComponentError("The published appearance estimate must be finite in [0, 1].")
     return fixture_count * appearance_probability * rates.rate(player_code, position) * award_points

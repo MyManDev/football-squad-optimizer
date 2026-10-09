@@ -8,6 +8,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from typing import Any
 
+from squadopt.data.errors import DataError
 from squadopt.data.snapshots import (
     CapturedSnapshot,
     build_snapshot_id,
@@ -32,6 +33,21 @@ class DefconInputError(ValueError):
     """An identity, duplicate key or forbidden season invalidates the inventory."""
 
 
+class DefconForbiddenSeason(DefconInputError):
+    """Refuse a forbidden season before the single outcome reading is claimed."""
+
+
+class DefconUnreadableDocument(DefconInputError):
+    """A retained file cannot be decoded as a JSON document."""
+
+
+def require_field(record: Any, key: str, kind: type[Any], *, label: str | None = None) -> Any:
+    value = record.get(key) if isinstance(record, dict) else None
+    if not isinstance(value, kind) or (kind is int and type(value) is not int):
+        raise DefconInputError(f"Required field {label or key} is absent or invalid.")
+    return value
+
+
 class DefconMissingInputs(ValueError):
     """This week cannot be paired under the fixed declaration."""
 
@@ -51,7 +67,10 @@ def decode(content: bytes) -> Any:
             result[key] = value
         return result
 
-    return json.loads(content, object_pairs_hook=unique)
+    try:
+        return json.loads(content, object_pairs_hook=unique)
+    except (json.JSONDecodeError, UnicodeError) as error:
+        raise DefconUnreadableDocument("A retained JSON document is invalid.") from error
 
 
 def payload(snapshot: CapturedSnapshot, name: str) -> Any:
@@ -85,8 +104,9 @@ def identity(snapshot: CapturedSnapshot) -> tuple[dict[str, Any], dict[int, dict
     ):
         raise DefconInputError("The decision capture metadata fails its identity binding.")
     bootstrap = payload(snapshot, BOOTSTRAP_PAYLOAD)
+    require_field(bootstrap, "elements", list, label="bootstrap.elements")
     if infer_season(snapshot) != DEFCON_SEASON:
-        raise DefconInputError("Only 2026-27 is admitted; 2025-26 input is forbidden.")
+        raise DefconForbiddenSeason("Only 2026-27 is admitted; 2025-26 input is forbidden.")
     if not isinstance(bootstrap.get("elements"), list):
         raise DefconInputError("The roster is absent or invalid.")
     elements: dict[int, dict[str, Any]] = {}
@@ -100,7 +120,7 @@ def identity(snapshot: CapturedSnapshot) -> tuple[dict[str, Any], dict[int, dict
             raise DefconInputError("The roster has an invalid element, code or club.") from error
         if identifier in elements or code in codes:
             raise DefconInputError("The roster has duplicate element ids or persistent codes.")
-        if type(element["element_type"]) is not int or element["element_type"] not in (1, 2, 3, 4):
+        if require_field(element, "element_type", int) not in (1, 2, 3, 4):
             raise DefconInputError("The published roster contains an invalid position.")
         elements[identifier] = element
         codes.add(code)
@@ -111,8 +131,11 @@ def identity(snapshot: CapturedSnapshot) -> tuple[dict[str, Any], dict[int, dict
 
 def fixture_map(snapshot: CapturedSnapshot) -> dict[int, dict[str, Any]]:
     result: dict[int, dict[str, Any]] = {}
-    for fixture in payload(snapshot, FIXTURES_PAYLOAD):
-        identifier = integer(fixture["id"], minimum=1)
+    document = payload(snapshot, FIXTURES_PAYLOAD)
+    if not isinstance(document, list):
+        raise DefconInputError("The retained fixtures are not a list.")
+    for fixture in document:
+        identifier = integer(require_field(fixture, "id", int, label="fixture.id"), minimum=1)
         if identifier in result:
             raise DefconInputError("A fixture id is duplicated.")
         result[identifier] = fixture
@@ -122,12 +145,16 @@ def fixture_map(snapshot: CapturedSnapshot) -> dict[int, dict[str, Any]]:
 def fixture_counts(
     fixtures: Mapping[int, dict[str, Any]], elements: Mapping[int, dict[str, Any]], week: int
 ) -> dict[int, int]:
-    return {
-        element["code"]: sum(
-            fixture.get("event") == week
-            and element["team"] in (fixture["team_h"], fixture["team_a"])
-            for fixture in fixtures.values()
+    matching = [fixture for fixture in fixtures.values() if fixture.get("event") == week]
+    clubs = [
+        (
+            require_field(fixture, "team_h", int, label="fixture.team_h"),
+            require_field(fixture, "team_a", int, label="fixture.team_a"),
         )
+        for fixture in matching
+    ]
+    return {
+        element["code"]: sum(element["team"] in pair for pair in clubs)
         for element in elements.values()
     }
 
@@ -135,7 +162,11 @@ def fixture_counts(
 def settled(
     bootstrap: Mapping[str, Any], fixtures: Mapping[int, dict[str, Any]], week: int
 ) -> bool:
-    events = [event for event in bootstrap["events"] if event["id"] == week]
+    events = [
+        event
+        for event in require_field(bootstrap, "events", list)
+        if require_field(event, "id", int, label="event.id") == week
+    ]
     if not events:
         return False
     if len(events) != 1:
@@ -170,7 +201,7 @@ def history_week(
     award_points: Mapping[str, int],
     deadline_utc: str | None = None,
 ) -> ParsedHistory:
-    """Read awarded labels and exclude invalid fit fixtures from both counts."""
+    """Read awarded labels, excluding invalid fit or realized diagnostic fixtures."""
     if not settled(bootstrap, fixtures, week):
         raise DefconMissingInputs("A required prior or realized week is not settled.")
     if deadline_utc is not None and as_instant(snapshot.metadata.captured_at_utc) >= as_instant(
@@ -183,8 +214,8 @@ def history_week(
     disagreements: list[dict[str, Any]] = []
     seen: set[int] = set()
     crosschecks = 0
-    for entry in payload(snapshot, live_payload(week))["elements"]:
-        element_id = integer(entry["id"], minimum=1)
+    for entry in require_field(payload(snapshot, live_payload(week)), "elements", list):
+        element_id = integer(require_field(entry, "id", int, label="event-live.id"), minimum=1)
         if element_id in seen:
             raise DefconInputError("An event-live element is duplicated.")
         seen.add(element_id)
@@ -194,6 +225,8 @@ def history_week(
         element = elements[element_id]
         code = element["code"]
         position = {1: "GK", 2: "DEF", 3: "MID", 4: "FWD"}[element["element_type"]]
+        if position == "GK" and deadline_utc is None:
+            continue
         local: set[int] = set()
         player_rows: list[FixtureAppearance] = []
         player_excluded = False
@@ -204,15 +237,16 @@ def history_week(
             if total_minutes > 0 and not entry["explain"]:
                 raise DefconMissingInputs("Positive gameweek minutes have no fixture explanation.")
         except (DefconMissingInputs, KeyError, TypeError) as error:
-            if deadline_utc is None:
-                raise DefconMissingInputs("Realized fixture minutes are invalid.") from error
             excluded.append(
                 {"gameweek": week, "player_code": code, "fixture": None, "reason": str(error)}
             )
             continue
         for explanation in entry["explain"]:
-            fixture_id = explanation.get("fixture")
+            fixture_id = None
             try:
+                if not isinstance(explanation, dict):
+                    raise DefconMissingInputs("A fixture explanation is invalid.")
+                fixture_id = explanation.get("fixture")
                 fixture_id = integer(fixture_id, minimum=1)
                 if fixture_id in local:
                     raise DefconInputError("A player-fixture explanation is duplicated.")
@@ -266,9 +300,7 @@ def history_week(
                         DEFCON_SEASON, week, fixture_id, code, position, kickoff, minutes, points
                     )
                 )
-            except (DefconMissingInputs, KeyError, TypeError) as error:
-                if deadline_utc is None:
-                    raise DefconMissingInputs("Realized fixture explanation is invalid.") from error
+            except (DefconMissingInputs, DataError, KeyError, TypeError) as error:
                 player_excluded = True
                 excluded.append(
                     {
@@ -279,20 +311,33 @@ def history_week(
                     }
                 )
         if not player_excluded and sum(row.minutes for row in player_rows) != total_minutes:
-            if deadline_utc is None:
-                raise DefconMissingInputs(
-                    "Fixture minutes do not sum to the reported gameweek minutes."
+            unexplained = {
+                f["id"]
+                for f in fixtures.values()
+                if f.get("event") == week and element["team"] in (f.get("team_h"), f.get("team_a"))
+            } - local
+            player_excluded = True
+            if unexplained and sum(row.minutes for row in player_rows) < total_minutes:
+                excluded.extend(
+                    {
+                        "gameweek": week,
+                        "player_code": code,
+                        "fixture": f,
+                        "reason": "missing_fixture_explanation",
+                    }
+                    for f in sorted(unexplained)
                 )
-            excluded.extend(
-                {
-                    "gameweek": week,
-                    "player_code": code,
-                    "fixture": row.fixture,
-                    "reason": "fixture_minutes_total_mismatch",
-                }
-                for row in player_rows
-            )
-            player_rows = []
+            else:
+                excluded.extend(
+                    {
+                        "gameweek": week,
+                        "player_code": code,
+                        "fixture": row.fixture,
+                        "reason": "fixture_minutes_total_mismatch",
+                    }
+                    for row in player_rows
+                )
+                player_rows = []
         if (
             week <= 5
             and total_minutes > 0
@@ -300,18 +345,29 @@ def history_week(
             and not player_excluded
             and position != "GK"
         ):
-            count = integer(entry["stats"]["defensive_contribution"])
-            threshold = 10 if position == "DEF" else 12
-            crosschecks += 1
-            if (count >= threshold) != (sum(row.awarded_points for row in player_rows) > 0):
+            try:
+                count = integer(entry["stats"]["defensive_contribution"])
+            except (DefconMissingInputs, KeyError, TypeError):
                 disagreements.append(
                     {
                         "gameweek": week,
                         "player_code": code,
                         "fixture": next(iter(local)),
-                        "reason": "count_award_disagreement",
+                        "reason": "count_absent",
                     }
                 )
+            else:
+                threshold = 10 if position == "DEF" else 12
+                crosschecks += 1
+                if (count >= threshold) != (sum(row.awarded_points for row in player_rows) > 0):
+                    disagreements.append(
+                        {
+                            "gameweek": week,
+                            "player_code": code,
+                            "fixture": next(iter(local)),
+                            "reason": "count_award_disagreement",
+                        }
+                    )
         rows.extend(player_rows)
     return ParsedHistory(
         tuple(rows), tuple(sorted(unmapped)), crosschecks, tuple(excluded), tuple(disagreements)
@@ -323,7 +379,7 @@ def candidate_handoff(
 ) -> InSeasonProjection:
     """Return unconditional base plus DEFCON; production project applies availability."""
     if base.season != DEFCON_SEASON:
-        raise DefconInputError("Only 2026-27 is admitted; 2025-26 handoffs are forbidden.")
+        raise DefconForbiddenSeason("Only 2026-27 is admitted; 2025-26 handoffs are forbidden.")
     bootstrap, elements = identity(snapshot)
     if base.source_snapshot_id != snapshot.metadata.snapshot_id:
         raise DefconMissingInputs("The published handoff and decision capture disagree.")

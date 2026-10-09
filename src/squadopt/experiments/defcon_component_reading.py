@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 
 from squadopt.evaluation.live_projection_audit import PRIOR_MINUTES_BUCKETS
+from squadopt.prediction.defcon_component import DEFCON_PRIOR_APPEARANCES
 
 BOOTSTRAP_DRAWS = 10_000
 BOOTSTRAP_SEED = 20261007
@@ -199,7 +200,7 @@ def summarize(
 def reading_constants() -> dict[str, Any]:
     """Keep constants available even if the numerical summary cannot complete."""
     return {
-        "prior_fixture_appearances": 20,
+        "prior_fixture_appearances": DEFCON_PRIOR_APPEARANCES,
         "bootstrap_draws": BOOTSTRAP_DRAWS,
         "bootstrap_seed": BOOTSTRAP_SEED,
         "quantile_method": "linear",

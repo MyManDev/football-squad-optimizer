@@ -44,6 +44,11 @@ files, reporting excluded fit fixtures and schema disagreements. They never open
 a GW6 or later event-live file, calculate candidate error, rank players or
 produce a gate verdict. Later fit validity is checked at the single reading. Post each output on #1000.
 
+Ready here describes input presence and identity, not final pairability. The report
+lists the development history actually opened, exclusions, absent count diagnostics
+and unmapped historical element ids. Missing or malformed inputs for one week leave
+the other weeks' rows available.
+
 ## The single reading
 
 After the declared first settled capture exists, the owner invokes the command
@@ -64,6 +69,14 @@ missing with a named reason. A stopped reading after outcome access saves a
 completed `insufficient_evidence` record with error type and message, while its
 private claim prevents a rerun. Unreadable capture metadata is skipped and its
 identity and reason are included in the report. No output promotes either candidate.
+
+If an unreadable metadata file exists at or before the selected reading capture,
+the reading refuses before its claim rather than substituting a later capture.
+An interrupted directory without metadata remains skippable. Forbidden-season
+publication or handoff identities also refuse before the claim. Multiple retained
+copies of one handoff fingerprint form one identity and all their byte hashes are
+recorded. A malformed realized DEFCON explanation is excluded from diagnostics with
+its player, fixture and reason; valid total points still pair that player and week.
 
 Submit these records as step 4 within seven days of the first settled capture.
 Only a passed verdict can support the separate step 5 wiring PR and its required
