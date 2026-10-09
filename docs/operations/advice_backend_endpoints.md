@@ -5,7 +5,7 @@ after the GW6 publish. The route was recorded on #632 (comment 6033468399, 2026-
 Its first step is this inventory: every route the backend serves, who calls it, what the
 site does when it is built without `VITE_ADVICE_API_ORIGIN`, and what replaces the route.
 
-Everything below was read at develop 6e7e6176, and line numbers refer to that commit.
+Everything below was read at develop 72f0fc57, and line numbers refer to that commit.
 
 #1001 owns three parts of the replacement: preferences on the device, hiding Contribute
 without an origin, and keeping the weekly football build. This page links #1001 and does
@@ -36,7 +36,7 @@ published tree plus the device's one-week plan.
 The API declares 18 routes. The site calls 7 of them.
 
 #988's list counts league state and the season views as routes the site uses, and #1001's
-endpoint table adds metrics, ready and health. At 6e7e6176 the site calls none of them, and
+endpoint table adds metrics, ready and health. At 72f0fc57 the site calls none of them, and
 their callers are in the next section. #1001 also says the contributions router is mounted
 only when a store is configured (`app.py:216-219`). That holds for `create_app`, but the
 deployment always passes a store (`runtime.py:114`), so the live backend serves all three
@@ -102,7 +102,7 @@ to the release.
   pure-points plan at 3 and 5 weeks at weight 0 and at each Top 100 weight, and the rival
   strategies over those windows at the same weights, against the default rival only
   (`src/squadopt/application/league_views.py:541-547`, `:567-586`, `:634-680` and
-  `:1283-1287`). Any other multi-week selection is computed only on request. #984 covers it
+  `:1285-1289`). Any other multi-week selection is computed only on request. #984 covers it
   only if its verdict says device. If the owner moves 352490 to the device menu (#981 step
   8, still his to decide per #1012), its publish solves no member (#981 step 6), and these
   published plans go too.
@@ -115,13 +115,13 @@ to the release.
   shows (`OfficialInformationCard.tsx:86-100`). Nothing replaces it. #1001 default b lets
   the option go with route 1, and #1001 step 5 keeps the weekly football build.
 - **The manager's word beyond the published documents.** The publish writes the one-week
-  manager's-word documents (`league_views.py:1297-1302`). The device does not take the
+  manager's-word documents (`league_views.py:1299-1304`). The device does not take the
   switch (`selection.ts:60`, `docs/contracts/league_device_plan_v1.md:141`), and #1001
   lists it as not in scope. #1006 records the manager's word on the device after route 1 as
   a separate owner decision (see "Still to decide").
 - **A named chip at a Top 100 weight, at one week.** The service computes it on request
   (`src/squadopt/application/advice_menu.py:268-276`). The publish writes chip documents
-  only at weight 0 (`league_views.py:465-484` and `:1716-1731`), and the device refuses the
+  only at weight 0 (`league_views.py:465-484` and `:1718-1733`), and the device refuses the
   pair (`selection.ts:76`, `league_device_plan_v1.md:120-121`). No issue covers it. A chip
   at 3 and 5 weeks is under the first item.
 - **A rival strategy at a Top 100 weight against a rival other than the default.** The
