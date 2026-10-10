@@ -31,6 +31,7 @@ from squadopt.features.football_tactical_inputs import (
     projection_digest,
     recipient_features,
     team_features,
+    validate_tactical_projection,
 )
 from squadopt.prediction.football_tactical_matchup import TacticalMatchupModel
 
@@ -896,6 +897,33 @@ def test_near_unit_raw_state_weights_are_normalized_consistently_and_receipted(
     assert all(p.clean_sheet_probability == 1 for p in result.home.players)
     assert all(p.clean_sheet_probability <= 1 for p in result.away.players)
     assert result.home.team_goal_rate == 0
+
+
+def test_admitted_state_weights_reach_exact_unit_mass_when_the_largest_ulp_is_coarse(
+    fitted: TacticalMatchupModel,
+) -> None:
+    # After division the residual mass is below half an ulp of the largest weight,
+    # so adding it to that weight cannot reach exact unit mass by itself.
+    weights = (0.08425102681607942, 0.09333810185124225, 0.2828427328825523, 0.539568138450126)
+    projection = _projection(season=TARGET_SEASON)
+    state = projection.states[0]
+    split = replace(
+        projection,
+        states=tuple(
+            replace(state, state_id=f"state-{index}", weight=weight)
+            for index, weight in enumerate(weights)
+        ),
+    )
+    validate_tactical_projection(split)
+    normalized = tactical.normalized_state_weights(split)
+    assert math.fsum(float(v) for v in normalized) == 1
+    assert normalized == pytest.approx(weights, rel=1e-15, abs=1e-16)
+    result, single = fitted.predict(split), fitted.predict(projection)
+    assert math.fsum(s.weight for s in result.states) == 1
+    assert result.home.team_goal_rate == pytest.approx(single.home.team_goal_rate, rel=1e-14)
+    assert [p.goals for p in result.home.players] == pytest.approx(
+        [p.goals for p in single.home.players], rel=1e-14
+    )
 
 
 @pytest.mark.parametrize("change", ["wrong-season", "earlier-gameweek", "earlier-decision"])

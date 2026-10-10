@@ -200,8 +200,11 @@ def normalized_state_weights(projection: TacticalProjection) -> Array:
     """Normalize only validated near-unit weights, preserving the original source digest.
 
     The source contract already refuses mass outside its 1e-12 tolerance. Division by
-    the fsum total and a final rounding correction on the largest entry give exact
-    fsum unit mass. This is numerical normalization, not learned state calibration.
+    the fsum total, then replacing the largest entry by the correctly rounded complement
+    of all other entries, gives exact fsum unit mass: that entry's own rounding error is
+    at most half its ulp, which fsum rounds back to one. Adding the rounded residual to
+    the largest entry instead fails when the residual is below half of that ulp. This is
+    numerical normalization, not learned state calibration.
     """
     weights = np.asarray([state.weight for state in projection.states], dtype=float)
     total = math.fsum(float(v) for v in weights)
@@ -214,7 +217,10 @@ def normalized_state_weights(projection: TacticalProjection) -> Array:
     if not np.isfinite(weights).all() or (weights < 0).any():
         raise ValueError("Tactical state weights must be finite and nonnegative.")
     weights /= total
-    weights[int(np.argmax(weights))] += 1 - math.fsum(float(v) for v in weights)
+    largest = int(np.argmax(weights))
+    weights[largest] = math.fsum(
+        [1.0, *(-float(v) for index, v in enumerate(weights) if index != largest)]
+    )
     if (weights < 0).any() or math.fsum(float(v) for v in weights) != 1:
         raise ValueError("Tactical state weights failed exact numerical unit normalization.")
     return _immutable(weights)
