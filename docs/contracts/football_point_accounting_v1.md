@@ -1,6 +1,6 @@
 # Raw football point accounting
 
-Issue #1070 step1 introduces a shared leaf in
+Issue #1070 step 1 introduces a shared leaf in
 `squadopt.contracts.football_point_accounting`. It has no model, source, filesystem,
 network, season, eligibility or fitting dependency. No existing caller changes in
 this step. The separate experimental families remain subject to their own review,
@@ -83,7 +83,7 @@ scope in a later integration unless a separate declared policy change is accepte
 For equal-mass raw worlds -2 and +2, clipping the mean gives 0, whereas averaging
 the clipped worlds gives 1. The helper neither averages worlds nor silently moves
 clipping between them. Double-gameweek sums, cross-fixture dependence, eligibility,
-captaincy, bench substitutions and the fixed15 optimizer remain caller concerns.
+captaincy, bench substitutions and the fixed-fifteen XI search remain caller concerns.
 
 Scoring weights come from the caller's accepted, source-bound rule declaration.
 No season comparison, source-position alias or coefficient default exists here.
@@ -101,7 +101,7 @@ scope, cancellation, overflow and the clipping-order witness. Copied-source faul
 checks and runtime evidence accompany the PR; original source bytes stay unchanged.
 These checks validate accounting rather than a learned predictor's accuracy.
 
-Actual combined native use is issue #1070 step2, in a separate reviewed PR after
+Actual combined native use is issue #1070 step 2, in a separate reviewed PR after
 the primitive and applicable predecessors actually merge. Dependencies include
 #1048, #1051, #1053, #1054 and the six family issues #1057, #1059, #1061, #1063,
 #1065 and #1067. Ibo reviews the shared domain and prediction integration. Each
