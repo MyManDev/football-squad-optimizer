@@ -151,9 +151,14 @@ def test_football_api_worker_windows_and_top100(tmp_path, monkeypatch, window, w
         assert result.get("top100", {}).get("weight", 0) == weight
         assert "selection_top100_weight" not in result
         assert "selection_top100_source" not in result
+    assert result["solver_status"] == "FEASIBLE"
+    assert result["optimality_gap"] is None
+    assert result["expected_gain_vs_hold"] is None
+    assert all(move["expected_points_delta"] is None for move in result["moves"])
     if window > 1:
         assert len(result["plan_weeks"]) == window
         assert not any("stays at zero" in s for s in result["stated_limits"])
+    if window in (1, 3, 5):
         # Rebuild the frozen public decision from the unweighted artifact, including
         # its appearance probabilities. This verifies publication independently of
         # the emitted metadata; scorer arithmetic has a separate official-rules oracle.
@@ -174,7 +179,8 @@ def test_football_api_worker_windows_and_top100(tmp_path, monkeypatch, window, w
         )
         gross = score.expected_net_points + result["transfer_hit_points"]
         assert result["expected_own_points"] == pytest.approx(gross)
-        assert result["plan_weeks"][0]["expected_points"] == pytest.approx(gross)
+        if window > 1:
+            assert result["plan_weeks"][0]["expected_points"] == pytest.approx(gross)
         terms = (
             "starting_points",
             "autosub_points",
@@ -185,7 +191,7 @@ def test_football_api_worker_windows_and_top100(tmp_path, monkeypatch, window, w
         for field in (*terms, "expected_net_points"):
             assert result["lineup_expectation"][field] == pytest.approx(getattr(score, field))
         assert result["lineup_expectation"]["assumptions"] == list(score.assumptions)
-        for week in result["plan_weeks"]:
+        for week in result.get("plan_weeks", []):
             explanation = week["lineup_expectation"]
             assert sum(explanation[field] for field in terms) == pytest.approx(
                 week["expected_points"]

@@ -6,7 +6,7 @@ Weekly XI rotation already existed. This change evaluates complete three- and fi
 
 ## Activation limits
 
-The live expected-lineup route is enabled only for the fixture-football model over three or five weeks, with appearance probabilities present and an explicit deterministic solver budget of at least five. Automatic chip strategy must be off, and first-week overlap, transfer-cap and role-exclusion arguments must all be absent. Existing alternative routes retain their prior behavior; the new autosub objective does not apply to every product combination.
+One-week pure-points advice from the fixture-football candidate now retains the published weekly appearance probabilities and improves roles on the native transfer proposal. The nominal multiweek expected-lineup route is enabled for the fixture-football model over three or five weeks, with appearance probabilities present and an explicit deterministic solver budget of at least five. Automatic chip strategy must be off, and first-week overlap, transfer-cap and role-exclusion arguments must all be absent. Existing alternative routes retain their prior behavior; the new autosub objective does not apply to every product combination.
 
 The public `model=football` selector uses the currently accepted football artifact; it is not a joint-role-only route. The reader accepts team-share v1, contextual v3, joint-role-minutes v1 and its explicitly selected retained-history variant under the same fixture-football family. Joint-role inputs additionally require their complete ready bundle. A usable observed-information node takes precedence and goes directly to the observed planner. The optional nominal proposal below therefore does not extend the observed action menu. Current-model and overlap-constrained solves retain their existing routes.
 
@@ -38,7 +38,9 @@ With roles and q fixed, the total is linear in mu. Recorded player multipliers a
 
 ## Bounded search and decisions
 
-Each weekly role-search invocation retains its incumbent and evaluates at most 128 distinct lineups by default. Candidates use legal one-for-one XI swaps within the same fifteen and six outfield bench orders. Every eligible ordered captain and vice pair in each explored XI is ranked analytically, at most 110 pairs. Pair ranking requires no additional full lineup scores or autosub calculations; those results remain cached. Evaluation counts, actual convolution states, captain pairs and cache use are recorded. This is a bounded search, not a global optimality proof. Branches can invoke it repeatedly, so 128 is not the request-wide budget.
+Each weekly role-search invocation retains its incumbent and evaluates at most 128 distinct lineups by default. Candidates use legal one-for-one XI swaps within the same fifteen and six outfield bench orders. The incumbent XI receives its complete bench-order pass before neighboring XIs are explored round-robin, subject to the unchanged total cap. A cap below seven can stop that pass; the ordinary 128-evaluation call covers it. Every eligible ordered captain and vice pair in each explored XI is ranked analytically, at most 110 pairs. Pair ranking requires no additional full lineup scores or autosub calculations; those results remain cached. Evaluation counts, actual convolution states, captain pairs and cache use are recorded. This is a bounded search, not a global optimality proof. Branches can invoke it repeatedly, so 128 is not the request-wide budget.
+
+Expected net points remain the primary role-selection objective. Only an exactly equal score prefers the XI with the larger sum of its effective appearance inputs; an equal sum retains the earlier complete action. This rule uses no floating-point tolerance, cannot accept a point loss for availability, and does not change forecasts, resources, the evaluation cap or a locked first action. It makes an available starter preferable to a known absent starter when guaranteed compatible cover makes their complete point scores identical.
 
 The frozen 42-record comparison below predates this complete captain-pair search and was not rerun for that change. Its new validation uses controlled fixed-XI cases and an independent official-outcome scorer; it does not establish realized score gains.
 
@@ -66,6 +68,8 @@ A captured percentage represents eligibility, not starting or appearance probabi
 
 Captured percentages are checked against the original forecast as a no-op, avoiding a second availability penalty. Cited, timely expected-absence statements may set first-week appearance and points to zero. Rotation warnings, broad minutes comments and confidence labels receive no invented probabilities; unsupported statements remain unapplied with reasons. The generic adapter accepts separately documented assumptions or external calibration, but this news integration supplies no external calibration. A separate explicit full-match restriction can revise minutes only from a verified fixture-component basis as described below; it does not refit starting probability.
 
+The captured next-round categories 0, 25, 50 and 75 are evaluated separately through the same accepted rule. They multiply the native football appearance and point forecasts once; 25 and 50 are not converted to absence. For native appearance 0.8 they give effective appearances 0, 0.2, 0.4 and 0.6. An explicit null uses the existing status fallback, while a missing next-round field is refused and the this-round field is not substituted. Synthetic source-to-reader-to-participation-to-one-week checks cover both strong and weak conditional points with compatible reserves. With one uncertain starter of conditional value V and certain compatible cover C, starting yields q*V + (1-q)*C: low q alone does not justify benching when V exceeds C. Cameos still prevent replacement. These are checks of the declared arithmetic, not injury calibration or live performance evidence.
+
 Evidence is tied to its source, season, gameweek and deadline. No recovery date is invented. Later-week zeros inherited from older forecasts remain when a conditional forecast is unavailable, and this limit is disclosed. The separate information experiment resolves one held player's captured eligibility before the next deadline while preserving mean forecasts. That timing is a scenario assumption, not a measured recovery prediction.
 
 ## Explicit coach constraints and model configuration
@@ -89,3 +93,105 @@ The fixed matrix compares legacy bench weight 0.1, zero bench weight and expecte
 Raw nominal expected points exceed legacy in 11 of 14 matched settings and fall below it in 3. Against zero bonus, the result is 7 higher and 7 lower. Conditional raw points are mixed too. The common Top100 selection utility is higher than legacy in all 14 nominal settings and in 13 conditional settings with one tie, but these preference units are not FPL points. Overlapping settings are descriptive comparisons, not independent samples or realized accuracy evidence. No parameters were selected from the winning cells.
 
 There is no applicable cited news artifact in this frozen capture, so its no-evidence news result is unchanged and is not solved a fourth time. The additional news path is exercised with controlled synthetic, source-cited records. That comparison did not verify model authentication, all-club coverage, a current production companion, news calibration or realized point gain. The later successful Gemini call verifies authentication and inference only; it does not revise the comparison or establish a numerical news effect.
+
+## Fixture and availability decisions in the one-week candidate
+
+The owner's 9 October 2026 request extends the experimental one-week football plan,
+not the forecast fit. It uses the same fixture-level point expectations and effective
+weekly appearance inputs already carried by the accepted football artifact. No current
+season outcome is read, no capture is rebuilt and no forecast or model version is
+replaced by this implementation. This is decision arithmetic and synthetic validation,
+not a claim of realized improvement. The prospective reading retains its declared
+GW20/GW38 schedule and records the planner revision it uses.
+
+### Research and code trace
+
+The current [official FPL rules](https://www.premierleague.com/en/news/4661029)
+specify priority-order automatic substitutions, separate goalkeeper cover, formation
+constraints and captain-to-vice fallback. A short playing appearance prevents an
+automatic replacement; an injury flag alone does not determine the decision.
+The scorer uses weekly positive-minute appearance. Card-only participation remains the
+explicit unsupported case stated in the existing assumptions above.
+
+[Dixon and Coles, 1997](https://rss.onlinelibrary.wiley.com/doi/abs/10.1111/1467-9876.00065)
+develop a Poisson regression model for football scores with changing team performance.
+This supports modeling fixture context upstream; it does not establish that this
+repository's forecast or lineup choice is calibrated.
+[Venter and van Vuuren, 2024](https://orion.journals.ac.za/pub/article/download/753/648/1931),
+section 5.4, select captain and vice by predicted points and order substitutes by
+forecast performance. That is a useful deterministic comparison, not evidence for
+our appearance-conditioned extension. Its historical rules and retrospective result
+are not used as current FPL rules or as a promotion gate.
+
+In this repository, `prediction/football_features.py` attaches recent own and opposing
+club goals and xG strengths plus venue to each fixture. `prediction/football.py`
+predicts own goals and conceded goals, then player goal/assist shares and clean-sheet
+credit. `football_contextual.py` additionally consumes opponent-adjusted dynamic
+strength. The planner therefore receives the effect of the player's club and opponent
+inside mu. A second club-strength or opponent multiplier in bench ordering would
+count that context twice.
+
+The artifact reader's availability rule scales both unconditional mu and learned q
+once. A source 75 percent is an eligibility multiplier, not a newly calibrated
+75 percent starting or appearance prediction. The participation adapter audits the
+same capture percentage as a no-op. This implementation copies effective q into the
+one-week planning horizon without reapplying the source percentage or fitting a new
+participation model. Missing q is refused on explicit expected-lineup calls; it is
+never replaced by certainty.
+
+### Joint first eleven and ordered reserves
+
+The native one-week planner first supplies a feasible purchase, transfer and resource
+path. Its selected fifteen remain fixed during role search. The role scorer evaluates
+legal first elevens, the six outfield reserve orders and captain/vice choices using
+the expectation above. XI alternatives are legal one-player swaps; after the incumbent
+bench pass, their orders receive round-robin turns up to the unchanged cap of 128.
+This can change a flagged starter, the starting goalkeeper, captain, vice and reserve
+priority. It does not globally optimize all squads or every possible eleven.
+
+Consider a synthetic defender with q = 0.75 and conditional points 6, so mu = 4.5.
+A certain replacement defender has mu = 5. With no other uncertainty or formation
+conflict, starting the flagged defender with this cover scores 4.5 + 0.25 * 5 = 5.75,
+whereas starting the replacement scores 5. Flagging the player therefore does not
+justify benching him. If his conditional expectation becomes 2, mu becomes 1.5:
+starting him scores 1.5 + 0.25 * 5 = 2.75, so the replacement should start. These are
+fabricated arithmetic examples, not estimates for any named player.
+
+The reserve decision also depends on the XI's formation. With three starting
+defenders, a missing defender may require defensive cover even when a midfielder has
+more forecast points. With four defenders, a forward or midfielder may be eligible.
+A fixture-driven change to that reserve forward's mu can therefore change the optimal
+first reserve. Any cameo blocks the replacement; starting probability is not used
+as a substitute for appearance probability. Double gameweeks retain the caller's
+probability of at least one appearance over the whole week.
+
+### Accounting, controls and validation
+
+Only experimental fixture-football member controls enable the new one-week role path;
+the low-level `plan_transfers` flag defaults to false. Current-model, proven-menu and
+rival-band callers retain their prior entry points. The separate active-preference
+menu retains its existing routing; this extension does not claim every product
+combination uses the new one-week roles. An explicitly forced chip on the
+experimental control uses the same role expectation, so its value and the no-chip
+control share one scoring basis; chip and reserve points are counted once. Manager exclusions
+on the experimental control pass their starter and captain restrictions to role
+search, including the vice. Because the vice is scored, a rule that bars only the
+control's vice binds and is solved and priced like any other. Top100 chooses on
+weighted mu and publishes the same frozen roles on raw mu through the exact player
+multipliers. Price comparisons use that same expected-score basis, and bench/vice changes count as changed decisions.
+
+The native CP objective remains a proposal surrogate. Role improvement reports
+FEASIBLE and clears surrogate bounds; no proof of globally optimal expected points
+is invented. It preserves transfers, purchase prices, bank, free transfers and chips.
+Legacy held-XI move deltas are withheld for expected-lineup payloads because they do
+not include reserve or vice recovery. No extra percentage, caveat or limit sentence
+is added to member-facing copy.
+
+The new synthetic cases independently enumerate tiny appearance worlds through the
+official realized scorer. They cover both flagged-player decisions, fixture-sensitive
+reserve priority, minimum-defender cover, cameos, unchanged q and single application
+of participation. A regression fixes starvation of the incumbent's sixth reserve
+order at the ordinary cap. Full-action locking and a one-evaluation cap retain the
+incumbent. The fake API/queue/worker test also reconstructs each published window-1,
+window-3 and window-5 decision on unweighted artifact points, including Top100 and
+both v1/contextual inputs. Those tests open no server process and read no real outcome.

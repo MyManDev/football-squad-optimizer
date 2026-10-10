@@ -49,6 +49,7 @@ from squadopt.planning.chip_strategy import optimize_chip_strategy
 from squadopt.planning.chip_tail import ChipTailForecast
 from squadopt.planning.expected_window import optimize_expected_window
 from squadopt.planning.guarded import optimize_guarded_window
+from squadopt.planning.lineup_utility import improve_plan_lineups
 from squadopt.planning.observed import optimize_observed_window
 
 LEDGER_TRANSFERS_CONTRACT_VERSION: Final = "ledger_transfers_v1"
@@ -393,6 +394,7 @@ def _prepare_planning(
     chip: str | None,
     transfer_cap: int | None = None,
     transfer_hit_cost_points: float | None = None,
+    expected_lineups: bool = False,
 ) -> _PreparedPlanning:
     """Validate the held squad against the capture and build the one-week horizon.
 
@@ -457,6 +459,12 @@ def _prepare_planning(
             "expected_points": table["expected_points"].astype("float64"),
         }
     )
+    if expected_lineups:
+        if "appearance_probability" not in projection.table:
+            raise DataSourceError("Expected lineups require published appearance probabilities.")
+        horizon_table["appearance_probability"] = projection.table[
+            "appearance_probability"
+        ].to_numpy()
     transfer_config = _transfer_config(
         rules,
         transfer_cap=None if transfer_cap is None else int(transfer_cap),
@@ -668,6 +676,7 @@ def plan_transfers(
     optimization: OptimizationConfig | None = None,
     chip: str | None = None,
     transfer_hit_cost_points: float | None = None,
+    expected_lineups: bool = False,
 ) -> tuple[TransferPlanResult, TransferDecision, TransferPlanningConfig]:
     """Decide this deadline's transfers from the held squad with a one-week horizon.
 
@@ -678,6 +687,8 @@ def plan_transfers(
     actually charges rather than what the planner is cautious about.
     """
 
+    if not isinstance(expected_lineups, bool):
+        raise DataSourceError("expected_lineups must be boolean.")
     prepared = _prepare_planning(
         inputs,
         projection,
@@ -686,6 +697,7 @@ def plan_transfers(
         optimization=optimization,
         chip=chip,
         transfer_hit_cost_points=transfer_hit_cost_points,
+        expected_lineups=expected_lineups,
     )
     plan = optimize_transfer_plan(
         prepared.horizon,
@@ -699,6 +711,8 @@ def plan_transfers(
             f"The transfer planner returned {plan.solver_status.name} with no plan for "
             f"{inputs.season} gameweek {prepared.gameweek}."
         )
+    if expected_lineups:
+        plan = improve_plan_lineups(plan, prepared.settings, prepared.transfer_config)
     decision = _package_decision(
         plan,
         held,
@@ -780,6 +794,7 @@ def plan_transfers_with_exclusion(
     first_week_exclusion: FirstWeekExclusion,
     *,
     optimization: OptimizationConfig | None = None,
+    expected_lineups: bool = False,
 ) -> tuple[TransferPlanResult, TransferDecision, TransferPlanningConfig]:
     """``plan_transfers`` with named players kept out of the week's eleven or captaincy.
 
@@ -790,6 +805,8 @@ def plan_transfers_with_exclusion(
     status rather than raised on; only no solution at all is an error.
     """
 
+    if not isinstance(expected_lineups, bool):
+        raise DataSourceError("expected_lineups must be boolean.")
     prepared = _prepare_planning(
         inputs,
         projection,
@@ -797,6 +814,7 @@ def plan_transfers_with_exclusion(
         rules,
         optimization=optimization,
         chip=None,
+        expected_lineups=expected_lineups,
     )
     plan = optimize_transfer_plan(
         prepared.horizon,
@@ -810,6 +828,14 @@ def plan_transfers_with_exclusion(
         raise DataSourceError(
             f"The transfer planner returned {plan.solver_status.name} with no plan under the "
             f"exclusion for {inputs.season} gameweek {prepared.gameweek}."
+        )
+    if expected_lineups:
+        plan = improve_plan_lineups(
+            plan,
+            prepared.settings,
+            prepared.transfer_config,
+            not_starting=first_week_exclusion.not_starting,
+            not_captain=first_week_exclusion.not_captain,
         )
     decision = _package_decision(
         plan,

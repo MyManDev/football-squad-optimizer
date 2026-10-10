@@ -379,10 +379,13 @@ def improve_expected_lineup(
 
     Six outfield bench orders are considered, with the best eligible captain/vice
     pair found analytically for each visited XI (at most 110 ordered pairs).
-    Round-robin exploration gives XI alternatives a turn before exhausting their
-    bench orders. The positive count cap includes the incumbent; duplicate scores
+    The incumbent XI's bench orders are completed first, then round-robin
+    exploration gives XI alternatives a turn before exhausting their bench orders.
+    The positive count cap includes the incumbent; duplicate scores
     and repeated autosub convolutions are cached. The XI/bench neighborhood remains
     bounded; no global lineup or transfer optimality is claimed.
+    Exactly equal point utility prefers the larger total effective XI appearance;
+    equal appearance totals retain the earlier complete action. No tolerance is used.
     locked_first freezes the entire action, including bench order and vice.
     """
     if (
@@ -396,6 +399,14 @@ def improve_expected_lineup(
     decision = _Decision(tuple(starting_xi), tuple(ordered_bench), captain_id, vice_captain_id)
     data = _prepare(squad, decision, chip, hit_points, not_starting, not_captain)
     incumbent = best = _score(data, decision)
+
+    def decision_key(score: ExpectedLineupScore) -> tuple[float, float]:
+        return (
+            score.expected_net_points,
+            math.fsum(data.chance[player] for player in score.starting_xi),
+        )
+
+    best_key = decision_key(best)
     cache = {decision: incumbent}
     evaluations, cache_hits = 1, 0
 
@@ -415,23 +426,33 @@ def improve_expected_lineup(
 
     if locked_first:
         return finish(False)
-    pending = [iter(_choices(data, decision, starters)) for starters in _neighbors(data, decision)]
-    while pending:
-        following = []
-        for iterator in pending:
-            candidate = next(iterator, None)
-            if candidate is None:
-                continue
-            following.append(iterator)
-            if candidate in cache:
-                cache_hits += 1
-                continue
-            if evaluations >= max_evaluations:
-                return finish(True)
-            scored = _score(data, candidate)
-            cache[candidate] = scored
-            evaluations += 1
-            if scored.expected_net_points > best.expected_net_points:
-                best = scored
-        pending = following
+
+    def candidates() -> Iterable[_Decision]:
+        # Six backup orders must not be starved by the much larger XI menu.
+        yield from _choices(data, decision, decision.starters)
+        pending = [
+            iter(_choices(data, decision, starters)) for starters in _neighbors(data, decision)[1:]
+        ]
+        while pending:
+            following = []
+            for iterator in pending:
+                candidate = next(iterator, None)
+                if candidate is not None:
+                    following.append(iterator)
+                    yield candidate
+            pending = following
+
+    for candidate in candidates():
+        if candidate in cache:
+            cache_hits += 1
+            continue
+        if evaluations >= max_evaluations:
+            return finish(True)
+        scored = _score(data, candidate)
+        cache[candidate] = scored
+        evaluations += 1
+        scored_key = decision_key(scored)
+        if scored_key > best_key:
+            best = scored
+            best_key = scored_key
     return finish(False)
