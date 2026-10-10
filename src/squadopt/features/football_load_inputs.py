@@ -286,8 +286,6 @@ def _validate_native_law(
         ):
             _fail("Native fixtures require seven states.")
         _unit_mass(fixture.probabilities, "fixture probabilities")
-        if type(fixture.minutes) is not tuple:
-            _fail("Native minutes must be immutable.")
         for index, value in enumerate(fixture.minutes):
             minutes = _number(value, "native minutes")
             valid = (
