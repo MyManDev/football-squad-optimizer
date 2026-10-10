@@ -114,3 +114,11 @@ bundle becomes ready. An identical rerun can finish or replay; conflicting bytes
 cannot replace a previous ready marker. The reader checks all digests and production
 source contracts again. This command performs no acquisition, fitting, site build,
 or runtime activation. Activation must separately select this validated bundle.
+
+The seal writes internal `football/<decision>.bundle.production.json` after destination
+preflight, copying and final validation, immediately before the ready marker. It
+records the sha256 of the sealed handoff's bytes and its own training provenance separately
+from the football producer's capture, cutoff, archive and population fields. It
+never replaces the ready marker. A failure before copies leaves no production record;
+an interruption after this record can leave provenance without readiness. An exact
+retry completes the marker, subject to the same immutable destination checks.

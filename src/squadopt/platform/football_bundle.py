@@ -58,6 +58,60 @@ def _digest(raw: bytes) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
+def _production_identity(forecast: Mapping[str, Any]) -> dict[str, Any]:
+    """Extract provenance from a pair already validated by the fixture-basis reader."""
+    fields = (
+        "model_version",
+        "season",
+        "gameweek",
+        "source_snapshot_id",
+        "source_fingerprint",
+        "captured_at_utc",
+        "training_rows",
+        "training_latest_kickoff",
+        "archive_hashes",
+        "training_selection",
+        "role_metadata",
+    )
+    return {field: forecast[field] for field in fields if field in forecast}
+
+
+def _production_record(
+    payloads: Mapping[str, bytes], snapshot_id: str, *, handoff_fingerprint: str
+) -> dict[str, Any]:
+    """Record the exact sealed bytes after production validators have accepted them."""
+    football = _production_identity(_object(payloads["forecast"]))
+    handoff = _object(payloads["handoff"])
+    if (
+        handoff.get("source_snapshot_id") != snapshot_id
+        or football.get("source_snapshot_id") != snapshot_id
+    ):
+        raise ValueError("Production record capture identities differ.")
+    training_keys = (
+        "component_training_seasons",
+        "component_training_rows",
+        "component_training_cutoff",
+        "component_training_data_fingerprint",
+        "fallback_training_seasons",
+        "training_selection",
+    )
+    diagnostics = handoff.get("diagnostics") or {}
+    return {
+        "contract_version": "football_production_record_v1",
+        "snapshot_id": snapshot_id,
+        "football": football,
+        "current_handoff": {
+            "model_version": handoff["model_version"],
+            "fingerprint": handoff_fingerprint,
+            "source_snapshot_id": handoff["source_snapshot_id"],
+            "sha256": _digest(payloads["handoff"]),
+            "training_provenance": {
+                key: diagnostics[key] for key in training_keys if key in diagnostics
+            },
+        },
+    }
+
+
 def _source(snapshot_root: Path, capture_id: str) -> CapturedSnapshot:
     # read_snapshot validates exact bytes; reject path aliases before opening them.
     if not re.fullmatch(r"[a-z0-9][A-Za-z0-9-]{0,159}", capture_id):
@@ -502,6 +556,15 @@ def seal_football_bundle(
         for role, path in destinations.items()
     ):
         raise ValueError("A bundle input changed while it was being sealed.")
+    # Write provenance only after the copied bytes and identities are verified.
+    write_bytes_once(
+        document_bytes(
+            _production_record(
+                payloads, snapshot_id, handoff_fingerprint=final_identity["handoff_fingerprint"]
+            )
+        ),
+        marker.with_suffix(".production.json"),
+    )
     write_bytes_once(raw_marker, marker)
     return read_football_bundle(
         artifact_root=artifact_root, snapshot_root=snapshot_root, snapshot_id=snapshot_id
