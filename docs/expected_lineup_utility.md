@@ -94,7 +94,6 @@ Raw nominal expected points exceed legacy in 11 of 14 matched settings and fall 
 
 There is no applicable cited news artifact in this frozen capture, so its no-evidence news result is unchanged and is not solved a fourth time. The additional news path is exercised with controlled synthetic, source-cited records. That comparison did not verify model authentication, all-club coverage, a current production companion, news calibration or realized point gain. The later successful Gemini call verifies authentication and inference only; it does not revise the comparison or establish a numerical news effect.
 
-
 ## Fixture and availability decisions in the one-week candidate
 
 The owner's 9 October 2026 request extends the experimental one-week football plan,
