@@ -116,6 +116,12 @@ class InSeasonProjection:
     evidence_fingerprint: str | None = None
     diagnostics: Mapping[str, object] = field(default_factory=dict)
     contract_version: str = PROJECTION_HANDOFF_CONTRACT_VERSION
+    augmentation_fingerprint: str | None = None
+    """Optional binding of an additive component's base, declaration and capture inputs.
+
+    Absent on existing producers, so their serialized bytes and fingerprints stay exact.
+    This identity does not promote a model or replace its original evidence identity.
+    """
 
     def __post_init__(self) -> None:
         if self.contract_version != PROJECTION_HANDOFF_CONTRACT_VERSION:
@@ -148,6 +154,16 @@ class InSeasonProjection:
         ):
             raise DataSourceError(
                 "Projection handoff evidence_fingerprint must be a lowercase SHA-256 digest."
+            )
+        if self.augmentation_fingerprint is not None and (
+            not isinstance(self.augmentation_fingerprint, str)
+            or len(self.augmentation_fingerprint) != 64
+            or any(
+                character not in "0123456789abcdef" for character in self.augmentation_fingerprint
+            )
+        ):
+            raise DataSourceError(
+                "Projection handoff augmentation_fingerprint must be a lowercase SHA-256 digest."
             )
         if self.model_version == ELITE_EVIDENCE_MODEL_VERSION and (
             self.evidence_fingerprint is None
@@ -228,6 +244,8 @@ class InSeasonProjection:
         }
         if self.evidence_fingerprint is not None:
             payload["evidence_fingerprint"] = self.evidence_fingerprint
+        if self.augmentation_fingerprint is not None:
+            payload["augmentation_fingerprint"] = self.augmentation_fingerprint
         # Added only when present, so a handoff that states no appearance chance keeps
         # exactly the fingerprint it has today and an old file still verifies. Two
         # handoffs agreeing on every point and differing here are different projections:
@@ -260,6 +278,8 @@ def write_projection_handoff(path: Path, projection: InSeasonProjection) -> Path
     }
     if projection.evidence_fingerprint is not None:
         document["evidence_fingerprint"] = projection.evidence_fingerprint
+    if projection.augmentation_fingerprint is not None:
+        document["augmentation_fingerprint"] = projection.augmentation_fingerprint
     if projection.appearance_probability is not None:
         document["appearance_probability"] = {
             str(player): value
@@ -316,6 +336,7 @@ def read_projection_handoff(path: Path) -> InSeasonProjection:
             ),
             diagnostics=dict(document.get("diagnostics") or {}),
             contract_version=str(document.get("contract_version", "")),
+            augmentation_fingerprint=document.get("augmentation_fingerprint"),
         )
     except (TypeError, ValueError) as error:
         raise DataSourceError(f"Projection handoff at {path} is malformed: {error}") from error
