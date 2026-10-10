@@ -597,7 +597,7 @@ def main(
         if week.coding_observed_at is not None and as_instant(captured_at) < as_instant(
             week.coding_observed_at
         ):
-            raise ClubNewsError("The clock moved backwards after coding. Nothing was captured.")
+            raise ClubNewsError("The clock moved backwards after coding.")
         still_open = next_open_deadline(deadlines, as_of_utc=captured_at)
         if (
             still_open.gameweek != deadline.gameweek
