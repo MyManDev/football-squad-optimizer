@@ -424,6 +424,49 @@ def test_scope_rechecks_disposition_meaning_and_international_competitions(
     assert verified_fixture_scope(quote.encode(), disposition, player_name="Saka")[1] is expected
 
 
+@pytest.mark.parametrize(
+    "quote,disposition,expected",
+    [
+        # "fixture" ending the clause names the upcoming league match under any label.
+        (
+            "Saka will start the next league fixture.",
+            "stated_expected_to_start",
+            ("upcoming_premier_league", True),
+        ),
+        (
+            "Saka will have his minutes managed in the next Premier League fixture.",
+            "stated_minutes_limited",
+            ("upcoming_premier_league", True),
+        ),
+        # A label with no clause rule still does not read the schedule as the match.
+        (
+            "Saka is expected to start once the next league fixture list is published.",
+            "stated_expected_to_start",
+            ("unspecified", False),
+        ),
+        (
+            "Saka will have his minutes managed across the next Premier League fixture schedule.",
+            "stated_minutes_limited",
+            ("unspecified", False),
+        ),
+        (
+            "Saka returns before the next league fixture programme resumes.",
+            "stated_returning_from_injury",
+            ("unspecified", False),
+        ),
+    ],
+)
+def test_a_fixture_list_is_not_the_upcoming_league_match_under_any_label(
+    quote, disposition, expected
+):
+    assert verified_fixture_scope(quote.encode(), disposition, player_name="Saka") == expected
+    document = _document(quote)
+    claim = parse_claim_response(
+        locate_claim_response(_response(quote=quote, label=disposition), (document,)), (document,)
+    )[0]
+    assert claim.scope_verified is expected[1]
+
+
 @pytest.mark.parametrize("disposition", ["stated_expected_absent", "stated_full_match_unavailable"])
 @pytest.mark.parametrize(
     "subject,other,expected",

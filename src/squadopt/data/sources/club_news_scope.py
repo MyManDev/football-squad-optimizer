@@ -49,7 +49,16 @@ def verified_fixture_scope(
             text,
         )
     )
-    upcoming = bool(re.search(rf"\b(?:upcoming|next) (?:premier )?league {_NOUN}\b", text))
+    # A label with no clause rule below is verified by this search alone, so "fixture" names
+    # the league match here only where it ends the clause, as in every clause form below;
+    # "the next league fixture list" is the schedule, not a match.
+    upcoming = bool(
+        re.search(
+            r"\b(?:upcoming|next) (?:premier )?league "
+            r"(?:match|game|fixture(?=\s*(?:[.!,;]|$)))\b",
+            text,
+        )
+    )
     if past or other:
         return ("ambiguous" if upcoming else "past" if past else "other_competition"), False
     if not upcoming:
