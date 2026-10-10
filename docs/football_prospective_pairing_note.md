@@ -78,9 +78,9 @@ The football artifact root is `artifacts/shadow/football_team_share_v1`. Every
 week read from it is pooled under the protocol's ordinary rules, as decision 2
 says, and carries `football_served: false`, replay weeks included. Check the
 immutable receipt at `<shadow-root>/receipts/<capture>.json` against the
-artifact bytes, including its fingerprint and SHA256. The required `--posted-receipts` input carries the
-pre-deadline SHA256 posts from #999 and their comment times. Record both those
-times and the file's write time.
+artifact bytes, including its fingerprint and SHA256. The required
+`--posted-receipts` input carries the pre-deadline SHA256 posts from #999 and
+their comment times. Record both those times and the file's write time.
 
 A missing receipt, missing post or digest mismatch is listed beside the week
 and introduces no new exclusion into the frozen protocol. The protocol's file
