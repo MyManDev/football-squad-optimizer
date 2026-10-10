@@ -144,7 +144,7 @@ def _targets(season: str, gameweeks: tuple[int, ...]) -> None:
         or any(type(gw) is not int or not 1 <= gw <= 38 for gw in gameweeks)
         or tuple(sorted(set(gameweeks))) != gameweeks
     ):
-        raise ValueError("score model target gameweeks must be distinct ordered integers in1..38")
+        raise ValueError("score model target gameweeks must be distinct ordered integers in 1..38")
 
 
 def _features(difference: int, phase: int) -> tuple[float, ...]:
@@ -405,9 +405,9 @@ class ScoreStateModel:
             or not math.isfinite(numerical_tolerance)
             or not 1e-12 <= numerical_tolerance <= 1e-6
         ):
-            raise ValueError("score numerical tolerance must be finite in1e-12..1e-6")
+            raise ValueError("score numerical tolerance must be finite in 1e-12..1e-6")
         if type(max_difference) is not int or not 1 <= max_difference <= 512:
-            raise ValueError("score max difference must be an integer in1..512")
+            raise ValueError("score max difference must be an integer in 1..512")
         self.numerical_tolerance = float(numerical_tolerance)
         self.max_difference = max_difference
         self._fitted: _Fitted | None = None
@@ -462,7 +462,7 @@ class ScoreStateModel:
         ):
             raise ValueError("score l2 must be finite and nonnegative")
         if type(max_iterations) is not int or not 1 <= max_iterations <= MAX_ITERATIONS:
-            raise ValueError("score max iterations must be an integer in1..1000")
+            raise ValueError("score max iterations must be an integer in 1..1000")
         rows = tuple(observations)
         if not rows:
             raise ValueError("score training observations must not be empty")

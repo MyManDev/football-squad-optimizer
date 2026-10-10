@@ -771,7 +771,7 @@ def plan_score_state_fixed_fifteen(
             "Role optimization requires the original captured fifteen and covered week."
         )
     if _id(max_evaluations, "role evaluation budget") > 128:
-        raise ValueError("The private role budget permits at most128 evaluations.")
+        raise ValueError("The private role budget permits at most 128 evaluations.")
     squad = _copy(experiment.roster.loc[experiment.roster.player_id.isin(ids)])
     if squad.groupby("club_code").size().gt(3).any():
         raise ValueError(

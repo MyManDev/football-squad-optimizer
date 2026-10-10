@@ -623,7 +623,7 @@ def test_internal_coefficient_replacement_refuses() -> None:
 
 @pytest.mark.parametrize("gameweeks", [(), (0,), (39,), (True,), (7, 6), (6, 6)])
 def test_bad_target_inventory_refuses(gameweeks: tuple[int, ...]) -> None:
-    with pytest.raises(ValueError, match="target gameweeks"):
+    with pytest.raises(ValueError, match=r"target gameweeks .* in 1\.\.38$"):
         ScoreStateModel().fit(
             (observation(),),
             cutoff=CUTOFF,
@@ -645,7 +645,7 @@ def test_bad_target_inventory_refuses(gameweeks: tuple[int, ...]) -> None:
     ],
 )
 def test_bad_optimizer_configuration_refuses(options: dict[str, Any]) -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"(l2 must be finite and nonnegative|in 1\.\.1000)$"):
         fit((observation(),), **options)
 
 
@@ -661,7 +661,7 @@ def test_bad_optimizer_configuration_refuses(options: dict[str, Any]) -> None:
     ],
 )
 def test_bad_numeric_configuration_refuses(options: dict[str, Any]) -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r" in (1e-12\.\.1e-6|1\.\.512)$"):
         ScoreStateModel(**options)
 
 

@@ -508,7 +508,8 @@ def test_fixed_fifteen_inventory_constraints_are_independently_preserved(fault):
     elif fault == "retained_hits":
         case.resources["hit_points"] = 0
         options["hit_points"] = 4
-    with pytest.raises((ValueError, EvaluationValidationError)):
+    match = r"permits at most 128 evaluations\.$" if fault == "over_budget" else None
+    with pytest.raises((ValueError, EvaluationValidationError), match=match):
         plan(compose(case, enabled=False), ids=ids, xi=xi, bench=bench, **options)
 
 
