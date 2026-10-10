@@ -13,8 +13,10 @@ from numbers import Real
 
 
 def _number(value: object, name: str, *, nonnegative: bool = False) -> float:
-    if isinstance(value, bool) or not isinstance(value, Real):
+    if isinstance(value, bool):
         raise ValueError(f"{name} must be a finite real number, not a Boolean.")
+    if not isinstance(value, Real):
+        raise ValueError(f"{name} must be a finite real number, not {type(value).__name__}.")
     try:
         result = float(value)
     except (OverflowError, ValueError) as exc:

@@ -2,6 +2,7 @@
 
 import math
 from dataclasses import FrozenInstanceError, asdict, replace
+from decimal import Decimal
 from fractions import Fraction
 
 import numpy as np
@@ -272,6 +273,18 @@ def test_invalid_moment_numbers_refuse_with_named_field(field, value):
 def test_invalid_coefficient_numbers_refuse_with_named_field(field, value):
     with pytest.raises(ValueError, match=f"coefficient.{field}"):
         replace(WEIGHTS, **{field: value})
+
+
+@pytest.mark.parametrize(
+    ("value", "kind"),
+    [(None, "NoneType"), ("0.5", "str"), (Decimal("0.5"), "Decimal"), ([0.5], "list")],
+)
+def test_unsupported_number_types_are_named_without_a_boolean_claim(value, kind):
+    with pytest.raises(ValueError, match=rf"coefficient\.goals .*not {kind}\.") as refused:
+        replace(WEIGHTS, goals=value)
+    assert "Boolean" not in str(refused.value)
+    with pytest.raises(ValueError, match=r"moment\.goals .*not a Boolean\."):
+        replace(MOMENTS, goals=True)
 
 
 @pytest.mark.parametrize("field", COEFFICIENT_FIELDS)
