@@ -16,6 +16,7 @@ import json
 import re
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 from squadopt.data.sources import fpl_live
@@ -82,6 +83,7 @@ def test_the_frozen_hash_is_the_study_record_with_crlf_read_as_lf() -> None:
         (opponent_projection, "apply_adjustment"),
         (opponent_projection, "_squad"),
         (opponent_projection, "_realized"),
+        (opponent_projection, "_bootstrap"),
     ],
 )
 def test_every_name_the_protocol_cites_exists(module: object, name: str) -> None:
@@ -174,3 +176,24 @@ def test_a_handoff_republished_for_the_same_capture_is_what_the_pairing_then_rea
     assert "Its modification time, as the file system reports it, must fall before" in paired
     assert "file sha256 and modification time" in paired
     assert "a paired handoff file written at or after the deadline" in missing
+
+
+def test_the_primary_interval_is_the_studys_bootstrap_on_weeks_in_order() -> None:
+    """With the seed fixed, the interval moves with the order of the weeks it is given.
+
+    So "2000 draws, seed 0, 5 and 95 percent" alone does not fix the endpoint the strict
+    gate reads: the function, its quantile rule and the order of the values have to be named.
+    """
+
+    weeks = np.arange(14, dtype="float64") - 6.0
+    in_order = opponent_projection._bootstrap(weeks, resamples=2000, seed=0)
+    reversed_order = opponent_projection._bootstrap(weeks[::-1], resamples=2000, seed=0)
+    assert in_order != reversed_order
+
+    primary = _section("Three readings and the gate")
+    assert (
+        "the interval is `_bootstrap` in `src/squadopt/experiments/opponent_projection.py`"
+        " with `resamples=2000` and `seed=0`, on the per-week values in ascending gameweek"
+        " order" in primary
+    )
+    assert "`np.quantile` at 0.05 and 0.95 with the default linear method" in primary

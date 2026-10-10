@@ -96,8 +96,12 @@ are reported separately and never treated as independent bootstrap units.
    minus candidate squared error, then equal-week mean. Include non-appearances
    whose settled row reports zero; do not invent zero for a missing row.
    Resample the complete paired gameweek values with replacement, 2000 draws,
-   NumPy PCG64 seed 0. Report the mean and percentile interval at 0.05 and 0.95.
-   The lower endpoint must be strictly greater than zero.
+   NumPy PCG64 seed 0: the interval is `_bootstrap` in
+   `src/squadopt/experiments/opponent_projection.py` with `resamples=2000` and
+   `seed=0`, on the per-week values in ascending gameweek order, so its
+   endpoints are `np.quantile` at 0.05 and 0.95 with the default linear method.
+   Report the mean and that interval. The lower endpoint must be strictly
+   greater than zero.
 2. **Ordering:** use the study's within-position Spearman reading. Within a week,
    calculate each position's correlation where it has at least five matched
    players and at least two distinct predictions; omit nonfinite correlations,
