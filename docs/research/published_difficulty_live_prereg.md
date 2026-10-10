@@ -24,19 +24,34 @@ is printed, and no threshold changes after live data is read.
 
 ## Paired inputs and comparator
 
-For each eligible week, use the latest `fpl-live` capture before its deadline
-whose next open deadline is that week. The same immutable capture supplies both
-arms, the full roster, prices, positions, availability and published fixture
-difficulty. Record capture id, instant, fingerprint and all required payload
-hashes. A candidate cannot draw a rating from an archive or a later capture.
+The runner reads the snapshot root and the handoff root the backend served the
+week from (`SQUADOPT_BACKEND_SNAPSHOT_ROOT` and `SQUADOPT_BACKEND_HANDOFF_ROOT`),
+and the record names both. For each eligible week, the decision capture is the
+latest `fpl-live` capture in that snapshot root, by capture instant, taken before
+the week's deadline, whose own target is that week (`read_inputs` in
+`src/squadopt/live/recommendation.py`, given no gameweek, returns that week's
+deadline), and that has a served baseline handoff: `handoff_fingerprint_for` in
+`src/squadopt/platform/capture_context.py` finds one for it in that handoff root.
+A capture without one was never served. It is passed over and listed, so an
+audit or rehearsal capture taken after the week's publication does not displace
+the served one. Two captures at the same latest instant make the week missing.
+The same immutable capture supplies both arms, the full roster, prices,
+positions, availability and published fixture difficulty. Record capture id,
+instant, fingerprint and all required payload hashes. A candidate cannot draw a
+rating from an archive or a later capture.
 
 The base is the exact `current` projection served for that capture, not the
-development control. Pair with exactly one stored handoff using
-`handoff_fingerprint_for` in `src/squadopt/platform/capture_context.py`, over the
-owner-selected weekly handoff root. Record handoff version, fingerprint and file
-hash. Apply the captured availability through `project` in
-`src/squadopt/live/recommendation.py`, as the live reader does. This is an offline
-read of stored inputs and needs no backend process.
+development control. `handoff_fingerprint_for` reads the handoff as it is when
+the runner runs, and a corrected handoff republished for the same capture
+replaces the gameweek alias with no deadline check. So the runner reads the
+paired handoff file itself: the gameweek alias when it matches the capture, else
+the one retained copy under `by-capture/<capture>/` that matches it, which is the
+file whose fingerprint `handoff_fingerprint_for` returns. Its modification time,
+as the file system reports it, must fall before the deadline. Record handoff
+version, fingerprint, file sha256 and modification time. Apply the captured
+availability through `project` in `src/squadopt/live/recommendation.py`, as the
+live reader does. This is an offline read of stored inputs and needs no backend
+process.
 
 If DEFCON, `ep_next` or another approved projection ships during the population,
 the base remains each week's actually served version. Report pooled readings
@@ -114,11 +129,13 @@ These already recorded development figures choose no additional live threshold.
 ## Missing weeks and provenance
 
 List every week from the binding start through GW20, with a scored or missing
-reason. Missing includes no targeting pre-deadline capture, an absent or ambiguous
-paired handoff, a refused source or fingerprint, or no later capture whose
-bootstrap counts the week in `scored_gameweeks` and that carries its settled live
-payload. Never repair a missing week with another week's capture or a
-reconstructed post-deadline handoff.
+reason. Missing includes no served pre-deadline capture targeting the week, two
+such captures at the same latest instant, an absent or ambiguous paired handoff,
+a paired handoff file written at or after the deadline, a refused source or
+fingerprint, or no later capture whose bootstrap counts the week in
+`scored_gameweeks` and that carries its settled live payload. Never repair a
+missing week with another week's capture or a reconstructed post-deadline
+handoff.
 Record excluded players and absent outcome rows rather than filling them.
 The runner refuses 2025-26 in every input and cannot print a real comparison
 before the settled-GW20 verdict condition. Tests use synthetic weeks only.

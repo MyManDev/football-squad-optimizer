@@ -3,11 +3,14 @@
 ``docs/research/published_difficulty_live_prereg.md`` binds from the moment it merges, so a
 rule it states wrongly cannot be corrected later. These tests pin the frozen candidate to the
 study record it is copied from, check that every function the protocol names exists under that
-name, and pin the sentences where a draft named a settlement flag the fixtures do not carry.
+name, and pin the sentences where a draft named a settlement flag the fixtures do not carry,
+could take an audit capture the backend never served, and paired a handoff whose write time
+nothing checked.
 """
 
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 import json
 import re
@@ -17,8 +20,10 @@ import pytest
 
 from squadopt.data.sources import fpl_live
 from squadopt.experiments import opponent_projection
-from squadopt.live import recommendation
-from squadopt.platform import capture_context
+from squadopt.live import InSeasonProjection, read_projection_handoff, recommendation
+from squadopt.live.tick import handoff_path_for
+from squadopt.platform import capture_context, projection_retention
+from squadopt.platform.backend_runtime import BackendConfig, BackendConfigError
 
 REPOSITORY = Path(__file__).resolve().parents[2]
 PROTOCOL = REPOSITORY / "docs" / "research" / "published_difficulty_live_prereg.md"
@@ -72,6 +77,7 @@ def test_the_frozen_hash_is_the_study_record_with_crlf_read_as_lf() -> None:
     [
         (fpl_live, "scored_gameweeks"),
         (capture_context, "handoff_fingerprint_for"),
+        (recommendation, "read_inputs"),
         (recommendation, "project"),
         (opponent_projection, "apply_adjustment"),
         (opponent_projection, "_squad"),
@@ -99,3 +105,72 @@ def test_settlement_is_read_from_the_event_flags_scored_gameweeks_reads() -> Non
     assert "The verdict names the earliest such capture and its fingerprint." in verdict
     assert "bootstrap counts the week in `scored_gameweeks`" in missing
     assert "marks the week scored" not in missing
+
+
+def test_the_roots_the_protocol_reads_are_the_ones_the_backend_serves_from() -> None:
+    with pytest.raises(BackendConfigError) as refused:
+        BackendConfig.from_environment({})
+    paired = _section("Paired inputs and comparator")
+
+    for variable in ("SQUADOPT_BACKEND_SNAPSHOT_ROOT", "SQUADOPT_BACKEND_HANDOFF_ROOT"):
+        assert variable in str(refused.value)
+        assert f"`{variable}`" in paired
+    assert "owner-selected" not in paired
+    assert "the record names both" in paired
+
+
+def test_a_capture_the_backend_never_served_does_not_displace_the_served_one() -> None:
+    """A late audit capture targets the same week but gets no handoff.
+
+    Taken as the decision capture, it would drop the week as unpaired while the backend kept
+    serving the earlier capture, in a population whose floor is eight weeks.
+    """
+
+    paired = _section("Paired inputs and comparator")
+    missing = _section("Missing weeks and provenance")
+
+    assert "whose own target is that week (`read_inputs`" in paired
+    assert "that has a served baseline handoff" in paired
+    assert "A capture without one was never served. It is passed over and listed" in paired
+    assert "Two captures at the same latest instant make the week missing." in paired
+    assert "no served pre-deadline capture targeting the week" in missing
+    assert "two such captures at the same latest instant" in missing
+
+
+def test_a_handoff_republished_for_the_same_capture_is_what_the_pairing_then_reads(
+    tmp_path: Path,
+) -> None:
+    """The premise of the file-time rule: the pairing alone cannot see a late republish."""
+
+    capture = "fpl-live-20261016T090000Z-000000000000"
+    served = InSeasonProjection(
+        season="2026-27",
+        gameweek=7,
+        source_snapshot_id=capture,
+        model_name="test",
+        model_version="test-v1",
+        feature_contract_version="test-v1",
+        expected_points={1: 4.5},
+    )
+    corrected = dataclasses.replace(served, expected_points={1: 5.0})
+    assert served.fingerprint != corrected.fingerprint
+    alias = handoff_path_for(tmp_path, "2026-27", 7)
+    projection_retention.publish_retained_handoff(alias, served)
+    projection_retention.publish_retained_handoff(alias, corrected)
+
+    retained = {
+        read_projection_handoff(path).fingerprint
+        for path in (tmp_path / "by-capture" / capture).glob("*.json")
+    }
+    assert retained == {served.fingerprint, corrected.fingerprint}
+    assert (
+        capture_context.handoff_fingerprint_for(tmp_path, "2026-27", 7, capture)
+        == corrected.fingerprint
+    )
+
+    paired = _section("Paired inputs and comparator")
+    missing = _section("Missing weeks and provenance")
+    assert "So the runner reads the paired handoff file itself" in paired
+    assert "Its modification time, as the file system reports it, must fall before" in paired
+    assert "file sha256 and modification time" in paired
+    assert "a paired handoff file written at or after the deadline" in missing
