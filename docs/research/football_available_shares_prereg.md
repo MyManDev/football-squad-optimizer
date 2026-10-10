@@ -42,8 +42,10 @@ week missing. A later own-target capture given its own baseline handoff before
 the deadline becomes the decision capture and needs its own base and candidate
 artifacts before the deadline, or the week is missing.
 
-Base and candidate must name that same capture, season, gameweek, cutoff and
-training selection. Read each with the existing validated forecast and
+Base and candidate artifacts must carry equal `source_snapshot_id`,
+`source_fingerprint`, `captured_at_utc`, `season`, `gameweek`,
+`training_latest_kickoff` and `training_selection`, naming the decision capture
+and its own target. Read each with the existing validated forecast and
 fixture-component contracts. Record versions, fingerprints, input hashes,
 artifact hashes and filesystem modification instants.
 
