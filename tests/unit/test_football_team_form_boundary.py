@@ -13,6 +13,7 @@ from tests.unit.test_advice_read import _valid_advice_document
 from tests.unit.test_football_publication import publication_case as publication_case
 
 from squadopt.live.football_artifact import (
+    SHARES_BEFORE_AVAILABILITY_LIMIT,
     football_artifact_path,
     forecast_digest,
     read_football_forecast,
@@ -207,6 +208,9 @@ def test_form_artifact_survives_worker_document_validation(publication_case, mon
     assert result["payload"]["decision_information"] == switches.decision_information(
         inputs.snapshot_id
     )
+    # Form keeps the v1 share split and the reader's later availability scaling, so the
+    # answer records the same limit as v1 and the joint-role versions.
+    assert result["payload"]["stated_limits"].count(SHARES_BEFORE_AVAILABILITY_LIMIT) == 1
 
 
 @pytest.mark.parametrize("with_components", [False, True])
