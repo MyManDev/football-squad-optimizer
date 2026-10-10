@@ -565,7 +565,8 @@ def _claim_targets_next_fixture(
     """Bind 'next league match' to the first club fixture after the source instant.
 
     A lexical next-match label cannot skip a game already played since publication.
-    Undated relevant fixtures and a double gameweek leave the weekly claim unbound.
+    Undated relevant fixtures leave the weekly claim unbound. So does a double gameweek,
+    unless ``multiple`` asks whether the claim would bind to the earliest of its fixtures.
     """
     if published_at_utc is None or published_precision != "instant":
         return False
