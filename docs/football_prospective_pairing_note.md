@@ -152,10 +152,11 @@ the later record. A draft timestamp is not represented as a merge timestamp.
 
 Step 2 implements the accepted input rule in its own PR, targeting merge before
 2026-10-17T10:00:00Z. Step 3 supplies the once-only scorer and mutation evidence,
-targeting 2026-11-27 and requiring merge before 2027-01-05T18:00:00Z. The owner's
-approved spent-GW5 rehearsal reports timings and counts only. The interim runs
-once after GW20 settlement and before 2027-01-16T13:30:00Z, with the heavy slot
-claimed. No figure from GW6 onward is calculated before its declared reading.
+targeting 2026-11-27 and requiring merge before 2027-01-05T18:00:00Z. The
+spent-GW5 rehearsal runs only with the owner's yes and reports timings and
+counts only. The interim runs once after GW20 settlement and before
+2027-01-16T13:30:00Z, with the heavy slot claimed. No figure from GW6 onward
+is calculated before its declared reading.
 
 The step 0 coordination request is on #988. It identifies the four existing
 users of `capture_context.py` and asks to keep or move `handoff_fingerprint_for`
