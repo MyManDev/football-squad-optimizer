@@ -161,21 +161,42 @@ def test_rounding_is_half_up_at_exact_ties(value: str, expected: float) -> None:
     assert measurement.Reading(7225, 16, 16).document()["scale_rounded"] == 21.3
 
 
-def test_three_week_control_refuses_before_emitting_a_binding_record() -> None:
+def _failed_control_payloads() -> dict[str, bytes]:
     payloads = _payloads()
     history = json.loads(payloads["entry-3-history.json"])
     history["current"][0]["points"] = 99
     payloads["entry-3-history.json"] = _bytes(history)
-    with pytest.raises(
-        measurement.ScaleMeasurementError, match="Explain on #1002 before step 4"
-    ) as refusal:
-        _measure(payloads)
-    # GW1 gaps are 15, 99 and 84; GW2 and GW3 keep 15, 15 and 30.
-    unrounded = math.sqrt((15**2 + 99**2 + 84**2 + 2 * (15**2 + 15**2 + 30**2)) / 9)
-    assert str(refusal.value).startswith(
-        f"GW1 to GW3 control is 46.9 (unrounded {unrounded:.4f}), expected 21.2, "
-        "from 3 members and 9 of 9 pair-weeks (0 dropped)."
+    return payloads
+
+
+# GW1 gaps are 15, 99 and 84; every other week keeps 15, 15 and 30.
+_GW1_SQUARES = 15**2 + 99**2 + 84**2
+_WEEK_SQUARES = 15**2 + 15**2 + 30**2
+
+
+def test_failed_three_week_control_is_recorded_with_its_aggregates() -> None:
+    record = _measure(_failed_control_payloads())
+    assert record["control_failed"] is True
+    control = record["control_gw1_to_gw3"]
+    assert control["scale_rounded"] == 46.9
+    assert control["scale_unrounded"] == pytest.approx(
+        math.sqrt((_GW1_SQUARES + 2 * _WEEK_SQUARES) / 9)
     )
+    assert control["expected_scale_rounded"] == 21.2
+    assert (control["pair_weeks_counted"], control["pair_weeks_dropped"]) == (9, 0)
+    # S and every companion reading are still recorded; only step 4 is held.
+    assert record["scale"]["scale_unrounded"] == pytest.approx(
+        math.sqrt((_GW1_SQUARES + 5 * _WEEK_SQUARES) / 18)
+    )
+    assert record["scale"]["scale_rounded"] == 36.4
+    assert [row["gameweek"] for row in record["by_gameweek"]] == [1, 2, 3, 4, 5, 6]
+    assert len(record["cumulative_comparisons"]) == 4
+
+
+def test_passing_control_is_recorded_as_passed() -> None:
+    record = _measure(_payloads())
+    assert record["control_failed"] is False
+    assert record["control_gw1_to_gw3"]["scale_rounded"] == 21.2
 
 
 def test_secondary_is_only_an_already_listed_captured_league() -> None:
@@ -419,6 +440,56 @@ def test_complete_synthetic_capture_runs_through_store_and_writes_aggregate_twin
     assert (tmp_path / "docs/strategy_rule_scale.md").is_file()
 
 
+def _main_arguments(tmp_path: Path, snapshot_id: str) -> list[str]:
+    return [
+        "--snapshot-root",
+        str(tmp_path / "captures"),
+        "--snapshot-id",
+        snapshot_id,
+        "--league",
+        "352490",
+        "--through-gameweek",
+        "6",
+    ]
+
+
+def test_passing_control_exits_zero_and_holds_nothing(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    metadata = _stored_capture(monkeypatch, tmp_path, _payloads())
+    assert measurement.main(_main_arguments(tmp_path, metadata.snapshot_id)) == 0
+    assert capsys.readouterr().err == ""
+    written = json.loads((tmp_path / "docs/strategy_rule_scale.json").read_text())
+    assert written["control_failed"] is False
+    text = (tmp_path / "docs/strategy_rule_scale.md").read_text()
+    assert "Control: passed" in text
+    assert "step 4 is held" not in text
+
+
+def test_failed_control_writes_the_record_and_holds_step_4(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    metadata = _stored_capture(monkeypatch, tmp_path, _failed_control_payloads())
+    exit_code = measurement.main(_main_arguments(tmp_path, metadata.snapshot_id))
+    assert exit_code == measurement.CONTROL_FAILED_EXIT == 2
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == (
+        "Recorded GW1 to GW6 scale 36.4 with a failed GW1 to GW3 control (46.9, expected 21.2). "
+        "Step 4 is held until the difference is explained on #1002.\n"
+    )
+    written = json.loads((tmp_path / "docs/strategy_rule_scale.json").read_text())
+    assert written["control_failed"] is True
+    assert written["control_gw1_to_gw3"]["scale_rounded"] == 46.9
+    text = (tmp_path / "docs/strategy_rule_scale.md").read_text()
+    assert text == measurement.markdown(written)
+    assert "Control: failed" in text
+    assert (
+        "The control failed, so step 4 is held. This record updates no constant "
+        "until the difference is explained on #1002."
+    ) in text
+
+
 @pytest.mark.parametrize(
     "row_change",
     [
@@ -437,9 +508,7 @@ def test_invalid_history_value_ends_in_the_one_line_refusal(
     row_change(history["current"])
     payloads["entry-2-history.json"] = _bytes(history)
     metadata = _stored_capture(monkeypatch, tmp_path, payloads)
-    arguments = ["--snapshot-root", str(tmp_path / "captures"), "--snapshot-id"]
-    arguments += [metadata.snapshot_id, "--league", "352490", "--through-gameweek", "6"]
-    assert measurement.main(arguments) == 1
+    assert measurement.main(_main_arguments(tmp_path, metadata.snapshot_id)) == 1
     error = capsys.readouterr().err
     assert error == "Measurement refused: The capture has invalid standings or history rows.\n"
     assert not (tmp_path / "docs").exists()

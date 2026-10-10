@@ -37,6 +37,8 @@ DECLARATION_PATH = "docs/strategy_rule_scale_prereg.md"
 DECLARATION_SHA256 = "ca7640830ebb528509c3f30b9b807bf365d57b04fce2d3914cbee22ffcc7b5a6"
 PRIMARY_LEAGUE = 352490
 CONTRACT_VERSION = "strategy_rule_scale_v1"
+CONTROL_EXPECTED = 21.2
+CONTROL_FAILED_EXIT = 2
 _LIVE_ID = re.compile(r"fpl-live-(\d{8}T\d{6}Z)-[0-9a-f]{12}")
 _FIRST_DATE = datetime(2026, 8, 26, tzinfo=UTC)
 _LAST_DATE = datetime(2027, 7, 1, tzinfo=UTC)
@@ -174,21 +176,14 @@ def measure_payloads(
     rows = league_net_rows(payloads, league, n)
     control = pair_week_reading(rows, range(1, 4))
     control_scale = control.scale()
-    if control_scale is None or round_half_up(control_scale) != 21.2:
-        # Aggregates only, so the explanation #1002 asks for has its counts to start from.
-        observed = (
-            f"{round_half_up(control_scale)} (unrounded {float(control_scale):.4f})"
-            if control_scale is not None
-            else "unavailable"
-        )
-        raise ScaleMeasurementError(
-            f"GW1 to GW3 control is {observed}, expected 21.2, from {len(rows)} members and "
-            f"{control.counted} of {control.expected} pair-weeks "
-            f"({control.expected - control.counted} dropped). Explain on #1002 before step 4."
-        )
+    # A failed control is recorded with its aggregates, never refused or repaired, and the
+    # record then holds step 4 until the difference is explained on #1002.
+    control_failed = control_scale is None or round_half_up(control_scale) != CONTROL_EXPECTED
     primary = pair_week_reading(rows, range(1, n + 1))
     scale = primary.scale()
-    assert scale is not None  # A passing three-week control contains pair-weeks.
+    if scale is None:
+        # An empty population is unavailable, never zero.
+        raise ScaleMeasurementError("No pair-week on GW1 to N has both members' rows.")
     secondary: list[dict[str, Any]] = []
     for other in listed_leagues:
         if other == league or f"league-{other}-standings.json" not in payloads:
@@ -215,7 +210,11 @@ def measure_payloads(
         "through_gameweek": n,
         "members": len(rows),
         "scale": primary.document(),
-        "control_gw1_to_gw3": control.document(),
+        "control_gw1_to_gw3": {
+            **control.document(),
+            "expected_scale_rounded": CONTROL_EXPECTED,
+        },
+        "control_failed": control_failed,
         "by_gameweek": [
             {"gameweek": week, **pair_week_reading(rows, (week,)).document()}
             for week in range(1, n + 1)
@@ -230,6 +229,7 @@ def measure_payloads(
 
 
 def markdown(record: Mapping[str, Any]) -> str:
+    control = record["control_gw1_to_gw3"]
     lines = [
         "# Strategy rule scale checkpoint",
         "",
@@ -244,8 +244,22 @@ def markdown(record: Mapping[str, Any]) -> str:
         f"S: {record['scale']['scale_rounded']} (unrounded {record['scale']['scale_unrounded']})",
         f"Pair-weeks counted: {record['scale']['pair_weeks_counted']}; "
         f"dropped: {record['scale']['pair_weeks_dropped']}",
-        f"GW1 to GW3 control: {record['control_gw1_to_gw3']['scale_rounded']}",
+        f"GW1 to GW3 control: {control['scale_rounded']} "
+        f"(unrounded {control['scale_unrounded']}; expected {control['expected_scale_rounded']}); "
+        f"pair-weeks counted: {control['pair_weeks_counted']}; "
+        f"dropped: {control['pair_weeks_dropped']}",
+        "Control: " + ("failed" if record["control_failed"] else "passed"),
         "",
+    ]
+    if record["control_failed"]:
+        lines.extend(
+            [
+                "The control failed, so step 4 is held. This record updates no constant "
+                "until the difference is explained on #1002.",
+                "",
+            ]
+        )
+    lines += [
         "Companion readings are recorded diagnostics. They do not change the rule's shape.",
         "",
         "## Single gameweeks",
@@ -427,6 +441,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         print(f"Measurement refused: {message}", file=sys.stderr)
         return 1
+    if record["control_failed"]:
+        # The record is written; a distinct exit keeps any caller from treating it as a pass.
+        print(
+            f"Recorded GW1 to GW{record['through_gameweek']} scale "
+            f"{record['scale']['scale_rounded']} with a failed GW1 to GW3 control "
+            f"({record['control_gw1_to_gw3']['scale_rounded']}, expected {CONTROL_EXPECTED}). "
+            "Step 4 is held until the difference is explained on #1002.",
+            file=sys.stderr,
+        )
+        return CONTROL_FAILED_EXIT
     print(
         f"Recorded GW1 to GW{record['through_gameweek']} scale {record['scale']['scale_rounded']}."
     )
