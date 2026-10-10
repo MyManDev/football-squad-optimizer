@@ -1046,6 +1046,18 @@ def test_inventory_skips_unreadable_metadata_and_records_its_identity(
     ]
 
 
+@pytest.mark.parametrize("name", [BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD])
+def test_intact_metadata_with_a_missing_payload_refuses_the_inventory(
+    tmp_path: Path, name: str
+) -> None:
+    # The runner documents that such a capture is repaired or removed before any mode.
+    capture(tmp_path)
+    damaged = capture(tmp_path, instant_offset=1)
+    (tmp_path / damaged.metadata.snapshot_id / "payloads" / name).unlink()
+    with pytest.raises(DefconMissingInputs, match="absent in the retained capture"):
+        runner.inventory(tmp_path, as_of="2026-12-01T00:00:00Z")
+
+
 def test_summary_failure_saves_completed_verdict_without_retrying_summary(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

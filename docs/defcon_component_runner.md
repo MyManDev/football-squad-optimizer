@@ -86,7 +86,12 @@ and every existing index row retains its order.
 
 If an unreadable metadata file exists at or before the selected reading capture,
 the reading refuses before its claim rather than substituting a later capture.
-An interrupted directory without metadata remains skippable. Forbidden-season
+An interrupted directory without metadata remains skippable. A capture whose
+metadata is intact but whose bootstrap or fixtures payload file is absent,
+unlisted or differs from its checksum is not skipped: the inventory refuses
+every mode before any claim or outcome read. Repair that capture from a retained
+copy, or, if it cannot be repaired, remove it from the snapshot root and record
+its identity on #1000, before running an input check or the reading. Forbidden-season
 publication or handoff identities also refuse before the claim. Multiple retained
 copies of one handoff fingerprint form one identity and all their byte hashes are
 recorded. A malformed realized DEFCON explanation is excluded from diagnostics with
