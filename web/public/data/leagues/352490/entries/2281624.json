@@ -1,0 +1,369 @@
+{
+  "contract_version": "provisional_league_ui_v1",
+  "generated_at_utc": "2026-10-10T06:07:04Z",
+  "source_kind": "live",
+  "payload": {
+    "league_id": 352490,
+    "season": "2026-27",
+    "gameweek": 6,
+    "scored_gameweek": 5,
+    "entry": {
+      "member_kind": "human",
+      "entry_id": 2281624,
+      "manager_name": "Mehmet Soydal",
+      "team_name": "buyuk geliyorumm",
+      "rank": 7,
+      "gameweek_points": 36,
+      "transfer_cost": 0,
+      "total_points": 333,
+      "movement": "down",
+      "movement_places": 2,
+      "data_quality": "complete"
+    },
+    "starting_xi": [
+      {
+        "player_id": 473284,
+        "name": "Konstantinos Tzolakis",
+        "short_name": "Tzolakis",
+        "position": "GK",
+        "team": "Hull City",
+        "price_tenths": 47,
+        "expected_points": 3.38344492950233,
+        "event_points": null,
+        "is_captain": false,
+        "is_vice_captain": false,
+        "bench_order": null,
+        "role": "starter"
+      },
+      {
+        "player_id": 477424,
+        "name": "Jo\u0161ko Gvardiol",
+        "short_name": "Gvardiol",
+        "position": "DEF",
+        "team": "Man City",
+        "price_tenths": 57,
+        "expected_points": 3.6993157992754457,
+        "event_points": null,
+        "is_captain": false,
+        "is_vice_captain": false,
+        "bench_order": null,
+        "role": "starter"
+      },
+      {
+        "player_id": 466075,
+        "name": "Riccardo Calafiori",
+        "short_name": "Calafiori",
+        "position": "DEF",
+        "team": "Arsenal",
+        "price_tenths": 59,
+        "expected_points": 3.59365129554469,
+        "event_points": null,
+        "is_captain": false,
+        "is_vice_captain": false,
+        "bench_order": null,
+        "role": "starter"
+      },
+      {
+        "player_id": 199798,
+        "name": "Ezri Konsa Ngoyo",
+        "short_name": "Ngoyo",
+        "position": "DEF",
+        "team": "Arsenal",
+        "price_tenths": 46,
+        "expected_points": 1.9747000311138394,
+        "event_points": null,
+        "is_captain": false,
+        "is_vice_captain": false,
+        "bench_order": null,
+        "role": "starter"
+      },
+      {
+        "player_id": 244850,
+        "name": "Morgan Rogers",
+        "short_name": "Rogers",
+        "position": "MID",
+        "team": "Chelsea",
+        "price_tenths": 78,
+        "expected_points": 4.596795481290255,
+        "event_points": null,
+        "is_captain": false,
+        "is_vice_captain": false,
+        "bench_order": null,
+        "role": "starter"
+      },
+      {
+        "player_id": 243298,
+        "name": "Cody Gakpo",
+        "short_name": "Gakpo",
+        "position": "MID",
+        "team": "Liverpool",
+        "price_tenths": 72,
+        "expected_points": 0.0,
+        "event_points": null,
+        "is_captain": false,
+        "is_vice_captain": false,
+        "bench_order": null,
+        "role": "starter"
+      },
+      {
+        "player_id": 244851,
+        "name": "Cole Palmer",
+        "short_name": "Palmer",
+        "position": "MID",
+        "team": "Chelsea",
+        "price_tenths": 97,
+        "expected_points": 5.323025429413814,
+        "event_points": null,
+        "is_captain": false,
+        "is_vice_captain": true,
+        "bench_order": null,
+        "role": "starter"
+      },
+      {
+        "player_id": 184029,
+        "name": "Martin \u00d8degaard",
+        "short_name": "\u00d8degaard",
+        "position": "MID",
+        "team": "Arsenal",
+        "price_tenths": 68,
+        "expected_points": 3.9797310309386273,
+        "event_points": null,
+        "is_captain": false,
+        "is_vice_captain": false,
+        "bench_order": null,
+        "role": "starter"
+      },
+      {
+        "player_id": 215413,
+        "name": "Kiernan Dewsbury-Hall",
+        "short_name": "Dewsbury-Hall",
+        "position": "MID",
+        "team": "Everton",
+        "price_tenths": 66,
+        "expected_points": 3.473628920850233,
+        "event_points": null,
+        "is_captain": false,
+        "is_vice_captain": false,
+        "bench_order": null,
+        "role": "starter"
+      },
+      {
+        "player_id": 223094,
+        "name": "Erling Haaland",
+        "short_name": "Haaland",
+        "position": "FWD",
+        "team": "Man City",
+        "price_tenths": 156,
+        "expected_points": 7.9988702038468515,
+        "event_points": null,
+        "is_captain": true,
+        "is_vice_captain": false,
+        "bench_order": null,
+        "role": "starter"
+      },
+      {
+        "player_id": 216646,
+        "name": "Yoane Wissa",
+        "short_name": "Wissa",
+        "position": "FWD",
+        "team": "Newcastle",
+        "price_tenths": 62,
+        "expected_points": 3.116881036344326,
+        "event_points": null,
+        "is_captain": false,
+        "is_vice_captain": false,
+        "bench_order": null,
+        "role": "starter"
+      }
+    ],
+    "bench": [
+      {
+        "player_id": 489639,
+        "name": "Bart Verbruggen",
+        "short_name": "Verbruggen",
+        "position": "GK",
+        "team": "Brighton",
+        "price_tenths": 45,
+        "expected_points": 2.7749400703238383,
+        "event_points": null,
+        "is_captain": false,
+        "is_vice_captain": false,
+        "bench_order": 1,
+        "role": "bench"
+      },
+      {
+        "player_id": 475168,
+        "name": "Jo\u00e3o Pedro Junqueira de Jesus",
+        "short_name": "Jesus",
+        "position": "FWD",
+        "team": "Chelsea",
+        "price_tenths": 77,
+        "expected_points": 3.822253355001549,
+        "event_points": null,
+        "is_captain": false,
+        "is_vice_captain": false,
+        "bench_order": 2,
+        "role": "bench"
+      },
+      {
+        "player_id": 108416,
+        "name": "John Egan",
+        "short_name": "Egan",
+        "position": "DEF",
+        "team": "Hull City",
+        "price_tenths": 41,
+        "expected_points": 2.802145162756736,
+        "event_points": null,
+        "is_captain": false,
+        "is_vice_captain": false,
+        "bench_order": 3,
+        "role": "bench"
+      },
+      {
+        "player_id": 244723,
+        "name": "Tyrick Mitchell",
+        "short_name": "Mitchell",
+        "position": "DEF",
+        "team": "Crystal Palace",
+        "price_tenths": 45,
+        "expected_points": 3.0234430953770723,
+        "event_points": null,
+        "is_captain": false,
+        "is_vice_captain": false,
+        "bench_order": 4,
+        "role": "bench"
+      }
+    ],
+    "bank_tenths": 4,
+    "free_transfers": 2,
+    "free_transfers_known": true,
+    "chips_used": {
+      "bboost": [
+        1
+      ],
+      "3xc": [
+        3
+      ],
+      "wildcard": [
+        4
+      ]
+    },
+    "chips": {
+      "known": true,
+      "gameweek": 6,
+      "states": {
+        "wildcard": {
+          "first_half": {
+            "state": "used",
+            "gameweek": 4,
+            "start_event": 2,
+            "stop_event": 19
+          },
+          "second_half": {
+            "state": "not_yet",
+            "gameweek": null,
+            "start_event": 20,
+            "stop_event": 38
+          }
+        },
+        "freehit": {
+          "first_half": {
+            "state": "available",
+            "gameweek": null,
+            "start_event": 2,
+            "stop_event": 19
+          },
+          "second_half": {
+            "state": "not_yet",
+            "gameweek": null,
+            "start_event": 20,
+            "stop_event": 38
+          }
+        },
+        "bboost": {
+          "first_half": {
+            "state": "used",
+            "gameweek": 1,
+            "start_event": 1,
+            "stop_event": 19
+          },
+          "second_half": {
+            "state": "not_yet",
+            "gameweek": null,
+            "start_event": 20,
+            "stop_event": 38
+          }
+        },
+        "3xc": {
+          "first_half": {
+            "state": "used",
+            "gameweek": 3,
+            "start_event": 1,
+            "stop_event": 19
+          },
+          "second_half": {
+            "state": "not_yet",
+            "gameweek": null,
+            "start_event": 20,
+            "stop_event": 38
+          }
+        }
+      }
+    },
+    "squad_basis": "captured",
+    "active_chip": null,
+    "purchase_prices_known": true,
+    "squad_sell_value_tenths": 1002,
+    "spendable_budget_tenths": 1006,
+    "source_snapshot_id": "fpl-live-20261010T035732Z-c77d032165af",
+    "squadopt_comparison": null,
+    "data_quality": "complete",
+    "missing_fields": [],
+    "device_plan": {
+      "top100_weights": [
+        5,
+        10,
+        20,
+        30,
+        40,
+        50
+      ],
+      "held": [
+        473284,
+        477424,
+        466075,
+        199798,
+        244850,
+        243298,
+        244851,
+        184029,
+        215413,
+        223094,
+        216646,
+        489639,
+        475168,
+        108416,
+        244723
+      ],
+      "bank_tenths": 4,
+      "free_transfers": 2,
+      "sell_tenths": {
+        "473284": 46,
+        "477424": 56,
+        "466075": 57,
+        "199798": 45,
+        "244850": 76,
+        "243298": 71,
+        "244851": 96,
+        "184029": 67,
+        "215413": 65,
+        "223094": 155,
+        "216646": 62,
+        "489639": 45,
+        "475168": 76,
+        "108416": 40,
+        "244723": 45
+      }
+    }
+  }
+}

@@ -72,7 +72,7 @@ dateline exact or establish that a statement applies to this fixture.
 | 14 | `feed_scout_news_link_present` | boolean | field absent → refuse |
 | 15 | `club_source_covered` | boolean | **never absent.** False = the club did not retain read-and-coded coverage; see the coverage rules below |
 | 16 | `rotation_claim_observed` | boolean | **never absent.** False = no resolved disposition is carried for him; read with columns 15 and 17 |
-| 17 | `rotation_claim_unresolved` | boolean | **never absent.** True = an unverified citation or conflicting claims resolved to this player |
+| 17 | `rotation_claim_unresolved` | boolean | **never absent.** True = a claim about this player was set aside (see below) or conflicting claims resolved to him |
 | 18 | `rotation_disposition` | string, closed | missing **only** where column 16 is False |
 | 19 | `rotation_claim_source_sha256` | string | no observed claim |
 | 20 | `rotation_claim_span_start` | Int64 | no located sentence |
@@ -104,6 +104,10 @@ finite English source check requires explicit unconditional wording. Absence, fu
 inability and rotation-risk restrictions must name the player and the relevant predicate
 in the same complete cited clause. Unsupported aliases, pronouns, training-only wording,
 other competitions, past matches and uncertain statements do not authorize those changes.
+The cited span must also be a whole sentence of the held source, by the same rule the
+manager-word reader applies: a quote cut from inside a longer sentence keeps its scope
+label but not `scope_verified`. A colon may introduce the sentence; a question mark or an
+ellipsis does not end one.
 
 The builder also checks the captured club calendar: the target week must have one dated
 fixture still ahead of the decision, and it must be the first club fixture after the exact
@@ -134,8 +138,16 @@ Columns 15, 16 and 17 distinguish these common cases:
 | an unresolved claim about him, with other coverage retained | True | False | **True** |
 | something was said and it was located | True | True | False |
 
-The third row records an unresolved claim: its citation could not be verified, or conflicting
-claims resolved to the same player. No disposition is carried. Conflicting player IDs are
+The third row records an unresolved claim. Either a claim about him was set aside, or
+conflicting claims resolved to the same player. A claim is set aside when:
+
+- its citation could not be verified: the quote did not locate once, or its document was not
+  fetched;
+- it left another text field empty, null or not text;
+- the parser refused it on its own;
+- another claim about the same player in the same response was set aside.
+
+No disposition is carried. Conflicting player IDs are
 also recorded in `players_with_conflicting_claims`; they are not a quiet-source result.
 The flags are independent: when all a club's citations fail, coverage is False while the
 affected players can still have unresolved=True. A retained claim can also coexist with a

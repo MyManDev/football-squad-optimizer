@@ -31,10 +31,13 @@ The advice record and the member histories name one league
 not recorded, until the record contract carries the league. The league receipt says so per
 league (`leagues.<id>.advice_recorded`), and its top-level `advice_recorded` is whether any
 league was recorded; a run asked to record whose list has none of them records nothing and
-logs `tick.week.advice_record.skipped`. The per-league `member_notes`, `removed` and
-`top100_note` sit under `leagues.<id>`; `legacy_tree` (top level) says what became of a tree
-from before the directory, and `removed_trees` (top level) names the trees of leagues the list
-no longer has, which the run removes so a dropped league's member names leave the site.
+logs `tick.week.advice_record.skipped`. The per-league `member_notes`, `removed`,
+`top100_note` and `purchase_prices_note` sit under `leagues.<id>`. The last says for how many
+captured members the purchase prices were rebuilt from the transfers list, and why not for
+each of the others; `scripts.build_league_site` prints the same line as `purchase`.
+`legacy_tree` (top level) says what became of a tree from before the directory, and
+`removed_trees` (top level) names the trees of leagues the list no longer has, which the run
+removes so a dropped league's member names leave the site.
 
 By hand, `scripts.build_league_site --league <id>` rebuilds one league from a capture. It
 keeps the other leagues the directory lists only when their trees were rendered from the same
@@ -68,7 +71,7 @@ results, and `--expected-at <UTC instant>` additionally evaluates missed complet
 | step | service / compatibility command | what it needs | what it leaves |
 | --- | --- | --- | --- |
 | top100 | `scripts.capture_top100_cohort`, `scripts.capture_elite_picks`, `scripts.export_player_evidence` | before the deadline; target gameweek ≥ 2 | `fpl-top100-*` and `fpl-elite-picks-*` snapshots; `artifacts/phase_b/player_evidence_v1_<season>_gw<NN>_top100.{csv,manifest.json}` |
-| capture | `squadopt.platform.fpl_capture.capture` with the entry registry and the league list | `data/entries/registry.json` (`scripts.seed_entry_registry`) | `data/snapshots/fpl-live-<utc>-<hash>/` with bootstrap, fixtures, every played event-live document from GW1, every member's three documents and the standings page |
+| capture | `squadopt.platform.fpl_capture.capture` with the entry registry and the league list | `data/entries/registry.json` (`scripts.seed_entry_registry`) | `data/snapshots/fpl-live-<utc>-<hash>/` with bootstrap, fixtures, every played event-live document from GW1, every member's three documents, every member's transfers list and, for a member whose history starts at GW1, the GW1 picks (these two are read after the others, and one the source still refuses after the retries is left out with a `missed` line rather than failing the capture), and the standings page |
 | settled outcomes | `application.settled_outcomes.export_settled_outcomes` | stored captures no newer than the selected capture; an earlier week with both pre-deadline and finished/checked captures | immutable table/manifest pairs under `artifacts/rotation`, plus per-run reports; unavailable pairs are stated, never filled with zero outcomes |
 | rotation | `scripts.export_rotation_evidence --snapshot <capture> --deadline-utc …` (only with `--rotation`) | the capture above, and either the committed synthetic fixture or the real club-news capture selected by `--rotation-capture` | `artifacts/rotation/rotation_evidence_v4_<season>_gw<NN>_<news hash>_decision_<decision hash>.{csv,manifest.json}` for a real club-news capture; `rotation_evidence_v4_<season>_gw<NN>_<decision hash>.{csv,manifest.json}` — one row per roster player in that capture, one categorical claim field, and the citation carried as a document digest plus a byte span rather than as text. Written exactly once per capture; a pair already on disk for it is reused rather than remade. With `--rotation`, the league stage also receives this table and its source, and solves every member one-week pure-points plan with the manager word switched on: `advice/<id>/saf-puan/1/hoca-sozu.json` beside the baseline, the index saying `evidence.available` and where the words came from, the site showing the switch, and an example-data label on every surface while the source is the fixture. Without `--rotation` the index says `no_evidence_this_run`, the switch is disabled with that reason, and a `hoca-sozu.json` an earlier publish left is removed (printed by `scripts.build_league_site`, and recorded under the league stage's `removed` in the run's receipt, with every member note under `member_notes`). **So a publish that should keep the switch must pass `--rotation`** (`--rotation` alone reads the fixture; `--rotation-capture <id>` reads a real club-news capture, which the registered hosts can now produce). A quote whose words carry wording the site never publishes is withheld and the page says so; the constraint still applies |
 | handoff | `scripts.build_projection_handoff --snapshot-id <capture> --evidence-table … --evidence-manifest …` | the capture above and the evidence | `data/handoffs/<season>-gw<NN>.json` — the Phase C component projection with the bounded Top-100 uplift on top (`phase-c-component-elite-top100-v1`); `--projection component-only` leaves the uplift out; without settled live history the producer falls back to the legacy blend and says so |
@@ -224,9 +227,23 @@ each line; the commands are in the table above and in the documents named.
    news document fetched at or after the decision capture, and the bundle refuses a news
    capture that completed after it.
 3. **The football forecast is built with its components from that capture**
-   (`scripts.build_football_forecast --with-components`), and **the projection handoff from
+   (`scripts.build_football_forecast --with-components --role-minutes --retained-role-history
+   --training-season 2022-23 --training-season 2023-24 --training-season 2024-25
+   --training-season 2026-27`), and **the projection handoff from
    the capture and the evidence** (`scripts.build_projection_handoff`). The bundle binds
    the forecast's and the handoff's fingerprints to the capture and refuses any other.
+   After these builds and before step 4, the owner runs
+   `python -m scripts.build_football_shadow --snapshot-root data/snapshots --snapshot-id <capture>
+   --archive-root data/raw/vaastav-fpl` from the week's commit. Its separate root is
+   `artifacts/shadow/football_team_share_v1`; never give it to the backend
+   (`artifacts/backend-artifact-root.json` or `-ArtifactRoot`), to
+   `scripts.prepare_football_bundle`, or to the planner chain runner and scorer (#923,
+   #992). Post the receipt's capture id, fingerprint and sha256 on #999 before the
+   deadline, then back up the artifact and receipt outside the repository preserving
+   modification times. Any later `fpl-live` capture targeting that week before the
+   deadline needs its own shadow build and handoff before the deadline, or the week is
+   missing. After the deadline, post the shadow input-check JSON with every season
+   capture on #999. See [the shadow note](football_prospective_shadow_note.md).
 4. **The weekly run**: rotation export, league tree, advice record, site, scoreboard,
    publish pull request (`platform.weekly_operations`). The journal refuses a stage whose
    predecessor did not complete; the league tree carries one `generated_at_utc`, which the
@@ -490,9 +507,34 @@ is refused in preflight, and any other difference from the record is still refus
 the end of the league stage.
 
 Check the candidate with `python -m scripts.check_league_tree <preview>/data`. The site
-pull request's CI also runs `shippedTree.test.ts` against the shipped tree; to run that
-check by hand, use `npx vitest run src/features/league/shippedTree.test.ts` from the
-publication worktree's `web` directory. Then use the [release recipe](deployment_runbook.md#release-in-one-command)
+pull request's CI also holds the shipped tree to the page's own validators
+(`shippedTree.test.ts`, `planModel.chips.shipped.test.ts`, `LeagueMemberPage.shipped.test.tsx`,
+`e2e/captain-line.spec.ts`). They find the trees the way the page does
+(`web/src/testSupport/shippedTrees.ts`: every tree `data/leagues.json` lists, or `data/league/`
+on a site without the directory) and fail, never skip, on a site that publishes neither; the
+member-page guard draws one tree and fails on a site that lists more, until it draws each; to
+run the first by hand, use `npx vitest run src/features/league/shippedTree.test.ts` from the
+publication worktree's `web` directory.
+
+**The first publish under the directory** (GW6 of 2026-27, the first since #959 and #960)
+needs nothing typed differently: the run moves `data/league/` to `data/leagues/<league id>/`
+before it reads or writes the tree, so the members' histories carry over, and writes
+`data/leagues.json` last. Four things differ from the weeks before it:
+
+- the accepted stamp `ship.sh` and `verify_live.py` take is `data/leagues.json`'s
+  `generated_at_utc` (with one league, the same as that league's `members.json`), not the
+  scoreboard's later stamp;
+- `scripts.add_device_plan_inputs` is not run on a weekly-run tree: the builder already
+  writes `device-plan.json` and each entry's inputs, with the Top 100 weights, and the script
+  refuses an entry that publishes purchase prices (it exists for a tree published before the
+  inputs, as fix13 was);
+- the tag is the next unused one: `site-2026-27-gw06-decision` already exists, so the
+  publisher's printed `-decision` tag would be refused only after `ship.sh` has waited for
+  the site pull request (`git ls-remote --tags origin 'site-2026-27-gw06-*'`);
+- the backend is restarted only after `verify_live.py` prints `ALL GOOD`: before the
+  release, the public site still serves the legacy tree's capture and the restart refuses.
+
+Then use the [release recipe](deployment_runbook.md#release-in-one-command)
 from Git Bash:
 `sh scripts/release/ship.sh --dry-run <site-PR> <unused-tag> <fresh-release-branch> <accepted-generated-at-ISO> <summary>`.
 Its real invocation performs the site release and runs `verify_live.py`; the restart

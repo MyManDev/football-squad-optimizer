@@ -122,7 +122,9 @@ regenerate it; do not repair the JSON directly.
 GitHub Pages can host the current static output, but Cloudflare Pages provides direct-upload
 preview aliases and convenient SPA behavior. It also leaves an optional Workers/Pages
 Functions path if a future browser integration needs a same-origin proxy. That is only an
-option: this decision introduces no server-side function.
+option: this decision introduces no server-side function. Before an FPL forwarder is built that
+way, a separate low-rate Worker measures whether FPL answers requests from Cloudflare's network
+at all, with the Pages site left static ([FPL forwarder probe](../../fpl_forwarder_probe.md)).
 
 The FastAPI service under `src/squadopt/api` cannot run on Cloudflare Pages and requires a
 separate backend-hosting decision before it is exposed publicly.

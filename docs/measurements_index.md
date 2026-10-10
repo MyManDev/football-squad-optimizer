@@ -60,6 +60,9 @@ The 22 September [football component ablation](research/football_component_ablat
 also read that season. Prior authorization provenance was unresolved; the owner
 [approved further football development use on 28 September](research/football_defcon_development_scope.md).
 This does not backdate permission or restore an untouched holdout.
+The 30 September [explicit lookahead measurement](research/explicit_lookahead_measurement.md)
+rebuilds the served football forecast, whose training includes 2025-26, after that approval;
+it scores plans on that forecast and scores nothing on 2025-26.
 `tests/unit/test_measurements_index.py` holds the rule that every committed artifact appears
 here (ADR 0003, rule 1).
 
@@ -220,6 +223,7 @@ identified below rather than being silently pooled with v1 evidence.
 | [planning_shortlist_matrix](research/planning_shortlist_matrix.md) ([record](research/planning_shortlist_matrix.json)) | Forty valid paired cases; median solve-time ratio 0.2569, two Free Hit losses exceed 0.1 points. Engineering screen failed; no promotion. | - |
 | `observed_rollout_measurement` ([record](research/observed_rollout_measurement.md), [JSON](research/observed_rollout_measurement.json)) | Full-universe 3/5-week observed rollout, 14 cases, 0 failures, 1 positive weighted menu deltas; authored sensitivity, no realized-return or promotion claim. | - |
 | [football_planning_replay](research/football_planning_replay.md) ([record](research/football_planning_replay.json)) | Frozen five-week control forecast replayed as hold, unprotected, protected and recourse: the feasible-hold guard keeps the five-week plan at 274.334 against 273.903 for holding, where the unprotected search fell to 248.401 with 28 hit points; both FEASIBLE, the proof gap 33.593 to 6.662. Three-week recourse 167.860 on a restricted menu; five-week recourse fails its proof requirement and the failure is kept. Validates the existing guard; no promotion. | - |
+| [explicit_lookahead_measurement](research/explicit_lookahead_measurement.md) ([record](research/explicit_lookahead_measurement.json)) | First-week action changed in 0 of 6 pairs (the declared primary finding; uninformative on squads built as the first week's optimum). Explicit tail on a rebuilt football_team_share_v1 forecast, two constructed squads, twenty main-search units a forecast week (hold probes outside them; see the record's corrections). Secondary readings: the two-week tail of the served five-week artifact reads +0.351 and +0.249 in-forecast for a three-week window; the fourteen-week tail is unsolved (FEASIBLE, gaps 3.8 to 8.2 percent, shortfalls not read); fourteen proved one-week solves beat every fourteen-week solve on the same rescore. Supports an incumbent hint, not a longer artifact; no promotion. | - |
 | `temporal_refinement_measurement` ([report](research/temporal_refinement_measurement.md), [JSON](research/temporal_refinement_measurement.json)) | Sixteen valid full-pool paired cases; 3 weighted gains, 5 losses over 0.1, 8 unchanged. Two five-week raw forecast gains; acceptance screen failed. Offline opt-in, no promotion. | - |
 | `triple_refinement_measurement` ([report](research/triple_refinement_measurement.md), [JSON](research/triple_refinement_measurement.json)) | Sixteen legal paired cases; 2 weighted gains, 5 losses over 0.1, 9 ties. One raw forecast gain; screen failed. Three-week neighborhoods remain offline opt-in. | - |
 
@@ -293,6 +297,8 @@ was written.
 `handoff_acceptance_checklist.md` · `candidate_declaration_review.md` ·
 `gw1_blocker_report_template.md` · `fw10_holdout_plan.md` · `opening_week_runbook.md` ·
 `artifact_preflight_spec.md` · `projection_horizon_contract.md` ·
-`rotation_evidence_prereg.md` · `football_prospective_prereg.md` · `availability_transitions_prereg.md`
+`rotation_evidence_prereg.md` · `football_prospective_prereg.md` · `availability_transitions_prereg.md` ·
+`football_lead_reliability_prereg.md` · `window_solver_highs_prereg.md`
 
 - [Frozen football window totals](research/football_window_totals.md): paired 1/3/5-week player sums from saved development forecasts; no model promotion.
+- [Planner policy chain protocol](research/planner_policy_chain_prereg.md): a prospective, stateful comparison of the routed multi-week planner, the full-window solver it replaced and the one-week path on realized points, over constructed squads with known purchase lots; read after GW20 (interim, no verdict) and GW38 (final); no record yet.

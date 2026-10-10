@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { installLeagueMocks } from "./leagueMocks";
 import AxeBuilder from "@axe-core/playwright";
 import { mockSuggestionOverview } from "../src/fixtures/weeklySuggestionOverview";
 import type { Scoreboard } from "../src/features/league/types";
@@ -67,6 +68,7 @@ for (const language of ["en", "tr"] as const) {
       },
     };
     await page.addInitScript((value) => localStorage.setItem("squadopt.language", value), language);
+    await installLeagueMocks(page);
     await page.route("**/data/league/scoreboard.json", (route) =>
       route.fulfill({
         json: {

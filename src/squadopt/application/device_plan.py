@@ -180,8 +180,9 @@ def device_plan_entry(
 ) -> dict[str, object] | None:
     """One member's side of the problem, or ``None`` where the live path would not plan.
 
-    The bank is the spending power the live path computes from the stated squad sale
-    value, not the raw bank; the sale prices are the ones the solver uses. A held squad
+    The bank and the sale prices are the ones the solver uses: for a member whose purchase
+    prices were rebuilt, the raw bank and the rule's sale prices; otherwise the spending
+    power the live path computes from the stated squad sale value. A held squad
     the live path refuses (a departed player, a squad from another week) publishes no
     block rather than a block the device would solve differently.
     """

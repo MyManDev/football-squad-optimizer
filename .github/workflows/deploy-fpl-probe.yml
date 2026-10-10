@@ -1,0 +1,209 @@
+name: Deploy FPL probe
+
+# The FPL probe Worker (workers/fpl-probe, docs/fpl_forwarder_probe.md) measures whether FPL
+# answers requests that leave from Cloudflare's network. It is dispatched by hand only, from the
+# default branch, into its own cloudflare-workers environment with its own Workers token. The
+# Pages token and the cloudflare-pages environment are never used here, and the Pages site is
+# not touched: it stays static.
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: deploy the probe, or delete it together with its KV namespace
+        required: true
+        type: choice
+        options:
+          - deploy
+          - delete
+        default: deploy
+
+permissions:
+  contents: read
+
+jobs:
+  reject_untrusted_dispatch:
+    name: reject non-default dispatch
+    if: github.ref != format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-24.04
+    steps:
+      - run: |
+          echo "::error::The FPL probe must be dispatched from the default branch."
+          exit 1
+
+  probe:
+    name: ${{ inputs.action }} FPL probe
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: cloudflare-workers
+    concurrency:
+      group: cloudflare-workers-fpl-probe
+      queue: max
+    permissions:
+      contents: read
+    steps:
+      - name: Require the Workers credentials
+        env:
+          CLOUDFLARE_WORKERS_API_TOKEN: ${{ secrets.CLOUDFLARE_WORKERS_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        shell: bash
+        run: |
+          missing=""
+          if [[ -z "$CLOUDFLARE_WORKERS_API_TOKEN" ]]; then missing="$missing CLOUDFLARE_WORKERS_API_TOKEN"; fi
+          if [[ -z "$CLOUDFLARE_ACCOUNT_ID" ]]; then missing="$missing CLOUDFLARE_ACCOUNT_ID"; fi
+          if [[ -n "$missing" ]]; then
+            echo "::error::The cloudflare-workers environment has no secret named:$missing. Add them to that environment as docs/fpl_forwarder_probe.md describes."
+            exit 1
+          fi
+
+      - name: Checkout the probe
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+
+      # The same files as the CI step in ci.yml; deploy-steps.test.mjs checks both lists against
+      # the test directory.
+      - name: Test the probe before it ships
+        if: inputs.action == 'deploy'
+        run: |
+          node --test \
+            workers/fpl-probe/test/probe.test.mjs \
+            workers/fpl-probe/test/deploy-steps.test.mjs
+
+      # A delete removes the Worker first, before anything that could stop the job, so a listing
+      # it cannot read never leaves the Worker calling FPL. --force skips wrangler's check for
+      # dependent Workers, which this one has none of. The step may fail because the Worker is
+      # already gone; the check after it decides.
+      - name: Delete the probe Worker
+        id: delete_worker
+        if: inputs.action == 'delete'
+        continue-on-error: true
+        uses: cloudflare/wrangler-action@25853364521e0d392ece9b0c1e97a4b37b638087 # v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_WORKERS_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: "4.123.0"
+          command: delete --name squadopt-fpl-probe --force
+
+      # The KV namespace is deleted only after this passes, so a Worker that is still running
+      # never keeps a binding to a deleted namespace.
+      - name: Confirm the probe no longer answers
+        id: confirm_gone
+        if: inputs.action == 'delete'
+        run: node workers/fpl-probe/scripts/deploy-steps.mjs confirm-gone
+
+      # From the repository root, where there is no wrangler configuration, so the namespace is
+      # titled exactly squadopt-fpl-probe and no Worker name is prefixed to it.
+      - name: List KV namespaces
+        id: kv_list
+        uses: cloudflare/wrangler-action@25853364521e0d392ece9b0c1e97a4b37b638087 # v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_WORKERS_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: "4.123.0"
+          command: kv namespace list
+
+      - name: Find the probe's KV namespace
+        id: kv_find
+        env:
+          LISTING: ${{ steps.kv_list.outputs.command-output }}
+        run: node workers/fpl-probe/scripts/deploy-steps.mjs find-namespace
+
+      - name: Create the probe's KV namespace
+        id: kv_create
+        if: inputs.action == 'deploy' && steps.kv_find.outputs.id == ''
+        uses: cloudflare/wrangler-action@25853364521e0d392ece9b0c1e97a4b37b638087 # v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_WORKERS_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: "4.123.0"
+          command: kv namespace create squadopt-fpl-probe
+
+      - name: List KV namespaces after creating one
+        id: kv_relist
+        if: steps.kv_create.outcome == 'success'
+        uses: cloudflare/wrangler-action@25853364521e0d392ece9b0c1e97a4b37b638087 # v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_WORKERS_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: "4.123.0"
+          command: kv namespace list
+
+      - name: Find the created KV namespace
+        id: kv_created
+        if: steps.kv_relist.outcome == 'success'
+        env:
+          LISTING: ${{ steps.kv_relist.outputs.command-output }}
+        run: node workers/fpl-probe/scripts/deploy-steps.mjs find-namespace
+
+      # The committed wrangler.toml holds a placeholder; the id is written on this runner only
+      # and never committed.
+      - name: Write the namespace id into wrangler.toml on this runner
+        if: inputs.action == 'deploy'
+        env:
+          NAMESPACE_ID: ${{ steps.kv_find.outputs.id || steps.kv_created.outputs.id }}
+        run: node workers/fpl-probe/scripts/deploy-steps.mjs fill-namespace-id
+
+      # The probe stops asking FPL by itself 7 days after this deploy, even if nobody deletes it.
+      - name: Choose when the probe stops
+        id: until
+        if: inputs.action == 'deploy'
+        run: node workers/fpl-probe/scripts/deploy-steps.mjs end-date
+
+      - name: Deploy the probe Worker
+        id: deploy
+        if: inputs.action == 'deploy'
+        uses: cloudflare/wrangler-action@25853364521e0d392ece9b0c1e97a4b37b638087 # v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_WORKERS_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: "4.123.0"
+          workingDirectory: workers/fpl-probe
+          command: deploy --var PROBE_UNTIL:${{ steps.until.outputs.until }}
+
+      # Fails only when the Worker itself does not answer with its JSON. A refusal by FPL shows
+      # up inside the records and passes: that refusal is the measurement.
+      - name: Smoke the live probe
+        id: smoke
+        if: steps.deploy.outcome == 'success'
+        run: node workers/fpl-probe/scripts/deploy-steps.mjs smoke
+
+      - name: Delete the probe's KV namespace
+        id: delete_namespace
+        if: inputs.action == 'delete' && steps.confirm_gone.outcome == 'success' && steps.kv_find.outputs.id != ''
+        uses: cloudflare/wrangler-action@25853364521e0d392ece9b0c1e97a4b37b638087 # v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_WORKERS_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: "4.123.0"
+          command: kv namespace delete --namespace-id ${{ steps.kv_find.outputs.id }}
+
+      - name: Report the result
+        if: always()
+        env:
+          ACTION: ${{ inputs.action }}
+          NAMESPACE_ID: ${{ steps.kv_find.outputs.id || steps.kv_created.outputs.id }}
+          PROBE_UNTIL: ${{ steps.until.outputs.until }}
+          DEPLOY_OUTCOME: ${{ steps.deploy.outcome }}
+          SMOKE_OUTCOME: ${{ steps.smoke.outcome }}
+          DELETE_WORKER_OUTCOME: ${{ steps.delete_worker.outcome }}
+          CONFIRM_GONE_OUTCOME: ${{ steps.confirm_gone.outcome }}
+          DELETE_NAMESPACE_OUTCOME: ${{ steps.delete_namespace.outcome }}
+        run: |
+          echo "## FPL probe: $ACTION" >> "$GITHUB_STEP_SUMMARY"
+          echo "- KV namespace: ${NAMESPACE_ID:-none}" >> "$GITHUB_STEP_SUMMARY"
+          if [[ "$ACTION" == "deploy" ]]; then
+            echo "- Deploy: ${DEPLOY_OUTCOME:-not-run}" >> "$GITHUB_STEP_SUMMARY"
+            echo "- Stops asking FPL at: ${PROBE_UNTIL:-not-set}" >> "$GITHUB_STEP_SUMMARY"
+            echo "- Smoke: ${SMOKE_OUTCOME:-not-run}" >> "$GITHUB_STEP_SUMMARY"
+            echo "- Results: https://squadopt.mymandev.com/api/v1/fpl-probe" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "- Worker delete: ${DELETE_WORKER_OUTCOME:-not-run}" >> "$GITHUB_STEP_SUMMARY"
+            echo "- Worker gone: ${CONFIRM_GONE_OUTCOME:-not-run}" >> "$GITHUB_STEP_SUMMARY"
+            echo "- Namespace delete: ${DELETE_NAMESPACE_OUTCOME:-not-run}" >> "$GITHUB_STEP_SUMMARY"
+          fi
