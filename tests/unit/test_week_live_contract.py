@@ -80,6 +80,17 @@ def test_progress_and_finished_examples_match_live_and_member_shapes(state):
         lambda item: item["members"][0].update(transfer_cost=True),
         lambda item: item["members"][0].update(entry_history_points=1.5),
         lambda item: item["members"][0]["pick_order"].__setitem__(0, "1"),
+        lambda item: item.update(season=202627),
+        lambda item: item.update(source_time=20261010),
+        lambda item: item["fixtures"][0].update(home_club=True),
+        lambda item: item["fixtures"][0].update(away_club="2"),
+        lambda item: item.update(fixtures={}),
+        lambda item: item.update(elements={}),
+        lambda item: item.update(members={}),
+        lambda item: item["fixtures"].append(64),
+        lambda item: item["elements"].append(16),
+        lambda item: item["members"].append(102),
+        lambda item: item["members"][0].update(pick_order={"1": 1}),
     ],
 )
 def test_wire_contract_refuses_malformed_or_unrequested_values(damage):
@@ -87,6 +98,12 @@ def test_wire_contract_refuses_malformed_or_unrequested_values(damage):
     damage(example)
     with pytest.raises(ValidationError):
         Draft202012Validator(SCHEMA, format_checker=FormatChecker()).validate(example)
+
+
+@pytest.mark.parametrize("document", [[], "week_live_v1", None])
+def test_wire_contract_refuses_a_document_that_is_not_an_object(document):
+    with pytest.raises(ValidationError):
+        Draft202012Validator(SCHEMA).validate(document)
 
 
 REQUIRED_FIELDS = {
