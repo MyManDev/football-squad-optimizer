@@ -242,6 +242,24 @@ def test_disabled_and_control_return_exact_original_frames_without_model(control
     assert json.loads(candidate.resource_bundle_json) == case.resources
 
 
+@pytest.mark.parametrize(
+    ("enabled", "control", "zero_coefficients"),
+    ((False, True, False), (False, False, True), (True, True, True)),
+)
+def test_contradictory_switches_refuse_instead_of_mislabelling_the_receipt(
+    model, enabled, control, zero_coefficients
+):
+    case = native_case()
+    with pytest.raises(ValueError, match="separate enabled learned arm"):
+        compose(
+            case,
+            model,
+            enabled=enabled,
+            control=control,
+            zero_coefficients=zero_coefficients,
+        )
+
+
 def test_zero_coefficient_ablation_retains_arbitrary_correlated_native_week_law(model):
     case = native_case(double=True)
     values = []

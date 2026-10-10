@@ -517,6 +517,11 @@ def compose_load_experiment(
     """Compose an explicit standalone arm without altering its supplied control."""
     if any(type(flag) is not bool for flag in (enabled, control, zero_coefficients)):
         raise ValueError("Load experiment switches must be explicit booleans.")
+    if (control and not enabled) or (zero_coefficients and (control or not enabled)):
+        raise ValueError(
+            "Control binds an enabled joint receipt; the zero-coefficient ablation is a"
+            " separate enabled learned arm."
+        )
     if (
         not isinstance(season, str)
         or not re.fullmatch(r"\d{4}-\d{2}", season)
