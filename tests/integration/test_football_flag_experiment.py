@@ -334,6 +334,48 @@ def test_dgw_uses_joint_week_appearance_and_preserves_complete_club_totals(model
     assert set(result.components.player_code) == set(case.roster.player_id)
 
 
+def test_two_week_composition_binds_each_week_and_plans_only_covered_weeks(model):
+    case = native_case(extra_week=True)
+    later = case.components.GW.eq(7) & case.components.player_code.eq(3)
+    case.components.loc[later, "residual_if_appearance"] = -4.0
+    case = recompute_native_scores(case)
+    result = compose(case, model)
+    predictions = {
+        (week.player_code, week.gameweek): model.predict(week) for week in case_inputs(case)
+    }
+    assert set(result.weekly.gameweek) == {6, 7}
+    for row in result.weekly.itertuples():
+        fixtures = result.components.loc[
+            result.components.player_code.eq(row.player_id) & result.components.GW.eq(row.gameweek)
+        ]
+        assert row.expected_points == pytest.approx(fsum(fixtures.expected_points), abs=1e-12)
+        assert row.appearance_probability == pytest.approx(
+            predictions[row.player_id, row.gameweek].weekly_appearance, abs=1e-15
+        )
+    focal = result.weekly.loc[result.weekly.player_id.eq(3)].set_index("gameweek")
+    assert focal.at[6, "expected_points"] > focal.at[7, "expected_points"]
+    assert json.loads(result.receipt_json)["gameweeks"] == [6, 7]
+    for gameweek in (6, 7):
+        decision = plan_flag_fixed_fifteen(
+            result, tuple(range(1, 16)), XI, BENCH, 13, 8, gameweek=gameweek
+        )
+        squad = decision.squad.set_index("player_id")
+        assert squad.at[3, "expected_points"] == focal.at[gameweek, "expected_points"]
+    with pytest.raises(ValueError, match="does not cover"):
+        plan_flag_fixed_fifteen(result, tuple(range(1, 16)), XI, BENCH, 13, 8, gameweek=8)
+
+
+def test_learned_composition_refuses_certain_native_appearance_without_epsilon(model):
+    case = native_case(uncertain_players=[p for p in range(1, 67) if p != 3])
+    focal = case.components.loc[case.components.player_code.eq(3)]
+    assert focal.zero_probability.eq(0).all()
+    for zero in (False, True):
+        with pytest.raises(ValueError, match="interior"):
+            compose(case, model, zero_coefficients=zero)
+    control = compose(case, control=True)
+    assert json.loads(control.receipt_json)["replacement_scope"] == "legacy_control"
+
+
 def test_learned_blank_week_is_explicit_zero_with_complete_coverage(model):
     case = native_case(blank=True)
     result = compose(case, model)
