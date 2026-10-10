@@ -179,8 +179,22 @@ DISTINCT_ARMS = {
 
 
 def test_eight_weeks_pair_all_arms_and_second_reading_opens_nothing(tmp_path, monkeypatch):
-    weeks = [week(gameweek, **DISTINCT_ARMS) for gameweek in range(6, 14)]
+    weeks = [week(gameweek, **DISTINCT_ARMS) for gameweek in range(6, 14)] + [week(14, 79)]
     result = read(list(reversed(weeks)), tmp_path)
+    assert result["exclusions"] == [
+        {
+            "gameweek": 14,
+            "reason": "insufficient_coverage",
+            "cohort_valid": 79,
+            "cohort_excluded": 21,
+            "cohort_exclusions": {
+                "chip_unresolved": 0,
+                "unreadable": 21,
+                "invalid_picks": 0,
+                "missing_outcome": 0,
+            },
+        }
+    ]
     assert result["paired_gameweeks"] == 8
     assert [row["gameweek"] for row in result["rows"]] == list(range(6, 14))
     for row in result["rows"]:
@@ -227,16 +241,16 @@ def _with_configuration(candidate, **changes):
 
 
 @pytest.mark.parametrize(
-    ("damage", "message"),
+    ("damage", "message", "code"),
     [
-        ("early_picks", "cannot precede deadline"),
-        ("early_outcome", "cannot precede deadline"),
-        ("changed_pool", "decision-time ownership pool"),
-        ("team_limit", "declared FPL policy"),
-        ("ownership_scale", "declared FPL policy"),
+        ("early_picks", "cannot precede deadline", "early_capture"),
+        ("early_outcome", "cannot precede deadline", "early_capture"),
+        ("changed_pool", "decision-time ownership pool", "provenance_mismatch"),
+        ("team_limit", "declared FPL policy", "invalid_configuration"),
+        ("ownership_scale", "declared FPL policy", "invalid_configuration"),
     ],
 )
-def test_capture_timing_pool_and_configuration_gates_refuse_the_week(damage, message):
+def test_capture_timing_pool_and_configuration_gates_refuse_the_week(damage, message, code):
     candidate = week()
     if damage == "early_picks":
         candidate = replace(candidate, picks=_restamp(candidate.picks, "2026-10-10T09:59:59Z"))
@@ -253,12 +267,21 @@ def test_capture_timing_pool_and_configuration_gates_refuse_the_week(damage, mes
         candidate = _with_configuration(candidate, max_players_per_team=4)
     else:
         candidate = _with_configuration(candidate, expected_points_scale=100)
-    with pytest.raises(EvaluationValidationError, match=message):
+    with pytest.raises(live.LiveWeekRefusal, match=message) as refused:
         live.prepare_live_week(candidate)
+    assert refused.value.code == code
 
 
-@pytest.mark.parametrize("damage", ["late_freeze", "wrong_cohort", "unchecked", "changed_decision"])
-def test_invalid_week_is_refused_before_a_reading(damage):
+@pytest.mark.parametrize(
+    ("damage", "code"),
+    [
+        ("late_freeze", "late_capture"),
+        ("wrong_cohort", "provenance_mismatch"),
+        ("unchecked", "unchecked_outcome"),
+        ("changed_decision", "provenance_mismatch"),
+    ],
+)
+def test_invalid_week_is_refused_before_a_reading(damage, code):
     candidate = week()
     if damage == "late_freeze":
         candidate = replace(
@@ -306,18 +329,54 @@ def test_invalid_week_is_refused_before_a_reading(damage):
                 },
             ),
         )
-    with pytest.raises(EvaluationValidationError):
+    with pytest.raises(live.LiveWeekRefusal) as refused:
         live.prepare_live_week(candidate)
+    assert refused.value.code == code
 
 
 def test_exactly_eighty_valid_members_pass_without_backfilling():
     prepared = live.prepare_live_week(week(coverage=80))
     assert len(prepared.managers) == 80
     assert prepared.provenance["cohort_excluded"] == 20
+    assert prepared.provenance["cohort_exclusions"] == {
+        "chip_unresolved": 0,
+        "unreadable": 20,
+        "invalid_picks": 0,
+        "missing_outcome": 0,
+    }
     assert prepared.provenance["solver_configuration"] == {
         "deterministic_time_limit": 5.0,
         "wall_time_limit_seconds": 600.0,
         "binding_limit": "deterministic_time",
+    }
+
+
+def test_thin_week_keeps_its_coverage_counted_by_reason():
+    candidate = week(coverage=82)
+    payloads = dict(candidate.picks.payloads)
+    for entry in (1001, 1002, 1003):
+        name = f"entry-{entry}-picks-gw06.json"
+        document = json.loads(payloads[name])
+        document["active_chip"] = "freehit"
+        payloads[name] = json.dumps(document).encode()
+    name = "entry-1004-picks-gw06.json"
+    document = json.loads(payloads[name])
+    document["automatic_subs"] = [{"entry": 1, "event": 6, "element_out": 3, "element_in": 7}]
+    payloads[name] = json.dumps(document).encode()
+    with pytest.raises(live.LiveWeekRefusal) as refused:
+        live.prepare_live_week(
+            replace(candidate, picks=replace(candidate.picks, payloads=payloads))
+        )
+    assert refused.value.code == "insufficient_coverage"
+    assert refused.value.coverage == {
+        "cohort_valid": 78,
+        "cohort_excluded": 22,
+        "cohort_exclusions": {
+            "chip_unresolved": 3,
+            "unreadable": 18,
+            "invalid_picks": 1,
+            "missing_outcome": 0,
+        },
     }
 
 

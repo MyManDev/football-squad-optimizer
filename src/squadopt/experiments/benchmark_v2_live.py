@@ -49,6 +49,41 @@ CLAIM_FILE = "benchmark-v2-live-2026-27.reading"
 # Match the named committed-measurement limits in scripts/_experiment_cli.py.
 MEASUREMENT_DETERMINISTIC_TIME_LIMIT = 5.0
 MEASUREMENT_WALL_TIME_LIMIT_SECONDS = 600.0
+# Stable exclusion codes. A record names why a week or a cohort entry is missing, never
+# an exception class or a raw entry id.
+WEEK_EXCLUSION_CODES = (
+    "invalid_gameweek",
+    "provenance_mismatch",
+    "late_capture",
+    "early_capture",
+    "invalid_configuration",
+    "unchecked_outcome",
+    "insufficient_coverage",
+    "missing_outcome",
+    "invalid_capture",
+)
+ENTRY_EXCLUSION_CODES = ("chip_unresolved", "unreadable", "invalid_picks", "missing_outcome")
+
+
+class LiveWeekRefusal(EvaluationValidationError):
+    """A refused week, with its stable exclusion code and any cohort coverage already read."""
+
+    def __init__(
+        self, code: str, message: str, *, coverage: Mapping[str, Any] | None = None
+    ) -> None:
+        if code not in WEEK_EXCLUSION_CODES:
+            raise ValueError(f"Unknown Benchmark V2 week exclusion code {code!r}.")
+        super().__init__(message)
+        self.code = code
+        self.coverage = dict(coverage or {})
+
+
+class UnresolvedChipError(EvaluationValidationError):
+    """An entry played a roster-changing chip that the protocol does not yet normalize."""
+
+
+class _MissingEntryOutcome(EvaluationValidationError):
+    """A cohort entry names a player without a realized outcome."""
 
 
 @dataclass(frozen=True)
@@ -84,7 +119,7 @@ def _original_picks(raw: bytes, *, entry_id: int, gameweek: int) -> bytes:
     """Reverse recorded FPL autosub position swaps, then normalize chip multipliers."""
     document = json.loads(raw)
     if document.get("active_chip") not in (None, "bboost", "3xc"):
-        raise EvaluationValidationError(
+        raise UnresolvedChipError(
             "Roster-changing chip normalization needs a frozen protocol decision."
         )
     picks = {row["element"]: dict(row) for row in document["picks"]}
@@ -117,7 +152,7 @@ def _original_picks(raw: bytes, *, entry_id: int, gameweek: int) -> bytes:
 def prepare_live_week(week: LiveBenchmarkWeek) -> PreparedLiveWeek:
     """Validate timing, identities and complete scoring inputs before any comparison."""
     if type(week.gameweek) is not int or not 3 <= week.gameweek <= 38:
-        raise EvaluationValidationError("Live Benchmark V2 requires gameweeks 3 to 38.")
+        raise LiveWeekRefusal("invalid_gameweek", "Live Benchmark V2 requires gameweeks 3 to 38.")
     sources = {
         "decision": "fpl-live",
         "freeze": "fpl-benchmark-decision",
@@ -128,25 +163,31 @@ def prepare_live_week(week: LiveBenchmarkWeek) -> PreparedLiveWeek:
     for role, source in sources.items():
         snapshot = getattr(week, role)
         if snapshot.metadata.source != source:
-            raise EvaluationValidationError(f"Invalid live Benchmark V2 {role} source.")
+            raise LiveWeekRefusal(
+                "provenance_mismatch", f"Invalid live Benchmark V2 {role} source."
+            )
         # A live-only admission window keeps archived seasons outside this reader.
         at = as_instant(snapshot.metadata.captured_at_utc)
         if not as_instant("2026-08-01T00:00:00Z") <= at < as_instant("2027-08-01T00:00:00Z"):
-            raise EvaluationValidationError("Live Benchmark V2 refuses another season.")
+            raise LiveWeekRefusal(
+                "provenance_mismatch", "Live Benchmark V2 refuses another season."
+            )
     bootstrap = week.decision.payloads[BOOTSTRAP_PAYLOAD]
     deadlines = {item.gameweek: item.deadline_utc for item in gameweek_deadlines(bootstrap)}
     deadline = as_instant(deadlines[week.gameweek])
     for snapshot in (week.decision, week.freeze, week.cohort):
         if as_instant(snapshot.metadata.captured_at_utc) >= deadline:
-            raise EvaluationValidationError(
-                "Benchmark decision, freeze and cohort must precede deadline."
+            raise LiveWeekRefusal(
+                "late_capture", "Benchmark decision, freeze and cohort must precede deadline."
             )
     for snapshot in (week.picks, week.outcome):
         if as_instant(snapshot.metadata.captured_at_utc) < deadline:
-            raise EvaluationValidationError("Benchmark picks and outcomes cannot precede deadline.")
+            raise LiveWeekRefusal(
+                "early_capture", "Benchmark picks and outcomes cannot precede deadline."
+            )
     if week.freeze.payloads[BOOTSTRAP_PAYLOAD] != bootstrap:
-        raise EvaluationValidationError(
-            "Benchmark freeze changed the decision-time ownership pool."
+        raise LiveWeekRefusal(
+            "provenance_mismatch", "Benchmark freeze changed the decision-time ownership pool."
         )
     binding = _json(week.freeze, "benchmark.json")
     picks_binding = _json(week.picks, "benchmark.json")
@@ -156,14 +197,16 @@ def prepare_live_week(week: LiveBenchmarkWeek) -> PreparedLiveWeek:
             week.gameweek,
             week.cohort.metadata.snapshot_id,
         ):
-            raise EvaluationValidationError(
-                "Benchmark capture differs from its frozen cohort/week."
+            raise LiveWeekRefusal(
+                "provenance_mismatch", "Benchmark capture differs from its frozen cohort/week."
             )
     if (binding.get("decision_snapshot_id"), binding.get("decision_fingerprint")) != (
         week.decision.metadata.snapshot_id,
         week.decision.metadata.fingerprint,
     ):
-        raise EvaluationValidationError("Benchmark freeze differs from its decision capture.")
+        raise LiveWeekRefusal(
+            "provenance_mismatch", "Benchmark freeze differs from its decision capture."
+        )
     frozen = _json(week.freeze, "system-decision.json")
     if (
         frozen.get("snapshot_id"),
@@ -176,20 +219,26 @@ def prepare_live_week(week: LiveBenchmarkWeek) -> PreparedLiveWeek:
         week.gameweek,
         week.decision.metadata.captured_at_utc,
     ) or as_instant(frozen["deadline_utc"]) != deadline:
-        raise EvaluationValidationError("Frozen system decision differs from the captured week.")
+        raise LiveWeekRefusal(
+            "provenance_mismatch", "Frozen system decision differs from the captured week."
+        )
     if hashlib.sha256(week.freeze.payloads["system-decision.json"]).hexdigest() != binding.get(
         "system_decision_sha256"
     ):
-        raise EvaluationValidationError("Frozen system decision digest differs.")
+        raise LiveWeekRefusal("provenance_mismatch", "Frozen system decision digest differs.")
     config_record = binding.get("template_configuration")
     if not isinstance(config_record, dict) or set(config_record) != {
         "budget_tenths",
         "max_players_per_team",
         "expected_points_scale",
     }:
-        raise EvaluationValidationError("Missing decision-time template configuration.")
+        raise LiveWeekRefusal(
+            "invalid_configuration", "Missing decision-time template configuration."
+        )
     if config_record["max_players_per_team"] != 3 or config_record["expected_points_scale"] != 1000:
-        raise EvaluationValidationError("Template configuration changes the declared FPL policy.")
+        raise LiveWeekRefusal(
+            "invalid_configuration", "Template configuration changes the declared FPL policy."
+        )
     config = OptimizationConfig(
         **config_record,
         solver_deterministic_time_limit=MEASUREMENT_DETERMINISTIC_TIME_LIMIT,
@@ -214,18 +263,20 @@ def prepare_live_week(week: LiveBenchmarkWeek) -> PreparedLiveWeek:
     v1_audit = audit_unconstrained_template_v1(pool, v1_template.starter_ids, config)
     cohort, _ = validate_top100_capture(week.cohort, target_gameweek=week.gameweek)
     if as_instant(cohort.deadline_timestamp_utc) != deadline:
-        raise EvaluationValidationError("Cohort deadline differs from the frozen decision.")
+        raise LiveWeekRefusal(
+            "provenance_mismatch", "Cohort deadline differs from the frozen decision."
+        )
     for snapshot in (week.picks, week.outcome):
         observed = {
             item.gameweek: as_instant(item.deadline_utc)
             for item in gameweek_deadlines(snapshot.payloads[BOOTSTRAP_PAYLOAD])
         }
         if observed.get(week.gameweek) != deadline:
-            raise EvaluationValidationError(
-                "Benchmark picks or outcomes name a different deadline."
+            raise LiveWeekRefusal(
+                "provenance_mismatch", "Benchmark picks or outcomes name a different deadline."
             )
     if week.gameweek not in scored_gameweeks(week.outcome.payloads[BOOTSTRAP_PAYLOAD]):
-        raise EvaluationValidationError("Benchmark outcome is not finished and checked.")
+        raise LiveWeekRefusal("unchecked_outcome", "Benchmark outcome is not finished and checked.")
     outcomes = live_event_outcomes(
         week.outcome.payloads[live_payload(week.gameweek)],
         week.outcome.payloads[BOOTSTRAP_PAYLOAD],
@@ -233,17 +284,23 @@ def prepare_live_week(week: LiveBenchmarkWeek) -> PreparedLiveWeek:
     )
     codes = player_codes(week.picks.payloads[BOOTSTRAP_PAYLOAD])
     managers = []
-    excluded = 0
+    entry_exclusions = dict.fromkeys(ENTRY_EXCLUSION_CODES, 0)
     outcome_ids = set(outcomes.player_id)
     for entry_id in cohort.entry_ids:
+        picks_name = entry_picks_payload(entry_id, week.gameweek)
+        history_name = entry_history_payload(entry_id)
+        if picks_name not in week.picks.payloads or history_name not in week.picks.payloads:
+            # The collector leaves an unreadable member's payloads out.
+            entry_exclusions["unreadable"] += 1
+            continue
         try:
             record = fpl_entry_picks(
                 _original_picks(
-                    week.picks.payloads[entry_picks_payload(entry_id, week.gameweek)],
+                    week.picks.payloads[picks_name],
                     entry_id=entry_id,
                     gameweek=week.gameweek,
                 ),
-                week.picks.payloads[entry_history_payload(entry_id)],
+                week.picks.payloads[history_name],
                 entry_id=entry_id,
                 season=SEASON,
                 gameweek=week.gameweek,
@@ -251,16 +308,34 @@ def prepare_live_week(week: LiveBenchmarkWeek) -> PreparedLiveWeek:
             )
             decision = _decision_from_record(record, player_pool=pool, codes=codes)
             if not set(decision.squad.player_id) <= outcome_ids:
-                raise EvaluationValidationError("Missing cohort player's realized outcome.")
+                raise _MissingEntryOutcome("Missing cohort player's realized outcome.")
             score_frozen_squad_decision(decision, outcomes.assign(total_points=0))
-            managers.append(decision)
+        except UnresolvedChipError:
+            entry_exclusions["chip_unresolved"] += 1
+        except _MissingEntryOutcome:
+            entry_exclusions["missing_outcome"] += 1
         except (DataError, EvaluationValidationError, KeyError, ValueError, TypeError):
-            excluded += 1
+            entry_exclusions["invalid_picks"] += 1
+        else:
+            managers.append(decision)
+    coverage = {
+        "cohort_valid": len(managers),
+        "cohort_excluded": sum(entry_exclusions.values()),
+        "cohort_exclusions": entry_exclusions,
+    }
     if len(managers) < 80:
-        raise EvaluationValidationError("Benchmark cohort has fewer than 80 valid frozen members.")
+        raise LiveWeekRefusal(
+            "insufficient_coverage",
+            "Benchmark cohort has fewer than 80 valid frozen members.",
+            coverage=coverage,
+        )
     for decision in (system, template):
         if not set(decision.squad.player_id) <= outcome_ids:
-            raise EvaluationValidationError("Missing system or template realized outcome.")
+            raise LiveWeekRefusal(
+                "missing_outcome",
+                "Missing system or template realized outcome.",
+                coverage=coverage,
+            )
         score_frozen_squad_decision(decision, outcomes.assign(total_points=0))
     return PreparedLiveWeek(
         week.gameweek,
@@ -286,8 +361,7 @@ def prepare_live_week(week: LiveBenchmarkWeek) -> PreparedLiveWeek:
             },
             "system_decision_sha256": binding["system_decision_sha256"],
             "model_version": frozen.get("model_version"),
-            "cohort_valid": len(managers),
-            "cohort_excluded": excluded,
+            **coverage,
             "v1_feasibility": dict(v1_audit),
         },
         tuple(v1_template.starter_ids),
@@ -333,9 +407,11 @@ def read_live_benchmark_once(
     for week in sorted(weeks, key=lambda item: item.gameweek):
         try:
             prepared.append(prepare_live_week(week))
-        except (DataError, EvaluationValidationError, KeyError, ValueError, TypeError) as error:
-            # Report stable classes, never raw entry ids from parsing failures.
-            exclusions.append({"gameweek": week.gameweek, "reason": type(error).__name__})
+        except LiveWeekRefusal as error:
+            # Report stable codes and counts, never raw entry ids from parsing failures.
+            exclusions.append({"gameweek": week.gameweek, "reason": error.code, **error.coverage})
+        except (DataError, EvaluationValidationError, KeyError, ValueError, TypeError):
+            exclusions.append({"gameweek": week.gameweek, "reason": "invalid_capture"})
     if len(prepared) < MINIMUM_WEEKS:
         raise EvaluationValidationError("Benchmark V2 needs eight valid paired gameweeks.")
     record_root.mkdir(parents=True, exist_ok=True)
