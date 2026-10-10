@@ -166,8 +166,16 @@ def test_three_week_control_refuses_before_emitting_a_binding_record() -> None:
     history = json.loads(payloads["entry-3-history.json"])
     history["current"][0]["points"] = 99
     payloads["entry-3-history.json"] = _bytes(history)
-    with pytest.raises(measurement.ScaleMeasurementError, match="Explain on #1002 before step 4"):
+    with pytest.raises(
+        measurement.ScaleMeasurementError, match="Explain on #1002 before step 4"
+    ) as refusal:
         _measure(payloads)
+    # GW1 gaps are 15, 99 and 84; GW2 and GW3 keep 15, 15 and 30.
+    unrounded = math.sqrt((15**2 + 99**2 + 84**2 + 2 * (15**2 + 15**2 + 30**2)) / 9)
+    assert str(refusal.value).startswith(
+        f"GW1 to GW3 control is 46.9 (unrounded {unrounded:.4f}), expected 21.2, "
+        "from 3 members and 9 of 9 pair-weeks (0 dropped)."
+    )
 
 
 def test_secondary_is_only_an_already_listed_captured_league() -> None:

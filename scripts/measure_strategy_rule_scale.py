@@ -175,9 +175,16 @@ def measure_payloads(
     control = pair_week_reading(rows, range(1, 4))
     control_scale = control.scale()
     if control_scale is None or round_half_up(control_scale) != 21.2:
-        observed = round_half_up(control_scale) if control_scale is not None else "unavailable"
+        # Aggregates only, so the explanation #1002 asks for has its counts to start from.
+        observed = (
+            f"{round_half_up(control_scale)} (unrounded {float(control_scale):.4f})"
+            if control_scale is not None
+            else "unavailable"
+        )
         raise ScaleMeasurementError(
-            f"GW1 to GW3 control is {observed}, expected 21.2. Explain on #1002 before step 4."
+            f"GW1 to GW3 control is {observed}, expected 21.2, from {len(rows)} members and "
+            f"{control.counted} of {control.expected} pair-weeks "
+            f"({control.expected - control.counted} dropped). Explain on #1002 before step 4."
         )
     primary = pair_week_reading(rows, range(1, n + 1))
     scale = primary.scale()
