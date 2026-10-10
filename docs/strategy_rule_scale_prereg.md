@@ -82,13 +82,13 @@ weeks 10 and 11. Text-key sorting must not reorder them.
 
 The new constant is S on GW1 to N. If it rounds to 21.2, retain both the value
 and `gap_and_weeks_strategy_rule_v1` and update only the provenance comment.
-Otherwise use the recorded value and `gap_and_weeks_strategy_rule_v2`.
+Otherwise use the recorded rounded S and `gap_and_weeks_strategy_rule_v2`.
 `BAND_EDGE_DIFFERENTIALS`, `SEASON_FINAL_GAMEWEEK`, the symmetric band and its
 square-root scaling stay as declared.
 
 The step 4 provenance names the capture, N, member count, counted/dropped
-pair-weeks and result path. Its pin test compares the constant with the committed
-JSON. Existing historical records naming 21.2 retain their original meaning.
+pair-weeks and result path. Its pin test compares the constant with the rounded S
+in the committed JSON. Existing historical records naming 21.2 retain their original meaning.
 If #983 step 4 has already merged, update its TypeScript value and parity test in
 the same PR. #981 step 6 reads the Python rule directly. Post the resulting value,
 rule id and merged step 4 PR on #983.
@@ -112,9 +112,10 @@ rounded S, control result and companion readings. Outputs contain aggregates onl
 Step 4 merges after the GW6 publish and at or after 2026-10-10T10:00:00Z, aiming
 for the GW7 publish. After the owner's release approval, the first live publish
 with a non-null suggestion must carry the resulting rule id and
-`band_edge_points = round(1.0 * S * sqrt(weeks_remaining), 1)`. Until then a league
-build test pins that same equality. No release or weekly run is authorized by
-this declaration alone.
+`band_edge_points = round(1.0 * C * sqrt(weeks_remaining), 1)`, where C is the
+rounded S that step 4 writes to `WEEKLY_POINTS_DIFFERENTIAL_POINTS`, not the
+unrounded S. Until then a league build test pins that same equality. No release
+or weekly run is authorized by this declaration alone.
 
 A follow-up issue covers GW12 and GW19 using this same script and preregistration.
 Their readings follow each week's final match, currently scheduled for
