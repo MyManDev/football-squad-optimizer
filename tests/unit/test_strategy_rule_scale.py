@@ -225,47 +225,80 @@ def test_passing_control_is_recorded_as_passed() -> None:
     assert record["control_gw1_to_gw3"]["scale_rounded"] == 21.2
 
 
-def test_secondary_is_only_an_already_listed_captured_league() -> None:
+def test_secondary_readings_cover_every_listed_league_and_no_other() -> None:
     payloads = _payloads()
     payloads.update(
         {key: value for key, value in _payloads(league=123).items() if key.startswith("league-")}
     )
-    assert _measure(payloads)["secondary_leagues"] == []
+    unlisted = _measure(payloads)
+    assert unlisted["secondary_leagues"] == []
     record = _measure(payloads, listed=(measurement.PRIMARY_LEAGUE, 123, 456))
-    assert len(record["secondary_leagues"]) == 1
-    assert record["secondary_leagues"][0]["league"] == 123
-    assert record["secondary_leagues"][0]["available"] is True
-    assert record["secondary_leagues"][0]["scale_rounded"] == 21.2
+    assert [row["league"] for row in record["secondary_leagues"]] == [123, 456]
+    measured, absent = record["secondary_leagues"]
+    assert measured["available"] is True
+    assert measured["scale_rounded"] == 21.2
+    assert absent == {
+        "league": 456,
+        "available": False,
+        "reason": "The capture has no standings for this listed league.",
+    }
+    # Reading (e) never changes the primary reading.
+    assert {**record, "secondary_leagues": []} == unlisted
 
 
-def _secondary_standings(*, has_next: bool) -> bytes:
+def _secondary_payloads(case: str) -> dict[str, bytes]:
+    """League 123 with members 11 to 13, broken the way ``case`` names."""
+    payloads = _payloads()
+    if case == "standings-absent":
+        return payloads
     standings = json.loads(_payloads(league=123)["league-123-standings.json"])
-    standings["standings"]["has_next"] = has_next
+    standings["standings"]["has_next"] = case == "standings-paginated"
     for row in standings["standings"]["results"]:
         row["entry"] += 10
-    return _bytes(standings)
+    payloads["league-123-standings.json"] = _bytes(standings)
+    if case in ("histories-missing", "standings-paginated"):
+        return payloads
+    for entry in (1, 2, 3):
+        history = json.loads(payloads[f"entry-{entry}-history.json"])
+        if case == "week-missing" and entry == 3:
+            history["current"] = [row for row in history["current"] if row["event"] != 4]
+        if case == "cost-missing" and entry == 2:
+            del history["current"][1]["event_transfers_cost"]
+        payloads[f"entry-{entry + 10}-history.json"] = _bytes(history)
+    return payloads
 
 
 @pytest.mark.parametrize(
-    "has_next,reason",
+    "case,reason",
     [
-        (False, "The capture lacks a standings or required history payload."),
-        (True, "The capture has invalid standings or history rows."),
+        ("standings-absent", "The capture has no standings for this listed league."),
+        ("histories-missing", "The capture lacks a standings or required history payload."),
+        ("standings-paginated", "The capture has invalid standings or history rows."),
+        ("week-missing", "A member lacks a history row for a week from GW1 to N."),
+        ("cost-missing", "A history row lacks event_transfers_cost."),
     ],
-    ids=["histories-missing", "standings-paginated"],
 )
 def test_unreadable_secondary_league_is_recorded_unavailable_without_refusing_s(
-    tmp_path: Path, has_next: bool, reason: str
+    tmp_path: Path, case: str, reason: str
 ) -> None:
-    payloads = _payloads()
-    payloads["league-123-standings.json"] = _secondary_standings(has_next=has_next)
-    record = _measure(payloads, listed=(measurement.PRIMARY_LEAGUE, 123))
+    record = _measure(_secondary_payloads(case), listed=(measurement.PRIMARY_LEAGUE, 123))
     assert record["scale"]["scale_rounded"] == 21.2
     assert record["secondary_leagues"] == [{"league": 123, "available": False, "reason": reason}]
+    assert {**record, "secondary_leagues": []} == _measure(_payloads())
     measurement.write_records(_provenance(record), tmp_path)
     text = (tmp_path / "docs/strategy_rule_scale.md").read_text()
-    assert f"League 123 is listed and captured but was not measured: {reason}" in text
+    assert f"League 123 is listed but was not measured: {reason}" in text
     assert "No additional listed league was measured." in text
+
+
+def test_complete_secondary_league_is_measured() -> None:
+    payloads = _secondary_payloads("complete")
+    record = _measure(payloads, listed=(measurement.PRIMARY_LEAGUE, 123))
+    (measured,) = record["secondary_leagues"]
+    assert measured["available"] is True
+    assert (measured["members"], measured["through_gameweek"]) == (3, 6)
+    assert (measured["pair_weeks_counted"], measured["pair_weeks_dropped"]) == (18, 0)
+    assert measured["scale_rounded"] == 21.2
 
 
 def _provenance(record: dict[str, Any]) -> dict[str, Any]:
@@ -477,6 +510,25 @@ def _main_arguments(tmp_path: Path, snapshot_id: str) -> list[str]:
         "--through-gameweek",
         "6",
     ]
+
+
+def test_unreadable_league_list_refuses_before_any_capture_opens(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    def forbidden(*args: Any, **kwargs: Any) -> Any:
+        pytest.fail("No capture opens before the league list is read.")
+
+    monkeypatch.setattr(measurement, "REPOSITORY_ROOT", tmp_path)
+    monkeypatch.setattr(measurement, "preregistration_gate", lambda: ("a" * 40, "b" * 64))
+    monkeypatch.setattr(measurement, "read_snapshot", forbidden)
+    (tmp_path / "config").mkdir()
+    (tmp_path / measurement.LEAGUE_LIST_FILE).write_text("{}")
+    snapshot_id = "fpl-live-20261013T120000Z-" + "a" * 12
+    assert measurement.main(_main_arguments(tmp_path, snapshot_id)) == 1
+    assert (
+        capsys.readouterr().err == "Measurement refused: Capture or provenance validation failed.\n"
+    )
+    assert not (tmp_path / "docs").exists()
 
 
 def test_passing_control_exits_zero_and_holds_nothing(

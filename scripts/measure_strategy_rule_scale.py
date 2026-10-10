@@ -166,6 +166,31 @@ def cumulative_reading(rows: NetRows, k: int, unrounded_scale: Decimal) -> dict[
     }
 
 
+def secondary_reading(payloads: Mapping[str, bytes], league: int, n: int) -> dict[str, Any]:
+    """Reading (e) for one listed league other than the primary, recorded only.
+
+    The league is available only when the capture holds its standings and every member has
+    a history row with event_transfers_cost for every week from GW1 to N. Otherwise it is
+    marked unavailable with no number, and it never refuses or changes the primary reading.
+    """
+    unavailable = {"league": league, "available": False}
+    if f"league-{league}-standings.json" not in payloads:
+        return {**unavailable, "reason": "The capture has no standings for this listed league."}
+    try:
+        rows = league_net_rows(payloads, league, n)
+    except ScaleMeasurementError as error:
+        return {**unavailable, "reason": str(error)}
+    if any(not set(range(1, n + 1)).issubset(row) for row in rows):
+        return {**unavailable, "reason": "A member lacks a history row for a week from GW1 to N."}
+    return {
+        "league": league,
+        "available": True,
+        "members": len(rows),
+        "through_gameweek": n,
+        **pair_week_reading(rows, range(1, n + 1)).document(),
+    }
+
+
 def measure_payloads(
     payloads: Mapping[str, bytes],
     *,
@@ -191,25 +216,6 @@ def measure_payloads(
     if scale is None:
         # An empty population is unavailable, never zero.
         raise ScaleMeasurementError("No pair-week on GW1 to N has both members' rows.")
-    secondary: list[dict[str, Any]] = []
-    for other in listed_leagues:
-        if other == league or f"league-{other}-standings.json" not in payloads:
-            continue
-        try:
-            other_rows = league_net_rows(payloads, other, n)
-        except ScaleMeasurementError as error:
-            # Reading (e) is recorded only, so an incomplete other league never refuses S.
-            secondary.append({"league": other, "available": False, "reason": str(error)})
-            continue
-        secondary.append(
-            {
-                "league": other,
-                "available": True,
-                "members": len(other_rows),
-                "through_gameweek": n,
-                **pair_week_reading(other_rows, range(1, n + 1)).document(),
-            }
-        )
     return {
         "contract_version": CONTRACT_VERSION,
         "season": "2026-27",
@@ -231,7 +237,9 @@ def measure_payloads(
             for k in range(3, n + 1)
         ],
         "cumulative_comparisons": [cumulative_reading(rows, k, scale) for k in range(3, n + 1)],
-        "secondary_leagues": secondary,
+        "secondary_leagues": [
+            secondary_reading(payloads, other, n) for other in listed_leagues if other != league
+        ],
     }
 
 
@@ -332,8 +340,7 @@ def markdown(record: Mapping[str, Any]) -> str:
             lines.extend(
                 [
                     "",
-                    f"League {row['league']} is listed and captured but was not measured: "
-                    f"{row['reason']}",
+                    f"League {row['league']} is listed but was not measured: {row['reason']}",
                 ]
             )
     return "\n".join(lines) + "\n"
@@ -404,6 +411,9 @@ def run_measurement(
     if league != PRIMARY_LEAGUE:
         raise ScaleMeasurementError("The proposed primary league is 352490.")
     revision, preregistration_hash = preregistration_gate()
+    # The gate refused a dirty tree, so this is config/leagues.json at the recorded revision.
+    # An unreadable list refuses before any capture opens, since reading (e) cannot be named.
+    listed_leagues = read_league_list(REPOSITORY_ROOT / LEAGUE_LIST_FILE)
     snapshot: CapturedSnapshot = read_snapshot(snapshot_root, snapshot_id)
     if snapshot.metadata.source != "fpl-live":
         raise ScaleMeasurementError("Use the declared live capture source.")
@@ -411,7 +421,7 @@ def run_measurement(
         snapshot.payloads,
         league=league,
         through_gameweek=through_gameweek,
-        listed_leagues=read_league_list(REPOSITORY_ROOT / LEAGUE_LIST_FILE),
+        listed_leagues=listed_leagues,
     )
     record.update(
         {
