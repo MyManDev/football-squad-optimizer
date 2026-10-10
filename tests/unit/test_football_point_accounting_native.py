@@ -97,8 +97,8 @@ def test_invented_capture_weights_survive_without_native_defaults(
     moments = ComponentMoments(0.75, 0.5, 0.21, 0.13, 0.2, 0.1, -0.6)
     result = raw_points(moments, weights)
     key = "GKP" if position == "GK" else position
-    # Score three mutually exclusive action worlds instead of copying the helper formula.
-    # 1/4 no play, 1/4 short play, 1/2 qualifying play.
+    # Hand-derived appearance masses: 1/4 no play, 1/4 short play, 1/2 qualifying play.
+    # The action-world reconstruction follows in the next test.
     expected = math.fsum(
         (
             0.25 * rules.short_play,
@@ -113,6 +113,51 @@ def test_invented_capture_weights_survive_without_native_defaults(
     assert result.raw_expected_points == expected
     assert result.moments is moments
     assert result.coefficients is weights
+
+
+@pytest.mark.parametrize("position", POSITIONS)
+@pytest.mark.parametrize("custom", (False, True))
+def test_invented_capture_weights_reproduce_explicit_action_worlds(
+    tmp_path: Path, position: str, custom: bool
+) -> None:
+    rules = _capture_rules(tmp_path, custom=custom)
+    key = "GKP" if position == "GK" else position
+    # Probability, credited minutes, goals, assists, clean sheet, DEFCON award and
+    # signed residual points. Clean sheets occur only in qualifying-minute worlds.
+    worlds = (
+        (0.25, 0, 0, 0, False, False, 0),
+        (0.15, 30, 1, 0, False, False, -1),
+        (0.10, 30, 0, 1, False, True, 0),
+        (0.20, 90, 0, 0, True, True, 3),
+        (0.30, 75, 1, 1, False, False, -2),
+    )
+
+    def mass(select: int) -> float:
+        return math.fsum(world[0] * float(world[select]) for world in worlds)
+
+    moments = ComponentMoments(
+        math.fsum(world[0] for world in worlds if world[1] > 0),
+        math.fsum(world[0] for world in worlds if world[1] >= 60),
+        mass(2),
+        mass(3),
+        mass(4),
+        mass(5),
+        mass(6),
+    )
+    realized = []
+    for probability, minutes, goals, assists, clean, dc, residual in worlds:
+        appearance = 0 if minutes == 0 else rules.short_play if minutes < 60 else rules.long_play
+        points = (
+            appearance
+            + rules.goals_scored[key] * goals
+            + rules.assists * assists
+            + rules.clean_sheets[key] * clean
+            + rules.defensive_contribution[key] * dc
+            + residual
+        )
+        realized.append(probability * points)
+    result = raw_points(moments, _weights(rules, position))
+    assert result.raw_expected_points == pytest.approx(math.fsum(realized), rel=1e-12, abs=1e-12)
 
 
 @pytest.mark.parametrize("season", ("2023-24", "2024-25", "2025-26"))
