@@ -7025,6 +7025,245 @@
       }
     },
     {
+      "name": "last-week-fraction",
+      "inputs": {
+        "decision_gameweek": 6,
+        "chips": [
+          {
+            "name": "wildcard",
+            "first_gameweek": 1,
+            "last_gameweek": 7.5,
+            "gain_this_week": 1.0
+          },
+          {
+            "name": "freehit",
+            "first_gameweek": 1,
+            "last_gameweek": 8,
+            "gain_this_week": 1.0
+          },
+          {
+            "name": "bboost",
+            "first_gameweek": 1,
+            "last_gameweek": 8,
+            "gain_this_week": 1.0
+          },
+          {
+            "name": "3xc",
+            "first_gameweek": 1,
+            "last_gameweek": 8,
+            "gain_this_week": 1.0
+          }
+        ],
+        "squad": [
+          {
+            "player_id": 101,
+            "club_id": 1,
+            "position": "GK",
+            "expected_points": 8.0,
+            "bench_order": null,
+            "is_captain": true
+          },
+          {
+            "player_id": 102,
+            "club_id": 2,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": null,
+            "is_captain": false
+          },
+          {
+            "player_id": 103,
+            "club_id": 3,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": null,
+            "is_captain": false
+          },
+          {
+            "player_id": 104,
+            "club_id": 4,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": null,
+            "is_captain": false
+          },
+          {
+            "player_id": 105,
+            "club_id": 5,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": null,
+            "is_captain": false
+          },
+          {
+            "player_id": 106,
+            "club_id": 6,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": null,
+            "is_captain": false
+          },
+          {
+            "player_id": 107,
+            "club_id": 7,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": null,
+            "is_captain": false
+          },
+          {
+            "player_id": 108,
+            "club_id": 8,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": null,
+            "is_captain": false
+          },
+          {
+            "player_id": 109,
+            "club_id": 9,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": null,
+            "is_captain": false
+          },
+          {
+            "player_id": 110,
+            "club_id": 10,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": null,
+            "is_captain": false
+          },
+          {
+            "player_id": 111,
+            "club_id": 11,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": null,
+            "is_captain": false
+          },
+          {
+            "player_id": 112,
+            "club_id": 12,
+            "position": "GK",
+            "expected_points": 2.0,
+            "bench_order": 1,
+            "is_captain": false
+          },
+          {
+            "player_id": 113,
+            "club_id": 13,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": 2,
+            "is_captain": false
+          },
+          {
+            "player_id": 114,
+            "club_id": 14,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": 3,
+            "is_captain": false
+          },
+          {
+            "player_id": 115,
+            "club_id": 15,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": 4,
+            "is_captain": false
+          }
+        ],
+        "calendar": [
+          {
+            "gameweek": 6,
+            "fixture_count_by_club": {
+              "1": 1,
+              "2": 1,
+              "3": 1,
+              "4": 1,
+              "5": 1,
+              "6": 1,
+              "7": 1,
+              "8": 1,
+              "9": 1,
+              "10": 1,
+              "11": 1,
+              "12": 1,
+              "13": 1,
+              "14": 1,
+              "15": 1,
+              "16": 1,
+              "17": 1,
+              "18": 1,
+              "19": 1,
+              "20": 1
+            }
+          },
+          {
+            "gameweek": 7,
+            "fixture_count_by_club": {
+              "1": 1,
+              "2": 1,
+              "3": 1,
+              "4": 1,
+              "5": 1,
+              "6": 1,
+              "7": 1,
+              "8": 1,
+              "9": 1,
+              "10": 1,
+              "11": 1,
+              "12": 1,
+              "13": 1,
+              "14": 1,
+              "15": 1,
+              "16": 1,
+              "17": 1,
+              "18": 1,
+              "19": 1,
+              "20": 1
+            }
+          },
+          {
+            "gameweek": 8,
+            "fixture_count_by_club": {
+              "1": 1,
+              "2": 1,
+              "3": 1,
+              "4": 1,
+              "5": 1,
+              "6": 1,
+              "7": 1,
+              "8": 1,
+              "9": 1,
+              "10": 1,
+              "11": 1,
+              "12": 1,
+              "13": 1,
+              "14": 1,
+              "15": 1,
+              "16": 1,
+              "17": 1,
+              "18": 1,
+              "19": 1,
+              "20": 1
+            }
+          }
+        ],
+        "holding_values": {
+          "bboost": 20.0,
+          "3xc": 18.0,
+          "wildcard": 12.0,
+          "freehit": 15.0
+        },
+        "threshold": "decaying",
+        "reserve": false
+      }
+    },
+    {
       "name": "reversed-window",
       "inputs": {
         "decision_gameweek": 6,
@@ -9547,6 +9786,245 @@
             "position": "DEF",
             "expected_points": 2.0,
             "bench_order": true,
+            "is_captain": false
+          },
+          {
+            "player_id": 114,
+            "club_id": 14,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": 3,
+            "is_captain": false
+          },
+          {
+            "player_id": 115,
+            "club_id": 15,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": 4,
+            "is_captain": false
+          }
+        ],
+        "calendar": [
+          {
+            "gameweek": 6,
+            "fixture_count_by_club": {
+              "1": 1,
+              "2": 1,
+              "3": 1,
+              "4": 1,
+              "5": 1,
+              "6": 1,
+              "7": 1,
+              "8": 1,
+              "9": 1,
+              "10": 1,
+              "11": 1,
+              "12": 1,
+              "13": 1,
+              "14": 1,
+              "15": 1,
+              "16": 1,
+              "17": 1,
+              "18": 1,
+              "19": 1,
+              "20": 1
+            }
+          },
+          {
+            "gameweek": 7,
+            "fixture_count_by_club": {
+              "1": 1,
+              "2": 1,
+              "3": 1,
+              "4": 1,
+              "5": 1,
+              "6": 1,
+              "7": 1,
+              "8": 1,
+              "9": 1,
+              "10": 1,
+              "11": 1,
+              "12": 1,
+              "13": 1,
+              "14": 1,
+              "15": 1,
+              "16": 1,
+              "17": 1,
+              "18": 1,
+              "19": 1,
+              "20": 1
+            }
+          },
+          {
+            "gameweek": 8,
+            "fixture_count_by_club": {
+              "1": 1,
+              "2": 1,
+              "3": 1,
+              "4": 1,
+              "5": 1,
+              "6": 1,
+              "7": 1,
+              "8": 1,
+              "9": 1,
+              "10": 1,
+              "11": 1,
+              "12": 1,
+              "13": 1,
+              "14": 1,
+              "15": 1,
+              "16": 1,
+              "17": 1,
+              "18": 1,
+              "19": 1,
+              "20": 1
+            }
+          }
+        ],
+        "holding_values": {
+          "bboost": 20.0,
+          "3xc": 18.0,
+          "wildcard": 12.0,
+          "freehit": 15.0
+        },
+        "threshold": "decaying",
+        "reserve": false
+      }
+    },
+    {
+      "name": "bench-order-text",
+      "inputs": {
+        "decision_gameweek": 6,
+        "chips": [
+          {
+            "name": "wildcard",
+            "first_gameweek": 1,
+            "last_gameweek": 8,
+            "gain_this_week": 1.0
+          },
+          {
+            "name": "freehit",
+            "first_gameweek": 1,
+            "last_gameweek": 8,
+            "gain_this_week": 1.0
+          },
+          {
+            "name": "bboost",
+            "first_gameweek": 1,
+            "last_gameweek": 8,
+            "gain_this_week": 1.0
+          },
+          {
+            "name": "3xc",
+            "first_gameweek": 1,
+            "last_gameweek": 8,
+            "gain_this_week": 1.0
+          }
+        ],
+        "squad": [
+          {
+            "player_id": 101,
+            "club_id": 1,
+            "position": "GK",
+            "expected_points": 8.0,
+            "bench_order": null,
+            "is_captain": true
+          },
+          {
+            "player_id": 102,
+            "club_id": 2,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": null,
+            "is_captain": false
+          },
+          {
+            "player_id": 103,
+            "club_id": 3,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": null,
+            "is_captain": false
+          },
+          {
+            "player_id": 104,
+            "club_id": 4,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": null,
+            "is_captain": false
+          },
+          {
+            "player_id": 105,
+            "club_id": 5,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": null,
+            "is_captain": false
+          },
+          {
+            "player_id": 106,
+            "club_id": 6,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": null,
+            "is_captain": false
+          },
+          {
+            "player_id": 107,
+            "club_id": 7,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": null,
+            "is_captain": false
+          },
+          {
+            "player_id": 108,
+            "club_id": 8,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": null,
+            "is_captain": false
+          },
+          {
+            "player_id": 109,
+            "club_id": 9,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": null,
+            "is_captain": false
+          },
+          {
+            "player_id": 110,
+            "club_id": 10,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": null,
+            "is_captain": false
+          },
+          {
+            "player_id": 111,
+            "club_id": 11,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": null,
+            "is_captain": false
+          },
+          {
+            "player_id": 112,
+            "club_id": 12,
+            "position": "GK",
+            "expected_points": 2.0,
+            "bench_order": 1,
+            "is_captain": false
+          },
+          {
+            "player_id": 113,
+            "club_id": 13,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": "2",
             "is_captain": false
           },
           {
@@ -14506,6 +14984,701 @@
               "18": 1,
               "19": 1,
               "20": 1
+            }
+          }
+        ],
+        "holding_values": {
+          "bboost": 20.0,
+          "3xc": 18.0,
+          "wildcard": 12.0,
+          "freehit": 15.0
+        },
+        "threshold": "decaying",
+        "reserve": false
+      }
+    },
+    {
+      "name": "threshold-without-held-chip",
+      "inputs": {
+        "decision_gameweek": 6,
+        "chips": [],
+        "squad": [
+          {
+            "player_id": 101,
+            "club_id": 1,
+            "position": "GK",
+            "expected_points": 8.0,
+            "bench_order": null,
+            "is_captain": true
+          },
+          {
+            "player_id": 102,
+            "club_id": 2,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": null,
+            "is_captain": false
+          },
+          {
+            "player_id": 103,
+            "club_id": 3,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": null,
+            "is_captain": false
+          },
+          {
+            "player_id": 104,
+            "club_id": 4,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": null,
+            "is_captain": false
+          },
+          {
+            "player_id": 105,
+            "club_id": 5,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": null,
+            "is_captain": false
+          },
+          {
+            "player_id": 106,
+            "club_id": 6,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": null,
+            "is_captain": false
+          },
+          {
+            "player_id": 107,
+            "club_id": 7,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": null,
+            "is_captain": false
+          },
+          {
+            "player_id": 108,
+            "club_id": 8,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": null,
+            "is_captain": false
+          },
+          {
+            "player_id": 109,
+            "club_id": 9,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": null,
+            "is_captain": false
+          },
+          {
+            "player_id": 110,
+            "club_id": 10,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": null,
+            "is_captain": false
+          },
+          {
+            "player_id": 111,
+            "club_id": 11,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": null,
+            "is_captain": false
+          },
+          {
+            "player_id": 112,
+            "club_id": 12,
+            "position": "GK",
+            "expected_points": 2.0,
+            "bench_order": 1,
+            "is_captain": false
+          },
+          {
+            "player_id": 113,
+            "club_id": 13,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": 2,
+            "is_captain": false
+          },
+          {
+            "player_id": 114,
+            "club_id": 14,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": 3,
+            "is_captain": false
+          },
+          {
+            "player_id": 115,
+            "club_id": 15,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": 4,
+            "is_captain": false
+          }
+        ],
+        "calendar": [
+          {
+            "gameweek": 6,
+            "fixture_count_by_club": {
+              "1": 1,
+              "2": 1,
+              "3": 1,
+              "4": 1,
+              "5": 1,
+              "6": 1,
+              "7": 1,
+              "8": 1,
+              "9": 1,
+              "10": 1,
+              "11": 1,
+              "12": 1,
+              "13": 1,
+              "14": 1,
+              "15": 1,
+              "16": 1,
+              "17": 1,
+              "18": 1,
+              "19": 1,
+              "20": 1
+            }
+          },
+          {
+            "gameweek": 7,
+            "fixture_count_by_club": {
+              "1": 1,
+              "2": 1,
+              "3": 1,
+              "4": 1,
+              "5": 1,
+              "6": 1,
+              "7": 1,
+              "8": 1,
+              "9": 1,
+              "10": 1,
+              "11": 1,
+              "12": 1,
+              "13": 1,
+              "14": 1,
+              "15": 1,
+              "16": 1,
+              "17": 1,
+              "18": 1,
+              "19": 1,
+              "20": 1
+            }
+          },
+          {
+            "gameweek": 8,
+            "fixture_count_by_club": {
+              "1": 1,
+              "2": 1,
+              "3": 1,
+              "4": 1,
+              "5": 1,
+              "6": 1,
+              "7": 1,
+              "8": 1,
+              "9": 1,
+              "10": 1,
+              "11": 1,
+              "12": 1,
+              "13": 1,
+              "14": 1,
+              "15": 1,
+              "16": 1,
+              "17": 1,
+              "18": 1,
+              "19": 1,
+              "20": 1
+            }
+          }
+        ],
+        "holding_values": {
+          "bboost": 20.0,
+          "3xc": 18.0,
+          "wildcard": 12.0,
+          "freehit": 15.0
+        },
+        "threshold": "other",
+        "reserve": false
+      }
+    },
+    {
+      "name": "reversed-window-without-gain",
+      "inputs": {
+        "decision_gameweek": 6,
+        "chips": [
+          {
+            "name": "wildcard",
+            "first_gameweek": 9,
+            "last_gameweek": 8,
+            "gain_this_week": null
+          },
+          {
+            "name": "freehit",
+            "first_gameweek": 1,
+            "last_gameweek": 8,
+            "gain_this_week": 1.0
+          },
+          {
+            "name": "bboost",
+            "first_gameweek": 1,
+            "last_gameweek": 8,
+            "gain_this_week": 1.0
+          },
+          {
+            "name": "3xc",
+            "first_gameweek": 1,
+            "last_gameweek": 8,
+            "gain_this_week": 1.0
+          }
+        ],
+        "squad": [
+          {
+            "player_id": 101,
+            "club_id": 1,
+            "position": "GK",
+            "expected_points": 8.0,
+            "bench_order": null,
+            "is_captain": true
+          },
+          {
+            "player_id": 102,
+            "club_id": 2,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": null,
+            "is_captain": false
+          },
+          {
+            "player_id": 103,
+            "club_id": 3,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": null,
+            "is_captain": false
+          },
+          {
+            "player_id": 104,
+            "club_id": 4,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": null,
+            "is_captain": false
+          },
+          {
+            "player_id": 105,
+            "club_id": 5,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": null,
+            "is_captain": false
+          },
+          {
+            "player_id": 106,
+            "club_id": 6,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": null,
+            "is_captain": false
+          },
+          {
+            "player_id": 107,
+            "club_id": 7,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": null,
+            "is_captain": false
+          },
+          {
+            "player_id": 108,
+            "club_id": 8,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": null,
+            "is_captain": false
+          },
+          {
+            "player_id": 109,
+            "club_id": 9,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": null,
+            "is_captain": false
+          },
+          {
+            "player_id": 110,
+            "club_id": 10,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": null,
+            "is_captain": false
+          },
+          {
+            "player_id": 111,
+            "club_id": 11,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": null,
+            "is_captain": false
+          },
+          {
+            "player_id": 112,
+            "club_id": 12,
+            "position": "GK",
+            "expected_points": 2.0,
+            "bench_order": 1,
+            "is_captain": false
+          },
+          {
+            "player_id": 113,
+            "club_id": 13,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": 2,
+            "is_captain": false
+          },
+          {
+            "player_id": 114,
+            "club_id": 14,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": 3,
+            "is_captain": false
+          },
+          {
+            "player_id": 115,
+            "club_id": 15,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": 4,
+            "is_captain": false
+          }
+        ],
+        "calendar": [
+          {
+            "gameweek": 6,
+            "fixture_count_by_club": {
+              "1": 1,
+              "2": 1,
+              "3": 1,
+              "4": 1,
+              "5": 1,
+              "6": 1,
+              "7": 1,
+              "8": 1,
+              "9": 1,
+              "10": 1,
+              "11": 1,
+              "12": 1,
+              "13": 1,
+              "14": 1,
+              "15": 1,
+              "16": 1,
+              "17": 1,
+              "18": 1,
+              "19": 1,
+              "20": 1
+            }
+          },
+          {
+            "gameweek": 7,
+            "fixture_count_by_club": {
+              "1": 1,
+              "2": 1,
+              "3": 1,
+              "4": 1,
+              "5": 1,
+              "6": 1,
+              "7": 1,
+              "8": 1,
+              "9": 1,
+              "10": 1,
+              "11": 1,
+              "12": 1,
+              "13": 1,
+              "14": 1,
+              "15": 1,
+              "16": 1,
+              "17": 1,
+              "18": 1,
+              "19": 1,
+              "20": 1
+            }
+          },
+          {
+            "gameweek": 8,
+            "fixture_count_by_club": {
+              "1": 1,
+              "2": 1,
+              "3": 1,
+              "4": 1,
+              "5": 1,
+              "6": 1,
+              "7": 1,
+              "8": 1,
+              "9": 1,
+              "10": 1,
+              "11": 1,
+              "12": 1,
+              "13": 1,
+              "14": 1,
+              "15": 1,
+              "16": 1,
+              "17": 1,
+              "18": 1,
+              "19": 1,
+              "20": 1
+            }
+          }
+        ],
+        "holding_values": {
+          "bboost": 20.0,
+          "3xc": 18.0,
+          "wildcard": 12.0,
+          "freehit": 15.0
+        },
+        "threshold": "decaying",
+        "reserve": false
+      }
+    },
+    {
+      "name": "calendar-club-zero",
+      "inputs": {
+        "decision_gameweek": 6,
+        "chips": [
+          {
+            "name": "wildcard",
+            "first_gameweek": 1,
+            "last_gameweek": 8,
+            "gain_this_week": 1.0
+          },
+          {
+            "name": "freehit",
+            "first_gameweek": 1,
+            "last_gameweek": 8,
+            "gain_this_week": 1.0
+          },
+          {
+            "name": "bboost",
+            "first_gameweek": 1,
+            "last_gameweek": 8,
+            "gain_this_week": 1.0
+          },
+          {
+            "name": "3xc",
+            "first_gameweek": 1,
+            "last_gameweek": 8,
+            "gain_this_week": 1.0
+          }
+        ],
+        "squad": [
+          {
+            "player_id": 101,
+            "club_id": 1,
+            "position": "GK",
+            "expected_points": 8.0,
+            "bench_order": null,
+            "is_captain": true
+          },
+          {
+            "player_id": 102,
+            "club_id": 2,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": null,
+            "is_captain": false
+          },
+          {
+            "player_id": 103,
+            "club_id": 3,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": null,
+            "is_captain": false
+          },
+          {
+            "player_id": 104,
+            "club_id": 4,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": null,
+            "is_captain": false
+          },
+          {
+            "player_id": 105,
+            "club_id": 5,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": null,
+            "is_captain": false
+          },
+          {
+            "player_id": 106,
+            "club_id": 6,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": null,
+            "is_captain": false
+          },
+          {
+            "player_id": 107,
+            "club_id": 7,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": null,
+            "is_captain": false
+          },
+          {
+            "player_id": 108,
+            "club_id": 8,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": null,
+            "is_captain": false
+          },
+          {
+            "player_id": 109,
+            "club_id": 9,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": null,
+            "is_captain": false
+          },
+          {
+            "player_id": 110,
+            "club_id": 10,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": null,
+            "is_captain": false
+          },
+          {
+            "player_id": 111,
+            "club_id": 11,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": null,
+            "is_captain": false
+          },
+          {
+            "player_id": 112,
+            "club_id": 12,
+            "position": "GK",
+            "expected_points": 2.0,
+            "bench_order": 1,
+            "is_captain": false
+          },
+          {
+            "player_id": 113,
+            "club_id": 13,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": 2,
+            "is_captain": false
+          },
+          {
+            "player_id": 114,
+            "club_id": 14,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": 3,
+            "is_captain": false
+          },
+          {
+            "player_id": 115,
+            "club_id": 15,
+            "position": "DEF",
+            "expected_points": 2.0,
+            "bench_order": 4,
+            "is_captain": false
+          }
+        ],
+        "calendar": [
+          {
+            "gameweek": 6,
+            "fixture_count_by_club": {
+              "1": 1,
+              "2": 1,
+              "3": 1,
+              "4": 1,
+              "5": 1,
+              "6": 1,
+              "7": 1,
+              "8": 1,
+              "9": 1,
+              "10": 1,
+              "11": 1,
+              "12": 1,
+              "13": 1,
+              "14": 1,
+              "15": 1,
+              "16": 1,
+              "17": 1,
+              "18": 1,
+              "19": 1,
+              "20": 1,
+              "0": 1
+            }
+          },
+          {
+            "gameweek": 7,
+            "fixture_count_by_club": {
+              "1": 1,
+              "2": 1,
+              "3": 1,
+              "4": 1,
+              "5": 1,
+              "6": 1,
+              "7": 1,
+              "8": 1,
+              "9": 1,
+              "10": 1,
+              "11": 1,
+              "12": 1,
+              "13": 1,
+              "14": 1,
+              "15": 1,
+              "16": 1,
+              "17": 1,
+              "18": 1,
+              "19": 1,
+              "20": 1,
+              "0": 1
+            }
+          },
+          {
+            "gameweek": 8,
+            "fixture_count_by_club": {
+              "1": 1,
+              "2": 1,
+              "3": 1,
+              "4": 1,
+              "5": 1,
+              "6": 1,
+              "7": 1,
+              "8": 1,
+              "9": 1,
+              "10": 1,
+              "11": 1,
+              "12": 1,
+              "13": 1,
+              "14": 1,
+              "15": 1,
+              "16": 1,
+              "17": 1,
+              "18": 1,
+              "19": 1,
+              "20": 1,
+              "0": 1
             }
           }
         ],

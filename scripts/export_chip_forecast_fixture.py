@@ -168,6 +168,7 @@ def build_fixture() -> dict[str, Any]:
         ("chip-name", ("chips", 0, "name"), "other"),
         ("first-week", ("chips", 0, "first_gameweek"), 0),
         ("last-week-boolean", ("chips", 0, "last_gameweek"), True),
+        ("last-week-fraction", ("chips", 0, "last_gameweek"), 7.5),
         ("reversed-window", ("chips", 0, "first_gameweek"), 9),
         ("gain-boolean", ("chips", 0, "gain_this_week"), True),
         ("gain-outside-window", ("chips", 0, "first_gameweek"), 7),
@@ -179,6 +180,7 @@ def build_fixture() -> dict[str, Any]:
         ("points-boolean", ("squad", 0, "expected_points"), True),
         ("bench-order", ("squad", 12, "bench_order"), 5),
         ("bench-order-boolean", ("squad", 12, "bench_order"), True),
+        ("bench-order-text", ("squad", 12, "bench_order"), "2"),
         ("captain-flag", ("squad", 0, "is_captain"), 1),
         ("no-captain", ("squad", 0, "is_captain"), False),
         ("calendar-start", ("calendar", 0, "gameweek"), 5),
@@ -209,6 +211,10 @@ def build_fixture() -> dict[str, Any]:
         "other-clubs",
         "missing-squad-club",
         "short-calendar",
+        # Each of these trips one check only; the neighbour it extends also trips a later one.
+        "threshold-without-held-chip",
+        "reversed-window-without-gain",
+        "calendar-club-zero",
     ):
         raw = base_inputs()
         if name == "duplicate-chip":
@@ -241,6 +247,13 @@ def build_fixture() -> dict[str, Any]:
                 week["fixture_count_by_club"].pop("1")
         elif name == "short-calendar":
             raw["calendar"].pop()
+        elif name == "threshold-without-held-chip":
+            raw.update(threshold="other", chips=[])
+        elif name == "reversed-window-without-gain":
+            raw["chips"][0].update(first_gameweek=9, gain_this_week=None)
+        elif name == "calendar-club-zero":
+            for week in raw["calendar"]:
+                week["fixture_count_by_club"]["0"] = 1
         refuse(name, raw)
     return {
         "constants": {
