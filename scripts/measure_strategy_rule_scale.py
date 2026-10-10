@@ -11,7 +11,8 @@ marked control_failed, and exits 3: step 4 is held until the difference is expla
 on #1002. Reading (d) divides by sqrt(k) times the unrounded S on GW1 to N. Reading (e)
 covers every other league in config/leagues.json at the measured revision and marks one
 it cannot measure as unavailable, never refusing the primary reading. The command
-writes no constant and no rule id: step 4 applies the declaration's update rule.
+writes no constant and no rule id: step 4 applies the declaration's update rule, under
+which the rule id's version increments only when the value changes.
 """
 
 from __future__ import annotations
