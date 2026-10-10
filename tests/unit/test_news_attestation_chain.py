@@ -293,6 +293,8 @@ def test_double_fixture_label_does_not_replace_another_scope_failure(tmp_path, q
             {"body": "It is not true that Saka will miss the next Premier League match."},
         ),
         ("stale-source", True, {"published_at": "2026-09-05T14:30:00Z"}),
+        # The page dates itself after its 14:00 fetch; a single week reports a timing failure.
+        ("published-after-fetch", True, {"published_at": "2026-09-12T14:20:00Z"}),
         (
             "minutes-name-failure",
             True,
