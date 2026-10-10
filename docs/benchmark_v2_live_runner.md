@@ -11,7 +11,10 @@ Each week supplies five immutable capture ids: `decision`, `freeze`, `cohort`,
 `last_gameweek`. Every gameweek in that range appears exactly once: with its five ids,
 or as `{"gameweek": n, "exclusion": "missing_capture"}` when its captures do not
 exist. A gap, a week outside the range or a repeated week refuses the reading before
-any capture is opened. The range is declared before any week is read. The claim and
+any capture is opened. The first gameweek is fixed at 7 by the preregistration
+amendment of 2026-10-10, accepted by the owner and declared before the GW7 deadline:
+`first_gameweek` must be 7, and a range starting at any other week is refused before
+any capture is opened. Gameweeks 3 to 6 are not part of the reading. The claim and
 the result record the declared range and the manifest's SHA256, and every missing
 week appears among the exclusions. Raw manager ids and picks stay in the local
 snapshot store and are absent from the resulting committed summary.

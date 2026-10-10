@@ -189,18 +189,18 @@ DISTINCT_ARMS = {
 }
 
 
-PAIRED = [6, 7, *range(9, 15)]
+PAIRED = [7, *range(9, 16)]
 
 
 def test_eight_weeks_pair_all_arms_and_second_reading_opens_nothing(tmp_path, monkeypatch):
-    weeks = [week(gameweek, **DISTINCT_ARMS) for gameweek in PAIRED] + [week(15, 79)]
+    weeks = [week(gameweek, **DISTINCT_ARMS) for gameweek in PAIRED] + [week(16, 79)]
     result = read(list(reversed(weeks)), tmp_path, missing=[8])
-    assert result["declared_gameweeks"] == {"first_gameweek": 6, "last_gameweek": 15}
+    assert result["declared_gameweeks"] == {"first_gameweek": 7, "last_gameweek": 16}
     assert result["manifest_sha256"] == "c" * 64
     assert result["exclusions"] == [
         {"gameweek": 8, "reason": "missing_capture"},
         {
-            "gameweek": 15,
+            "gameweek": 16,
             "reason": "insufficient_coverage",
             "cohort_valid": 79,
             "cohort_excluded": 21,
@@ -244,9 +244,9 @@ def test_eight_weeks_pair_all_arms_and_second_reading_opens_nothing(tmp_path, mo
         f"| {gameweek} | 89.000 | 87.000 | 99.000 | +2.000 | -10.000 | 100 | 0 |"
         for gameweek in PAIRED
     ]
-    assert "- Declared gameweeks: 6 to 15" in markdown
+    assert "- Declared gameweeks: 7 to 16" in markdown
     assert "| 8 | `missing_capture` | not read | not read |" in markdown
-    assert "| 15 | `insufficient_coverage` | 79 | 21 |" in markdown
+    assert "| 16 | `insufficient_coverage` | 79 | 21 |" in markdown
     monkeypatch.setattr(
         live, "prepare_live_week", lambda *_: pytest.fail("Second input was opened")
     )
@@ -257,11 +257,13 @@ def test_eight_weeks_pair_all_arms_and_second_reading_opens_nothing(tmp_path, mo
 @pytest.mark.parametrize(
     ("listed", "missing", "first", "last"),
     [
-        ([6, 7, *range(9, 15)], (), 6, 14),  # GW8 left out without a trace
-        (list(range(6, 14)), (), 6, 12),  # GW13 outside the declared range
-        (list(range(6, 14)), (7,), 6, 13),  # GW7 both captured and missing
-        (list(range(6, 14)), (), 13, 6),  # reversed range
-        (list(range(6, 14)), (), 2, 13),  # before the first prospective cohort
+        ([7, *range(9, 16)], (), 7, 15),  # GW8 left out without a trace
+        (list(range(7, 15)), (), 7, 13),  # GW14 outside the declared range
+        (list(range(7, 15)), (8,), 7, 14),  # GW8 both captured and missing
+        (list(range(7, 15)), (), 14, 7),  # reversed range
+        (list(range(6, 14)), (), 6, 13),  # starts before the declared GW7
+        (list(range(8, 16)), (), 8, 15),  # starts after the declared GW7
+        (list(range(7, 15)), (), 2, 14),  # before the first prospective cohort
     ],
 )
 def test_every_declared_gameweek_is_listed_before_any_week_is_prepared(
@@ -280,7 +282,7 @@ def test_every_declared_gameweek_is_listed_before_any_week_is_prepared(
 
 
 def test_coverage_below_eighty_cannot_make_a_valid_eighth_week(tmp_path):
-    weeks = [week(gameweek) for gameweek in range(6, 13)] + [week(13, 79)]
+    weeks = [week(gameweek) for gameweek in range(7, 14)] + [week(14, 79)]
     with pytest.raises(EvaluationValidationError, match="eight valid"):
         read(weeks, tmp_path)
     assert not (tmp_path / live.CLAIM_FILE).exists()
@@ -537,14 +539,14 @@ def test_settled_autosub_positions_restore_the_original_captain_and_bench():
 
 
 def test_failed_claimed_reading_cannot_be_looked_at_again(tmp_path, monkeypatch):
-    weeks = [week(gameweek) for gameweek in range(6, 14)]
+    weeks = [week(gameweek) for gameweek in range(7, 15)]
     monkeypatch.setattr(
         live, "_score", lambda *a: (_ for _ in ()).throw(OSError("synthetic failure"))
     )
     with pytest.raises(OSError, match="synthetic failure"):
         read(weeks, tmp_path)
     claim = json.loads((tmp_path / live.CLAIM_FILE).read_bytes())
-    assert claim["declared_gameweeks"] == {"first_gameweek": 6, "last_gameweek": 13}
+    assert claim["declared_gameweeks"] == {"first_gameweek": 7, "last_gameweek": 14}
     assert claim["manifest_sha256"] == "c" * 64
     monkeypatch.setattr(
         live, "prepare_live_week", lambda *_: pytest.fail("Second input was opened")

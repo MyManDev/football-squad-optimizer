@@ -47,6 +47,9 @@ from squadopt.scenarios.rivals import template_rival_from_ownership
 LIVE_CONTRACT = "benchmark_v2_live_v1"
 SEASON = "2026-27"
 MINIMUM_WEEKS = 8
+# The owner fixed the first gameweek of the contiguous reading range at GW7 on
+# 2026-10-10, before the GW7 deadline (preregistration amendment of that date).
+FIRST_GAMEWEEK = 7
 READING_FILE = "benchmark-v2-live-2026-27.json"
 CLAIM_FILE = "benchmark-v2-live-2026-27.reading"
 # Match the named committed-measurement limits in scripts/_experiment_cli.py.
@@ -503,13 +506,16 @@ def check_declared_gameweeks(
     first_gameweek: object,
     last_gameweek: object,
 ) -> None:
-    """Require every gameweek of the declared range exactly once, captured or missing."""
+    """Require the range from GW7 and every gameweek in it once, captured or missing."""
     if (
         type(first_gameweek) is not int
         or type(last_gameweek) is not int
-        or not 3 <= first_gameweek <= last_gameweek <= 38
+        or first_gameweek != FIRST_GAMEWEEK
+        or not FIRST_GAMEWEEK <= last_gameweek <= 38
     ):
-        raise EvaluationValidationError("Benchmark V2 needs a declared gameweek range in 3 to 38.")
+        raise EvaluationValidationError(
+            "Benchmark V2 needs the declared gameweek range from GW7 to at most GW38."
+        )
     listed = [*captured, *missing]
     if len(set(listed)) != len(listed):
         raise EvaluationValidationError("Benchmark V2 gameweeks must be unique.")

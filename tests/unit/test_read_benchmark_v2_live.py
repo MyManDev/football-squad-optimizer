@@ -27,7 +27,8 @@ def test_command_names_no_record_root():
 
 
 @pytest.mark.parametrize(
-    "refusal", ["early", "repeat", "recorded", "indexed", "holdout", "gap", "undeclared"]
+    "refusal",
+    ["early", "repeat", "recorded", "indexed", "holdout", "gap", "undeclared", "before_gw7"],
 )
 def test_command_refusal_opens_no_capture(tmp_path, monkeypatch, record, refusal):
     manifest = tmp_path / "private-manifest.json"
@@ -39,9 +40,9 @@ def test_command_refusal_opens_no_capture(tmp_path, monkeypatch, record, refusal
                 for role in ("decision", "freeze", "cohort", "picks", "outcome")
             },
         }
-        for week in range(6, 14)
+        for week in range(7, 15)
     ]
-    declared = {"first_gameweek": 6, "last_gameweek": 13}
+    declared = {"first_gameweek": 7, "last_gameweek": 14}
     if refusal == "early":
         weeks = weeks[:7]
     if refusal == "repeat":
@@ -57,10 +58,13 @@ def test_command_refusal_opens_no_capture(tmp_path, monkeypatch, record, refusal
             {**item, "picks_snapshot_id": "fpl-live-20251010T080000Z-aabbcc"} for item in weeks
         ]
     if refusal == "gap":
-        weeks = [item for item in weeks if item["gameweek"] != 9] + [{**weeks[-1], "gameweek": 14}]
-        declared = {"first_gameweek": 6, "last_gameweek": 14}
+        weeks = [item for item in weeks if item["gameweek"] != 9] + [{**weeks[-1], "gameweek": 15}]
+        declared = {"first_gameweek": 7, "last_gameweek": 15}
     if refusal == "undeclared":
         declared = {}
+    if refusal == "before_gw7":
+        weeks = [{**item, "gameweek": item["gameweek"] - 1} for item in weeks]
+        declared = {"first_gameweek": 6, "last_gameweek": 13}
     manifest.write_text(
         json.dumps({"season": "2026-27", **declared, "weeks": weeks}), encoding="utf-8"
     )
@@ -84,7 +88,7 @@ def test_command_refusal_opens_no_capture(tmp_path, monkeypatch, record, refusal
 def test_command_reads_eight_real_format_synthetic_capture_ids(tmp_path, monkeypatch, record):
     store = tmp_path / "store"
     rows = []
-    for gameweek in range(6, 14):
+    for gameweek in range(7, 15):
         candidate = week(gameweek)
         captures = {}
         for role in ("decision", "cohort"):
@@ -135,10 +139,10 @@ def test_command_reads_eight_real_format_synthetic_capture_ids(tmp_path, monkeyp
                 **{role + "_snapshot_id": value.snapshot_id for role, value in captures.items()},
             }
         )
-    rows.append({"gameweek": 14, "exclusion": "missing_capture"})
+    rows.append({"gameweek": 15, "exclusion": "missing_capture"})
     manifest = tmp_path / "manifest.json"
     manifest.write_text(
-        json.dumps({"season": "2026-27", "first_gameweek": 6, "last_gameweek": 14, "weeks": rows}),
+        json.dumps({"season": "2026-27", "first_gameweek": 7, "last_gameweek": 15, "weeks": rows}),
         encoding="utf-8",
     )
     # The committed declaration has LF endings; a Windows checkout may hold CRLF.
@@ -162,8 +166,8 @@ def test_command_reads_eight_real_format_synthetic_capture_ids(tmp_path, monkeyp
     )
     result = json.loads((record / READING_FILE).read_bytes())
     assert result["paired_gameweeks"] == 8 and result["locked_holdout_accessed"] is False
-    assert result["exclusions"] == [{"gameweek": 14, "reason": "missing_capture"}]
-    assert result["declared_gameweeks"] == {"first_gameweek": 6, "last_gameweek": 14}
+    assert result["exclusions"] == [{"gameweek": 15, "reason": "missing_capture"}]
+    assert result["declared_gameweeks"] == {"first_gameweek": 7, "last_gameweek": 15}
     assert result["manifest_sha256"] == cli.hashlib.sha256(manifest.read_bytes()).hexdigest()
     assert result["preregistration_sha256"] == cli.hashlib.sha256(committed).hexdigest()
     assert (record / CLAIM_FILE).exists()
