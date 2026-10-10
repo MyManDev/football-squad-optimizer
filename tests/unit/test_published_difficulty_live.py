@@ -229,6 +229,36 @@ def test_week_reads_mse_mae_ordering_and_realized_starters_plus_captain() -> Non
     assert measured.squared_error_improvement == measured.comparator_mse - measured.candidate_mse
 
 
+def test_week_readings_point_toward_the_candidate_that_was_right() -> None:
+    rows = frame()
+    rows["published_signal"] = -3.0
+    # An easy fixture for the weaker player of each close pair and a hard one for the
+    # stronger swaps their order in DEF, in MID and among the two leading forwards.
+    for weaker, stronger in ((2, 3), (8, 9), (16, 17)):
+        rows.loc[weaker, "published_signal"] = -1.0
+        rows.loc[stronger, "published_signal"] = -5.0
+    adjusted, _ = study.adjusted_points(rows)
+    rows["realized_points"] = adjusted
+    measured, _ = study.measure_week(rows, season=study.SEASON, gameweek=7, handoff_version="base")
+    # One adjacent swap among six players gives Spearman 1 - 6 * 2 / (6 * 35) = 33 / 35.
+    assert measured.candidate_rank == pytest.approx(1.0)
+    assert measured.comparator_rank == pytest.approx(33 / 35)
+    assert measured.rank_improvement == pytest.approx(1.0 - 33 / 35)
+    base, candidate = measured.comparator_decision, measured.candidate_decision
+    assert set(base["starting_xi"]) == set(candidate["starting_xi"])
+    assert (base["captain"], candidate["captain"]) == (18, 17)
+    totals = dict(zip(rows.player_id, rows.realized_points, strict=True))
+    assert measured.comparator_realized_points == pytest.approx(
+        sum(totals[p] for p in base["starting_xi"]) + totals[18]
+    )
+    assert measured.decision_difference == pytest.approx(totals[17] - totals[18])
+    assert measured.decision_difference > 0
+    assert measured.candidate_mae == 0
+    assert measured.absolute_error_improvement == pytest.approx(measured.comparator_mae)
+    assert measured.absolute_error_improvement > 0
+    assert measured.identical_decision is False
+
+
 def test_gate_weights_whole_weeks_equally_and_keeps_versions() -> None:
     measured, _ = study.measure_week(
         frame(), season=study.SEASON, gameweek=7, handoff_version="old"
