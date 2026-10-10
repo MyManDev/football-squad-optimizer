@@ -65,8 +65,11 @@ WEEK_EXCLUSION_CODES = (
     "insufficient_coverage",
     "missing_outcome",
     "invalid_capture",
+    "missing_capture",
 )
 ENTRY_EXCLUSION_CODES = ("chip_unresolved", "unreadable", "invalid_picks", "missing_outcome")
+# A declared week whose captures do not exist is listed in the manifest with this code.
+MISSING_CAPTURE = "missing_capture"
 
 
 class LiveWeekRefusal(EvaluationValidationError):
@@ -397,12 +400,39 @@ def _score(decision: FrozenSquadDecision, outcomes: pd.DataFrame) -> dict[str, A
     }
 
 
+def check_declared_gameweeks(
+    captured: Sequence[object],
+    missing: Sequence[object],
+    *,
+    first_gameweek: object,
+    last_gameweek: object,
+) -> None:
+    """Require every gameweek of the declared range exactly once, captured or missing."""
+    if (
+        type(first_gameweek) is not int
+        or type(last_gameweek) is not int
+        or not 3 <= first_gameweek <= last_gameweek <= 38
+    ):
+        raise EvaluationValidationError("Benchmark V2 needs a declared gameweek range in 3 to 38.")
+    listed = [*captured, *missing]
+    if len(set(listed)) != len(listed):
+        raise EvaluationValidationError("Benchmark V2 gameweeks must be unique.")
+    if set(listed) != set(range(first_gameweek, last_gameweek + 1)):
+        raise EvaluationValidationError(
+            "Benchmark V2 must list every declared gameweek, captured or missing."
+        )
+
+
 def read_live_benchmark_once(
     weeks: Sequence[LiveBenchmarkWeek],
     *,
     record_root: Path,
     repository_commit: str,
     preregistration_sha256: str,
+    first_gameweek: int,
+    last_gameweek: int,
+    manifest_sha256: str,
+    missing_gameweeks: Sequence[int] = (),
 ) -> dict[str, Any]:
     """Refuse early/duplicate readings; claim once before calculating paired scores."""
     claim = record_root / CLAIM_FILE
@@ -410,10 +440,17 @@ def read_live_benchmark_once(
         raise EvaluationValidationError("Benchmark V2 live reading has already been claimed.")
     if len(weeks) < MINIMUM_WEEKS:
         raise EvaluationValidationError("Benchmark V2 needs eight valid paired gameweeks.")
-    if len({week.gameweek for week in weeks}) != len(weeks):
-        raise EvaluationValidationError("Benchmark V2 gameweeks must be unique.")
+    check_declared_gameweeks(
+        [week.gameweek for week in weeks],
+        missing_gameweeks,
+        first_gameweek=first_gameweek,
+        last_gameweek=last_gameweek,
+    )
+    declared = {"first_gameweek": first_gameweek, "last_gameweek": last_gameweek}
     prepared: list[PreparedLiveWeek] = []
-    exclusions: list[dict[str, Any]] = []
+    exclusions: list[dict[str, Any]] = [
+        {"gameweek": gameweek, "reason": MISSING_CAPTURE} for gameweek in missing_gameweeks
+    ]
     for week in sorted(weeks, key=lambda item: item.gameweek):
         try:
             prepared.append(prepare_live_week(week))
@@ -424,6 +461,7 @@ def read_live_benchmark_once(
             exclusions.append({"gameweek": week.gameweek, "reason": "invalid_capture"})
     if len(prepared) < MINIMUM_WEEKS:
         raise EvaluationValidationError("Benchmark V2 needs eight valid paired gameweeks.")
+    exclusions.sort(key=lambda row: row["gameweek"])
     record_root.mkdir(parents=True, exist_ok=True)
     try:
         with claim.open("xb") as handle:
@@ -433,6 +471,8 @@ def read_live_benchmark_once(
                         "contract_version": LIVE_CONTRACT,
                         "repository_commit": repository_commit,
                         "preregistration_sha256": preregistration_sha256,
+                        "declared_gameweeks": declared,
+                        "manifest_sha256": manifest_sha256,
                     }
                 )
             )
@@ -477,6 +517,8 @@ def read_live_benchmark_once(
         "scoring_basis": ScoringPolicy.OFFICIAL_AUTOSUB_CAPTAIN_V2.value,
         "template_policy": OWNERSHIP_TEMPLATE_V2,
         "cohort_policy": TOP_MANAGER_COHORT_VERSION,
+        "declared_gameweeks": declared,
+        "manifest_sha256": manifest_sha256,
         "paired_gameweeks": len(rows),
         "repository_commit": repository_commit,
         "preregistration_sha256": preregistration_sha256,
@@ -520,6 +562,9 @@ def render_live_reading_markdown(result: Mapping[str, Any]) -> str:
         f"- Cohort policy: `{result['cohort_policy']}`",
         f"- Repository commit: `{result['repository_commit']}`",
         f"- Preregistration SHA256: `{result['preregistration_sha256']}`",
+        f"- Manifest SHA256: `{result['manifest_sha256']}`",
+        f"- Declared gameweeks: {result['declared_gameweeks']['first_gameweek']} to "
+        f"{result['declared_gameweeks']['last_gameweek']}",
         f"- Paired gameweeks: {result['paired_gameweeks']}",
         f"- Excluded gameweeks: {len(exclusions)}",
         "",

@@ -13,9 +13,11 @@ from squadopt.evaluation import EvaluationValidationError
 from squadopt.experiments.benchmark_v2_live import (
     CLAIM_FILE,
     MINIMUM_WEEKS,
+    MISSING_CAPTURE,
     READING_FILE,
     SEASON,
     LiveBenchmarkWeek,
+    check_declared_gameweeks,
     read_live_benchmark_once,
 )
 
@@ -32,17 +34,31 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if (args.record_root / CLAIM_FILE).exists() or (args.record_root / READING_FILE).exists():
             raise EvaluationValidationError("Benchmark V2 live reading has already been claimed.")
-        manifest = json.loads(args.manifest.read_bytes())
+        raw_manifest = args.manifest.read_bytes()
+        manifest = json.loads(raw_manifest)
         if not isinstance(manifest, dict) or manifest.get("season") != SEASON:
             raise EvaluationValidationError("Live Benchmark V2 admits only 2026-27.")
-        specifications = manifest.get("weeks")
-        if not isinstance(specifications, list) or len(specifications) < MINIMUM_WEEKS:
+        listed = manifest.get("weeks")
+        if not isinstance(listed, list) or not all(isinstance(item, dict) for item in listed):
+            raise EvaluationValidationError("Invalid private Benchmark week manifest.")
+        # A declared week without captures stays listed, with its reason, never left out.
+        missing = [item for item in listed if item.get("exclusion") == MISSING_CAPTURE]
+        specifications = [item for item in listed if "exclusion" not in item]
+        if len(missing) + len(specifications) != len(listed) or any(
+            set(item) != {"gameweek", "exclusion"} for item in missing
+        ):
+            raise EvaluationValidationError("Invalid private Benchmark week manifest.")
+        if len(specifications) < MINIMUM_WEEKS:
             raise EvaluationValidationError("Benchmark V2 needs eight valid paired gameweeks.")
+        check_declared_gameweeks(
+            [item.get("gameweek") for item in specifications],
+            [item["gameweek"] for item in missing],
+            first_gameweek=manifest.get("first_gameweek"),
+            last_gameweek=manifest.get("last_gameweek"),
+        )
         # Validate every id before opening any capture. Never enumerate the store.
         roles = ("decision", "freeze", "cohort", "picks", "outcome")
         for specification in specifications:
-            if not isinstance(specification, dict):
-                raise EvaluationValidationError("Invalid private Benchmark week manifest.")
             for role in roles:
                 identifier = specification.get(role + "_snapshot_id")
                 match = _CAPTURE.fullmatch(identifier) if isinstance(identifier, str) else None
@@ -74,6 +90,10 @@ def main(argv: list[str] | None = None) -> int:
             record_root=args.record_root,
             repository_commit=revision,
             preregistration_sha256=hashlib.sha256(preregistration.read_bytes()).hexdigest(),
+            first_gameweek=manifest["first_gameweek"],
+            last_gameweek=manifest["last_gameweek"],
+            missing_gameweeks=[item["gameweek"] for item in missing],
+            manifest_sha256=hashlib.sha256(raw_manifest).hexdigest(),
         )
     except (
         DataError,

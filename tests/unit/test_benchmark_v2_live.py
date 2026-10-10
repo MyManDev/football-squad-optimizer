@@ -156,9 +156,17 @@ def week(
     return live.LiveBenchmarkWeek(gameweek, decision, freeze, cohort, picks, outcome)
 
 
-def read(weeks, root):
+def read(weeks, root, *, missing=(), first=None, last=None):
+    listed = [candidate.gameweek for candidate in weeks] + list(missing)
     return live.read_live_benchmark_once(
-        weeks, record_root=root, repository_commit="a" * 40, preregistration_sha256="b" * 64
+        weeks,
+        record_root=root,
+        repository_commit="a" * 40,
+        preregistration_sha256="b" * 64,
+        first_gameweek=min(listed) if first is None else first,
+        last_gameweek=max(listed) if last is None else last,
+        missing_gameweeks=missing,
+        manifest_sha256="c" * 64,
     )
 
 
@@ -181,12 +189,18 @@ DISTINCT_ARMS = {
 }
 
 
+PAIRED = [6, 7, *range(9, 15)]
+
+
 def test_eight_weeks_pair_all_arms_and_second_reading_opens_nothing(tmp_path, monkeypatch):
-    weeks = [week(gameweek, **DISTINCT_ARMS) for gameweek in range(6, 14)] + [week(14, 79)]
-    result = read(list(reversed(weeks)), tmp_path)
+    weeks = [week(gameweek, **DISTINCT_ARMS) for gameweek in PAIRED] + [week(15, 79)]
+    result = read(list(reversed(weeks)), tmp_path, missing=[8])
+    assert result["declared_gameweeks"] == {"first_gameweek": 6, "last_gameweek": 15}
+    assert result["manifest_sha256"] == "c" * 64
     assert result["exclusions"] == [
+        {"gameweek": 8, "reason": "missing_capture"},
         {
-            "gameweek": 14,
+            "gameweek": 15,
             "reason": "insufficient_coverage",
             "cohort_valid": 79,
             "cohort_excluded": 21,
@@ -196,10 +210,10 @@ def test_eight_weeks_pair_all_arms_and_second_reading_opens_nothing(tmp_path, mo
                 "invalid_picks": 0,
                 "missing_outcome": 0,
             },
-        }
+        },
     ]
     assert result["paired_gameweeks"] == 8
-    assert [row["gameweek"] for row in result["rows"]] == list(range(6, 14))
+    assert [row["gameweek"] for row in result["rows"]] == PAIRED
     for row in result["rows"]:
         assert (row["system"]["points"], row["template"]["points"]) == (89, 87)
         assert row["cohort"]["points"] == 99
@@ -226,12 +240,39 @@ def test_eight_weeks_pair_all_arms_and_second_reading_opens_nothing(tmp_path, mo
     week_lines = [line for line in markdown.splitlines() if line.endswith("| 100 | 0 |")]
     assert week_lines == [
         f"| {gameweek} | 89.000 | 87.000 | 99.000 | +2.000 | -10.000 | 100 | 0 |"
-        for gameweek in range(6, 14)
+        for gameweek in PAIRED
     ]
-    assert "| 14 | `insufficient_coverage` | 79 | 21 |" in markdown
+    assert "- Declared gameweeks: 6 to 15" in markdown
+    assert "| 8 | `missing_capture` | not read | not read |" in markdown
+    assert "| 15 | `insufficient_coverage` | 79 | 21 |" in markdown
     monkeypatch.setattr(live, "prepare_live_week", lambda _: pytest.fail("Second input was opened"))
     with pytest.raises(EvaluationValidationError, match="already been claimed"):
-        read(weeks, tmp_path)
+        read(weeks, tmp_path, missing=[8])
+
+
+@pytest.mark.parametrize(
+    ("listed", "missing", "first", "last"),
+    [
+        ([6, 7, *range(9, 15)], (), 6, 14),  # GW8 left out without a trace
+        (list(range(6, 14)), (), 6, 12),  # GW13 outside the declared range
+        (list(range(6, 14)), (7,), 6, 13),  # GW7 both captured and missing
+        (list(range(6, 14)), (), 13, 6),  # reversed range
+        (list(range(6, 14)), (), 2, 13),  # before the first prospective cohort
+    ],
+)
+def test_every_declared_gameweek_is_listed_before_any_week_is_prepared(
+    tmp_path, monkeypatch, listed, missing, first, last
+):
+    monkeypatch.setattr(live, "prepare_live_week", lambda _: pytest.fail("Input was opened"))
+    with pytest.raises(EvaluationValidationError, match=r"declared gameweek|unique"):
+        read(
+            [week(gameweek) for gameweek in listed],
+            tmp_path,
+            missing=missing,
+            first=first,
+            last=last,
+        )
+    assert not (tmp_path / live.CLAIM_FILE).exists()
 
 
 def test_coverage_below_eighty_cannot_make_a_valid_eighth_week(tmp_path):
@@ -457,7 +498,9 @@ def test_failed_claimed_reading_cannot_be_looked_at_again(tmp_path, monkeypatch)
     )
     with pytest.raises(OSError, match="synthetic failure"):
         read(weeks, tmp_path)
-    assert (tmp_path / live.CLAIM_FILE).exists()
+    claim = json.loads((tmp_path / live.CLAIM_FILE).read_bytes())
+    assert claim["declared_gameweeks"] == {"first_gameweek": 6, "last_gameweek": 13}
+    assert claim["manifest_sha256"] == "c" * 64
     monkeypatch.setattr(live, "prepare_live_week", lambda _: pytest.fail("Second input was opened"))
     with pytest.raises(EvaluationValidationError, match="already been claimed"):
         read(weeks, tmp_path)

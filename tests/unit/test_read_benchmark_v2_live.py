@@ -11,7 +11,7 @@ from squadopt.data.snapshots import write_snapshot
 from squadopt.experiments.benchmark_v2_live import CLAIM_FILE
 
 
-@pytest.mark.parametrize("refusal", ["early", "repeat", "holdout"])
+@pytest.mark.parametrize("refusal", ["early", "repeat", "holdout", "gap", "undeclared"])
 def test_command_refusal_opens_no_capture(tmp_path, monkeypatch, refusal):
     manifest = tmp_path / "private-manifest.json"
     record = tmp_path / "record"
@@ -19,18 +19,30 @@ def test_command_refusal_opens_no_capture(tmp_path, monkeypatch, refusal):
         {
             "gameweek": week,
             **{
-                role + "_snapshot_id": "fpl-live-20251010T080000Z-aabbcc"
+                role + "_snapshot_id": "fpl-live-20261010T080000Z-aabbcc"
                 for role in ("decision", "freeze", "cohort", "picks", "outcome")
             },
         }
         for week in range(6, 14)
     ]
+    declared = {"first_gameweek": 6, "last_gameweek": 13}
     if refusal == "early":
         weeks = weeks[:7]
     if refusal == "repeat":
         record.mkdir()
         (record / CLAIM_FILE).write_bytes(b"claimed")
-    manifest.write_text(json.dumps({"season": "2026-27", "weeks": weeks}), encoding="utf-8")
+    if refusal == "holdout":
+        weeks = [
+            {**item, "picks_snapshot_id": "fpl-live-20251010T080000Z-aabbcc"} for item in weeks
+        ]
+    if refusal == "gap":
+        weeks = [item for item in weeks if item["gameweek"] != 9] + [{**weeks[-1], "gameweek": 14}]
+        declared = {"first_gameweek": 6, "last_gameweek": 14}
+    if refusal == "undeclared":
+        declared = {}
+    manifest.write_text(
+        json.dumps({"season": "2026-27", **declared, "weeks": weeks}), encoding="utf-8"
+    )
     monkeypatch.setattr(cli, "read_snapshot", lambda *_: pytest.fail("Refused capture was opened"))
     monkeypatch.setattr(
         cli.subprocess, "run", lambda *a, **k: pytest.fail("Early git gate was reached")
@@ -104,8 +116,12 @@ def test_command_reads_eight_real_format_synthetic_capture_ids(tmp_path, monkeyp
                 **{role + "_snapshot_id": value.snapshot_id for role, value in captures.items()},
             }
         )
+    rows.append({"gameweek": 14, "exclusion": "missing_capture"})
     manifest = tmp_path / "manifest.json"
-    manifest.write_text(json.dumps({"season": "2026-27", "weeks": rows}), encoding="utf-8")
+    manifest.write_text(
+        json.dumps({"season": "2026-27", "first_gameweek": 6, "last_gameweek": 14, "weeks": rows}),
+        encoding="utf-8",
+    )
     replies = iter([SimpleNamespace(stdout="a" * 40), SimpleNamespace(stdout="")])
     monkeypatch.setattr(cli.subprocess, "run", lambda *a, **k: next(replies))
     assert (
@@ -123,3 +139,6 @@ def test_command_reads_eight_real_format_synthetic_capture_ids(tmp_path, monkeyp
     )
     record = json.loads((tmp_path / "record" / cli.READING_FILE).read_bytes())
     assert record["paired_gameweeks"] == 8 and record["locked_holdout_accessed"] is False
+    assert record["exclusions"] == [{"gameweek": 14, "reason": "missing_capture"}]
+    assert record["declared_gameweeks"] == {"first_gameweek": 6, "last_gameweek": 14}
+    assert record["manifest_sha256"] == cli.hashlib.sha256(manifest.read_bytes()).hexdigest()

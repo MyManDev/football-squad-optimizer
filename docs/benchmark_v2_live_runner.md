@@ -7,7 +7,13 @@ week, replaces a cohort member or reads the locked 2025-26 holdout.
 
 Each week supplies five immutable capture ids: `decision`, `freeze`, `cohort`,
 `picks` and `outcome`. The caller lists them with `gameweek` in a JSON manifest under
-`weeks`, with top-level `season: 2026-27`. Raw manager ids and picks stay in the local
+`weeks`, with top-level `season: 2026-27` and the declared range `first_gameweek` and
+`last_gameweek`. Every gameweek in that range appears exactly once: with its five ids,
+or as `{"gameweek": n, "exclusion": "missing_capture"}` when its captures do not
+exist. A gap, a week outside the range or a repeated week refuses the reading before
+any capture is opened. The range is declared before any week is read. The claim and
+the result record the declared range and the manifest's SHA256, and every missing
+week appears among the exclusions. Raw manager ids and picks stay in the local
 snapshot store and are absent from the resulting committed summary.
 
 The decision capture is the exact pre-deadline `fpl-live` source. The freeze is a
