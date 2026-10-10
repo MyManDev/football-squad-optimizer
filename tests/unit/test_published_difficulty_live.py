@@ -640,3 +640,36 @@ def test_unchecked_nonfinal_week_is_missing_in_single_reading(tmp_path, monkeypa
     assert seven["status"] == "missing"
     assert report["valid_weeks"] == 0
     assert not (kwargs["output_directory"] / "gw07-players.csv").exists()
+
+
+@pytest.mark.parametrize("refused", ["duplicate_live_id", "no_matched_row"])
+def test_refused_week_outcome_is_missing_rather_than_a_refused_reading(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, refused: str
+) -> None:
+    def change(docs: dict[str, Any]) -> None:
+        held = docs[live_payload(7)]["elements"]
+        if refused == "duplicate_live_id":
+            held.append(dict(held[0]))
+        else:
+            held.clear()
+
+    snapshots, kwargs = reading_setup(tmp_path, monkeypatch, outcome_change=change)
+    report = runner.reading(snapshots, **kwargs)
+    seven = next(w for w in report["week_identities"] if w["gameweek"] == 7)
+    assert (seven["status"], seven["reason"]) == ("missing", "DifficultyMissingInputs")
+    assert report["valid_weeks"] == 0
+    assert not (kwargs["output_directory"] / "refused.json").exists()
+
+
+def test_settled_roster_is_refused_before_the_claim(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def change(docs: dict[str, Any]) -> None:
+        players = docs[BOOTSTRAP_PAYLOAD]["elements"]
+        players[1]["code"] = players[0]["code"]
+
+    snapshots, kwargs = reading_setup(tmp_path, monkeypatch, outcome_change=change)
+    with pytest.raises(study.DifficultyInputError, match="roster"):
+        runner.reading(snapshots, **kwargs)
+    assert not (tmp_path / "common/research-claims").exists()
+    assert not kwargs["output_directory"].exists()

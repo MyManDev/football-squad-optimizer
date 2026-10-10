@@ -54,9 +54,11 @@ projections are never adjusted.
 
 Join outcomes by persistent player code, retain observed zero-minute rows and
 drop absent players from both arms. Record every eligible week as scored or
-missing. A failed solve removes the week from the joint gate. The three
-readings use the same scored weeks with equal gameweek weights; squared error
-is primary, and absolute error is diagnostic. The JSON includes pooled and
+missing. A week whose settled live payload is refused or matches no captured
+player is missing; the settled roster itself is validated before the claim.
+A failed solve removes the week from the joint gate. The three readings use
+the same scored weeks with equal gameweek weights; squared error is primary,
+and absolute error is diagnostic. The JSON includes pooled and
 per-handoff-version readings, squad decisions, input identities, fixed
 constants and the code commit. Full player evidence stays in private CSV files.
 

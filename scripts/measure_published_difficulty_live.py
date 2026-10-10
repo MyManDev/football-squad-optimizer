@@ -346,7 +346,7 @@ def joined_rows(
     seen = set()
     for item in decode(outcome.payloads[live_payload(week)])["elements"]:
         if type(item["id"]) is not int or item["id"] in seen:
-            raise DifficultyInputError("A realized player identity is invalid or duplicated.")
+            raise DifficultyMissingInputs("A realized player identity is invalid or duplicated.")
         seen.add(item["id"])
         if item["id"] in realized_ids:
             points = item["stats"]["total_points"]
@@ -358,6 +358,8 @@ def joined_rows(
     rows = projected.rename(columns={"expected_points": "predicted_points"}).copy()
     dropped = sorted(set(int(v) for v in rows["player_id"]) - set(totals))
     rows = rows.loc[rows["player_id"].isin(totals)].copy()
+    if rows.empty:
+        raise DifficultyMissingInputs("No captured player has a settled outcome row.")
     rows["realized_points"] = rows["player_id"].map(totals)
     rows["fixture_count"] = [
         len(clubs.get(code_to_club[int(code)], [])) for code in rows["player_id"]
@@ -389,6 +391,8 @@ def reading(
     selected = first_settled(captures)
     if as_instant(selected.metadata.captured_at_utc) > as_instant(as_of):
         raise DifficultyMissingInputs("The reading instant precedes the settled capture.")
+    # Every week joins this roster, so it is refused before the claim, not after.
+    elements(selected)
     weeks = eligible_weeks(selected, declaration["merged_at"])
     output = safe_path(output_directory)
     private = safe_path(ROOT / "artifacts")
