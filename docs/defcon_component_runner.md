@@ -26,9 +26,13 @@ existing `by-capture/<snapshot-id>/*.json` layout, and member advice records wit
 `2026-27/gwNN/entry-<id>/<snapshot-id>/advice.json`. The last pre-deadline
 publication selects the exact handoff fingerprint. An absent last capture or
 handoff is missing input, never a reason to select an older publication.
+A hidden staging directory that an interrupted record writer left beside a
+capture directory never landed, so it is not a publication.
 Deadline proof is the retained publication's `generated_at_utc`, capture identity
 and exact handoff fingerprint. Restoring a file with a later modification time
-does not invalidate that content proof.
+does not invalidate that content proof. Because the game moves deadlines, each
+week's deadline comes from the latest retained capture in the input check and
+from the declared settled capture in the reading, never from an older bootstrap.
 
 The inventory is restricted to capture identifiers in the 2026-27 season date
 range. The bootstrap verifies the season before any event-live file is opened.
