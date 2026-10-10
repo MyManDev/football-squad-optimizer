@@ -59,8 +59,8 @@ is not repaired by rebuilding a forecast or borrowing another capture's file.
 For each week record the branch, selected handoff fingerprint, model version,
 file path and write time. Also record the handoff that the backend rule, the
 rule `load_capture_identity` applies, selects at reading time, and flag any
-difference. The helper computes it with its own branch b code, since it does
-not import the backend module; step 2 names this field
+difference. The prospective input helper computes it with its own branch b
+code, since it does not import the backend module; step 2 names this field
 `backend_rule_fingerprint`. That diagnostic changes no score or
 classification. Read-time I/O refusals follow the runner's pre-outcome refusal
 rules: a handoff file that exists but raises `OSError` when read refuses the
