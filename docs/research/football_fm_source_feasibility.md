@@ -4,7 +4,7 @@ Research date: 2026-10-09. This records public source evidence and a schema audi
 
 The owner's 2026-10-09 decision retains the local datasets and FM adapter for private training preparation and keeps every dataset outside Git. Exact permitted source/model rights, authentic historical vintage, scoped temporal FPL mapping and the accepted evaluation protocol still determine which rows may actually train a forecast. This decision is recorded on #1057; no unknown license is inferred to be a training grant.
 
-Three publicly declared licensed datasets were downloaded through version-pinned public endpoints and streamed as CSV without extracting archives or executing provider code. No audited source establishes complete, correctly dated Premier League attribute coverage for every development season or the current 2026-27 season. There are useful candidates, but source rights, historical vintage and identity evidence still need acceptance before model ingestion.
+The initial audit downloaded three publicly declared licensed datasets through version-pinned public endpoints and streamed them as CSV without extracting archives or executing provider code. Later downloads under the owner's requests, described in the candidate and eligibility sections below, widened the private catalog. No audited source establishes complete, correctly dated Premier League attribute coverage for every development season or the current 2026-27 season. There are useful candidates, but source rights, historical vintage and identity evidence still need acceptance before model ingestion.
 
 ## Audited sources
 
