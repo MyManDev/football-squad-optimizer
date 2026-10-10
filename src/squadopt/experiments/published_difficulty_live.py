@@ -235,6 +235,12 @@ def summarize(weeks: tuple[DifficultyWeek, ...]) -> dict[str, Any]:
         and decision is not None
         and decision >= 0
     )
+    if passed:
+        verdict = "passed"
+    elif len(weeks) < MINIMUM_WEEKS:
+        verdict = "insufficient_evidence"
+    else:
+        verdict = "failed"
     versions = {}
     for version in sorted({week.handoff_version for week in weeks}):
         held = [week for week in ordered if week.handoff_version == version]
@@ -251,7 +257,7 @@ def summarize(weeks: tuple[DifficultyWeek, ...]) -> dict[str, Any]:
         "candidate": CANDIDATE,
         "promotion": False,
         "valid_weeks": len(weeks),
-        "verdict": "passed" if passed else "insufficient_evidence" if len(weeks) < 8 else "failed",
+        "verdict": verdict,
         "squared_error_improvement": float(np.mean(errors)) if errors.size else None,
         "squared_error_interval_90": {"lower": low, "upper": high} if errors.size else None,
         "rank_improvement": rank,
