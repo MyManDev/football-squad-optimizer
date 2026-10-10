@@ -140,6 +140,11 @@ def build_vectors() -> dict[str, object]:
         {8: absent, 9: absent, 11: {"points": 5}, 5: {"points": 6}, 6: {"points": 9}},
     )
     case("formation-minimum-skips-reserve", {2: absent, 11: {"points": 9}, 5: {"points": 4}})
+    case("absent-reserve-skipped", {8: absent, 11: absent, 5: {"points": 6}})
+    case(
+        "zero-minute-reserve-card",
+        {8: absent, 11: {"minutes": 0, "points": -1, "card_shown": True}, 5: {"points": 6}},
+    )
     case(
         "zero-minute-card-participation",
         {2: {"minutes": 0, "points": -3, "card_shown": True}, 5: {"points": 5}},

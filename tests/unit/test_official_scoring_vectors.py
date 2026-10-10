@@ -18,6 +18,8 @@ def test_vectors_cover_all_declared_finished_week_cases():
         "goalkeeper-swap",
         "outfield-bench-order",
         "formation-minimum-skips-reserve",
+        "absent-reserve-skipped",
+        "zero-minute-reserve-card",
         "zero-minute-card-participation",
         "absent-captain-vice-fallback",
         "captain-and-vice-absent",
@@ -35,6 +37,8 @@ def test_vectors_cover_all_declared_finished_week_cases():
     } <= cases.keys()
     assert cases["normal-week"]["expected"]["gross"] == 12
     assert cases["transfer-hit"]["expected"]["net"] == 8
+    assert cases["absent-reserve-skipped"]["expected"]["gross"] == 17
+    assert cases["zero-minute-reserve-card"]["expected"]["gross"] == 10
     assert cases["bench-boost"]["expected"]["gross"] == 16
     assert cases["bench-boost-absent-starter"]["expected"]["gross"] == 19
     assert cases["bench-boost-absent-captain"]["expected"]["gross"] == 23
