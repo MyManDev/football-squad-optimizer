@@ -114,3 +114,10 @@ bundle becomes ready. An identical rerun can finish or replay; conflicting bytes
 cannot replace a previous ready marker. The reader checks all digests and production
 source contracts again. This command performs no acquisition, fitting, site build,
 or runtime activation. Activation must separately select this validated bundle.
+
+The first validated attempt also creates `football/<decision>.bundle.preparation.json`
+after immutable destination checks, before copies. It binds the capture's relative
+file inventory and the exact retained handoff, forecast and companion bytes. It is
+provenance for retries, never readiness. Reuse the original retained handoff after
+an interruption; a changed producer input needs a new capture. Moving identical
+inputs or changing only Windows path casing preserves their content identity.
