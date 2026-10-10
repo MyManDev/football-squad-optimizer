@@ -90,8 +90,12 @@ are the settled fixture's scored goals and assists under those same values.
 For each eligible fixture row, calculate base squared error minus candidate
 squared error. Average within each gameweek, then equally across scored weeks.
 Players within a week share a club forecast and fixtures, so the gameweek is the
-bootstrap block: resample whole paired gameweeks with replacement, 2000 draws,
-NumPy PCG64 seed 0, percentile endpoints 0.05 and 0.95.
+bootstrap block: resample whole paired gameweeks with replacement. With the n
+scored weeks' means in gameweek order, draw
+`idx = numpy.random.default_rng(0).integers(0, n, size=(2000, n))` (PCG64,
+seed 0). Each of the 2000 rows gives the mean of the selected week means, and
+the interval endpoints are `numpy.quantile` of those 2000 values at 0.05 and
+0.95 with `method="linear"`.
 
 There is one verdict after every GW20 fixture has settled. The record names
 the earliest capture demonstrating GW20 finished and data_checked. Pass requires
