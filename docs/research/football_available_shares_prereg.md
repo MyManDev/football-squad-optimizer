@@ -62,8 +62,17 @@ captured position plus three per assist. Join its element ids through the settle
 bootstrap's stable player codes, then match the pre-deadline fixture id. For
 doubles, score the separate fixture explanations; do not split a weekly total.
 No goals or assists column is added to the settled-outcomes feature table.
-Missing outcome rows or ambiguous explanations are excluded and counted,
-never invented as zero. An explicit settled zero is a valid observation.
+
+A player's realized goals and assists in a fixture are the `value` of the
+`goals_scored` and `assists` items in his `explain` entry for that fixture id.
+An item absent from that entry counts as 0, and so does a fixture for which he
+has no entry. A row is ambiguous when any of his entries names a fixture outside
+his captured club's fixtures in that gameweek, or when his goals or assists
+summed over his entries differ from his weekly `stats.goals_scored` or
+`stats.assists`. Ambiguous rows are excluded and counted. A player whose element
+is absent from the settled payload, and a pre-deadline fixture that the settled
+capture no longer places in the gameweek, are excluded and counted, never scored
+as zero.
 
 ## Primary reading and pass rule
 
