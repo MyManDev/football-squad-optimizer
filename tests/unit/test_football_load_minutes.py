@@ -547,11 +547,70 @@ def test_target_scope_refuses_invalid_or_protected_values(
 
 
 @pytest.mark.parametrize(
-    "change", [{"season": "2025-26"}, {"gameweek": 8}, {"decision_at": "2026-08-31T00:00:00Z"}]
+    ("change", "message"),
+    [
+        ({"season": "2025-26"}, "Protected"),
+        # Each remaining week is otherwise valid, so only the fitted target can refuse it.
+        ({"gameweek": 8, "covered_gameweeks": (8,)}, "outside the fitted load target"),
+        (
+            {
+                "decision_at": "2026-08-31T00:00:00Z",
+                "interval_start_at": "2026-08-03T00:00:00Z",
+                "interval_end_at": "2026-08-31T00:00:00Z",
+            },
+            "outside the fitted load target",
+        ),
+    ],
 )
-def test_prediction_target_clock_refusal(fitted: LoadMinutesModel, change: dict[str, Any]) -> None:
-    with pytest.raises((ValueError, DataError)):
+def test_prediction_target_clock_refusal(
+    fitted: LoadMinutesModel, change: dict[str, Any], message: str
+) -> None:
+    with pytest.raises((ValueError, DataError), match=message):
         fitted.predict(replace(_week(), **change))
+
+
+def test_target_fixture_features_and_gaps_follow_their_own_fixture() -> None:
+    model = _fit(_training(fixtures=3))
+    state = model._fitted
+    assert state is not None
+    # Consecutive kickoff gaps are 48 hours; the first-to-third interval is 96 hours.
+    assert model.metadata.gap_mean_hours == 48
+    assert model.metadata.gap_scale_hours == 1
+    week = _week(fixtures=3)
+    values = dict(zip(week.feature_names, week.features, strict=True))
+    for index, gap in ((1, 30.0), (2, 48.0), (3, 66.0)):
+        values[f"fixture_{index}_club_scheduled_kickoff_gap_hours"] = gap
+        values[f"fixture_{index}_known_prior_non_pl_matches"] = float(index)
+    week = replace(week, features=tuple(values[name] for name in week.feature_names))
+    context, _, trailing, names = load_model._packed_design(week, state.transform)
+    offset = 7 * len(context)
+    gap_column = names.index("cameo_short:target_club_scheduled_kickoff_gap_hours") - offset
+    opportunity_column = names.index("cameo_short:target_known_prior_non_pl_matches") - offset
+    prior_gap_column = names.index("cameo_short:prior_fixture_gap_scaled") - offset
+    feature_names = model.metadata.feature_names
+    for position, raw_gap in ((0, 30.0), (2, 66.0)):
+        state_index = week.native_joint_states.index(
+            tuple(4 if i == position else 0 for i in range(3))
+        )
+        gap_index = feature_names.index(f"fixture_{position + 1}_club_scheduled_kickoff_gap_hours")
+        opportunity_index = feature_names.index(
+            f"fixture_{position + 1}_known_prior_non_pl_matches"
+        )
+        assert trailing[state_index, gap_column] == pytest.approx(
+            (raw_gap - model.metadata.means[gap_index]) / model.metadata.scales[gap_index]
+        )
+        assert trailing[state_index, opportunity_column] == pytest.approx(
+            (position + 1 - model.metadata.means[opportunity_index])
+            / model.metadata.scales[opportunity_index]
+        )
+    third_only = week.native_joint_states.index((0, 0, 4))
+    assert trailing[third_only, prior_gap_column] == pytest.approx(0)
+
+
+def test_untrained_target_fixture_feature_refuses() -> None:
+    model = _fit(_training(fixtures=1))
+    with pytest.raises(ValueError, match="no training support for target fixture"):
+        model.predict(_week(fixtures=2))
 
 
 def test_not_fitted_public_metadata_and_predict_refuse() -> None:
