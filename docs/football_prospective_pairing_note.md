@@ -2,7 +2,7 @@
 
 Status: draft awaiting the owner's confirmation of Decision defaults 1 to 5 on
 [issue #1007](https://github.com/MyManDev/football-squad-optimizer/issues/1007).
-Written: 2026-10-08, before any GW6-or-later outcome comparison by this task.
+Written: 2026-10-07T21:54Z, before any GW6-or-later outcome comparison by this task.
 This note proposes the exact issue defaults for review. They become accepted
 rules only after the owner confirms or amends them on the issue and this PR
 merges. Record the acceptance and GW6 timing declaration before merge; cite
