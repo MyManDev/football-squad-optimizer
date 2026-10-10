@@ -114,12 +114,38 @@ def test_prefix_and_cumulative_readings_run_from_gw3_through_n() -> None:
     record = _measure(_payloads())
     assert [row["through_gameweek"] for row in record["prefixes"]] == [3, 4, 5, 6]
     assert [row["through_gameweek"] for row in record["cumulative_comparisons"]] == [3, 4, 5, 6]
-    # Every pair's weekly gap is constant, so its k-week gap is k times that gap and the
-    # ratio grows as sqrt(k). The tolerance leaves open which S divides it, still open on #1041.
+    # Every pair's weekly gap is constant, so its k-week gap is k times that gap and, divided
+    # by the unrounded S (sqrt(450), not the rounded 21.2), the ratio is exactly sqrt(k).
     ratios = [
-        row["cumulative_rms_over_sqrt_k_times_scale"] for row in record["cumulative_comparisons"]
+        row["cumulative_rms_over_sqrt_k_times_unrounded_scale"]
+        for row in record["cumulative_comparisons"]
     ]
-    assert ratios == pytest.approx([math.sqrt(k) for k in (3, 4, 5, 6)], rel=1e-2)
+    assert ratios == pytest.approx([math.sqrt(k) for k in (3, 4, 5, 6)], rel=1e-9)
+
+
+def test_cumulative_ratio_divides_by_the_unrounded_scale_on_gw1_to_n() -> None:
+    payloads = _payloads()
+    history = json.loads(payloads["entry-3-history.json"])
+    history["current"][5]["points"] = 60
+    payloads["entry-3-history.json"] = _bytes(history)
+    record = _measure(payloads)
+    # GW1 to GW5 keep gaps 15, 15 and 30; GW6 has 15, 60 and 45. S on GW1 to 6 is sqrt(700),
+    # which differs from S on GW1 to k (sqrt(450) for k up to 5) and from its rounding 26.5.
+    assert record["scale"]["scale_unrounded"] == pytest.approx(math.sqrt(700))
+    assert record["scale"]["scale_rounded"] == 26.5
+    expected = [math.sqrt(k * 450 / 700) for k in (3, 4, 5)]
+    expected.append(math.sqrt((90**2 + 210**2 + 120**2) / 3) / (math.sqrt(6) * math.sqrt(700)))
+    rows = record["cumulative_comparisons"]
+    assert [row["cumulative_rms_over_sqrt_k_times_unrounded_scale"] for row in rows] == (
+        pytest.approx(expected, rel=1e-9)
+    )
+    for row in rows:
+        assert row["cumulative_rms"] == pytest.approx(
+            row["cumulative_rms_over_sqrt_k_times_unrounded_scale"]
+            * math.sqrt(row["through_gameweek"])
+            * record["scale"]["scale_unrounded"],
+            rel=1e-9,
+        )
 
 
 @pytest.mark.parametrize("field", ["finished", "data_checked"])
@@ -464,6 +490,9 @@ def test_passing_control_exits_zero_and_holds_nothing(
     text = (tmp_path / "docs/strategy_rule_scale.md").read_text()
     assert "Control: passed" in text
     assert "step 4 is held" not in text
+    assert (
+        "Ratio is the cumulative RMS divided by sqrt(k) times the unrounded S on GW1 to N."
+    ) in text
 
 
 def test_failed_control_writes_the_record_and_holds_step_4(

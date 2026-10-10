@@ -136,7 +136,8 @@ def pair_week_reading(rows: NetRows, weeks: Sequence[int]) -> Reading:
     return Reading(squares, counted, len(rows) * (len(rows) - 1) // 2 * len(weeks))
 
 
-def cumulative_reading(rows: NetRows, k: int, scale: Decimal) -> dict[str, Any]:
+def cumulative_reading(rows: NetRows, k: int, unrounded_scale: Decimal) -> dict[str, Any]:
+    """Reading (d): the divisor is sqrt(k) times the unrounded S on GW1 to N."""
     squares = counted = 0
     weeks = range(1, k + 1)
     for first, second in combinations(rows, 2):
@@ -147,7 +148,11 @@ def cumulative_reading(rows: NetRows, k: int, scale: Decimal) -> dict[str, Any]:
     rms = reading.scale()
     with localcontext() as context:
         context.prec = 50
-        ratio = rms / (Decimal(k).sqrt() * scale) if rms is not None and scale else None
+        ratio = (
+            rms / (Decimal(k).sqrt() * unrounded_scale)
+            if rms is not None and unrounded_scale
+            else None
+        )
     return {
         "through_gameweek": k,
         "pair_counted": counted,
@@ -155,7 +160,9 @@ def cumulative_reading(rows: NetRows, k: int, scale: Decimal) -> dict[str, Any]:
         "pair_dropped": reading.expected - counted,
         "cumulative_squared_difference_sum": squares,
         "cumulative_rms": float(rms) if rms is not None else None,
-        "cumulative_rms_over_sqrt_k_times_scale": float(ratio) if ratio is not None else None,
+        "cumulative_rms_over_sqrt_k_times_unrounded_scale": (
+            float(ratio) if ratio is not None else None
+        ),
     }
 
 
@@ -291,6 +298,8 @@ def markdown(record: Mapping[str, Any]) -> str:
             "",
             "## Cumulative comparisons",
             "",
+            "Ratio is the cumulative RMS divided by sqrt(k) times the unrounded S on GW1 to N.",
+            "",
             "| Through GW | RMS | Ratio | Pairs counted | Dropped |",
             "| --- | --- | --- | --- | --- |",
         ]
@@ -298,7 +307,7 @@ def markdown(record: Mapping[str, Any]) -> str:
     for row in record["cumulative_comparisons"]:
         lines.append(
             f"| {row['through_gameweek']} | {row['cumulative_rms']} | "
-            f"{row['cumulative_rms_over_sqrt_k_times_scale']} | "
+            f"{row['cumulative_rms_over_sqrt_k_times_unrounded_scale']} | "
             f"{row['pair_counted']} | {row['pair_dropped']} |"
         )
     lines.extend(
