@@ -54,7 +54,6 @@ Date is the file's last commit (`git log -1 --format=%as -- scripts/<name>.py`).
 | `freeze_route_a_declaration.py` | measurement runner | `docs/route_a_declaration.json` | 2026-08-23 |
 | `measure_anchored_calibration.py` | measurement runner | `docs/anchored_calibration.json` | 2026-08-23 |
 | `measure_benchmark_v2.py` | measurement runner | `docs/benchmark_v2.json` | 2026-09-01 |
-| `read_benchmark_v2_live.py` | measurement runner | `<record-root>/benchmark-v2-live-2026-27.json` and its Markdown twin | 2026-10-08 |
 | `measure_candidate_runtime.py` | measurement runner | `docs/candidate_runtime.json` | 2026-08-16 |
 | `measure_capture_lead_time.py` | measurement runner | `docs/capture_lead_time.json`; also `docs/weekly_runbook.md` | 2026-09-08 |
 | `measure_capture_season_phase.py` | measurement runner | `docs/capture_season_phase.json` | 2026-09-08 |
@@ -74,6 +73,7 @@ Date is the file's last commit (`git log -1 --format=%as -- scripts/<name>.py`).
 | `measure_template_rival.py` | measurement runner | `docs/template_rival_strength.json` (+ per-season variants) | 2026-08-19 |
 | `measure_window_solver_highs.py` | measurement runner | `docs/research/window_solver_highs.json`, `docs/research/window_solver_highs.md`; `check` writes only `artifacts/window_solver_highs/`; protocol `docs/window_solver_highs_prereg.md` | 2026-10-06 |
 | `measure_windowed_rank.py` | measurement runner | `docs/windowed_rank.json` | 2026-08-20 |
+| `read_benchmark_v2_live.py` | measurement runner | `docs/benchmark-v2-live-2026-27.json` and its Markdown twin, with the claim `docs/benchmark-v2-live-2026-27.reading` | 2026-10-10 |
 | `record_preseason_difficulty.py` | measurement runner | `docs/preseason_fixture_difficulty.json`; also `docs/gw1_run_sheet.md` | 2026-09-07 |
 | `run_candidate_gate.py` | measurement runner | `docs/issue43_candidate_declaration.json` (reads and judges); `docs/candidate_gate_spec.md` | 2026-08-19 |
 | `run_captain_attribution.py` | measurement runner | `docs/phase2_captain_attribution.json` | 2026-08-31 |

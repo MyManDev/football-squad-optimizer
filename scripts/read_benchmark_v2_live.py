@@ -23,17 +23,28 @@ from squadopt.experiments.benchmark_v2_live import (
 
 ROOT = Path(__file__).resolve().parents[1]
 PREREGISTRATION = "docs/benchmark_v2_prereg.md"
+# One fixed root for the claim and the record, the committed docs directory: a caller who
+# could name another root could take the reading again there.
+RECORD_ROOT = ROOT / "docs"
+MEASUREMENTS_INDEX = ROOT / "docs" / "measurements_index.md"
 _CAPTURE = re.compile(r"fpl-[a-z0-9-]+-(\d{8})T\d{6}Z-[0-9a-f]+")
+
+
+def _already_read() -> bool:
+    """A claim, a record or an index row for this reading means it has been taken."""
+    stem = READING_FILE.removesuffix(".json")
+    if any((RECORD_ROOT / name).exists() for name in (CLAIM_FILE, READING_FILE, f"{stem}.md")):
+        return True
+    return MEASUREMENTS_INDEX.exists() and stem in MEASUREMENTS_INDEX.read_text(encoding="utf-8")
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--snapshot-root", type=Path, required=True)
-    parser.add_argument("--record-root", type=Path, required=True)
     args = parser.parse_args(argv)
     try:
-        if (args.record_root / CLAIM_FILE).exists() or (args.record_root / READING_FILE).exists():
+        if _already_read():
             raise EvaluationValidationError("Benchmark V2 live reading has already been claimed.")
         raw_manifest = args.manifest.read_bytes()
         manifest = json.loads(raw_manifest)
@@ -92,7 +103,7 @@ def main(argv: list[str] | None = None) -> int:
         ]
         result = read_live_benchmark_once(
             weeks,
-            record_root=args.record_root,
+            record_root=RECORD_ROOT,
             repository_commit=revision,
             preregistration_sha256=hashlib.sha256(preregistration).hexdigest(),
             first_gameweek=manifest["first_gameweek"],
@@ -116,7 +127,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 1
     print(f"Recorded {result['paired_gameweeks']} paired gameweeks.")
-    print(args.record_root / READING_FILE)
+    print(RECORD_ROOT / READING_FILE)
     return 0
 
 

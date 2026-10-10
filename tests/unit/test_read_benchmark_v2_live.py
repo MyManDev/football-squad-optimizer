@@ -8,13 +8,29 @@ from scripts import read_benchmark_v2_live as cli
 from tests.unit.test_benchmark_v2_live import week
 
 from squadopt.data.snapshots import write_snapshot
-from squadopt.experiments.benchmark_v2_live import CLAIM_FILE
+from squadopt.experiments.benchmark_v2_live import CLAIM_FILE, READING_FILE
 
 
-@pytest.mark.parametrize("refusal", ["early", "repeat", "holdout", "gap", "undeclared"])
-def test_command_refusal_opens_no_capture(tmp_path, monkeypatch, refusal):
+@pytest.fixture
+def record(tmp_path, monkeypatch):
+    """The command's fixed record root and measurements index, kept inside the test."""
+    root = tmp_path / "docs"
+    root.mkdir()
+    monkeypatch.setattr(cli, "RECORD_ROOT", root)
+    monkeypatch.setattr(cli, "MEASUREMENTS_INDEX", root / "measurements_index.md")
+    return root
+
+
+def test_command_names_no_record_root():
+    with pytest.raises(SystemExit):
+        cli.main(["--manifest", "m.json", "--snapshot-root", "s", "--record-root", "elsewhere"])
+
+
+@pytest.mark.parametrize(
+    "refusal", ["early", "repeat", "recorded", "indexed", "holdout", "gap", "undeclared"]
+)
+def test_command_refusal_opens_no_capture(tmp_path, monkeypatch, record, refusal):
     manifest = tmp_path / "private-manifest.json"
-    record = tmp_path / "record"
     weeks = [
         {
             "gameweek": week,
@@ -29,8 +45,13 @@ def test_command_refusal_opens_no_capture(tmp_path, monkeypatch, refusal):
     if refusal == "early":
         weeks = weeks[:7]
     if refusal == "repeat":
-        record.mkdir()
         (record / CLAIM_FILE).write_bytes(b"claimed")
+    if refusal == "recorded":
+        (record / READING_FILE.replace(".json", ".md")).write_text("# Reading", encoding="utf-8")
+    if refusal == "indexed":
+        (record / "measurements_index.md").write_text(
+            "| `benchmark-v2-live-2026-27` | merged reading | |", encoding="utf-8"
+        )
     if refusal == "holdout":
         weeks = [
             {**item, "picks_snapshot_id": "fpl-live-20251010T080000Z-aabbcc"} for item in weeks
@@ -54,15 +75,13 @@ def test_command_refusal_opens_no_capture(tmp_path, monkeypatch, refusal):
                 str(manifest),
                 "--snapshot-root",
                 str(tmp_path / "no-store"),
-                "--record-root",
-                str(record),
             ]
         )
         == 1
     )
 
 
-def test_command_reads_eight_real_format_synthetic_capture_ids(tmp_path, monkeypatch):
+def test_command_reads_eight_real_format_synthetic_capture_ids(tmp_path, monkeypatch, record):
     store = tmp_path / "store"
     rows = []
     for gameweek in range(6, 14):
@@ -137,15 +156,17 @@ def test_command_reads_eight_real_format_synthetic_capture_ids(tmp_path, monkeyp
                 str(manifest),
                 "--snapshot-root",
                 str(store),
-                "--record-root",
-                str(tmp_path / "record"),
             ]
         )
         == 0
     )
-    record = json.loads((tmp_path / "record" / cli.READING_FILE).read_bytes())
-    assert record["paired_gameweeks"] == 8 and record["locked_holdout_accessed"] is False
-    assert record["exclusions"] == [{"gameweek": 14, "reason": "missing_capture"}]
-    assert record["declared_gameweeks"] == {"first_gameweek": 6, "last_gameweek": 14}
-    assert record["manifest_sha256"] == cli.hashlib.sha256(manifest.read_bytes()).hexdigest()
-    assert record["preregistration_sha256"] == cli.hashlib.sha256(committed).hexdigest()
+    result = json.loads((record / READING_FILE).read_bytes())
+    assert result["paired_gameweeks"] == 8 and result["locked_holdout_accessed"] is False
+    assert result["exclusions"] == [{"gameweek": 14, "reason": "missing_capture"}]
+    assert result["declared_gameweeks"] == {"first_gameweek": 6, "last_gameweek": 14}
+    assert result["manifest_sha256"] == cli.hashlib.sha256(manifest.read_bytes()).hexdigest()
+    assert result["preregistration_sha256"] == cli.hashlib.sha256(committed).hexdigest()
+    assert (record / CLAIM_FILE).exists()
+    # The fixed root holds the claim, so the same manifest cannot be read a second time.
+    monkeypatch.setattr(cli, "read_snapshot", lambda *_: pytest.fail("Second capture was opened"))
+    assert cli.main(["--manifest", str(manifest), "--snapshot-root", str(store)]) == 1

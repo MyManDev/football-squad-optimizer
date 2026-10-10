@@ -58,12 +58,15 @@ in gameweek order with three fixed decimals. Twelve
 weeks remains the preregistration's preferred population for a season interpretation;
 the runner introduces no improvement gate or interval threshold.
 
-Choose and keep one persistent private record root for this study. After preflight
-admits eight weeks, the runner atomically claims `benchmark-v2-live-2026-27.reading`
-before calculating paired scores. A second invocation refuses before opening captures.
-A failed claimed reading also stays claimed; recovery requires an explicit owner-reviewed
-protocol amendment, not deleting the claim or selecting another root. A successful
-reading writes one JSON and its Markdown twin. The later result PR must add the
+The command has one fixed record root, the repository's `docs/` directory; no caller
+chooses another. After preflight admits eight weeks, the runner atomically claims
+`docs/benchmark-v2-live-2026-27.reading` before calculating paired scores. A second
+invocation refuses before opening captures when that claim, the JSON or Markdown
+record, or a `docs/measurements_index.md` row naming the reading already exists, so
+once the result PR merges every checkout refuses. A failed claimed reading also stays
+claimed; recovery requires an explicit owner-reviewed protocol amendment, not deleting
+the claim. A successful reading writes `docs/benchmark-v2-live-2026-27.json` and its
+Markdown twin beside the claim. The later result PR commits all three and must add the
 measurements-index row. The existing descriptive historical record is preserved.
 
 After the collector has supplied the required immutable inputs, the implementation and
@@ -71,7 +74,7 @@ preregistration are committed and the complete quality suite has passed, the rea
 
 ```powershell
 $env:PYTHONPATH="<worktree>/src;<worktree>"
-C:/Users/ertug/Desktop/MyManDev/projects/football-squad-optimizer/.venv/Scripts/python.exe -m scripts.read_benchmark_v2_live --manifest <private-manifest.json> --snapshot-root <snapshot-root> --record-root <persistent-private-record-root>
+C:/Users/ertug/Desktop/MyManDev/projects/football-squad-optimizer/.venv/Scripts/python.exe -m scripts.read_benchmark_v2_live --manifest <private-manifest.json> --snapshot-root <snapshot-root>
 ```
 
 The collector and the actual reading remain separate issue steps. No real live reading
