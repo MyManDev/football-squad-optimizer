@@ -598,7 +598,13 @@ def main(
             week.coding_observed_at
         ):
             raise ClubNewsError("The clock moved backwards after coding.")
-        still_open = next_open_deadline(deadlines, as_of_utc=captured_at)
+        try:
+            still_open = next_open_deadline(deadlines, as_of_utc=captured_at)
+        except DataError as error:
+            raise ClubNewsError(
+                "The coding deadline passed before the capture was written, and no later "
+                "deadline is published."
+            ) from error
         if (
             still_open.gameweek != deadline.gameweek
             or still_open.deadline_utc != deadline.deadline_utc

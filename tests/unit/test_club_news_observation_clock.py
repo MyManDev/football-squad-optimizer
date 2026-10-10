@@ -566,6 +566,9 @@ def test_capture_rechecks_deadline_after_model_answers(
             assert "clock moved backwards" not in printed
         else:
             assert "clock moved backwards" not in printed
+            assert "passed before the capture was written" in printed
+            assert "no later deadline is published" in printed
+            assert "season is over" not in printed
         assert printed.count("Nothing was captured.") == 1
         assert "Capture       " not in printed
         assert not capture_root.exists()
