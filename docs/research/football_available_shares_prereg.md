@@ -17,6 +17,10 @@ protocol takes the most conservative reading and names it where it applies.
    Its expected size is declared below, before any data, as a pre-data
    estimate from a simulation on forecasts only, not a measurement.
    Club-channel bias is a defined secondary reading with no verdict.
+2. The verdict labels are `insufficient_evidence` (fewer than eight scored
+   weeks), `pass` (interval lower end above zero), `candidate_worse` (upper
+   end below zero) and `not_separated` otherwise, recorded as no separation
+   rather than failure. They replace a pass or fail verdict.
 
 ## Arms and binding start
 
@@ -93,7 +97,7 @@ is absent from the settled payload, and a pre-deadline fixture that the settled
 capture no longer places in the gameweek, are excluded and counted, never scored
 as zero.
 
-## Primary reading and pass rule
+## Primary reading and verdict rule
 
 Population: decision-week player-fixtures at club-fixtures where at least one
 rostered player has captured m < 1, counting only players with m > 0.
@@ -118,10 +122,22 @@ the interval endpoints are `numpy.quantile` of those 2000 values at 0.05 and
 0.95 with `method="linear"`.
 
 There is one verdict after every GW20 fixture has settled. The record names
-the earliest capture demonstrating GW20 finished and data_checked. Pass requires
-at least eight scored weeks and the entire primary 90 percent interval strictly
-above zero. Otherwise fail; fewer than eight is insufficient evidence and cannot
-pass. A week with no eligible observed rows is listed as missing, not zero.
+the earliest capture demonstrating GW20 finished and data_checked. Let n be the
+number of scored weeks and [lo, hi] the primary 90 percent interval. The
+verdict is the first of these labels that holds:
+
+1. n < 8: `insufficient_evidence`.
+2. lo > 0: `pass`.
+3. hi < 0: `candidate_worse`.
+4. Otherwise: `not_separated`.
+
+`not_separated` is recorded as no separation between the arms, not as a failure
+and not as evidence against the fix. Two details are read conservatively. With
+fewer than eight scored weeks no other label is given, whichever way the
+interval points. Both comparisons with zero are strict, so an endpoint exactly
+at zero gives `not_separated`. A week with no eligible observed rows is listed
+as missing, not zero.
+
 No outcome of a scored week is read for any reading of this protocol, primary or
 secondary, before a capture shows GW20 finished and data_checked. Until then a
 runner may check inputs only (captures, artifacts, write times, bindings and
@@ -145,13 +161,13 @@ and base predicted attacking points is 1.118, and the expected weekly mean gain
 is about 0.0023 squared points against a weekly standard deviation of about
 0.011.
 
-Under those assumptions the pass rule above passes in 22.6 percent of
+Under those assumptions the rule above gives `pass` in 22.6 percent of
 simulated seasons at 14 scored weeks and in 17.3 percent at eight. With
-club-level gamma overdispersion (shape 10) it passes in 18.6 and 18.3 percent.
-A normal approximation gives about 0.21 at 14 weeks and 0.17 at eight. When
-the base is true, the rule passes 1 to 2.5 percent of the time. At 14 scored
-weeks, the most GW7 to GW20 allows, a pass is about a 1 in 5 chance even when
-the fix is exactly right.
+club-level gamma overdispersion (shape 10) it gives `pass` in 18.6 and 18.3
+percent. A normal approximation gives about 0.21 at 14 weeks and 0.17 at eight.
+When the base is true, the rule gives `pass` 1 to 2.5 percent of the time.
+At 14 scored weeks, the most GW7 to GW20 allows, a pass is about a 1 in 5
+chance even when the fix is exactly right.
 
 This is a pre-data estimate from a simulation on forecasts only, not a
 measurement. It changes no reading, label or threshold, and the record does not
@@ -199,8 +215,8 @@ The locked 2025-26 holdout remains unopened.
 The later scoring runner and verdict PR add a small markdown and JSON record
 under `docs/research/` and a `docs/measurements_index.md` row. Record source and
 code provenance, every scored week's timely candidate artifact, missing reasons,
-the frozen readings and the single verdict. Do not claim a shipping result from
-the forecast-only sizing.
+the frozen readings and the single verdict with its label. Do not claim a
+shipping result from the forecast-only sizing.
 
 ## Separate implementation and shipping gates
 
@@ -212,10 +228,12 @@ build wall time on the owner's PC, then waits for Ibo's approving review.
 No frozen-path PR merges within 24 hours of a deadline, and no queue entry occurs
 while a weekly run is underway. The owner runs Tuesday and Friday through GW20.
 
-A pass still needs the owner's explicit yes on #1009 and a surviving football
+A `pass` still needs the owner's explicit yes on #1009 and a surviving football
 option under #988. A separate ship PR selects the new version at the first
 deadline after merge and names what #844 and
-`docs/research/planner_policy_chain_prereg.md` score after that switch. A failed
-verdict leaves the served version unchanged and records the result. If the owner
-drops the football option, that decision is recorded on the issue instead.
+`docs/research/planner_policy_chain_prereg.md` score after that switch. Any
+other label (`insufficient_evidence`, `not_separated` or `candidate_worse`)
+leaves the served version unchanged, and the record states the label; a
+`not_separated` result is recorded as no separation, not as a failure. If the
+owner drops the football option, that decision is recorded on the issue instead.
 This protocol authorizes no member-page text, release or backend operation.
