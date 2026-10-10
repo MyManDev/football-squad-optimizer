@@ -34,14 +34,14 @@ It also checks the clock after fitting, before publishing. A forecast's write ti
 is compared with the deadline independently; a late write never claims timely input.
 
 The two retained files are `<root>/football/<capture>.json` and
-`<root>/receipts/<capture>.json`. Receipt contract `football_shadow_receipt_v1` holds
-the capture instant, season, own target gameweek and deadline, the reader's model
-version and fingerprint, `artifact_sha256`, `artifact_write_utc`,
-`written_before_deadline`, `repository_commit`, `repository_tree_clean`,
-`python_version`, `library_versions` for numpy, scipy, scikit-learn and pandas,
-`wall_seconds`, the document's `archive_hashes`, the same season's complete
-same-target usable live inventory in `gameweek_captures`, `skipped_captures`,
-`ambiguous_latest`, `newest_for_gameweek` and `served: false`.
+`<root>/receipts/<capture>.json`. A receipt this command writes, contract
+`football_shadow_receipt_v1`, holds the capture instant, season, own target gameweek
+and deadline, the reader's model version and fingerprint, `artifact_sha256`,
+`artifact_write_utc`, `written_before_deadline`, `repository_commit`,
+`repository_tree_clean`, `python_version`, `library_versions` for numpy, scipy,
+scikit-learn and pandas, `wall_seconds`, the document's `archive_hashes`, the same
+season's complete same-target usable live inventory in `gameweek_captures`,
+`skipped_captures`, `ambiguous_latest`, `newest_for_gameweek` and `served: false`.
 Inventory validation runs before fitting. Captures without a bootstrap payload
 are skipped and their IDs recorded; other damaged captures still refuse.
 The newest flag requires the decision capture to be strictly later than every
@@ -50,6 +50,20 @@ and `newest_for_gameweek: false`, matching the input check's ambiguity rule.
 Repository status is read with Git's optional locks disabled.
 The inventory describes what was present at build time; the
 post-deadline input check determines the final selected capture.
+
+Decision accepted by the owner on 2026-10-10, on #1069: the receipt contract stays
+`football_shadow_receipt_v1`. The keys `skipped_captures`, `ambiguous_latest`,
+`python_version` and `library_versions` are additive, and the stricter
+`newest_for_gameweek` rule above is part of v1. Receipts written from the merge
+of #1069 carry these four keys and the stricter rule. The GW6 receipt, for capture
+`fpl-live-20261010T035732Z-c77d032165af`, was written before this change and has
+none of the four keys. It is read under the earlier rule: `newest_for_gameweek` is
+true when the decision capture is the last entry of `gameweek_captures` ordered by
+capture instant and then capture id. Its four other GW6 captures are all earlier,
+so its `newest_for_gameweek: true` is the same under both rules. Readers must
+accept both shapes. The command's `read_shadow_receipt` accepts a v1 receipt with
+none or all of the four keys, refuses any other key set, and returns
+`newest_for_gameweek` as recorded, never recomputed.
 
 Before the deadline, post the capture id, fingerprint and artifact sha256 on #999.
 The comment's timestamp provides evidence independent of local modification time.

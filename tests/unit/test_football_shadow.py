@@ -470,6 +470,94 @@ def test_capture_ties_match_latest_selection_ambiguity(case, tie):
     assert receipt["skipped_captures"] == []
 
 
+# The keys the command wrote at 66a826c9 (#1019), the code behind the GW6 receipt.
+GW6_RECEIPT_KEYS = {
+    "contract_version",
+    "snapshot_id",
+    "captured_at_utc",
+    "season",
+    "gameweek",
+    "deadline_utc",
+    "model_version",
+    "fingerprint",
+    "artifact_sha256",
+    "artifact_write_utc",
+    "written_before_deadline",
+    "repository_commit",
+    "repository_tree_clean",
+    "wall_seconds",
+    "archive_hashes",
+    "gameweek_captures",
+    "newest_for_gameweek",
+    "served",
+}
+ADDITIVE_KEYS = {"skipped_captures", "ambiguous_latest", "python_version", "library_versions"}
+
+
+def test_built_receipt_is_the_gw6_shape_plus_the_additive_keys_and_reads(case):
+    receipt = build(case)
+    assert receipt["contract_version"] == "football_shadow_receipt_v1"
+    assert set(receipt) == GW6_RECEIPT_KEYS | ADDITIVE_KEYS
+    assert GW6_RECEIPT_KEYS.isdisjoint(ADDITIVE_KEYS)
+    assert shadow.RECEIPT_KEYS == GW6_RECEIPT_KEYS
+    assert shadow.RECEIPT_ADDITIVE_KEYS == ADDITIVE_KEYS
+    path = case["shadow_root"] / "receipts" / (receipt["snapshot_id"] + ".json")
+    assert shadow.read_shadow_receipt(path) == receipt
+
+
+@pytest.mark.parametrize("latest", ["strictly-latest", "earlier-rule-tie"])
+def test_gw6_style_receipt_without_additive_keys_reads_under_the_earlier_rule(
+    case, tmp_path, latest
+):
+    receipt = {key: value for key, value in build(case).items() if key not in ADDITIVE_KEYS}
+    capture = receipt["snapshot_id"]
+    instant = receipt["captured_at_utc"]
+    rows = [
+        {
+            "snapshot_id": "fpl-live-20260901T000000Z-000000000000",
+            "captured_at_utc": "2026-09-01T00:00:00Z",
+        },
+        {"snapshot_id": capture, "captured_at_utc": instant},
+    ]
+    if latest == "earlier-rule-tie":
+        tied = capture.rsplit("-", 1)[0] + "-" + "0" * 12
+        assert tied < capture
+        rows.insert(1, {"snapshot_id": tied, "captured_at_utc": instant})
+    # The earlier rule: the decision capture is the last row by instant, then capture id.
+    rows.sort(key=lambda row: (datetime.fromisoformat(row["captured_at_utc"]), row["snapshot_id"]))
+    receipt["gameweek_captures"] = rows
+    receipt["newest_for_gameweek"] = rows[-1]["snapshot_id"] == capture
+    assert receipt["newest_for_gameweek"] is True
+    assert set(receipt) == GW6_RECEIPT_KEYS
+    path = tmp_path / "gw6-style" / "receipts" / (capture + ".json")
+    shadow.write_document_once(receipt, path)
+    read = shadow.read_shadow_receipt(path)
+    assert read == receipt
+    assert "ambiguous_latest" not in read
+    # Read as recorded: a tie the stricter rule would mark ambiguous is not recomputed.
+    assert read["newest_for_gameweek"] is True
+
+
+@pytest.mark.parametrize(
+    "shape", ["partial-additive", "missing-base", "unknown-key", "other-contract", "not-object"]
+)
+def test_receipt_reader_refuses_any_other_shape(case, tmp_path, shape):
+    receipt = build(case)
+    if shape == "partial-additive":
+        del receipt["ambiguous_latest"]
+    elif shape == "missing-base":
+        receipt = {key: value for key, value in receipt.items() if key not in ADDITIVE_KEYS}
+        del receipt["served"]
+    elif shape == "unknown-key":
+        receipt["unexpected"] = True
+    elif shape == "other-contract":
+        receipt["contract_version"] = "football_shadow_receipt_v2"
+    path = tmp_path / "receipt.json"
+    path.write_text(json.dumps([] if shape == "not-object" else receipt), encoding="utf-8")
+    with pytest.raises(ValueError, match="receipt"):
+        shadow.read_shadow_receipt(path)
+
+
 @pytest.mark.parametrize(
     "version", [JOINT_ROLE_RETAINED_HISTORY_MODEL_VERSION, CONTEXTUAL_MODEL_VERSION]
 )

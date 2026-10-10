@@ -24,6 +24,33 @@ from squadopt.prediction.football import FOOTBALL_MODEL_VERSION
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_SHADOW_ROOT = Path("artifacts/shadow/football_team_share_v1")
 RECEIPT_CONTRACT = "football_shadow_receipt_v1"
+# Every v1 receipt carries these keys, including the GW6 receipt written before #1069.
+RECEIPT_KEYS = frozenset(
+    {
+        "contract_version",
+        "snapshot_id",
+        "captured_at_utc",
+        "season",
+        "gameweek",
+        "deadline_utc",
+        "model_version",
+        "fingerprint",
+        "artifact_sha256",
+        "artifact_write_utc",
+        "written_before_deadline",
+        "repository_commit",
+        "repository_tree_clean",
+        "wall_seconds",
+        "archive_hashes",
+        "gameweek_captures",
+        "newest_for_gameweek",
+        "served",
+    }
+)
+# Additive v1 keys, written from the merge of #1069 together with the stricter newest rule.
+RECEIPT_ADDITIVE_KEYS = frozenset(
+    {"skipped_captures", "ambiguous_latest", "python_version", "library_versions"}
+)
 
 
 def _utc_now() -> datetime:
@@ -167,6 +194,20 @@ def build_shadow(
     }
     write_document_once(receipt, receipt_path)
     return receipt
+
+
+def read_shadow_receipt(path: Path) -> dict[str, Any]:
+    """Read a v1 receipt with none or all of the additive keys, as it was written.
+
+    A receipt without ``ambiguous_latest`` was written under the earlier newest rule,
+    so its ``newest_for_gameweek`` is returned as recorded and never recomputed.
+    """
+    document = json.loads(path.read_bytes())
+    if not isinstance(document, dict) or document.get("contract_version") != RECEIPT_CONTRACT:
+        raise ValueError("The file is not a football_shadow_receipt_v1 receipt.")
+    if set(document) not in (set(RECEIPT_KEYS), set(RECEIPT_KEYS | RECEIPT_ADDITIVE_KEYS)):
+        raise ValueError("A v1 shadow receipt carries none or all of the additive keys.")
+    return document
 
 
 def main() -> None:
