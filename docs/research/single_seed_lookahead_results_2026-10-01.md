@@ -198,3 +198,28 @@ Evidence hashes (SHA256; raw operational files remain in the local study record)
 | protocol.json | `c977b45814d23b9a182b9093c2ff1d62957f8d60a1c9e5aa691e60f0cae5de53` |
 | summary.json | `4f863e06a815face00a793ebcf66806d5063cb99eb2c007a65dc5e3068876ab5` |
 | reference-check.json | `b5ed75f69a114390ddde926c50481d4eaa1712faab3a6170f1e71a36e6238e08` |
+
+## Notes added after review, 10 October 2026
+
+No number, status, verdict or hash above changed; these notes add context only.
+
+- The display window is not an input to any solve in single_seed_v1: the
+  runner uses it only to score the first 3 or 5 weeks of the returned 14-week
+  path. The 3- and 5-week cells of each plain profile/weight combination
+  therefore ran the same solves on the same inputs, so their identical paths,
+  work and bounds are expected rather than a separate finding. The 16
+  comparisons rest on 10 distinct solve pairs, and the core 4 of 4 on two.
+- The per-phase and per-path evidence (the four files above) is not
+  committed. Phase-level statements, such as all 256 phases being complete,
+  fair and costed, the smaller phase overshoots and the 28.150118 sequential
+  total, can be checked only against those files, which this report
+  identifies by hash.
+- The committed runner, `scripts/measure_guarded_lookahead.py`, refuses to
+  start after its preregistered cutoff of 2026-10-01T05:00Z, and
+  single_seed_v1 also stops when a source hash recorded by the reference study
+  differs, so it cannot regenerate this report as committed.
+- The measured planner and producer are the copies in the measured source:
+  develop at `e401d4be` with #905's `832084c2` applied, and #898's producer at
+  `8d510a03`. Develop has since changed `src/squadopt/planning` and
+  `src/squadopt/application/football_live.py`, so these numbers describe the
+  measured source, not the planner on develop.

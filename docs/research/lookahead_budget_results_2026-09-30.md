@@ -129,3 +129,21 @@ a fully certified feasible path when another construction fails, while charging
 all failed work. It must be tested as a new candidate and cannot repair this
 screen retroactively. The first question is reliability under fixed resource
 limits; speculative RL, ANN or Bayesian search is not justified by this result.
+
+## Notes added after review, 10 October 2026
+
+Apart from restored spacing between words and numbers, no text above changed,
+and no number, status, verdict or hash; these notes add context only.
+
+- The phase and path evidence (the results, protocol and summary files
+  above) is not committed. Phase-level statements, such as the 66.000929
+  continuation and the 84.664626 window-tail construction, can be checked
+  only against those files, which this report identifies by hash.
+- The committed runner, `scripts/measure_guarded_lookahead.py`, refuses to
+  start after its preregistered cutoff of 2026-10-01T05:00Z, so it cannot
+  regenerate this report as committed.
+- The measured planner and producer are the copies in the measured source:
+  develop at `e401d4be` with #905's `832084c2` applied, and #898's producer at
+  `8d510a03`. Develop has since changed `src/squadopt/planning` and
+  `src/squadopt/application/football_live.py`, so these numbers describe the
+  measured source, not the planner on develop.
