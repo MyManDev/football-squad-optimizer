@@ -8,6 +8,7 @@ import pytest
 from tests.unit.test_benchmark_v2_measurement import _parity_snapshot, _top100_page
 from tests.unit.test_weekly_operations import world
 
+from squadopt.application import weekly_plan
 from squadopt.application.build import _recent_events
 from squadopt.data.errors import DataError, DataSourceError
 from squadopt.data.snapshots import read_snapshot, write_snapshot
@@ -16,7 +17,7 @@ from squadopt.live.ledger import write_manifest
 from squadopt.platform import benchmark_capture as capture
 from squadopt.platform import weekly_operations as weekly
 from squadopt.platform.runlog import configure_run_logging
-from squadopt.platform.weekly_journal import WeeklyRun, fingerprint_paths
+from squadopt.platform.weekly_journal import WeeklyRun, fingerprint_paths, inspect_run
 
 DEADLINE = "2026-10-10T10:00:00Z"
 PRE = "2026-10-10T08:00:00Z"
@@ -648,6 +649,42 @@ def test_decide_precedes_freeze_and_options_are_in_declaration(tmp_path):
         "freeze": True,
         "picks_freezes": ["explicit-freeze"],
     }
+
+
+def test_weekly_run_executes_both_research_stages_in_plan_order_and_resumes(tmp_path, monkeypatch):
+    operation = world(tmp_path)
+    # The decision step is not under test: --decide only satisfies the freeze guard here.
+    monkeypatch.setattr(weekly_plan, "preflight_decide", lambda *a, **k: None)
+    freeze_id = "fpl-benchmark-decision-20261009T080000Z-aaaaaaaaaaaa"
+    request = replace(operation.request, decide=True)
+    kwargs = dict(
+        run_id="research",
+        repository_commit="b" * 40,
+        handoff=operation.supplied_handoff,
+        benchmark_freeze=True,
+        benchmark_picks_freezes=(freeze_id,),
+    )
+    enabled = weekly.WeeklyOperations(request, operation.paths, **kwargs)
+    enabled._decide = lambda: enabled._receipt("decide", {"skipped_reason": "synthetic"})
+    doc = json.loads(enabled.execute().read_bytes())
+    assert doc["status"] == "completed"
+    assert [stage["name"] for stage in doc["stages"]] == enabled.stages
+    assert {stage["status"] for stage in doc["stages"]} == {"completed"}
+    values = {stage["name"]: stage["value"] for stage in doc["stages"]}
+    assert values["benchmark_freeze"] == {"status": "unavailable", "reason": "no_cohort"}
+    assert values["benchmark_picks"] == {
+        "captures": [
+            {"freeze_snapshot_id": freeze_id, "status": "unavailable", "reason": "missing_freeze"}
+        ]
+    }
+    events = _recent_events(operation.paths.log_root, "season_tick", 200)
+    plans = [event.fields["stages"] for event in events if event.message == "tick.week.plan"]
+    assert plans == [[name for name in enabled.stages if not name.startswith("benchmark_")]]
+    assert not any(str(event.fields.get("stage", "")).startswith("benchmark_") for event in events)
+    resumed = weekly.WeeklyOperations(request, operation.paths, resume=True, **kwargs)
+    resumed._decide = lambda: pytest.fail("A completed stage ran again")
+    resumed.execute()
+    assert inspect_run(operation.paths.journal, "research")["status"] == "completed"
 
 
 @pytest.mark.parametrize("identifier", ["", "..", "../..", "folder/id", r"folder\id"])
