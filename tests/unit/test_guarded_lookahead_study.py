@@ -421,7 +421,7 @@ def test_single_seed_requires_reference_before_any_preparation(tmp_path, monkeyp
     "record", ["lookahead_budget_results_2026-09-30", "single_seed_lookahead_results_2026-10-01"]
 )
 def test_each_result_record_has_its_index_row(record):
-    """ADR 0003 rule 1, no row, no commit; the index test only sees records with a JSON twin."""
+    """ADR 0003 rule 1, no row, no commit; the index test never looks under docs/research/."""
     docs = Path(__file__).resolve().parents[2] / "docs"
     assert (docs / "research" / f"{record}.md").is_file()
     index = (docs / "measurements_index.md").read_text(encoding="utf-8")

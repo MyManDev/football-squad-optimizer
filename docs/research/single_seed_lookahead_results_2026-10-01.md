@@ -216,8 +216,9 @@ No number, status, verdict or hash above changed; these notes add context only.
   identifies by hash.
 - The committed runner, `scripts/measure_guarded_lookahead.py`, refuses to
   start after its preregistered cutoff of 2026-10-01T05:00Z, and
-  single_seed_v1 also stops when a source hash recorded by the reference study
-  differs, so it cannot regenerate this report as committed.
+  single_seed_v1 also stops before any solve when a source hash recorded by
+  the reference study, other than the runner's own, differs, so it cannot
+  regenerate this report as committed.
 - The measured planner and producer are the copies in the measured source:
   develop at `e401d4be` with #905's `832084c2` applied, and #898's producer at
   `8d510a03`. Develop has since changed `src/squadopt/planning` and
