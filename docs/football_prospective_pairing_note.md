@@ -60,13 +60,17 @@ For each week record the branch, selected handoff fingerprint, model version,
 file path and write time. Also record what `load_capture_identity` selects at
 reading time and flag any difference. That diagnostic changes no score or
 classification. Read-time I/O refusals follow the runner's pre-outcome refusal
-rules; a failed read is not a silent opportunity to change inputs.
+rules: a handoff file that exists but raises `OSError` when read refuses the
+run. A failed read is not a silent opportunity to change inputs.
 
 Implement the pairing using `handoff_path_for` and `read_projection_handoff`
 from `squadopt.live`. The prospective input helper/check and runner must not
 import `squadopt.platform`. While the backend helper exists, synthetic tests
-pin branch b equal to `load_capture_identity`, including alias precedence and
-unique retained fingerprints. No backend is started to perform those tests.
+pin branch b equal to `load_capture_identity` for absent, invalid (`ValueError`
+or `DataError` when read) and mismatched files, including alias precedence and
+unique retained fingerprints. That helper skips a file that raises `OSError`
+and falls through to the retained copies, so the equality test excludes the
+refused case. No backend is started to perform those tests.
 
 ## Proposed default 2: the never-served football arm
 
