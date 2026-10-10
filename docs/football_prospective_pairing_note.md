@@ -146,9 +146,13 @@ runner engineering requirements in #1007, not extra readings or score gates.
 
 ## Timing, review and handoff
 
-Target the note's merge before 2026-10-09T10:00:00Z if the owner answers in
-time; in every case it must merge before GW7's first kickoff at
-2026-10-17T11:30:00Z. A draft timestamp is not represented as a merge timestamp.
+The early target, a merge before 2026-10-09T10:00:00Z, passed before the
+owner answered. The hard limit for merging this note is before GW7's first
+kickoff, 2026-10-17T11:30:00Z, and it is never enqueued or merged while a
+weekly run (the Tuesday settle or the Friday publish) is under way. The
+acceptance covers a merge before that instant only; that is the most
+conservative reading of the limit. The merge instant is the one GitHub
+records for the pull request that adds this note.
 
 The owner accepted these defaults on 2026-10-10, after GW6's first kickoff at
 2026-10-10T11:30:00Z, so this note merges after that kickoff too. GW6 therefore
@@ -190,6 +194,7 @@ The owner accepted these decisions on 2026-10-10, answering
 | Defaults 1 to 5 | As proposed on #1007, with no amendment. Default 1 to Default 5 above state them. |
 | GW6 timing | Accepted after GW6's first kickoff, 2026-10-10T11:30:00Z. GW6 cannot be a paired week; both records list it as missing, with that fact beside it. |
 | First paired week | GW7. |
+| Merge limit | Before 2026-10-17T11:30:00Z, and never during a weekly run. |
 
 This note fixes only what the protocol left open. It is not an amendment of
 the frozen protocol.
