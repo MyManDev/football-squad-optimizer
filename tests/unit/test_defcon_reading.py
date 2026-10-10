@@ -851,6 +851,8 @@ def test_duplicate_realized_explanation_excludes_diagnostics_and_keeps_week_scor
     retained = next(row for row in paired_rows if row.player_code == 102)
     assert retained.realized == 2
     assert retained.awarded_defcon == 0
+    assert retained.defcon_diagnostic is False
+    assert row["defcon_diagnostic_excluded_player_codes"] == [102]
 
 
 @pytest.mark.parametrize("duplicate", ["fixture", "statistic"])
@@ -1316,6 +1318,13 @@ def test_invalid_realized_diagnostic_does_not_remove_a_valid_scored_week(
     assert row["excluded_realized_diagnostics"][0]["player_code"] == 102
     assert row["excluded_realized_diagnostics"][0]["fixture"] == 9
     assert row["excluded_realized_diagnostics"][0]["reason"]
+    # Player 102 leaves both diagnostic sides in GW9 only; GW9 still scores every player.
+    assert row["defcon_diagnostic_excluded_player_codes"] == [102]
+    assert next(w for w in report["weekly"] if w["gameweek"] == 9)["players"] == 3
+    defenders = report["defcon_by_position"]["DEF"]
+    assert defenders["players"] == 6
+    assert defenders["excluded_players"] == 1
+    assert defenders["awarded_defcon"] == 12
     selected = runner.first_settled(captures, tuple(range(6, 13)))
     decision, original, _ = runner.published_pair(
         kwargs["publications"],
@@ -1335,6 +1344,26 @@ def test_invalid_realized_diagnostic_does_not_remove_a_valid_scored_week(
     )
     pairs, _, _ = runner.paired_week(full, original, outcome)
     assert next(p for p in pairs if p.player_code == 102).realized == 2
+    assert {p.player_code: p.defcon_diagnostic for p in pairs} == {102: False, 103: True, 104: True}
+
+
+def test_failed_realized_award_leaves_both_sides_of_the_defcon_diagnostic() -> None:
+    rows = (
+        replace(paired(6, 1, "DEF", 2.0, 3.0, 1.0), awarded_defcon=2),
+        replace(paired(6, 2, "DEF", 0.0, 4.0, 1.0), awarded_defcon=0, defcon_diagnostic=False),
+        replace(paired(6, 3, "MID", 0.0, 1.5, 1.0), awarded_defcon=0),
+    )
+    report = summarize(rows, scored_weeks=tuple(range(6, 13)))
+    assert report["weekly"][0]["players"] == 3
+    assert report["defcon_by_position"]["DEF"] == {
+        "players": 1,
+        "excluded_players": 1,
+        "term_unconditional": 2.0,
+        "term_decided": 2.0,
+        "awarded_defcon": 2,
+    }
+    assert report["defcon_by_position"]["MID"]["term_unconditional"] == 0.5
+    assert report["defcon_by_position"]["MID"]["excluded_players"] == 0
 
 
 @pytest.mark.parametrize("count", [None, "15"])

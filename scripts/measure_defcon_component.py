@@ -585,6 +585,8 @@ def paired_week(
     awarded: dict[int, int] = {}
     for row in observed.rows:
         awarded[row.player_code] = awarded.get(row.player_code, 0) + row.awarded_points
+    # A failing realized award leaves its player out of both sides of the diagnostic.
+    diagnostic_excluded = {item["player_code"] for item in observed.excluded_rows}
     totals = {}
     seen = set()
     for element in require_field(
@@ -643,6 +645,7 @@ def paired_week(
                 decided_candidate - comparator,
                 awarded.get(code, 0),
                 component["prior_minutes"][str(code)],
+                code not in diagnostic_excluded,
             )
         )
     if audit is not None:
@@ -653,6 +656,9 @@ def paired_week(
             development_schema_disagreements=component["development_schema_disagreements"],
             fixture_count_mismatches=mismatches,
             excluded_realized_diagnostics=list(observed.excluded_rows),
+            defcon_diagnostic_excluded_player_codes=sorted(
+                row.player_code for row in rows if not row.defcon_diagnostic
+            ),
             unmapped_history=component["unmapped_history"],
             unmapped_history_count=sum(len(ids) for ids in component["unmapped_history"].values()),
         )

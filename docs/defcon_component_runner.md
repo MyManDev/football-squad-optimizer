@@ -91,6 +91,8 @@ publication or handoff identities also refuse before the claim. Multiple retaine
 copies of one handoff fingerprint form one identity and all their byte hashes are
 recorded. A malformed realized DEFCON explanation is excluded from diagnostics with
 its player, fixture and reason; valid total points still pair that player and week.
+That player-week leaves both the forecast term and the awarded side of the
+by-position DEFCON diagnostic, and the week's record lists its player code.
 
 Submit these records as step 4 within seven days of the first settled capture.
 Only a passed verdict can support the separate step 5 wiring PR and its required

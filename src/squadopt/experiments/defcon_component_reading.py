@@ -30,6 +30,8 @@ class PairedDefconRow:
     term_decided: float
     awarded_defcon: int
     prior_minutes: float
+    # False when a realized award failed its checks: both diagnostic sides leave the player.
+    defcon_diagnostic: bool = True
 
 
 def summarize(
@@ -151,11 +153,13 @@ def summarize(
     diagnostics = {}
     for position in ("DEF", "MID", "FWD"):
         held = [row for row in rows if row.position == position]
+        kept = [row for row in held if row.defcon_diagnostic]
         diagnostics[position] = {
-            "players": len(held),
-            "term_unconditional": sum(row.term_unconditional for row in held),
-            "term_decided": sum(row.term_decided for row in held),
-            "awarded_defcon": sum(row.awarded_defcon for row in held),
+            "players": len(kept),
+            "excluded_players": len(held) - len(kept),
+            "term_unconditional": sum(row.term_unconditional for row in kept),
+            "term_decided": sum(row.term_decided for row in kept),
+            "awarded_defcon": sum(row.awarded_defcon for row in kept),
         }
     buckets = {}
     for label, low, high in PRIOR_MINUTES_BUCKETS:
