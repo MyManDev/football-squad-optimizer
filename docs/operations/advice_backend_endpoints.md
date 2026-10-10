@@ -103,9 +103,10 @@ to the release.
   strategies over those windows at the same weights, against the default rival only
   (`src/squadopt/application/league_views.py:541-547`, `:567-586`, `:634-680` and
   `:1285-1289`). Any other multi-week selection is computed only on request. #984 covers it
-  only if its verdict says device. If the owner moves 352490 to the device menu (#981 step
-  8, still his to decide per #1012), its publish solves no member (#981 step 6), and these
-  published plans go too.
+  only if its verdict says device. The owner decided on 2026-10-07 that 352490 stays on the
+  full server menu through GW20 (#981 comment 6044634066), so these published plans stay
+  until then. Moving it to the device menu (#981 step 8) needs his yes after GW20 settles;
+  its publish then solves no member (#981 step 6), and these published plans go too.
 - **Preferences:** keep, avoid, no paid transfers and save chips. Without capabilities a
   preferences address resolves to not listed (`adviceSelection.ts:393-401`), and the device
   refuses it (`selection.ts:58-65`). #1001 steps 1 to 3 bring them to the device at window
@@ -163,8 +164,8 @@ to the release.
   connector and the watcher task on the owner's PC is the owner's own step, from his own
   PowerShell, after the release (#988 route 1, and #632 comment 6033468399).
 - **The manager's word on the device.** #1006 records it as a separate owner decision after
-  route 1. #1012 lists whether the manager's word stays frozen until #524 widens as still
-  the owner's to decide.
+  route 1. The owner decided on 2026-10-07 that the manager's word stays as it is until #524
+  widens (#1006 comment 6044635085, also recorded on #1012).
 - **Offline callers of backend modules.** `squadopt.platform.capture_context` is imported
   by `scripts/check_football_prospective_inputs.py`,
   `scripts/measure_member_plan_determinism.py`, `scripts/measure_member_window_proofs.py`
