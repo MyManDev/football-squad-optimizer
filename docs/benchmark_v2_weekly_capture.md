@@ -53,3 +53,30 @@ a journal refusal emits a generic `research_stage_refused` failure event and
 re-raises so a stopped resume is visible. Source or output drift still refuses
 resume and needs a new reviewed run. No research flag silently adds a decide step.
 The default stage declaration and product plan remain unchanged with both flags off.
+
+## Operating schedule
+
+The owner accepted these decisions on 2026-10-10:
+
+- GW6 is recorded as lost for Benchmark V2.
+- From the GW7 Friday run, the pre-deadline freeze (`--benchmark-freeze`) runs on
+  the Friday run together with a pre-deadline ledger decision (`--decide`). Any
+  undecided week is rolled first, as the runbook's catch-up section
+  ([Rolling a week that was not decided](weekly_runbook.md#rolling-a-week-that-was-not-decided))
+  says.
+- The frozen-cohort picks collection runs alongside the Tuesday settlement.
+
+Where these leave a detail open, the most conservative reading is taken:
+
+- An undecided week is caught up with `squadopt gameweek roll` only. It is not
+  decided after its deadline as a `replay` entry.
+- The picks collection is the standalone command above, run beside the Tuesday
+  settlement and outside its weekly run. The weekly `--benchmark-picks-freeze`
+  option is not used for it: that stage runs before the run's handoff, and a
+  journal refusal there would stop the run.
+- `--decide` refuses in the weekly pre-flight, before the first capture, while
+  the ledger does not hold the gameweek before the target, and that refusal stops
+  the whole run. So the Friday line in [weekly_runbook.md](weekly_runbook.md)
+  stays the members' loop with neither flag, and the operator adds both to a
+  Friday run only after checking that the ledger holds the gameweek before the
+  target.
