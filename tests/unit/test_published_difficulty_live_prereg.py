@@ -17,6 +17,7 @@ import re
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import pytest
 
 from squadopt.data.sources import fpl_live
@@ -212,3 +213,32 @@ def test_the_gate_reads_the_pooled_figures_and_the_version_split_has_no_verdict(
     assert "The gate reads the pooled readings over all jointly scored weeks" in paired
     assert "the readings for each handoff version carry no verdict" in paired
     assert "**Pass** requires all three conditions, read from the pooled figures" in gate
+
+
+def test_the_signal_reads_each_fixtures_difficulty_on_the_clubs_own_side() -> None:
+    """A fixture carries two published ratings; the frozen fit read the club's own one.
+
+    Reading the opponent's side instead inverts the ranking of easy and hard weeks, and the
+    frozen coefficients would then be applied to a different signal from the one they fit.
+    """
+
+    matches = pd.DataFrame(
+        {
+            "season": ["2024-25"],
+            "gameweek": [7],
+            "home_club": [3],
+            "away_club": [14],
+            "home_difficulty": [2.0],
+            "away_difficulty": [5.0],
+        }
+    )
+    lookup = opponent_projection._difficulty_lookup(matches, "2024-25", 7)
+    assert lookup[(3, 14, True)] == 2.0
+    assert lookup[(14, 3, False)] == 5.0
+
+    candidate = _section("Fixed candidate")
+    assert "each read on the club's own side" in candidate
+    assert "`team_h_difficulty` when it is at home and `team_a_difficulty` when it is away" in (
+        candidate
+    )
+    assert "`_difficulty_lookup`" in candidate

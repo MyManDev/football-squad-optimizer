@@ -63,8 +63,11 @@ route choice does not alter the pairing rule.
 ## Fixed candidate
 
 Candidate id: `published_difficulty_live_2026_v1`. For a player's club, signal
-is minus the mean published difficulty across that club's decision-week fixtures.
-For position p, multiplier is `max(0, 1 + slope[p] * (signal - centre[p]))`.
+is minus the mean published difficulty across that club's decision-week fixtures,
+each read on the club's own side: `team_h_difficulty` when it is at home and
+`team_a_difficulty` when it is away, the archive columns `_difficulty_lookup` in
+the study reads. For position p, multiplier is
+`max(0, 1 + slope[p] * (signal - centre[p]))`.
 A blank week has multiplier 1. Only the decision-week projection is adjusted;
 later weeks and 3 or 5 week windows are excluded.
 
