@@ -136,6 +136,14 @@ def build_vectors() -> dict[str, object]:
     case("normal-week")
     case("goalkeeper-swap", {1: absent, 12: {"points": 5}})
     case(
+        "zero-minute-goalkeeper-card",
+        {1: {"minutes": 0, "points": -1, "card_shown": True}, 12: {"points": 5}},
+    )
+    case(
+        "zero-minute-reserve-goalkeeper-card",
+        {1: absent, 12: {"minutes": 0, "points": -1, "card_shown": True}},
+    )
+    case(
         "outfield-bench-order",
         {8: absent, 9: absent, 11: {"points": 5}, 5: {"points": 6}, 6: {"points": 9}},
     )

@@ -16,6 +16,8 @@ def test_vectors_cover_all_declared_finished_week_cases():
     cases = {item["name"]: item for item in build_vectors()["cases"]}
     assert {
         "goalkeeper-swap",
+        "zero-minute-goalkeeper-card",
+        "zero-minute-reserve-goalkeeper-card",
         "outfield-bench-order",
         "formation-minimum-skips-reserve",
         "absent-reserve-skipped",
@@ -37,6 +39,8 @@ def test_vectors_cover_all_declared_finished_week_cases():
     } <= cases.keys()
     assert cases["normal-week"]["expected"]["gross"] == 12
     assert cases["transfer-hit"]["expected"]["net"] == 8
+    assert cases["zero-minute-goalkeeper-card"]["expected"]["gross"] == 10
+    assert cases["zero-minute-reserve-goalkeeper-card"]["expected"]["gross"] == 10
     assert cases["absent-reserve-skipped"]["expected"]["gross"] == 17
     assert cases["zero-minute-reserve-card"]["expected"]["gross"] == 10
     assert cases["bench-boost"]["expected"]["gross"] == 16
