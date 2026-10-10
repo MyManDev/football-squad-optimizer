@@ -301,6 +301,27 @@ def test_complete_secondary_league_is_measured() -> None:
     assert measured["scale_rounded"] == 21.2
 
 
+def _uncosted_week_after_n(payload: bytes) -> bytes:
+    """One history with an extra GW7 row, after N, carrying no event_transfers_cost."""
+    history = json.loads(payload)
+    history["current"].append({"event": 7, "points": 40, "total_points": 0})
+    return _bytes(history)
+
+
+def test_secondary_league_needs_the_transfer_cost_only_on_gw1_to_n() -> None:
+    payloads = _secondary_payloads("complete")
+    payloads["entry-12-history.json"] = _uncosted_week_after_n(payloads["entry-12-history.json"])
+    record = _measure(payloads, listed=(measurement.PRIMARY_LEAGUE, 123))
+    (measured,) = record["secondary_leagues"]
+    assert measured["available"] is True
+    assert (measured["pair_weeks_counted"], measured["scale_rounded"]) == (18, 21.2)
+    # The primary league still refuses any history row without the cost.
+    payloads = _payloads()
+    payloads["entry-2-history.json"] = _uncosted_week_after_n(payloads["entry-2-history.json"])
+    with pytest.raises(measurement.ScaleMeasurementError, match="event_transfers_cost"):
+        _measure(payloads)
+
+
 def _provenance(record: dict[str, Any]) -> dict[str, Any]:
     return {
         **record,

@@ -103,8 +103,14 @@ def admitted_gameweek(bootstrap: bytes, through_gameweek: int) -> int:
     return highest
 
 
-def league_net_rows(payloads: Mapping[str, bytes], league: int, n: int) -> NetRows:
-    """Consume FPL readers while keeping member identities out of the output."""
+def league_net_rows(
+    payloads: Mapping[str, bytes], league: int, n: int, *, cost_through_n_only: bool = False
+) -> NetRows:
+    """Consume FPL readers while keeping member identities out of the output.
+
+    The primary league refuses any history row without event_transfers_cost. Reading (e)
+    passes cost_through_n_only, since a secondary league needs the cost on GW1 to N only.
+    """
     try:
         standings = fpl_league_standings(
             payloads[f"league-{league}-standings.json"], league_id=league
@@ -114,7 +120,11 @@ def league_net_rows(payloads: Mapping[str, bytes], league: int, n: int) -> NetRo
             history = fpl_entry_history_points(
                 payloads[entry_history_payload(member.entry_id)], entry_id=member.entry_id
             )
-            if any(week.transfer_cost is None for week in history):
+            if any(
+                week.transfer_cost is None
+                for week in history
+                if not cost_through_n_only or week.gameweek <= n
+            ):
                 raise ScaleMeasurementError("A history row lacks event_transfers_cost.")
             rows.append(
                 {
@@ -186,7 +196,7 @@ def secondary_reading(payloads: Mapping[str, bytes], league: int, n: int) -> dic
     if f"league-{league}-standings.json" not in payloads:
         return {**unavailable, "reason": "The capture has no standings for this listed league."}
     try:
-        rows = league_net_rows(payloads, league, n)
+        rows = league_net_rows(payloads, league, n, cost_through_n_only=True)
     except ScaleMeasurementError as error:
         return {**unavailable, "reason": str(error)}
     if any(not set(range(1, n + 1)).issubset(row) for row in rows):
