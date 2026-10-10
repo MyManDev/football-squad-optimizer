@@ -43,7 +43,7 @@ from squadopt.data.sources.fpl_live import (
 )
 
 DECLARATION_PATH = "docs/strategy_rule_scale_prereg.md"
-DECLARATION_SHA256 = "ca7640830ebb528509c3f30b9b807bf365d57b04fce2d3914cbee22ffcc7b5a6"
+DECLARATION_SHA256 = "9b5f36ed5651dee692cbb9dab3157ddbb00456840b1811271dc994e34546d442"
 PRIMARY_LEAGUE = 352490
 CONTRACT_VERSION = "strategy_rule_scale_v1"
 CONTROL_EXPECTED = 21.2
