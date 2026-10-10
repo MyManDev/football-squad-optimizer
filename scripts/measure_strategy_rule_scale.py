@@ -1,8 +1,17 @@
-"""Measure the proposed shared strategy scale from one named settled live capture.
+"""Measure the shared strategy scale from one named settled live capture.
 
-No product imports this command. The proposed method in #1041 must be accepted on
-#1002 and merged before execution. An amended declaration needs a reviewed update
-to DECLARATION_SHA256 and this instrument before it can read a capture.
+No product imports this command. It measures the method declared in
+docs/strategy_rule_scale_prereg.md, whose decisions the owner accepted on #1002 on
+2026-10-10, and it opens no capture until that declaration is merged on origin/develop
+with the bytes DECLARATION_SHA256 pins. An amendment needs a reviewed update to the
+declaration, DECLARATION_SHA256 and this instrument before it can read a capture.
+
+A GW1 to GW3 control that does not round to 21.2 still writes the aggregate record,
+marked control_failed, and exits 2: step 4 is held until the difference is explained
+on #1002. Reading (d) divides by sqrt(k) times the unrounded S on GW1 to N. Reading (e)
+covers every other league in config/leagues.json at the measured revision and marks one
+it cannot measure as unavailable, never refusing the primary reading. The command
+writes no constant and no rule id: step 4 applies the declaration's update rule.
 """
 
 from __future__ import annotations
@@ -200,7 +209,7 @@ def measure_payloads(
 ) -> dict[str, Any]:
     """Calculate aggregates only; unit tests supply synthetic FPL-shaped payloads."""
     if league != PRIMARY_LEAGUE:
-        raise ScaleMeasurementError("The proposed shared scale is measured on league 352490.")
+        raise ScaleMeasurementError("The shared scale is measured on league 352490.")
     try:
         n = admitted_gameweek(payloads["bootstrap-static.json"], through_gameweek)
     except KeyError as error:
@@ -369,7 +378,7 @@ def _git_output(*arguments: str) -> bytes:
 
 
 def preregistration_gate() -> tuple[str, str]:
-    """Before opening any capture, require the reviewed declaration on origin/develop."""
+    """Before opening any capture, require the accepted declaration on origin/develop."""
     revision, dirty = _git_revision()
     if dirty:
         raise ScaleMeasurementError("Commit the reviewed instrument before a real measurement.")
@@ -398,7 +407,7 @@ def preregistration_gate() -> tuple[str, str]:
     digest = sha256(merged).hexdigest()
     if local != merged or digest != DECLARATION_SHA256:
         raise ScaleMeasurementError(
-            "The declaration differs from the reviewed proposed method. "
+            "The declaration differs from the accepted method this instrument pins. "
             "Update this instrument by review."
         )
     return revision, digest
@@ -409,7 +418,7 @@ def run_measurement(
 ) -> dict[str, Any]:
     _validate_live_id(snapshot_id)
     if league != PRIMARY_LEAGUE:
-        raise ScaleMeasurementError("The proposed primary league is 352490.")
+        raise ScaleMeasurementError("The primary league is 352490.")
     revision, preregistration_hash = preregistration_gate()
     # The gate refused a dirty tree, so this is config/leagues.json at the recorded revision.
     # An unreadable list refuses before any capture opens, since reading (e) cannot be named.

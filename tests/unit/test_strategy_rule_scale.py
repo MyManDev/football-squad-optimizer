@@ -1,4 +1,4 @@
-"""The proposed #1002 instrument, exercised only on synthetic FPL-shaped payloads."""
+"""The #1002 instrument, exercised only on synthetic FPL-shaped payloads."""
 
 from __future__ import annotations
 
