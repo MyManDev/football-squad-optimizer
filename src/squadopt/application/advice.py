@@ -1581,8 +1581,10 @@ def advise_with_top100(
 
     **What is published** is the weighted plan's decision (moves, eleven, captain) with
     every number scored on the base projection: the players' expected points, each move's
-    gain, the plan's own total. The vice-captain and the bench order follow the base
-    points, by the same completion rule every plan uses.
+    gain, the plan's own total. On a legacy plan the vice-captain and the bench order
+    follow the base points, by the same completion rule every plan uses; an
+    expected-lineup plan keeps the vice and bench order it was chosen with and rescores
+    them on the base points (``rebased_week``).
 
     **The price** is what choosing on the weight gives up in the base model against the
     control, both net of the game's hit charge, floored at zero; the ceiling is the price

@@ -278,7 +278,9 @@ def decision_changed(
 ) -> bool:
     """Whether two one-week plans differ in their moves, their eleven or their captain.
 
-    A plan whose score moved while every decision stayed is not a changed plan.
+    On an expected-lineup week the vice-captain and the bench order are scored too, so a
+    change to either is a changed plan there. A plan whose score moved while every
+    decision stayed is not a changed plan.
     """
 
     if sorted(control.transfers_in_ids) != sorted(decision.transfers_in_ids):
