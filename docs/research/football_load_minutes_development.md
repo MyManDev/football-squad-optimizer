@@ -154,8 +154,9 @@ returned frames retain their original values. Scoring/resource nonfinite values
 still refuse. Target FPL kickoffs must belong to the declared July-to-June season.
 
 The existing bounded expected-lineup engine selects legal fixed-fifteen XI,
-ordered bench and captain/vice roles using these weekly values. Inventory,
-chip, hit, restrictions and locks remain bound to the native resource receipt.
+ordered bench and captain/vice roles using these weekly values. The original
+owned inventory and chip availability remain bound to the native resource
+receipt, and a hit, restriction or lock that the receipt records cannot change.
 It is not global transfer optimization. The scorer retains its independent
 player-week and supplied conditional-point approximation. Separate predicted
 player roles do not establish a legal joint club eleven, correlation between
@@ -182,12 +183,13 @@ are excluded. No actual gain, real-data model training or live integration is cl
 
 ## Prepared implementation evidence
 
-Focused checks pass 445 distinct cases: 140 source, 58 model, 70 private
-integration and 177 existing native minute, availability, component and lineup
-regressions. The initial 67 integration cases passed, then the corrected
-inventory fixture and 36 affected cases verified the isolated owned-fifteen
-refusal and three additional accepted unknown-role representations. These
-overlapping runs are not added to the distinct total. Only focused local files
+Focused checks pass 321 distinct new cases: 177 source, 60 model and 84
+private integration. The preparation run also passed 177 existing native
+minute, availability, component and lineup regressions. The initial 67
+integration cases passed, then the corrected inventory fixture and 36
+affected cases verified the isolated owned-fifteen refusal and three
+additional accepted unknown-role representations. These overlapping runs are
+not added to the distinct total. Only focused local files
 ran; no full local suite or actual forecast was invoked.
 
 Eighteen isolated copied-source faults produced 21 failing behavioral checks.
