@@ -33,7 +33,7 @@ from squadopt.platform.club_news_provider import register_provider
 
 
 def test_a_reused_answer_names_the_capture_it_was_coded_in_through_every_later_run(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     calls: list[str] = []
 
@@ -52,11 +52,6 @@ def test_a_reused_answer_names_the_capture_it_was_coded_in_through_every_later_r
     published = _text(STARTED - timedelta(hours=3))
 
     def _run(clock: _Clock, *extra: str) -> tuple[str, str]:
-        # Capture completion is its own clock; keep it on this synthetic week's timeline.
-        monkeypatch.setattr(
-            "squadopt.platform.club_news_acquire._utc_now",
-            lambda: _text(clock.readings[-1] + timedelta(seconds=30)),
-        )
         code = main(
             _command(tmp_path, roster_id, *extra),
             environ=_environment(name),

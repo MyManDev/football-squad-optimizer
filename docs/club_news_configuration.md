@@ -118,7 +118,7 @@ One acquisition run keeps four times apart, because each answers a different que
 | Publication | when the club says an article was published | the held page's own verifiable fields; never rewritten |
 | Fetch | when one page was read | recorded on each document |
 | Coding observation | the one instant the week's coding looks from | taken once, after the last page was read |
-| Capture completion | when the capture was written | after coding |
+| Capture completion | when the capture was written | after coding, and still before the target deadline |
 
 The run's own start settles the target gameweek and deadline before any page is read. It
 also bounds the inputs that must already exist: an earlier news capture given for reuse has
@@ -142,6 +142,12 @@ an unlisted model or a client library that is not installed refuses with nothing
 adapter itself is built after the fetch. A page stamped later than the observation, or an
 observation earlier than the run's start, means the clock went backwards, and the run stops
 the same way. When no page could be read at all, nothing is observed and no adapter is built.
+
+The same deadline check runs again just before the capture is written. If the deadline
+passed while the model was answering, or the clock went back past the observation, the run
+stops with `Refused` and writes nothing; the calls it made are spent. The refusal names
+the completion instant and its specific cause. A later gameweek is not substituted; start
+a new run for it.
 
 The documents are selected once, and that one selection is both what is sent for coding and
 what the run reports as selected.

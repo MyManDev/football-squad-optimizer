@@ -34,12 +34,16 @@ question, and a run that let one stand in for another would report a time nobody
   context and the target-deadline check all use. Taken before the fetch, as it used to be,
   it turned an article published while the pages were being read into one "published after
   the observation" although the page in hand already carried it.
-- *Capture completion*: when the capture was written, after coding.
+- *Capture completion*: when the capture was written, after coding and still before the
+  target deadline.
 
 The target gameweek is settled before any page is read, from the instant the run started.
 The coding observation must still fall before that same deadline. If the deadline passed
 while the pages were being read, the run stops: it does not code against a closed week, and
 it does not move to the next gameweek on its own.
+The same check runs again just before the capture is written. If the deadline passed while
+the model was answering, or the clock went back past the observation, the run stops with
+Refused and writes nothing; the calls it made are spent.
 """
 
 import argparse
@@ -359,10 +363,6 @@ def _parse_arguments(argv: list[str] | None = None) -> argparse.Namespace:
     return arguments
 
 
-def _utc_now() -> str:
-    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
-
-
 def _raw_claim_count(entry: CodedClub) -> int | None:
     """How many claims one coded answer states, before any is checked against its source.
 
@@ -591,13 +591,42 @@ def main(
         print("Dry run: nothing written.")
         return 0
 
+    captured_at = "unavailable"
+    try:
+        captured_at = _instant_text(now())
+        if week.coding_observed_at is not None and as_instant(captured_at) < as_instant(
+            week.coding_observed_at
+        ):
+            raise ClubNewsError("The clock moved backwards after coding.")
+        try:
+            still_open = next_open_deadline(deadlines, as_of_utc=captured_at)
+        except DataError as error:
+            raise ClubNewsError(
+                "The coding deadline passed before the capture was written, and no later "
+                "deadline is published."
+            ) from error
+        if (
+            still_open.gameweek != deadline.gameweek
+            or still_open.deadline_utc != deadline.deadline_utc
+        ):
+            raise DataError(
+                "The coding deadline is no longer the next open deadline. "
+                f"Gameweek {still_open.gameweek} was not substituted; start a new run for it."
+            )
+    except (ClubNewsError, DataError, ValueError) as error:
+        print(
+            f"Refused: gameweek {deadline.gameweek} deadline {deadline.deadline_utc} "
+            f"at capture completion {captured_at}: {error} Nothing was captured."
+        )
+        return 1
+
     metadata = write_club_news_capture(
         arguments.capture_root or arguments.snapshot_root,
         documents=week.documents,
         coded=week.coded,
         clubs_declared=week.clubs_declared,
         clubs_covered=week.clubs_covered,
-        captured_at_utc=_utc_now(),
+        captured_at_utc=captured_at,
         clubs_partially_covered=week.clubs_partially_covered,
     )
     # The id is the point of the command: the weekly runner takes it next.
