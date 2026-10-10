@@ -61,7 +61,7 @@ from squadopt.platform.capture_context import handoff_fingerprint_for
 
 ROOT = Path(__file__).resolve().parents[1]
 DECLARATION = "docs/research/published_difficulty_live_prereg.md"
-DECLARATION_SHA256 = "2ef26f6033483f686b98487696e09d7dfbb62ff253fc1a3a730bf2e053fa10bd"
+DECLARATION_SHA256 = "0d5178b56be82a8cf0786b11e0404da6e551118f878dc3cce12651899c79c13a"
 CAPTURE_NAME = re.compile(r"fpl-live-(?:2026(?:0[89]|1[012])|20270[1-5])\d{2}T\d{6}Z-[0-9a-f]{12}")
 HASH = re.compile(r"[0-9a-f]{64}")
 #: The roots the backend serves from; the protocol reads these two and names both.
