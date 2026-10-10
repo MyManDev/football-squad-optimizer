@@ -429,6 +429,58 @@ def test_gate_weights_whole_weeks_equally_and_keeps_versions() -> None:
     )
 
 
+def test_the_primary_interval_is_the_studys_bootstrap_on_weeks_in_order() -> None:
+    measured, _ = study.measure_week(
+        frame(), season=study.SEASON, gameweek=7, handoff_version="base"
+    )
+    values = [0.4, -0.1, 0.9, 0.2, 0.05, 0.3, -0.2, 0.6, 0.15]
+    weeks = [
+        replace(measured, gameweek=7 + i, squared_error_improvement=value)
+        for i, value in enumerate(values)
+    ]
+    # Independently: 2000 PCG64 draws from seed 0, linear np.quantile at 0.05 and 0.95.
+    generator = np.random.default_rng(0)
+    ordered = np.array(values)
+    draws = [ordered[generator.integers(0, ordered.size, ordered.size)].mean() for _ in range(2000)]
+    expected = {
+        "lower": float(np.quantile(draws, 0.05)),
+        "upper": float(np.quantile(draws, 0.95)),
+    }
+    for given in (weeks, weeks[::-1], weeks[3:] + weeks[:3]):
+        assert study.summarize(tuple(given))["squared_error_interval_90"] == expected
+    assert (study.BOOTSTRAP_RESAMPLES, study.BOOTSTRAP_SEED) == (2000, 0)
+
+
+def test_the_gate_reads_the_pooled_figures_and_the_version_split_has_no_verdict() -> None:
+    measured, _ = study.measure_week(
+        frame(), season=study.SEASON, gameweek=7, handoff_version="base"
+    )
+    weeks = tuple(
+        replace(
+            measured,
+            gameweek=7 + i,
+            handoff_version="old" if i < 6 else "new",
+            # The newer version alone would fail every clause; the pooled figures pass.
+            squared_error_improvement=1.0 if i < 6 else -0.5,
+            rank_improvement=0.1 if i < 6 else -0.1,
+            decision_difference=2.0 if i < 6 else -1.0,
+        )
+        for i in range(9)
+    )
+    report = study.summarize(weeks)
+    assert report["verdict"] == "passed"
+    assert report["squared_error_improvement"] == pytest.approx(0.5)
+    assert report["by_handoff_version"]["new"]["squared_error_improvement"] == -0.5
+    for split in report["by_handoff_version"].values():
+        assert set(split) == {
+            "weeks",
+            "player_rows",
+            "squared_error_improvement",
+            "rank_improvement",
+            "decision_difference",
+        }
+
+
 def test_locked_season_is_refused_before_inventory_loader(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
