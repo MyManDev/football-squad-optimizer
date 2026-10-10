@@ -122,8 +122,14 @@ The rule is not changed after data is read.
   decision with official normal-week substitutions and captain fallback. Omit
   and count weeks where either arm's primary or tie-break remains unproven at
   the larger budget. Report paired realized difference and identical decisions.
-- Per-club credited goals and assists versus realized club totals, preserving
-  fixture ids and reporting base and candidate separately.
+- Club attacking totals, for each arm and each channel. For a club-fixture,
+  credited goals are the sum over the players the forecast lists for it,
+  including those with m = 0, of m times the arm's forecast goals; credited
+  assists likewise. Realized goals and assists are the sums of the same players'
+  realized values read as above, so own goals do not count. Report the
+  equal-week mean of realized minus credited and of its square, over all
+  club-fixtures and over eligible club-fixtures alone, preserving fixture ids.
+  A club-fixture with an excluded row is left out and counted.
 
 These explain the primary finding; none is an extra pass condition. Report counts
 and equal-week means, and retain full rows under ignored `artifacts/`.
