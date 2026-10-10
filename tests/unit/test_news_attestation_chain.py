@@ -214,7 +214,9 @@ def test_manifest_response_digests_must_match_bound_capture(tmp_path):
         "source-label",
         "empty-responses",
         "empty-declared-digests",
+        "empty-declared-digests-nothing-covered",
         "duplicate-declared-digests",
+        "foreign-declared-digest",
         "omitted-covered-response",
     ],
 )
@@ -251,8 +253,19 @@ def test_each_coding_attestation_condition_is_checked_independently(
         responses = ()
     elif mismatch == "empty-declared-digests":
         table.attrs["response_sha256s"] = ()
+    elif mismatch == "empty-declared-digests-nothing-covered":
+        # With no club covered, an omitted response is allowed, so only the
+        # nonempty-list check can refuse an empty declaration.
+        table.attrs["response_sha256s"] = ()
+        table.attrs["clubs_covered"] = ()
     elif mismatch == "duplicate-declared-digests":
         table.attrs["response_sha256s"] *= 2
+    elif mismatch == "foreign-declared-digest":
+        # Every stored response stays declared, so only the subset check can refuse a
+        # declared digest that the bound capture does not hold.
+        table.attrs["response_sha256s"] = tuple(
+            sorted({*table.attrs["response_sha256s"], "f" * 64})
+        )
     elif mismatch == "omitted-covered-response":
         other = replace(
             entry, club="Man Utd", response=replace(entry.response, text=entry.response.text + " ")
