@@ -72,7 +72,7 @@ import `squadopt.platform`. While the backend helper exists, synthetic tests
 pin branch b equal to `load_capture_identity` for absent, invalid (`ValueError`
 or `DataError` when read) and mismatched files, including alias precedence and
 unique retained fingerprints. That helper skips a file that raises `OSError`
-and falls through to the retained copies, so the equality test excludes the
+and moves on to the remaining copies, so the equality test excludes the
 refused case. No backend is started to perform those tests.
 
 ## Proposed default 2: the never-served football arm
