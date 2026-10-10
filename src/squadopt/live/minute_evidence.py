@@ -33,6 +33,11 @@ from squadopt.prediction.football_minutes_role import (
     ROLE_COMPONENT_COLUMNS,
     RoleMinuteDistribution,
 )
+from squadopt.prediction.football_team_form import (
+    TEAM_FORM_FEATURE_VERSION,
+    TEAM_FORM_MODEL_VERSION,
+    team_form_metadata,
+)
 
 # A JSON protocol boundary, not an import dependency on the unmerged producer.
 # This reader names only the fields needed to prove and recompute its intervention.
@@ -402,10 +407,16 @@ class FixtureComponentBasis:
             served.get("contract_version") != ARTIFACT_CONTRACT
             or companion.get("contract_version") != FIXTURE_COMPONENTS_CONTRACT
             or served.get("model_version")
-            not in (FOOTBALL_MODEL_VERSION, *JOINT_ROLE_MODEL_VERSIONS)
+            not in (FOOTBALL_MODEL_VERSION, *JOINT_ROLE_MODEL_VERSIONS, TEAM_FORM_MODEL_VERSION)
             or companion.get("model_version") != served.get("model_version")
         ):
             raise ValueError("Only the PR912 v1 fixture component contract is supported.")
+        if served["model_version"] == TEAM_FORM_MODEL_VERSION and any(
+            document.get("feature_contract_version") != TEAM_FORM_FEATURE_VERSION
+            or document.get("team_form_metadata") != team_form_metadata()
+            for document in (served, companion)
+        ):
+            raise ValueError("Team form components require matching feature identity and metadata.")
         role_metadata = served.get("role_metadata")
         if served["model_version"] == JOINT_ROLE_RETAINED_HISTORY_MODEL_VERSION and (
             not isinstance(role_metadata, dict)
