@@ -106,7 +106,7 @@ test("an unsupported saved template and direct URL cannot fetch an unlisted pair
     .locator("main details summary", { hasText: MESSAGES.tr.leagueMembers.advancedSettings })
     .click();
   await expect(
-    page.getByRole("button", { name: /^Unavailable saved plan Fark yarat/ }),
+    page.getByRole("button", { name: /^Unavailable saved plan Farkı kapat/ }),
   ).toBeDisabled();
   await expect(page.getByRole("button", { name: "Hesapla" })).toBeDisabled();
   expect(reads).toEqual([]);
