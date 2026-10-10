@@ -408,6 +408,30 @@ def test_transport_failure_creates_no_picks_receipt_or_claim_and_retry_succeeds(
     )
 
 
+@pytest.mark.parametrize("endpoint", ["/bootstrap-static/", "/event/6/live/"])
+def test_shared_endpoint_outage_is_a_retryable_transport_failure(tmp_path, endpoint):
+    _root, study, _ledger, _cohort, boot, frozen_receipt = frozen(tmp_path)
+    fetcher = settled_fetcher(boot)
+    before = sorted(path.name for path in study.iterdir())
+
+    def broken(url):
+        if url.endswith(endpoint):
+            raise DataSourceError("synthetic unreachable host")
+        return fetcher(url)
+
+    with pytest.raises(capture.BenchmarkCaptureRefused) as refused:
+        capture.capture_settled_picks(
+            study, freeze_snapshot_id=frozen_receipt.snapshot_id, fetcher=broken, now=lambda: POST
+        )
+    assert capture.refusal_code(refused.value) == "transport_failure"
+    assert sorted(path.name for path in study.iterdir()) == before
+    assert not capture.picks_claim_path(study, frozen_receipt.snapshot_id).exists()
+    capture.capture_settled_picks(
+        study, freeze_snapshot_id=frozen_receipt.snapshot_id, fetcher=fetcher, now=lambda: POST
+    )
+    assert capture.picks_claim_path(study, frozen_receipt.snapshot_id).exists()
+
+
 def test_repeat_freeze_and_picks_return_only_the_first_claimed_ids(tmp_path):
     root, study, ledger, _cohort, boot, receipt = frozen(tmp_path)
     repeated = capture.freeze_decision(

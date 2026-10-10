@@ -115,6 +115,16 @@ def _private_fetch(url: str) -> bytes:
         return fetch(url)
 
 
+def _read_required(fetcher: Callable[[str], bytes], url: str) -> bytes:
+    # A failed read of a shared endpoint is retryable, not an invalid freeze.
+    try:
+        return fetcher(url)
+    except (DataError, OSError) as error:
+        raise BenchmarkCaptureRefused(
+            "transport_failure", "Benchmark collection has an unresolved read failure."
+        ) from error
+
+
 def _now() -> str:
     return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
@@ -334,7 +344,7 @@ def capture_settled_picks(
         raise BenchmarkCaptureRefused(
             "not_settled", "Benchmark picks cannot be read before the target deadline."
         )
-    bootstrap = fetcher(f"{BASE_URL}/bootstrap-static/")
+    bootstrap = _read_required(fetcher, f"{BASE_URL}/bootstrap-static/")
     observed = {item.gameweek: item.deadline_utc for item in gameweek_deadlines(bootstrap)}
     if (
         gameweek not in scored_gameweeks(bootstrap)
@@ -361,7 +371,7 @@ def capture_settled_picks(
             continue
         payloads[entry_picks_payload(entry, gameweek)] = picks
         payloads[entry_history_payload(entry)] = history
-    event = fetcher(f"{BASE_URL}/event/{gameweek}/live/")
+    event = _read_required(fetcher, f"{BASE_URL}/event/{gameweek}/live/")
     completed_at = now()
     if as_instant(completed_at) < as_instant(deadline):
         raise BenchmarkCaptureRefused(
