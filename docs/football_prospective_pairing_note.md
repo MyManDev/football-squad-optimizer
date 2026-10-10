@@ -28,8 +28,10 @@ The owner decided on 2026-10-07, recorded on
 [the program](https://github.com/MyManDev/football-squad-optimizer/issues/1012)
 and [the shadow issue](https://github.com/MyManDev/football-squad-optimizer/issues/999),
 that `football_team_share_v1` is built from GW6 into a separate shadow root and
-never served. #988 route 1 retires the backend after the GW6 publish. The two
-arms therefore need preserved inputs that survive that retirement.
+never served. As the shadow issue records decision 2, shadow weeks are the v1
+arm's weeks, and each receipt records `served: false`. #988 route 1 retires the
+backend after the GW6 publish. The two arms therefore need preserved inputs
+that survive that retirement.
 
 ## Proposed default 1: pair Current in this order
 
@@ -69,9 +71,10 @@ unique retained fingerprints. No backend is started to perform those tests.
 ## Proposed default 2: the never-served football arm
 
 The football artifact root is `artifacts/shadow/football_team_share_v1`. Every
-pooled shadow week records `football_served: false`. Check the immutable receipt
-at `<shadow-root>/receipts/<capture>.json` against the artifact bytes, including
-its fingerprint and SHA256. The required `--posted-receipts` input carries the
+week read from it is pooled under the protocol's ordinary rules, as decision 2
+says, and carries `football_served: false`, replay weeks included. Check the
+immutable receipt at `<shadow-root>/receipts/<capture>.json` against the
+artifact bytes, including its fingerprint and SHA256. The required `--posted-receipts` input carries the
 pre-deadline SHA256 posts from #999 and their comment times. Record both those
 times and the file's write time.
 
