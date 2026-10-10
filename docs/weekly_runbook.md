@@ -536,7 +536,12 @@ the release restart command separately checks the public/local capture IDs.
 
 ## What stays a person's act
 
-The owner runs the Tuesday settle and the Friday publish through GW20 (deadline 2027-01-05T18:00:00Z), including the midweek GW13, GW18 and GW20 decision runs; a delegated stage requires the owner's approval for that run, and after GW20 the weekly run moves off the owner's PC as tracked in #1010 (decision #1005).
+The owner runs the Tuesday settle and the Friday publish through GW20 (deadline
+2027-01-05T18:00:00Z), including the midweek GW13, GW18 and GW20 decision runs (the rhythm
+and the midweek days are in
+[which days those two land on](deployment_runbook.md#which-days-those-two-land-on)); a
+delegated stage requires the owner's approval for that run, and after GW20 the weekly run
+moves off the owner's PC as tracked in #1010 (decision #1005).
 
 The outward half of publishing — merging the PR, releasing develop to main, the
 `site-<season>-gw<NN>-decision` tag, the Pages dispatch — is printed, not performed.
