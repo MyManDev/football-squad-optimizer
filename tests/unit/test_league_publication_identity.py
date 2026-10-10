@@ -190,8 +190,11 @@ def test_seed_refuses_changed_inherited_tree_before_copy(tmp_path, layout):
     operation = SimpleNamespace(
         paths=SimpleNamespace(out=tmp_path / "preview"), _published_tree=lambda: source
     )
-    with pytest.raises(ValueError, match=r"file changed: history/1\.json"):
+    with pytest.raises(DataError, match=r"file changed: history/1\.json") as refused:
         WeeklyOperations._seed_preview(operation)
+    # The refusal names the published tree, so a site with several leagues says which.
+    assert str(tree) in str(refused.value)
+    assert isinstance(refused.value.__cause__, ValueError)
     assert not (tmp_path / "preview/data").exists()
 
 

@@ -870,10 +870,16 @@ class WeeklyOperations:
             return
         # Check the inherited publication once, before any stage overlays the preview.
         # Existing previews may hold interrupted writes and are resumed in place.
-        for league in read_league_directory(source):
-            check_tree_identity(source / league.path)
+        trees = [source / league.path for league in read_league_directory(source)]
         if (source / LEGACY_TREE).is_dir():
-            check_tree_identity(source / LEGACY_TREE)
+            trees.append(source / LEGACY_TREE)
+        for tree in trees:
+            try:
+                check_tree_identity(tree)
+            except ValueError as error:
+                raise DataError(
+                    f"Published league tree {tree} cannot seed the preview: {error}"
+                ) from error
         shutil.copytree(source, target)
 
     def _publish(self) -> WeeklyStageResult:
