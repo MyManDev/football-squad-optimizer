@@ -344,6 +344,16 @@ def _stored_capture(
     return metadata
 
 
+DECLARATION = Path(__file__).resolve().parents[2] / measurement.DECLARATION_PATH
+
+
+@pytest.mark.skipif(not DECLARATION.is_file(), reason="the #1002 declaration has not merged yet")
+def test_pin_matches_the_declaration_in_this_tree() -> None:
+    """Whichever of the declaration and this runner merges second fails here on a stale pin."""
+    declared = DECLARATION.read_bytes().replace(b"\r\n", b"\n")
+    assert sha256(declared).hexdigest() == measurement.DECLARATION_SHA256
+
+
 def test_complete_synthetic_capture_runs_through_store_and_writes_aggregate_twins(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
