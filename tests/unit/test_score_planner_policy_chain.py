@@ -2043,6 +2043,35 @@ def test_a_decided_or_failed_chain_week_is_scored_or_refused_and_never_passed_ov
             scorer.score_chain_week(record, outcomes)
 
 
+def test_an_outcome_capture_whose_live_payload_cannot_be_read_refuses_the_reading(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Rule 25: a week's outcome capture is read, or the reading stops in the scorer's words
+    before anything is written, as any other capture that cannot be read stops it. It is never
+    a traceback."""
+
+    evidence, snapshots, records = _world(tmp_path, monkeypatch, through=6)
+    _identity(monkeypatch)
+    # GW06's latest capture with its live payload scores an element its bootstrap does not name.
+    unreadable = _outcome_capture(snapshots, 6, hours_after=9, points=POINTS | {999: 2})
+    _outcome_capture(snapshots, 20, settled_through=20, live=False)
+    _read_through(monkeypatch, 6)
+    index = tmp_path / "index.md"
+    with pytest.raises(
+        scorer.ScorerError,
+        match=rf"^GW06: the outcome capture {re.escape(unreadable)} cannot be read: ",
+    ):
+        scorer.score(
+            evidence,
+            snapshots,
+            "gw20",
+            receipts=tmp_path / RECEIPTS,
+            records_dir=records,
+            index_file=index,
+        )
+    assert not records.exists() and not index.exists()
+
+
 def test_the_scorer_runs_only_from_its_own_merge_commit_on_a_clean_tree(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

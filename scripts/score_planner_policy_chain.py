@@ -1569,11 +1569,18 @@ def score_week(week: WeekEvidence, outcome: Outcome) -> WeekScores:
     truncated = rule_14_truncated(week)
     splits: dict[tuple[str, str], str] = {}
     if outcome.snapshot is not None and missing is None:
-        outcomes = live_event_outcomes(
-            outcome.snapshot.payloads[live_payload(week.gameweek)],
-            outcome.snapshot.payloads[BOOTSTRAP_PAYLOAD],
-            gameweek=week.gameweek,
-        )
+        try:
+            outcomes = live_event_outcomes(
+                outcome.snapshot.payloads[live_payload(week.gameweek)],
+                outcome.snapshot.payloads[BOOTSTRAP_PAYLOAD],
+                gameweek=week.gameweek,
+            )
+        except (DataError, ValueError, KeyError, TypeError) as error:
+            # Rule 25: as any other capture that cannot be read, it refuses the reading.
+            raise ScorerError(
+                f"GW{week.gameweek:02d}: the outcome capture {outcome.snapshot_id} cannot be "
+                f"read: {error}"
+            ) from error
         for chain, record in sorted(week.records.items()):
             scored = score_chain_week(record, outcomes)
             if scored is None:
