@@ -106,6 +106,7 @@ Date is the file's last commit (`git log -1 --format=%as -- scripts/<name>.py`).
 | `run_team_rating_study.py` | measurement runner | `docs/team_rating_study.json` | 2026-08-19 |
 | `run_terminal_value_study.py` | measurement runner | `docs/terminal_value_study.json` | 2026-08-20 |
 | `run_transfer_discipline_seasons.py` | measurement runner | `docs/transfer_discipline.json` (+ rolling variants) | 2026-08-18 |
+| `score_planner_policy_chain.py` | measurement runner | `docs/research/planner_policy_chain_gw20.json` and `planner_policy_chain_gw38.json` with their markdown twins, each once, from the chain runner's evidence, the receipts posted on the tracking issue (`--receipts`, `--producer-changes`) and the season's outcome captures; needs a clean, non-shallow clone that reaches origin; protocol `docs/research/planner_policy_chain_prereg.md`, rules 2, 3, 6, 13, 14 and 20 to 37 | 2026-10-08 |
 
 ## Artifact-only runners
 
@@ -118,6 +119,7 @@ Date is the file's last commit (`git log -1 --format=%as -- scripts/<name>.py`).
 | `measure_availability_transitions.py` | artifact-only runner | a fresh `--output` directory the operator names (`record.json`, `summary.md`); refuses the snapshot root and the repository's `data/` and `docs/`; protocol `docs/availability_transitions_prereg.md` | 2026-10-01 |
 | `measure_football_lead_reliability.py` | artifact-only runner | a fresh `--output` directory the operator names (`record.json`, `summary.md`, `forecasts.csv`); refuses the archive and the repository's `data/` and `docs/`; protocol `docs/football_lead_reliability_prereg.md` | 2026-10-06 |
 | `measure_instrument.py` | artifact-only runner | caller-selected `--output`; replay in `docs/measurement_instrument.md` | 2026-09-13 |
+| `measure_planner_policy_chain.py` | artifact-only runner | `artifacts/planner_policy_chain/` (receipts, forecast copies, decision records, weekly manifests), each week copied to `--evidence-copy-root` outside the checkout; reads no outcome; protocol `docs/research/planner_policy_chain_prereg.md` | 2026-10-06 |
 | `plan_transfer_horizon.py` | artifact-only runner | `data/handoffs/`; `docs/projection_horizon_contract.md` | 2026-08-31 |
 | `probe_phase_e_runtime.py` | artifact-only runner | checkpoints via `_phase_e_checkpoints`; prereg `docs/phase_e_candidate_selection_prereg.md` | 2026-09-07 |
 | `run_baseline_bayesopt.py` | artifact-only runner | `artifacts/bayesopt/` | 2026-08-15 |
