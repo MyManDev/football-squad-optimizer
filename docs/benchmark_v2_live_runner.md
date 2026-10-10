@@ -52,11 +52,19 @@ managers per week are required. All primary means and medians use the identical
 gameweek set, in gameweek order. The record carries capture identities, timestamps,
 model identity, configuration, the scoring, template and cohort policy versions,
 coverage, exclusions with stable reason codes, zero-minute starters, autosub
-recovery, vice-captain recovery, bench contribution and V1-to-V2 score changes. Its
-Markdown twin repeats the summary, each week's cohort coverage and the exclusions,
+recovery, vice-captain recovery, bench contribution and V1-to-V2 score changes. Under
+`official_autosub_captain_v2` the bench scores only through automatic substitutions,
+so `bench_contribution` and `autosub_recovery` hold the same value by definition: the
+points the substitutes brought in. Both keep the preregistration's names. The
+record's Markdown twin repeats the summary, each week's cohort coverage and the exclusions,
 in gameweek order with three fixed decimals. Twelve
 weeks remains the preregistration's preferred population for a season interpretation;
 the runner introduces no improvement gate or interval threshold.
+
+Below eight valid paired weeks the runner refuses and writes nothing. It has no
+season-end mode: the `insufficient_evidence` record that #1016's third box needs
+when the season ends without eight valid weeks is not produced here and remains
+work for the reading step.
 
 The command has one fixed record root, the repository's `docs/` directory; no caller
 chooses another. After preflight admits eight weeks, the runner atomically claims
