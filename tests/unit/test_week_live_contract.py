@@ -68,6 +68,18 @@ def test_progress_and_finished_examples_match_live_and_member_shapes(state):
         lambda item: item["elements"][0].pop("card_shown"),
         lambda item: item["members"][0].update(captain="7"),
         lambda item: item.update(gameweek=39),
+        lambda item: item.update(gameweek=0),
+        lambda item: item.update(season="2026"),
+        lambda item: item["fixtures"][0].update(id=9007199254740992),
+        lambda item: item["elements"][0].update(element_id=0),
+        lambda item: item["elements"][0].update(position="GKP"),
+        lambda item: item["elements"][0].update(club="1"),
+        lambda item: item["members"][0].update(entry_id="101"),
+        lambda item: item["members"][0].update(gameweek="6"),
+        lambda item: item["members"][0].update(vice="8"),
+        lambda item: item["members"][0].update(transfer_cost=True),
+        lambda item: item["members"][0].update(entry_history_points=1.5),
+        lambda item: item["members"][0]["pick_order"].__setitem__(0, "1"),
     ],
 )
 def test_wire_contract_refuses_malformed_or_unrequested_values(damage):
@@ -75,6 +87,39 @@ def test_wire_contract_refuses_malformed_or_unrequested_values(damage):
     damage(example)
     with pytest.raises(ValidationError):
         Draft202012Validator(SCHEMA, format_checker=FormatChecker()).validate(example)
+
+
+REQUIRED_FIELDS = {
+    "document": ("contract_version", "season", "gameweek", "source_time", "fixtures", "elements"),
+    "fixture": ("id", "home_club", "away_club", "finished"),
+    "element": ("element_id", "points", "minutes", "card_shown"),
+    "member": (
+        "entry_id",
+        "gameweek",
+        "pick_order",
+        "captain",
+        "vice",
+        "active_chip",
+        "transfer_cost",
+    ),
+}
+
+
+@pytest.mark.parametrize(
+    ("part", "field"),
+    [(part, field) for part, fields in REQUIRED_FIELDS.items() for field in fields],
+)
+def test_wire_contract_refuses_a_missing_required_field(part, field):
+    example = copy.deepcopy(EXAMPLES["in_progress"])
+    target = {
+        "document": example,
+        "fixture": example["fixtures"][0],
+        "element": example["elements"][0],
+        "member": example["members"][0],
+    }[part]
+    del target[field]
+    with pytest.raises(ValidationError):
+        Draft202012Validator(SCHEMA).validate(example)
 
 
 def test_progress_example_contains_absence_pending_bench_and_pending_vice():
