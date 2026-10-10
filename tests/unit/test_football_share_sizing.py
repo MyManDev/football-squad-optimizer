@@ -334,7 +334,10 @@ def test_main_rebuilt_companion_has_lf_bytes_under_windows_text_translation(
         ("holdout_selection", "2025-26 holdout"),
         ("evidence_outside_artifacts", "artifacts directory"),
         ("evidence_inside_input_root", "separate roots"),
+        ("input_inside_evidence_root", "separate roots"),
         ("other_model", "retained-history base"),
+        ("other_season", "declared live season"),
+        ("no_archive_root", "requires --archive-root"),
         ("rebuilt_fingerprint", "differs from the served build"),
     ],
 )
@@ -356,8 +359,12 @@ def test_main_refusals_write_no_record(tmp_path, monkeypatch, capsys, case, refu
     elif case == "evidence_inside_input_root":
         artifact_root = tmp_path / "artifacts/served"
         evidence_root = artifact_root / "synthetic-sizing"
+    elif case == "input_inside_evidence_root":
+        artifact_root = evidence_root / "served"
     elif case == "other_model":
         served["model_version"] = "football_team_share_v1"
+    elif case == "other_season":
+        served["season"] = "2025-26"
     forecast_path = runner.football_artifact_path(artifact_root, "synthetic")
     forecast_path.parent.mkdir(parents=True)
     forecast_path.write_bytes(json.dumps(served).encode("utf-8"))
@@ -376,23 +383,21 @@ def test_main_refusals_write_no_record(tmp_path, monkeypatch, capsys, case, refu
         runner, "read_snapshot", lambda root, identifier: snapshot_reads.append(identifier)
     )
     monkeypatch.setattr(football_live, "produce_football_components", produce)
-    monkeypatch.setattr(
-        sys,
-        "argv",
-        [
-            "measure_football_shares",
-            "--snapshot-root",
-            str(tmp_path / "synthetic-captures"),
-            "--snapshot-id",
-            "synthetic",
-            "--artifact-root",
-            str(artifact_root),
-            "--archive-root",
-            str(tmp_path / "synthetic-archive"),
-            "--evidence-root",
-            str(evidence_root),
-        ],
-    )
+    argv = [
+        "measure_football_shares",
+        "--snapshot-root",
+        str(tmp_path / "synthetic-captures"),
+        "--snapshot-id",
+        "synthetic",
+        "--artifact-root",
+        str(artifact_root),
+        "--evidence-root",
+        str(evidence_root),
+    ]
+    if case != "no_archive_root":
+        argv += ["--archive-root", str(tmp_path / "synthetic-archive")]
+    monkeypatch.setattr(sys, "argv", argv)
+    paths_before = sorted(tmp_path.rglob("*"))
     if case == "rebuilt_fingerprint":
         with pytest.raises(ValueError, match=refusal):
             runner.main()
@@ -403,6 +408,6 @@ def test_main_refusals_write_no_record(tmp_path, monkeypatch, capsys, case, refu
         assert refusal in capsys.readouterr().err
         assert producer_calls == []
         assert snapshot_reads == []
-    assert not evidence_root.exists()
+    assert sorted(tmp_path.rglob("*")) == paths_before
     assert not (tmp_path / "docs").exists()
     assert not forecast_path.with_suffix(".components.json").exists()
