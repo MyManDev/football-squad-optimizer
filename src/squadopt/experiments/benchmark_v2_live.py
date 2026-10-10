@@ -27,8 +27,11 @@ from squadopt.data.sources.fpl_live import (
 )
 from squadopt.data.timestamps import as_instant
 from squadopt.evaluation import (
+    OWNERSHIP_TEMPLATE_V2,
+    TOP_MANAGER_COHORT_VERSION,
     EvaluationValidationError,
     FrozenSquadDecision,
+    ScoringPolicy,
     audit_unconstrained_template_v1,
     build_constrained_ownership_template,
     score_frozen_squad_decision,
@@ -471,7 +474,9 @@ def read_live_benchmark_once(
     result = {
         "contract_version": LIVE_CONTRACT,
         "season": SEASON,
-        "scoring_basis": "official_autosub_captain_v2",
+        "scoring_basis": ScoringPolicy.OFFICIAL_AUTOSUB_CAPTAIN_V2.value,
+        "template_policy": OWNERSHIP_TEMPLATE_V2,
+        "cohort_policy": TOP_MANAGER_COHORT_VERSION,
         "paired_gameweeks": len(rows),
         "repository_commit": repository_commit,
         "preregistration_sha256": preregistration_sha256,
@@ -485,21 +490,76 @@ def read_live_benchmark_once(
         else "twelve_or_more_valid_paired_weeks",
     }
     write_bytes_once(document_bytes(result), record_root / READING_FILE)
-    markdown = [
-        "# Benchmark V2 live reading",
-        "",
-        f"Paired weeks: {len(rows)}",
-        "",
-        "| GW | System | Template | Cohort | System minus template | System minus cohort |",
-        "| --- | ---: | ---: | ---: | ---: | ---: |",
-    ]
-    markdown.extend(
-        f"| {row['gameweek']} | {row['system']['points']} | {row['template']['points']} "
-        f"| {row['cohort']['points']} | {row['system_minus_template']} "
-        f"| {row['system_minus_cohort']} |"
-        for row in rows
-    )
     write_bytes_once(
-        ("\n".join(markdown) + "\n").encode(), record_root / READING_FILE.replace(".json", ".md")
+        render_live_reading_markdown(result).encode(),
+        record_root / READING_FILE.replace(".json", ".md"),
     )
     return result
+
+
+def render_live_reading_markdown(result: Mapping[str, Any]) -> str:
+    """Render the Markdown twin with fixed decimals, every table in gameweek order."""
+
+    def number(value: float) -> str:
+        return f"{value:.3f}"
+
+    def signed(value: float) -> str:
+        return f"{value:+.3f}"
+
+    summary = result["summary"]
+    rows = sorted(result["rows"], key=lambda row: row["gameweek"])
+    exclusions = sorted(result["exclusions"], key=lambda row: row["gameweek"])
+    lines = [
+        "# Benchmark V2 live reading",
+        "",
+        f"- Season: {result['season']}",
+        f"- Contract: `{result['contract_version']}`",
+        f"- Interpretation: `{result['interpretation']}`",
+        f"- Scoring policy: `{result['scoring_basis']}`",
+        f"- Template policy: `{result['template_policy']}`",
+        f"- Cohort policy: `{result['cohort_policy']}`",
+        f"- Repository commit: `{result['repository_commit']}`",
+        f"- Preregistration SHA256: `{result['preregistration_sha256']}`",
+        f"- Paired gameweeks: {result['paired_gameweeks']}",
+        f"- Excluded gameweeks: {len(exclusions)}",
+        "",
+        "## Summary",
+        "",
+        "| Comparison | Mean | Median |",
+        "| --- | ---: | ---: |",
+        "| System minus template "
+        f"| {signed(summary['mean_system_minus_template'])} "
+        f"| {signed(summary['median_system_minus_template'])} |",
+        "| System minus cohort "
+        f"| {signed(summary['mean_system_minus_cohort'])} "
+        f"| {signed(summary['median_system_minus_cohort'])} |",
+        "",
+        "## Paired gameweeks",
+        "",
+        "| GW | System | Template | Cohort | System minus template | System minus cohort "
+        "| Cohort valid | Cohort excluded |",
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+    ]
+    lines.extend(
+        f"| {row['gameweek']} | {number(row['system']['points'])} "
+        f"| {number(row['template']['points'])} | {number(row['cohort']['points'])} "
+        f"| {signed(row['system_minus_template'])} | {signed(row['system_minus_cohort'])} "
+        f"| {row['provenance']['cohort_valid']} | {row['provenance']['cohort_excluded']} |"
+        for row in rows
+    )
+    lines.extend(["", "## Excluded gameweeks", ""])
+    if exclusions:
+        lines.extend(
+            [
+                "| GW | Reason | Cohort valid | Cohort excluded |",
+                "| --- | --- | ---: | ---: |",
+            ]
+        )
+        lines.extend(
+            f"| {row['gameweek']} | `{row['reason']}` "
+            f"| {row.get('cohort_valid', 'not read')} | {row.get('cohort_excluded', 'not read')} |"
+            for row in exclusions
+        )
+    else:
+        lines.append("None.")
+    return "\n".join(lines) + "\n"

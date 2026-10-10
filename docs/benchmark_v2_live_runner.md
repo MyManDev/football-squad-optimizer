@@ -44,8 +44,11 @@ seconds with a 600-second wall cap; both limits are recorded with each valid wee
 At least eight distinct valid paired weeks and at least 80 of the original 100
 managers per week are required. All primary means and medians use the identical
 gameweek set, in gameweek order. The record carries capture identities, timestamps,
-model identity, configuration, coverage, exclusions, zero-minute starters, autosub
-recovery, vice-captain recovery, bench contribution and V1-to-V2 score changes. Twelve
+model identity, configuration, the scoring, template and cohort policy versions,
+coverage, exclusions with stable reason codes, zero-minute starters, autosub
+recovery, vice-captain recovery, bench contribution and V1-to-V2 score changes. Its
+Markdown twin repeats the summary, each week's cohort coverage and the exclusions,
+in gameweek order with three fixed decimals. Twelve
 weeks remains the preregistration's preferred population for a season interpretation;
 the runner introduces no improvement gate or interval threshold.
 

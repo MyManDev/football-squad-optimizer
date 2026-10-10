@@ -212,8 +212,23 @@ def test_eight_weeks_pair_all_arms_and_second_reading_opens_nothing(tmp_path, mo
         "mean_system_minus_cohort": -10,
         "median_system_minus_cohort": -10,
     }
+    assert (result["scoring_basis"], result["template_policy"], result["cohort_policy"]) == (
+        "official_autosub_captain_v2",
+        "ownership_template_v2",
+        "as_of_top_100_v1",
+    )
     assert json.loads((tmp_path / live.READING_FILE).read_bytes()) == result
-    assert (tmp_path / live.READING_FILE.replace(".json", ".md")).exists()
+    markdown = (tmp_path / live.READING_FILE.replace(".json", ".md")).read_text(encoding="utf-8")
+    assert "- Template policy: `ownership_template_v2`" in markdown
+    assert "- Cohort policy: `as_of_top_100_v1`" in markdown
+    assert "| System minus template | +2.000 | +2.000 |" in markdown
+    assert "| System minus cohort | -10.000 | -10.000 |" in markdown
+    week_lines = [line for line in markdown.splitlines() if line.endswith("| 100 | 0 |")]
+    assert week_lines == [
+        f"| {gameweek} | 89.000 | 87.000 | 99.000 | +2.000 | -10.000 | 100 | 0 |"
+        for gameweek in range(6, 14)
+    ]
+    assert "| 14 | `insufficient_coverage` | 79 | 21 |" in markdown
     monkeypatch.setattr(live, "prepare_live_week", lambda _: pytest.fail("Second input was opened"))
     with pytest.raises(EvaluationValidationError, match="already been claimed"):
         read(weeks, tmp_path)
