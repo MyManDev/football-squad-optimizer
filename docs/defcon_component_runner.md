@@ -33,6 +33,10 @@ and exact handoff fingerprint. Restoring a file with a later modification time
 does not invalidate that content proof. Because the game moves deadlines, each
 week's deadline comes from the latest retained capture in the input check and
 from the declared settled capture in the reading, never from an older bootstrap.
+Only the selected final publication's capture must state that deadline. An
+earlier same-week publication whose capture still carries a since-moved deadline
+is listed in the week's identity proof under `nonfinal_deadline_notes` and
+never makes the week missing.
 
 The inventory is restricted to capture identifiers in the 2026-27 season date
 range. The bootstrap verifies the season before any event-live file is opened.

@@ -281,9 +281,6 @@ def published_pair(
             # An absent last publication capture must not silently select an earlier one.
             records.append((stamp, doc, None, payload_checksum(content)))
             continue
-        inputs = read_inputs(capture, season=DEFCON_SEASON, gameweek=week)
-        if as_instant(inputs.deadline.deadline_utc) != as_instant(deadline_utc):
-            raise DefconInputError("The retained captures disagree on the target deadline.")
         if doc["capture"]["captured_at_utc"] != capture.metadata.captured_at_utc or (
             as_instant(capture.metadata.captured_at_utc) > stamp
         ):
@@ -303,7 +300,12 @@ def published_pair(
     capture = selected[2]
     if capture is None:
         raise DefconMissingInputs("The final publication decision capture is absent.")
+    # The declaration proves the deadline on the selected capture only.
+    selected_deadline = read_inputs(capture, season=DEFCON_SEASON, gameweek=week).deadline
+    if as_instant(selected_deadline.deadline_utc) != as_instant(deadline_utc):
+        raise DefconInputError("The selected decision capture disagrees on the target deadline.")
     identifier, fingerprint = next(iter(identities))
+    deadline_notes = nonfinal_deadline_notes(records, identifier, week, deadline_utc)
     if any(
         item[1]["provenance"]["projection_handoff_fingerprint"] != fingerprint
         for item in records
@@ -357,8 +359,40 @@ def published_pair(
             ),
             "capture_fingerprint": capture.metadata.fingerprint,
             "input_hashes": dict(capture.metadata.checksums),
+            "nonfinal_deadline_notes": deadline_notes,
         },
     )
+
+
+def nonfinal_deadline_notes(
+    records: list[tuple[datetime, Any, CapturedSnapshot | None, str]],
+    selected: str,
+    week: int,
+    deadline_utc: str,
+) -> list[dict[str, Any]]:
+    """Record, never enforce, how an earlier publication's capture states the deadline."""
+    notes: dict[str, dict[str, Any]] = {}
+    for _, doc, capture, _ in records:
+        identifier = doc["capture"]["snapshot_id"]
+        if capture is None or identifier == selected or identifier in notes:
+            continue
+        try:
+            stated = read_inputs(capture, season=DEFCON_SEASON, gameweek=week).deadline
+        except (DataError, ValueError, KeyError, TypeError) as error:
+            notes[identifier] = {
+                "capture": identifier,
+                "reason": "deadline_unreadable",
+                "detail": f"{type(error).__name__}: {error}",
+            }
+            continue
+        if as_instant(stated.deadline_utc) != as_instant(deadline_utc):
+            notes[identifier] = {
+                "capture": identifier,
+                "reason": "deadline_disagreement",
+                "capture_deadline_utc": stated.deadline_utc,
+                "target_deadline_utc": deadline_utc,
+            }
+    return [notes[identifier] for identifier in sorted(notes)]
 
 
 def first_settled(

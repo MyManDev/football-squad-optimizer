@@ -1180,6 +1180,60 @@ def test_input_check_reads_each_deadline_from_the_latest_retained_capture(tmp_pa
     assert report["weeks"][0]["identity"]["capture"] == snapshot.metadata.snapshot_id
 
 
+@pytest.mark.parametrize("moved", ["earlier", "final"])
+def test_only_the_selected_publication_capture_must_state_the_target_deadline(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, moved: str
+) -> None:
+    # An extra GW8 publish whose capture still carries a deadline the game later moved.
+    def stale(documents: dict[str, Any]) -> None:
+        documents[BOOTSTRAP_PAYLOAD]["events"][7]["deadline_time"] = stamp(
+            START + timedelta(weeks=7, days=1)
+        )
+
+    captures, kwargs = reading_fixture(tmp_path, monkeypatch)
+    week_root = kwargs["publications"] / "2026-27/gw08"
+    consistent = next(week_root.glob("entry-*/*/advice.json")).parent.name
+    extra = capture(
+        kwargs["snapshot_root"],
+        target=8,
+        change=stale,
+        instant_offset=-60 if moved == "earlier" else 60,
+    )
+    publication(tmp_path, extra, base(extra, target=8))
+    captures = runner.inventory(kwargs["snapshot_root"], as_of=kwargs["as_of"])
+    checked = runner.check_inputs(
+        captures,
+        publications=kwargs["publications"],
+        handoffs=kwargs["handoffs"],
+        weeks=(8,),
+        as_of=kwargs["as_of"],
+        snapshot_root=kwargs["snapshot_root"],
+    )
+    report = runner.reading(captures, **kwargs)
+    row = next(row for row in report["week_identities"] if row["gameweek"] == 8)
+    if moved == "earlier":
+        assert checked["weeks"][0]["status"] == "identity_and_inventory_ready"
+        assert row["status"] == "scored"
+        assert report["valid_weeks"] == 7
+        for proof in (checked["weeks"][0]["identity"], row["identity"]):
+            assert proof["capture"] == consistent
+            assert len(proof["publication_sha256"]) == 1
+            (note,) = proof["nonfinal_deadline_notes"]
+            assert note["capture"] == extra.metadata.snapshot_id
+            assert note["reason"] == "deadline_disagreement"
+            assert runner.as_instant(note["capture_deadline_utc"]) == START + timedelta(
+                weeks=7, days=1
+            )
+            assert runner.as_instant(note["target_deadline_utc"]) == START + timedelta(weeks=7)
+        others = [w["identity"] for w in report["week_identities"] if w["gameweek"] != 8]
+        assert all(proof["nonfinal_deadline_notes"] == [] for proof in others)
+    else:
+        assert checked["weeks"][0]["status"] == row["status"] == "missing"
+        assert checked["weeks"][0]["reason"] == row["reason"] == "input_validation"
+        assert "selected decision capture disagrees" in row["detail"]
+        assert report["valid_weeks"] == 6
+
+
 def test_unlanded_staging_record_is_not_a_publication(tmp_path: Path) -> None:
     snapshot = capture(tmp_path / "snapshots")
     path = publication(tmp_path, snapshot, base(snapshot))
