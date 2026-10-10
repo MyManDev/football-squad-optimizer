@@ -21,6 +21,9 @@ protocol takes the most conservative reading and names it where it applies.
    weeks), `pass` (interval lower end above zero), `candidate_worse` (upper
    end below zero) and `not_separated` otherwise, recorded as no separation
    rather than failure. They replace a pass or fail verdict.
+3. The club-total check means equality only where at least one available
+   player has positive weight in the channel, and zero credited where none
+   does.
 
 ## Arms and binding start
 
@@ -40,10 +43,20 @@ change that moves either arm's forecasts under an unchanged version name is
 named in the record, and the weeks built after it are reported separately
 beside the pooled figure.
 
-The owner clarification on #1009 governs the all-absent or zero-positive-weight
-boundary before candidate code can be approved. This protocol neither supplies
-that decision nor changes its primary reading. The candidate PR also cites the
-merged retained-history base record from #997 and needs Ibo's approving review.
+The all-absent and zero-positive-weight boundary follows the owner's decision
+of 2026-10-10 (decision 3 above). The candidate's club-total check asks that,
+at a club-fixture where every m is 0 or 1, credited club goals and assists
+equal the club forecast. That equality is required only where at least one
+available player, here a player with m = 1, has positive weight in the
+channel. Where none does, which covers a club-fixture whose rostered players
+all have m = 0 and one whose available players all have zero weight, the
+credited total in that channel is zero. As the most conservative reading, the
+rule fixes what the check asserts and nothing else: club-fixtures with an m
+strictly between 0 and 1 are outside the check, the conditional share formula
+above is unchanged wherever an available player has positive weight, and the
+rule changes neither the primary population nor its loss. The candidate PR
+also cites the merged retained-history base record from #997 and needs Ibo's
+approving review.
 
 The first scored week is the first 2026-27 deadline strictly after both this
 protocol and the candidate implementation merge. Candidate artifacts must exist
@@ -221,10 +234,11 @@ shipping result from the forecast-only sizing.
 ## Separate implementation and shipping gates
 
 The candidate PR waits until after the GW6 publish boundary
-`2026-10-10T10:00:00Z`. It proves all-available equality, the owner-approved
-binary boundary rule, shares in [0, 1], unchanged fixed-capture v1 and base
-fingerprints, and no backend share-limit sentence for the new version. It records
-build wall time on the owner's PC, then waits for Ibo's approving review.
+`2026-10-10T10:00:00Z`. It proves all-available equality, the binary
+club-total check under the boundary rule the owner accepted on 2026-10-10,
+shares in [0, 1], unchanged fixed-capture v1 and base fingerprints, and no
+backend share-limit sentence for the new version. It records build wall time
+on the owner's PC, then waits for Ibo's approving review.
 No frozen-path PR merges within 24 hours of a deadline, and no queue entry occurs
 while a weekly run is underway. The owner runs Tuesday and Friday through GW20.
 
