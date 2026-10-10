@@ -97,7 +97,10 @@ def captured(
         root,
         source="fpl-live",
         captured_at_utc=stamp(instant),
-        payloads={key: json.dumps(value).encode() for key, value in documents.items()},
+        payloads={
+            key: value if isinstance(value, bytes) else json.dumps(value).encode()
+            for key, value in documents.items()
+        },
     )
     return read_snapshot(root, metadata.snapshot_id)
 
@@ -642,7 +645,9 @@ def test_unchecked_nonfinal_week_is_missing_in_single_reading(tmp_path, monkeypa
     assert not (kwargs["output_directory"] / "gw07-players.csv").exists()
 
 
-@pytest.mark.parametrize("refused", ["duplicate_live_id", "no_matched_row"])
+@pytest.mark.parametrize(
+    "refused", ["duplicate_live_id", "no_matched_row", "invalid_json", "duplicate_key"]
+)
 def test_refused_week_outcome_is_missing_rather_than_a_refused_reading(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, refused: str
 ) -> None:
@@ -650,8 +655,12 @@ def test_refused_week_outcome_is_missing_rather_than_a_refused_reading(
         held = docs[live_payload(7)]["elements"]
         if refused == "duplicate_live_id":
             held.append(dict(held[0]))
-        else:
+        elif refused == "no_matched_row":
             held.clear()
+        elif refused == "invalid_json":
+            docs[live_payload(7)] = b'{"elements": ['
+        else:
+            docs[live_payload(7)] = b'{"elements": [], "elements": []}'
 
     snapshots, kwargs = reading_setup(tmp_path, monkeypatch, outcome_change=change)
     report = runner.reading(snapshots, **kwargs)

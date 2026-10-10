@@ -342,9 +342,13 @@ def joined_rows(
         projected = project(
             read_inputs(decision, season=SEASON, gameweek=week), in_season=handoff
         ).table
+    try:
+        realized = decode(outcome.payloads[live_payload(week)])
+    except ValueError as error:
+        raise DifficultyMissingInputs("A settled live payload is not a valid document.") from error
     totals = {}
     seen = set()
-    for item in decode(outcome.payloads[live_payload(week)])["elements"]:
+    for item in realized["elements"]:
         if type(item["id"]) is not int or item["id"] in seen:
             raise DifficultyMissingInputs("A realized player identity is invalid or duplicated.")
         seen.add(item["id"])
