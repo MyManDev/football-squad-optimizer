@@ -61,17 +61,21 @@ unavailable, never zero.
 
 All readings come from the same named capture. None changes the update rule.
 
-1. Control (a): S on GW1 to GW3 must round to 21.2. A mismatch stops the binding
-   run; its difference must be explained on #1002 before a step 4 PR opens.
+1. Control (a): S on GW1 to GW3 must round to 21.2. A mismatch does not stop
+   the run. The runner still writes the aggregate record with the control
+   marked failed, and no step 4 PR opens until the difference is explained on
+   #1002. Two details are read conservatively: a control with no counted
+   pair-week is unavailable and is marked failed, and the same hold applies to
+   the constant PR of any later checkpoint whose control fails.
 2. Reading (b): S for each single gameweek, with its observed pair count. The
    fifteen-member complete population has 105 unordered pairs per week.
 3. Reading (c): S on GW1 to k for every k from 3 through N.
 4. Reading (d): for each k, the root mean square over pairs of their cumulative
-   k-week differences, divided by `sqrt(k) * S`. Record coverage alongside this
-   diagnostic. A cumulative k-week observation needs both members' rows for all
-   k weeks; count unavailable cumulative pairs separately, with no zero imputation.
-   This reading does not
-   change the square-root shape of the strategy rule.
+   k-week differences, divided by `sqrt(k)` times the unrounded S on GW1 to N.
+   Record coverage alongside this diagnostic. A cumulative k-week observation
+   needs both members' rows for all k weeks; count unavailable cumulative pairs
+   separately, with no zero imputation. This reading does not change the
+   square-root shape of the strategy rule.
 5. Reading (e): if a second listed league has at least six settled weeks in the
    same capture, record its S descriptively. This neither changes the primary
    league nor introduces a per-league constant or a new capture.
@@ -108,10 +112,11 @@ weekly run. The measurement never opens a running run's `run.json`.
 The record is `docs/strategy_rule_scale.json` with its Markdown twin at
 `docs/strategy_rule_scale.md` and one row in `docs/measurements_index.md`. Record the
 named source capture, admitted weeks, member and pair-week counts, unrounded and
-rounded S, control result and companion readings. Outputs contain aggregates only.
+rounded S, the control result, passed or failed, and the companion readings. A
+failed control is recorded the same way. Outputs contain aggregates only.
 
 Step 4 merges after the GW6 publish and at or after 2026-10-10T10:00:00Z, aiming
-for the GW7 publish. After the owner's release approval, the first live publish
+for the GW7 publish. A failed control holds it as control (a) states. After the owner's release approval, the first live publish
 with a non-null suggestion must carry the resulting rule id and
 `band_edge_points = round(1.0 * C * sqrt(weeks_remaining), 1)`, where C is the
 rounded S, which `WEEKLY_POINTS_DIFFERENTIAL_POINTS` holds after step 4 whether
