@@ -326,6 +326,29 @@ describe("member decision controls", () => {
     }
   });
 
+  // The owner's names for #1005 Part D, word for word in both languages. The copy is
+  // pinned here rather than read back from MESSAGES, so a change to any of them fails.
+  it.each([
+    ["tr", ["En çok puan", "Farkı koru", "Farkı kapat"], "Plan süresi"],
+    ["en", ["Most points", "Hold the gap", "Close the gap"], "Plan length"],
+  ] as const)(
+    "renders the approved strategy and plan length names in %s",
+    (language, names, legend) => {
+      const copy = MESSAGES[language].leagueMembers;
+      expect([
+        copy.strategies["saf-puan"].name,
+        copy.strategies["ortak-koru"].name,
+        copy.strategies["fark-yarat"].name,
+      ]).toEqual(names);
+      expect(copy.windowLegend).toBe(legend);
+      renderControls(`/league/352490/members/${ENTRY}`, undefined, language);
+      for (const name of names) {
+        expect(screen.getByRole("radio", { name: new RegExp(`^${name}`) })).toBeInTheDocument();
+      }
+      expect(screen.getByRole("group", { name: legend })).toBeInTheDocument();
+    },
+  );
+
   it("renders the plan and the advanced part apart, and every input once without a part", () => {
     const count = (container: HTMLElement, name: string) =>
       container.querySelectorAll(`input[name="${name}"]`).length;
