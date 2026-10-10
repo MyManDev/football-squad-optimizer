@@ -302,10 +302,18 @@ def test_the_free_squad_is_solved_by_the_844_method_the_owner_accepted() -> None
         SolverStatus.FEASIBLE, {"deterministic_time_budget_exhausted": False}
     )
 
+    opening = _protocol().split("## Binding start and one verdict")[0]
     assert (
         "One detail departs from Decision 6 as the issue wrote it, by a decision accepted by the"
-        " owner on 2026-10-10" in _protocol()
+        " owner on 2026-10-10" in opening
     )
+    # The summary must not read as if an arm proven at 60 units still needed a 240 unit solve.
+    assert "60 deterministic units and then 240 when 60 does not prove an arm" in opening
+    assert (
+        "when either arm's primary or tie-break is still not proven OPTIMAL at 240 units, or when"
+        " the wall clock stops any solve of either arm" in opening
+    )
+    assert "unless both arms are proven OPTIMAL at 240" not in opening
     squad = _section("Three readings and the gate")
     for sentence in (
         "each arm's squad, XI and captain come from `optimize_squad`",

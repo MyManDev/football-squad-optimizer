@@ -9,9 +9,11 @@ by the owner on 2026-10-10 in answer to the question put on #1009. Decision 6
 named a free squad from `optimize_squad` with the study's configuration, which
 bounds the solve by a 10 second wall clock and no deterministic ceiling. The free
 squad is instead solved by the #844 method (`docs/football_prospective_prereg.md`):
-linearization level 2, one worker, seed 0, 60 and then 240 deterministic units,
-an 1800 second wall ceiling, and a week is missing unless both arms are proven
-OPTIMAL at 240. Reading 3 below states it in full.
+linearization level 2, one worker, seed 0, 60 deterministic units and then 240
+when 60 does not prove an arm, and an 1800 second wall ceiling. A week is missing
+when either arm's primary or tie-break is still not proven OPTIMAL at 240 units,
+or when the wall clock stops any solve of either arm. Reading 3 below states it
+in full.
 
 ## Binding start and one verdict
 
