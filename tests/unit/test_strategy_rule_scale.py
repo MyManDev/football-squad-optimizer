@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import math
 import subprocess
+from collections.abc import Callable
 from decimal import Decimal
 from hashlib import sha256
 from pathlib import Path
@@ -13,7 +14,7 @@ from typing import Any
 import pytest
 from scripts import measure_strategy_rule_scale as measurement
 
-from squadopt.data.snapshots import write_snapshot
+from squadopt.data.snapshots import SnapshotMetadata, write_snapshot
 
 
 def _bytes(value: Any) -> bytes:
@@ -289,12 +290,14 @@ def test_declaration_pin_detects_method_amendments_before_measurement(
         measurement.preregistration_gate()
 
 
-def test_complete_synthetic_capture_runs_through_store_and_writes_aggregate_twins(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    root = tmp_path / "captures"
+def _stored_capture(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, payloads: dict[str, bytes]
+) -> SnapshotMetadata:
     metadata = write_snapshot(
-        root, source="fpl-live", captured_at_utc="2026-10-13T12:00:00Z", payloads=_payloads()
+        tmp_path / "captures",
+        source="fpl-live",
+        captured_at_utc="2026-10-13T12:00:00Z",
+        payloads=payloads,
     )
     monkeypatch.setattr(measurement, "REPOSITORY_ROOT", tmp_path)
     monkeypatch.setattr(measurement, "preregistration_gate", lambda: ("a" * 40, "b" * 64))
@@ -307,8 +310,15 @@ def test_complete_synthetic_capture_runs_through_store_and_writes_aggregate_twin
             }
         )
     )
+    return metadata
+
+
+def test_complete_synthetic_capture_runs_through_store_and_writes_aggregate_twins(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    metadata = _stored_capture(monkeypatch, tmp_path, _payloads())
     record = measurement.run_measurement(
-        snapshot_root=root,
+        snapshot_root=tmp_path / "captures",
         snapshot_id=metadata.snapshot_id,
         league=measurement.PRIMARY_LEAGUE,
         through_gameweek=6,
@@ -318,3 +328,29 @@ def test_complete_synthetic_capture_runs_through_store_and_writes_aggregate_twin
     assert record["scale"]["scale_rounded"] == 21.2
     assert record["preregistration_sha256"] == "b" * 64
     assert (tmp_path / "docs/strategy_rule_scale.md").is_file()
+
+
+@pytest.mark.parametrize(
+    "row_change",
+    [
+        pytest.param(lambda rows: rows.append(dict(rows[0])), id="duplicated-week"),
+        pytest.param(lambda rows: rows[1].update(event_transfers_cost=None), id="null-cost"),
+    ],
+)
+def test_invalid_history_value_ends_in_the_one_line_refusal(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    row_change: Callable[[list[dict[str, Any]]], None],
+) -> None:
+    payloads = _payloads()
+    history = json.loads(payloads["entry-2-history.json"])
+    row_change(history["current"])
+    payloads["entry-2-history.json"] = _bytes(history)
+    metadata = _stored_capture(monkeypatch, tmp_path, payloads)
+    arguments = ["--snapshot-root", str(tmp_path / "captures"), "--snapshot-id"]
+    arguments += [metadata.snapshot_id, "--league", "352490", "--through-gameweek", "6"]
+    assert measurement.main(arguments) == 1
+    error = capsys.readouterr().err
+    assert error == "Measurement refused: The capture has invalid standings or history rows.\n"
+    assert not (tmp_path / "docs").exists()

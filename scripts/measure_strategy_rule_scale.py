@@ -24,7 +24,7 @@ from typing import Any
 from scripts._provenance import REPOSITORY_ROOT, _git_revision, write_json, write_text
 
 from squadopt.contracts.league_list import LEAGUE_LIST_FILE, read_league_list
-from squadopt.data.errors import DataSourceError
+from squadopt.data.errors import DataError
 from squadopt.data.snapshots import CapturedSnapshot, read_snapshot
 from squadopt.data.sources.fpl_live import (
     entry_history_payload,
@@ -116,7 +116,8 @@ def league_net_rows(payloads: Mapping[str, bytes], league: int, n: int) -> NetRo
         raise ScaleMeasurementError(
             "The capture lacks a standings or required history payload."
         ) from error
-    except DataSourceError as error:
+    except DataError as error:
+        # A duplicated week or a null value raises a DataError that is not a DataSourceError.
         raise ScaleMeasurementError("The capture has invalid standings or history rows.") from error
     if len(rows) < 2:
         raise ScaleMeasurementError("The league needs at least two captured members.")
@@ -383,7 +384,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             league=args.league,
             through_gameweek=args.through_gameweek,
         )
-    except (ScaleMeasurementError, DataSourceError, OSError, ValueError, SystemExit) as error:
+    except (ScaleMeasurementError, DataError, OSError, ValueError, SystemExit) as error:
         # Third-party parse/integrity exceptions can contain member ids or names.
         message = (
             str(error)
