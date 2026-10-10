@@ -126,6 +126,8 @@ eligibility applied once. Unsupported/malformed capture bases refuse even in con
 unflagged native independent-fixture law within floating-point roundoff. It removes
 the old captured multiplier, so it is intentionally distinct from legacy served
 control when that multiplier is below one. Metadata names these arms explicitly.
+Requesting zero coefficients in disabled or control composition refuses, so a receipt
+never names an ablation that did not run.
 
 For a full captured real-club roster, the original native attacking share is proportional
 to its per90 rate times original expected minutes. Therefore the retained-rate update is

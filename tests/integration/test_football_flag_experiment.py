@@ -281,6 +281,18 @@ def test_exact_legacy_control_keeps_supplied_values_resources_and_metadata(mode)
     assert json.loads(result.receipt_json)["replacement_scope"] == "legacy_control"
 
 
+@pytest.mark.parametrize("mode", ["disabled", "control"])
+def test_zero_coefficient_switch_refuses_outside_the_learned_arm(model, mode):
+    with pytest.raises(ValueError, match="zero-coefficient"):
+        compose(
+            native_case(),
+            model,
+            enabled=mode != "disabled",
+            control=mode == "control",
+            zero_coefficients=True,
+        )
+
+
 def test_zero_coefficient_ablation_is_unflagged_native_law_not_legacy_rule(model):
     case = native_case(double=True)
     result = compose(case, model, zero_coefficients=True)

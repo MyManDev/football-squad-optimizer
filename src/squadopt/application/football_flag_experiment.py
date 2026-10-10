@@ -539,6 +539,8 @@ def compose_flag_experiment(
     """
     if any(type(flag) is not bool for flag in (enabled, control, zero_coefficients)):
         raise ValueError("Experiment switches must be explicit booleans.")
+    if zero_coefficients and (not enabled or control):
+        raise ValueError("The zero-coefficient ablation requires the enabled learned arm.")
     if (
         not isinstance(season, str)
         or len(season) != 7
