@@ -122,8 +122,14 @@ def test_command_reads_eight_real_format_synthetic_capture_ids(tmp_path, monkeyp
         json.dumps({"season": "2026-27", "first_gameweek": 6, "last_gameweek": 14, "weeks": rows}),
         encoding="utf-8",
     )
-    replies = iter([SimpleNamespace(stdout="a" * 40), SimpleNamespace(stdout="")])
-    monkeypatch.setattr(cli.subprocess, "run", lambda *a, **k: next(replies))
+    # The committed declaration has LF endings; a Windows checkout may hold CRLF.
+    committed = b"# Benchmark V2 pre-registration\n"
+    replies = {
+        ("git", "rev-parse", "HEAD"): SimpleNamespace(stdout="a" * 40),
+        ("git", "status", "--porcelain"): SimpleNamespace(stdout=""),
+        ("git", "show", "HEAD:docs/benchmark_v2_prereg.md"): SimpleNamespace(stdout=committed),
+    }
+    monkeypatch.setattr(cli.subprocess, "run", lambda command, **_: replies[tuple(command)])
     assert (
         cli.main(
             [
@@ -142,3 +148,4 @@ def test_command_reads_eight_real_format_synthetic_capture_ids(tmp_path, monkeyp
     assert record["exclusions"] == [{"gameweek": 14, "reason": "missing_capture"}]
     assert record["declared_gameweeks"] == {"first_gameweek": 6, "last_gameweek": 14}
     assert record["manifest_sha256"] == cli.hashlib.sha256(manifest.read_bytes()).hexdigest()
+    assert record["preregistration_sha256"] == cli.hashlib.sha256(committed).hexdigest()

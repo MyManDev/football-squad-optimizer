@@ -22,6 +22,7 @@ from squadopt.experiments.benchmark_v2_live import (
 )
 
 ROOT = Path(__file__).resolve().parents[1]
+PREREGISTRATION = "docs/benchmark_v2_prereg.md"
 _CAPTURE = re.compile(r"fpl-[a-z0-9-]+-(\d{8})T\d{6}Z-[0-9a-f]+")
 
 
@@ -74,6 +75,11 @@ def main(argv: list[str] | None = None) -> int:
         ).stdout.strip()
         if dirty:
             raise EvaluationValidationError("Benchmark V2 refuses an uncommitted implementation.")
+        # Digest the committed declaration, not the checkout's bytes: a Windows tree under
+        # core.autocrlf holds CRLF, and its digest would match no other checkout.
+        preregistration = subprocess.run(
+            ["git", "show", f"HEAD:{PREREGISTRATION}"], cwd=ROOT, check=True, capture_output=True
+        ).stdout
         weeks = [
             LiveBenchmarkWeek(
                 specification["gameweek"],
@@ -84,12 +90,11 @@ def main(argv: list[str] | None = None) -> int:
             )
             for specification in specifications
         ]
-        preregistration = ROOT / "docs" / "benchmark_v2_prereg.md"
         result = read_live_benchmark_once(
             weeks,
             record_root=args.record_root,
             repository_commit=revision,
-            preregistration_sha256=hashlib.sha256(preregistration.read_bytes()).hexdigest(),
+            preregistration_sha256=hashlib.sha256(preregistration).hexdigest(),
             first_gameweek=manifest["first_gameweek"],
             last_gameweek=manifest["last_gameweek"],
             missing_gameweeks=[item["gameweek"] for item in missing],
