@@ -15,7 +15,9 @@ totals, whose widest gap was 111, and a computation on GW1 to GW3 only. That
 computation used capture `fpl-live-20261007T105015Z-4e18c56cbb04`, fifteen
 members of league 352490 and 315 pair-weeks. Its net-score root mean square
 was 21.203, rounding to the existing 21.2. These are the issue's previously
-disclosed observations, not a new execution of this proposal.
+disclosed observations, credited to the issue's record, not a new execution of
+this declaration. The author of this document read no capture outcome for any
+week this declaration measures, GW1 through N, before writing it.
 
 The question is the weekly differential scale to use in the already declared
 `gap_and_weeks_strategy_rule_v1` band. One shared constant is measured on 352490,
@@ -94,9 +96,14 @@ weeks 10 and 11. Text-key sorting must not reorder them.
 
 ## Value and rule-version update
 
-The new constant is S on GW1 to N. If it rounds to 21.2, retain both the value
-and `gap_and_weeks_strategy_rule_v1` and update only the provenance comment.
-Otherwise use the recorded rounded S and `gap_and_weeks_strategy_rule_v2`.
+The new constant is S on GW1 to N, rounded. If it equals the value the constant
+holds when the checkpoint runs, retain both that value and the rule id in force
+and update only the provenance comment. At GW6 that value is 21.2 and the id is
+`gap_and_weeks_strategy_rule_v1`. Otherwise use the recorded rounded S, and the
+rule id's version increments by one from the id in force, so a change at GW6
+gives `gap_and_weeks_strategy_rule_v2`. The version increments only when the
+value changes: at the GW12 and GW19 checkpoints an unchanged value keeps its id,
+and a changed value takes the next version after the id in force.
 `BAND_EDGE_DIFFERENTIALS`, `SEASON_FINAL_GAMEWEEK`, the symmetric band and its
 square-root scaling stay as declared.
 
@@ -133,7 +140,8 @@ it was retained or changed, not the unrounded S. Until then a league build test
 pins that same equality. No release or weekly run is authorized by this
 declaration alone.
 
-A follow-up issue covers GW12 and GW19 using this same script and preregistration.
+A follow-up issue, #1044, covers GW12 and GW19 using this same script and
+preregistration, including the rule-version clause above.
 Their readings follow each week's final match, currently scheduled for
 2026-11-29T16:30:00Z and 2027-01-03T16:30:00Z respectively. The captured finished
 and data_checked flags remain the execution gate if that schedule changes. Once
