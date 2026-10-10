@@ -4,6 +4,15 @@ Issue #1009 part (b), step 1. This protocol freezes Decisions 5 and 6 before any
 live comparison is read. It changes no producer, handoff, device table or member
 page. It does not rerun the development study or open the locked 2025-26 holdout.
 
+One detail departs from Decision 6 as the issue wrote it, by a decision accepted
+by the owner on 2026-10-10 in answer to the question put on #1009. Decision 6
+named a free squad from `optimize_squad` with the study's configuration, which
+bounds the solve by a 10 second wall clock and no deterministic ceiling. The free
+squad is instead solved by the #844 method (`docs/football_prospective_prereg.md`):
+linearization level 2, one worker, seed 0, 60 and then 240 deterministic units,
+an 1800 second wall ceiling, and a week is missing unless both arms are proven
+OPTIMAL at 240. Reading 3 below states it in full.
+
 ## Binding start and one verdict
 
 The target is a merge before the GW7 deadline, `2026-10-17T10:00:00Z`, either
@@ -112,16 +121,35 @@ are reported separately and never treated as independent bootstrap units.
    players and at least two distinct predictions; omit nonfinite correlations,
    average the remaining positions, and return zero if none qualify. The
    equal-week candidate-minus-base estimate must be at least zero.
-3. **Free squad:** reuse `_squad` from the same study with `OptimizationConfig()`
-   as at this protocol's commit: budget 1000 tenths, squad 15, XI 11, maximum
-   three per club, bench weight 0.1, expected-points scale 1000, solver wall
-   ceiling 10 seconds, no deterministic-time ceiling, seed 0. Both arms use the
+3. **Free squad:** each arm's squad, XI and captain come from `optimize_squad`
+   in `src/squadopt/optimization/optimizer.py`, by the #844 method the owner
+   accepted on 2026-10-10. The players enter as `_squad` in the same study
+   prepares them: player id, name, club, position, price and the arm's
+   decision-week projection, with a missing projection read as zero and a
+   negative one clipped to zero. The squad rules are the `OptimizationConfig()`
+   defaults as at this protocol's commit: budget 1000 tenths, squad 15, XI 11,
+   maximum three per club, bench weight 0.1, expected-points scale 1000, seed 0.
+   The solver runs at `linearization_level=2` with one search worker, a wall
+   ceiling of 1800 seconds (`solver_time_limit_seconds=1800.0`) and a
+   deterministic ceiling of 60 units (`solver_deterministic_time_limit=60.0`).
+   An arm whose primary and tie-break are both proven OPTIMAL at 60 units is
+   decided by that solve. Otherwise it is solved once more from the same input
+   at 240 units, and that solve decides the arm. A week is missing for the joint
+   gate, counted and listed, when either arm's primary or tie-break is still not
+   proven OPTIMAL at 240 units, or when `wall_clock_stopped_the_search` in the
+   same module holds for any solve of either arm. Where the accepted decision
+   leaves a detail open, this text takes the most conservative reading: the
+   study's input preparation above is kept unchanged, a tie-break counts as
+   proven only when it was attempted and completed, and a wall-clock stop on
+   any solve, at 60 or at 240 units, makes the week missing. Both arms use the
    same frozen squad and formation rules. Score realized starters plus the
    captain again, matching the development study's `_realized` reading. No
-   transfer, hit or chip is involved. Report solver status and selected squad,
-   XI and captain. If either arm cannot produce a solution, the week is missing
-   for the joint gate. The equal-week candidate-minus-base estimate must be at
-   least zero. This clause uses the point estimate, not an interval.
+   transfer, hit or chip is involved. The record names the limits and every
+   status: for each arm and week, the budget that decided it, each solve's
+   primary and tie-break status and deterministic time, whether the wall clock
+   stopped it, and the selected squad, XI and captain. The equal-week
+   candidate-minus-base estimate must be at least zero. This clause uses the
+   point estimate, not an interval.
 
 **Pass** requires all three conditions, read from the pooled figures on the
 same population, and at least eight jointly scored weeks. Otherwise fail; fewer
@@ -142,7 +170,8 @@ List every week from the binding start through GW20, with a scored or missing
 reason. Missing includes no served pre-deadline capture targeting the week, two
 such captures at the same latest instant, an absent or ambiguous paired handoff,
 a paired handoff file written at or after the deadline, a refused source or
-fingerprint, or no later capture whose bootstrap counts the week in
+fingerprint, a free squad that reading 3 leaves unproven or clock-stopped in
+one arm or both, or no later capture whose bootstrap counts the week in
 `scored_gameweeks` and that carries its settled live payload. Never repair a
 missing week with another week's capture or a reconstructed post-deadline
 handoff.

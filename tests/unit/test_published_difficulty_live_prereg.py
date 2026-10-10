@@ -6,8 +6,9 @@ study record it is copied from, check that every function the protocol names exi
 name, and pin the sentences where a draft named a settlement flag the fixtures do not carry,
 could take an audit capture the backend never served, paired a handoff whose write time nothing
 checked, left the interval's function, quantile rule and week order open, did not say whether
-the pooled or the per-version figures decide, and did not say which side of a fixture the
-signal reads.
+the pooled or the per-version figures decide, did not say which side of a fixture the signal
+reads, and solved the free squad on a wall clock, which the owner replaced on 2026-10-10 with
+the #844 method.
 """
 
 from __future__ import annotations
@@ -26,6 +27,7 @@ from squadopt.data.sources import fpl_live
 from squadopt.experiments import opponent_projection
 from squadopt.live import InSeasonProjection, read_projection_handoff, recommendation
 from squadopt.live.tick import handoff_path_for
+from squadopt.optimization import OptimizationConfig, SolverStatus, optimizer
 from squadopt.platform import capture_context, projection_retention
 from squadopt.platform.backend_runtime import BackendConfig, BackendConfigError
 
@@ -87,6 +89,8 @@ def test_the_frozen_hash_is_the_study_record_with_crlf_read_as_lf() -> None:
         (opponent_projection, "_squad"),
         (opponent_projection, "_realized"),
         (opponent_projection, "_bootstrap"),
+        (optimizer, "optimize_squad"),
+        (optimizer, "wall_clock_stopped_the_search"),
     ],
 )
 def test_every_name_the_protocol_cites_exists(module: object, name: str) -> None:
@@ -244,3 +248,80 @@ def test_the_signal_reads_each_fixtures_difficulty_on_the_clubs_own_side() -> No
         candidate
     )
     assert "`_difficulty_lookup`" in candidate
+
+
+def _synthetic_pool() -> pd.DataFrame:
+    """Forty made-up players on twelve clubs; no capture and no outcome is read."""
+
+    rows: list[dict[str, object]] = []
+    identifier = 0
+    for position, count in (("GK", 4), ("DEF", 12), ("MID", 14), ("FWD", 10)):
+        for _ in range(count):
+            identifier += 1
+            rows.append(
+                {
+                    "player_id": identifier,
+                    "name": f"Synthetic {identifier}",
+                    "team_id": 1 + (identifier - 1) % 12,
+                    "position": position,
+                    "price_tenths": 40 + (identifier * 7) % 60,
+                    "expected_points": 2.0 + ((identifier * 37) % 23) / 4.0,
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+def test_the_free_squad_is_solved_by_the_844_method_the_owner_accepted() -> None:
+    """The study's `OptimizationConfig()` stops on ten wall-clock seconds and no work ceiling.
+
+    A solve the clock cut short is a function of the machine, so the squad clause would score
+    solver truncation rather than the two forecasts. On 2026-10-10 the owner accepted the #844
+    method in its place. This pins the text to that method and shows that the code it cites
+    records every limit and status the record has to name.
+    """
+
+    study = OptimizationConfig()
+    assert study.solver_time_limit_seconds == 10.0
+    assert study.solver_deterministic_time_limit is None
+
+    config = OptimizationConfig(
+        solver_time_limit_seconds=1800.0, solver_deterministic_time_limit=60.0
+    )
+    result = optimizer.optimize_squad(_synthetic_pool(), config, linearization_level=2)
+    diagnostics = result.diagnostics
+    assert result.solver_status is SolverStatus.OPTIMAL
+    assert diagnostics["tiebreak_attempted"] is True
+    assert diagnostics["tiebreak_completed"] is True
+    assert diagnostics["linearization_level"] == 2
+    assert diagnostics["num_search_workers"] == 1
+    assert diagnostics["deterministic_seed"] == 0
+    assert diagnostics["solver_deterministic_time_limit"] == 60.0
+    assert diagnostics["solver_time_limit_seconds"] == 1800.0
+    assert not optimizer.wall_clock_stopped_the_search(result.solver_status, diagnostics)
+    assert optimizer.wall_clock_stopped_the_search(
+        SolverStatus.FEASIBLE, {"deterministic_time_budget_exhausted": False}
+    )
+
+    assert (
+        "One detail departs from Decision 6 as the issue wrote it, by a decision accepted by the"
+        " owner on 2026-10-10" in _protocol()
+    )
+    squad = _section("Three readings and the gate")
+    for sentence in (
+        "each arm's squad, XI and captain come from `optimize_squad`",
+        "by the #844 method the owner accepted on 2026-10-10",
+        "The players enter as `_squad` in the same study prepares them",
+        "The solver runs at `linearization_level=2` with one search worker",
+        "a wall ceiling of 1800 seconds (`solver_time_limit_seconds=1800.0`)",
+        "a deterministic ceiling of 60 units (`solver_deterministic_time_limit=60.0`)",
+        "Otherwise it is solved once more from the same input at 240 units",
+        "when either arm's primary or tie-break is still not proven OPTIMAL at 240 units",
+        "`wall_clock_stopped_the_search` in the same module holds for any solve of either arm",
+        "a tie-break counts as proven only when it was attempted and completed",
+        "The record names the limits and every status",
+    ):
+        assert sentence in squad, sentence
+    for stale in ("ceiling 10 seconds", "no deterministic-time ceiling", "cannot produce"):
+        assert stale not in squad, stale
+    missing = _section("Missing weeks and provenance")
+    assert "a free squad that reading 3 leaves unproven or clock-stopped" in missing
