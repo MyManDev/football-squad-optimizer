@@ -76,9 +76,18 @@ All readings come from the same named capture. None changes the update rule.
    needs both members' rows for all k weeks; count unavailable cumulative pairs
    separately, with no zero imputation. This reading does not change the
    square-root shape of the strategy rule.
-5. Reading (e): if a second listed league has at least six settled weeks in the
-   same capture, record its S descriptively. This neither changes the primary
-   league nor introduces a per-league constant or a new capture.
+5. Reading (e): the listed leagues are those in `config/leagues.json` at the
+   repository revision the measurement runs from, which the record names. For
+   every listed league other than 352490, the record carries either its S,
+   computed descriptively by the estimator above on gameweeks 1 through N of the
+   same named capture, or a mark that it is unavailable. A secondary league is
+   available only when that capture holds its standings and, for every member
+   in them, a readable history row carrying `event_transfers_cost` for every
+   gameweek 1 through N; requiring a row for every week is the conservative
+   reading. Otherwise, including when its standings are absent, it is recorded
+   as unavailable with no number. A missing or unavailable secondary league
+   never refuses or changes the primary reading. This reading introduces no
+   per-league constant and no new capture.
 
 Week and prefix readings serialize as lists in numeric gameweek order, including
 weeks 10 and 11. Text-key sorting must not reorder them.
