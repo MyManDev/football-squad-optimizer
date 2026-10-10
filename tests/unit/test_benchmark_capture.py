@@ -818,3 +818,30 @@ def test_unclaimed_freeze_and_private_retry_output_are_refused_or_hidden(
     monkeypatch.setattr(capture, "fetch", shared_fetch)
     assert capture._private_fetch("synthetic") == b"{}"
     assert capsys.readouterr().out == ""
+
+
+def test_cli_names_a_missing_freeze_without_a_network_read(tmp_path, monkeypatch, capsys):
+    _root, study, _ledger, _cohort, _boot, receipt = frozen(tmp_path)
+    monkeypatch.setattr(capture, "fetch", lambda _: pytest.fail("Missing freeze was fetched"))
+    absent = receipt.snapshot_id[:-1] + ("0" if receipt.snapshot_id[-1] != "0" else "1")
+    assert capture.main(["--snapshot-root", str(study), "--freeze-snapshot", absent]) == 1
+    assert capsys.readouterr().out.strip() == "Benchmark picks capture refused: missing_freeze"
+
+
+def test_claim_whose_fingerprint_differs_is_refused(tmp_path):
+    root, study, ledger, cohort, _boot, receipt = frozen(tmp_path)
+    claim = capture.freeze_claim_path(study, 6)
+    claim.write_text(
+        json.dumps({"snapshot_id": receipt.snapshot_id, "fingerprint": "0" * 64}),
+        encoding="utf-8",
+    )
+    with pytest.raises(capture.BenchmarkCaptureRefused) as refused:
+        capture.freeze_decision(
+            root,
+            decision_directory=ledger,
+            cohort_snapshot_id=cohort.snapshot_id,
+            gameweek=6,
+            output_root=study,
+            now=lambda: PRE,
+        )
+    assert refused.value.reason == "provenance_mismatch"
