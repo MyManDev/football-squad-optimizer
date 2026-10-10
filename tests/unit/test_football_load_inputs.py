@@ -713,6 +713,8 @@ def test_original_bytes_hash_and_size_are_bound() -> None:
         ("native_basis_version", "unknown"),
         ("native_basis_fit_cutoff", DECISION),
         ("source_sha256", "A" * 64),
+        ("interval_start_at", "2024-09-07T12:00:00Z"),
+        ("interval_end_at", "2024-10-04T11:00:00Z"),
     ],
 )
 def test_direct_load_values_cannot_bypass_typed_receipts(field: str, value: Any) -> None:
@@ -785,7 +787,24 @@ def test_final_fpl_labels_require_known_recorded_starts_and_exact_native_identit
 
 @pytest.mark.parametrize(
     ("minutes", "starts", "state"),
-    [(0, 0, 0), (40, 1, 1), (75, 1, 2), (120, 1, 3), (10, 0, 4), (65, 0, 5), (100, 0, 6)],
+    [
+        (0, 0, 0),
+        (40, 1, 1),
+        (75, 1, 2),
+        (120, 1, 3),
+        (10, 0, 4),
+        (65, 0, 5),
+        (100, 0, 6),
+        # Bin edges: 60 credited minutes reach the 60-minute bin, 90 the full bin.
+        (59, 1, 1),
+        (60, 1, 2),
+        (89, 1, 2),
+        (90, 1, 3),
+        (59, 0, 4),
+        (60, 0, 5),
+        (89, 0, 5),
+        (90, 0, 6),
+    ],
 )
 def test_each_fpl_state_is_bound_to_separate_credited_minutes_and_recorded_start(
     minutes: int, starts: int, state: int
@@ -928,6 +947,199 @@ def test_past_club_completion_and_physical_player_exit_require_real_recorded_clo
         document["matches"][-1]["recorded_exit_at"] = "2024-10-02T18:01:00Z"
     with pytest.raises(DataError):
         read_week(document)
+
+
+@pytest.mark.parametrize(
+    ("minutes", "valid"),
+    [
+        ((0, 59.5, 60, 90, 12, 60, 120), True),
+        ((0, 60, 75, 90, 12, 65, 90), False),
+        ((0, 40, 90, 90, 12, 65, 90), False),
+        ((0, 40, 75, 89.5, 12, 65, 90), False),
+        ((0, 40, 75, 90, 60, 65, 90), False),
+        ((0, 40, 75, 90, 12, 90, 90), False),
+        ((0, 40, 75, 90, 12, 65, 89.5), False),
+    ],
+)
+def test_native_minute_supports_respect_their_bin_edges(
+    minutes: tuple[float, ...], valid: bool
+) -> None:
+    fixture = replace(native_fixtures()[0], minutes=minutes)
+    states, probabilities = native_joint((fixture,))
+    if valid:
+        native_joint_law_digest((fixture,), states, probabilities)
+    else:
+        with pytest.raises(DataError, match="declared state bins"):
+            native_joint_law_digest((fixture,), states, probabilities)
+
+
+def test_record_captured_after_the_snapshot_capture_refuses() -> None:
+    document = snapshot_document()
+    # Captured and published before the decision, but after the snapshot itself was captured.
+    document["matches"][-1].update(
+        captured_at="2024-10-04T10:40:00Z", published_at="2024-10-04T10:50:00Z"
+    )
+    with pytest.raises(DataError, match="bind snapshot capture"):
+        read_week(document)
+
+
+def travel_group(**record: Any) -> dict[str, Any]:
+    return {
+        "complete": True,
+        "evidence_ref": "synthetic-travel-coverage",
+        "expected_ids": ["trip1"],
+        "records": [
+            {
+                "id": "trip1",
+                "distance_km": 300,
+                "duration_hours": None,
+                "end_at": None,
+                "captured_at": "2024-10-04T10:00:00Z",
+                "published_at": "2024-10-04T10:10:00Z",
+                "evidence_ref": "synthetic-trip",
+                **record,
+            }
+        ],
+    }
+
+
+def club_only_row(identity: str, kickoff: str, *, future: bool = False) -> dict[str, Any]:
+    if future:
+        return {
+            **snapshot_document()["upcoming_fixtures"][0],
+            "fixture_id": identity,
+            "competition_id": "FA",
+            "kickoff": kickoff,
+        }
+    settled = kickoff.replace("T18:00", "T20:00")
+    captured = kickoff.replace("T18:00", "T21:00")
+    return club_match(player_match(identity, "FA", kickoff, settled, captured, 20, 20, 90))
+
+
+@pytest.mark.parametrize(
+    "kind",
+    [
+        "exposure-beyond-settlement",
+        "added-and-extra-beyond-exposure",
+        "national-registered-club",
+        "national-premier-league",
+        "exit-without-exposure",
+        "starter-without-exposure",
+        "membership-starts-late",
+        "membership-ends-early",
+        "alias-not-yet-valid",
+        "alias-outside-inventory",
+        "settled-and-future",
+        "future-beyond-horizon",
+        "planned-travel-outside-horizon",
+        "actual-travel-before-interval",
+        "actual-travel-ends-after-capture",
+        "proxy-travel-duration",
+        "travel-duration-clock",
+        "travel-inventory",
+    ],
+)
+def test_each_source_refusal_reaches_its_own_guard(kind: str) -> None:
+    document = snapshot_document()
+    national, cup = document["matches"][0], document["matches"][-1]
+    coverage, mapping, travel = document["coverage"], document["mapping"], document["travel"]
+    if kind == "exposure-beyond-settlement":
+        # 123 physical minutes cannot fit in a match settled 120 minutes after kickoff.
+        cup.update(settled_at="2024-10-02T20:00:00Z", recorded_exit_at=None)
+        message = "contradicts total exposure"
+    elif kind == "added-and-extra-beyond-exposure":
+        cup.update(physical_minutes=30, added_minutes=20, extra_time_minutes=20)
+        cup["recorded_exit_at"] = None
+        message = "contradicts total exposure"
+    elif kind == "national-registered-club":
+        national["registered_club_code"] = 20
+        message = "temporal transfer mapping"
+    elif kind == "national-premier-league":
+        national["is_premier_league"] = True
+        message = "national-team mapping"
+    elif kind == "exit-without-exposure":
+        cup.update(physical_minutes=0, added_minutes=0, extra_time_minutes=0, starts=0)
+        message = "known positive exposure"
+    elif kind == "starter-without-exposure":
+        cup.update(physical_minutes=0, added_minutes=0, extra_time_minutes=0)
+        cup["recorded_exit_at"] = None
+        message = "recorded starter"
+    elif kind == "membership-starts-late":
+        mapping["club_memberships"][0]["valid_from"] = "2024-09-10T00:00:00Z"
+        message = "starts too late"
+    elif kind == "membership-ends-early":
+        mapping["national_memberships"][0]["valid_until"] = "2024-10-04T00:00:00Z"
+        message = "must include decision_at"
+    elif kind == "alias-not-yet-valid":
+        mapping["player_aliases"][1]["valid_from"] = "2024-09-21T00:00:00Z"
+        message = "temporal persistent mapping"
+    elif kind == "alias-outside-inventory":
+        document["fixture_aliases"] = [
+            {"alias": "elsewhere", "canonical_fixture_id": "absent", "evidence_ref": "x"}
+        ]
+        message = "outside expected player fixture inventory"
+    elif kind == "settled-and-future":
+        document["club_matches"].append(club_only_row("club-only", "2024-09-25T18:00:00Z"))
+        document["upcoming_fixtures"].append(
+            club_only_row("club-only", "2024-10-04T20:00:00Z", future=True)
+        )
+        coverage["expected_club_match_ids"].append("club-only")
+        coverage["expected_upcoming_fixture_ids"].append("club-only")
+        message = "both settled and future"
+    elif kind == "future-beyond-horizon":
+        document["upcoming_fixtures"].append(
+            club_only_row("late-cup", "2024-10-06T18:00:00Z", future=True)
+        )
+        coverage["expected_upcoming_fixture_ids"].append("late-cup")
+        message = "exceeds the target horizon"
+    elif kind == "planned-travel-outside-horizon":
+        travel["planned"] = travel_group(start_at="2024-10-06T11:00:00Z")
+        message = "Planned travel must bind"
+    elif kind == "actual-travel-before-interval":
+        travel["actual"] = travel_group(
+            start_at="2024-09-01T08:00:00Z", end_at="2024-09-01T10:00:00Z"
+        )
+        message = "completed predecision itinerary"
+    elif kind == "actual-travel-ends-after-capture":
+        travel["actual"] = travel_group(
+            start_at="2024-10-04T08:00:00Z", end_at="2024-10-04T10:05:00Z"
+        )
+        message = "completed predecision itinerary"
+    elif kind == "proxy-travel-duration":
+        travel["venue_distance_proxy"] = travel_group(
+            start_at="2024-10-05T15:00:00Z", duration_hours=2
+        )
+        message = "cannot assert actual itinerary"
+    elif kind == "travel-duration-clock":
+        travel["actual"] = travel_group(
+            start_at="2024-10-01T08:00:00Z", end_at="2024-10-01T10:00:00Z", duration_hours=3
+        )
+        message = "contradicts declared journey clocks"
+    else:
+        travel["actual"] = travel_group(
+            start_at="2024-10-01T08:00:00Z", end_at="2024-10-01T10:00:00Z"
+        )
+        travel["actual"]["expected_ids"].append("trip2")
+        message = "lacks declared covered journeys"
+    with pytest.raises(DataError, match=message):
+        read_week(document)
+
+
+def test_club_matches_and_prior_non_pl_opportunities_follow_their_windows() -> None:
+    document = snapshot_document(2)
+    document["club_matches"].append(club_only_row("old-cup", "2024-09-25T18:00:00Z"))
+    document["upcoming_fixtures"].append(
+        club_only_row("midweek-cup", "2024-10-06T18:00:00Z", future=True)
+    )
+    document["coverage"]["expected_club_match_ids"].append("old-cup")
+    document["coverage"]["expected_upcoming_fixture_ids"].append("midweek-cup")
+    values = feature_values(read_week(document, count=2))
+    assert (values["club_matches_7d"], values["club_matches_14d"]) == (2, 3)
+    assert values["club_matches_28d"] == 3
+    # Europe precedes both targets; the midweek cup falls between them.
+    assert values["fixture_1_known_prior_non_pl_matches"] == 1
+    assert values["fixture_2_known_prior_non_pl_matches"] == 2
+    assert values["known_upcoming_club_matches_before_last_target"] == 2
 
 
 def test_postdeadline_native_support_is_strict_and_boolean_probabilities_refuse() -> None:
