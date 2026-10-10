@@ -11,6 +11,7 @@ import json
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any
@@ -47,6 +48,26 @@ def football_bundle_path(artifact_root: Path, snapshot_id: str) -> Path:
     return football_artifact_path(artifact_root, snapshot_id).with_suffix(".bundle.json")
 
 
+class FootballBundleStage(StrEnum):
+    STARTED = ".bundle.started.json"
+    PREPARATION = ".bundle.preparation.json"
+    PRODUCTION = ".bundle.production.json"
+    FOLDER = ".bundle"
+
+
+def football_bundle_stage_path(
+    artifact_root: Path, snapshot_id: str, stage: FootballBundleStage
+) -> Path:
+    return football_artifact_path(artifact_root, snapshot_id).with_suffix(stage.value)
+
+
+def football_bundle_stage_paths(artifact_root: Path, snapshot_id: str) -> tuple[Path, ...]:
+    return tuple(
+        football_bundle_stage_path(artifact_root, snapshot_id, stage)
+        for stage in FootballBundleStage
+    )
+
+
 def _object(raw: bytes) -> dict[str, Any]:
     result = json.loads(raw)
     if not isinstance(result, dict):
@@ -58,10 +79,14 @@ def _digest(raw: bytes) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
-def _source(snapshot_root: Path, capture_id: str) -> CapturedSnapshot:
-    # read_snapshot validates exact bytes; reject path aliases before opening them.
+def _require_capture_id(capture_id: str) -> None:
     if not re.fullmatch(r"[a-z0-9][A-Za-z0-9-]{0,159}", capture_id):
         raise ValueError("Invalid bundle source capture identity.")
+
+
+def _source(snapshot_root: Path, capture_id: str) -> CapturedSnapshot:
+    # read_snapshot validates exact bytes; reject path aliases before opening them.
+    _require_capture_id(capture_id)
     _safe(Path(addressable(snapshot_root / capture_id)))
     return read_snapshot(snapshot_root, capture_id)
 
@@ -427,11 +452,38 @@ def seal_football_bundle(
         read_football_bundle(
             artifact_root=artifact_root, snapshot_root=snapshot_root, snapshot_id=snapshot_id
         )
+    site_tree = single_league_tree(site_data_root, league_id)
+    for capture_id in (snapshot_id, news_capture_id, official_injury_capture_id):
+        if capture_id is not None:
+            _require_capture_id(capture_id)
+    if (news_capture_id is not None) != (rotation_table_path is not None):
+        raise ValueError("News requires both exact rotation artifacts, or none of the three.")
+    if rotation_table_path is not None:
+        for path in (rotation_table_path, rotation_table_path.with_suffix(".manifest.json")):
+            if path.name in _RESERVED_FILENAMES:
+                raise ValueError("Reserved rotation artifact filename.")
+            if not _ROTATION_FILENAME.fullmatch(path.name):
+                raise ValueError("Invalid sealed rotation filename.")
+    # The attempt record takes the decision capture's name. Read that capture by its
+    # exact identity first: where the filesystem ignores case, a miscased id would
+    # otherwise create the real capture's record with other bytes, and the corrected
+    # retry could never write its own.
+    _source(snapshot_root, snapshot_id)
+    # A failed preparation has no ready marker or copied folder yet. Record the
+    # attempt before either, so older v1 readers cannot serve its loose artifacts.
+    started = football_bundle_stage_path(artifact_root, snapshot_id, FootballBundleStage.STARTED)
+    _safe(Path(addressable(started)))
+    write_bytes_once(
+        document_bytes(
+            {"contract_version": "football_bundle_attempt_v1", "snapshot_id": snapshot_id}
+        ),
+        started,
+    )
     files = {
         "forecast": football_artifact_path(artifact_root, snapshot_id),
         "components": football_components_path(artifact_root, snapshot_id),
         "handoff": handoff_path,
-        **_site_files(single_league_tree(site_data_root, league_id)),
+        **_site_files(site_tree),
     }
     if rotation_table_path is not None:
         files.update(
@@ -452,7 +504,7 @@ def seal_football_bundle(
         news_capture_id=news_capture_id,
         official_injury_capture_id=official_injury_capture_id,
     )
-    folder = marker.parent / (snapshot_id + ".bundle")
+    folder = football_bundle_stage_path(artifact_root, snapshot_id, FootballBundleStage.FOLDER)
     destinations = dict(files)
     destinations["handoff"] = folder / "handoff.json"
     for role, path in files.items():

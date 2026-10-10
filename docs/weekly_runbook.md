@@ -254,6 +254,9 @@ each line; the commands are in the table above and in the documents named.
    augments). Its marker is written last, after every
    copy has been read back through the production validators; a name or an input the reader
    would refuse is refused before anything is copied.
+   A refused seal after argument resolution turns off the unsealed football input and the
+   manager's word for that capture until the identical retry completes; never remove an
+   attempt record by hand.
 6. **The site pull request merges through develop's merge queue, the release is cut and
    tagged, the backend is restarted** (`docs/deployment_runbook.md`). The restart reads the
    one capture every published human entry names, on the public site and locally, and
