@@ -110,6 +110,18 @@ def test_missing_row_drops_only_its_two_pair_weeks() -> None:
     assert cumulative["cumulative_rms"] == 60
 
 
+def test_prefix_and_cumulative_readings_run_from_gw3_through_n() -> None:
+    record = _measure(_payloads())
+    assert [row["through_gameweek"] for row in record["prefixes"]] == [3, 4, 5, 6]
+    assert [row["through_gameweek"] for row in record["cumulative_comparisons"]] == [3, 4, 5, 6]
+    # Every pair's weekly gap is constant, so its k-week gap is k times that gap and the
+    # ratio grows as sqrt(k). The tolerance leaves open which S divides it, still open on #1041.
+    ratios = [
+        row["cumulative_rms_over_sqrt_k_times_scale"] for row in record["cumulative_comparisons"]
+    ]
+    assert ratios == pytest.approx([math.sqrt(k) for k in (3, 4, 5, 6)], rel=1e-2)
+
+
 @pytest.mark.parametrize("field", ["finished", "data_checked"])
 @pytest.mark.parametrize("week", [4, 6])
 def test_unfinished_or_unchecked_gameweek_refuses(field: str, week: int) -> None:
