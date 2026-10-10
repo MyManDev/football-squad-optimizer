@@ -1,16 +1,14 @@
-# Prospective football pairing proposal
+# Prospective football pairing rule
 
-Status: draft awaiting the owner's confirmation of Decision defaults 1 to 5 on
-[issue #1007](https://github.com/MyManDev/football-squad-optimizer/issues/1007).
+Status: accepted. On 2026-10-10 the owner accepted Decision defaults 1 to 5 of
+[issue #1007](https://github.com/MyManDev/football-squad-optimizer/issues/1007)
+as proposed, with no amendment, answering
+[the question in comment 6045899361](https://github.com/MyManDev/football-squad-optimizer/issues/1007#issuecomment-6045899361).
 Written: 2026-10-07T21:54Z, before any GW6-or-later outcome comparison by this task.
-This note proposes the exact issue defaults for review. They become accepted
-rules only after the owner confirms or amends them on the issue and this PR
-merges. Record the acceptance and GW6 timing declaration before merge; cite
-the actual GitHub merge timestamp on the issue after merge.
 
 The frozen protocol remains [football_prospective_prereg.md](football_prospective_prereg.md),
 merged in #844 at 2026-09-26T06:00:39Z as `ccd803de`. Its first scored week is
-GW6; GW1 to GW5 remain spent. This proposal does not edit the protocol or change
+GW6; GW1 to GW5 remain spent. This note does not edit the protocol or change
 its readings, scored-capture choice, scoring policy, promotion thresholds or
 once-only GW20/GW38 reading schedule.
 
@@ -33,7 +31,7 @@ arm's weeks, and each receipt records `served: false`. #988 route 1 retires the
 backend after the GW6 publish. The two arms therefore need preserved inputs
 that survive that retirement.
 
-## Proposed default 1: pair Current in this order
+## Default 1: pair Current in this order
 
 **Branch a, the published-plan handoff.** Inspect member advice records for the
 scored capture, counting only those whose recorded publication preceded the
@@ -75,7 +73,7 @@ unique retained fingerprints. That helper skips a file that raises `OSError`
 and moves on to the remaining copies, so the equality test excludes the
 refused case. No backend is started to perform those tests.
 
-## Proposed default 2: the never-served football arm
+## Default 2: the never-served football arm
 
 The football artifact root is `artifacts/shadow/football_team_share_v1`. Every
 week read from it is pooled under the protocol's ordinary rules, as decision 2
@@ -93,7 +91,7 @@ protocol's existing missing status. This note does not permit a different
 football version, a newly rebuilt late artifact or a change to the protocol's
 classification.
 
-## Proposed default 3: capture and outcome inventory
+## Default 3: capture and outcome inventory
 
 The runner inventories every 2026-27 `fpl-live` capture in `--snapshot-root` and
 records each capture's own target. The scored capture remains the last capture
@@ -116,7 +114,7 @@ GW20 week whose outcome capture, input fingerprints or realized scores differ,
 list both readings' values. Do not conceal settlement corrections or rewrite
 the interim record. The once-only and missing/replay rules stay those of #844.
 
-## Proposed default 4: reading two's members
+## Default 4: reading two's members
 
 Include every entry whose picks are present in the scored capture, whichever
 listed league supplied it. Record the count per week. Entry ids, per-player
@@ -124,7 +122,7 @@ rows and per-member plans stay in the ignored private evidence, not the
 committed aggregate record. Reading two retains the protocol's normal-week
 plan, proof/completeness and scoring rules.
 
-## Proposed default 5: one runner for both readings
+## Default 5: one runner for both readings
 
 The runner records its repository commit and the SHA256 of its own bytes. Its
 checkout must be clean and its commit an ancestor of `origin/develop`.
@@ -170,13 +168,14 @@ must preserve captures, handoffs, advice records, shadow artifacts and their
 modification times because the protocol uses those times. The note alone
 authorizes no collection, rehearsal, reading, release or backend action.
 
-## Acceptance record required before merge
+## Acceptance record
 
-Owner decision comment: pending.
-Accepted defaults or listed amendments: pending.
-GW6 timing declaration for the reviewed merge window: pending.
+The owner accepted these decisions on 2026-10-10, answering
+[#1007 comment 6045899361](https://github.com/MyManDev/football-squad-optimizer/issues/1007#issuecomment-6045899361).
 
-The PR remains draft until that evidence exists. Replace pending fields with
-the owner's actual decision and the review's timing declaration. The actual
-merge instant comes from GitHub after merge, not a predicted timestamp. Do not record
-an inferred approval or treat the proposal as an accepted protocol amendment.
+| Decision | Accepted rule |
+| --- | --- |
+| Defaults 1 to 5 | As proposed on #1007, with no amendment. Default 1 to Default 5 above state them. |
+
+This note fixes only what the protocol left open. It is not an amendment of
+the frozen protocol.
