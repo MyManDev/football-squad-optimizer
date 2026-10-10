@@ -92,6 +92,25 @@ def served_again(case):
     return replace(case, weekly=weekly)
 
 
+def unknown_role_case(missing=None):
+    """The native four-bin control whose starting roles remain unknown."""
+    case = native_case()
+    frame = case.components.copy(deep=True)
+    for index, row in frame.iterrows():
+        probabilities = (*(float(row[f"minute_probability_{i}"]) for i in range(4)), 0.0, 0.0, 0.0)
+        minutes = (*(float(row[f"minute_value_{i}"]) for i in range(4)), 10.0, 65.0, 90.0)
+        values = score_row(row, probabilities, minutes)
+        frame.loc[index, list(values)] = list(values.values())
+    for column in ROLE_COMPONENT_COLUMNS:
+        if column.startswith(("start_", "cameo_")):
+            frame[column] = pd.Series([missing] * len(frame), dtype="object")
+    frame["minute_role_status"] = "unavailable_no_known_start_labels"
+    frame["known_start_label_rows"] = 0
+    frame["unknown_start_label_rows"] = 80
+    frame["unknown_role_probability"] = frame.appearance_probability
+    return served_again(replace(case, components=frame))
+
+
 def assert_unmarked_equal(actual, expected):
     actual = actual.copy(deep=True)
     actual.attrs = {k: v for k, v in actual.attrs.items() if k != RECEIPT_ATTR}
@@ -418,6 +437,8 @@ def test_gk_goal_value_and_negative_raw_clipping_remain_native_rules(model):
         "alias_to_two_clubs",
         "source_receipt",
         "availability_receipt",
+        "availability_already_applied",
+        "availability_undeclared",
     ),
 )
 def test_original_basis_and_comparator_refusals(fault):
@@ -470,6 +491,10 @@ def test_original_basis_and_comparator_refusals(fault):
         case.components.attrs.pop("captured_availability_sha256")
     elif fault == "availability_receipt":
         case.components.attrs.pop("captured_availability_evidence_ref")
+    elif fault == "availability_already_applied":
+        case.components.attrs["availability_application"] = "applied_once"
+    elif fault == "availability_undeclared":
+        case.components.attrs.pop("availability_application")
     with pytest.raises(ValueError):
         compose(case, enabled=False)
 
@@ -616,6 +641,71 @@ def test_model_prediction_receipt_and_joint_marginal_refusals(model, monkeypatch
     monkeypatch.setattr(model, "predict", invalid)
     with pytest.raises(ValueError):
         compose(case, model, weeks=weeks)
+
+
+@pytest.mark.parametrize(
+    "fault",
+    (
+        "basis",
+        "position",
+        "decision",
+        "deadline",
+        "fixture_kickoff",
+        "fixture_home",
+        "fixture_opponent",
+        "fixture_law",
+        "role_status",
+    ),
+)
+def test_enabled_load_inputs_must_bind_the_same_native_capture(model, fault):
+    case = native_case()
+    weeks = list(case_inputs(case))
+    first = weeks[0]
+    assert (first.player_code, first.position, len(first.fixtures)) == (1, "GK", 1)
+    message = "differs from the original native capture"
+    if fault == "basis":
+        weeks[0] = replace(first, native_basis_sha256="0" * 64)
+    elif fault == "position":
+        weeks[0] = replace(first, position="FWD")
+    elif fault == "decision":
+        weeks[0] = replace(
+            first,
+            decision_at="2026-09-22T11:00:00Z",
+            interval_start_at="2026-08-25T11:00:00Z",
+            interval_end_at="2026-09-22T11:00:00Z",
+        )
+    elif fault == "deadline":
+        weeks[0] = replace(first, deadline_at="2026-09-22T17:00:00Z")
+    elif fault.startswith("fixture_"):
+        message = "different native fixture"
+        fixture = first.fixtures[0]
+        assert (fixture.club_code, fixture.opponent_code, fixture.is_home) == (1, 2, 1)
+        probabilities = first.native_joint_probabilities
+        if fault == "fixture_kickoff":
+            fixture = replace(fixture, kickoff="2026-09-23T16:00:00Z")
+        elif fault == "fixture_home":
+            fixture = replace(fixture, is_home=0)
+        elif fault == "fixture_opponent":
+            fixture = replace(fixture, opponent_code=3)
+        else:
+            # The same weekly appearance with a different native role split.
+            probabilities = (0.12, 0.10, 0.08, 0.45, 0.10, 0.10, 0.05)
+            fixture = replace(fixture, probabilities=probabilities)
+        weeks[0] = replace(
+            first,
+            fixtures=(fixture,),
+            native_joint_probabilities=probabilities,
+            native_joint_law_sha256=native_joint_law_digest(
+                (fixture,), first.native_joint_states, probabilities
+            ),
+        )
+    else:
+        message = "starting-role support"
+        case = unknown_role_case()
+        basis = native_basis_digest(case.components)
+        weeks = [replace(week, native_basis_sha256=basis) for week in weeks]
+    with pytest.raises(ValueError, match=message):
+        compose(case, model, weeks=tuple(weeks))
 
 
 def test_native_components_cannot_be_scaled_twice_before_recipients(model):
@@ -790,21 +880,8 @@ def test_zero_attacking_channels_and_structural_endpoints_have_no_invented_suppo
 
 @pytest.mark.parametrize("missing", (None, pd.NA, math.nan), ids=("null", "pandas_na", "nan"))
 def test_unknown_native_start_roles_remain_exact_disabled_control(missing):
-    case = native_case()
-    frame = case.components.copy(deep=True)
-    for index, row in frame.iterrows():
-        probabilities = (*(float(row[f"minute_probability_{i}"]) for i in range(4)), 0.0, 0.0, 0.0)
-        minutes = (*(float(row[f"minute_value_{i}"]) for i in range(4)), 10.0, 65.0, 90.0)
-        values = score_row(row, probabilities, minutes)
-        frame.loc[index, list(values)] = list(values.values())
-    for column in ROLE_COMPONENT_COLUMNS:
-        if column.startswith(("start_", "cameo_")):
-            frame[column] = pd.Series([missing] * len(frame), dtype="object")
-    frame["minute_role_status"] = "unavailable_no_known_start_labels"
-    frame["known_start_label_rows"] = 0
-    frame["unknown_start_label_rows"] = 80
-    frame["unknown_role_probability"] = frame.appearance_probability
-    case = served_again(replace(case, components=frame))
+    case = unknown_role_case(missing)
+    frame = case.components
     candidate = compose(case, object(), weeks=object(), enabled=False)
     assert_unmarked_equal(candidate.components, frame)
     assert_unmarked_equal(candidate.weekly, case.weekly)
