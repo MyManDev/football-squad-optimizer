@@ -188,10 +188,12 @@ def prepare_live_week(week: LiveBenchmarkWeek) -> PreparedLiveWeek:
                 "late_capture", "Benchmark decision, freeze and cohort must precede deadline."
             )
     # As-of membership: a cohort taken before the previous deadline ranks an older week.
+    # The deadline's own instant already closes that week, as in the late_capture gate
+    # above and in next_open_deadline, so a capture at that instant belongs to this week.
     previous = deadlines.get(week.gameweek - 1)
-    if previous is None or as_instant(week.cohort.metadata.captured_at_utc) <= as_instant(previous):
+    if previous is None or as_instant(week.cohort.metadata.captured_at_utc) < as_instant(previous):
         raise LiveWeekRefusal(
-            "stale_cohort", "Benchmark cohort must follow the previous gameweek deadline."
+            "stale_cohort", "Benchmark cohort cannot precede the previous gameweek deadline."
         )
     for snapshot in (week.picks, week.outcome):
         if as_instant(snapshot.metadata.captured_at_utc) < deadline:

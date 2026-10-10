@@ -303,7 +303,8 @@ def _with_configuration(candidate, **changes):
     ("captured_at_utc", "admitted"),
     [
         ("2026-10-09T08:00:00Z", False),  # before GW6's deadline: ranked as of GW5
-        ("2026-10-17T10:00:00Z", False),  # at GW7's deadline: GW7 not yet ranked
+        ("2026-10-17T09:59:59Z", False),  # GW7 still open: the cohort of an older week
+        ("2026-10-17T10:00:00Z", True),  # GW7's deadline closes GW7, so GW8 is open
         ("2026-10-17T10:00:01Z", True),
     ],
 )

@@ -26,8 +26,10 @@ The weekly collector must record this configuration before the target deadline.
 Existing late decisions or unrecorded configurations cannot be reconstructed.
 
 The cohort is the original pre-deadline `fpl-top100` capture with unique rank_sort
-1 to 100, taken after the previous gameweek's deadline so that it ranks the managers as
-of the target week. An older capture is refused as `stale_cohort`. The post-deadline `fpl-benchmark-picks` capture holds its original members'
+1 to 100, taken while the target week is the open one: at or after the previous
+gameweek's deadline, whose own instant already closes that week as every deadline
+gate here counts it. An older capture is refused as `stale_cohort`. The post-deadline
+`fpl-benchmark-picks` capture holds its original members'
 target-week picks, histories and bootstrap, plus `benchmark.json` naming that same
 cohort, season and week. Unreadable members remain absent. The original bench positions
 are recovered from FPL's explicit autosubstitution pairs when its settled positions
