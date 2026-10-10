@@ -278,6 +278,7 @@ def advice_read_schema() -> dict[str, Any]:
                         "enum": [
                             "football_team_share_v1",
                             "football_contextual_v3",
+                            "football_match_context_v1",
                             "football_joint_role_minutes_v1",
                             "football_joint_role_retained_history_v1",
                         ]
