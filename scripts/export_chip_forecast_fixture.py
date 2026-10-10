@@ -267,11 +267,15 @@ def build_fixture() -> dict[str, Any]:
     }
 
 
+def render() -> str:
+    """The fixture's committed text: the generator's own format, never reformatted."""
+
+    return json.dumps(build_fixture(), indent=2, allow_nan=False) + "\n"
+
+
 def main() -> None:
     FIXTURE.parent.mkdir(parents=True, exist_ok=True)
-    FIXTURE.write_text(
-        json.dumps(build_fixture(), indent=2, allow_nan=False) + "\n", encoding="utf-8"
-    )
+    FIXTURE.write_text(render(), encoding="utf-8", newline="\n")
 
 
 if __name__ == "__main__":

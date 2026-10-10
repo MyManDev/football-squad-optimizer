@@ -2,11 +2,17 @@
 
 import json
 
-from scripts.export_chip_forecast_fixture import FIXTURE, build_fixture
+from scripts.export_chip_forecast_fixture import FIXTURE, build_fixture, render
 
 
 def test_fixture_is_the_python_rules_current_answer() -> None:
     assert json.loads(FIXTURE.read_text(encoding="utf-8")) == build_fixture()
+
+
+def test_fixture_is_the_generators_exact_text() -> None:
+    # Parsed JSON holds true equal to 1, so a refusal edited from true to 1 would still
+    # compare equal above while no longer testing a boolean. The text does not.
+    assert FIXTURE.read_text(encoding="utf-8") == render()
 
 
 def test_fixture_covers_the_required_branches() -> None:
