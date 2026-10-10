@@ -69,6 +69,7 @@ Date is the file's last commit (`git log -1 --format=%as -- scripts/<name>.py`).
 | `measure_rotation_ceiling.py` | measurement runner | `docs/rotation_oracle_ceiling.json` | 2026-09-09 |
 | `measure_scenario_path_dependence.py` | measurement runner | `docs/scenario_path_dependence.json` | 2026-08-19 |
 | `measure_strategy_bench.py` | measurement runner | `docs/strategy_bench.json` | 2026-09-10 |
+| `measure_strategy_rule_scale.py` | measurement runner | `docs/strategy_rule_scale.json`, `docs/strategy_rule_scale.md` | 2026-10-10 |
 | `measure_strategy_screening.py` | measurement runner | `docs/strategy_screening.json` | 2026-08-31 |
 | `measure_template_rival.py` | measurement runner | `docs/template_rival_strength.json` (+ per-season variants) | 2026-08-19 |
 | `measure_window_solver_highs.py` | measurement runner | `docs/research/window_solver_highs.json`, `docs/research/window_solver_highs.md`; `check` writes only `artifacts/window_solver_highs/`; protocol `docs/window_solver_highs_prereg.md` | 2026-10-06 |
