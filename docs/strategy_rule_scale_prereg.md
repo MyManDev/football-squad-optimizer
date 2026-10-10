@@ -1,12 +1,25 @@
-# Strategy rule scale preregistration proposal
+# Strategy rule scale: preregistration
 
-Status: draft awaiting the owner's confirmation on
-[issue #1002](https://github.com/MyManDev/football-squad-optimizer/issues/1002).
-Written: 2026-10-08, before this task computes any scale beyond GW3.
-The six recommended Decision defaults below are proposed for approval. This
-document becomes the binding preregistration only after the owner accepts or
-amends them on the issue and the declaration PR merges. Merge before
-2026-10-12T19:00:00Z, during an idle weekly-operation window.
+Status: pre-registered on the decisions the owner accepted on 2026-10-10 on
+[issue #1002](https://github.com/MyManDev/football-squad-optimizer/issues/1002),
+before any scale beyond GW3 was computed. It binds from its merge, due before
+2026-10-12T19:00:00Z under Decision default 6, in an idle weekly-operation
+window. Written: 2026-10-08 as a proposal, and revised on 2026-10-10 to record
+the owner's decisions.
+
+## Decisions accepted by the owner on 2026-10-10
+
+| Question on #1002 | Accepted by the owner on 2026-10-10 |
+| --- | --- |
+| Decision defaults 1 to 6 | Accepted as proposed: one constant for every league, the estimator, the readings, the update rule, the checkpoints and the timing, as stated below. |
+| A GW1 to GW3 control that fails | The runner writes the aggregate record with the control marked failed, and step 4 is held until the difference is explained on #1002. |
+| The divisor of reading (d) | The unrounded S on GW1 to N. |
+| Reading (e) | The league list is `config/leagues.json` at the measured revision. A secondary league is available when its standings and every member's history for every admitted week are readable in the named capture. A missing secondary league never refuses the primary reading. |
+| Disclosure of prior reads | It credits the issue's record, and this document's author states having read no capture outcome for the measured weeks. |
+| The rule id at the GW12 and GW19 checkpoints | The id's version increments only when the value changes; an unchanged value keeps its id. |
+
+Where a decision leaves a detail open, this declaration takes the most
+conservative reading and names it as such where it applies.
 
 ## Prior observation and question
 
@@ -116,9 +129,9 @@ rule id and merged step 4 PR on #983.
 
 ## Execution, records and checkpoints
 
-Nobody computes S beyond GW3 before this declaration merges with its method
-accepted. The wired-into-nothing step 2 script uses synthetic FPL-shaped histories
-for its tests: hand-computed S, hit subtraction, missing pair-weeks, unchecked-week
+Nobody computes S beyond GW3 before this declaration merges. The
+wired-into-nothing step 2 script uses synthetic FPL-shaped histories for its
+tests: hand-computed S, hit subtraction, missing pair-weeks, unchecked-week
 refusal, absent transfer-cost refusal, half-up ties and numeric week rendering.
 
 Step 3 reads the first capture marking GW6 finished and data_checked. That capture
@@ -132,8 +145,9 @@ rounded S, the control result, passed or failed, and the companion readings. A
 failed control is recorded the same way. Outputs contain aggregates only.
 
 Step 4 merges after the GW6 publish and at or after 2026-10-10T10:00:00Z, aiming
-for the GW7 publish. A failed control holds it as control (a) states. After the owner's release approval, the first live publish
-with a non-null suggestion must carry the resulting rule id and
+for the GW7 publish. A failed control holds it as control (a) states. After the
+owner's release approval, the first live publish with a non-null suggestion must
+carry the resulting rule id and
 `band_edge_points = round(1.0 * C * sqrt(weeks_remaining), 1)`, where C is the
 rounded S, which `WEEKLY_POINTS_DIFFERENTIAL_POINTS` holds after step 4 whether
 it was retained or changed, not the unrounded S. Until then a league build test
@@ -148,10 +162,9 @@ and data_checked flags remain the execution gate if that schedule changes. Once
 the TypeScript port exists, later value changes update both languages and parity
 in one PR.
 
-## Scope and approval gate
+## Scope
 
-This proposal contains no measured GW4-or-later number, code change, member copy,
-TypeScript port, new league capture, per-league/device scale or shape change.
-The owner may amend any recommended default on #1002 before merge. Any accepted
-amendment must be reflected here before the declaration becomes binding. The
-step 1 PR remains draft pending that decision and is not enqueued by this task.
+This declaration contains no measured GW4-or-later number, code change, member
+copy, TypeScript port, new league capture, per-league/device scale or shape
+change. The owner accepted Decision defaults 1 to 6 and the five decisions
+recorded above on 2026-10-10 on #1002, and this text states them as accepted.
