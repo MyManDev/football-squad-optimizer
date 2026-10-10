@@ -261,6 +261,9 @@ def published_pair(
     for path in sorted(
         (safe_path(publications) / DEFCON_SEASON / f"gw{week:02d}").glob("entry-*/*/advice.json")
     ):
+        if path.parent.name.startswith("."):
+            # A hidden sibling is a writer's staging directory, never a landed record.
+            continue
         content = safe_path(path).read_bytes()
         doc = publication_fields(decode(content))
         if integer(doc["gameweek"], minimum=1) != week:

@@ -1180,6 +1180,31 @@ def test_input_check_reads_each_deadline_from_the_latest_retained_capture(tmp_pa
     assert report["weeks"][0]["identity"]["capture"] == snapshot.metadata.snapshot_id
 
 
+def test_unlanded_staging_record_is_not_a_publication(tmp_path: Path) -> None:
+    snapshot = capture(tmp_path / "snapshots")
+    path = publication(tmp_path, snapshot, base(snapshot))
+    # A writer that died before its landing rename leaves this hidden sibling behind.
+    document = decode(path.read_bytes())
+    document["provenance"]["projection_handoff_fingerprint"] = "f" * 64
+    document["generated_at_utc"] = stamp(
+        datetime.fromisoformat(snapshot.metadata.captured_at_utc) + timedelta(seconds=40)
+    )
+    staging = path.parents[1] / f".{snapshot.metadata.snapshot_id}.staging-1-abcd" / "advice.json"
+    staging.parent.mkdir()
+    staging.write_text(json.dumps(document), encoding="utf-8")
+    chosen, handoff, proof = runner.published_pair(
+        tmp_path / "publications",
+        tmp_path / "handoffs",
+        runner.inventory(tmp_path / "snapshots", as_of="2026-12-01T00:00:00Z"),
+        6,
+        as_of="2026-12-01T00:00:00Z",
+        deadline_utc=stamp(START + timedelta(weeks=5)),
+    )
+    assert chosen.metadata.snapshot_id == snapshot.metadata.snapshot_id
+    assert handoff.fingerprint == base(snapshot).fingerprint
+    assert proof["publication_sha256"] == [runner.payload_checksum(path.read_bytes())]
+
+
 def test_checker_keeps_other_week_after_a_malformed_publication(tmp_path: Path) -> None:
     for week in (6, 7):
         snapshot = capture(tmp_path / "snapshots", target=week)
