@@ -332,20 +332,31 @@ def _validate_live_id(snapshot_id: str) -> None:
         raise ScaleMeasurementError("The declared capture is outside live season 2026-27.")
 
 
+def _git_output(*arguments: str) -> bytes:
+    return subprocess.run(
+        ["git", *arguments], cwd=REPOSITORY_ROOT, capture_output=True, check=True
+    ).stdout
+
+
 def preregistration_gate() -> tuple[str, str]:
     """Before opening any capture, require the reviewed declaration on origin/develop."""
     revision, dirty = _git_revision()
     if dirty:
         raise ScaleMeasurementError("Commit the reviewed instrument before a real measurement.")
     try:
+        remote = _git_output("ls-remote", "origin", "refs/heads/develop").split()[:1]
+        tracked = _git_output("rev-parse", "--verify", "origin/develop").split()
+    except (OSError, subprocess.CalledProcessError) as error:
+        raise ScaleMeasurementError(
+            "Cannot compare origin/develop with the remote's develop."
+        ) from error
+    if not remote or remote != tracked:
+        # A clone fetched before an amendment would otherwise run the superseded method.
+        raise ScaleMeasurementError("Fetch origin/develop before a real measurement.")
+    try:
         merged = (
-            subprocess.run(
-                ["git", "show", f"origin/develop:{DECLARATION_PATH}"],
-                cwd=REPOSITORY_ROOT,
-                capture_output=True,
-                check=True,
-            )
-            .stdout.decode("utf-8")
+            _git_output("show", f"origin/develop:{DECLARATION_PATH}")
+            .decode("utf-8")
             .replace("\r\n", "\n")
             .encode("utf-8")
         )

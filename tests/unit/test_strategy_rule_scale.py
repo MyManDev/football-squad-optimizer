@@ -290,18 +290,34 @@ def test_invalid_or_holdout_identifier_refuses_before_prereg_or_capture_read(
     )
 
 
+def _git(
+    declared: bytes | None, *, remote: bytes = b"c" * 40, tracked: bytes = b"c" * 40
+) -> Callable[..., subprocess.CompletedProcess[bytes]]:
+    """Answer the gate's git calls; a None declaration is absent from origin/develop."""
+
+    def run(command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[bytes]:
+        outputs = {
+            "ls-remote": remote + b"\trefs/heads/develop\n",
+            "rev-parse": tracked + b"\n",
+            "show": declared,
+        }
+        output = outputs[command[1]]
+        if output is None:
+            raise subprocess.CalledProcessError(128, command)
+        return subprocess.CompletedProcess(command, 0, stdout=output)
+
+    return run
+
+
 def test_unmerged_preregistration_refuses_before_reading_any_capture(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     monkeypatch.setattr(measurement, "_git_revision", lambda: ("a" * 40, False))
-
-    def unmerged(*args: Any, **kwargs: Any) -> Any:
-        raise subprocess.CalledProcessError(128, "git show")
 
     def forbidden(*args: Any, **kwargs: Any) -> Any:
         pytest.fail("No snapshot is read before the declaration merges.")
 
-    monkeypatch.setattr(measurement.subprocess, "run", unmerged)
+    monkeypatch.setattr(measurement.subprocess, "run", _git(None))
     monkeypatch.setattr(measurement, "read_snapshot", forbidden)
     assert (
         measurement.main(
@@ -318,6 +334,7 @@ def test_unmerged_preregistration_refuses_before_reading_any_capture(
         )
         == 1
     )
+    assert "must first merge into origin/develop" in capsys.readouterr().err
     assert not (tmp_path / "docs").exists()
 
 
@@ -330,14 +347,25 @@ def test_declaration_pin_detects_method_amendments_before_measurement(
     declared = b"Synthetic reviewed declaration\n"
     (tmp_path / measurement.DECLARATION_PATH).write_bytes(declared)
     monkeypatch.setattr(measurement, "DECLARATION_SHA256", sha256(declared).hexdigest())
-    monkeypatch.setattr(
-        measurement.subprocess,
-        "run",
-        lambda *args, **kwargs: subprocess.CompletedProcess([], 0, stdout=declared),
-    )
+    monkeypatch.setattr(measurement.subprocess, "run", _git(declared))
     assert measurement.preregistration_gate() == ("a" * 40, sha256(declared).hexdigest())
     (tmp_path / measurement.DECLARATION_PATH).write_text("Different method\n")
     with pytest.raises(measurement.ScaleMeasurementError, match="differs"):
+        measurement.preregistration_gate()
+
+
+def test_stale_origin_develop_refuses_before_reading_the_declaration(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A clone fetched before an amendment holds the old declaration and pin, all agreeing."""
+    monkeypatch.setattr(measurement, "REPOSITORY_ROOT", tmp_path)
+    monkeypatch.setattr(measurement, "_git_revision", lambda: ("a" * 40, False))
+    (tmp_path / "docs").mkdir()
+    declared = b"Superseded declaration\n"
+    (tmp_path / measurement.DECLARATION_PATH).write_bytes(declared)
+    monkeypatch.setattr(measurement, "DECLARATION_SHA256", sha256(declared).hexdigest())
+    monkeypatch.setattr(measurement.subprocess, "run", _git(declared, remote=b"d" * 40))
+    with pytest.raises(measurement.ScaleMeasurementError, match="Fetch origin/develop"):
         measurement.preregistration_gate()
 
 
