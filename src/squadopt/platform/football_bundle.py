@@ -464,6 +464,11 @@ def seal_football_bundle(
                 raise ValueError("Reserved rotation artifact filename.")
             if not _ROTATION_FILENAME.fullmatch(path.name):
                 raise ValueError("Invalid sealed rotation filename.")
+    # The attempt record takes the decision capture's name. Read that capture by its
+    # exact identity first: where the filesystem ignores case, a miscased id would
+    # otherwise create the real capture's record with other bytes, and the corrected
+    # retry could never write its own.
+    _source(snapshot_root, snapshot_id)
     # A failed preparation has no ready marker or copied folder yet. Record the
     # attempt before either, so older v1 readers cannot serve its loose artifacts.
     started = football_bundle_stage_path(artifact_root, snapshot_id, FootballBundleStage.STARTED)

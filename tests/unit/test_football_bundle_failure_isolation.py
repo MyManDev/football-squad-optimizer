@@ -11,6 +11,7 @@ from tests.unit.test_football_bundle import case as case
 from tests.unit.test_football_bundle import publication_case as publication_case
 from tests.unit.test_football_bundle_switches import baseline, load, signature
 
+from squadopt.data.errors import DataError
 from squadopt.data.snapshots import read_snapshot, write_snapshot
 from squadopt.live import read_inputs, read_projection_handoff, write_projection_handoff
 from squadopt.live.football_artifact import football_artifact_path, forecast_digest
@@ -264,3 +265,20 @@ def test_malformed_capture_identity_does_not_disable_legacy_inputs(case, news_ca
         path.exists()
         for path in bundle.football_bundle_stage_paths(case["artifact_root"], case["snapshot_id"])
     )
+
+
+def test_miscased_decision_identity_does_not_disable_legacy_inputs(case):
+    real = case["snapshot_id"]
+    miscased = real[0] + real[1:].swapcase()
+    before = signature(case)
+    with pytest.raises(DataError):
+        bundle.seal_football_bundle(**dict(case, snapshot_id=miscased))
+    assert signature(case) == before
+    assert load(case).football is not None
+    for capture_id in (real, miscased):
+        assert not any(
+            path.exists()
+            for path in bundle.football_bundle_stage_paths(case["artifact_root"], capture_id)
+        )
+    # Where the filesystem ignores case, a record left by the miscased id would refuse this.
+    assert bundle.seal_football_bundle(**case).snapshot_id == real
