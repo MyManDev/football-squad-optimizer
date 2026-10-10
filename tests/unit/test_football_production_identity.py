@@ -13,6 +13,7 @@ from tests.unit.test_minute_evidence import basis_from
 from squadopt.live import read_projection_handoff, write_projection_handoff
 from squadopt.live.football_artifact import forecast_digest
 from squadopt.platform import football_bundle as bundle
+from squadopt.prediction.football_minutes_role import ROLE_MINUTE_VERSION
 
 
 @pytest.mark.parametrize(
@@ -164,6 +165,33 @@ def test_joint_record_keeps_three_archive_seasons_and_causal_history_apart(case)
         "2023-24",
         "2024-25",
     ]
+    # The whole joint record, so its role metadata and archive fields stay pinned too.
+    assert record == {
+        "contract_version": "football_production_record_v1",
+        "snapshot_id": "test-capture",
+        "football": {
+            "model_version": "football_joint_role_minutes_v1",
+            "season": "2026-27",
+            "gameweek": 6,
+            "source_snapshot_id": "test-capture",
+            "source_fingerprint": "a" * 64,
+            "captured_at_utc": "2026-09-22T12:00:00+00:00",
+            "training_rows": 1000,
+            "training_latest_kickoff": "2026-09-20T15:00:00+00:00",
+            "archive_hashes": {"test": "b" * 64},
+            "training_selection": selection,
+            "role_metadata": {"version": ROLE_MINUTE_VERSION, "known_start_label_rows": 96},
+        },
+        "current_handoff": {
+            "model_version": handoff.model_version,
+            "fingerprint": handoff.fingerprint,
+            "source_snapshot_id": "test-capture",
+            "sha256": bundle._digest(case["handoff_path"].read_bytes()),
+            "training_provenance": {
+                "component_training_seasons": ["2021-22", "2022-23", "2023-24", "2024-25"],
+            },
+        },
+    }
 
 
 def test_preflight_refusal_leaves_no_production_record(case):
