@@ -246,7 +246,7 @@ identity, coverage and model-use rights require explicit admission.
 includes earlier PL event material rather than this requested archive. The
 [StatsBomb open-data repository](https://github.com/hudl/open-data) is a separate
 source with its own licence and competition coverage; its public files do not
-establish these project's complete inputs or permission gates. Neither source
+establish this project's complete inputs or permission gates. Neither source
 is downloaded, joined or fitted in this step.
 
 FM traits can be later predictors or ANN inputs only after #1057 rights,
