@@ -55,8 +55,10 @@ process.
 
 If DEFCON, `ep_next` or another approved projection ships during the population,
 the base remains each week's actually served version. Report pooled readings
-and counts and readings for each handoff version. Do not replace earlier weeks
-with a later model. The #988 route choice does not alter the pairing rule.
+and counts and readings for each handoff version. The gate reads the pooled
+readings over all jointly scored weeks; the readings for each handoff version
+carry no verdict. Do not replace earlier weeks with a later model. The #988
+route choice does not alter the pairing rule.
 
 ## Fixed candidate
 
@@ -118,11 +120,12 @@ are reported separately and never treated as independent bootstrap units.
    for the joint gate. The equal-week candidate-minus-base estimate must be at
    least zero. This clause uses the point estimate, not an interval.
 
-**Pass** requires all three conditions on the same population and at least
-eight jointly scored weeks. Otherwise fail; fewer than eight is insufficient
-evidence and cannot pass. Weekly mean absolute error and its base-minus-candidate
-difference are reported as the development counterpart with no verdict. Report
-the number of identical squad decisions and their zero differences.
+**Pass** requires all three conditions, read from the pooled figures on the
+same population, and at least eight jointly scored weeks. Otherwise fail; fewer
+than eight is insufficient evidence and cannot pass. Weekly mean absolute error
+and its base-minus-candidate difference are reported as the development
+counterpart with no verdict. Report the number of identical squad decisions and
+their zero differences.
 
 Squared error replaces development absolute error because these forecasts are
 expected values. The decision clause retains a point estimate: the development

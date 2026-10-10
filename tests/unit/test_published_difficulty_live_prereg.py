@@ -197,3 +197,18 @@ def test_the_primary_interval_is_the_studys_bootstrap_on_weeks_in_order() -> Non
         " order" in primary
     )
     assert "`np.quantile` at 0.05 and 0.95 with the default linear method" in primary
+
+
+def test_the_gate_reads_the_pooled_figures_and_the_version_split_has_no_verdict() -> None:
+    """With pooled and per-version readings both reported, the text must say which decides.
+
+    Otherwise a disagreement between them, once a new handoff version ships mid-population,
+    lets either one be picked after the outcomes are read.
+    """
+
+    paired = _section("Paired inputs and comparator")
+    gate = _section("Three readings and the gate")
+
+    assert "The gate reads the pooled readings over all jointly scored weeks" in paired
+    assert "the readings for each handoff version carry no verdict" in paired
+    assert "**Pass** requires all three conditions, read from the pooled figures" in gate
