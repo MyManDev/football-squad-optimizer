@@ -150,6 +150,10 @@ MIN_WEEKS_FOR_INTERVAL = 6
 MIN_WEEKS_FOR_VERDICT = 15
 #: Rule 26: each paid transfer is charged at the game's four points.
 HIT_POINTS_CHARGED = 4.0
+#: Rules 21 to 23: the statuses the runner writes for a chain's week. A decided or failed arm
+#: played a team (rules 17 and 22); a held or blocked chain played nothing.
+PLAYED_STATUSES: tuple[str, ...] = ("decided", "failed")
+UNPLAYED_STATUSES: tuple[str, ...] = ("held", "blocked")
 #: Rule 3: the planner source and the binding source, as file lists, and the test on them.
 PLANNER_SOURCE: tuple[str, ...] = (
     "src/squadopt/planning/",
@@ -1405,12 +1409,45 @@ def paid_hits(record: Mapping[str, Any]) -> float:
     return HIT_POINTS_CHARGED * int(first.get("paid_transfer_count", 0))
 
 
+def played_advice(record: Mapping[str, Any], chain: str) -> Mapping[str, Any] | None:
+    """Rules 21 to 23 and 26: the advice a chain played that week, or None for a held or
+    blocked chain, which played nothing.
+
+    A decided arm played its plan's first week and a failed arm its held team (rules 17 and 22),
+    so a record of either without an advice object, or a record of a status the runner never
+    writes, refuses the reading by ``chain``: it is never passed over as a chain that played
+    nothing, which would narrow the pairs. No outcome is read.
+    """
+
+    status = record.get("status")
+    if status in UNPLAYED_STATUSES:
+        return None
+    if status not in PLAYED_STATUSES:
+        raise ScorerError(
+            f"{chain}: the record's status is {status!r}, which the runner never writes."
+        )
+    advice = record.get("advice")
+    if not isinstance(advice, Mapping):
+        raise ScorerError(f"{chain}: the {status} record holds no advice to score (rule 26).")
+    return cast(Mapping[str, Any], advice)
+
+
+def refuse_unplayable_records(week: WeekEvidence) -> None:
+    """Rules 22 and 26: every record of the week states a status the runner writes, and every
+    decided or failed record holds the advice its arm played. One that does not refuses the
+    reading by its chain. No outcome is read."""
+
+    for (profile, arm), record in sorted(week.records.items()):
+        played_advice(record, f"GW{week.gameweek:02d} {profile} {arm}")
+
+
 def score_chain_week(record: Mapping[str, Any], outcomes: Any) -> ChainScore | None:
-    """One chain's realized week, or None where the chain played nothing (rules 21 to 23)."""
+    """One chain's realized week, or None where the chain played nothing (rules 21 to 23). A
+    decided or failed record without its advice refuses the reading (``played_advice``)."""
 
     status = str(record.get("status"))
-    advice = record.get("advice")
-    if status in ("blocked", "held") or not isinstance(advice, Mapping):
+    advice = played_advice(record, f"{record.get('profile')} {record.get('arm')}")
+    if advice is None:
         return None
     hits = paid_hits(record)
     played = {**advice, "transfer_hit_points": hits}
@@ -2154,14 +2191,16 @@ def refuse_before_outcomes(
 ) -> None:
     """Every refusal of the evidence that needs no outcome, run before the first outcome is
     scored, so a reading one of them refuses has scored nothing (rules 28 and 37): each week's
-    receipt deadline, each record's truncation (rule 14), the producer changes declared
-    (rule 6) and, for the final reading, the interim record's identity (rule 25). Each runs
-    again where the record is built. Only the comparison of an unchanged outcome capture's
-    differences with the interim's needs the outcomes, so it alone comes after scoring."""
+    receipt deadline, each record's truncation (rule 14), each record's status and each played
+    record's advice (rules 22 and 26), the producer changes declared (rule 6) and, for the final
+    reading, the interim record's identity (rule 25). Each runs again where the record is built.
+    Only the comparison of an unchanged outcome capture's differences with the interim's needs
+    the outcomes, so it alone comes after scoring."""
 
     for week in evidence:
         receipt_deadline(week)
         rule_14_truncated(week)
+        refuse_unplayable_records(week)
     refuse_contradicted_changes(
         {
             week.gameweek: cast(str | None, week.receipt.get("model_version"))
@@ -2779,8 +2818,9 @@ def score(
     origin, its record in committed history or in another worktree, the release tags, the
     receipts file and, for the final reading, the interim record on develop (rule 25). The
     evidence, the frozen source, each week's receipt deadline, each record's truncation
-    (rule 14), the producer changes declared (rule 6) and, for the final reading, the interim
-    record's identity are checked once the gameweek has settled and before the first outcome
+    (rule 14), each record's status and each played record's advice (rules 22 and 26), the
+    producer changes declared (rule 6) and, for the final reading, the interim record's
+    identity are checked once the gameweek has settled and before the first outcome
     is scored; only an unchanged outcome capture's differences are compared with the interim's
     after scoring. Everything the reading writes
     is rendered before the first write: the record's bytes, the twin rendered from those bytes

@@ -1958,6 +1958,91 @@ def test_a_decided_record_the_scorer_cannot_score_refuses_the_reading_by_its_cha
     assert not records.exists() and not index.exists()
 
 
+@pytest.mark.parametrize(
+    ("arm", "status", "change", "message"),
+    [
+        ("served_3", "decided", lambda record: record.pop("advice"), "the decided record holds"),
+        ("served_3", "decided", lambda record: record.update(advice=None), "the decided record"),
+        ("served_3", "decided", lambda record: record.update(advice=[]), "the decided record"),
+        ("hold_3", "failed", lambda record: record.update(advice=None), "the failed record"),
+        ("served_3", "decided", lambda record: record.update(status="played"), "the record's st"),
+    ],
+    ids=["decided_absent", "decided_null", "decided_list", "failed_null", "unknown_status"],
+)
+def test_a_played_record_without_its_advice_refuses_the_reading_before_any_outcome(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    arm: str,
+    status: str,
+    change: Callable[[dict[str, Any]], object],
+    message: str,
+) -> None:
+    """Rules 22, 26 and 27: a decided or failed chain played a team, so a record of either that
+    holds no advice object, or a record whose status the runner never writes, refuses the
+    reading by its chain before any outcome is chosen. Such a chain is never passed over as one
+    that played nothing, which would narrow the pairs, and nothing is written."""
+
+    failing = (("hold_3", 6),) if status == "failed" else ()
+    evidence, snapshots, records = _world(tmp_path, monkeypatch, through=6, failing=failing)
+    _identity(monkeypatch)
+
+    def malformed(document: dict[str, Any]) -> None:
+        if (document["profile"], document["arm"]) == ("p950", arm):
+            assert document["status"] == status and isinstance(document["advice"], dict)
+            change(document)
+
+    _rewrite_week(evidence, tmp_path / RECEIPTS, 6, malformed)
+    _outcome_capture(snapshots, 20, settled_through=20, live=False)
+    _read_through(monkeypatch, 6)
+    chosen: list[int] = []
+    choose = scorer.outcome_capture
+
+    def spied(captures: Any, gameweek: int, deadline: str | None = None) -> scorer.Outcome:
+        chosen.append(gameweek)
+        return choose(captures, gameweek, deadline)
+
+    monkeypatch.setattr(scorer, "outcome_capture", spied)
+    index = tmp_path / "index.md"
+    with pytest.raises(scorer.ScorerError, match=rf"^GW06 p950 {arm}: {message}"):
+        scorer.score(
+            evidence,
+            snapshots,
+            "gw20",
+            receipts=tmp_path / RECEIPTS,
+            records_dir=records,
+            index_file=index,
+        )
+    assert chosen == [] and not records.exists() and not index.exists()
+
+
+def test_a_decided_or_failed_chain_week_is_scored_or_refused_and_never_passed_over() -> None:
+    """Rules 22 and 26: only a held or a blocked chain scores nothing. A decided or failed
+    record without an advice object, or of a status the runner never writes, refuses the
+    reading by its chain."""
+
+    outcomes = _outcomes()
+    base = {
+        "profile": "p1000",
+        "arm": "served_3",
+        "players": _players(),
+        "plan": {"weeks": [{"paid_transfer_count": 0}]},
+    }
+    for status in ("held", "blocked"):
+        assert scorer.score_chain_week({**base, "status": status}, outcomes) is None
+    for status in ("decided", "failed"):
+        for advice in ({}, {"advice": None}, {"advice": []}, {"advice": "lineup"}):
+            with pytest.raises(
+                scorer.ScorerError, match=rf"^p1000 served_3: the {status} record holds no advice"
+            ):
+                scorer.score_chain_week({**base, "status": status, **advice}, outcomes)
+        scored = scorer.score_chain_week({**base, "status": status, "advice": _lineup(8)}, outcomes)
+        assert scored is not None and scored.status == status
+    for status in ("played", None):
+        record = {**base, "status": status, "advice": _lineup(8)}
+        with pytest.raises(scorer.ScorerError, match=r"^p1000 served_3: the record's status is "):
+            scorer.score_chain_week(record, outcomes)
+
+
 def test_the_scorer_runs_only_from_its_own_merge_commit_on_a_clean_tree(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
