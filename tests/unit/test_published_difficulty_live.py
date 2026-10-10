@@ -625,6 +625,22 @@ def test_two_retained_files_of_one_fingerprint_are_ambiguous(tmp_path: Path) -> 
         runner.paired_handoff(root, snapshot, 7)
 
 
+def test_a_paired_file_the_backend_does_not_serve_is_refused(tmp_path: Path) -> None:
+    root = tmp_path / "handoffs"
+    snapshot = captured(tmp_path / "captures")
+    handoff(root, snapshot)
+    served = handoff(root, snapshot, alias=True, delta=1)
+    # The backend still serves this alias, but a duplicate key keeps the runner from reading it.
+    alias = handoff_path_for(root, study.SEASON, 7)
+    alias.write_bytes(alias.read_bytes().replace(b"{", b'{"note": 1, "note": 1, ', 1))
+    assert (
+        runner.handoff_fingerprint_for(root, study.SEASON, 7, snapshot.metadata.snapshot_id)
+        == served.fingerprint
+    )
+    with pytest.raises(study.DifficultyMissingInputs, match="not the one the backend serves"):
+        runner.paired_handoff(root, snapshot, 7)
+
+
 def test_early_reading_refuses_before_any_outcome_bytes(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -942,6 +958,28 @@ def test_unchecked_nonfinal_week_is_missing_in_single_reading(tmp_path, monkeypa
     assert seven["status"] == "missing"
     assert report["valid_weeks"] == 0
     assert not (kwargs["output_directory"] / "gw07-players.csv").exists()
+
+
+def test_the_record_lists_unserved_captures_with_scored_and_missing_weeks(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _, kwargs = reading_setup(tmp_path, monkeypatch)
+    root = kwargs["snapshot_root"]
+    # An audit capture after week 7 was published, and a week 8 capture never served.
+    audit = captured(root, offset=1)
+    never_served = captured(root, target=8)
+    snapshots = runner.inventory(root, season=study.SEASON, as_of="2027-01-20T00:00:00Z")
+    report = runner.reading(snapshots, **kwargs)
+    weeks = {week["gameweek"]: week for week in report["week_identities"]}
+    assert weeks[7]["status"] == "scored"
+    assert weeks[7]["decision_capture"] != audit.metadata.snapshot_id
+    assert weeks[7]["unserved_captures"] == [audit.metadata.snapshot_id]
+    assert (weeks[8]["status"], weeks[8]["detail"]) == (
+        "missing",
+        "No served pre-deadline capture targets the week.",
+    )
+    assert weeks[8]["unserved_captures"] == [never_served.metadata.snapshot_id]
+    assert weeks[9]["unserved_captures"] == []
 
 
 @pytest.mark.parametrize(
