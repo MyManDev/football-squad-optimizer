@@ -14,11 +14,13 @@ deadline is at or before that merge is excluded, even if it settles later.
 The record stores merge commit, merge instant and the resulting first week.
 
 The population ends at GW20, whose deadline is `2027-01-05T18:00:00Z`.
-There is exactly one verdict, after a captured calendar shows every GW20 fixture
-`finished` and `data_checked`. The verdict names the earliest eligible settled
-capture and its fingerprint. A runner refuses real-week comparisons before that
-condition. Synthetic tests may run earlier. No interim error, ordering or squad
-comparison is printed, and no threshold changes after live data is read.
+There is exactly one verdict, after an `fpl-live` capture's bootstrap marks the
+GW20 event `finished` and `data_checked`, the two event flags `scored_gameweeks`
+in `src/squadopt/data/sources/fpl_live.py` reads; fixtures carry no
+`data_checked` flag. The verdict names the earliest such capture and its
+fingerprint. A runner refuses real-week comparisons before that condition.
+Synthetic tests may run earlier. No interim error, ordering or squad comparison
+is printed, and no threshold changes after live data is read.
 
 ## Paired inputs and comparator
 
@@ -113,9 +115,10 @@ These already recorded development figures choose no additional live threshold.
 
 List every week from the binding start through GW20, with a scored or missing
 reason. Missing includes no targeting pre-deadline capture, an absent or ambiguous
-paired handoff, a refused source or fingerprint, or no later capture that marks
-the week scored and carries its settled live payload. Never repair a missing
-week with another week's capture or a reconstructed post-deadline handoff.
+paired handoff, a refused source or fingerprint, or no later capture whose
+bootstrap counts the week in `scored_gameweeks` and that carries its settled live
+payload. Never repair a missing week with another week's capture or a
+reconstructed post-deadline handoff.
 Record excluded players and absent outcome rows rather than filling them.
 The runner refuses 2025-26 in every input and cannot print a real comparison
 before the settled-GW20 verdict condition. Tests use synthetic weeks only.
