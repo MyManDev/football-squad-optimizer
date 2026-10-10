@@ -70,6 +70,13 @@ WEEK_EXCLUSION_CODES = (
 ENTRY_EXCLUSION_CODES = ("chip_unresolved", "unreadable", "invalid_picks", "missing_outcome")
 # A declared week whose captures do not exist is listed in the manifest with this code.
 MISSING_CAPTURE = "missing_capture"
+# Chips whose captured roster is the scored roster (preregistration amendment of
+# 2026-10-10): Bench Boost and Triple Captain change only multipliers, which the
+# normal-week policy resets, and a Wildcard only the transfer cost, which the primary
+# score excludes.
+CAPTURED_ROSTER_CHIPS = (None, "bboost", "3xc", "wildcard")
+# Valid cohort entries scored under a chip roster rule, counted per week.
+CHIP_ROSTERS = ("wildcard",)
 
 
 class LiveWeekRefusal(EvaluationValidationError):
@@ -86,7 +93,7 @@ class LiveWeekRefusal(EvaluationValidationError):
 
 
 class UnresolvedChipError(EvaluationValidationError):
-    """An entry played a roster-changing chip that the protocol does not yet normalize."""
+    """An entry's roster comes from a chip whose roster the protocol does not score."""
 
 
 class _MissingEntryOutcome(EvaluationValidationError):
@@ -122,13 +129,18 @@ def _json(snapshot: CapturedSnapshot, name: str) -> Any:
     return document
 
 
+def _active_chip(raw: bytes) -> object:
+    document = json.loads(raw)
+    if not isinstance(document, dict):
+        raise EvaluationValidationError("Entry picks must be a JSON object.")
+    return document.get("active_chip")
+
+
 def _original_picks(raw: bytes, *, entry_id: int, gameweek: int) -> bytes:
     """Reverse recorded FPL autosub position swaps, then normalize chip multipliers."""
+    if _active_chip(raw) not in CAPTURED_ROSTER_CHIPS:
+        raise UnresolvedChipError("The protocol scores no captured roster for this chip.")
     document = json.loads(raw)
-    if document.get("active_chip") not in (None, "bboost", "3xc"):
-        raise UnresolvedChipError(
-            "Roster-changing chip normalization needs a frozen protocol decision."
-        )
     picks = {row["element"]: dict(row) for row in document["picks"]}
     changed: set[int] = set()
     for substitution in document.get("automatic_subs", []):
@@ -300,6 +312,7 @@ def prepare_live_week(week: LiveBenchmarkWeek) -> PreparedLiveWeek:
     codes = player_codes(week.picks.payloads[BOOTSTRAP_PAYLOAD])
     managers = []
     entry_exclusions = dict.fromkeys(ENTRY_EXCLUSION_CODES, 0)
+    chip_rosters = dict.fromkeys(CHIP_ROSTERS, 0)
     outcome_ids = set(outcomes.player_id)
     for entry_id in cohort.entry_ids:
         picks_name = entry_picks_payload(entry_id, week.gameweek)
@@ -308,7 +321,9 @@ def prepare_live_week(week: LiveBenchmarkWeek) -> PreparedLiveWeek:
             # The collector leaves an unreadable member's payloads out.
             entry_exclusions["unreadable"] += 1
             continue
+        chip: object = None
         try:
+            chip = _active_chip(week.picks.payloads[picks_name])
             record = fpl_entry_picks(
                 _original_picks(
                     week.picks.payloads[picks_name],
@@ -333,10 +348,13 @@ def prepare_live_week(week: LiveBenchmarkWeek) -> PreparedLiveWeek:
             entry_exclusions["invalid_picks"] += 1
         else:
             managers.append(decision)
+            if isinstance(chip, str) and chip in chip_rosters:
+                chip_rosters[chip] += 1
     coverage = {
         "cohort_valid": len(managers),
         "cohort_excluded": sum(entry_exclusions.values()),
         "cohort_exclusions": entry_exclusions,
+        "cohort_chip_rosters": chip_rosters,
     }
     if len(managers) < 80:
         raise LiveWeekRefusal(

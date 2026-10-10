@@ -35,10 +35,12 @@ cohort, season and week. Unreadable members remain absent. The original bench po
 are recovered from FPL's explicit autosubstitution pairs when its settled positions
 have moved. Normal-week multipliers are used throughout. Transfer hits and chip
 multipliers do not enter the primary score. The frozen squad remains the captured squad.
-Free Hit, Wildcard and unrecognized chips are refused pending a protocol decision
-on how to normalize a changed roster. The runner does not invent a counterfactual
-squad or count one toward coverage. This decision must be settled before merging
-or taking a binding reading.
+Chip rosters follow the preregistration amendment of 2026-10-10, accepted by the
+owner. A Wildcard entry is scored on its captured roster, since a Wildcard changes only
+the transfer cost, which the primary score excludes. Free Hit and unrecognized chips
+are refused as `chip_unresolved`. The runner does not invent a counterfactual squad or
+count one toward coverage. Each week records how many valid entries were scored on a
+Wildcard roster under `cohort_chip_rosters`.
 
 The outcome is a completed `fpl-live` capture whose target week is finished and checked
 and whose player event points and minutes cover all three primary arms. Every capture

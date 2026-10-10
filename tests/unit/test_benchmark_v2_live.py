@@ -210,6 +210,7 @@ def test_eight_weeks_pair_all_arms_and_second_reading_opens_nothing(tmp_path, mo
                 "invalid_picks": 0,
                 "missing_outcome": 0,
             },
+            "cohort_chip_rosters": {"wildcard": 0},
         },
     ]
     assert result["paired_gameweeks"] == 8
@@ -456,14 +457,52 @@ def test_thin_week_keeps_its_coverage_counted_by_reason():
             "invalid_picks": 1,
             "missing_outcome": 0,
         },
+        "cohort_chip_rosters": {"wildcard": 0},
     }
 
 
-@pytest.mark.parametrize("chip", ["freehit", "wildcard", "unknown"])
+@pytest.mark.parametrize("chip", ["freehit", "unknown"])
 def test_unresolved_roster_chips_cannot_silently_count_toward_coverage(chip):
     document = {"active_chip": chip}
-    with pytest.raises(EvaluationValidationError, match="protocol decision"):
+    with pytest.raises(live.UnresolvedChipError, match="no captured roster"):
         live._original_picks(json.dumps(document).encode(), entry_id=1, gameweek=6)
+
+
+def _play_chip(payloads, entries, gameweek, chip, captain=None):
+    """Set an active chip, and optionally a new captain and vice, on captured picks."""
+    for entry in entries:
+        name = f"entry-{entry}-picks-gw{gameweek:02d}.json"
+        document = json.loads(payloads[name])
+        document["active_chip"] = chip
+        if captain is not None:
+            for row in document["picks"]:
+                row["is_captain"] = row["element"] == captain[0]
+                row["is_vice_captain"] = row["element"] == captain[1]
+                row["multiplier"] = (
+                    (3 if chip == "3xc" else 2)
+                    if row["element"] == captain[0]
+                    else int(row["position"] <= 11 or chip == "bboost")
+                )
+        payloads[name] = json.dumps(document).encode()
+
+
+def test_wildcard_entry_scores_its_captured_roster_and_keeps_the_week():
+    # 21 Wildcard entries left a week below 80 valid members when every chip was refused.
+    candidate = week(event_points=DISTINCT_POINTS)
+    payloads = dict(candidate.picks.payloads)
+    _play_chip(payloads, range(1001, 1022), 6, "wildcard", captain=(14, 13))
+    prepared = live.prepare_live_week(
+        replace(candidate, picks=replace(candidate.picks, payloads=payloads))
+    )
+    assert prepared.provenance["cohort_valid"] == 100
+    assert prepared.provenance["cohort_excluded"] == 0
+    assert prepared.provenance["cohort_chip_rosters"] == {"wildcard": 21}
+    wildcard, normal = prepared.managers[0], prepared.managers[21]
+    assert (wildcard.captain_id, normal.captain_id) == (1014, 1008)
+    # The captured Wildcard roster scores its own captain: 88 from the XI and the
+    # autosub, plus 14 for the captain, against 88 plus 8 for an entry without a chip.
+    assert live._score(wildcard, prepared.outcomes)["points"] == 102
+    assert live._score(normal, prepared.outcomes)["points"] == 96
 
 
 def test_settled_autosub_positions_restore_the_original_captain_and_bench():
