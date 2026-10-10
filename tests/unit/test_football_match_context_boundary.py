@@ -14,6 +14,7 @@ from tests.unit.test_advice_read import _valid_advice_document
 from tests.unit.test_football_publication import publication_case as publication_case
 
 from squadopt.live.football_artifact import (
+    SHARES_BEFORE_AVAILABILITY_LIMIT,
     football_artifact_path,
     forecast_digest,
     read_football_forecast,
@@ -326,6 +327,9 @@ def test_match_context_artifact_survives_real_worker_and_document_schema(
     assert result["payload"]["decision_information"] == switches.decision_information(
         inputs.snapshot_id
     )
+    # Like v1, this candidate splits goal and assist shares before the reader applies
+    # captured availability, so its answer states that limit exactly once.
+    assert result["payload"]["stated_limits"].count(SHARES_BEFORE_AVAILABILITY_LIMIT) == 1
     assert json.loads(ADVICE_READ_SCHEMA_PATH.read_text(encoding="utf-8")) == advice_read_schema()
 
 
