@@ -35,6 +35,9 @@ goals must agree within its player rows and with the opposing side. Player xG is
 summed once per side; xGA is the opponent's sum. Duplicate player-fixture rows,
 incomplete pairs, inconsistent scores, negative/nonfinite xG and naive timestamps
 are refused. This does not reconstruct missing or ambiguous double-week xG.
+This pairing check covers every season in the selected history and is stricter than
+the v1 builder, which drops an unpaired side, so before the first real fit run the
+form builder once over the selected archives and record whether every fixture pairs.
 
 The target's season selects the current-season population. Older seasons do not
 enter these form totals. Each club has season match/win/draw/loss counts, points per
@@ -64,6 +67,10 @@ invent future form changes or infer an unplayed result.
 experiments. Only selected training sources are opened. Including current-season
 history remains an explicit selection; without it these current-season metrics are
 cold-start values. No new training population is chosen or run by this PR.
+The first real fit may select only the archives 2022-23, 2023-24 and 2024-25 and
+the captured season. The locked 2025-26 outcome population is refused by name at
+the command and in the producer before any source is read, and any other archive
+outside that list is refused before it is opened.
 The first usable selected season supplies prior history only; at least one later
 usable selected season must provide supervised rows for fitting.
 
@@ -75,6 +82,10 @@ learned goal intensity, then player goal/assist and clean-sheet expectations. It
 not a separate points bonus. Minute, participation, residual and defensive-action
 heads keep their original feature inputs. Own/opponent form columns and venue are
 reversed together when forecasting the opposing goal rate.
+These eighteen form columns are fitted on one row per club fixture, and with one
+archive plus the captured season only captured-season weeks from GW2 supervise them,
+so the first real fit should select at least two supervised seasons and say so in
+its record.
 
 For standardized team inputs z, the fitted head uses
 `lambda = exp(intercept + coefficients @ z)` with the existing Poisson objective

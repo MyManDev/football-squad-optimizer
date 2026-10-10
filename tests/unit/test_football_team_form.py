@@ -420,15 +420,61 @@ def test_invalid_opt_in_fails_before_any_source_read(tmp_path, kwargs):
         produce_football_forecast(SimpleNamespace(), tmp_path, **kwargs)
 
 
+@pytest.mark.parametrize("with_components", [False, True])
+@pytest.mark.parametrize(
+    "selected",
+    [
+        ("2025-26",),
+        ("2024-25", "2025-26"),
+        ["2024-25", "2025-26", "2026-27"],
+    ],
+)
+def test_team_form_refuses_the_locked_season_before_any_source_read(
+    monkeypatch, tmp_path, selected, with_components
+):
+    from squadopt.application import football_live
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("The locked season must be refused before any source read")
+
+    for name in ("infer_season", "read_inputs", "archive_history", "captured_history"):
+        monkeypatch.setattr(football_live, name, forbidden)
+    produce = (
+        football_live.produce_football_components
+        if with_components
+        else football_live.produce_football_forecast
+    )
+    with pytest.raises(ValueError, match="locked 2025-26 outcome population"):
+        produce(SimpleNamespace(), tmp_path, training_seasons=selected, team_form=True)
+
+
+def test_team_form_archives_are_pinned_to_the_explicit_allowlist(monkeypatch, tmp_path):
+    producer, snapshot, _inputs, calls = _form_producer(monkeypatch)
+    assert producer.TEAM_FORM_ARCHIVE_SEASONS == ("2022-23", "2023-24", "2024-25")
+    assert producer.LOCKED_OUTCOME_SEASON not in producer.TEAM_FORM_ARCHIVE_SEASONS
+    # A supported archive outside the allowlist is refused before any outcome is opened.
+    monkeypatch.setattr(producer, "ARCHIVE_SEASONS", ("2021-22", "2024-25"))
+    for name in ("archive_history", "captured_history"):
+        monkeypatch.setattr(producer, name, lambda *a, **kw: pytest.fail("outcome read"))
+    with pytest.raises(ValueError, match=r"only 2022-23, 2023-24, 2024-25 and the captured"):
+        producer.produce_football_forecast(
+            snapshot, tmp_path, training_seasons=("2021-22", "2026-27"), team_form=True
+        )
+    assert calls == []
+
+
 @pytest.mark.parametrize(
     "extra",
     [
         [],
         ["--contextual", "--training-season", "2024-25"],
         ["--role-minutes", "--training-season", "2024-25"],
+        ["--training-season", "2025-26"],
+        ["--training-season", "2024-25", "--training-season", "2025-26"],
+        ["--training-season", "2025-26", "--training-season", "2026-27", "--with-components"],
     ],
 )
-def test_cli_team_form_guard_precedes_snapshot_read(monkeypatch, extra):
+def test_cli_team_form_guard_precedes_snapshot_read(monkeypatch, capsys, extra):
     import scripts.build_football_forecast as command
 
     monkeypatch.setattr(
@@ -453,3 +499,5 @@ def test_cli_team_form_guard_precedes_snapshot_read(monkeypatch, extra):
     with pytest.raises(SystemExit) as error:
         command.main()
     assert error.value.code == 2
+    locked = "cannot read the locked 2025-26 outcome population"
+    assert (locked in capsys.readouterr().err) is ("2025-26" in extra)

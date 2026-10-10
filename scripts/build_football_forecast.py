@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from squadopt.application.football_live import (
+    LOCKED_OUTCOME_SEASON,
     produce_football_components,
     produce_football_forecast,
 )
@@ -56,6 +57,10 @@ def main() -> None:
     if args.team_form and (args.contextual or args.role_minutes or not args.training_seasons):
         parser.error(
             "--team-form requires --training-season and excludes --contextual/--role-minutes"
+        )
+    if args.team_form and LOCKED_OUTCOME_SEASON in args.training_seasons:
+        parser.error(
+            f"--team-form cannot read the locked {LOCKED_OUTCOME_SEASON} outcome population"
         )
     if args.role_minutes and (args.contextual or not args.training_seasons):
         parser.error("--role-minutes requires --training-season and excludes --contextual")

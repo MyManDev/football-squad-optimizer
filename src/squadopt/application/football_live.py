@@ -56,6 +56,11 @@ from squadopt.prediction.football_team_form import (
     team_form_metadata,
 )
 
+# The archives team form may select beside the captured season. The 2025-26 outcome
+# population is locked, so it is absent here and refused by name before any read.
+TEAM_FORM_ARCHIVE_SEASONS = ("2022-23", "2023-24", "2024-25")
+LOCKED_OUTCOME_SEASON = "2025-26"
+
 
 def causal_training(
     history: pd.DataFrame, *, prior_only_season: str | None = None, team_form: bool = False
@@ -170,6 +175,12 @@ def _forecast_and_components(
         raise ValueError("team_form must be boolean and excludes contextual/role_minutes.")
     if team_form and training_seasons is None:
         raise ValueError("Team form requires an explicit training-season allowlist.")
+    if (
+        team_form
+        and isinstance(training_seasons, Sequence)
+        and LOCKED_OUTCOME_SEASON in training_seasons
+    ):
+        raise ValueError("Team form cannot read the locked 2025-26 outcome population.")
     if manager_words is not None and not contextual:
         raise ValueError("Manager context requires the contextual candidate.")
     season = infer_season(snapshot)
@@ -180,6 +191,10 @@ def _forecast_and_components(
     if role_minutes and (archives != ("2022-23", "2023-24", "2024-25") or not include_current):
         raise ValueError(
             "Joint role minutes require exactly 2022-23, 2023-24, 2024-25 and the captured season."
+        )
+    if team_form and not set(archives) <= set(TEAM_FORM_ARCHIVE_SEASONS):
+        raise ValueError(
+            "Team form may select only 2022-23, 2023-24, 2024-25 and the captured season."
         )
     history = (
         archive_history(archive_root)
