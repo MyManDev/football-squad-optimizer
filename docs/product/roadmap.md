@@ -126,12 +126,13 @@ What a strategy may publish is a closed list with no probability and no spread i
   asks for eight valid paired gameweeks as `docs/benchmark_v2_prereg.md` defines them, the
   system's decision against the ownership template and the `as_of_top_100_v1` cohort. GW1
   cannot be one, since the protocol gives GW1 no cohort and its capture is gone from the
-  operational `data/snapshots`. GW4's ledger decision is a replay. GW5 is the first
-  candidate, a live decision with an overall Top-100 cohort captured before its deadline
-  (`fpl-top100-20260918T122433Z-ce78d1e94c1e`), and it has not been scored as a paired
-  gameweek (`docs/benchmark_v2.md` has no GW5 entry). If every week from GW6 on is decided
-  live with its cohort captured before the deadline, GW12 is the eighth. The GW3 cohort was
-  lost before it could be settled (see Phase A below).
+  operational `data/snapshots`. GW4's ledger decision is a replay. GW5 was decided live with
+  an overall Top-100 cohort captured before its deadline
+  (`fpl-top100-20260918T122433Z-ce78d1e94c1e`), but it cannot be one either: the
+  preregistration amendment of 2026-10-10, accepted by the owner before the GW7 deadline,
+  starts the live reading at GW7, so GW5 and GW6 are outside it. If every week from GW7 on is
+  decided live with its cohort captured before the deadline, GW14 is the eighth. The GW3
+  cohort was lost before it could be settled (see Phase A below).
 - **Phase B: complete.**
 - **Phase C: the component base is the live default; members have had it bare since GW5.**
   GW4's member advice (`site-2026-27-gw04-decision`, #499 and #500) was solved on the
