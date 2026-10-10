@@ -40,7 +40,7 @@ Require Python 3.13 and Node 22 in the first two outputs. Replace angle-bracket
 placeholders before running. `py` is not assumed to be installed. The fresh install
 sequence on a new PC is **never exercised**; local tests used an existing environment.
 
-## 2. Restore the five irreplaceable trees
+## 2. Restore the irreplaceable trees
 
 Choose the existing backup directory on a second physical drive. Reparse paths,
 including many synced-folder roots, are refused. It must be outside every checkout/worktree.
@@ -65,9 +65,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\backup_data.ps1 -Des
 ```
 
 The example selects the newest manifest; select an older named recovery point if needed
-and pass that same name to verification. Stop here if verification is nonzero. Do not restore runtime queues, caches, PID files
+and pass that same name to verification. Stop here if verification is nonzero. The five
+required trees are created first; the optional private `benchmark_v2_captures` tree is
+restored by the same record loop when the manifest holds it. Do not restore runtime queues, caches, PID files
 or jobs. The new backend creates its own runtime store. Do not treat a clone as a data
-backup: Git does not contain these five trees. First real backup and real restore are
+backup: Git does not contain these trees. First real backup and real restore are
 **never exercised**; only disposable fixture restores have passed. Registering a daily
 backup is a separate owner action using the line in the
 [deployment runbook](deployment_runbook.md#back-up-irreplaceable-data).

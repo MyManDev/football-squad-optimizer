@@ -62,7 +62,8 @@ deployment that changes persistent state. This is a proposed operating procedure
 claim that such a schedule is running. Record the actual interval between protected copies
 and time an isolated restore before setting a recovery-time commitment. The existing site's
 seven-day CI artifact retention is not a backup policy for private ledger/advice records.
-`scripts/backup_data.ps1` (#670) takes an additive, verified copy of the five data trees; the
+`scripts/backup_data.ps1` (#670) takes an additive, verified copy of snapshots, ledger, handoffs, advice_records, entries and
+private immutable benchmark_v2_captures when that optional tree exists; the
 repository does not record whether it runs on a schedule.
 
 No notification target was found on 9 September. Since #676 there is one, for the backend

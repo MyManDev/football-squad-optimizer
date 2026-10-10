@@ -15,7 +15,7 @@ pytestmark = pytest.mark.skipif(
     POWERSHELL is None or shutil.which("git") is None, reason="requires PowerShell 5.1 and Git"
 )
 SCRIPT = Path(__file__).resolve().parents[2] / "scripts/backup_data.ps1"
-TREES = ("snapshots", "ledger", "handoffs", "advice_records", "entries")
+TREES = ("snapshots", "ledger", "handoffs", "advice_records", "entries", "benchmark_v2_captures")
 
 
 def _git(repo: Path, *args: str) -> None:
@@ -67,6 +67,26 @@ def test_script_parses_as_ascii_powershell() -> None:
     subprocess.run([str(POWERSHELL), "-NoProfile", "-Command", command], check=True)
 
 
+def test_optional_benchmark_tree_can_be_absent_and_later_added(backup: tuple[Path, Path]) -> None:
+    repo, destination = backup
+    tree = repo / "data/benchmark_v2_captures"
+    (tree / "record.json").unlink()
+    tree.rmdir()
+    assert _run(repo, destination).returncode == 0
+    assert not (destination / "benchmark_v2_captures").exists()
+    tree.mkdir()
+    claims = tree / "claims"
+    claims.mkdir()
+    (claims / "freeze-2026-27-gw06.json").write_text(
+        '{"snapshot_id":"synthetic"}', encoding="ascii"
+    )
+    assert _run(repo, destination).returncode == 0
+    assert (destination / "benchmark_v2_captures/claims/freeze-2026-27-gw06.json").read_bytes() == (
+        claims / "freeze-2026-27-gw06.json"
+    ).read_bytes()
+    assert _run(repo, destination, "-Verify").returncode == 0
+
+
 def test_dry_run_then_additive_backup_and_verify(backup: tuple[Path, Path]) -> None:
     repo, destination = backup
     before = {
@@ -82,7 +102,7 @@ def test_dry_run_then_additive_backup_and_verify(backup: tuple[Path, Path]) -> N
     assert result.returncode == 0, result.stderr
     assert not (destination / "runtime").exists() and not (destination / "raw").exists()
     manifest = json.loads(max(destination.glob("manifest-*.json")).read_text(encoding="utf-8-sig"))
-    assert len(manifest["files"]) == 5
+    assert len(manifest["files"]) == len(TREES)
     for record in manifest["files"]:
         content = (repo / "data" / record["path"]).read_bytes()
         assert record["sha256"].lower() == hashlib.sha256(content).hexdigest()
@@ -178,7 +198,7 @@ def test_source_loss_does_not_replace_last_good_manifest(backup: tuple[Path, Pat
     for tree in TREES:
         (repo / "data" / tree / "record.json").unlink()
     result = _run(repo, destination)
-    assert result.returncode == 1 and "MISSING at source: 5 files" in result.stdout
+    assert result.returncode == 1 and f"MISSING at source: {len(TREES)} files" in result.stdout
     assert before == {
         p.relative_to(destination): p.read_bytes() for p in destination.rglob("*") if p.is_file()
     }
@@ -234,7 +254,7 @@ def test_staging_and_lock_land_without_false_loss_even_with_old_manifest(
     assert _run(repo, destination).returncode == 0
     manifest_path = next(destination.glob("manifest-*.json"))
     manifest = json.loads(manifest_path.read_text(encoding="utf-8-sig"))
-    assert len(manifest["files"]) == 5
+    assert len(manifest["files"]) == len(TREES)
     assert not (destination / tree / "2026-27").exists()
     # A pre-fix manifest may already contain these transient records.
     for path in (record, lock):
@@ -281,7 +301,7 @@ def test_dot_temporaries_are_reported_but_ordinary_names_are_backed_up(
     assert "TRANSIENT handoffs/.retain-fixture" in result.stdout
     assert "TRANSIENT ledger/2026-27/gw04/.outcome.json.tmp-55-abcd" in result.stdout
     manifest = json.loads(next(destination.glob("manifest-*.json")).read_text())
-    assert len(manifest["files"]) == 7
+    assert len(manifest["files"]) == len(TREES) + 2
     assert not any(part.startswith(".") for r in manifest["files"] for part in r["path"].split("/"))
     for relative in stable_paths:
         assert (destination / relative).read_text() == "stable"

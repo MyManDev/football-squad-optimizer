@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-Additively back up the five irreplaceable data trees, or verify the latest manifest.
+Additively back up the irreplaceable data trees, or verify the latest manifest.
 .DESCRIPTION
 Windows PowerShell 5.1. No source writes, deletion, overwrite, runtime or raw reads.
 The destination must already exist outside this repository and every linked worktree.
@@ -17,7 +17,7 @@ Set-StrictMode -Version 2.0
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
 $source = Join-Path $repo 'data'
-$trees = @('snapshots', 'ledger', 'handoffs', 'advice_records', 'entries')
+$trees = @('snapshots', 'ledger', 'handoffs', 'advice_records', 'entries', 'benchmark_v2_captures')
 $skippedTransient = New-Object 'Collections.Generic.List[string]'
 
 function File-Hash([string]$path) {
@@ -44,7 +44,7 @@ function Is-Within([string]$path, [string]$root) {
         $path.StartsWith($root + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)
 }
 function Manifest-Path([string]$root, [string]$relative) {
-    if ($relative -notmatch '^(snapshots|ledger|handoffs|advice_records|entries)/' -or
+    if ($relative -notmatch '^(snapshots|ledger|handoffs|advice_records|entries|benchmark_v2_captures)/' -or
         $relative.Split('/') -contains '..' -or $relative.Contains('\')) {
         throw 'Invalid relative path in manifest.'
     }
@@ -64,6 +64,7 @@ function Source-Files {
         $root = Join-Path $source $tree
         Assert-NoLinks $root
         if (-not (Test-Path -LiteralPath $root -PathType Container)) {
+            if ($tree -eq 'benchmark_v2_captures') { continue }
             throw "Missing source tree: $tree"
         }
         $pending = New-Object 'Collections.Generic.Stack[string]'
