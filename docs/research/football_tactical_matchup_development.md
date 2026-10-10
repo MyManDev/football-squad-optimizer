@@ -192,13 +192,15 @@ roles, not squad acquisitions or the default transfer planner.
 
 ## Synthetic validation evidence
 
-196 source/model and raw-source integration cases pass. An independent
+199 source/model and raw-source integration cases pass. An independent
 oracle reads original synthetic JSON, fits 12 observations with 54 goal and 18
 assist credits, verifies learned paired rates and recipient allocation, recomputes
 state-integrated clean sheets, and checks weekly expected points and legal role
-utility by independently enumerating the appearance worlds. Changed opposition
-defending traits change the selected XI, captain and ordered reserves under the
-supplied scoring contract. There is no measured real-data improvement.
+utility by independently enumerating the appearance worlds. Against the native
+control, the learned matchup changes the selected XI, captain and ordered
+reserves under the supplied scoring contract. Changed opposition defending
+traits alone change the selected captain. There is no measured real-data
+improvement.
 The committed unit tests now include a present outfield player at 75 minutes,
 an independent posterior-weight recipient refit for each head compared with a
 prior-weight refit, and a nonzero fitted model's zero-attacking-channel path.
