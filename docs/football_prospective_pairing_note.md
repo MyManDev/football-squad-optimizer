@@ -79,9 +79,9 @@ refused case. No backend is started to perform those tests.
 
 The football artifact root is `artifacts/shadow/football_team_share_v1`. Every
 week read from it is pooled under the protocol's ordinary rules, as decision 2
-says, and carries `football_served: false`, replay weeks included. Check the
-immutable receipt at `<shadow-root>/receipts/<capture>.json` against the
-artifact bytes, including its fingerprint and SHA256. The required
+says. Every such week, replay weeks included, carries `football_served: false`.
+Check the immutable receipt at `<shadow-root>/receipts/<capture>.json` against
+the artifact bytes, including its fingerprint and SHA256. The required
 `--posted-receipts` input carries the pre-deadline SHA256 posts from #999 and
 their comment times. Record both those times and the file's write time.
 
