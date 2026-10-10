@@ -127,8 +127,10 @@ The runner records its repository commit and the SHA256 of its own bytes. Its
 checkout must be clean and its commit an ancestor of `origin/develop`.
 At GW38 it refuses bytes different from those named by the interim record,
 unless a change was declared on #1007 before that change's PR merged. The
-final record cites that declaration. Fixes can be reviewed before the interim;
-the runner is not silently pinned to another program's implementation.
+final record cites that declaration. Fixes stay possible before the interim:
+until then the runner's bytes may change without a declaration, and only from
+the interim record on does the GW38 byte check apply. This differs from PC1's
+scorer, which can run only as the bytes it was added with.
 
 Existing-record refusal checks the working tree, freshly fetched develop and
 all Git history. Both JSON and Markdown records are create-once. Render the
