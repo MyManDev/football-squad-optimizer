@@ -114,9 +114,10 @@ Step 4 merges after the GW6 publish and at or after 2026-10-10T10:00:00Z, aiming
 for the GW7 publish. After the owner's release approval, the first live publish
 with a non-null suggestion must carry the resulting rule id and
 `band_edge_points = round(1.0 * C * sqrt(weeks_remaining), 1)`, where C is the
-rounded S that step 4 writes to `WEEKLY_POINTS_DIFFERENTIAL_POINTS`, not the
-unrounded S. Until then a league build test pins that same equality. No release
-or weekly run is authorized by this declaration alone.
+rounded S, which `WEEKLY_POINTS_DIFFERENTIAL_POINTS` holds after step 4 whether
+it was retained or changed, not the unrounded S. Until then a league build test
+pins that same equality. No release or weekly run is authorized by this
+declaration alone.
 
 A follow-up issue covers GW12 and GW19 using this same script and preregistration.
 Their readings follow each week's final match, currently scheduled for
