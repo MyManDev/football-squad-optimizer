@@ -25,13 +25,14 @@ The three strategies retain `PREREG_OPEN` status.
 
 ## Named input and admitted population
 
-The runner takes `--snapshot-root`, a required explicit `--snapshot-id`, `--league`
-and `--through-gameweek`. There is no latest-capture default. The primary league
+The registered runner is `scripts/measure_strategy_rule_scale.py`. It takes
+`--snapshot-root`, a required explicit `--snapshot-id`, `--league` and
+`--through-gameweek`. There is no latest-capture default. The primary league
 is 352490 in 2026-27. N is the highest gameweek marked both finished and
 data_checked in that capture's bootstrap. Every gameweek 1 through N must have
 those flags, and this checkpoint requires N at least 6. The declared through-week
-is recorded beside N and must describe this admitted checkpoint, rather than
-selecting a more favorable subset after a result is seen.
+must equal N, and any other value refuses the run, so no more favorable subset
+can be selected after a result is seen. It is recorded beside N.
 
 Membership is every entry in that capture's `league-352490-standings.json`.
 Weekly net score is the `points` field minus `transfer_cost` returned by
