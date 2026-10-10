@@ -99,3 +99,27 @@ def test_progress_example_contains_absence_pending_bench_and_pending_vice():
     assert complete(captain) and captain["minutes"] == 0
     assert not complete(vice) and vice["minutes"] == 0
     assert member["vice"] in member["pick_order"][:11]
+
+
+def test_finished_example_settles_the_progress_example_inputs():
+    progress, finished = EXAMPLES["in_progress"], EXAMPLES["finished"]
+    assert progress["members"] == finished["members"]
+    assert [
+        {key: value for key, value in fixture.items() if key != "finished"}
+        for fixture in progress["fixtures"]
+    ] == [
+        {key: value for key, value in fixture.items() if key != "finished"}
+        for fixture in finished["fixtures"]
+    ]
+    settled = {item["element_id"]: item for item in finished["elements"]}
+    assert settled.keys() == {item["element_id"] for item in progress["elements"]}
+    pending_clubs = {
+        club
+        for fixture in progress["fixtures"]
+        if not fixture["finished"]
+        for club in (fixture["home_club"], fixture["away_club"])
+    }
+    completed = [item for item in progress["elements"] if item["club"] not in pending_clubs]
+    assert completed
+    for element in completed:
+        assert element == settled[element["element_id"]]
