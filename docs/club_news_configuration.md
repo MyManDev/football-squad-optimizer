@@ -145,7 +145,7 @@ the same way. When no page could be read at all, nothing is observed and no adap
 
 The same deadline check runs again just before the capture is written. If the deadline
 passed while the model was answering, or the clock went back past the observation, the run
-stops with `Refused` and writes nothing; the calls it made are spent. The refusal records
+stops with `Refused` and writes nothing; the calls it made are spent. The refusal names
 the completion instant and its specific cause. A later gameweek is not substituted; start
 a new run for it.
 
