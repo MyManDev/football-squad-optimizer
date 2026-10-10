@@ -1248,6 +1248,41 @@ def test_only_the_selected_publication_capture_must_state_the_target_deadline(
         assert report["valid_weeks"] == 6
 
 
+def test_unreadable_earlier_deadline_is_a_note_and_never_makes_the_week_missing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # An earlier GW8 publish whose capture lists no GW8 event cannot state any deadline.
+    def unlisted(documents: dict[str, Any]) -> None:
+        del documents[BOOTSTRAP_PAYLOAD]["events"][7]
+
+    captures, kwargs = reading_fixture(tmp_path, monkeypatch)
+    week_root = kwargs["publications"] / "2026-27/gw08"
+    consistent = next(week_root.glob("entry-*/*/advice.json")).parent.name
+    extra = capture(kwargs["snapshot_root"], target=8, change=unlisted, instant_offset=-60)
+    publication(tmp_path, extra, base(extra, target=8))
+    captures = runner.inventory(kwargs["snapshot_root"], as_of=kwargs["as_of"])
+    checked = runner.check_inputs(
+        captures,
+        publications=kwargs["publications"],
+        handoffs=kwargs["handoffs"],
+        weeks=(8,),
+        as_of=kwargs["as_of"],
+        snapshot_root=kwargs["snapshot_root"],
+    )
+    report = runner.reading(captures, **kwargs)
+    row = next(row for row in report["week_identities"] if row["gameweek"] == 8)
+    assert checked["weeks"][0]["status"] == "identity_and_inventory_ready"
+    assert row["status"] == "scored"
+    assert report["valid_weeks"] == 7
+    for proof in (checked["weeks"][0]["identity"], row["identity"]):
+        assert proof["capture"] == consistent
+        (note,) = proof["nonfinal_deadline_notes"]
+        assert note["capture"] == extra.metadata.snapshot_id
+        assert note["reason"] == "deadline_unreadable"
+        assert note["detail"].startswith("DataSourceError: ")
+        assert "publishes no gameweek 8" in note["detail"]
+
+
 def test_unlanded_staging_record_is_not_a_publication(tmp_path: Path) -> None:
     snapshot = capture(tmp_path / "snapshots")
     path = publication(tmp_path, snapshot, base(snapshot))
