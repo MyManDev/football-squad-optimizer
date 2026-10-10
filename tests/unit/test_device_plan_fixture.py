@@ -93,8 +93,15 @@ def test_preferences_hold_every_constraint_and_prove_the_infeasible_case() -> No
             assert kept in reference["squad"]
         if case["name"] == "avoid-not-held":
             avoided = preferences["avoid_players"][0]
+            assert avoided not in case["entry"]["held"]
             assert avoided in plain["squad"]
             assert avoided not in reference["squad"]
+        if case["name"] in {"avoid-held", "avoid-top100"}:
+            # Avoiding a held player forces his sale, where the plan without it keeps him.
+            avoided = preferences["avoid_players"][0]
+            assert avoided in case["entry"]["held"]
+            assert avoided in plain["squad"]
+            assert avoided in reference["transfers_out"]
         assert set(preferences["keep_players"]) <= set(reference["squad"])
         assert not set(preferences["avoid_players"]) & set(reference["squad"])
         if preferences["no_hits"]:
