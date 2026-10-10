@@ -89,10 +89,11 @@ Eligibility is fixed from the decision capture and companion, before outcomes.
 Include both partial and fully available players. A player's absence after the
 capture does not retrospectively change eligibility.
 
-Predicted attacking points are `(goal_points[position] * goals + 3 * assists)
-* m`, separately for each arm and fixture. For 2026-27, goal points are GK 10,
-DEF 6, MID 5 and FWD 4. Availability is applied once. Realized attacking points
-are the settled fixture's scored goals and assists under those same values.
+Predicted attacking points are
+`(goal_points[position] * goals + 3 * assists) * m`, separately for each arm and
+fixture. For 2026-27, goal points are GK 10, DEF 6, MID 5 and FWD 4.
+Availability is applied once. Realized attacking points are the settled
+fixture's scored goals and assists under those same values.
 
 For each eligible fixture row, calculate base squared error minus candidate
 squared error. Average within each gameweek, then equally across scored weeks.
