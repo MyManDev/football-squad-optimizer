@@ -42,7 +42,8 @@ Decision:
 
 1. The owner runs the Tuesday settle and the Friday publish through GW20. Each
    delegated stage requires his approval for that run. Until the owner says
-   otherwise, the PC1 decide step and the C2 pair check run the same way. After GW20 the weekly run moves off his PC (#1010).
+   otherwise, the PC1 decide step and the C2 pair check run the same way. After
+   GW20 the weekly run moves off his PC (#1010).
 2. League 352490 keeps the full server menu through GW20. The price honesty
    readings at GW9 and GW15 and the Top 100 plan readings at GW12 and GW20 retain
    their records; #981 step 8 waits until then.
