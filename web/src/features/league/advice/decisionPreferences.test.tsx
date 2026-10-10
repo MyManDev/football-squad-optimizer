@@ -160,8 +160,8 @@ it.each([
 ] as const)(
   "names the approved strategy when preferences conflict in %s",
   (language, instruction) => {
-    // A rival strategy with preferences conflicts; the sentence names the approved strategy.
-    const query = new URLSearchParams({ mode: "ortak-koru", preferences: preferencesKey(p) });
+    // Manager news with preferences conflicts; the sentence names the approved strategy.
+    const query = new URLSearchParams({ llm: "on", preferences: preferencesKey(p) });
     render(
       <LanguageProvider initialLanguage={language}>
         <MemoryRouter initialEntries={[`/?${query.toString()}`]}>

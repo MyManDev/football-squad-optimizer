@@ -14,7 +14,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { mockEntryAdviceIndex, mockLeagueMembersEnvelope } from "../../../fixtures/league";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { MESSAGES } from "../../../i18n/messages";
-import type { EntryAdviceIndex } from "../types";
+import { MEMBER_STRATEGIES, type EntryAdviceIndex } from "../types";
 import { MemberDecisionControls } from "./MemberDecisionControls";
 
 afterEach(cleanup);
@@ -326,8 +326,10 @@ describe("member decision controls", () => {
     }
   });
 
-  // The owner's names for #1005 Part D, word for word in both languages. The copy is
-  // pinned here rather than read back from MESSAGES, so a change to any of them fails.
+  // The owner's names for #1005 Part D, word for word in both languages and in the
+  // catalogue's strategy order. The copy is pinned here rather than read back from
+  // MESSAGES, so a change to any of them fails. No slug is spelled out, so the
+  // repository's slug counts stay as Part D records them.
   it.each([
     ["tr", ["En çok puan", "Farkı koru", "Farkı kapat"], "Plan süresi"],
     ["en", ["Most points", "Hold the gap", "Close the gap"], "Plan length"],
@@ -335,11 +337,7 @@ describe("member decision controls", () => {
     "renders the approved strategy and plan length names in %s",
     (language, names, legend) => {
       const copy = MESSAGES[language].leagueMembers;
-      expect([
-        copy.strategies["saf-puan"].name,
-        copy.strategies["ortak-koru"].name,
-        copy.strategies["fark-yarat"].name,
-      ]).toEqual(names);
+      expect(MEMBER_STRATEGIES.map((strategy) => copy.strategies[strategy].name)).toEqual(names);
       expect(copy.windowLegend).toBe(legend);
       renderControls(`/league/352490/members/${ENTRY}`, undefined, language);
       for (const name of names) {
