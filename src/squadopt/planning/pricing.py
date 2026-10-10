@@ -5,8 +5,8 @@ a share of any rise since — the rest is the sell-on fee the game keeps — rou
 to a tenth; a fall is passed on in full. The rule is stated once here so the live
 transfer decision, the season chain, and any later price model agree on it.
 
-``spending_power`` is the same rule read at the level of a whole squad, for the case
-where the per-player purchase prices are not published but the squad's selling value is.
+``spending_power`` reads a stated aggregate against the per-player prices, for the case
+where the purchase prices are not known but a cap on what the squad raises is stated.
 """
 
 import math
@@ -110,10 +110,15 @@ def spending_power(
     Where the purchase prices are *not* known, a caller has no per-player answer and the
     usual fallback is the current price, which is an upper bound: the game never pays
     more than the market price for a sale and pays less whenever the player has risen.
-    The public endpoints do publish the aggregate, though, so the size of that
-    overstatement is known exactly even when its division among the fifteen is not:
+    A stated aggregate below the sum of those prices proves an overstatement of at least
+    the difference, even where its division among the fifteen is unknown:
 
         shortfall = sum(sell prices handed in) - stated squad selling value
+
+    The aggregate the public picks document states is the fifteen at the market prices of
+    that week's deadline, not their selling value, so for a member's squad the shortfall
+    removes only the price moves since that deadline. The rest of the overstatement is
+    invisible here, and only purchase prices remove it.
 
     The shortfall is removed from the budget in the one order that keeps every subset of
     sales honest. Take it from the bank first, because a sale of *any* subset draws on

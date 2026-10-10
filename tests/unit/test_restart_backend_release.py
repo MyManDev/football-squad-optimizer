@@ -35,6 +35,13 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 RUNBOOK = ROOT / "docs/deployment_runbook.md"
 POWERSHELL = shutil.which("powershell.exe")
+# The variables an agent sets for its shells (scripts/backend_parentage.ps1).
+AGENT_MARKERS = {
+    "CLAUDECODE",
+    "CODEX_SANDBOX",
+    "CODEX_SANDBOX_NETWORK_DISABLED",
+    "CODEX_SESSION_ID",
+}
 pytestmark = [
     pytest.mark.skipif(POWERSHELL is None, reason="requires Windows PowerShell 5.1"),
     pytest.mark.skipif(shutil.which("git") is None, reason="requires Git"),
@@ -100,6 +107,8 @@ class World:
         script = (ROOT / "scripts/release/restart_backend.ps1").read_text(encoding="ascii")
         _write(self.author, "scripts/release/restart_backend.ps1", script)
         _write(self.author, "scripts/run_backend_local.ps1", launcher)
+        helper = (ROOT / "scripts/backend_parentage.ps1").read_text(encoding="ascii")
+        _write(self.author, "scripts/backend_parentage.ps1", helper)
         _write(self.author, "docs/contracts/advice.schema.json", "{}\n")
         _write(self.author, "docs/notes.md", "notes\n")
         _write(self.author, DATA, '{"gameweek": 6}\n')
@@ -410,7 +419,12 @@ class Owner:
     def __init__(self, world: World) -> None:
         self.world = world
         self.log = world.root / "launcher.log"
-        self.environment = {**os.environ, "SQUADOPT_TEST_LAUNCHER_LOG": str(self.log)}
+        # Whatever started pytest is no agent here; test_backend_parentage.py covers the guard.
+        self.environment = {
+            **{name: value for name, value in os.environ.items() if name not in AGENT_MARKERS},
+            "SQUADOPT_TEST_LAUNCHER_LOG": str(self.log),
+            "SQUADOPT_AGENT_APPLICATIONS": "no-agent-application.exe",
+        }
         self.commit = ""
 
     def follow(self, blocks: list[list[str]], values: dict[str, str]) -> list[tuple[str, str]]:

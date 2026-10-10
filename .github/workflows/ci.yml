@@ -145,7 +145,7 @@ jobs:
   web:
     name: web (node 22)
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: web
@@ -188,6 +188,18 @@ jobs:
 
       - name: Unit tests
         run: npx vitest run
+
+      # The FPL probe Worker and its deploy steps are plain JavaScript with no dependencies,
+      # tested by Node's own runner without credentials. The files are named rather than their
+      # directory: Node 22 runs a directory argument as a module and fails, and a glob that
+      # matches nothing passes. deploy-steps.test.mjs checks this list, and the same one in
+      # deploy-fpl-probe.yml, against the test directory.
+      - name: FPL probe worker tests
+        working-directory: .
+        run: |
+          node --test \
+            workers/fpl-probe/test/probe.test.mjs \
+            workers/fpl-probe/test/deploy-steps.test.mjs
 
       - name: Build
         env:

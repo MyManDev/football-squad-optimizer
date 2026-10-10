@@ -1,0 +1,16 @@
+{
+  "contract_version": "league_directory_v1",
+  "generated_at_utc": "2026-10-10T06:07:04Z",
+  "source_kind": "live",
+  "payload": {
+    "leagues": [
+      {
+        "league_id": 352490,
+        "league_name": "iyi olan kazans\u0131n v4",
+        "season": "2026-27",
+        "gameweek": 6,
+        "path": "leagues/352490"
+      }
+    ]
+  }
+}

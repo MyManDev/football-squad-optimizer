@@ -65,8 +65,11 @@ def _write(path: Path, document: dict) -> None:
 def _held_from_entry(entry: dict, prices: dict[int, int]) -> HeldSquad:
     """The held squad as ``held_squad_from_picks`` builds it, from the published document.
 
-    The entry publishes no purchase prices, so the current prices stand in for them and the
-    stated squad selling value caps the budget, exactly the fallback the builder took.
+    A tree from before the device inputs was built before purchase prices were rebuilt
+    from the transfers list, so its entries publish none: the current prices stand in for
+    them and the stated squad selling value caps the budget, exactly the fallback the
+    builder took. An entry that does publish them came from a builder that writes the
+    device inputs itself, and is refused.
     """
 
     ids = [int(p["player_id"]) for p in (*entry["starting_xi"], *entry["bench"])]

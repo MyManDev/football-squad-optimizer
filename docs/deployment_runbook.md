@@ -59,6 +59,8 @@ tool in plaintext.
 
 3. In Cloudflare, create a token scoped to the selected account with only **Account →
    Cloudflare Pages → Edit**. Do not grant Zone, Workers, or unrelated account permissions.
+   The FPL probe's Workers token is a separate token in a separate environment,
+   `cloudflare-workers` ([FPL forwarder probe](fpl_forwarder_probe.md)); never widen this one.
 
 4. Add the account ID and replacement token as **Environment secrets**, then add the project
    name as a repository Actions variable. Each `gh secret set` command prompts securely; do not
@@ -163,9 +165,12 @@ accepted advice and entry files remain byte-identical. Generate the complete con
 roster with `scripts.build_player_catalog` from that capture before the site-data PR. That one
 stays a step: it writes `data/players.json` into the site-data tree after the candidate exists,
 and adding that path to the publisher's approved list is a boundary change for the owner to
-approve. The page's own validators (`shippedTree.test.ts`) need no run by hand here either: the
-site PR's CI runs them on the committed tree, and the deploy workflow refuses a tag without a
-successful `main` push CI, which runs them again.
+approve. The page's own validators (`shippedTree.test.ts` and the other shipped-tree guards)
+need no run by hand here either: the site PR's CI runs them on every tree the committed site
+lists (`web/src/testSupport/shippedTrees.ts`; the member-page guard draws one tree and fails
+on a site that lists more), failing rather than skipping when it lists none, and the deploy
+workflow refuses a tag without a successful `main` push CI, which runs
+them again.
 
 No cron is used: a person is already operating the deadline, and only that person knows the
 decision has been accepted. GW1 on 2026-08-21 is a documented one-off exception: its approved
@@ -319,8 +324,14 @@ recovery guidance. It can only replace a running backend, never start one. If it
 start it by hand from the released code, as [a stopped backend](#a-stopped-backend-starts-from-the-release)
 below describes, then carry on. The processes belong to the logon session and nothing restarts
 them, so a logoff or a reboot between the publish and this step leaves nothing to restart.
-Replace `<same-ISO>` with the accepted candidate timestamp used for `ship.sh`. First preview
-the restart:
+Run it from a plain Windows PowerShell window, never from an agent application's shell or
+terminal: a backend started inside an application's process tree dies when that application
+updates or closes, as on 2026-10-04 when a Store update of the Codex app ended the api and
+the workers started from its sandbox. The helper and the launcher refuse to start a backend
+when an agent application (`claude.exe`, the Codex app's `ChatGPT.exe` and `codex.exe`, its
+sandbox service) is among their ancestors, or a variable those agents set for their shells
+is present (`scripts/backend_parentage.ps1`); the dry run is not refused. Replace `<same-ISO>` with the
+accepted candidate timestamp used for `ship.sh`. First preview the restart:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\release\restart_backend.ps1 -AcceptedGeneratedAt <same-ISO> -DryRun
@@ -344,7 +355,9 @@ as `web/`, do not refuse. The main checkout stays on `develop`, so the answer to
 is to wait for the next release and restart after it, or to pass `-Force`, which runs
 develop's code anyway and prints `FORCED`. `-Force` is one switch: it also permits open work.
 This check needs no running backend and comes before the registry is read, so the dry run
-prints the release and its verdict even when the backend is down.
+prints the release and its verdict even when the backend is down. A release whose production
+job ended red although the site serves it (fix16's smoke failed on the takeover race #971
+fixed) is not the one the script finds; name it with `-ReleaseTag`.
 
 The script then verifies the public site, requires the public capture to match the fetched
 `origin/develop` publication, refuses open work unless `-Force`, and pulls with
@@ -573,7 +586,10 @@ it kept that HTML for the name: when a later deploy built a chunk of that name, 
 reaching that edge got HTML for the chunk and browsers kept the broken copy for a year. Then
 the smoke reads the shell, follows every asset it names (the entry, its stylesheets, every
 lazy page, the device solver's worker and wasm, the fonts) and requires each to answer as
-itself, never as the shell.
+itself, never as the shell. A walk that meets a missing asset reads the shell again and walks
+again within the same retry budget: for a moment after a deploy the alias can still answer the
+previous release's shell, whose entry the new deployment no longer holds (fix16's production
+smoke failed on exactly that, `index-DWoiDReR.js`, while the site itself was consistent).
 
 So **never request a not-yet-deployed asset name on the live domain** (a local build predicts
 the names CI will publish): each such request poisons that name at the edge that answered.

@@ -1,3 +1,6 @@
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import type { Page, Route } from "@playwright/test";
 
 import {
@@ -8,6 +11,7 @@ import {
 } from "../src/fixtures/league";
 import type { AdviceStrategy } from "../src/features/league/types";
 import type { WindowSize } from "../src/lib/decisionVocabulary";
+import { shippedTrees } from "../src/testSupport/shippedTrees";
 
 const STRATEGIES: readonly AdviceStrategy[] = [
   "saf-puan",
@@ -65,6 +69,26 @@ export function openCalendar() {
  * recently registered route first, so a spec that needs the API routes it after this call.
  */
 export async function installLeagueMocks(page: Page) {
+  // Registered first, so every route below wins over it: a document the example league
+  // does not carry (the scoreboard, the histories, the series, the device inputs) is the
+  // shipped tree's, read from wherever the site publishes it. Before the directory these
+  // were the files under data/league/ themselves.
+  const example = mockLeagueMembersEnvelope.payload.league_id;
+  const shipped = shippedTrees().find(
+    ({ root }) =>
+      JSON.parse(readFileSync(join(root, "members.json"), "utf-8")).payload.league_id === example,
+  )?.root;
+  await page.route(/\/data\/league\/([^?]+)(?:\?.*)?$/, (route) => {
+    const relative =
+      route
+        .request()
+        .url()
+        .match(/\/data\/league\/([^?]+)/)?.[1] ?? "";
+    const parts = relative.split("/");
+    if (shipped === undefined || parts.includes("..")) return missing(route);
+    const path = join(shipped, ...parts);
+    return existsSync(path) ? route.fulfill({ path }) : missing(route);
+  });
   await page.route("**/api/v1/**", (route) => route.abort("connectionrefused"));
   await page.route("**/data/fixtures.json", (route) => fulfill(route, openCalendar()));
   // No league directory: the site from before it, whose one league under `data/league/`

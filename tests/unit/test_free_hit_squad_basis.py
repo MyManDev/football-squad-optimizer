@@ -306,14 +306,20 @@ def test_a_capture_stores_the_pre_free_hit_picks_beside_the_played_week(
     assert written is not None
     snapshot = read_snapshot(tmp_path / "snapshots", written.snapshot_id)
     entry_documents = {name for name in snapshot.payloads if name.startswith("entry-")}
+    # The purchase-price rebuild's documents come last: each transfers list, and the
+    # opening picks of the entry whose history starts at gameweek 1 (entry 22's history
+    # here is no history, so nothing is named from it).
     assert entry_documents == {
         "entry-11.json",
         "entry-11-history.json",
         "entry-11-picks-gw03.json",
         "entry-11-picks-gw02.json",
+        "entry-11-picks-gw01.json",
+        "entry-11-transfers.json",
         "entry-22.json",
         "entry-22-history.json",
         "entry-22-picks-gw03.json",
+        "entry-22-transfers.json",
     }
     assert reads.count(f"{fpl_capture.BASE_URL}/entry/11/event/2/picks/") == 1
     assert not any(url.endswith("/entry/22/event/2/picks/") for url in reads)

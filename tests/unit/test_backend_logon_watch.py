@@ -19,7 +19,14 @@ def _quoted(path: Path) -> str:
 
 
 def _run(
-    tmp_path: Path, *, health: str, connector: str, dry_run: bool = False, setup: str = ""
+    tmp_path: Path,
+    *,
+    health: str,
+    connector: str,
+    dry_run: bool = False,
+    setup: str = "",
+    ready: str = "$true",
+    github: str = "$true",
 ) -> str:
     scripts = tmp_path / "scripts"
     scripts.mkdir()
@@ -34,9 +41,18 @@ $global:tick = 0
 SETUP
 function Invoke-WebRequest {
     param([switch]$UseBasicParsing, $TimeoutSec, $Uri)
+    if ($Uri -eq 'http://127.0.0.1:18763/ready') {
+        if (READY) { return @{StatusCode=200; Content='{"ready":true}'} }
+        throw 'not ready'
+    }
     if ($Uri -ne 'http://127.0.0.1:18763/health') { throw 'wrong target' }
     if (HEALTH) { return @{StatusCode=200} }
     throw 'offline'
+}
+function Fake-GitHub {
+    Write-Output ('DISPATCH tick=' + $global:tick + ' ' + ($args -join ' ')) |
+        Out-File -FilePath DISPATCHES -Append
+    if (GITHUB) { $global:LASTEXITCODE = 0 } else { $global:LASTEXITCODE = 1; 'denied' }
 }
 function Get-CimInstance {
     param($ClassName, $Filter, $ErrorAction)
@@ -59,12 +75,15 @@ function Stop-Process { throw 'must never stop a process' }
 function taskkill { throw 'must never kill a process' }
 try {
     & SCRIPT -RepoRoot ROOT -Port 18763 -TunnelName test-tunnel -ConnectorLabel test-watch `
-        -Cloudflared EXE -Watch DRYRUN
+        -Cloudflared EXE -GitHubCli Fake-GitHub -Watch DRYRUN
 } catch {
     if ($_.Exception.Message -ne 'TEST_FINISHED') { throw }
 }
 Write-Output ('TICKS=' + $global:tick)
 """.replace("HEALTH", health)
+        .replace("READY", ready)
+        .replace("GITHUB", github)
+        .replace("DISPATCHES", _quoted(tmp_path / "dispatches.txt"))
         .replace("SETUP", setup)
         .replace("CONNECTOR", connector)
         .replace("ACTIONS", _quoted(tmp_path / "actions.txt"))
@@ -100,6 +119,7 @@ def test_watch_resets_after_recovery_and_only_starts_missing_backend(tmp_path: P
     assert "-Port " in actions
     assert "-RepoRoot" in actions
     assert "--label" not in actions
+    assert _dispatches(tmp_path) == [], "a launch that brought the backend back is not reported"
 
 
 def test_watch_ignores_another_label_and_starts_only_its_connector(tmp_path: Path) -> None:
@@ -200,7 +220,7 @@ def test_existing_watcher_allows_only_dry_run_probes(tmp_path: Path, dry_run: bo
     (scripts / "run_backend_local.ps1").touch()
     contender = tmp_path / "contender.ps1"
     contender.write_text(
-        "function Invoke-WebRequest { return @{StatusCode=200} }\n"
+        "function Invoke-WebRequest { return @{StatusCode=200; Content='{\"ready\":true}'} }\n"
         f"function Get-CimInstance {{ {PRESENT} }}\n"
         "function Start-Process { throw 'must not launch' }\n"
         "function Start-Sleep { throw 'must not loop' }\n"
@@ -243,4 +263,133 @@ def test_existing_watcher_allows_only_dry_run_probes(tmp_path: Path, dry_run: bo
 def test_registered_shortcut_runs_watch() -> None:
     source = SCRIPT.read_text(encoding="ascii")
     assert '$link.Arguments += " -Watch -ConnectorLabel' in source
+    assert '$link.Arguments += " -GitHubCli `"$GitHubCli`""' in source
     assert "with -Watch to start and watch now" in source
+
+
+def _dispatches(tmp_path: Path) -> list[str]:
+    path = tmp_path / "dispatches.txt"
+    return path.read_text(encoding="utf-16").splitlines() if path.exists() else []
+
+
+def test_an_api_that_stays_not_ready_is_reported_once_and_again_when_ready(tmp_path: Path) -> None:
+    output = _run(
+        tmp_path, health="$true", connector=PRESENT, ready="$global:tick -notin @(1, 2, 3, 4)"
+    )
+    dispatches = _dispatches(tmp_path)
+    assert [line.split()[1] for line in dispatches] == ["tick=3", "tick=5"]
+    assert all(
+        "workflow run backend-uptime.yml -f dry_run=false -R MyManDev/football-squad-optimizer"
+        in line
+        for line in dispatches
+    )
+    assert "/ready is not ready" in output
+    assert "asked GitHub to run the uptime check now" in output
+    assert not (tmp_path / "actions.txt").exists(), "a backend that answers is never relaunched"
+    assert not (tmp_path / "data/runtime/backend/run/watch-alert.txt").exists()
+
+
+def test_a_short_not_ready_spell_is_not_reported(tmp_path: Path) -> None:
+    _run(tmp_path, health="$true", connector=PRESENT, ready="$global:tick -notin @(2, 3)")
+    assert _dispatches(tmp_path) == []
+
+
+def test_a_silent_api_with_live_recorded_processes_is_reported_once(tmp_path: Path) -> None:
+    registry = tmp_path / "data/runtime/backend/run"
+    registry.mkdir(parents=True)
+    (registry / "backend.pids.json").write_text(
+        '{"processes":[{"pid":123,"start_ticks_utc":"0"}]}', encoding="ascii"
+    )
+    _run(
+        tmp_path,
+        health="$false",
+        connector=PRESENT,
+        setup=(
+            "function Get-Process { param($Id,$ErrorAction); "
+            "return @{StartTime=[datetime]::MinValue} }"
+        ),
+    )
+    assert [line.split()[1] for line in _dispatches(tmp_path)] == ["tick=0"]
+    assert not (tmp_path / "actions.txt").exists()
+    assert (registry / "watch-alert.txt").exists(), "the open episode is kept for the next watcher"
+
+
+def test_a_backend_a_launch_did_not_bring_back_is_reported_once(tmp_path: Path) -> None:
+    _run(tmp_path, health="$false", connector=PRESENT)
+    actions = (tmp_path / "actions.txt").read_text(encoding="utf-16")
+    assert actions.count("START") == 3
+    assert [line.split()[1] for line in _dispatches(tmp_path)] == ["tick=3"]
+
+
+def test_a_refused_request_is_logged_and_the_watch_goes_on(tmp_path: Path) -> None:
+    output = _run(
+        tmp_path,
+        health="$true",
+        connector=PRESENT,
+        ready="$global:tick -lt 3",
+        github="$false",
+    )
+    assert "could not ask GitHub to run the uptime check" in output
+    assert "TICKS=8" in output
+
+
+def _ticks(tmp_path: Path) -> list[str]:
+    return [line.split()[1] for line in _dispatches(tmp_path)]
+
+
+def test_a_refused_alert_is_asked_again_at_the_fifth_check(tmp_path: Path) -> None:
+    _run(
+        tmp_path,
+        health="$true",
+        connector=PRESENT,
+        ready="$false",
+        github="$global:tick -ne 2",
+    )
+    assert _ticks(tmp_path) == ["tick=2", "tick=7"]
+    assert (tmp_path / "data/runtime/backend/run/watch-alert.txt").exists()
+
+
+def test_a_refused_recovery_keeps_the_episode_open(tmp_path: Path) -> None:
+    _run(
+        tmp_path,
+        health="$true",
+        connector=PRESENT,
+        ready="$global:tick -ge 3",
+        github="$global:tick -ne 3",
+    )
+    assert _ticks(tmp_path) == ["tick=2", "tick=3"]
+    assert (tmp_path / "data/runtime/backend/run/watch-alert.txt").exists()
+
+
+def test_a_restarted_watcher_still_asks_for_the_run_that_closes_the_incident(
+    tmp_path: Path,
+) -> None:
+    marker = tmp_path / "data/runtime/backend/run/watch-alert.txt"
+    marker.parent.mkdir(parents=True)
+    marker.write_text("2026-10-05T12:00:00", encoding="ascii")
+    output = _run(tmp_path, health="$true", connector=PRESENT)
+    assert _ticks(tmp_path) == ["tick=0"]
+    assert "the backend is healthy and ready again" in output
+    assert not marker.exists()
+
+
+def test_a_dry_run_only_says_what_it_would_ask(tmp_path: Path) -> None:
+    registry = tmp_path / "data/runtime/backend/run"
+    registry.mkdir(parents=True)
+    (registry / "backend.pids.json").write_text(
+        '{"processes":[{"pid":123,"start_ticks_utc":"0"}]}', encoding="ascii"
+    )
+    output = _run(
+        tmp_path,
+        health="$false",
+        connector=PRESENT,
+        dry_run=True,
+        setup=(
+            "function Get-Process { param($Id,$ErrorAction); "
+            "return @{StartTime=[datetime]::MinValue} }"
+        ),
+    )
+    assert "would ask GitHub to run the uptime check now" in output
+    assert _dispatches(tmp_path) == []
+    assert not (registry / "watch-alert.txt").exists()
+    assert not (tmp_path / "data/runtime/backend/logs").exists()

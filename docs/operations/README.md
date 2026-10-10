@@ -9,6 +9,7 @@
 | Produce the member publication for a week | [Weekly runbook](../weekly_runbook.md) |
 | Understand opening capture/decision/settlement | [Opening-week runbook](../opening_week_runbook.md) |
 | Deploy the static website | [Deployment runbook](../deployment_runbook.md) |
+| Measure whether FPL answers Cloudflare's network before an FPL forwarder is built | [FPL forwarder probe](../fpl_forwarder_probe.md) |
 | Prepare and accept the separate advice API/worker | [Backend runbook](../backend_runbook.md) |
 | Run the advice API/worker on the owner's PC behind a Cloudflare Tunnel, and the zero-cost hosting comparison | [Backend free hosting](../backend_free_hosting.md) |
 | Read the committed season summary | [2026-27 season ledger](../season_ledger_2026-27.md) |

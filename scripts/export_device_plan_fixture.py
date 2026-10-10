@@ -2,8 +2,8 @@
 
     python -m scripts.export_device_plan_fixture
 
-The page's solver (``web/src/features/league/device/planModel.ts``) restates the server's
-one-week model. This fixture is what holds the two together: every instance here is
+The page's solver (``web/src/features/league/device/solve/week.ts`` over ``lp/``) restates
+the server's one-week model. This fixture is what holds the two together: every instance here is
 solved by the repository's planner under the member planning policy, and the web test
 solves the same instances with the device solver and requires the same answer. The
 Python test ``tests/unit/test_device_plan_fixture.py`` requires the recorded answers to

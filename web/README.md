@@ -16,11 +16,18 @@ order, after `npm ci` and a Python `.[api,dev]` install for the last step:
 | Lint and format                               | `npm run lint` and `npm run format:check`                              |
 | Typecheck                                     | `npm run typecheck`                                                    |
 | Unit tests                                    | `npx vitest run`                                                       |
+| FPL probe worker tests                        | the `node --test` run below, from the repository root                  |
 | Build                                         | `npm run build`                                                        |
 | Deployment assets                             | `npm run check:deployment`                                             |
 | Bundle budget                                 | `npm run size`                                                         |
 | Playwright smoke                              | `npm run e2e` (after `npx playwright install chromium`)                |
 | Publication and browser API worker acceptance | the pytest run below, from the repository root                         |
+
+The FPL probe row runs the Worker's own suites ([FPL forwarder probe](../docs/fpl_forwarder_probe.md)):
+
+```sh
+node --test workers/fpl-probe/test/probe.test.mjs workers/fpl-probe/test/deploy-steps.test.mjs
+```
 
 The last row runs, with `SQUADOPT_PUBLICATION_CONTRACT=1` and `SQUADOPT_BROWSER_SMOKE=1` set:
 
