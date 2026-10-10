@@ -37,10 +37,22 @@ have moved. Normal-week multipliers are used throughout. Transfer hits and chip
 multipliers do not enter the primary score. The frozen squad remains the captured squad.
 Chip rosters follow the preregistration amendment of 2026-10-10, accepted by the
 owner. A Wildcard entry is scored on its captured roster, since a Wildcard changes only
-the transfer cost, which the primary score excludes. Free Hit and unrecognized chips
-are refused as `chip_unresolved`. The runner does not invent a counterfactual squad or
-count one toward coverage. Each week records how many valid entries were scored on a
-Wildcard roster under `cohort_chip_rosters`.
+the transfer cost, which the primary score excludes. A Free Hit roster is never scored:
+the entry is scored on the roster the Free Hit reverts to, its previous week's squad,
+starting XI, bench order, captain and vice-captain, against the target week's outcomes.
+Those picks are read only from the previous week's `fpl-benchmark-picks` capture listed
+in the same manifest, admitted when its `benchmark.json` names that week's frozen cohort
+and it was captured at or after that week's deadline. The previous week's recorded
+automatic substitutions are reversed as for any other roster. An entry whose previous
+picks are missing, including every Free Hit entry of the first declared week, whose
+previous week is outside the reading, is excluded as `free_hit_previous_missing`.
+A previous roster that is itself a Free Hit roster, and any unrecognized chip, is
+excluded as `chip_unresolved`. The runner does not invent a counterfactual squad or
+count one toward coverage. Excluded entries count against the 80-member floor like any
+other, and a week below it stays out of both comparisons. Each week records how many
+valid entries were scored on a Wildcard or a reverted Free Hit roster under
+`cohort_chip_rosters`, and the previous week's picks capture it admitted under
+`previous_picks`.
 
 The outcome is a completed `fpl-live` capture whose target week is finished and checked
 and whose player event points and minutes cover all three primary arms. Every capture

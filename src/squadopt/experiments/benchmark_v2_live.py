@@ -67,7 +67,13 @@ WEEK_EXCLUSION_CODES = (
     "invalid_capture",
     "missing_capture",
 )
-ENTRY_EXCLUSION_CODES = ("chip_unresolved", "unreadable", "invalid_picks", "missing_outcome")
+ENTRY_EXCLUSION_CODES = (
+    "chip_unresolved",
+    "free_hit_previous_missing",
+    "unreadable",
+    "invalid_picks",
+    "missing_outcome",
+)
 # A declared week whose captures do not exist is listed in the manifest with this code.
 MISSING_CAPTURE = "missing_capture"
 # Chips whose captured roster is the scored roster (preregistration amendment of
@@ -75,8 +81,10 @@ MISSING_CAPTURE = "missing_capture"
 # normal-week policy resets, and a Wildcard only the transfer cost, which the primary
 # score excludes.
 CAPTURED_ROSTER_CHIPS = (None, "bboost", "3xc", "wildcard")
+# A Free Hit entry is scored on the roster the chip reverts to: the previous week's.
+FREE_HIT = "freehit"
 # Valid cohort entries scored under a chip roster rule, counted per week.
-CHIP_ROSTERS = ("wildcard",)
+CHIP_ROSTERS = ("wildcard", FREE_HIT)
 
 
 class LiveWeekRefusal(EvaluationValidationError):
@@ -98,6 +106,10 @@ class UnresolvedChipError(EvaluationValidationError):
 
 class _MissingEntryOutcome(EvaluationValidationError):
     """A cohort entry names a player without a realized outcome."""
+
+
+class _MissingPreviousRoster(EvaluationValidationError):
+    """A Free Hit entry's previous-week picks are not in the reading's frozen captures."""
 
 
 @dataclass(frozen=True)
@@ -168,8 +180,50 @@ def _original_picks(raw: bytes, *, entry_id: int, gameweek: int) -> bytes:
     return json.dumps(document).encode()
 
 
-def prepare_live_week(week: LiveBenchmarkWeek) -> PreparedLiveWeek:
-    """Validate timing, identities and complete scoring inputs before any comparison."""
+def _admitted_previous_picks(
+    week: LiveBenchmarkWeek,
+    previous: LiveBenchmarkWeek | None,
+    deadlines: Mapping[int, str],
+) -> tuple[CapturedSnapshot, Mapping[int, int]] | None:
+    """The previous week's frozen picks capture and its player codes, when admissible.
+
+    Only the picks capture listed for gameweek t-1 in the same reading is read: bound to
+    that week's frozen cohort and captured at or after its deadline. Anything else
+    leaves the Free Hit entries of week t without a previous roster, never a guessed one.
+    """
+    prior = deadlines.get(week.gameweek - 1)
+    if previous is None or previous.gameweek != week.gameweek - 1 or prior is None:
+        return None
+    picks = previous.picks
+    try:
+        binding = _json(picks, "benchmark.json")
+        captured = as_instant(picks.metadata.captured_at_utc)
+        observed = {
+            item.gameweek: as_instant(item.deadline_utc)
+            for item in gameweek_deadlines(picks.payloads[BOOTSTRAP_PAYLOAD])
+        }
+        codes = player_codes(picks.payloads[BOOTSTRAP_PAYLOAD])
+    except (DataError, EvaluationValidationError, KeyError, ValueError, TypeError):
+        return None
+    admitted = (
+        picks.metadata.source == "fpl-benchmark-picks"
+        and previous.cohort.metadata.source == "fpl-top100"
+        and (binding.get("season"), binding.get("gameweek"), binding.get("cohort_snapshot_id"))
+        == (SEASON, previous.gameweek, previous.cohort.metadata.snapshot_id)
+        and observed.get(previous.gameweek) == as_instant(prior)
+        and as_instant(prior) <= captured < as_instant("2027-08-01T00:00:00Z")
+    )
+    return (picks, codes) if admitted else None
+
+
+def prepare_live_week(
+    week: LiveBenchmarkWeek, previous: LiveBenchmarkWeek | None = None
+) -> PreparedLiveWeek:
+    """Validate timing, identities and complete scoring inputs before any comparison.
+
+    ``previous`` is the reading's own gameweek t-1, whose picks capture supplies the
+    roster a Free Hit entry reverts to.
+    """
     if type(week.gameweek) is not int or not 3 <= week.gameweek <= 38:
         raise LiveWeekRefusal("invalid_gameweek", "Live Benchmark V2 requires gameweeks 3 to 38.")
     sources = {
@@ -202,8 +256,8 @@ def prepare_live_week(week: LiveBenchmarkWeek) -> PreparedLiveWeek:
     # As-of membership: a cohort taken before the previous deadline ranks an older week.
     # The deadline's own instant already closes that week, as in the late_capture gate
     # above and in next_open_deadline, so a capture at that instant belongs to this week.
-    previous = deadlines.get(week.gameweek - 1)
-    if previous is None or as_instant(week.cohort.metadata.captured_at_utc) < as_instant(previous):
+    prior = deadlines.get(week.gameweek - 1)
+    if prior is None or as_instant(week.cohort.metadata.captured_at_utc) < as_instant(prior):
         raise LiveWeekRefusal(
             "stale_cohort", "Benchmark cohort cannot precede the previous gameweek deadline."
         )
@@ -310,6 +364,7 @@ def prepare_live_week(week: LiveBenchmarkWeek) -> PreparedLiveWeek:
         gameweek=week.gameweek,
     )
     codes = player_codes(week.picks.payloads[BOOTSTRAP_PAYLOAD])
+    previous_roster = _admitted_previous_picks(week, previous, deadlines)
     managers = []
     entry_exclusions = dict.fromkeys(ENTRY_EXCLUSION_CODES, 0)
     chip_rosters = dict.fromkeys(CHIP_ROSTERS, 0)
@@ -324,24 +379,37 @@ def prepare_live_week(week: LiveBenchmarkWeek) -> PreparedLiveWeek:
         chip: object = None
         try:
             chip = _active_chip(week.picks.payloads[picks_name])
+            roster_capture, roster_week, roster_codes = week.picks, week.gameweek, codes
+            if chip == FREE_HIT:
+                # The Free Hit roster itself is never scored. The chip reverts to the
+                # previous week's squad, XI, bench order, captain and vice-captain.
+                if previous_roster is None or not {
+                    entry_picks_payload(entry_id, week.gameweek - 1),
+                    history_name,
+                } <= set(previous_roster[0].payloads):
+                    raise _MissingPreviousRoster("Free Hit entry has no previous roster.")
+                (roster_capture, roster_codes), roster_week = previous_roster, week.gameweek - 1
             record = fpl_entry_picks(
                 _original_picks(
-                    week.picks.payloads[picks_name],
+                    roster_capture.payloads[entry_picks_payload(entry_id, roster_week)],
                     entry_id=entry_id,
-                    gameweek=week.gameweek,
+                    gameweek=roster_week,
                 ),
-                week.picks.payloads[history_name],
+                roster_capture.payloads[history_name],
                 entry_id=entry_id,
                 season=SEASON,
-                gameweek=week.gameweek,
-                source_snapshot_id=week.picks.metadata.snapshot_id,
+                gameweek=roster_week,
+                source_snapshot_id=roster_capture.metadata.snapshot_id,
             )
-            decision = _decision_from_record(record, player_pool=pool, codes=codes)
+            decision = _decision_from_record(record, player_pool=pool, codes=roster_codes)
             if not set(decision.squad.player_id) <= outcome_ids:
                 raise _MissingEntryOutcome("Missing cohort player's realized outcome.")
             score_frozen_squad_decision(decision, outcomes.assign(total_points=0))
         except UnresolvedChipError:
+            # Includes a Free Hit whose previous roster is itself a Free Hit roster.
             entry_exclusions["chip_unresolved"] += 1
+        except _MissingPreviousRoster:
+            entry_exclusions["free_hit_previous_missing"] += 1
         except _MissingEntryOutcome:
             entry_exclusions["missing_outcome"] += 1
         except (DataError, EvaluationValidationError, KeyError, ValueError, TypeError):
@@ -384,6 +452,14 @@ def prepare_live_week(week: LiveBenchmarkWeek) -> PreparedLiveWeek:
                     "captured_at_utc": getattr(week, role).metadata.captured_at_utc,
                 }
                 for role in sources
+            },
+            # The previous week's picks capture that Free Hit entries revert to, if any.
+            "previous_picks": None
+            if previous_roster is None
+            else {
+                "snapshot_id": previous_roster[0].metadata.snapshot_id,
+                "fingerprint": previous_roster[0].metadata.fingerprint,
+                "captured_at_utc": previous_roster[0].metadata.captured_at_utc,
             },
             "deadline_utc": deadlines[week.gameweek],
             "template_configuration": config_record,
@@ -471,9 +547,12 @@ def read_live_benchmark_once(
     exclusions: list[dict[str, Any]] = [
         {"gameweek": gameweek, "reason": MISSING_CAPTURE} for gameweek in missing_gameweeks
     ]
+    # A Free Hit entry reverts to the previous week's roster, read only from this
+    # reading's own frozen captures of that week.
+    listed = {week.gameweek: week for week in weeks}
     for week in sorted(weeks, key=lambda item: item.gameweek):
         try:
-            prepared.append(prepare_live_week(week))
+            prepared.append(prepare_live_week(week, listed.get(week.gameweek - 1)))
         except LiveWeekRefusal as error:
             # Report stable codes and counts, never raw entry ids from parsing failures.
             exclusions.append({"gameweek": week.gameweek, "reason": error.code, **error.coverage})

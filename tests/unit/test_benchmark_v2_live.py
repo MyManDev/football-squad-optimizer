@@ -171,7 +171,7 @@ def read(weeks, root, *, missing=(), first=None, last=None):
 
 
 def test_early_reading_refuses_before_preparing_or_scoring(tmp_path, monkeypatch):
-    monkeypatch.setattr(live, "prepare_live_week", lambda _: pytest.fail("Early input was opened"))
+    monkeypatch.setattr(live, "prepare_live_week", lambda *_: pytest.fail("Early input was opened"))
     with pytest.raises(EvaluationValidationError, match="eight valid"):
         read([week()] * 7, tmp_path)
     assert not (tmp_path / live.CLAIM_FILE).exists()
@@ -206,11 +206,12 @@ def test_eight_weeks_pair_all_arms_and_second_reading_opens_nothing(tmp_path, mo
             "cohort_excluded": 21,
             "cohort_exclusions": {
                 "chip_unresolved": 0,
+                "free_hit_previous_missing": 0,
                 "unreadable": 21,
                 "invalid_picks": 0,
                 "missing_outcome": 0,
             },
-            "cohort_chip_rosters": {"wildcard": 0},
+            "cohort_chip_rosters": {"wildcard": 0, "freehit": 0},
         },
     ]
     assert result["paired_gameweeks"] == 8
@@ -246,7 +247,9 @@ def test_eight_weeks_pair_all_arms_and_second_reading_opens_nothing(tmp_path, mo
     assert "- Declared gameweeks: 6 to 15" in markdown
     assert "| 8 | `missing_capture` | not read | not read |" in markdown
     assert "| 15 | `insufficient_coverage` | 79 | 21 |" in markdown
-    monkeypatch.setattr(live, "prepare_live_week", lambda _: pytest.fail("Second input was opened"))
+    monkeypatch.setattr(
+        live, "prepare_live_week", lambda *_: pytest.fail("Second input was opened")
+    )
     with pytest.raises(EvaluationValidationError, match="already been claimed"):
         read(weeks, tmp_path, missing=[8])
 
@@ -264,7 +267,7 @@ def test_eight_weeks_pair_all_arms_and_second_reading_opens_nothing(tmp_path, mo
 def test_every_declared_gameweek_is_listed_before_any_week_is_prepared(
     tmp_path, monkeypatch, listed, missing, first, last
 ):
-    monkeypatch.setattr(live, "prepare_live_week", lambda _: pytest.fail("Input was opened"))
+    monkeypatch.setattr(live, "prepare_live_week", lambda *_: pytest.fail("Input was opened"))
     with pytest.raises(EvaluationValidationError, match=r"declared gameweek|unique"):
         read(
             [week(gameweek) for gameweek in listed],
@@ -420,6 +423,7 @@ def test_exactly_eighty_valid_members_pass_without_backfilling():
     assert prepared.provenance["cohort_excluded"] == 20
     assert prepared.provenance["cohort_exclusions"] == {
         "chip_unresolved": 0,
+        "free_hit_previous_missing": 0,
         "unreadable": 20,
         "invalid_picks": 0,
         "missing_outcome": 0,
@@ -434,10 +438,10 @@ def test_exactly_eighty_valid_members_pass_without_backfilling():
 def test_thin_week_keeps_its_coverage_counted_by_reason():
     candidate = week(coverage=82)
     payloads = dict(candidate.picks.payloads)
-    for entry in (1001, 1002, 1003):
+    for entry, chip in ((1001, "freehit"), (1002, "freehit"), (1003, "unknown")):
         name = f"entry-{entry}-picks-gw06.json"
         document = json.loads(payloads[name])
-        document["active_chip"] = "freehit"
+        document["active_chip"] = chip
         payloads[name] = json.dumps(document).encode()
     name = "entry-1004-picks-gw06.json"
     document = json.loads(payloads[name])
@@ -452,12 +456,13 @@ def test_thin_week_keeps_its_coverage_counted_by_reason():
         "cohort_valid": 78,
         "cohort_excluded": 22,
         "cohort_exclusions": {
-            "chip_unresolved": 3,
+            "chip_unresolved": 1,
+            "free_hit_previous_missing": 2,
             "unreadable": 18,
             "invalid_picks": 1,
             "missing_outcome": 0,
         },
-        "cohort_chip_rosters": {"wildcard": 0},
+        "cohort_chip_rosters": {"wildcard": 0, "freehit": 0},
     }
 
 
@@ -496,7 +501,7 @@ def test_wildcard_entry_scores_its_captured_roster_and_keeps_the_week():
     )
     assert prepared.provenance["cohort_valid"] == 100
     assert prepared.provenance["cohort_excluded"] == 0
-    assert prepared.provenance["cohort_chip_rosters"] == {"wildcard": 21}
+    assert prepared.provenance["cohort_chip_rosters"] == {"wildcard": 21, "freehit": 0}
     wildcard, normal = prepared.managers[0], prepared.managers[21]
     assert (wildcard.captain_id, normal.captain_id) == (1014, 1008)
     # The captured Wildcard roster scores its own captain: 88 from the XI and the
@@ -541,6 +546,127 @@ def test_failed_claimed_reading_cannot_be_looked_at_again(tmp_path, monkeypatch)
     claim = json.loads((tmp_path / live.CLAIM_FILE).read_bytes())
     assert claim["declared_gameweeks"] == {"first_gameweek": 6, "last_gameweek": 13}
     assert claim["manifest_sha256"] == "c" * 64
-    monkeypatch.setattr(live, "prepare_live_week", lambda _: pytest.fail("Second input was opened"))
+    monkeypatch.setattr(
+        live, "prepare_live_week", lambda *_: pytest.fail("Second input was opened")
+    )
     with pytest.raises(EvaluationValidationError, match="already been claimed"):
         read(weeks, tmp_path)
+
+
+def _with_picks(candidate, payloads):
+    return replace(candidate, picks=replace(candidate.picks, payloads=payloads))
+
+
+def _set_previous_roster(payloads, entries, gameweek):
+    """Captain the goalkeeper and put element 15 first among outfield substitutes.
+
+    The first entry's settled picks also carry the autosub FPL made for that bench order.
+    """
+    for entry in entries:
+        name = f"entry-{entry}-picks-gw{gameweek:02d}.json"
+        document = json.loads(payloads[name])
+        rows = {row["element"]: row for row in document["picks"]}
+        rows[15]["position"], rows[7]["position"] = 13, 15
+        if entry == entries[0]:
+            rows[3]["position"], rows[15]["position"] = rows[15]["position"], rows[3]["position"]
+            document["automatic_subs"] = [
+                {"entry": entry, "event": gameweek, "element_out": 3, "element_in": 15}
+            ]
+        for row in rows.values():
+            row["is_captain"] = row["element"] == 1
+            row["is_vice_captain"] = row["element"] == 9
+            row["multiplier"] = 2 if row["element"] == 1 else int(row["position"] <= 11)
+        payloads[name] = json.dumps(document).encode()
+
+
+def test_free_hit_entry_scores_the_roster_it_reverts_to():
+    previous = week(7, event_points=DISTINCT_POINTS)
+    payloads = dict(previous.picks.payloads)
+    _set_previous_roster(payloads, list(range(1001, 1022)), 7)
+    previous = _with_picks(previous, payloads)
+    current = week(8, event_points=DISTINCT_POINTS)
+    payloads = dict(current.picks.payloads)
+    # The Free Hit roster itself would score 102 with element 14 as captain.
+    _play_chip(payloads, range(1001, 1022), 8, "freehit", captain=(14, 13))
+    prepared = live.prepare_live_week(_with_picks(current, payloads), previous)
+    assert prepared.provenance["cohort_valid"] == 100
+    assert prepared.provenance["cohort_chip_rosters"] == {"wildcard": 0, "freehit": 21}
+    assert prepared.provenance["previous_picks"] == {
+        "snapshot_id": previous.picks.metadata.snapshot_id,
+        "fingerprint": previous.picks.metadata.fingerprint,
+        "captured_at_utc": previous.picks.metadata.captured_at_utc,
+    }
+    reverted, normal = prepared.managers[0], prepared.managers[21]
+    # GW7's autosub is reversed, so the XI and bench are the ones the manager set.
+    assert 1003 in reverted.starting_xi and 1015 not in reverted.starting_xi
+    assert reverted.bench == (1002, 1015, 1012, 1007)
+    assert (reverted.captain_id, reverted.vice_captain_id) == (1001, 1009)
+    # Scored against GW8 outcomes: 81 from the XI, 15 from the first legal substitute
+    # for the absent element 3, and 1 for the goalkeeper captain.
+    scores = [live._score(manager, prepared.outcomes)["points"] for manager in prepared.managers]
+    assert scores[:21] == [97] * 21
+    assert live._score(normal, prepared.outcomes)["points"] == 96
+
+
+@pytest.mark.parametrize(
+    "absence", ["no_previous_week", "absent_member", "other_cohort", "early", "other_week"]
+)
+def test_free_hit_without_previous_picks_is_counted_never_guessed(absence):
+    previous = week(7, coverage=90 if absence == "absent_member" else 100)
+    if absence == "other_cohort":
+        binding = {"season": "2026-27", "gameweek": 7, "cohort_snapshot_id": "other"}
+        previous = _with_picks(
+            previous,
+            {**previous.picks.payloads, "benchmark.json": json.dumps(binding).encode()},
+        )
+    elif absence == "early":
+        previous = replace(previous, picks=_restamp(previous.picks, "2026-10-17T09:59:59Z"))
+    elif absence == "other_week":
+        previous = week(6)
+    current = week(8)
+    payloads = dict(current.picks.payloads)
+    _play_chip(payloads, range(1091, 1101), 8, "freehit")
+    prepared = live.prepare_live_week(
+        _with_picks(current, payloads), None if absence == "no_previous_week" else previous
+    )
+    assert prepared.provenance["cohort_valid"] == 90
+    assert prepared.provenance["cohort_exclusions"]["free_hit_previous_missing"] == 10
+    assert prepared.provenance["cohort_chip_rosters"]["freehit"] == 0
+    assert (prepared.provenance["previous_picks"] is not None) == (absence == "absent_member")
+
+
+def test_free_hit_after_a_free_hit_has_no_roster_to_revert_to():
+    previous = week(7)
+    payloads = dict(previous.picks.payloads)
+    _play_chip(payloads, range(1091, 1101), 7, "freehit")
+    previous = _with_picks(previous, payloads)
+    current = week(8)
+    payloads = dict(current.picks.payloads)
+    _play_chip(payloads, range(1091, 1101), 8, "freehit")
+    prepared = live.prepare_live_week(_with_picks(current, payloads), previous)
+    assert prepared.provenance["cohort_valid"] == 90
+    assert prepared.provenance["cohort_exclusions"]["chip_unresolved"] == 10
+    assert prepared.provenance["cohort_exclusions"]["free_hit_previous_missing"] == 0
+
+
+def test_chip_heavy_week_stays_paired_and_a_first_week_free_hit_is_counted(tmp_path):
+    weeks = {gameweek: week(gameweek) for gameweek in range(7, 16)}
+    # GW7's previous week is outside the reading, so its Free Hit entries have no roster.
+    payloads = dict(weeks[7].picks.payloads)
+    _play_chip(payloads, range(1001, 1022), 7, "freehit")
+    weeks[7] = _with_picks(weeks[7], payloads)
+    # GW10 is chip heavy: 30 Free Hits revert to GW9 and 21 Wildcards keep their roster.
+    payloads = dict(weeks[10].picks.payloads)
+    _play_chip(payloads, range(1001, 1031), 10, "freehit")
+    _play_chip(payloads, range(1031, 1052), 10, "wildcard")
+    weeks[10] = _with_picks(weeks[10], payloads)
+    result = read(list(weeks.values()), tmp_path)
+    assert result["paired_gameweeks"] == 8
+    assert [row["gameweek"] for row in result["rows"]] == list(range(8, 16))
+    (excluded,) = result["exclusions"]
+    assert (excluded["gameweek"], excluded["reason"]) == (7, "insufficient_coverage")
+    assert excluded["cohort_exclusions"]["free_hit_previous_missing"] == 21
+    chip_week = next(row for row in result["rows"] if row["gameweek"] == 10)
+    assert chip_week["provenance"]["cohort_valid"] == 100
+    assert chip_week["provenance"]["cohort_chip_rosters"] == {"wildcard": 21, "freehit": 30}
+    assert chip_week["provenance"]["previous_picks"] is not None
