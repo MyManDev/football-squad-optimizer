@@ -592,6 +592,36 @@ def test_failed_control_writes_the_record_and_holds_step_4(
     ) in text
 
 
+def test_control_with_no_counted_pair_week_is_recorded_unavailable_and_failed(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    payloads = _payloads()
+    for entry in (1, 2, 3):
+        history = json.loads(payloads[f"entry-{entry}-history.json"])
+        history["current"] = [row for row in history["current"] if row["event"] > 3]
+        payloads[f"entry-{entry}-history.json"] = _bytes(history)
+    metadata = _stored_capture(monkeypatch, tmp_path, payloads)
+    exit_code = measurement.main(_main_arguments(tmp_path, metadata.snapshot_id))
+    assert exit_code == measurement.CONTROL_FAILED_EXIT
+    assert capsys.readouterr().err == (
+        "Recorded GW1 to GW6 scale 21.2 with a failed GW1 to GW3 control "
+        "(unavailable, expected 21.2). "
+        "Step 4 is held until the difference is explained on #1002.\n"
+    )
+    written = json.loads((tmp_path / "docs/strategy_rule_scale.json").read_text())
+    assert written["control_failed"] is True
+    control = written["control_gw1_to_gw3"]
+    assert (control["scale_rounded"], control["scale_unrounded"]) == (None, None)
+    assert (control["pair_weeks_counted"], control["pair_weeks_dropped"]) == (0, 9)
+    # S on GW1 to N still has GW4 to GW6, so the record is written rather than refused.
+    assert (written["scale"]["scale_rounded"], written["scale"]["pair_weeks_counted"]) == (21.2, 9)
+    text = (tmp_path / "docs/strategy_rule_scale.md").read_text()
+    assert (
+        "GW1 to GW3 control: unavailable (unrounded unavailable; expected 21.2); "
+        "pair-weeks counted: 0; dropped: 9\nControl: failed\n"
+    ) in text
+
+
 def test_usage_error_exit_differs_from_a_failed_control(
     capsys: pytest.CaptureFixture[str],
 ) -> None:

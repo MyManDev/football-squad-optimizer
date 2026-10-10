@@ -88,6 +88,11 @@ def round_half_up(value: Decimal) -> float:
     return float(value.quantize(Decimal("0.1"), rounding=ROUND_HALF_UP))
 
 
+def _shown(value: object) -> object:
+    """A control with no counted pair-week is unavailable, never zero."""
+    return "unavailable" if value is None else value
+
+
 def admitted_gameweek(bootstrap: bytes, through_gameweek: int) -> int:
     checked = scored_gameweeks(bootstrap)
     highest = max(checked, default=0)
@@ -279,8 +284,9 @@ def markdown(record: Mapping[str, Any]) -> str:
         f"S: {record['scale']['scale_rounded']} (unrounded {record['scale']['scale_unrounded']})",
         f"Pair-weeks counted: {record['scale']['pair_weeks_counted']}; "
         f"dropped: {record['scale']['pair_weeks_dropped']}",
-        f"GW1 to GW3 control: {control['scale_rounded']} "
-        f"(unrounded {control['scale_unrounded']}; expected {control['expected_scale_rounded']}); "
+        f"GW1 to GW3 control: {_shown(control['scale_rounded'])} "
+        f"(unrounded {_shown(control['scale_unrounded'])}; "
+        f"expected {control['expected_scale_rounded']}); "
         f"pair-weeks counted: {control['pair_weeks_counted']}; "
         f"dropped: {control['pair_weeks_dropped']}",
         "Control: " + ("failed" if record["control_failed"] else "passed"),
@@ -485,7 +491,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(
             f"Recorded GW1 to GW{record['through_gameweek']} scale "
             f"{record['scale']['scale_rounded']} with a failed GW1 to GW3 control "
-            f"({record['control_gw1_to_gw3']['scale_rounded']}, expected {CONTROL_EXPECTED}). "
+            f"({_shown(record['control_gw1_to_gw3']['scale_rounded'])}, "
+            f"expected {CONTROL_EXPECTED}). "
             "Step 4 is held until the difference is explained on #1002.",
             file=sys.stderr,
         )
