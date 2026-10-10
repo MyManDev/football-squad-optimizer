@@ -128,6 +128,6 @@ In the manual GW6 reseal window after this change merges and before GW7's normal
 league publication, an unrecorded historical tree cannot start or finish a seal.
 Partial member or entry copies without a valid ready marker do not make that tree
 legacy-compatible. The normal league writer establishes the record; this rule does
-not authorise removing a marker or identity, rewriting historical bytes, or inventing
+not authorize removing a marker or identity, rewriting historical bytes, or inventing
 a migration receipt. Legacy bundles that are already ready remain readable and
 replayable.

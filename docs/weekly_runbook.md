@@ -85,8 +85,8 @@ stage spends work. An older news-only filename is not a substitute. V2/V3 pairs 
 readable for historical replay, without claiming the new V4 binding.
 
 Before publishing, run `python -m scripts.check_league_tree <preview>/data` against the
-candidate tree, or use the publication worktree's `web/public/data`. It runs the wider
-publication identity, menu, Top 100 and manager's-word release checks and exits
+candidate tree, or use the publication worktree's `web/public/data`. It runs the
+publication identity, wider menu, Top 100 and manager's-word release checks and exits
 non-zero on any finding. Its final verdict covers all four checks.
 It expects what each member's `advice/<id>/index.json` declares: an absence the index
 states in the producer's shape with a string reason (the menu a `--skip-top100` run leaves

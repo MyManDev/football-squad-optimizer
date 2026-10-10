@@ -4,9 +4,10 @@
 to its retained scoreboard, history and series-horizon set. It contains no forecasts
 or runtime paths. Weekly preparation validates the inherited record once before
 copying a published tree into its preview. The league and scoreboard writers can
-resume interrupted writes in that preview, then record the completed set. The stage journals
-the final identity file. The GW5 settled writer follows the same rule on its scratch
-candidate, keeping the current decision capture distinct from the outcome capture.
+resume interrupted writes in that preview, then record the completed set. The
+scoreboard stage journals the final identity file. The GW5 settled writer follows
+the same rule on its scratch candidate, keeping the current decision capture
+distinct from the outcome capture.
 
 The record carries `contract_version: league_publication_identity_v1`, the current
 `source_snapshot_id`, league, season and gameweek, and `files`. Every rendered human
@@ -15,11 +16,13 @@ explicitly marked `data_quality: empty` may have no entry file. The identity sti
 names the writer's decision capture when no member could be rendered.
 
 `files` maps each protected relative filename to the SHA256 of its JSON document,
-serialized with sorted keys, compact separators and no NaN. Paths are restricted to
-`members.json`, `entries/<positive integer>.json`, `history/<positive integer>.json`,
-`scoreboard.json` and `series-horizon.json`. Every protected file on disk must be
-listed, and every listed document must match. The remote release check verifies
-every listed document; the disk check also verifies the complete file inventory.
+serialized by Python's `json.dumps` with sorted keys, compact separators, ASCII
+escapes and no NaN (`document_digest` in `squadopt.contracts.league_publication_identity`).
+Paths are restricted to `members.json`, `entries/<positive integer>.json`,
+`history/<positive integer>.json`, `scoreboard.json` and `series-horizon.json`.
+Every protected file on disk must be listed, and every listed document must match.
+The remote release check verifies every listed document; the disk check also
+verifies the complete file inventory.
 Older historical captures are retained as their actual documents, never restamped
 as the new decision capture. Their presence and contents travel as one recorded set.
 
