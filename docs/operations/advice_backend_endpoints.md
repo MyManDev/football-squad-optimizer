@@ -147,8 +147,9 @@ to the release.
   (`docs/architecture/decisions/0009-advice-backend-hosting-options.md:153-154`) and
   `docs/backend_free_hosting.md` section 3 say to delete the repository variable
   `ADVICE_API_ORIGIN`, which is a repository setting, not a pull request. #1001 step 4
-  assumes that #988 removes `ci.yml:196` and `:222`, which is a pull request. Either way, the 8 Playwright tests
-  under "Also outside the site" then skip. The docs that name the variable change with it:
+  assumes that #988 removes `ci.yml:196` and `:222`, which is a pull request. Either way,
+  the 8 Playwright tests under "Also outside the site" then skip. The docs that name the
+  variable change with it:
   `docs/architecture/operations_inventory.md`, `docs/backend_free_hosting.md` section 3 and
   `docs/rebuild_production.md:135-144`. The release needs the owner's yes, as every
   release does. Per #988 (comment 6045439960), it waits for #1001 steps 1 to 4 to merge,
