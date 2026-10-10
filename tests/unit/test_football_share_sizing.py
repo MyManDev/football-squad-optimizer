@@ -326,3 +326,83 @@ def test_main_rebuilt_companion_has_lf_bytes_under_windows_text_translation(
     assert json.loads(summary) == record
     assert summary == (tmp_path / "docs/research/football_share_sizing.json").read_bytes()
     assert b"\r" not in summary
+
+
+@pytest.mark.parametrize(
+    "case, refusal",
+    [
+        ("holdout_selection", "2025-26 holdout"),
+        ("evidence_outside_artifacts", "artifacts directory"),
+        ("evidence_inside_input_root", "separate roots"),
+        ("other_model", "retained-history base"),
+        ("rebuilt_fingerprint", "differs from the served build"),
+    ],
+)
+def test_main_refusals_write_no_record(tmp_path, monkeypatch, capsys, case, refusal):
+    from scripts import measure_football_shares as runner
+
+    from squadopt.application import football_live
+
+    served = SyntheticBasis([1, 0.5]).served | {
+        "rows": [{"gameweek": 6}],
+        "training_selection": {"allowed_seasons": ["2024-25"]},
+    }
+    artifact_root = tmp_path / "served-artifacts"
+    evidence_root = tmp_path / "artifacts/synthetic-sizing"
+    if case == "holdout_selection":
+        served["training_selection"] = {"allowed_seasons": ["2024-25", "2025-26"]}
+    elif case == "evidence_outside_artifacts":
+        evidence_root = tmp_path / "synthetic-sizing"
+    elif case == "evidence_inside_input_root":
+        artifact_root = tmp_path / "artifacts/served"
+        evidence_root = artifact_root / "synthetic-sizing"
+    elif case == "other_model":
+        served["model_version"] = "football_team_share_v1"
+    forecast_path = runner.football_artifact_path(artifact_root, "synthetic")
+    forecast_path.parent.mkdir(parents=True)
+    forecast_path.write_bytes(json.dumps(served).encode("utf-8"))
+    snapshot_reads = []
+    producer_calls = []
+
+    def produce(captured, archive, **kwargs):
+        producer_calls.append(kwargs)
+        fingerprint = "c" * 64 if case == "rebuilt_fingerprint" else served["fingerprint"]
+        return {**served, "fingerprint": fingerprint}, {"name": "synthetic"}
+
+    monkeypatch.setattr(runner, "REPOSITORY_ROOT", tmp_path)
+    monkeypatch.setattr(runner, "_forecast_source", lambda root, identifier: object())
+    monkeypatch.setattr(runner, "read_inputs", lambda captured, *, season: object())
+    monkeypatch.setattr(
+        runner, "read_snapshot", lambda root, identifier: snapshot_reads.append(identifier)
+    )
+    monkeypatch.setattr(football_live, "produce_football_components", produce)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "measure_football_shares",
+            "--snapshot-root",
+            str(tmp_path / "synthetic-captures"),
+            "--snapshot-id",
+            "synthetic",
+            "--artifact-root",
+            str(artifact_root),
+            "--archive-root",
+            str(tmp_path / "synthetic-archive"),
+            "--evidence-root",
+            str(evidence_root),
+        ],
+    )
+    if case == "rebuilt_fingerprint":
+        with pytest.raises(ValueError, match=refusal):
+            runner.main()
+        assert len(producer_calls) == 1
+    else:
+        with pytest.raises(SystemExit):
+            runner.main()
+        assert refusal in capsys.readouterr().err
+        assert producer_calls == []
+        assert snapshot_reads == []
+    assert not evidence_root.exists()
+    assert not (tmp_path / "docs").exists()
+    assert not forecast_path.with_suffix(".components.json").exists()
