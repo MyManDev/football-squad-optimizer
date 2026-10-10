@@ -1156,6 +1156,30 @@ def test_later_input_checks_open_only_actual_development_history(
     assert report["development_history_weeks_read"] == sorted(opened)
 
 
+def test_input_check_reads_each_deadline_from_the_latest_retained_capture(tmp_path: Path) -> None:
+    # The game moves deadlines, so an older capture can still carry GW7's earlier one.
+    def provisional(documents: dict[str, Any]) -> None:
+        documents[BOOTSTRAP_PAYLOAD]["events"][6]["deadline_time"] = stamp(
+            START + timedelta(weeks=6, days=1)
+        )
+
+    capture(tmp_path / "snapshots", target=5, change=provisional)
+    snapshot = capture(tmp_path / "snapshots", target=7)
+    publication(tmp_path, snapshot, base(snapshot, target=7))
+    captures = runner.inventory(tmp_path / "snapshots", as_of="2026-12-01T00:00:00Z")
+    assert next(iter(captures)) != snapshot.metadata.snapshot_id
+    report = runner.check_inputs(
+        captures,
+        publications=tmp_path / "publications",
+        handoffs=tmp_path / "handoffs",
+        weeks=(7,),
+        as_of="2026-12-01T00:00:00Z",
+        snapshot_root=tmp_path / "snapshots",
+    )
+    assert report["weeks"][0]["status"] == "identity_and_inventory_ready"
+    assert report["weeks"][0]["identity"]["capture"] == snapshot.metadata.snapshot_id
+
+
 def test_checker_keeps_other_week_after_a_malformed_publication(tmp_path: Path) -> None:
     for week in (6, 7):
         snapshot = capture(tmp_path / "snapshots", target=week)

@@ -399,10 +399,15 @@ def check_inputs(
 ) -> dict[str, Any]:
     rows = []
     development_reads: set[str] = set()
+    # The game moves deadlines, so the latest retained capture states each one, not the first.
+    deadline_capture = max(
+        captures.values(),
+        key=lambda s: (as_instant(s.metadata.captured_at_utc), s.metadata.snapshot_id),
+        default=None,
+    )
     for week in weeks:
         row: dict[str, Any] = {"gameweek": week, "status": "missing"}
         try:
-            deadline_capture = next(iter(captures.values()), None)
             if deadline_capture is None:
                 raise DefconMissingInputs("No retained capture supplies the target deadline.")
             deadline = read_inputs(
