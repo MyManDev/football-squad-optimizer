@@ -803,6 +803,8 @@ def read_phase_projection(
     source: PhaseSource,
     model_cutoff: str,
 ) -> PhaseProjection:
+    if not isinstance(source, PhaseSource):
+        raise ValueError("A phase source receipt is required.")
     # A later-window projection may be captured after model fitting, provided
     # it is still known before its own recorded decision. It is not an outcome.
     known_at = max(

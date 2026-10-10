@@ -283,6 +283,13 @@ def test_projection_receipt_requires_semantics_bytes_time_and_admitted_use(chang
         read_projection(document, source=replace(receipt, **changes))
 
 
+@pytest.mark.parametrize("receipt", [None, "receipt", {"published_at": DECISION}])
+def test_projection_without_a_typed_source_receipt_is_refused_as_a_receipt(receipt):
+    components, _, _ = native_case()
+    with pytest.raises(ValueError, match="source receipt is required"):
+        read_projection(projection_document(components), source=receipt)
+
+
 def test_future_window_source_is_allowed_only_before_its_recorded_decision():
     components, _, _ = native_case()
     document = projection_document(components)
