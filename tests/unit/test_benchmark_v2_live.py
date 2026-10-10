@@ -36,6 +36,9 @@ def week(
     boot["events"][0].update(
         id=gameweek, deadline_time=stamp(0), finished=False, data_checked=False
     )
+    boot["events"].append(
+        {"id": gameweek - 1, "deadline_time": stamp(-168), "finished": True, "data_checked": True}
+    )
     for element in boot["elements"]:
         element["selected_by_percent"] = str(100 - element["id"])
     decision_boot = json.dumps(boot).encode()
@@ -238,6 +241,25 @@ def _with_configuration(candidate, **changes):
         candidate,
         freeze=_with_payload(candidate.freeze, "benchmark.json", json.dumps(binding).encode()),
     )
+
+
+@pytest.mark.parametrize(
+    ("captured_at_utc", "admitted"),
+    [
+        ("2026-10-09T08:00:00Z", False),  # before GW6's deadline: ranked as of GW5
+        ("2026-10-17T10:00:00Z", False),  # at GW7's deadline: GW7 not yet ranked
+        ("2026-10-17T10:00:01Z", True),
+    ],
+)
+def test_cohort_ranked_before_the_previous_deadline_is_stale(captured_at_utc, admitted):
+    candidate = week(8)
+    candidate = replace(candidate, cohort=_restamp(candidate.cohort, captured_at_utc))
+    if admitted:
+        assert live.prepare_live_week(candidate).gameweek == 8
+        return
+    with pytest.raises(live.LiveWeekRefusal, match="previous gameweek deadline") as refused:
+        live.prepare_live_week(candidate)
+    assert refused.value.code == "stale_cohort"
 
 
 @pytest.mark.parametrize(
