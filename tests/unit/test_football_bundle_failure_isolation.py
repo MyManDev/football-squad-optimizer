@@ -246,3 +246,21 @@ def test_unresolved_rotation_arguments_do_not_disable_legacy_inputs(case, argume
         path.exists()
         for path in bundle.football_bundle_stage_paths(case["artifact_root"], case["snapshot_id"])
     )
+
+
+@pytest.mark.parametrize("news_capture_id", ["snapshots/club-news-1", "Club-news-1"])
+def test_malformed_capture_identity_does_not_disable_legacy_inputs(case, news_capture_id):
+    before = signature(case)
+    altered = dict(
+        case,
+        news_capture_id=news_capture_id,
+        rotation_table_path=case["artifact_root"] / "rotation.csv",
+    )
+    with pytest.raises(ValueError, match="capture identity"):
+        bundle.seal_football_bundle(**altered)
+    assert signature(case) == before
+    assert load(case).football is not None
+    assert not any(
+        path.exists()
+        for path in bundle.football_bundle_stage_paths(case["artifact_root"], case["snapshot_id"])
+    )

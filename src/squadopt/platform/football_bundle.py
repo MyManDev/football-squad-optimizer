@@ -79,10 +79,14 @@ def _digest(raw: bytes) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
-def _source(snapshot_root: Path, capture_id: str) -> CapturedSnapshot:
-    # read_snapshot validates exact bytes; reject path aliases before opening them.
+def _require_capture_id(capture_id: str) -> None:
     if not re.fullmatch(r"[a-z0-9][A-Za-z0-9-]{0,159}", capture_id):
         raise ValueError("Invalid bundle source capture identity.")
+
+
+def _source(snapshot_root: Path, capture_id: str) -> CapturedSnapshot:
+    # read_snapshot validates exact bytes; reject path aliases before opening them.
+    _require_capture_id(capture_id)
     _safe(Path(addressable(snapshot_root / capture_id)))
     return read_snapshot(snapshot_root, capture_id)
 
@@ -449,6 +453,9 @@ def seal_football_bundle(
             artifact_root=artifact_root, snapshot_root=snapshot_root, snapshot_id=snapshot_id
         )
     site_tree = single_league_tree(site_data_root, league_id)
+    for capture_id in (snapshot_id, news_capture_id, official_injury_capture_id):
+        if capture_id is not None:
+            _require_capture_id(capture_id)
     if (news_capture_id is not None) != (rotation_table_path is not None):
         raise ValueError("News requires both exact rotation artifacts, or none of the three.")
     if rotation_table_path is not None:
