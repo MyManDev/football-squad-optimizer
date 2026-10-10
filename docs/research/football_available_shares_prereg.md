@@ -75,7 +75,11 @@ the earliest capture demonstrating GW20 finished and data_checked. Pass requires
 at least eight scored weeks and the entire primary 90 percent interval strictly
 above zero. Otherwise fail; fewer than eight is insufficient evidence and cannot
 pass. A week with no eligible observed rows is listed as missing, not zero.
-No interim primary comparison or repeated verdict is permitted.
+No outcome of a scored week is read for any reading of this protocol, primary or
+secondary, before a capture shows GW20 finished and data_checked. Until then a
+runner may check inputs only (captures, artifacts, write times, bindings and
+missing reasons) and refuses any real-week comparison. Each reading is taken
+once, at the verdict, and no verdict is repeated.
 
 Squared error is the primary loss because most realized attacking points are
 zero and absolute error would reward the very downward shrinkage being tested.
