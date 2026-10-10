@@ -30,16 +30,28 @@ The population ends at GW20, deadline `2027-01-05T18:00:00Z`.
 
 ## Captures, timely artifacts and outcomes
 
-For each eligible week, use the latest pre-deadline `fpl-live` capture targeting
-that week's next open deadline. Base and candidate must name that same capture,
-season, gameweek, cutoff and training selection. Read each with the existing
-validated forecast and fixture-component contracts. Record versions, fingerprints,
-input hashes, artifact hashes and filesystem modification instants.
+For each eligible week g, the scored capture is the decision capture: the last
+`fpl-live` capture, by capture instant, whose own target is g
+(`read_inputs(snapshot, season="2026-27").deadline.gameweek` in
+`src/squadopt/live/recommendation.py`) and for which the weekly run's handoff
+root holds a served baseline handoff (`handoff_fingerprint_for` in
+`src/squadopt/platform/capture_context.py`). A capture without one was never
+served; it is passed over and listed as unserved, so a later audit capture does
+not displace the served one. Two captures at the same latest instant make the
+week missing. A later own-target capture given its own baseline handoff before
+the deadline becomes the decision capture and needs its own base and candidate
+artifacts before the deadline, or the week is missing.
+
+Base and candidate must name that same capture, season, gameweek, cutoff and
+training selection. Read each with the existing validated forecast and
+fixture-component contracts. Record versions, fingerprints, input hashes,
+artifact hashes and filesystem modification instants.
 
 An artifact with file time at or after the deadline is missing. Never rebuild a
 prospective candidate after the deadline or fill a missing week with another
-capture. The owner runs the added shadow build before each deadline, under a
-separate runbook PR. This protocol does not run weekly operations or publish.
+capture. The owner runs the added shadow build on the decision capture before
+each deadline, under a separate runbook PR. This protocol does not run weekly
+operations or publish.
 
 Use the first later capture whose recorded calendar marks the scored gameweek
 finished and data_checked and whose live payload covers it. Realized attacking
@@ -109,9 +121,10 @@ and equal-week means, and retain full rows under ignored `artifacts/`.
 
 Apply the missing-week rules in `docs/football_prospective_prereg.md`, with this
 protocol's two named football versions: list every week from the binding start
-through GW20; no targeting capture, missing or late required artifact, invalid
-binding or model version, missing required handoff for the secondary squad
-reading, or missing settled live payload is recorded with its reason. Secondary
+through GW20; no decision capture (no own-target capture, none with a served
+baseline handoff, or two at the latest instant), missing or late required
+artifact, invalid binding or model version, or missing settled live payload is
+recorded with its reason. Secondary
 missingness is reported separately and cannot remove a valid primary week.
 A late artifact may be labelled replay beside the record and never pooled.
 The locked 2025-26 holdout remains unopened.
