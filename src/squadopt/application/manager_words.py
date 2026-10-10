@@ -52,7 +52,11 @@ from squadopt.data.sources.fpl_live import (
     team_names,
 )
 from squadopt.data.timestamps import as_instant
-from squadopt.features.rotation_evidence import claim_fixture_calendar, claim_targets_next_fixture
+from squadopt.features.rotation_evidence import (
+    claim_fixture_calendar,
+    claim_has_only_multiple_fixture_failure,
+    claim_targets_next_fixture,
+)
 from squadopt.features.rotation_evidence_artifact import read_rotation_evidence_artifact
 from squadopt.planning import FirstWeekExclusion
 
@@ -148,8 +152,15 @@ class ManagerWord:
     publication_verified: bool = False
     publication_source: str | None = None
     publication_source_sha256: str | None = None
+    fixture_binding_reason: str | None = None
 
     def __post_init__(self) -> None:
+        if self.fixture_binding_reason not in (None, "ambiguous_current_week_fixture"):
+            raise ManagerWordsError("Unknown fixture binding reason.")
+        if self.fixture_binding_reason is not None and (
+            self.scope_verified or self.fixture_scope != "upcoming_premier_league"
+        ):
+            raise ManagerWordsError("Multiple-fixture evidence must remain unverified in scope.")
         if self.words is None and self.words_status == WORDS_SHOWN:
             object.__setattr__(self, "words_status", WORDS_UNRESOLVED)
         if self.words is not None and self.words_status != WORDS_SHOWN:
@@ -510,6 +521,22 @@ def manager_words_from_artifact(
             and metadata.source == publication_source
             and metadata.source_sha256 == publication_digest
         )
+        fixture_binding_reason = None
+        if (
+            not scope_verified
+            and publication_verified
+            and disposition
+            in (
+                "stated_expected_absent",
+                "stated_full_match_unavailable",
+                "stated_rotation_risk",
+            )
+            and checked_scope == (scope, True)
+            and whole_sentence
+            and target_basis is not None
+            and _targets_decision(row, document, target_basis, only_multiple=True)
+        ):
+            fixture_binding_reason = "ambiguous_current_week_fixture"
         status = WORDS_SHOWN if resolved else WORDS_UNRESOLVED
         if cited is not None and QUOTE_WITHHELD_PATTERN.search(cited):
             cited, status = None, WORDS_WITHHELD_FIGURE
@@ -533,6 +560,7 @@ def manager_words_from_artifact(
                 publication_verified=publication_verified,
                 publication_source=publication_source,
                 publication_source_sha256=publication_digest,
+                fixture_binding_reason=fixture_binding_reason,
             )
         )
     return ManagerWords(
@@ -620,11 +648,7 @@ def _decision_fixture_basis(
     snapshot_root: Path | None,
 ) -> tuple[pd.DataFrame, dict[int, tuple[str, int, str]], str] | None:
     """Read only the exact immutable decision named by the checked manifest."""
-    if (
-        snapshot_root is None
-        or "rotation_claim_scope_verified" not in table
-        or not table.rotation_claim_scope_verified.fillna(False).any()
-    ):
+    if snapshot_root is None or "rotation_claim_scope_verified" not in table:
         return None
     try:
         snapshot = read_snapshot(snapshot_root, str(table.attrs["roster_snapshot_id"]))
@@ -659,12 +683,24 @@ def _targets_decision(
     row: Mapping[Hashable, object],
     document: RawDocument | None,
     basis: tuple[pd.DataFrame, dict[int, tuple[str, int, str]], str],
+    *,
+    only_multiple: bool = False,
 ) -> bool:
     calendar, players, captured = basis
     player = players.get(int(str(row["player_id"])))
     if document is None or player is None or player[0] != document.club:
         return False
-    return claim_targets_next_fixture(
+    if only_multiple:
+        try:
+            published = as_instant(str(row.get("rotation_claim_published_at_utc")))
+            fetched = as_instant(document.fetched_at_utc)
+            cutoff = as_instant(captured)
+            if not published <= fetched <= cutoff or cutoff - published > pd.Timedelta(days=7):
+                return False
+        except (DataError, TypeError, ValueError):
+            return False
+    check = claim_has_only_multiple_fixture_failure if only_multiple else claim_targets_next_fixture
+    return check(
         calendar,
         team_code=player[1],
         target_gameweek=int(str(row["target_gameweek"])),
