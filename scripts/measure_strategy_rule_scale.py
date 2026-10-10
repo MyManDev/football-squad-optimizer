@@ -186,10 +186,16 @@ def measure_payloads(
     for other in listed_leagues:
         if other == league or f"league-{other}-standings.json" not in payloads:
             continue
-        other_rows = league_net_rows(payloads, other, n)
+        try:
+            other_rows = league_net_rows(payloads, other, n)
+        except ScaleMeasurementError as error:
+            # Reading (e) is recorded only, so an incomplete other league never refuses S.
+            secondary.append({"league": other, "available": False, "reason": str(error)})
+            continue
         secondary.append(
             {
                 "league": other,
+                "available": True,
                 "members": len(other_rows),
                 "through_gameweek": n,
                 **pair_week_reading(other_rows, range(1, n + 1)).document(),
@@ -283,13 +289,23 @@ def markdown(record: Mapping[str, Any]) -> str:
             "| --- | --- | --- | --- | --- |",
         ]
     )
-    for row in record["secondary_leagues"]:
+    measured = [row for row in record["secondary_leagues"] if row["available"]]
+    for row in measured:
         lines.append(
             f"| {row['league']} | {row['members']} | {row['scale_rounded']} | "
             f"{row['pair_weeks_counted']} | {row['pair_weeks_dropped']} |"
         )
-    if not record["secondary_leagues"]:
-        lines.extend(["", "No additional listed league has captured standings and histories."])
+    if not measured:
+        lines.extend(["", "No additional listed league was measured."])
+    for row in record["secondary_leagues"]:
+        if not row["available"]:
+            lines.extend(
+                [
+                    "",
+                    f"League {row['league']} is listed and captured but was not measured: "
+                    f"{row['reason']}",
+                ]
+            )
     return "\n".join(lines) + "\n"
 
 

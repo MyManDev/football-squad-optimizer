@@ -167,7 +167,38 @@ def test_secondary_is_only_an_already_listed_captured_league() -> None:
     record = _measure(payloads, listed=(measurement.PRIMARY_LEAGUE, 123, 456))
     assert len(record["secondary_leagues"]) == 1
     assert record["secondary_leagues"][0]["league"] == 123
+    assert record["secondary_leagues"][0]["available"] is True
     assert record["secondary_leagues"][0]["scale_rounded"] == 21.2
+
+
+def _secondary_standings(*, has_next: bool) -> bytes:
+    standings = json.loads(_payloads(league=123)["league-123-standings.json"])
+    standings["standings"]["has_next"] = has_next
+    for row in standings["standings"]["results"]:
+        row["entry"] += 10
+    return _bytes(standings)
+
+
+@pytest.mark.parametrize(
+    "has_next,reason",
+    [
+        (False, "The capture lacks a standings or required history payload."),
+        (True, "The capture has invalid standings or history rows."),
+    ],
+    ids=["histories-missing", "standings-paginated"],
+)
+def test_unreadable_secondary_league_is_recorded_unavailable_without_refusing_s(
+    tmp_path: Path, has_next: bool, reason: str
+) -> None:
+    payloads = _payloads()
+    payloads["league-123-standings.json"] = _secondary_standings(has_next=has_next)
+    record = _measure(payloads, listed=(measurement.PRIMARY_LEAGUE, 123))
+    assert record["scale"]["scale_rounded"] == 21.2
+    assert record["secondary_leagues"] == [{"league": 123, "available": False, "reason": reason}]
+    measurement.write_records(_provenance(record), tmp_path)
+    text = (tmp_path / "docs/strategy_rule_scale.md").read_text()
+    assert f"League 123 is listed and captured but was not measured: {reason}" in text
+    assert "No additional listed league was measured." in text
 
 
 def _provenance(record: dict[str, Any]) -> dict[str, Any]:
