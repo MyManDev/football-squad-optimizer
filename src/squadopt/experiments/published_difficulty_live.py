@@ -20,7 +20,7 @@ from squadopt.experiments.opponent_projection import (
     _squad,
     apply_adjustment,
 )
-from squadopt.optimization import OptimizationConfig
+from squadopt.optimization import OptimizationConfig, SolverStatus, wall_clock_stopped_the_search
 from squadopt.optimization.models import SquadOptimizationError
 
 SEASON = "2026-27"
@@ -37,6 +37,10 @@ COEFFICIENTS: Mapping[str, tuple[float, float]] = MappingProxyType(
 BOOTSTRAP_RESAMPLES = 2000
 BOOTSTRAP_SEED = 0
 MINIMUM_WEEKS = 8
+#: The #844 solver method (docs/football_prospective_prereg.md, reading one).
+LINEARIZATION_LEVEL = 2
+DETERMINISTIC_UNITS: tuple[float, ...] = (60.0, 240.0)
+WALL_CEILING_SECONDS = 1800.0
 
 
 class DifficultyInputError(ValueError):
@@ -51,7 +55,7 @@ class DifficultySolveFailure(DifficultyMissingInputs):
     """Retain the actual solve traces when the joint weekly gate is missing."""
 
     def __init__(self, decisions: dict[str, dict[str, object]]) -> None:
-        super().__init__("A free-squad arm failed; the joint week is missing.")
+        super().__init__("A free-squad arm is not proven at 240 units; the joint week is missing.")
         self.decisions = decisions
 
 
@@ -84,8 +88,16 @@ def verify_coefficients(content: bytes) -> None:
         raise DifficultyInputError("The recorded coefficient values differ from the fixed fit.")
 
 
-def optimization_config() -> OptimizationConfig:
-    """Use the protocol's complete configuration, independently of future defaults."""
+def optimization_config(deterministic_units: float) -> OptimizationConfig:
+    """Use the protocol's complete configuration, independently of future defaults.
+
+    The squad rules are the study's. The solver follows the #844 method the owner
+    accepted on 2026-10-10: seed 0, a deterministic ceiling of 60 units, or of 240
+    when 60 does not prove the decision, and a wall ceiling of 1800 seconds per
+    solve. ``configure_solver`` gives every solve one search worker.
+    """
+    if deterministic_units not in DETERMINISTIC_UNITS:
+        raise DifficultyInputError("Only the declared deterministic budgets are admitted.")
     return OptimizationConfig(
         budget_tenths=1000,
         squad_size=15,
@@ -96,10 +108,102 @@ def optimization_config() -> OptimizationConfig:
         max_players_per_team=3,
         bench_weight=0.1,
         expected_points_scale=1000,
-        solver_time_limit_seconds=10.0,
-        solver_deterministic_time_limit=None,
+        solver_time_limit_seconds=WALL_CEILING_SECONDS,
+        solver_deterministic_time_limit=deterministic_units,
         deterministic_seed=0,
     )
+
+
+def clock_stopped(attempt: Mapping[str, object]) -> bool:
+    """Whether the wall clock, not the deterministic budget, stopped this solve."""
+    diagnostics = attempt.get("solver_diagnostics")
+    status = attempt.get("solver_status")
+    if not isinstance(diagnostics, dict) or not isinstance(status, str):
+        return False
+    if status not in set(SolverStatus):
+        return False
+    return wall_clock_stopped_the_search(SolverStatus(status), diagnostics)
+
+
+def proven(attempt: Mapping[str, object]) -> bool:
+    """The primary and the tie-break both proved OPTIMAL under the declared solver.
+
+    A tie-break counts as proven only when it was attempted and completed.
+    """
+    diagnostics = attempt.get("solver_diagnostics")
+    return (
+        attempt.get("solver_status") == SolverStatus.OPTIMAL
+        and isinstance(diagnostics, dict)
+        and diagnostics.get("tiebreak_attempted") is True
+        and diagnostics.get("tiebreak_completed") is True
+        and diagnostics.get("num_search_workers") == 1
+        and diagnostics.get("linearization_level") == LINEARIZATION_LEVEL
+        and not clock_stopped(attempt)
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class ArmSolve:
+    decided: bool
+    starters: tuple[int, ...]
+    captain: int | None
+    record: dict[str, object]
+
+
+def free_squad(rows: pd.DataFrame, prediction: np.ndarray) -> ArmSolve:
+    """Solve one arm at 60 units, and once more at 240 when 60 does not prove it.
+
+    The 240 solve decides an arm 60 left unproven. The arm has no decision, and its
+    week is missing for the joint gate, when it is still unproven at 240 or when the
+    wall clock stopped any of its solves. Every solve is recorded with its limits,
+    its primary and tie-break status, its deterministic time and the clock reading.
+    """
+    attempts: list[dict[str, object]] = []
+    starters: tuple[int, ...] = ()
+    captain: int | None = None
+    for units in DETERMINISTIC_UNITS:
+        attempt: dict[str, object] = {
+            "deterministic_units": units,
+            "wall_ceiling_seconds": WALL_CEILING_SECONDS,
+            "linearization_level": LINEARIZATION_LEVEL,
+            "deterministic_seed": 0,
+        }
+        attempts.append(attempt)
+        try:
+            starters, captain = _squad(
+                rows,
+                prediction,
+                optimization_config(units),
+                diagnostics=attempt,
+                linearization_level=LINEARIZATION_LEVEL,
+            )
+        except (ExperimentExecutionError, SquadOptimizationError) as error:
+            attempt["error"] = type(error).__name__
+            starters, captain = (), None
+        diagnostics = attempt.get("solver_diagnostics")
+        held = diagnostics if isinstance(diagnostics, dict) else {}
+        attempt["primary_status"] = held.get("solver_status_name")
+        attempt["tiebreak_status"] = held.get("tiebreak_status")
+        attempt["primary_deterministic_time"] = held.get("primary_deterministic_time")
+        attempt["tiebreak_deterministic_time"] = held.get("tiebreak_deterministic_time")
+        attempt["wall_clock_stopped"] = clock_stopped(attempt)
+        attempt["proven"] = proven(attempt)
+        if attempt["proven"] or attempt["wall_clock_stopped"]:
+            break
+    final = attempts[-1]
+    stopped = any(attempt["wall_clock_stopped"] for attempt in attempts)
+    decided = final["proven"] is True and not stopped
+    record: dict[str, object] = {
+        "decided": decided,
+        "decided_at_units": final["deterministic_units"],
+        "wall_clock_stopped": stopped,
+        "solver_status": final.get("solver_status"),
+        "squad": final.get("squad", []),
+        "starting_xi": final.get("starting_xi", []),
+        "captain": final.get("captain"),
+        "attempts": attempts,
+    }
+    return ArmSolve(decided, starters, captain, record)
 
 
 @dataclass(frozen=True, slots=True)
@@ -162,16 +266,16 @@ def measure_week(
     if not np.isfinite(realized).all():
         raise DifficultyMissingInputs("The paired realized points are incomplete.")
     comparator = rows["predicted_points"].to_numpy(dtype=float)
-    config = optimization_config()
-    comparator_trace: dict[str, object] = {}
-    candidate_trace: dict[str, object] = {}
-    try:
-        base_xi, base_captain = _squad(rows, comparator, config, diagnostics=comparator_trace)
-        next_xi, next_captain = _squad(rows, adjusted, config, diagnostics=candidate_trace)
-    except (ExperimentExecutionError, SquadOptimizationError) as error:
-        raise DifficultySolveFailure(
-            {"comparator": comparator_trace, "candidate": candidate_trace}
-        ) from error
+    base = free_squad(rows, comparator)
+    candidate = free_squad(rows, adjusted)
+    comparator_trace = base.record
+    candidate_trace = candidate.record
+    if not base.decided or not candidate.decided:
+        raise DifficultySolveFailure({"comparator": comparator_trace, "candidate": candidate_trace})
+    if base.captain is None or candidate.captain is None:
+        raise DifficultyInputError("A proven arm recorded no captain.")
+    base_xi, base_captain = base.starters, base.captain
+    next_xi, next_captain = candidate.starters, candidate.captain
     base_points = _realized(rows, base_xi, base_captain)
     next_points = _realized(rows, next_xi, next_captain)
     base_mse = float(np.mean((comparator - realized) ** 2))
@@ -275,5 +379,14 @@ def summarize(weeks: tuple[DifficultyWeek, ...]) -> dict[str, Any]:
             "seed": BOOTSTRAP_SEED,
             "minimum_weeks": MINIMUM_WEEKS,
             "gameweek_weights": "equal",
+            "free_squad_solver": {
+                "entry_point": "optimize_squad",
+                "linearization_level": LINEARIZATION_LEVEL,
+                "num_search_workers": 1,
+                "deterministic_seed": 0,
+                "deterministic_units": list(DETERMINISTIC_UNITS),
+                "wall_ceiling_seconds": WALL_CEILING_SECONDS,
+                "scored_only_when": "both arms' primary and tie-break proven OPTIMAL",
+            },
         },
     }

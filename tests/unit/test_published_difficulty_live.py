@@ -18,6 +18,7 @@ from tests.unit.test_season_rules import _chips, _rules, _scoring
 
 from squadopt.data.snapshots import CapturedSnapshot, read_snapshot, write_snapshot
 from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD, live_payload
+from squadopt.experiments import opponent_projection
 from squadopt.experiments import published_difficulty_live as study
 from squadopt.experiments.opponent_projection import _squad
 from squadopt.live.recommendation import InSeasonProjection, write_projection_handoff
@@ -203,15 +204,133 @@ def test_invalid_adjustment_inputs_refuse(corruption: str) -> None:
 def test_reused_squad_records_the_same_actual_solve_and_default_answer() -> None:
     rows = frame()
     trace: dict[str, object] = {}
-    expected = _squad(rows, rows["predicted_points"].to_numpy(), study.optimization_config())
+    config = study.optimization_config(60.0)
+    expected = _squad(rows, rows["predicted_points"].to_numpy(), config, linearization_level=2)
     actual = _squad(
-        rows, rows["predicted_points"].to_numpy(), study.optimization_config(), diagnostics=trace
+        rows,
+        rows["predicted_points"].to_numpy(),
+        config,
+        diagnostics=trace,
+        linearization_level=2,
     )
     assert expected == actual
     assert trace["solver_status"] == "OPTIMAL"
     assert len(trace["squad"]) == 15
     assert len(trace["starting_xi"]) == 11
     assert trace["captain"] == actual[1]
+    solver = trace["solver_diagnostics"]
+    assert solver["linearization_level"] == 2
+    assert solver["num_search_workers"] == 1
+    assert solver["deterministic_seed"] == 0
+    assert solver["solver_deterministic_time_limit"] == 60.0
+    assert solver["solver_time_limit_seconds"] == 1800.0
+    # The study's own call passes no level, which is the solver default it always used.
+    assert _squad(rows, rows["predicted_points"].to_numpy(), config) == expected
+
+
+def test_free_squad_is_solved_by_the_844_method(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[tuple[float | None, float, int, int | None]] = []
+    original = opponent_projection.optimize_squad
+
+    def spy(players: pd.DataFrame, config: Any, **kwargs: Any) -> Any:
+        calls.append(
+            (
+                config.solver_deterministic_time_limit,
+                config.solver_time_limit_seconds,
+                config.deterministic_seed,
+                kwargs.get("linearization_level"),
+            )
+        )
+        return original(players, config, **kwargs)
+
+    monkeypatch.setattr(opponent_projection, "optimize_squad", spy)
+    measured, _ = study.measure_week(
+        frame(), season=study.SEASON, gameweek=7, handoff_version="base"
+    )
+    # Both arms are proven at 60 units, so neither is solved again at 240.
+    assert calls == [(60.0, 1800.0, 0, 2), (60.0, 1800.0, 0, 2)]
+    for decision in (measured.comparator_decision, measured.candidate_decision):
+        assert decision["decided"] is True
+        assert decision["decided_at_units"] == 60.0
+        assert decision["wall_clock_stopped"] is False
+        (attempt,) = decision["attempts"]
+        assert attempt["primary_status"] == "OPTIMAL"
+        assert attempt["tiebreak_status"] == "OPTIMAL"
+        assert attempt["wall_clock_stopped"] is False
+        assert attempt["proven"] is True
+        assert isinstance(attempt["primary_deterministic_time"], float)
+        assert isinstance(attempt["tiebreak_deterministic_time"], float)
+        assert decision["squad"] == attempt["squad"]
+        assert decision["captain"] == attempt["captain"]
+
+
+def _unproven(result: Any, *, clock: bool) -> Any:
+    """The same answer, recorded as a tie-break the budget (or the clock) cut short."""
+    diagnostics = dict(result.diagnostics)
+    diagnostics.update(
+        tiebreak_status="FEASIBLE",
+        tiebreak_completed=False,
+        deterministic_time_budget_exhausted=not clock,
+    )
+    return replace(result, diagnostics=diagnostics)
+
+
+@pytest.mark.parametrize("unproven_at", [(60.0,), (60.0, 240.0)])
+def test_an_arm_unproven_at_60_is_decided_at_240_and_unproven_there_is_missing(
+    monkeypatch: pytest.MonkeyPatch, unproven_at: tuple[float, ...]
+) -> None:
+    calls: list[float | None] = []
+    original = opponent_projection.optimize_squad
+
+    def solve(players: pd.DataFrame, config: Any, **kwargs: Any) -> Any:
+        calls.append(config.solver_deterministic_time_limit)
+        result = original(players, config, **kwargs)
+        if config.solver_deterministic_time_limit in unproven_at:
+            return _unproven(result, clock=False)
+        return result
+
+    monkeypatch.setattr(opponent_projection, "optimize_squad", solve)
+    if unproven_at == (60.0,):
+        measured, _ = study.measure_week(
+            frame(), season=study.SEASON, gameweek=7, handoff_version="base"
+        )
+        assert calls == [60.0, 240.0, 60.0, 240.0]
+        decision = measured.candidate_decision
+        assert decision["decided_at_units"] == 240.0
+        assert [a["proven"] for a in decision["attempts"]] == [False, True]
+        assert decision["attempts"][0]["tiebreak_status"] == "FEASIBLE"
+        return
+    with pytest.raises(study.DifficultySolveFailure) as failure:
+        study.measure_week(frame(), season=study.SEASON, gameweek=7, handoff_version="base")
+    # Both arms are solved and recorded even when the first is already unproven.
+    assert calls == [60.0, 240.0, 60.0, 240.0]
+    for arm in ("comparator", "candidate"):
+        decision = failure.value.decisions[arm]
+        assert decision["decided"] is False
+        assert decision["decided_at_units"] == 240.0
+        assert [a["deterministic_units"] for a in decision["attempts"]] == [60.0, 240.0]
+        assert [a["proven"] for a in decision["attempts"]] == [False, False]
+
+
+def test_a_wall_clock_stop_at_60_makes_the_week_missing_without_a_240_solve(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[float | None] = []
+    original = opponent_projection.optimize_squad
+
+    def solve(players: pd.DataFrame, config: Any, **kwargs: Any) -> Any:
+        calls.append(config.solver_deterministic_time_limit)
+        result = original(players, config, **kwargs)
+        return _unproven(result, clock=True) if len(calls) == 1 else result
+
+    monkeypatch.setattr(opponent_projection, "optimize_squad", solve)
+    with pytest.raises(study.DifficultySolveFailure) as failure:
+        study.measure_week(frame(), season=study.SEASON, gameweek=7, handoff_version="base")
+    comparator = failure.value.decisions["comparator"]
+    assert comparator["wall_clock_stopped"] is True
+    assert [a["wall_clock_stopped"] for a in comparator["attempts"]] == [True]
+    assert failure.value.decisions["candidate"]["decided"] is True
+    assert calls == [60.0, 60.0]
 
 
 def test_week_reads_mse_mae_ordering_and_realized_starters_plus_captain() -> None:
@@ -494,7 +613,7 @@ def test_candidate_solve_failure_retains_both_traces(monkeypatch: pytest.MonkeyP
     def solve(*args: Any, **kwargs: Any) -> Any:
         nonlocal calls
         calls += 1
-        if calls == 2:
+        if calls > 1:
             kwargs["diagnostics"].update({"solver_status": "UNKNOWN", "squad": []})
             raise study.ExperimentExecutionError("synthetic solve failure")
         return original(*args, **kwargs)
@@ -504,7 +623,11 @@ def test_candidate_solve_failure_retains_both_traces(monkeypatch: pytest.MonkeyP
         study.measure_week(frame(), season=study.SEASON, gameweek=7, handoff_version="base")
     assert failure.value.decisions["comparator"]["solver_status"] == "OPTIMAL"
     assert failure.value.decisions["candidate"]["solver_status"] == "UNKNOWN"
-    assert calls == 2
+    assert [a["error"] for a in failure.value.decisions["candidate"]["attempts"]] == [
+        "ExperimentExecutionError",
+        "ExperimentExecutionError",
+    ]
+    assert calls == 3
 
 
 def test_coefficient_identity_is_identical_on_windows_and_linux() -> None:
