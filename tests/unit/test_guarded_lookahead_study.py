@@ -1,6 +1,7 @@
 """The preregistration refuses missing evidence, hidden archive reads and claimed scores."""
 
 from dataclasses import replace
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -414,3 +415,16 @@ def test_single_seed_requires_reference_before_any_preparation(tmp_path, monkeyp
             method="single_seed_v1",
         )
     assert not (tmp_path / "output").exists()
+
+
+@pytest.mark.parametrize(
+    "record", ["lookahead_budget_results_2026-09-30", "single_seed_lookahead_results_2026-10-01"]
+)
+def test_each_result_record_has_its_index_row(record):
+    """ADR 0003 rule 1, no row, no commit; the index test only sees records with a JSON twin."""
+    docs = Path(__file__).resolve().parents[2] / "docs"
+    assert (docs / "research" / f"{record}.md").is_file()
+    index = (docs / "measurements_index.md").read_text(encoding="utf-8")
+    rows = [line for line in index.splitlines() if line.startswith(f"| `{record}` ")]
+    assert len(rows) == 1, f"expected one index row for {record}, found {len(rows)}"
+    assert f"(research/{record}.md)" in rows[0]
