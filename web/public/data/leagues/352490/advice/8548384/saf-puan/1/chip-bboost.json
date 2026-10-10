@@ -1,0 +1,212 @@
+{
+  "contract_version": "provisional_league_ui_v1",
+  "generated_at_utc": "2026-10-10T06:07:04Z",
+  "source_kind": "live",
+  "payload": {
+    "season": "2026-27",
+    "gameweek": 6,
+    "entry_id": 8548384,
+    "league_id": 352490,
+    "mode": "saf-puan",
+    "window": 1,
+    "source_snapshot_id": "fpl-live-20261010T035732Z-c77d032165af",
+    "moves": [
+      {
+        "move_id": "gw06-1",
+        "player_out": {
+          "player_id": 108413,
+          "name": "Will Hughes",
+          "short_name": "Hughes",
+          "position": "MID",
+          "team": "Crystal Palace"
+        },
+        "player_in": {
+          "player_id": 243413,
+          "name": "Regan Slater",
+          "short_name": "Slater",
+          "position": "MID",
+          "team": "Hull City"
+        },
+        "expected_points_delta": 1.9366337491818015,
+        "reason_code": "points_gain"
+      }
+    ],
+    "transfer_hit_points": 0.0,
+    "expected_gain_vs_hold": 1.9366337491818015,
+    "expected_points_cost": 0.0,
+    "rival_label": null,
+    "solver_status": "OPTIMAL",
+    "optimality_gap": 0.0,
+    "wall_clock_stopped_the_search": false,
+    "expected_own_points": 61.155788546532825,
+    "captain": {
+      "player_id": 223094,
+      "name": "Erling Haaland",
+      "short_name": "Haaland",
+      "position": "FWD",
+      "team": "Man City",
+      "expected_points": 7.9988702038468515
+    },
+    "vice_captain": {
+      "player_id": 244850,
+      "name": "Morgan Rogers",
+      "short_name": "Rogers",
+      "position": "MID",
+      "team": "Chelsea",
+      "expected_points": 4.596795481290255
+    },
+    "starting_xi": [
+      {
+        "player_id": 67089,
+        "name": "Martin Dubravka",
+        "short_name": "Dubravka",
+        "position": "GK",
+        "team": "Spurs",
+        "expected_points": 0.08206076680465356
+      },
+      {
+        "player_id": 226597,
+        "name": "Gabriel dos Santos Magalh\u00e3es",
+        "short_name": "Magalh\u00e3es",
+        "position": "DEF",
+        "team": "Arsenal",
+        "expected_points": 4.557988193553639
+      },
+      {
+        "player_id": 97032,
+        "name": "Virgil van Dijk",
+        "short_name": "Dijk",
+        "position": "DEF",
+        "team": "Liverpool",
+        "expected_points": 4.022055479126265
+      },
+      {
+        "player_id": 477424,
+        "name": "Jo\u0161ko Gvardiol",
+        "short_name": "Gvardiol",
+        "position": "DEF",
+        "team": "Man City",
+        "expected_points": 3.6993157992754457
+      },
+      {
+        "player_id": 445087,
+        "name": "Ronald Araujo",
+        "short_name": "Araujo",
+        "position": "DEF",
+        "team": "Liverpool",
+        "expected_points": 3.235698985987142
+      },
+      {
+        "player_id": 244850,
+        "name": "Morgan Rogers",
+        "short_name": "Rogers",
+        "position": "MID",
+        "team": "Chelsea",
+        "expected_points": 4.596795481290255
+      },
+      {
+        "player_id": 446008,
+        "name": "Bryan Mbeumo",
+        "short_name": "Mbeumo",
+        "position": "MID",
+        "team": "Man Utd",
+        "expected_points": 4.514593666623016
+      },
+      {
+        "player_id": 184029,
+        "name": "Martin \u00d8degaard",
+        "short_name": "\u00d8degaard",
+        "position": "MID",
+        "team": "Arsenal",
+        "expected_points": 3.9797310309386273
+      },
+      {
+        "player_id": 243413,
+        "name": "Regan Slater",
+        "short_name": "Slater",
+        "position": "MID",
+        "team": "Hull City",
+        "expected_points": 2.676878987203782
+      },
+      {
+        "player_id": 223094,
+        "name": "Erling Haaland",
+        "short_name": "Haaland",
+        "position": "FWD",
+        "team": "Man City",
+        "expected_points": 7.9988702038468515
+      },
+      {
+        "player_id": 475168,
+        "name": "Jo\u00e3o Pedro Junqueira de Jesus",
+        "short_name": "Jesus",
+        "position": "FWD",
+        "team": "Chelsea",
+        "expected_points": 3.822253355001549
+      }
+    ],
+    "bench": [
+      {
+        "player_id": 154561,
+        "name": "David Raya Mart\u00edn",
+        "short_name": "Mart\u00edn",
+        "position": "GK",
+        "team": "Arsenal",
+        "expected_points": 3.937285604836277
+      },
+      {
+        "player_id": 577725,
+        "name": "Josh King",
+        "short_name": "King",
+        "position": "MID",
+        "team": "Fulham",
+        "expected_points": 3.1380162134324854
+      },
+      {
+        "player_id": 572584,
+        "name": "Abdoul Ouattara",
+        "short_name": "Ouattara",
+        "position": "DEF",
+        "team": "Ipswich Town",
+        "expected_points": 1.4556126578047055
+      },
+      {
+        "player_id": 631000,
+        "name": "Robinio Vaz",
+        "short_name": "Vaz",
+        "position": "FWD",
+        "team": "Hull City",
+        "expected_points": 1.4397619169612816
+      }
+    ],
+    "chip": "bboost",
+    "stated_limits": [
+      "The current model was trained on seasons that awarded no defensive-contribution (DEFCON) points, so it does not forecast those points.",
+      "The chip is in this plan because the member chose it; the planner did not weigh it. The gain stated is this gameweek's only: what the chip would be worth in a later gameweek is not measured, so this is not advice to play it now."
+    ],
+    "data_quality": "complete",
+    "missing_fields": [],
+    "squad_basis": "captured",
+    "control_solver_status": "OPTIMAL",
+    "control_optimality_gap": 0.0,
+    "chip_choice": {
+      "chip": "bboost",
+      "gain_vs_no_chip": 5.3043805176096726,
+      "basis": "one_week_expected_points_v1",
+      "windows_left": {
+        "first_half": {
+          "state": "available",
+          "gameweek": null,
+          "start_event": 1,
+          "stop_event": 19
+        },
+        "second_half": {
+          "state": "not_yet",
+          "gameweek": null,
+          "start_event": 20,
+          "stop_event": 38
+        }
+      }
+    }
+  }
+}
