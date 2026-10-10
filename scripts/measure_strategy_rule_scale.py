@@ -7,7 +7,7 @@ with the bytes DECLARATION_SHA256 pins. An amendment needs a reviewed update to 
 declaration, DECLARATION_SHA256 and this instrument before it can read a capture.
 
 A GW1 to GW3 control that does not round to 21.2 still writes the aggregate record,
-marked control_failed, and exits 2: step 4 is held until the difference is explained
+marked control_failed, and exits 3: step 4 is held until the difference is explained
 on #1002. Reading (d) divides by sqrt(k) times the unrounded S on GW1 to N. Reading (e)
 covers every other league in config/leagues.json at the measured revision and marks one
 it cannot measure as unavailable, never refusing the primary reading. The command
@@ -47,7 +47,8 @@ DECLARATION_SHA256 = "9b5f36ed5651dee692cbb9dab3157ddbb00456840b1811271dc994e345
 PRIMARY_LEAGUE = 352490
 CONTRACT_VERSION = "strategy_rule_scale_v1"
 CONTROL_EXPECTED = 21.2
-CONTROL_FAILED_EXIT = 2
+# Distinct from a refusal (1) and from an argparse usage error (2), neither of which writes.
+CONTROL_FAILED_EXIT = 3
 _LIVE_ID = re.compile(r"fpl-live-(\d{8}T\d{6}Z)-[0-9a-f]{12}")
 _FIRST_DATE = datetime(2026, 8, 26, tzinfo=UTC)
 _LAST_DATE = datetime(2027, 7, 1, tzinfo=UTC)

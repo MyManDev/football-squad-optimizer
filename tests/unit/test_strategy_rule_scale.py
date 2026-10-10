@@ -573,7 +573,7 @@ def test_failed_control_writes_the_record_and_holds_step_4(
 ) -> None:
     metadata = _stored_capture(monkeypatch, tmp_path, _failed_control_payloads())
     exit_code = measurement.main(_main_arguments(tmp_path, metadata.snapshot_id))
-    assert exit_code == measurement.CONTROL_FAILED_EXIT == 2
+    assert exit_code == measurement.CONTROL_FAILED_EXIT == 3
     captured = capsys.readouterr()
     assert captured.out == ""
     assert captured.err == (
@@ -590,6 +590,17 @@ def test_failed_control_writes_the_record_and_holds_step_4(
         "The control failed, so step 4 is held. This record updates no constant "
         "until the difference is explained on #1002."
     ) in text
+
+
+def test_usage_error_exit_differs_from_a_failed_control(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    # argparse exits 2 before anything is written, so a written failed control cannot share it.
+    with pytest.raises(SystemExit) as usage:
+        measurement.main([])
+    assert usage.value.code == 2
+    assert measurement.CONTROL_FAILED_EXIT not in (0, 1, 2)
+    assert "required" in capsys.readouterr().err
 
 
 @pytest.mark.parametrize(
