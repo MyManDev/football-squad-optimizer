@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import copy
 import math
+import pickle
 from dataclasses import FrozenInstanceError, asdict, replace
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -482,6 +484,23 @@ def test_catalog_lookups_do_not_rescan_source_snapshots_or_temporal_mappings():
     assert base.value(12, base.attributes[0]) == 19.0
     assert base.value(1, base.attributes[0]) == 8.0
     assert base.value(999, base.attributes[0]) is None
+
+
+@pytest.mark.parametrize(
+    "duplicate",
+    [copy.copy, copy.deepcopy, lambda x: pickle.loads(pickle.dumps(x))],
+    ids=["copy", "deepcopy", "pickle"],
+)
+def test_catalog_copies_rebuild_their_indexes_from_the_supplied_facts(duplicate):
+    base = catalog()
+    copied = duplicate(base)
+    assert copied == base and asdict(copied) == asdict(base)
+    copied.validate_unit(unit(1))
+    assert copied.value(12, base.attributes[0]) == 19.0
+    assert copied.value(1, base.attributes[0]) == 8.0
+    history = duplicate(observation(2, replacement=True))
+    assert history == observation(2, replacement=True)
+    history.catalog.validate_unit(unit(1, replacement=True))
 
 
 @pytest.mark.parametrize(

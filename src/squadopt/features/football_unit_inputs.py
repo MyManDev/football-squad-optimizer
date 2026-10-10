@@ -9,7 +9,7 @@ from __future__ import annotations
 import math
 import re
 from collections.abc import Mapping
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, fields, replace
 from datetime import datetime, timedelta
 from types import MappingProxyType
 from typing import Literal, cast
@@ -282,6 +282,11 @@ class UnitInputCatalog:
         # serialization and source fingerprints retain only the supplied facts.
         object.__setattr__(self, "_club_index", MappingProxyType(active_clubs))
         object.__setattr__(self, "_value_index", MappingProxyType(values))
+
+    def __reduce__(self) -> tuple[type[UnitInputCatalog], tuple[object, ...]]:
+        # Copies and pickles carry only the supplied facts; construction validates
+        # them again and rebuilds the derived indexes, which cannot be pickled.
+        return type(self), tuple(getattr(self, item.name) for item in fields(self))
 
     def validate_unit(self, unit: ClubUnit) -> None:
         active = cast(Mapping[int, int], self.__dict__["_club_index"])
