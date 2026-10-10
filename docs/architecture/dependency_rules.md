@@ -130,6 +130,11 @@ Only vocabulary. Nothing that computes a decision, and nothing that imports anyt
   strategy declares and DoE/BO read. It is vocabulary two layers share (the product's
   strategy catalogue and the laboratory), which is why it lives here and not in
   `bayesopt`; the one-release re-export in `bayesopt.models` was removed on 2026-09-26.
+- `PointCoefficients`, `ComponentMoments`, `RawPointResult`, `raw_points` and
+  `clip_points` in `contracts/football_point_accounting.py`: the raw FPL point algebra
+  that the football prediction families and the live native integration both score with
+  (#1070). It imports nothing else in `squadopt` and turns caller-supplied moments into
+  expected points, not a decision. Both owners placed it here on 2026-10-10 (#1071).
 - Identity and fingerprint primitives and the contract-version registry remain future
   candidates under [ADR 0002](decisions/0002-contract-versioning.md); they are not moved by
   this extraction.

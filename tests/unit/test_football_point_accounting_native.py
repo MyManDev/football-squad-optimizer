@@ -15,7 +15,7 @@ from squadopt.contracts.football_point_accounting import (
 )
 from squadopt.data.snapshots import read_snapshot, write_snapshot
 from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD
-from squadopt.live.minute_evidence import _score_components
+from squadopt.live.minute_evidence import _score_components  # private on purpose: parity witness
 from squadopt.live.rules import ScoringRules, read_season_rules
 
 POSITIONS = ("GK", "DEF", "MID", "FWD")

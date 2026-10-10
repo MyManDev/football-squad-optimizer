@@ -58,6 +58,16 @@ a card-only contribution. This allowance does not declare FPL appearance or
 autosub support. That policy and any wider accounting reconciliation belong to
 the caller. Conditional residual conversion at q = 0 instead produces R = 0.
 
+Two boundary conditions bind the #1070 step 2 caller before any native caller is
+wired. First, the native companion validator in `src/squadopt/live/minute_evidence.py`
+accepts minute sums within 1e-10, while `support_roundoff` stops at four
+`math.ulp(1.0)` units, so a row native validation accepts can be refused here (for
+example a p60 minus q near 5e-11). Step 2 declares its choice, a named refusal of
+such a row or tighter native validation, before wiring; this primitive does not widen
+its cap. Second, this primitive checks only that R is finite, and both native
+producers give R = 0 at q = 0, so the step 2 caller asserts R = 0 when q = 0 at its
+boundary.
+
 ## Nonlinear moments and approximation
 
 The primitive scores supplied moments; it does not infer them from a mean goal
@@ -98,7 +108,8 @@ Focused checks cover independent action-world scoring, invented capture-derived
 weights for all four positions, accepted native raw/clip parity across its season
 boundaries, nonlinear moment preservation, signed residual conversion, zero-support
 scope, cancellation, overflow and the clipping-order witness. Copied-source fault
-checks and runtime evidence accompany the PR; original source bytes stay unchanged.
+checks and runtime measurements made while preparing the PR are not part of the
+repository; original source bytes stay unchanged.
 These checks validate accounting rather than a learned predictor's accuracy.
 
 Actual combined native use is issue #1070 step 2, in a separate reviewed PR after
