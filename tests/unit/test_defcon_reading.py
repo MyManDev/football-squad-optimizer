@@ -1486,6 +1486,22 @@ def test_gate_floor_small_groups_and_average_rank_spearman_are_fixed() -> None:
     assert len(result["excluded_rank_groups"]) == 5
 
 
+def test_realized_only_tie_uses_average_ranks_not_first_occurrence() -> None:
+    import math
+
+    rows = tuple(
+        paired(6, code, "DEF", realized, forecast + 1.0, forecast)
+        for code, realized, forecast in ((1, 10.0, 1.0), (2, 10.0, 2.0), (3, 11.0, 3.0))
+    )
+    report = summarize(rows, scored_weeks=tuple(range(6, 13)))
+    (group,) = report["rank_groups"]
+    # Average ranks (1.5, 1.5, 3) against (1, 2, 3); first occurrence would give exactly 1.0.
+    assert group["comparator"] == pytest.approx(math.sqrt(3) / 2, abs=1e-12)
+    assert group["candidate"] == pytest.approx(math.sqrt(3) / 2, abs=1e-12)
+    assert report["ranks"]["DEF"]["comparator"] == pytest.approx(0.8660254, abs=1e-7)
+    assert report["ranks"]["DEF"]["candidate"] == pytest.approx(0.8660254, abs=1e-7)
+
+
 def test_rank_boundary_accepts_equality_and_rejects_a_lower_delta(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
