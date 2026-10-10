@@ -279,9 +279,17 @@ def test_production_record_backstop_refuses_different_capture_pair(case, role):
         bundle._production_record(payloads, case["snapshot_id"], handoff_fingerprint="synthetic")
 
 
-def test_first_copy_failure_leaves_no_record_and_rebuilt_diagnostics_can_retry(case, monkeypatch):
+def test_first_copy_failure_leaves_no_record_and_only_the_prepared_handoff_can_retry(
+    case, monkeypatch
+):
     original = bundle.write_bytes_once
     marker = bundle.football_bundle_path(case["artifact_root"], case["snapshot_id"])
+    handoff = replace(
+        read_projection_handoff(case["handoff_path"]),
+        diagnostics={"component_training_seasons": ["2021-22", "2022-23", "2023-24", "2024-25"]},
+    )
+    write_projection_handoff(case["handoff_path"], handoff)
+    prepared = case["handoff_path"].read_bytes()
 
     def interrupted(raw, path, **kwargs):
         if path.name == "handoff.json":
@@ -293,12 +301,16 @@ def test_first_copy_failure_leaves_no_record_and_rebuilt_diagnostics_can_retry(c
         bundle.seal_football_bundle(**case)
     assert not marker.exists()
     assert not marker.with_suffix(".production.json").exists()
-    handoff = replace(
-        read_projection_handoff(case["handoff_path"]),
-        diagnostics={"component_training_seasons": ["2021-22", "2022-23", "2023-24", "2024-25"]},
-    )
-    write_projection_handoff(case["handoff_path"], handoff)
+    # The preparation receipt binds the handoff before any copy, so rebuilt diagnostics
+    # need a new capture and still leave no production record.
+    rebuilt = replace(handoff, diagnostics={"component_training_seasons": ["2024-25"]})
+    write_projection_handoff(case["handoff_path"], rebuilt)
     monkeypatch.setattr(bundle, "write_bytes_once", original)
+    with pytest.raises(ValueError, match="input handoff changed; resume refused"):
+        bundle.seal_football_bundle(**case)
+    assert not marker.exists()
+    assert not marker.with_suffix(".production.json").exists()
+    case["handoff_path"].write_bytes(prepared)
     ready = bundle.seal_football_bundle(**case)
     record = json.loads(marker.with_suffix(".production.json").read_bytes())
     assert record["current_handoff"]["sha256"] == bundle._digest(
