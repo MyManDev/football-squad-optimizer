@@ -32,6 +32,7 @@ from squadopt.data.sources.fpl_live import (
     gameweek_deadlines,
     live_payload,
     next_open_deadline,
+    scored_gameweeks,
 )
 from squadopt.data.timestamps import as_instant, normalize_utc_timestamp
 from squadopt.evaluation.promotion import ExperimentExecutionError
@@ -212,26 +213,16 @@ def fixtures(snapshot: CapturedSnapshot) -> list[dict[str, Any]]:
 
 
 def first_settled(captures: Mapping[str, CapturedSnapshot]) -> CapturedSnapshot:
+    """The earliest capture whose bootstrap marks GW20 finished and data checked.
+
+    These are the two event flags ``scored_gameweeks`` reads; fixtures carry no
+    ``data_checked`` flag, so no fixture field decides settlement.
+    """
     for snapshot in sorted(
         captures.values(),
         key=lambda s: (as_instant(s.metadata.captured_at_utc), s.metadata.snapshot_id),
     ):
-        events = [e for e in bootstrap(snapshot)["events"] if e["id"] == 20]
-        played = [f for f in fixtures(snapshot) if f.get("event") == 20]
-        if (
-            len(events) == 1
-            and events[0].get("finished") is True
-            and events[0].get("data_checked") is True
-            and as_instant(events[0]["deadline_time"])
-            < as_instant(snapshot.metadata.captured_at_utc)
-            and all(
-                f.get("finished") is True
-                and f.get("finished_provisional") is True
-                and isinstance(f.get("kickoff_time"), str)
-                and as_instant(f["kickoff_time"]) < as_instant(snapshot.metadata.captured_at_utc)
-                for f in played
-            )
-        ):
+        if 20 in scored_gameweeks(snapshot.payloads[BOOTSTRAP_PAYLOAD]):
             return snapshot
     raise DifficultyMissingInputs("GW20 is not settled; no real comparison can be printed.")
 
@@ -524,18 +515,11 @@ def reading(
             try:
                 settled = partial_snapshot(
                     safe_path(snapshot_root) / selected.metadata.snapshot_id,
-                    (BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD, live_payload(week)),
+                    (BOOTSTRAP_PAYLOAD, live_payload(week)),
                 )
-                events = [e for e in bootstrap(settled)["events"] if e["id"] == week]
-                played = [f for f in fixtures(settled) if f.get("event") == week]
-                if (
-                    len(events) != 1
-                    or events[0].get("finished") is not True
-                    or events[0].get("data_checked") is not True
-                    or not all(f.get("finished") is True for f in played)
-                ):
+                if week not in scored_gameweeks(settled.payloads[BOOTSTRAP_PAYLOAD]):
                     raise DifficultyMissingInputs(
-                        "The selected reading capture has no settled week."
+                        "The reading capture does not count the week in scored_gameweeks."
                     )
                 rows, dropped = joined_rows(decision, handoff, settled, week, projected=projected)
                 measured_week, player_evidence = measure_week(

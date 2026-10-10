@@ -691,21 +691,27 @@ def test_once_only_claim_survives_across_output_directories(
         runner.reading(snapshots, output_directory=other_worktree / "artifacts/two", **kwargs)
 
 
-@pytest.mark.parametrize("unfinished", ["data_checked", "fixture", "future_kickoff"])
-def test_settlement_refuses_unfinished_or_future_fixtures(tmp_path: Path, unfinished: str) -> None:
+@pytest.mark.parametrize("unset", ["finished", "data_checked"])
+def test_settlement_needs_both_event_flags_scored_gameweeks_reads(
+    tmp_path: Path, unset: str
+) -> None:
     def change(docs: dict[str, Any]) -> None:
-        if unfinished == "data_checked":
-            docs[BOOTSTRAP_PAYLOAD]["events"][-1]["data_checked"] = False
-        else:
-            fixture = docs[FIXTURES_PAYLOAD][-1]
-            if unfinished == "fixture":
-                fixture["finished"] = False
-            else:
-                fixture["kickoff_time"] = "2027-01-20T00:00:00Z"
+        docs[BOOTSTRAP_PAYLOAD]["events"][-1][unset] = False
 
     snapshot = captured(tmp_path, final=True, change=change)
     with pytest.raises(study.DifficultyMissingInputs, match="GW20"):
         runner.first_settled({snapshot.metadata.snapshot_id: snapshot})
+
+
+def test_settlement_is_read_from_the_event_flags_not_the_fixtures(tmp_path: Path) -> None:
+    def change(docs: dict[str, Any]) -> None:
+        fixture = docs[FIXTURES_PAYLOAD][-1]
+        fixture["finished"] = False
+        fixture["finished_provisional"] = False
+        fixture["kickoff_time"] = "2027-01-20T00:00:00Z"
+
+    snapshot = captured(tmp_path, final=True, change=change)
+    assert runner.first_settled({snapshot.metadata.snapshot_id: snapshot}) == snapshot
 
 
 def test_settled_blank_week_needs_no_nonexistent_fixture(tmp_path: Path) -> None:
