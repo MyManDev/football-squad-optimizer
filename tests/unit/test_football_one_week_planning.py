@@ -7,19 +7,30 @@ import pandas as pd
 import pytest
 from tests.unit.test_advice_chips import _every_chip_open
 from tests.unit.test_advice_worker import ENTRY_ID, _deployment
+from tests.unit.test_api_advice_switches import COUNTS
 from tests.unit.test_expected_lineup_planning import assert_same_resources
 from tests.unit.test_football_lineup_selection import _official_expectation, _squad
+from tests.unit.test_league_views import _verified_manager_word
 from tests.unit.test_live_football_model import _forecast
 
 from squadopt.application.advice import (
     AdviseEntryRequest,
+    advise_with_managers_word,
+    advise_with_top100,
     net_expected_points,
     solve_member_control,
 )
 from squadopt.application.advice_chips import advise_with_chip
 from squadopt.application.entries import held_squad_from_picks
 from squadopt.application.football_participation import bind_football_participation
-from squadopt.application.top100_weight import base_net, base_points, decision_changed, rebased_week
+from squadopt.application.manager_words import ManagerWords
+from squadopt.application.top100_weight import (
+    base_net,
+    base_points,
+    decision_changed,
+    rebased_week,
+    weighted_projection,
+)
 from squadopt.data.errors import DataSourceError
 from squadopt.data.sources.fpl_live import availability_snapshot
 from squadopt.live.football_artifact import (
@@ -171,6 +182,76 @@ def test_bench_or_vice_alone_counts_as_changed_experimental_decision(football_wo
         )
         changed = replace(week, vice_captain_id=vice)
     assert decision_changed(week, control.decision, changed, control.decision)
+
+
+def _published_score(payload, projection):
+    table = projection.table.set_index("player_id", drop=False)
+    xi = tuple(p["player_id"] for p in payload["starting_xi"])
+    bench = tuple(p["player_id"] for p in payload["bench"])
+    return expected_lineup_score(
+        table.loc[list((*xi, *bench))],
+        xi,
+        bench,
+        payload["captain"]["player_id"],
+        payload["vice_captain"]["player_id"],
+        hit_points=payload["transfer_hit_points"],
+    )
+
+
+@pytest.mark.parametrize("weight", [0, 20])
+def test_word_barring_only_the_expected_lineup_vice_rescores_the_published_roles(
+    football_world, weight
+):
+    capture, football, picks, _ = football_world
+    table = football.projection.table
+    # Distinct points, so a re-picked vice cannot hide behind an equal one.
+    distinct = table.assign(
+        expected_points=table.expected_points
+        + table.player_id * 1e-3 * table.appearance_probability.gt(0)
+    )
+    projection = replace(football.projection, table=distinct)
+    control = solve_member_control(picks, capture.inputs, projection, capture.rules)
+    chosen_on = weighted_projection(projection, COUNTS.counts, weight) if weight else projection
+    week = solve_member_control(picks, capture.inputs, chosen_on, capture.rules).plan.weeks[0]
+    assert week.lineup_expectation is not None
+    assert week.captain.appearance_probability < 1
+    vice = int(week.vice_captain_id)
+    words = ManagerWords(
+        season=capture.inputs.season,
+        gameweek=2,
+        source_kind="synthetic_fixture",
+        source_label="club_news_v1.fixture.json",
+        evidence_table="rotation_evidence_v4_2026-27_gw02.csv",
+        clubs_covered=("Club 1",),
+        words=(_verified_manager_word(vice, "stated_rotation_risk"),),
+    )
+    request = AdviseEntryRequest(
+        season=capture.inputs.season, gameweek=2, league_id=1, entry_id=ENTRY_ID
+    )
+    context = {
+        "provider": capture.provider,
+        "inputs": capture.inputs,
+        "projection": projection,
+        "rules": capture.rules,
+        "control": control,
+    }
+    if weight:
+        advice = advise_with_top100(request, weight=weight, counts=COUNTS, words=words, **context)
+        payload = advice.word_payload
+        assert payload is not None, advice.word_unavailable
+    else:
+        payload = advise_with_managers_word(request, words=words, **context)
+    score = _published_score(payload, projection)
+
+    assert payload["vice_captain"]["player_id"] != vice
+    for field in ("vice_bonus_points", "expected_net_points"):
+        assert payload["lineup_expectation"][field] == pytest.approx(getattr(score, field))
+    assert payload["expected_own_points"] == pytest.approx(
+        score.expected_net_points + payload["transfer_hit_points"]
+    )
+    # The vice is part of the expected-lineup score, so barring him binds and is priced.
+    assert payload["evidence"]["binding"] is True
+    assert payload["expected_points_cost"] >= 0.0
 
 
 @pytest.mark.parametrize("chip", ["wildcard", "freehit", "3xc", "bboost"])

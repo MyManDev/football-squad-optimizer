@@ -176,9 +176,10 @@ combination uses the new one-week roles. An explicitly forced chip on the
 experimental control uses the same role expectation, so its value and the no-chip
 control share one scoring basis; chip and reserve points are counted once. Manager exclusions
 on the experimental control pass their starter and captain restrictions to role
-search, including the vice. Top100 chooses on weighted mu and publishes the same
-frozen roles on raw mu through the exact player multipliers. Price comparisons use
-that same expected-score basis, and bench/vice changes count as changed decisions.
+search, including the vice. Because the vice is scored, a rule that bars only the
+control's vice binds and is solved and priced like any other. Top100 chooses on
+weighted mu and publishes the same frozen roles on raw mu through the exact player
+multipliers. Price comparisons use that same expected-score basis, and bench/vice changes count as changed decisions.
 
 The native CP objective remains a proposal surrogate. Role improvement reports
 FEASIBLE and clears surrogate bounds; no proof of globally optimal expected points

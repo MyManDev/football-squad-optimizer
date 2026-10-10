@@ -1214,11 +1214,23 @@ def _player_ids(frame: "pd.DataFrame") -> set[int]:
 
 
 def _breaks(week: PlanningWeekResult, exclusion: FirstWeekExclusion) -> bool:
-    """Whether a solved week starts a player the exclusion benches or captains one it bars."""
+    """Whether a solved week starts a player the exclusion benches or captains one it bars.
+
+    An expected-lineup week scores its vice-captain's armband recovery, so a barred vice
+    breaks the rule there too: re-picking him on the page would leave the published total
+    counting a vice the rule removed. A legacy week's vice scores nothing and is re-picked
+    on publication (``_vice_not_barred``).
+    """
 
     if _player_ids(week.starting_xi) & set(exclusion.not_starting):
         return True
-    return int(str(week.captain["player_id"])) in exclusion.not_captain
+    if int(str(week.captain["player_id"])) in exclusion.not_captain:
+        return True
+    return (
+        week.lineup_expectation is not None
+        and week.vice_captain_id is not None
+        and int(str(week.vice_captain_id)) in exclusion.not_captain
+    )
 
 
 def _vice_not_barred(payload: dict[str, object], barred: frozenset[object]) -> None:
@@ -1327,7 +1339,8 @@ def advise_with_managers_word(
     margin's own effect on unrelated transfers into the price of the club's word.
 
     Either way the rows are measured under the rule, and a vice-captain the rule bars from
-    the armband is replaced (``_vice_not_barred``).
+    the armband is replaced (``_vice_not_barred``). On an expected-lineup control the vice
+    is part of the score, so a barred vice binds and the plan is solved under the rule.
 
     **What the member reads** is every statement about a player in the fifteen they hold,
     the fifteen the control would end with, or the fifteen this plan ends with, so a word
