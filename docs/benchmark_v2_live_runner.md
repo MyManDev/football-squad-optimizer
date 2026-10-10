@@ -46,11 +46,11 @@ starting XI, bench order, captain and vice-captain, against the target week's ou
 Those picks are read only from the previous week's `fpl-benchmark-picks` capture listed
 in the same manifest, admitted when its `benchmark.json` names that week's frozen cohort
 and it was captured at or after that week's deadline. The previous week's recorded
-automatic substitutions are reversed as for any other roster. An entry whose previous
-picks are missing, including every Free Hit entry of the first declared week, whose
-previous week is outside the reading, is excluded as `free_hit_previous_missing`.
-A previous roster that is itself a Free Hit roster, and any unrecognized chip, is
-excluded as `chip_unresolved`. The runner does not invent a counterfactual squad or
+automatic substitutions are reversed as for any other roster. A Free Hit entry whose
+previous picks are missing is excluded as `free_hit_previous_missing`. That includes
+every Free Hit entry of GW7, since GW6 is outside the reading. An entry whose previous
+roster is itself a Free Hit roster, or who played an unrecognized chip, is excluded as
+`chip_unresolved`. The runner does not invent a counterfactual squad or
 count one toward coverage. Excluded entries count against the 80-member floor like any
 other, and a week below it stays out of both comparisons. Each week records how many
 valid entries were scored on a Wildcard or a reverted Free Hit roster under
