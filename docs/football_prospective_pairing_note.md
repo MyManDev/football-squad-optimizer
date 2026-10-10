@@ -4,13 +4,17 @@ Status: accepted. On 2026-10-10 the owner accepted Decision defaults 1 to 5 of
 [issue #1007](https://github.com/MyManDev/football-squad-optimizer/issues/1007)
 as proposed, with no amendment, answering
 [the question in comment 6045899361](https://github.com/MyManDev/football-squad-optimizer/issues/1007#issuecomment-6045899361).
+The acceptance came after GW6's first kickoff (2026-10-10T11:30:00Z), so GW6
+is not a paired week and GW7 is the first paired week.
 Written: 2026-10-07T21:54Z, before any GW6-or-later outcome comparison by this task.
 
 The frozen protocol remains [football_prospective_prereg.md](football_prospective_prereg.md),
 merged in #844 at 2026-09-26T06:00:39Z as `ccd803de`. Its first scored week is
-GW6; GW1 to GW5 remain spent. This note does not edit the protocol or change
-its readings, scored-capture choice, scoring policy, promotion thresholds or
-once-only GW20/GW38 reading schedule.
+GW6; GW1 to GW5 remain spent. Under this rule GW6 stays in both records as a
+missing week and GW7 is the first paired week, as the timing section states.
+This note does not edit the protocol or change its readings, scored-capture
+choice, scoring policy, promotion thresholds or once-only GW20/GW38 reading
+schedule.
 
 ## Why the pairing needs a durable rule
 
@@ -144,9 +148,17 @@ runner engineering requirements in #1007, not extra readings or score gates.
 
 Target the note's merge before 2026-10-09T10:00:00Z if the owner answers in
 time; in every case it must merge before GW7's first kickoff at
-2026-10-17T11:30:00Z. If the actual merge occurs after GW6's first kickoff,
-2026-10-10T11:30:00Z, record that fact in the accepted note and beside GW6 in
-the later record. A draft timestamp is not represented as a merge timestamp.
+2026-10-17T11:30:00Z. A draft timestamp is not represented as a merge timestamp.
+
+The owner accepted these defaults on 2026-10-10, after GW6's first kickoff at
+2026-10-10T11:30:00Z, so this note merges after that kickoff too. GW6 therefore
+cannot be a paired week, and GW7 is the first paired week. Both records list
+GW6 as a missing week under the protocol's missing reason, cannot pair the
+scored capture with exactly one handoff, and state beside it that this rule
+was accepted and merged after GW6's first kickoff. GW6 is never pooled, never
+shown as replay and never repaired, and the step 2 check reports it the same
+way. Listing GW6 under that existing missing reason, rather than under a new
+status, is the most conservative reading of the decision.
 
 Step 2 implements the accepted input rule in its own PR, targeting merge before
 2026-10-17T10:00:00Z. Step 3 supplies the once-only scorer and mutation evidence,
@@ -176,6 +188,8 @@ The owner accepted these decisions on 2026-10-10, answering
 | Decision | Accepted rule |
 | --- | --- |
 | Defaults 1 to 5 | As proposed on #1007, with no amendment. Default 1 to Default 5 above state them. |
+| GW6 timing | Accepted after GW6's first kickoff, 2026-10-10T11:30:00Z. GW6 cannot be a paired week; both records list it as missing, with that fact beside it. |
+| First paired week | GW7. |
 
 This note fixes only what the protocol left open. It is not an amendment of
 the frozen protocol.
