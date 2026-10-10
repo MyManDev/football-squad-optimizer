@@ -17,6 +17,13 @@ availability m. The reader applies m_i exactly once. All other components stay
 the same. The candidate has its own artifact root and is never substituted for
 the base, v1 or v1's shadow. Their fingerprints and bytes remain unchanged.
 
+The candidate producer is frozen from its merge through GW20. The record names
+the code revision that built each week's base and candidate artifacts, as the
+weekly run and the shadow build record it, or says that none was recorded. A
+change that moves either arm's forecasts under an unchanged version name is
+named in the record, and the weeks built after it are reported separately
+beside the pooled figure.
+
 The owner clarification on #1009 governs the all-absent or zero-positive-weight
 boundary before candidate code can be approved. This protocol neither supplies
 that decision nor changes its primary reading. The candidate PR also cites the
