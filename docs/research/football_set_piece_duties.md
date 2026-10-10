@@ -237,16 +237,17 @@ here, and no ANN or set-piece gain is claimed.
 ## Verification receipts
 
 Only synthetic fixtures and focused/default regressions are implementation
-evidence. The final source/model/integration run passed 177 cases in 9.45 seconds:
-81 source cases, 56 model cases and 40 integration cases. Seven relevant existing
-component, publication, bundle-switch and bounded-lineup files passed 138 cases
-in 50.10 seconds, with one existing optional `research-bo` skip. This is 315
-distinct passed cases, not a full local suite. Temporary fixture access required
-the Windows test sandbox override; no server or real forecast was run.
+evidence. The final source/model/integration run passed 192 cases in 28.01 seconds
+while other jobs shared the PC: 84 source cases, 56 model cases and 52 integration
+cases. Seven relevant existing component, publication, bundle-switch and
+bounded-lineup files passed 138 cases in 50.10 seconds, with one existing optional
+`research-bo` skip. This is 330 distinct passed cases, not a full local suite.
+Temporary fixture access required the Windows test sandbox override; no server or
+real forecast was run.
 
 Ruff check and formatting pass for all seven new Python files. Strict scoped mypy
 passes for all three source modules. All six import contracts are kept over 456
-files and 3,836 dependencies. No existing tracked source or default caller changed.
+files and 3,835 dependencies. No existing tracked source or default caller changed.
 
 Eight faults were injected into separate private module copies. Original source
 and test paths were never injected. Named assertions caught every fault:
@@ -264,9 +265,11 @@ and test paths were never injected. Named assertions caught every fault:
 
 The first four probes used the 55-case model baseline before the public metadata
 accessor was added; that accessor has a separate passing prefit/postfit/frozen
-receipt regression. The final four probes used the final 121-case source/E2E
-baseline. This records 39 failing checks from eight faults, not 39 independent
-faults. Private receipts retain source-copy hashes and the named failure cases.
+receipt regression. The final four probes used the 121-case source/E2E baseline
+of 81 source and 40 integration cases, before later review fixes added 12
+integration cases and three source cases. This records 39 failing checks from
+eight faults, not 39 independent faults. Private receipts retain source-copy
+hashes and the named failure cases.
 
 An invented 18-observation fit took 0.157 seconds locally. Three complete parsed
 projection-to-allocation-to-weekly-to-bounded-action calls over 66 source players,
