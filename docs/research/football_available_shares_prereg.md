@@ -4,7 +4,19 @@ Issue #1009 part (a), step 2. The forecast-only sizing step in PR #1032 meets
 the unchanged go rule: four available players gain at least 0.2 expected points
 on its declared GW6 capture. This protocol is conditional on that sizing record
 being accepted and merged. Sizing is not an outcome or an accuracy finding.
-No prospective outcome is read before this protocol merges.
+No prospective outcome is read before this protocol merges. The owner's
+decisions of 2026-10-10 on #1009 are recorded in the next section.
+
+## Owner decisions, 2026-10-10
+
+The owner accepted these decisions on #1009 on 2026-10-10, before any
+prospective outcome is read. Where a decision leaves a detail open, this
+protocol takes the most conservative reading and names it where it applies.
+
+1. The attacking-points squared-error improvement stays the primary reading.
+   Its expected size is declared below, before any data, as a pre-data
+   estimate from a simulation on forecasts only, not a measurement.
+   Club-channel bias is a defined secondary reading with no verdict.
 
 ## Arms and binding start
 
@@ -118,7 +130,32 @@ once, at the verdict, and no verdict is repeated.
 
 Squared error is the primary loss because most realized attacking points are
 zero and absolute error would reward the very downward shrinkage being tested.
+The owner kept this primary reading on 2026-10-10. The first-order alternative,
+club-channel bias, is the last secondary reading below and has no verdict.
 The rule is not changed after data is read.
+
+## Expected size, declared before any data
+
+The review of this protocol on 2026-10-08 simulated the primary rule from the
+GW6 forecast table of PR #1032 alone; no outcome was read. It assumed that the
+candidate is exactly true, that each player's goals and assists are Poisson
+draws, and that a doubtful player plays with probability m. On that table the
+sum over the 487 eligible rows of the squared difference between the candidate
+and base predicted attacking points is 1.118, and the expected weekly mean gain
+is about 0.0023 squared points against a weekly standard deviation of about
+0.011.
+
+Under those assumptions the pass rule above passes in 22.6 percent of
+simulated seasons at 14 scored weeks and in 17.3 percent at eight. With
+club-level gamma overdispersion (shape 10) it passes in 18.6 and 18.3 percent.
+A normal approximation gives about 0.21 at 14 weeks and 0.17 at eight. When
+the base is true, the rule passes 1 to 2.5 percent of the time. At 14 scored
+weeks, the most GW7 to GW20 allows, a pass is about a 1 in 5 chance even when
+the fix is exactly right.
+
+This is a pre-data estimate from a simulation on forecasts only, not a
+measurement. It changes no reading, label or threshold, and the record does not
+report it as a result.
 
 ## Secondary readings, with no verdict
 
@@ -134,13 +171,14 @@ The rule is not changed after data is read.
   decision with official normal-week substitutions and captain fallback. Omit
   and count weeks where either arm's primary or tie-break remains unproven at
   the larger budget. Report paired realized difference and identical decisions.
-- Club attacking totals, for each arm and each channel. For a club-fixture,
-  credited goals are the sum over the players the forecast lists for it,
-  including those with m = 0, of m times the arm's forecast goals; credited
-  assists likewise. Realized goals and assists are the sums of the same players'
-  realized values read as above, so own goals do not count. Report the
-  equal-week mean of realized minus credited and of its square, over all
-  club-fixtures and over eligible club-fixtures alone, preserving fixture ids.
+- Club-channel bias, the first-order reading of club attacking totals, for each
+  arm and each channel. For a club-fixture, credited goals are the sum over the
+  players the forecast lists for it, including those with m = 0, of m times the
+  arm's forecast goals; credited assists likewise. Realized goals and assists
+  are the sums of the same players' realized values read as above, so own
+  goals do not count. Report the equal-week mean of realized minus credited and
+  of its square, over all club-fixtures and over eligible club-fixtures alone,
+  preserving fixture ids.
   A club-fixture with an excluded row is left out and counted.
 
 These explain the primary finding; none is an extra pass condition. Report counts
