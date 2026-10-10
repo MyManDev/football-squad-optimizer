@@ -41,6 +41,7 @@ from squadopt.features.football_tactical_inputs import (
 MODEL_VERSION: Final = "football_tactical_matchup_v1"
 FEATURE_VERSION: Final = "causal_named_tactical_matchup_features_v1"
 HEADS: Final = ("goals", "assists")
+CONSTANT_RELATIVE_SPREAD: Final = 1e-12
 Array = npt.NDArray[np.float64]
 
 
@@ -240,7 +241,11 @@ def _transform(values: Array, weights: Array, names: tuple[str, ...], weighting:
                 continue
             means[index] = math.fsum(weights * values[:, index]) / total
             variance = math.fsum(weights * (values[:, index] - means[index]) ** 2) / total
-            scales[index] = math.sqrt(variance) if variance else 1.0
+            spread = math.sqrt(variance)
+            # A column constant up to binary roundoff carries no training signal. Its
+            # roundoff spread must not become the unit later differences divide by.
+            if spread > CONSTANT_RELATIVE_SPREAD * float(np.max(np.abs(observed))):
+                scales[index] = spread
     if not np.isfinite(means).all() or not np.isfinite(scales).all() or (scales <= 0).any():
         raise ValueError("Tactical transform moments exceed finite support.")
     receipt = TacticalTransformReceipt(

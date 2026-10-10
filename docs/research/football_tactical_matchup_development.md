@@ -150,12 +150,15 @@ are recorded. No global optimum, identifiability or predictive gain is claimed.
 
 Feature transformations use training rows only. Team moments use prior shared
 state weights with half the fixture weight per side. Recipient moments use prior
-state/native-share weights, without outcome-dependent preprocessing. Exactly
-constant observed columns retain unit scale. Fitted arrays are backed by immutable
-bytes; metadata includes named features, transforms, parameter vectors, sources,
-rules, training identities and decision/label clocks. Failed refits preserve the
-prior fitted snapshot. Composition requires one unchanged snapshot throughout
-control binding and learned predictions.
+state/native-share weights, without outcome-dependent preprocessing. Observed
+columns that are constant, or whose weighted spread is at most 1e-12 of their
+largest magnitude (binary roundoff of a constant), retain unit scale; dividing by
+roundoff would turn a later real difference into an overflow refusal. Fitted
+arrays are backed by immutable bytes; metadata includes named features,
+transforms, parameter vectors, sources, rules, training identities and
+decision/label clocks. Failed refits preserve the prior fitted snapshot.
+Composition requires one unchanged snapshot throughout control binding and
+learned predictions.
 
 ## Native component replacement and decisions
 

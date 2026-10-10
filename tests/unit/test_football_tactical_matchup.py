@@ -327,6 +327,66 @@ def test_exact_constant_transform_is_invariant_to_weight_splitting_and_ignores_z
     assert transform.apply(constant[:2]) == pytest.approx(np.zeros((2, 1)))
 
 
+def test_roundoff_constant_transform_column_keeps_unit_scale() -> None:
+    values = np.array([[0.55], [0.5500000000000002], [0.55]])
+    transform = tactical._transform(
+        values, np.array([0.25, 0.5, 0.25]), ("roundoff",), "synthetic-only"
+    )
+    assert transform.receipt.scales == (1.0,)
+    assert transform.apply(np.array([[0.6]]))[0, 0] == pytest.approx(0.05, abs=1e-12)
+    varying = tactical._transform(
+        np.array([[0.55], [0.6]]), np.array([0.5, 0.5]), ("varying",), "synthetic-only"
+    )
+    assert varying.receipt.scales == pytest.approx((0.025,))
+
+
+def test_training_trait_constant_up_to_roundoff_neither_learns_nor_refuses_new_values() -> None:
+    def uniform(
+        side: TacticalSideState, value: int, goal_shares: tuple[float, ...] | None = None
+    ) -> TacticalSideState:
+        players = []
+        for index, player in enumerate(side.players):
+            attributes = (value,) * len(TRAITS)
+            player = replace(player, profile=replace(player.profile, attributes=attributes))
+            if goal_shares is not None:
+                player = replace(player, native_goal_share=goal_shares[index])
+            players.append(player)
+        return replace(side, players=tuple(players))
+
+    # Goal-share weighted averages of a constant 11/20 trait differ only by roundoff.
+    uneven = (0.0, 0.4662865961371724, 0.48311857876858233, 0.05059482509424534)
+    observations = []
+    for index, shares in enumerate((uneven, (0, 0.1, 0.2, 0.7), uneven, (0, 0.3, 0.3, 0.4))):
+        observation = _observation(index, physical=(4 if shares is uneven else 1, 2))
+        state = observation.projection.states[0]
+        home, away = uniform(state.home, 11, shares), uniform(state.away, 11)
+        states = (replace(state, home=home, away=away),)
+        observations.append(
+            replace(observation, projection=replace(observation.projection, states=states))
+        )
+    raw = np.concatenate(
+        [
+            tactical._team_matrix(o.projection).reshape(-1, len(tactical.TEAM_FEATURES))
+            for o in observations
+        ]
+    )
+    column = raw[:, tactical.TEAM_FEATURES.index("own_goal_weighted_heading")]
+    assert 0 < column.max() - column.min() < 1e-15
+    model = _fit(tuple(observations))
+    transform = model.metadata.team_transform
+    assert dict(zip(transform.features, transform.scales, strict=True))[
+        "own_goal_weighted_heading"
+    ] == pytest.approx(1.0)
+    target = _projection(season=TARGET_SEASON)
+    state = target.states[0]
+
+    def rate(value: int) -> float:
+        changed = replace(state, home=uniform(state.home, value), away=uniform(state.away, 11))
+        return model.predict(replace(target, states=(changed,))).home.team_goal_rate
+
+    assert rate(12) == pytest.approx(rate(11), rel=1e-9)
+
+
 def test_pair_joint_mixture_matches_independent_probability_and_gradient() -> None:
     group = tactical._PairGroup(
         np.array([[[0.2, -0.4], [0.1, 0.3]], [[-0.5, 0.6], [0.7, -0.1]]]),
