@@ -1,0 +1,639 @@
+"""Read #1009(b)'s fixed comparison once, after the declared settled GW20 capture."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import re
+import subprocess
+from collections.abc import Mapping
+from dataclasses import asdict
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
+
+import numpy as np
+import pandas as pd
+
+from squadopt.data.atomic import WRITTEN, write_document_once
+from squadopt.data.errors import DataError
+from squadopt.data.snapshots import (
+    CapturedSnapshot,
+    SnapshotMetadata,
+    build_snapshot_id,
+    payload_checksum,
+    snapshot_fingerprint,
+)
+from squadopt.data.sources.fpl_live import (
+    BOOTSTRAP_PAYLOAD,
+    FIXTURES_PAYLOAD,
+    gameweek_deadlines,
+    live_payload,
+    next_open_deadline,
+    scored_gameweeks,
+)
+from squadopt.data.timestamps import as_instant, normalize_utc_timestamp
+from squadopt.evaluation.promotion import ExperimentExecutionError
+from squadopt.experiments.published_difficulty_live import (
+    SEASON,
+    DifficultyInputError,
+    DifficultyMissingInputs,
+    DifficultySolveFailure,
+    DifficultyWeek,
+    decode,
+    measure_week,
+    require_season,
+    summarize,
+    verify_coefficients,
+)
+from squadopt.live.recommendation import (
+    InSeasonProjection,
+    infer_season,
+    project,
+    read_inputs,
+    read_projection_handoff,
+)
+from squadopt.live.tick import handoff_path_for
+from squadopt.optimization.models import SquadOptimizationError
+from squadopt.platform.capture_context import handoff_fingerprint_for
+
+ROOT = Path(__file__).resolve().parents[1]
+DECLARATION = "docs/research/published_difficulty_live_prereg.md"
+DECLARATION_SHA256 = "0d5178b56be82a8cf0786b11e0404da6e551118f878dc3cce12651899c79c13a"
+CAPTURE_NAME = re.compile(r"fpl-live-(?:2026(?:0[89]|1[012])|20270[1-5])\d{2}T\d{6}Z-[0-9a-f]{12}")
+HASH = re.compile(r"[0-9a-f]{64}")
+#: The roots the backend serves from; the protocol reads these two and names both.
+SERVED_ROOTS = ("SQUADOPT_BACKEND_SNAPSHOT_ROOT", "SQUADOPT_BACKEND_HANDOFF_ROOT")
+
+
+def safe_path(path: Path) -> Path:
+    resolved = path.resolve()
+    spelling = resolved.as_posix().casefold()
+    if any(spelling == p or spelling.startswith(p + "/") for p in ("c:/sqr", "c:/sqrweb")):
+        raise DifficultyInputError("Rehearsal folders are forbidden inputs and outputs.")
+    return resolved
+
+
+def served_roots(environ: Mapping[str, str]) -> tuple[Path, Path]:
+    """The snapshot and handoff roots the backend served from, never chosen at verdict time."""
+    values = [environ.get(name, "").strip() for name in SERVED_ROOTS]
+    if not all(values):
+        raise DifficultyInputError("Both served roots must be set as the backend reads them.")
+    return Path(values[0]), Path(values[1])
+
+
+def command(*args: str) -> str:
+    return subprocess.run(args, cwd=ROOT, capture_output=True, text=True, check=True).stdout.strip()
+
+
+def digest(content: bytes) -> str:
+    return hashlib.sha256(content.replace(b"\r\n", b"\n")).hexdigest()
+
+
+def frozen_declaration() -> dict[str, str]:
+    info = json.loads(
+        command(
+            "gh",
+            "pr",
+            "view",
+            "1033",
+            "--repo",
+            "MyManDev/football-squad-optimizer",
+            "--json",
+            "state,mergedAt,mergeCommit",
+        )
+    )
+    if info.get("state") != "MERGED" or not info.get("mergedAt"):
+        raise DifficultyInputError(
+            "The preregistration must merge before any real input is opened."
+        )
+    merged = info["mergeCommit"]["oid"]
+    content = subprocess.run(
+        ["git", "show", f"{merged}:{DECLARATION}"], cwd=ROOT, capture_output=True, check=True
+    ).stdout
+    if (
+        digest(content) != DECLARATION_SHA256
+        or digest((ROOT / DECLARATION).read_bytes()) != DECLARATION_SHA256
+    ):
+        raise DifficultyInputError("The accepted declaration differs; runner review is required.")
+    command("git", "merge-base", "--is-ancestor", merged, "HEAD")
+    if command("git", "status", "--porcelain", "--untracked-files=normal"):
+        raise DifficultyInputError("The reading requires clean committed code.")
+    verify_coefficients((ROOT / "docs/opponent_projection_study.json").read_bytes())
+    return {
+        "merge_commit": merged,
+        "merged_at": normalize_utc_timestamp(info["mergedAt"], label="merge"),
+        "sha256": DECLARATION_SHA256,
+        "code_commit": command("git", "rev-parse", "HEAD"),
+    }
+
+
+def partial_snapshot(
+    directory: Path, names: tuple[str, ...] = (BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD)
+) -> CapturedSnapshot:
+    directory = safe_path(directory)
+    if not CAPTURE_NAME.fullmatch(directory.name):
+        raise DifficultyInputError("A capture name is outside the admitted 2026-27 season range.")
+    doc = decode((directory / "metadata.json").read_bytes())
+    hashes = doc["checksums"]
+    if (
+        not isinstance(hashes, dict)
+        or not hashes
+        or any(
+            not isinstance(k, str)
+            or not re.fullmatch(r"[a-z0-9]+(?:[-_.][a-z0-9]+)*", k)
+            or not isinstance(v, str)
+            or not HASH.fullmatch(v)
+            for k, v in hashes.items()
+        )
+    ):
+        raise DifficultyInputError("The payload inventory is invalid.")
+    stamp = normalize_utc_timestamp(doc["captured_at_utc"], label="capture")
+    fingerprint = snapshot_fingerprint(
+        source=doc["source"],
+        captured_at_utc=stamp,
+        schema_version=doc["schema_version"],
+        checksums=hashes,
+    )
+    if (
+        doc["source"] != "fpl-live"
+        or doc["schema_version"] != "snapshot_v1"
+        or (
+            fingerprint != doc["fingerprint"]
+            or directory.name != doc["snapshot_id"]
+            or directory.name
+            != build_snapshot_id(source="fpl-live", captured_at_utc=stamp, fingerprint=fingerprint)
+        )
+    ):
+        raise DifficultyInputError("The capture identity is invalid.")
+    metadata = SnapshotMetadata(
+        directory.name, "fpl-live", stamp, "snapshot_v1", hashes, fingerprint
+    )
+    payloads: dict[str, bytes] = {}
+    # Season is checked from verified bootstrap bytes before any outcome loader call.
+    for name in dict.fromkeys((BOOTSTRAP_PAYLOAD, *names)):
+        if name not in hashes:
+            raise DifficultyMissingInputs("A required captured payload is absent.")
+        content = safe_path(directory / "payloads" / name).read_bytes()
+        if payload_checksum(content) != hashes[name]:
+            raise DifficultyMissingInputs("A payload differs from its captured checksum.")
+        payloads[name] = content
+        if name == BOOTSTRAP_PAYLOAD:
+            require_season(infer_season(CapturedSnapshot(metadata, payloads)))
+    return CapturedSnapshot(metadata, payloads)
+
+
+def inventory(root: Path, *, season: str, as_of: str) -> dict[str, CapturedSnapshot]:
+    require_season(season)
+    result = {}
+    for directory in sorted(safe_path(root).iterdir()):
+        if directory.is_dir() and CAPTURE_NAME.fullmatch(directory.name):
+            named_instant = datetime.strptime(
+                directory.name.split("-")[2], "%Y%m%dT%H%M%SZ"
+            ).replace(tzinfo=UTC)
+            if named_instant > as_instant(as_of):
+                continue
+            snapshot = partial_snapshot(directory)
+            if as_instant(snapshot.metadata.captured_at_utc) <= as_instant(as_of):
+                result[snapshot.metadata.snapshot_id] = snapshot
+    return result
+
+
+def bootstrap(snapshot: CapturedSnapshot) -> dict[str, Any]:
+    return dict(decode(snapshot.payloads[BOOTSTRAP_PAYLOAD]))
+
+
+def fixtures(snapshot: CapturedSnapshot) -> list[dict[str, Any]]:
+    values = decode(snapshot.payloads[FIXTURES_PAYLOAD])
+    if not isinstance(values, list) or len({f["id"] for f in values}) != len(values):
+        raise DifficultyInputError("The fixture inventory has invalid or duplicate ids.")
+    return values
+
+
+def first_settled(captures: Mapping[str, CapturedSnapshot]) -> CapturedSnapshot:
+    """The earliest capture whose bootstrap marks GW20 finished and data checked.
+
+    These are the two event flags ``scored_gameweeks`` reads; fixtures carry no
+    ``data_checked`` flag, so no fixture field decides settlement.
+    """
+    for snapshot in sorted(
+        captures.values(),
+        key=lambda s: (as_instant(s.metadata.captured_at_utc), s.metadata.snapshot_id),
+    ):
+        if 20 in scored_gameweeks(snapshot.payloads[BOOTSTRAP_PAYLOAD]):
+            return snapshot
+    raise DifficultyMissingInputs("GW20 is not settled; no real comparison can be printed.")
+
+
+def eligible_weeks(snapshot: CapturedSnapshot, merged_at: str) -> tuple[int, ...]:
+    deadlines = gameweek_deadlines(snapshot.payloads[BOOTSTRAP_PAYLOAD])
+    return tuple(
+        sorted(
+            d.gameweek
+            for d in deadlines
+            if d.gameweek <= 20 and as_instant(d.deadline_utc) > as_instant(merged_at)
+        )
+    )
+
+
+def week_captures(
+    captures: Mapping[str, CapturedSnapshot], week: int, handoff_root: Path
+) -> tuple[list[CapturedSnapshot], list[CapturedSnapshot]]:
+    """Split the captures whose own target is ``week`` into served and unserved.
+
+    A capture is served when ``handoff_fingerprint_for`` finds its baseline handoff in
+    the served handoff root. One without it was never served: it is passed over and
+    listed, so an audit or rehearsal capture cannot displace the served one.
+    """
+    root = safe_path(handoff_root)
+    served: list[CapturedSnapshot] = []
+    unserved: list[CapturedSnapshot] = []
+    for snapshot in sorted(
+        captures.values(),
+        key=lambda s: (as_instant(s.metadata.captured_at_utc), s.metadata.snapshot_id),
+    ):
+        deadlines = gameweek_deadlines(snapshot.payloads[BOOTSTRAP_PAYLOAD])
+        try:
+            target = next_open_deadline(deadlines, as_of_utc=snapshot.metadata.captured_at_utc)
+        except DataError:
+            continue
+        if target.gameweek != week:
+            continue
+        if handoff_fingerprint_for(root, SEASON, week, snapshot.metadata.snapshot_id) is None:
+            unserved.append(snapshot)
+        else:
+            served.append(snapshot)
+    return served, unserved
+
+
+def decision_capture(served: list[CapturedSnapshot]) -> CapturedSnapshot:
+    """The latest served capture; two at the same latest instant make the week missing."""
+    if not served:
+        raise DifficultyMissingInputs("No served pre-deadline capture targets the week.")
+    instant = max(as_instant(s.metadata.captured_at_utc) for s in served)
+    latest = [s for s in served if as_instant(s.metadata.captured_at_utc) == instant]
+    if len(latest) != 1:
+        raise DifficultyMissingInputs("The latest decision capture instant is ambiguous.")
+    return latest[0]
+
+
+def _matching_handoff(
+    path: Path, snapshot_id: str, week: int
+) -> tuple[InSeasonProjection, Path, bytes] | None:
+    try:
+        content = safe_path(path).read_bytes()
+        decode(content)
+        handoff = read_projection_handoff(path)
+    except (DataError, OSError, ValueError):
+        return None
+    if (handoff.source_snapshot_id, handoff.season, handoff.gameweek) != (
+        snapshot_id,
+        SEASON,
+        week,
+    ):
+        return None
+    return handoff, path, content
+
+
+def paired_handoff(
+    root: Path, snapshot: CapturedSnapshot, week: int
+) -> tuple[InSeasonProjection, dict[str, Any]]:
+    """Read the served handoff file itself and prove it was written before the deadline.
+
+    The paired file is the gameweek alias when it matches the capture, else the one
+    retained copy under ``by-capture/<capture>/`` that matches it. Its fingerprint must
+    be the one ``handoff_fingerprint_for`` returns, and its modification time must fall
+    before the deadline. A late file never falls back to another copy.
+    """
+    root = safe_path(root)
+    snapshot_id = snapshot.metadata.snapshot_id
+    inputs = read_inputs(snapshot, season=SEASON, gameweek=week)
+    fingerprint = handoff_fingerprint_for(root, SEASON, week, snapshot_id)
+    if fingerprint is None:
+        raise DifficultyMissingInputs("The capture has no served baseline handoff.")
+    alias = _matching_handoff(handoff_path_for(root, SEASON, week), snapshot_id, week)
+    if alias is not None:
+        candidates = [alias]
+    else:
+        retained = (
+            _matching_handoff(path, snapshot_id, week)
+            for path in sorted((root / "by-capture" / snapshot_id).glob("*.json"))
+        )
+        candidates = [match for match in retained if match is not None]
+    if len(candidates) != 1:
+        raise DifficultyMissingInputs("The paired handoff file is absent or ambiguous.")
+    handoff, path, content = candidates[0]
+    if handoff.fingerprint != fingerprint:
+        raise DifficultyMissingInputs("The paired handoff file is not the one the backend serves.")
+    modified = path.stat().st_mtime
+    if modified >= as_instant(inputs.deadline.deadline_utc).timestamp():
+        raise DifficultyMissingInputs(
+            "The paired handoff file was written at or after its deadline."
+        )
+    return handoff, {
+        "handoff_fingerprint": fingerprint,
+        "handoff_version": handoff.model_version,
+        "handoff_sha256": hashlib.sha256(content).hexdigest(),
+        "handoff_file": str(path),
+        "handoff_file_is_alias": alias is not None,
+        "handoff_modified_utc": datetime.fromtimestamp(modified, tz=UTC).isoformat(),
+    }
+
+
+def elements(snapshot: CapturedSnapshot) -> dict[int, dict[str, Any]]:
+    result: dict[int, dict[str, Any]] = {}
+    codes = set()
+    for item in bootstrap(snapshot)["elements"]:
+        if (
+            type(item["id"]) is not int
+            or item["id"] <= 0
+            or type(item["code"]) is not int
+            or item["code"] <= 0
+            or item["id"] in result
+            or item["code"] in codes
+        ):
+            raise DifficultyInputError("The roster has an invalid or duplicate player identity.")
+        result[item["id"]] = item
+        codes.add(item["code"])
+    return result
+
+
+def captured_club_ratings(decision: CapturedSnapshot, week: int) -> dict[int, list[float]]:
+    held_fixtures = [f for f in fixtures(decision) if f.get("event") == week]
+    clubs: dict[int, list[float]] = {}
+    for fixture in held_fixtures:
+        for side in ("h", "a"):
+            rating = fixture.get("team_" + side + "_difficulty")
+            if not isinstance(rating, (int, float)) or isinstance(rating, bool):
+                raise DifficultyMissingInputs(
+                    "A captured fixture difficulty is missing or invalid."
+                )
+            if not np.isfinite(rating) or not 1 <= rating <= 5:
+                raise DifficultyMissingInputs(
+                    "A captured fixture difficulty is missing or invalid."
+                )
+            clubs.setdefault(fixture["team_" + side], []).append(float(rating))
+    return clubs
+
+
+def joined_rows(
+    decision: CapturedSnapshot,
+    handoff: InSeasonProjection,
+    outcome: CapturedSnapshot,
+    week: int,
+    *,
+    projected: pd.DataFrame | None = None,
+) -> tuple[pd.DataFrame, list[int]]:
+    decided = elements(decision)
+    realized_ids = elements(outcome)
+    if projected is None:
+        projected = project(
+            read_inputs(decision, season=SEASON, gameweek=week), in_season=handoff
+        ).table
+    try:
+        realized = decode(outcome.payloads[live_payload(week)])
+    except ValueError as error:
+        raise DifficultyMissingInputs("A settled live payload is not a valid document.") from error
+    totals = {}
+    seen = set()
+    for item in realized["elements"]:
+        if type(item["id"]) is not int or item["id"] in seen:
+            raise DifficultyMissingInputs("A realized player identity is invalid or duplicated.")
+        seen.add(item["id"])
+        if item["id"] in realized_ids:
+            points = item["stats"]["total_points"]
+            if type(points) is not int:
+                raise DifficultyMissingInputs("A realized points row is invalid.")
+            totals[realized_ids[item["id"]]["code"]] = points
+    clubs = captured_club_ratings(decision, week)
+    code_to_club = {item["code"]: item["team"] for item in decided.values()}
+    rows = projected.rename(columns={"expected_points": "predicted_points"}).copy()
+    dropped = sorted(set(int(v) for v in rows["player_id"]) - set(totals))
+    rows = rows.loc[rows["player_id"].isin(totals)].copy()
+    if rows.empty:
+        raise DifficultyMissingInputs("No captured player has a settled outcome row.")
+    rows["realized_points"] = rows["player_id"].map(totals)
+    rows["fixture_count"] = [
+        len(clubs.get(code_to_club[int(code)], [])) for code in rows["player_id"]
+    ]
+    rows["published_signal"] = [
+        -float(np.mean(clubs[code_to_club[int(code)]]))
+        if code_to_club[int(code)] in clubs
+        else float("nan")
+        for code in rows["player_id"]
+    ]
+    return rows.sort_values("player_id").reset_index(drop=True), dropped
+
+
+def reading(
+    captures: Mapping[str, CapturedSnapshot],
+    *,
+    snapshot_root: Path,
+    handoff_root: Path,
+    declaration: Mapping[str, str],
+    as_of: str,
+    output_directory: Path,
+    owner_approved: bool,
+    weekly_run_idle: bool,
+) -> dict[str, Any]:
+    if not owner_approved or not weekly_run_idle:
+        raise DifficultyInputError(
+            "The owner must authorize the reading outside weekly operations."
+        )
+    selected = first_settled(captures)
+    if as_instant(selected.metadata.captured_at_utc) > as_instant(as_of):
+        raise DifficultyMissingInputs("The reading instant precedes the settled capture.")
+    # Every week joins this roster, so it is refused before the claim, not after.
+    elements(selected)
+    weeks = eligible_weeks(selected, declaration["merged_at"])
+    output = safe_path(output_directory)
+    private = safe_path(ROOT / "artifacts")
+    if not output.is_relative_to(private):
+        raise DifficultyInputError(
+            "Reading evidence must stay under this worktree's ignored artifacts."
+        )
+    if command(
+        "git", "log", "--all", "--format=%H", "--", "docs/research/published_difficulty_live.json"
+    ):
+        raise DifficultyInputError("A committed verdict record prevents another reading.")
+    claims = safe_path(
+        Path(command("git", "rev-parse", "--path-format=absolute", "--git-common-dir"))
+        / "research-claims/published-difficulty"
+    )
+    claim = claims / (DECLARATION_SHA256 + "-claim.json")
+    if claim.exists():
+        raise DifficultyInputError("This declaration already claimed its single reading.")
+    if not safe_path(handoff_root).is_dir():
+        raise DifficultyMissingInputs("The handoff root is absent; no reading was claimed.")
+    prepared = {}
+    audit: list[dict[str, Any]] = []
+    for week in weeks:
+        proof: dict[str, Any] = {}
+        unserved: list[str] = []
+        try:
+            served, passed_over = week_captures(captures, week, handoff_root)
+            unserved = [s.metadata.snapshot_id for s in passed_over]
+            decision = decision_capture(served)
+            handoff, proof = paired_handoff(handoff_root, decision, week)
+            projected = project(
+                read_inputs(decision, season=SEASON, gameweek=week), in_season=handoff
+            ).table
+            elements(decision)
+            captured_club_ratings(decision, week)
+            prepared[week] = (decision, handoff, proof, projected, unserved)
+        except (DifficultyMissingInputs, DataError, OSError, KeyError, TypeError) as error:
+            audit.append(
+                {
+                    "gameweek": week,
+                    "status": "missing",
+                    "reason": type(error).__name__,
+                    "detail": str(error) if isinstance(error, DifficultyInputError) else None,
+                    "identity": proof,
+                    "unserved_captures": unserved,
+                    "solver_decisions": None,
+                }
+            )
+    if not prepared:
+        raise DifficultyMissingInputs(
+            "No week pairs with valid projection inputs; no reading was claimed."
+        )
+    output.mkdir(parents=True, exist_ok=True)
+    claims.mkdir(parents=True, exist_ok=True)
+    if (
+        write_document_once(
+            {"capture": selected.metadata.snapshot_id, "declaration": dict(declaration)}, claim
+        )
+        != WRITTEN
+    ):
+        raise DifficultyInputError("This declaration already claimed its single reading.")
+    measured: list[DifficultyWeek] = []
+    evidence = []
+    try:
+        for week, (decision, handoff, proof, projected, unserved) in prepared.items():
+            try:
+                settled = partial_snapshot(
+                    safe_path(snapshot_root) / selected.metadata.snapshot_id,
+                    (BOOTSTRAP_PAYLOAD, live_payload(week)),
+                )
+                if week not in scored_gameweeks(settled.payloads[BOOTSTRAP_PAYLOAD]):
+                    raise DifficultyMissingInputs(
+                        "The reading capture does not count the week in scored_gameweeks."
+                    )
+                rows, dropped = joined_rows(decision, handoff, settled, week, projected=projected)
+                measured_week, player_evidence = measure_week(
+                    rows, season=SEASON, gameweek=week, handoff_version=handoff.model_version
+                )
+                measured.append(measured_week)
+                evidence.append((week, player_evidence))
+                audit.append(
+                    {
+                        "gameweek": week,
+                        "status": "scored",
+                        "identity": proof,
+                        "unserved_captures": unserved,
+                        "decision_capture": decision.metadata.snapshot_id,
+                        "decision_fingerprint": decision.metadata.fingerprint,
+                        "decision_input_hashes": dict(decision.metadata.checksums),
+                        "dropped_player_codes": dropped,
+                        "reading_input_hashes": dict(settled.metadata.checksums),
+                        "reading": asdict(measured_week),
+                    }
+                )
+            except (
+                DifficultyMissingInputs,
+                DataError,
+                OSError,
+                KeyError,
+                TypeError,
+                ExperimentExecutionError,
+                SquadOptimizationError,
+            ) as error:
+                audit.append(
+                    {
+                        "gameweek": week,
+                        "status": "missing",
+                        "reason": type(error).__name__,
+                        "detail": str(error) if isinstance(error, DifficultyInputError) else None,
+                        "identity": proof,
+                        "unserved_captures": unserved,
+                        "solver_decisions": error.decisions
+                        if isinstance(error, DifficultySolveFailure)
+                        else None,
+                    }
+                )
+        report = {
+            "contract_version": "published_difficulty_live_reading_v1",
+            "season": SEASON,
+            "declaration": dict(declaration),
+            "as_of": as_of,
+            "served_roots": {
+                SERVED_ROOTS[0]: str(snapshot_root),
+                SERVED_ROOTS[1]: str(handoff_root),
+            },
+            "reading_capture": selected.metadata.snapshot_id,
+            "reading_fingerprint": selected.metadata.fingerprint,
+            "reading_input_hashes": dict(selected.metadata.checksums),
+            "eligible_weeks": list(weeks),
+            "week_identities": sorted(audit, key=lambda item: item["gameweek"]),
+            **summarize(tuple(measured)),
+        }
+        if write_document_once(report, output / "reading.json") != WRITTEN:
+            raise DifficultyInputError("A saved reading record already exists.")
+        for week, frame in evidence:
+            with (output / f"gw{week:02d}-players.csv").open(
+                "x", encoding="utf-8", newline=""
+            ) as stream:
+                frame.to_csv(stream, index=False)
+        return report
+    except (ValueError, DataError, OSError, KeyError, TypeError):
+        write_document_once(
+            {"status": "reading_refused", "declaration": dict(declaration)}, output / "refused.json"
+        )
+        raise
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--season", default=SEASON)
+    parser.add_argument("--as-of", required=True)
+    parser.add_argument("--output-directory", type=Path, required=True)
+    parser.add_argument("--owner-approved", action="store_true")
+    parser.add_argument("--weekly-run-idle", action="store_true")
+    args = parser.parse_args()
+    try:
+        require_season(args.season)
+        declaration = frozen_declaration()
+        if not args.owner_approved or not args.weekly_run_idle:
+            raise DifficultyInputError("Owner approval and an idle weekly-run window are required.")
+        snapshot_root, handoff_root = served_roots(os.environ)
+        as_of = normalize_utc_timestamp(args.as_of, label="reading instant")
+        captures = inventory(snapshot_root, season=args.season, as_of=as_of)
+        report = reading(
+            captures,
+            snapshot_root=snapshot_root,
+            handoff_root=handoff_root,
+            declaration=declaration,
+            as_of=as_of,
+            output_directory=args.output_directory,
+            owner_approved=args.owner_approved,
+            weekly_run_idle=args.weekly_run_idle,
+        )
+        print(json.dumps(report, indent=2, sort_keys=True, allow_nan=False))
+        return 0
+    except (ValueError, DataError, OSError, KeyError, TypeError, subprocess.CalledProcessError):
+        print(
+            json.dumps(
+                {
+                    "status": "refused",
+                    "promotion": False,
+                    "reason": "fixed_identity_or_verdict_date_gate_failed",
+                }
+            )
+        )
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
