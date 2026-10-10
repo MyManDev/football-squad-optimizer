@@ -21,6 +21,12 @@ The ``rivals`` block is a second, smaller world: the unit tests' three-capture w
 writes and whose answers the real advice service gives (``advise_entry`` under each rival
 strategy against each rival). The device restates that service's rule, and this is what
 holds it to it.
+
+The ``preferences`` block is the window-one planner's answer under a member's explicit
+preferences (keep, avoid, no hits, save chips) on one fifteen of the main world, solved
+with ``optimize_transfer_plan(..., preferences=...)``: alone, beside a Wildcard or a Free
+Hit, at a Top 100 weight on a copy of the document that carries synthetic Top 100 counts,
+and one set the planner proves infeasible, recorded as a refusal.
 """
 
 from __future__ import annotations
@@ -774,8 +780,9 @@ def main() -> int:
     print(
         f"Wrote {FIXTURE} with {len(fixture['members'])} instances, "
         f"{len(fixture['chips'])} chip instances and "
-        f"{len(fixture['rivals']['cases'])} rival strategy cases and "
-        f"{len(fixture['rivals']['top100_cases'])} Top 100 cases."
+        f"{len(fixture['rivals']['cases'])} rival strategy cases, "
+        f"{len(fixture['rivals']['top100_cases'])} Top 100 cases and "
+        f"{len(fixture['preferences']['cases'])} preference cases."
     )
     return 0
 
