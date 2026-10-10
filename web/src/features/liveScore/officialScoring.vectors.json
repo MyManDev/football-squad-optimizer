@@ -1,0 +1,3754 @@
+{
+  "reference": "score_recorded_decision",
+  "scoring_basis": "official_autosub_captain_v2",
+  "cases": [
+    {
+      "name": "normal-week",
+      "input": {
+        "contract_version": "week_live_v1",
+        "season": "2026-27",
+        "gameweek": 6,
+        "source_time": "2026-10-12T22:00:00Z",
+        "fixtures": [
+          {
+            "id": 61,
+            "home_club": 1,
+            "away_club": 2,
+            "finished": true
+          }
+        ],
+        "elements": [
+          {
+            "element_id": 1,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "GK",
+            "club": 1
+          },
+          {
+            "element_id": 2,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 3,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 4,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 5,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 6,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 7,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 1
+          },
+          {
+            "element_id": 8,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 1
+          },
+          {
+            "element_id": 9,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 10,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 11,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 12,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "GK",
+            "club": 2
+          },
+          {
+            "element_id": 13,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          },
+          {
+            "element_id": 14,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          },
+          {
+            "element_id": 15,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          }
+        ],
+        "members": [
+          {
+            "entry_id": 101,
+            "gameweek": 6,
+            "pick_order": [1, 2, 3, 4, 7, 8, 9, 10, 13, 14, 15, 12, 11, 5, 6],
+            "captain": 7,
+            "vice": 13,
+            "active_chip": null,
+            "transfer_cost": 0
+          }
+        ]
+      },
+      "expected": {
+        "refused": false,
+        "net": 12.0,
+        "gross": 12.0,
+        "scoring_basis": "official_autosub_captain_v2"
+      }
+    },
+    {
+      "name": "goalkeeper-swap",
+      "input": {
+        "contract_version": "week_live_v1",
+        "season": "2026-27",
+        "gameweek": 6,
+        "source_time": "2026-10-12T22:00:00Z",
+        "fixtures": [
+          {
+            "id": 61,
+            "home_club": 1,
+            "away_club": 2,
+            "finished": true
+          }
+        ],
+        "elements": [
+          {
+            "element_id": 1,
+            "points": 0,
+            "minutes": 0,
+            "card_shown": false,
+            "position": "GK",
+            "club": 1
+          },
+          {
+            "element_id": 2,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 3,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 4,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 5,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 6,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 7,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 1
+          },
+          {
+            "element_id": 8,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 1
+          },
+          {
+            "element_id": 9,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 10,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 11,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 12,
+            "points": 5,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "GK",
+            "club": 2
+          },
+          {
+            "element_id": 13,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          },
+          {
+            "element_id": 14,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          },
+          {
+            "element_id": 15,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          }
+        ],
+        "members": [
+          {
+            "entry_id": 101,
+            "gameweek": 6,
+            "pick_order": [1, 2, 3, 4, 7, 8, 9, 10, 13, 14, 15, 12, 11, 5, 6],
+            "captain": 7,
+            "vice": 13,
+            "active_chip": null,
+            "transfer_cost": 0
+          }
+        ]
+      },
+      "expected": {
+        "refused": false,
+        "net": 16.0,
+        "gross": 16.0,
+        "scoring_basis": "official_autosub_captain_v2"
+      }
+    },
+    {
+      "name": "zero-minute-goalkeeper-card",
+      "input": {
+        "contract_version": "week_live_v1",
+        "season": "2026-27",
+        "gameweek": 6,
+        "source_time": "2026-10-12T22:00:00Z",
+        "fixtures": [
+          {
+            "id": 61,
+            "home_club": 1,
+            "away_club": 2,
+            "finished": true
+          }
+        ],
+        "elements": [
+          {
+            "element_id": 1,
+            "points": -1,
+            "minutes": 0,
+            "card_shown": true,
+            "position": "GK",
+            "club": 1
+          },
+          {
+            "element_id": 2,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 3,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 4,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 5,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 6,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 7,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 1
+          },
+          {
+            "element_id": 8,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 1
+          },
+          {
+            "element_id": 9,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 10,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 11,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 12,
+            "points": 5,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "GK",
+            "club": 2
+          },
+          {
+            "element_id": 13,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          },
+          {
+            "element_id": 14,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          },
+          {
+            "element_id": 15,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          }
+        ],
+        "members": [
+          {
+            "entry_id": 101,
+            "gameweek": 6,
+            "pick_order": [1, 2, 3, 4, 7, 8, 9, 10, 13, 14, 15, 12, 11, 5, 6],
+            "captain": 7,
+            "vice": 13,
+            "active_chip": null,
+            "transfer_cost": 0
+          }
+        ]
+      },
+      "expected": {
+        "refused": false,
+        "net": 10.0,
+        "gross": 10.0,
+        "scoring_basis": "official_autosub_captain_v2"
+      }
+    },
+    {
+      "name": "zero-minute-reserve-goalkeeper-card",
+      "input": {
+        "contract_version": "week_live_v1",
+        "season": "2026-27",
+        "gameweek": 6,
+        "source_time": "2026-10-12T22:00:00Z",
+        "fixtures": [
+          {
+            "id": 61,
+            "home_club": 1,
+            "away_club": 2,
+            "finished": true
+          }
+        ],
+        "elements": [
+          {
+            "element_id": 1,
+            "points": 0,
+            "minutes": 0,
+            "card_shown": false,
+            "position": "GK",
+            "club": 1
+          },
+          {
+            "element_id": 2,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 3,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 4,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 5,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 6,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 7,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 1
+          },
+          {
+            "element_id": 8,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 1
+          },
+          {
+            "element_id": 9,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 10,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 11,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 12,
+            "points": -1,
+            "minutes": 0,
+            "card_shown": true,
+            "position": "GK",
+            "club": 2
+          },
+          {
+            "element_id": 13,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          },
+          {
+            "element_id": 14,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          },
+          {
+            "element_id": 15,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          }
+        ],
+        "members": [
+          {
+            "entry_id": 101,
+            "gameweek": 6,
+            "pick_order": [1, 2, 3, 4, 7, 8, 9, 10, 13, 14, 15, 12, 11, 5, 6],
+            "captain": 7,
+            "vice": 13,
+            "active_chip": null,
+            "transfer_cost": 0
+          }
+        ]
+      },
+      "expected": {
+        "refused": false,
+        "net": 10.0,
+        "gross": 10.0,
+        "scoring_basis": "official_autosub_captain_v2"
+      }
+    },
+    {
+      "name": "outfield-bench-order",
+      "input": {
+        "contract_version": "week_live_v1",
+        "season": "2026-27",
+        "gameweek": 6,
+        "source_time": "2026-10-12T22:00:00Z",
+        "fixtures": [
+          {
+            "id": 61,
+            "home_club": 1,
+            "away_club": 2,
+            "finished": true
+          }
+        ],
+        "elements": [
+          {
+            "element_id": 1,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "GK",
+            "club": 1
+          },
+          {
+            "element_id": 2,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 3,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 4,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 5,
+            "points": 6,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 6,
+            "points": 9,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 7,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 1
+          },
+          {
+            "element_id": 8,
+            "points": 0,
+            "minutes": 0,
+            "card_shown": false,
+            "position": "MID",
+            "club": 1
+          },
+          {
+            "element_id": 9,
+            "points": 0,
+            "minutes": 0,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 10,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 11,
+            "points": 5,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 12,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "GK",
+            "club": 2
+          },
+          {
+            "element_id": 13,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          },
+          {
+            "element_id": 14,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          },
+          {
+            "element_id": 15,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          }
+        ],
+        "members": [
+          {
+            "entry_id": 101,
+            "gameweek": 6,
+            "pick_order": [1, 2, 3, 4, 7, 8, 9, 10, 13, 14, 15, 12, 11, 5, 6],
+            "captain": 7,
+            "vice": 13,
+            "active_chip": null,
+            "transfer_cost": 0
+          }
+        ]
+      },
+      "expected": {
+        "refused": false,
+        "net": 21.0,
+        "gross": 21.0,
+        "scoring_basis": "official_autosub_captain_v2"
+      }
+    },
+    {
+      "name": "formation-minimum-skips-reserve",
+      "input": {
+        "contract_version": "week_live_v1",
+        "season": "2026-27",
+        "gameweek": 6,
+        "source_time": "2026-10-12T22:00:00Z",
+        "fixtures": [
+          {
+            "id": 61,
+            "home_club": 1,
+            "away_club": 2,
+            "finished": true
+          }
+        ],
+        "elements": [
+          {
+            "element_id": 1,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "GK",
+            "club": 1
+          },
+          {
+            "element_id": 2,
+            "points": 0,
+            "minutes": 0,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 3,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 4,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 5,
+            "points": 4,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 6,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 7,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 1
+          },
+          {
+            "element_id": 8,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 1
+          },
+          {
+            "element_id": 9,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 10,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 11,
+            "points": 9,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 12,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "GK",
+            "club": 2
+          },
+          {
+            "element_id": 13,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          },
+          {
+            "element_id": 14,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          },
+          {
+            "element_id": 15,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          }
+        ],
+        "members": [
+          {
+            "entry_id": 101,
+            "gameweek": 6,
+            "pick_order": [1, 2, 3, 4, 7, 8, 9, 10, 13, 14, 15, 12, 11, 5, 6],
+            "captain": 7,
+            "vice": 13,
+            "active_chip": null,
+            "transfer_cost": 0
+          }
+        ]
+      },
+      "expected": {
+        "refused": false,
+        "net": 15.0,
+        "gross": 15.0,
+        "scoring_basis": "official_autosub_captain_v2"
+      }
+    },
+    {
+      "name": "absent-reserve-skipped",
+      "input": {
+        "contract_version": "week_live_v1",
+        "season": "2026-27",
+        "gameweek": 6,
+        "source_time": "2026-10-12T22:00:00Z",
+        "fixtures": [
+          {
+            "id": 61,
+            "home_club": 1,
+            "away_club": 2,
+            "finished": true
+          }
+        ],
+        "elements": [
+          {
+            "element_id": 1,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "GK",
+            "club": 1
+          },
+          {
+            "element_id": 2,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 3,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 4,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 5,
+            "points": 6,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 6,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 7,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 1
+          },
+          {
+            "element_id": 8,
+            "points": 0,
+            "minutes": 0,
+            "card_shown": false,
+            "position": "MID",
+            "club": 1
+          },
+          {
+            "element_id": 9,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 10,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 11,
+            "points": 0,
+            "minutes": 0,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 12,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "GK",
+            "club": 2
+          },
+          {
+            "element_id": 13,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          },
+          {
+            "element_id": 14,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          },
+          {
+            "element_id": 15,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          }
+        ],
+        "members": [
+          {
+            "entry_id": 101,
+            "gameweek": 6,
+            "pick_order": [1, 2, 3, 4, 7, 8, 9, 10, 13, 14, 15, 12, 11, 5, 6],
+            "captain": 7,
+            "vice": 13,
+            "active_chip": null,
+            "transfer_cost": 0
+          }
+        ]
+      },
+      "expected": {
+        "refused": false,
+        "net": 17.0,
+        "gross": 17.0,
+        "scoring_basis": "official_autosub_captain_v2"
+      }
+    },
+    {
+      "name": "zero-minute-reserve-card",
+      "input": {
+        "contract_version": "week_live_v1",
+        "season": "2026-27",
+        "gameweek": 6,
+        "source_time": "2026-10-12T22:00:00Z",
+        "fixtures": [
+          {
+            "id": 61,
+            "home_club": 1,
+            "away_club": 2,
+            "finished": true
+          }
+        ],
+        "elements": [
+          {
+            "element_id": 1,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "GK",
+            "club": 1
+          },
+          {
+            "element_id": 2,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 3,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 4,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 5,
+            "points": 6,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 6,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 7,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 1
+          },
+          {
+            "element_id": 8,
+            "points": 0,
+            "minutes": 0,
+            "card_shown": false,
+            "position": "MID",
+            "club": 1
+          },
+          {
+            "element_id": 9,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 10,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 11,
+            "points": -1,
+            "minutes": 0,
+            "card_shown": true,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 12,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "GK",
+            "club": 2
+          },
+          {
+            "element_id": 13,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          },
+          {
+            "element_id": 14,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          },
+          {
+            "element_id": 15,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          }
+        ],
+        "members": [
+          {
+            "entry_id": 101,
+            "gameweek": 6,
+            "pick_order": [1, 2, 3, 4, 7, 8, 9, 10, 13, 14, 15, 12, 11, 5, 6],
+            "captain": 7,
+            "vice": 13,
+            "active_chip": null,
+            "transfer_cost": 0
+          }
+        ]
+      },
+      "expected": {
+        "refused": false,
+        "net": 10.0,
+        "gross": 10.0,
+        "scoring_basis": "official_autosub_captain_v2"
+      }
+    },
+    {
+      "name": "zero-minute-card-participation",
+      "input": {
+        "contract_version": "week_live_v1",
+        "season": "2026-27",
+        "gameweek": 6,
+        "source_time": "2026-10-12T22:00:00Z",
+        "fixtures": [
+          {
+            "id": 61,
+            "home_club": 1,
+            "away_club": 2,
+            "finished": true
+          }
+        ],
+        "elements": [
+          {
+            "element_id": 1,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "GK",
+            "club": 1
+          },
+          {
+            "element_id": 2,
+            "points": -3,
+            "minutes": 0,
+            "card_shown": true,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 3,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 4,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 5,
+            "points": 5,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 6,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 7,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 1
+          },
+          {
+            "element_id": 8,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 1
+          },
+          {
+            "element_id": 9,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 10,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 11,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 12,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "GK",
+            "club": 2
+          },
+          {
+            "element_id": 13,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          },
+          {
+            "element_id": 14,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          },
+          {
+            "element_id": 15,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          }
+        ],
+        "members": [
+          {
+            "entry_id": 101,
+            "gameweek": 6,
+            "pick_order": [1, 2, 3, 4, 7, 8, 9, 10, 13, 14, 15, 12, 11, 5, 6],
+            "captain": 7,
+            "vice": 13,
+            "active_chip": null,
+            "transfer_cost": 0
+          }
+        ]
+      },
+      "expected": {
+        "refused": false,
+        "net": 8.0,
+        "gross": 8.0,
+        "scoring_basis": "official_autosub_captain_v2"
+      }
+    },
+    {
+      "name": "absent-captain-vice-fallback",
+      "input": {
+        "contract_version": "week_live_v1",
+        "season": "2026-27",
+        "gameweek": 6,
+        "source_time": "2026-10-12T22:00:00Z",
+        "fixtures": [
+          {
+            "id": 61,
+            "home_club": 1,
+            "away_club": 2,
+            "finished": true
+          }
+        ],
+        "elements": [
+          {
+            "element_id": 1,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "GK",
+            "club": 1
+          },
+          {
+            "element_id": 2,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 3,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 4,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 5,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 6,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 7,
+            "points": 0,
+            "minutes": 0,
+            "card_shown": false,
+            "position": "MID",
+            "club": 1
+          },
+          {
+            "element_id": 8,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 1
+          },
+          {
+            "element_id": 9,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 10,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 11,
+            "points": 3,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 12,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "GK",
+            "club": 2
+          },
+          {
+            "element_id": 13,
+            "points": 5,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          },
+          {
+            "element_id": 14,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          },
+          {
+            "element_id": 15,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          }
+        ],
+        "members": [
+          {
+            "entry_id": 101,
+            "gameweek": 6,
+            "pick_order": [1, 2, 3, 4, 7, 8, 9, 10, 13, 14, 15, 12, 11, 5, 6],
+            "captain": 7,
+            "vice": 13,
+            "active_chip": null,
+            "transfer_cost": 0
+          }
+        ]
+      },
+      "expected": {
+        "refused": false,
+        "net": 22.0,
+        "gross": 22.0,
+        "scoring_basis": "official_autosub_captain_v2"
+      }
+    },
+    {
+      "name": "captain-and-vice-absent",
+      "input": {
+        "contract_version": "week_live_v1",
+        "season": "2026-27",
+        "gameweek": 6,
+        "source_time": "2026-10-12T22:00:00Z",
+        "fixtures": [
+          {
+            "id": 61,
+            "home_club": 1,
+            "away_club": 2,
+            "finished": true
+          }
+        ],
+        "elements": [
+          {
+            "element_id": 1,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "GK",
+            "club": 1
+          },
+          {
+            "element_id": 2,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 3,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 4,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 5,
+            "points": 4,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 6,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 7,
+            "points": 0,
+            "minutes": 0,
+            "card_shown": false,
+            "position": "MID",
+            "club": 1
+          },
+          {
+            "element_id": 8,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 1
+          },
+          {
+            "element_id": 9,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 10,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 11,
+            "points": 3,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 12,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "GK",
+            "club": 2
+          },
+          {
+            "element_id": 13,
+            "points": 0,
+            "minutes": 0,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          },
+          {
+            "element_id": 14,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          },
+          {
+            "element_id": 15,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          }
+        ],
+        "members": [
+          {
+            "entry_id": 101,
+            "gameweek": 6,
+            "pick_order": [1, 2, 3, 4, 7, 8, 9, 10, 13, 14, 15, 12, 11, 5, 6],
+            "captain": 7,
+            "vice": 13,
+            "active_chip": null,
+            "transfer_cost": 0
+          }
+        ]
+      },
+      "expected": {
+        "refused": false,
+        "net": 16.0,
+        "gross": 16.0,
+        "scoring_basis": "official_autosub_captain_v2"
+      }
+    },
+    {
+      "name": "triple-captain-absent",
+      "input": {
+        "contract_version": "week_live_v1",
+        "season": "2026-27",
+        "gameweek": 6,
+        "source_time": "2026-10-12T22:00:00Z",
+        "fixtures": [
+          {
+            "id": 61,
+            "home_club": 1,
+            "away_club": 2,
+            "finished": true
+          }
+        ],
+        "elements": [
+          {
+            "element_id": 1,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "GK",
+            "club": 1
+          },
+          {
+            "element_id": 2,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 3,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 4,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 5,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 6,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 7,
+            "points": 0,
+            "minutes": 0,
+            "card_shown": false,
+            "position": "MID",
+            "club": 1
+          },
+          {
+            "element_id": 8,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 1
+          },
+          {
+            "element_id": 9,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 10,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 11,
+            "points": 3,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 12,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "GK",
+            "club": 2
+          },
+          {
+            "element_id": 13,
+            "points": 5,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          },
+          {
+            "element_id": 14,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          },
+          {
+            "element_id": 15,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          }
+        ],
+        "members": [
+          {
+            "entry_id": 101,
+            "gameweek": 6,
+            "pick_order": [1, 2, 3, 4, 7, 8, 9, 10, 13, 14, 15, 12, 11, 5, 6],
+            "captain": 7,
+            "vice": 13,
+            "active_chip": "3xc",
+            "transfer_cost": 0
+          }
+        ]
+      },
+      "expected": {
+        "refused": false,
+        "net": 27.0,
+        "gross": 27.0,
+        "scoring_basis": "official_autosub_captain_v2"
+      }
+    },
+    {
+      "name": "bench-boost",
+      "input": {
+        "contract_version": "week_live_v1",
+        "season": "2026-27",
+        "gameweek": 6,
+        "source_time": "2026-10-12T22:00:00Z",
+        "fixtures": [
+          {
+            "id": 61,
+            "home_club": 1,
+            "away_club": 2,
+            "finished": true
+          }
+        ],
+        "elements": [
+          {
+            "element_id": 1,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "GK",
+            "club": 1
+          },
+          {
+            "element_id": 2,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 3,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 4,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 5,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 6,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 7,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 1
+          },
+          {
+            "element_id": 8,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 1
+          },
+          {
+            "element_id": 9,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 10,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 11,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 12,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "GK",
+            "club": 2
+          },
+          {
+            "element_id": 13,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          },
+          {
+            "element_id": 14,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          },
+          {
+            "element_id": 15,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          }
+        ],
+        "members": [
+          {
+            "entry_id": 101,
+            "gameweek": 6,
+            "pick_order": [1, 2, 3, 4, 7, 8, 9, 10, 13, 14, 15, 12, 11, 5, 6],
+            "captain": 7,
+            "vice": 13,
+            "active_chip": "bboost",
+            "transfer_cost": 0
+          }
+        ]
+      },
+      "expected": {
+        "refused": false,
+        "net": 16.0,
+        "gross": 16.0,
+        "scoring_basis": "official_autosub_captain_v2"
+      }
+    },
+    {
+      "name": "bench-boost-absent-starter",
+      "input": {
+        "contract_version": "week_live_v1",
+        "season": "2026-27",
+        "gameweek": 6,
+        "source_time": "2026-10-12T22:00:00Z",
+        "fixtures": [
+          {
+            "id": 61,
+            "home_club": 1,
+            "away_club": 2,
+            "finished": true
+          }
+        ],
+        "elements": [
+          {
+            "element_id": 1,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "GK",
+            "club": 1
+          },
+          {
+            "element_id": 2,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 3,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 4,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 5,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 6,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 7,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 1
+          },
+          {
+            "element_id": 8,
+            "points": 0,
+            "minutes": 0,
+            "card_shown": false,
+            "position": "MID",
+            "club": 1
+          },
+          {
+            "element_id": 9,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 10,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 11,
+            "points": 5,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 12,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "GK",
+            "club": 2
+          },
+          {
+            "element_id": 13,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          },
+          {
+            "element_id": 14,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          },
+          {
+            "element_id": 15,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          }
+        ],
+        "members": [
+          {
+            "entry_id": 101,
+            "gameweek": 6,
+            "pick_order": [1, 2, 3, 4, 7, 8, 9, 10, 13, 14, 15, 12, 11, 5, 6],
+            "captain": 7,
+            "vice": 13,
+            "active_chip": "bboost",
+            "transfer_cost": 0
+          }
+        ]
+      },
+      "expected": {
+        "refused": false,
+        "net": 19.0,
+        "gross": 19.0,
+        "scoring_basis": "official_autosub_captain_v2"
+      }
+    },
+    {
+      "name": "bench-boost-absent-captain",
+      "input": {
+        "contract_version": "week_live_v1",
+        "season": "2026-27",
+        "gameweek": 6,
+        "source_time": "2026-10-12T22:00:00Z",
+        "fixtures": [
+          {
+            "id": 61,
+            "home_club": 1,
+            "away_club": 2,
+            "finished": true
+          }
+        ],
+        "elements": [
+          {
+            "element_id": 1,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "GK",
+            "club": 1
+          },
+          {
+            "element_id": 2,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 3,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 4,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 5,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 6,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 7,
+            "points": 0,
+            "minutes": 0,
+            "card_shown": false,
+            "position": "MID",
+            "club": 1
+          },
+          {
+            "element_id": 8,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 1
+          },
+          {
+            "element_id": 9,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 10,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 11,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 12,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "GK",
+            "club": 2
+          },
+          {
+            "element_id": 13,
+            "points": 5,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          },
+          {
+            "element_id": 14,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          },
+          {
+            "element_id": 15,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          }
+        ],
+        "members": [
+          {
+            "entry_id": 101,
+            "gameweek": 6,
+            "pick_order": [1, 2, 3, 4, 7, 8, 9, 10, 13, 14, 15, 12, 11, 5, 6],
+            "captain": 7,
+            "vice": 13,
+            "active_chip": "bboost",
+            "transfer_cost": 0
+          }
+        ]
+      },
+      "expected": {
+        "refused": false,
+        "net": 23.0,
+        "gross": 23.0,
+        "scoring_basis": "official_autosub_captain_v2"
+      }
+    },
+    {
+      "name": "zero-minute-vice-card",
+      "input": {
+        "contract_version": "week_live_v1",
+        "season": "2026-27",
+        "gameweek": 6,
+        "source_time": "2026-10-12T22:00:00Z",
+        "fixtures": [
+          {
+            "id": 61,
+            "home_club": 1,
+            "away_club": 2,
+            "finished": true
+          }
+        ],
+        "elements": [
+          {
+            "element_id": 1,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "GK",
+            "club": 1
+          },
+          {
+            "element_id": 2,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 3,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 4,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 5,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 6,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 7,
+            "points": 0,
+            "minutes": 0,
+            "card_shown": false,
+            "position": "MID",
+            "club": 1
+          },
+          {
+            "element_id": 8,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 1
+          },
+          {
+            "element_id": 9,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 10,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 11,
+            "points": 3,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 12,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "GK",
+            "club": 2
+          },
+          {
+            "element_id": 13,
+            "points": -1,
+            "minutes": 0,
+            "card_shown": true,
+            "position": "FWD",
+            "club": 2
+          },
+          {
+            "element_id": 14,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          },
+          {
+            "element_id": 15,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          }
+        ],
+        "members": [
+          {
+            "entry_id": 101,
+            "gameweek": 6,
+            "pick_order": [1, 2, 3, 4, 7, 8, 9, 10, 13, 14, 15, 12, 11, 5, 6],
+            "captain": 7,
+            "vice": 13,
+            "active_chip": null,
+            "transfer_cost": 0
+          }
+        ]
+      },
+      "expected": {
+        "refused": false,
+        "net": 11.0,
+        "gross": 11.0,
+        "scoring_basis": "official_autosub_captain_v2"
+      }
+    },
+    {
+      "name": "free-hit",
+      "input": {
+        "contract_version": "week_live_v1",
+        "season": "2026-27",
+        "gameweek": 6,
+        "source_time": "2026-10-12T22:00:00Z",
+        "fixtures": [
+          {
+            "id": 61,
+            "home_club": 1,
+            "away_club": 2,
+            "finished": true
+          }
+        ],
+        "elements": [
+          {
+            "element_id": 1,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "GK",
+            "club": 1
+          },
+          {
+            "element_id": 2,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 3,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 4,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 5,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 6,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 7,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 1
+          },
+          {
+            "element_id": 8,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 1
+          },
+          {
+            "element_id": 9,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 10,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 11,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 12,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "GK",
+            "club": 2
+          },
+          {
+            "element_id": 13,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          },
+          {
+            "element_id": 14,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          },
+          {
+            "element_id": 15,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          }
+        ],
+        "members": [
+          {
+            "entry_id": 101,
+            "gameweek": 6,
+            "pick_order": [1, 2, 3, 4, 7, 8, 9, 10, 13, 14, 15, 12, 11, 5, 6],
+            "captain": 7,
+            "vice": 13,
+            "active_chip": "freehit",
+            "transfer_cost": 0
+          }
+        ]
+      },
+      "expected": {
+        "refused": false,
+        "net": 12.0,
+        "gross": 12.0,
+        "scoring_basis": "official_autosub_captain_v2"
+      }
+    },
+    {
+      "name": "wildcard",
+      "input": {
+        "contract_version": "week_live_v1",
+        "season": "2026-27",
+        "gameweek": 6,
+        "source_time": "2026-10-12T22:00:00Z",
+        "fixtures": [
+          {
+            "id": 61,
+            "home_club": 1,
+            "away_club": 2,
+            "finished": true
+          }
+        ],
+        "elements": [
+          {
+            "element_id": 1,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "GK",
+            "club": 1
+          },
+          {
+            "element_id": 2,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 3,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 4,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 5,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 6,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 7,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 1
+          },
+          {
+            "element_id": 8,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 1
+          },
+          {
+            "element_id": 9,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 10,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 11,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 12,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "GK",
+            "club": 2
+          },
+          {
+            "element_id": 13,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          },
+          {
+            "element_id": 14,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          },
+          {
+            "element_id": 15,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          }
+        ],
+        "members": [
+          {
+            "entry_id": 101,
+            "gameweek": 6,
+            "pick_order": [1, 2, 3, 4, 7, 8, 9, 10, 13, 14, 15, 12, 11, 5, 6],
+            "captain": 7,
+            "vice": 13,
+            "active_chip": "wildcard",
+            "transfer_cost": 0
+          }
+        ]
+      },
+      "expected": {
+        "refused": false,
+        "net": 12.0,
+        "gross": 12.0,
+        "scoring_basis": "official_autosub_captain_v2"
+      }
+    },
+    {
+      "name": "transfer-hit",
+      "input": {
+        "contract_version": "week_live_v1",
+        "season": "2026-27",
+        "gameweek": 6,
+        "source_time": "2026-10-12T22:00:00Z",
+        "fixtures": [
+          {
+            "id": 61,
+            "home_club": 1,
+            "away_club": 2,
+            "finished": true
+          }
+        ],
+        "elements": [
+          {
+            "element_id": 1,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "GK",
+            "club": 1
+          },
+          {
+            "element_id": 2,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 3,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 4,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 5,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 6,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 7,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 1
+          },
+          {
+            "element_id": 8,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 1
+          },
+          {
+            "element_id": 9,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 10,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 11,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 12,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "GK",
+            "club": 2
+          },
+          {
+            "element_id": 13,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          },
+          {
+            "element_id": 14,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          },
+          {
+            "element_id": 15,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          }
+        ],
+        "members": [
+          {
+            "entry_id": 101,
+            "gameweek": 6,
+            "pick_order": [1, 2, 3, 4, 7, 8, 9, 10, 13, 14, 15, 12, 11, 5, 6],
+            "captain": 7,
+            "vice": 13,
+            "active_chip": null,
+            "transfer_cost": 4
+          }
+        ]
+      },
+      "expected": {
+        "refused": false,
+        "net": 8.0,
+        "gross": 12.0,
+        "scoring_basis": "official_autosub_captain_v2"
+      }
+    },
+    {
+      "name": "double-gameweek",
+      "input": {
+        "contract_version": "week_live_v1",
+        "season": "2026-27",
+        "gameweek": 6,
+        "source_time": "2026-10-12T22:00:00Z",
+        "fixtures": [
+          {
+            "id": 61,
+            "home_club": 1,
+            "away_club": 2,
+            "finished": true
+          },
+          {
+            "id": 62,
+            "home_club": 1,
+            "away_club": 3,
+            "finished": true
+          }
+        ],
+        "elements": [
+          {
+            "element_id": 1,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "GK",
+            "club": 1
+          },
+          {
+            "element_id": 2,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 3,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 4,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 5,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 6,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 7,
+            "points": 10,
+            "minutes": 180,
+            "card_shown": false,
+            "position": "MID",
+            "club": 1
+          },
+          {
+            "element_id": 8,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 1
+          },
+          {
+            "element_id": 9,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 10,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 11,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 12,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "GK",
+            "club": 2
+          },
+          {
+            "element_id": 13,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          },
+          {
+            "element_id": 14,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          },
+          {
+            "element_id": 15,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          }
+        ],
+        "members": [
+          {
+            "entry_id": 101,
+            "gameweek": 6,
+            "pick_order": [1, 2, 3, 4, 7, 8, 9, 10, 13, 14, 15, 12, 11, 5, 6],
+            "captain": 7,
+            "vice": 13,
+            "active_chip": null,
+            "transfer_cost": 0
+          }
+        ]
+      },
+      "expected": {
+        "refused": false,
+        "net": 30.0,
+        "gross": 30.0,
+        "scoring_basis": "official_autosub_captain_v2"
+      }
+    },
+    {
+      "name": "club-with-no-fixture",
+      "input": {
+        "contract_version": "week_live_v1",
+        "season": "2026-27",
+        "gameweek": 6,
+        "source_time": "2026-10-12T22:00:00Z",
+        "fixtures": [
+          {
+            "id": 63,
+            "home_club": 2,
+            "away_club": 3,
+            "finished": true
+          }
+        ],
+        "elements": [
+          {
+            "element_id": 1,
+            "points": 0,
+            "minutes": 0,
+            "card_shown": false,
+            "position": "GK",
+            "club": 1
+          },
+          {
+            "element_id": 2,
+            "points": 0,
+            "minutes": 0,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 3,
+            "points": 0,
+            "minutes": 0,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 4,
+            "points": 0,
+            "minutes": 0,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 5,
+            "points": 0,
+            "minutes": 0,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 6,
+            "points": 0,
+            "minutes": 0,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 7,
+            "points": 0,
+            "minutes": 0,
+            "card_shown": false,
+            "position": "MID",
+            "club": 1
+          },
+          {
+            "element_id": 8,
+            "points": 0,
+            "minutes": 0,
+            "card_shown": false,
+            "position": "MID",
+            "club": 1
+          },
+          {
+            "element_id": 9,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 10,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 11,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 12,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "GK",
+            "club": 2
+          },
+          {
+            "element_id": 13,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          },
+          {
+            "element_id": 14,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          },
+          {
+            "element_id": 15,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          }
+        ],
+        "members": [
+          {
+            "entry_id": 101,
+            "gameweek": 6,
+            "pick_order": [1, 2, 3, 4, 7, 8, 9, 10, 13, 14, 15, 12, 11, 5, 6],
+            "captain": 7,
+            "vice": 13,
+            "active_chip": null,
+            "transfer_cost": 0
+          }
+        ]
+      },
+      "expected": {
+        "refused": false,
+        "net": 8.0,
+        "gross": 8.0,
+        "scoring_basis": "official_autosub_captain_v2"
+      }
+    },
+    {
+      "name": "unknown-chip",
+      "input": {
+        "contract_version": "week_live_v1",
+        "season": "2026-27",
+        "gameweek": 6,
+        "source_time": "2026-10-12T22:00:00Z",
+        "fixtures": [
+          {
+            "id": 61,
+            "home_club": 1,
+            "away_club": 2,
+            "finished": true
+          }
+        ],
+        "elements": [
+          {
+            "element_id": 1,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "GK",
+            "club": 1
+          },
+          {
+            "element_id": 2,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 3,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 4,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 5,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 6,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 7,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 1
+          },
+          {
+            "element_id": 8,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 1
+          },
+          {
+            "element_id": 9,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 10,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 11,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 12,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "GK",
+            "club": 2
+          },
+          {
+            "element_id": 13,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          },
+          {
+            "element_id": 14,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          },
+          {
+            "element_id": 15,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          }
+        ],
+        "members": [
+          {
+            "entry_id": 101,
+            "gameweek": 6,
+            "pick_order": [1, 2, 3, 4, 7, 8, 9, 10, 13, 14, 15, 12, 11, 5, 6],
+            "captain": 7,
+            "vice": 13,
+            "active_chip": "unknown",
+            "transfer_cost": 0
+          }
+        ]
+      },
+      "expected": {
+        "refused": true,
+        "reason": "unsupported_chip"
+      }
+    },
+    {
+      "name": "negative-captain-points",
+      "input": {
+        "contract_version": "week_live_v1",
+        "season": "2026-27",
+        "gameweek": 6,
+        "source_time": "2026-10-12T22:00:00Z",
+        "fixtures": [
+          {
+            "id": 61,
+            "home_club": 1,
+            "away_club": 2,
+            "finished": true
+          }
+        ],
+        "elements": [
+          {
+            "element_id": 1,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "GK",
+            "club": 1
+          },
+          {
+            "element_id": 2,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 3,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 4,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 5,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 6,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 7,
+            "points": -2,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 1
+          },
+          {
+            "element_id": 8,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 1
+          },
+          {
+            "element_id": 9,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 10,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 11,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 12,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "GK",
+            "club": 2
+          },
+          {
+            "element_id": 13,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          },
+          {
+            "element_id": 14,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          },
+          {
+            "element_id": 15,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          }
+        ],
+        "members": [
+          {
+            "entry_id": 101,
+            "gameweek": 6,
+            "pick_order": [1, 2, 3, 4, 7, 8, 9, 10, 13, 14, 15, 12, 11, 5, 6],
+            "captain": 7,
+            "vice": 13,
+            "active_chip": null,
+            "transfer_cost": 0
+          }
+        ]
+      },
+      "expected": {
+        "refused": false,
+        "net": 6.0,
+        "gross": 6.0,
+        "scoring_basis": "official_autosub_captain_v2"
+      }
+    },
+    {
+      "name": "zero-minute-captain-card",
+      "input": {
+        "contract_version": "week_live_v1",
+        "season": "2026-27",
+        "gameweek": 6,
+        "source_time": "2026-10-12T22:00:00Z",
+        "fixtures": [
+          {
+            "id": 61,
+            "home_club": 1,
+            "away_club": 2,
+            "finished": true
+          }
+        ],
+        "elements": [
+          {
+            "element_id": 1,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "GK",
+            "club": 1
+          },
+          {
+            "element_id": 2,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 3,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 4,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 5,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 6,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "DEF",
+            "club": 1
+          },
+          {
+            "element_id": 7,
+            "points": -3,
+            "minutes": 0,
+            "card_shown": true,
+            "position": "MID",
+            "club": 1
+          },
+          {
+            "element_id": 8,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 1
+          },
+          {
+            "element_id": 9,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 10,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 11,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "MID",
+            "club": 2
+          },
+          {
+            "element_id": 12,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "GK",
+            "club": 2
+          },
+          {
+            "element_id": 13,
+            "points": 5,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          },
+          {
+            "element_id": 14,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          },
+          {
+            "element_id": 15,
+            "points": 1,
+            "minutes": 90,
+            "card_shown": false,
+            "position": "FWD",
+            "club": 2
+          }
+        ],
+        "members": [
+          {
+            "entry_id": 101,
+            "gameweek": 6,
+            "pick_order": [1, 2, 3, 4, 7, 8, 9, 10, 13, 14, 15, 12, 11, 5, 6],
+            "captain": 7,
+            "vice": 13,
+            "active_chip": null,
+            "transfer_cost": 0
+          }
+        ]
+      },
+      "expected": {
+        "refused": false,
+        "net": 16.0,
+        "gross": 16.0,
+        "scoring_basis": "official_autosub_captain_v2"
+      }
+    }
+  ]
+}
