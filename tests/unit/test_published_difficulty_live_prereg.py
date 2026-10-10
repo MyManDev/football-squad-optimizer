@@ -4,8 +4,10 @@
 rule it states wrongly cannot be corrected later. These tests pin the frozen candidate to the
 study record it is copied from, check that every function the protocol names exists under that
 name, and pin the sentences where a draft named a settlement flag the fixtures do not carry,
-could take an audit capture the backend never served, and paired a handoff whose write time
-nothing checked.
+could take an audit capture the backend never served, paired a handoff whose write time nothing
+checked, left the interval's function, quantile rule and week order open, did not say whether
+the pooled or the per-version figures decide, and did not say which side of a fixture the
+signal reads.
 """
 
 from __future__ import annotations
