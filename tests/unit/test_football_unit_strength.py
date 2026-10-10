@@ -250,6 +250,15 @@ def test_actual_away_observations_identify_venue_interaction_without_changing_ba
     assert fitted.predict(replace(neutral, home=False)).own_goal_rate == 1.4
 
 
+def test_training_attribute_definitions_must_agree_across_observations():
+    training = list(observations())
+    later = training[1].catalog
+    redefined = replace(later.attributes[0], definition="Another synthetic bounded skill")
+    training[1] = replace(training[1], catalog=replace(later, attributes=(redefined,)))
+    with pytest.raises(ValueError, match="Training attribute definitions"):
+        FootballUnitStrengthModel(tuple(training), cutoff=T + timedelta(days=50))
+
+
 def test_offset_fitting_uses_baseline_weighted_exposure(monkeypatch: pytest.MonkeyPatch):
     from squadopt.prediction import football_unit_strength as module
 

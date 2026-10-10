@@ -25,8 +25,10 @@ from squadopt.features.football_fm_attributes import read_fm_attributes
 from squadopt.features.football_unit_catalog import read_unit_observations, read_unit_projection
 from squadopt.features.football_unit_inputs import (
     UNIT_INPUT_VERSION,
+    ClubUnit,
     NumericAttributeSpec,
     ProjectedUnitState,
+    UnitPlayer,
 )
 from squadopt.live.minute_evidence import _score_components
 from squadopt.prediction.football import FOOTBALL_MODEL_VERSION
@@ -341,6 +343,46 @@ def test_learned_unit_changes_keeper_choice_against_independent_role_oracle(expe
         assert actual == oracle
         outcomes.append(actual)
     assert outcomes == [101, 1]
+
+
+@pytest.mark.parametrize("damage", ["unknown_player", "changed_position"])
+def test_projected_state_players_must_exist_in_the_retained_club_pool(experiment, damage):
+    _, p, result = experiment
+    state = result.state_rates[0]
+    players = tuple(
+        (UnitPlayer(50, x.position) if damage == "unknown_player" else UnitPlayer(9, "FWD"))
+        if x.player_id == 9
+        else x
+        for x in state.own.players
+    )
+    changed = replace(state, own=ClubUnit(state.own.club, players))
+    bad = replace(result, state_rates=(changed, *result.state_rates[1:]))
+    with pytest.raises(ValueError, match="retained club pool"):
+        unit_fixture_components(baseline(p), [bad], season=p.season)
+
+
+def test_weekly_points_sum_fixture_points_clipped_separately(experiment):
+    model, p, result = experiment
+    second = replace(
+        p,
+        fixture_id=80,
+        catalog=replace(p.catalog, fixture_id=80),
+        kickoff=p.kickoff + timedelta(days=3),
+    )
+    first = baseline(p)
+    first.loc[first.player_code.eq(2), "residual_if_appearance"] = -10.0
+    native = pd.concat([_score_components(first), baseline(second)], ignore_index=True)
+    components = unit_fixture_components(native, [result, model.predict(second)], season=p.season)
+    raw = components.loc[components.player_code.eq(2)].set_index("fixture").raw_expected_points
+    assert raw[8] < 0 < raw[80]
+    weekly = unit_weekly_forecast(
+        roster(),
+        components,
+        calendar(components),
+        gameweek=8,
+        eligibility=dict.fromkeys(roster().player_id, 1.0),
+    )
+    assert weekly.loc[weekly.player_id.eq(2), "expected_points"].item() == pytest.approx(raw[80])
 
 
 def test_dgw_postdeadline_second_projection_refuses(experiment):
