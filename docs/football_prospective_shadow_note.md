@@ -61,8 +61,11 @@ none of the four keys. It is read under the earlier rule: `newest_for_gameweek` 
 true when the decision capture is the last entry of `gameweek_captures` ordered by
 capture instant and then capture id. Its four other GW6 captures are all earlier,
 so its `newest_for_gameweek: true` is the same under both rules. Readers must
-accept both shapes. The command's `read_shadow_receipt` accepts a v1 receipt with
-none or all of the four keys, refuses any other key set, and returns
+accept both shapes.
+
+The decision leaves the reader's handling of other shapes open. As the most
+conservative reading, the command's `read_shadow_receipt` accepts a v1 receipt with
+none or all of the four keys, refuses any other key set or contract, and returns
 `newest_for_gameweek` as recorded, never recomputed.
 
 Before the deadline, post the capture id, fingerprint and artifact sha256 on #999.
