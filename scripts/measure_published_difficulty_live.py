@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 import subprocess
 from collections.abc import Mapping
@@ -62,6 +63,8 @@ DECLARATION = "docs/research/published_difficulty_live_prereg.md"
 DECLARATION_SHA256 = "2ef26f6033483f686b98487696e09d7dfbb62ff253fc1a3a730bf2e053fa10bd"
 CAPTURE_NAME = re.compile(r"fpl-live-(?:2026(?:0[89]|1[012])|20270[1-5])\d{2}T\d{6}Z-[0-9a-f]{12}")
 HASH = re.compile(r"[0-9a-f]{64}")
+#: The roots the backend serves from; the protocol reads these two and names both.
+SERVED_ROOTS = ("SQUADOPT_BACKEND_SNAPSHOT_ROOT", "SQUADOPT_BACKEND_HANDOFF_ROOT")
 
 
 def safe_path(path: Path) -> Path:
@@ -70,6 +73,14 @@ def safe_path(path: Path) -> Path:
     if any(spelling == p or spelling.startswith(p + "/") for p in ("c:/sqr", "c:/sqrweb")):
         raise DifficultyInputError("Rehearsal folders are forbidden inputs and outputs.")
     return resolved
+
+
+def served_roots(environ: Mapping[str, str]) -> tuple[Path, Path]:
+    """The snapshot and handoff roots the backend served from, never chosen at verdict time."""
+    values = [environ.get(name, "").strip() for name in SERVED_ROOTS]
+    if not all(values):
+        raise DifficultyInputError("Both served roots must be set as the backend reads them.")
+    return Path(values[0]), Path(values[1])
 
 
 def command(*args: str) -> str:
@@ -236,59 +247,107 @@ def eligible_weeks(snapshot: CapturedSnapshot, merged_at: str) -> tuple[int, ...
     )
 
 
-def decision_capture(captures: Mapping[str, CapturedSnapshot], week: int) -> CapturedSnapshot:
-    matches = []
-    for snapshot in captures.values():
+def week_captures(
+    captures: Mapping[str, CapturedSnapshot], week: int, handoff_root: Path
+) -> tuple[list[CapturedSnapshot], list[CapturedSnapshot]]:
+    """Split the captures whose own target is ``week`` into served and unserved.
+
+    A capture is served when ``handoff_fingerprint_for`` finds its baseline handoff in
+    the served handoff root. One without it was never served: it is passed over and
+    listed, so an audit or rehearsal capture cannot displace the served one.
+    """
+    root = safe_path(handoff_root)
+    served: list[CapturedSnapshot] = []
+    unserved: list[CapturedSnapshot] = []
+    for snapshot in sorted(
+        captures.values(),
+        key=lambda s: (as_instant(s.metadata.captured_at_utc), s.metadata.snapshot_id),
+    ):
         deadlines = gameweek_deadlines(snapshot.payloads[BOOTSTRAP_PAYLOAD])
         try:
             target = next_open_deadline(deadlines, as_of_utc=snapshot.metadata.captured_at_utc)
         except DataError:
             continue
-        if target.gameweek == week:
-            matches.append(snapshot)
-    if not matches:
-        raise DifficultyMissingInputs("No targeting pre-deadline decision capture is retained.")
-    instant = max(as_instant(s.metadata.captured_at_utc) for s in matches)
-    latest = [s for s in matches if as_instant(s.metadata.captured_at_utc) == instant]
+        if target.gameweek != week:
+            continue
+        if handoff_fingerprint_for(root, SEASON, week, snapshot.metadata.snapshot_id) is None:
+            unserved.append(snapshot)
+        else:
+            served.append(snapshot)
+    return served, unserved
+
+
+def decision_capture(served: list[CapturedSnapshot]) -> CapturedSnapshot:
+    """The latest served capture; two at the same latest instant make the week missing."""
+    if not served:
+        raise DifficultyMissingInputs("No served pre-deadline capture targets the week.")
+    instant = max(as_instant(s.metadata.captured_at_utc) for s in served)
+    latest = [s for s in served if as_instant(s.metadata.captured_at_utc) == instant]
     if len(latest) != 1:
         raise DifficultyMissingInputs("The latest decision capture instant is ambiguous.")
     return latest[0]
 
 
+def _matching_handoff(
+    path: Path, snapshot_id: str, week: int
+) -> tuple[InSeasonProjection, Path, bytes] | None:
+    try:
+        content = safe_path(path).read_bytes()
+        decode(content)
+        handoff = read_projection_handoff(path)
+    except (DataError, OSError, ValueError):
+        return None
+    if (handoff.source_snapshot_id, handoff.season, handoff.gameweek) != (
+        snapshot_id,
+        SEASON,
+        week,
+    ):
+        return None
+    return handoff, path, content
+
+
 def paired_handoff(
     root: Path, snapshot: CapturedSnapshot, week: int
 ) -> tuple[InSeasonProjection, dict[str, Any]]:
+    """Read the served handoff file itself and prove it was written before the deadline.
+
+    The paired file is the gameweek alias when it matches the capture, else the one
+    retained copy under ``by-capture/<capture>/`` that matches it. Its fingerprint must
+    be the one ``handoff_fingerprint_for`` returns, and its modification time must fall
+    before the deadline. A late file never falls back to another copy.
+    """
     root = safe_path(root)
+    snapshot_id = snapshot.metadata.snapshot_id
     inputs = read_inputs(snapshot, season=SEASON, gameweek=week)
-    alias = handoff_path_for(root, SEASON, week)
-    retained = root / "by-capture" / snapshot.metadata.snapshot_id
-    matched: dict[str, tuple[InSeasonProjection, Path, str]] = {}
-    for path in (alias, *sorted(retained.glob("*.json"))):
-        try:
-            content = safe_path(path).read_bytes()
-            decode(content)
-            handoff = read_projection_handoff(path)
-            if (handoff.source_snapshot_id, handoff.season, handoff.gameweek) != (
-                snapshot.metadata.snapshot_id,
-                SEASON,
-                week,
-            ):
-                continue
-            if path.stat().st_mtime >= as_instant(inputs.deadline.deadline_utc).timestamp():
-                continue
-            matched[handoff.fingerprint] = (handoff, path, hashlib.sha256(content).hexdigest())
-        except (DataError, OSError, ValueError):
-            continue
-    fingerprint = handoff_fingerprint_for(root, SEASON, week, snapshot.metadata.snapshot_id)
-    if len(matched) != 1 or fingerprint not in matched:
-        raise DifficultyMissingInputs("The capture cannot pair with exactly one stored handoff.")
-    handoff, path, file_hash = matched[fingerprint]
+    fingerprint = handoff_fingerprint_for(root, SEASON, week, snapshot_id)
+    if fingerprint is None:
+        raise DifficultyMissingInputs("The capture has no served baseline handoff.")
+    alias = _matching_handoff(handoff_path_for(root, SEASON, week), snapshot_id, week)
+    if alias is not None:
+        candidates = [alias]
+    else:
+        retained = (
+            _matching_handoff(path, snapshot_id, week)
+            for path in sorted((root / "by-capture" / snapshot_id).glob("*.json"))
+        )
+        candidates = [match for match in retained if match is not None]
+    if len(candidates) != 1:
+        raise DifficultyMissingInputs("The paired handoff file is absent or ambiguous.")
+    handoff, path, content = candidates[0]
+    if handoff.fingerprint != fingerprint:
+        raise DifficultyMissingInputs("The paired handoff file is not the one the backend serves.")
+    modified = path.stat().st_mtime
+    if modified >= as_instant(inputs.deadline.deadline_utc).timestamp():
+        raise DifficultyMissingInputs(
+            "The paired handoff file was written at or after its deadline."
+        )
     return handoff, {
         "handoff_fingerprint": fingerprint,
         "handoff_version": handoff.model_version,
-        "handoff_sha256": file_hash,
+        "handoff_sha256": hashlib.sha256(content).hexdigest(),
         "handoff_file": str(path),
-        "handoff_file_time": path.stat().st_mtime,
+        "handoff_file_is_alias": alias is not None,
+        "handoff_modified_utc": datetime.fromtimestamp(modified, tz=UTC).isoformat(),
     }
 
 
@@ -421,22 +480,27 @@ def reading(
     audit: list[dict[str, Any]] = []
     for week in weeks:
         proof: dict[str, Any] = {}
+        unserved: list[str] = []
         try:
-            decision = decision_capture(captures, week)
+            served, passed_over = week_captures(captures, week, handoff_root)
+            unserved = [s.metadata.snapshot_id for s in passed_over]
+            decision = decision_capture(served)
             handoff, proof = paired_handoff(handoff_root, decision, week)
             projected = project(
                 read_inputs(decision, season=SEASON, gameweek=week), in_season=handoff
             ).table
             elements(decision)
             captured_club_ratings(decision, week)
-            prepared[week] = (decision, handoff, proof, projected)
+            prepared[week] = (decision, handoff, proof, projected, unserved)
         except (DifficultyMissingInputs, DataError, OSError, KeyError, TypeError) as error:
             audit.append(
                 {
                     "gameweek": week,
                     "status": "missing",
                     "reason": type(error).__name__,
+                    "detail": str(error) if isinstance(error, DifficultyInputError) else None,
                     "identity": proof,
+                    "unserved_captures": unserved,
                     "solver_decisions": None,
                 }
             )
@@ -456,7 +520,7 @@ def reading(
     measured: list[DifficultyWeek] = []
     evidence = []
     try:
-        for week, (decision, handoff, proof, projected) in prepared.items():
+        for week, (decision, handoff, proof, projected, unserved) in prepared.items():
             try:
                 settled = partial_snapshot(
                     safe_path(snapshot_root) / selected.metadata.snapshot_id,
@@ -484,6 +548,7 @@ def reading(
                         "gameweek": week,
                         "status": "scored",
                         "identity": proof,
+                        "unserved_captures": unserved,
                         "decision_capture": decision.metadata.snapshot_id,
                         "decision_fingerprint": decision.metadata.fingerprint,
                         "decision_input_hashes": dict(decision.metadata.checksums),
@@ -506,7 +571,9 @@ def reading(
                         "gameweek": week,
                         "status": "missing",
                         "reason": type(error).__name__,
+                        "detail": str(error) if isinstance(error, DifficultyInputError) else None,
                         "identity": proof,
+                        "unserved_captures": unserved,
                         "solver_decisions": error.decisions
                         if isinstance(error, DifficultySolveFailure)
                         else None,
@@ -517,6 +584,10 @@ def reading(
             "season": SEASON,
             "declaration": dict(declaration),
             "as_of": as_of,
+            "served_roots": {
+                SERVED_ROOTS[0]: str(snapshot_root),
+                SERVED_ROOTS[1]: str(handoff_root),
+            },
             "reading_capture": selected.metadata.snapshot_id,
             "reading_fingerprint": selected.metadata.fingerprint,
             "reading_input_hashes": dict(selected.metadata.checksums),
@@ -542,8 +613,6 @@ def reading(
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--season", default=SEASON)
-    parser.add_argument("--snapshot-root", type=Path, required=True)
-    parser.add_argument("--handoff-root", type=Path, required=True)
     parser.add_argument("--as-of", required=True)
     parser.add_argument("--output-directory", type=Path, required=True)
     parser.add_argument("--owner-approved", action="store_true")
@@ -554,12 +623,13 @@ def main() -> int:
         declaration = frozen_declaration()
         if not args.owner_approved or not args.weekly_run_idle:
             raise DifficultyInputError("Owner approval and an idle weekly-run window are required.")
+        snapshot_root, handoff_root = served_roots(os.environ)
         as_of = normalize_utc_timestamp(args.as_of, label="reading instant")
-        captures = inventory(args.snapshot_root, season=args.season, as_of=as_of)
+        captures = inventory(snapshot_root, season=args.season, as_of=as_of)
         report = reading(
             captures,
-            snapshot_root=args.snapshot_root,
-            handoff_root=args.handoff_root,
+            snapshot_root=snapshot_root,
+            handoff_root=handoff_root,
             declaration=declaration,
             as_of=as_of,
             output_directory=args.output_directory,

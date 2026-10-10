@@ -22,6 +22,7 @@ from squadopt.experiments import opponent_projection
 from squadopt.experiments import published_difficulty_live as study
 from squadopt.experiments.opponent_projection import _squad
 from squadopt.live.recommendation import InSeasonProjection, write_projection_handoff
+from squadopt.live.tick import handoff_path_for
 
 START = datetime(2026, 8, 25, 18, tzinfo=UTC)
 
@@ -113,6 +114,8 @@ def handoff(
     target: int = 7,
     filename: str = "base.json",
     delta: float = 0,
+    alias: bool = False,
+    written: datetime | None = None,
 ) -> InSeasonProjection:
     base = InSeasonProjection(
         study.SEASON,
@@ -123,9 +126,17 @@ def handoff(
         "phase_c_component_form_window_v1",
         {1000 + i: float(i % 6 + 1) + delta for i in range(1, 19)},
     )
-    path = root / "by-capture" / snapshot.metadata.snapshot_id / filename
+    path = (
+        handoff_path_for(root, study.SEASON, target)
+        if alias
+        else root / "by-capture" / snapshot.metadata.snapshot_id / filename
+    )
     write_projection_handoff(path, base)
-    instant = datetime.fromisoformat(snapshot.metadata.captured_at_utc).timestamp()
+    instant = (
+        written.timestamp()
+        if written is not None
+        else datetime.fromisoformat(snapshot.metadata.captured_at_utc).timestamp()
+    )
     os.utime(path, (instant, instant))
     return base
 
@@ -428,6 +439,8 @@ def test_locked_season_is_refused_before_inventory_loader(
     with pytest.raises(study.DifficultyInputError, match="2025-26"):
         runner.inventory(tmp_path, season="2025-26", as_of="2027-01-20T00:00:00Z")
     monkeypatch.setattr(runner, "frozen_declaration", forbidden)
+    for name in runner.SERVED_ROOTS:
+        monkeypatch.setenv(name, str(tmp_path))
     monkeypatch.setattr(
         sys,
         "argv",
@@ -435,10 +448,6 @@ def test_locked_season_is_refused_before_inventory_loader(
             "runner",
             "--season",
             "2025-26",
-            "--snapshot-root",
-            str(tmp_path),
-            "--handoff-root",
-            str(tmp_path),
             "--as-of",
             "2027-01-20T00:00:00Z",
             "--output-directory",
@@ -446,6 +455,39 @@ def test_locked_season_is_refused_before_inventory_loader(
         ],
     )
     assert runner.main() == 1
+
+
+def test_the_roots_are_the_ones_the_backend_serves_from(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    assert runner.SERVED_ROOTS == (
+        "SQUADOPT_BACKEND_SNAPSHOT_ROOT",
+        "SQUADOPT_BACKEND_HANDOFF_ROOT",
+    )
+    with pytest.raises(study.DifficultyInputError, match="served roots"):
+        runner.served_roots({"SQUADOPT_BACKEND_SNAPSHOT_ROOT": str(tmp_path)})
+    monkeypatch.setattr(runner, "frozen_declaration", lambda: {"merged_at": "2026-10-01T00:00:00Z"})
+    opened: list[Path] = []
+
+    def inventory(root: Path, **kwargs: Any) -> Any:
+        opened.append(root)
+        raise study.DifficultyInputError("stop after the root is chosen")
+
+    monkeypatch.setattr(runner, "inventory", inventory)
+    argv = ["runner", "--as-of", "2027-01-20T00:00:00Z", "--output-directory", str(tmp_path)]
+    monkeypatch.setattr(sys, "argv", [*argv, "--owner-approved", "--weekly-run-idle"])
+    for name in runner.SERVED_ROOTS:
+        monkeypatch.delenv(name, raising=False)
+    assert runner.main() == 1
+    assert opened == []
+    monkeypatch.setenv("SQUADOPT_BACKEND_SNAPSHOT_ROOT", str(tmp_path / "served-captures"))
+    monkeypatch.setenv("SQUADOPT_BACKEND_HANDOFF_ROOT", str(tmp_path / "served-handoffs"))
+    assert runner.main() == 1
+    assert opened == [tmp_path / "served-captures"]
+    # No command-line root can stand in for the served one.
+    monkeypatch.setattr(sys, "argv", [*argv, "--snapshot-root", str(tmp_path)])
+    with pytest.raises(SystemExit):
+        runner.main()
 
 
 def test_unmerged_declaration_refuses_before_any_input(
@@ -458,19 +500,77 @@ def test_unmerged_declaration_refuses_before_any_input(
         runner.frozen_declaration()
 
 
-def test_pairing_refuses_multiple_fingerprints_and_missing_latest(tmp_path: Path) -> None:
+def test_pairing_refuses_retained_copies_that_disagree_and_passes_over_unserved(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "handoffs"
     snapshot = captured(tmp_path / "captures")
-    base = handoff(tmp_path / "handoffs", snapshot)
-    paired, _ = runner.paired_handoff(tmp_path / "handoffs", snapshot, 7)
+    base = handoff(root, snapshot)
+    paired, proof = runner.paired_handoff(root, snapshot, 7)
     assert paired.fingerprint == base.fingerprint
-    handoff(tmp_path / "handoffs", snapshot, filename="other.json", delta=1)
-    with pytest.raises(study.DifficultyMissingInputs, match="exactly one"):
-        runner.paired_handoff(tmp_path / "handoffs", snapshot, 7)
-    later = captured(tmp_path / "captures", offset=1)
-    selected = runner.decision_capture({s.metadata.snapshot_id: s for s in (snapshot, later)}, 7)
-    assert selected.metadata.snapshot_id == later.metadata.snapshot_id
-    with pytest.raises(study.DifficultyMissingInputs):
-        runner.paired_handoff(tmp_path / "handoffs", selected, 7)
+    assert proof["handoff_file_is_alias"] is False
+    handoff(root, snapshot, filename="other.json", delta=1)
+    # With no alias, two retained fingerprints leave the backend nothing to serve.
+    with pytest.raises(study.DifficultyMissingInputs, match="no served baseline handoff"):
+        runner.paired_handoff(root, snapshot, 7)
+    served, unserved = runner.week_captures({snapshot.metadata.snapshot_id: snapshot}, 7, root)
+    assert (served, [s.metadata.snapshot_id for s in unserved]) == (
+        [],
+        [snapshot.metadata.snapshot_id],
+    )
+    with pytest.raises(study.DifficultyMissingInputs, match="No served"):
+        runner.decision_capture(served)
+
+
+def test_an_unserved_later_capture_does_not_displace_the_served_one(tmp_path: Path) -> None:
+    root = tmp_path / "handoffs"
+    served_capture = captured(tmp_path / "captures")
+    handoff(root, served_capture)
+    audit = captured(tmp_path / "captures", offset=1)
+    captures = {s.metadata.snapshot_id: s for s in (served_capture, audit)}
+    served, unserved = runner.week_captures(captures, 7, root)
+    assert [s.metadata.snapshot_id for s in unserved] == [audit.metadata.snapshot_id]
+    selected = runner.decision_capture(served)
+    assert selected.metadata.snapshot_id == served_capture.metadata.snapshot_id
+
+
+def test_pairing_reads_the_alias_when_it_matches_the_capture(tmp_path: Path) -> None:
+    root = tmp_path / "handoffs"
+    snapshot = captured(tmp_path / "captures")
+    # A rebuild for the same capture leaves the old and new builds retained beside the alias.
+    handoff(root, snapshot, filename="first-build.json")
+    handoff(root, snapshot, filename="second-build.json", delta=1)
+    alias = handoff(root, snapshot, alias=True, delta=1)
+    paired, proof = runner.paired_handoff(root, snapshot, 7)
+    assert paired.fingerprint == alias.fingerprint
+    assert proof["handoff_file_is_alias"] is True
+    path = runner.handoff_path_for(root, study.SEASON, 7)
+    assert proof["handoff_file"] == str(path.resolve())
+    assert proof["handoff_sha256"] == runner.hashlib.sha256(path.read_bytes()).hexdigest()
+    assert proof["handoff_modified_utc"] == snapshot.metadata.captured_at_utc.replace("Z", "+00:00")
+
+
+def test_a_late_alias_never_falls_back_to_a_retained_copy(tmp_path: Path) -> None:
+    root = tmp_path / "handoffs"
+    snapshot = captured(tmp_path / "captures")
+    handoff(root, snapshot)
+    # A corrected handoff republished for the same capture after the deadline.
+    handoff(root, snapshot, alias=True, delta=1, written=START + timedelta(weeks=6, hours=1))
+    with pytest.raises(study.DifficultyMissingInputs, match="deadline"):
+        runner.paired_handoff(root, snapshot, 7)
+
+
+def test_two_retained_files_of_one_fingerprint_are_ambiguous(tmp_path: Path) -> None:
+    root = tmp_path / "handoffs"
+    snapshot = captured(tmp_path / "captures")
+    handoff(root, snapshot, filename="one.json")
+    handoff(root, snapshot, filename="two.json")
+    assert (
+        runner.handoff_fingerprint_for(root, study.SEASON, 7, snapshot.metadata.snapshot_id)
+        is not None
+    )
+    with pytest.raises(study.DifficultyMissingInputs, match="ambiguous"):
+        runner.paired_handoff(root, snapshot, 7)
 
 
 def test_early_reading_refuses_before_any_outcome_bytes(
@@ -567,6 +667,16 @@ def test_once_only_claim_survives_across_output_directories(
     )
     report = runner.reading(snapshots, output_directory=tmp_path / "artifacts/one", **kwargs)
     assert report["reading_capture"] == outcome.metadata.snapshot_id
+    assert report["served_roots"] == {
+        "SQUADOPT_BACKEND_SNAPSHOT_ROOT": str(root),
+        "SQUADOPT_BACKEND_HANDOFF_ROOT": str(tmp_path / "handoffs"),
+    }
+    seven = next(w for w in report["week_identities"] if w["gameweek"] == 7)
+    assert seven["status"] == "scored"
+    assert seven["unserved_captures"] == []
+    assert seven["identity"]["handoff_modified_utc"] < "2026-10-06T18:00:00"
+    assert seven["reading"]["candidate_decision"]["decided_at_units"] == 60.0
+    assert report["constants"]["free_squad_solver"]["deterministic_units"] == [60.0, 240.0]
     assert report["valid_weeks"] == 1
     assert report["verdict"] == "insufficient_evidence"
     assert (tmp_path / "artifacts/one/gw07-players.csv").is_file()
@@ -670,8 +780,11 @@ def test_handoff_written_at_deadline_is_refused(tmp_path):
     path = next((root / "by-capture" / snapshot.metadata.snapshot_id).glob("*.json"))
     instant = (START + timedelta(weeks=6)).timestamp()
     os.utime(path, (instant, instant))
-    with pytest.raises(study.DifficultyMissingInputs, match="exactly one"):
+    with pytest.raises(study.DifficultyMissingInputs, match="at or after its deadline"):
         runner.paired_handoff(root, snapshot, 7)
+    os.utime(path, (instant - 1, instant - 1))
+    _, proof = runner.paired_handoff(root, snapshot, 7)
+    assert proof["handoff_modified_utc"] == "2026-10-06T17:59:59+00:00"
 
 
 def test_admitted_name_with_locked_bootstrap_refuses_before_event_read(tmp_path, monkeypatch):
@@ -704,8 +817,13 @@ def test_equal_latest_instants_make_week_missing(tmp_path):
 
     two = captured(tmp_path, change=change)
     assert one.metadata.snapshot_id != two.metadata.snapshot_id
+    for snapshot in (one, two):
+        handoff(tmp_path / "handoffs", snapshot)
+    captures = {s.metadata.snapshot_id: s for s in (one, two)}
+    served, unserved = runner.week_captures(captures, 7, tmp_path / "handoffs")
+    assert (len(served), unserved) == (2, [])
     with pytest.raises(study.DifficultyMissingInputs, match="ambiguous"):
-        runner.decision_capture({s.metadata.snapshot_id: s for s in (one, two)}, 7)
+        runner.decision_capture(served)
 
 
 def reading_setup(tmp_path, monkeypatch, *, outcome_change=None):
