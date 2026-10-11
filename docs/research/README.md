@@ -4,6 +4,7 @@
 | --- | --- |
 | Prediction research programme | [Research agenda](../prediction_research_agenda.md) |
 | Fixture football candidate and observed planning | [Implementation and evidence contract](football_candidate_development.md) |
+| Private set-piece duties candidate | [Source, learned allocation, synthetic checks and real-use gates](football_set_piece_duties.md) |
 | Football candidate development measurements | [Results and rejected ablations](football_candidate_results.md) |
 | Private projected club units and replacement quality | [Model and integration boundaries](football_projected_unit_strength.md) |
 | Football Manager source and training feasibility | [Sources, schemas and admission gates](football_fm_source_feasibility.md) |
