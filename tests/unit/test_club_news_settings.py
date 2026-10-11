@@ -127,6 +127,17 @@ def test_invalid_toml_never_echoes_the_secret_line(tmp_path: Path) -> None:
     assert str(path) not in str(error.value)
 
 
+@pytest.mark.parametrize("field", ["unknown", "max_completion_tokens"])
+def test_settings_refusal_names_field_without_its_secret_looking_value(
+    tmp_path: Path, field: str
+) -> None:
+    path = settings(tmp_path, f'provider="openai"\n{field}="{SECRET}"\n')
+    with pytest.raises(ClubNewsError) as error:
+        resolve_provider_config({}, settings_file=path)
+    assert field in str(error.value)
+    assert SECRET not in str(error.value)
+
+
 @pytest.mark.parametrize(
     "source",
     [

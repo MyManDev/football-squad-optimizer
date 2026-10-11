@@ -1,8 +1,8 @@
 {
   "contract_version": "fixtures_v1",
-  "generated_at_utc": "2026-10-02T17:19:10.792735Z",
+  "generated_at_utc": "2026-10-10T06:07:22Z",
   "payload": {
-    "captured_at_utc": "2026-10-02T10:43:14.825881Z",
+    "captured_at_utc": "2026-10-10T03:57:32.746463Z",
     "current_gameweek": 6,
     "gameweeks": [
       {
@@ -6695,7 +6695,7 @@
       }
     ],
     "season": "2026-27",
-    "source_snapshot_id": "fpl-live-20261002T104314Z-8b70515b9b31",
+    "source_snapshot_id": "fpl-live-20261010T035732Z-c77d032165af",
     "unscheduled_count": 0
   }
 }

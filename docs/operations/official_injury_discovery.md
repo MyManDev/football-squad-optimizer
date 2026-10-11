@@ -115,6 +115,13 @@ cannot replace a previous ready marker. The reader checks all digests and produc
 source contracts again. This command performs no acquisition, fitting, site build,
 or runtime activation. Activation must separately select this validated bundle.
 
+The first validated attempt also creates `football/<decision>.bundle.preparation.json`
+after immutable destination checks, before copies. It binds the capture's relative
+file inventory and the exact retained handoff, forecast and companion bytes. It is
+provenance for retries, never readiness. Reuse the original retained handoff after
+an interruption; a changed producer input needs a new capture. Moving identical
+inputs or changing only Windows path casing preserves their content identity.
+
 The seal writes internal `football/<decision>.bundle.production.json` after destination
 preflight, copying and final validation, immediately before the ready marker. It
 records the sha256 of the sealed handoff's bytes and its own training provenance separately

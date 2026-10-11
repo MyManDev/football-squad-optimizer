@@ -33,6 +33,7 @@ const predictionModel: Predicate = (value) =>
       "football_contextual_v3",
       "football_joint_role_minutes_v1",
       "football_joint_role_retained_history_v1",
+      "football_team_form_v1",
     ),
     experimental: oneOf(true),
     fingerprint: (digest) => typeof digest === "string" && /^[a-f0-9]{64}$/.test(digest),
