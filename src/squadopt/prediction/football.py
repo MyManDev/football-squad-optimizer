@@ -62,6 +62,7 @@ class FixtureFootballModel:
     """Fit on precomputed causal features; predict each fixture from one information state."""
 
     model_version = FOOTBALL_MODEL_VERSION
+    minute_features: tuple[str, ...] = FEATURES
     team_features: tuple[str, ...] = TEAM_FEATURES
 
     def __init__(self, train: pd.DataFrame, history: pd.DataFrame, *, cutoff: pd.Timestamp):
@@ -82,7 +83,7 @@ class FixtureFootballModel:
         self.train_rows = len(train)
         x = _matrix(train, FEATURES)
         self.minutes = _pipeline(LogisticRegression(C=1, max_iter=1000, random_state=0))
-        _fit(self.minutes, x, train.m_bin)
+        _fit(self.minutes, _matrix(train, self.minute_features), train.m_bin)
         self.minute_means: Array = (
             train.groupby("m_bin")
             .minutes.mean()
@@ -153,7 +154,9 @@ class FixtureFootballModel:
             raise ValueError("Duplicate player-fixture target.")
         x = _matrix(target, FEATURES)
         probabilities = np.zeros((len(target), 4), dtype=float)
-        probabilities[:, self.minutes[-1].classes_.astype(int)] = self.minutes.predict_proba(x)
+        probabilities[:, self.minutes[-1].classes_.astype(int)] = self.minutes.predict_proba(
+            _matrix(target, self.minute_features)
+        )
         if role_steps:
             for pos, transition in self.transitions.items():
                 mask = target.position.eq(pos).to_numpy()
@@ -167,9 +170,11 @@ class FixtureFootballModel:
         other = target.loc[:, list(self.team_features)].copy()
         for column in self.team_features:
             if column.startswith("own_"):
-                opposing = "opp_" + column[4:]
-                other[column] = target[opposing].to_numpy()
-                other[opposing] = target[column].to_numpy()
+                opposite = "opp_" + column.removeprefix("own_")
+                if opposite not in self.team_features:
+                    raise ValueError("Team feature requires its opposing-side counterpart.")
+                other[column] = target[opposite].to_numpy()
+                other[opposite] = target[column].to_numpy()
         other["home"] = 1 - target.home.to_numpy()
         opponent = np.asarray(self.team.predict(_matrix(other, self.team_features)), dtype=float)
         output: dict[str, Any] = {

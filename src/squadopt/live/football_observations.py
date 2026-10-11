@@ -15,6 +15,7 @@ import pandas as pd
 from squadopt.planning.models import InitialSquadState, PlanningHorizon
 from squadopt.planning.recourse import ObservationNode
 from squadopt.prediction.football import FOOTBALL_MODEL_VERSION, JOINT_ROLE_MODEL_VERSIONS
+from squadopt.prediction.football_match_context import MATCH_CONTEXT_MODEL_VERSION
 from squadopt.prediction.football_team_form import TEAM_FORM_MODEL_VERSION
 
 AVAILABILITY_OBSERVATION_VERSION = "captured_next_deadline_resolution_v1"
@@ -74,6 +75,7 @@ def availability_observations(
     # the two nodes start next week and never replace the decided week's forecast.
     if model_version not in (
         FOOTBALL_MODEL_VERSION,
+        MATCH_CONTEXT_MODEL_VERSION,
         *JOINT_ROLE_MODEL_VERSIONS,
         TEAM_FORM_MODEL_VERSION,
     ):

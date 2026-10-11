@@ -36,6 +36,12 @@ def main() -> None:
         help="Build the separate football_team_form_v1 candidate from explicit training seasons.",
     )
     parser.add_argument(
+        "--match-context",
+        action="store_true",
+        help="Build football_match_context_v1 with PL workload and venue defense; "
+        "requires an explicit permitted training-season allowlist.",
+    )
+    parser.add_argument(
         "--role-minutes",
         action="store_true",
         help="Fit joint starting/substitute minutes using the explicit training-season allowlist.",
@@ -62,6 +68,21 @@ def main() -> None:
         parser.error(
             f"--team-form cannot read the locked {LOCKED_OUTCOME_SEASON} outcome population"
         )
+    if args.match_context and (
+        not args.training_seasons
+        or args.contextual
+        or args.role_minutes
+        or args.retained_role_history
+        or args.rotation_evidence
+        or args.club_news_source
+        or args.team_form
+    ):
+        parser.error(
+            "--match-context requires --training-season "
+            "and excludes other candidates/manager inputs"
+        )
+    if args.match_context and "2025-26" in args.training_seasons:
+        parser.error("--match-context cannot read the locked 2025-26 outcome population")
     if args.role_minutes and (args.contextual or not args.training_seasons):
         parser.error("--role-minutes requires --training-season and excludes --contextual")
     if args.retained_role_history and not (args.role_minutes and args.with_components):
@@ -74,7 +95,7 @@ def main() -> None:
         parser.error("--with-components does not accept contextual manager inputs")
     snapshot = read_snapshot(args.snapshot_root, args.snapshot_id)
     variant_options: dict[str, Any] = {}
-    for name in ("role_minutes", "retained_role_history", "team_form"):
+    for name in ("role_minutes", "retained_role_history", "team_form", "match_context"):
         if getattr(args, name):
             variant_options[name] = True
     words = (

@@ -28,6 +28,11 @@ from squadopt.prediction.football import (
     JOINT_ROLE_RETAINED_HISTORY_MODEL_VERSION,
 )
 from squadopt.prediction.football_components import role_component_record
+from squadopt.prediction.football_match_context import (
+    MATCH_CONTEXT_FEATURE_VERSION,
+    MATCH_CONTEXT_MODEL_VERSION,
+    match_context_metadata,
+)
 from squadopt.prediction.football_minutes_role import (
     RETAINED_HISTORY_ROLE_FEATURE_VERSION,
     ROLE_COMPONENT_COLUMNS,
@@ -407,7 +412,12 @@ class FixtureComponentBasis:
             served.get("contract_version") != ARTIFACT_CONTRACT
             or companion.get("contract_version") != FIXTURE_COMPONENTS_CONTRACT
             or served.get("model_version")
-            not in (FOOTBALL_MODEL_VERSION, *JOINT_ROLE_MODEL_VERSIONS, TEAM_FORM_MODEL_VERSION)
+            not in (
+                FOOTBALL_MODEL_VERSION,
+                MATCH_CONTEXT_MODEL_VERSION,
+                *JOINT_ROLE_MODEL_VERSIONS,
+                TEAM_FORM_MODEL_VERSION,
+            )
             or companion.get("model_version") != served.get("model_version")
         ):
             raise ValueError("Only the PR912 v1 fixture component contract is supported.")
@@ -417,6 +427,15 @@ class FixtureComponentBasis:
             for document in (served, companion)
         ):
             raise ValueError("Team form components require matching feature identity and metadata.")
+        if served["model_version"] == MATCH_CONTEXT_MODEL_VERSION and any(
+            document.get("feature_contract_version") != MATCH_CONTEXT_FEATURE_VERSION
+            or json.dumps(document.get("match_context_metadata"), sort_keys=True)
+            != json.dumps(match_context_metadata(), sort_keys=True)
+            for document in (served, companion)
+        ):
+            raise ValueError(
+                "Match-context components require their exact feature and head metadata."
+            )
         role_metadata = served.get("role_metadata")
         if served["model_version"] == JOINT_ROLE_RETAINED_HISTORY_MODEL_VERSION and (
             not isinstance(role_metadata, dict)
