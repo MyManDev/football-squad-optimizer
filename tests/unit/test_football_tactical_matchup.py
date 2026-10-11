@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 from dataclasses import FrozenInstanceError, replace
 from datetime import UTC, datetime, timedelta
+from types import MappingProxyType
 from typing import Any
 
 import numpy as np
@@ -29,6 +30,7 @@ from squadopt.features.football_tactical_inputs import (
     TacticalStyleFixture,
     observation_digest,
     projection_digest,
+    recipient_feature_names,
     recipient_features,
     team_features,
     validate_tactical_projection,
@@ -539,6 +541,35 @@ def test_fitted_recipients_move_native_shares_and_preserve_club_mass(
             p.goals + p.assists <= result_side.team_goal_rate + 1e-12 for p in result_side.players
         )
         assert _players(result_side)[result_side.club * 100 + 1].goals == 0
+
+
+def test_learned_concentration_beyond_one_physical_event_refuses_at_predict(
+    fitted: TacticalMatchupModel,
+) -> None:
+    state = fitted._fitted
+    assert state is not None
+    gammas = {}
+    for head in ("goals", "assists"):
+        names = recipient_feature_names(head)
+        gamma = np.zeros(len(names), dtype=float)
+        gamma[names.index("role_attacker")] = 40.0
+        gammas[head] = gamma
+    concentrated = TacticalMatchupModel()
+    concentrated._fitted = replace(
+        state,
+        metadata=replace(
+            state.metadata,
+            goal_gamma=tuple(float(v) for v in gammas["goals"]),
+            assist_gamma=tuple(float(v) for v in gammas["assists"]),
+        ),
+        gammas=MappingProxyType(gammas),
+    )
+    projection = _projection(season=TARGET_SEASON)
+    control = concentrated.predict(projection, control=True)
+    assert all(p.goals + p.assists <= control.home.team_goal_rate for p in control.home.players)
+    # The attacker now takes nearly all of .8 goals plus .8 * .5 assists per event.
+    with pytest.raises(ValueError, match="goal plus assist marginal exceeds physical event"):
+        concentrated.predict(projection)
 
 
 def test_training_only_scalers_use_prior_not_outcome_posterior() -> None:

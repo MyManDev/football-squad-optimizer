@@ -553,6 +553,10 @@ def test_zero_native_intensities_preserve_zero_attacking_channels(
     assert candidate.components.goals.eq(0).all()
     assert candidate.components.assists.eq(0).all()
     assert candidate.components.clean_sheet_probability.eq(candidate.components.p60).all()
+    for head in ("goals", "assists"):
+        pd.testing.assert_series_equal(
+            candidate.components[head + "_share"], w.native[head + "_share"]
+        )
     if not zero_fit:
         pd.testing.assert_frame_equal(candidate.components, calls[0])
 
@@ -649,6 +653,73 @@ def test_complete_source_coverage_named_channels_and_calendar_refuse(
         return
     with pytest.raises(ValueError):
         compose(w, model)
+
+
+def test_calendar_row_with_another_decision_clock_refuses(model: TacticalMatchupModel) -> None:
+    w = world()
+    calendar = w.calendar.copy(deep=True)
+    calendar.loc[0, "decision_at"] = "2026-10-09T00:01:00Z"
+    with pytest.raises(ValueError, match="Native calendar disagrees with the common captured"):
+        compose(replace(w, calendar=calendar), model)
+
+
+@pytest.mark.parametrize(
+    "clocks",
+    [
+        {"captured_at": "2026-10-09T00:00:01Z"},
+        {"deadline_at": CUTOFF},
+        {"deadline_at": "2026-10-08T23:30:00Z"},
+    ],
+    ids=["capture-after-decision", "deadline-at-decision", "deadline-before-decision"],
+)
+def test_capture_decision_and_deadline_must_be_strictly_ordered(
+    model: TacticalMatchupModel, clocks: dict[str, str]
+) -> None:
+    with pytest.raises(ValueError, match="decision must be before the deadline"):
+        compose(world(), model, **clocks)
+
+
+@pytest.mark.parametrize(
+    "fit_change",
+    [
+        {"cutoff": "2026-10-08T12:00:00Z"},
+        {"target_season": "2027-28"},
+        {"target_gameweek": GAMEWEEK - 1},
+    ],
+    ids=["earlier-cutoff", "other-season", "earlier-gameweek"],
+)
+def test_compose_refuses_a_model_fitted_for_another_decision_or_target(
+    fit_change: dict[str, Any],
+) -> None:
+    arguments: dict[str, Any] = dict(
+        cutoff=CUTOFF,
+        allowed_seasons=("2024-25",),
+        target_season=SEASON,
+        target_gameweek=GAMEWEEK,
+    )
+    arguments.update(fit_change)
+    other = TacticalMatchupModel(max_iter=600).fit(observations(), **arguments)
+    with pytest.raises(ValueError, match="exact native decision/target window"):
+        compose(world(), other)
+
+
+def test_learned_replacement_recomputes_recipient_shares_from_replaced_marginals(
+    model: TacticalMatchupModel,
+) -> None:
+    w = world()
+    candidate = compose(w, model)
+    native = w.native.set_index(["fixture", "player_code"])
+    moved = False
+    for _, side in candidate.components.groupby(["fixture", "club"]):
+        for head in ("goals", "assists"):
+            total = math.fsum(float(v) for v in side[head])
+            assert total > 0
+            shares = side[head + "_share"].to_numpy(dtype=float)
+            assert shares == pytest.approx((side[head] / total).to_numpy(dtype=float), rel=1e-12)
+            keys = list(zip(side.fixture, side.player_code, strict=True))
+            before = native.loc[keys, head + "_share"].to_numpy(dtype=float)
+            moved = moved or not np.allclose(shares, before, rtol=0, atol=1e-6)
+    assert moved
 
 
 @pytest.mark.parametrize(
