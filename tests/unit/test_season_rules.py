@@ -22,6 +22,7 @@ from squadopt.live import (
     render_rules,
     rules_to_dict,
 )
+from squadopt.live.rules import squad_budget_tenths, transfer_sell_on_fee
 
 SEASON = "2026-27"
 
@@ -118,6 +119,48 @@ def test_the_rules_are_read_exactly_as_published(tmp_path: Path) -> None:
     assert rules.transfers.transfers_cap == 20
     assert len(rules.chips) == 8
     assert rules.diagnostics["awards_defensive_contribution"] is True
+
+
+def test_the_fee_and_budget_a_rebuild_reads_are_the_ones_the_rules_carry(tmp_path: Path) -> None:
+    """The purchase-price rebuild reads the two fields without the whole rule set; a page
+    and the plan behind it must not read two different fees."""
+
+    rules = read_season_rules(_capture(tmp_path), season=SEASON)
+    assert transfer_sell_on_fee(_bootstrap()) == rules.transfers.sell_on_fee == 0.5
+    assert squad_budget_tenths(_bootstrap()) == rules.transfers.budget_tenths == 1000
+
+
+def test_the_fee_and_budget_are_read_from_the_rules_block_alone() -> None:
+    elsewhere = _bootstrap(
+        game_config={"scoring": _scoring()},
+        game_settings={"transfers_sell_on_fee": 0.5, "squad_total_spend": 1000},
+    )
+    assert transfer_sell_on_fee(elsewhere) is None
+    assert squad_budget_tenths(elsewhere) is None
+
+
+@pytest.mark.parametrize(
+    "rules",
+    [
+        {"element_sell_at_purchase_price": True},
+        {"transfers_sell_on_fee": "0.5"},
+        {"transfers_sell_on_fee": 1.5},
+        {"transfers_sell_on_fee": True},
+        {"transfers_sell_on_fee": None},
+    ],
+)
+def test_a_fee_the_selling_rule_cannot_apply_is_no_fee(rules: dict[str, Any]) -> None:
+    """Selling at the purchase price is a rule neither the selling price nor the planner
+    models, so a capture that sets it has no fee a rebuilt budget could be priced under."""
+
+    bootstrap = _bootstrap(game_config={"rules": {**_rules(), **rules}, "scoring": _scoring()})
+    assert transfer_sell_on_fee(bootstrap) is None
+
+
+@pytest.mark.parametrize("budget", [0, -1, 999.5, "1000", None])
+def test_a_budget_that_is_not_a_positive_count_of_tenths_is_no_budget(budget: object) -> None:
+    rules = {**_rules(), "squad_total_spend": budget}
+    assert squad_budget_tenths(_bootstrap(game_config={"rules": rules})) is None
 
 
 def test_chip_windows_are_the_two_halves_of_the_season(tmp_path: Path) -> None:

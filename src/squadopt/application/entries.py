@@ -46,9 +46,9 @@ class EntryPicks:
     """A manager's team as the public FPL entry endpoints report it, at one gameweek.
 
     ``element`` ids are FPL element ids (the same ids the capture's bootstrap uses);
-    ``purchase_prices`` may be empty when the endpoint does not publish them, in which
-    case the held squad prices each player at his current price and
-    ``squad_sell_value_tenths`` states what the fifteen together are really worth.
+    ``purchase_prices`` may be empty when they could not be rebuilt from the transfers
+    list, in which case the held squad prices each player at his current price and
+    ``squad_sell_value_tenths`` caps what the fifteen together may raise.
     """
 
     entry_id: int
@@ -82,19 +82,21 @@ class EntryPicks:
     """Chip name -> the gameweeks it was played (what the planner's windows need)."""
     purchase_prices: Mapping[int, int] = field(default_factory=dict)
     purchase_prices_known: bool = False
-    """False when no *per-player* selling price can be derived. The public endpoints do
-    not publish purchase prices, so nothing says what any one of the fifteen would raise
-    on his own. What the fifteen raise together is a different question and
-    ``squad_sell_value_tenths`` answers it; a consumer that needs the split, to price one
-    named sale, still has to say it does not have it."""
+    """True when ``purchase_prices`` holds what was paid for each of the fifteen. The picks
+    document publishes no purchase price; a capture-built picks object rebuilds them from
+    the member's transfers list and opening picks (``live.purchase_prices``) and raises
+    this flag only when every check of that rebuild held. With the flag down nothing says
+    what any one of the fifteen would raise on his own, and a consumer that needs the
+    split, to price one named sale, has to say it does not have it."""
     squad_sell_value_tenths: int | None = None
-    """What the fifteen would raise if all were sold, in tenths, or None when the source
-    does not state it.
+    """What the fifteen are worth to sell, in tenths, as far as the source shows it, or
+    None when it shows nothing.
 
-    The endpoints publish the entry's whole worth at the deadline (squad plus bank), so
-    subtracting the bank leaves the squad's selling value exactly. It is the budget a
-    plan may spend, and it is below the sum of the current prices for anyone holding a
-    player who has risen, because the game keeps half of that rise. A held squad built
+    With the purchase prices known it is exact: the game's selling rule applied to each
+    player at the capture's prices, the budget the planner holds a plan to. Without them
+    it is the picks document's worth less its bank, which is the fifteen at the deadline's
+    *market* prices: an upper bound, too high by about half of every rise since a player
+    was bought, and so still the budget's cap rather than the budget. A held squad built
     without it, and without purchase prices, has no honest budget at all."""
     source_snapshot_id: str | None = None
     active_chip: str | None = None
@@ -244,15 +246,17 @@ def held_squad_from_picks(picks: EntryPicks, *, current_prices: Mapping[int, int
     """The ``HeldSquad`` the transfer planner starts from, for a registered entry.
 
     ``current_prices`` are the capture's prices (element id -> tenths); purchase prices
-    fall back to them when the entry endpoints do not publish what was paid.
+    fall back to them when what was paid could not be rebuilt.
 
     That fallback is an upper bound, not an answer: the game sells a risen player for his
     purchase price plus half the rise, never for the market price, so a squad priced this
-    way is worth more on paper than the member could raise. What stops a plan spending the
-    difference is ``picks.squad_sell_value_tenths``, which the endpoints do publish for the
-    fifteen together; it travels to the planner on the held squad and caps the budget
-    there. Without it, and without purchase prices, there is no honest budget to plan on
-    and this refuses rather than guessing the optimistic one.
+    way is worth more on paper than the member could raise. What stops a plan spending
+    more than the source states is ``picks.squad_sell_value_tenths``, the fifteen's worth
+    less the bank as the picks document gives it; it travels to the planner on the held
+    squad and caps the budget there. That worth is a market value too, so the cap still
+    overstates a member whose players have risen; only rebuilt purchase prices remove the
+    overstatement. Without the cap, and without purchase prices, there is no honest
+    budget to plan on and this refuses rather than guessing the optimistic one.
     """
 
     missing = [p for p in picks.squad if p not in current_prices]

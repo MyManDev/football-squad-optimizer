@@ -1,7 +1,8 @@
 # Experimental football model in member advice
 
-The default remains `current`. Choosing `football` uses the measured
-`football_team_share_v1` goal, assist, clean-sheet, DEFCON and minutes model.
+The default remains `current`. Since `site-2026-27-gw06-fix14`, choosing `football`
+uses `football_joint_role_retained_history_v1` for goal, assist, clean-sheet,
+DEFCON and minutes forecasts. `football_team_share_v1` is a separate unserved shadow.
 It is available in the member page only when a validated forecast exists for the
 service's exact capture. Development gains are not independent prospective proof.
 
@@ -19,7 +20,10 @@ Run from the deployed revision, with operator-selected paths:
 ```powershell
 python scripts/build_football_forecast.py --snapshot-root data/snapshots `
   --snapshot-id <accepted-capture> --archive-root data/raw/vaastav-fpl `
-  --artifact-root artifacts
+  --artifact-root <retained-history-artifact-root> --role-minutes `
+  --retained-role-history --with-components `
+  --training-season 2022-23 --training-season 2023-24 `
+  --training-season 2024-25 --training-season 2026-27
 ```
 
 Use the backend's configured artifact root if it differs. The producer reads only
@@ -77,13 +81,17 @@ What follows from it:
 - The contextual candidate, `football_contextual_v3`, applies availability before the
   split (`availability_application: before_team_shares_v1`) and does not have this
   limit.
-- No committed measurement records how large the loss is on a live capture, so this
-  document states the mechanism and no size.
+- On capture `fpl-live-20261002T104314Z-8b70515b9b31`, the retained-history model
+  leaves 14.678791716983769 attacking expected points uncredited in decision week 6.
+  Four available players gain at least 0.2 points under the conditional share
+  candidate, with a maximum gain of 0.21821737796427154. The forecast-only go rule
+  passes; this is not a realized accuracy reading. See
+  [the sizing record](research/football_share_sizing.md).
 
-Members are told. Every answer the `football_team_share_v1` forecast decided, one week
-or a window, carries `SHARES_BEFORE_AVAILABILITY_LIMIT` in its `stated_limits`, and the
-member page shows it in English and in Turkish. An answer decided by
-`football_contextual_v3` does not carry it.
+Backend answers from v1 and both joint role versions carry
+`SHARES_BEFORE_AVAILABILITY_LIMIT` in `stated_limits`. The member page displays
+no limit sentence in either language, as its football-share tests require.
+An answer decided by `football_contextual_v3` does not carry that backend field.
 
 Removing the limit means applying availability to the share weights before the split,
 as the contextual candidate does. That changes the forecast, so it is a new model
