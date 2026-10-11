@@ -17,6 +17,7 @@ Date is the file's last commit (`git log -1 --format=%as -- scripts/<name>.py`).
 
 | Script | Class | Record it writes, or what names it | Last commit |
 | --- | --- | --- | --- |
+| `add_device_plan_inputs.py` | operational | `docs/contracts/league_device_plan_v1.md`; `docs/weekly_runbook.md` | 2026-10-11 |
 | `build_league_site.py` | shim | `squadopt.application.league_publication`; `docs/weekly_runbook.md` | 2026-09-10 |
 | `build_projection_handoff.py` | shim | `squadopt.application.projection_handoff`; `docs/weekly_runbook.md` | 2026-09-10 |
 | `build_scoreboard.py` | shim | `squadopt.application.scoreboard`; `docs/weekly_runbook.md` | 2026-09-10 |
