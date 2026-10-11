@@ -13,11 +13,12 @@ entry document itself, under the tree's own publication stamp; where the site ha
 directory, the league's line gains the table's path. Nothing is solved and no plan changes;
 the plans stay the bytes the advice record holds.
 
-Refused: a tree whose members or entries name another capture than the one given, a
-handoff for another capture or gameweek, a member whose fifteen the capture does not
-price. With ``--verify`` every member's problem is rebuilt from the written documents and
-solved with the repository's planner, and the transfers, captain and eleven must be the
-published ones.
+Refused, with the tree untouched: a tree whose members or entries name another capture
+than the one given, a handoff for another capture or gameweek, a member whose fifteen the
+capture does not price, and a per-capture table already on the site that differs from the
+one this would write. With ``--verify`` every member's problem is rebuilt from the written
+documents and solved with the repository's planner, and the transfers, captain and eleven
+must be the published ones.
 """
 
 from __future__ import annotations
@@ -37,9 +38,13 @@ from squadopt.application.device_plan import (
     device_plan_table,
 )
 from squadopt.application.entries import EntryError
-from squadopt.application.league_publication import write_device_plan_table
+from squadopt.application.league_publication import (
+    check_device_plan_table,
+    write_device_plan_table,
+)
 from squadopt.contracts.league import LEAGUE_VIEW_CONTRACT_VERSION
 from squadopt.contracts.league_tree import (
+    LEAGUE_DIRECTORY_FILE,
     device_plan_path,
     read_league_directory,
     single_league_tree,
@@ -149,6 +154,10 @@ def add_device_plan_inputs(
         for _, row in inputs.players.iterrows()
     }
 
+    table_document = device_plan_capture_table(
+        inputs, projection, rules, bootstrap=snapshot.payloads[BOOTSTRAP_PAYLOAD]
+    )
+    check_device_plan_table(site_data_root, snapshot_id, table_document)
     written: list[str] = []
     entries = sorted((league_dir / "entries").glob("*.json"))
     for path in entries:
@@ -193,25 +202,22 @@ def add_device_plan_inputs(
         file=out,
     )
     table = device_plan_path(snapshot_id)
-    write_device_plan_table(
-        site_data_root,
-        snapshot_id,
-        device_plan_capture_table(
-            inputs, projection, rules, bootstrap=snapshot.payloads[BOOTSTRAP_PAYLOAD]
-        ),
-        generated_at_utc=stamp,
-    )
+    write_device_plan_table(site_data_root, snapshot_id, table_document, generated_at_utc=stamp)
     written.append(table.as_posix())
     lines = read_league_directory(site_data_root)
     if lines:
+        # The directory keeps its own stamp, the latest league's: the release check reads it.
+        directory = _read(site_data_root / LEAGUE_DIRECTORY_FILE)
         write_league_directory(
             site_data_root,
             [
                 replace(line, device_plan=table.as_posix()) if line.league_id == league_id else line
                 for line in lines
             ],
-            generated_at_utc=stamp,
+            generated_at_utc=str(directory["generated_at_utc"]),
+            source_kind=str(directory.get("source_kind", "live")),
         )
+        written.append(LEAGUE_DIRECTORY_FILE)
     print(f"Wrote {table.as_posix()} for capture {snapshot_id}.", file=out)
     if verify:
         _verify(league_dir, document, out)

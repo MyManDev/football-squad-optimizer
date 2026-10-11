@@ -12,7 +12,6 @@ from squadopt.contracts.league_tree import (
     LeagueDirectoryError,
     PublishedLeague,
     device_plan_capture,
-    device_plan_dir,
     device_plan_path,
     find_league_tree,
     league_tree,
@@ -151,7 +150,6 @@ def test_a_capture_s_device_plan_table_lives_under_device_by_its_capture() -> No
     assert device_plan_path("fpl-live-20261010T035732Z-c77d032165af").as_posix() == (
         "device/fpl-live-20261010T035732Z-c77d032165af/device-plan.json"
     )
-    assert device_plan_dir(Path("site/data"), "cap") == Path("site/data/device/cap")
     assert device_plan_capture("device/cap/device-plan.json") == "cap"
     assert device_plan_capture("leagues/352490/device-plan.json") is None
     assert device_plan_capture("device/cap/other.json") is None

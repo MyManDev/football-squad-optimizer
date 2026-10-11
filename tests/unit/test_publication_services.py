@@ -19,11 +19,12 @@ from squadopt.application import weekly_suggestion_eval as review
 from squadopt.application.advice_record import record_member_advice
 from squadopt.application.league_publication import (
     LeaguePublicationRequest,
+    check_device_plan_table,
     league_tree_capture,
     leagues_beside,
     prepare_league_publication,
     publish_league,
-    remove_stale_device_tables,
+    remove_device_tables,
     settle_legacy_tree,
     write_device_plan_table,
 )
@@ -458,6 +459,10 @@ def test_a_build_of_one_league_keeps_the_others_of_its_capture_and_refuses_anoth
     write_league_directory(tmp_path, [other, lines[1]], generated_at_utc="x")
     with pytest.raises(DataError, match="device-plan table of capture capture-b"):
         leagues_beside(tmp_path, 9, "capture-a")
+    odd = replace(lines[0], device_plan="elsewhere/device-plan.json")
+    write_league_directory(tmp_path, [odd, lines[1]], generated_at_utc="x")
+    with pytest.raises(DataError, match="no per-capture table"):
+        leagues_beside(tmp_path, 9, "capture-a")
 
 
 def test_the_capture_s_device_plan_table_is_written_once_and_never_replaced(
@@ -479,16 +484,47 @@ def test_the_capture_s_device_plan_table_is_written_once_and_never_replaced(
             tmp_path, "cap", {**payload, "players": []}, generated_at_utc="later"
         )
     assert json.loads(first.read_text(encoding="utf-8")) == envelope
+    # The check alone names the path and refuses the same way, before anything is written.
+    assert check_device_plan_table(tmp_path, "cap", payload) == first
+    assert check_device_plan_table(tmp_path, "other", payload) == (
+        tmp_path / "device" / "other" / "device-plan.json"
+    )
+    assert not (tmp_path / "device" / "other").exists()
+    with pytest.raises(DataError, match="Remove that directory"):
+        check_device_plan_table(tmp_path, "cap", {**payload, "players": []})
 
 
-def test_the_tables_of_other_captures_are_removed_with_the_unlisted_trees(tmp_path: Path) -> None:
+def test_a_table_of_another_payload_refuses_the_publication_before_any_member_is_solved(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    request = publication_world(tmp_path)
+    table = request.out_dir / "data" / "device" / request.snapshot_id / "device-plan.json"
+    table.parent.mkdir(parents=True)
+    table.write_text(json.dumps({"payload": {"contract_version": "other"}}), encoding="utf-8")
+    solved: list[int] = []
+
+    def no_solve(*args: object, **kwargs: object) -> None:
+        solved.append(1)
+        raise AssertionError("a member was solved after the table refusal")
+
+    monkeypatch.setattr(league_views, "build_league_views", no_solve)
+    monkeypatch.setattr("squadopt.application.league_publication.build_league_views", no_solve)
+    with pytest.raises(DataError, match="already holds another device-plan table"):
+        publish_league(request)
+    assert solved == []
+    assert not (request.out_dir / "data" / "leagues" / "352490" / "members.json").exists()
+
+
+def test_the_device_tables_are_removed_with_the_unlisted_trees(tmp_path: Path) -> None:
     for capture in ("cap-a", "cap-b", "cap-c"):
         (tmp_path / "device" / capture).mkdir(parents=True)
         (tmp_path / "device" / capture / "device-plan.json").write_text("{}", encoding="utf-8")
     (tmp_path / "device" / "notes.txt").write_text("kept", encoding="utf-8")
-    assert remove_stale_device_tables(tmp_path, "cap-b") == ["device/cap-a", "device/cap-c"]
+    assert remove_device_tables(tmp_path, keep="cap-b") == ["device/cap-a", "device/cap-c"]
     assert sorted(p.name for p in (tmp_path / "device").iterdir()) == ["cap-b", "notes.txt"]
-    assert remove_stale_device_tables(tmp_path / "nowhere", "cap-b") == []
+    # The weekly run keeps none: it writes its own capture's table again.
+    assert remove_device_tables(tmp_path) == ["device/cap-b"]
+    assert remove_device_tables(tmp_path / "nowhere") == []
 
 
 def _published_line(league_id: int) -> PublishedLeague:

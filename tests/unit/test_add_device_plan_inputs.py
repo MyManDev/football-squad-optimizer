@@ -14,6 +14,12 @@ from tests.unit.test_league_views import _legal_squad, _member_picks, _Provider,
 from squadopt.application.device_plan import DEVICE_PLAN_DOCUMENT
 from squadopt.application.entries import EntryRegistration
 from squadopt.application.league_views import build_league_views
+from squadopt.contracts.league_tree import (
+    PublishedLeague,
+    read_league_directory,
+    write_league_directory,
+)
+from squadopt.data.errors import DataError
 
 world = world_module._world  # re-register the fixture in this module
 
@@ -118,3 +124,70 @@ def test_the_command_refuses_with_a_sentence_and_exit_one(
     )
     assert code == 1
     assert capsys.readouterr().out.startswith("Refused: ")
+
+
+def test_on_a_directory_site_the_league_s_line_names_the_table_and_the_stamp_is_kept(
+    world: dict[str, Any], tmp_path: Path
+) -> None:
+    inputs, projection, rules = _world_context(world)
+    site = tmp_path / "site"
+    build_league_views(
+        _Provider({101: _member_picks(world, 101, _legal_squad(world))}),
+        (EntryRegistration(101, "member-a", "2026-08-23T00:00:00Z"),),
+        inputs,
+        projection,
+        rules,
+        league_id=352490,
+        league_name="Test League",
+        out_dir=site / "leagues" / "352490",
+    )
+    (site / "leagues" / "352490" / DEVICE_PLAN_DOCUMENT).unlink()
+    for path in (site / "leagues" / "352490" / "entries").glob("*.json"):
+        envelope = json.loads(path.read_text(encoding="utf-8"))
+        del envelope["payload"]["device_plan"]
+        path.write_text(json.dumps(envelope, indent=2), encoding="utf-8", newline="\n")
+    lines = [
+        PublishedLeague(352490, "Test League", "2026-27", 2, "leagues/352490"),
+        PublishedLeague(9, "League 9", "2026-27", 2, "leagues/9"),
+    ]
+    write_league_directory(site, lines, generated_at_utc="2026-09-01T12:00:00Z")
+
+    written = add_device_plan_inputs(
+        snapshot_root=world["snapshot_root"],
+        snapshot_id=world["gw2_id"],
+        handoff_path=world_module._handoff(world),
+        site_data_root=site,
+        out=io.StringIO(),
+        league_id=352490,
+    )
+    table = f"device/{world['gw2_id']}/{DEVICE_PLAN_DOCUMENT}"
+    assert written == ["entries/101.json", DEVICE_PLAN_DOCUMENT, table, "leagues.json"]
+    assert (site / table).is_file()
+    directory = json.loads((site / "leagues.json").read_text(encoding="utf-8"))
+    # The directory keeps its own stamp; only this league's line gains the table.
+    assert directory["generated_at_utc"] == "2026-09-01T12:00:00Z"
+    assert read_league_directory(site) == [
+        PublishedLeague(9, "League 9", "2026-27", 2, "leagues/9"),
+        PublishedLeague(352490, "Test League", "2026-27", 2, "leagues/352490", table),
+    ]
+
+
+def test_a_table_of_another_payload_already_on_the_site_is_refused_untouched(
+    world: dict[str, Any], tmp_path: Path
+) -> None:
+    built = tmp_path / "built"
+    _build(world, built)
+    _strip(built)
+    table = built / "device" / world["gw2_id"] / DEVICE_PLAN_DOCUMENT
+    table.parent.mkdir(parents=True)
+    table.write_text(json.dumps({"payload": {"contract_version": "other"}}), encoding="utf-8")
+    before = {p: p.read_bytes() for p in built.rglob("*.json")}
+    with pytest.raises(DataError, match="already holds another device-plan table"):
+        add_device_plan_inputs(
+            snapshot_root=world["snapshot_root"],
+            snapshot_id=world["gw2_id"],
+            handoff_path=world_module._handoff(world),
+            site_data_root=built,
+            out=io.StringIO(),
+        )
+    assert {p: p.read_bytes() for p in built.rglob("*.json")} == before

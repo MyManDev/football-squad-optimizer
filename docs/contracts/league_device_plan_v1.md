@@ -92,18 +92,22 @@ Three things the device model takes as given:
 
 ## The per-capture table (v2)
 
-The shared document is a function of the capture, not of the league: every league a run
-renders gets the same table. Since #981 step 1 the run writes it once more, once per
-capture, at `data/device/<source_snapshot_id>/device-plan.json`, in the same envelope, and
-each line of the league directory (`data/leagues.json`) names it under `device_plan`
+The shared document does not depend on the league: every league a run renders gets the
+same table. Since #981 step 1 the run writes it once more, once per capture, at
+`data/device/<source_snapshot_id>/device-plan.json`, in the same envelope, and each line of
+the league directory (`data/leagues.json`) names it under `device_plan`
 (`device/<capture>/device-plan.json`, relative to `data/`). The path carries the capture,
-so the file never changes once written and a page may cache it for as long as the capture
-is served; a second league of the same run finds it written and leaves it, and a payload
-that differs from the one on disk is refused rather than overwritten
-(`league_publication.write_device_plan_table`). The weekly run removes the tables of every
-other capture when it seeds its preview (`remove_stale_device_tables`), and a build of one
-league refuses a directory line whose table is another capture's, as it refuses a tree
-rendered from another capture (`leagues_beside`). The tree keeps its own v1 copy during the
+so a page may cache the file for as long as the capture is served: a published table
+changes only when the week is published again from the same capture, which rewrites every
+tree too. Within a run the first league writes it and every later league finds it and
+leaves it; a table already on disk with another payload (an earlier build of the same
+capture with another handoff, other Top 100 inputs or other code) is refused before any
+member is solved (`league_publication.check_device_plan_table`). The weekly run removes
+every table at the start of its league stage, after the preview is seeded, and writes its
+own capture's again (`remove_device_tables`); by hand, the operator removes
+`data/device/<capture>/` in the candidate and rebuilds every league of the list. A build of
+one league refuses a directory line whose table is another capture's, or is no per-capture
+table, as it refuses a tree rendered from another capture (`leagues_beside`). The tree keeps its own v1 copy during the
 transition, for pages from before the per-capture table; the copy stops with #981 step 8,
 after GW20, with the owner's yes.
 

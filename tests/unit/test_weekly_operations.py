@@ -1390,7 +1390,8 @@ def test_a_league_dropped_from_the_list_leaves_the_site_with_its_tree(tmp_path: 
     dropped = operation.paths.out / "data" / "leagues" / "9"
     (dropped / "entries").mkdir(parents=True)
     (dropped / "members.json").write_text("{}", encoding="utf-8")
-    # An earlier week's device-plan table, seeded from the published tree, goes the same way.
+    # An earlier build's device-plan table, seeded from the published tree, goes the same
+    # way, whatever its capture: the run writes this capture's table again.
     stale = operation.paths.out / "data" / "device" / "fpl-live-earlier" / "device-plan.json"
     stale.parent.mkdir(parents=True)
     stale.write_text("{}", encoding="utf-8")

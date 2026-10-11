@@ -66,12 +66,6 @@ def device_plan_path(snapshot_id: str) -> PurePosixPath:
     return PurePosixPath(DEVICE_ROOT) / snapshot_id / DEVICE_PLAN_FILE
 
 
-def device_plan_dir(site_data_root: Path, snapshot_id: str) -> Path:
-    """The directory of the capture's device-plan table under a site's ``data/``."""
-
-    return Path(site_data_root) / Path(*device_plan_path(snapshot_id).parent.parts)
-
-
 def device_plan_capture(device_plan: str) -> str | None:
     """The capture a directory line's ``device_plan`` names, or None where the path is
     not a per-capture table (``device/<capture>/device-plan.json``)."""

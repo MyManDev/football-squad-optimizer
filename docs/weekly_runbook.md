@@ -41,7 +41,9 @@ captured members the purchase prices were rebuilt from the transfers list, and w
 each of the others; `scripts.build_league_site` prints the same line as `purchase`.
 `legacy_tree` (top level) says what became of a tree from before the directory, and
 `removed_trees` (top level) names the trees of leagues the list no longer has, which the run
-removes so a dropped league's member names leave the site.
+removes so a dropped league's member names leave the site, and the device-plan tables of
+every earlier build under `data/device/`, which the run removes before it writes this
+capture's own.
 
 By hand, `scripts.build_league_site --league <id>` rebuilds one league from a capture. It
 keeps the other leagues the directory lists only when their trees were rendered from the same

@@ -24,7 +24,7 @@ from squadopt.application.league_publication import (
     LeaguePublicationRequest,
     publish_league,
     records_advice_for,
-    remove_stale_device_tables,
+    remove_device_tables,
     remove_unlisted_trees,
     settle_legacy_tree,
 )
@@ -857,12 +857,10 @@ class WeeklyOperations:
             legacy = settle_legacy_tree(self.paths.out / "data", self.request.league_ids)
         except LeagueDirectoryError as error:
             raise WeekError(str(error)) from error
-        # A league dropped from the list leaves the site with its tree, and an earlier
-        # week's capture leaves its device-plan table.
+        # A league dropped from the list leaves the site with its tree, and every earlier
+        # build leaves a device-plan table; the run writes this capture's table again.
         removed_trees = remove_unlisted_trees(self.paths.out / "data", self.request.league_ids)
-        removed_trees.extend(
-            remove_stale_device_tables(self.paths.out / "data", self._capture_id())
-        )
+        removed_trees.extend(remove_device_tables(self.paths.out / "data"))
         for league_id in self.request.league_ids:
             # Each league is stamped after its own solves (the stamp is when the advice
             # was published, read against the deadline); the directory the last league
@@ -913,7 +911,8 @@ class WeeklyOperations:
                 "legacy_tree": (
                     None if legacy is None else {"outcome": legacy[0], "league_id": legacy[1]}
                 ),
-                # Trees of leagues the list no longer has, removed from the site.
+                # Trees of leagues the list no longer has, and the device-plan tables of
+                # every earlier build, removed from the site before this run wrote its own.
                 "removed_trees": removed_trees,
                 "leagues": leagues,
             },

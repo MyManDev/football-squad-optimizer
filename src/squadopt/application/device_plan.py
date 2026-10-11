@@ -29,6 +29,7 @@ from typing import Any, Final
 
 from squadopt.application.strategies.catalog import STRATEGY_CATALOG
 from squadopt.application.top100_weight import TOP100_WEIGHTS, Top100Counts, weighted_projection
+from squadopt.contracts.league_tree import DEVICE_PLAN_FILE
 from squadopt.contracts.players import sort_players_by_id
 from squadopt.data.errors import DataSourceError
 from squadopt.data.sources.fpl_live import element_prices, player_codes
@@ -48,7 +49,7 @@ from squadopt.prediction.elite_evidence import ELITE_COHORT_SIZE
 DEVICE_PLAN_CONTRACT_VERSION: Final = "league_device_plan_v1"
 #: The per-capture table: one document per capture, no league in it.
 DEVICE_PLAN_TABLE_CONTRACT_VERSION: Final = "league_device_plan_v2"
-DEVICE_PLAN_DOCUMENT: Final = "device-plan.json"
+DEVICE_PLAN_DOCUMENT: Final = DEVICE_PLAN_FILE
 
 
 def device_plan_table(
