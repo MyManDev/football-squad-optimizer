@@ -253,7 +253,10 @@ each line; the commands are in the table above and in the documents named.
    the tree it seals, as `scripts.add_device_plan_inputs --league <id>` names the tree it
    augments). Its marker is written last, after every
    copy has been read back through the production validators; a name or an input the reader
-   would refuse is refused before anything is copied.
+   would refuse is refused before anything is copied. The first validated,
+   copy-compatible seal records capture, handoff, forecast and component contents in
+   `football/<capture>.bundle.preparation.json`; retries must use those same contents, and
+   changed inputs require a new capture.
 6. **The site pull request merges through develop's merge queue, the release is cut and
    tagged, the backend is restarted** (`docs/deployment_runbook.md`). The restart reads the
    one capture every published human entry names, on the public site and locally, and
