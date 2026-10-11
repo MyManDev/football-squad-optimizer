@@ -356,6 +356,31 @@ def test_invalid_option_combinations_refuse_before_source_reads(monkeypatch, tmp
         football_live.produce_football_forecast(object(), tmp_path, **options)
 
 
+def test_team_form_and_match_context_refuse_together_before_source_reads(monkeypatch, tmp_path):
+    from squadopt.application import football_live
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("Two candidates in one call must fail before reading or fitting")
+
+    for name in ("infer_season", "read_inputs", "archive_history", "captured_history"):
+        monkeypatch.setattr(football_live, name, forbidden)
+    refusal = "team_form and match_context select separate candidates"
+    with pytest.raises(ValueError, match=refusal):
+        football_live.causal_training(pd.DataFrame(), team_form=True, match_context=True)
+    for produce in (
+        football_live.produce_football_forecast,
+        football_live.produce_football_components,
+    ):
+        with pytest.raises(ValueError, match=refusal):
+            produce(
+                object(),
+                tmp_path,
+                training_seasons=("2024-25",),
+                team_form=True,
+                match_context=True,
+            )
+
+
 @pytest.mark.parametrize("with_components", [False, True])
 def test_cli_forwards_explicit_candidate_and_selected_sources(
     publication_case, monkeypatch, capsys, with_components
@@ -426,6 +451,7 @@ def test_cli_forwards_explicit_candidate_and_selected_sources(
         ["--training-season", "2024-25", "--retained-role-history"],
         ["--training-season", "2024-25", "--rotation-evidence", "unused"],
         ["--training-season", "2024-25", "--club-news-source", "unused"],
+        ["--training-season", "2024-25", "--team-form"],
     ],
 )
 def test_cli_invalid_candidate_mode_refuses_before_any_capture_read(monkeypatch, extra):
