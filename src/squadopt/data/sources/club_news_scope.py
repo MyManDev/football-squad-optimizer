@@ -11,8 +11,9 @@ FIXTURE_SCOPES = (
     "ambiguous",
     "unspecified",
 )
-CLAIM_SCOPE_VERSION = "source_fixture_scope_v1"
-_MATCH = r"(?:the )?(?:upcoming|next) (?:premier )?league (?:match|game)"
+CLAIM_SCOPE_VERSION = "source_fixture_scope_v2"
+_NOUN = r"(?:match|game|fixture)"
+_MATCH = rf"(?:the )?(?:upcoming|next) (?:premier )?league {_NOUN}"
 
 #: What may stand between a sentence boundary and the quote: space, and a quotation mark
 #: or bracket that opens (before) or closes (after) the sentence the quote is.
@@ -49,7 +50,7 @@ def verified_fixture_scope(
         return "ambiguous", False
     past = bool(
         re.search(
-            r"\b(?:previous|last|yesterday's) (?:premier )?league (?:match|game)\b|\byesterday\b",
+            rf"\b(?:previous|last|yesterday's) (?:premier )?league {_NOUN}\b|\byesterday\b",
             text,
         )
     )
@@ -60,7 +61,16 @@ def verified_fixture_scope(
             text,
         )
     )
-    upcoming = bool(re.search(r"\b(?:upcoming|next) (?:premier )?league (?:match|game)\b", text))
+    # A label with no clause rule below is verified by this search alone, so "fixture" names
+    # the league match here only where it ends the clause, as in every clause form below;
+    # "the next league fixture list" is the schedule, not a match.
+    upcoming = bool(
+        re.search(
+            r"\b(?:upcoming|next) (?:premier )?league "
+            r"(?:match|game|fixture(?=\s*(?:[.!,;]|$)))\b",
+            text,
+        )
+    )
     if past or other:
         return ("ambiguous" if upcoming else "past" if past else "other_competition"), False
     if not upcoming:
@@ -78,10 +88,12 @@ def verified_fixture_scope(
     ):
         return "ambiguous", False
     absence = (
-        rf"(?:will miss {_MATCH}"
+        rf"(?:(?:will miss|misses) {_MATCH}"
+        rf"|will play no part in {_MATCH}"
         rf"|(?:will not|won't|cannot|can't) (?:play|feature|travel|be available) "
         rf"(?:(?:in|for|to) )?{_MATCH}"
-        rf"|(?:is|has been|will be) (?:ruled out|unavailable|out) (?:for|of) {_MATCH})"
+        rf"|(?:is not|isn't) available for {_MATCH}"
+        rf"|(?:is|has been|will be) (?:ruled out|unavailable|out|sidelined) (?:for|of) {_MATCH})"
     )
     if disposition == "stated_expected_absent" and not _named_clause(text, player_name, absence):
         return "ambiguous", False
@@ -151,7 +163,7 @@ def _full_match_inability(text: str, player_name: str | None) -> bool:
     )
     full = r"(?:full|whole|entire)"
     minutes = r"(?:full )?(?:90|ninety) minutes"
-    direct = rf"{inability}{full} (?:upcoming|next) (?:premier )?league (?:match|game)"
+    direct = rf"{inability}{full} (?:upcoming|next) (?:premier )?league {_NOUN}"
     followed = rf"{inability}(?:{full} (?:match|game)|{minutes}) (?:in|during|of) {_MATCH}"
     if _named_clause(text, player_name, rf"(?:{direct}|{followed})"):
         return True

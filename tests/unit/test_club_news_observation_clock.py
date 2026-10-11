@@ -504,6 +504,82 @@ def test_a_deadline_that_passes_during_the_download_stops_the_week(
     assert after == before
 
 
+@pytest.mark.parametrize(
+    ("finish_offset", "later_deadline", "dry_run", "expected_code"),
+    [
+        (-1, None, False, 0),
+        (-601, None, False, 1),
+        (0, None, False, 1),
+        (1, None, False, 1),
+        (1, "2026-09-19T17:30:00Z", False, 1),
+        (1, None, True, 0),
+    ],
+)
+def test_capture_rechecks_deadline_after_model_answers(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    finish_offset: int,
+    later_deadline: str | None,
+    dry_run: bool,
+    expected_code: int,
+) -> None:
+    clock = _Timeline(as_instant(DEADLINE) - timedelta(minutes=5), timedelta(0))
+    calls: list[str] = []
+
+    class CompletingProvider(_Provider):
+        def code(
+            self, documents: Sequence[RawDocument], roster: Sequence[RosterPlayer]
+        ) -> ClaimResponse:
+            calls.append(documents[0].club)
+            clock.now = as_instant(DEADLINE) + timedelta(seconds=finish_offset)
+            return super().code(documents, roster)
+
+    name = "fake-capture-completion-clock"
+    register_provider(name, lambda config: CompletingProvider())
+    snapshots = tmp_path / "snapshots"
+    roster_id = _roster_snapshot(snapshots, later_deadline=later_deadline)
+    capture_root = tmp_path / "news-captures"
+    extra = ["--capture-root", str(capture_root)]
+    if dry_run:
+        extra.append("--dry-run")
+    code = main(
+        _command(tmp_path, roster_id, *extra),
+        environ=_environment(name),
+        opener=clock.opener(),
+        now=clock,
+        sleeper=lambda _: None,
+    )
+    printed = capsys.readouterr().out
+    assert calls == ["Arsenal", "Man Utd"]
+    assert code == expected_code, printed
+    if dry_run:
+        assert "Dry run: nothing written." in printed
+        assert not capture_root.exists()
+    elif expected_code:
+        assert f"gameweek {TARGET_GAMEWEEK} deadline {DEADLINE}" in printed
+        assert f"capture completion {_text(clock.now)}:" in printed
+        if finish_offset == -601:
+            assert "clock moved backwards after coding" in printed
+            assert "no longer the next open deadline" not in printed
+        elif later_deadline is not None:
+            assert "was not substituted; start a new run for it" in printed
+            assert "clock moved backwards" not in printed
+        else:
+            assert "clock moved backwards" not in printed
+            assert "passed before the capture was written" in printed
+            assert "no later deadline is published" in printed
+            assert "season is over" not in printed
+        assert printed.count("Nothing was captured.") == 1
+        assert "Capture       " not in printed
+        assert not capture_root.exists()
+    else:
+        capture_id = next(
+            line.split()[-1] for line in printed.splitlines() if line.startswith("Capture")
+        )
+        captured = read_snapshot(capture_root, capture_id)
+        assert captured.metadata.captured_at_utc == _text(clock.now)
+
+
 def test_an_observation_earlier_than_the_start_of_the_run_stops_the_week(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -588,7 +664,7 @@ def test_the_command_says_nothing_was_observed_when_no_page_could_be_read(
 
 
 def test_a_reused_answer_keeps_its_own_times_and_only_the_reading_is_new(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """Unchanged pages for the same target are not asked about twice.
 
@@ -614,11 +690,6 @@ def test_a_reused_answer_keeps_its_own_times_and_only_the_reading_is_new(
     published = _text(STARTED - timedelta(hours=3))
 
     def _run(clock: _Clock, *extra: str) -> str:
-        # Capture completion is its own clock; keep it on this synthetic week's timeline.
-        monkeypatch.setattr(
-            "squadopt.platform.club_news_acquire._utc_now",
-            lambda: _text(clock.readings[-1] + timedelta(seconds=30)),
-        )
         code = main(
             _command(tmp_path, roster_id, *extra),
             environ=_environment(name),

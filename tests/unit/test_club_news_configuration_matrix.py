@@ -13,7 +13,6 @@ sentinel, the opener, the clock and the provider are injected, and every write i
 import sys
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import replace
-from datetime import timedelta
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -25,7 +24,6 @@ from tests.unit.test_club_news_observation_clock import (
     _command,
     _opener,
     _roster_snapshot,
-    _text,
 )
 from tests.unit.test_club_news_settings import settings
 
@@ -460,12 +458,6 @@ def _run(
 
     roster_id = _roster_snapshot(tmp_path / "snapshots")
     clock = _Clock()
-    # Capture completion is its own clock; keep it on this synthetic week's timeline.
-    monkeypatch.setattr(
-        club_news_acquire,
-        "_utc_now",
-        lambda: _text(clock.readings[-1] + timedelta(seconds=30)),
-    )
     code = main(
         _command(tmp_path, roster_id, *extra),
         environ=environ,

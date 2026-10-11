@@ -116,6 +116,21 @@ marker. The reader checks all digests and production
 source contracts again. This command performs no acquisition, fitting, site build,
 or runtime activation. Activation must separately select this validated bundle.
 
+The first validated attempt also creates `football/<decision>.bundle.preparation.json`
+after immutable destination checks, before copies. It binds the capture's relative
+file inventory and the exact retained handoff, forecast and companion bytes. It is
+provenance for retries, never readiness. Reuse the original retained handoff after
+an interruption; a changed producer input needs a new capture. Moving identical
+inputs or changing only Windows path casing preserves their content identity.
+
+The seal writes internal `football/<decision>.bundle.production.json` after destination
+preflight, copying and final validation, immediately before the ready marker. It
+records the sha256 of the sealed handoff's bytes and its own training provenance separately
+from the football producer's capture, cutoff, archive and population fields. It
+never replaces the ready marker. A failure before copies leaves no production record;
+an interruption after this record can leave provenance without readiness. An exact
+retry completes the marker, subject to the same immutable destination checks.
+
 Fresh seals and interrupted seals without a ready marker require
 `publication-identity.json` when they retain scoreboard, history or series-horizon
 documents. The next normal league publication writes that record.

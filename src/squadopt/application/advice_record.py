@@ -641,10 +641,11 @@ def build_member_advice_record(
             # the source published. A banked second transfer would be invisible.
             "free_transfers_known": bool(picks.free_transfers_known),
             "purchase_prices_known": bool(picks.purchase_prices_known),
-            # What the whole squad sells for, which the endpoints state even where they
-            # state no purchase price. It is the budget the plan was held to, so the
-            # record carries it beside the bank rather than leaving a reader to add up
-            # current prices and get a larger number than the member could ever raise.
+            # What the whole squad sells for: the rule's sum where the purchase prices
+            # below were rebuilt, otherwise the stated worth less the bank, a market value
+            # that caps it. It is the budget the plan was held to, so the record carries it
+            # beside the bank rather than leaving a reader to add up current prices and get
+            # a larger number than the member could ever raise.
             "squad_sell_value_tenths": (
                 None
                 if picks.squad_sell_value_tenths is None

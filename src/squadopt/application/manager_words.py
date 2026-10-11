@@ -40,7 +40,11 @@ from squadopt.data._long_paths import addressable
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import CapturedSnapshot, read_snapshot
 from squadopt.data.sources.club_news import CLUB_NEWS_SOURCE, FixtureClubNewsProvider, RawDocument
-from squadopt.data.sources.club_news_capture import read_captured_documents
+from squadopt.data.sources.club_news_capture import read_captured_documents, read_captured_responses
+from squadopt.data.sources.club_news_coding import (
+    ROTATION_CLAIM_CODING_CONTRACT_VERSION,
+    coding_prompt_sha256,
+)
 from squadopt.data.sources.club_news_metadata import PUBLICATION_SOURCES, publication_metadata
 from squadopt.data.sources.club_news_scope import FIXTURE_SCOPES, verified_fixture_scope
 from squadopt.data.sources.fpl_live import (
@@ -52,7 +56,11 @@ from squadopt.data.sources.fpl_live import (
     team_names,
 )
 from squadopt.data.timestamps import as_instant
-from squadopt.features.rotation_evidence import claim_fixture_calendar, claim_targets_next_fixture
+from squadopt.features.rotation_evidence import (
+    claim_fixture_calendar,
+    claim_has_only_multiple_fixture_failure,
+    claim_targets_next_fixture,
+)
 from squadopt.features.rotation_evidence_artifact import read_rotation_evidence_artifact
 from squadopt.planning import FirstWeekExclusion
 
@@ -148,8 +156,15 @@ class ManagerWord:
     publication_verified: bool = False
     publication_source: str | None = None
     publication_source_sha256: str | None = None
+    fixture_binding_reason: str | None = None
 
     def __post_init__(self) -> None:
+        if self.fixture_binding_reason not in (None, "ambiguous_current_week_fixture"):
+            raise ManagerWordsError("Unknown fixture binding reason.")
+        if self.fixture_binding_reason is not None and (
+            self.scope_verified or self.fixture_scope != "upcoming_premier_league"
+        ):
+            raise ManagerWordsError("Multiple-fixture evidence must remain unverified in scope.")
         if self.words is None and self.words_status == WORDS_SHOWN:
             object.__setattr__(self, "words_status", WORDS_UNRESOLVED)
         if self.words is not None and self.words_status != WORDS_SHOWN:
@@ -438,6 +453,57 @@ def _require_the_coded_documents(
     return SOURCE_CHECK_CITED_DOCUMENTS_HELD
 
 
+def _coding_attested(
+    table: pd.DataFrame, source_kind: str, source_label: str, snapshot_root: Path | None
+) -> bool:
+    """Check the bound responses before retaining any capture-backed attestation."""
+    news_id = table.attrs.get("club_news_snapshot_id")
+    if source_kind != SOURCE_CLUB_NEWS_CAPTURE and news_id is None:
+        return True
+    if (
+        source_kind != SOURCE_CLUB_NEWS_CAPTURE
+        or snapshot_root is None
+        or not isinstance(news_id, str)
+        or news_id != source_label
+    ):
+        return False
+    try:
+        snapshot = _club_news_snapshot(snapshot_root / news_id, snapshot_root)
+        if snapshot.metadata.captured_at_utc != table.attrs.get("club_news_captured_at_utc"):
+            return False
+        responses = read_captured_responses(snapshot)
+        if not responses:
+            return False
+        for entry in responses:
+            expected = coding_prompt_sha256(entry.response.model_identifier)
+            if (
+                entry.prompt_contract_version != ROTATION_CLAIM_CODING_CONTRACT_VERSION
+                or entry.prompt_sha256 != expected
+                or entry.response.model_identifier != table.attrs.get("model_identifier")
+                or table.attrs.get("prompt_sha256") != expected
+                or json.loads(entry.response.text).get("contract_version")
+                != ROTATION_CLAIM_CODING_CONTRACT_VERSION
+            ):
+                return False
+        clubs_by_digest: dict[str, set[str]] = {}
+        for entry in responses:
+            digest = hashlib.sha256(entry.response.text.encode()).hexdigest()
+            clubs_by_digest.setdefault(digest, set()).add(entry.club)
+        declared = table.attrs.get("response_sha256s")
+        if (
+            not declared
+            or tuple(sorted(set(declared))) != tuple(declared)
+            or not set(declared) <= set(clubs_by_digest)
+        ):
+            return False
+        covered = set(table.attrs.get("clubs_covered") or ())
+        return all(
+            digest in declared or not clubs & covered for digest, clubs in clubs_by_digest.items()
+        )
+    except (DataError, KeyError, ValueError, OSError, AttributeError):
+        return False
+
+
 def manager_words_from_artifact(
     table_path: Path,
     manifest_path: Path,
@@ -459,6 +525,7 @@ def manager_words_from_artifact(
         )
     clubs = _covered(table, table_path)
     source_check = _require_the_coded_documents(table, table_path, documents, source_label)
+    coding_attested = _coding_attested(table, source_kind, source_label, snapshot_root)
     target_basis = _decision_fixture_basis(table, snapshot_root)
     words: list[ManagerWord] = []
     for row in table.to_dict(orient="records"):
@@ -484,7 +551,8 @@ def manager_words_from_artifact(
             else ("unspecified", False)
         )
         scope_verified = (
-            row.get("rotation_claim_scope_verified") is True
+            coding_attested
+            and row.get("rotation_claim_scope_verified") is True
             and checked_scope == (scope, True)
             # The table's flag and the quote's own wording are not enough: the quote must
             # be a whole sentence of the source, or the source may say something else.
@@ -502,7 +570,8 @@ def manager_words_from_artifact(
             else None
         )
         publication_verified = (
-            row.get("rotation_claim_publication_verified") is True
+            coding_attested
+            and row.get("rotation_claim_publication_verified") is True
             and metadata is not None
             and metadata.verified
             and metadata.published_at_utc == _text(row.get("rotation_claim_published_at_utc"))
@@ -510,6 +579,22 @@ def manager_words_from_artifact(
             and metadata.source == publication_source
             and metadata.source_sha256 == publication_digest
         )
+        fixture_binding_reason = None
+        if (
+            not scope_verified
+            and publication_verified
+            and disposition
+            in (
+                "stated_expected_absent",
+                "stated_full_match_unavailable",
+                "stated_rotation_risk",
+            )
+            and checked_scope == (scope, True)
+            and whole_sentence
+            and target_basis is not None
+            and _targets_decision(row, document, target_basis, only_multiple=True)
+        ):
+            fixture_binding_reason = "ambiguous_current_week_fixture"
         status = WORDS_SHOWN if resolved else WORDS_UNRESOLVED
         if cited is not None and QUOTE_WITHHELD_PATTERN.search(cited):
             cited, status = None, WORDS_WITHHELD_FIGURE
@@ -533,6 +618,7 @@ def manager_words_from_artifact(
                 publication_verified=publication_verified,
                 publication_source=publication_source,
                 publication_source_sha256=publication_digest,
+                fixture_binding_reason=fixture_binding_reason,
             )
         )
     return ManagerWords(
@@ -620,11 +706,7 @@ def _decision_fixture_basis(
     snapshot_root: Path | None,
 ) -> tuple[pd.DataFrame, dict[int, tuple[str, int, str]], str] | None:
     """Read only the exact immutable decision named by the checked manifest."""
-    if (
-        snapshot_root is None
-        or "rotation_claim_scope_verified" not in table
-        or not table.rotation_claim_scope_verified.fillna(False).any()
-    ):
+    if snapshot_root is None or "rotation_claim_scope_verified" not in table:
         return None
     try:
         snapshot = read_snapshot(snapshot_root, str(table.attrs["roster_snapshot_id"]))
@@ -659,12 +741,24 @@ def _targets_decision(
     row: Mapping[Hashable, object],
     document: RawDocument | None,
     basis: tuple[pd.DataFrame, dict[int, tuple[str, int, str]], str],
+    *,
+    only_multiple: bool = False,
 ) -> bool:
     calendar, players, captured = basis
     player = players.get(int(str(row["player_id"])))
     if document is None or player is None or player[0] != document.club:
         return False
-    return claim_targets_next_fixture(
+    if only_multiple:
+        try:
+            published = as_instant(str(row.get("rotation_claim_published_at_utc")))
+            fetched = as_instant(document.fetched_at_utc)
+            cutoff = as_instant(captured)
+            if not published <= fetched <= cutoff or cutoff - published > pd.Timedelta(days=7):
+                return False
+        except (DataError, TypeError, ValueError):
+            return False
+    check = claim_has_only_multiple_fixture_failure if only_multiple else claim_targets_next_fixture
+    return check(
         calendar,
         team_code=player[1],
         target_gameweek=int(str(row["target_gameweek"])),
