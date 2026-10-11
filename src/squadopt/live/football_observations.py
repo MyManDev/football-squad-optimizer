@@ -15,6 +15,7 @@ import pandas as pd
 from squadopt.planning.models import InitialSquadState, PlanningHorizon
 from squadopt.planning.recourse import ObservationNode
 from squadopt.prediction.football import FOOTBALL_MODEL_VERSION, JOINT_ROLE_MODEL_VERSIONS
+from squadopt.prediction.football_team_form import TEAM_FORM_MODEL_VERSION
 
 AVAILABILITY_OBSERVATION_VERSION = "captured_next_deadline_resolution_v1"
 
@@ -65,13 +66,17 @@ def availability_observations(
         raise ValueError(
             "Availability information must be capture-bound and known before deadline."
         )
-    # Both models allocate fixture components before the reader applies captured
+    # These models allocate fixture components before the reader applies captured
     # eligibility to weekly E and q. Invert only that external multiplier: the
     # fitted start/cameo/minute law remains inside the conditional forecast. The
     # contextual model reallocates team shares after availability and is not invertible
     # from weekly totals. A current-week minute intervention is also preserved:
     # the two nodes start next week and never replace the decided week's forecast.
-    if model_version not in (FOOTBALL_MODEL_VERSION, *JOINT_ROLE_MODEL_VERSIONS):
+    if model_version not in (
+        FOOTBALL_MODEL_VERSION,
+        *JOINT_ROLE_MODEL_VERSIONS,
+        TEAM_FORM_MODEL_VERSION,
+    ):
         return result("conditional_team_components_unavailable")
     if len(horizon.gameweeks) not in (3, 5):
         return result("unsupported_window")
