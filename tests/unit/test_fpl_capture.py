@@ -370,6 +370,8 @@ def test_the_extra_payloads_land_in_the_snapshot_and_survive_the_checksum(
     assert written is not None
 
     snapshot = read_snapshot(tmp_path / "snapshots", written.snapshot_id)
+    # The history here is not a history, so no opening picks are named from it; the
+    # gameweek 1 picks are the captured picks of a gameweek 2 capture anyway.
     assert set(snapshot.payloads) == {
         BOOTSTRAP_PAYLOAD,
         FIXTURES_PAYLOAD,
@@ -378,10 +380,88 @@ def test_the_extra_payloads_land_in_the_snapshot_and_survive_the_checksum(
         "entry-11.json",
         "entry-11-history.json",
         "entry-11-picks-gw01.json",
+        "entry-11-transfers.json",
     }
     assert json.loads(snapshot.payloads["entry-11-picks-gw01.json"])["read"].endswith(
         "/entry/11/event/1/picks/"
     )
+    assert json.loads(snapshot.payloads["entry-11-transfers.json"])["read"].endswith(
+        "/entry/11/transfers/"
+    )
+
+
+def _history(*weeks: int) -> bytes:
+    rows = [{"event": week, "event_transfers": 0, "event_transfers_cost": 0} for week in weeks]
+    return json.dumps({"chips": [], "current": rows}).encode("utf-8")
+
+
+def test_the_rebuild_reads_each_transfers_list_and_the_opening_picks_of_a_full_season() -> None:
+    base = fpl_capture.BASE_URL
+    payloads = {
+        "entry-11-history.json": _history(1, 2, 3),
+        # A late joiner: the squad opened at gameweek 3's prices, which no document states.
+        "entry-22-history.json": _history(3),
+        # Already read, by the Free Hit walk-back or as a gameweek 2 capture's picks.
+        "entry-33-history.json": _history(1, 2),
+        "entry-33-picks-gw01.json": b"{}",
+        "entry-33-transfers.json": b"[]",
+        # Unreadable: the capture keeps bytes, so only the transfers list is named.
+        "entry-44-history.json": b"not json",
+    }
+    assert dict(fpl_capture.purchase_price_endpoints(payloads)) == {
+        "entry-11-transfers.json": f"{base}/entry/11/transfers/",
+        "entry-11-picks-gw01.json": f"{base}/entry/11/event/1/picks/",
+        "entry-22-transfers.json": f"{base}/entry/22/transfers/",
+        "entry-44-transfers.json": f"{base}/entry/44/transfers/",
+    }
+
+
+def test_a_rebuild_document_the_source_refuses_is_left_out_and_the_capture_completes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The member's budget then stays the stated worth; a capture is not failed for it."""
+
+    monkeypatch.setattr(fpl_capture, "_utc_now", lambda: "2026-08-25T09:00:00Z")
+
+    def fake_fetch(url: str, **_: Any) -> bytes:
+        if url.endswith("bootstrap-static/"):
+            return _bootstrap()
+        if url.endswith("fixtures/"):
+            return json.dumps([{"event": 1, "kickoff_time": "2026-08-21T19:00:00Z"}]).encode()
+        if url.endswith("/transfers/"):
+            raise DataSourceError(f"{url} returned HTTP 404 Not Found.")
+        return json.dumps({"read": url}).encode("utf-8")
+
+    monkeypatch.setattr(fpl_capture, "fetch", fake_fetch)
+    written = fpl_capture.capture(
+        tmp_path / "snapshots", entry_registry=_registry(tmp_path / "registry.json", [11])
+    )
+    assert written is not None
+    snapshot = read_snapshot(tmp_path / "snapshots", written.snapshot_id)
+    assert "entry-11-transfers.json" not in snapshot.payloads
+    assert "entry-11-picks-gw01.json" in snapshot.payloads
+    assert "missed   entry-11-transfers.json" in capsys.readouterr().out
+
+
+def test_the_documents_the_capture_needs_are_still_read_strictly(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(fpl_capture, "_utc_now", lambda: "2026-08-25T09:00:00Z")
+
+    def fake_fetch(url: str, **_: Any) -> bytes:
+        if url.endswith("bootstrap-static/"):
+            return _bootstrap()
+        if url.endswith("fixtures/"):
+            return json.dumps([{"event": 1, "kickoff_time": "2026-08-21T19:00:00Z"}]).encode()
+        if url.endswith("/history/"):
+            raise DataSourceError(f"{url} returned HTTP 404 Not Found.")
+        return json.dumps({"read": url}).encode("utf-8")
+
+    monkeypatch.setattr(fpl_capture, "fetch", fake_fetch)
+    with pytest.raises(DataSourceError, match="history"):
+        fpl_capture.capture(
+            tmp_path / "snapshots", entry_registry=_registry(tmp_path / "registry.json", [11])
+        )
 
 
 def test_a_capture_without_a_registry_adds_only_the_live_history(

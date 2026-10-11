@@ -16,9 +16,11 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any
 
+from squadopt.application.league_tree_identity import check_tree_identity, protected_files
 from squadopt.application.manager_words import load_manager_words
 from squadopt.contracts.injuries import require_official_injury_source
 from squadopt.contracts.league import LEAGUE_VIEW_CONTRACT_VERSION
+from squadopt.contracts.league_publication_identity import IDENTITY_FILE, publication_path
 from squadopt.contracts.league_tree import single_league_tree
 from squadopt.data._long_paths import addressable
 from squadopt.data.atomic import document_bytes, write_bytes_once
@@ -33,6 +35,7 @@ from squadopt.live.football_artifact import football_artifact_path, read_footbal
 from squadopt.platform.football_minute_basis import _basis_from_snapshot, football_components_path
 from squadopt.platform.official_injury_capture import REPORT_PAYLOAD, read_official_injury_capture
 from squadopt.platform.projection_retention import _safe
+from squadopt.platform.weekly_journal import WeeklyJournalError, fingerprint_paths
 
 CONTRACT_VERSION = "football_ready_bundle_v1"
 _REQUIRED = frozenset({"forecast", "components", "handoff", "site_members"})
@@ -77,6 +80,139 @@ def _object(raw: bytes) -> dict[str, Any]:
 
 def _digest(raw: bytes) -> str:
     return hashlib.sha256(raw).hexdigest()
+
+
+def _preparation_inputs(
+    snapshot_root: Path, snapshot_id: str, files: Mapping[str, Path]
+) -> dict[str, Any]:
+    paths = {
+        "capture": snapshot_root / snapshot_id,
+        **{role: files[role] for role in ("handoff", "forecast", "components")},
+    }
+    inputs = {}
+    for role, path in paths.items():
+        target = Path(addressable(path))
+        expects_directory = role == "capture"
+        if target.exists() and not (target.is_dir() if expects_directory else target.is_file()):
+            kind = "directory" if expects_directory else "file"
+            raise ValueError(
+                f"Invalid football preparation input {role}: Expected a {kind} at {path}."
+            )
+        try:
+            # The extended-length form, so a deep artifact root is fingerprinted too.
+            artifacts = fingerprint_paths([target])
+        except WeeklyJournalError as error:
+            raise ValueError(f"Invalid football preparation input {role}: {error}") from error
+        record = artifacts[0]
+        if role == "capture":
+            relative = {
+                "directories": record["directories"],
+                "files": [
+                    {
+                        "path": Path(item["path"]).relative_to(Path(record["path"])).as_posix(),
+                        "size": item["size"],
+                        "sha256": item["sha256"],
+                    }
+                    for item in record["files"]
+                ],
+            }
+            identity = {"sha256": _digest(document_bytes(relative))}
+        else:
+            identity = {"size": record["size"], "sha256": record["sha256"]}
+        inputs[role] = {"path": str(path.resolve()), **identity}
+    return {
+        "contract_version": "football_preparation_v1",
+        "snapshot_id": snapshot_id,
+        "inputs": inputs,
+    }
+
+
+def _check_preparation(prior: Mapping[str, Any], current: Mapping[str, Any]) -> None:
+    if (
+        set(prior) != {"contract_version", "snapshot_id", "inputs"}
+        or prior.get("contract_version") != "football_preparation_v1"
+    ):
+        raise ValueError("Invalid football preparation contract; resume refused.")
+    prior_inputs = prior.get("inputs")
+    if not isinstance(prior_inputs, Mapping):
+        raise ValueError("Invalid football preparation inputs; resume refused.")
+    if set(prior_inputs) != set(current["inputs"]):
+        raise ValueError("Invalid football preparation input roles; resume refused.")
+    for role in ("capture", "handoff", "forecast", "components"):
+        prior_role = prior_inputs.get(role)
+        if not isinstance(prior_role, Mapping) or {
+            key: value for key, value in prior_role.items() if key != "path"
+        } != {key: value for key, value in current["inputs"][role].items() if key != "path"}:
+            raise ValueError(f"Football preparation input {role} changed; resume refused.")
+    if prior.get("snapshot_id") != current["snapshot_id"]:
+        raise ValueError("Football preparation identity changed; resume refused.")
+
+
+def _preparation_replay_identity(raw: bytes) -> dict[str, Any]:
+    """Compare create-once receipts by content while keeping the first recorded paths."""
+    document = _object(raw)
+    _check_preparation(document, document)
+    return {
+        **document,
+        "inputs": {
+            role: {key: value for key, value in identity.items() if key != "path"}
+            for role, identity in document["inputs"].items()
+        },
+    }
+
+
+def _production_identity(forecast: Mapping[str, Any]) -> dict[str, Any]:
+    """Extract provenance from a pair already validated by the fixture-basis reader."""
+    fields = (
+        "model_version",
+        "season",
+        "gameweek",
+        "source_snapshot_id",
+        "source_fingerprint",
+        "captured_at_utc",
+        "training_rows",
+        "training_latest_kickoff",
+        "archive_hashes",
+        "training_selection",
+        "role_metadata",
+    )
+    return {field: forecast[field] for field in fields if field in forecast}
+
+
+def _production_record(
+    payloads: Mapping[str, bytes], snapshot_id: str, *, handoff_fingerprint: str
+) -> dict[str, Any]:
+    """Record the exact sealed bytes after production validators have accepted them."""
+    football = _production_identity(_object(payloads["forecast"]))
+    handoff = _object(payloads["handoff"])
+    if (
+        handoff.get("source_snapshot_id") != snapshot_id
+        or football.get("source_snapshot_id") != snapshot_id
+    ):
+        raise ValueError("Production record capture identities differ.")
+    training_keys = (
+        "component_training_seasons",
+        "component_training_rows",
+        "component_training_cutoff",
+        "component_training_data_fingerprint",
+        "fallback_training_seasons",
+        "training_selection",
+    )
+    diagnostics = handoff.get("diagnostics") or {}
+    return {
+        "contract_version": "football_production_record_v1",
+        "snapshot_id": snapshot_id,
+        "football": football,
+        "current_handoff": {
+            "model_version": handoff["model_version"],
+            "fingerprint": handoff_fingerprint,
+            "source_snapshot_id": handoff["source_snapshot_id"],
+            "sha256": _digest(payloads["handoff"]),
+            "training_provenance": {
+                key: diagnostics[key] for key in training_keys if key in diagnostics
+            },
+        },
+    }
 
 
 def _require_capture_id(capture_id: str) -> None:
@@ -126,7 +262,7 @@ def _validate(
         require_official_injury_source()
     extras = files.keys() - (_REQUIRED | _OPTIONAL)
     if not files.keys() >= _REQUIRED or any(
-        not re.fullmatch(r"site_entry_[1-9][0-9]*", role) for role in extras
+        not re.fullmatch(r"site_entry_[1-9][0-9]*|site_tree_[0-9a-f]{64}", role) for role in extras
     ):
         raise ValueError("Bundle file roles are incomplete or unsupported.")
     has_rotation = files.keys() >= _OPTIONAL
@@ -142,7 +278,7 @@ def _validate(
     inputs = read_inputs(snapshot, season=infer_season(snapshot))
     if as_instant(inputs.captured_at_utc) >= as_instant(inputs.deadline.deadline_utc):
         raise ValueError("A ready decision capture must precede its deadline.")
-    forecast = read_football_forecast(files["forecast"], inputs)
+    forecast = read_football_forecast(Path(addressable(files["forecast"])), inputs)
     _basis_from_snapshot(
         _object(Path(addressable(files["forecast"])).read_bytes()),
         _object(Path(addressable(files["components"])).read_bytes()),
@@ -150,7 +286,7 @@ def _validate(
         inputs,
         forecast,
     )
-    handoff = read_projection_handoff(files["handoff"])
+    handoff = read_projection_handoff(Path(addressable(files["handoff"])))
     if (
         handoff.source_snapshot_id != snapshot_id
         or handoff.season != inputs.season
@@ -158,11 +294,16 @@ def _validate(
         or not set(handoff.expected_points) <= set(inputs.players.player_id)
     ):
         raise ValueError("Projection handoff differs from the decision capture or roster.")
-    site_files = _site_files(files["site_members"].parent)
+    site_files = _site_files(
+        files["site_members"].parent,
+        retain_history=any(role.startswith("site_tree_") for role in files),
+    )
     if {role: path for role, path in files.items() if role.startswith("site_")} != site_files:
         raise ValueError("Bundle site files differ from its declared human members.")
     generated = set()
     for role, path in site_files.items():
+        if role.startswith("site_tree_"):
+            continue
         document = _object(Path(addressable(path)).read_bytes())
         payload = document["payload"]
         if (
@@ -258,7 +399,7 @@ def _validate(
     return identities, official_report
 
 
-def _site_files(tree: Path) -> dict[str, Path]:
+def _site_files(tree: Path, *, retain_history: bool = True) -> dict[str, Path]:
     """Read the existing member/entry envelopes of one league's tree, without importing
     runtime services."""
     member_path = tree / "members.json"
@@ -308,6 +449,20 @@ def _site_files(tree: Path) -> dict[str, Path]:
         result[role] = path
     if len(result) == 1:
         raise ValueError("A ready site requires at least one human member capture.")
+    if not retain_history:
+        return result
+    identity = check_tree_identity(tree)
+    retained = {
+        name: path
+        for name, path in protected_files(tree).items()
+        if name != "members.json" and not name.startswith("entries/")
+    }
+    if retained and identity is None:
+        raise ValueError("Retained league history requires a publication identity record.")
+    if identity is not None:
+        retained[IDENTITY_FILE] = tree / IDENTITY_FILE
+    for name, path in retained.items():
+        result["site_tree_" + _digest(name.encode())] = path
     return result
 
 
@@ -347,6 +502,15 @@ def _relative_files(marker: Path, snapshot_id: str, records: object) -> dict[str
         }.get(role)
         if re.fullmatch(r"site_entry_[1-9][0-9]*", role):
             expected = site + "entries/" + role.removeprefix("site_entry_") + ".json"
+        if re.fullmatch(r"site_tree_[0-9a-f]{64}", role):
+            if not isinstance(relative, str) or not relative.startswith(site):
+                raise ValueError("Retained league file is outside its sealed tree.")
+            name = relative.removeprefix(site)
+            if (name != IDENTITY_FILE and not publication_path(name)) or role != (
+                "site_tree_" + _digest(name.encode())
+            ):
+                raise ValueError("Retained league file has an unexpected role or path.")
+            expected = relative
         if expected is None:
             if (
                 role not in _OPTIONAL
@@ -439,7 +603,13 @@ def seal_football_bundle(
     publishes when it is not named.
 
     Copies may survive an interruption; only the final marker makes them ready.
-    Repeating the identical inputs completes that interruption or returns a replay.
+    Repeating byte-identical inputs with all required identity records completes an
+    interruption or returns a replay. A legacy ready marker replays its original copies.
+    Fresh seals or interrupted seals without a ready marker require an identity
+    record when they retain history. Surviving copies alone do not permit legacy replay.
+    The first validated, copy-compatible attempt records capture, handoff, forecast
+    and components in a create-once preparation receipt. Retries must use those same
+    contents; changed inputs require a new capture. File locations are informational.
     """
     if official_injury_capture_id is not None:
         require_official_injury_source()
@@ -452,6 +622,9 @@ def seal_football_bundle(
         read_football_bundle(
             artifact_root=artifact_root, snapshot_root=snapshot_root, snapshot_id=snapshot_id
         )
+    legacy_ready = existing is not None and not any(
+        role.startswith("site_tree_") for role in _object(existing)["files"]
+    )
     site_tree = single_league_tree(site_data_root, league_id)
     for capture_id in (snapshot_id, news_capture_id, official_injury_capture_id):
         if capture_id is not None:
@@ -483,8 +656,15 @@ def seal_football_bundle(
         "forecast": football_artifact_path(artifact_root, snapshot_id),
         "components": football_components_path(artifact_root, snapshot_id),
         "handoff": handoff_path,
-        **_site_files(site_tree),
+        **_site_files(site_tree, retain_history=not legacy_ready),
     }
+    preparation_path = football_bundle_stage_path(
+        artifact_root, snapshot_id, FootballBundleStage.PREPARATION
+    )
+    _safe(Path(addressable(preparation_path)))
+    preparation = _preparation_inputs(snapshot_root, snapshot_id, files)
+    if Path(addressable(preparation_path)).exists():
+        _check_preparation(_object(Path(addressable(preparation_path)).read_bytes()), preparation)
     if rotation_table_path is not None:
         files.update(
             rotation_table=rotation_table_path,
@@ -504,6 +684,7 @@ def seal_football_bundle(
         news_capture_id=news_capture_id,
         official_injury_capture_id=official_injury_capture_id,
     )
+    _check_preparation(preparation, _preparation_inputs(snapshot_root, snapshot_id, files))
     folder = football_bundle_stage_path(artifact_root, snapshot_id, FootballBundleStage.FOLDER)
     destinations = dict(files)
     destinations["handoff"] = folder / "handoff.json"
@@ -513,6 +694,13 @@ def seal_football_bundle(
     for role in _OPTIONAL & files.keys():
         destinations[role] = folder / files[role].name
     payloads = {role: Path(addressable(path)).read_bytes() for role, path in files.items()}
+    # Bind the copy bytes to the receipt, including changes after the source recheck.
+    for role in ("handoff", "forecast", "components"):
+        raw = payloads[role]
+        if {"size": len(raw), "sha256": _digest(raw)} != {
+            key: value for key, value in preparation["inputs"][role].items() if key != "path"
+        }:
+            raise ValueError(f"Football preparation input {role} changed before copying.")
     record = {
         "contract_version": CONTRACT_VERSION,
         "snapshot_id": snapshot_id,
@@ -536,6 +724,12 @@ def seal_football_bundle(
             and Path(addressable(path)).read_bytes() != payloads[role]
         ):
             raise ValueError("A different immutable bundle artifact already exists.")
+    # Record normal writers' inputs before copies. A retry must keep all four identities.
+    # This receipt is never a ready marker; without one, active bundle readers treat it
+    # as an incomplete attempt and serve no loose football input for this capture.
+    write_bytes_once(
+        document_bytes(preparation), preparation_path, parse=_preparation_replay_identity
+    )
     for role, path in destinations.items():
         if path != files[role]:
             write_bytes_once(payloads[role], path)
@@ -554,6 +748,15 @@ def seal_football_bundle(
         for role, path in destinations.items()
     ):
         raise ValueError("A bundle input changed while it was being sealed.")
+    # Write provenance only after the copied bytes and identities are verified.
+    write_bytes_once(
+        document_bytes(
+            _production_record(
+                payloads, snapshot_id, handoff_fingerprint=final_identity["handoff_fingerprint"]
+            )
+        ),
+        football_bundle_stage_path(artifact_root, snapshot_id, FootballBundleStage.PRODUCTION),
+    )
     write_bytes_once(raw_marker, marker)
     return read_football_bundle(
         artifact_root=artifact_root, snapshot_root=snapshot_root, snapshot_id=snapshot_id

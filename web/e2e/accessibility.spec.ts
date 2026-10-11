@@ -224,7 +224,9 @@ test("skip link and the sidebar's controls take keyboard focus in order", async 
     navigation.getByRole("link", { name: "Bu hafta", exact: true }),
     navigation.getByRole("link", { name: "Lig", exact: true }),
     navigation.getByRole("link", { name: "Fikstür", exact: true }),
-    navigation.getByRole("link", { name: "Katkıda bulun", exact: true }),
+    ...(process.env.VITE_ADVICE_API_ORIGIN
+      ? [navigation.getByRole("link", { name: "Katkıda bulun", exact: true })]
+      : []),
     sidebar.getByRole("button", { name: /^TR/ }),
     sidebar.getByRole("button", { name: /^EN/ }),
   ];
@@ -284,7 +286,13 @@ test("the tablet rail names every icon and opens the sidebar over the page", asy
   await page.setViewportSize({ width: 820, height: 1180 });
   await page.goto("/");
   const navigation = page.getByRole("navigation");
-  for (const name of ["Bu hafta", "Lig", "Fikstür", "Katkıda bulun"]) {
+  const names = ["Bu hafta", "Lig", "Fikstür"];
+  if (process.env.VITE_ADVICE_API_ORIGIN) {
+    names.push("Katkıda bulun");
+  } else {
+    await expect(page.locator('#sidebar a[href="/contribute"]')).toHaveCount(0);
+  }
+  for (const name of names) {
     const link = navigation.getByRole("link", { name, exact: true });
     await expect(link).toBeVisible();
     const box = (await link.boundingBox())!;

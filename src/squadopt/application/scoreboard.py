@@ -66,14 +66,17 @@ from pathlib import Path
 from typing import Any, Final
 
 from squadopt.application.entries import EntryRegistry
+from squadopt.application.league_tree_identity import record_tree_identity
 from squadopt.application.scoreboard_baselines import human_baseline_rows
 from squadopt.contracts.league import LEAGUE_VIEW_CONTRACT_VERSION
+from squadopt.contracts.league_publication_identity import IDENTITY_FILE
 from squadopt.contracts.league_tree import (
     LEGACY_TREE,
     find_league_tree,
     league_tree_dir,
     read_league_directory,
 )
+from squadopt.data._long_paths import addressable
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import list_snapshot_ids, read_snapshot
 from squadopt.data.sources import FPL_LIVE_SOURCE
@@ -734,7 +737,34 @@ class ScoreboardPublicationResult:
 
     @property
     def output_paths(self) -> tuple[Path, ...]:
-        return (self.target,)
+        identity = self.target.with_name(IDENTITY_FILE)
+        return (self.target, identity) if identity.is_file() else (self.target,)
+
+
+def _retained_publication_capture(tree: Path) -> str | None:
+    """Read only the retained capture header so an interrupted writer can retry.
+
+    The inherited file hashes were verified at preview seeding. They can be stale
+    during this writer's retry, while the original decision capture stays required.
+    """
+    identity_path = tree / IDENTITY_FILE
+    readable = Path(addressable(identity_path))
+    if not readable.exists():
+        return None
+    try:
+        record = json.loads(readable.read_bytes())
+    except (OSError, ValueError) as error:
+        raise DataError(
+            f"Cannot read retained publication identity {identity_path}: {error}"
+        ) from error
+    if not isinstance(record, dict):
+        raise DataError(f"Retained publication identity {identity_path} must be a JSON object.")
+    capture = record.get("source_snapshot_id")
+    if not isinstance(capture, str) or not capture.strip():
+        raise DataError(
+            f"Retained publication identity {identity_path} needs a nonempty source_snapshot_id."
+        )
+    return capture
 
 
 def publish_scoreboard(request: ScoreboardPublicationRequest) -> ScoreboardPublicationResult:
@@ -802,6 +832,9 @@ def publish_scoreboard(request: ScoreboardPublicationRequest) -> ScoreboardPubli
         site_data, request.league_id
     )
     target = tree / SCOREBOARD_FILE
+    # The inherited tree was verified when the weekly preview was seeded. A retry
+    # may already contain this stage's new scoreboard beside the previous record.
+    prior_capture = _retained_publication_capture(tree)
     # An empty ledger root beside a scoreboard that already publishes our rows: the
     # decisions were made, their local record is what is missing. Keep the rows.
     published_ours = _published_ours(target, season) if not entries else {}
@@ -854,6 +887,8 @@ def publish_scoreboard(request: ScoreboardPublicationRequest) -> ScoreboardPubli
         encoding="utf-8",
         newline="\n",
     )
+    if prior_capture is not None:
+        record_tree_identity(tree, source_snapshot_id=prior_capture)
     return ScoreboardPublicationResult(
         snapshot_id,
         season,

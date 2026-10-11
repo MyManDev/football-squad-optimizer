@@ -201,10 +201,19 @@ def _acquire(
     own rule: its only network reach is the club hosts the registry names.
     """
 
-    # Fetch time and model completion are separate clocks in production. Keep both
-    # on this synthetic week's clock, with completion strictly after the documents.
-    completed = (now + timedelta(minutes=1)).isoformat().replace("+00:00", "Z")
-    monkeypatch.setattr("squadopt.platform.club_news_acquire._utc_now", lambda: completed)
+    # Advance the injected clock after the real synthetic acquisition finishes.
+    from squadopt.platform import club_news_acquire
+
+    acquisition = club_news_acquire.acquire_week
+    finished = False
+
+    def acquire_then_advance(**kwargs):
+        nonlocal finished
+        result = acquisition(**kwargs)
+        finished = True
+        return result
+
+    monkeypatch.setattr(club_news_acquire, "acquire_week", acquire_then_advance)
     snapshots = tmp_path / "snapshots"
     code = acquire(
         [
@@ -221,7 +230,7 @@ def _acquire(
             KEY_ENVIRONMENT_VARIABLE: "not-a-real-key",
         },
         opener=_host(),
-        now=lambda: now,
+        now=lambda: now + timedelta(minutes=1) if finished else now,
         sleeper=lambda _: None,
     )
     return code

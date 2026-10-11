@@ -221,10 +221,11 @@ Nothing under `data/sample/` is any club's captured bytes. Real captures stay un
 - **Provenance is now per club; the exporter's call granularity is not.** `ModelProvenance` is
   the per-club record and `ClubModelProvenance` collects one per club, so a row's
   `model_response_sha256` is the digest of that player's club's response and the manifest lists
-  every response the week holds. What has not moved is how many calls the exporter makes: it
-  still asks once. `code(documents, roster)` is already club-agnostic, so calling it per club
-  is a change in the caller and none here: what the caller needs is documents that know their
-  own club, and the fetch adapter that assigns one is where that comes from.
+  every response the week keeps as evidence (a response refused whole is stored but left out,
+  see `docs/rotation_evidence_contract.md`). What has not moved is how many calls the exporter
+  makes: it still asks once. `code(documents, roster)` is already club-agnostic, so calling it
+  per club is a change in the caller and none here: what the caller needs is documents that know
+  their own club, and the fetch adapter that assigns one is where that comes from.
 - **The runbook names the variables now.** `docs/weekly_runbook.md` (Timing, beside the
   club-news capture) says which three variables select the provider, the model and the key,
   and what happens when the model is not one the adapter has checked. The `llm` extra is still

@@ -580,24 +580,22 @@ const en = {
     strategyLegend: "Strategy",
     strategies: {
       "saf-puan": {
-        name: "Pure points",
-        // Not "the highest expected points": the solve maximises the eleven, the captain
-        // and the bench together, and the figure below the card is the eleven and the
-        // captain only. A banded plan that keeps a weaker bench can read higher on that
-        // figure. Measured on the 2026-27 GW4 capture: entry 3832237's pure-points plan
-        // publishes 46.5454 against its ortak-koru plan's 46.7016, both OPTIMAL, both
-        // free of hits.
+        name: "Most points",
+        // The owner-approved name states the plan's aim, rather than ranking the
+        // published figure. The solve includes the bench; the card counts eleven plus
+        // captain. On 2026-27 GW4, entry 3832237's plan publishes 46.5454 against its
+        // ortak-koru plan's 46.7016, both OPTIMAL and free of hits.
         description: "Points alone, no rival in the equation.",
         short: "Points alone, no rival in the equation.",
       },
       "ortak-koru": {
-        name: "Keep the shared core",
+        name: "Hold the gap",
         description:
           "Requests at least 9 shared players between your recommended 15 and the rival's XI. This minimum may be lowered to fit the free-transfer limit; the plan states the applied bound.",
         short: "Asks for at least 9 of your 15 in the rival's eleven.",
       },
       "fark-yarat": {
-        name: "Create a gap",
+        name: "Close the gap",
         description:
           "Requests at most 5 shared players between your recommended 15 and the rival's XI. This maximum may be raised to fit the free-transfer limit; the plan states the applied bound.",
         short: "Asks for at most 5 of your 15 in the rival's eleven.",
@@ -653,7 +651,7 @@ const en = {
     rivalsUnreadable: "Some members' squads could not be read. Reload the page to read them again.",
     rivalNoDefault:
       "This publish named no standings neighbour for you, so no rival is chosen on your behalf: pick one and the plan against them can be computed.",
-    windowLegend: "Window",
+    windowLegend: "Plan length",
     windowTitle: (weeks: number) => `The ${weeks}-week window`,
     windowRule:
       "The moves and the lineup above are the first week's. Each row below is one gameweek of the plan.",
@@ -1597,18 +1595,18 @@ const tr: MessageSchema<typeof en> = {
     strategyLegend: "Strateji",
     strategies: {
       "saf-puan": {
-        name: "Saf puan",
+        name: "En çok puan",
         description: "Yalnız puan; denklemde rakip yok.",
         short: "Yalnız puan; denklemde rakip yok.",
       },
       "ortak-koru": {
-        name: "Ortak çekirdeği koru",
+        name: "Farkı koru",
         description:
           "Önerilen 15 oyuncun ile rakibin ilk 11'i arasında en az 9 ortak oyuncu ister. Ücretsiz transfer sınırına uymak için bu alt sınır düşürülebilir; plan uygulanan sınırı belirtir.",
         short: "15'inle rakibin ilk 11'i arasında en az 9 ortak oyuncu ister.",
       },
       "fark-yarat": {
-        name: "Fark yarat",
+        name: "Farkı kapat",
         description:
           "Önerilen 15 oyuncun ile rakibin ilk 11'i arasında en fazla 5 ortak oyuncu ister. Ücretsiz transfer sınırına uymak için bu üst sınır yükseltilebilir; plan uygulanan sınırı belirtir.",
         short: "15'inle rakibin ilk 11'i arasında en fazla 5 ortak oyuncu ister.",
@@ -1661,7 +1659,7 @@ const tr: MessageSchema<typeof en> = {
     rivalsUnreadable: "Bazı üyelerin kadroları okunamadı. Yeniden okumak için sayfayı yenile.",
     rivalNoDefault:
       "Bu yayın senin için sıralamada bir komşu belirlemedi, o yüzden yerine bir rakip seçilmiyor: birini seç, ona karşı plan hesaplanabilsin.",
-    windowLegend: "Pencere",
+    windowLegend: "Plan süresi",
     windowTitle: (weeks) => `${weeks} haftalık pencere`,
     windowRule:
       "Yukarıdaki hamleler ve kadro ilk haftanın. Aşağıdaki her satır planın bir oyun haftası.",

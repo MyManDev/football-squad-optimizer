@@ -774,12 +774,16 @@ def test_the_preview_records_advice_only_when_it_is_the_publication(
             gameweek=2,
             report=SimpleNamespace(members=(), removed=()),
             top100_note="",
+            purchase_prices_note="rebuilt for 1 of 1",
             legacy_tree="",
             published=None,
         )
 
     monkeypatch.setattr(weekly, "publish_league", publish)
-    assert operation._league().value["advice_recorded"] is False
+    preview = operation._league().value
+    assert preview["advice_recorded"] is False
+    # The operator's line on the purchase prices is in the league's receipt.
+    assert preview["leagues"]["352490"]["purchase_prices_note"] == "rebuilt for 1 of 1"
     # No evidence stage ran, so no Top 100 table reaches the league build.
     assert calls[0].top100_evidence is None
     publishing = weekly.WeeklyOperations(
@@ -1401,3 +1405,15 @@ def test_a_league_the_registry_was_not_seeded_from_stops_a_one_league_run(
         operation.execute()
     # The seed command it names seeds exactly the run's leagues.
     assert "seed_entry_registry --league 7 --snapshot-id" in str(refused.value)
+
+
+def test_completed_preview_league_and_scoreboard_share_valid_identity(tmp_path):
+    from squadopt.application.league_tree_identity import check_tree_identity
+
+    operation = world(tmp_path)
+    operation.execute()
+    tree = operation.paths.out / "data/leagues/352490"
+    identity = check_tree_identity(tree)
+    assert identity is not None
+    assert "scoreboard.json" in identity["files"]
+    assert identity["source_snapshot_id"] == operation.request.snapshot_id

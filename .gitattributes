@@ -1,6 +1,7 @@
-# The web app is authored and formatted with LF line endings on every platform
+# The web app and the Workers are authored and formatted with LF line endings on every platform
 # (prettier, generated types, committed data); keep the working tree the same.
 web/** text eol=lf
+workers/** text eol=lf
 scripts/release/*.sh text eol=lf
 
 # Read by digest, so their bytes have to be the same on every checkout. Under
