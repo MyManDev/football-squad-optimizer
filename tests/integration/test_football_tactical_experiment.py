@@ -480,7 +480,8 @@ def test_chips_hits_and_locked_roles_match_independent_official_score(
         ("3xc", 4.0, {"chip": None}),
         ("3xc", 4.0, {"chip": "bboost"}),
         ("3xc", 4.0, {"hit_points": 0.0}),
-        ("3xc", 4.0, {"hit_points": True}),
+        # True equals 1.0 numerically, so only the explicit boolean refusal catches it.
+        ("3xc", 1.0, {"hit_points": True}),
     ],
 )
 def test_fixed_fifteen_refuses_a_caller_chip_or_hit_that_differs_from_the_bound_bundle(
