@@ -1390,11 +1390,25 @@ def test_a_league_dropped_from_the_list_leaves_the_site_with_its_tree(tmp_path: 
     dropped = operation.paths.out / "data" / "leagues" / "9"
     (dropped / "entries").mkdir(parents=True)
     (dropped / "members.json").write_text("{}", encoding="utf-8")
+    # An earlier week's device-plan table, seeded from the published tree, goes the same way.
+    stale = operation.paths.out / "data" / "device" / "fpl-live-earlier" / "device-plan.json"
+    stale.parent.mkdir(parents=True)
+    stale.write_text("{}", encoding="utf-8")
     doc = json.loads(operation.execute().read_bytes())
     league = {stage["name"]: stage["value"] for stage in doc["stages"]}["league"]
-    assert league["removed_trees"] == ["leagues/9"]
-    assert not dropped.exists()
+    assert league["removed_trees"] == ["leagues/9", "device/fpl-live-earlier"]
+    assert not dropped.exists() and not stale.parent.exists()
     assert (operation.paths.out / "data" / "leagues" / "352490" / "members.json").is_file()
+    # This week's table is written once under its capture and journaled with the stage.
+    table = operation.paths.out / "data" / "device" / league["snapshot_id"] / "device-plan.json"
+    assert table.is_file()
+    recorded = [
+        row["path"]
+        for stage in doc["stages"]
+        if stage["name"] == "league"
+        for row in stage["outputs"]
+    ]
+    assert str(table) in recorded
 
 
 def test_a_league_the_registry_was_not_seeded_from_stops_a_one_league_run(
