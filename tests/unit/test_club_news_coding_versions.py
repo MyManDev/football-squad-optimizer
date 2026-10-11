@@ -152,6 +152,13 @@ def test_old_contract_cannot_smuggle_in_the_new_label() -> None:
         QUOTE,
         "In the next league match, Saka cannot play the full 90 minutes.",
         "Saka won't be able to complete the whole next Premier League game.",
+        "Saka cannot complete the full next Premier League fixture.",
+        "Saka cannot complete the full next league fixture.",
+        # The scope rule reads "fixture" at the end of the clause, with or without a stop.
+        "Saka cannot complete the full upcoming league fixture!",
+        "Saka cannot complete the full next league fixture",
+        # A leading phrase ends at its comma.
+        "In the next league fixture, Saka cannot complete the full match.",
     ],
 )
 def test_explicit_upcoming_full_match_limit_remains_categorical_and_cited(quote: str) -> None:
@@ -181,6 +188,17 @@ def test_explicit_upcoming_full_match_limit_remains_categorical_and_cited(quote:
         "Saka cannot complete the full match.",
         "If he is injured, Saka cannot complete the full upcoming league match.",
         "It is not true that Saka cannot complete the full upcoming league match.",
+        # "fixture" names the league match only after "next" or "upcoming" and the league
+        # qualifier, ending the clause.
+        "Saka cannot complete the full fixture list before the next league match.",
+        "Saka cannot play the full fixture in the next league match.",
+        "Saka cannot complete the full Premier League fixture list before the next league match.",
+        "Saka cannot complete the full league fixture list before the next league match.",
+        "Saka cannot complete the full next Premier League fixture list.",
+        "In the next league match, Saka cannot complete the full league fixture.",
+        "In the next league match, Saka cannot complete the full next league fixture list.",
+        # The scope search reads "fixture" the same way.
+        "Saka cannot complete the full match before the next league fixture list.",
     ],
 )
 def test_vague_past_wrong_competition_and_conditional_quotes_do_not_authorize_new_label(

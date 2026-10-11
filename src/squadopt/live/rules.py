@@ -276,6 +276,52 @@ def free_transfer_cap(bootstrap: bytes) -> int | None:
     return None
 
 
+def _rules_block(bootstrap: bytes) -> Mapping[str, object] | None:
+    document = json.loads(bootstrap.decode("utf-8"))
+    config = document.get("game_config") if isinstance(document, Mapping) else None
+    rules = config.get("rules") if isinstance(config, Mapping) else None
+    return rules if isinstance(rules, Mapping) else None
+
+
+def transfer_sell_on_fee(bootstrap: bytes) -> float | None:
+    """The share of a price rise the game keeps on a sale, read from the captured settings.
+
+    ``game_config.rules.transfers_sell_on_fee`` is the field ``read_season_rules`` builds
+    ``TransferRules.sell_on_fee`` from, and so the fee the planner applies; this reads that
+    field alone, with no other block to fall back on, so a member's page and the plan
+    behind it cannot read two different fees. None when the field is absent or is not a
+    fraction, and None when ``element_sell_at_purchase_price`` is set: neither
+    ``planning.pricing.sell_price_tenths`` nor the planner models that rule, so a selling
+    value derived under it would be a different game's.
+    """
+
+    rules = _rules_block(bootstrap)
+    if rules is None or bool(rules.get("element_sell_at_purchase_price", False)):
+        return None
+    fee = rules.get("transfers_sell_on_fee")
+    if isinstance(fee, bool) or not isinstance(fee, int | float) or not 0.0 <= fee <= 1.0:
+        return None
+    return float(fee)
+
+
+def squad_budget_tenths(bootstrap: bytes) -> int | None:
+    """What a squad may cost at the opening deadline, read from the captured settings.
+
+    ``game_config.rules.squad_total_spend``, the field ``read_season_rules`` builds
+    ``TransferRules.budget_tenths`` from. None when the field is absent or not a whole
+    number of tenths.
+    """
+
+    rules = _rules_block(bootstrap)
+    if rules is None or "squad_total_spend" not in rules:
+        return None
+    try:
+        budget = _int(rules, "squad_total_spend", "rules")
+    except SeasonRulesError:
+        return None
+    return budget if budget > 0 else None
+
+
 def chip_availability_for(
     rules: SeasonRules,
     gameweeks: Sequence[int],

@@ -1148,10 +1148,12 @@ def _entry_squad_payload(
         "active_chip": picks.active_chip,
         "purchase_prices_known": bool(picks.purchase_prices_known),
         # What the fifteen would raise if sold, and that plus the bank: what the member
-        # may spend. The endpoints publish no purchase price, so no page may add up the
-        # fifteen current prices and call the total a budget, because the game keeps half
-        # of every rise since a player was bought. The aggregate is published instead, and
-        # it is what the plan on this page was held to. Null where a source states neither.
+        # may spend. No page may add up the fifteen current prices and call the total a
+        # budget, because the game keeps half of every rise since a player was bought.
+        # Where the purchase prices were rebuilt this is the rule's sum at the capture's
+        # prices, exactly the budget the plan on this page was held to; otherwise it is
+        # the stated worth less the bank, a market value the plan was capped at. Null
+        # where a source states neither.
         "squad_sell_value_tenths": (
             None if picks.squad_sell_value_tenths is None else int(picks.squad_sell_value_tenths)
         ),

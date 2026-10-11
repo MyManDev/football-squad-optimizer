@@ -774,12 +774,16 @@ def test_the_preview_records_advice_only_when_it_is_the_publication(
             gameweek=2,
             report=SimpleNamespace(members=(), removed=()),
             top100_note="",
+            purchase_prices_note="rebuilt for 1 of 1",
             legacy_tree="",
             published=None,
         )
 
     monkeypatch.setattr(weekly, "publish_league", publish)
-    assert operation._league().value["advice_recorded"] is False
+    preview = operation._league().value
+    assert preview["advice_recorded"] is False
+    # The operator's line on the purchase prices is in the league's receipt.
+    assert preview["leagues"]["352490"]["purchase_prices_note"] == "rebuilt for 1 of 1"
     # No evidence stage ran, so no Top 100 table reaches the league build.
     assert calls[0].top100_evidence is None
     publishing = weekly.WeeklyOperations(

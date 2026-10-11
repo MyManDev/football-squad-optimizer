@@ -21,6 +21,7 @@ transition: what it changed, what was accepted and what still waits on a real en
 | `src/squadopt/api/` | Optional HTTP adapter over application/platform contracts |
 | `scripts/` | Compatible repository commands and research entry points |
 | `web/` | Member website, runtime publication validation and browser tests |
+| `workers/` | Cloudflare Workers deployed separately from the static site (today only the [FPL probe](docs/fpl_forwarder_probe.md)) |
 | `deploy/` | Deployment configuration for separate API and worker processes |
 | `tests/` | Offline fixtures, unit tests and opt-in acceptance probes |
 | `docs/` | Product, operations, architecture, contracts and scientific evidence |
