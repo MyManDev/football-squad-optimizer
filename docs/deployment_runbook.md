@@ -193,6 +193,11 @@ fixed Friday run would decide the week on a capture more than five days stale â€
 news, before injuries, before price changes. Move the decision run to the day before the
 deadline for those five and keep the capture lead time from `docs/weekly_runbook.md`.
 
+The owner runs the Tuesday settle and the Friday publish through GW20, whose deadline is
+2027-01-05T18:00:00Z, including the midweek GW13, GW18 and GW20 decision runs. A delegated
+stage requires the owner's approval for that run. After GW20 the weekly run moves off
+the owner's PC, tracked in #1010. This operator decision was recorded in #1005.
+
 **The Tuesday run may publish nothing, and that is a pass, not a failure.** A gameweek counts as
 settled only when the source says both `finished` and `data_checked`
 (`application/scoreboard.py`), so a Tuesday that arrives before the check publishes "not settled
