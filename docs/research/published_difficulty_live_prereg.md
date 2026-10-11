@@ -15,6 +15,11 @@ when either arm's primary or tie-break is still not proven OPTIMAL at 240 units,
 or when the wall clock stops any solve of either arm. Reading 3 below states it
 in full.
 
+One clarification, made on 2026-10-11 at the reviewer's request on #1033 and
+before any live comparison or outcome was read, changes no rule: every scored
+week's outcomes, live payload and bootstrap alike, come from the one verdict
+capture, as Three readings and the gate and Missing weeks and provenance state.
+
 ## Binding start and one verdict
 
 The target is a merge before the GW7 deadline, `2026-10-17T10:00:00Z`, either
@@ -105,6 +110,10 @@ its result is not a condition for this protocol.
 
 Join settled live total points to the captured roster by stable player code,
 using the settled bootstrap's element-id-to-code map for its live payload.
+Every scored week's outcomes, its settled live payload and the bootstrap that
+counts it in `scored_gameweeks` and maps its element ids, are read from the one
+verdict capture that Binding start and one verdict names, never from any other
+capture, even for a week settled long before GW20.
 One gameweek is the unit, with equal weight across scored weeks. Player counts
 are reported separately and never treated as independent bootstrap units.
 
@@ -174,9 +183,10 @@ such captures at the same latest instant, an absent or ambiguous paired handoff,
 a paired handoff file written at or after the deadline, a refused source or
 fingerprint, a free squad that reading 3 leaves unproven or clock-stopped in
 one arm or both, or no later capture whose bootstrap counts the week in
-`scored_gameweeks` and that carries its settled live payload. Never repair a
-missing week with another week's capture or a reconstructed post-deadline
-handoff.
+`scored_gameweeks` and that carries its settled live payload, where the only
+later capture read is the verdict capture, as Three readings and the gate
+states. Never repair a missing week with another week's capture or a
+reconstructed post-deadline handoff.
 Record excluded players and absent outcome rows rather than filling them.
 The runner refuses 2025-26 in every input and cannot print a real comparison
 before the settled-GW20 verdict condition. Tests use synthetic weeks only.

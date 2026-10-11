@@ -8,7 +8,8 @@ could take an audit capture the backend never served, paired a handoff whose wri
 checked, left the interval's function, quantile rule and week order open, did not say whether
 the pooled or the per-version figures decide, did not say which side of a fixture the signal
 reads, and solved the free squad on a wall clock, which the owner replaced on 2026-10-10 with
-the #844 method.
+the #844 method. A clarification of 2026-10-11, asked for in the review approving #1033, binds
+every scored week's outcomes to the one verdict capture.
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ import dataclasses
 import hashlib
 import json
 import re
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import numpy as np
@@ -28,7 +30,7 @@ from squadopt.experiments import opponent_projection
 from squadopt.live import InSeasonProjection, read_projection_handoff, recommendation
 from squadopt.live.tick import handoff_path_for
 from squadopt.optimization import OptimizationConfig, SolverStatus, optimizer
-from squadopt.platform import capture_context, projection_retention
+from squadopt.platform import capture_context, fpl_capture, projection_retention
 from squadopt.platform.backend_runtime import BackendConfig, BackendConfigError
 
 REPOSITORY = Path(__file__).resolve().parents[2]
@@ -114,6 +116,54 @@ def test_settlement_is_read_from_the_event_flags_scored_gameweeks_reads() -> Non
     assert "The verdict names the earliest such capture and its fingerprint." in verdict
     assert "bootstrap counts the week in `scored_gameweeks`" in missing
     assert "marks the week scored" not in missing
+
+
+def _deadline(week: int) -> str:
+    """A made-up weekly calendar; no real deadline or capture is read."""
+
+    opening = datetime(2026, 8, 21, 17, 30, tzinfo=UTC)
+    return (opening + timedelta(weeks=week - 1)).isoformat().replace("+00:00", "Z")
+
+
+def test_every_scored_weeks_outcomes_come_from_the_one_verdict_capture() -> None:
+    """Any capture after a week settles carries its outcomes, so the text must name which one.
+
+    Every capture keeps the live payload of every played week, and its bootstrap marks every
+    settled week. Without the binding sentence a runner could join GW8 to the GW9 capture and
+    GW12 to a later one, one capture per week chosen after the fact. The premise half shows the
+    one verdict capture holds all of them: a synthetic capture taken once GW20 has settled asks
+    for the live payload of GW1 through GW20 and counts each of those weeks as scored.
+    """
+
+    events = [
+        {
+            "id": week,
+            "deadline_time": _deadline(week),
+            "finished": week <= 20,
+            "data_checked": week <= 20,
+        }
+        for week in range(1, 39)
+    ]
+    bootstrap = json.dumps({"events": events}).encode("utf-8")
+    settled_after_gw20 = _deadline(21).replace("17:30:00", "09:00:00")
+
+    endpoints = fpl_capture.live_history_endpoints(bootstrap, as_of_utc=settled_after_gw20)
+    assert {fpl_live.live_payload(week) for week in range(1, 21)} <= set(endpoints)
+    assert fpl_live.scored_gameweeks(bootstrap) == frozenset(range(1, 21))
+
+    opening = _protocol().split("## Binding start and one verdict")[0]
+    gate = _section("Three readings and the gate")
+    missing = _section("Missing weeks and provenance")
+    assert (
+        "One clarification, made on 2026-10-11 at the reviewer's request on #1033 and before any"
+        " live comparison or outcome was read, changes no rule" in opening
+    )
+    assert (
+        "Every scored week's outcomes, its settled live payload and the bootstrap that counts it"
+        " in `scored_gameweeks` and maps its element ids, are read from the one verdict capture"
+        " that Binding start and one verdict names, never from any other capture" in gate
+    )
+    assert "where the only later capture read is the verdict capture" in missing
 
 
 def test_the_roots_the_protocol_reads_are_the_ones_the_backend_serves_from() -> None:
