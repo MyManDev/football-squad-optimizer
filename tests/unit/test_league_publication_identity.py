@@ -123,10 +123,10 @@ def test_markerless_interrupted_legacy_copies_do_not_admit_unrecorded_history(ca
     marker_path = bundle.football_bundle_path(case["artifact_root"], case["snapshot_id"])
     original = bundle.write_bytes_once
 
-    def interrupt_at_marker(raw, target):
+    def interrupt_at_marker(raw, target, **kwargs):
         if target == marker_path:
             raise OSError("synthetic interruption after copies")
-        return original(raw, target)
+        return original(raw, target, **kwargs)
 
     monkeypatch.setattr(bundle, "write_bytes_once", interrupt_at_marker)
     with pytest.raises(OSError, match="after copies"):

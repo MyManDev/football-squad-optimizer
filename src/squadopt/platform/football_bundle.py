@@ -78,7 +78,8 @@ def _preparation_inputs(
                 f"Invalid football preparation input {role}: Expected a {kind} at {path}."
             )
         try:
-            artifacts = fingerprint_paths([path])
+            # The extended-length form, so a deep artifact root is fingerprinted too.
+            artifacts = fingerprint_paths([target])
         except WeeklyJournalError as error:
             raise ValueError(f"Invalid football preparation input {role}: {error}") from error
         record = artifacts[0]
