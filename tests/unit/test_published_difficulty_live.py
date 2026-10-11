@@ -600,6 +600,16 @@ def test_the_declaration_is_the_text_the_clarification_left(
     with pytest.raises(study.DifficultyInputError, match="declaration differs"):
         runner.frozen_declaration()
     texts["protocol-merge"] = protocol
+    # The text #1075 merged must itself carry the pinned digest, not only the checkout's.
+    texts["clarification-merge"] = protocol + b"another clarification\n"
+    with pytest.raises(study.DifficultyInputError, match="declaration differs"):
+        runner.frozen_declaration()
+    texts["clarification-merge"] = clarified
+    # A later change to the protocol text in the checkout refuses the reading too.
+    (tmp_path / runner.DECLARATION).write_bytes(clarified + b"amended\n")
+    with pytest.raises(study.DifficultyInputError, match="declaration differs"):
+        runner.frozen_declaration()
+    (tmp_path / runner.DECLARATION).write_bytes(clarified.replace(b"\n", b"\r\n"))
     pulls["1075"][0] = "OPEN"
     with pytest.raises(study.DifficultyInputError, match="merge"):
         runner.frozen_declaration()
