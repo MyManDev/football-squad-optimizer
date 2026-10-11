@@ -11,6 +11,7 @@ import json
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any
@@ -50,6 +51,26 @@ def football_bundle_path(artifact_root: Path, snapshot_id: str) -> Path:
     return football_artifact_path(artifact_root, snapshot_id).with_suffix(".bundle.json")
 
 
+class FootballBundleStage(StrEnum):
+    STARTED = ".bundle.started.json"
+    PREPARATION = ".bundle.preparation.json"
+    PRODUCTION = ".bundle.production.json"
+    FOLDER = ".bundle"
+
+
+def football_bundle_stage_path(
+    artifact_root: Path, snapshot_id: str, stage: FootballBundleStage
+) -> Path:
+    return football_artifact_path(artifact_root, snapshot_id).with_suffix(stage.value)
+
+
+def football_bundle_stage_paths(artifact_root: Path, snapshot_id: str) -> tuple[Path, ...]:
+    return tuple(
+        football_bundle_stage_path(artifact_root, snapshot_id, stage)
+        for stage in FootballBundleStage
+    )
+
+
 def _object(raw: bytes) -> dict[str, Any]:
     result = json.loads(raw)
     if not isinstance(result, dict):
@@ -61,6 +82,16 @@ def _digest(raw: bytes) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
+def _preparation_target(role: str, path: Path) -> Path:
+    """Name the writer role whose path holds the wrong kind of entry."""
+    target = Path(addressable(path))
+    expects_directory = role == "capture"
+    if target.exists() and not (target.is_dir() if expects_directory else target.is_file()):
+        kind = "directory" if expects_directory else "file"
+        raise ValueError(f"Invalid football preparation input {role}: Expected a {kind} at {path}.")
+    return target
+
+
 def _preparation_inputs(
     snapshot_root: Path, snapshot_id: str, files: Mapping[str, Path]
 ) -> dict[str, Any]:
@@ -70,13 +101,7 @@ def _preparation_inputs(
     }
     inputs = {}
     for role, path in paths.items():
-        target = Path(addressable(path))
-        expects_directory = role == "capture"
-        if target.exists() and not (target.is_dir() if expects_directory else target.is_file()):
-            kind = "directory" if expects_directory else "file"
-            raise ValueError(
-                f"Invalid football preparation input {role}: Expected a {kind} at {path}."
-            )
+        target = _preparation_target(role, path)
         try:
             # The extended-length form, so a deep artifact root is fingerprinted too.
             artifacts = fingerprint_paths([target])
@@ -194,10 +219,14 @@ def _production_record(
     }
 
 
-def _source(snapshot_root: Path, capture_id: str) -> CapturedSnapshot:
-    # read_snapshot validates exact bytes; reject path aliases before opening them.
+def _require_capture_id(capture_id: str) -> None:
     if not re.fullmatch(r"[a-z0-9][A-Za-z0-9-]{0,159}", capture_id):
         raise ValueError("Invalid bundle source capture identity.")
+
+
+def _source(snapshot_root: Path, capture_id: str) -> CapturedSnapshot:
+    # read_snapshot validates exact bytes; reject path aliases before opening them.
+    _require_capture_id(capture_id)
     _safe(Path(addressable(snapshot_root / capture_id)))
     return read_snapshot(snapshot_root, capture_id)
 
@@ -600,15 +629,44 @@ def seal_football_bundle(
     legacy_ready = existing is not None and not any(
         role.startswith("site_tree_") for role in _object(existing)["files"]
     )
+    site_tree = single_league_tree(site_data_root, league_id)
+    for capture_id in (snapshot_id, news_capture_id, official_injury_capture_id):
+        if capture_id is not None:
+            _require_capture_id(capture_id)
+    if (news_capture_id is not None) != (rotation_table_path is not None):
+        raise ValueError("News requires both exact rotation artifacts, or none of the three.")
+    if rotation_table_path is not None:
+        for path in (rotation_table_path, rotation_table_path.with_suffix(".manifest.json")):
+            if path.name in _RESERVED_FILENAMES:
+                raise ValueError("Reserved rotation artifact filename.")
+            if not _ROTATION_FILENAME.fullmatch(path.name):
+                raise ValueError("Invalid sealed rotation filename.")
+    # The attempt record takes the decision capture's name. Read that capture by its
+    # exact identity first: where the filesystem ignores case, a miscased id would
+    # otherwise create the real capture's record with other bytes, and the corrected
+    # retry could never write its own. A file in the capture's place is named as the
+    # preparation input it is, before the snapshot reader looks inside it.
+    _preparation_target("capture", snapshot_root / snapshot_id)
+    _source(snapshot_root, snapshot_id)
+    # A failed preparation has no ready marker or copied folder yet. Record the
+    # attempt before either, so older v1 readers cannot serve its loose artifacts.
+    started = football_bundle_stage_path(artifact_root, snapshot_id, FootballBundleStage.STARTED)
+    _safe(Path(addressable(started)))
+    write_bytes_once(
+        document_bytes(
+            {"contract_version": "football_bundle_attempt_v1", "snapshot_id": snapshot_id}
+        ),
+        started,
+    )
     files = {
         "forecast": football_artifact_path(artifact_root, snapshot_id),
         "components": football_components_path(artifact_root, snapshot_id),
         "handoff": handoff_path,
-        **_site_files(
-            single_league_tree(site_data_root, league_id), retain_history=not legacy_ready
-        ),
+        **_site_files(site_tree, retain_history=not legacy_ready),
     }
-    preparation_path = marker.with_suffix(".preparation.json")
+    preparation_path = football_bundle_stage_path(
+        artifact_root, snapshot_id, FootballBundleStage.PREPARATION
+    )
     _safe(Path(addressable(preparation_path)))
     preparation = _preparation_inputs(snapshot_root, snapshot_id, files)
     if Path(addressable(preparation_path)).exists():
@@ -633,7 +691,7 @@ def seal_football_bundle(
         official_injury_capture_id=official_injury_capture_id,
     )
     _check_preparation(preparation, _preparation_inputs(snapshot_root, snapshot_id, files))
-    folder = marker.parent / (snapshot_id + ".bundle")
+    folder = football_bundle_stage_path(artifact_root, snapshot_id, FootballBundleStage.FOLDER)
     destinations = dict(files)
     destinations["handoff"] = folder / "handoff.json"
     for role, path in files.items():
@@ -673,7 +731,8 @@ def seal_football_bundle(
         ):
             raise ValueError("A different immutable bundle artifact already exists.")
     # Record normal writers' inputs before copies. A retry must keep all four identities.
-    # This receipt is never a ready marker and is ignored by active bundle readers.
+    # This receipt is never a ready marker; without one, active bundle readers treat it
+    # as an incomplete attempt and serve no loose football input for this capture.
     write_bytes_once(
         document_bytes(preparation), preparation_path, parse=_preparation_replay_identity
     )
@@ -702,7 +761,7 @@ def seal_football_bundle(
                 payloads, snapshot_id, handoff_fingerprint=final_identity["handoff_fingerprint"]
             )
         ),
-        marker.with_suffix(".production.json"),
+        football_bundle_stage_path(artifact_root, snapshot_id, FootballBundleStage.PRODUCTION),
     )
     write_bytes_once(raw_marker, marker)
     return read_football_bundle(
