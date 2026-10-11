@@ -329,12 +329,17 @@ def test_a_publication_date_forged_after_export_is_not_reported_verified(
         ("Saka won't feature in the next Premier League match.", True),
         ("Saka will not travel to the next Premier League match.", True),
         ("Saka is unavailable for the upcoming league game.", True),
+        ("Saka misses the next Premier League match.", True),
+        ("Saka is sidelined for the next Premier League match.", True),
+        ("Saka will play no part in the next Premier League match.", True),
+        ("Saka is not available for the next Premier League match.", True),
+        ("Saka will miss the next Premier League fixture.", True),
+        # The tense and contraction forms the rule already reads for its other predicates.
+        ("Saka has been sidelined for the next Premier League match.", True),
+        ("Saka will be sidelined for the next Premier League match.", True),
+        ("Saka isn't available for the next Premier League match.", True),
         # Natural wordings the finite rule does not read. They stay readable and unapplied.
-        ("Saka misses the next Premier League match.", False),
-        ("Saka is sidelined for the next Premier League match.", False),
-        ("Saka will play no part in the next Premier League match.", False),
-        ("Saka is not available for the next Premier League match.", False),
-        ("Saka will miss the next Premier League fixture.", False),
+        ("Saka will sit out the next Premier League match.", False),
         ("Saka will miss Saturday's Premier League match.", False),
         ("Bukayo Saka will miss the next Premier League match.", False),
     ],
@@ -530,6 +535,9 @@ def test_two_fixtures_sharing_the_first_kickoff_leave_the_statement_unbound(
         ("Saka will miss the cup match.", "other_competition"),
         ("Saka will miss the national team game.", "other_competition"),
         ("Saka missed the previous league match.", "past"),
+        # The present tense reads neither a past league fixture nor another competition.
+        ("Saka misses the last Premier League fixture.", "past"),
+        ("Saka misses the cup match.", "other_competition"),
         # A conditional shares its label with a wrong subject, a mixed reference and a
         # wording about the right match that the rule does not read.
         (
@@ -538,7 +546,7 @@ def test_two_fixtures_sharing_the_first_kickoff_leave_the_statement_unbound(
         ),
         ("Timber will miss the next Premier League match.", "ambiguous"),
         ("Saka will miss the next Premier League match after the cup match.", "ambiguous"),
-        ("Saka is sidelined for the next Premier League match.", "ambiguous"),
+        ("Saka will sit out the next Premier League match.", "ambiguous"),
         # No fixture at all shares its label with a fixture named in words outside the rule.
         ("Saka will not travel.", "unspecified"),
         ("Saka will miss Saturday's Premier League match.", "unspecified"),
@@ -547,6 +555,8 @@ def test_two_fixtures_sharing_the_first_kickoff_leave_the_statement_unbound(
         "cup",
         "national_team",
         "past_league_match",
+        "past_league_fixture",
+        "cup_in_the_present_tense",
         "conditional",
         "another_player",
         "league_and_cup_together",
