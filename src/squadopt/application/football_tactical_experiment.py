@@ -702,7 +702,8 @@ def compose_tactical_candidate(
             "captured_at": captured,
             "native_cutoff": cutoff,
             "deadline_at": deadline,
-            "model_version": MODEL_VERSION if enabled else FOOTBALL_MODEL_VERSION,
+            # A control frame keeps the native rows, so it names their version.
+            "model_version": MODEL_VERSION if enabled and not control else FOOTBALL_MODEL_VERSION,
             "feature_version": FEATURE_VERSION if enabled else None,
             "model_metadata": metadata,
             "projection_sha256": projection_hashes,

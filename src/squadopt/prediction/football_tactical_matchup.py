@@ -22,6 +22,7 @@ from scipy.special import gammaln, logsumexp, xlogy
 
 from squadopt.data.timestamps import normalize_utc_timestamp
 from squadopt.features.football_tactical_inputs import (
+    PROTECTED_SEASON,
     TEAM_FEATURES,
     TacticalObservation,
     TacticalProfile,
@@ -454,7 +455,7 @@ class TacticalMatchupModel:
             or not isinstance(target_season, str)
             or not re.fullmatch(r"20\d{2}-\d{2}", target_season)
             or int(target_season[-2:]) != (int(target_season[:4]) + 1) % 100
-            or target_season == "2025-26"
+            or target_season == PROTECTED_SEASON
         ):
             raise ValueError("Tactical fit requires an admitted target season and gameweek.")
         seen = set()

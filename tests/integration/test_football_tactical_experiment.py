@@ -41,8 +41,9 @@ from squadopt.features.football_tactical_inputs import (
     TacticalProjection,
 )
 from squadopt.live.minute_evidence import _score_components
+from squadopt.prediction.football import FOOTBALL_MODEL_VERSION
 from squadopt.prediction.football_components import COMPONENT_COLUMNS
-from squadopt.prediction.football_tactical_matchup import TacticalMatchupModel
+from squadopt.prediction.football_tactical_matchup import MODEL_VERSION, TacticalMatchupModel
 
 
 @pytest.fixture(scope="module")
@@ -521,6 +522,19 @@ def test_disabled_route_preserves_native_numbers_and_never_needs_tactical_input(
         assert row.expected_points == pytest.approx(
             w.availability[row.player_id] * native.expected_points.sum()
         )
+
+
+def test_receipt_model_version_names_the_version_its_component_rows_carry(
+    model: TacticalMatchupModel,
+) -> None:
+    w = world()
+    for candidate, version in (
+        (compose(w, None, enabled=False, projections=()), FOOTBALL_MODEL_VERSION),
+        (compose(w, model, control=True), FOOTBALL_MODEL_VERSION),
+        (compose(w, model), MODEL_VERSION),
+    ):
+        assert set(candidate.components.model_version) == {version}
+        assert json.loads(candidate.receipt_json)["model_version"] == version
 
 
 def test_clipping_happens_at_fixture_before_weekly_eligibility(model: TacticalMatchupModel) -> None:

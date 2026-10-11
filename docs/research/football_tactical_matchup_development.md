@@ -167,7 +167,16 @@ full-roster paired rates, G/A/CS marginals and four-bin minute, appearance and p
 moments at the common cutoff. Partial roster control, different native decision
 time, repeated eligibility and calendar/projection gaps refuse. Explicit disabled
 and control calls preserve native numeric components; disabled calls do not access
-the model or tactical projections.
+the model or tactical projections. Their receipts name the native model version
+those rows carry; only a learned replacement names the tactical version.
+
+The control binding admits only base intensities that are constant
+across a fixture's states. The native v1 row carries one paired rate per
+player-fixture, and its clean-sheet law applies that one opposition rate to the
+four minute bins; it is not a mixture over projected states. State-varying base
+intensities change the state-integrated clean sheet away from that law and refuse
+at control. A native producer whose clean-sheet law is a state mixture, and the
+binding that would admit it, belong to step 2.
 
 Learned mode replaces only paired rate fields and expected player G/A/CS. Native
 minute, defensive-contribution and residual fields remain the scoring basis.
@@ -195,7 +204,7 @@ roles, not squad acquisitions or the default transfer planner.
 
 ## Synthetic validation evidence
 
-199 source/model and raw-source integration cases pass. An independent
+217 source/model and raw-source integration cases pass. An independent
 oracle reads original synthetic JSON, fits 12 observations with 54 goal and 18
 assist credits, verifies learned paired rates and recipient allocation, recomputes
 state-integrated clean sheets, and checks weekly expected points and legal role
