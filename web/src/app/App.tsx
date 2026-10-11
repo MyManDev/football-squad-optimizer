@@ -137,7 +137,9 @@ function LocalizedApp({ basename }: { basename: string }) {
                   />
                 ))}
                 <Route path="/fixtures" element={<FixturesPage />} />
-                <Route path="/contribute" element={<ContributePage />} />
+                {import.meta.env.VITE_ADVICE_API_ORIGIN && (
+                  <Route path="/contribute" element={<ContributePage />} />
+                )}
                 <Route path="/status" element={<StatusPage />} />
                 <Route path="/admin" element={<AdminPage />} />
                 <Route path="*" element={<EmptyState title={messages.shell.notFound} />} />

@@ -15,7 +15,7 @@ from squadopt.application.advice import member_horizon_builder
 from squadopt.application.advice_record import record_directory
 from squadopt.application.capture_entries import CapturePicksProvider
 from squadopt.application.chip_forecast_publication import forecast_source
-from squadopt.application.entries import EntryRegistration, EntryRegistry
+from squadopt.application.entries import EntryError, EntryRegistration, EntryRegistry
 from squadopt.application.league_views import (
     LeagueViewsReport,
     MemberMapper,
@@ -137,6 +137,10 @@ class LeaguePublicationResult:
     #: Why the Top 100 menu is off this run, for the operator; empty when it is on or
     #: was not asked for.
     top100_note: str = ""
+    #: For how many of the captured members the purchase prices were rebuilt from the
+    #: transfers list, and why not for the rest, for the operator; empty when the capture
+    #: holds no member's picks.
+    purchase_prices_note: str = ""
     #: What became of a tree from before the league directory: "adopted" (moved to the
     #: league's path, its histories kept) or "removed" (a leftover beside a directory);
     #: empty when there was none.
@@ -317,6 +321,44 @@ def load_publication_top100(
     except Top100InputsRefused as refusal:
         return None, refusal.reason, f"Top 100 menu off ({refusal.reason}): {refusal}"
     return counts, None, ""
+
+
+def purchase_prices_note(
+    provider: CapturePicksProvider,
+    registrations: Sequence[EntryRegistration],
+    *,
+    season: str,
+    gameweek: int,
+) -> str:
+    """One line for the operator: whose purchase prices were rebuilt, and why not the rest.
+
+    Asked of a provider in this process because, with workers, each member is rendered in
+    a process of its own whose provider the parent never sees. A member's page carries the
+    flag only; without this line a renamed source field would quietly put every member
+    back on the stated worth as the budget. ``gameweek`` is the captured picks' week.
+    Empty when the capture holds no member's picks.
+    """
+
+    held = [entry.entry_id for entry in registrations if provider.holds(entry.entry_id, gameweek)]
+    if not held:
+        return ""
+    reasons: list[str] = []
+    rebuilt = pending = 0
+    for entry_id in held:
+        try:
+            result = provider.purchase_prices_for(entry_id, season, gameweek)
+        except (DataError, EntryError) as error:
+            reasons.append(f"{entry_id}: the squad itself was refused ({error})")
+            continue
+        pending += result.pending
+        if result.known:
+            rebuilt += 1
+        else:
+            reasons.append(f"{entry_id}: {result.reason}")
+    note = f"rebuilt for {rebuilt} of {len(held)}"
+    if pending:
+        note += f"; {pending} transfer(s) for the open deadline left out"
+    return "; ".join([note, *reasons])
 
 
 def adopt_legacy_tree(site_data_root: Path, league_id: int) -> tuple[str, Path] | None:
@@ -534,8 +576,9 @@ def publish_prepared_league(
     # Read before the build below rewrites the tree: the tree this publication replaces is
     # the only place that says which capture each earlier week showed each member.
     shown = published_advice_captures(out_dir) if history_root is not None else {}
+    provider = CapturePicksProvider(snapshot, request.snapshot_id)
     report = build_league_views(
-        CapturePicksProvider(snapshot, request.snapshot_id),
+        provider,
         prepared.registrations,
         inputs,
         projection,
@@ -612,6 +655,9 @@ def publish_prepared_league(
         report=report,
         output_paths=tuple(sorted(outputs)),
         top100_note=top100_note,
+        purchase_prices_note=purchase_prices_note(
+            provider, prepared.registrations, season=season, gameweek=report.gameweek - 1
+        ),
         legacy_tree=legacy[0] if legacy is not None else "",
         published=published,
     )

@@ -146,9 +146,9 @@ the multi-week model and the lineup expectation step stay with the service.
 | Field | Meaning |
 | --- | --- |
 | `held` | The fifteen player ids. |
-| `bank_tenths` | The spending power the live path computes from the stated squad sale value, not the raw bank. |
+| `bank_tenths` | The bank the live path plans with. Where the member's purchase prices were rebuilt from the transfers list (`purchase_prices_known` on the entry), the raw bank; otherwise the spending power computed from the stated squad sale value, the bank less any shortfall it covers. |
 | `free_transfers` | The free transfers under the cap. |
-| `sell_tenths` | Each held player's sale price in tenths, keyed by player id as text. |
+| `sell_tenths` | Each held player's sale price in tenths, keyed by player id as text. Where the purchase prices were rebuilt, the game's selling rule on each player's purchase price at the capture's price; otherwise the current price less any per-player deduction the spending power takes. |
 | `top100_weights` | Present where the shared document carries `rules.top100`: the weights it carries, so a page can offer them before it reads the document. |
 
 ## What holds the two solvers together

@@ -8,6 +8,10 @@ own squad on the way:
 python -m squadopt.platform.weekly_operations --season 2026-27 --gameweek 5 --league-list config/leagues.json --workers 8 --run-id 2026-27-gw05-decision
 ```
 
+The optional private Benchmark V2 capture flags and the owner's settlement command
+are documented in [benchmark_v2_weekly_capture.md](benchmark_v2_weekly_capture.md).
+Both flags default off and do not alter the published decision.
+
 `config/leagues.json` (`league_list_v1`) is the one place that says which classic leagues the
 site serves; `--league <id>`, repeatable, names them on the command line instead (the list
 path is relative to `--workspace`). Every league in the list is rendered from the one
@@ -31,10 +35,13 @@ The advice record and the member histories name one league
 not recorded, until the record contract carries the league. The league receipt says so per
 league (`leagues.<id>.advice_recorded`), and its top-level `advice_recorded` is whether any
 league was recorded; a run asked to record whose list has none of them records nothing and
-logs `tick.week.advice_record.skipped`. The per-league `member_notes`, `removed` and
-`top100_note` sit under `leagues.<id>`; `legacy_tree` (top level) says what became of a tree
-from before the directory, and `removed_trees` (top level) names the trees of leagues the list
-no longer has, which the run removes so a dropped league's member names leave the site.
+logs `tick.week.advice_record.skipped`. The per-league `member_notes`, `removed`,
+`top100_note` and `purchase_prices_note` sit under `leagues.<id>`. The last says for how many
+captured members the purchase prices were rebuilt from the transfers list, and why not for
+each of the others; `scripts.build_league_site` prints the same line as `purchase`.
+`legacy_tree` (top level) says what became of a tree from before the directory, and
+`removed_trees` (top level) names the trees of leagues the list no longer has, which the run
+removes so a dropped league's member names leave the site.
 
 By hand, `scripts.build_league_site --league <id>` rebuilds one league from a capture. It
 keeps the other leagues the directory lists only when their trees were rendered from the same
@@ -68,7 +75,7 @@ results, and `--expected-at <UTC instant>` additionally evaluates missed complet
 | step | service / compatibility command | what it needs | what it leaves |
 | --- | --- | --- | --- |
 | top100 | `scripts.capture_top100_cohort`, `scripts.capture_elite_picks`, `scripts.export_player_evidence` | before the deadline; target gameweek ≥ 2 | `fpl-top100-*` and `fpl-elite-picks-*` snapshots; `artifacts/phase_b/player_evidence_v1_<season>_gw<NN>_top100.{csv,manifest.json}` |
-| capture | `squadopt.platform.fpl_capture.capture` with the entry registry and the league list | `data/entries/registry.json` (`scripts.seed_entry_registry`) | `data/snapshots/fpl-live-<utc>-<hash>/` with bootstrap, fixtures, every played event-live document from GW1, every member's three documents and the standings page |
+| capture | `squadopt.platform.fpl_capture.capture` with the entry registry and the league list | `data/entries/registry.json` (`scripts.seed_entry_registry`) | `data/snapshots/fpl-live-<utc>-<hash>/` with bootstrap, fixtures, every played event-live document from GW1, every member's three documents, every member's transfers list and, for a member whose history starts at GW1, the GW1 picks (these two are read after the others, and one the source still refuses after the retries is left out with a `missed` line rather than failing the capture), and the standings page |
 | settled outcomes | `application.settled_outcomes.export_settled_outcomes` | stored captures no newer than the selected capture; an earlier week with both pre-deadline and finished/checked captures | immutable table/manifest pairs under `artifacts/rotation`, plus per-run reports; unavailable pairs are stated, never filled with zero outcomes |
 | rotation | `scripts.export_rotation_evidence --snapshot <capture> --deadline-utc …` (only with `--rotation`) | the capture above, and either the committed synthetic fixture or the real club-news capture selected by `--rotation-capture` | `artifacts/rotation/rotation_evidence_v4_<season>_gw<NN>_<news hash>_decision_<decision hash>.{csv,manifest.json}` for a real club-news capture; `rotation_evidence_v4_<season>_gw<NN>_<decision hash>.{csv,manifest.json}` — one row per roster player in that capture, one categorical claim field, and the citation carried as a document digest plus a byte span rather than as text. Written exactly once per capture; a pair already on disk for it is reused rather than remade. With `--rotation`, the league stage also receives this table and its source, and solves every member one-week pure-points plan with the manager word switched on: `advice/<id>/saf-puan/1/hoca-sozu.json` beside the baseline, the index saying `evidence.available` and where the words came from, the site showing the switch, and an example-data label on every surface while the source is the fixture. Without `--rotation` the index says `no_evidence_this_run`, the switch is disabled with that reason, and a `hoca-sozu.json` an earlier publish left is removed (printed by `scripts.build_league_site`, and recorded under the league stage's `removed` in the run's receipt, with every member note under `member_notes`). **So a publish that should keep the switch must pass `--rotation`** (`--rotation` alone reads the fixture; `--rotation-capture <id>` reads a real club-news capture, which the registered hosts can now produce). A quote whose words carry wording the site never publishes is withheld and the page says so; the constraint still applies |
 | handoff | `scripts.build_projection_handoff --snapshot-id <capture> --evidence-table … --evidence-manifest …` | the capture above and the evidence | `data/handoffs/<season>-gw<NN>.json` — the Phase C component projection with the bounded Top-100 uplift on top (`phase-c-component-elite-top100-v1`); `--projection component-only` leaves the uplift out; without settled live history the producer falls back to the legacy blend and says so |
@@ -224,9 +231,23 @@ each line; the commands are in the table above and in the documents named.
    news document fetched at or after the decision capture, and the bundle refuses a news
    capture that completed after it.
 3. **The football forecast is built with its components from that capture**
-   (`scripts.build_football_forecast --with-components`), and **the projection handoff from
+   (`scripts.build_football_forecast --with-components --role-minutes --retained-role-history
+   --training-season 2022-23 --training-season 2023-24 --training-season 2024-25
+   --training-season 2026-27`), and **the projection handoff from
    the capture and the evidence** (`scripts.build_projection_handoff`). The bundle binds
    the forecast's and the handoff's fingerprints to the capture and refuses any other.
+   After these builds and before step 4, the owner runs
+   `python -m scripts.build_football_shadow --snapshot-root data/snapshots --snapshot-id <capture>
+   --archive-root data/raw/vaastav-fpl` from the week's commit. Its separate root is
+   `artifacts/shadow/football_team_share_v1`; never give it to the backend
+   (`artifacts/backend-artifact-root.json` or `-ArtifactRoot`), to
+   `scripts.prepare_football_bundle`, or to the planner chain runner and scorer (#923,
+   #992). Post the receipt's capture id, fingerprint and sha256 on #999 before the
+   deadline, then back up the artifact and receipt outside the repository preserving
+   modification times. Any later `fpl-live` capture targeting that week before the
+   deadline needs its own shadow build and handoff before the deadline, or the week is
+   missing. After the deadline, post the shadow input-check JSON with every season
+   capture on #999. See [the shadow note](football_prospective_shadow_note.md).
 4. **The weekly run**: rotation export, league tree, advice record, site, scoreboard,
    publish pull request (`platform.weekly_operations`). The journal refuses a stage whose
    predecessor did not complete; the league tree carries one `generated_at_utc`, which the
@@ -236,7 +257,15 @@ each line; the commands are in the table above and in the documents named.
    the tree it seals, as `scripts.add_device_plan_inputs --league <id>` names the tree it
    augments). Its marker is written last, after every
    copy has been read back through the production validators; a name or an input the reader
-   would refuse is refused before anything is copied.
+   would refuse is refused before anything is copied. The first validated,
+   copy-compatible seal records capture, handoff, forecast and component contents in
+   `football/<capture>.bundle.preparation.json`; retries must use those same contents, and
+   changed inputs require a new capture.
+   The internal `football/<decision>.bundle.production.json` receipt is written after
+   those final checks, immediately before the ready marker. It records the sha256 of
+   the sealed handoff's bytes and its own training provenance separately from the
+   football producer's inputs.
+   An interruption can leave provenance without a marker; provenance alone is never ready.
 6. **The site pull request merges through develop's merge queue, the release is cut and
    tagged, the backend is restarted** (`docs/deployment_runbook.md`). The restart reads the
    one capture every published human entry names, on the public site and locally, and
@@ -535,6 +564,13 @@ The readiness field `league_tree_matches_capture` checks season and gameweek onl
 the release restart command separately checks the public/local capture IDs.
 
 ## What stays a person's act
+
+The owner runs the Tuesday settle and the Friday publish through GW20 (deadline
+2027-01-05T18:00:00Z), including the midweek GW13, GW18 and GW20 decision runs (the rhythm
+and the midweek days are in
+[which days those two land on](deployment_runbook.md#which-days-those-two-land-on)); a
+delegated stage requires the owner's approval for that run, and after GW20 the weekly run
+moves off the owner's PC as tracked in #1010 (decision #1005).
 
 The outward half of publishing — merging the PR, releasing develop to main, the
 `site-<season>-gw<NN>-decision` tag, the Pages dispatch — is printed, not performed.

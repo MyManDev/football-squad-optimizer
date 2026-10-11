@@ -26,7 +26,7 @@ from squadopt.application.device_plan import (
     DEVICE_PLAN_DOCUMENT,
     device_plan_entry,
 )
-from squadopt.application.entries import EntryRegistration, held_squad_from_picks
+from squadopt.application.entries import EntryPicks, EntryRegistration, held_squad_from_picks
 from squadopt.application.league_views import build_league_views
 from squadopt.live.transfers import MEMBER_PLANNING_POLICY, member_planning_inputs
 from squadopt.optimization import OptimizationConfig
@@ -37,17 +37,46 @@ from squadopt.planning import (
     TransferPlanningConfig,
     optimize_transfer_plan,
 )
+from squadopt.planning.pricing import sell_price_tenths
 
 world = world_module._world  # re-register the fixture in this module
 
 
+def _prices(projection: Any) -> dict[int, int]:
+    return {
+        int(v): int(p)
+        for v, p in zip(
+            projection.table["player_id"], projection.table["price_tenths"], strict=True
+        )
+    }
+
+
+def _rebuilt_picks(world: dict[str, Any]) -> EntryPicks:
+    """The fixture member with the prices paid rebuilt: 1001 bought 0.3 below its price
+    now, 1013 0.3 below and 1021 0.2 above it, the rest at today's prices."""
+
+    _, projection, _ = _world_context(world)
+    prices = _prices(projection)
+    picks = _member_picks(world, 101, _legal_squad(world))
+    paid = {player: prices[player] for player in picks.squad}
+    paid.update({1001: prices[1001] - 3, 1013: prices[1013] - 3, 1021: prices[1021] + 2})
+    return replace(
+        picks,
+        purchase_prices=paid,
+        purchase_prices_known=True,
+        squad_sell_value_tenths=sum(
+            sell_price_tenths(prices[player], paid[player]) for player in picks.squad
+        ),
+    )
+
+
 def _build(
-    world: dict[str, Any], out: Path
+    world: dict[str, Any], out: Path, picks: EntryPicks | None = None
 ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
     inputs, projection, rules = _world_context(world)
     squad = _legal_squad(world)
     build_league_views(
-        _Provider({101: _member_picks(world, 101, squad)}),
+        _Provider({101: picks or _member_picks(world, 101, squad)}),
         (EntryRegistration(101, "member-a", "2026-08-23T00:00:00Z"),),
         inputs,
         projection,
@@ -118,12 +147,15 @@ def test_the_shared_document_carries_the_table_in_solver_order_with_the_solver_s
     }
 
 
+@pytest.mark.parametrize("rebuilt", [False, True])
 def test_the_two_documents_alone_rebuild_the_problem_the_published_plan_solved(
-    world: dict[str, Any], tmp_path: Path
+    world: dict[str, Any], tmp_path: Path, rebuilt: bool
 ) -> None:
-    """Numbers from the documents, the repository's solver, the published answer."""
+    """Numbers from the documents, the repository's solver, the published answer: for a
+    member planned on the stated worth, and for one whose purchase prices were rebuilt."""
 
-    shared, entry, advice = _build(world, tmp_path / "league")
+    picks = _rebuilt_picks(world) if rebuilt else None
+    shared, entry, advice = _build(world, tmp_path / "league", picks)
     payload, block = shared["payload"], entry["payload"]["device_plan"]
     rules_out = payload["rules"]
     sell = {int(k): v for k, v in block["sell_tenths"].items()}
@@ -204,6 +236,28 @@ def test_the_member_block_carries_the_spending_power_not_the_raw_numbers(
     assert block["bank_tenths"] == 0
     assert block["sell_tenths"] == {str(p): prices[p] - 7 for p in picks.squad}
     assert block["free_transfers"] == 1
+
+
+def test_a_member_with_rebuilt_purchase_prices_gets_the_raw_bank_and_the_rules_prices(
+    world: dict[str, Any], tmp_path: Path
+) -> None:
+    """Nothing is withheld where what was paid is known: the bank is the bank, and each
+    sale price is the rule's (1001 risen 0.3 keeps 0.1 of it, 1013 the same, 1021 fell)."""
+
+    _, projection, _ = _world_context(world)
+    prices = _prices(projection)
+    picks = _rebuilt_picks(world)
+    _, entry, _ = _build(world, tmp_path / "league", picks)
+    block = entry["payload"]["device_plan"]
+    assert block["bank_tenths"] == picks.bank_tenths == 5
+    assert block["sell_tenths"] == {
+        str(p): sell_price_tenths(prices[p], picks.purchase_prices[p]) for p in picks.squad
+    }
+    assert (block["sell_tenths"]["1001"], block["sell_tenths"]["1021"]) == (
+        prices[1001] - 2,
+        prices[1021],
+    )
+    assert entry["payload"]["spendable_budget_tenths"] == 5 + sum(block["sell_tenths"].values())
 
 
 def test_the_published_caution_margin_is_the_one_that_decides_the_plan(
