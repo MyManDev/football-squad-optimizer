@@ -13,8 +13,9 @@ import json
 import math
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass
+from enum import Enum
 from numbers import Integral, Real
-from typing import cast
+from typing import Final, cast
 
 import pandas as pd
 
@@ -84,6 +85,15 @@ EXPERIMENT_RECEIPT_FIELDS = (
     "control_binding",
     "lineup_proof_scope",
 )
+
+
+class _BoundResource(Enum):
+    """Marks a transaction resource that is read from the bound resource bundle."""
+
+    FROM_BUNDLE = "bound_resource_bundle"
+
+
+FROM_BUNDLE: Final = _BoundResource.FROM_BUNDLE
 
 
 @dataclass(frozen=True)
@@ -751,6 +761,30 @@ def _bound_candidate(
     return cast(dict[str, object], receipt)
 
 
+def _bound_transaction(
+    resources_json: str,
+    chip: str | _BoundResource | None,
+    hit_points: float | _BoundResource,
+) -> tuple[str | None, float]:
+    """Read the chip and hit points from the byte-bound bundle; a differing caller refuses."""
+    bundle = json.loads(resources_json)
+    if not isinstance(bundle, dict) or not {"chip", "hit_points"} <= set(bundle):
+        raise ValueError("The bound resource bundle must declare its chip and hit_points.")
+    bound_chip = bundle["chip"]
+    if bound_chip is not None and (type(bound_chip) is not str or not bound_chip):
+        raise ValueError("The bound resource bundle declares an invalid chip.")
+    bound_hits = _finite(bundle["hit_points"], "bound resource hit_points", 0)
+    if chip is not FROM_BUNDLE and chip != bound_chip:
+        raise ValueError("Fixed-fifteen chip disagrees with the bound resource bundle.")
+    if hit_points is not FROM_BUNDLE and (
+        isinstance(hit_points, bool)
+        or not isinstance(hit_points, Real)
+        or float(hit_points) != bound_hits
+    ):
+        raise ValueError("Fixed-fifteen hit_points disagree with the bound resource bundle.")
+    return bound_chip, bound_hits
+
+
 def plan_tactical_fixed_fifteen(
     candidate: TacticalExperiment,
     *,
@@ -761,8 +795,8 @@ def plan_tactical_fixed_fifteen(
     captain_id: object,
     vice_captain_id: object,
     resource_bundle: Mapping[str, object],
-    chip: str | None = None,
-    hit_points: float = 0.0,
+    chip: str | _BoundResource | None = FROM_BUNDLE,
+    hit_points: float | _BoundResource = FROM_BUNDLE,
     max_evaluations: int = 128,
     locked_first: bool = False,
     not_starting: Iterable[object] = (),
@@ -770,10 +804,13 @@ def plan_tactical_fixed_fifteen(
 ) -> TacticalFixedFifteenPlan:
     """Change only roles on an explicit legal15; transaction resources are byte-bound.
 
+    The chip and hit points are read from the bound resource bundle and recorded in
+    the plan receipt. A caller value that differs from the bundle refuses.
     The accepted current engine has exact utility under independent weekly appearances
     but explores a bounded XI neighborhood. It is not the unmerged exhaustive engine.
     """
     receipt = _bound_candidate(candidate, resource_bundle)
+    bound_chip, bound_hits = _bound_transaction(candidate.resource_bundle_json, chip, hit_points)
     week = _integer(gameweek, "fixed-fifteen gameweek")
     if week not in cast(list[int], receipt["gameweeks"]):
         raise ValueError("Fixed-fifteen week is outside the bound tactical window.")
@@ -829,8 +866,8 @@ def plan_tactical_fixed_fifteen(
         ordered_bench,
         captain_id,
         vice_captain_id,
-        chip=chip,
-        hit_points=hit_points,
+        chip=bound_chip,
+        hit_points=bound_hits,
         not_starting=not_starting,
         not_captain=not_captain,
         max_evaluations=int(max_evaluations),
@@ -842,6 +879,8 @@ def plan_tactical_fixed_fifteen(
             "candidate_receipt_sha256": _sha(candidate.receipt_json),
             "gameweek": week,
             "resource_bundle_sha256": _sha(candidate.resource_bundle_json),
+            "chip": bound_chip,
+            "hit_points": bound_hits,
             "fixed_squad_resources_sha256": _frame_digest(original_resources),
             "scored_squad_sha256": _frame_digest(selected),
             "incumbent_fingerprint": search.incumbent.fingerprint,

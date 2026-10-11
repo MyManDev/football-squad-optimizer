@@ -331,7 +331,9 @@ def world(
     blank: bool = False,
     residual: float | None = None,
     zero_rates: bool = False,
+    resources: dict[str, Any] | None = None,
 ) -> TacticalWorld:
+    captured_resources = RESOURCES if resources is None else resources
     specs = [
         (7201, 6, 1, 2, "2026-10-10T12:00:00Z"),
         (7202, 6, 3, 4, "2026-10-10T15:00:00Z"),
@@ -462,7 +464,7 @@ def world(
         season=SEASON,
         availability_application="not_applied",
         source_snapshot_id="synthetic-tactical-capture",
-        resources=RESOURCES,
+        resources=captured_resources,
     )
     native = _score_components(native)
     if residual is None:
@@ -486,6 +488,6 @@ def world(
         for club in range(1, 7)
         for code, position in club_players(club)
     )
-    roster.attrs["resources"] = RESOURCES
+    roster.attrs["resources"] = captured_resources
     availability = {int(code): 0.75 if code in (6, 13) else 1.0 for code in roster.player_id}
     return TacticalWorld(native, roster, pd.DataFrame(calendar), ps, availability)

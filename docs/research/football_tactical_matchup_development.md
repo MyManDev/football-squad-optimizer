@@ -184,7 +184,10 @@ Shared tactical states are within each paired fixture; this union does not
 establish cross-fixture minute correlations. Blank weeks remain zero. The supplied
 legal fifteen retains prices,
 club limits, bank/transfer/chip resources, and explicit captain, vice-captain,
-reserve and role restrictions. The accepted bounded expected-lineup scorer decides
+reserve and role restrictions. The chip and hit points the role scorer uses are
+read from the byte-bound resource bundle and recorded in the plan receipt; a
+caller value that differs from the bundle, or a bundle that does not declare
+both, refuses. The accepted bounded expected-lineup scorer decides
 roles under its independent player-week positive-minute participation contract.
 The shared tactical states determine fixture scoring; this role adapter does not
 claim correlated-player autosub optimization. This preparation changes

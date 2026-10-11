@@ -456,14 +456,60 @@ def test_captured_blank_week_is_distinct_from_an_omitted_calendar_week(
 def test_chips_hits_and_locked_roles_match_independent_official_score(
     model: TacticalMatchupModel, chip: str | None
 ) -> None:
-    w = world()
-    candidate = compose(w, model)
-    plan = fixed(w, candidate, chip=chip, hit_points=4.0, locked_first=True)
+    bundle = {**RESOURCES, "chip": chip, "hit_points": 4.0}
+    w = world(resources=bundle)
+    candidate = compose(w, model, resource_bundle=bundle)
+    plan = fixed(w, candidate, resource_bundle=bundle, locked_first=True)
+    assert plan.search.best.chip == chip
+    assert plan.search.best.hit_points == 4.0
+    receipt = json.loads(plan.receipt_json)
+    assert (receipt["chip"], receipt["hit_points"]) == (chip, 4.0)
     assert plan.search.best.starting_xi == XI
     assert plan.search.best.ordered_bench == BENCH
     assert plan.search.best.expected_net_points == pytest.approx(
         official_points(plan.squad, plan.search.best)
     )
+
+
+@pytest.mark.parametrize(
+    "bundle_chip,bundle_hits,caller",
+    [
+        (None, 0.0, {"chip": "bboost"}),
+        (None, 0.0, {"hit_points": 4.0}),
+        ("3xc", 4.0, {"chip": None}),
+        ("3xc", 4.0, {"chip": "bboost"}),
+        ("3xc", 4.0, {"hit_points": 0.0}),
+        ("3xc", 4.0, {"hit_points": True}),
+    ],
+)
+def test_fixed_fifteen_refuses_a_caller_chip_or_hit_that_differs_from_the_bound_bundle(
+    model: TacticalMatchupModel,
+    bundle_chip: str | None,
+    bundle_hits: float,
+    caller: dict[str, Any],
+) -> None:
+    bundle = {**RESOURCES, "chip": bundle_chip, "hit_points": bundle_hits}
+    w = world(resources=bundle)
+    candidate = compose(w, model, resource_bundle=bundle)
+    agreeing = fixed(
+        w, candidate, resource_bundle=bundle, chip=bundle_chip, hit_points=int(bundle_hits)
+    )
+    assert json.loads(agreeing.receipt_json)["chip"] == bundle_chip
+    assert agreeing.search.best.hit_points == bundle_hits
+    name = next(iter(caller))
+    with pytest.raises(ValueError, match=f"{name} disagree"):
+        fixed(w, candidate, resource_bundle=bundle, **caller)
+
+
+@pytest.mark.parametrize("missing", ["chip", "hit_points"])
+def test_fixed_fifteen_refuses_a_bound_bundle_without_its_chip_or_hits(
+    model: TacticalMatchupModel, missing: str
+) -> None:
+    bundle = {key: value for key, value in RESOURCES.items() if key != missing}
+    w = world(resources=bundle)
+    candidate = compose(w, model, resource_bundle=bundle)
+    with pytest.raises(ValueError, match="must declare its chip and hit_points"):
+        fixed(w, candidate, resource_bundle=bundle)
 
 
 def test_disabled_route_preserves_native_numbers_and_never_needs_tactical_input() -> None:
