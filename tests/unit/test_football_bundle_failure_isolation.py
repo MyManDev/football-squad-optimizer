@@ -226,7 +226,13 @@ def test_unresolved_league_argument_does_not_disable_legacy_inputs(case):
 
 
 @pytest.mark.parametrize(
-    "argument", ["bad_rotation_name", "news_without_rotation", "rotation_without_news"]
+    "argument",
+    [
+        "bad_rotation_name",
+        "reserved_rotation_name",
+        "news_without_rotation",
+        "rotation_without_news",
+    ],
 )
 def test_unresolved_rotation_arguments_do_not_disable_legacy_inputs(case, argument):
     before = signature(case)
@@ -235,6 +241,12 @@ def test_unresolved_rotation_arguments_do_not_disable_legacy_inputs(case, argume
         altered.update(
             news_capture_id="synthetic-news",
             rotation_table_path=case["artifact_root"] / "bad.name.csv",
+        )
+    elif argument == "reserved_rotation_name":
+        # A reserved name passes the filename pattern; only the reserved check refuses it.
+        altered.update(
+            news_capture_id="synthetic-news",
+            rotation_table_path=case["artifact_root"] / "handoff.json",
         )
     elif argument == "news_without_rotation":
         altered["news_capture_id"] = "synthetic-news"
