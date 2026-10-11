@@ -14,7 +14,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { mockEntryAdviceIndex, mockLeagueMembersEnvelope } from "../../../fixtures/league";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { MESSAGES } from "../../../i18n/messages";
-import type { EntryAdviceIndex } from "../types";
+import { MEMBER_STRATEGIES, type EntryAdviceIndex } from "../types";
 import { MemberDecisionControls } from "./MemberDecisionControls";
 
 afterEach(cleanup);
@@ -86,7 +86,7 @@ describe("member decision controls", () => {
     expect(screen.getByDisplayValue("saf-puan")).toBeChecked();
     expect(screen.queryByRole("combobox")).toBeNull();
 
-    fireEvent.click(screen.getByRole("radio", { name: /Ortak çekirdeği koru/ }));
+    fireEvent.click(screen.getByRole("radio", { name: /Farkı koru/ }));
 
     expect(screen.getByTestId("selection").textContent).toBe("ortak-koru/-/-");
     expect(screen.getByRole("combobox", { name: "Karşısında oynadığın üye" })).toBeInTheDocument();
@@ -139,13 +139,13 @@ describe("member decision controls", () => {
   });
 
   it("writes a strategy change with a listed window into the shareable URL", () => {
-    // Pure points solved five weeks, so the radio is clickable; every rival strategy is
+    // Most points solved five weeks, so the radio is clickable; every rival strategy is
     // published at one week only. The window must not survive the change and leave the
     // control showing a checked radio it has just disabled.
     renderControls(`/league/352490/members/${ENTRY}?window=5`);
     expect(screen.getByRole("radio", { name: /5 hafta/ })).toBeChecked();
 
-    fireEvent.click(screen.getByRole("radio", { name: /Ortak çekirdeği koru/ }));
+    fireEvent.click(screen.getByRole("radio", { name: /Farkı koru/ }));
 
     expect(screen.getByRole("radio", { name: /1 hafta/ })).toBeChecked();
     expect(screen.getByRole("radio", { name: /5 hafta/ })).not.toBeChecked();
@@ -220,7 +220,7 @@ describe("member decision controls", () => {
     };
     renderControls(`/league/352490/members/${ENTRY}`, index, "en");
 
-    const marked = screen.getByRole("radio", { name: /Create a gap.*The rule's pick/s });
+    const marked = screen.getByRole("radio", { name: /Close the gap.*The rule's pick/s });
     expect(marked).not.toBeChecked();
     // The rule marks; the URL still chooses. Nothing was selected on the member's behalf.
     expect(screen.getByDisplayValue("saf-puan")).toBeChecked();
@@ -302,14 +302,12 @@ describe("member decision controls", () => {
     }
   });
 
-  it("does not tell a member the pure-points plan has the highest expected points", () => {
-    // A superlative nothing enforces. `expected_own_points` — the figure the member's
-    // card shows — is the eleven plus the captain; the solve maximises the eleven, the
-    // captain and the bench together, so the two have different maximisers. On the
-    // 2026-27 GW4 capture entry 3832237's pure-points plan publishes 46.5454 with a
-    // 7.1846 bench and its ortak-koru plan publishes 46.7016 with a 4.3379 bench: the
-    // banded plan is higher on the number that is printed and lower on the one that was
-    // optimised. The card may say what the plan is chosen on; it may not rank it.
+  it("uses the approved plan aim without ranking the published expected-points figure", () => {
+    // The approved name states an aim. The description must not rank the published
+    // figure: the solve also values the bench, while expected_own_points counts eleven
+    // plus captain. On 2026-27 GW4, entry 3832237's plan publishes 46.5454 with a
+    // 7.1846 bench and its ortak-koru plan publishes 46.7016 with a 4.3379 bench, both
+    // OPTIMAL and free of hits. The description guard preserves that distinction.
     const SUPERLATIVE = /highest|most expected|en yüksek|en iyi puan/i;
     for (const language of ["tr", "en"] as const) {
       const { description } = MESSAGES[language].leagueMembers.strategies["saf-puan"];
@@ -327,6 +325,27 @@ describe("member decision controls", () => {
       unmount();
     }
   });
+
+  // The owner's names for #1005 Part D, word for word in both languages and in the
+  // catalogue's strategy order. The copy is pinned here rather than read back from
+  // MESSAGES, so a change to any of them fails. No slug is spelled out, so the
+  // repository's slug counts stay as Part D records them.
+  it.each([
+    ["tr", ["En çok puan", "Farkı koru", "Farkı kapat"], "Plan süresi"],
+    ["en", ["Most points", "Hold the gap", "Close the gap"], "Plan length"],
+  ] as const)(
+    "renders the approved strategy and plan length names in %s",
+    (language, names, legend) => {
+      const copy = MESSAGES[language].leagueMembers;
+      expect(MEMBER_STRATEGIES.map((strategy) => copy.strategies[strategy].name)).toEqual(names);
+      expect(copy.windowLegend).toBe(legend);
+      renderControls(`/league/352490/members/${ENTRY}`, undefined, language);
+      for (const name of names) {
+        expect(screen.getByRole("radio", { name: new RegExp(`^${name}`) })).toBeInTheDocument();
+      }
+      expect(screen.getByRole("group", { name: legend })).toBeInTheDocument();
+    },
+  );
 
   it("renders the plan and the advanced part apart, and every input once without a part", () => {
     const count = (container: HTMLElement, name: string) =>
@@ -362,7 +381,7 @@ describe("member decision controls", () => {
     for (const name of ["llm", "top100", "chip"]) expect(count(plan.container, name)).toBe(0);
     // The plan names the choice it shows, and the chosen strategy in one short line.
     expect(screen.getByRole("heading", { name: "Plan ayarları" })).toBeInTheDocument();
-    expect(screen.getByText("şu an: Fark yarat · 1 hafta")).toBeInTheDocument();
+    expect(screen.getByText("şu an: Farkı kapat · 1 hafta")).toBeInTheDocument();
     expect(
       screen.getByText(MESSAGES.tr.leagueMembers.strategies["fark-yarat"].short),
     ).toBeInTheDocument();
@@ -471,7 +490,7 @@ describe("the device's statement beside the publish", () => {
         </MemoryRouter>
       </LanguageProvider>,
     );
-    const differential = screen.getByRole("radio", { name: /Fark yarat/ });
+    const differential = screen.getByRole("radio", { name: /Farkı kapat/ });
     expect(differential).toBeEnabled();
     fireEvent.click(differential);
     // The window stays at the default one week, which the device offers.
@@ -522,7 +541,7 @@ describe("the device's statement beside the publish", () => {
       </LanguageProvider>,
     );
     // The publish solved pure points only, so no rival strategy is on the page at all.
-    expect(screen.queryByRole("radio", { name: /Fark yarat/ })).toBeNull();
-    expect(screen.queryByRole("radio", { name: /Ortak çekirdeği koru/ })).toBeNull();
+    expect(screen.queryByRole("radio", { name: /Farkı kapat/ })).toBeNull();
+    expect(screen.queryByRole("radio", { name: /Farkı koru/ })).toBeNull();
   });
 });
