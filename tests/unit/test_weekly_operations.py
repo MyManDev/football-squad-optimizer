@@ -1395,10 +1395,22 @@ def test_a_league_dropped_from_the_list_leaves_the_site_with_its_tree(tmp_path: 
     stale = operation.paths.out / "data" / "device" / "fpl-live-earlier" / "device-plan.json"
     stale.parent.mkdir(parents=True)
     stale.write_text("{}", encoding="utf-8")
+    # This capture's own table from an earlier build goes too, and is written again: a
+    # republished week carries the table its code writes now, not the earlier build's.
+    own = operation.request.snapshot_id
+    earlier = operation.paths.out / "data" / "device" / own / "device-plan.json"
+    earlier.parent.mkdir(parents=True)
+    earlier.write_text(json.dumps({"payload": {"contract_version": "other"}}), encoding="utf-8")
     doc = json.loads(operation.execute().read_bytes())
     league = {stage["name"]: stage["value"] for stage in doc["stages"]}["league"]
-    assert league["removed_trees"] == ["leagues/9", "device/fpl-live-earlier"]
+    assert league["removed_trees"] == [
+        "leagues/9",
+        *sorted(["device/fpl-live-earlier", f"device/{own}"]),
+    ]
     assert not dropped.exists() and not stale.parent.exists()
+    assert json.loads(earlier.read_text(encoding="utf-8"))["payload"]["contract_version"] == (
+        "league_device_plan_v2"
+    )
     assert (operation.paths.out / "data" / "leagues" / "352490" / "members.json").is_file()
     # This week's table is written once under its capture and journaled with the stage.
     table = operation.paths.out / "data" / "device" / league["snapshot_id"] / "device-plan.json"
