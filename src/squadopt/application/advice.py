@@ -460,7 +460,12 @@ def solve_member_control(
         for _, row in inputs.players.iterrows()
     }
     held = held_squad_from_picks(picks, current_prices=prices)
-    plan, decision, transfer_config = plan_transfers(inputs, projection, held, rules)
+    if projection.diagnostics.get("model_name") == "fixture_football_candidate":
+        plan, decision, transfer_config = plan_transfers(
+            inputs, projection, held, rules, expected_lineups=True
+        )
+    else:
+        plan, decision, transfer_config = plan_transfers(inputs, projection, held, rules)
     try:
         run_transfer_advice_diagnostic(
             plan,
@@ -478,8 +483,10 @@ def solve_member_control(
 
 
 def net_expected_points(plan: TransferPlanResult) -> float:
-    """A plan's expected points as the member would score them: the eleven's projected
-    points minus the hits the plan pays. A constraint that forces paid transfers is not
+    """A plan's expected points after the hits the plan pays.
+
+    Expected-lineup weeks include automatic substitutions and vice recovery;
+    legacy weeks retain the eleven and captain score. A constraint that forces paid transfers is not
     cheap because the gross projection barely moved.
 
     ``total_transfer_hit_points`` is counted at the game's charge, so this compares two
@@ -488,7 +495,11 @@ def net_expected_points(plan: TransferPlanResult) -> float:
     worth making at all; applying it again here would price the same caution twice.
     """
 
-    score = plan.total_projected_score
+    score = (
+        sum(expected_week_points(week) for week in plan.weeks)
+        if any(week.lineup_expectation is not None for week in plan.weeks)
+        else plan.total_projected_score
+    )
     hits = plan.total_transfer_hit_points
     if score is None or hits is None or not math.isfinite(score) or not math.isfinite(hits):
         raise EntryError("A solved plan must carry finite projected points and hit points.")
@@ -689,6 +700,11 @@ def build_advice_payload(
             choice=choice_points,
             expected_total=_published_total(lineup),
         )
+    if week is not None and week.lineup_expectation is not None:
+        # The held-XI comparator does not score automatic substitutions.
+        gain_vs_hold = None
+        for move in moves:
+            move["expected_points_delta"] = None
     missing = _missing_fields(picks)
     return {
         "season": picks.season,
@@ -1198,11 +1214,23 @@ def _player_ids(frame: "pd.DataFrame") -> set[int]:
 
 
 def _breaks(week: PlanningWeekResult, exclusion: FirstWeekExclusion) -> bool:
-    """Whether a solved week starts a player the exclusion benches or captains one it bars."""
+    """Whether a solved week starts a player the exclusion benches or captains one it bars.
+
+    An expected-lineup week scores its vice-captain's armband recovery, so a barred vice
+    breaks the rule there too: re-picking him on the page would leave the published total
+    counting a vice the rule removed. A legacy week's vice scores nothing and is re-picked
+    on publication (``_vice_not_barred``).
+    """
 
     if _player_ids(week.starting_xi) & set(exclusion.not_starting):
         return True
-    return int(str(week.captain["player_id"])) in exclusion.not_captain
+    if int(str(week.captain["player_id"])) in exclusion.not_captain:
+        return True
+    return (
+        week.lineup_expectation is not None
+        and week.vice_captain_id is not None
+        and int(str(week.vice_captain_id)) in exclusion.not_captain
+    )
 
 
 def _vice_not_barred(payload: dict[str, object], barred: frozenset[object]) -> None:
@@ -1311,7 +1339,8 @@ def advise_with_managers_word(
     margin's own effect on unrelated transfers into the price of the club's word.
 
     Either way the rows are measured under the rule, and a vice-captain the rule bars from
-    the armband is replaced (``_vice_not_barred``).
+    the armband is replaced (``_vice_not_barred``). On an expected-lineup control the vice
+    is part of the score, so a barred vice binds and the plan is solved under the rule.
 
     **What the member reads** is every statement about a player in the fifteen they hold,
     the fifteen the control would end with, or the fifteen this plan ends with, so a word
@@ -1363,7 +1392,12 @@ def advise_with_managers_word(
     }
     held = held_squad_from_picks(picks, current_prices=prices)
     plan, decision, _config = plan_transfers_with_exclusion(
-        inputs, projection, held, rules, exclusion
+        inputs,
+        projection,
+        held,
+        rules,
+        exclusion,
+        expected_lineups=control_week.lineup_expectation is not None,
     )
     # Both plans are solved under the member planning policy, so the tag is what the rule
     # costs under the policy that chose the plan, not the policy's own caution on other
@@ -1515,7 +1549,12 @@ def solve_word_control(
     }
     held = held_squad_from_picks(control.picks, current_prices=prices)
     plan, decision, config = plan_transfers_with_exclusion(
-        inputs, projection, held, rules, exclusion
+        inputs,
+        projection,
+        held,
+        rules,
+        exclusion,
+        expected_lineups=control.plan.weeks[0].lineup_expectation is not None,
     )
     return MemberControl(picks=control.picks, plan=plan, decision=decision, transfer_config=config)
 
@@ -1542,8 +1581,10 @@ def advise_with_top100(
 
     **What is published** is the weighted plan's decision (moves, eleven, captain) with
     every number scored on the base projection: the players' expected points, each move's
-    gain, the plan's own total. The vice-captain and the bench order follow the base
-    points, by the same completion rule every plan uses.
+    gain, the plan's own total. On a legacy plan the vice-captain and the bench order
+    follow the base points, by the same completion rule every plan uses; an
+    expected-lineup plan keeps the vice and bench order it was chosen with and rescores
+    them on the base points (``rebased_week``).
 
     **The price** is what choosing on the weight gives up in the base model against the
     control, both net of the game's hit charge, floored at zero; the ceiling is the price
@@ -1682,7 +1723,12 @@ def advise_with_top100(
         held = held_squad_from_picks(picks, current_prices=prices)
         if exclusion is not None and binding:
             plan, decision, _config = plan_transfers_with_exclusion(
-                inputs, weighted, held, rules, exclusion
+                inputs,
+                weighted,
+                held,
+                rules,
+                exclusion,
+                expected_lineups=preferred_week.lineup_expectation is not None,
             )
         else:
             plan, decision = preferred.plan, preferred.decision

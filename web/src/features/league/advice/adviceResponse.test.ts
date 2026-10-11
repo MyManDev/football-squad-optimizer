@@ -39,6 +39,7 @@ describe("nested published advice", () => {
       "football_match_context_v1",
       "football_joint_role_minutes_v1",
       "football_joint_role_retained_history_v1",
+      "football_team_form_v1",
     ]) {
       const joint = {
         ...football,

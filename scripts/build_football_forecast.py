@@ -3,8 +3,10 @@
 import argparse
 import json
 from pathlib import Path
+from typing import Any
 
 from squadopt.application.football_live import (
+    LOCKED_OUTCOME_SEASON,
     produce_football_components,
     produce_football_forecast,
 )
@@ -28,6 +30,11 @@ def main() -> None:
         "Excluded seasons are not read. Omit to retain the existing training population.",
     )
     parser.add_argument("--contextual", action="store_true", help="Build football_contextual_v3.")
+    parser.add_argument(
+        "--team-form",
+        action="store_true",
+        help="Build the separate football_team_form_v1 candidate from explicit training seasons.",
+    )
     parser.add_argument(
         "--match-context",
         action="store_true",
@@ -53,6 +60,14 @@ def main() -> None:
     parser.add_argument("--rotation-evidence", type=Path)
     parser.add_argument("--club-news-source", type=Path)
     args = parser.parse_args()
+    if args.team_form and (args.contextual or args.role_minutes or not args.training_seasons):
+        parser.error(
+            "--team-form requires --training-season and excludes --contextual/--role-minutes"
+        )
+    if args.team_form and LOCKED_OUTCOME_SEASON in args.training_seasons:
+        parser.error(
+            f"--team-form cannot read the locked {LOCKED_OUTCOME_SEASON} outcome population"
+        )
     if args.match_context and (
         not args.training_seasons
         or args.contextual
@@ -60,6 +75,7 @@ def main() -> None:
         or args.retained_role_history
         or args.rotation_evidence
         or args.club_news_source
+        or args.team_form
     ):
         parser.error(
             "--match-context requires --training-season "
@@ -78,6 +94,10 @@ def main() -> None:
     if args.with_components and args.rotation_evidence:
         parser.error("--with-components does not accept contextual manager inputs")
     snapshot = read_snapshot(args.snapshot_root, args.snapshot_id)
+    variant_options: dict[str, Any] = {}
+    for name in ("role_minutes", "retained_role_history", "team_form", "match_context"):
+        if getattr(args, name):
+            variant_options[name] = True
     words = (
         load_manager_words(
             args.rotation_evidence,
@@ -92,9 +112,7 @@ def main() -> None:
             snapshot,
             args.archive_root,
             training_seasons=args.training_seasons,
-            **({"role_minutes": True} if args.role_minutes else {}),
-            **({"retained_role_history": True} if args.retained_role_history else {}),
-            **({"match_context": True} if args.match_context else {}),
+            **variant_options,
         )
     else:
         document = produce_football_forecast(
@@ -103,9 +121,7 @@ def main() -> None:
             contextual=args.contextual,
             manager_words=words,
             training_seasons=args.training_seasons,
-            **({"role_minutes": True} if args.role_minutes else {}),
-            **({"retained_role_history": True} if args.retained_role_history else {}),
-            **({"match_context": True} if args.match_context else {}),
+            **variant_options,
         )
         companion = None
     publish_football_artifacts(

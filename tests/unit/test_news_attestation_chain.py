@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import shutil
 from dataclasses import replace
 from pathlib import Path
 
@@ -31,7 +32,11 @@ from squadopt.application.rotation_export import RotationExportRequest, export_r
 from squadopt.data.errors import DataValidationError
 from squadopt.data.snapshots import write_snapshot
 from squadopt.data.sources import club_news_scope
-from squadopt.data.sources.club_news_capture import CodedClub, write_club_news_capture
+from squadopt.data.sources.club_news_capture import (
+    CodedClub,
+    read_captured_responses,
+    write_club_news_capture,
+)
 from squadopt.data.sources.club_news_coding import (
     ROTATION_CLAIM_CODING_CONTRACT_VERSION,
     coding_prompt_sha256,
@@ -49,6 +54,9 @@ def _pair(
     extra_fixture=None,
     disposition="stated_expected_absent",
     body=None,
+    prompt_model="synthetic-stub",
+    extra_coded=(),
+    extra_documents=(),
 ):
     root = tmp_path / "snapshots"
     if extra_fixture is None:
@@ -68,17 +76,18 @@ def _pair(
     news = write_club_news_capture(
         root,
         # ``body`` is what the club published, when that is more than the quote itself.
-        documents=(_document(quote if body is None else body),),
+        documents=(_document(quote if body is None else body), *extra_documents),
         coded=(
             CodedClub(
                 "Arsenal",
                 _response(quote=quote, label=disposition, version=version),
                 version,
-                coding_prompt_sha256(contract_version=version),
+                coding_prompt_sha256(prompt_model, contract_version=version),
             ),
+            *extra_coded,
         ),
-        clubs_declared=("Arsenal",),
-        clubs_covered=("Arsenal",),
+        clubs_declared=("Arsenal", *(entry.club for entry in extra_coded)),
+        clubs_covered=("Arsenal", *(entry.club for entry in extra_coded)),
         captured_at_utc="2026-09-12T14:30:00Z",
     )
     result = export_rotation_evidence(
@@ -139,6 +148,170 @@ def test_replayed_legacy_evidence_never_silently_acquires_attestation(tmp_path, 
     assert word.words is not None
     assert not word.scope_verified and not word.publication_verified
     assert word.role is None
+
+
+def test_forged_legacy_attestation_is_withheld_after_manifest_is_resealed(tmp_path):
+    control_path, _, _ = _pair(tmp_path / "control")
+    control = pd.read_csv(control_path)
+    columns = [
+        "rotation_claim_fixture_scope",
+        "rotation_claim_scope_verified",
+        "rotation_claim_publication_verified",
+        "rotation_claim_publication_source",
+        "rotation_claim_publication_source_sha256",
+    ]
+    table_path, manifest_path, source = _pair(
+        tmp_path / "legacy", version="rotation_claim_coding_v2"
+    )
+
+    def forge(frame):
+        frame[columns] = control[columns]
+        frame["prompt_sha256"] = coding_prompt_sha256("synthetic-stub")
+
+    _rewrite(table_path, manifest_path, forge)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["prompt_sha256"] = coding_prompt_sha256("synthetic-stub")
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    table = read_rotation_evidence_artifact(table_path, manifest_path)
+    observed = table.loc[table.rotation_claim_observed].iloc[0]
+    assert bool(observed.rotation_claim_scope_verified)
+    assert bool(observed.rotation_claim_publication_verified)
+    (word,) = load_manager_words(table_path, club_news_source=source).words
+    assert word.words is not None
+    assert not word.scope_verified and not word.publication_verified
+    assert word.role is None
+
+
+def test_response_index_prompt_digest_must_match_its_recorded_model(tmp_path):
+    table_path, manifest_path, source = _pair(tmp_path, prompt_model="different-synthetic-model")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["prompt_sha256"] = coding_prompt_sha256("synthetic-stub")
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    (word,) = load_manager_words(table_path, club_news_source=source).words
+    assert word.words is not None
+    assert not word.scope_verified and not word.publication_verified
+
+
+def test_manifest_response_digests_must_match_bound_capture(tmp_path):
+    table_path, manifest_path, source = _pair(tmp_path)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["response_sha256s"] = ["f" * 64]
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    (word,) = load_manager_words(table_path, club_news_source=source).words
+    assert word.words is not None
+    assert not word.scope_verified and not word.publication_verified
+
+
+@pytest.mark.parametrize(
+    "mismatch",
+    [
+        "index-contract",
+        "index-prompt",
+        "response-model",
+        "manifest-prompt",
+        "body-contract",
+        "completion-time",
+        "source-label",
+        "empty-responses",
+        "empty-declared-digests",
+        "empty-declared-digests-nothing-covered",
+        "duplicate-declared-digests",
+        "foreign-declared-digest",
+        "omitted-covered-response",
+    ],
+)
+def test_each_coding_attestation_condition_is_checked_independently(
+    tmp_path, monkeypatch, mismatch
+):
+    table_path, manifest_path, source = _pair(tmp_path)
+    table = read_rotation_evidence_artifact(table_path, manifest_path)
+    _, kind, label = documents_from_source(source)
+    snapshot = manager_words._club_news_snapshot(source, source.parent)
+    responses = read_captured_responses(snapshot)
+    assert manager_words._coding_attested(table, kind, label, source.parent)
+    entry = responses[0]
+    if mismatch == "index-contract":
+        entry = replace(entry, prompt_contract_version="rotation_claim_coding_v2")
+    elif mismatch == "index-prompt":
+        entry = replace(entry, prompt_sha256=coding_prompt_sha256("another-model"))
+    elif mismatch == "response-model":
+        table.attrs["model_identifier"] = "another-model"
+    elif mismatch == "manifest-prompt":
+        table.attrs["prompt_sha256"] = coding_prompt_sha256("another-model")
+    elif mismatch == "body-contract":
+        body = json.loads(entry.response.text)
+        body["contract_version"] = "rotation_claim_coding_v2"
+        entry = replace(entry, response=replace(entry.response, text=json.dumps(body)))
+        table.attrs["response_sha256s"] = (
+            hashlib.sha256(entry.response.text.encode()).hexdigest(),
+        )
+    elif mismatch == "completion-time":
+        table.attrs["club_news_captured_at_utc"] = "2026-09-12T14:00:00Z"
+    elif mismatch == "source-label":
+        label = "another-source-label"
+    elif mismatch == "empty-responses":
+        responses = ()
+    elif mismatch == "empty-declared-digests":
+        table.attrs["response_sha256s"] = ()
+    elif mismatch == "empty-declared-digests-nothing-covered":
+        # With no club covered, an omitted response is allowed, so only the
+        # nonempty-list check can refuse an empty declaration.
+        table.attrs["response_sha256s"] = ()
+        table.attrs["clubs_covered"] = ()
+    elif mismatch == "duplicate-declared-digests":
+        table.attrs["response_sha256s"] *= 2
+    elif mismatch == "foreign-declared-digest":
+        # Every stored response stays declared, so only the subset check can refuse a
+        # declared digest that the bound capture does not hold.
+        table.attrs["response_sha256s"] = tuple(
+            sorted({*table.attrs["response_sha256s"], "f" * 64})
+        )
+    elif mismatch == "omitted-covered-response":
+        other = replace(
+            entry, club="Man Utd", response=replace(entry.response, text=entry.response.text + " ")
+        )
+        responses = (*responses, other)
+        table.attrs["clubs_covered"] = ("Arsenal", "Man Utd")
+    if mismatch not in ("empty-responses", "omitted-covered-response"):
+        responses = (entry,)
+    monkeypatch.setattr(manager_words, "read_captured_responses", lambda _: responses)
+    assert not manager_words._coding_attested(table, kind, label, source.parent)
+
+
+@pytest.mark.parametrize("refused", [False, True])
+def test_a_refused_club_response_keeps_the_other_clubs_attestation(tmp_path, refused):
+    absent = "Mount will miss the next Premier League match."
+    starts = "Mount will start the next Premier League match."
+    url = "https://club.example/united/news"
+    document = replace(
+        _document(absent + "\n" + starts), club="Man Utd", requested_url=url, final_url=url
+    )
+    response = _response(quote=absent, label="stated_expected_absent")
+    body = json.loads(response.text)
+    body["documents"][0]["url"] = url
+    claim = body["claims"][0]
+    claim.update(player_name="Mount", team_name="Man Utd", source_url=url)
+    if refused:
+        body["claims"].append({**claim, "quote": starts, "disposition": "stated_expected_to_start"})
+    response = replace(response, text=json.dumps(body))
+    coded = CodedClub(
+        "Man Utd",
+        response,
+        ROTATION_CLAIM_CODING_CONTRACT_VERSION,
+        coding_prompt_sha256("synthetic-stub"),
+    )
+    table_path, manifest_path, source = _pair(
+        tmp_path, extra_coded=(coded,), extra_documents=(document,)
+    )
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert manifest["clubs_covered"] == (["Arsenal"] if refused else ["Arsenal", "Man Utd"])
+    assert len(manifest["response_sha256s"]) == (1 if refused else 2)
+    words = load_manager_words(table_path, club_news_source=source)
+    saka = next(word for word in words.words if word.player_id == 900001)
+    assert saka.scope_verified and saka.publication_verified and saka.role == "not_starting"
+    assert words.exclusion().not_starting == (
+        frozenset({900001}) if refused else frozenset({900001, 900009})
+    )
 
 
 ABSENCE = "Saka will miss the next Premier League match."
@@ -378,15 +551,29 @@ def test_incomplete_attestation_is_refused_and_legacy_direct_words_are_safe(tmp_
 def test_reader_without_the_exact_decision_snapshot_withholds_target_attestation(tmp_path):
     table_path, manifest_path, source = _pair(tmp_path)
     documents, kind, label = documents_from_source(source)
+    news_only = tmp_path / "news-only"
+    shutil.copytree(source, news_only / source.name)
     words = manager_words_from_artifact(
         table_path,
         manifest_path,
         documents=documents,
         source_kind=kind,
         source_label=label,
+        snapshot_root=news_only,
     )
     (word,) = words.words
     assert word.publication_verified
+    assert not word.scope_verified and word.role is None
+
+
+def test_reader_without_bound_news_capture_withholds_both_attestations(tmp_path):
+    table_path, manifest_path, source = _pair(tmp_path)
+    documents, kind, label = documents_from_source(source)
+    words = manager_words_from_artifact(
+        table_path, manifest_path, documents=documents, source_kind=kind, source_label=label
+    )
+    (word,) = words.words
+    assert not word.publication_verified
     assert not word.scope_verified and word.role is None
 
 

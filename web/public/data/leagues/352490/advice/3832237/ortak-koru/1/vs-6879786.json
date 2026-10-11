@@ -1,0 +1,285 @@
+{
+  "contract_version": "provisional_league_ui_v1",
+  "generated_at_utc": "2026-10-10T06:07:04Z",
+  "source_kind": "live",
+  "payload": {
+    "season": "2026-27",
+    "gameweek": 6,
+    "entry_id": 3832237,
+    "league_id": 352490,
+    "mode": "ortak-koru",
+    "window": 1,
+    "source_snapshot_id": "fpl-live-20261010T035732Z-c77d032165af",
+    "moves": [
+      {
+        "move_id": "gw06-1",
+        "player_out": {
+          "player_id": 84450,
+          "name": "Granit Xhaka",
+          "short_name": "Xhaka",
+          "position": "MID",
+          "team": "Sunderland"
+        },
+        "player_in": {
+          "player_id": 195546,
+          "name": "Emiliano Buend\u00eda Stati",
+          "short_name": "Stati",
+          "position": "MID",
+          "team": "Aston Villa"
+        },
+        "expected_points_delta": 0.11816596786659517,
+        "reason_code": "mode_tradeoff"
+      },
+      {
+        "move_id": "gw06-2",
+        "player_out": {
+          "player_id": 178301,
+          "name": "Ollie Watkins",
+          "short_name": "Watkins",
+          "position": "FWD",
+          "team": "Aston Villa"
+        },
+        "player_in": {
+          "player_id": 216646,
+          "name": "Yoane Wissa",
+          "short_name": "Wissa",
+          "position": "FWD",
+          "team": "Newcastle"
+        },
+        "expected_points_delta": 0.047657447460665026,
+        "reason_code": "mode_tradeoff"
+      },
+      {
+        "move_id": "gw06-3",
+        "player_out": {
+          "player_id": 437730,
+          "name": "Antoine Semenyo",
+          "short_name": "Semenyo",
+          "position": "MID",
+          "team": "Man City"
+        },
+        "player_in": {
+          "player_id": 244851,
+          "name": "Cole Palmer",
+          "short_name": "Palmer",
+          "position": "MID",
+          "team": "Chelsea"
+        },
+        "expected_points_delta": 2.4940528243197377,
+        "reason_code": "mode_tradeoff"
+      },
+      {
+        "move_id": "gw06-4",
+        "player_out": {
+          "player_id": 441164,
+          "name": "Pedro Porro Sauceda",
+          "short_name": "Sauceda",
+          "position": "DEF",
+          "team": "Spurs"
+        },
+        "player_in": {
+          "player_id": 437499,
+          "name": "Maxence Lacroix",
+          "short_name": "Lacroix",
+          "position": "DEF",
+          "team": "Chelsea"
+        },
+        "expected_points_delta": 1.8253031337326036,
+        "reason_code": "mode_tradeoff"
+      },
+      {
+        "move_id": "gw06-5",
+        "player_out": {
+          "player_id": 472769,
+          "name": "Nico O'Reilly",
+          "short_name": "O'Reilly",
+          "position": "DEF",
+          "team": "Man City"
+        },
+        "player_in": {
+          "player_id": 466075,
+          "name": "Riccardo Calafiori",
+          "short_name": "Calafiori",
+          "position": "DEF",
+          "team": "Arsenal"
+        },
+        "expected_points_delta": 1.315793118107834,
+        "reason_code": "mode_tradeoff"
+      }
+    ],
+    "transfer_hit_points": 0.0,
+    "expected_gain_vs_hold": 5.800972491487435,
+    "expected_points_cost": 6.415581034959516,
+    "rival_label": "entry-6879786",
+    "solver_status": "OPTIMAL",
+    "optimality_gap": 0.0,
+    "wall_clock_stopped_the_search": false,
+    "expected_own_points": 48.723305927772245,
+    "captain": {
+      "player_id": 244851,
+      "name": "Cole Palmer",
+      "short_name": "Palmer",
+      "position": "MID",
+      "team": "Chelsea",
+      "expected_points": 5.323025429413814
+    },
+    "vice_captain": {
+      "player_id": 226597,
+      "name": "Gabriel dos Santos Magalh\u00e3es",
+      "short_name": "Magalh\u00e3es",
+      "position": "DEF",
+      "team": "Arsenal",
+      "expected_points": 4.557988193553639
+    },
+    "starting_xi": [
+      {
+        "player_id": 154561,
+        "name": "David Raya Mart\u00edn",
+        "short_name": "Mart\u00edn",
+        "position": "GK",
+        "team": "Arsenal",
+        "expected_points": 3.937285604836277
+      },
+      {
+        "player_id": 226597,
+        "name": "Gabriel dos Santos Magalh\u00e3es",
+        "short_name": "Magalh\u00e3es",
+        "position": "DEF",
+        "team": "Arsenal",
+        "expected_points": 4.557988193553639
+      },
+      {
+        "player_id": 466075,
+        "name": "Riccardo Calafiori",
+        "short_name": "Calafiori",
+        "position": "DEF",
+        "team": "Arsenal",
+        "expected_points": 3.59365129554469
+      },
+      {
+        "player_id": 437499,
+        "name": "Maxence Lacroix",
+        "short_name": "Lacroix",
+        "position": "DEF",
+        "team": "Chelsea",
+        "expected_points": 2.891931282741331
+      },
+      {
+        "player_id": 244851,
+        "name": "Cole Palmer",
+        "short_name": "Palmer",
+        "position": "MID",
+        "team": "Chelsea",
+        "expected_points": 5.323025429413814
+      },
+      {
+        "player_id": 446008,
+        "name": "Bryan Mbeumo",
+        "short_name": "Mbeumo",
+        "position": "MID",
+        "team": "Man Utd",
+        "expected_points": 4.514593666623016
+      },
+      {
+        "player_id": 430871,
+        "name": "Matheus Santos Carneiro da Cunha",
+        "short_name": "Cunha",
+        "position": "MID",
+        "team": "Man Utd",
+        "expected_points": 4.4635446562597805
+      },
+      {
+        "player_id": 424876,
+        "name": "Dominik Szoboszlai",
+        "short_name": "Szoboszlai",
+        "position": "MID",
+        "team": "Liverpool",
+        "expected_points": 3.858004507173562
+      },
+      {
+        "player_id": 195546,
+        "name": "Emiliano Buend\u00eda Stati",
+        "short_name": "Stati",
+        "position": "MID",
+        "team": "Aston Villa",
+        "expected_points": 3.412700201099913
+      },
+      {
+        "player_id": 502500,
+        "name": "Igor Thiago Nascimento Rodrigues",
+        "short_name": "Rodrigues",
+        "position": "FWD",
+        "team": "Brentford",
+        "expected_points": 3.7306746247680795
+      },
+      {
+        "player_id": 216646,
+        "name": "Yoane Wissa",
+        "short_name": "Wissa",
+        "position": "FWD",
+        "team": "Newcastle",
+        "expected_points": 3.116881036344326
+      }
+    ],
+    "bench": [
+      {
+        "player_id": 204936,
+        "name": "Gianluigi Donnarumma",
+        "short_name": "Donnarumma",
+        "position": "GK",
+        "team": "Man City",
+        "expected_points": 3.082495342651006
+      },
+      {
+        "player_id": 169432,
+        "name": "Oli McBurnie",
+        "short_name": "McBurnie",
+        "position": "FWD",
+        "team": "Hull City",
+        "expected_points": 3.069223588883662
+      },
+      {
+        "player_id": 231416,
+        "name": "Ferdi Kad\u0131o\u011flu",
+        "short_name": "Kad\u0131o\u011flu",
+        "position": "DEF",
+        "team": "Brighton",
+        "expected_points": 2.2778581774368583
+      },
+      {
+        "player_id": 106611,
+        "name": "Michael Keane",
+        "short_name": "Keane",
+        "position": "DEF",
+        "team": "Everton",
+        "expected_points": 0.11929007215421392
+      }
+    ],
+    "chip": null,
+    "stated_limits": [
+      "No chip is offered inside the window. A finite window counts nothing for holding a chip back, so a planner that could reach one would spend it; chip timing is a season-long decision this window cannot price.",
+      "The current model was trained on seasons that awarded no defensive-contribution (DEFCON) points, so it does not forecast those points."
+    ],
+    "data_quality": "complete",
+    "missing_fields": [],
+    "squad_basis": "captured",
+    "rival_entry_id": 6879786,
+    "expected_points_cost_ceiling": 6.415581034959516,
+    "overlap_count": 6,
+    "transfer_cap": 5,
+    "overlap_target": 9,
+    "overlap_applied": 6,
+    "plan_kind": "within_free_transfers",
+    "alternative_plan": {
+      "kind": "with_hits",
+      "overlap_applied": 9,
+      "transfer_hit_points": 12.0,
+      "expected_points_cost": 19.021505009147276,
+      "expected_points_cost_ceiling": 19.021505009147276
+    },
+    "expected_gap_vs_rival": 6.044316323590621,
+    "captain_agreement": true,
+    "control_solver_status": "OPTIMAL",
+    "control_optimality_gap": 0.0
+  }
+}

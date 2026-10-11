@@ -281,6 +281,7 @@ def advice_read_schema() -> dict[str, Any]:
                             "football_match_context_v1",
                             "football_joint_role_minutes_v1",
                             "football_joint_role_retained_history_v1",
+                            "football_team_form_v1",
                         ]
                     },
                     "experimental": {"const": True},

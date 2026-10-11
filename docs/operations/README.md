@@ -16,6 +16,7 @@
 | Understand storage responsibilities | [Persistence boundaries](../architecture/decisions/0005-persistence-boundaries.md) |
 | Understand hosting responsibilities | [Backend hosting](../architecture/decisions/0006-backend-hosting.md) |
 | Compare where the advice backend could run instead of the owner's PC (proposed, undecided) | [Hosting options](../architecture/decisions/0009-advice-backend-hosting-options.md) |
+| See every advice backend route, who calls it and what replaces it when the backend is retired (#988 route 1) | [Advice backend endpoints](advice_backend_endpoints.md) |
 
 The complete member-publication week and `squadopt season tick` are different workflows.
 Use the weekly runbook to identify the operation required; installing a scheduler around

@@ -217,3 +217,46 @@ correction may only normalize those two already-computed truth values to built-i
 input, fold, optimizer result, score, exclusion, cohort, threshold or interpretation.
 After that correction is committed and the quality gates pass, exactly one corrective
 execution with the original command and immutable inputs is authorized.
+
+## Live chip roster and first gameweek amendment
+
+**Amended:** 2026-10-10, accepted by the owner, before any live Benchmark V2 week
+was read and before the gameweek 7 deadline.
+
+The primary score normalizes chip effects out (see the primary scoring policy). For
+the live reading, this amendment fixes which roster is scored for a member of the
+frozen `as_of_top_100_v1` cohort who played a roster-changing chip in target
+gameweek `t`, and it fixes where the reading starts. The owner accepted three
+decisions:
+
+1. **Wildcard.** The entry's captured gameweek `t` roster is scored under
+   `official_autosub_captain_v2`. A Wildcard changes only the transfer cost, which
+   the primary score already excludes.
+2. **Free Hit.** The captured Free Hit roster is never scored. The entry is scored
+   on the roster the Free Hit reverts to: its gameweek `t-1` squad, starting XI,
+   bench order, captain and vice-captain, read from that entry's gameweek `t-1`
+   picks in the frozen cohort captures, against gameweek `t` outcomes. This
+   normalizes the Free Hit effect out. If the entry's gameweek `t-1` picks are
+   missing, the entry is excluded with the counted reason
+   `free_hit_previous_missing`; its roster is never guessed.
+3. **First gameweek.** The contiguous gameweek range of the live reading starts at
+   gameweek 7. Every gameweek from 7 to the reading's declared last gameweek is
+   listed, captured or recorded as missing. Gameweeks 3 to 6 are not part of the
+   live reading.
+
+Bench Boost and Triple Captain remain normalized by the normal-week multipliers.
+Where a decision leaves a detail open, the most conservative reading applies:
+
+- Gameweek `t-1` picks are read only from the gameweek `t-1` picks capture listed in
+  the same reading, bound to the gameweek `t-1` frozen cohort and captured at or
+  after the gameweek `t-1` deadline. The gameweek 6 capture is outside the reading,
+  so a Free Hit entry in gameweek 7 is excluded as `free_hit_previous_missing`.
+- Recorded gameweek `t-1` automatic substitutions are reversed, so the starting XI
+  and bench order are the ones the manager set, as for every other scored roster.
+- A gameweek `t-1` roster that is itself a Free Hit roster is not the roster the
+  chip reverts to. That entry is excluded as `chip_unresolved`, as is any chip this
+  protocol does not name.
+- An excluded entry counts against the 80-entry floor like any other. A week below
+  the floor stays out of both comparisons, so the paired-week set remains identical.
+
+No other reading, threshold, comparison or exclusion changes.

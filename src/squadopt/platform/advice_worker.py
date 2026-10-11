@@ -101,6 +101,7 @@ from squadopt.platform.worker_heartbeat import (
 from squadopt.platform.worker_metrics import serve_worker_metrics
 from squadopt.prediction.football import FOOTBALL_MODEL_VERSION, JOINT_ROLE_MODEL_VERSIONS
 from squadopt.prediction.football_match_context import MATCH_CONTEXT_MODEL_VERSION
+from squadopt.prediction.football_team_form import TEAM_FORM_MODEL_VERSION
 
 __all__ = [
     "DEFAULT_ARCHIVE_EVERY_SECONDS",
@@ -424,6 +425,7 @@ def build_advice_compute(
                         FOOTBALL_MODEL_VERSION,
                         MATCH_CONTEXT_MODEL_VERSION,
                         *JOINT_ROLE_MODEL_VERSIONS,
+                        TEAM_FORM_MODEL_VERSION,
                     )
                     else []
                 ),
