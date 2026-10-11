@@ -18,6 +18,7 @@ from tests.unit.test_season_rules import _chips, _rules, _scoring
 
 from squadopt.data.snapshots import CapturedSnapshot, read_snapshot, write_snapshot
 from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD, live_payload
+from squadopt.data.timestamps import normalize_utc_timestamp
 from squadopt.experiments import opponent_projection
 from squadopt.experiments import published_difficulty_live as study
 from squadopt.experiments.opponent_projection import _squad
@@ -552,6 +553,58 @@ def test_unmerged_declaration_refuses_before_any_input(
         runner.frozen_declaration()
 
 
+def test_the_pinned_declaration_is_the_checkout_text_after_the_clarification() -> None:
+    held = (runner.ROOT / runner.DECLARATION).read_bytes()
+    assert runner.digest(held) == runner.DECLARATION_SHA256
+    assert runner.PROTOCOL_SHA256 != runner.DECLARATION_SHA256
+    assert (runner.PROTOCOL_PULL, runner.CLARIFICATION_PULL) == ("1033", "1075")
+
+
+def test_the_declaration_is_the_text_the_clarification_left(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    protocol, clarified = b"protocol\n", b"protocol\none verdict capture\n"
+    monkeypatch.setattr(runner, "PROTOCOL_SHA256", runner.digest(protocol))
+    monkeypatch.setattr(runner, "DECLARATION_SHA256", runner.digest(clarified))
+    (tmp_path / runner.DECLARATION).parent.mkdir(parents=True)
+    (tmp_path / runner.DECLARATION).write_bytes(clarified.replace(b"\n", b"\r\n"))
+    monkeypatch.setattr(runner, "ROOT", tmp_path)
+    (tmp_path / "docs/opponent_projection_study.json").write_bytes(b"{}")
+    monkeypatch.setattr(runner, "verify_coefficients", lambda content: None)
+    texts = {"protocol-merge": protocol, "clarification-merge": clarified}
+    monkeypatch.setattr(runner, "declaration_at", lambda commit: texts[commit])
+    pulls = {
+        "1033": ["MERGED", "2026-10-11T12:23:36Z", "protocol-merge"],
+        "1075": ["MERGED", "2026-10-11T16:07:39Z", "clarification-merge"],
+    }
+    calls: list[tuple[str, ...]] = []
+
+    def command(*args: str) -> str:
+        calls.append(args)
+        if args[:3] == ("gh", "pr", "view"):
+            state, instant, commit = pulls[args[3]]
+            return json.dumps({"state": state, "mergedAt": instant, "mergeCommit": {"oid": commit}})
+        return "code" if args[:2] == ("git", "rev-parse") else ""
+
+    monkeypatch.setattr(runner, "command", command)
+    held = runner.frozen_declaration()
+    # The binding start stays the protocol's own merge; the text read is the clarified one.
+    assert held["merged_at"] == normalize_utc_timestamp("2026-10-11T12:23:36Z", label="m")
+    assert (held["merge_commit"], held["clarification_commit"]) == (
+        "protocol-merge",
+        "clarification-merge",
+    )
+    assert held["sha256"] == runner.digest(clarified)
+    assert ("git", "merge-base", "--is-ancestor", "clarification-merge", "HEAD") in calls
+    texts["protocol-merge"] = clarified
+    with pytest.raises(study.DifficultyInputError, match="declaration differs"):
+        runner.frozen_declaration()
+    texts["protocol-merge"] = protocol
+    pulls["1075"][0] = "OPEN"
+    with pytest.raises(study.DifficultyInputError, match="merge"):
+        runner.frozen_declaration()
+
+
 def test_pairing_refuses_retained_copies_that_disagree_and_passes_over_unserved(
     tmp_path: Path,
 ) -> None:
@@ -1019,3 +1072,66 @@ def test_settled_roster_is_refused_before_the_claim(
         runner.reading(snapshots, **kwargs)
     assert not (tmp_path / "common/research-claims").exists()
     assert not kwargs["output_directory"].exists()
+
+
+@pytest.mark.parametrize("verdict_gap", ["none", "live_payload", "unchecked"])
+def test_a_later_capture_never_supplies_a_scored_weeks_outcomes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, verdict_gap: str
+) -> None:
+    def gap(docs: dict[str, Any]) -> None:
+        if verdict_gap == "live_payload":
+            del docs[live_payload(7)]
+        elif verdict_gap == "unchecked":
+            docs[BOOTSTRAP_PAYLOAD]["events"][6]["data_checked"] = False
+
+    def other_points(docs: dict[str, Any]) -> None:
+        for item in docs[live_payload(7)]["elements"]:
+            item["stats"]["total_points"] = 20
+
+    _, kwargs = reading_setup(tmp_path, monkeypatch, outcome_change=gap)
+    root = kwargs["snapshot_root"]
+    # A later settled capture counts GW7 and holds its live payload, with other points.
+    later = captured(root, final=True, offset=3600, change=other_points)
+    snapshots = runner.inventory(root, season=study.SEASON, as_of="2027-01-20T00:00:00Z")
+    verdict = runner.first_settled(snapshots)
+    assert verdict.metadata.snapshot_id != later.metadata.snapshot_id
+    original = Path.read_bytes
+    opened: list[Path] = []
+
+    def tracked(path: Path) -> bytes:
+        opened.append(path)
+        return original(path)
+
+    monkeypatch.setattr(Path, "read_bytes", tracked)
+    report = runner.reading(snapshots, **kwargs)
+    assert not [path for path in opened if later.metadata.snapshot_id in path.parts]
+    assert report["reading_capture"] == verdict.metadata.snapshot_id
+    seven = next(w for w in report["week_identities"] if w["gameweek"] == 7)
+    assert seven["outcome_capture"] == verdict.metadata.snapshot_id
+    players = kwargs["output_directory"] / "gw07-players.csv"
+    if verdict_gap == "none":
+        assert seven["status"] == "scored"
+        assert seven["reading_input_hashes"] == dict(verdict.metadata.checksums)
+        realized = pd.read_csv(players).set_index("player_id")["realized_points"]
+        assert (realized == (realized.index - 1000) % 8).all()
+        assert report["valid_weeks"] == 1
+    else:
+        assert (seven["status"], seven["reason"]) == ("missing", "DifficultyMissingInputs")
+        assert report["valid_weeks"] == 0
+        assert not players.exists()
+
+
+def test_outcomes_are_read_only_from_the_capture_the_verdict_named(tmp_path: Path) -> None:
+    verdict = captured(tmp_path, final=True)
+    later = captured(tmp_path, final=True, offset=3600)
+    held = runner.verdict_outcomes(tmp_path, verdict, 7)
+    assert (held.metadata.snapshot_id, held.metadata.fingerprint) == (
+        verdict.metadata.snapshot_id,
+        verdict.metadata.fingerprint,
+    )
+    assert live_payload(7) in held.payloads
+    named = CapturedSnapshot(
+        replace(verdict.metadata, fingerprint=later.metadata.fingerprint), verdict.payloads
+    )
+    with pytest.raises(study.DifficultyMissingInputs, match="not the verdict capture"):
+        runner.verdict_outcomes(tmp_path, named, 7)

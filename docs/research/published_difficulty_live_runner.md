@@ -1,16 +1,21 @@
 # Published fixture difficulty live runner
 
 This is #1009 part (b), step 2. Its sole statistical specification is the
-protocol in [#1033](https://github.com/MyManDev/football-squad-optimizer/pull/1033).
+protocol in [#1033](https://github.com/MyManDev/football-squad-optimizer/pull/1033),
+with the clarification
+[#1075](https://github.com/MyManDev/football-squad-optimizer/pull/1075) added.
 Preparing synthetic code does not accept an unmerged protocol or authorize its
-real reading. The executable verifies #1033's actual merged declaration, its
-exact digest and clean committed ancestry before opening any real input.
+real reading. Before opening any real input, the executable verifies that
+#1033 and #1075 both merged, that the protocol text at #1033's merge and at
+#1075's merge each has its pinned digest, that the checkout holds the text after
+#1075, and that the code is clean and descends from both merges. The binding
+start stays #1033's merge.
 An amended protocol requires corresponding reviewed runner changes.
 
 ## Decisions accepted by the owner on 2026-10-10
 
 The owner accepted the reviewer's recommendations on #1009 on 2026-10-10. The
-runner follows #1033's text with them, and its pinned digest is that text's:
+runner follows #1033's text with them:
 
 - The free squad is solved by the #844 method, as reading 3 of #1033 states it.
 - The runner reads the snapshot root and the handoff root the backend served
@@ -24,11 +29,16 @@ runner follows #1033's text with them, and its pinned digest is that text's:
 - The gate reads the pooled figures; the split by handoff version has no verdict.
 - The difficulty signal reads each fixture on the club's own side.
 
+#1033 merged on 2026-10-11 with these decisions, and #1075 then added one
+clarification that changes no rule: every scored week's outcomes, its settled
+live payload and the bootstrap that counts it in `scored_gameweeks` and maps its
+element ids, come from the one verdict capture, never from any other capture.
 `DECLARATION_SHA256` in `scripts/measure_published_difficulty_live.py` is
-`0d5178b56be82a8cf0786b11e0404da6e551118f878dc3cce12651899c79c13a`, the sha256
+`858a37f55c2e6376f7d5ab9b7ee092c4b87c976cc2503d6fec86e48338adff17`, the sha256
 of `docs/research/published_difficulty_live_prereg.md` after CRLF to LF
-normalization as #1033 carries it with these decisions (commit 226299a6). This
-runner merges after #1033. If #1033's text changes again before it merges, the
+normalization as #1075 left it on `develop`. `PROTOCOL_SHA256` is
+`0d5178b56be82a8cf0786b11e0404da6e551118f878dc3cce12651899c79c13a`, the same
+digest of the text #1033 merged. If the protocol's text changes again, the
 runner refuses every real reading until a reviewed update re-pins it.
 
 ## The candidate and the free squad
@@ -78,9 +88,18 @@ begins, retain the claim after refusal or crash; the executable never removes it
 An existing committed verdict record also prevents a second reading.
 
 No real-week comparison is produced before that settled-GW20 condition. The
-first such capture is chosen by capture instant then snapshot id, and it
-supplies every week's outcomes: a week it does not count in `scored_gameweeks`,
-or whose live payload it lacks, is missing. Fixture fields decide no settlement.
+first such capture is chosen by capture instant then snapshot id; it is the one
+verdict capture, and, as #1075 binds it, every scored week's outcomes are read
+from it alone: the week's settled live payload and the bootstrap that counts
+the week in `scored_gameweeks` and maps its element ids. `verdict_outcomes`
+reopens that capture by its own name, checks that its identity, fingerprint and
+payload inventory are the ones selected, and opens no other capture's payloads,
+even for a week settled long before GW20. A week it does not count in
+`scored_gameweeks`, or whose live payload it lacks, is missing, and no later
+capture is searched for it. Each week's record names its `outcome_capture`.
+The collector stores every played week's live payload in each capture
+(`live_history_endpoints` in `src/squadopt/platform/fpl_capture.py`), so the
+verdict capture can hold them all. Fixture fields decide no settlement.
 
 For each post-merge deadline through GW20, the decision capture is the latest
 capture whose own target is that week and for which `handoff_fingerprint_for`
@@ -125,10 +144,6 @@ reading:
 - When the alias does not match, two retained copies that both match the
   capture leave the paired file ambiguous, even with one fingerprint, so the
   week is missing.
-- The settled GW20 capture supplies every week's outcomes; no other capture is
-  searched for a week it lacks. The collector stores every played week's live
-  payload in each capture (`live_history_endpoints` in
-  `src/squadopt/platform/fpl_capture.py`), so that capture holds them all.
 - The served roots come only from the backend's two variables; the command line
   names neither.
 - Both arms are solved and recorded even when the first is already unproven.

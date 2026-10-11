@@ -61,7 +61,13 @@ from squadopt.platform.capture_context import handoff_fingerprint_for
 
 ROOT = Path(__file__).resolve().parents[1]
 DECLARATION = "docs/research/published_difficulty_live_prereg.md"
-DECLARATION_SHA256 = "0d5178b56be82a8cf0786b11e0404da6e551118f878dc3cce12651899c79c13a"
+#: The protocol's own merge, which dates the binding start, and the text it merged.
+PROTOCOL_PULL = "1033"
+PROTOCOL_SHA256 = "0d5178b56be82a8cf0786b11e0404da6e551118f878dc3cce12651899c79c13a"
+#: The clarification that binds every scored week to the one verdict capture, and the
+#: protocol text it left, which is the declaration this runner reads under.
+CLARIFICATION_PULL = "1075"
+DECLARATION_SHA256 = "858a37f55c2e6376f7d5ab9b7ee092c4b87c976cc2503d6fec86e48338adff17"
 CAPTURE_NAME = re.compile(r"fpl-live-(?:2026(?:0[89]|1[012])|20270[1-5])\d{2}T\d{6}Z-[0-9a-f]{12}")
 HASH = re.compile(r"[0-9a-f]{64}")
 #: The roots the backend serves from; the protocol reads these two and names both.
@@ -92,13 +98,14 @@ def digest(content: bytes) -> str:
     return hashlib.sha256(content.replace(b"\r\n", b"\n")).hexdigest()
 
 
-def frozen_declaration() -> dict[str, str]:
+def merged_pull(number: str) -> tuple[str, str]:
+    """The merge commit and merge instant of one declaration pull request."""
     info = json.loads(
         command(
             "gh",
             "pr",
             "view",
-            "1033",
+            number,
             "--repo",
             "MyManDev/football-squad-optimizer",
             "--json",
@@ -109,22 +116,39 @@ def frozen_declaration() -> dict[str, str]:
         raise DifficultyInputError(
             "The preregistration must merge before any real input is opened."
         )
-    merged = info["mergeCommit"]["oid"]
-    content = subprocess.run(
-        ["git", "show", f"{merged}:{DECLARATION}"], cwd=ROOT, capture_output=True, check=True
+    return info["mergeCommit"]["oid"], normalize_utc_timestamp(info["mergedAt"], label="merge")
+
+
+def declaration_at(commit: str) -> bytes:
+    return subprocess.run(
+        ["git", "show", f"{commit}:{DECLARATION}"], cwd=ROOT, capture_output=True, check=True
     ).stdout
+
+
+def frozen_declaration() -> dict[str, str]:
+    """Verify the protocol #1033 merged and the text #1075's clarification left.
+
+    The binding start is #1033's merge. The declaration read is the text after
+    #1075, and the checkout must hold exactly that text.
+    """
+    merged, merged_at = merged_pull(PROTOCOL_PULL)
+    clarified, clarified_at = merged_pull(CLARIFICATION_PULL)
     if (
-        digest(content) != DECLARATION_SHA256
+        digest(declaration_at(merged)) != PROTOCOL_SHA256
+        or digest(declaration_at(clarified)) != DECLARATION_SHA256
         or digest((ROOT / DECLARATION).read_bytes()) != DECLARATION_SHA256
     ):
         raise DifficultyInputError("The accepted declaration differs; runner review is required.")
     command("git", "merge-base", "--is-ancestor", merged, "HEAD")
+    command("git", "merge-base", "--is-ancestor", clarified, "HEAD")
     if command("git", "status", "--porcelain", "--untracked-files=normal"):
         raise DifficultyInputError("The reading requires clean committed code.")
     verify_coefficients((ROOT / "docs/opponent_projection_study.json").read_bytes())
     return {
         "merge_commit": merged,
-        "merged_at": normalize_utc_timestamp(info["mergedAt"], label="merge"),
+        "merged_at": merged_at,
+        "clarification_commit": clarified,
+        "clarified_at": clarified_at,
         "sha256": DECLARATION_SHA256,
         "code_commit": command("git", "rev-parse", "HEAD"),
     }
@@ -225,6 +249,31 @@ def first_settled(captures: Mapping[str, CapturedSnapshot]) -> CapturedSnapshot:
         if 20 in scored_gameweeks(snapshot.payloads[BOOTSTRAP_PAYLOAD]):
             return snapshot
     raise DifficultyMissingInputs("GW20 is not settled; no real comparison can be printed.")
+
+
+def verdict_outcomes(snapshot_root: Path, verdict: CapturedSnapshot, week: int) -> CapturedSnapshot:
+    """Read one scored week's outcomes from the verdict capture and from no other.
+
+    The week's settled live payload, and the bootstrap that counts it in
+    ``scored_gameweeks`` and maps its element ids, both come from the one capture
+    ``first_settled`` named, even for a week settled long before GW20. No later
+    capture is searched for a week the verdict capture lacks; that week is missing.
+    """
+    settled = partial_snapshot(
+        safe_path(snapshot_root) / verdict.metadata.snapshot_id,
+        (BOOTSTRAP_PAYLOAD, live_payload(week)),
+    )
+    if (
+        settled.metadata.snapshot_id != verdict.metadata.snapshot_id
+        or settled.metadata.fingerprint != verdict.metadata.fingerprint
+        or dict(settled.metadata.checksums) != dict(verdict.metadata.checksums)
+    ):
+        raise DifficultyMissingInputs("The outcome capture is not the verdict capture.")
+    if week not in scored_gameweeks(settled.payloads[BOOTSTRAP_PAYLOAD]):
+        raise DifficultyMissingInputs(
+            "The verdict capture does not count the week in scored_gameweeks."
+        )
+    return settled
 
 
 def eligible_weeks(snapshot: CapturedSnapshot, merged_at: str) -> tuple[int, ...]:
@@ -442,6 +491,7 @@ def reading(
         raise DifficultyInputError(
             "The owner must authorize the reading outside weekly operations."
         )
+    # The one verdict capture: every scored week's outcomes are read from it alone.
     selected = first_settled(captures)
     if as_instant(selected.metadata.captured_at_utc) > as_instant(as_of):
         raise DifficultyMissingInputs("The reading instant precedes the settled capture.")
@@ -513,14 +563,7 @@ def reading(
     try:
         for week, (decision, handoff, proof, projected, unserved) in prepared.items():
             try:
-                settled = partial_snapshot(
-                    safe_path(snapshot_root) / selected.metadata.snapshot_id,
-                    (BOOTSTRAP_PAYLOAD, live_payload(week)),
-                )
-                if week not in scored_gameweeks(settled.payloads[BOOTSTRAP_PAYLOAD]):
-                    raise DifficultyMissingInputs(
-                        "The reading capture does not count the week in scored_gameweeks."
-                    )
+                settled = verdict_outcomes(snapshot_root, selected, week)
                 rows, dropped = joined_rows(decision, handoff, settled, week, projected=projected)
                 measured_week, player_evidence = measure_week(
                     rows, season=SEASON, gameweek=week, handoff_version=handoff.model_version
@@ -537,6 +580,7 @@ def reading(
                         "decision_fingerprint": decision.metadata.fingerprint,
                         "decision_input_hashes": dict(decision.metadata.checksums),
                         "dropped_player_codes": dropped,
+                        "outcome_capture": settled.metadata.snapshot_id,
                         "reading_input_hashes": dict(settled.metadata.checksums),
                         "reading": asdict(measured_week),
                     }
@@ -558,6 +602,7 @@ def reading(
                         "detail": str(error) if isinstance(error, DifficultyInputError) else None,
                         "identity": proof,
                         "unserved_captures": unserved,
+                        "outcome_capture": selected.metadata.snapshot_id,
                         "solver_decisions": error.decisions
                         if isinstance(error, DifficultySolveFailure)
                         else None,
