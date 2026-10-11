@@ -5,6 +5,8 @@
 | Prediction research programme | [Research agenda](../prediction_research_agenda.md) |
 | Fixture football candidate and observed planning | [Implementation and evidence contract](football_candidate_development.md) |
 | Football candidate development measurements | [Results and rejected ablations](football_candidate_results.md) |
+| Private projected club units and replacement quality | [Model and integration boundaries](football_projected_unit_strength.md) |
+| Football Manager source and training feasibility | [Sources, schemas and admission gates](football_fm_source_feasibility.md) |
 | Registered findings and evidence | [Measurements index](../measurements_index.md) |
 | Operational component model | [Component policy](../phase_c_operational_component.md) |
 | Operational component and Top-100 composition | [Elite policy](../phase_c_operational_elite_policy.md) |
