@@ -82,6 +82,16 @@ def _digest(raw: bytes) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
+def _preparation_target(role: str, path: Path) -> Path:
+    """Name the writer role whose path holds the wrong kind of entry."""
+    target = Path(addressable(path))
+    expects_directory = role == "capture"
+    if target.exists() and not (target.is_dir() if expects_directory else target.is_file()):
+        kind = "directory" if expects_directory else "file"
+        raise ValueError(f"Invalid football preparation input {role}: Expected a {kind} at {path}.")
+    return target
+
+
 def _preparation_inputs(
     snapshot_root: Path, snapshot_id: str, files: Mapping[str, Path]
 ) -> dict[str, Any]:
@@ -91,13 +101,7 @@ def _preparation_inputs(
     }
     inputs = {}
     for role, path in paths.items():
-        target = Path(addressable(path))
-        expects_directory = role == "capture"
-        if target.exists() and not (target.is_dir() if expects_directory else target.is_file()):
-            kind = "directory" if expects_directory else "file"
-            raise ValueError(
-                f"Invalid football preparation input {role}: Expected a {kind} at {path}."
-            )
+        target = _preparation_target(role, path)
         try:
             # The extended-length form, so a deep artifact root is fingerprinted too.
             artifacts = fingerprint_paths([target])
@@ -640,7 +644,9 @@ def seal_football_bundle(
     # The attempt record takes the decision capture's name. Read that capture by its
     # exact identity first: where the filesystem ignores case, a miscased id would
     # otherwise create the real capture's record with other bytes, and the corrected
-    # retry could never write its own.
+    # retry could never write its own. A file in the capture's place is named as the
+    # preparation input it is, before the snapshot reader looks inside it.
+    _preparation_target("capture", snapshot_root / snapshot_id)
     _source(snapshot_root, snapshot_id)
     # A failed preparation has no ready marker or copied folder yet. Record the
     # attempt before either, so older v1 readers cannot serve its loose artifacts.

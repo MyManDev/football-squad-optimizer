@@ -97,15 +97,15 @@ def test_failure_keeps_previous_ready_and_never_selects_partial(
     real_write = bundle.write_bytes_once
     real_validate = bundle._validate
 
-    def fail_site(tree):
+    def fail_site(tree, **kwargs):
         if tree == candidate["site_data_root"] / "league":
             raise OSError("synthetic preparation failure")
-        return real_site(tree)
+        return real_site(tree, **kwargs)
 
-    def fail_record(raw, target):
+    def fail_record(raw, target, **kwargs):
         if target.name == "202.json" and any(part.endswith(".bundle") for part in target.parts):
             raise OSError("synthetic recording failure")
-        return real_write(raw, target)
+        return real_write(raw, target, **kwargs)
 
     def fail_verify(**kwargs):
         if (
@@ -135,10 +135,11 @@ def test_failure_keeps_previous_ready_and_never_selects_partial(
         assert (folder / "site/league/members.json").is_file()
         assert (folder / "site/league/entries/101.json").is_file()
         assert not (folder / "site/league/entries/202.json").exists()
-        # Isolate the real partial-folder guard from the attempt guard in this test.
-        bundle.football_bundle_stage_path(
-            candidate["artifact_root"], candidate["snapshot_id"], bundle.FootballBundleStage.STARTED
-        ).unlink()
+        # Isolate the real partial-folder guard from the attempt and preparation records.
+        for stage in (bundle.FootballBundleStage.STARTED, bundle.FootballBundleStage.PREPARATION):
+            bundle.football_bundle_stage_path(
+                candidate["artifact_root"], candidate["snapshot_id"], stage
+            ).unlink()
     assert signature(candidate, configured) != prior_signature
     selected = load(candidate, configured=configured, inputs=inputs, projection=projection)
     assert selected.football is None and not selected.football_components_bound
