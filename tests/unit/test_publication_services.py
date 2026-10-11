@@ -23,7 +23,9 @@ from squadopt.application.league_publication import (
     leagues_beside,
     prepare_league_publication,
     publish_league,
+    remove_stale_device_tables,
     settle_legacy_tree,
+    write_device_plan_table,
 )
 from squadopt.application.site_publication import SitePublicationRequest, publish_site
 from squadopt.contracts.league_tree import (
@@ -235,6 +237,7 @@ def test_installed_member_publication_and_pool_write_the_same_contracts(
     assert directory in first.output_paths
     listed = json.loads(directory.read_text(encoding="utf-8"))
     assert listed["contract_version"] == "league_directory_v1"
+    table = request.out_dir / "data" / "device" / request.snapshot_id / "device-plan.json"
     assert listed["payload"]["leagues"] == [
         {
             "league_id": 352490,
@@ -242,9 +245,22 @@ def test_installed_member_publication_and_pool_write_the_same_contracts(
             "season": first.season,
             "gameweek": first.gameweek,
             "path": "leagues/352490",
+            "device_plan": f"device/{request.snapshot_id}/device-plan.json",
         }
     ]
     assert listed["generated_at_utc"] == "2026-08-27T10:00:00Z"
+    # The capture's own table, once beside the trees, in the league views' envelope.
+    assert table in first.output_paths
+    shared = json.loads(table.read_text(encoding="utf-8"))
+    assert shared["contract_version"] == "provisional_league_ui_v1"
+    assert shared["generated_at_utc"] == "2026-08-27T10:00:00Z"
+    assert shared["payload"]["contract_version"] == "league_device_plan_v2"
+    assert "league_id" not in shared["payload"]
+    assert shared["payload"]["source_snapshot_id"] == request.snapshot_id
+    copy = json.loads((tree / "device-plan.json").read_text(encoding="utf-8"))["payload"]
+    assert copy["contract_version"] == "league_device_plan_v1" and copy["league_id"] == 352490
+    assert [p["id"] for p in shared["payload"]["players"]] == [p["id"] for p in copy["players"]]
+    assert all("element_id" in p and "start_tenths" in p for p in shared["payload"]["players"])
     document = json.loads(history.read_text(encoding="utf-8"))
     assert document["payload"]["weeks"][0]["status"] == "unsettled"
     assert document["payload"]["weeks"][0]["advice_generated_at_utc"] == "2026-08-27T10:00:00Z"
@@ -433,6 +449,46 @@ def test_a_build_of_one_league_keeps_the_others_of_its_capture_and_refuses_anoth
     assert leagues_beside(tmp_path, 9, "capture-a") == [lines[0]]
     with pytest.raises(DataError, match="two captures"):
         leagues_beside(tmp_path, 9, "capture-b")
+    # A line whose device-plan table is another capture's is refused the same way; one
+    # whose table is this capture's is kept with its table.
+    own = replace(lines[0], device_plan="device/capture-a/device-plan.json")
+    write_league_directory(tmp_path, [own, lines[1]], generated_at_utc="x")
+    assert leagues_beside(tmp_path, 9, "capture-a") == [own]
+    other = replace(lines[0], device_plan="device/capture-b/device-plan.json")
+    write_league_directory(tmp_path, [other, lines[1]], generated_at_utc="x")
+    with pytest.raises(DataError, match="device-plan table of capture capture-b"):
+        leagues_beside(tmp_path, 9, "capture-a")
+
+
+def test_the_capture_s_device_plan_table_is_written_once_and_never_replaced(
+    tmp_path: Path,
+) -> None:
+    payload = {"contract_version": "league_device_plan_v2", "players": [{"id": 1}]}
+    stamp = "2026-10-11T10:00:00Z"
+    first = write_device_plan_table(tmp_path, "cap", payload, generated_at_utc=stamp)
+    assert first == tmp_path / "device" / "cap" / "device-plan.json"
+    # The second league of the run finds the table and keeps the first stamp.
+    again = write_device_plan_table(tmp_path, "cap", dict(payload), generated_at_utc="later")
+    assert again == first
+    envelope = json.loads(first.read_text(encoding="utf-8"))
+    assert envelope["generated_at_utc"] == stamp
+    assert envelope["contract_version"] == "provisional_league_ui_v1"
+    assert envelope["payload"] == payload
+    with pytest.raises(DataError, match="written once per capture"):
+        write_device_plan_table(
+            tmp_path, "cap", {**payload, "players": []}, generated_at_utc="later"
+        )
+    assert json.loads(first.read_text(encoding="utf-8")) == envelope
+
+
+def test_the_tables_of_other_captures_are_removed_with_the_unlisted_trees(tmp_path: Path) -> None:
+    for capture in ("cap-a", "cap-b", "cap-c"):
+        (tmp_path / "device" / capture).mkdir(parents=True)
+        (tmp_path / "device" / capture / "device-plan.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "device" / "notes.txt").write_text("kept", encoding="utf-8")
+    assert remove_stale_device_tables(tmp_path, "cap-b") == ["device/cap-a", "device/cap-c"]
+    assert sorted(p.name for p in (tmp_path / "device").iterdir()) == ["cap-b", "notes.txt"]
+    assert remove_stale_device_tables(tmp_path / "nowhere", "cap-b") == []
 
 
 def _published_line(league_id: int) -> PublishedLeague:

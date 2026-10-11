@@ -59,10 +59,22 @@ def test_the_script_writes_the_builder_s_bytes(world: dict[str, Any], tmp_path: 
         verify=True,
         out=out,
     )
-    assert written == ["entries/101.json", DEVICE_PLAN_DOCUMENT]
+    table = f"device/{world['gw2_id']}/{DEVICE_PLAN_DOCUMENT}"
+    assert written == ["entries/101.json", DEVICE_PLAN_DOCUMENT, table]
     for relative in ("league/entries/101.json", f"league/{DEVICE_PLAN_DOCUMENT}"):
         assert (older / relative).read_bytes() == (built / relative).read_bytes(), relative
     assert "same as published" in out.getvalue()
+    # The capture's own table beside the tree, under the tree's stamp (#981 step 1); the
+    # legacy tree has no directory, so no line names it.
+    envelope = json.loads((older / table).read_text(encoding="utf-8"))
+    copy = json.loads((older / "league" / DEVICE_PLAN_DOCUMENT).read_text(encoding="utf-8"))
+    assert envelope["generated_at_utc"] == copy["generated_at_utc"]
+    assert envelope["payload"]["contract_version"] == "league_device_plan_v2"
+    assert "league_id" not in envelope["payload"]
+    assert [p["id"] for p in envelope["payload"]["players"]] == [
+        p["id"] for p in copy["payload"]["players"]
+    ]
+    assert not (older / "leagues.json").exists()
 
 
 def test_a_tree_naming_another_capture_is_refused_untouched(

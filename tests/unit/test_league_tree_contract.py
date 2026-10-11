@@ -11,6 +11,9 @@ from squadopt.contracts.league_tree import (
     LEGACY_TREE,
     LeagueDirectoryError,
     PublishedLeague,
+    device_plan_capture,
+    device_plan_dir,
+    device_plan_path,
     find_league_tree,
     league_tree,
     league_tree_dir,
@@ -142,3 +145,49 @@ def test_the_legacy_tree_is_adopted_once_and_refused_when_it_is_not_the_leagues(
     leftover = _legacy(tmp_path, 352490)
     assert adopt_legacy_tree(tmp_path, 352490) == ("removed", leftover)
     assert not leftover.exists()
+
+
+def test_a_capture_s_device_plan_table_lives_under_device_by_its_capture() -> None:
+    assert device_plan_path("fpl-live-20261010T035732Z-c77d032165af").as_posix() == (
+        "device/fpl-live-20261010T035732Z-c77d032165af/device-plan.json"
+    )
+    assert device_plan_dir(Path("site/data"), "cap") == Path("site/data/device/cap")
+    assert device_plan_capture("device/cap/device-plan.json") == "cap"
+    assert device_plan_capture("leagues/352490/device-plan.json") is None
+    assert device_plan_capture("device/cap/other.json") is None
+    for bad in ("", " cap", "a/b", "..", ".", 7):
+        with pytest.raises(LeagueDirectoryError):
+            device_plan_path(bad)  # type: ignore[arg-type]
+
+
+def test_a_directory_line_names_its_device_plan_table_and_two_leagues_may_share_it(
+    tmp_path: Path,
+) -> None:
+    table = device_plan_path("cap").as_posix()
+    with_table = [_league(7, device_plan=table), _league(9, device_plan=table)]
+    write_league_directory(tmp_path, with_table, generated_at_utc="2026-10-11T10:00:00Z")
+    rows = json.loads((tmp_path / LEAGUE_DIRECTORY_FILE).read_text(encoding="utf-8"))
+    assert [row["device_plan"] for row in rows["payload"]["leagues"]] == [table, table]
+    assert read_league_directory(tmp_path) == with_table
+    # A line from before the table has no key at all, and reads back as None.
+    write_league_directory(tmp_path, [_league(9)], generated_at_utc="2026-10-11T10:00:00Z")
+    rows = json.loads((tmp_path / LEAGUE_DIRECTORY_FILE).read_text(encoding="utf-8"))
+    assert "device_plan" not in rows["payload"]["leagues"][0]
+    assert read_league_directory(tmp_path)[0].device_plan is None
+    # Sharing a table is not sharing a tree.
+    with pytest.raises(LeagueDirectoryError, match="share a tree"):
+        write_league_directory(
+            tmp_path,
+            [_league(7, device_plan=table), _league(9, path="leagues/7", device_plan=table)],
+            generated_at_utc="x",
+        )
+
+
+@pytest.mark.parametrize("device_plan", ["", "/device/cap/device-plan.json", "../x.json", 7])
+def test_a_directory_line_with_an_unusable_device_plan_is_refused(
+    tmp_path: Path, device_plan: object
+) -> None:
+    with pytest.raises(LeagueDirectoryError, match="device plan"):
+        write_league_directory(
+            tmp_path, [_league(7, device_plan=device_plan)], generated_at_utc="x"
+        )

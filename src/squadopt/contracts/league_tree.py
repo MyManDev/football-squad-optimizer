@@ -4,7 +4,11 @@ A site publishes ``data/leagues.json``, the directory, and one tree per league u
 ``data/leagues/<league_id>/`` (members.json, entries/, advice/, scoreboard.json, the
 device-plan document, history/). The directory is the set of leagues the last publication
 rendered: one run renders every league from one capture for one week, and writes the
-directory whole. Readers read the directory first; a site from before it carried one
+directory whole. Beside the trees, one device-plan table per capture lives under
+``data/device/<capture>/device-plan.json``: the same table for every league of the run,
+keyed by the capture so it never changes once written and can be cached long. A directory
+line names its league's table under ``device_plan``; a line from before the table has
+none. Readers read the directory first; a site from before it carried one
 league under ``data/league/`` and is read as a directory of one, and the first
 publication into the new layout adopts that tree as the league's own. Every writer and
 reader of a league tree takes its path from here, so no module spells the layout.
@@ -23,6 +27,9 @@ LEAGUE_DIRECTORY_FILE: Final = "leagues.json"
 LEAGUES_ROOT: Final = "leagues"
 #: The single tree a site published before the directory existed.
 LEGACY_TREE: Final = "league"
+#: The per-capture device-plan tables, one directory per capture.
+DEVICE_ROOT: Final = "device"
+DEVICE_PLAN_FILE: Final = "device-plan.json"
 
 
 class LeagueDirectoryError(ValueError):
@@ -43,6 +50,38 @@ def league_tree_dir(site_data_root: Path, league_id: int) -> Path:
     return Path(site_data_root) / Path(*league_tree(league_id).parts)
 
 
+def device_plan_path(snapshot_id: str) -> PurePosixPath:
+    """The capture's device-plan table, relative to ``data/``:
+    ``device/<capture>/device-plan.json``."""
+
+    if (
+        not isinstance(snapshot_id, str)
+        or not snapshot_id
+        or snapshot_id != snapshot_id.strip()
+        or "/" in snapshot_id
+        or "\\" in snapshot_id
+        or snapshot_id in (".", "..")
+    ):
+        raise LeagueDirectoryError(f"A capture id names one directory; got {snapshot_id!r}.")
+    return PurePosixPath(DEVICE_ROOT) / snapshot_id / DEVICE_PLAN_FILE
+
+
+def device_plan_dir(site_data_root: Path, snapshot_id: str) -> Path:
+    """The directory of the capture's device-plan table under a site's ``data/``."""
+
+    return Path(site_data_root) / Path(*device_plan_path(snapshot_id).parent.parts)
+
+
+def device_plan_capture(device_plan: str) -> str | None:
+    """The capture a directory line's ``device_plan`` names, or None where the path is
+    not a per-capture table (``device/<capture>/device-plan.json``)."""
+
+    parts = PurePosixPath(device_plan).parts
+    if len(parts) == 3 and parts[0] == DEVICE_ROOT and parts[2] == DEVICE_PLAN_FILE:
+        return parts[1]
+    return None
+
+
 @dataclass(frozen=True, slots=True)
 class PublishedLeague:
     """One line of the directory: the league, its season and deadline, and its tree."""
@@ -52,27 +91,42 @@ class PublishedLeague:
     season: str
     gameweek: int
     path: str
+    #: The league's device-plan table, relative to ``data/`` (``device_plan_path``); None on
+    #: a line from before the per-capture table, whose readers take the tree's own copy.
+    device_plan: str | None = None
 
     def as_record(self) -> dict[str, Any]:
-        return {
+        record: dict[str, Any] = {
             "league_id": int(self.league_id),
             "league_name": str(self.league_name),
             "season": str(self.season),
             "gameweek": int(self.gameweek),
             "path": str(self.path),
         }
+        if self.device_plan is not None:
+            # Not coerced: a value that is not a path is refused where the line is checked.
+            record["device_plan"] = self.device_plan
+        return record
 
 
 def _published(record: object) -> PublishedLeague:
     if not isinstance(record, dict):
         raise LeagueDirectoryError("A directory line is an object.")
-    league_id, name, season, gameweek, path = (
+    league_id, name, season, gameweek, path, device_plan = (
         record.get("league_id"),
         record.get("league_name"),
         record.get("season"),
         record.get("gameweek"),
         record.get("path"),
+        record.get("device_plan"),
     )
+    if device_plan is not None and (
+        not isinstance(device_plan, str)
+        or not device_plan
+        or PurePosixPath(device_plan).is_absolute()
+        or ".." in PurePosixPath(device_plan).parts
+    ):
+        raise LeagueDirectoryError(f"A directory line names no usable device plan: {record!r}.")
     if (
         isinstance(league_id, bool)
         or not isinstance(league_id, int)
@@ -90,7 +144,7 @@ def _published(record: object) -> PublishedLeague:
         or not path
     ):
         raise LeagueDirectoryError(f"A directory line is not a published league: {record!r}.")
-    return PublishedLeague(league_id, name, season, gameweek, path)
+    return PublishedLeague(league_id, name, season, gameweek, path, device_plan)
 
 
 def read_league_directory(site_data_root: Path) -> list[PublishedLeague]:

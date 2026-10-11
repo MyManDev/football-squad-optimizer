@@ -3,7 +3,8 @@
 What a member's one-week plan needs, published so the member's own device can solve it.
 Two documents, both inside the `provisional_league_ui_v1` envelope the league tree uses,
 both in the league's tree (`data/leagues/<league id>/` under the league directory,
-`data/league/` on a site from before it):
+`data/league/` on a site from before it), and since #981 step 1 a third beside the trees,
+the capture's own table (v2, below):
 
 - `device-plan.json`, one per publication: the capture's projection table in the order the
   server's solver sees it, the server's integer objective coefficients, and the season's
@@ -88,6 +89,39 @@ Three things the device model takes as given:
 - Every held player is in the table with a sale price. The producer writes a null block
   otherwise. A held id the table does not carry would be left out of the model, and a held
   player with no sale price would be priced at the buy price.
+
+## The per-capture table (v2)
+
+The shared document is a function of the capture, not of the league: every league a run
+renders gets the same table. Since #981 step 1 the run writes it once more, once per
+capture, at `data/device/<source_snapshot_id>/device-plan.json`, in the same envelope, and
+each line of the league directory (`data/leagues.json`) names it under `device_plan`
+(`device/<capture>/device-plan.json`, relative to `data/`). The path carries the capture,
+so the file never changes once written and a page may cache it for as long as the capture
+is served; a second league of the same run finds it written and leaves it, and a payload
+that differs from the one on disk is refused rather than overwritten
+(`league_publication.write_device_plan_table`). The weekly run removes the tables of every
+other capture when it seeds its preview (`remove_stale_device_tables`), and a build of one
+league refuses a directory line whose table is another capture's, as it refuses a tree
+rendered from another capture (`leagues_beside`). The tree keeps its own v1 copy during the
+transition, for pages from before the per-capture table; the copy stops with #981 step 8,
+after GW20, with the owner's yes.
+
+The producer is `squadopt.application.device_plan.device_plan_capture_table`, which the
+site builder and `scripts/add_device_plan_inputs.py` share. The document is the shared
+document above with these differences:
+
+| Field | Meaning |
+| --- | --- |
+| `contract_version` | Exactly `league_device_plan_v2`. |
+| `league_id` | Absent. The league is the directory line's; the table belongs to the capture. |
+| `players[].element_id` | The game's per-season element id of the player, the id the entry endpoints name him by, beside `id`, his persistent code. Read from the capture's bootstrap; a table player the bootstrap does not name refuses the build. |
+| `players[].start_tenths` | His price at the season's first deadline in tenths (`now_cost` less `cost_change_start` in the bootstrap), beside `buy_tenths`, his price at the capture. |
+| `rules.chips` | The season's chip windows as the rules state them: `name`, `number`, `start_event`, `stop_event`, `chip_type`, in the source's order. The entry document's `chips` block still says which halves a member has left. |
+| `rules.transfers_cap` | The game's cap on transfers in one week, or null where the rules state none, beside `rules.max_free_transfers`, the policy's cap on banked free transfers. |
+
+Every other field, the order of `players` and the solver rules are the shared document's.
+The page reads the v1 copy until #981 step 2 makes it read the per-capture table.
 
 ## What the device answers
 

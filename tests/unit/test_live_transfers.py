@@ -110,6 +110,9 @@ def _elements(
                 "team": (index % 6) + 1,
                 "element_type": element_type,
                 "now_cost": 45 + (index % 4) * 5 + (price_shift or {}).get(code, 0),
+                # How far the price moved since the season's first deadline, so a start
+                # price can be read back: down one, unchanged or up one across the shape.
+                "cost_change_start": (index % 3) - 1,
                 "status": "i" if code in injured else "a",
                 "chance_of_playing_next_round": 0 if code in injured else None,
                 "news": "Knee injury" if code in injured else "",

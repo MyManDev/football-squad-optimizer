@@ -1095,7 +1095,11 @@ def test_the_member_planning_hit_cost_reaches_the_published_bytes(
 # payload. Every readable assertion above held across that move -- the same two forced swaps,
 # the same deltas, the same gain against holding -- which is why those literals are asserted
 # before this digest rather than after it.
-IN_SEASON_MEMBER_ADVICE_SHA256 = "8eb88a595a2e1c1700e39b01cee11005e54d98543d98b727b15e3526cb6d0a8c"
+# Moved again on 2026-10-11 (#981 step 1): the world's bootstrap elements gained
+# `cost_change_start`, so the per-capture device-plan table can read a start price, and
+# the capture id inside this payload moved with the bytes. The readable assertions above
+# held once more.
+IN_SEASON_MEMBER_ADVICE_SHA256 = "0684a9c9fa5c3c4ce81d57e98c0e2b1fd0c96e80c54147b6953622897a3dfb40"
 # (player_out, player_in, expected_points_delta) per move, each pair one position. A
 # row is that swap's share of what the plan gains against holding the fifteen, measured
 # on the payload's own basis (the eleven with the captain doubled) with the rows above

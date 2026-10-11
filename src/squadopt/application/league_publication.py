@@ -15,6 +15,7 @@ from squadopt.application.advice import member_horizon_builder
 from squadopt.application.advice_record import record_directory
 from squadopt.application.capture_entries import CapturePicksProvider
 from squadopt.application.chip_forecast_publication import forecast_source
+from squadopt.application.device_plan import device_plan_capture_table
 from squadopt.application.entries import EntryError, EntryRegistration, EntryRegistry
 from squadopt.application.league_views import (
     LeagueViewsReport,
@@ -36,11 +37,15 @@ from squadopt.application.weekly_suggestion_eval import (
     published_advice_captures,
     published_page_captures,
 )
+from squadopt.contracts.league import LEAGUE_VIEW_CONTRACT_VERSION
 from squadopt.contracts.league_tree import (
+    DEVICE_ROOT,
     LEAGUES_ROOT,
     LEGACY_TREE,
     LeagueDirectoryError,
     PublishedLeague,
+    device_plan_capture,
+    device_plan_path,
     league_tree,
     league_tree_dir,
     legacy_tree_league_id,
@@ -52,6 +57,7 @@ from squadopt.data.errors import DataError
 from squadopt.data.snapshots import CapturedSnapshot, list_snapshot_ids, read_snapshot
 from squadopt.data.sources import FPL_LIVE_SOURCE
 from squadopt.data.sources.fpl_live import (
+    BOOTSTRAP_PAYLOAD,
     EntryGameweekPoints,
     fpl_entry_history_points,
     fpl_league_name,
@@ -460,6 +466,56 @@ def remove_unlisted_trees(site_data_root: Path, league_ids: Sequence[int]) -> li
     return removed
 
 
+def remove_stale_device_tables(site_data_root: Path, snapshot_id: str) -> list[str]:
+    """Remove the per-capture device-plan tables of every capture but ``snapshot_id``.
+
+    The weekly preview is seeded from the published tree, so without this each week's
+    table would stay on the site beside the next one's, keyed by a capture no directory
+    line names any more. Returns the removed directories, relative to the site's data root.
+    """
+
+    root = Path(site_data_root) / DEVICE_ROOT
+    removed: list[str] = []
+    if not root.is_dir():
+        return removed
+    for table in sorted(root.iterdir()):
+        if table.is_dir() and table.name != snapshot_id:
+            shutil.rmtree(table)
+            removed.append(f"{DEVICE_ROOT}/{table.name}")
+    return removed
+
+
+def write_device_plan_table(
+    site_data_root: Path, snapshot_id: str, document: Mapping[str, object], *, generated_at_utc: str
+) -> Path:
+    """Write the capture's device-plan table once, under ``data/device/<capture>/``.
+
+    The table is a function of the capture alone, so a second league of the same run finds
+    it written and leaves it: the publication stamp stays the first league's, and a payload
+    that differs from the one on disk is refused rather than overwritten, since a page
+    caches the file by its capture for as long as the capture is served.
+    """
+
+    target = Path(site_data_root) / Path(*device_plan_path(snapshot_id).parts)
+    envelope = {
+        "contract_version": LEAGUE_VIEW_CONTRACT_VERSION,
+        "generated_at_utc": generated_at_utc,
+        "source_kind": "live",
+        "payload": dict(document),
+    }
+    if target.is_file():
+        existing = json.loads(target.read_text(encoding="utf-8"))
+        if existing.get("payload") != envelope["payload"]:
+            raise DataError(
+                f"{target} already holds another device-plan table for capture {snapshot_id}; "
+                "a table is written once per capture and never replaced."
+            )
+        return target
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(envelope, indent=2), encoding="utf-8", newline="\n")
+    return target
+
+
 def league_tree_capture(tree: Path) -> str | None:
     """The capture a published tree was rendered from: its first human entry's
     ``source_snapshot_id``; None when the tree names no member or cannot be read."""
@@ -507,6 +563,13 @@ def leagues_beside(site_data_root: Path, league_id: int, snapshot_id: str) -> li
                 f"The site lists league {line.league_id} rendered from capture {capture}; "
                 f"building league {league_id} alone from {snapshot_id} would leave the site "
                 "on two captures. Rebuild every league with the weekly run's league list."
+            )
+        table = None if line.device_plan is None else device_plan_capture(line.device_plan)
+        if line.device_plan is not None and table != snapshot_id:
+            raise DataError(
+                f"The site lists league {line.league_id} with the device-plan table of capture "
+                f"{table}; building league {league_id} alone from {snapshot_id} would leave the "
+                "site on two captures. Rebuild every league with the weekly run's league list."
             )
         kept.append(line)
     return kept
@@ -607,6 +670,21 @@ def publish_prepared_league(
         chip_forecast_source=forecast_source(snapshot),
     )
     outputs = [out_dir / name for name in report.files]
+    # The capture's own table, shared by every league of the run and written once: the
+    # tree keeps its own copy for pages from before the per-capture table.
+    table = write_device_plan_table(
+        site_data,
+        request.snapshot_id,
+        device_plan_capture_table(
+            inputs,
+            projection,
+            read_season_rules(snapshot, season=season),
+            bootstrap=snapshot.payloads[BOOTSTRAP_PAYLOAD],
+            top100=top100_counts,
+        ),
+        generated_at_utc=report.generated_at_utc,
+    )
+    outputs.append(table)
     if history_root is not None:
         # This publication's own member pages name this week's capture.
         shown.update(published_page_captures(out_dir))
@@ -641,6 +719,7 @@ def publish_prepared_league(
         season=report.season,
         gameweek=report.gameweek,
         path=league_tree(report.league_id).as_posix(),
+        device_plan=device_plan_path(request.snapshot_id).as_posix(),
     )
     directory = write_league_directory(
         site_data,
