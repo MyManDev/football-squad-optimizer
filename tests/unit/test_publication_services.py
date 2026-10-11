@@ -55,6 +55,10 @@ def publication_world(
     # The worker fixture does not need it; no score has been confirmed in this fixture.
     for event in bootstrap["events"]:
         event["data_checked"] = False
+    # Every real bootstrap states how far each price moved since the season's first
+    # deadline; the per-capture device-plan table reads a start price from it.
+    for index, element in enumerate(bootstrap["elements"]):
+        element.setdefault("cost_change_start", (index % 3) - 1)
     if complete_chip_calendar:
         # Exercise the real capture-to-panel club join, not a projection-derived map.
         # These are synthetic fixtures covering the captured first-half chip windows.

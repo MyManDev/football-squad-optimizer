@@ -21,7 +21,13 @@ from squadopt.contracts.league_tree import (
 )
 from squadopt.data.errors import DataError
 
-world = world_module._world  # re-register the fixture in this module
+
+@pytest.fixture(name="world")
+def _world(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
+    """The shared world whose bootstrap carries ``cost_change_start``, as a real one does,
+    so the per-capture device-plan table can read each player's start price."""
+
+    return world_module.build_world(tmp_path, start_prices=True)
 
 
 def _build(world: dict[str, Any], out: Path) -> None:

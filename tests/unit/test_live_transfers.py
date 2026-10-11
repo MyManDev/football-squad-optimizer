@@ -96,6 +96,7 @@ def _elements(
     *,
     price_shift: dict[int, int] | None = None,
     injured: tuple[int, ...] = (),
+    start_prices: bool = False,
 ) -> list[dict[str, Any]]:
     records: list[dict[str, Any]] = []
     code = 1000
@@ -110,14 +111,17 @@ def _elements(
                 "team": (index % 6) + 1,
                 "element_type": element_type,
                 "now_cost": 45 + (index % 4) * 5 + (price_shift or {}).get(code, 0),
-                # How far the price moved since the season's first deadline, so a start
-                # price can be read back: down one, unchanged or up one across the shape.
-                "cost_change_start": (index % 3) - 1,
                 "status": "i" if code in injured else "a",
                 "chance_of_playing_next_round": 0 if code in injured else None,
                 "news": "Knee injury" if code in injured else "",
                 "news_added": "2026-08-26T10:00:00Z" if code in injured else None,
             }
+            if start_prices:
+                # How far the price moved since the season's first deadline, so a start
+                # price can be read back: down one, unchanged or up one across the shape.
+                # Opt-in, so the default world's bytes, and the device-plan fixture and
+                # the advice digest pinned on them, stay what they are.
+                record["cost_change_start"] = (index % 3) - 1
             if event_points is not None:
                 record["event_points"] = event_points
             records.append(record)
@@ -217,11 +221,21 @@ def _world(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
     return build_world(tmp_path)
 
 
-def build_world(tmp_path: Path) -> dict[str, Any]:
+@pytest.fixture(name="world_with_start_prices")
+def _world_with_start_prices(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
+    """The same world whose bootstrap elements carry ``cost_change_start``, as every real
+    bootstrap does, for the tests that read a start price from it."""
+
+    return build_world(tmp_path, start_prices=True)
+
+
+def build_world(tmp_path: Path, *, start_prices: bool = False) -> dict[str, Any]:
     """The three-capture world under ``tmp_path``: GW1, the GW2 deadline, GW2 settled.
 
     A plain function so the device-plan parity fixture (``scripts/export_device_plan_fixture``)
     can build the same world outside pytest and record what the advice service answers on it.
+    With ``start_prices`` the elements carry ``cost_change_start``; the default bytes do not,
+    and the fixture and the pinned digests are recorded on the default.
     """
 
     snapshot_root = tmp_path / "snapshots"
@@ -229,7 +243,10 @@ def build_world(tmp_path: Path) -> dict[str, Any]:
         snapshot_root,
         source="fpl-live",
         captured_at_utc=GW1_CAPTURED_AT,
-        payloads={BOOTSTRAP_PAYLOAD: _bootstrap(), FIXTURES_PAYLOAD: b"[]"},
+        payloads={
+            BOOTSTRAP_PAYLOAD: _bootstrap(elements=_elements(start_prices=start_prices)),
+            FIXTURES_PAYLOAD: b"[]",
+        },
     )
     # By the GW2 deadline the opening gameweek has finished, two prices have risen and
     # one has fallen, and one player is out injured.
@@ -242,7 +259,10 @@ def build_world(tmp_path: Path) -> dict[str, Any]:
             BOOTSTRAP_PAYLOAD: _bootstrap(
                 events=gw1_finished,
                 elements=_elements(
-                    event_points=2, price_shift={1001: 3, 1012: 1, 1020: -2}, injured=(1005,)
+                    event_points=2,
+                    price_shift={1001: 3, 1012: 1, 1020: -2},
+                    injured=(1005,),
+                    start_prices=start_prices,
                 ),
             ),
             FIXTURES_PAYLOAD: b"[]",
@@ -258,7 +278,9 @@ def build_world(tmp_path: Path) -> dict[str, Any]:
         source="fpl-live",
         captured_at_utc=GW2_SETTLE_CAPTURED_AT,
         payloads={
-            BOOTSTRAP_PAYLOAD: _bootstrap(events=gw2_finished, elements=_elements(event_points=3)),
+            BOOTSTRAP_PAYLOAD: _bootstrap(
+                events=gw2_finished, elements=_elements(event_points=3, start_prices=start_prices)
+            ),
             FIXTURES_PAYLOAD: b"[]",
         },
     )
