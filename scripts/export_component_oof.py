@@ -205,7 +205,7 @@ def _modelling_frame(archive_root: Path, seasons: tuple[str, ...]) -> tuple[pd.D
     panel = build_panel(archive_root, seasons=seasons)
     fixtures = build_fixture_panel(archive_root, seasons=seasons)
     # `load_team_codes` returns one season's table without naming the season, so the
-    # caller labels it -- the same shape `run_fixture_group_conformal` uses.
+    # caller labels it -- the shape the retired `run_fixture_group_conformal` used.
     team_codes = pd.concat(
         [load_team_codes(archive_root, season).assign(season=season) for season in seasons],
         ignore_index=True,

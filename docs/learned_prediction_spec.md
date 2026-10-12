@@ -35,12 +35,13 @@ The walk-forward package exposes:
 
 ```python
 from squadopt.backtest import (
-    LearnedBenchmarkConfig,
     build_ridge_prediction_snapshot,
     make_ridge_projection_builder,
-    run_learned_benchmark,
 )
 ```
+
+The paired benchmark (`run_learned_benchmark` and `LearnedBenchmarkConfig`) has been removed
+with its runner on 2026-10-12; the sections below record what it ran.
 
 `FittedRidgePredictor` contains only frozen numeric state and fingerprints. A scikit-learn
 estimator is never part of the public result. `build_ridge_prediction_snapshot` returns the
@@ -165,6 +166,8 @@ input boundary; scenario code does not need to reconstruct predictions or traini
 
 ## Artifacts and command
 
+The runner has been removed (2026-10-12); the Retired runners table in `scripts/README.md` says
+how to restore and run it. The command was:
 ```powershell
 .venv\Scripts\python -m scripts.run_learned_benchmark
 ```

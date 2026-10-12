@@ -1,10 +1,8 @@
 """Builders: from the live path's records to ``ui_view_v1`` view models.
 
-The primary path reads a **frozen ledger entry** (``decision.json`` plus the entry's
-``projections.csv``), because that is the record a decision was made from and the only
-one a reader should be shown. The in-memory path (a ``Recommendation`` just built) exists
-for the moment a decision is being recorded and carries the fuller risk block; it must
-agree with the ledger path on everything the ledger stores.
+Recommendations are read from a **frozen ledger entry** (``decision.json`` plus the
+entry's ``projections.csv``), because that is the record a decision was made from and the
+only one a reader should be shown.
 """
 
 import json
@@ -24,7 +22,6 @@ from squadopt.application.views import (
     PoolView,
     RecommendationView,
     RiskView,
-    RivalComparisonView,
     RunLogEventView,
     StatusView,
     TickActionView,
@@ -36,8 +33,6 @@ from squadopt.application.views import (
 )
 from squadopt.contracts.run_logs import component_log_directory
 from squadopt.live.ledger import LedgerEntry, decision_mode, load_ledger
-from squadopt.live.report import Recommendation
-from squadopt.live.risk import LiveRiskDiagnostics
 from squadopt.live.tick import LedgerState, TickPlan
 
 _PROJECTIONS_FILE = "projections.csv"
@@ -82,12 +77,6 @@ def _public_recommendation_metadata(value: object) -> dict[str, JsonValue]:
         for key in sorted(_PUBLIC_RECOMMENDATION_METADATA_KEYS)
         if key in metadata
     }
-
-
-def _pair(value: object) -> tuple[float, float] | None:
-    if isinstance(value, list | tuple) and len(value) == 2:
-        return (float(str(value[0])), float(str(value[1])))
-    return None
 
 
 _UNKNOWN_POSITION = "UNK"
@@ -246,56 +235,6 @@ def _risk_from_status(status: str) -> RiskView:
     )
 
 
-def _risk_view(risk: LiveRiskDiagnostics) -> RiskView:
-    metrics = risk.metrics
-    diagnostics = dict(risk.diagnostics)
-    interval = diagnostics.get("probability_below_threshold_interval")
-    comparisons = diagnostics.get("rival_comparisons", [])
-    rivals = tuple(
-        RivalComparisonView(
-            rival=str(item["rival"]),
-            probability_ahead=float(str(item["probability_ahead"])),
-            probability_ahead_interval=_pair(item["probability_ahead_interval"]) or (0.0, 1.0),
-            mean_difference=float(str(item["mean_difference"])),
-            shared_starters=int(str(item["shared_starters"])),
-        )
-        for item in (comparisons if isinstance(comparisons, list | tuple) else [])
-        if isinstance(item, Mapping)
-    )
-    return RiskView(
-        status=str(risk.status.value),
-        reason=str(risk.reason),
-        blockers=tuple(str(b.value) for b in risk.blockers),
-        scenario_count=None if metrics is None else int(metrics.scenario_count),
-        lower_quantile_probability=(
-            None if metrics is None else float(metrics.lower_quantile_probability)
-        ),
-        lower_quantile_score=None if metrics is None else float(metrics.lower_quantile_score),
-        mean_score=None if metrics is None else float(metrics.mean_score),
-        mean_worst_fraction_score=(
-            None if metrics is None else float(metrics.mean_worst_fraction_score)
-        ),
-        worst_fraction=None if metrics is None else float(metrics.worst_fraction),
-        points_threshold=None if metrics is None else float(metrics.points_threshold),
-        probability_below_threshold=(
-            None if metrics is None else float(metrics.probability_below_threshold)
-        ),
-        probability_below_threshold_interval=_pair(interval),
-        location_shift_points=(
-            None
-            if diagnostics.get("location_shift_points") is None
-            else float(str(diagnostics["location_shift_points"]))
-        ),
-        stated_limits=tuple(_strs(diagnostics.get("stated_limits", []))),
-        rivals=rivals,
-        residual_source=(
-            None
-            if risk.residual_provenance.get("source_id") is None
-            else str(risk.residual_provenance["source_id"])
-        ),
-    )
-
-
 # --- recommendations ------------------------------------------------------------
 
 
@@ -353,80 +292,6 @@ def recommendation_view_from_ledger(
         settled=outcome is not None,
         captain_multiplier=3 if chip == "3xc" else 2,
         metadata=_public_recommendation_metadata(decision.get("metadata", {})),
-    )
-
-
-def recommendation_view(
-    recommendation: Recommendation, *, outcome: Mapping[str, object] | None = None
-) -> RecommendationView:
-    """The view of a recommendation just built (fuller risk block than the ledger keeps)."""
-
-    pool = recommendation.squad
-    index = _player_index(pool)
-    starters = [int(v) for v in recommendation.starting_xi["player_id"].tolist()]
-    bench_ids = [int(v) for v in recommendation.bench["player_id"].tolist()]
-    captain = int(recommendation.captain["player_id"])
-    realized: dict[int, float] | None = None
-    if outcome is not None:
-        by_player = outcome.get("realized_points_by_player")
-        if isinstance(by_player, Mapping):
-            realized = {int(str(key)): float(str(value)) for key, value in by_player.items()}
-    squad, xi, bench = _players_from_ids(index, starters, bench_ids, captain, realized)
-    transfers = None
-    if recommendation.transfers is not None:
-        block = recommendation.transfers.as_record()
-        pool_index = dict(index)
-        for frame in (
-            recommendation.transfers.transfers_in,
-            recommendation.transfers.transfers_out,
-        ):
-            if {
-                "player_id",
-                "name",
-                "team_id",
-                "position",
-                "price_tenths",
-                "expected_points",
-            } <= set(frame.columns):
-                pool_index.update(_player_index(frame))
-        transfers = _transfer_view(block, pool_index)
-    return RecommendationView(
-        season=recommendation.season,
-        gameweek=int(recommendation.gameweek),
-        deadline_utc=recommendation.deadline_utc,
-        snapshot_id=recommendation.snapshot_id,
-        captured_at_utc=recommendation.captured_at_utc,
-        model_name=recommendation.model_name,
-        model_version=recommendation.model_version,
-        feature_contract_version=recommendation.feature_contract_version,
-        prediction_fingerprint=recommendation.prediction_fingerprint,
-        report_contract_version=recommendation.contract_version,
-        solver_status=recommendation.solver_status,
-        solver_proved_optimal=recommendation.solver_proved_optimal,
-        decision_kind="transfer" if transfers is not None else "opening",
-        squad=squad,
-        starting_xi=xi,
-        bench=bench,
-        captain_player_id=captain,
-        total_cost_tenths=int(recommendation.total_cost_tenths),
-        projected_score=float(recommendation.projected_score),
-        unavailable_player_count=int(
-            str(recommendation.diagnostics.get("unavailable_players_in_pool", 0))
-        ),
-        risk=_risk_view(recommendation.risk),
-        transfers=transfers,
-        outcome_realized_score=(
-            None if outcome is None else float(str(outcome["realized_xi_score"]))
-        ),
-        outcome_net_score=None if outcome is None else float(str(outcome["realized_net_score"])),
-        settled=outcome is not None,
-        captain_multiplier=(
-            3
-            if recommendation.transfers is not None
-            and recommendation.transfers.as_record().get("chip") == "3xc"
-            else 2
-        ),
-        metadata={},
     )
 
 
@@ -677,7 +542,6 @@ __all__ = [
     "JsonValue",
     "ledger_view",
     "pool_view",
-    "recommendation_view",
     "recommendation_view_from_ledger",
     "status_view",
 ]

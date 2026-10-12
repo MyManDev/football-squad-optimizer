@@ -744,7 +744,6 @@ const en = {
     noPreviousRank: "Previous rank unavailable",
     movementNote:
       "Movement compares the game's current and previous weekly ranks in this capture; the points beside it are from the last completed and checked gameweek.",
-    unknown: "unknown",
     newMember: "new",
     movementLabel: (movement: "up" | "down" | "same", places: number) =>
       movement === "same"
@@ -1749,7 +1748,6 @@ const tr: MessageSchema<typeof en> = {
     noPreviousRank: "Önceki sıra bilinmiyor",
     movementNote:
       "Hareket, oyunun bu veri çekiminde bildirdiği mevcut ve önceki haftalık sıraları karşılaştırır; yanındaki puanlar son tamamlanmış ve kontrol edilmiş haftadandır.",
-    unknown: "bilinmiyor",
     newMember: "yeni",
     movementLabel: (movement, places) =>
       movement === "same"

@@ -230,9 +230,10 @@ it does not convert decimal prices to `price_tenths`.
 - Only one gameweek is modeled.
 - Bench slots are not ordered.
 - There is no vice captain.
-- The Sprint 3 package can attach calibrated marginal projection intervals, but this
-  baseline objective still ignores uncertainty and player correlation. The separate Sprint
-  4 risk package reuses this feasible set with a documented conformal lower-bound objective.
+- This baseline objective ignores uncertainty and player correlation. The Sprint 3 package
+  could attach calibrated marginal projection intervals, and the separate Sprint 4 risk
+  package reused this feasible set with a documented conformal lower-bound objective; both
+  packages were removed on 2026-10-12.
 - The objective is subject to the documented integer scaling approximation.
 - Feasible time-limited solutions are not guaranteed to match across different machines.
 - Solver performance has only been designed and tested for Sprint 0-sized pools.

@@ -41,10 +41,6 @@ import pandas as pd
 from squadopt.data.errors import DataValidationError
 from squadopt.data.sources.club_news import RosterPlayer
 
-#: The normalisation rule, versioned. Changing how names are folded changes which claims
-#: resolved yesterday, so a stored resolution is only reproducible beside the rule's name.
-CLAIM_NAME_FOLD_VERSION: Final = "claim_name_fold_v1"
-
 #: Why a claim could not be placed. Three states, never collapsed into one another.
 UNRESOLVED_REASONS: Final[tuple[str, ...]] = ("unknown_team", "no_match", "ambiguous")
 

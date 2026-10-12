@@ -3,6 +3,8 @@
 ## Status and scope
 
 This document defines the implemented Sprint 3 player-projection uncertainty contract.
+The `squadopt.uncertainty` package that implemented it was removed on 2026-10-12, with its
+benchmark runner; the document records the contract as it was.
 
 Contract version: `projection_uncertainty_v1`.
 
@@ -13,7 +15,8 @@ risk-aware optimization, and Bayesian Optimization work.
 
 ## Public interface
 
-The importable API lives under `squadopt.uncertainty`:
+The package has been removed (2026-10-12); this section records the API that lived under
+`squadopt.uncertainty`:
 
 ```python
 from squadopt.uncertainty import (
@@ -126,8 +129,9 @@ squad-level realized-score confidence intervals.
 
 ## Real-data benchmark
 
-Reproduce the pinned benchmark after fetching the historical archive:
-
+The runner has been removed (2026-10-12) with the `squadopt.uncertainty` package; the Retired
+runners table in `scripts/README.md` says how to restore and run it. The pinned benchmark was
+reproduced after fetching the historical archive:
 ```powershell
 .venv\Scripts\python -m scripts.fetch_historical_data
 .venv\Scripts\python -m scripts.run_uncertainty_benchmark

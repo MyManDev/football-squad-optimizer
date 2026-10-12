@@ -19,8 +19,6 @@ rather than assumed.
 """
 
 import math
-from collections.abc import Mapping
-from types import MappingProxyType
 from typing import Final
 
 import pandas as pd
@@ -275,28 +273,7 @@ def aggregate_team_gameweek(fixtures: pd.DataFrame) -> pd.DataFrame:
     ).reset_index(drop=True)
 
 
-# A club with no fixture plays no matches, and zero states that. Named separately
-# from the mapping below because a count is an integer while a missing difficulty is
-# not, and a caller filling a count column needs the former without narrowing the
-# latter.
+# A club with no fixture plays no matches, and zero states that. Only the counts take
+# this default: a missing difficulty stays missing, because zero would describe the
+# easiest possible tie rather than the absence of one.
 BLANK_GAMEWEEK_FIXTURE_COUNT: Final = 0
-
-
-def blank_gameweek_defaults() -> Mapping[str, object]:
-    """Values for a club with no fixture in a gameweek.
-
-    Counts are zero, because "plays no matches" is a fact and zero states it. The
-    difficulty columns stay empty on purpose: a club with no fixture has no difficulty,
-    and filling zero would describe it as facing the easiest possible tie — which is
-    the opposite of the truth for a points projection.
-    """
-
-    return MappingProxyType(
-        {
-            "fixture_count": BLANK_GAMEWEEK_FIXTURE_COUNT,
-            "home_fixture_count": BLANK_GAMEWEEK_FIXTURE_COUNT,
-            "away_fixture_count": BLANK_GAMEWEEK_FIXTURE_COUNT,
-            "mean_fixture_difficulty": pd.NA,
-            "minimum_fixture_difficulty": pd.NA,
-        }
-    )

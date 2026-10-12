@@ -108,9 +108,9 @@ but are not monotone.
 `features/strength.py` already estimates both sides through the same shifted primitive every
 other rolling feature uses, and `attach_opponent_strength` produces
 `opponent_attack_strength` and `opponent_defence_strength`. Worth knowing before starting: **no
-production path consumes it today.** The only non-test caller is the measurement study, so the
-work is wiring an existing estimate into the rate, not building a new estimator — which is also
-why the two sides must enter separately, as the issue requires.
+production path consumes it today.** The only non-test caller was the measurement study, retired
+on 2026-10-12, so the work is wiring an existing estimate into the rate, not building a new
+estimator, which is also why the two sides must enter separately, as the issue requires.
 
 ## Direction
 

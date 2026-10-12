@@ -26,7 +26,6 @@ transition: what it changed, what was accepted and what still waits on a real en
 | `tests/` | Offline fixtures, unit tests and opt-in acceptance probes |
 | `docs/` | Product, operations, architecture, contracts and scientific evidence |
 | `data/` | Private local operational state; a Git checkout is not its backup |
-| `notebooks/` | Exploration only; every notebook calls importable `src/squadopt/` code |
 | `constraints.txt` | Pinned package versions the container and measurement checks install |
 | `artifacts/` | Git-ignored local experiment outputs; generated, never source |
 | `.codex-tmp/` | Git-ignored agent worktrees and scratch; not project content |

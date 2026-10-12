@@ -6,6 +6,9 @@ This document defines the implemented Sprint 4 risk-aware single-gameweek decisi
 contract. It consumes the frozen Sprint 3 projection-uncertainty output without fitting a
 new prediction model or inventing a probability distribution.
 
+The `squadopt.risk` package that implemented it was removed on 2026-10-12, with its
+screening runner; the document records the contract as it was.
+
 Contract versions:
 
 - objective: `conformal_lcb_objective_v1`;
@@ -15,6 +18,9 @@ The Sprint 0 feasible set is unchanged. Budget, squad and starting sizes, positi
 formation bounds, team limits, and captain constraints remain identical.
 
 ## Public interface
+
+The `squadopt.risk` package has been removed (2026-10-12); this section records the interface it
+had.
 
 ```python
 from squadopt.risk import (
@@ -176,6 +182,8 @@ dependence, so the portfolio-risk and Monte Carlo limitations remain.
 
 ## Reproduction
 
+The runner has been removed (2026-10-12) with the `squadopt.risk` package; the Retired runners
+table in `scripts/README.md` says how to restore and run it. The commands were:
 ```powershell
 .venv\Scripts\python -m scripts.fetch_historical_data
 .venv\Scripts\python -m scripts.run_risk_screening

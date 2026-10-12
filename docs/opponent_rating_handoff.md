@@ -184,8 +184,9 @@ originally written, this route read as normalising by `fixture_difficulty` — w
 Decision 1 ruling has since established is not a pre-match value on archive rows, and which
 `attach_fixture_features` now refuses by default. The multiplier is the **fitted
 Dixon-Coles rating's** expected-goals term for that fixture, computed from matches already
-played at that gameweek's deadline — the per-fold signal `build_opponent_signal.py` (#154)
-records at `(season, gameweek, club_code)` grain is exactly this object, and it is the
+played at that gameweek's deadline. The per-fold signal that `build_opponent_signal.py` (#154,
+retired on 2026-10-12, see Retired runners in `scripts/README.md`) recorded at
+`(season, gameweek, club_code)` grain is exactly this object, and it is the
 input Route B should consume. Nothing else about the route changes.
 
 This is the textbook shape and it is also the more expensive change: it moves

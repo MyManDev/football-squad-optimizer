@@ -1,6 +1,5 @@
 """Tests for the deterministic Ridge reference and paired benchmark."""
 
-import json
 from dataclasses import replace
 
 import pandas as pd
@@ -13,16 +12,11 @@ from tests.fixtures.synthetic_gameweeks import (
 )
 
 from squadopt.backtest import (
-    BacktestConfigurationError,
     DecisionPoint,
-    LearnedBenchmarkConfig,
     build_ridge_prediction_snapshot,
     build_walk_forward_fold,
-    learned_benchmark_to_dict,
-    learned_benchmark_to_markdown,
     make_ridge_projection_builder,
     rows_through,
-    run_learned_benchmark,
 )
 from squadopt.features import CrossSeasonConfig, build_feature_dataset
 from squadopt.prediction import (
@@ -199,54 +193,6 @@ def test_changing_training_data_changes_its_fingerprint() -> None:
         != original.provenance.training_data_fingerprint
     )
     assert rebuilt.diagnostics["model_fingerprint"] != original.diagnostics["model_fingerprint"]
-
-
-def test_locked_holdout_is_rejected_by_the_development_benchmark() -> None:
-    with pytest.raises(BacktestConfigurationError, match="locked holdout"):
-        LearnedBenchmarkConfig(seasons=(SEASON,))
-
-
-def test_paired_benchmark_returns_prediction_decision_and_residual_contracts() -> None:
-    panel = make_two_season_gameweeks()
-    config = LearnedBenchmarkConfig(
-        seasons=(PREVIOUS_SEASON,),
-        ridge_config=RidgeProjectionConfig(min_training_rows=20),
-    )
-    before = panel.copy(deep=True)
-
-    result = run_learned_benchmark(panel, config)
-
-    assert result.decision_metrics.folds == 7
-    assert result.decision_metrics.comparable_scored_folds == 7
-    assert result.baseline_prediction_metrics.observations == 7 * 36
-    assert result.learned_prediction_metrics.observations == 7 * 36
-    assert len(result.learned_prediction_metrics.by_position) == 4
-    assert len(result.residuals) == 7 * 36
-    assert result.residuals["residual"].equals(
-        result.residuals["realized_points"] - result.residuals["predicted_points"]
-    )
-    assert result.diagnostics["automatic_promotion"] is False
-    assert result.diagnostics["holdout_accessed"] is False
-    assert_frame_equal(panel, before)
-
-
-def test_learned_benchmark_reports_are_json_safe_and_explicitly_non_promoting() -> None:
-    result = run_learned_benchmark(
-        make_two_season_gameweeks(),
-        LearnedBenchmarkConfig(
-            seasons=(PREVIOUS_SEASON,),
-            ridge_config=RidgeProjectionConfig(min_training_rows=20),
-        ),
-    )
-
-    report = learned_benchmark_to_dict(result)
-    markdown = learned_benchmark_to_markdown(result)
-
-    assert json.loads(json.dumps(report))["decision"]["automatic_promotion"] is False
-    assert report["decision"]["holdout_accessed"] is False
-    assert len(report["folds"]) == 7
-    assert "No automatic promotion" in markdown
-    assert "locked holdout was not accessed" in markdown
 
 
 def test_fitted_model_rejects_tampered_state() -> None:

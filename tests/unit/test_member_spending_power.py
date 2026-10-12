@@ -108,11 +108,12 @@ def test_a_real_members_stated_worth_overstates_what_the_squad_raises() -> None:
         sell_prices_tenths=current,
         stated_squad_sell_value_tenths=REAL_MEMBER_STATED,
     )
-    assert stated.spendable_tenths == 1014
+    spendable = stated.bank_tenths + sum(stated.sell_prices_tenths.values())
+    assert spendable == 1014
     rule = sum(sell_price_tenths(now, paid) for now, paid in REAL_MEMBER_PRICES.values())
     assert rule == 995
     assert REAL_MEMBER_BANK + rule == 1003
-    assert stated.spendable_tenths - (REAL_MEMBER_BANK + rule) == 11
+    assert spendable - (REAL_MEMBER_BANK + rule) == 11
 
 
 def test_a_worth_smaller_than_its_own_bank_is_refused_rather_than_read_as_a_debt() -> None:
@@ -149,7 +150,7 @@ def test_with_no_stated_value_the_sell_prices_and_bank_are_returned_untouched() 
     assert dict(power.sell_prices_tenths) == _prices()
     assert power.withheld_from_bank_tenths == 0
     assert power.per_player_deduction_tenths == 0
-    assert power.squad_sell_value_known is False
+    assert power.stated_squad_sell_value_tenths is None
 
 
 def test_a_shortfall_the_bank_covers_comes_out_of_the_bank_alone() -> None:
@@ -167,7 +168,9 @@ def test_a_shortfall_the_bank_covers_comes_out_of_the_bank_alone() -> None:
     assert power.per_player_deduction_tenths == 0
     assert power.bank_tenths == 17
     assert dict(power.sell_prices_tenths) == priced
-    assert power.spendable_tenths == 920, "the stated value plus the bank, exactly"
+    assert power.bank_tenths + sum(power.sell_prices_tenths.values()) == 920, (
+        "the stated value plus the bank, exactly"
+    )
 
 
 def test_a_shortfall_larger_than_the_bank_comes_off_every_held_players_sell_price() -> None:
@@ -206,7 +209,7 @@ def test_a_stated_value_above_the_priced_total_credits_the_member_with_nothing()
     )
     assert power.bank_tenths == 20
     assert dict(power.sell_prices_tenths) == priced
-    assert power.spendable_tenths == 920
+    assert power.bank_tenths + sum(power.sell_prices_tenths.values()) == 920
 
 
 @pytest.mark.parametrize("bad", [-1, "8"])

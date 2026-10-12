@@ -4,7 +4,8 @@ import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
 import indexFixture from "../../../../public/data/index.json";
-import type { DataClient, Loaded } from "../../../data/client";
+import type { DataClient } from "../../../data/client";
+import type { Loaded } from "../../../data/envelope";
 import { NotFoundError } from "../../../data/client";
 import { DataClientContext } from "../../../data/queries";
 import type { LedgerView, RecommendationView, SiteIndex } from "../../../data/schema";

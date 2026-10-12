@@ -15,7 +15,7 @@ available in Git at `6ca49686:docs/architecture/system_map.md`.
 | `optimization`, `planning` | Decisions and plans; shared constraints/selection/verification live in `optimization.decisions` |
 | `evaluation` | Scoring, promotion policy and bootstrap statistics shared by experiments and backtests |
 | `scenarios` | Joint point scenarios, scenario paths and rival squads; domain, not research: `live` (plan selection, report, risk) and `application` import it |
-| Research packages | Uncertainty, risk, search, preflight, recalibration, backtests and experiments; obey the declared layer order |
+| Research packages | Search, preflight, recalibration, backtests and experiments; obey the declared layer order |
 | `live` | Domain records, decisions, advice and settled operational calculations |
 | `application` | Typed workflows, publication/evidence builders and advice capabilities; no platform or script imports |
 | `platform` | Filesystem, capture, queue, process pool, metrics, backup and command adapters |

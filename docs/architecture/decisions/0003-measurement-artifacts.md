@@ -33,8 +33,9 @@ prose:
 
 - `tests/unit/test_measurement_preflight.py:92-96` pins **five literal `docs/*.json` paths** and
   asserts they stay conformant.
-- `tests/unit/test_uncertainty_fixture_contract.py` reads
-  `docs/control_uncertainty_calibration.json` and asserts a configuration fingerprint against it.
+- the uncertainty fixture-contract test read `docs/control_uncertainty_calibration.json` and
+  asserted a configuration fingerprint against it (that test has been removed with the
+  `squadopt.uncertainty` package, 2026-10-12).
 - `src/squadopt/backtest/production_benchmark.py:192` sets
   `source_reference="docs/production_prediction_spec.md"` — a docs path **embedded into
   generated artifacts**, so moving that file changes artifact bytes.

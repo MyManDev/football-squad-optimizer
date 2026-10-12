@@ -28,7 +28,7 @@ without saying what they are accountable for producing.
 | Owner | Role | Owns the question | Zone |
 | --- | --- | --- | --- |
 | **İbrahim** (`@SpeedyV5`) | **data / data mining**<br>Data & Predictive Modeling | How do we produce the best available, leakage-safe, calibrated future information for the optimizer? | `data/`, `features/`, `prediction/`; club news and the LLM adapter (the `club_news` modules under `src/squadopt/data/sources/` and `src/squadopt/platform/`) |
-| **the owner** (`@ErtugrulS32175`) | **optimization / evaluation**<br>Optimization & Decision Science + Core Architecture Hardening | Given that information, what is the best decision, how do we know, and how does the core remain modular and reproducible? | `optimization/`, `evaluation/`, `uncertainty/`, `scenarios/`, `risk/`, `planning/`, `bayesopt/`, `preflight/`, `recalibration/`, `experiments/`, `live/`; core CI and `.github/`, dependency enforcement, branch protection, `application/`, `web/` and `docs/architecture/` |
+| **the owner** (`@ErtugrulS32175`) | **optimization / evaluation**<br>Optimization & Decision Science + Core Architecture Hardening | Given that information, what is the best decision, how do we know, and how does the core remain modular and reproducible? | `optimization/`, `evaluation/`, `scenarios/`, `planning/`, `bayesopt/`, `preflight/`, `recalibration/`, `experiments/`, `live/`; core CI and `.github/`, dependency enforcement, branch protection, `application/`, `web/` and `docs/architecture/` |
 | **the owner** (`@ErtugrulS32175`), since 2026-09-25 | **platform / backend**<br>Platform, Backend & Runtime Engineering | How do accepted engine contracts become a traceable runtime, backend platform, and product without infrastructure leaking into the core? | `platform/` (apart from the club news modules), `api/`, `live/`'s operational surface (`ledger.py`, `tick.py`, `recommendation.py`), runtime registries and adapters, installed CLI, workers, persistence adapters, deployment (`deploy/`, the container image) and observability |
 | **shared, both owners** | (none) | (none) | `contracts/`, `src/squadopt/data/schema.py`, `optimization/config.py`, `backtest/` |
 
@@ -174,9 +174,10 @@ Calibrating prediction residuals into intervals or quantiles is the data side's 
 responsibility — it is the tail end of "produce the best available future information", and the
 open work on it (#38's calendar-aware recalibration) starts from prediction residuals.
 
-The `uncertainty/` **package** stays with optimization/evaluation, where all of it was written.
+The `uncertainty/` **package** stayed with optimization/evaluation, where all of it was written.
 Reassigning a package nobody is currently changing, on the strength of a research plan, would
-be churn for a hypothetical.
+be churn for a hypothetical. It has since been removed with its runners (2026-10-12), so the
+trigger below now decides where a new one would live.
 
 The trigger for revisiting is specific rather than "later": **when the prediction side starts
 producing a distribution rather than a point estimate.** That is not a preference, it is a

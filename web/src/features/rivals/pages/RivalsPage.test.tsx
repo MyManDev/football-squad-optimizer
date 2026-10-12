@@ -9,7 +9,8 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
-import type { DataClient, Loaded } from "../../../data/client";
+import type { DataClient } from "../../../data/client";
+import type { Loaded } from "../../../data/envelope";
 import { DataClientContext } from "../../../data/queries";
 import type { PoolView, SiteIndex } from "../../../data/schema";
 import { unsettledRecommendationFixture } from "../../../fixtures/settledRecommendation";

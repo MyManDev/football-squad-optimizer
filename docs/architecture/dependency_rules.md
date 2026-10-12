@@ -21,19 +21,17 @@ contracts
       prediction
         optimization
           evaluation
-            uncertainty
-              scenarios
-                risk
-                  planning
-                    bayesopt
-                      preflight
-                        recalibration
-                          backtest
-                            experiments
-                              live
-                                application
-                                  platform
-                                    api / entry points
+            scenarios
+              planning
+                bayesopt
+                  preflight
+                    recalibration
+                      backtest
+                        experiments
+                          live
+                            application
+                              platform
+                                api / entry points
 ```
 
 `application`, `platform`, and the optional `api` adapter now exist and are enforced as the
@@ -63,6 +61,9 @@ otherwise:
 | `{uncertainty, scenarios, risk}` as one tier | `risk` imports `uncertainty` three times (`config.py:13`, `evaluation.py:29`, `optimizer.py:20`). Risk is built on top of spread, not beside it. |
 | `{experiments, bayesopt, recalibration, preflight}` as one tier | Four separate edges cross it: `experiments` to `bayesopt` (4), `backtest` to `bayesopt` (1), `backtest` to `preflight` (1), `experiments` to `preflight` (1). `bayesopt` is in fact a pure leaf and `preflight` only imports `data`, so both belong far lower. |
 
+The `uncertainty` and `risk` packages in the first two rows have been removed with their runners
+(2026-10-12); the rows stay as the reasoning that set the order.
+
 The original ordering change took the violation count from **16
 imports across 9 pairs** to **5 imports across 3 pairs** without moving a single line of code.
 The shared-contract and evaluation extraction subsequently removed those five exceptions.
@@ -76,9 +77,6 @@ read meaning into it, and do not "fix" it:
 - `preflight` imports only `data`.
 - `recalibration` imports `data`, `features` and `scenarios`, so it needs to be above
   `scenarios` but is otherwise unconstrained.
-- `scenarios` does not import `uncertainty`, so the two could trade places. The import itself
-  is refused all the same: `uncertainty` is laboratory, and the contract `Product does not
-  import the laboratory` lists `scenarios` among its sources.
 - `planning` imports only `optimization` and `contracts` (`DecisionPreferences` from
   `contracts.preferences`, in `planning/chip_strategy.py:14` and `planning/optimizer.py:14`).
 
@@ -181,9 +179,7 @@ layers = [
     "preflight",
     "bayesopt",
     "planning",
-    "risk",
     "scenarios",
-    "uncertainty",
     "evaluation",
     "optimization",
     "prediction",
@@ -222,8 +218,8 @@ packages fall into five groups, each importing only groups below it:
 | domain | `live`, `planning`, `optimization`, `evaluation`, `scenarios`, `prediction`, `features` |
 | data | `data`, `contracts` |
 
-The measurement **laboratory** — `experiments`, `backtest`, `bayesopt`, `recalibration`,
-`preflight`, `risk`, `uncertainty` — is a side tree, not a group in that column. It may import domain and data, and no
+The measurement **laboratory** (`experiments`, `backtest`, `bayesopt`, `recalibration`,
+`preflight`) is a side tree, not a group in that column. It may import domain and data, and no
 product group (adapters, runtime, use cases, or domain) may import it. The linear order alone
 could not say this: it placed the laboratory below `application`, so the deployed advice worker
 was loading 43 laboratory modules, and a product decision (`plan_selection`) was living in the
@@ -242,4 +238,5 @@ cost nothing. Measured at the time: outside its own package **nothing** under `s
 contract had classified as product, so the gate would have allowed a product import of either
 and said nothing. Adding them changed no import and left all three contracts green. The reason
 to do it early is the one the eight `ignore_imports` entries recorded: a boundary is cheap to
-state while nothing crosses it, and expensive once nine statements do.
+state while nothing crosses it, and expensive once nine statements do. Both packages have since
+been removed with their runners (2026-10-12), and their entries left the contracts with them.

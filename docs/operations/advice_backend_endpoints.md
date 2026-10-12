@@ -61,7 +61,7 @@ contributions routes.
 | `GET /ready` (`app.py:635`) | `backend-uptime.yml:60`, `start_backend_at_logon.ps1:218`, `run_backend_local.ps1:227` and `:456`, `scripts/release/restart_backend.ps1:234`, `backend_status.py:271`, `smoke_backend_local.py:135`, CI's browser acceptance (`tests/integration/test_advice_browser.py:425`, `web/e2e/advice-backend.spec.ts:285`) | As for `/health`. |
 | `GET /metrics` (`app.py:620`) | `backend_status.py:272`, `run_backend_local.ps1:233`, `restart_backend.ps1:160`, the load tool (`src/squadopt/platform/advice_load.py:108`) | Goes with the backend. |
 | `GET /api/v1/info` (`app.py:672`) | None | Goes with the backend. |
-| `GET /api/v1/seasons` and the five season views under `/api/v1/seasons/{season}/` (`app.py:676-704`) | None | The site already reads the same files from the static tree (`web/src/data/client.ts:95-125`). |
+| `GET /api/v1/seasons` and the five season views under `/api/v1/seasons/{season}/` (`app.py:676-704`) | None | The site already reads the same files from the static tree (`web/src/data/client.ts:88-118`). |
 
 Also outside the site:
 

@@ -556,24 +556,6 @@ def _fixture_status(record: Mapping[str, object], label: str) -> str:
     return "provisional" if _boolean(record, "provisional_start_time", label) else "scheduled"
 
 
-def unscheduled_fixture_count(fixtures: bytes) -> int:
-    """How many fixtures the capture holds with no gameweek.
-
-    :func:`fixture_snapshot` excludes these, which is right: a club whose match was
-    postponed genuinely has no fixture that gameweek, and inventing a row for one that
-    has no date would put a match in a week nobody has scheduled it in. But the
-    exclusion is silent, and what it hides is not nothing. Each of these fixtures will
-    be given a gameweek, and that gameweek can be one a caller is already planning
-    over, so a count of zero and a count of three are different statements about how
-    settled a calendar is.
-
-    Counted here rather than at the caller so it is counted the same way the exclusion
-    is decided: one field, ``event``, in one place.
-    """
-
-    return sum(1 for record in _array_records(fixtures, "Fixture") if record.get("event") is None)
-
-
 def fixture_snapshot(
     fixtures: bytes,
     bootstrap: bytes,
@@ -1084,7 +1066,6 @@ def scout_snapshot(bootstrap: bytes) -> pd.DataFrame:
 # the transport, so declaring where a payload comes from stays separate from going to get
 # it. Everything below reads bytes that are already on disk, like the rest of the module.
 
-_ENTRY_FIELDS: Final = ("id", "name", "current_event")
 _PICK_FIELDS: Final = ("element", "position", "is_captain", "is_vice_captain", "multiplier")
 _CHIP_FIELDS: Final = ("name", "event")
 _STANDING_FIELDS: Final = ("entry", "entry_name", "player_name", "rank")
@@ -1802,21 +1783,6 @@ def scored_gameweeks(bootstrap: bytes) -> frozenset[int]:
         ):
             scored.add(_positive(_integer(record, "id", "Bootstrap event"), "gameweek"))
     return frozenset(scored)
-
-
-def entry_label(entry: bytes, *, entry_id: int) -> str:
-    """Return the team name the entry summary publishes, for the registry's label."""
-
-    identifier = _positive(entry_id, "entry id")
-    document = _document(entry, "Entry")
-    _require_fields((document,), _ENTRY_FIELDS, "Entry")
-    declared = _integer(document, "id", "Entry")
-    if declared != identifier:
-        raise DataSourceError(f"Entry payload declares entry {declared}, not {identifier}.")
-    name = _text(document, "name", "Entry")
-    if not name:
-        raise InvalidValueError(f"Entry {identifier} declares an empty team name.")
-    return name
 
 
 def _chips_used(history: bytes, *, entry_id: int) -> Mapping[str, tuple[int, ...]]:
