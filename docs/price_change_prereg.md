@@ -96,6 +96,19 @@ Candidate A has these six feature groups, fixed before data:
    same fixed 6000-manager denominator floor. This shared resolution prevents a
    rounded live ownership of 0.0 from becoming a denominator of one. The floor is
    fixed before fitting and is applied identically to archive and live rows.
+   The two sources read different transfer windows. A round's archive counts
+   cover the window before that round's deadline, so a round g-1 feature row
+   gives the window ending at deadline g-1; an earlier feature row gives an
+   earlier window. Live reads the origin capture's running counts for the
+   window ending at deadline g. The feature row's `selected`, in the
+   denominator here and in feature 6, shifts the same way. Round g's counts
+   would match the live window but overlap the archive label: P at origin g is
+   round g-1's value under `shift_price_to_deadline`, and the h=1 label is
+   round g's value minus round g-1's, so round g's transfers move prices inside
+   that label. The archive therefore reads the previous window, one window
+   earlier than live. Its window is explicitly a previous-window proxy for the
+   live one, not the same window. This offset is a declared difference between
+   archive and live, named in the reports of clauses 1, 2 and 3 below.
 2. Last observed gameweek's price change: the feature row's value minus its
    preceding observed row's value. Live uses `cost_change_event`.
 3. Change since the season's beginning: the feature row's value minus that
@@ -107,7 +120,8 @@ Candidate A has these six feature groups, fixed before data:
 6. Ownership relative to the largest contemporaneously observed ownership:
    selected divided by the maximum selected in the feature gameweek; live
    selected_by_percent divided by the maximum in the same capture. Refuse a
-   nonpositive denominator.
+   nonpositive denominator. The archive ownership is the same previous-window
+   proxy declared under feature 1, one window earlier than live.
 
 Numeric fields must be finite; price and transfer counts must be integral where
 the source defines counts. A missing field, missing preceding price observation
@@ -235,6 +249,10 @@ A passes only if all three hold:
    named moves fails. A larger realized move of the named sign counts as correct.
 3. At h=1 on the paired live primary rows its mean Brier is at or below the final
    training base rate. No positive tolerance is allowed.
+
+Clauses 1 and 2 score the archive form of features 1 and 6, and clause 3 their
+live form. Each clause's report names the one-window offset declared under
+feature 1.
 
 B passes its optional first-deadline replacement gate only if its live Brier
 difference has upper 95% endpoint strictly below zero, its mean named moves per
