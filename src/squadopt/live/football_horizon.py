@@ -19,6 +19,16 @@ from squadopt.prediction.football import (
     FixtureFootballModel,
 )
 from squadopt.prediction.football_features import football_features
+from squadopt.prediction.football_match_context import (
+    MATCH_CONTEXT_FEATURE_VERSION,
+    MATCH_CONTEXT_MODEL_VERSION,
+    match_context_features,
+)
+from squadopt.prediction.football_team_form import (
+    TEAM_FORM_FEATURE_VERSION,
+    TEAM_FORM_MODEL_VERSION,
+    football_team_form_features,
+)
 
 
 def weekly_appearance(group: pd.DataFrame) -> float:
@@ -59,6 +69,12 @@ def build_football_horizon(
     weeks = tuple(gameweeks)
     if not isinstance(role_transitions, bool):
         raise ValueError("role_transitions must be a boolean.")
+    form = model.model_version == TEAM_FORM_MODEL_VERSION
+    if role_transitions and form:
+        raise ValueError("Team form does not combine role-transition experiments.")
+    match_context = model.model_version == MATCH_CONTEXT_MODEL_VERSION
+    if match_context and role_transitions:
+        raise ValueError("Match context does not support role transitions.")
     if (
         not weeks
         or any(
@@ -103,7 +119,13 @@ def build_football_horizon(
         # Each club's player shares must be normalized across the entire roster for
         # that match. Role steps are common to its players under a fixed roster.
         for steps, target in targets.groupby("role_steps", sort=True):
-            features = football_features(history, target, model.cutoff)
+            features = (
+                football_team_form_features(history, target, model.cutoff)
+                if form
+                else match_context_features(history, target, model.cutoff)
+                if match_context
+                else football_features(history, target, model.cutoff)
+            )
             target = pd.concat([target.drop(columns="home"), features], axis=1)
             prediction = model.predict(target, role_steps=int(cast(int, steps)))
             target_parts.append(pd.concat([target, prediction], axis=1))
@@ -151,7 +173,11 @@ def build_football_horizon(
         source_snapshot_id,
         "fixture_football_candidate",
         ROLE_MODEL_VERSION if role_transitions else model.model_version,
-        "causal_football_fixture_features_v1",
+        TEAM_FORM_FEATURE_VERSION
+        if form
+        else MATCH_CONTEXT_FEATURE_VERSION
+        if match_context
+        else "causal_football_fixture_features_v1",
         "fixture_sum_blank_zero_v1",
         contract_version=(
             APPEARANCE_HORIZON_CONTRACT_VERSION

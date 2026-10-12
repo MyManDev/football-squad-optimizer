@@ -488,7 +488,9 @@ describe("the proof stamp", () => {
 describe("the decision heading", () => {
   it("names the selection beside the heading", () => {
     show("tr", {}, `/league/352490/members/${ENTRY}?window=1`);
-    expect(screen.getByTestId("member-selection-summary")).toHaveTextContent("Saf puan · 1 hafta");
+    expect(screen.getByTestId("member-selection-summary")).toHaveTextContent(
+      "En çok puan · 1 hafta",
+    );
   });
 
   it("echoes a computation in the heading, where it stays in view once the drawer closes", async () => {
@@ -550,7 +552,7 @@ describe("honesty and the tools", () => {
     expect(within(advanced).getByText(copy.templatesTitle)).toBeInTheDocument();
     const settings = screen.getByRole("region", { name: copy.planTitle });
     expect(within(settings).getByRole("group", { name: "Top 100 etkisi" })).toBeVisible();
-    expect(within(settings).getByRole("group", { name: "Pencere" })).toBeVisible();
+    expect(within(settings).getByRole("group", { name: "Plan süresi" })).toBeVisible();
     expect(within(settings).getByRole("button", { name: "Hesapla" })).toBeVisible();
     expect(settings).toContainElement(advanced);
     expect(advanced.querySelector('input[name="top100"]')).toBeNull();

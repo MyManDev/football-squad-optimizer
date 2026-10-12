@@ -114,7 +114,12 @@ for (const language of ["tr", "en"] as const) {
       await page
         .locator("#sidebar a")
         .evaluateAll((links) => links.map((link) => link.getAttribute("href"))),
-    ).toEqual(["/", "/league/352490/members", "/fixtures", "/contribute"]);
+    ).toEqual([
+      "/",
+      "/league/352490/members",
+      "/fixtures",
+      ...(process.env.VITE_ADVICE_API_ORIGIN ? ["/contribute"] : []),
+    ]);
     await expect(
       page.locator(
         'a[href="/league/352490"], a[href^="/gw/"], a[href^="/moves"], a[href^="/rivals"], a[href="/league/352490/members/squadopt"]',
@@ -139,7 +144,7 @@ test("a member page's sidebar adds only its member block to the chrome", async (
     "/league/352490/members/35249001#kadro",
     "/league/352490/members",
     "/fixtures",
-    "/contribute",
+    ...(process.env.VITE_ADVICE_API_ORIGIN ? ["/contribute"] : []),
   ]);
   await expect(
     page.locator(

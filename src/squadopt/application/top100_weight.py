@@ -211,7 +211,10 @@ def base_points(projection: Projection) -> dict[int, float]:
 
 
 def base_net(week: PlanningWeekResult, points: Mapping[int, float]) -> float:
-    """A solved week scored on base points: the eleven, the captain once more, minus hits.
+    """A solved week on base points, retaining its fixed roles and scoring basis.
+
+    Expected-lineup weeks include reserves and vice recovery; legacy weeks use
+    the eleven and captain. Both subtract actual hits.
 
     The same arithmetic as the planner's own ``projected_score`` less the game's charge
     (``net_expected_points``), with the points read from ``points`` instead of the week.
@@ -219,6 +222,10 @@ def base_net(week: PlanningWeekResult, points: Mapping[int, float]) -> float:
 
     if week.chip is not None:
         raise EntryError("A weighted one-week plan plays no chip; this week plays one.")
+    if week.lineup_expectation is not None:
+        from squadopt.application.lineup_publication import expected_week_points
+
+        return expected_week_points(rebased_week(week, points)) - float(week.transfer_hit_points)
     eleven = [points[int(str(player))] for player in week.starting_xi["player_id"]]
     captain = points[int(str(week.captain["player_id"]))]
     score = float(sum(eleven) + captain)
@@ -271,7 +278,9 @@ def decision_changed(
 ) -> bool:
     """Whether two one-week plans differ in their moves, their eleven or their captain.
 
-    A plan whose score moved while every decision stayed is not a changed plan.
+    On an expected-lineup week the vice-captain and the bench order are scored too, so a
+    change to either is a changed plan there. A plan whose score moved while every
+    decision stayed is not a changed plan.
     """
 
     if sorted(control.transfers_in_ids) != sorted(decision.transfers_in_ids):
@@ -282,4 +291,10 @@ def decision_changed(
     eleven = {int(str(player)) for player in week.starting_xi["player_id"]}
     if control_eleven != eleven:
         return True
-    return int(str(control_week.captain["player_id"])) != int(str(week.captain["player_id"]))
+    if int(str(control_week.captain["player_id"])) != int(str(week.captain["player_id"])):
+        return True
+    if control_week.lineup_expectation is not None or week.lineup_expectation is not None:
+        return control_week.vice_captain_id != week.vice_captain_id or tuple(
+            control_week.bench.player_id
+        ) != tuple(week.bench.player_id)
+    return False

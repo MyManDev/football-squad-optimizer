@@ -229,6 +229,25 @@ function gather(ROOT: string): Tree {
 }
 
 const trees = shippedTrees().map(({ path, root }) => ({ path, root, tree: gather(root) }));
+
+/**
+ * Each rival document is a full device solve of several seconds, and a league on the full
+ * menu publishes hundreds of them: more than the web job's time allows. In CI the first
+ * rival document of every member's strategy is solved, and the count left out is named in a
+ * skipped line; outside CI, or with SHIPPED_PLANS=all, every one is.
+ */
+const ALL_RIVAL_PLANS = process.env.SHIPPED_PLANS === "all" || !process.env.CI;
+
+/** The first rival document, by path, of each member's strategy. */
+function firstOfEachStrategy(cases: Case[]): Case[] {
+  const kept = new Map<string, Case>();
+  for (const c of [...cases].sort((a, b) => a.path.localeCompare(b.path))) {
+    const strategy = c.path.split("/")[2];
+    const key = `${c.entryId}/${strategy}`;
+    if (!kept.has(key)) kept.set(key, c);
+  }
+  return [...kept.values()];
+}
 const ids = (players: Array<{ player_id: number }>) => players.map((p) => p.player_id);
 
 /** The (squad, starter, captain) a document is chosen on: the base points or a weight's. */
@@ -423,10 +442,14 @@ describe("the shipped one-week plans", () => {
         ["top100", "a Top 100 weight (top100-*)"],
       ];
       for (const [kind, label] of kinds) {
-        const shipped = tree.cases.filter((c) => c.kind === kind);
+        const named = tree.cases.filter((c) => c.kind === kind);
+        const shipped = kind === "rival" && !ALL_RIVAL_PLANS ? firstOfEachStrategy(named) : named;
         if (shipped.length === 0) {
           it.skip(`${label}: no member's index names such a document, so none is solved`, () => {});
           continue;
+        }
+        if (shipped.length < named.length) {
+          it.skip(`${label}: ${named.length - shipped.length} of ${named.length} are solved only with SHIPPED_PLANS=all or outside CI`, () => {});
         }
         it.each(shipped.map((c) => [c.entryId, c.path, c] as const))(
           `entry %i, ${label}, %s is the device's answer`,

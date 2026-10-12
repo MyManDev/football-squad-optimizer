@@ -3,7 +3,8 @@
 What a member's one-week plan needs, published so the member's own device can solve it.
 Two documents, both inside the `provisional_league_ui_v1` envelope the league tree uses,
 both in the league's tree (`data/leagues/<league id>/` under the league directory,
-`data/league/` on a site from before it):
+`data/league/` on a site from before it), and since #981 step 1 a third beside the trees,
+the capture's own table (v2, below):
 
 - `device-plan.json`, one per publication: the capture's projection table in the order the
   server's solver sees it, the server's integer objective coefficients, and the season's
@@ -88,6 +89,45 @@ Three things the device model takes as given:
 - Every held player is in the table with a sale price. The producer writes a null block
   otherwise. A held id the table does not carry would be left out of the model, and a held
   player with no sale price would be priced at the buy price.
+
+## The per-capture table (v2)
+
+The shared document does not depend on the league: every league a run renders gets the
+same table. Since #981 step 1 the run writes it once more, once per capture, at
+`data/device/<source_snapshot_id>/device-plan.json`, in the same envelope, and each line of
+the league directory (`data/leagues.json`) names it under `device_plan`
+(`device/<capture>/device-plan.json`, relative to `data/`) and the sha256 of the file's
+bytes under `device_plan_sha256`. The path carries the capture, but the table changes when
+the week is published again from the same capture, which rewrites every tree too. So the
+path alone is never cached as unchanging: a page fetches the table with the digest as its
+version and checks the bytes against it. Within a run the first league writes it and every later league finds it and
+leaves it; a table already on disk with another payload (an earlier build of the same
+capture with another handoff, other Top 100 inputs or other code) is refused before any
+member is solved (`league_publication.check_device_plan_table`). The weekly run removes
+every table at the start of its league stage, after the preview is seeded, and writes its
+own capture's again (`remove_device_tables`); by hand, the operator removes
+`data/device/<capture>/` in the candidate and rebuilds every league of the list. A build of
+one league refuses a directory line whose table is another capture's, or is no per-capture
+table, as it refuses a tree rendered from another capture, and one whose table's bytes are
+not the ones its digest names (`leagues_beside`). The tree keeps its own v1 copy during the
+transition, for pages from before the per-capture table; the copy stops with #981 step 8,
+after GW20, with the owner's yes.
+
+The producer is `squadopt.application.device_plan.device_plan_capture_table`, which the
+site builder and `scripts/add_device_plan_inputs.py` share. The document is the shared
+document above with these differences:
+
+| Field | Meaning |
+| --- | --- |
+| `contract_version` | Exactly `league_device_plan_v2`. |
+| `league_id` | Absent. The league is the directory line's; the table belongs to the capture. |
+| `players[].element_id` | The game's per-season element id of the player, the id the entry endpoints name him by, beside `id`, his persistent code. Read from the capture's bootstrap; a table player the bootstrap does not name refuses the build. |
+| `players[].start_tenths` | His price at the season's first deadline in tenths (`now_cost` less `cost_change_start` in the bootstrap), beside `buy_tenths`, his price at the capture. |
+| `rules.chips` | The season's chip windows as the rules state them: `name`, `number`, `start_event`, `stop_event`, `chip_type`, in the source's order. The entry document's `chips` block still says which halves a member has left. |
+| `rules.transfers_cap` | The game's cap on transfers in one week, or null where the rules state none, beside `rules.max_free_transfers`, the policy's cap on banked free transfers. |
+
+Every other field, the order of `players` and the solver rules are the shared document's.
+The page reads the v1 copy until #981 step 2 makes it read the per-capture table.
 
 ## What the device answers
 
