@@ -183,7 +183,7 @@ ranges) and 3.13 (the pinned measurement environment in `constraints.txt`).
 
 A dependency added to `pyproject.toml` is still not *automatically* added to
 `constraints.txt` — `scipy` arrived that way in #139 — but the two are no longer kept in step
-by hand alone. `tests/unit/test_dependency_pins.py` fails when a declared dependency has no
+by hand alone. `tests/architecture/test_dependency_pins.py` fails when a declared dependency has no
 pin, and fails again when a pin falls outside the range it is declared with, which is the same
 drift running the other way. Adding the dependency to both files is still a manual step; going
 on to merge with only one of them done is not.

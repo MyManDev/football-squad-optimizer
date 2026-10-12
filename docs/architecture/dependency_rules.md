@@ -203,7 +203,7 @@ those services.
 
 The original five-edge baseline was measured against `b031ef1` (PR #110). The shared-layer
 extraction verifies the zero-exception contract with `lint-imports`; behavior compatibility
-is covered by `tests/unit/test_layer_contracts.py` and the existing consumer suites.
+is covered by `tests/architecture/test_layer_contracts.py` and the existing consumer suites.
 
 ## The groups the order encodes
 
