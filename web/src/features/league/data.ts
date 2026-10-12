@@ -1,10 +1,15 @@
 import type { RequestOptions } from "../../data/request";
 import { LeagueDataError, LeagueDataMissing } from "./dataErrors";
 import { findLeague, loadLeagueDirectory, type LeagueRef, type PublishedLeague } from "./directory";
-import { fetchPublishedJson } from "./publishedJson";
+import { fetchPublishedBytes, fetchPublishedJson } from "./publishedJson";
 import { assertAdviceIndex, assertEnvelope, assertMembers, assertSquad } from "./publicationShape";
 import { chipPath, isMemberChip } from "./advice/chipChoice";
-import { isDevicePlanDocument, type DevicePlanDocument } from "./device/types";
+import {
+  DEVICE_PLAN_CONTRACT_VERSION,
+  DEVICE_PLAN_TABLE_CONTRACT_VERSION,
+  isDevicePlanDocument,
+  type DevicePlanDocument,
+} from "./device/types";
 import { isTop100Weight, top100TargetPath, type Top100Target } from "./advice/top100";
 import type { WindowSize } from "../../lib/decisionVocabulary";
 import type {
@@ -89,6 +94,14 @@ function ownLeague<T>(envelope: LeagueViewEnvelope<T>, leagueId: number): League
   return envelope;
 }
 
+/** The sha256 of the bytes as lower-case hex, or null where the browser offers no digest. */
+async function sha256Hex(bytes: ArrayBuffer): Promise<string | null> {
+  const subtle = globalThis.crypto?.subtle;
+  if (!subtle) return null;
+  const digest = new Uint8Array(await subtle.digest("SHA-256", bytes));
+  return Array.from(digest, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
 export function createLeagueTree(league: LeagueRef): LeagueTree {
   const base = `${import.meta.env.BASE_URL}data/${league.path}/`;
   async function read<T>(
@@ -131,16 +144,56 @@ export function createLeagueTree(league: LeagueRef): LeagueTree {
   }
 
   /**
-   * The capture's table and rules for a solve on the member's own device. Published beside
-   * members.json by the same build; absent on a tree from before it, which reads as
-   * `LeagueDataMissing`. There is no example document: the page offers the device solve
-   * only where the publisher wrote its inputs.
+   * The capture's own table, where the directory line names one: read at its digest as the
+   * version, held to that digest byte for byte, and to the table's contract. Anything else
+   * (no table named, a missing or changed file, a browser without a digest, another
+   * shape) reads as null, and the tree's own copy is read instead. An abort is not a
+   * fallback.
+   */
+  async function loadCaptureTable(
+    options?: RequestOptions,
+  ): Promise<LeagueViewEnvelope<DevicePlanDocument> | null> {
+    const table = league.devicePlan;
+    if (table === undefined) return null;
+    try {
+      const bytes = await fetchPublishedBytes(
+        `${import.meta.env.BASE_URL}data/`,
+        `${table.path}?v=${table.sha256}`,
+        options,
+      );
+      if ((await sha256Hex(bytes)) !== table.sha256) return null;
+      const envelope = assertEnvelope<unknown>(JSON.parse(new TextDecoder().decode(bytes)));
+      const payload = envelope.payload;
+      if (
+        !isDevicePlanDocument(payload) ||
+        payload.contract_version !== DEVICE_PLAN_TABLE_CONTRACT_VERSION
+      ) {
+        return null;
+      }
+      return envelope as LeagueViewEnvelope<DevicePlanDocument>;
+    } catch {
+      options?.signal?.throwIfAborted();
+      return null;
+    }
+  }
+
+  /**
+   * The capture's table and rules for a solve on the member's own device: the capture's
+   * own table where the directory names it, else the copy published beside members.json by
+   * the same build; absent on a tree from before it, which reads as `LeagueDataMissing`.
+   * There is no example document: the page offers the device solve only where the
+   * publisher wrote its inputs.
    */
   async function loadDevicePlan(
     options?: RequestOptions,
   ): Promise<LeagueViewEnvelope<DevicePlanDocument>> {
+    const shared = await loadCaptureTable(options);
+    if (shared !== null) return shared;
     const envelope = await read<unknown>("device-plan.json", options);
-    if (!isDevicePlanDocument(envelope.payload)) {
+    if (
+      !isDevicePlanDocument(envelope.payload) ||
+      envelope.payload.contract_version !== DEVICE_PLAN_CONTRACT_VERSION
+    ) {
       throw new LeagueDataError("The published device-plan document is not the expected shape.");
     }
     return envelope as LeagueViewEnvelope<DevicePlanDocument>;

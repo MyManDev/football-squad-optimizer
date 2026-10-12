@@ -67,13 +67,15 @@ describe("the moves of a plan solved on the device", () => {
     expect(plain.moves.length).toBeGreaterThan(0);
     const at = new Date("2026-10-03T01:02:03Z");
     // The pure-points plan's moves are a points gain.
-    const pure = deviceAdviceEnvelope(document, squad, plain, at).payload;
+    const pure = deviceAdviceEnvelope(document, squad, plain, at, 352490).payload;
     expect(pure.moves.map((move) => move.reason_code)).toEqual(
       plain.moves.map(() => "points_gain"),
     );
     // A rival strategy's are its trade-off, as build_advice_payload labels a mode's moves.
-    const banded = deviceAdviceEnvelope(document, squad, { ...plain, rival }, at).payload;
+    const banded = deviceAdviceEnvelope(document, squad, { ...plain, rival }, at, 352490).payload;
     expect(banded.mode).toBe("fark-yarat");
+    // The league is the tree's: the capture's table names none.
+    expect(pure.league_id).toBe(352490);
     expect(banded.moves.map((move) => move.reason_code)).toEqual(
       plain.moves.map(() => "mode_tradeoff"),
     );

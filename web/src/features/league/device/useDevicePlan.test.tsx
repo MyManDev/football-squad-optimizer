@@ -55,7 +55,8 @@ function squadWith(
 }
 
 const REQUEST: AdviceRequest = {
-  leagueId: document.league_id,
+  // The fixture is a tree's copy (v1), which names its league.
+  leagueId: document.league_id!,
   entryId: ENTRY_ID,
   strategy: "saf-puan",
   window: 1,
