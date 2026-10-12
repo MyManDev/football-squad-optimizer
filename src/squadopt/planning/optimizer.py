@@ -333,7 +333,12 @@ def _build_model(
     paid_transfer_vars: list[cp_model.IntVar] = []
     objective_terms: list[cp_model.LinearExpr] = []
     acquisition = (
-        AcquisitionSales(players_by_week, transfer_config.acquisition_sell_on_fee)
+        AcquisitionSales(
+            players_by_week,
+            transfer_config.acquisition_sell_on_fee,
+            held=[player_id in initial_ids for player_id in players_by_week[0]["player_id"]],
+            free_hit_possible=any("freehit" in week_chips for week_chips in chip_vars),
+        )
         if transfer_config.acquisition_sell_on_fee is not None
         else None
     )
@@ -498,9 +503,7 @@ def _build_model(
         proceeds = (
             cp_model.LinearExpr.weighted_sum(transfers_out, sell_prices)
             if acquisition is None
-            else acquisition.add_week(
-                model, week_index, players, transfers_in, transfers_out, free_hit
-            )
+            else acquisition.add_week(model, week_index, transfers_in, transfers_out, free_hit)
         )
         model.add(
             bank_after

@@ -14,8 +14,15 @@ for purchases inside the horizon. For current price C, known purchase price P
 and retained integer percentage R, sale proceeds are C when C <= P and
 P + floor((C - P) * R / 100) otherwise. This uses the existing pricing contract.
 The solver tracks the last permanent acquisition week and indexes its sale
-value. Extraction independently replays purchases numerically and checks bank
-and free-transfer continuity. All week tables have the same ordered player IDs.
+value. A player whose sale price no lot can change, in any week, carries no lot.
+When no buy price moves inside the horizon and no week can play a Free Hit, a
+copy bought inside the horizon sells at that same price, so only the original
+holding can sell for anything else. A held player's lot is then one Boolean per
+week, whether the original holding is still held. The choice is made once for
+the whole horizon. Both reductions price every legal sequence of moves exactly
+as the full lot does. Extraction independently replays purchases numerically
+and checks bank and free-transfer continuity. All week tables have the same
+ordered player IDs.
 
 Original holdings keep their supplied sale path until sold: an unknown purchase
 price is never inferred from a discounted sale price. A subsequent repurchase
@@ -40,5 +47,10 @@ results must retain their original convention.
 
 Hand-accounted tests cover rising and falling prices, three and five weeks,
 zero/full/half fees, original holdings, repurchases, Wildcard, Free Hit and a
-false affordability counterexample. This establishes accounting correctness;
+false affordability counterexample. Random horizons check that the two
+reductions refuse no legal sequence of moves and price none differently from
+the full lot, and that whole plans solve to the same value. The same value
+need not mean the same plan: the tie-break does not separate every pair of
+plans, so which of two tied plans comes back depends on the search, and the
+encoding changes the search. This establishes accounting correctness;
 it does not establish higher realized FPL points or solve chip continuation value.
