@@ -240,6 +240,10 @@ if ($Status) {
 }
 
 # ---------------------------------------------------------------------------- start
+# Never from an agent application's process tree (scripts\backend_parentage.ps1).
+. (Join-Path $PSScriptRoot "backend_parentage.ps1")
+Assert-NotUnderAgentApplication -Action "start the backend"
+
 # This operator-owned file is outside the runtime store. Never read it for Stop/Status:
 # a malformed selection must not prevent inspecting or stopping recorded processes.
 if ($PSBoundParameters.ContainsKey('ArtifactRoot')) {

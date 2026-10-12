@@ -189,16 +189,21 @@ example CX33, 4 vCPU and 8 GB at €8.99) was marked "not available" on 2026-09-
 - **Tunnel and DNS.** The same tunnel moves to the new host, and the DNS record (a CNAME to the
   tunnel) does not change. Cloudflare sends each request to the geographically closest
   connected replica, so two connectors in front of two different stores would split members
-  across two queues. Two things on the PC bring its connector back:
+  across two queues. Three things on the PC bring its connector back:
   - A running watcher. It checks every 60 s and starts a connector labelled `squadopt-logon`
     after three consecutive checks find none, so a stopped connector comes back a few minutes
     later. `-Unregister` does not end a running watcher, and the script has no switch that
     does, so a scripted move needs a step of its own for it.
   - The Startup shortcut, which starts a new watcher at the next logon. `-Unregister` removes
     only that shortcut.
+  - The scheduled task `SquadOptBackendWatch`, where the owner registered it
+    ([free hosting](../../backend_free_hosting.md)): it starts a watcher at logon and again
+    within five minutes of one ending, so a watcher ended while it is enabled comes back.
 
   The order is:
-  1. On the PC, end any running watcher. One started by the shortcut is the hidden
+  1. On the PC, first disable the watch task if it is registered
+     (`Disable-ScheduledTask -TaskName SquadOptBackendWatch`), then end any running watcher.
+     One started by the shortcut or the task is the hidden
      `powershell.exe` whose command line contains `start_backend_at_logon.ps1` and `-Watch`.
      One started by hand in a PowerShell window ends when that window is closed. Every watcher
      holds the mutex `Global\SquadOpt-backend-8000-squadopt-logon` while it runs, so none is
@@ -258,7 +263,9 @@ example CX33, 4 vCPU and 8 GB at €8.99) was marked "not available" on 2026-09-
   The `Dockerfile` does not change, and neither does the site build or the uptime workflow,
   because the public hostname stays the same.
 - **Rollback.** Stop the host's connector (`systemctl stop cloudflared`). On the PC, run
-  `start_backend_at_logon.ps1 -Register`, then start a watcher now with
+  `start_backend_at_logon.ps1 -Register` (or, where the watch task was registered,
+  `Enable-ScheduledTask -TaskName SquadOptBackendWatch`, which starts one within five
+  minutes), then start a watcher now with
   `start_backend_at_logon.ps1 -Watch` from the main checkout, in a window left open, or sign
   out and in again. `-Register` alone only writes the shortcut, which runs at the next logon,
   as the script itself prints. Members reach the PC again once its connector is up. Answers

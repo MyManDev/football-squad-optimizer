@@ -35,12 +35,13 @@ from pathlib import Path
 
 from squadopt.application.manager_words import SOURCE_CLUB_NEWS_CAPTURE
 from squadopt.application.strategies.rule import STRATEGY_RULE_ID
+from squadopt.contracts.league_tree import published_league_trees
 from squadopt.prediction.elite_evidence import COMPONENT_ELITE_MODEL_VERSION
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 ROADMAP = REPOSITORY_ROOT / "docs" / "product" / "roadmap.md"
-SEASON_DATA = REPOSITORY_ROOT / "web" / "public" / "data" / "2026-27"
-MEMBER_ADVICE = REPOSITORY_ROOT / "web" / "public" / "data" / "league" / "advice"
+SITE_DATA = REPOSITORY_ROOT / "web" / "public" / "data"
+SEASON_DATA = SITE_DATA / "2026-27"
 TOP100_PROTOCOL = REPOSITORY_ROOT / "docs" / "top100_effect_prereg.md"
 BENCHMARK_PROTOCOL = REPOSITORY_ROOT / "docs" / "benchmark_v2_prereg.md"
 UPTIME_WORKFLOW = REPOSITORY_ROOT / ".github" / "workflows" / "backend-uptime.yml"
@@ -235,7 +236,12 @@ def test_the_managers_word_is_not_said_to_carry_club_news_no_published_week_read
     and the roadmap has to say the switch has run on example data.
     """
 
-    indexes = sorted(MEMBER_ADVICE.glob("*/index.json"))
+    # Every member index the site publishes, under whichever trees its directory lists.
+    indexes = sorted(
+        index
+        for tree in published_league_trees(SITE_DATA)
+        for index in (tree / "advice").glob("*/index.json")
+    )
     assert indexes, "the published tree holds no member index, so this test checks nothing"
     sources = set()
     for index in indexes:

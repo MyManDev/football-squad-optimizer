@@ -2,9 +2,11 @@
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
+import { pagesNotFound } from "./vite/pagesNotFound.ts";
+
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), pagesNotFound()],
   // Hosting-agnostic: set VITE_BASE_PATH (e.g. "/football-squad-optimizer/") for a
   // sub-path deployment such as GitHub Pages; "/" for a root domain.
   base: process.env.VITE_BASE_PATH ?? "/",
@@ -25,7 +27,7 @@ export default defineConfig({
     environment: "jsdom",
     globals: false,
     setupFiles: ["./src/test/setup.ts"],
-    include: ["src/**/*.test.{ts,tsx}", "scripts/**/*.test.mjs"],
+    include: ["src/**/*.test.{ts,tsx}", "scripts/**/*.test.mjs", "vite/**/*.test.ts"],
     css: { modules: { classNameStrategy: "non-scoped" } },
   },
 });

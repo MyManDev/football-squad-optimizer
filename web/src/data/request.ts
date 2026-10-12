@@ -10,6 +10,20 @@ export function isAbortError(error: unknown): boolean {
   return error instanceof Error && error.name === "AbortError";
 }
 
+/**
+ * Read and drop the body of a response the caller will not use. Chromium keeps a response
+ * whose body is never read open until it is collected, so a refused 404 left the page
+ * holding the request and never network-idle. A refusal's body is small; one that fails to
+ * read (the request was aborted) has nothing left open.
+ */
+export async function discardBody(response: Response): Promise<void> {
+  try {
+    await response.arrayBuffer();
+  } catch {
+    // Aborted or failed mid-body: nothing is left open.
+  }
+}
+
 export async function withRequestDeadline<T>(
   operation: (signal: AbortSignal) => Promise<T>,
   { signal, timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS }: RequestOptions = {},

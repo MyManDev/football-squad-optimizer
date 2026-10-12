@@ -2,11 +2,13 @@
 
 import hashlib
 import json
+import shutil
 from dataclasses import replace
 from pathlib import Path
 
 import pandas as pd
 import pytest
+from pandas.testing import assert_frame_equal
 from tests.fixtures.synthetic_rotation_capture import (
     CAPTURED_AT,
     DEADLINE,
@@ -17,8 +19,15 @@ from tests.fixtures.synthetic_rotation_capture import (
     fixtures_payload,
 )
 from tests.unit.test_club_news_coding_versions import _document, _response
+from tests.unit.test_football_participation import _world
 from tests.unit.test_rotation_export_from_capture import _decision
 
+from squadopt.application import manager_words
+from squadopt.application.football_context import bind_football_context
+from squadopt.application.football_participation import (
+    bind_football_participation,
+    participation_summary,
+)
 from squadopt.application.manager_words import (
     ManagerWordsError,
     _is_whole_sentence,
@@ -27,14 +36,20 @@ from squadopt.application.manager_words import (
     manager_words_from_artifact,
 )
 from squadopt.application.rotation_export import RotationExportRequest, export_rotation_evidence
-from squadopt.data.errors import DataValidationError
+from squadopt.data.errors import DataSourceError, DataValidationError
 from squadopt.data.snapshots import write_snapshot
-from squadopt.data.sources.club_news_capture import CodedClub, write_club_news_capture
+from squadopt.data.sources import club_news_scope
+from squadopt.data.sources.club_news_capture import (
+    CodedClub,
+    read_captured_responses,
+    write_club_news_capture,
+)
 from squadopt.data.sources.club_news_coding import (
     ROTATION_CLAIM_CODING_CONTRACT_VERSION,
     coding_prompt_sha256,
 )
-from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD
+from squadopt.data.sources.club_news_scope import is_whole_sentence
+from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD, GameweekDeadline
 from squadopt.features.rotation_evidence_artifact import read_rotation_evidence_artifact
 
 
@@ -46,6 +61,12 @@ def _pair(
     extra_fixture=None,
     disposition="stated_expected_absent",
     body=None,
+    prompt_model="synthetic-stub",
+    extra_coded=(),
+    extra_documents=(),
+    declared_scope="upcoming_premier_league",
+    coded_name="Saka",
+    published_at="2026-09-12T13:00:00Z",
 ):
     root = tmp_path / "snapshots"
     if extra_fixture is None:
@@ -62,20 +83,31 @@ def _pair(
                 FIXTURES_PAYLOAD: json.dumps(fixtures).encode(),
             },
         ).snapshot_id
+    document = _document(quote if body is None else body)
+    content = document.content.replace(b"2026-09-12T13:00:00Z", published_at.encode())
+    document = replace(document, content=content, readable=content, byte_length=len(content))
+    response = _response(quote=quote, label=disposition, version=version)
+    response_body = json.loads(response.text)
+    response_body["documents"][0]["published_at_utc"] = published_at
+    response_body["claims"][0]["player_name"] = coded_name
+    if version == ROTATION_CLAIM_CODING_CONTRACT_VERSION:
+        response_body["claims"][0]["fixture_scope"] = declared_scope
+    response = replace(response, text=json.dumps(response_body))
     news = write_club_news_capture(
         root,
         # ``body`` is what the club published, when that is more than the quote itself.
-        documents=(_document(quote if body is None else body),),
+        documents=(document, *extra_documents),
         coded=(
             CodedClub(
                 "Arsenal",
-                _response(quote=quote, label=disposition, version=version),
+                response,
                 version,
-                coding_prompt_sha256(contract_version=version),
+                coding_prompt_sha256(prompt_model, contract_version=version),
             ),
+            *extra_coded,
         ),
-        clubs_declared=("Arsenal",),
-        clubs_covered=("Arsenal",),
+        clubs_declared=("Arsenal", *(entry.club for entry in extra_coded)),
+        clubs_covered=("Arsenal", *(entry.club for entry in extra_coded)),
         captured_at_utc="2026-09-12T14:30:00Z",
     )
     result = export_rotation_evidence(
@@ -112,6 +144,223 @@ def test_real_export_and_reader_bind_scope_publication_and_role(tmp_path):
     )
 
 
+def _consumer_reading(table, words, club, double):
+    word = words.words[0]
+    forecast, inputs, _ = _world()
+    ids = {1: word.player_id, 2: 900002}
+
+    def remap(frame):
+        frame = frame.copy(deep=True)
+        frame["player_id"] = frame.player_id.replace(ids)
+        frame["team_id"] = club
+        if "gameweek" in frame:
+            frame["gameweek"] = frame.gameweek.replace({6: TARGET_GAMEWEEK, 7: TARGET_GAMEWEEK + 1})
+        return frame
+
+    inputs = replace(
+        inputs,
+        captured_at_utc=CAPTURED_AT,
+        deadline=GameweekDeadline(TARGET_GAMEWEEK, DEADLINE, False),
+        players=remap(inputs.players),
+        availability=remap(inputs.availability),
+    )
+    horizon_table = remap(forecast.horizon.table)
+    if double:
+        horizon_table.loc[horizon_table.gameweek.eq(TARGET_GAMEWEEK), "fixture_count"] = 2
+    forecast = replace(
+        forecast,
+        horizon=replace(forecast.horizon, table=horizon_table),
+        projection=replace(forecast.projection, table=remap(forecast.projection.table)),
+    )
+    result = bind_football_participation(
+        forecast, inputs, manager_words=words, rotation_table_sha256=table.attrs["table_sha256"]
+    )
+    reason = participation_summary(result.projection.diagnostics)["statement_outcomes"][0]["reason"]
+    fixtures = pd.DataFrame(
+        {
+            "fixture": [401, 403] if double else [401],
+            "club": [club, club] if double else [club],
+            "GW": [TARGET_GAMEWEEK] * (2 if double else 1),
+            "kickoff": [pd.Timestamp("2026-09-12T19:00:00Z")]
+            + ([pd.Timestamp("2026-09-13T19:00:00Z")] if double else []),
+        }
+    )
+    context, audit = bind_football_context(
+        inputs.players.assign(club=club),
+        inputs.availability,
+        season=SEASON,
+        gameweek=TARGET_GAMEWEEK,
+        cutoff=pd.Timestamp(CAPTURED_AT),
+        manager_words=words,
+        fixture_calendar=fixtures,
+    )
+    return reason, context, audit, result, forecast
+
+
+@pytest.mark.parametrize("double", [False, True])
+def test_page_table_reader_and_both_consumers_report_double_fixture_reason(tmp_path, double):
+    bootstrap = json.loads(bootstrap_payload())
+    club = next(team["id"] for team in bootstrap["teams"] if team["name"] == "Arsenal")
+    opponent = next(team["id"] for team in bootstrap["teams"] if team["name"] == "Fulham")
+    extra = {
+        "id": 403,
+        "event": TARGET_GAMEWEEK,
+        "team_h": club,
+        "team_a": opponent,
+        "team_h_difficulty": 3,
+        "team_a_difficulty": 3,
+        "kickoff_time": "2026-09-13T19:00:00Z",
+        "finished": False,
+        "provisional_start_time": False,
+    }
+    table_path, manifest_path, source = _pair(tmp_path, extra_fixture=extra if double else None)
+    table = read_rotation_evidence_artifact(table_path, manifest_path)
+    row = table.loc[table.rotation_claim_observed].iloc[0]
+    assert bool(row.rotation_claim_scope_verified) is not double
+    words = load_manager_words(table_path, club_news_source=source)
+    (word,) = words.words
+    assert word.publication_verified
+    assert word.scope_verified is not double
+    assert word.fixture_binding_reason == ("ambiguous_current_week_fixture" if double else None)
+
+    reason, context, audit, result, forecast = _consumer_reading(table, words, club, double)
+    if double:
+        assert reason == audit[0]["reason"] == "ambiguous_current_week_fixture"
+        assert_frame_equal(result.horizon.table, forecast.horizon.table, check_exact=True)
+        assert context.availability_probability.tolist() == [0.75, 1.0]
+    else:
+        assert reason == "explicit_evidence"
+        assert audit[0]["reason"] == "explicit_source_restriction"
+        assert (
+            result.projection.table.set_index("player_id").loc[word.player_id, "expected_points"]
+            == 0
+        )
+        assert context.set_index("player_id").loc[word.player_id, "availability_probability"] == 0
+
+
+@pytest.mark.parametrize(
+    "quote,kickoff",
+    [
+        ("Saka might miss the next Premier League match.", "2026-09-13T19:00:00Z"),
+        ("Saka will miss the cup match.", "2026-09-13T19:00:00Z"),
+        ("Saka will miss the next Premier League match.", None),
+        ("Saka will miss the next Premier League match.", "2026-09-12T19:00:00Z"),
+    ],
+)
+def test_double_fixture_label_does_not_replace_another_scope_failure(tmp_path, quote, kickoff):
+    if kickoff is None:
+        with pytest.raises(DataSourceError, match="no kickoff"):
+            _pair(
+                tmp_path,
+                extra_fixture={
+                    "id": 403,
+                    "event": TARGET_GAMEWEEK,
+                    "team_h": 1,
+                    "team_a": 2,
+                    "team_h_difficulty": 3,
+                    "team_a_difficulty": 3,
+                    "kickoff_time": None,
+                    "finished": False,
+                    "provisional_start_time": False,
+                },
+            )
+        return
+    bootstrap = json.loads(bootstrap_payload())
+    club = next(team["id"] for team in bootstrap["teams"] if team["name"] == "Arsenal")
+    opponent = next(team["id"] for team in bootstrap["teams"] if team["name"] == "Fulham")
+    table_path, _, source = _pair(
+        tmp_path,
+        quote=quote,
+        extra_fixture={
+            "id": 403,
+            "event": TARGET_GAMEWEEK,
+            "team_h": club,
+            "team_a": opponent,
+            "team_h_difficulty": 3,
+            "team_a_difficulty": 3,
+            "kickoff_time": kickoff,
+            "finished": False,
+            "provisional_start_time": False,
+        },
+    )
+    (word,) = load_manager_words(table_path, club_news_source=source).words
+    assert not word.scope_verified
+    assert word.fixture_binding_reason is None
+
+
+@pytest.mark.parametrize(
+    "case,double,options",
+    [
+        ("declared-ambiguous", True, {"declared_scope": "ambiguous"}),
+        ("declared-unspecified", True, {"declared_scope": "unspecified"}),
+        ("coded-full-name", True, {"coded_name": "Bukayo Saka"}),
+        ("single-fixture-name-failure", False, {"coded_name": "Bukayo Saka"}),
+        ("single-table-scope-refusal", False, {}),
+        (
+            "negated-source",
+            True,
+            {"body": "It is not true that Saka will miss the next Premier League match."},
+        ),
+        ("stale-source", True, {"published_at": "2026-09-05T14:30:00Z"}),
+        # The page dates itself after its 14:00 fetch; a single week reports a timing failure.
+        ("published-after-fetch", True, {"published_at": "2026-09-12T14:20:00Z"}),
+        (
+            "minutes-name-failure",
+            True,
+            {
+                "coded_name": "Bukayo Saka",
+                "disposition": "stated_minutes_limited",
+                "quote": "Saka will be limited in the next Premier League match.",
+            },
+        ),
+        (
+            "single-minutes-name-failure",
+            False,
+            {
+                "coded_name": "Bukayo Saka",
+                "disposition": "stated_minutes_limited",
+                "quote": "Saka will be limited in the next Premier League match.",
+            },
+        ),
+    ],
+)
+def test_another_failure_never_becomes_a_double_fixture_reason(tmp_path, case, double, options):
+    bootstrap = json.loads(bootstrap_payload())
+    club = next(team["id"] for team in bootstrap["teams"] if team["name"] == "Arsenal")
+    opponent = next(team["id"] for team in bootstrap["teams"] if team["name"] == "Fulham")
+    extra = {
+        "id": 403,
+        "event": TARGET_GAMEWEEK,
+        "team_h": club,
+        "team_a": opponent,
+        "team_h_difficulty": 3,
+        "team_a_difficulty": 3,
+        "kickoff_time": "2026-09-13T19:00:00Z",
+        "finished": False,
+        "provisional_start_time": False,
+    }
+    table_path, manifest_path, source = _pair(
+        tmp_path, extra_fixture=extra if double else None, **options
+    )
+    if case == "single-table-scope-refusal":
+        _rewrite(
+            table_path,
+            manifest_path,
+            lambda frame: frame.loc.__setitem__(
+                (frame.rotation_claim_observed, "rotation_claim_scope_verified"), False
+            ),
+        )
+    table = read_rotation_evidence_artifact(table_path, manifest_path)
+    words = load_manager_words(table_path, club_news_source=source)
+    (word,) = words.words
+    assert not word.scope_verified
+    assert word.fixture_binding_reason is None, case
+    reason, context, audit, result, forecast = _consumer_reading(table, words, club, double)
+    assert reason == audit[0]["reason"] == "upcoming_league_scope_unverified", case
+    assert_frame_equal(result.horizon.table, forecast.horizon.table, check_exact=True)
+    assert context.availability_probability.tolist() == [0.75, 1.0]
+
+
 @pytest.mark.parametrize(
     "quote",
     [
@@ -138,25 +387,188 @@ def test_replayed_legacy_evidence_never_silently_acquires_attestation(tmp_path, 
     assert word.role is None
 
 
-ABSENCE = "Saka will miss the next Premier League match."
+def test_forged_legacy_attestation_is_withheld_after_manifest_is_resealed(tmp_path):
+    control_path, _, _ = _pair(tmp_path / "control")
+    control = pd.read_csv(control_path)
+    columns = [
+        "rotation_claim_fixture_scope",
+        "rotation_claim_scope_verified",
+        "rotation_claim_publication_verified",
+        "rotation_claim_publication_source",
+        "rotation_claim_publication_source_sha256",
+    ]
+    table_path, manifest_path, source = _pair(
+        tmp_path / "legacy", version="rotation_claim_coding_v2"
+    )
+
+    def forge(frame):
+        frame[columns] = control[columns]
+        frame["prompt_sha256"] = coding_prompt_sha256("synthetic-stub")
+
+    _rewrite(table_path, manifest_path, forge)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["prompt_sha256"] = coding_prompt_sha256("synthetic-stub")
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    table = read_rotation_evidence_artifact(table_path, manifest_path)
+    observed = table.loc[table.rotation_claim_observed].iloc[0]
+    assert bool(observed.rotation_claim_scope_verified)
+    assert bool(observed.rotation_claim_publication_verified)
+    (word,) = load_manager_words(table_path, club_news_source=source).words
+    assert word.words is not None
+    assert not word.scope_verified and not word.publication_verified
+    assert word.role is None
+
+
+def test_response_index_prompt_digest_must_match_its_recorded_model(tmp_path):
+    table_path, manifest_path, source = _pair(tmp_path, prompt_model="different-synthetic-model")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["prompt_sha256"] = coding_prompt_sha256("synthetic-stub")
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    (word,) = load_manager_words(table_path, club_news_source=source).words
+    assert word.words is not None
+    assert not word.scope_verified and not word.publication_verified
+
+
+def test_manifest_response_digests_must_match_bound_capture(tmp_path):
+    table_path, manifest_path, source = _pair(tmp_path)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["response_sha256s"] = ["f" * 64]
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    (word,) = load_manager_words(table_path, club_news_source=source).words
+    assert word.words is not None
+    assert not word.scope_verified and not word.publication_verified
 
 
 @pytest.mark.parametrize(
-    ("body", "quote"),
+    "mismatch",
     [
-        (f"It is not true that {ABSENCE}", ABSENCE),
-        ("Neither Timber nor Saka will miss the next Premier League match.", ABSENCE),
-        (f"Arteta denied that {ABSENCE}", ABSENCE),
-        (f"Reports that {ABSENCE[:-1]} are wrong.", ABSENCE[:-1]),
-        (f"{ABSENCE[:-1]} if he fails a late test.", ABSENCE[:-1]),
-        (f"{ABSENCE[:-1]}, according to one report the club rejects.", ABSENCE[:-1]),
-        (f"Arteta said {ABSENCE}", ABSENCE),
-        # A question is not a statement, whichever side of the quote its mark falls.
-        (f"{ABSENCE[:-1]}? Not at all, said Arteta.", ABSENCE[:-1]),
-        # An ellipsis is not the end of anything.
-        (f"{ABSENCE[:-1]}... if he fails a late test.", ABSENCE[:-1]),
+        "index-contract",
+        "index-prompt",
+        "response-model",
+        "manifest-prompt",
+        "body-contract",
+        "completion-time",
+        "source-label",
+        "empty-responses",
+        "empty-declared-digests",
+        "empty-declared-digests-nothing-covered",
+        "duplicate-declared-digests",
+        "foreign-declared-digest",
+        "omitted-covered-response",
     ],
 )
+def test_each_coding_attestation_condition_is_checked_independently(
+    tmp_path, monkeypatch, mismatch
+):
+    table_path, manifest_path, source = _pair(tmp_path)
+    table = read_rotation_evidence_artifact(table_path, manifest_path)
+    _, kind, label = documents_from_source(source)
+    snapshot = manager_words._club_news_snapshot(source, source.parent)
+    responses = read_captured_responses(snapshot)
+    assert manager_words._coding_attested(table, kind, label, source.parent)
+    entry = responses[0]
+    if mismatch == "index-contract":
+        entry = replace(entry, prompt_contract_version="rotation_claim_coding_v2")
+    elif mismatch == "index-prompt":
+        entry = replace(entry, prompt_sha256=coding_prompt_sha256("another-model"))
+    elif mismatch == "response-model":
+        table.attrs["model_identifier"] = "another-model"
+    elif mismatch == "manifest-prompt":
+        table.attrs["prompt_sha256"] = coding_prompt_sha256("another-model")
+    elif mismatch == "body-contract":
+        body = json.loads(entry.response.text)
+        body["contract_version"] = "rotation_claim_coding_v2"
+        entry = replace(entry, response=replace(entry.response, text=json.dumps(body)))
+        table.attrs["response_sha256s"] = (
+            hashlib.sha256(entry.response.text.encode()).hexdigest(),
+        )
+    elif mismatch == "completion-time":
+        table.attrs["club_news_captured_at_utc"] = "2026-09-12T14:00:00Z"
+    elif mismatch == "source-label":
+        label = "another-source-label"
+    elif mismatch == "empty-responses":
+        responses = ()
+    elif mismatch == "empty-declared-digests":
+        table.attrs["response_sha256s"] = ()
+    elif mismatch == "empty-declared-digests-nothing-covered":
+        # With no club covered, an omitted response is allowed, so only the
+        # nonempty-list check can refuse an empty declaration.
+        table.attrs["response_sha256s"] = ()
+        table.attrs["clubs_covered"] = ()
+    elif mismatch == "duplicate-declared-digests":
+        table.attrs["response_sha256s"] *= 2
+    elif mismatch == "foreign-declared-digest":
+        # Every stored response stays declared, so only the subset check can refuse a
+        # declared digest that the bound capture does not hold.
+        table.attrs["response_sha256s"] = tuple(
+            sorted({*table.attrs["response_sha256s"], "f" * 64})
+        )
+    elif mismatch == "omitted-covered-response":
+        other = replace(
+            entry, club="Man Utd", response=replace(entry.response, text=entry.response.text + " ")
+        )
+        responses = (*responses, other)
+        table.attrs["clubs_covered"] = ("Arsenal", "Man Utd")
+    if mismatch not in ("empty-responses", "omitted-covered-response"):
+        responses = (entry,)
+    monkeypatch.setattr(manager_words, "read_captured_responses", lambda _: responses)
+    assert not manager_words._coding_attested(table, kind, label, source.parent)
+
+
+@pytest.mark.parametrize("refused", [False, True])
+def test_a_refused_club_response_keeps_the_other_clubs_attestation(tmp_path, refused):
+    absent = "Mount will miss the next Premier League match."
+    starts = "Mount will start the next Premier League match."
+    url = "https://club.example/united/news"
+    document = replace(
+        _document(absent + "\n" + starts), club="Man Utd", requested_url=url, final_url=url
+    )
+    response = _response(quote=absent, label="stated_expected_absent")
+    body = json.loads(response.text)
+    body["documents"][0]["url"] = url
+    claim = body["claims"][0]
+    claim.update(player_name="Mount", team_name="Man Utd", source_url=url)
+    if refused:
+        body["claims"].append({**claim, "quote": starts, "disposition": "stated_expected_to_start"})
+    response = replace(response, text=json.dumps(body))
+    coded = CodedClub(
+        "Man Utd",
+        response,
+        ROTATION_CLAIM_CODING_CONTRACT_VERSION,
+        coding_prompt_sha256("synthetic-stub"),
+    )
+    table_path, manifest_path, source = _pair(
+        tmp_path, extra_coded=(coded,), extra_documents=(document,)
+    )
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert manifest["clubs_covered"] == (["Arsenal"] if refused else ["Arsenal", "Man Utd"])
+    assert len(manifest["response_sha256s"]) == (1 if refused else 2)
+    words = load_manager_words(table_path, club_news_source=source)
+    saka = next(word for word in words.words if word.player_id == 900001)
+    assert saka.scope_verified and saka.publication_verified and saka.role == "not_starting"
+    assert words.exclusion().not_starting == (
+        frozenset({900001}) if refused else frozenset({900001, 900009})
+    )
+
+
+ABSENCE = "Saka will miss the next Premier League match."
+
+CUT_QUOTES = [
+    (f"It is not true that {ABSENCE}", ABSENCE),
+    ("Neither Timber nor Saka will miss the next Premier League match.", ABSENCE),
+    (f"Arteta denied that {ABSENCE}", ABSENCE),
+    (f"Reports that {ABSENCE[:-1]} are wrong.", ABSENCE[:-1]),
+    (f"{ABSENCE[:-1]} if he fails a late test.", ABSENCE[:-1]),
+    (f"{ABSENCE[:-1]}, according to one report the club rejects.", ABSENCE[:-1]),
+    (f"Arteta said {ABSENCE}", ABSENCE),
+    # A question is not a statement, whichever side of the quote its mark falls.
+    (f"{ABSENCE[:-1]}? Not at all, said Arteta.", ABSENCE[:-1]),
+    # An ellipsis is not the end of anything.
+    (f"{ABSENCE[:-1]}... if he fails a late test.", ABSENCE[:-1]),
+]
+
+
+@pytest.mark.parametrize(("body", "quote"), CUT_QUOTES)
 def test_a_quote_cut_from_inside_a_sentence_carries_no_authority(tmp_path, body, quote):
     """The quote's own wording passes the scope rule; the sentence it was cut from says more.
 
@@ -167,8 +579,37 @@ def test_a_quote_cut_from_inside_a_sentence_carries_no_authority(tmp_path, body,
     table_path, manifest_path, source = _pair(tmp_path, quote=quote, body=body)
     row = read_rotation_evidence_artifact(table_path, manifest_path)
     observed = row.loc[row.rotation_claim_observed].iloc[0]
-    # The table accepts it: its rule reads the quote alone.
-    assert bool(observed.rotation_claim_scope_verified)
+    # The table refuses it too: the parser asks the reader's question of the cited bytes.
+    # The label keeps what the quote's own wording says; only the flag is withheld.
+    assert not bool(observed.rotation_claim_scope_verified)
+    assert observed.rotation_claim_fixture_scope == "upcoming_premier_league"
+
+    (word,) = load_manager_words(table_path, club_news_source=source).words
+
+    assert word.words == quote and word.publication_verified
+    assert not word.scope_verified and word.role is None
+
+
+@pytest.mark.parametrize(("body", "quote"), CUT_QUOTES)
+def test_a_table_written_before_the_parser_asked_for_a_sentence_is_refused_by_the_reader(
+    tmp_path, body, quote
+):
+    """A pair exported before the parser checked sentences still says True for a cut quote.
+
+    Such a pair is reused as it is, and no manifest records the parse contract, so the
+    reader's own whole-sentence check is what keeps the claim from taking a role.
+    """
+
+    table_path, manifest_path, source = _pair(tmp_path, quote=quote, body=body)
+    _rewrite(
+        table_path,
+        manifest_path,
+        lambda frame: frame.loc.__setitem__(
+            (frame.rotation_claim_observed, "rotation_claim_scope_verified"), True
+        ),
+    )
+    row = read_rotation_evidence_artifact(table_path, manifest_path)
+    assert bool(row.loc[row.rotation_claim_observed].iloc[0].rotation_claim_scope_verified)
 
     (word,) = load_manager_words(table_path, club_news_source=source).words
 
@@ -187,7 +628,9 @@ def test_a_quote_cut_from_inside_a_sentence_carries_no_authority(tmp_path, body,
     ],
 )
 def test_a_quote_that_is_a_whole_sentence_of_the_source_still_binds(tmp_path, body, quote):
-    table_path, _, source = _pair(tmp_path, quote=quote, body=body)
+    table_path, manifest_path, source = _pair(tmp_path, quote=quote, body=body)
+    row = read_rotation_evidence_artifact(table_path, manifest_path)
+    assert bool(row.loc[row.rotation_claim_observed].iloc[0].rotation_claim_scope_verified)
 
     (word,) = load_manager_words(table_path, club_news_source=source).words
 
@@ -230,12 +673,62 @@ def test_a_quote_that_is_a_whole_sentence_of_the_source_still_binds(tmp_path, bo
 def test_whole_sentence_boundaries(text, quote, expected):
     encoded = text.encode("utf-8")
     first = encoded.index(quote.encode("utf-8"))
-    assert _is_whole_sentence(encoded, first, first + len(quote.encode("utf-8"))) is expected
+    last = first + len(quote.encode("utf-8"))
+    assert _is_whole_sentence(encoded, first, last) is expected
+    # The parser's copy, which sets the table's flag, answers the same.
+    assert is_whole_sentence(encoded, first, last) is expected
 
 
 def test_a_span_that_cuts_a_character_in_half_is_not_a_sentence():
     encoded = "Şaka is out.".encode()
     assert _is_whole_sentence(encoded, 1, len(encoded)) is False
+    assert is_whole_sentence(encoded, 1, len(encoded)) is False
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        'Arteta said: "Saka is out." Is he fit? No\u2026 Timber is.\nCoach: (Saka is out)!',
+        "It is not true that Saka is out, he said... Really?! \u201cYes.\u201d\r\nEnd: [no] ",
+        "Şaka?\tOut!  Out. 'In'.. ok",
+        # Club pages write single quotes and the apostrophe as &rsquo;, which reads as U+2019.
+        "Coach: \u2018Saka is out.\u2019 Timber\u2019s fine!\u2026 Wait\u2026\n\u2018Out\u2019",
+        # A tab before a line break, a semicolon and a no-break space.
+        "Team news\nSaka is out\t\nTimber is fit; Saka is out.\u00a0Odegaard\u00a0is out",
+    ],
+)
+def test_the_parser_and_the_reader_hold_one_definition_of_a_whole_sentence(text):
+    """The parser sets the table's flag and the reader refuses a claim by its own copy.
+
+    Every span of each text gets the same answer from both. A few texts cannot show that
+    the copies agree everywhere; the next test holds the code itself.
+    """
+
+    encoded = text.encode("utf-8")
+    for first in range(len(encoded)):
+        for last in range(first + 1, len(encoded) + 1):
+            assert is_whole_sentence(encoded, first, last) is _is_whole_sentence(
+                encoded, first, last
+            ), (first, last)
+
+
+def test_the_parser_and_the_reader_run_the_same_code_for_a_whole_sentence():
+    """The two copies are the same function: the same constants and the same code.
+
+    Only the docstrings differ. A change to one copy alone fails here, whatever text it
+    would take to show the answers apart.
+    """
+
+    for name in ("_SPACE", "_MARKS", "_SENTENCE_END", "_BOUNDARY", "_OPENING", "_STATEMENT_END"):
+        assert getattr(club_news_scope, name) == getattr(manager_words, name), name
+    parser, reader = is_whole_sentence, _is_whole_sentence
+    ours, theirs = parser.__code__, reader.__code__
+    assert ours.co_code == theirs.co_code
+    assert ours.co_names == theirs.co_names
+    assert ours.co_varnames == theirs.co_varnames
+    assert [value for value in ours.co_consts if value != parser.__doc__] == [
+        value for value in theirs.co_consts if value != reader.__doc__
+    ]
 
 
 def _rewrite(table_path, manifest_path, change):
@@ -295,15 +788,29 @@ def test_incomplete_attestation_is_refused_and_legacy_direct_words_are_safe(tmp_
 def test_reader_without_the_exact_decision_snapshot_withholds_target_attestation(tmp_path):
     table_path, manifest_path, source = _pair(tmp_path)
     documents, kind, label = documents_from_source(source)
+    news_only = tmp_path / "news-only"
+    shutil.copytree(source, news_only / source.name)
     words = manager_words_from_artifact(
         table_path,
         manifest_path,
         documents=documents,
         source_kind=kind,
         source_label=label,
+        snapshot_root=news_only,
     )
     (word,) = words.words
     assert word.publication_verified
+    assert not word.scope_verified and word.role is None
+
+
+def test_reader_without_bound_news_capture_withholds_both_attestations(tmp_path):
+    table_path, manifest_path, source = _pair(tmp_path)
+    documents, kind, label = documents_from_source(source)
+    words = manager_words_from_artifact(
+        table_path, manifest_path, documents=documents, source_kind=kind, source_label=label
+    )
+    (word,) = words.words
+    assert not word.publication_verified
     assert not word.scope_verified and word.role is None
 
 

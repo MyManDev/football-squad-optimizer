@@ -45,13 +45,17 @@ from squadopt.data.sources.club_news import (
     RawDocument,
 )
 from squadopt.data.sources.club_news_metadata import PublicationMetadata, publication_metadata
-from squadopt.data.sources.club_news_scope import FIXTURE_SCOPES, verified_fixture_scope
+from squadopt.data.sources.club_news_scope import (
+    FIXTURE_SCOPES,
+    is_whole_sentence,
+    verified_fixture_scope,
+)
 from squadopt.data.timestamps import normalize_utc_timestamp
 
 #: This parser's own contract, separate from the response format's. The response format is
 #: what a model is asked to produce; this is what the parser produces from it, and the two
 #: can move independently.
-CLAIM_PARSE_CONTRACT_VERSION: Final = "rotation_claim_parse_v3"
+CLAIM_PARSE_CONTRACT_VERSION: Final = "rotation_claim_parse_v4"
 
 #: Keys a claim must carry. ``paraphrase`` is required and then discarded -- see the module
 #: docstring. A response missing any of these is a different format, not a sparse one.
@@ -257,7 +261,12 @@ def _require_explicit_full_match_limit(quote: bytes) -> None:
     Existing labels and source-role handling do not pass through this gate.
     """
     text = " ".join(quote.decode("utf-8").casefold().replace("\u2019", "'").split())
-    scope = re.search(r"\b(?:upcoming|next) (?:premier )?league (?:match|game)\b", text)
+    # "fixture" names the league match only where it ends the clause, as in every form the
+    # scope rule verifies; "the next league fixture list" is the schedule, not a match.
+    scope = re.search(
+        r"\b(?:upcoming|next) (?:premier )?league (?:match|game|fixture(?=\s*(?:[.!,;]|$)))\b",
+        text,
+    )
     uncertainty = re.search(
         r"\b(?:if|unless|might|may|could|unlikely|perhaps|possibly)\b"
         r"|\b(?:not saying|did not say|didn't say|not true|no longer|not the case)\b",
@@ -266,8 +275,13 @@ def _require_explicit_full_match_limit(quote: bytes) -> None:
     inability = re.search(
         r"\b(?:cannot|can't|will not(?: be able to)?|won't(?: be able to)?|is unable to) "
         r"(?:complete|finish|play|last) (?:the )?"
-        r"(?:(?:full|whole|entire) (?:(?:upcoming|next) )?(?:(?:premier )?league )?"
-        r"(?:match|game)|(?:full )?(?:90|ninety) minutes)\b",
+        # "fixture" names the league match only in the scope rule's direct form: after "next"
+        # or "upcoming" and the league qualifier, ending the clause. "Full fixture list" and
+        # "full next league fixture list" are the schedule, not a match.
+        r"(?:(?:full|whole|entire) "
+        r"(?:(?:(?:upcoming|next) )?(?:(?:premier )?league )?(?:match|game)"
+        r"|(?:upcoming|next) (?:premier )?league fixture(?=\s*(?:[.!,;]|$)))"
+        r"|(?:full )?(?:90|ninety) minutes)\b",
         text,
     )
     if scope is None or inability is None or uncertainty is not None:
@@ -397,7 +411,14 @@ def parse_claim_response(
             scope, checked = verified_fixture_scope(
                 content[span_start:span_end], disposition, player_name=player_name
             )
-            scope_verified = checked and scope == declared_scope
+            # The scope rule reads the quote alone, so the span must also be a whole
+            # sentence of the bytes it indexes, or the source may say something else. The
+            # label keeps what the quote's wording says; only the flag is withheld.
+            scope_verified = (
+                checked
+                and scope == declared_scope
+                and is_whole_sentence(content, span_start, span_end)
+            )
             if scope != declared_scope:
                 scope = "ambiguous"
             metadata = publications[source_url]

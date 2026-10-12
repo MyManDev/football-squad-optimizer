@@ -7,6 +7,12 @@ import { MESSAGES } from "../src/i18n/messages";
 import { installLeagueMocks } from "./leagueMocks";
 import { mockSuggestionOverview } from "../src/fixtures/weeklySuggestionOverview";
 
+// Every test reads the example league, never the shipped tree: the history it routes is
+// read through the tree the gate finds, which moves when the site publishes a directory.
+test.beforeEach(async ({ page }) => {
+  await installLeagueMocks(page);
+});
+
 for (const language of ["tr", "en"] as const) {
   test(`recorded settings expand without inventing settled scores in ${language}`, async ({
     page,
@@ -79,7 +85,6 @@ for (const language of ["tr", "en"] as const) {
 test("member can open recorded history and inspect the Python-scored result on mobile", async ({
   page,
 }, testInfo) => {
-  await installLeagueMocks(page);
   const historyDocument = structuredClone(fixture);
   historyDocument.payload.entry_id = 35249001;
   await page.route("**/data/league/history/35249001.json", (route) =>

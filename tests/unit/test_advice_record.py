@@ -380,6 +380,38 @@ def test_the_publish_records_what_each_member_was_told(
     }
 
 
+def test_the_record_carries_rebuilt_purchase_prices_and_the_rules_selling_value(
+    world: dict[str, Any], tmp_path: Path
+) -> None:
+    """Where the prices paid were rebuilt the record says what they were, so a later
+    reader can price any sale the member made, and its selling value is the rule's."""
+
+    inputs, projection, rules = _world_context(world)
+    picks = _member_picks(world, 101, _legal_squad())
+    paid = {player: 50 for player in picks.squad}
+    rebuilt = replace(
+        picks, purchase_prices=paid, purchase_prices_known=True, squad_sell_value_tenths=740
+    )
+    records = tmp_path / "records"
+    build_league_views(
+        _Provider({101: rebuilt}),
+        (EntryRegistration(101, "member-a", "2026-08-23T00:00:00Z"),),
+        inputs,
+        projection,
+        rules,
+        league_id=352490,
+        league_name="Test League",
+        out_dir=tmp_path / "site",
+        now=WHEN,
+        advice_record_root=records,
+    )
+    state = load_member_advice_record(records, SEASON, 2, 101, world["gw2_id"])["state"]
+    assert isinstance(state, dict)
+    assert state["purchase_prices_known"] is True
+    assert state["purchase_prices"] == {str(player): 50 for player in sorted(picks.squad)}
+    assert state["squad_sell_value_tenths"] == 740
+
+
 def _index(out: Path, entry_id: int) -> dict[str, Any]:
     document: dict[str, Any] = json.loads(
         (out / "advice" / str(entry_id) / "index.json").read_text(encoding="utf-8")

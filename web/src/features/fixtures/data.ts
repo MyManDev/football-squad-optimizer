@@ -1,6 +1,6 @@
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 
-import { withRequestDeadline } from "../../data/request";
+import { discardBody, withRequestDeadline } from "../../data/request";
 import type { Fixture, FixtureGameweek, FixturesPayload } from "./types";
 
 const PATH = `${import.meta.env.BASE_URL}data/fixtures.json`;
@@ -57,7 +57,10 @@ export async function loadFixtures(signal?: AbortSignal): Promise<FixturesPayloa
     return await withRequestDeadline(
       async (deadline) => {
         const response = await fetch(PATH, { cache: "no-cache", signal: deadline });
-        if (!response.ok) return null;
+        if (!response.ok) {
+          await discardBody(response);
+          return null;
+        }
         const document = JSON.parse(await response.text()) as {
           contract_version?: unknown;
           payload?: FixturesPayload;

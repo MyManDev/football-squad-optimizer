@@ -110,7 +110,39 @@ its byte digest, and the source captures retain their original fingerprints.
 
 The ready marker `football/<decision>.bundle.json` is written last with the existing
 create-once writer. An interrupted operation may leave copies, but no incomplete
-bundle becomes ready. An identical rerun can finish or replay; conflicting bytes
-cannot replace a previous ready marker. The reader checks all digests and production
+bundle becomes ready. An identical rerun can finish or replay when all required
+identity records are present; conflicting bytes cannot replace a previous ready
+marker. The reader checks all digests and production
 source contracts again. This command performs no acquisition, fitting, site build,
 or runtime activation. Activation must separately select this validated bundle.
+
+The first validated attempt also creates `football/<decision>.bundle.preparation.json`
+after immutable destination checks, before copies. It binds the capture's relative
+file inventory and the exact retained handoff, forecast and companion bytes. It is
+provenance for retries, never readiness. Reuse the original retained handoff after
+an interruption; a changed producer input needs a new capture. Moving identical
+inputs or changing only Windows path casing preserves their content identity.
+
+The seal writes internal `football/<decision>.bundle.production.json` after destination
+preflight, copying and final validation, immediately before the ready marker. It
+records the sha256 of the sealed handoff's bytes and its own training provenance separately
+from the football producer's capture, cutoff, archive and population fields. It
+never replaces the ready marker. A failure before copies leaves no production record;
+an interruption after this record can leave provenance without readiness. An exact
+retry completes the marker, subject to the same immutable destination checks.
+
+Fresh seals and interrupted seals without a ready marker require
+`publication-identity.json` when they retain scoreboard, history or series-horizon
+documents. The next normal league publication writes that record.
+It binds the current entries and the retained set together; it cannot be recreated
+by dropping a failed record. Existing ready bundles without retained-tree roles
+replay their original members and entries only. The complete rule is documented in
+`docs/contracts/league_publication_identity_v1.md`.
+
+In the manual GW6 reseal window after this change merges and before GW7's normal
+league publication, an unrecorded historical tree cannot start or finish a seal.
+Partial member or entry copies without a valid ready marker do not make that tree
+legacy-compatible. The normal league writer establishes the record; this rule does
+not authorize removing a marker or identity, rewriting historical bytes, or inventing
+a migration receipt. Legacy bundles that are already ready remain readable and
+replayable.

@@ -178,7 +178,6 @@ def _acquire(case, tmp_path, monkeypatch, capsys, mode):
 
     monkeypatch.setattr(club_news_acquire, "resolve_provider_config", lambda *a, **k: config)
     monkeypatch.setattr(club_news_acquire, "bind_coding_provider", bind)
-    monkeypatch.setattr(club_news_acquire, "_utc_now", lambda: FETCHED)
     before = set(case["snapshot_root"].iterdir())
     status = club_news_acquire.main(
         [

@@ -1,5 +1,6 @@
 """Installed publication services use named captures and preserve the public contracts."""
 
+import hashlib
 import json
 from collections.abc import Mapping
 from dataclasses import replace
@@ -19,13 +20,17 @@ from squadopt.application import weekly_suggestion_eval as review
 from squadopt.application.advice_record import record_member_advice
 from squadopt.application.league_publication import (
     LeaguePublicationRequest,
+    check_device_plan_table,
     league_tree_capture,
     leagues_beside,
     prepare_league_publication,
     publish_league,
+    remove_device_tables,
     settle_legacy_tree,
+    write_device_plan_table,
 )
 from squadopt.application.site_publication import SitePublicationRequest, publish_site
+from squadopt.application.top100_weight import Top100Counts
 from squadopt.contracts.league_tree import (
     LeagueDirectoryError,
     PublishedLeague,
@@ -34,6 +39,7 @@ from squadopt.contracts.league_tree import (
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import read_snapshot, write_snapshot
 from squadopt.data.sources.vaastav import SUPPORTED_SEASONS
+from squadopt.live.recommendation import Projection
 from squadopt.platform.publication_workers import league_mapper
 
 NOW = datetime(2026, 8, 27, 10, tzinfo=UTC)
@@ -52,6 +58,10 @@ def publication_world(
     # The worker fixture does not need it; no score has been confirmed in this fixture.
     for event in bootstrap["events"]:
         event["data_checked"] = False
+    # Every real bootstrap states how far each price moved since the season's first
+    # deadline; the per-capture device-plan table reads a start price from it.
+    for index, element in enumerate(bootstrap["elements"]):
+        element.setdefault("cost_change_start", (index % 3) - 1)
     if complete_chip_calendar:
         # Exercise the real capture-to-panel club join, not a projection-derived map.
         # These are synthetic fixtures covering the captured first-half chip windows.
@@ -235,6 +245,7 @@ def test_installed_member_publication_and_pool_write_the_same_contracts(
     assert directory in first.output_paths
     listed = json.loads(directory.read_text(encoding="utf-8"))
     assert listed["contract_version"] == "league_directory_v1"
+    table = request.out_dir / "data" / "device" / request.snapshot_id / "device-plan.json"
     assert listed["payload"]["leagues"] == [
         {
             "league_id": 352490,
@@ -242,9 +253,23 @@ def test_installed_member_publication_and_pool_write_the_same_contracts(
             "season": first.season,
             "gameweek": first.gameweek,
             "path": "leagues/352490",
+            "device_plan": f"device/{request.snapshot_id}/device-plan.json",
+            "device_plan_sha256": hashlib.sha256(table.read_bytes()).hexdigest(),
         }
     ]
     assert listed["generated_at_utc"] == "2026-08-27T10:00:00Z"
+    # The capture's own table, once beside the trees, in the league views' envelope.
+    assert table in first.output_paths
+    shared = json.loads(table.read_text(encoding="utf-8"))
+    assert shared["contract_version"] == "provisional_league_ui_v1"
+    assert shared["generated_at_utc"] == "2026-08-27T10:00:00Z"
+    assert shared["payload"]["contract_version"] == "league_device_plan_v2"
+    assert "league_id" not in shared["payload"]
+    assert shared["payload"]["source_snapshot_id"] == request.snapshot_id
+    copy = json.loads((tree / "device-plan.json").read_text(encoding="utf-8"))["payload"]
+    assert copy["contract_version"] == "league_device_plan_v1" and copy["league_id"] == 352490
+    assert [p["id"] for p in shared["payload"]["players"]] == [p["id"] for p in copy["players"]]
+    assert all("element_id" in p and "start_tenths" in p for p in shared["payload"]["players"])
     document = json.loads(history.read_text(encoding="utf-8"))
     assert document["payload"]["weeks"][0]["status"] == "unsettled"
     assert document["payload"]["weeks"][0]["advice_generated_at_utc"] == "2026-08-27T10:00:00Z"
@@ -269,6 +294,44 @@ def test_installed_member_publication_and_pool_write_the_same_contracts(
             parallel.out_dir / "data/leagues/352490/history" / f"{member_fixture.ENTRY_ID}.json"
         ).read_bytes()
     )
+
+
+def test_with_top100_counts_the_capture_table_is_the_tree_copy_plus_its_own_fields(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def counts(
+        request: LeaguePublicationRequest, inputs: object, projection: Projection
+    ) -> tuple[Top100Counts, None, str]:
+        ids = [int(str(player)) for player in projection.table.player_id][:3]
+        return (
+            Top100Counts(
+                counts={ids[0]: 60, ids[1]: 30, ids[2]: 1},
+                table_sha256="a" * 64,
+                cohort_snapshot_id="fpl-top100-x",
+                picks_snapshot_id="fpl-elite-picks-x",
+                picks_gameweek=1,
+            ),
+            None,
+            "",
+        )
+
+    monkeypatch.setattr(league_publication, "load_publication_top100", counts)
+    request = publication_world(tmp_path)
+    publish_league(request)
+    data = request.out_dir / "data"
+    table = data / "device" / request.snapshot_id / "device-plan.json"
+    shared = json.loads(table.read_text(encoding="utf-8"))["payload"]
+    tree = data / "leagues" / "352490" / "device-plan.json"
+    copy = json.loads(tree.read_text(encoding="utf-8"))["payload"]
+    # Both documents carry the week's Top 100 inputs.
+    assert shared["rules"]["top100"]["cohort_snapshot_id"] == "fpl-top100-x"
+    assert sorted(p["top100_count"] for p in shared["players"] if p["top100_count"]) == [1, 30, 60]
+    # Without its own fields the shared table is the tree's copy without its league, whole.
+    for player in shared["players"]:
+        del player["element_id"], player["start_tenths"]
+    del shared["rules"]["chips"], shared["rules"]["transfers_cap"], shared["contract_version"]
+    del copy["contract_version"], copy["league_id"]
+    assert shared == copy
 
 
 def test_the_history_counts_only_the_captures_the_published_trees_carried(
@@ -552,6 +615,101 @@ def test_a_build_of_one_league_keeps_the_others_of_its_capture_and_refuses_anoth
     assert leagues_beside(tmp_path, 9, "capture-a") == [lines[0]]
     with pytest.raises(DataError, match="two captures"):
         leagues_beside(tmp_path, 9, "capture-b")
+    # A line whose device-plan table is another capture's is refused the same way; one
+    # whose table is this capture's, with the digest of the bytes on disk, is kept.
+    table = tmp_path / "device" / "capture-a" / "device-plan.json"
+    table.parent.mkdir(parents=True)
+    table.write_bytes(b'{"payload": {"players": []}}\n')
+    digest = hashlib.sha256(table.read_bytes()).hexdigest()
+    own = replace(
+        lines[0], device_plan="device/capture-a/device-plan.json", device_plan_sha256=digest
+    )
+    write_league_directory(tmp_path, [own, lines[1]], generated_at_utc="x")
+    assert leagues_beside(tmp_path, 9, "capture-a") == [own]
+    # A table replaced since the line was written, or gone, is not the one the line names.
+    table.write_bytes(b'{"payload": {"players": [1]}}\n')
+    with pytest.raises(DataError, match="bytes are not the ones its line names"):
+        leagues_beside(tmp_path, 9, "capture-a")
+    table.unlink()
+    with pytest.raises(DataError, match="bytes are not the ones its line names"):
+        leagues_beside(tmp_path, 9, "capture-a")
+    other = replace(
+        lines[0], device_plan="device/capture-b/device-plan.json", device_plan_sha256=digest
+    )
+    write_league_directory(tmp_path, [other, lines[1]], generated_at_utc="x")
+    with pytest.raises(DataError, match="device-plan table of capture capture-b"):
+        leagues_beside(tmp_path, 9, "capture-a")
+    odd = replace(lines[0], device_plan="elsewhere/device-plan.json", device_plan_sha256=digest)
+    write_league_directory(tmp_path, [odd, lines[1]], generated_at_utc="x")
+    with pytest.raises(DataError, match="no per-capture table"):
+        leagues_beside(tmp_path, 9, "capture-a")
+
+
+def test_the_capture_s_device_plan_table_is_written_once_and_never_replaced(
+    tmp_path: Path,
+) -> None:
+    payload = {"contract_version": "league_device_plan_v2", "players": [{"id": 1}]}
+    stamp = "2026-10-11T10:00:00Z"
+    first = write_device_plan_table(tmp_path, "cap", payload, generated_at_utc=stamp)
+    assert first == tmp_path / "device" / "cap" / "device-plan.json"
+    # The second league of the run finds the table and keeps the first stamp.
+    again = write_device_plan_table(tmp_path, "cap", dict(payload), generated_at_utc="later")
+    assert again == first
+    envelope = json.loads(first.read_text(encoding="utf-8"))
+    assert envelope["generated_at_utc"] == stamp
+    assert envelope["contract_version"] == "provisional_league_ui_v1"
+    assert envelope["payload"] == payload
+    with pytest.raises(DataError, match="written once per capture"):
+        write_device_plan_table(
+            tmp_path, "cap", {**payload, "players": []}, generated_at_utc="later"
+        )
+    assert json.loads(first.read_text(encoding="utf-8")) == envelope
+    # The check alone names the path and refuses the same way, before anything is written.
+    assert check_device_plan_table(tmp_path, "cap", payload) == first
+    assert check_device_plan_table(tmp_path, "other", payload) == (
+        tmp_path / "device" / "other" / "device-plan.json"
+    )
+    assert not (tmp_path / "device" / "other").exists()
+    with pytest.raises(DataError, match="Remove that directory"):
+        check_device_plan_table(tmp_path, "cap", {**payload, "players": []})
+    # A table that cannot be read as an envelope is refused the same way, with the remedy.
+    for broken in ("", '{"payload": ', "[]", "null", '"text"'):
+        first.write_text(broken, encoding="utf-8")
+        with pytest.raises(DataError, match="Remove that directory"):
+            check_device_plan_table(tmp_path, "cap", payload)
+
+
+def test_a_table_of_another_payload_refuses_the_publication_before_any_member_is_solved(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    request = publication_world(tmp_path)
+    table = request.out_dir / "data" / "device" / request.snapshot_id / "device-plan.json"
+    table.parent.mkdir(parents=True)
+    table.write_text(json.dumps({"payload": {"contract_version": "other"}}), encoding="utf-8")
+    solved: list[int] = []
+
+    def no_solve(*args: object, **kwargs: object) -> None:
+        solved.append(1)
+        raise AssertionError("a member was solved after the table refusal")
+
+    monkeypatch.setattr(league_views, "build_league_views", no_solve)
+    monkeypatch.setattr("squadopt.application.league_publication.build_league_views", no_solve)
+    with pytest.raises(DataError, match="already holds another device-plan table"):
+        publish_league(request)
+    assert solved == []
+    assert not (request.out_dir / "data" / "leagues" / "352490" / "members.json").exists()
+
+
+def test_the_device_tables_are_removed_with_the_unlisted_trees(tmp_path: Path) -> None:
+    for capture in ("cap-a", "cap-b", "cap-c"):
+        (tmp_path / "device" / capture).mkdir(parents=True)
+        (tmp_path / "device" / capture / "device-plan.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "device" / "notes.txt").write_text("kept", encoding="utf-8")
+    assert remove_device_tables(tmp_path, keep="cap-b") == ["device/cap-a", "device/cap-c"]
+    assert sorted(p.name for p in (tmp_path / "device").iterdir()) == ["cap-b", "notes.txt"]
+    # The weekly run keeps none: it writes its own capture's table again.
+    assert remove_device_tables(tmp_path) == ["device/cap-b"]
+    assert remove_device_tables(tmp_path / "nowhere") == []
 
 
 def _published_line(league_id: int) -> PublishedLeague:

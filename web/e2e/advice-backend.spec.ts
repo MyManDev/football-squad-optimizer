@@ -1,5 +1,5 @@
 import { execFileSync, spawnSync } from "node:child_process";
-import { cp, readFile } from "node:fs/promises";
+import { cp, readFile, rm } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
@@ -54,9 +54,13 @@ test("member selections compute, reload uses cache, and a stopped backend leaves
   test.setTimeout(120_000);
   // These are the Python fixture's captured squad and member documents. No route,
   // including the API, is intercepted; Chromium enforces the cross-origin request.
-  await cp(context.siteRoot, `node_modules/.cache/${context.buildName}/data`, {
-    recursive: true,
-  });
+  const built = `node_modules/.cache/${context.buildName}/data`;
+  await cp(context.siteRoot, built, { recursive: true });
+  // The fixture publishes one league as the legacy tree, which is what its backend reads.
+  // The build also carries the committed site, whose league directory would send the page
+  // to another league's tree, so the page is left with the fixture's alone.
+  await rm(`${built}/leagues.json`, { force: true });
+  await rm(`${built}/leagues`, { recursive: true, force: true });
   const route =
     `${context.apiOrigin}/api/v1/leagues/${context.leagueId}` +
     `/entries/${context.entryId}/advice`;

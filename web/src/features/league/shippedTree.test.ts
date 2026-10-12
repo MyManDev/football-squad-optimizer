@@ -4,8 +4,9 @@
  * Every other test here reads example documents, so a producer that starts publishing a
  * shape the page refuses stays green everywhere and breaks only in production: a member's
  * index with a rival strategy's three-week file was refused whole, and every control on
- * the live member page went dark. This walks what is actually committed under
- * `public/data/league` and holds each index and each advice document to the validators
+ * the live member page went dark. This walks every tree the committed site publishes
+ * (`testSupport/shippedTrees.ts`) and holds each index and each advice document to the
+ * validators
  * the page applies, and each file the index names to the path the page would read.
  *
  * It also reads `history/` and `scoreboard.json`, which a settled publish writes and
@@ -26,6 +27,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { isRefusedMemberIndex, refusedMemberIndex } from "../../testSupport/refusedMember";
+import { shippedTrees } from "../../testSupport/shippedTrees";
 import { resolvePublishedAdvice } from "./advice/adviceSelection";
 import { isAdvicePayload } from "./advice/adviceShape";
 import { TOP100_WEIGHTS, top100TargetPath } from "./advice/top100";
@@ -40,9 +42,6 @@ import type {
   LeagueViewEnvelope,
   Scoreboard,
 } from "./types";
-
-const ROOT = join(__dirname, "../../../public/data/league");
-const read = (relative: string): unknown => JSON.parse(readFileSync(join(ROOT, relative), "utf-8"));
 
 function walk(directory: string, found: string[] = []): string[] {
   for (const entry of readdirSync(directory, { withFileTypes: true })) {
@@ -150,13 +149,11 @@ describe("a member the producer could not advise", () => {
   });
 });
 
-const shipped = existsSync(join(ROOT, "members.json"));
-
-describe.skipIf(!shipped)("the shipped league tree", () => {
-  const members = shipped
-    ? assertMembers(assertEnvelope<LeagueMembers>(read("members.json"))).payload
-    : null;
-  const humans = (members?.members ?? []).flatMap((member) =>
+describe.each(shippedTrees())("the shipped league tree $path", ({ root: ROOT }) => {
+  const read = (relative: string): unknown =>
+    JSON.parse(readFileSync(join(ROOT, relative), "utf-8"));
+  const members = assertMembers(assertEnvelope<LeagueMembers>(read("members.json"))).payload;
+  const humans = members.members.flatMap((member) =>
     member.member_kind === "human" ? [member.entry_id] : [],
   );
 
@@ -171,7 +168,7 @@ describe.skipIf(!shipped)("the shipped league tree", () => {
       const held = holdMemberIndex(
         entryId,
         read(relative),
-        members!.members,
+        members.members,
         existsSync(join(ROOT, `entries/${entryId}.json`)),
       );
       if (held.kind === "advised") expect(existsSync(join(ROOT, held.path)), held.path).toBe(true);
@@ -246,7 +243,7 @@ describe.skipIf(!shipped)("the shipped league tree", () => {
           query,
           index.league_id,
           entryId,
-          members!.members,
+          members.members,
           index,
         );
         expect(selection.path, row.path).toBe(row.path);

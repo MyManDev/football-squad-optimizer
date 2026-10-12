@@ -140,3 +140,35 @@ it("selects team, position and player; keeps choices in the URL and clears chip 
     save_chips: true,
   });
 });
+
+it("reads a refused roster's body, so the request ends", async () => {
+  const response = new Response("<html>bad gateway</html>", { status: 502 });
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response));
+  render(
+    <LanguageProvider>
+      <MemoryRouter>
+        <DecisionPreferencesPanel squad={squad} available />
+      </MemoryRouter>
+    </LanguageProvider>,
+  );
+  await waitFor(() => expect(response.bodyUsed).toBe(true));
+});
+
+it.each([
+  ["tr", "En çok puanı seçin"],
+  ["en", "Select most points"],
+] as const)(
+  "names the approved strategy when preferences conflict in %s",
+  (language, instruction) => {
+    // Manager news with preferences conflicts; the sentence names the approved strategy.
+    const query = new URLSearchParams({ llm: "on", preferences: preferencesKey(p) });
+    render(
+      <LanguageProvider initialLanguage={language}>
+        <MemoryRouter initialEntries={[`/?${query.toString()}`]}>
+          <DecisionPreferencesPanel squad={squad} available={false} />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+    expect(screen.getByRole("alert")).toHaveTextContent(instruction);
+  },
+);

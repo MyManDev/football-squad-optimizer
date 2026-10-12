@@ -1,6 +1,7 @@
-import { withRequestDeadline, type RequestOptions } from "../../data/request";
+import type { RequestOptions } from "../../data/request";
 import { LeagueDataError, LeagueDataMissing } from "./dataErrors";
 import { findLeague, loadLeagueDirectory, type LeagueRef, type PublishedLeague } from "./directory";
+import { fetchPublishedJson } from "./publishedJson";
 import { assertAdviceIndex, assertEnvelope, assertMembers, assertSquad } from "./publicationShape";
 import { chipPath, isMemberChip } from "./advice/chipChoice";
 import { isDevicePlanDocument, type DevicePlanDocument } from "./device/types";
@@ -59,30 +60,6 @@ export interface LeagueTree {
   raw(relative: string, options?: RequestOptions): Promise<unknown>;
 }
 
-async function fetchDocument(
-  base: string,
-  relative: string,
-  options?: RequestOptions,
-): Promise<unknown> {
-  return withRequestDeadline(async (signal) => {
-    const response = await fetch(`${base}${relative}`, { cache: "no-cache", signal });
-    if (response.status === 404) throw new LeagueDataMissing(relative);
-    if (!response.ok)
-      throw new LeagueDataError(`League data is not available (${response.status}).`);
-    // Static hosts can return their HTML app shell for an unpublished JSON path.
-    // A broken JSON publication is unreadable and must not become an example fallback.
-    const body = await response.text();
-    try {
-      return JSON.parse(body) as unknown;
-    } catch {
-      if (/^\s*(?:<!doctype\s+html\b|<html\b)/i.test(body)) {
-        throw new LeagueDataMissing(relative);
-      }
-      throw new LeagueDataError(`The published league document at ${relative} is not valid JSON.`);
-    }
-  }, options);
-}
-
 /**
  * The example league is a development and test convenience. The guard is written so the
  * production build can prove the import unreachable: without it the fixture module was
@@ -118,7 +95,7 @@ export function createLeagueTree(league: LeagueRef): LeagueTree {
     relative: string,
     options?: RequestOptions,
   ): Promise<LeagueViewEnvelope<T>> {
-    const envelope = assertEnvelope<T>(await fetchDocument(base, relative, options));
+    const envelope = assertEnvelope<T>(await fetchPublishedJson(base, relative, options));
     return ownLeague(envelope, league.leagueId);
   }
 
@@ -331,7 +308,7 @@ export function createLeagueTree(league: LeagueRef): LeagueTree {
     entryAdviceTop100: loadEntryAdviceTop100,
     entryAdviceIndex: loadEntryAdviceIndex,
     scoreboard: loadScoreboard,
-    raw: (relative, options) => fetchDocument(base, relative, options),
+    raw: (relative, options) => fetchPublishedJson(base, relative, options),
   };
 }
 
@@ -350,7 +327,7 @@ export async function lookupPublishedLeague(
   if (league === null) return { status: "unsupported" };
   const envelope = assertMembers(
     assertEnvelope(
-      (await fetchDocument(
+      (await fetchPublishedJson(
         `${import.meta.env.BASE_URL}data/${league.path}/`,
         "members.json",
       )) as LeagueViewEnvelope<LeagueMembers>,

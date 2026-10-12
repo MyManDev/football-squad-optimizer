@@ -8,7 +8,7 @@ shows it (last checked 26 September 2026).
 | Read-only inspection | Finding |
 | --- | --- |
 | GitHub repository environments | Only `cloudflare-pages` returned. |
-| Repository variables | `CLOUDFLARE_PAGES_PROJECT=football-squad-optimizer` on 9 September. Since 18 September also `ADVICE_API_ORIGIN=https://squadopt-api.mymandev.com` (`gh variable list`), which the site build in `.github/workflows/ci.yml` has passed as `VITE_ADVICE_API_ORIGIN` since #615 ([backend free hosting](../backend_free_hosting.md#3-tell-the-site-build-where-the-api-is)). |
+| Repository variables | `CLOUDFLARE_PAGES_PROJECT=football-squad-optimizer` on 9 September. Since 18 September also `ADVICE_API_ORIGIN=https://squadopt-api.mymandev.com` (`gh variable list`), which the site build in `.github/workflows/ci.yml` has passed as `VITE_ADVICE_API_ORIGIN` since #615 ([backend free hosting](../backend_free_hosting.md#3-tell-the-site-build-where-the-api-is)). Optional `BACKEND_ALERT_ASSIGNEE`, read by `.github/workflows/backend-uptime.yml`: the login a new `backend-down` issue is assigned to (`gh variable set BACKEND_ALERT_ASSIGNEE --body <login>`, a login with push access; unset assigns nobody). |
 | Repository secret names (values not read) | Cloudflare account ID and API token; no backend or backup credential name returned. |
 | Recent GitHub scheduled runs | None on 9 September. Since #676 the `Backend uptime` workflow is scheduled (`*/15` in `.github/workflows/backend-uptime.yml`); `gh run list --event schedule` lists its runs, which land hours apart rather than every fifteen minutes (measured in [backend free hosting](../backend_free_hosting.md#recommendation)). |
 | Windows scheduled task names/actions matching squad, football or FPL | No matching task returned. This does not exclude an unrelatedly named task or another machine. |
@@ -62,7 +62,8 @@ deployment that changes persistent state. This is a proposed operating procedure
 claim that such a schedule is running. Record the actual interval between protected copies
 and time an isolated restore before setting a recovery-time commitment. The existing site's
 seven-day CI artifact retention is not a backup policy for private ledger/advice records.
-`scripts/backup_data.ps1` (#670) takes an additive, verified copy of the five data trees; the
+`scripts/backup_data.ps1` (#670) takes an additive, verified copy of snapshots, ledger, handoffs, advice_records, entries and
+private immutable benchmark_v2_captures when that optional tree exists; the
 repository does not record whether it runs on a schedule.
 
 No notification target was found on 9 September. Since #676 there is one, for the backend

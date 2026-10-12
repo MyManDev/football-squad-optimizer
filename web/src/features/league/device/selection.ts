@@ -1,9 +1,9 @@
 /**
  * Which selections the device can solve from the published inputs, and what each one
  * needs: the plain pure-points plan over one week; the same with a chip the member still
- * holds; a rival strategy over one week against a named rival. Nothing switched on
- * beyond that (the club's word, a Top 100 weight, the football model, preferences, a
- * longer window) is the service's.
+ * holds; a rival strategy over one week against a named rival; the pure-points plan at a
+ * Top 100 weight the member block names. Nothing switched on beyond that (the club's word,
+ * the football model, preferences, a longer window) is the service's.
  */
 
 import type { AdviceRequest } from "../advice/adviceClient";

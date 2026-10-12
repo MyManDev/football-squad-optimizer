@@ -15,7 +15,9 @@ from squadopt.application.advice import member_horizon_builder
 from squadopt.application.advice_record import league_record_root, record_directory
 from squadopt.application.capture_entries import CapturePicksProvider
 from squadopt.application.chip_forecast_publication import forecast_source
-from squadopt.application.entries import EntryRegistration, EntryRegistry
+from squadopt.application.device_plan import device_plan_capture_table
+from squadopt.application.entries import EntryError, EntryRegistration, EntryRegistry
+from squadopt.application.league_tree_identity import record_tree_identity
 from squadopt.application.league_views import (
     LeagueViewsReport,
     MemberMapper,
@@ -37,11 +39,16 @@ from squadopt.application.weekly_suggestion_eval import (
     published_page_captures,
     refuse_dropped_history_weeks,
 )
+from squadopt.contracts.league import LEAGUE_VIEW_CONTRACT_VERSION
 from squadopt.contracts.league_tree import (
+    DEVICE_ROOT,
     LEAGUES_ROOT,
     LEGACY_TREE,
     LeagueDirectoryError,
     PublishedLeague,
+    device_plan_capture,
+    device_plan_path,
+    device_plan_sha256,
     league_tree,
     league_tree_dir,
     legacy_tree_league_id,
@@ -53,6 +60,7 @@ from squadopt.data.errors import DataError
 from squadopt.data.snapshots import CapturedSnapshot, list_snapshot_ids, read_snapshot
 from squadopt.data.sources import FPL_LIVE_SOURCE
 from squadopt.data.sources.fpl_live import (
+    BOOTSTRAP_PAYLOAD,
     EntryGameweekPoints,
     fpl_entry_history_points,
     fpl_league_name,
@@ -143,6 +151,10 @@ class LeaguePublicationResult:
     #: Why the Top 100 menu is off this run, for the operator; empty when it is on or
     #: was not asked for.
     top100_note: str = ""
+    #: For how many of the captured members the purchase prices were rebuilt from the
+    #: transfers list, and why not for the rest, for the operator; empty when the capture
+    #: holds no member's picks.
+    purchase_prices_note: str = ""
     #: What became of a tree from before the league directory: "adopted" (moved to the
     #: league's path, its histories kept) or "removed" (a leftover beside a directory);
     #: empty when there was none.
@@ -325,6 +337,44 @@ def load_publication_top100(
     return counts, None, ""
 
 
+def purchase_prices_note(
+    provider: CapturePicksProvider,
+    registrations: Sequence[EntryRegistration],
+    *,
+    season: str,
+    gameweek: int,
+) -> str:
+    """One line for the operator: whose purchase prices were rebuilt, and why not the rest.
+
+    Asked of a provider in this process because, with workers, each member is rendered in
+    a process of its own whose provider the parent never sees. A member's page carries the
+    flag only; without this line a renamed source field would quietly put every member
+    back on the stated worth as the budget. ``gameweek`` is the captured picks' week.
+    Empty when the capture holds no member's picks.
+    """
+
+    held = [entry.entry_id for entry in registrations if provider.holds(entry.entry_id, gameweek)]
+    if not held:
+        return ""
+    reasons: list[str] = []
+    rebuilt = pending = 0
+    for entry_id in held:
+        try:
+            result = provider.purchase_prices_for(entry_id, season, gameweek)
+        except (DataError, EntryError) as error:
+            reasons.append(f"{entry_id}: the squad itself was refused ({error})")
+            continue
+        pending += result.pending
+        if result.known:
+            rebuilt += 1
+        else:
+            reasons.append(f"{entry_id}: {result.reason}")
+    note = f"rebuilt for {rebuilt} of {len(held)}"
+    if pending:
+        note += f"; {pending} transfer(s) for the open deadline left out"
+    return "; ".join([note, *reasons])
+
+
 def adopt_legacy_tree(site_data_root: Path, league_id: int) -> tuple[str, Path] | None:
     """Make the legacy tree the league's own before a publication into the new layout.
 
@@ -411,6 +461,80 @@ def remove_unlisted_trees(site_data_root: Path, league_ids: Sequence[int]) -> li
     return removed
 
 
+def remove_device_tables(site_data_root: Path, *, keep: str | None = None) -> list[str]:
+    """Remove the per-capture device-plan tables, all of them or every capture but ``keep``.
+
+    The weekly preview is seeded from the published tree, so without this each week's
+    table would stay on the site beside the next one's, keyed by a capture no directory
+    line names any more. The weekly league stage removes every table, its own capture's
+    included: the run rebuilds every tree from that capture and writes the table again, so
+    a republish of a capture after a code change replaces the table as it replaces the
+    trees. Returns the removed directories, relative to the site's data root.
+    """
+
+    root = Path(site_data_root) / DEVICE_ROOT
+    removed: list[str] = []
+    if not root.is_dir():
+        return removed
+    for table in sorted(root.iterdir()):
+        if table.is_dir() and table.name != keep:
+            shutil.rmtree(table)
+            removed.append(f"{DEVICE_ROOT}/{table.name}")
+    return removed
+
+
+def check_device_plan_table(
+    site_data_root: Path, snapshot_id: str, document: Mapping[str, object]
+) -> Path:
+    """The capture's table path; refuse one already on disk that holds another payload.
+
+    Within one run every league shares the capture's table, so a second league finds it
+    written and leaves it. A table from an earlier build of the same capture that differs,
+    which a changed handoff, the Top 100 inputs or a code change can produce, is refused
+    rather than overwritten, before any member is solved: the weekly run removes its own
+    capture's table at the start of its league stage and never meets this; by hand, remove
+    ``data/device/<capture>/`` in the candidate and rebuild every league of the list.
+    """
+
+    target = Path(site_data_root) / Path(*device_plan_path(snapshot_id).parts)
+    if target.is_file():
+        try:
+            existing = json.loads(target.read_text(encoding="utf-8"))
+        except ValueError:
+            existing = None
+        if not isinstance(existing, dict) or existing.get("payload") != dict(document):
+            raise DataError(
+                f"{target} already holds another device-plan table for capture {snapshot_id}; "
+                "a table is written once per capture. Remove that directory in the candidate "
+                "and rebuild every league of the list, or let the weekly run rebuild the week."
+            )
+    return target
+
+
+def write_device_plan_table(
+    site_data_root: Path, snapshot_id: str, document: Mapping[str, object], *, generated_at_utc: str
+) -> Path:
+    """Write the capture's device-plan table once, under ``data/device/<capture>/``.
+
+    A table already on disk with the same payload is left as it is, so the publication
+    stamp stays the first league's; one with another payload is refused
+    (``check_device_plan_table``).
+    """
+
+    target = check_device_plan_table(site_data_root, snapshot_id, document)
+    if target.is_file():
+        return target
+    envelope = {
+        "contract_version": LEAGUE_VIEW_CONTRACT_VERSION,
+        "generated_at_utc": generated_at_utc,
+        "source_kind": "live",
+        "payload": dict(document),
+    }
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(envelope, indent=2), encoding="utf-8", newline="\n")
+    return target
+
+
 def league_tree_capture(tree: Path) -> str | None:
     """The capture a published tree was rendered from: its first human entry's
     ``source_snapshot_id``; None when the tree names no member or cannot be read."""
@@ -459,6 +583,27 @@ def leagues_beside(site_data_root: Path, league_id: int, snapshot_id: str) -> li
                 f"building league {league_id} alone from {snapshot_id} would leave the site "
                 "on two captures. Rebuild every league with the weekly run's league list."
             )
+        if line.device_plan is not None:
+            table = device_plan_capture(line.device_plan)
+            if table is None:
+                raise DataError(
+                    f"The site lists league {line.league_id} with a device plan at "
+                    f"{line.device_plan}, which is no per-capture table. Rebuild every league "
+                    "with the weekly run's league list."
+                )
+            if table != snapshot_id:
+                raise DataError(
+                    f"The site lists league {line.league_id} with the device-plan table of "
+                    f"capture {table}; building league {league_id} alone from {snapshot_id} "
+                    "would leave the site on two captures. Rebuild every league with the "
+                    "weekly run's league list."
+                )
+            if device_plan_sha256(root, line.device_plan) != line.device_plan_sha256:
+                raise DataError(
+                    f"The site lists league {line.league_id} with a device-plan table whose "
+                    f"bytes are not the ones its line names ({line.device_plan}). Rebuild every "
+                    "league with the weekly run's league list."
+                )
         kept.append(line)
     return kept
 
@@ -521,6 +666,17 @@ def publish_prepared_league(
             f"{int(inputs.deadline.gameweek)}. Refused before any member is solved."
         )
     top100_counts, top100_reason, top100_note = load_publication_top100(request, inputs, projection)
+    # The capture's own table, shared by every league of the run and written once: checked
+    # against any table already on disk before a member is solved, written after the tree,
+    # which keeps its own copy for pages from before the per-capture table.
+    table_payload = device_plan_capture_table(
+        inputs,
+        projection,
+        read_season_rules(snapshot, season=season),
+        bootstrap=snapshot.payloads[BOOTSTRAP_PAYLOAD],
+        top100=top100_counts,
+    )
+    check_device_plan_table(site_data, request.snapshot_id, table_payload)
     # This league's own root in the record store, derived once: the record is written there,
     # the histories read it, and the outputs list it. Every league records and renders its
     # histories; the league the store has always held keeps the store's root.
@@ -549,8 +705,9 @@ def publish_prepared_league(
             entry_ids=[entry.entry_id for entry in prepared.registrations],
             replaced=carried,
         )
+    provider = CapturePicksProvider(snapshot, request.snapshot_id)
     report = build_league_views(
-        CapturePicksProvider(snapshot, request.snapshot_id),
+        provider,
         prepared.registrations,
         inputs,
         projection,
@@ -579,6 +736,13 @@ def publish_prepared_league(
         chip_forecast_source=forecast_source(snapshot),
     )
     outputs = [out_dir / name for name in report.files]
+    table_file = write_device_plan_table(
+        site_data,
+        request.snapshot_id,
+        table_payload,
+        generated_at_utc=report.generated_at_utc,
+    )
+    outputs.append(table_file)
     if history_root is not None:
         # This publication's own member pages name this week's capture.
         shown.update(published_page_captures(out_dir))
@@ -614,6 +778,11 @@ def publish_prepared_league(
         season=report.season,
         gameweek=report.gameweek,
         path=league_tree(report.league_id).as_posix(),
+        device_plan=device_plan_path(request.snapshot_id).as_posix(),
+        # The table's version: a republish of the capture replaces the file at this path.
+        device_plan_sha256=device_plan_sha256(
+            site_data, device_plan_path(request.snapshot_id).as_posix()
+        ),
     )
     directory = write_league_directory(
         site_data,
@@ -621,6 +790,10 @@ def publish_prepared_league(
         generated_at_utc=report.generated_at_utc,
     )
     outputs.append(directory)
+    # The scoreboard stage completes and journals this record after its own write.
+    # Keeping its intermediate bytes among the league outputs would invalidate the
+    # completed journal when that later stage updates the retained scoreboard.
+    record_tree_identity(out_dir, source_snapshot_id=request.snapshot_id)
     return LeaguePublicationResult(
         snapshot_id=request.snapshot_id,
         season=season,
@@ -628,6 +801,9 @@ def publish_prepared_league(
         report=report,
         output_paths=tuple(sorted(outputs)),
         top100_note=top100_note,
+        purchase_prices_note=purchase_prices_note(
+            provider, prepared.registrations, season=season, gameweek=report.gameweek - 1
+        ),
         legacy_tree=legacy[0] if legacy is not None else "",
         published=published,
     )

@@ -28,9 +28,11 @@ from squadopt.application.evidence_io import write_json
 from squadopt.application.league_publication import (
     LeaguePublicationRequest,
     publish_league,
+    remove_device_tables,
     remove_unlisted_trees,
     settle_legacy_tree,
 )
+from squadopt.application.league_tree_identity import check_tree_identity
 from squadopt.application.player_evidence import PlayerEvidenceRequest, export_player_evidence
 from squadopt.application.projection_handoff import build as build_handoff
 from squadopt.application.rotation_export import RotationExportRequest, export_rotation_evidence
@@ -46,6 +48,7 @@ from squadopt.application.weekly_plan import (
     MODE_RULE,
     WeekError,
     WeeklyRequest,
+    _require_capture_name,
     capture_deadline,
     decision_mode_for,
     evidence_artifact,
@@ -57,7 +60,12 @@ from squadopt.application.weekly_plan import (
     rotation_source_capture,
 )
 from squadopt.contracts.league_list import LEAGUE_LIST_FILE, LeagueListError, read_league_list
-from squadopt.contracts.league_tree import LeagueDirectoryError, PublishedLeague
+from squadopt.contracts.league_tree import (
+    LEGACY_TREE,
+    LeagueDirectoryError,
+    PublishedLeague,
+    read_league_directory,
+)
 from squadopt.contracts.run_logs import LOG_ROOT_NAME
 from squadopt.data.errors import DataError, SourceRevisionError
 from squadopt.data.snapshots import list_snapshot_ids, read_snapshot
@@ -65,7 +73,7 @@ from squadopt.data.source_revision import source_revision
 from squadopt.features.evidence_artifact import read_player_evidence_artifact
 from squadopt.features.rotation_evidence_artifact import read_rotation_evidence_artifact
 from squadopt.live import handoff_path_for, load_entry, read_projection_handoff, read_season_rules
-from squadopt.platform import cohort_capture, elite_capture
+from squadopt.platform import benchmark_capture, cohort_capture, elite_capture
 from squadopt.platform._queue_lock import QueueFileLock
 from squadopt.platform.fpl_capture import capture
 from squadopt.platform.projection_retention import publish_retained_handoff, retained_handoff_path
@@ -204,6 +212,8 @@ class WeeklyOperations:
         record_advice: bool = False,
         publish_suffix: str = "",
         no_advice_record: bool = False,
+        benchmark_freeze: bool = False,
+        benchmark_picks_freezes: tuple[str, ...] = (),
     ) -> None:
         if paths.out == paths.journal / "preview":
             paths = replace(paths, out=paths.journal / run_id / "preview")
@@ -215,6 +225,10 @@ class WeeklyOperations:
         self.supplied_handoff = handoff
         self.record_advice = record_advice
         self.no_advice_record = no_advice_record
+        self.benchmark_freeze = benchmark_freeze
+        for identifier in benchmark_picks_freezes:
+            _require_capture_name(identifier, "--benchmark-picks-freeze")
+        self.benchmark_picks_freezes = benchmark_picks_freezes
         self.publish_names = PublishNames(
             request.season, request.gameweek, "decision", publish_suffix
         )
@@ -228,11 +242,15 @@ class WeeklyOperations:
         if "top100" in self.plan.steps:
             self.stages.extend(("top100_cohort", "top100_picks", "top100_evidence"))
         self.stages.extend(("capture", "settled_outcomes"))
+        if benchmark_picks_freezes:
+            self.stages.append("benchmark_picks")
         if request.rotation:
             self.stages.append("rotation")
         self.stages.append("handoff")
         if request.decide:
             self.stages.append("decide")
+        if benchmark_freeze:
+            self.stages.append("benchmark_freeze")
         self.stages.extend(("league", "site", "scoreboard"))
         if request.publish:
             self.stages.append("publish")
@@ -248,6 +266,12 @@ class WeeklyOperations:
             self.rule_snapshot = prior["rule_snapshot"]
             self.ledger_inputs = [Path(value) for value in prior["ledger_inputs"]]
             self.record_inputs = [Path(value) for value in prior["record_inputs"]]
+        decision_directory = paths.ledger / request.season / f"gw{request.gameweek:02d}"
+        if benchmark_freeze and not request.decide and decision_directory not in self.ledger_inputs:
+            raise WeekError(
+                "--benchmark-freeze requires --decide or an existing primary decision "
+                "(missing_decision)."
+            )
         declaration = {
             "request": asdict(request),
             "paths": {key: str(value) for key, value in asdict(paths).items()},
@@ -263,6 +287,11 @@ class WeeklyOperations:
                 "record_advice": record_advice,
                 "publish_suffix": publish_suffix,
                 "no_advice_record": no_advice_record,
+            }
+        if benchmark_freeze or benchmark_picks_freezes:
+            declaration["benchmark_capture_options"] = {
+                "freeze": benchmark_freeze,
+                "picks_freezes": list(benchmark_picks_freezes),
             }
         self.run = WeeklyRun(paths.journal, run_id, declaration, self.stages, resume=resume)
 
@@ -517,6 +546,98 @@ class WeeklyOperations:
             result.output_paths,
         )
 
+    def _benchmark_freeze(self) -> WeeklyStageResult:
+        """Record unavailable input codes without changing the publication tree."""
+        try:
+            cohort = self._cohort_id()
+            if self.request.season != benchmark_capture.SEASON:
+                raise benchmark_capture.BenchmarkCaptureRefused(
+                    "not_a_decision", "Benchmark freeze needs the live season."
+                )
+            if cohort is None:
+                raise benchmark_capture.BenchmarkCaptureRefused(
+                    "no_cohort", "Benchmark freeze needs a cohort."
+                )
+            receipt = benchmark_capture.freeze_decision(
+                self.paths.snapshots,
+                decision_directory=self.paths.ledger
+                / self.request.season
+                / f"gw{self.request.gameweek:02d}",
+                cohort_snapshot_id=cohort,
+                gameweek=self.request.gameweek,
+                output_root=self._benchmark_root(),
+            )
+        except (DataError, OSError, ValueError, KeyError, TypeError) as error:
+            return self._receipt(
+                "benchmark-freeze",
+                {"status": "unavailable", "reason": benchmark_capture.refusal_code(error)},
+            )
+        frozen = read_snapshot(self._benchmark_root(), receipt.snapshot_id)
+        binding = json.loads(frozen.payloads["benchmark.json"])
+        return self._receipt(
+            "benchmark-freeze",
+            {
+                "status": "captured",
+                "snapshot_id": receipt.snapshot_id,
+                "fingerprint": receipt.fingerprint,
+            },
+            (
+                *(
+                    self._benchmark_root() / identifier
+                    for identifier in (
+                        receipt.snapshot_id,
+                        binding["decision_snapshot_id"],
+                        binding["cohort_snapshot_id"],
+                    )
+                ),
+                benchmark_capture.freeze_claim_path(self._benchmark_root(), self.request.gameweek),
+            ),
+        )
+
+    def _benchmark_picks(self) -> WeeklyStageResult:
+        outcomes = []
+        outputs: list[Path] = []
+        for identifier in self.benchmark_picks_freezes:
+            try:
+                receipt = benchmark_capture.capture_settled_picks(
+                    self._benchmark_root(), freeze_snapshot_id=identifier
+                )
+            except (DataError, OSError, ValueError, KeyError, TypeError) as error:
+                outcomes.append(
+                    {
+                        "freeze_snapshot_id": identifier,
+                        "status": "unavailable",
+                        "reason": benchmark_capture.refusal_code(error),
+                    }
+                )
+                continue
+            captured = read_snapshot(self._benchmark_root(), receipt.snapshot_id)
+            binding = json.loads(captured.payloads["benchmark.json"])
+            outcome = binding["outcome_snapshot_id"]
+            outputs.extend(
+                (
+                    self._benchmark_root() / receipt.snapshot_id,
+                    self._benchmark_root() / outcome,
+                    benchmark_capture.picks_claim_path(self._benchmark_root(), identifier),
+                )
+            )
+            outcomes.append(
+                {
+                    "freeze_snapshot_id": identifier,
+                    "status": "captured",
+                    "snapshot_id": receipt.snapshot_id,
+                    "fingerprint": receipt.fingerprint,
+                    "outcome_snapshot_id": outcome,
+                    "members_readable": binding["members_readable"],
+                    "members_unreadable": binding["members_unreadable"],
+                    "failure_counts": binding["failure_counts"],
+                }
+            )
+        return self._receipt("benchmark-picks", {"captures": outcomes}, tuple(outputs))
+
+    def _benchmark_root(self) -> Path:
+        return self.paths.workspace / "data" / "benchmark_v2_captures"
+
     def _rotation_source(self) -> Path:
         """What the rotation stage reads from, as a path the journal can fingerprint.
 
@@ -762,8 +883,10 @@ class WeeklyOperations:
             legacy = settle_legacy_tree(self.paths.out / "data", self.request.league_ids)
         except LeagueDirectoryError as error:
             raise WeekError(str(error)) from error
-        # A league dropped from the list leaves the site with its tree.
+        # A league dropped from the list leaves the site with its tree, and every earlier
+        # build leaves a device-plan table; the run writes this capture's table again.
         removed_trees = remove_unlisted_trees(self.paths.out / "data", self.request.league_ids)
+        removed_trees.extend(remove_device_tables(self.paths.out / "data"))
         for league_id in self.request.league_ids:
             # Each league is stamped after its own solves (the stamp is when the advice
             # was published, read against the deadline); the directory the last league
@@ -791,6 +914,9 @@ class WeeklyOperations:
                 "removed": list(result.report.removed),
                 # Empty when the Top 100 menu was offered or never asked for.
                 "top100_note": result.top100_note,
+                # Whose purchase prices were rebuilt from the transfers list, and why not
+                # the rest; empty when the capture held no member's picks.
+                "purchase_prices_note": result.purchase_prices_note,
             }
         # Whether this run recorded the advice of every league it rendered, which the
         # publish stage requires: a publication whose record misses a league could not be
@@ -808,7 +934,8 @@ class WeeklyOperations:
                 "legacy_tree": (
                     None if legacy is None else {"outcome": legacy[0], "league_id": legacy[1]}
                 ),
-                # Trees of leagues the list no longer has, removed from the site.
+                # Trees of leagues the list no longer has, and the device-plan tables of
+                # every earlier build, removed from the site before this run wrote its own.
                 "removed_trees": removed_trees,
                 "leagues": leagues,
             },
@@ -879,6 +1006,18 @@ class WeeklyOperations:
         source = self._published_tree()
         if target.exists() or not source.is_dir():
             return
+        # Check the inherited publication once, before any stage overlays the preview.
+        # Existing previews may hold interrupted writes and are resumed in place.
+        trees = [source / league.path for league in read_league_directory(source)]
+        if (source / LEGACY_TREE).is_dir():
+            trees.append(source / LEGACY_TREE)
+        for tree in trees:
+            try:
+                check_tree_identity(tree)
+            except ValueError as error:
+                raise DataError(
+                    f"Published league tree {tree} cannot seed the preview: {error}"
+                ) from error
         shutil.copytree(source, target)
 
     def _publish(self) -> WeeklyStageResult:
@@ -908,6 +1047,16 @@ class WeeklyOperations:
     ) -> WeeklyStageResult:
         """Run one journalled stage and record its boundary in the run log."""
 
+        if name.startswith("benchmark_"):
+            # These receipts stay private. Product status pages consume the run log.
+            try:
+                return self.run.stage(
+                    name, inputs=inputs, operation=operation, repeatable=repeatable
+                )
+            except Exception:
+                self.log.event("tick.week.stage.failed", stage=name, error="research_stage_refused")
+                raise
+
         self.log.event("tick.week.stage.start", stage=name)
         try:
             result = self.run.stage(name, inputs=inputs, operation=operation, repeatable=repeatable)
@@ -929,7 +1078,7 @@ class WeeklyOperations:
             season=self.request.season,
             gameweek=self.request.gameweek,
             leagues=list(self.request.league_ids),
-            stages=list(self.stages),
+            stages=[name for name in self.stages if not name.startswith("benchmark_")],
             resume=self.resume,
         )
         if self.no_advice_record:
@@ -981,6 +1130,16 @@ class WeeklyOperations:
             self.values["settled_outcomes"] = dict(
                 self._stage("settled_outcomes", inputs=[p.snapshots], operation=self._settled).value
             )
+            if self.benchmark_picks_freezes:
+                self.values["benchmark_picks"] = dict(
+                    self._stage(
+                        "benchmark_picks",
+                        inputs=[
+                            self._benchmark_root() / value for value in self.benchmark_picks_freezes
+                        ],
+                        operation=self._benchmark_picks,
+                    ).value
+                )
             if self.request.rotation:
                 self.values["rotation"] = dict(
                     self._stage(
@@ -1008,6 +1167,19 @@ class WeeklyOperations:
                         "decide",
                         inputs=[selected, held_handoff, *self.ledger_inputs],
                         operation=self._decide,
+                    ).value
+                )
+            if self.benchmark_freeze:
+                benchmark_inputs = [
+                    p.ledger / self.request.season / f"gw{self.request.gameweek:02d}"
+                ]
+                if self._cohort_id():
+                    benchmark_inputs.append(self._snapshot_path(str(self._cohort_id())))
+                self.values["benchmark_freeze"] = dict(
+                    self._stage(
+                        "benchmark_freeze",
+                        inputs=benchmark_inputs,
+                        operation=self._benchmark_freeze,
                     ).value
                 )
             self._seed_preview()
@@ -1089,6 +1261,17 @@ def build_parser() -> argparse.ArgumentParser:
         "--projection", choices=("component", "component-only"), default="component"
     )
     parser.add_argument("--decide", action="store_true")
+    parser.add_argument(
+        "--benchmark-freeze",
+        action="store_true",
+        help="Opt-in private Benchmark V2 freeze of the existing primary decision.",
+    )
+    parser.add_argument(
+        "--benchmark-picks-freeze",
+        action="append",
+        default=[],
+        help="Opt-in settled target picks for an explicit Benchmark freeze id.",
+    )
     parser.add_argument("--chip", choices=CHIP_CHOICES)
     parser.add_argument("--rotation", action="store_true")
     parser.add_argument(
@@ -1230,6 +1413,12 @@ def main(argv: list[str] | None = None) -> int:
             args.rotation_capture,
         )
         print(request.plan().describe())
+        for identifier in args.benchmark_picks_freeze:
+            _require_capture_name(identifier, "--benchmark-picks-freeze")
+        if args.benchmark_freeze:
+            print("Private research stage: benchmark_freeze")
+        if args.benchmark_picks_freeze:
+            print("Private research stage: benchmark_picks")
         names = PublishNames(request.season, request.gameweek, "decision", args.publish_suffix)
         recording = (
             "False (--no-advice-record)"
@@ -1260,6 +1449,8 @@ def main(argv: list[str] | None = None) -> int:
             record_advice=args.record_advice,
             publish_suffix=args.publish_suffix,
             no_advice_record=args.no_advice_record,
+            benchmark_freeze=args.benchmark_freeze,
+            benchmark_picks_freezes=tuple(args.benchmark_picks_freeze),
         )
         completed = operation.execute()
         print(f"Verified weekly run: {completed}")

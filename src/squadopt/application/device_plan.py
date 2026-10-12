@@ -7,7 +7,12 @@ on the member's device can state the same problem and return the same answer:
 
 - ``device_plan_table``: the capture's table in the order the solver sees it, with the
   server's own integer objective coefficients, and the season's rules and the member
-  planning policy as numbers. One document per publication.
+  planning policy as numbers. One document per league tree (contract v1).
+- ``device_plan_capture_table``: the same table once per capture (contract v2), with no
+  league in it, each player's element id and start price beside his code and price, and
+  the season's chip windows and per-week transfer cap beside the policy's numbers. Written
+  under ``data/device/<capture>/`` so every league of a run shares it. A republish of the
+  capture replaces it, so the directory line names it with the sha256 of its bytes.
 - ``device_plan_entry``: one member's fifteen, the bank after the spending-power rule, the
   free transfers under the cap, and the sale price of each held player. One block per
   entry document, or ``None`` when the live path would refuse to plan for that member.
@@ -20,12 +25,14 @@ the server uses, not a description of them.
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Final
+from typing import Any, Final
 
 from squadopt.application.strategies.catalog import STRATEGY_CATALOG
 from squadopt.application.top100_weight import TOP100_WEIGHTS, Top100Counts, weighted_projection
+from squadopt.contracts.league_tree import DEVICE_PLAN_FILE
 from squadopt.contracts.players import sort_players_by_id
 from squadopt.data.errors import DataSourceError
+from squadopt.data.sources.fpl_live import element_prices, player_codes
 from squadopt.live.recommendation import Projection, RecommendationInputs
 from squadopt.live.rules import SeasonRules
 from squadopt.live.transfers import (
@@ -40,7 +47,9 @@ from squadopt.optimization.coefficients import objective_coefficients, scale_exp
 from squadopt.prediction.elite_evidence import ELITE_COHORT_SIZE
 
 DEVICE_PLAN_CONTRACT_VERSION: Final = "league_device_plan_v1"
-DEVICE_PLAN_DOCUMENT: Final = "device-plan.json"
+#: The per-capture table: one document per capture, no league in it.
+DEVICE_PLAN_TABLE_CONTRACT_VERSION: Final = "league_device_plan_v2"
+DEVICE_PLAN_DOCUMENT: Final = DEVICE_PLAN_FILE
 
 
 def device_plan_table(
@@ -70,6 +79,98 @@ def device_plan_table(
     held cannot be sold. No per-week transfer cap applies under the member policy.
     """
 
+    body = _table_body(inputs, projection, rules, optimization=optimization, top100=top100)
+    return {
+        "contract_version": DEVICE_PLAN_CONTRACT_VERSION,
+        "league_id": int(league_id),
+        **body,
+    }
+
+
+def device_plan_capture_table(
+    inputs: RecommendationInputs,
+    projection: Projection,
+    rules: SeasonRules,
+    *,
+    bootstrap: bytes,
+    optimization: OptimizationConfig | None = None,
+    top100: Top100Counts | None = None,
+) -> dict[str, object]:
+    """The capture's table once for every league of the run (contract v2).
+
+    Everything ``device_plan_table`` publishes except the league, so every league of a run
+    shares it under ``data/device/<capture>/``. It also depends on the run's inputs (the
+    handoff, the Top 100 inputs, the code), so a republish of the capture can replace it.
+    Each player also carries ``element_id``, the game's per-season id the entry endpoints
+    name him by, and ``start_tenths``, his price at the season's first deadline, both read
+    from the capture's bootstrap; a table player the bootstrap does not name is refused.
+    ``rules`` also carries ``chips``, the season's chip windows as the rules state them,
+    and ``transfers_cap``, the game's cap on transfers in one week (null where it states
+    none), beside the policy's cap on banked free transfers.
+    """
+
+    body = _table_body(inputs, projection, rules, optimization=optimization, top100=top100)
+    codes = player_codes(bootstrap)
+    elements = {code: element for element, code in codes.items()}
+    prices = element_prices(bootstrap)
+    players: list[dict[str, object]] = []
+    for row in body["players"]:
+        code = int(str(row["id"]))
+        element = elements.get(code)
+        if element is None:
+            raise DataSourceError(
+                f"The capture's bootstrap names no element for player code {code}; the table "
+                "cannot carry his element id or start price."
+            )
+        players.append(
+            {
+                "id": row["id"],
+                "element_id": int(element),
+                "name": row["name"],
+                "short_name": row["short_name"],
+                "team": row["team"],
+                "position": row["position"],
+                "buy_tenths": row["buy_tenths"],
+                "start_tenths": int(prices[element].start_tenths),
+                **{key: value for key, value in row.items() if key not in _V1_PLAYER_KEYS},
+            }
+        )
+    body_rules = dict(body["rules"])
+    body_rules["transfers_cap"] = (
+        None if rules.transfers.transfers_cap is None else int(rules.transfers.transfers_cap)
+    )
+    body_rules["chips"] = [
+        {
+            "name": window.name,
+            "number": window.number,
+            "start_event": window.start_event,
+            "stop_event": window.stop_event,
+            "chip_type": window.chip_type,
+        }
+        for window in rules.chips
+    ]
+    return {
+        "contract_version": DEVICE_PLAN_TABLE_CONTRACT_VERSION,
+        **{key: value for key, value in body.items() if key not in ("rules", "players")},
+        "rules": body_rules,
+        "players": players,
+    }
+
+
+_V1_PLAYER_KEYS: Final = ("id", "name", "short_name", "team", "position", "buy_tenths")
+
+
+def _table_body(
+    inputs: RecommendationInputs,
+    projection: Projection,
+    rules: SeasonRules,
+    *,
+    optimization: OptimizationConfig | None,
+    top100: Top100Counts | None,
+) -> dict[str, Any]:
+    """The fields the two table contracts share: the deadline, the policy, the rules and
+    the players in solver order."""
+
     settings = OptimizationConfig() if optimization is None else optimization
     table = sort_players_by_id(
         projection.table.loc[
@@ -92,8 +193,6 @@ def device_plan_table(
                     scale_expected_points(points, settings.expected_points_scale)
                 )
     return {
-        "contract_version": DEVICE_PLAN_CONTRACT_VERSION,
-        "league_id": int(league_id),
         "season": str(inputs.season),
         "gameweek": int(inputs.deadline.gameweek),
         "source_snapshot_id": str(inputs.snapshot_id),
@@ -180,8 +279,9 @@ def device_plan_entry(
 ) -> dict[str, object] | None:
     """One member's side of the problem, or ``None`` where the live path would not plan.
 
-    The bank is the spending power the live path computes from the stated squad sale
-    value, not the raw bank; the sale prices are the ones the solver uses. A held squad
+    The bank and the sale prices are the ones the solver uses: for a member whose purchase
+    prices were rebuilt, the raw bank and the rule's sale prices; otherwise the spending
+    power the live path computes from the stated squad sale value. A held squad
     the live path refuses (a departed player, a squad from another week) publishes no
     block rather than a block the device would solve differently.
     """

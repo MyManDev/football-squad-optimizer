@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router";
 
-import { withRequestDeadline } from "../../../data/request";
+import { discardBody, withRequestDeadline } from "../../../data/request";
 import { Card } from "../../../design/components/Card";
 import { useLanguage } from "../../../i18n/context";
 import type { EntrySquad } from "../types";
@@ -50,7 +50,10 @@ export function DecisionPreferencesPanel({
           signal,
           cache: "no-store",
         });
-        if (!response.ok) throw new Error("Roster unavailable");
+        if (!response.ok) {
+          await discardBody(response);
+          throw new Error("Roster unavailable");
+        }
         const value = (await response.json()) as { season?: string; players?: Player[] };
         if (
           value.season !== squad.season ||
@@ -126,8 +129,8 @@ export function DecisionPreferencesPanel({
       {conflict && (
         <p role="alert">
           {tr
-            ? "Tercihler geçersiz veya seçiminizle çelişiyor. Saf puanı seçin, teknik direktör yorumunu kapatın; çipleri saklarken başka çip seçmeyin."
-            : "Invalid or conflicting preferences. Select pure points, turn manager news off and do not choose a chip while saving chips."}
+            ? "Tercihler geçersiz veya seçiminizle çelişiyor. En çok puanı seçin, teknik direktör yorumunu kapatın; çipleri saklarken başka çip seçmeyin."
+            : "Invalid or conflicting preferences. Select most points, turn manager news off and do not choose a chip while saving chips."}
         </p>
       )}
       <fieldset className={styles.fieldset} disabled={!available || !selected.valid}>

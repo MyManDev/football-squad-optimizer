@@ -59,6 +59,8 @@ tool in plaintext.
 
 3. In Cloudflare, create a token scoped to the selected account with only **Account →
    Cloudflare Pages → Edit**. Do not grant Zone, Workers, or unrelated account permissions.
+   The FPL probe's Workers token is a separate token in a separate environment,
+   `cloudflare-workers` ([FPL forwarder probe](fpl_forwarder_probe.md)); never widen this one.
 
 4. Add the account ID and replacement token as **Environment secrets**, then add the project
    name as a repository Actions variable. Each `gh secret set` command prompts securely; do not
@@ -163,9 +165,12 @@ accepted advice and entry files remain byte-identical. Generate the complete con
 roster with `scripts.build_player_catalog` from that capture before the site-data PR. That one
 stays a step: it writes `data/players.json` into the site-data tree after the candidate exists,
 and adding that path to the publisher's approved list is a boundary change for the owner to
-approve. The page's own validators (`shippedTree.test.ts`) need no run by hand here either: the
-site PR's CI runs them on the committed tree, and the deploy workflow refuses a tag without a
-successful `main` push CI, which runs them again.
+approve. The page's own validators (`shippedTree.test.ts` and the other shipped-tree guards)
+need no run by hand here either: the site PR's CI runs them on every tree the committed site
+lists (`web/src/testSupport/shippedTrees.ts`; the member-page guard draws one tree and fails
+on a site that lists more), failing rather than skipping when it lists none, and the deploy
+workflow refuses a tag without a successful `main` push CI, which runs
+them again.
 
 No cron is used: a person is already operating the deadline, and only that person knows the
 decision has been accepted. GW1 on 2026-08-21 is a documented one-off exception: its approved
@@ -187,6 +192,11 @@ own day:** GW13 (Wed 2 Dec), GW18 (Tue 29 Dec), GW20 (Tue 5 Jan), GW25 (Wed 10 F
 fixed Friday run would decide the week on a capture more than five days stale — before team
 news, before injuries, before price changes. Move the decision run to the day before the
 deadline for those five and keep the capture lead time from `docs/weekly_runbook.md`.
+
+The owner runs the Tuesday settle and the Friday publish through GW20, whose deadline is
+2027-01-05T18:00:00Z, including the midweek GW13, GW18 and GW20 decision runs. A delegated
+stage requires the owner's approval for that run. After GW20 the weekly run moves off
+the owner's PC, tracked in #1010. This operator decision was recorded in #1005.
 
 **The Tuesday run may publish nothing, and that is a pass, not a failure.** A gameweek counts as
 settled only when the source says both `finished` and `data_checked`
@@ -319,8 +329,14 @@ recovery guidance. It can only replace a running backend, never start one. If it
 start it by hand from the released code, as [a stopped backend](#a-stopped-backend-starts-from-the-release)
 below describes, then carry on. The processes belong to the logon session and nothing restarts
 them, so a logoff or a reboot between the publish and this step leaves nothing to restart.
-Replace `<same-ISO>` with the accepted candidate timestamp used for `ship.sh`. First preview
-the restart:
+Run it from a plain Windows PowerShell window, never from an agent application's shell or
+terminal: a backend started inside an application's process tree dies when that application
+updates or closes, as on 2026-10-04 when a Store update of the Codex app ended the api and
+the workers started from its sandbox. The helper and the launcher refuse to start a backend
+when an agent application (`claude.exe`, the Codex app's `ChatGPT.exe` and `codex.exe`, its
+sandbox service) is among their ancestors, or a variable those agents set for their shells
+is present (`scripts/backend_parentage.ps1`); the dry run is not refused. Replace `<same-ISO>` with the
+accepted candidate timestamp used for `ship.sh`. First preview the restart:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\release\restart_backend.ps1 -AcceptedGeneratedAt <same-ISO> -DryRun
@@ -344,7 +360,9 @@ as `web/`, do not refuse. The main checkout stays on `develop`, so the answer to
 is to wait for the next release and restart after it, or to pass `-Force`, which runs
 develop's code anyway and prints `FORCED`. `-Force` is one switch: it also permits open work.
 This check needs no running backend and comes before the registry is read, so the dry run
-prints the release and its verdict even when the backend is down.
+prints the release and its verdict even when the backend is down. A release whose production
+job ended red although the site serves it (fix16's smoke failed on the takeover race #971
+fixed) is not the one the script finds; name it with `-ReleaseTag`.
 
 The script then verifies the public site, requires the public capture to match the fetched
 `origin/develop` publication, refuses open work unless `-Force`, and pulls with
@@ -573,7 +591,10 @@ it kept that HTML for the name: when a later deploy built a chunk of that name, 
 reaching that edge got HTML for the chunk and browsers kept the broken copy for a year. Then
 the smoke reads the shell, follows every asset it names (the entry, its stylesheets, every
 lazy page, the device solver's worker and wasm, the fonts) and requires each to answer as
-itself, never as the shell.
+itself, never as the shell. A walk that meets a missing asset reads the shell again and walks
+again within the same retry budget: for a moment after a deploy the alias can still answer the
+previous release's shell, whose entry the new deployment no longer holds (fix16's production
+smoke failed on exactly that, `index-DWoiDReR.js`, while the site itself was consistent).
 
 So **never request a not-yet-deployed asset name on the live domain** (a local build predicts
 the names CI will publish): each such request poisons that name at the edge that answered.
@@ -622,7 +643,7 @@ Run the smoke command immediately against the production alias printed by Wrangl
 
 ## Back up irreplaceable data
 
-From the source checkout, run `powershell -ExecutionPolicy Bypass -File scripts\backup_data.ps1 -Destination '<existing-backup-directory>' -DryRun`, then remove `-DryRun` to copy snapshots, ledger, handoffs, advice records and entries. Choose a second physical drive outside every repository worktree; synced folders such as OneDrive can carry reparse-point attributes and are deliberately refused; all five source trees must exist, and reparse points are refused. The script never reads runtime/raw or changes the source, never deletes old backups, and preserves conflicts as stamped files named by that run's manifest. A new conflict exits nonzero and lists the finding; an existing variant with the same hash is reused. Paths with any dot-prefixed component are transient by repository convention and are excluded, including from older manifests. Each run reports the excluded source count and a bounded sample, plus the count ignored from an older manifest. Source files missing since the last manifest raise a nonzero alarm with a bounded sample and total count; new files still copy additively, but no new manifest is written. Restore the lost files or explicitly run `-AcceptMissing` to acknowledge the listed loss and write a new manifest; it never deletes old backup files or manifests. `-AcceptMissing` is never part of the scheduled task: a person types it only after inspecting the loss list. Run the same command with `-Verify` to compare both sides with the latest manifest; a missing, changed or unrecorded source file fails. To restore, stop writers first, copy each manifest entry's `destination_path` from the backup to its `path` under the restored checkout's `data`, then run `-Verify -Manifest <that-manifest-name>`; the name must be a `manifest-*.json` file within the backup directory. After restoring an older recovery point, a plain backup can report newer files as missing against the latest manifest: inspect that list, then use `-AcceptMissing` if the older state is intentional. Do not blindly copy a stale canonical file over its newer conflict variant. The first real backup and restore have **never been exercised** here: only temporary fixtures were used. The scheduled task must run as the owner with Git on PATH. The scheduled action appends output to a log outside the repository and preserves the exit code; Task Scheduler alone retains only the last result. Scheduling is the owner's action; after replacing all three path placeholders, this PowerShell line registers a daily action (it does not run the backup now):
+From the source checkout, run `powershell -ExecutionPolicy Bypass -File scripts\backup_data.ps1 -Destination '<existing-backup-directory>' -DryRun`, then remove `-DryRun` to copy snapshots, ledger, handoffs, advice records and entries, plus the private Benchmark V2 captures (`benchmark_v2_captures`) when that optional tree exists. Choose a second physical drive outside every repository worktree; synced folders such as OneDrive can carry reparse-point attributes and are deliberately refused; the five required source trees must exist, and reparse points are refused. The script never reads runtime/raw or changes the source, never deletes old backups, and preserves conflicts as stamped files named by that run's manifest. A new conflict exits nonzero and lists the finding; an existing variant with the same hash is reused. Paths with any dot-prefixed component are transient by repository convention and are excluded, including from older manifests. Each run reports the excluded source count and a bounded sample, plus the count ignored from an older manifest. Source files missing since the last manifest raise a nonzero alarm with a bounded sample and total count; new files still copy additively, but no new manifest is written. Restore the lost files or explicitly run `-AcceptMissing` to acknowledge the listed loss and write a new manifest; it never deletes old backup files or manifests. `-AcceptMissing` is never part of the scheduled task: a person types it only after inspecting the loss list. Run the same command with `-Verify` to compare both sides with the latest manifest; a missing, changed or unrecorded source file fails. To restore, stop writers first, copy each manifest entry's `destination_path` from the backup to its `path` under the restored checkout's `data`, then run `-Verify -Manifest <that-manifest-name>`; the name must be a `manifest-*.json` file within the backup directory. After restoring an older recovery point, a plain backup can report newer files as missing against the latest manifest: inspect that list, then use `-AcceptMissing` if the older state is intentional. Do not blindly copy a stale canonical file over its newer conflict variant. The first real backup and restore have **never been exercised** here: only temporary fixtures were used. The scheduled task must run as the owner with Git on PATH. The scheduled action appends output to a log outside the repository and preserves the exit code; Task Scheduler alone retains only the last result. Scheduling is the owner's action; after replacing all three path placeholders, this PowerShell line registers a daily action (it does not run the backup now):
 
 ```powershell
 Register-ScheduledTask -TaskName 'SquadOptDataBackup' -Action (New-ScheduledTaskAction -Execute 'powershell.exe' -Argument '-NoProfile -Command "& powershell.exe -NoProfile -ExecutionPolicy Bypass -File ''<repo>\scripts\backup_data.ps1'' -Destination ''<backup>'' *>> ''<outside-repository-log>''; exit $LASTEXITCODE"') -Trigger (New-ScheduledTaskTrigger -Daily -At '03:00')

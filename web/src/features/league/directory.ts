@@ -6,8 +6,9 @@
  * both until every publication writes the list.
  */
 
-import { withRequestDeadline, type RequestOptions } from "../../data/request";
+import type { RequestOptions } from "../../data/request";
 import { LeagueDataError, LeagueDataMissing } from "./dataErrors";
+import { fetchPublishedJson } from "./publishedJson";
 import type { LeagueViewEnvelope } from "./types";
 
 /** One published league: its number and the tree's path under `data/`, no trailing slash. */
@@ -35,23 +36,8 @@ export function leagueTreePath(leagueId: number): string {
   return `leagues/${leagueId}`;
 }
 
-async function fetchJson(relative: string, options?: RequestOptions): Promise<unknown> {
-  return withRequestDeadline(async (signal) => {
-    const response = await fetch(`${import.meta.env.BASE_URL}data/${relative}`, {
-      cache: "no-cache",
-      signal,
-    });
-    if (response.status === 404) throw new LeagueDataMissing(relative);
-    if (!response.ok)
-      throw new LeagueDataError(`League data is not available (${response.status}).`);
-    const body = await response.text();
-    try {
-      return JSON.parse(body) as unknown;
-    } catch {
-      if (/^\s*(?:<!doctype\s+html\b|<html\b)/i.test(body)) throw new LeagueDataMissing(relative);
-      throw new LeagueDataError(`The published document at ${relative} is not valid JSON.`);
-    }
-  }, options);
+function fetchJson(relative: string, options?: RequestOptions): Promise<unknown> {
+  return fetchPublishedJson(`${import.meta.env.BASE_URL}data/`, relative, options);
 }
 
 function record(value: unknown): value is Record<string, unknown> {

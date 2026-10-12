@@ -7,7 +7,10 @@ The piece docs/backend_free_hosting.md left to the owner: start the backend at l
 logoff or reboot. This script starts what is not running and leaves alone what is.
 It does not run on resume from sleep; the PC must stay awake to serve requests.
 With -Watch, start missing components on the first pass, then check every 60 seconds
-and start a missing component after three consecutive failures.
+and start a missing component after three consecutive failures. What it sees but must
+not repair (an api that answers while /ready is not ready, recorded processes alive
+behind a silent api, a backend a launch did not bring back) it reports by asking
+GitHub to run the uptime check now, which opens the incident within minutes.
 -DryRun checks once, prints status and planned starts, and changes nothing.
 
   powershell -ExecutionPolicy Bypass -File scripts\start_backend_at_logon.ps1
@@ -37,6 +40,9 @@ param(
     [string]$Cloudflared = "",
     [ValidatePattern('^[A-Za-z0-9_-]+$')]
     [string]$ConnectorLabel = "squadopt-logon",
+    # The GitHub CLI that asks for the uptime check; found on PATH or in its default
+    # folder when empty.
+    [string]$GitHubCli = "",
     [switch]$Watch,
     [switch]$DryRun,
     [switch]$Register,
@@ -96,6 +102,10 @@ if ($Register) {
         $Cloudflared = (Resolve-Path -LiteralPath $Cloudflared).Path
         $link.Arguments += " -Cloudflared `"$Cloudflared`""
     }
+    if ($GitHubCli -ne "") {
+        $GitHubCli = (Resolve-Path -LiteralPath $GitHubCli).Path
+        $link.Arguments += " -GitHubCli `"$GitHubCli`""
+    }
     $link.WorkingDirectory = $RepoRoot
     $link.WindowStyle = 7
     $link.Description = "Starts the SquadOpt advice backend and its tunnel connector at logon"
@@ -152,7 +162,15 @@ function Get-BackendBlocker {
 
 function Start-MissingBackend {
     $blocker = Get-BackendBlocker
-    if ($blocker) { Write-Condition "backend" $blocker; return }
+    if ($blocker) {
+        Write-Condition "backend" $blocker
+        Send-OperatorAlert "the api is silent while its recorded processes are alive"
+        return
+    }
+    $script:launchesSinceHealthy++
+    if ($script:launchesSinceHealthy -ge 2) {
+        Send-OperatorAlert "the backend did not come back after a launch"
+    }
     if ($DryRun) {
         Write-Line "would ask the launcher to start the backend on 127.0.0.1:$Port; it refuses while recorded processes are alive"
         return
@@ -193,7 +211,90 @@ function Start-MissingConnector {
     } catch { Write-Line "tunnel launch failed: $_" }
 }
 
+# The api can answer /health while its workers are dead or its queue is stuck; /ready says
+# so. The watcher never kills or restarts a running backend, so it does not repair this.
+function Test-BackendReady {
+    try {
+        $ready = Invoke-WebRequest -UseBasicParsing -TimeoutSec 5 "http://127.0.0.1:$Port/ready"
+        if ($ready.StatusCode -ne 200) { return $false }
+        return ((($ready.Content | ConvertFrom-Json).ready) -eq $true)
+    } catch { return $false }
+}
+
+# What the watcher sees but must not repair reaches the owner within minutes: the
+# repository's uptime check is asked to run now, and it opens the backend-down incident,
+# assigned to the owner, in a red run GitHub mails, instead of waiting for the schedule's
+# next slot, hours apart (docs/backend_free_hosting.md). Asked once per episode, and once
+# more when the backend is ready again, so the incident closes. $requestTaken says
+# whether GitHub took the request (a return value would carry the logged lines too). A
+# refused or failed request is tried again at the fifth call after it, so a broken CLI
+# is not run every minute.
+function Request-UptimeCheck([string]$reason) {
+    $script:requestTaken = $false
+    if ($script:requestSkips -gt 0) {
+        $script:requestSkips--
+        return
+    }
+    if ($DryRun) {
+        Write-Line "would ask GitHub to run the uptime check now: $reason"
+        $script:requestTaken = $true
+        return
+    }
+    $gh = $GitHubCli
+    if (-not $gh) {
+        $found = @(Get-Command gh -CommandType Application -ErrorAction SilentlyContinue)
+        if ($found.Count -gt 0) { $gh = $found[0].Path } else { $gh = "C:\Program Files\GitHub CLI\gh.exe" }
+    }
+    # Windows PowerShell 5.1 turns a native command's redirected stderr into a terminating
+    # error under the Stop preference; the answer is read instead.
+    $preference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $global:LASTEXITCODE = 0
+        $answer = & $gh workflow run backend-uptime.yml -f dry_run=false -R MyManDev/football-squad-optimizer 2>&1
+        if ($LASTEXITCODE -eq 0) {
+            Write-Line "asked GitHub to run the uptime check now: $reason"
+            $script:requestTaken = $true
+            return
+        }
+        Write-Line ("could not ask GitHub to run the uptime check ({0}): {1}" -f $reason, (($answer | Out-String).Trim()))
+    } catch {
+        Write-Line "could not ask GitHub to run the uptime check ($reason): $_"
+    } finally { $ErrorActionPreference = $preference }
+    $script:requestSkips = 4
+}
+
+# The episode is kept in a file beside the process registry, so a watcher the task starts
+# again after a reboot or a logoff still asks for the run that closes the incident.
+$alertMarker = Join-Path $RepoRoot "data\runtime\backend\run\watch-alert.txt"
+
+function Set-AlertMarker([bool]$on) {
+    if ($DryRun) { return }
+    try {
+        if ($on) {
+            New-Item -ItemType Directory -Force (Split-Path -Parent $alertMarker) | Out-Null
+            (Get-Date).ToUniversalTime().ToString("s") | Out-File -FilePath $alertMarker -Encoding ascii
+        } elseif (Test-Path -LiteralPath $alertMarker) {
+            Remove-Item -LiteralPath $alertMarker -Force
+        }
+    } catch { Write-Line "could not record the alert episode: $_" }
+}
+
+function Send-OperatorAlert([string]$reason) {
+    if ($script:alerted) { return }
+    Request-UptimeCheck $reason
+    if ($script:requestTaken) {
+        $script:alerted = $true
+        Set-AlertMarker $true
+    }
+}
+
 $backendFailures = 0
+$notReadyChecks = 0
+$launchesSinceHealthy = 0
+$requestSkips = 0
+$requestTaken = $false
+$alerted = Test-Path -LiteralPath $alertMarker
 $connectorFailures = 0
 $threshold = 1
 $labelPattern = '(?:^|\s)--label(?:=|\s+)"?' + [regex]::Escape($ConnectorLabel) + '"?(?=\s|$)'
@@ -222,7 +323,24 @@ try {
     } catch { }
     if ($answers) {
         $backendFailures = 0
-        Write-Condition "backend" "backend healthy on 127.0.0.1:$Port"
+        $launchesSinceHealthy = 0
+        if (Test-BackendReady) {
+            $notReadyChecks = 0
+            Write-Condition "backend" "backend healthy on 127.0.0.1:$Port"
+            if ($alerted) {
+                Request-UptimeCheck "the backend is healthy and ready again"
+                if ($requestTaken) {
+                    $alerted = $false
+                    Set-AlertMarker $false
+                }
+            }
+        } else {
+            $notReadyChecks++
+            Write-Condition "backend" "backend answers on 127.0.0.1:$Port but /ready is not ready"
+            if ($notReadyChecks -ge 3) {
+                Send-OperatorAlert "the backend answers but /ready has not been ready for three checks"
+            }
+        }
     } else { $backendFailures++ }
     if ($backendFailures -ge $threshold) {
         Start-MissingBackend

@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { installLeagueMocks } from "./leagueMocks";
 import AxeBuilder from "@axe-core/playwright";
 import { mockLeagueMembersEnvelope } from "../src/fixtures/league";
 import { MESSAGES } from "../src/i18n/messages";
@@ -24,6 +25,7 @@ for (const language of ["en", "tr"] as const) {
       ...state,
     }));
     await page.addInitScript((value) => localStorage.setItem("squadopt.language", value), language);
+    await installLeagueMocks(page);
     await page.route("**/data/league/members.json", (route) =>
       route.fulfill({ json: publication }),
     );

@@ -279,4 +279,16 @@ describe("the fixture document", () => {
     serve(published(broken));
     expect(await loadFixtures()).toBeNull();
   });
+
+  it("is absent when not published, and reads the 404's body so the request ends", async () => {
+    const response = new Response("<!doctype html><p>No document is published.</p>", {
+      status: 404,
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => response),
+    );
+    expect(await loadFixtures()).toBeNull();
+    expect(response.bodyUsed).toBe(true);
+  });
 });

@@ -11,8 +11,21 @@ FIXTURE_SCOPES = (
     "ambiguous",
     "unspecified",
 )
-CLAIM_SCOPE_VERSION = "source_fixture_scope_v1"
-_MATCH = r"(?:the )?(?:upcoming|next) (?:premier )?league (?:match|game)"
+CLAIM_SCOPE_VERSION = "source_fixture_scope_v2"
+_NOUN = r"(?:match|game|fixture)"
+_MATCH = rf"(?:the )?(?:upcoming|next) (?:premier )?league {_NOUN}"
+
+#: What may stand between a sentence boundary and the quote: space, and a quotation mark
+#: or bracket that opens (before) or closes (after) the sentence the quote is.
+_SPACE = " \t"
+_MARKS = "\"'\u201c\u201d\u2018\u2019()[]"
+_SENTENCE_END = ".!?"
+_BOUNDARY = _SENTENCE_END + "\n\r"
+#: What may stand before the quoted statement: a boundary, or the colon that introduces
+#: reported words ("Arteta said: ...", "Coach: ...").
+_OPENING = _BOUNDARY + ":"
+#: What may close the quoted statement itself: a period, an exclamation mark or a line end.
+_STATEMENT_END = ".!\n\r"
 
 
 def verified_fixture_scope(
@@ -37,7 +50,7 @@ def verified_fixture_scope(
         return "ambiguous", False
     past = bool(
         re.search(
-            r"\b(?:previous|last|yesterday's) (?:premier )?league (?:match|game)\b|\byesterday\b",
+            rf"\b(?:previous|last|yesterday's) (?:premier )?league {_NOUN}\b|\byesterday\b",
             text,
         )
     )
@@ -48,7 +61,16 @@ def verified_fixture_scope(
             text,
         )
     )
-    upcoming = bool(re.search(r"\b(?:upcoming|next) (?:premier )?league (?:match|game)\b", text))
+    # A label with no clause rule below is verified by this search alone, so "fixture" names
+    # the league match here only where it ends the clause, as in every clause form below;
+    # "the next league fixture list" is the schedule, not a match.
+    upcoming = bool(
+        re.search(
+            r"\b(?:upcoming|next) (?:premier )?league "
+            r"(?:match|game|fixture(?=\s*(?:[.!,;]|$)))\b",
+            text,
+        )
+    )
     if past or other:
         return ("ambiguous" if upcoming else "past" if past else "other_competition"), False
     if not upcoming:
@@ -66,10 +88,12 @@ def verified_fixture_scope(
     ):
         return "ambiguous", False
     absence = (
-        rf"(?:will miss {_MATCH}"
+        rf"(?:(?:will miss|misses) {_MATCH}"
+        rf"|will play no part in {_MATCH}"
         rf"|(?:will not|won't|cannot|can't) (?:play|feature|travel|be available) "
         rf"(?:(?:in|for|to) )?{_MATCH}"
-        rf"|(?:is|has been|will be) (?:ruled out|unavailable|out) (?:for|of) {_MATCH})"
+        rf"|(?:is not|isn't) available for {_MATCH}"
+        rf"|(?:is|has been|will be) (?:ruled out|unavailable|out|sidelined) (?:for|of) {_MATCH})"
     )
     if disposition == "stated_expected_absent" and not _named_clause(text, player_name, absence):
         return "ambiguous", False
@@ -77,6 +101,45 @@ def verified_fixture_scope(
     if disposition == "stated_rotation_risk" and not _named_clause(text, player_name, rotation):
         return "ambiguous", False
     return "upcoming_premier_league", True
+
+
+def is_whole_sentence(text: bytes, first: int, last: int) -> bool:
+    """Whether ``text[first:last]`` is a complete sentence of ``text``, not part of one.
+
+    :func:`verified_fixture_scope` reads the quote alone, and "Saka will miss the next
+    Premier League match." is also a substring of "It is not true that Saka will miss the
+    next Premier League match." So a claim's scope is verified only where the source's own
+    text bounds the quote: before it, the start of the text, a line break, the end of a
+    sentence or the colon that introduces reported words; after it, the end of the text, a
+    line break or the end of a sentence. A question mark is not the end of a statement, and
+    an ellipsis is not the end of anything.
+
+    The manager-word reader holds a copy of this rule
+    (``squadopt.application.manager_words._is_whole_sentence``), and the two must agree: a
+    table flag set by one definition and refused by the other says something no consumer
+    acts on. A test holds both copies to the same answers.
+    """
+    try:
+        before = text[:first].decode("utf-8")
+        quoted = text[first:last].decode("utf-8")
+        after = text[last:].decode("utf-8")
+    except UnicodeDecodeError:
+        return False
+    lead = before.rstrip(_SPACE).rstrip(_MARKS).rstrip(_SPACE)
+    if lead and lead[-1] not in _OPENING:
+        return False
+    rest = after.lstrip(_SPACE).lstrip(_MARKS).lstrip(_SPACE)
+    if rest.startswith((".", "\u2026")):
+        # "... if he fails a late test": the sentence goes on, whatever the quote ends with.
+        return False
+    core = quoted.strip().rstrip(_MARKS)
+    if core.endswith(("..", "\u2026")):
+        return False
+    if core.endswith((".", "!")):
+        return True
+    if core.endswith("?") or rest.startswith("?"):
+        return False
+    return not rest or rest[0] in _STATEMENT_END
 
 
 def _named_clause(text: str, player_name: str | None, predicate: str) -> bool:
@@ -100,7 +163,7 @@ def _full_match_inability(text: str, player_name: str | None) -> bool:
     )
     full = r"(?:full|whole|entire)"
     minutes = r"(?:full )?(?:90|ninety) minutes"
-    direct = rf"{inability}{full} (?:upcoming|next) (?:premier )?league (?:match|game)"
+    direct = rf"{inability}{full} (?:upcoming|next) (?:premier )?league {_NOUN}"
     followed = rf"{inability}(?:{full} (?:match|game)|{minutes}) (?:in|during|of) {_MATCH}"
     if _named_clause(text, player_name, rf"(?:{direct}|{followed})"):
         return True

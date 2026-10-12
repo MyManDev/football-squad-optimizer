@@ -29,6 +29,8 @@ async function run({
   ignoreClose = false,
   failCreate = false,
   missingLabel = false,
+  assignee = "",
+  unassignable = "",
 } = {}) {
   const real = {
     number: 42,
@@ -41,6 +43,7 @@ async function run({
   const calls = [];
   const logs = [];
   const failures = [];
+  const warnings = [];
   const urls = [];
   let fetches = 0;
   const api = {
@@ -55,6 +58,9 @@ async function run({
     create: async (args) => {
       calls.push(["create", args]);
       if (failCreate) throw new Error("create denied");
+      if (unassignable && args.assignees?.includes(unassignable)) {
+        throw Object.assign(new Error("Validation Failed"), { status: 422 });
+      }
       const issue = {
         ...args,
         number: 99,
@@ -104,6 +110,7 @@ async function run({
           EXERCISE: exercise,
           TEST_HEALTH_URL: healthUrl,
           GITHUB_RUN_ATTEMPT: "2",
+          ALERT_ASSIGNEE: assignee,
         },
       },
       {
@@ -113,7 +120,11 @@ async function run({
         serverUrl: "https://example.test",
       },
       github,
-      { info: (line) => logs.push(line), setFailed: (line) => failures.push(line) },
+      {
+        info: (line) => logs.push(line),
+        setFailed: (line) => failures.push(line),
+        warning: (line) => warnings.push(line),
+      },
       async (url) => {
         fetches += 1;
         urls.push(String(url));
@@ -133,7 +144,7 @@ async function run({
   } catch (caught) {
     error = caught;
   }
-  return { issues, calls, logs, failures, fetches, urls, error };
+  return { issues, calls, logs, failures, warnings, fetches, urls, error };
 }
 
 describe("backend alarm issue exercise", () => {
@@ -344,5 +355,77 @@ describe("backend readiness probe", () => {
       false,
     );
     expect(result.logs.some((line) => line.startsWith("Dry run: would open incident;"))).toBe(true);
+  });
+});
+
+describe("the alarm reaches a person", () => {
+  const down = { event: "schedule", exercise: "false", production: false, response: 503 };
+
+  it("fails the run that opens an incident, and assigns it to the configured login", async () => {
+    const result = await run({ ...down, assignee: "owner-login" });
+    expect(result.error).toBeUndefined();
+    const created = result.calls.find(([kind]) => kind === "create")[1];
+    expect(created.assignees).toEqual(["owner-login"]);
+    expect(result.failures).toEqual([
+      "The backend is down: health (HTTP 503), ready (HTTP 503, false: worker_heartbeat).",
+    ]);
+  });
+
+  it("opens the incident unassigned when GitHub refuses the login, and says so", async () => {
+    const result = await run({ ...down, assignee: "gone-member", unassignable: "gone-member" });
+    expect(result.error).toBeUndefined();
+    const creates = result.calls.filter(([kind]) => kind === "create").map(([, args]) => args);
+    expect(creates).toHaveLength(2);
+    expect(creates[0].assignees).toEqual(["gone-member"]);
+    expect(creates[1]).not.toHaveProperty("assignees");
+    expect(result.issues.get(99).labels).toEqual(["backend-down"]);
+    expect(result.warnings).toHaveLength(1);
+    expect(result.failures).toEqual([
+      "The backend is down: health (HTTP 503), ready (HTTP 503, false: worker_heartbeat).",
+    ]);
+  });
+
+  it("assigns nobody without a login, or with one that is not a login", async () => {
+    for (const assignee of ["", "  ", "owner login", "@owner", "a".repeat(40)]) {
+      const result = await run({ ...down, assignee });
+      expect(result.calls.find(([kind]) => kind === "create")[1]).not.toHaveProperty("assignees");
+      expect(result.failures).toHaveLength(1);
+    }
+  });
+
+  it("fails again only when what fails changes, never while it stays the same", async () => {
+    const notReady = JSON.stringify({ ready: false, checks: { worker_heartbeat: false } });
+    const changed = await run({
+      event: "schedule",
+      exercise: "false",
+      readyResponse: 503,
+      readyBody: notReady,
+    });
+    expect(changed.failures).toEqual([
+      "The backend is still down, and what fails changed: ready (HTTP 503, false: worker_heartbeat).",
+    ]);
+    const same = await run({
+      event: "schedule",
+      exercise: "false",
+      readyResponse: 503,
+      readyBody: notReady,
+      incidentBody: changed.issues.get(42).body,
+    });
+    expect(same.logs.some((line) => line.startsWith("Check: no change;"))).toBe(true);
+    expect(same.failures).toEqual([]);
+  });
+
+  it("passes on recovery, on a healthy check and in a dry run, and never assigns an exercise", async () => {
+    const recovered = await run({ event: "schedule", exercise: "false", assignee: "owner-login" });
+    expect(recovered.issues.get(42).state).toBe("closed");
+    expect(recovered.failures).toEqual([]);
+    const healthy = await run({ event: "schedule", exercise: "false", production: false });
+    expect(healthy.failures).toEqual([]);
+    const dry = await run({ ...down, event: "workflow_dispatch", dryRun: "true" });
+    expect(dry.failures).toEqual([]);
+    expect(dry.calls.some(([kind]) => kind === "create")).toBe(false);
+    const exercise = await run({ assignee: "owner-login" });
+    expect(exercise.failures).toEqual([]);
+    expect(exercise.calls.find(([kind]) => kind === "create")[1]).not.toHaveProperty("assignees");
   });
 });

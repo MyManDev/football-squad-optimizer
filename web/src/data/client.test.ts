@@ -24,3 +24,28 @@ it.each([null, [], "wrong"])(
     );
   },
 );
+
+it.each([
+  [404, "NotFoundError"],
+  [502, "Error"],
+])("reads a %i answer's body before refusing it", async (status, name) => {
+  const response = new Response("<!doctype html><p>No document is published.</p>", { status });
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => response),
+  );
+  await expect(new StaticDataClient().getStatus("2026-27")).rejects.toMatchObject({ name });
+  expect(response.bodyUsed).toBe(true);
+});
+
+it("reads a missing live score's body before refusing it", async () => {
+  const response = new Response("<!doctype html>", { status: 404 });
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => response),
+  );
+  await expect(new StaticDataClient().getLiveScore("2026-27", 6)).rejects.toMatchObject({
+    name: "NotFoundError",
+  });
+  expect(response.bodyUsed).toBe(true);
+});
