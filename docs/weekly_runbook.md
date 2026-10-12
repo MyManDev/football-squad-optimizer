@@ -38,10 +38,10 @@ other league is under `data/advice_records/leagues/<league id>/<season>/...`. A 
 leagues therefore has one record of a capture in each, and neither refuses the other. The
 league receipt says per league whether it was recorded (`leagues.<id>.advice_recorded`), and
 its top-level `advice_recorded` is whether every league was. A league's histories are refused,
-before any member is solved, when they would drop a gameweek the histories they replace carry
-for a member this run renders: the refusal names each member and week, and the records of
-those weeks are to be restored rather than published as absent. A week whose status changes
-(unsettled to settled) is not a drop. The per-league `member_notes`, `removed`,
+before any of that league's members is solved, when they would drop a gameweek the histories
+they replace carry for a member this run renders: the refusal names each member and week, and
+the records of those weeks are to be restored rather than published as absent. A week whose
+status changes (unsettled to settled) is not a drop. The per-league `member_notes`, `removed`,
 `top100_note` and `purchase_prices_note` sit under `leagues.<id>`. The last says for how many
 captured members the purchase prices were rebuilt from the transfers list, and why not for
 each of the others; `scripts.build_league_site` prints the same line as `purchase`.
