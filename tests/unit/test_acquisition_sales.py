@@ -6,6 +6,8 @@ import pandas as pd
 import pytest
 
 from squadopt.planning import ChipAvailability, InitialSquadState, PlanningHorizon
+from squadopt.planning import optimizer as planning_optimizer
+from squadopt.planning.acquisition import AcquisitionSales
 from squadopt.planning.models import TransferPlanningConfig, TransferPlanningConfigurationError
 from squadopt.planning.optimizer import optimize_transfer_plan
 
@@ -163,3 +165,57 @@ def test_observed_continuation_rebases_with_the_supplied_fee(
         horizon.table.loc[horizon.table.player_id.eq("FWD_B"), "sell_price_tenths"].item()
         == expected
     )
+
+
+def _encodings(monkeypatch):
+    built = []
+
+    def build(*args, **kwargs):
+        built.append(AcquisitionSales(*args, **kwargs))
+        return built[-1]
+
+    monkeypatch.setattr(planning_optimizer, "AcquisitionSales", build)
+    return built
+
+
+@pytest.mark.parametrize(("fee", "expected"), [(None, [20, 22, 12, 14, 14]), (0.5, None)])
+def test_frozen_prices_sell_the_original_at_its_supplied_price(
+    known_optimum_players, small_config, monkeypatch, fee, expected
+):
+    built = _encodings(monkeypatch)
+    result = _solve(
+        known_optimum_players,
+        small_config,
+        [60] * 5,
+        ["FWD_B", "FWD_A", "FWD_B", "FWD_A", "FWD_A"],
+        fee=fee,
+        original="FWD_B",
+        supplied=[52] * 5,
+    )
+    # The original sells for the supplied 52. A sells for its own 50, the copy of B
+    # bought back at 60 sells for 60, where the supplied path would credit 52 again.
+    assert result.solver_status.name == "OPTIMAL"
+    banks = [w.bank_after_tenths for w in result.weeks]
+    assert banks == (expected or [20, 22, 12, 22, 22])
+    assert result.weeks[1].transfers_out.iloc[0].sell_price_tenths == 52
+    if fee is not None:
+        assert [sales.encoding for sales in built] == ["original_held"]
+        assert result.weeks[3].transfers_out.iloc[0].sell_price_tenths == 60
+
+
+def test_frozen_prices_never_pay_a_supplied_price_for_a_player_not_held(
+    known_optimum_players, small_config, monkeypatch
+):
+    built = _encodings(monkeypatch)
+    result = _solve(
+        known_optimum_players,
+        small_config,
+        [60] * 3,
+        ["FWD_A", "FWD_B", "FWD_A"],
+        supplied=[52] * 3,
+    )
+    # B is bought at 60 and sold at 60: its supplied 52 would describe a holding the
+    # horizon never started with.
+    assert [sales.encoding for sales in built] == ["original_held"]
+    assert [w.bank_after_tenths for w in result.weeks] == [20, 10, 20]
+    assert result.weeks[2].transfers_out.iloc[0].sell_price_tenths == 60
