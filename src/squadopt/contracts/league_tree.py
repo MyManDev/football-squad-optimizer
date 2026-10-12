@@ -5,18 +5,23 @@ A site publishes ``data/leagues.json``, the directory, and one tree per league u
 device-plan document, history/). The directory is the set of leagues the last publication
 rendered: one run renders every league from one capture for one week, and writes the
 directory whole. Beside the trees, one device-plan table per capture lives under
-``data/device/<capture>/device-plan.json``: the same table for every league of the run,
-keyed by the capture so it never changes once written and can be cached long. A directory
-line names its league's table under ``device_plan``; a line from before the table has
-none. Readers read the directory first; a site from before it carried one
-league under ``data/league/`` and is read as a directory of one, and the first
-publication into the new layout adopts that tree as the league's own. Every writer and
-reader of a league tree takes its path from here, so no module spells the layout.
+``data/device/<capture>/device-plan.json``: the same table for every league of the run.
+A directory line names its league's table under ``device_plan`` and the sha256 of the
+table file's bytes under ``device_plan_sha256``. The path is the capture's, but the table
+is replaced when the week is published again from that capture, so a reader fetches it
+with the digest as its version and checks the bytes against it; the path alone is never
+cached as unchanging. A line from before the table has neither. Readers read the
+directory first; a site from before it carried one league under ``data/league/`` and is
+read as a directory of one, and the first publication into the new layout adopts that
+tree as the league's own. Every writer and reader of a league tree takes its path from
+here, so no module spells the layout.
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
+import re
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
@@ -30,6 +35,7 @@ LEGACY_TREE: Final = "league"
 #: The per-capture device-plan tables, one directory per capture.
 DEVICE_ROOT: Final = "device"
 DEVICE_PLAN_FILE: Final = "device-plan.json"
+_SHA256: Final = re.compile(r"[0-9a-f]{64}")
 
 
 class LeagueDirectoryError(ValueError):
@@ -76,6 +82,16 @@ def device_plan_capture(device_plan: str) -> str | None:
     return None
 
 
+def device_plan_sha256(site_data_root: Path, device_plan: str) -> str | None:
+    """The sha256 of the table a directory line names, as its file's bytes, or None where
+    the file is missing. A line carries it as ``device_plan_sha256``."""
+
+    target = Path(site_data_root) / Path(*PurePosixPath(device_plan).parts)
+    if not target.is_file():
+        return None
+    return hashlib.sha256(target.read_bytes()).hexdigest()
+
+
 @dataclass(frozen=True, slots=True)
 class PublishedLeague:
     """One line of the directory: the league, its season and deadline, and its tree."""
@@ -88,6 +104,9 @@ class PublishedLeague:
     #: The league's device-plan table, relative to ``data/`` (``device_plan_path``); None on
     #: a line from before the per-capture table, whose readers take the tree's own copy.
     device_plan: str | None = None
+    #: The sha256 of that table's file, its version: the table at a path is replaced when
+    #: its capture is published again. Present exactly when ``device_plan`` is.
+    device_plan_sha256: str | None = None
 
     def as_record(self) -> dict[str, Any]:
         record: dict[str, Any] = {
@@ -100,19 +119,22 @@ class PublishedLeague:
         if self.device_plan is not None:
             # Not coerced: a value that is not a path is refused where the line is checked.
             record["device_plan"] = self.device_plan
+        if self.device_plan_sha256 is not None:
+            record["device_plan_sha256"] = self.device_plan_sha256
         return record
 
 
 def _published(record: object) -> PublishedLeague:
     if not isinstance(record, dict):
         raise LeagueDirectoryError("A directory line is an object.")
-    league_id, name, season, gameweek, path, device_plan = (
+    league_id, name, season, gameweek, path, device_plan, digest = (
         record.get("league_id"),
         record.get("league_name"),
         record.get("season"),
         record.get("gameweek"),
         record.get("path"),
         record.get("device_plan"),
+        record.get("device_plan_sha256"),
     )
     if device_plan is not None and (
         not isinstance(device_plan, str)
@@ -121,6 +143,12 @@ def _published(record: object) -> PublishedLeague:
         or ".." in PurePosixPath(device_plan).parts
     ):
         raise LeagueDirectoryError(f"A directory line names no usable device plan: {record!r}.")
+    if (device_plan is None) != (digest is None) or (
+        digest is not None and (not isinstance(digest, str) or not _SHA256.fullmatch(digest))
+    ):
+        raise LeagueDirectoryError(
+            f"A directory line names its device plan with the sha256 of its bytes: {record!r}."
+        )
     if (
         isinstance(league_id, bool)
         or not isinstance(league_id, int)
@@ -138,7 +166,7 @@ def _published(record: object) -> PublishedLeague:
         or not path
     ):
         raise LeagueDirectoryError(f"A directory line is not a published league: {record!r}.")
-    return PublishedLeague(league_id, name, season, gameweek, path, device_plan)
+    return PublishedLeague(league_id, name, season, gameweek, path, device_plan, digest)
 
 
 def read_league_directory(site_data_root: Path) -> list[PublishedLeague]:

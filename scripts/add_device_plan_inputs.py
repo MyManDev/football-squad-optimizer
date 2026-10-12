@@ -46,6 +46,7 @@ from squadopt.contracts.league import LEAGUE_VIEW_CONTRACT_VERSION
 from squadopt.contracts.league_tree import (
     LEAGUE_DIRECTORY_FILE,
     device_plan_path,
+    device_plan_sha256,
     read_league_directory,
     single_league_tree,
     write_league_directory,
@@ -208,10 +209,14 @@ def add_device_plan_inputs(
     if lines:
         # The directory keeps its own stamp, the latest league's: the release check reads it.
         directory = _read(site_data_root / LEAGUE_DIRECTORY_FILE)
+        # The line names the table with the sha256 of its bytes, the table's version.
+        digest = device_plan_sha256(site_data_root, table.as_posix())
         write_league_directory(
             site_data_root,
             [
-                replace(line, device_plan=table.as_posix()) if line.league_id == league_id else line
+                replace(line, device_plan=table.as_posix(), device_plan_sha256=digest)
+                if line.league_id == league_id
+                else line
                 for line in lines
             ],
             generated_at_utc=str(directory["generated_at_utc"]),

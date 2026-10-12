@@ -1,5 +1,6 @@
 """Weekly service composition keeps provenance, preflight and preview semantics."""
 
+import hashlib
 import json
 import re
 import shutil
@@ -1412,9 +1413,14 @@ def test_a_league_dropped_from_the_list_leaves_the_site_with_its_tree(tmp_path: 
         "league_device_plan_v2"
     )
     assert (operation.paths.out / "data" / "leagues" / "352490" / "members.json").is_file()
-    # This week's table is written once under its capture and journaled with the stage.
+    # This week's table is written once under its capture and journaled with the stage,
+    # and the directory names it with the digest of the bytes written now.
     table = operation.paths.out / "data" / "device" / league["snapshot_id"] / "device-plan.json"
     assert table.is_file()
+    listed = json.loads((operation.paths.out / "data" / "leagues.json").read_text("utf-8"))
+    assert [line["device_plan_sha256"] for line in listed["payload"]["leagues"]] == [
+        hashlib.sha256(table.read_bytes()).hexdigest()
+    ]
     recorded = [
         row["path"]
         for stage in doc["stages"]

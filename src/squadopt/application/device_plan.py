@@ -11,8 +11,8 @@ on the member's device can state the same problem and return the same answer:
 - ``device_plan_capture_table``: the same table once per capture (contract v2), with no
   league in it, each player's element id and start price beside his code and price, and
   the season's chip windows and per-week transfer cap beside the policy's numbers. Written
-  under ``data/device/<capture>/`` so every league of a run shares it and a page can cache
-  it for as long as the capture is served.
+  under ``data/device/<capture>/`` so every league of a run shares it. A republish of the
+  capture replaces it, so the directory line names it with the sha256 of its bytes.
 - ``device_plan_entry``: one member's fifteen, the bank after the spending-power rule, the
   free transfers under the cap, and the sale price of each held player. One block per
   entry document, or ``None`` when the live path would refuse to plan for that member.
@@ -98,8 +98,9 @@ def device_plan_capture_table(
 ) -> dict[str, object]:
     """The capture's table once for every league of the run (contract v2).
 
-    Everything ``device_plan_table`` publishes except the league, so the document is a
-    function of the capture alone and is written once under ``data/device/<capture>/``.
+    Everything ``device_plan_table`` publishes except the league, so every league of a run
+    shares it under ``data/device/<capture>/``. It also depends on the run's inputs (the
+    handoff, the Top 100 inputs, the code), so a republish of the capture can replace it.
     Each player also carries ``element_id``, the game's per-season id the entry endpoints
     name him by, and ``start_tenths``, his price at the season's first deadline, both read
     from the capture's bootstrap; a table player the bootstrap does not name is refused.

@@ -96,10 +96,11 @@ The shared document does not depend on the league: every league a run renders ge
 same table. Since #981 step 1 the run writes it once more, once per capture, at
 `data/device/<source_snapshot_id>/device-plan.json`, in the same envelope, and each line of
 the league directory (`data/leagues.json`) names it under `device_plan`
-(`device/<capture>/device-plan.json`, relative to `data/`). The path carries the capture,
-so a page may cache the file for as long as the capture is served: a published table
-changes only when the week is published again from the same capture, which rewrites every
-tree too. Within a run the first league writes it and every later league finds it and
+(`device/<capture>/device-plan.json`, relative to `data/`) and the sha256 of the file's
+bytes under `device_plan_sha256`. The path carries the capture, but the table changes when
+the week is published again from the same capture, which rewrites every tree too. So the
+path alone is never cached as unchanging: a page fetches the table with the digest as its
+version and checks the bytes against it. Within a run the first league writes it and every later league finds it and
 leaves it; a table already on disk with another payload (an earlier build of the same
 capture with another handoff, other Top 100 inputs or other code) is refused before any
 member is solved (`league_publication.check_device_plan_table`). The weekly run removes
@@ -107,7 +108,8 @@ every table at the start of its league stage, after the preview is seeded, and w
 own capture's again (`remove_device_tables`); by hand, the operator removes
 `data/device/<capture>/` in the candidate and rebuilds every league of the list. A build of
 one league refuses a directory line whose table is another capture's, or is no per-capture
-table, as it refuses a tree rendered from another capture (`leagues_beside`). The tree keeps its own v1 copy during the
+table, as it refuses a tree rendered from another capture, and one whose table's bytes are
+not the ones its digest names (`leagues_beside`). The tree keeps its own v1 copy during the
 transition, for pages from before the per-capture table; the copy stops with #981 step 8,
 after GW20, with the owner's yes.
 

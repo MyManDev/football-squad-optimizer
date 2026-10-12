@@ -46,6 +46,7 @@ from squadopt.contracts.league_tree import (
     PublishedLeague,
     device_plan_capture,
     device_plan_path,
+    device_plan_sha256,
     league_tree,
     league_tree_dir,
     legacy_tree_league_id,
@@ -503,8 +504,11 @@ def check_device_plan_table(
 
     target = Path(site_data_root) / Path(*device_plan_path(snapshot_id).parts)
     if target.is_file():
-        existing = json.loads(target.read_text(encoding="utf-8"))
-        if existing.get("payload") != dict(document):
+        try:
+            existing = json.loads(target.read_text(encoding="utf-8"))
+        except ValueError:
+            existing = None
+        if not isinstance(existing, dict) or existing.get("payload") != dict(document):
             raise DataError(
                 f"{target} already holds another device-plan table for capture {snapshot_id}; "
                 "a table is written once per capture. Remove that directory in the candidate "
@@ -599,6 +603,12 @@ def leagues_beside(site_data_root: Path, league_id: int, snapshot_id: str) -> li
                     f"capture {table}; building league {league_id} alone from {snapshot_id} "
                     "would leave the site on two captures. Rebuild every league with the "
                     "weekly run's league list."
+                )
+            if device_plan_sha256(root, line.device_plan) != line.device_plan_sha256:
+                raise DataError(
+                    f"The site lists league {line.league_id} with a device-plan table whose "
+                    f"bytes are not the ones its line names ({line.device_plan}). Rebuild every "
+                    "league with the weekly run's league list."
                 )
         kept.append(line)
     return kept
@@ -710,14 +720,13 @@ def publish_prepared_league(
         chip_forecast_source=forecast_source(snapshot),
     )
     outputs = [out_dir / name for name in report.files]
-    outputs.append(
-        write_device_plan_table(
-            site_data,
-            request.snapshot_id,
-            table_payload,
-            generated_at_utc=report.generated_at_utc,
-        )
+    table_file = write_device_plan_table(
+        site_data,
+        request.snapshot_id,
+        table_payload,
+        generated_at_utc=report.generated_at_utc,
     )
+    outputs.append(table_file)
     if history_root is not None:
         # This publication's own member pages name this week's capture.
         shown.update(published_page_captures(out_dir))
@@ -753,6 +762,10 @@ def publish_prepared_league(
         gameweek=report.gameweek,
         path=league_tree(report.league_id).as_posix(),
         device_plan=device_plan_path(request.snapshot_id).as_posix(),
+        # The table's version: a republish of the capture replaces the file at this path.
+        device_plan_sha256=device_plan_sha256(
+            site_data, device_plan_path(request.snapshot_id).as_posix()
+        ),
     )
     directory = write_league_directory(
         site_data,

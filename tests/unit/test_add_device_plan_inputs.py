@@ -1,5 +1,6 @@
 """The script writes into an older tree exactly what the builder writes into a new one."""
 
+import hashlib
 import io
 import json
 import shutil
@@ -172,9 +173,10 @@ def test_on_a_directory_site_the_league_s_line_names_the_table_and_the_stamp_is_
     directory = json.loads((site / "leagues.json").read_text(encoding="utf-8"))
     # The directory keeps its own stamp; only this league's line gains the table.
     assert directory["generated_at_utc"] == "2026-09-01T12:00:00Z"
+    digest = hashlib.sha256((site / table).read_bytes()).hexdigest()
     assert read_league_directory(site) == [
         PublishedLeague(9, "League 9", "2026-27", 2, "leagues/9"),
-        PublishedLeague(352490, "Test League", "2026-27", 2, "leagues/352490", table),
+        PublishedLeague(352490, "Test League", "2026-27", 2, "leagues/352490", table, digest),
     ]
 
 
