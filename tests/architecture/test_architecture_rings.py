@@ -2,10 +2,11 @@
 
 ADR 0010 reads the packages under `src/squadopt` as five clean-architecture rings, R1
 (vocabulary) to R5 (composition), with the measurement laboratory as a research side tree. The
-rings are written in four places: the `RINGS` mapping below, the package table of
-`ARCHITECTURE.md`, the layer order and the contracts in `pyproject.toml`, and the `LABORATORY`
-list of `tests/architecture/test_run_boundary.py`. A ring written in prose drifts from the code
-the first time a package is added or moved, so this file holds the four to one another:
+rings are written in five places: the `RINGS` mapping below, the package table of
+`ARCHITECTURE.md`, the package map `src/squadopt/README.md`, the layer order and the contracts
+in `pyproject.toml`, and the `LABORATORY` list of `tests/architecture/test_run_boundary.py`. A
+ring written in prose drifts from the code the first time a package is added or moved, so this
+file holds the five to one another:
 
 - the mapping names exactly the entries under `src/squadopt` (the packages and the one
   top-level module, `integration.py`), and exactly the packages of the exhaustive layers list;
@@ -17,7 +18,10 @@ the first time a package is added or moved, so this file holds the four to one a
   list the run-boundary probe reads;
 - the package table of `ARCHITECTURE.md` matches the mapping row for row, and every contract in
   `pyproject.toml` has a row in its enforcement map and is named in the verification section of
-  `docs/architecture/dependency_rules.md`.
+  `docs/architecture/dependency_rules.md`;
+- the package map's table matches the mapping row for row, gives each package its position in
+  the layers list, and names, by the keys of its contract table, exactly the contracts that hold
+  the package as a source (the layers contract holds every package).
 
 A package that spans two rings, such as `data` (vocabulary and storage), is written with both
 rings, innermost first, exactly as the table writes it, and is placed by its innermost ring.
@@ -37,6 +41,7 @@ PACKAGE = REPOSITORY_ROOT / "src" / "squadopt"
 PYPROJECT = REPOSITORY_ROOT / "pyproject.toml"
 ARCHITECTURE = REPOSITORY_ROOT / "ARCHITECTURE.md"
 DEPENDENCY_RULES = REPOSITORY_ROOT / "docs" / "architecture" / "dependency_rules.md"
+PACKAGE_MAP = PACKAGE / "README.md"
 
 RESEARCH = "Research"
 
@@ -190,3 +195,33 @@ def test_every_contract_is_in_the_enforcement_map_and_the_dependency_rules() -> 
 
     assert sorted(mapped) == sorted(names)
     assert [name for name in names if f"`{name}`" not in verification] == []
+
+
+def test_the_package_map_places_every_package_by_ring_layer_and_contract() -> None:
+    text = PACKAGE_MAP.read_text(encoding="utf-8")
+    keys = {key: name for key, name in _table(text, "| Key | Contract |")}
+    contracts = _contracts()
+    assert list(keys.values()) == [contract["name"] for contract in contracts]
+
+    layers = _layers()
+    expected = {
+        name: (
+            RINGS[name],
+            str(layers.index(name) + 1),
+            {
+                contract["name"]
+                for contract in contracts
+                if contract["type"] == "layers"
+                or f"squadopt.{name}" in contract.get("source_modules", [])
+            },
+        )
+        for name in RINGS
+    }
+    rows = _table(text, "| Package | Ring | Layer | Owner | Checked by | Known violation |")
+    found = {
+        _unquoted(row[0]): (row[1], row[2], {keys[key.strip()] for key in row[4].split(",")})
+        for row in rows
+    }
+
+    assert found == expected
+    assert len(rows) == len(RINGS), "a package has two rows"

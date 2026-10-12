@@ -19,7 +19,7 @@ The Python code is one installed package, `squadopt`, arranged in dependency rin
 | Path | Responsibility |
 | --- | --- |
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | Rings, deployment units, scaling seams, enforcement and known violations |
-| `src/squadopt/`: product rings | `contracts` and the schema half of `data` (R1, vocabulary); `features`, `prediction`, `optimization`, `planning`, `scenarios`, `evaluation` and `live` (R2, domain); `application` and `integration` (R3, use cases); `platform`, `api` and the storage half of `data` (R4 adapters and R5 composition) |
+| [`src/squadopt/`](src/squadopt/README.md): product rings | `contracts` and the schema half of `data` (R1, vocabulary); `features`, `prediction`, `optimization`, `planning`, `scenarios`, `evaluation` and `live` (R2, domain); `application` and `integration` (R3, use cases); `platform`, `api` and the storage half of `data` (R4 adapters and R5 composition) |
 | `src/squadopt/`: research arm | `experiments`, `backtest`, `bayesopt`, `recalibration` and `preflight`, the measurement laboratory; no product package may import it |
 | [`scripts/`](scripts/README.md) | Repository commands, measurement runners, fixture generators and the release recipe, catalogued by role |
 | [`web/`](web/README.md) | Member website, runtime publication validation, the in-browser device solver and browser tests |

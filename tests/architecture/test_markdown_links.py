@@ -13,8 +13,8 @@ What does not count is skipped before matching:
 - fenced code blocks and inline code spans, because a link written as an example is text;
 - a target with a scheme (`https:`, `mailto:`) or one starting with `//`, because it leaves
   the repository and a test that needs the network is not a fitness function;
-- a target that is only an in-page anchor (`#section`). An anchor after a path is dropped
-  and the path is checked.
+- a target that is only an in-page anchor (`#section`) is not a path; the anchor check below
+  reads it. An anchor after a path is dropped and the path is checked.
 
 A target resolves when, read from the document's own folder (or from the repository root
 when it starts with `/`), it names a file git lists or a folder holding one. The listing is
@@ -24,6 +24,15 @@ counts while a pull request is being prepared, and a path the repository ignores
 machine running the test: it would not exist for anyone reading the link on GitHub. The
 comparison is exact, so a link whose case differs from the file's fails on Windows too, as it
 would on GitHub and in CI.
+
+An anchor is checked too, when it points into a Markdown document: `#section` in the
+document itself, or `guide.md#section` in another one. It must name a heading of that
+document, as GitHub derives the name from the heading's text (lower case, punctuation other
+than `-` and `_` dropped, each space a hyphen, and `-1`, `-2` added to repeats), or an
+`<a name>` or `<a id>` the document declares. Before this check was added the documents held
+69 links with such an anchor and one was broken: the table of contents of `scripts/README.md`
+pointed to a heading that had been renamed. A renamed heading breaks every link to it without
+moving a file, which the path check cannot see.
 """
 
 from __future__ import annotations
@@ -57,6 +66,24 @@ FENCE = re.compile(r"^\s*(`{3,}|~{3,})(.*)$")
 
 #: A target that leaves the repository: a scheme such as `https:` or `mailto:`, or `//host`.
 EXTERNAL = re.compile(r"^(?:[A-Za-z][A-Za-z0-9+.-]*:|//)")
+
+#: An ATX heading, `#` to `######`, with its optional closing run of `#`.
+HEADING = re.compile(r"^ {0,3}#{1,6}(?:[ \t]+(.*?))?(?:[ \t]+#+)?[ \t]*$")
+
+#: An anchor a document declares in HTML, `<a name="x">` or `<a id="x">`.
+HTML_ANCHOR = re.compile(r"<a\s+(?:[^>]*\s)?(?:name|id)=\"([^\"]+)\"")
+
+#: The inline markup a heading's text loses when it is rendered: a link or image keeps its
+#: text, an HTML tag is dropped, and code and emphasis keep what they wrap.
+RENDERED = (
+    (re.compile(r"!?\[((?:[^\[\]]|\[[^\[\]]*\])*)\]\([^()]*(?:\([^()]*\)[^()]*)*\)"), r"\1"),
+    (re.compile(r"<[^<>]+>"), ""),
+    (re.compile(r"`+"), ""),
+    (re.compile(r"(?<!\w)_{1,2}(?=\S)(.+?)(?<=\S)_{1,2}(?!\w)"), r"\1"),
+)
+
+#: What GitHub drops from a heading's text when it names the anchor.
+NOT_IN_AN_ANCHOR = re.compile(r"[^\w\- ]")
 
 
 def _listed_paths() -> list[str]:
@@ -102,10 +129,10 @@ def _resolvable(listed: list[str]) -> frozenset[str]:
     return frozenset(found)
 
 
-def _link_targets(text: str) -> list[tuple[int, str]]:
-    """The raw target of every link outside code, with its line number."""
+def _lines_outside_fences(text: str) -> list[tuple[int, str]]:
+    """Every line that is not inside a fenced code block, with its line number."""
 
-    targets: list[tuple[int, str]] = []
+    lines: list[tuple[int, str]] = []
     fence: str | None = None
     for number, line in enumerate(text.splitlines(), 1):
         marker = FENCE.match(line)
@@ -123,12 +150,62 @@ def _link_targets(text: str) -> list[tuple[int, str]]:
             if closes:
                 fence = None
             continue
+        lines.append((number, line))
+    return lines
+
+
+def _link_targets(text: str) -> list[tuple[int, str]]:
+    """The raw target of every link outside code, with its line number."""
+
+    targets: list[tuple[int, str]] = []
+    for number, line in _lines_outside_fences(text):
         prose = CODE_SPAN.sub("", line)
         targets.extend((number, target) for target in INLINE_LINK.findall(prose))
         definition = REFERENCE_DEFINITION.match(prose)
         if definition:
             targets.append((number, definition.group(1)))
     return targets
+
+
+def _anchor_name(heading: str) -> str:
+    """The anchor GitHub gives a heading, before a repeat is numbered."""
+
+    text = heading
+    for pattern, replacement in RENDERED:
+        text = pattern.sub(replacement, text)
+    return NOT_IN_AN_ANCHOR.sub("", text.strip().lower()).replace(" ", "-")
+
+
+def _anchors(text: str) -> frozenset[str]:
+    """Every anchor a document offers: its headings' names and its declared HTML anchors."""
+
+    found: set[str] = set()
+    seen: dict[str, int] = {}
+    for _, line in _lines_outside_fences(text):
+        found.update(HTML_ANCHOR.findall(line))
+        heading = HEADING.match(line)
+        if heading is None:
+            continue
+        name = _anchor_name(heading.group(1) or "")
+        repeat = seen.get(name, 0)
+        seen[name] = repeat + 1
+        found.add(name if repeat == 0 else f"{name}-{repeat}")
+    return frozenset(found)
+
+
+def _anchor_target(document: str, raw: str) -> tuple[str, str] | None:
+    """The Markdown document and the anchor a target names, or None when it names neither."""
+
+    target = raw[1:-1] if raw.startswith("<") and raw.endswith(">") else raw
+    if "#" not in target or EXTERNAL.match(target):
+        return None
+    path, anchor = target.split("#", 1)
+    if not anchor:
+        return None
+    named = _repository_path(document, path) if path else document
+    if named is None or not named.endswith(".md"):
+        return None
+    return named, unquote(anchor)
 
 
 def _repository_path(document: str, raw: str) -> str | None:
@@ -180,6 +257,75 @@ def test_every_relative_link_in_a_tracked_markdown_file_resolves() -> None:
             *broken,
         ]
     )
+
+
+def test_every_anchor_in_a_link_names_a_heading_of_its_document() -> None:
+    anchored: list[tuple[str, int, str, str, str]] = []
+    for document in _tracked_markdown():
+        source = REPOSITORY_ROOT / document
+        if not source.is_file():
+            continue
+        for number, raw in _link_targets(source.read_text(encoding="utf-8")):
+            named = _anchor_target(document, raw)
+            if named is not None:
+                anchored.append((document, number, raw, *named))
+    # If this ever falls near zero the patterns have stopped matching and the test is asleep.
+    assert len(anchored) >= 60, f"expected the documents to link to anchors; found {len(anchored)}"
+
+    offered: dict[str, frozenset[str]] = {}
+    broken: list[str] = []
+    for document, number, raw, target, anchor in anchored:
+        source = REPOSITORY_ROOT / target
+        if not source.is_file():
+            continue  # A missing document is the path check's finding, not this one's.
+        if target not in offered:
+            offered[target] = _anchors(source.read_text(encoding="utf-8"))
+        if anchor not in offered[target]:
+            broken.append(f"{document}:{number} links to {raw}")
+    assert not broken, "\n".join(
+        [
+            "An anchor names no heading of its document. Link to the heading's current name",
+            "(lower case, punctuation dropped, spaces as hyphens):",
+            *broken,
+        ]
+    )
+
+
+def test_a_heading_is_named_as_github_names_it() -> None:
+    """The naming rule is exercised on a synthetic document, so a drift in it is seen here."""
+
+    document = "\n".join(
+        [
+            "# Retired compatibility commands",
+            "## 7. Known violations",
+            "## ADR 0002 \u2014 Where contract versions live",
+            "### The `league_device_plan_v1` table, *in short*",
+            "## See [the guide](guide.md) and __this__ ##",
+            "## Notes",
+            "## Notes",
+            "```text",
+            "# not a heading",
+            "```",
+            '<a name="kept-by-hand"></a>',
+            "#hashtag is not a heading",
+        ]
+    )
+
+    assert _anchors(document) == {
+        "retired-compatibility-commands",
+        "7-known-violations",
+        "adr-0002--where-contract-versions-live",
+        "the-league_device_plan_v1-table-in-short",
+        "see-the-guide-and-this",
+        "notes",
+        "notes-1",
+        "kept-by-hand",
+    }
+    assert _anchor_target("docs/README.md", "#notes") == ("docs/README.md", "notes")
+    assert _anchor_target("docs/README.md", "guide.md#notes") == ("docs/guide.md", "notes")
+    assert _anchor_target("docs/README.md", "../src/app.py#L10") is None
+    assert _anchor_target("docs/README.md", "https://example.com/a.md#x") is None
+    assert _anchor_target("docs/README.md", "guide.md") is None
 
 
 def test_code_and_external_targets_are_not_links() -> None:

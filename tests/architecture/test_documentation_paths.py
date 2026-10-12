@@ -128,10 +128,9 @@ PROPOSED: dict[str, str] = {
 #: does not edit: the backend restart compares `src`, `scripts` and `docs/contracts` with the
 #: live release (ADR 0010, context). Each entry is the document and the citation, with the path
 #: it should name; the next change to that document fixes it and deletes the entry, and the
-#: test below fails once an entry excuses nothing.
-RELEASED_PATH_CITATIONS: dict[tuple[str, str], str] = {
-    ("scripts/README.md", "data/sources/vaastav.py"): "src/squadopt/data/sources/vaastav.py",
-}
+#: test below fails once an entry excuses nothing. It is empty: the one entry, a rooted
+#: `data/sources/vaastav.py` in `scripts/README.md`, was corrected with the catalogue's rows.
+RELEASED_PATH_CITATIONS: dict[tuple[str, str], str] = {}
 
 
 #: Where a measurement runner lives. Only a citation under one of these can be the forward

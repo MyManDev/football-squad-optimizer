@@ -175,7 +175,7 @@ inside functions, the other rows by reading the cited files.
 | Use cases and domain records import the storage half of `data` | `application`: 88 import statements in 29 modules; `live`: 17 in 9; `features`: 16 in 4 | Storage ports declared in `application`, with file adapters in `platform` | Phase 2: a shrink-only ratchet. Phase 3: the ports, triggered by ADR 0005 or issue #1010 |
 | `data` holds both R1 vocabulary and R4 storage, and sits at the bottom of the layer order | One package, two rings | The contract "The decision core and prediction import no storage or source module" keeps the packages that are clean today off the storage half | The contract is in force (Phase 1); the split itself is an open question in ADR 0010 |
 | `contracts` reads and writes files | `LEAGUE_LIST_FILE` and `read_league_list` in `src/squadopt/contracts/league_list.py`; `read_league_directory` and `write_league_directory` in `src/squadopt/contracts/league_tree.py` | Move the file IO to an adapter, with a one-release re-export | Phase 2: ratchet; Phase 3: after issue #981 |
-| Runtime code loads schemas from `docs/contracts` by a relative path | 7 modules: 2 in `application`, 5 in `platform` | A ratchet that allowlists the 7 modules, so that no eighth appears | Phase 2 |
+| Runtime code names `docs/contracts` by a path relative to the working directory | 8 modules: 2 in `application`, 6 in `platform`; each names a schema as the default target of the function that writes it or as a constant the tests read, and none reads it when it runs ([contracts guide](docs/contracts/README.md)) | A ratchet that allowlists the 8 modules, so that no ninth appears | Phase 2 |
 | The CP-SAT driver has no public port | 19 private names imported from `optimization.optimizer`: 5 by `planning/optimizer.py`, 7 by `scenarios/optimization.py`, 7 by `scenarios/rank.py` | A public solver driver in `optimization` | Phase 3 |
 | Ports are declared in an adapter ring | 15 of the 24 typed Protocols under `src/squadopt` are in `platform`; 3 are in `application` | Use-case ports move to `application` | Phase 3 |
 | Laboratory modules live in the use-case ring | Six `football_*_experiment` modules in `application`, imported only by tests; the run-boundary probe reports them as laboratory if a product entry point loads one | Move them to `experiments`, with no re-export | Phase 2, after agreement on issue #1012 |
@@ -196,9 +196,10 @@ lives. A module whose job is to talk to the outside world, such as a network cli
 launcher or a store, is an adapter and belongs in `platform`, or in the storage half of `data`
 for captured inputs. A module that only measures belongs in the research arm.
 
-**A script.** Add one row to the [script catalogue](scripts/README.md) in the same pull request.
-An operational command imports product packages only; `tests/architecture/test_run_boundary.py`
-imports every row of the operational table and fails if the laboratory loads. A measurement
+**A script.** Add one row to the [script catalogue](scripts/README.md) in the same pull request;
+every file under `scripts/` has exactly one. An operational command imports product packages
+only; `tests/architecture/test_run_boundary.py` imports every `.py` row of the operational table,
+apart from the three laboratory tools it names, and fails if the laboratory loads. A measurement
 runner writes its record to `docs/` and adds the row to the measurements index.
 
 **A document.** Follow the naming key in the [documentation guide](docs/README.md). A record is
@@ -217,4 +218,9 @@ state lives.
   [dependency rules](docs/architecture/dependency_rules.md),
   [system map](docs/architecture/system_map.md) and [ownership](docs/architecture/ownership.md)
 - [Architecture decision records](docs/architecture/decisions/README.md)
+- [Package map](src/squadopt/README.md), with the guides to
+  [platform](src/squadopt/platform/README.md),
+  [application](src/squadopt/application/README.md) and
+  [experiments](src/squadopt/experiments/README.md)
+- [Contracts guide](docs/contracts/README.md)
 - [Script catalogue](scripts/README.md), [test guide](tests/README.md) and [web guide](web/README.md)

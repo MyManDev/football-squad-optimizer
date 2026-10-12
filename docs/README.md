@@ -23,7 +23,7 @@ shape of the system, start with the [architecture overview](../ARCHITECTURE.md);
 | --- | --- |
 | [architecture/](architecture/README.md) | Working agreements: layering, ownership, branching, PR discipline, runtime boundaries |
 | [architecture/decisions/](architecture/decisions/README.md) | Architecture decision records, numbered and never renamed |
-| [contracts/](contracts/) | Versioned JSON schemas and contract notes; some schemas are loaded by the code at runtime, and the website generates its types from `ui_view_v1` |
+| [contracts/](contracts/README.md) | Versioned JSON schemas and contract notes; most schemas are written by a Python function and held to it by a test, and the website generates its types from `ui_view_v1` |
 | [operations/](operations/README.md) | The operations guide and newer operational references; the runbooks stay at the root of `docs/` |
 | [product/](product/README.md) | The member experience and the roadmap |
 | [research/](research/README.md) | The research guide, newer protocols and explanations, and their records; older records stay at the root |
