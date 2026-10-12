@@ -11,6 +11,13 @@ imports every product entry point and every ``.py`` row of the "Operational comm
 in ``scripts/README.md``, then reads ``sys.modules``. The rows are read from the README, so a
 command added there is covered without editing this file. If the union loads no laboratory
 module, no single one of them does.
+
+A laboratory module is any module of a laboratory package, and also a module of
+``squadopt.application`` whose name ends in ``_experiment``. Six such modules hold private
+football model experiments inside ``application`` and are imported only by tests
+(ARCHITECTURE.md, known violations). The contract that keeps the laboratory out of the
+product does not cover them, because they sit in a product package, so the probe reports one
+as soon as a product entry point or an operational command loads it.
 """
 
 from __future__ import annotations
@@ -31,6 +38,12 @@ LABORATORY = (
     "bayesopt",
     "recalibration",
     "preflight",
+)
+
+#: The modules the probe reports: every module of a laboratory package, and a module of
+#: ``application`` whose name ends in ``_experiment``.
+LABORATORY_MODULE = re.compile(
+    rf"squadopt\.(?:(?:{'|'.join(LABORATORY)})(?:\..+)?|application\.(?:\w+\.)*\w+_experiment)"
 )
 
 PRODUCT_ENTRY_POINTS = (
@@ -60,10 +73,11 @@ MOVED_TO_PROVENANCE = (
 )
 
 # Imports each named module in order and reports the laboratory modules each one loaded
-# first, so a failure names the import that brought the laboratory in.
+# first, so a failure names the import that brought the laboratory in. The first argument is
+# the pattern of `LABORATORY_MODULE`.
 PROBE = """
-import importlib, json, sys
-laboratory = set(sys.argv[1].split(","))
+import importlib, json, re, sys
+laboratory = re.compile(sys.argv[1])
 seen = set()
 loaded_by = {}
 for name in sys.argv[2:]:
@@ -71,9 +85,7 @@ for name in sys.argv[2:]:
     new = sorted(
         module
         for module in sys.modules
-        if module.startswith("squadopt.")
-        and module.split(".")[1] in laboratory
-        and module not in seen
+        if laboratory.fullmatch(module) and module not in seen
     )
     seen.update(new)
     if new:
@@ -100,13 +112,11 @@ def test_the_readme_table_names_the_commands_this_file_is_about() -> None:
     assert set(LABORATORY_TOOLS) <= set(commands)
 
 
-def test_the_product_and_the_operational_commands_load_no_laboratory_module() -> None:
-    modules = [
-        *PRODUCT_ENTRY_POINTS,
-        *(f"scripts.{name}" for name in operational_commands() if name not in LABORATORY_TOOLS),
-    ]
+def _laboratory_loaded_by(modules: list[str]) -> dict[str, list[str]]:
+    """Import `modules` in order in a fresh interpreter; the laboratory each loaded first."""
+
     result = subprocess.run(
-        [sys.executable, "-c", PROBE, ",".join(LABORATORY), *modules],
+        [sys.executable, "-c", PROBE, LABORATORY_MODULE.pattern, *modules],
         cwd=REPOSITORY_ROOT,
         env={
             **os.environ,
@@ -119,7 +129,31 @@ def test_the_product_and_the_operational_commands_load_no_laboratory_module() ->
     )
 
     assert result.returncode == 0, result.stdout + result.stderr
-    loaded_by = json.loads(result.stdout.splitlines()[-1])
+    loaded_by: dict[str, list[str]] = json.loads(result.stdout.splitlines()[-1])
+    return loaded_by
+
+
+def test_the_probe_reports_a_laboratory_module_that_lives_in_application() -> None:
+    """A pattern that matched nothing would pass the boundary test while checking nothing."""
+
+    assert LABORATORY_MODULE.fullmatch("squadopt.experiments")
+    assert LABORATORY_MODULE.fullmatch("squadopt.preflight.validator")
+    assert LABORATORY_MODULE.fullmatch("squadopt.application.football_unit_experiment")
+    assert not LABORATORY_MODULE.fullmatch("squadopt.application")
+    assert not LABORATORY_MODULE.fullmatch("squadopt.application.football_live")
+    assert not LABORATORY_MODULE.fullmatch("squadopt.live.plan_selection")
+    assert not LABORATORY_MODULE.fullmatch("squadopt.experiments_index")
+
+    module = "squadopt.application.football_unit_experiment"
+    assert module in _laboratory_loaded_by([module]).get(module, [])
+
+
+def test_the_product_and_the_operational_commands_load_no_laboratory_module() -> None:
+    modules = [
+        *PRODUCT_ENTRY_POINTS,
+        *(f"scripts.{name}" for name in operational_commands() if name not in LABORATORY_TOOLS),
+    ]
+    loaded_by = _laboratory_loaded_by(modules)
     assert loaded_by == {}, (
         f"laboratory modules loaded, by the import that loaded them first: {loaded_by}"
     )

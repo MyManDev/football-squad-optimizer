@@ -65,9 +65,14 @@ under [known violations](#7-known-violations).
 | `recalibration` | Research | Calendar-aware residual measurement before recalibration. |
 | `preflight` | Research | Validation of residual-export handoffs and of committed measurement records. Three operational commands load it on purpose (`LABORATORY_TOOLS` in `tests/architecture/test_run_boundary.py`). |
 
-The rings are a reading of the enforced layer order, not a replacement for it. The layer order
-in `pyproject.toml` is one valid linear extension of the rings, and the tie-break within a ring
+The rings are a reading of the enforced layer order, not a replacement for it. Read from the
+bottom, the layer order in `pyproject.toml` reaches each product package only after every
+package of an inner ring, with one exception, `integration` (see
+[known violations](#7-known-violations)), and reaches the research arm only after every R2
+package. Within a ring the order is the tie-break
 ([dependency rules](docs/architecture/dependency_rules.md)).
+`tests/architecture/test_architecture_rings.py` holds this table, the layer order, the
+laboratory contract and the run-boundary probe to one mapping.
 
 ## 3. The research arm and the three tiers
 
@@ -124,23 +129,27 @@ only** when the boundary is stated but the code behind it is not built.
 
 ## 6. Enforcement map
 
-Six import-linter contracts in `pyproject.toml` run as the fifth CI gate (`lint-imports`). None
-has an `ignore_imports` entry.
+The import-linter contracts in `pyproject.toml` run as the fifth CI gate (`lint-imports`). Each
+one has a row below, and none has an `ignore_imports` entry.
 
 | Contract | What it holds |
 | --- | --- |
-| Layered architecture | The linear layer order; `exhaustive` makes every new package fail until it is placed. |
+| Layered architecture | The linear layer order; `exhaustive` makes every new package fail until it is placed. The laboratory sits above `live`, so an import of the laboratory from `live` or any package below it breaks this contract as well. |
 | Product does not import the laboratory | No product package imports `experiments`, `backtest`, `bayesopt`, `recalibration` or `preflight`. |
 | HTTP adapter uses only public boundaries | `api` reaches the engine only through `platform` and `application`. |
 | Frameworks, network and databases stay in api and platform | Web frameworks, network clients, model SDKs, the standard library's network modules and `sqlite3` are imported only by `api` and `platform`. |
 | The package never imports the repository scripts | Nothing under `src/squadopt` imports `scripts`. |
 | The decision core imports no OS or process module | `contracts`, `optimization`, `planning`, `scenarios` and `evaluation` import no `os`, `shutil`, `tempfile` or `subprocess`. |
+| The decision core and prediction import no storage or source module | `contracts`, `optimization`, `planning`, `scenarios`, `evaluation` and `prediction` import none of the storage and source modules of `data`: `snapshots`, `sources`, `atomic`, `loaders`, `adapters`, `checksums`, `tables`, `pipeline`, `source_revision` and `_long_paths`. |
+| The CP-SAT solver stays in the decision core | Every package except `optimization`, `planning`, `scenarios`, `evaluation` and `backtest` is refused `ortools`; `backtest` imports it only to record its version. |
+| Use cases and domain records start no processes or threads | `application` and `live` import none of `subprocess`, `multiprocessing`, `concurrent`, `threading`, `signal`, `argparse` or `asyncio`; processes, threads and the command line belong to the composition roots. |
 
 The tests in `tests/architecture/` hold the rules that an import graph cannot see:
 
 | Test | What it holds |
 | --- | --- |
-| `tests/architecture/test_run_boundary.py` | The product entry points and every operational command load no laboratory module when they run. |
+| `tests/architecture/test_architecture_rings.py` | The ring table above, the layer order, the laboratory contract and the run-boundary probe agree with one mapping, and every contract has a row in the map above. |
+| `tests/architecture/test_run_boundary.py` | The product entry points and every operational command load no laboratory module when they run; a module of `application` whose name ends in `_experiment` is reported as laboratory. |
 | `tests/architecture/test_layer_contracts.py` | Moved symbols keep their compatibility imports and their deterministic outputs. |
 | `tests/architecture/test_documentation_paths.py` | A source path or command cited in the documentation exists. |
 | `tests/architecture/test_markdown_links.py` | Every relative link in a tracked Markdown file resolves. |
@@ -164,12 +173,12 @@ inside functions, the other rows by reading the cited files.
 | Violation | Measured | Remedy | Phase |
 | --- | --- | --- | --- |
 | Use cases and domain records import the storage half of `data` | `application`: 88 import statements in 29 modules; `live`: 17 in 9; `features`: 16 in 4 | Storage ports declared in `application`, with file adapters in `platform` | Phase 2: a shrink-only ratchet. Phase 3: the ports, triggered by ADR 0005 or issue #1010 |
-| `data` holds both R1 vocabulary and R4 storage, and sits at the bottom of the layer order | One package, two rings | A contract that keeps the decision core and the model lane off the storage modules | Phase 1 (the contract); the split itself is an open question in ADR 0010 |
+| `data` holds both R1 vocabulary and R4 storage, and sits at the bottom of the layer order | One package, two rings | The contract "The decision core and prediction import no storage or source module" keeps the packages that are clean today off the storage half | The contract is in force (Phase 1); the split itself is an open question in ADR 0010 |
 | `contracts` reads and writes files | `LEAGUE_LIST_FILE` and `read_league_list` in `src/squadopt/contracts/league_list.py`; `read_league_directory` and `write_league_directory` in `src/squadopt/contracts/league_tree.py` | Move the file IO to an adapter, with a one-release re-export | Phase 2: ratchet; Phase 3: after issue #981 |
 | Runtime code loads schemas from `docs/contracts` by a relative path | 7 modules: 2 in `application`, 5 in `platform` | A ratchet that allowlists the 7 modules, so that no eighth appears | Phase 2 |
 | The CP-SAT driver has no public port | 19 private names imported from `optimization.optimizer`: 5 by `planning/optimizer.py`, 7 by `scenarios/optimization.py`, 7 by `scenarios/rank.py` | A public solver driver in `optimization` | Phase 3 |
 | Ports are declared in an adapter ring | 15 of the 24 typed Protocols under `src/squadopt` are in `platform`; 3 are in `application` | Use-case ports move to `application` | Phase 3 |
-| Laboratory modules live in the use-case ring | Six `football_*_experiment` modules in `application`, imported only by tests | Move them to `experiments`, with no re-export | Phase 2, after agreement on issue #1012 |
+| Laboratory modules live in the use-case ring | Six `football_*_experiment` modules in `application`, imported only by tests; the run-boundary probe reports them as laboratory if a product entry point loads one | Move them to `experiments`, with no re-export | Phase 2, after agreement on issue #1012 |
 | `platform` mixes deployment roles | 54 Python files in one flat package: weekly batch, API side, queue and worker, captures, club news, storage and CLI | Split by deployment unit (ADR 0008, M6) | Phase 3, needs a new ADR |
 | `integration` is a use-case module placed as its own layer | `src/squadopt/integration.py` sits between `evaluation` and `optimization` in the layer order | Fold it into `application`, with a one-release re-export | Phase 2 |
 | `scripts/` is outside the import contracts | mypy checks 7 script files; `lint-imports` checks none | Operator logic moves into the installed package, the direction ADR 0007 set | Phase 3 |
@@ -178,7 +187,8 @@ inside functions, the other rows by reading the cited files.
 
 **A package under `src/squadopt`.** Choose its ring first. Add it to the layers list in
 `pyproject.toml` (the contract is exhaustive, so an unplaced package fails), to the source or
-forbidden lists of the contracts its ring implies, to the ring table above, and to
+forbidden lists of the contracts its ring implies, to the ring table above and to `RINGS` in
+`tests/architecture/test_architecture_rings.py` (the test fails until both name it), and to
 `.github/CODEOWNERS`. A new ring, or a package that fits none, needs an ADR.
 
 **A module.** Put it in the package whose ring matches what it does, not where its first caller

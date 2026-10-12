@@ -17,7 +17,7 @@ the codebase must read that way, and that clean-architecture and scalable-archit
 principles apply from that date.
 
 The repository already had an enforced shape. ADR 0001 made it one layered package checked by
-import-linter, and `pyproject.toml` holds six contracts with no `ignore_imports` entry. ADR 0008
+import-linter, and `pyproject.toml` held six contracts with no `ignore_imports` entry. ADR 0008
 spent the structure budget on boundaries and repetition rather than on renames. What it lacked
 was a statement a reader could use: no document said which ring a package belongs to, the
 repository root had no architecture overview, most top-level folders had no guide, and the nine
@@ -65,15 +65,18 @@ executable source of truth and the tie-break within a ring.
 
 - The six existing contracts stay as they are.
 - Three forbidden contracts are added, each measured above at zero violations, with no ignore
-  entries: the decision core and the model lane read no captures and write no files; the CP-SAT
-  solver stays in the decision core; use cases and domain records start no processes or
-  threads. `prediction` becomes a source of the first only with the agreement of its zone owner.
+  entries: "The decision core and prediction import no storage or source module", "The CP-SAT
+  solver stays in the decision core" and "Use cases and domain records start no processes or
+  threads". The first names imports only: `contracts` still reads and writes files through
+  `pathlib`, which is a known violation in the overview. `prediction` is a source of the first
+  at zero violations; its zone owner confirms that in review.
 - The layer order moves the laboratory packages above `live`. This only loosens the order:
-  today's order refuses an import from the laboratory into `live`, which the move allows, and
-  the contract "Product does not import the laboratory" keeps refusing the reverse.
+  the previous order refused an import from the laboratory into `live`, which the move allows,
+  and the contract "Product does not import the laboratory" keeps refusing the reverse.
 - A test in `tests/architecture` holds the ring table of the overview to one mapping, to the
   entries under `src/squadopt`, to the exhaustive layers list and to the laboratory lists of the
-  contracts and of the run-boundary test.
+  contracts and of the run-boundary test, and holds every contract to a row of the overview's
+  enforcement map.
 - The architecture fitness functions live in `tests/architecture`, apart from the unit tests.
 
 **3. Navigation instead of renames.** The repository explains itself through an architecture

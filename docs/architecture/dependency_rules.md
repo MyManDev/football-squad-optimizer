@@ -24,12 +24,12 @@ contracts
             evaluation
               scenarios
                 planning
-                  bayesopt
-                    preflight
-                      recalibration
-                        backtest
-                          experiments
-                            live
+                  live
+                    bayesopt
+                      preflight
+                        recalibration
+                          backtest
+                            experiments
                               application
                                 platform
                                   api / entry points
@@ -86,9 +86,9 @@ read meaning into it, and do not "fix" it:
   `contracts.preferences`, in `planning/chip_strategy.py:6` and `planning/optimizer.py:15`)
   and `scenarios`: three modules import `scenarios.expected_lineup`
   (`planning/expected_swap.py:31`, `planning/football_exact_lineup.py:17` and
-  `planning/lineup_utility.py:21`). So `planning` must sit above `scenarios` and below
-  `experiments`, which imports it; its position relative to `bayesopt`, `preflight`,
-  `recalibration` and `backtest` is free.
+  `planning/lineup_utility.py:21`). So `planning` must sit above `scenarios` and below `live`
+  and `experiments`, which import it; no import fixes its position relative to `bayesopt`,
+  `preflight`, `recalibration` and `backtest`.
 
 If a future import makes one of these positions load-bearing, say so here at the same time.
 
@@ -111,7 +111,7 @@ are resolved by these shared owners:
 | `data.schema` to `optimization.config` / `optimization.validation` | `contracts.players`: `Position`, `POSITIONS`, `REQUIRED_COLUMNS` | Original optimization locations and `data.schema` still expose the same objects. |
 | `prediction.integration` to `optimization.coefficients` | `contracts.players.sort_players_by_id` | `optimization.coefficients.sort_players_by_id` re-exports the same function. |
 | `backtest.production_benchmark` to `experiments` / `experiments.config` | `evaluation.promotion.PromotionPolicy` and `evaluation.statistics` | None since 2026-09-26: the one-release re-exports in `experiments.config` and `experiments.statistics` are removed; the `experiments` barrel still lists the policy, the errors and the interval as part of its interface. |
-| `application.mode_selection` to `experiments.plan_selection` | `live.plan_selection` (the product's per-member plan chooser, `mode_plan_selection_v1`); its `ExperimentExecutionError` joins its siblings in `evaluation.promotion` | None at the old location: `experiments` sits below `live`, so a re-export there would invert the layers contract (rule 1 outranks rule 2). The laboratory callers (barrel, `scripts/measure_mode_plan_selection.py`, `tests/unit/test_plan_selection.py`) import `squadopt.live.plan_selection` directly (moved 2026-09-10); the error is imported from `evaluation.promotion`. |
+| `application.mode_selection` to `experiments.plan_selection` | `live.plan_selection` (the product's per-member plan chooser, `mode_plan_selection_v1`); its `ExperimentExecutionError` joins its siblings in `evaluation.promotion` | None at the old location: when it moved, `experiments` sat below `live`, so a re-export there would have inverted the layers contract (rule 1 outranks rule 2). The laboratory callers (`scripts/measure_mode_plan_selection.py`, `tests/unit/test_plan_selection.py`) import `squadopt.live.plan_selection` directly (moved 2026-09-10); the error is imported from `evaluation.promotion`, where the `experiments` barrel also takes it from. |
 
 The policy's two exception base classes also live in `evaluation.promotion`, keeping their
 existing `ExperimentError` / `ExperimentConfigurationError` names and inheritance so callers
@@ -184,12 +184,12 @@ layers = [
     "api",
     "platform",
     "application",
-    "live",
     "experiments",
     "backtest",
     "recalibration",
     "preflight",
     "bayesopt",
+    "live",
     "planning",
     "scenarios",
     "evaluation",
@@ -220,6 +220,30 @@ The original five-edge baseline was measured against `b031ef1` (PR #110). The sh
 extraction verifies the zero-exception contract with `lint-imports`; behavior compatibility
 is covered by `tests/architecture/test_layer_contracts.py` and the existing consumer suites.
 
+`lint-imports` runs every contract in `pyproject.toml`, and none has an `ignore_imports` entry:
+
+1. `Layered architecture`: the order at the top of this document.
+2. `Product does not import the laboratory`: see [the groups the order encodes](#the-groups-the-order-encodes).
+3. `HTTP adapter uses only public boundaries`: the forbidden contract above.
+4. `Frameworks, network and databases stay in api and platform`: web frameworks, network
+   clients, model SDKs and `sqlite3` stay in `api` and `platform`.
+5. `The package never imports the repository scripts`: nothing under `src/squadopt` imports
+   `scripts`.
+6. `The decision core imports no OS or process module`: `contracts`, `optimization`,
+   `planning`, `scenarios` and `evaluation` import no `os`, `shutil`, `tempfile` or
+   `subprocess`.
+7. `The decision core and prediction import no storage or source module`: the same five
+   packages and `prediction` import none of the storage and source modules of `data`.
+8. `The CP-SAT solver stays in the decision core`: only `optimization`, `planning`,
+   `scenarios`, `evaluation` and `backtest` may import `ortools`.
+9. `Use cases and domain records start no processes or threads`: `application` and `live`
+   import no process, thread, signal, command-line or event-loop module.
+
+The last three state rings of [ADR 0010](decisions/0010-clean-architecture-rings-and-repository-layout.md).
+The [architecture overview](../../ARCHITECTURE.md) gives what each contract holds in its
+enforcement map, and `tests/architecture/test_architecture_rings.py` checks that every contract in
+`pyproject.toml` is named in this list and has a row in that map.
+
 ## The groups the order encodes
 
 The linear order above is one valid extension of a smaller structure. Read by role, the
@@ -239,7 +263,10 @@ product group (adapters, runtime, use cases, or domain) may import it. The linea
 could not say this: it placed the laboratory below `application`, so the deployed advice worker
 was loading 43 laboratory modules, and a product decision (`plan_selection`) was living in the
 lab. The contract `Product does not import the laboratory` in `pyproject.toml` states the rule
-directly; the layers contract stays unchanged as the tie-break within each group.
+directly, and the layers contract stays as the tie-break within each group. Since ADR 0010 the
+layer order also places the laboratory above `live`, so for `live` and every package below it
+the layers contract refuses an import of the laboratory as well; for `application`, `platform`
+and `api` the forbidden contract alone refuses it.
 
 That contract started with eight `ignore_imports` entries, all in `application`, each annotated
 with the follow-up PR that removed it. The last (`mode_selection` to `experiments.plan_selection`)
@@ -264,5 +291,7 @@ every package, the contracts that enforce them and the known violations. The gro
 correspond as follows: `contracts` and the schema half of `data` are R1 (vocabulary); the domain
 group is R2; the use cases group is R3; `api`, `platform` and the storage half of `data` are R4
 (adapters) and, for their entry points, R5 (composition). The laboratory is the research side
-tree. The rings do not change the order in this document; the layers contract remains the
-executable statement and the tie-break within a ring.
+tree. The rings changed one thing in the order: the laboratory now sits above `live`. The
+layers contract remains the executable statement and the tie-break within a ring, and
+`tests/architecture/test_architecture_rings.py` checks that the order reads the rings from the
+inside out, with `integration` as its one listed exception.
