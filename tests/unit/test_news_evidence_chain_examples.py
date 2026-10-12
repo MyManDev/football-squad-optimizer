@@ -116,15 +116,16 @@ def _chain(
             else json.dumps(fixtures).encode(),
         },
     ).snapshot_id
+    answer = _stating(SOURCE_DATE) if response is None else response
     news = write_club_news_capture(
         root,
         documents=(_document(ABSENCE) if document is None else document,),
         coded=(
             CodedClub(
                 "Arsenal",
-                _stating(SOURCE_DATE) if response is None else response,
+                answer,
                 version,
-                coding_prompt_sha256(contract_version=version),
+                coding_prompt_sha256(answer.model_identifier, contract_version=version),
             ),
         ),
         clubs_declared=("Arsenal",),

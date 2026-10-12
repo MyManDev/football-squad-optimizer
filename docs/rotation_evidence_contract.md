@@ -226,8 +226,13 @@ answered by two models, served by two model versions, or asked under two prompts
 claims came from somewhere other than the model the manifest names is not a week anyone can
 check. Same reasoning as the coding call's refusal to declare a fallback model.
 
-The manifest's `response_sha256s` lists every response the week holds, sorted and without
-repeats. One response can legitimately cover several clubs, and separate calls can return
+The manifest's `response_sha256s` lists the retained responses contributing evidence,
+sorted and without repeats. Responses refused whole are stored in the capture but omitted
+from this list, and their clubs are removed from `clubs_covered`. Their omission does not
+remove another club's attestation. The reader checks every stored response's coding
+contract, model and prompt, requires the declared digests to be a nonempty sorted unique
+subset of the stored digests, and permits an omitted digest only when none of its clubs is
+covered. One response can legitimately cover several clubs, and separate calls can return
 identical bytes; this list identifies response content, not call count.
 
 A claim placed on a player whose club has no recorded response refuses the whole week, naming

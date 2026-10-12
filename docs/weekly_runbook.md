@@ -94,8 +94,9 @@ stage spends work. An older news-only filename is not a substitute. V2/V3 pairs 
 readable for historical replay, without claiming the new V4 binding.
 
 Before publishing, run `python -m scripts.check_league_tree <preview>/data` against the
-candidate tree, or use the publication worktree's `web/public/data`. It runs the wider
-menu, Top 100 and manager's-word release checks and exits non-zero on any finding.
+candidate tree, or use the publication worktree's `web/public/data`. It runs the
+publication identity, wider menu, Top 100 and manager's-word release checks and exits
+non-zero on any finding. Its final verdict covers all four checks.
 It expects what each member's `advice/<id>/index.json` declares: an absence the index
 states in the producer's shape with a string reason (the menu a `--skip-top100` run leaves
 out, a window or rival pair listed in `unavailable`, a member with no advice this week) is
@@ -263,6 +264,17 @@ each line; the commands are in the table above and in the documents named.
    copy-compatible seal records capture, handoff, forecast and component contents in
    `football/<capture>.bundle.preparation.json`; retries must use those same contents, and
    changed inputs require a new capture.
+   The internal `football/<decision>.bundle.production.json` receipt is written after
+   those final checks, immediately before the ready marker. It records the sha256 of
+   the sealed handoff's bytes and its own training provenance separately from the
+   football producer's inputs.
+   An interruption can leave provenance without a marker; provenance alone is never ready.
+   A new seal with retained scoreboard, history or series-horizon files requires
+   `publication-identity.json`. The next normal league publication establishes it.
+   See `docs/contracts/league_publication_identity_v1.md` for replay and identity rules.
+   A refused seal after argument resolution turns off the unsealed football input and the
+   manager's word for that capture until the identical retry completes; never remove an
+   attempt record by hand.
 6. **The site pull request merges through develop's merge queue, the release is cut and
    tagged, the backend is restarted** (`docs/deployment_runbook.md`). The restart reads the
    one capture every published human entry names, on the public site and locally, and

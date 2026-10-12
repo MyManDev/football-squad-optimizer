@@ -27,6 +27,8 @@ def manager_word_attestation_reason(word: ManagerWord) -> str | None:
     ):
         return "publication_unverified"
     if not word.scope_verified or word.fixture_scope != "upcoming_premier_league":
+        if word.fixture_binding_reason == "ambiguous_current_week_fixture":
+            return "ambiguous_current_week_fixture"
         return "upcoming_league_scope_unverified"
     return None
 

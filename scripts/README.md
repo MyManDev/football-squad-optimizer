@@ -59,6 +59,7 @@ Date is the file's last commit (`git log -1 --format=%as -- scripts/<name>.py`).
 | `measure_capture_lead_time.py` | measurement runner | `docs/capture_lead_time.json`; also `docs/weekly_runbook.md` | 2026-09-08 |
 | `measure_capture_season_phase.py` | measurement runner | `docs/capture_season_phase.json` | 2026-09-08 |
 | `measure_component_fidelity.py` | measurement runner | `docs/phase_d_component_fidelity.json` | 2026-09-07 |
+| `measure_defcon_component.py` | measurement runner | outcome-free identity check; one owner-authorized `docs/research/defcon_component_reading.{json,md}` record under #1000 | 2026-10-10 |
 | `measure_double_reduction.py` | measurement runner | `docs/double_reduction.json`, `docs/double_reduction.md` | 2026-09-25 |
 | `measure_export_precision.py` | measurement runner | `docs/export_precision.json` | 2026-08-16 |
 | `measure_football_shares.py` | measurement runner | `docs/research/football_share_sizing.json`; summary and player-fixture table in `artifacts/` | 2026-10-09 |
@@ -124,6 +125,7 @@ Date is the file's last commit (`git log -1 --format=%as -- scripts/<name>.py`).
 | `measure_football_lead_reliability.py` | artifact-only runner | a fresh `--output` directory the operator names (`record.json`, `summary.md`, `forecasts.csv`); refuses the archive and the repository's `data/` and `docs/`; protocol `docs/football_lead_reliability_prereg.md` | 2026-10-06 |
 | `measure_instrument.py` | artifact-only runner | caller-selected `--output`; replay in `docs/measurement_instrument.md` | 2026-09-13 |
 | `measure_planner_policy_chain.py` | artifact-only runner | `artifacts/planner_policy_chain/` (receipts, forecast copies, decision records, weekly manifests), each week copied to `--evidence-copy-root` outside the checkout; reads no outcome; protocol `docs/research/planner_policy_chain_prereg.md` | 2026-10-06 |
+| `measure_published_difficulty_live.py` | artifact-only runner | private JSON/CSV under ignored `artifacts/`; usage in `docs/research/published_difficulty_live_runner.md`; one reading after settled GW20 | 2026-10-11 |
 | `plan_transfer_horizon.py` | artifact-only runner | `data/handoffs/`; `docs/projection_horizon_contract.md` | 2026-08-31 |
 | `probe_phase_e_runtime.py` | artifact-only runner | checkpoints via `_phase_e_checkpoints`; prereg `docs/phase_e_candidate_selection_prereg.md` | 2026-09-07 |
 | `run_baseline_bayesopt.py` | artifact-only runner | `artifacts/bayesopt/` | 2026-08-15 |
@@ -147,9 +149,15 @@ Date is the file's last commit (`git log -1 --format=%as -- scripts/<name>.py`).
 | Script | Class | Record it writes, or what names it | Last commit |
 | --- | --- | --- | --- |
 | `export_chip_forecast_fixture.py` | fixture generator | `web/src/fixtures/chip-forecast/cases.json`; #1003 | 2026-10-10 |
+| `export_official_scoring_vectors.py` | fixture generator | `web/src/features/liveScore/officialScoring.vectors.json`; synthetic official finished-week scores for #1008 | 2026-10-10 |
 | `generate_club_news_coding_fixture.py` | fixture generator | committed coding fixture; `docs/rotation_claim_coding.md` | 2026-09-10 |
 | `generate_club_news_fixture.py` | fixture generator | committed club-news fixture | 2026-09-08 |
 | `generate_sample_data.py` | fixture generator | `data/sample/`; `docs/data_pipeline.md` | 2026-08-11 |
+
+After exporting official scoring vectors, run
+`npx prettier --write src/features/liveScore/officialScoring.vectors.json` from
+`web`. The drift test compares parsed JSON, preserving the Python answers while
+allowing the web formatter's layout.
 
 ## Imported helpers
 
