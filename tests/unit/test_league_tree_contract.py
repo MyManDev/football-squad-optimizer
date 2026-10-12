@@ -207,6 +207,7 @@ def test_a_directory_line_with_an_unusable_device_plan_is_refused(
         {"device_plan_sha256": "a" * 64},
         {"device_plan": "device/cap/device-plan.json", "device_plan_sha256": "A" * 64},
         {"device_plan": "device/cap/device-plan.json", "device_plan_sha256": "a" * 63},
+        {"device_plan": "device/cap/device-plan.json", "device_plan_sha256": "a" * 65},
         {"device_plan": "device/cap/device-plan.json", "device_plan_sha256": 7},
     ],
 )

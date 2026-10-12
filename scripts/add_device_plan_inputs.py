@@ -16,9 +16,11 @@ the plans stay the bytes the advice record holds.
 Refused, with the tree untouched: a tree whose members or entries name another capture
 than the one given, a handoff for another capture or gameweek, a member whose fifteen the
 capture does not price, and a per-capture table already on the site that differs from the
-one this would write. With ``--verify`` every member's problem is rebuilt from the written
-documents and solved with the repository's planner, and the transfers, captain and eleven
-must be the published ones.
+one this would write. That refusal names this script's way out: remove the capture's
+directory under ``data/device/`` and run this again for every league of the list, which
+writes one table that every line names. With ``--verify`` every member's problem is
+rebuilt from the written documents and solved with the repository's planner, and the
+transfers, captain and eleven must be the published ones.
 """
 
 from __future__ import annotations
@@ -115,6 +117,22 @@ def _held_from_entry(entry: dict, prices: dict[int, int]) -> HeldSquad:
     )
 
 
+def _table_remedy(site_data_root: Path, snapshot_id: str) -> str:
+    """This script's way out of a capture table that differs from the one it would write.
+
+    The script never reads the other leagues' lines, so removing the table and running it
+    again for every league of the list writes one table that every line names. The site
+    builder names another way out (``BUILDER_TABLE_REMEDY``): a build of one league refuses
+    every other line whose table is gone.
+    """
+
+    directory = Path(site_data_root) / Path(*device_plan_path(snapshot_id).parent.parts)
+    return (
+        f"Remove {directory} and run scripts/add_device_plan_inputs.py again for every "
+        "league of the list (--league)."
+    )
+
+
 def add_device_plan_inputs(
     *,
     snapshot_root: Path,
@@ -158,7 +176,8 @@ def add_device_plan_inputs(
     table_document = device_plan_capture_table(
         inputs, projection, rules, bootstrap=snapshot.payloads[BOOTSTRAP_PAYLOAD]
     )
-    check_device_plan_table(site_data_root, snapshot_id, table_document)
+    remedy = _table_remedy(site_data_root, snapshot_id)
+    check_device_plan_table(site_data_root, snapshot_id, table_document, remedy=remedy)
     written: list[str] = []
     entries = sorted((league_dir / "entries").glob("*.json"))
     for path in entries:
@@ -203,7 +222,9 @@ def add_device_plan_inputs(
         file=out,
     )
     table = device_plan_path(snapshot_id)
-    write_device_plan_table(site_data_root, snapshot_id, table_document, generated_at_utc=stamp)
+    write_device_plan_table(
+        site_data_root, snapshot_id, table_document, generated_at_utc=stamp, remedy=remedy
+    )
     written.append(table.as_posix())
     lines = read_league_directory(site_data_root)
     if lines:

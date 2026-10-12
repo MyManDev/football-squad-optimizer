@@ -1,6 +1,10 @@
 """Release checks keep their findings when run through one command."""
 
+import hashlib
 import json
+import shutil
+import urllib.error
+from email.message import Message
 from io import BytesIO
 from pathlib import Path
 from typing import Any
@@ -545,6 +549,93 @@ def test_a_site_with_a_directory_is_checked_tree_by_tree(tmp_path, capsys):
     assert main([str(tmp_path)]) == 1
     output = capsys.readouterr().out
     assert "leagues" in output and "10" in output and "members.json" in output
+
+
+ORIGIN = "https://site.example"
+
+
+def _serve(monkeypatch: pytest.MonkeyPatch, data: Path) -> list[str]:
+    """Serve ``data`` as the live site's ``data/``: a file that is not there answers 404.
+    Returns the URLs asked for."""
+
+    asked: list[str] = []
+
+    def urlopen(request, timeout):
+        asked.append(request.full_url)
+        target = data / request.full_url.removeprefix(f"{ORIGIN}/data/")
+        if not target.is_file():
+            raise urllib.error.HTTPError(request.full_url, 404, "Not Found", Message(), None)
+        return BytesIO(target.read_bytes())
+
+    monkeypatch.setattr("urllib.request.urlopen", urlopen)
+    return asked
+
+
+@pytest.mark.parametrize("live", [False, True], ids=["on-disk", "live"])
+def test_each_line_finds_its_device_plan_table_with_the_sha256_it_names(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch, live: bool
+) -> None:
+    """The table is checked on disk and live alike; a line from before the table is not."""
+
+    _tree(tmp_path)
+    (tmp_path / "leagues").mkdir()
+    (tmp_path / "league").rename(tmp_path / "leagues" / "9")
+    shutil.copytree(tmp_path / "leagues" / "9", tmp_path / "leagues" / "10")
+    table = tmp_path / "device" / "cap" / "device-plan.json"
+    table.parent.mkdir(parents=True)
+    table.write_bytes(b'{"payload": {"players": []}}\n')
+    digest = hashlib.sha256(table.read_bytes()).hexdigest()
+    line = {"season": "2026-27", "gameweek": 1}
+    directory = {
+        "contract_version": "league_directory_v1",
+        "payload": {
+            "leagues": [
+                {
+                    **line,
+                    "league_id": 9,
+                    "league_name": "Nine",
+                    "path": "leagues/9",
+                    "device_plan": "device/cap/device-plan.json",
+                    "device_plan_sha256": digest,
+                },
+                # A line from before the per-capture table names none.
+                {**line, "league_id": 10, "league_name": "Ten", "path": "leagues/10"},
+            ]
+        },
+    }
+    (tmp_path / "leagues.json").write_text(json.dumps(directory), encoding="utf-8")
+    asked = _serve(monkeypatch, tmp_path) if live else []
+    root = ORIGIN if live else str(tmp_path)
+
+    # The table the line names, with its bytes: the site passes.
+    assert main([root]) == 0
+    output = capsys.readouterr().out
+    assert "  ok  league 9: device/cap/device-plan.json has the sha256 its line names" in output
+    assert "league 10" not in output
+    assert output.rstrip().endswith("FINAL: ALL GOOD")
+    if live:
+        assert [url for url in asked if "/data/device/" in url] == [
+            f"{ORIGIN}/data/device/cap/device-plan.json"
+        ]
+
+    # A table replaced since the line was written is not the one the line names.
+    table.write_bytes(b'{"payload": {"players": [1]}}\n')
+    changed = hashlib.sha256(table.read_bytes()).hexdigest()
+    assert main([root]) == 1
+    output = capsys.readouterr().out
+    assert (
+        f"  BAD league 9: device/cap/device-plan.json has sha256 {changed}, the line names {digest}"
+    ) in output
+    assert "league 10" not in output
+    assert output.rstrip().endswith("FINAL: FAILURE(S)")
+
+    # A table that is gone fails the same way.
+    table.unlink()
+    assert main([root]) == 1
+    output = capsys.readouterr().out
+    assert "  BAD league 9: device/cap/device-plan.json is missing" in output
+    assert "league 10" not in output
+    assert output.rstrip().endswith("FINAL: FAILURE(S)")
 
 
 @pytest.mark.parametrize(
