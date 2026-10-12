@@ -17,6 +17,20 @@
 | Understand hosting responsibilities | [Backend hosting](../architecture/decisions/0006-backend-hosting.md) |
 | Compare where the advice backend could run instead of the owner's PC (proposed, undecided) | [Hosting options](../architecture/decisions/0009-advice-backend-hosting-options.md) |
 | See every advice backend route, who calls it and what replaces it when the backend is retired (#988 route 1) | [Advice backend endpoints](advice_backend_endpoints.md) |
+| Cut a release, deploy a `site-*` tag and verify the live site with the release recipe (`scripts/release/ship.sh`, `deploy.sh`, `verify_live.py`, `clean_body.py`) | [Release in one command](../deployment_runbook.md#release-in-one-command) |
+| Restart a running backend on the code of the live release (`scripts/release/restart_backend.ps1`), or start a stopped one from that release | [The release window](../deployment_runbook.md#the-release-window-is-closed-to-develop) and [a stopped backend](../deployment_runbook.md#a-stopped-backend-starts-from-the-release) |
+| Register or remove the `SquadOptBackendWatch` scheduled task, which starts the backend and its tunnel at logon and restarts a missing component | [Backend free hosting, starting the backend](../backend_free_hosting.md#1-start-the-backend) |
+| Register the `SquadOptDataBackup` scheduled task, which backs up the private data trees daily with `scripts/backup_data.ps1` | [Back up irreplaceable data](../deployment_runbook.md#back-up-irreplaceable-data) |
+
+## Workflows
+
+| Workflow | Runs on | What it does |
+| --- | --- | --- |
+| [`CI`](../../.github/workflows/ci.yml) | Pull requests and pushes to `develop` and `main`, the `develop` merge queue, manual dispatch | The five Python gates on Python 3.11 and 3.13, the container build and smoke, and the web checks; uploads the `site` artifact |
+| [`Deploy Pages`](../../.github/workflows/deploy-pages.yml) | A completed CI run, or a manual dispatch with a `site-*` tag | Deploys a pull request preview, or the tagged production artifact after its checks |
+| [`Backend uptime`](../../.github/workflows/backend-uptime.yml) | A schedule every 15 minutes, or a manual dispatch | Probes the backend's health and readiness and opens or closes a `backend-down` issue |
+| [`Windows scripts`](../../.github/workflows/windows-scripts.yml) | Pull requests and pushes that touch the PowerShell scripts, the release recipe or their tests | Parses the PowerShell scripts and runs their tests on Windows |
+| [`Deploy FPL probe`](../../.github/workflows/deploy-fpl-probe.yml) | Manual dispatch from the default branch | Deploys or deletes the FPL probe Worker ([FPL forwarder probe](../fpl_forwarder_probe.md)) |
 
 The complete member-publication week and `squadopt season tick` are different workflows.
 Use the weekly runbook to identify the operation required; installing a scheduler around

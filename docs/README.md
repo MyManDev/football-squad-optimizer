@@ -1,36 +1,70 @@
 # Documentation
 
-Start with the area you are changing. These indexes organize the existing documents without
-relocating immutable measurement records or changing their embedded source references.
+This folder holds the product, operations, architecture and research documentation, the
+versioned public contracts, and the committed measurement records. It is part of the build
+surface: tests read some documents, runners write records here, and some paths are embedded in
+generated files ([ADR 0003](architecture/decisions/0003-measurement-artifacts.md)). For the
+shape of the system, start with the [architecture overview](../ARCHITECTURE.md); for terms, the
+[glossary](glossary.md).
 
-| Area | Start here | What belongs here |
+## Where to start, by reader
+
+| Reader | Start here | Then |
 | --- | --- | --- |
-| Product | [Product guide](product/README.md) | League-member flow, strategies, public contracts and UI |
-| Operations | [Operations guide](operations/README.md) | Weekly execution, deployment, ledger and recovery procedures |
-| Research | [Research guide](research/README.md) | Prediction, preregistrations, measurements and promotion evidence |
-| Architecture | [System map](architecture/system_map.md) | Package boundaries, ownership and design decisions |
-| Public schemas | [Contract directory](contracts/) | Versioned API, job, view, run and artifact schemas |
-| Development | [Contributing](../CONTRIBUTING.md) | Current branch workflow and required checks |
+| Operator running the weekly publication or the backend | [Operations guide](operations/README.md) | [Weekly runbook](weekly_runbook.md), [deployment runbook](deployment_runbook.md), [backend runbook](backend_runbook.md), [backend free hosting](backend_free_hosting.md), [rebuilding the production machine](rebuild_production.md) |
+| Developer changing code | [Architecture overview](../ARCHITECTURE.md) and [contributing](../CONTRIBUTING.md) | [Architecture agreements](architecture/README.md), [decision records](architecture/decisions/README.md), [script catalogue](../scripts/README.md), [test guide](../tests/README.md), [web guide](../web/README.md) |
+| Researcher measuring a model or policy | [Research guide](research/README.md) | [Measurements index](measurements_index.md), [prediction research agenda](prediction_research_agenda.md), [experimentation specification](experimentation_spec.md) |
+| Consumer of a published document or the API | [Contract directory](contracts/) | [Data contract](data_contract.md), [data dictionary](data_dictionary.md), [backend HTTP boundary](architecture/backend.md) |
+| Reader of reports and decisions | [Product guide](product/README.md) and [roadmap](product/roadmap.md) | [Measurements index](measurements_index.md), [season ledger](season_ledger_2026-27.md), [product and operations decisions](decisions.md) |
 
-## Runtime, research and local state
+## Folders
 
-`src/squadopt` remains one installed package. A research module being present in main does
-not activate its model or selector. Promotion and calibration boundaries still decide that.
-The member website can read static publications; a deployed job API is a separate runtime
-with separate acceptance evidence.
+| Folder | Holds |
+| --- | --- |
+| [architecture/](architecture/README.md) | Working agreements: layering, ownership, branching, PR discipline, runtime boundaries |
+| [architecture/decisions/](architecture/decisions/README.md) | Architecture decision records, numbered and never renamed |
+| [contracts/](contracts/) | Versioned JSON schemas and contract notes; some schemas are loaded by the code at runtime, and the website generates its types from `ui_view_v1` |
+| [operations/](operations/README.md) | The operations guide and newer operational references; the runbooks stay at the root of `docs/` |
+| [product/](product/README.md) | The member experience and the roadmap |
+| [research/](research/README.md) | The research guide, newer protocols and explanations, and their records; older records stay at the root |
+| [images/](images/) | Screenshots that merged pull requests refer to |
 
-`data/` contains private operational inputs and records; generated `web/public/data` is the
-published view. Git history and a site artifact do not replace a backup of private state.
-`artifacts/` is for regenerable experiment expansions. Temporary work belongs in ignored
-worktree scratch directories, not in product source.
+Most documents and all older records sit at the root of `docs/`. Their paths are cited by code,
+tests, records and merged pull requests, so they stay where they are.
 
-## Historical records
+## Naming key
 
-Existing Markdown and JSON records remain at their established paths. Some paths are used
-by tests or embedded in fingerprints/provenance. Follow
-[the measurement-artifact decision](architecture/decisions/0003-measurement-artifacts.md)
-before moving a record. Add a current-status note rather than rewriting a historical result.
+The file name says what kind of document it is.
 
-The preserved pre-alignment development tree and retired topic commits are on
-`archive/pre-main-alignment-20260909`; its `docs/archive/README.md` explains recovery.
-That aggregate archive is not a branch to merge wholesale into develop.
+| Pattern | Kind | Rule |
+| --- | --- | --- |
+| `<name>.json` with `<name>.md` beside it | A measurement record and its readable twin | Never edited after it merges, except by regeneration under the same protocol; needs a row in the [measurements index](measurements_index.md) |
+| `<name>_prereg.md`, `<name>_protocol.md` | A pre-registration | Frozen when it merges; a later decision is recorded elsewhere and links back |
+| `<name>_spec.md` | A specification of a component or a measurement design | Living; `candidate_gate_spec.md` and `production_prediction_spec.md` are embedded in generated records as `source_reference` and never move |
+| `<name>_runbook.md` | An operator procedure | Living; kept in step with the commands it names |
+| `<name>_note.md` | A note that explains a record or a protocol decision | Read together with the record or protocol it explains |
+| Anything else | A living document | Updated when the code it describes changes |
+
+A schema file under `contracts/` is named after its contract version, `<contract>_v<N>.schema.json`.
+
+## Where a new document goes
+
+- A new **record** goes where its runner writes it (the root of `docs/` or `research/`), with
+  its index row in the same pull request.
+- A new **research** protocol or explanation goes in `research/`.
+- A new **operational** procedure goes in `operations/`; a new **product** document in
+  `product/`; a new **architecture** agreement in `architecture/`, with a row in its guide.
+- A **decision with alternatives** goes in a new decision record; a product or operations
+  decision without one goes in [decisions.md](decisions.md).
+
+## Records never move
+
+Existing records and pre-registrations remain at their established paths. Tests, runners and
+other records cite them, and some paths are embedded in generated bytes. Follow
+[the measurement-artifact decision](architecture/decisions/0003-measurement-artifacts.md) before
+moving one. Add a current-status note to a living document rather than rewriting a historical
+result.
+
+The preserved pre-alignment development tree and retired topic commits are on the branch
+`archive/pre-main-alignment-20260909`; the `docs/archive/README.md` file on that branch explains
+recovery. That aggregate archive is not a branch to merge wholesale into develop.

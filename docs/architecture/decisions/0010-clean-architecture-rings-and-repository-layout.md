@@ -1,0 +1,151 @@
+# ADR 0010: Clean-architecture rings and the repository layout
+
+- **Status:** accepted (owner direction 2026-10-12) for naming the rings and enforcing them by
+  contracts and tests. The deferred moves listed below are open questions for the owner; this
+  record does not decide them.
+- **Date:** 2026-10-13
+- **Decider:** Ertuğrul (repository owner)
+- **Related:** [ADR 0001](0001-modular-monolith.md), [ADR 0003](0003-measurement-artifacts.md),
+  [ADR 0005](0005-persistence-boundaries.md), [ADR 0006](0006-backend-hosting.md),
+  [ADR 0007](0007-enterprise-transition.md), [ADR 0008](0008-structure-investment.md),
+  [dependency rules](../dependency_rules.md), [architecture overview](../../../ARCHITECTURE.md)
+
+## Context
+
+On 2026-10-12 the owner directed that the project is an enterprise and academic system, that
+the codebase must read that way, and that clean-architecture and scalable-architecture
+principles apply from that date.
+
+The repository already had an enforced shape. ADR 0001 made it one layered package checked by
+import-linter, and `pyproject.toml` holds six contracts with no `ignore_imports` entry. ADR 0008
+spent the structure budget on boundaries and repetition rather than on renames. What it lacked
+was a statement a reader could use: no document said which ring a package belongs to, the
+repository root had no architecture overview, most top-level folders had no guide, and the nine
+architecture fitness functions sat among several hundred unit tests in `tests/unit`.
+
+The following were measured on this tree. Import counts come from an AST scan that includes
+imports inside functions.
+
+- The storage and source modules of `data` (`snapshots`, `sources`, `atomic`, `loaders`,
+  `adapters`, `checksums`, `tables`, `pipeline`, `source_revision`, `_long_paths`) are imported
+  by `application` in 88 statements across 29 modules, by `live` in 17 across 9, and by
+  `features` in 16 across 4. `contracts`, `optimization`, `planning`, `scenarios`, `evaluation`
+  and `prediction` import none of them.
+- `ortools` is imported only by `optimization`, `planning`, `scenarios`, `evaluation` and
+  `backtest`.
+- `application` and `live` import none of `subprocess`, `multiprocessing`, `concurrent`,
+  `threading`, `signal`, `argparse` or `asyncio`.
+- 24 classes under `src/squadopt` are typed `Protocol` ports; 15 of them are declared in
+  `platform` and 3 in `application`.
+- `planning` and `scenarios` import 19 private names from `optimization.optimizer`.
+- `contracts` reads and writes files (`src/squadopt/contracts/league_list.py` and
+  `src/squadopt/contracts/league_tree.py`), and 7 modules load a schema from `docs/contracts`
+  by a relative path at runtime.
+- Six modules named `football_*_experiment` live in `application` and are imported only by
+  tests.
+- `platform` holds 54 Python files in one flat package that serves three of ADR 0006's
+  deployment units: the API, the worker and operations.
+
+Three constraints shape what can change and when. `scripts/release/restart_backend.ps1`
+compares `src`, `scripts` and `docs/contracts` with the live site release before it restarts
+the backend, so a change to those paths belongs inside a release window. The weekly publish
+refuses when `origin/develop` no longer holds the run's source revision, so a merge during a run
+stops that run's publication. And committed records never move (ADR 0003, rule 5).
+
+## Decision
+
+**1. The rings are named.** The packages are read as five rings, R1 vocabulary, R2 domain, R3
+use cases, R4 adapters and R5 composition and delivery, with the measurement laboratory as a
+research side tree that no product ring may import. Dependencies point inward. The ring of
+every entry under `src/squadopt` is one row of the table in the
+[architecture overview](../../../ARCHITECTURE.md). The layer order in `pyproject.toml` stays the
+executable source of truth and the tie-break within a ring.
+
+**2. The rings are enforced by contracts and tests, not by prose.**
+
+- The six existing contracts stay as they are.
+- Three forbidden contracts are added, each measured above at zero violations, with no ignore
+  entries: the decision core and the model lane read no captures and write no files; the CP-SAT
+  solver stays in the decision core; use cases and domain records start no processes or
+  threads. `prediction` becomes a source of the first only with the agreement of its zone owner.
+- The layer order moves the laboratory packages above `live`. This only loosens the order:
+  today's order refuses an import from the laboratory into `live`, which the move allows, and
+  the contract "Product does not import the laboratory" keeps refusing the reverse.
+- A test in `tests/architecture` holds the ring table of the overview to one mapping, to the
+  entries under `src/squadopt`, to the exhaustive layers list and to the laboratory lists of the
+  contracts and of the run-boundary test.
+- The architecture fitness functions live in `tests/architecture`, apart from the unit tests.
+
+**3. Navigation instead of renames.** The repository explains itself through an architecture
+overview at the root, a root README that maps the folders, a documentation guide by audience,
+a glossary, an index of these records, and a README in every top-level folder and in each
+package whose modules serve more than one role. No package is renamed and no record moves.
+
+**4. The ratchet rule.** A rule that the code breaks today is introduced as a check whose
+allowlist holds exactly today's violations, each with its remedy and phase. The allowlist may
+only shrink; a new violation fails the gate. The contracts that hold no exceptions today keep
+none.
+
+## Deferred moves and their triggers
+
+The overview lists every known violation with its remedy. The moves below wait for the trigger
+named with them.
+
+| Move | Trigger |
+| --- | --- |
+| The six `application` laboratory modules move into `experiments`, with no re-export (a re-export from `application` would break the contract that the product does not import the laboratory) | Agreement on issue #1012, with no open pull request on those files |
+| `src/squadopt/integration.py` folds into `application`, with a one-release re-export | After the GW7 publish |
+| Package guides for `live`, `data`, `prediction` and `features` | After the GW7 publish, with the data owner for the last three |
+| Record tests widened to `docs/research` | After the index matcher reads Markdown link targets: today 13 of the 20 JSON records there are not found by it, and 19 of the 20 name no producing commit |
+| Ratchets for storage imports, for file IO in `contracts` and the decision core, and for runtime `docs/contracts` paths | After the GW7 publish, under rule 4 |
+| Tests that keep the script catalogue complete, the package guides in step with their modules and every document reachable | After the GW7 publish, announced on issues #1012 and #978, because they fail pull requests in flight |
+| The league-list file IO leaves `contracts` | After issue #981 |
+| A public CP-SAT driver in `optimization` | After pull request #969 merges, on measured gain |
+
+## Rejected options
+
+- **Regrouping `tests/unit` by package.** 329 import statements under `tests/` name a
+  `tests.unit` module, so every move would rewrite imports in other test files for no change in
+  what is tested.
+- **Renaming `data`, `application`, `platform` or `scenarios`, or flattening `src/`.** ADR 0008
+  measured the cost, and nothing has made it smaller.
+- **Moving records, pre-registrations or `docs/contracts`.** Records are cited by path in tests,
+  runners and generated bytes (ADR 0003). The contract schemas are loaded at runtime by the 7
+  modules above and compared by the backend restart check.
+- **One umbrella package for the laboratory.** 3 JSON records and 23 Markdown documents under
+  `docs/` and `docs/research` name a laboratory module by its dotted name or its path, and would
+  then name modules that no longer exist. Not this season.
+- **A ring line in each package docstring.** The tested table is the declaration; a second copy
+  in prose would drift from it.
+- **Widening the record tests to `docs/research` now.** It fails on the 13 and 19 records counted
+  above.
+- **Removing the two screenshots under `docs/images/member-mobile`.** The body of merged pull
+  request #1023 refers to them.
+- **A README under `.github/`.** GitHub would show it on the repository page in place of the
+  root README.
+
+## Open questions for the owner
+
+1. **The scripts regroup.** Moving measurement runners and generators into subfolders of
+   `scripts/` would supersede ADR 0008's rejection of a scripts restructure. Operator commands
+   and the PowerShell scripts cannot move, because scheduled tasks and runbooks hold their
+   paths.
+2. **Splitting `platform` by deployment unit (ADR 0008, M6).** The seam is real; the split needs
+   a record that supersedes the deferral, and the operator entry points
+   (`squadopt.platform.weekly_operations`, `squadopt.platform.advice_worker`,
+   `squadopt.platform.cli:main`) would keep permanent re-exports.
+3. **Version 2.0.0.** `squadopt.__version__` is read from the installed metadata, and no code
+   under `src/` or `scripts/` writes it into a record, so a major version would mark the
+   restructure without changing any artifact.
+   The changelog keeps `1.0.0` until the owner decides.
+4. **Storage ports.** Whether ports for captures, the ledger, handoffs, publication writing and
+   the clock are built now, or when ADR 0005's activation conditions or issue #1010 require
+   them; and whether `data` is then split into a vocabulary package and a storage package.
+
+## Consequences
+
+The architecture is stated once, in a form a test can read, and every later structural change
+is classified against it rather than argued. The known violations are listed with numbers, so
+progress on each is measurable. No import path, record path or operator command changes as a
+result of this record; the moves that would change them wait for their triggers and, where
+listed, for the owner's answer.

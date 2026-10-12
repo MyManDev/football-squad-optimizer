@@ -18,6 +18,12 @@ latest successful immutable `site-...` deployment tag, so production may deliber
 
 ## Protection
 
+Since 2026-09-26 (#867) `develop` merges through a GitHub merge queue. A pull request whose
+checks are green is enqueued, with the GraphQL `enqueuePullRequest` mutation or with
+`gh pr merge`, which lands in the same queue. The queue runs the required checks again on the
+`merge_group` event against the grouped merge, then makes the squash commit from the pull
+request's title and body. `main` has no queue: it moves by release merge only.
+
 Both branches are protected, with strict up-to-date branches. The required checks are
 not listed here, because a copy in a document goes stale when the setting moves: this
 section used to name three contexts for `develop` after the fourth had been added. Read
@@ -45,9 +51,9 @@ closed.
 
 ## The gates
 
-Five exist today. The first four are also documented in `../../README.md` under Quality checks,
-`../handoff_acceptance_checklist.md:36` item 16, and `../recalibration_runbook.md`; the fifth is
-the layering contract in [dependency rules](dependency_rules.md). CI enforces all five:
+Five exist today. All five are also listed in `../../CONTRIBUTING.md`; the first four appear in
+`../handoff_acceptance_checklist.md:36` item 16 and in `../recalibration_runbook.md`; the fifth
+is the layering contract in [dependency rules](dependency_rules.md). CI enforces all five:
 
 | # | Gate | Command |
 | --- | --- | --- |

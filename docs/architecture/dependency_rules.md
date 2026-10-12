@@ -20,19 +20,24 @@ contracts
     features
       prediction
         optimization
-          evaluation
-            scenarios
-              planning
-                bayesopt
-                  preflight
-                    recalibration
-                      backtest
-                        experiments
-                          live
-                            application
-                              platform
-                                api / entry points
+          integration
+            evaluation
+              scenarios
+                planning
+                  bayesopt
+                    preflight
+                      recalibration
+                        backtest
+                          experiments
+                            live
+                              application
+                                platform
+                                  api / entry points
 ```
+
+`integration` is one module, `src/squadopt/integration.py`, which optimizes a squad from a
+canonical projection CSV. It imports only `data` and `optimization`, so it sits directly above
+`optimization` as a layer of its own.
 
 `application`, `platform`, and the optional `api` adapter now exist and are enforced as the
 three highest package layers in `pyproject.toml`. `contracts` is the lowest package and
@@ -77,8 +82,13 @@ read meaning into it, and do not "fix" it:
 - `preflight` imports only `data`.
 - `recalibration` imports `data`, `features` and `scenarios`, so it needs to be above
   `scenarios` but is otherwise unconstrained.
-- `planning` imports only `optimization` and `contracts` (`DecisionPreferences` from
-  `contracts.preferences`, in `planning/chip_strategy.py:14` and `planning/optimizer.py:14`).
+- `planning` imports `optimization`, `contracts` (`DecisionPreferences` from
+  `contracts.preferences`, in `planning/chip_strategy.py:6` and `planning/optimizer.py:15`)
+  and `scenarios`: three modules import `scenarios.expected_lineup`
+  (`planning/expected_swap.py:31`, `planning/football_exact_lineup.py:17` and
+  `planning/lineup_utility.py:21`). So `planning` must sit above `scenarios` and below
+  `experiments`, which imports it; its position relative to `bayesopt`, `preflight`,
+  `recalibration` and `backtest` is free.
 
 If a future import makes one of these positions load-bearing, say so here at the same time.
 
@@ -168,6 +178,8 @@ root_package = "squadopt"
 [[tool.importlinter.contracts]]
 name = "Layered architecture"
 type = "layers"
+containers = ["squadopt"]
+exhaustive = true
 layers = [
     "api",
     "platform",
@@ -181,6 +193,7 @@ layers = [
     "planning",
     "scenarios",
     "evaluation",
+    "integration",
     "optimization",
     "prediction",
     "features",
@@ -189,8 +202,10 @@ layers = [
 ]
 ```
 
-The excerpt abbreviates the fully qualified names used by `pyproject.toml`, which is the
-executable source of truth. `squadopt.api` is listed above `squadopt.platform`, which is listed
+The excerpt leaves out the comments and the other settings of `pyproject.toml`, which is the
+executable source of truth. Because the layers are named inside the `squadopt` container and
+the contract is exhaustive, a new package directly under `squadopt` fails the gate until it is
+placed in this list. `squadopt.api` is listed above `squadopt.platform`, which is listed
 above `squadopt.application`; the API therefore cannot be imported back into runtime or
 application code. The platform's first package contract is the versioned run context and
 manifest. No baseline violation remains and there are no `ignore_imports` entries. Every
@@ -214,7 +229,7 @@ packages fall into five groups, each importing only groups below it:
 | --- | --- |
 | adapters | `api` |
 | runtime | `platform` |
-| use cases | `application` |
+| use cases | `application`, `integration` |
 | domain | `live`, `planning`, `optimization`, `evaluation`, `scenarios`, `prediction`, `features` |
 | data | `data`, `contracts` |
 
@@ -240,3 +255,14 @@ and said nothing. Adding them changed no import and left all three contracts gre
 to do it early is the one the eight `ignore_imports` entries recorded: a boundary is cheap to
 state while nothing crosses it, and expensive once nine statements do. Both packages have since
 been removed with their runners (2026-10-12), and their entries left the contracts with them.
+
+## Rings
+
+[ADR 0010](decisions/0010-clean-architecture-rings-and-repository-layout.md) names the rings
+these groups map to, and the [architecture overview](../../ARCHITECTURE.md) gives the ring of
+every package, the contracts that enforce them and the known violations. The groups above
+correspond as follows: `contracts` and the schema half of `data` are R1 (vocabulary); the domain
+group is R2; the use cases group is R3; `api`, `platform` and the storage half of `data` are R4
+(adapters) and, for their entry points, R5 (composition). The laboratory is the research side
+tree. The rings do not change the order in this document; the layers contract remains the
+executable statement and the tie-break within a ring.
