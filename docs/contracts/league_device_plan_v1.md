@@ -141,10 +141,13 @@ Since #981 step 2 the page reads the per-capture table where its league's direct
 names one (`web/src/features/league/data.ts`): it asks for `data/<device_plan>?v=<device_plan_sha256>`,
 holds the bytes to that sha256 and the payload to this contract, and otherwise reads the
 tree's v1 copy. A missing or changed table, a payload of another shape or a browser without
-a digest all fall back to the copy; a read that runs out of its time does not, because the
-copy is on the same site and a second wait would double the member's. A table from another
-capture is still refused by the device solve, as the copy is. Because the address carries
-the digest, `web/public/_headers` lets a browser keep `/data/device/*` for a year.
+a digest all fall back to the copy. So does a line whose table is another capture's than the
+member's page: a directory read before a later publish still names the earlier table, and a
+browser may keep it, while the copy is read as the tree is now. A read that runs out of its
+time does not fall back, because the copy is on the same site and a second wait would double
+the member's. A document from another capture than the member's page is still refused by
+the device solve. Because the address carries the digest, `web/public/_headers` lets a
+browser keep `/data/device/*` for a year.
 
 ## What the device answers
 

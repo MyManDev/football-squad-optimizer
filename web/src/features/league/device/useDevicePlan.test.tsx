@@ -9,13 +9,14 @@ import { createRequire } from "node:module";
 import { join } from "node:path";
 
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import fixture from "../../../fixtures/device-plan/instances.json";
 import { mockEntrySquadEnvelopes } from "../../../fixtures/league";
-import { withLeague } from "../../../testSupport/league";
+import { stubTree, withLeague } from "../../../testSupport/league";
 import { isAdvicePayload } from "../advice/adviceShape";
 import type { AdviceRequest } from "../advice/adviceClient";
+import type { LeagueTree } from "../data";
 import { LeagueDataError, LeagueDataMissing } from "../dataErrors";
 import type { EntrySquad, LeagueViewEnvelope } from "../types";
 import type { DevicePlanReply, DevicePlanRequest } from "./deviceSolver.worker";
@@ -166,7 +167,8 @@ function Harness({
 }: {
   squad: EntrySquad;
   request: AdviceRequest;
-  loadDocument: () => Promise<LeagueViewEnvelope<DevicePlanDocument>>;
+  /** Absent, the league's tree reads the document, as on the page. */
+  loadDocument?: () => Promise<LeagueViewEnvelope<DevicePlanDocument>>;
   solver: DeviceSolver;
   onState: (state: DevicePlanPhase) => void;
   rivals?: readonly number[];
@@ -188,7 +190,7 @@ function Harness({
     squad,
     request,
     {
-      loadDocument,
+      ...(loadDocument ? { loadDocument } : {}),
       createSolver: createSolver ?? (() => solver),
       now: () => new Date("2026-10-03T01:02:03Z"),
       ...timerDependencies,
@@ -225,6 +227,35 @@ describe("the worker", () => {
     // read from its source; the ceiling itself is tested in solve/ceiling.test.ts.
     const source = readFileSync(join(__dirname, "deviceSolver.worker.ts"), "utf8");
     expect(source).toContain("solveRequest(withinCeiling(loaded), event.data)");
+  });
+});
+
+describe("the device's inputs", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("are asked of the league's tree for the capture the member's page shows", async () => {
+    // A directory read before a later publish can still name the earlier capture's table;
+    // the tree reads that table only for the capture it is asked for.
+    const devicePlan = vi
+      .fn<LeagueTree["devicePlan"]>()
+      .mockImplementation(async () => envelope(document));
+    stubTree({ devicePlan });
+    const squad = squadWith(entry);
+    render(
+      withLeague(
+        <Harness
+          squad={squad}
+          request={REQUEST}
+          solver={new InProcessSolver()}
+          onState={() => {}}
+        />,
+      ),
+    );
+    await act(async () => screen.getByText("run").click());
+    await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("done"));
+    expect(devicePlan).toHaveBeenCalledWith(squad.source_snapshot_id);
   });
 });
 

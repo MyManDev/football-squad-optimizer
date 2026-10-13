@@ -64,6 +64,8 @@ function sha256(text: string): string {
 const TABLE_TEXT = bytesOf(envelope(captureTable()));
 const TABLE_SHA = sha256(TABLE_TEXT);
 const COPY = envelope({ ...copy, source_snapshot_id: CAPTURE });
+const LATER_CAPTURE = "fpl-live-20261023T060000Z-ba9876543210";
+const LATER_COPY = envelope({ ...copy, source_snapshot_id: LATER_CAPTURE });
 
 function league(devicePlan?: LeagueRef["devicePlan"]): LeagueRef {
   return { leagueId: copy.league_id, path: `leagues/${copy.league_id}`, devicePlan };
@@ -126,9 +128,9 @@ describe("tree.devicePlan", () => {
       [`/data/${TABLE_PATH}?v=${TABLE_SHA}`, () => new Response(TABLE_TEXT)],
       [`/data/leagues/${copy.league_id}/device-plan.json`, () => jsonResponse(COPY)],
     ]);
-    const read = await createLeagueTree(
-      league({ path: TABLE_PATH, sha256: TABLE_SHA }),
-    ).devicePlan();
+    const read = await createLeagueTree(league({ path: TABLE_PATH, sha256: TABLE_SHA })).devicePlan(
+      CAPTURE,
+    );
     expect(read.payload.contract_version).toBe(DEVICE_PLAN_TABLE_CONTRACT_VERSION);
     expect(read.payload.league_id).toBeUndefined();
     expect(read.payload.source_snapshot_id).toBe(CAPTURE);
@@ -152,7 +154,9 @@ describe("tree.devicePlan", () => {
       [`/data/${TABLE_PATH}?v=${digest}`, answer],
       [`/data/leagues/${copy.league_id}/device-plan.json`, () => jsonResponse(COPY)],
     ]);
-    const read = await createLeagueTree(league({ path: TABLE_PATH, sha256: digest })).devicePlan();
+    const read = await createLeagueTree(league({ path: TABLE_PATH, sha256: digest })).devicePlan(
+      CAPTURE,
+    );
     expect(read.payload.contract_version).toBe("league_device_plan_v1");
     expect(read.payload.league_id).toBe(copy.league_id);
     expect(fetcher.mock.calls.map(([url]) => url)).toEqual([
@@ -161,11 +165,28 @@ describe("tree.devicePlan", () => {
     ]);
   });
 
+  it("reads the tree's copy, not a table of another capture than the member's page", async () => {
+    // The directory was read before a later publish, and the browser may keep the earlier
+    // capture's table for a year: the copy is read as the tree is now.
+    const fetcher = stubFetchByUrl([
+      [`/data/${TABLE_PATH}?v=${TABLE_SHA}`, () => new Response(TABLE_TEXT)],
+      [`/data/leagues/${copy.league_id}/device-plan.json`, () => jsonResponse(LATER_COPY)],
+    ]);
+    const read = await createLeagueTree(league({ path: TABLE_PATH, sha256: TABLE_SHA })).devicePlan(
+      LATER_CAPTURE,
+    );
+    expect(read.payload.contract_version).toBe("league_device_plan_v1");
+    expect(read.payload.source_snapshot_id).toBe(LATER_CAPTURE);
+    expect(fetcher.mock.calls.map(([url]) => url)).toEqual([
+      `/data/leagues/${copy.league_id}/device-plan.json`,
+    ]);
+  });
+
   it("reads the tree's copy alone where the directory names no table", async () => {
     const fetcher = stubFetchByUrl([
       [`/data/leagues/${copy.league_id}/device-plan.json`, () => jsonResponse(COPY)],
     ]);
-    const read = await createLeagueTree(league()).devicePlan();
+    const read = await createLeagueTree(league()).devicePlan(CAPTURE);
     expect(read.payload.league_id).toBe(copy.league_id);
     expect(fetcher.mock.calls.map(([url]) => url)).toEqual([
       `/data/leagues/${copy.league_id}/device-plan.json`,
@@ -179,7 +200,9 @@ describe("tree.devicePlan", () => {
         () => jsonResponse(envelope(captureTable())),
       ],
     ]);
-    await expect(createLeagueTree(league()).devicePlan()).rejects.toThrow("not the expected shape");
+    await expect(createLeagueTree(league()).devicePlan(CAPTURE)).rejects.toThrow(
+      "not the expected shape",
+    );
   });
 
   it("does not fall back once the page has stopped asking", async () => {
@@ -195,7 +218,7 @@ describe("tree.devicePlan", () => {
       [`/data/leagues/${copy.league_id}/device-plan.json`, () => jsonResponse(COPY)],
     ]);
     await expect(
-      createLeagueTree(league({ path: TABLE_PATH, sha256: TABLE_SHA })).devicePlan({
+      createLeagueTree(league({ path: TABLE_PATH, sha256: TABLE_SHA })).devicePlan(CAPTURE, {
         signal: controller.signal,
       }),
     ).rejects.toThrow();
@@ -212,7 +235,7 @@ describe("tree.devicePlan", () => {
     );
     vi.stubGlobal("fetch", fetcher);
     await expect(
-      createLeagueTree(league({ path: TABLE_PATH, sha256: TABLE_SHA })).devicePlan({
+      createLeagueTree(league({ path: TABLE_PATH, sha256: TABLE_SHA })).devicePlan(CAPTURE, {
         timeoutMs: 20,
       }),
     ).rejects.toMatchObject({ name: "TimeoutError" });
