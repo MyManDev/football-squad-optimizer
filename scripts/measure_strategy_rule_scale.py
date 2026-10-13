@@ -13,6 +13,11 @@ covers every other league in config/leagues.json at the measured revision and ma
 it cannot measure as unavailable, never refusing the primary reading. The command
 writes no constant and no rule id: step 4 applies the declaration's update rule, under
 which the rule id's version increments only when the value changes.
+
+The later checkpoints #1044 names, GW12 and GW19, run the same instrument with
+--checkpoint gw12 or gw19 and the matching --through-gameweek. Each writes its own pair
+of records, docs/strategy_rule_scale_gw12.* or _gw19.*, and never the GW6 record
+(docs/strategy_rule_scale.*) or an earlier checkpoint's: those keep their bytes.
 """
 
 from __future__ import annotations
@@ -50,6 +55,9 @@ CONTRACT_VERSION = "strategy_rule_scale_v1"
 CONTROL_EXPECTED = 21.2
 # Distinct from a refusal (1) and from an argparse usage error (2), neither of which writes.
 CONTROL_FAILED_EXIT = 3
+#: The later checkpoints (#1044): the name on the command line and the gameweek each is the
+#: record through. The GW6 record of #1002 has no name and keeps its paths.
+CHECKPOINTS: Mapping[str, int] = {"gw12": 12, "gw19": 19}
 _LIVE_ID = re.compile(r"fpl-live-(\d{8}T\d{6}Z)-[0-9a-f]{12}")
 _FIRST_DATE = datetime(2026, 8, 26, tzinfo=UTC)
 _LAST_DATE = datetime(2027, 7, 1, tzinfo=UTC)
@@ -272,7 +280,7 @@ def measure_payloads(
 def markdown(record: Mapping[str, Any]) -> str:
     control = record["control_gw1_to_gw3"]
     lines = [
-        "# Strategy rule scale checkpoint",
+        f"# Strategy rule scale checkpoint {str(record.get('checkpoint', 'gw6')).upper()}",
         "",
         f"Source capture: `{record['snapshot_id']}`",
         f"Source fingerprint: `{record['snapshot_fingerprint']}`",
@@ -373,11 +381,23 @@ def markdown(record: Mapping[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def write_records(record: Mapping[str, Any], repository_root: Path) -> None:
-    json_path = repository_root / "docs" / "strategy_rule_scale.json"
+def record_paths(repository_root: Path, checkpoint: str | None = None) -> tuple[Path, Path]:
+    """The JSON record and its Markdown twin: the GW6 pair, or a later checkpoint's own."""
+    if checkpoint is not None and checkpoint not in CHECKPOINTS:
+        raise ScaleMeasurementError(f"Unknown checkpoint {checkpoint!r}.")
+    stem = "strategy_rule_scale" if checkpoint is None else f"strategy_rule_scale_{checkpoint}"
+    docs = repository_root / "docs"
+    return docs / f"{stem}.json", docs / f"{stem}.md"
+
+
+def write_records(
+    record: Mapping[str, Any], repository_root: Path, checkpoint: str | None = None
+) -> None:
+    """Write one checkpoint's two files and nothing else: an earlier record keeps its bytes."""
+    json_path, markdown_path = record_paths(repository_root, checkpoint)
     write_json(json_path, record)
     written = json.loads(json_path.read_text(encoding="utf-8"))
-    write_text(repository_root / "docs" / "strategy_rule_scale.md", markdown(written))
+    write_text(markdown_path, markdown(written))
 
 
 def _validate_live_id(snapshot_id: str) -> None:
@@ -432,11 +452,22 @@ def preregistration_gate() -> tuple[str, str]:
 
 
 def run_measurement(
-    *, snapshot_root: Path, snapshot_id: str, league: int, through_gameweek: int
+    *,
+    snapshot_root: Path,
+    snapshot_id: str,
+    league: int,
+    through_gameweek: int,
+    checkpoint: str | None = None,
 ) -> dict[str, Any]:
     _validate_live_id(snapshot_id)
     if league != PRIMARY_LEAGUE:
         raise ScaleMeasurementError("The primary league is 352490.")
+    if checkpoint is not None and through_gameweek != CHECKPOINTS[checkpoint]:
+        # A checkpoint is the record through its own gameweek; the highest-N rule below
+        # then holds that gameweek to the capture's highest settled one.
+        raise ScaleMeasurementError(
+            f"The {checkpoint} checkpoint is the record through GW{CHECKPOINTS[checkpoint]}."
+        )
     revision, preregistration_hash = preregistration_gate()
     # The gate refused a dirty tree, so this is config/leagues.json at the recorded revision.
     # An unreadable list refuses before any capture opens, since reading (e) cannot be named.
@@ -458,9 +489,10 @@ def run_measurement(
             "repository_commit": revision,
             "working_tree_dirty": False,
             "preregistration_sha256": preregistration_hash,
+            "checkpoint": checkpoint or "gw6",
         }
     )
-    write_records(record, REPOSITORY_ROOT)
+    write_records(record, REPOSITORY_ROOT, checkpoint)
     return record
 
 
@@ -470,6 +502,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--snapshot-id", required=True)
     parser.add_argument("--league", type=int, required=True)
     parser.add_argument("--through-gameweek", type=int, required=True)
+    parser.add_argument(
+        "--checkpoint",
+        choices=sorted(CHECKPOINTS),
+        default=None,
+        help="a later checkpoint (#1044), written to its own docs/strategy_rule_scale_<name>.*",
+    )
     args = parser.parse_args(argv)
     try:
         record = run_measurement(
@@ -477,6 +515,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             snapshot_id=args.snapshot_id,
             league=args.league,
             through_gameweek=args.through_gameweek,
+            checkpoint=args.checkpoint,
         )
     except (ScaleMeasurementError, DataError, OSError, ValueError, SystemExit) as error:
         # Third-party parse/integrity exceptions can contain member ids or names.
