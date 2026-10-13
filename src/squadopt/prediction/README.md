@@ -23,8 +23,8 @@ hours either side of a deadline only a blocker fix merges here
 - **It imports no storage or source module of `data`.** No contract makes it a source yet:
   "The decision core imports no storage or source module" adds it when its zone owner agrees.
 - **It touches no file.** `tests/architecture/test_core_file_io.py` holds it to no `open`,
-  no file method of `Path`, no pandas reader or writer and no file function of `os`, with no
-  allowlist entry.
+  no file method of `Path`, no pandas reader or writer it lists and no file function of `os`,
+  `glob`, NumPy or joblib, with no allowlist entry.
 - **No laboratory, no outside world.** It imports no laboratory module ("Product does not import
   the laboratory"), no web framework, network client, model SDK or `sqlite3` ("Frameworks,
   network and databases stay in api and platform"), no repository script ("The package never

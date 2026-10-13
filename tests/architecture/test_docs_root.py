@@ -12,7 +12,8 @@ So the living documents at the root are frozen here as a list that only shrinks.
 goes in the folder of its readers (`architecture/`, `operations/`, `product/`, `research/` or
 `specs/`), each of which has a guide that links it. A document leaves the list when it is
 moved or retired; nothing here requires that, and a move is a change to every link and
-citation of the old path in the same pull request.
+citation of the old path in the same pull request. `LIVING_AT_THE_ROOT_SIZE` pins the size of
+the list, so a name cannot join it without changing a number a reviewer sees.
 
 What counts as living is what is not something else, by name:
 
@@ -149,6 +150,10 @@ LIVING_AT_THE_ROOT: frozenset[str] = frozenset(
     }
 )
 
+#: The size of `LIVING_AT_THE_ROOT`. Lower it when a document leaves the list; raising it is
+#: the growth the list refuses.
+LIVING_AT_THE_ROOT_SIZE = 106
+
 
 def _root_files() -> list[str]:
     """Every file directly under `docs/`, by name."""
@@ -204,6 +209,12 @@ def test_the_list_of_living_documents_at_the_root_only_shrinks() -> None:
             "docs/ (it moved, was removed or became a record). Remove it from the list:",
             *gone,
         ]
+    )
+
+
+def test_the_list_of_living_documents_at_the_root_keeps_its_size() -> None:
+    assert len(LIVING_AT_THE_ROOT) == LIVING_AT_THE_ROOT_SIZE, (
+        "the list only shrinks: when a document leaves it, lower LIVING_AT_THE_ROOT_SIZE"
     )
 
 

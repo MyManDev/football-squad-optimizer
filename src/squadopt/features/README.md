@@ -96,4 +96,5 @@ ARCHITECTURE.md measures and schedules these; this list says where they are.
   `squadopt.application`, with file adapters in `platform` (Phase 3).
 - **File access.** `evidence_artifact.py`, `rotation_evidence_artifact.py` and
   `settled_outcomes.py` read their artifacts' manifests and tables themselves. The remedy is the
-  same storage ports (Phase 3); no check holds it today.
+  same storage ports (Phase 3). Until then `tests/architecture/test_use_case_file_io.py`
+  allowlists these 3, and fails on any other module here that reads or writes a file.

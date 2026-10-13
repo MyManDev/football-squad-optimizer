@@ -152,7 +152,9 @@ ARCHITECTURE.md measures and schedules these; this list says where they are.
 - **File access.** 24 modules here read or write files themselves, among them
   `league_publication.py`, `league_views.py` and `site.py` (the published trees),
   `advice_record.py`, and `player_evidence.py` and `rotation_export.py` (the evidence exports).
-  The remedy is the same storage ports (Phase 3); no check holds it today.
+  The remedy is the same storage ports (Phase 3). Until then
+  `tests/architecture/test_use_case_file_io.py` allowlists the 24, and fails on any other
+  module here that reads or writes a file.
 - **Ports.** Three typed ports are declared here: `DecisionVerifier` in `commands.py`,
   `EntryPicksProvider` in `entries.py` and `TickObserver` in `season.py`.
 - **Paths to `docs/contracts`.** `contract.py` names `docs/contracts/ui_view_v1.schema.json`

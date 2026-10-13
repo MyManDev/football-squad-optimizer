@@ -23,7 +23,8 @@ better than guessing at it per file.
 Removing an entry is not a repair of the record. A committed record is the run that happened,
 and re-running one to fix a metadata field replaces a measurement with a different one. An
 entry leaves this list when a **later** run of that measurement writes a record that names its
-commit.
+commit. `LIST_SIZES` pins the size of both frozen lists, so a record cannot join one without
+changing a number a reviewer sees.
 
 ## Records under `docs/research`
 
@@ -111,6 +112,10 @@ RESEARCH_WITHOUT_A_COMMIT: frozenset[str] = frozenset(
     }
 )
 
+#: The size of each frozen list. Lower it when a record leaves its list; raising it is the
+#: growth the lists refuse, so a new record cannot join one by being added to it.
+LIST_SIZES = {"WITHOUT_A_COMMIT": 18, "RESEARCH_WITHOUT_A_COMMIT": 19}
+
 #: The folders whose JSON files the check reads, relative to `docs/` ("" is the root).
 RECORD_FOLDERS: tuple[str, ...] = ("", "research")
 
@@ -188,6 +193,15 @@ def test_the_frozen_lists_only_shrink() -> None:
         "these are listed but no longer exist under docs/; delete their entries: "
         + ", ".join(departed)
     )
+
+
+def test_the_frozen_lists_keep_their_size() -> None:
+    sizes = {
+        "WITHOUT_A_COMMIT": len(WITHOUT_A_COMMIT),
+        "RESEARCH_WITHOUT_A_COMMIT": len(RESEARCH_WITHOUT_A_COMMIT),
+    }
+
+    assert sizes == LIST_SIZES, "the lists only shrink: when a record leaves, lower its size"
 
 
 def test_the_two_lists_are_kept_apart() -> None:

@@ -251,7 +251,7 @@ entries, and they may only shrink (rule 1 above):
     `application`, `live` and `features` import none of the storage and source modules of
     `data` beyond the 122 direct import edges from 43 modules they have today, each an
     `ignore_imports` entry; `tests/architecture/test_storage_ratchet.py` holds the entries to
-    a frozen copy, so the list only shrinks.
+    a frozen copy whose size it pins by package, so the list only shrinks.
 
 The last four enforce the rings that
 [ADR 0010](decisions/0010-clean-architecture-rings-and-repository-layout.md), an accepted record,

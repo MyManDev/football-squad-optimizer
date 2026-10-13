@@ -104,4 +104,6 @@ ARCHITECTURE.md measures and schedules these; this list says where they are.
 - **File access.** `ledger.py` writes, locks, lists and reads the ledger's entries;
   `recommendation.py` writes and reads projection handoffs; `calibration.py`,
   `football_artifact.py` and `risk.py` read files; and `tick.py` asks whether a handoff file
-  exists. The remedy is the same storage ports (Phase 3); no check holds it today.
+  exists. The remedy is the same storage ports (Phase 3). Until then
+  `tests/architecture/test_use_case_file_io.py` allowlists these 6, and fails on any other
+  module here that reads or writes a file.

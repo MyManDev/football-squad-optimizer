@@ -26,7 +26,8 @@ The two frozen lists are the unreachable documents of 2026-10-13, split by what 
   whose guide is the place to link them.
 
 A document leaves a list when a link reaches it, and the test fails until it is removed from
-the list, so the lists cannot hold a document that is reachable.
+the list, so the lists cannot hold a document that is reachable. `LIST_SIZES` pins the size of
+each list, so a new document cannot join one without changing a number a reviewer sees.
 """
 
 from __future__ import annotations
@@ -247,6 +248,10 @@ NOT_NAMED_IN_THE_INDEX: frozenset[str] = frozenset(
     }
 )
 
+#: The size of each list. Lower it when a document leaves its list; raising it is the growth
+#: the lists refuse, so a new unreachable document cannot join one by being added to it.
+LIST_SIZES = {"NAMED_IN_THE_INDEX_WITHOUT_A_LINK": 119, "NOT_NAMED_IN_THE_INDEX": 73}
+
 
 def _documents(listed: list[str]) -> list[str]:
     """Every Markdown file git lists that exists on disk."""
@@ -314,6 +319,15 @@ def test_the_lists_of_unreachable_documents_only_shrink() -> None:
             *stale,
         ]
     )
+
+
+def test_the_two_lists_keep_their_size() -> None:
+    sizes = {
+        "NAMED_IN_THE_INDEX_WITHOUT_A_LINK": len(NAMED_IN_THE_INDEX_WITHOUT_A_LINK),
+        "NOT_NAMED_IN_THE_INDEX": len(NOT_NAMED_IN_THE_INDEX),
+    }
+
+    assert sizes == LIST_SIZES, "the lists only shrink: when a document leaves, lower its size"
 
 
 def test_the_two_lists_say_what_would_fix_each_document() -> None:

@@ -14,14 +14,17 @@ entry leaves both. The scan below reads every Python file of the sources, includ
 inside functions, and resolves each import to the module it names the way import-linter's graph
 does: it must find exactly the entries of `BASELINE`, so a new direct import fails here as it
 fails `lint-imports`, and an entry whose import is gone fails until it is deleted from both
-lists. An import of the `data` package root would reach the storage modules without an edge
-here; `tests/architecture/test_storage_imports.py` refuses it from these sources.
+lists. Adding an import together with its entry in both lists would still pass those checks,
+so `BASELINE_SIZE` pins the size of `BASELINE` by package, and growth changes a number a
+reviewer sees. An import of the `data` package root would reach the storage modules without an
+edge here; `tests/architecture/test_storage_imports.py` refuses it from these sources.
 """
 
 from __future__ import annotations
 
 import ast
 import tomllib
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
@@ -178,6 +181,10 @@ BASELINE: dict[str, str] = {
     "squadopt.application.advice_record -> squadopt.data.source_revision": SOURCE_REVISION,
 }
 
+#: The size of `BASELINE` by source package. Lower a count when an entry leaves; raising one
+#: is the growth the ratchet refuses, so it cannot happen by adding an entry to both lists.
+BASELINE_SIZE = {"application": 89, "live": 17, "features": 16}
+
 
 def _contract(name: str) -> dict[str, Any]:
     document = tomllib.loads(PYPROJECT.read_text(encoding="utf-8"))
@@ -276,6 +283,12 @@ def test_every_entry_is_a_direct_import_from_a_source_to_a_storage_module() -> N
     assert malformed == []
     assert len(STORAGE_PORT_EDGES) == len(set(STORAGE_PORT_EDGES)), "an edge is listed twice"
     assert set(BASELINE.values()) == {STORAGE_PORTS, SOURCE_REVISION}
+
+
+def test_the_baseline_keeps_its_size() -> None:
+    assert Counter(entry.split(".")[1] for entry in BASELINE) == BASELINE_SIZE, (
+        "the storage baseline only shrinks: when an entry leaves, lower its package's count"
+    )
 
 
 def test_the_sources_import_the_storage_half_exactly_where_the_baseline_says() -> None:

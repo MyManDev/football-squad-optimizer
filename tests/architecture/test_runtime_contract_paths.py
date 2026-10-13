@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import ast
 import re
+from collections import Counter
 from itertools import pairwise
 from pathlib import Path
 
@@ -52,6 +53,10 @@ ALLOWLIST: dict[str, str] = dict.fromkeys(
     ),
     CALLER_PASSES_THE_PATH,
 )
+
+#: The size of `ALLOWLIST` by package. Lower a count when an entry leaves; raising one, or
+#: adding a package, is the growth the ratchet refuses.
+ALLOWLIST_SIZE = {"application": 2, "platform": 6}
 
 #: A separator between path parts that do not join, such as the result of another call.
 _GAP = ""
@@ -148,10 +153,11 @@ def test_only_the_allowlisted_modules_name_a_path_into_docs_contracts() -> None:
 
 
 def test_the_allowlist_is_two_application_and_six_platform_modules() -> None:
-    packages = [module.split(".")[1] for module in ALLOWLIST]
+    packages = Counter(module.split(".")[1] for module in ALLOWLIST)
 
-    assert (packages.count("application"), packages.count("platform")) == (2, 6)
-    assert len(ALLOWLIST) == len(packages)
+    assert packages == ALLOWLIST_SIZE, (
+        "the allowlist only shrinks: when an entry leaves, lower its package's count with it"
+    )
     assert set(ALLOWLIST.values()) == {CALLER_PASSES_THE_PATH}
 
 
