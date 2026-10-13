@@ -15,12 +15,15 @@ its header.
 | [0005](0005-persistence-boundaries.md) | Separate transactional metadata from analytical artifacts | 2026-08-20 | Accepted | None |
 | [0006](0006-backend-hosting.md) | Host the advice backend beside Pages, not inside it | 2026-08-27 | Accepted | Amended in place on 2026-08-27, after the platform owner's review |
 | [0007](0007-enterprise-transition.md) | Move the operational scripts into the installed package, in one change | 2026-09-10 | Accepted | None |
-| [0008](0008-structure-investment.md) | Spend the structure budget on repetition and boundaries, not on renames | 2026-09-15 | Accepted | None |
+| [0008](0008-structure-investment.md) | Spend the structure budget on repetition and boundaries, not on renames | 2026-09-15 | Accepted | [0011](0011-storage-ports-and-platform-split.md) supersedes the deferral of M6, the `platform` split |
 | [0009](0009-advice-backend-hosting-options.md) | Where the advice backend runs, five options compared for the owner's decision | 2026-09-25 | Proposed | None |
-| [0010](0010-clean-architecture-rings-and-repository-layout.md) | Clean-architecture rings and the repository layout | 2026-10-13 | Accepted (owner, 2026-10-13) | None |
+| [0010](0010-clean-architecture-rings-and-repository-layout.md) | Clean-architecture rings and the repository layout | 2026-10-13 | Accepted (owner, 2026-10-13) | [0011](0011-storage-ports-and-platform-split.md) amends two triggers of the deferred moves and answers open questions 1, 2 and 4 |
+| [0011](0011-storage-ports-and-platform-split.md) | Storage ports, a named data vocabulary and the platform split by deployment unit | 2026-10-13 | Accepted (owner, 2026-10-13) | None |
 
 ADR 0004's own revisit condition led to ADR 0006, which keeps the static site and adds the
 backend beside it. ADR 0010 builds on ADRs 0001 and 0008 and leaves their decisions standing.
+ADR 0011 decides the remedies ADR 0010 deferred, and is the record ADR 0010 said the `platform`
+split needs.
 
 ## Decided without an ADR yet
 

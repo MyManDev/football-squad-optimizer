@@ -122,6 +122,10 @@ with its trigger; it lands in its own pull request once the trigger fires.
 | The league-list file IO leaves `contracts` | After issue #981 |
 | A public CP-SAT driver in `optimization` | After pull request #969 merges, on measured gain |
 
+[ADR 0011](0011-storage-ports-and-platform-split.md), accepted on 2026-10-13, amends two of
+these triggers (the league list moves before #981 step 6 opens; the CP-SAT driver lands before
+the GW7 freeze) and answers open questions 1, 2 and 4 below.
+
 ## Rejected options
 
 This record proposes to reject the options below; each becomes a rejection when the owner

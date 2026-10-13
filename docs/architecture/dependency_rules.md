@@ -150,6 +150,11 @@ Only vocabulary. Nothing that computes a decision, and nothing that imports anyt
   that the football prediction families and the live native integration both score with
   (#1070). It imports nothing else in `squadopt` and turns caller-supplied moments into
   expected points, not a decision. Both owners placed it here on 2026-10-10 (#1071).
+- `CONTRACT_SCHEMA_DIRECTORY` and `contract_schema_path` in `contracts/schema_paths.py`: the
+  one place that names the folder of the committed schemas, `docs/contracts`, relative to the
+  working directory as every schema writer and test used it before
+  ([ADR 0011](decisions/0011-storage-ports-and-platform-split.md), decision 6). It imports
+  nothing else in `squadopt` and refuses a name that is not `<name>_v<N>`.
 - Identity and fingerprint primitives and the contract-version registry remain future
   candidates under [ADR 0002](decisions/0002-contract-versioning.md); they are not moved by
   this extraction.
@@ -171,6 +176,13 @@ place. If a symbol is not vocabulary that at least two layers need, it does not 
 3. **Boundary files change only by joint approval** — see [ownership](ownership.md).
 4. **The order is a claim about the code, so it is verified, not trusted.** Any change here
    comes with the regenerated numbers.
+5. **A private name is not an import surface.** A single-underscore name is imported across
+   packages only where `tests/architecture/test_private_imports.py` allowlists it, with its
+   remedy, and that list only shrinks: the owning module publishes the name and keeps the
+   private alias for one release (rule 2), as `optimization.cpsat` did for the CP-SAT driver
+   that `planning` and `scenarios` had reached through the private names of
+   `optimization.optimizer` ([ADR 0011](decisions/0011-storage-ports-and-platform-split.md),
+   decision 5).
 
 ## Verification
 
@@ -240,8 +252,9 @@ entries, and they may only shrink (rule 1 above):
 6. `The decision core imports no OS or process module`: `contracts`, `optimization`,
    `planning`, `scenarios` and `evaluation` import no `os`, `shutil`, `tempfile` or
    `subprocess`.
-7. `The decision core imports no storage or source module`: the same five packages import
-   none of the storage and source modules of `data`.
+7. `The decision core imports no storage or source module`: the same five packages, and
+   `application.ports`, the home ADR 0011 gives the use-case storage ports, import none of the
+   storage and source modules of `data`.
 8. `The CP-SAT solver stays in the decision core`: only `optimization`, `planning`,
    `scenarios`, `evaluation` and `backtest` may import `ortools`.
 9. `Use cases and domain records import no process, thread, event-loop or command-line module`:

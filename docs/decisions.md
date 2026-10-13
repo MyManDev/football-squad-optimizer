@@ -82,6 +82,26 @@ said that fixing the architecture directly is the top priority.
 
 Source: the owner's direction to the maintainers on 2026-10-13.
 
+## 2026-10-13: ADR 0011 accepted
+
+Decision: the architecture is fixed directly, and this is the first priority. The owner
+accepted [ADR 0011](architecture/decisions/0011-storage-ports-and-platform-split.md): storage
+ports declared in the ring that consumes them, with file adapters in `platform`; the vocabulary
+half of `data` in named modules, with `data` kept as one package; `platform` split into seven
+subpackages by deployment unit, which supersedes the deferral of that split in ADR 0008; no file
+IO in `contracts` or the decision core; a public CP-SAT driver; one resolver for schema paths;
+a shim policy with permanent operator entry points and names frozen until the planner chain's
+final reading; and merge discipline around deadlines and runs. It amends two triggers of ADR
+0010's deferred moves and answers its open questions 1, 2 and 4; question 3 (version 2.0.0)
+stays open.
+
+Reason: ADR 0010 listed the known violations with remedies but deferred most of them behind
+triggers or open questions. The owner's direction of 2026-10-13 makes the fixes the next work,
+so the remedies needed one record that decides them and the order they land in.
+
+Source: the owner's acceptance of 2026-10-13, and
+[ADR 0011](architecture/decisions/0011-storage-ports-and-platform-split.md).
+
 ## 2026-10-07: Weekly operation and the next development steps
 
 Decision:

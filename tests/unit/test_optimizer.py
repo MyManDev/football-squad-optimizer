@@ -18,10 +18,8 @@ from squadopt import (
 )
 from squadopt.live.report import live_optimization_config
 from squadopt.optimization.coefficients import scale_bench_coefficient, scale_expected_points
-from squadopt.optimization.optimizer import (
-    _map_solver_status,
-    wall_clock_stopped_the_search,
-)
+from squadopt.optimization.cpsat import map_solver_status
+from squadopt.optimization.optimizer import wall_clock_stopped_the_search
 
 
 def _ids(frame: pd.DataFrame) -> set[object]:
@@ -241,12 +239,12 @@ def test_bench_coefficient_uses_round_half_up() -> None:
     ],
 )
 def test_maps_solver_statuses(raw_status: int, expected: SolverStatus) -> None:
-    assert _map_solver_status(raw_status) is expected
+    assert map_solver_status(raw_status) is expected
 
 
 def test_model_invalid_status_is_an_execution_error() -> None:
     with pytest.raises(SolverExecutionError):
-        _map_solver_status(cp_model.MODEL_INVALID)
+        map_solver_status(cp_model.MODEL_INVALID)
 
 
 def test_preserves_extra_input_columns(

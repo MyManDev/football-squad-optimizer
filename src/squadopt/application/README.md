@@ -12,9 +12,9 @@ domain records import no process, thread, event-loop or command-line module" in
 `source_revision()` in `squadopt.data.source_revision`, which runs `git`; ARCHITECTURE.md lists
 it as a known violation.
 
-Its 61 Python files, 57 at the top level and four in the `strategies/` subpackage, sit in one
-folder. This page places every one of them in exactly one family. Review: the owner
-([ownership](../../../docs/architecture/ownership.md)).
+Its 62 Python files, 57 at the top level, four in the `strategies/` subpackage and the package
+file of `ports/`, are placed by this page: every one of them is in exactly one family. Review:
+the owner ([ownership](../../../docs/architecture/ownership.md)).
 
 ## Member advice
 
@@ -134,6 +134,20 @@ may end in `_experiment` (`tests/architecture/test_run_boundary.py`).
 | `football_candidate.py` | The read-only football candidate handoff: forecasts, plans, shared worlds and rival utility. |
 | `football_window_review.py` | Shared match-world evaluation across complete three- and five-week candidate plans. |
 
+## Storage ports
+
+The home [ADR 0011](../../../docs/architecture/decisions/0011-storage-ports-and-platform-split.md)
+(decision 1) gives the storage ports only the use cases consume: one module per port group and
+no barrel, so the pull requests that land different groups never edit the same file. The
+package is a source of the contract "The decision core imports no storage or source module",
+so it imports nothing from the storage half of `data`; its file adapters are the singletons of
+`squadopt.platform.storage`, and `tests/architecture/test_storage_ports.py` holds each adapter
+to its port. It holds no port yet: each group lands in its own pull request.
+
+| Module | What it does |
+| --- | --- |
+| `ports/__init__.py` | The package file, a docstring that names the port groups: `archive`, `publication`, `artifacts`, `club_news`, `rotation_evidence`, `advice_records` and `revision`. |
+
 ## Package surface
 
 | Module | What it does |
@@ -145,8 +159,9 @@ may end in `_experiment` (`tests/architecture/test_run_boundary.py`).
 ARCHITECTURE.md measures and schedules these; this list says where they are.
 
 - **Storage imports.** Modules here import the storage half of `squadopt.data` (captures,
-  atomic writes, loaders) directly. The remedy is storage ports declared here with file adapters
-  in `platform` (Phase 3). Until then the contract "Use cases, domain records and features
+  atomic writes, loaders) directly. The remedy is storage ports declared in `ports/`, with
+  file adapters in `squadopt.platform.storage` (ADR 0011, decision 1; both homes exist and
+  hold no module yet). Until then the contract "Use cases, domain records and features
   import no storage or source module" holds them to today's imports: 89 edges from 30 modules,
   each an `ignore_imports` entry that may only go.
 - **File access.** 24 modules here read or write files themselves, among them
@@ -157,8 +172,9 @@ ARCHITECTURE.md measures and schedules these; this list says where they are.
   module here that reads or writes a file.
 - **Ports.** Three typed ports are declared here: `DecisionVerifier` in `commands.py`,
   `EntryPicksProvider` in `entries.py` and `TickObserver` in `season.py`.
-- **Paths to `docs/contracts`.** `contract.py` names `docs/contracts/ui_view_v1.schema.json`
-  as the default target of `write_ui_view_schema`, and `chip_forecast.py` names
-  `docs/contracts/chip_forecast_v1.schema.json` as a constant the tests read. Neither reads the
-  file when it runs. `tests/architecture/test_runtime_contract_paths.py` allowlists both, with
-  the six in `platform`, and fails on any other module that names the folder.
+- **Paths to `docs/contracts`.** Closed here under ADR 0011 (decision 6): `contract.py` takes
+  the default target of `write_ui_view_schema`, and `chip_forecast.py` the constant the tests
+  read, from `contract_schema_path` in `squadopt.contracts.schema_paths`, the same relative
+  path each built before. Neither reads the file when it runs.
+  `tests/architecture/test_contract_schema_paths.py` pins both constants to their former
+  literals and fails on any module here that names the folder itself.

@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import json
 import math
-from pathlib import Path
 from typing import Any, Final
 
 import jsonschema
@@ -30,15 +29,14 @@ from squadopt.contracts.information import decision_information_schema, official
 from squadopt.contracts.injuries import official_injuries_schema
 from squadopt.contracts.league import LEAGUE_VIEW_CONTRACT_VERSION
 from squadopt.contracts.preferences import preferences_schema
+from squadopt.contracts.schema_paths import contract_schema_path
 from squadopt.planning.chip_strategy import CHIP_STRATEGY_VERSION
 
 LEAGUE_STATE_CONTRACT_VERSION: Final = "league_state_v1"
 LEAGUE_CAPABILITIES_CONTRACT_VERSION: Final = "league_capabilities_v1"
-ADVICE_READ_SCHEMA_PATH: Final = Path("docs") / "contracts" / "advice_read_v1.schema.json"
-LEAGUE_STATE_SCHEMA_PATH: Final = Path("docs") / "contracts" / "league_state_v1.schema.json"
-LEAGUE_CAPABILITIES_SCHEMA_PATH: Final = (
-    Path("docs") / "contracts" / "league_capabilities_v1.schema.json"
-)
+ADVICE_READ_SCHEMA_PATH: Final = contract_schema_path("advice_read_v1")
+LEAGUE_STATE_SCHEMA_PATH: Final = contract_schema_path(LEAGUE_STATE_CONTRACT_VERSION)
+LEAGUE_CAPABILITIES_SCHEMA_PATH: Final = contract_schema_path(LEAGUE_CAPABILITIES_CONTRACT_VERSION)
 
 
 class AdviceDocumentError(ValueError):
