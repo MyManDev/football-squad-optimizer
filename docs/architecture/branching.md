@@ -156,8 +156,8 @@ better trade than a gate that is fast and occasionally wrong.
 `tmp_path`, and the repository paths tests touch (`docs/`, `web/public/data/`) are read-only; no
 test opens a socket or binds a port, and `tests/integration/test_backend_api.py` uses FastAPI's
 in-process `TestClient`. The determinism constraint is unaffected because it applies *within* a
-solve — CP-SAT is pinned to `num_search_workers = 1`
-(`src/squadopt/optimization/optimizer.py`) — not across tests.
+solve, where CP-SAT is pinned to `num_search_workers = 1`
+(`configure_solver` in `src/squadopt/optimization/cpsat.py`), not across tests.
 
 **The gate is green at deliberate oversubscription, and that is how a defect was found.**
 `pytest -n 16 --dist loadscope` puts two workers on every core. It ran 133 s, 135 s and 135 s

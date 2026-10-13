@@ -40,8 +40,24 @@ from squadopt.optimization import (
     SolverStatus,
 )
 from squadopt.optimization.coefficients import scale_expected_points, sort_players_by_id
+from squadopt.optimization.cpsat import (
+    CP_SAT_SAFE_INTEGER_MAX,
+    MIN_TIEBREAK_DETERMINISTIC_TIME,
+    MIN_TIEBREAK_TIME_SECONDS,
+    configure_solver,
+)
+from squadopt.optimization.cpsat import deterministic_time_used as _deterministic_time_used
+from squadopt.optimization.cpsat import map_solver_status as _map_solver_status
+from squadopt.optimization.cpsat import raw_status_name as _raw_status_name
+from squadopt.optimization.cpsat import (
+    remaining_deterministic_time as _remaining_deterministic_time,
+)
+from squadopt.optimization.cpsat import solve as _solve
 from squadopt.optimization.decisions import (
     add_decision_constraints as _add_decision_constraints,
+)
+from squadopt.optimization.decisions import (
+    add_tiebreak_objective as _add_tiebreak_objective,
 )
 from squadopt.optimization.decisions import (
     selected_indices as _selected_indices,
@@ -49,18 +65,8 @@ from squadopt.optimization.decisions import (
 from squadopt.optimization.decisions import (
     verify_solution as _verify_solution,
 )
-from squadopt.optimization.optimizer import (
-    CP_SAT_SAFE_INTEGER_MAX,
-    MIN_TIEBREAK_DETERMINISTIC_TIME,
-    MIN_TIEBREAK_TIME_SECONDS,
-    _add_tiebreak_objective,
-    _deterministic_time_used,
-    _empty_result,
-    _map_solver_status,
-    _raw_status_name,
-    _remaining_deterministic_time,
-    _solve,
-    configure_solver,
+from squadopt.optimization.models import (
+    empty_result as _empty_result,
 )
 from squadopt.optimization.validation import validate_players
 from squadopt.scenarios.evaluation import (

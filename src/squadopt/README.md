@@ -26,19 +26,19 @@ to `pyproject.toml`.
 | Package | Ring | Layer | Owner | Checked by | Known violation |
 | --- | --- | --- | --- | --- | --- |
 | `api` | R4, R5 | 1 | either | C1, C2, C3, C5, C8 | none |
-| `platform` | R4, R5 | 2 | either; the `club_news_*` modules are İbrahim's zone | C1, C2, C5, C8 | declares 15 of the package's 24 typed ports; mixes deployment roles; 6 modules name `docs/contracts` by a relative path |
+| `platform` | R4, R5 | 2 | either; the `club_news_*` modules are İbrahim's zone | C1, C2, C5, C8 | declares 15 of the package's 24 typed ports; mixes deployment roles; 6 modules name `docs/contracts` by a relative path; imports a private name of `application.weekly_plan` |
 | `integration` | R3 | 3 | the owner | C1, C2, C4, C5, C8 | none; a one-release re-export, removed in the release after the next `site-*` tag |
 | `application` | R3 | 4 | the owner | C1, C2, C4, C5, C8, C9, C10 | imports the storage half of `data`; reads and writes files; 2 modules name `docs/contracts` by a relative path; declares 3 ports; starts `git` through `data.source_revision` |
-| `experiments` | Research | 5 | the owner | C1, C4, C5, C8 | none |
+| `experiments` | Research | 5 | the owner | C1, C4, C5, C8 | imports private names of `prediction.football`, `live.minute_evidence` and `evaluation.statistics` |
 | `backtest` | Research | 6 | both | C1, C4, C5 | none |
 | `recalibration` | Research | 7 | the owner | C1, C4, C5, C8 | none |
 | `preflight` | Research | 8 | the owner | C1, C4, C5, C8 | none |
-| `bayesopt` | Research | 9 | the owner | C1, C4, C5, C8 | none |
+| `bayesopt` | Research | 9 | the owner | C1, C4, C5, C8 | imports a private name of `contracts.factors` |
 | `live` | R2 | 10 | the owner; `ledger.py`, `tick.py` and `recommendation.py` either | C1, C2, C4, C5, C8, C9, C10 | imports the storage half of `data`; reads and writes files |
-| `planning` | R2 | 11 | the owner | C1, C2, C4, C5, C6, C7 | imports private names of `optimization.optimizer` |
-| `scenarios` | R2 | 12 | the owner | C1, C2, C4, C5, C6, C7 | imports private names of `optimization.optimizer` |
+| `planning` | R2 | 11 | the owner | C1, C2, C4, C5, C6, C7 | imports 5 private names of `scenarios.expected_lineup` |
+| `scenarios` | R2 | 12 | the owner | C1, C2, C4, C5, C6, C7 | imports a private name of `evaluation.scoring` |
 | `evaluation` | R2 | 13 | the owner | C1, C2, C4, C5, C6, C7 | reads files (`component_handoff.py`) |
-| `optimization` | R2 | 14 | the owner; `config.py` both | C1, C2, C4, C5, C6, C7 | the CP-SAT driver has no public port |
+| `optimization` | R2 | 14 | the owner; `config.py` both | C1, C2, C4, C5, C6, C7 | none |
 | `prediction` | R2 | 15 | İbrahim | C1, C2, C4, C5, C8 | none |
 | `features` | R2 | 16 | İbrahim | C1, C2, C4, C5, C8, C10 | imports the storage half of `data`; reads files |
 | `data` | R1, R4 | 17 | İbrahim; `schema.py` both | C1, C2, C4, C5, C8 | one package in two rings, at the bottom of the layer order; three vocabulary modules import the storage half |
@@ -87,7 +87,7 @@ packages has no row in its guide, has two, or a row names a module that is not t
 | `scenarios` | Scenario generation and paths (`generator`, `paths`, `models`, `components`, `decomposition`); scoring and selection (`evaluation`, `decision_scoring`, `selection`, `expected_lineup`, `transfer_decisions`); rivals and rank (`rivals`, `rank`, `optimization`); `reporting`; the football lane (`football`, `football_diagnostics`, `football_lineups`) |
 | `evaluation` | Fold scoring and inference (`evaluator`, `scoring`, `statistics`, `promotion`, `benchmarks`, `models`, `cohorts`); component evaluation (`component_decisions`, `component_handoff`, `component_metrics`); audits and gates (`appearance`, `appearance_recalibration`, `live_projection_audit`, `live_series`, `participation_composition`, `prediction_gate`, `prior_minutes_level`, `projection_level`, `rotation_ceiling`, `top100_effect`) |
 | `integration` | One module, `integration.py`: a one-release re-export of `application.projection_csv` |
-| `optimization` | The CP-SAT driver (`optimizer`); configuration, validation and results (`config`, `validation`, `models`); objective coefficients and top-K candidates (`coefficients`, `candidates`); the squad constraints shared with every CP-SAT consumer (`decisions`) |
+| `optimization` | The public CP-SAT driver (`cpsat`: solver settings, the solve call, its status and its deterministic work) and the one-week squad optimizer over it (`optimizer`); configuration, validation and results (`config`, `validation`, `models`); objective coefficients and top-K candidates (`coefficients`, `candidates`); the squad constraints and the tie-break shared with every CP-SAT consumer (`decisions`) |
 | `prediction` | The projection table and its hand-off (`projection`, `baseline`, `integration`, `components`, `config`, `factors`); the operational control (`opening`, `in_season`, `component_dataset`, `component_models`, `elite_evidence`); adjustments to a projection (`availability`, `participation_updates`, `defcon_component`); candidates measured against the control (`production`, `minutes`, `participation`, `learned`, `learned_rate`); the football lane (15 `football*` modules, six of them private models): [prediction guide](prediction/README.md) |
 | `features` | Leakage-safe features (`builder`, `rolling`, `config`, `fixtures`, `strength`, `cross_season`); deadline evidence (`evidence`, `evidence_artifact`, `rotation_evidence`, `rotation_evidence_artifact`); what happened (`component_targets`, `settled_outcomes`); the inputs of the private football models (8 `football_*` modules): [features guide](features/README.md) |
 | `data` | Vocabulary (`schema`, `errors`, `timestamps`, `identity`, `claim_identity`, `validation`, `cleaning`, `cohorts`, `fixtures`); storage (`snapshots`, `loaders`, `atomic`, `adapters`, `checksums`, `tables`, `pipeline`, `source_revision`, `_long_paths`); `sources/`: the FPL API (`fpl_live`, `fpl_information`, `fpl_set_pieces`), the historical archive (`vaastav`, `football_history`), club news (8 `club_news*` modules) and the official injury list (`premier_league_injuries`): [data guide](data/README.md) |

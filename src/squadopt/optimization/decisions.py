@@ -1,7 +1,9 @@
 """Shared squad/lineup constraints and verification for CP-SAT consumers.
 
 Transfer planning owns bank accounting and opts out of static budget enforcement.
-Objectives, solver settings and output ordering remain with the caller.
+The canonical tie-break among squads of equal objective value is shared here too
+(`add_tiebreak_objective`); the primary objective, solver settings and output ordering
+remain with the caller.
 """
 
 from collections import Counter, defaultdict
@@ -10,6 +12,7 @@ import pandas as pd
 from ortools.sat.python import cp_model
 
 from squadopt.optimization.config import POSITIONS, OptimizationConfig
+from squadopt.optimization.cpsat import CP_SAT_SAFE_INTEGER_MAX
 from squadopt.optimization.models import SolverExecutionError
 
 
@@ -121,3 +124,39 @@ def verify_solution(
             + ", ".join(failures)
             + "."
         )
+
+
+def add_tiebreak_objective(
+    model: cp_model.CpModel,
+    squad_vars: list[cp_model.IntVar],
+    starter_vars: list[cp_model.IntVar],
+    captain_vars: list[cp_model.IntVar],
+    primary_objective: cp_model.LinearExpr,
+    config: OptimizationConfig,
+    primary_value: int,
+) -> None:
+    player_count = len(squad_vars)
+    largest_rank = max(0, player_count - 1)
+    max_squad_rank_sum = config.squad_size * largest_rank
+    max_starter_rank_sum = config.starting_size * largest_rank
+    starter_weight = max_squad_rank_sum + 1
+    captain_weight = starter_weight * (max_starter_rank_sum + 1)
+    conservative_tiebreak_bound = (
+        captain_weight * largest_rank + starter_weight * max_starter_rank_sum + max_squad_rank_sum
+    )
+    if conservative_tiebreak_bound > CP_SAT_SAFE_INTEGER_MAX:
+        raise SolverExecutionError(
+            "Deterministic tie-break coefficients exceed the safe CP-SAT integer range."
+        )
+
+    model.add(primary_objective == primary_value)
+    tiebreak_terms: list[cp_model.LinearExpr] = []
+    for rank in range(player_count):
+        tiebreak_terms.extend(
+            (
+                rank * squad_vars[rank],
+                starter_weight * rank * starter_vars[rank],
+                captain_weight * rank * captain_vars[rank],
+            )
+        )
+    model.minimize(cp_model.LinearExpr.sum(tiebreak_terms))

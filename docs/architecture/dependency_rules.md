@@ -171,6 +171,13 @@ place. If a symbol is not vocabulary that at least two layers need, it does not 
 3. **Boundary files change only by joint approval** — see [ownership](ownership.md).
 4. **The order is a claim about the code, so it is verified, not trusted.** Any change here
    comes with the regenerated numbers.
+5. **A private name is not an import surface.** A single-underscore name is imported across
+   packages only where `tests/architecture/test_private_imports.py` allowlists it, with its
+   remedy, and that list only shrinks: the owning module publishes the name and keeps the
+   private alias for one release (rule 2), as `optimization.cpsat` did for the CP-SAT driver
+   that `planning` and `scenarios` had reached through the private names of
+   `optimization.optimizer` ([ADR 0011](decisions/0011-storage-ports-and-platform-split.md),
+   decision 5).
 
 ## Verification
 
