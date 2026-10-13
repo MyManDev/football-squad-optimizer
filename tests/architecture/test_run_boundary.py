@@ -13,11 +13,12 @@ command added there is covered without editing this file. If the union loads no 
 module, no single one of them does.
 
 A laboratory module is any module of a laboratory package, and also a module of
-``squadopt.application`` whose name ends in ``_experiment``. Six such modules hold private
-football model experiments inside ``application`` and are imported only by tests
-(ARCHITECTURE.md, known violations). The contract that keeps the laboratory out of the
-product does not cover them, because they sit in a product package, so the probe reports one
-as soon as a product entry point or an operational command loads it.
+``squadopt.application`` whose name ends in ``_experiment``. Six such modules held private
+football model experiments inside ``application`` until Phase 2 of ADR 0010 moved them to
+``squadopt.experiments``. The contract that keeps the laboratory out of the product cannot
+see a laboratory module that sits in a product package, so ``application`` must hold no
+``_experiment`` module, and the probe reports one as soon as a product entry point or an
+operational command loads it.
 """
 
 from __future__ import annotations
@@ -133,19 +134,29 @@ def _laboratory_loaded_by(modules: list[str]) -> dict[str, list[str]]:
     return loaded_by
 
 
-def test_the_probe_reports_a_laboratory_module_that_lives_in_application() -> None:
+def test_the_probe_reports_a_laboratory_module() -> None:
     """A pattern that matched nothing would pass the boundary test while checking nothing."""
 
     assert LABORATORY_MODULE.fullmatch("squadopt.experiments")
     assert LABORATORY_MODULE.fullmatch("squadopt.preflight.validator")
-    assert LABORATORY_MODULE.fullmatch("squadopt.application.football_unit_experiment")
+    assert LABORATORY_MODULE.fullmatch("squadopt.experiments.football_unit_experiment")
+    assert LABORATORY_MODULE.fullmatch("squadopt.application.price_experiment")
+    assert LABORATORY_MODULE.fullmatch("squadopt.application.strategies.price_experiment")
     assert not LABORATORY_MODULE.fullmatch("squadopt.application")
     assert not LABORATORY_MODULE.fullmatch("squadopt.application.football_live")
     assert not LABORATORY_MODULE.fullmatch("squadopt.live.plan_selection")
     assert not LABORATORY_MODULE.fullmatch("squadopt.experiments_index")
 
-    module = "squadopt.application.football_unit_experiment"
+    module = "squadopt.experiments.football_unit_experiment"
     assert module in _laboratory_loaded_by([module]).get(module, [])
+
+
+def test_the_use_case_ring_holds_no_experiment_module() -> None:
+    """The six football experiments left `application` with no re-export; none may follow."""
+
+    application = REPOSITORY_ROOT / "src" / "squadopt" / "application"
+
+    assert sorted(path.name for path in application.rglob("*_experiment.py")) == []
 
 
 def test_the_product_and_the_operational_commands_load_no_laboratory_module() -> None:

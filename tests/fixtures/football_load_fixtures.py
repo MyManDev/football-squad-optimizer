@@ -517,7 +517,7 @@ def parse_workload(document, fixtures, states, probabilities):
 
 
 def case_documents(case, *, heavy_players=()):
-    from squadopt.application.football_load_experiment import native_basis_digest
+    from squadopt.experiments.football_load_experiment import native_basis_digest
 
     for player in case.roster.to_dict("records"):
         for gameweek in case.gameweeks:

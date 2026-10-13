@@ -358,7 +358,7 @@ def parse_snapshot(document):
 
 
 def case_documents(case):
-    from squadopt.application.football_score_state_experiment import native_basis_digest
+    from squadopt.experiments.football_score_state_experiment import native_basis_digest
 
     for fixture, rows in case.native.groupby("fixture", sort=False):
         home = rows.loc[rows.home.eq(1)].iloc[0]

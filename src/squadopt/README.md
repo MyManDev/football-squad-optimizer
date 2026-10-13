@@ -27,7 +27,7 @@ to `pyproject.toml`.
 | --- | --- | --- | --- | --- | --- |
 | `api` | R4, R5 | 1 | either | C1, C2, C3, C5, C8 | none |
 | `platform` | R4, R5 | 2 | either; the `club_news_*` modules are İbrahim's zone | C1, C2, C5, C8 | declares 15 of the package's 24 typed ports; mixes deployment roles; 6 modules name `docs/contracts` by a relative path |
-| `application` | R3 | 3 | the owner | C1, C2, C4, C5, C8, C9 | imports the storage half of `data`; holds six laboratory modules; 2 modules name `docs/contracts` by a relative path; declares 3 ports; starts `git` through `data.source_revision` |
+| `application` | R3 | 3 | the owner | C1, C2, C4, C5, C8, C9 | imports the storage half of `data`; 2 modules name `docs/contracts` by a relative path; declares 3 ports; starts `git` through `data.source_revision` |
 | `experiments` | Research | 4 | the owner | C1, C4, C5, C8 | none |
 | `backtest` | Research | 5 | both | C1, C4, C5 | none |
 | `recalibration` | Research | 6 | the owner | C1, C4, C5, C8 | none |
@@ -71,7 +71,7 @@ A family is a set of modules that share a name prefix or a job. `platform`, `app
 | `api` | `app` (the FastAPI routes), `runtime` (`build_app`, the API process's composition), `views` (published-view reads), `contributions` (community observations) |
 | `platform` | Weekly run, advice API services, advice queue and workers, captures, club news and the model adapter, run records and recovery, the installed CLI: [platform guide](platform/README.md) |
 | `application` | Member advice, chips and strategies, the device plan, weekly and multi-week planning, league and site publication, the season ledger and settlement, evidence exports, the football lane: [application guide](application/README.md) |
-| `experiments` | The screening design and its runner, the season chain, Phase C to E readings, Benchmark V2, the football studies, chip timing: [experiments guide](experiments/README.md) |
+| `experiments` | The screening design and its runner, the season chain, Phase C to E readings, Benchmark V2, the football studies and the private football experiments, chip timing: [experiments guide](experiments/README.md) |
 | `backtest` | Walk-forward `folds` and `splits`; the production benchmark (`production`, `production_benchmark`, `production_reporting`); the learned candidate (`learned`, `learned_candidate`); `candidate_residuals`, `horizon_decay`, `opening_prior` |
 | `recalibration` | `study`, `measurement`, `models`, `reporting` |
 | `preflight` | `validator` (residual-export handoffs), `measurement` (committed records), `models`, `reporting` |
@@ -94,9 +94,10 @@ model a member can choose in place of the current model (`PREDICTION_MODELS` in
 `application/advice_capabilities.py`), and the inputs, plans and records behind it. It is a
 lane, not a package: each module sits in the package whose ring matches its job, from
 `features` and `prediction` up to `application` and `platform`, and the research studies of
-it sit in `experiments` and `bayesopt`. Six `application` modules of the lane end in
-`_experiment` and are laboratory code in a product package; ARCHITECTURE.md lists them as a
-known violation, and the run-boundary probe reports one if a product entry point loads it.
+it sit in `experiments` and `bayesopt`. Its six private model experiments, the
+`football_*_experiment` modules, are laboratory code and live in `experiments`;
+`tests/architecture/test_run_boundary.py` fails if a module whose name ends in `_experiment`
+appears in `application`.
 
 **`integration.py`.** The only module directly under `squadopt` besides `__init__.py`. It reads a canonical
 projection CSV and optimizes a squad from it, so its job is a use case (R3), but the layer

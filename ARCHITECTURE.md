@@ -152,7 +152,7 @@ The tests in `tests/architecture/` hold the rules that an import graph cannot se
 | --- | --- |
 | `tests/architecture/test_architecture_rings.py` | The ring table above, the layer order, the laboratory contract and the run-boundary probe agree with one mapping, and every contract has a row in the map above. |
 | `tests/architecture/test_storage_imports.py` | No source of the storage contract imports the `data` package root, which re-exports storage names, so the contract sees every `data` module those sources import. |
-| `tests/architecture/test_run_boundary.py` | The product entry points and every operational command load no laboratory module when they run; a module of `application` whose name ends in `_experiment` is reported as laboratory. |
+| `tests/architecture/test_run_boundary.py` | The product entry points and every operational command load no laboratory module when they run; a module of `application` whose name ends in `_experiment` is reported as laboratory, and `application` holds none. |
 | `tests/architecture/test_layer_contracts.py` | Moved symbols keep their compatibility imports and their deterministic outputs. |
 | `tests/architecture/test_documentation_paths.py` | A source path or command cited in the documentation exists. |
 | `tests/architecture/test_markdown_links.py` | Every relative link in a tracked Markdown file resolves. |
@@ -186,7 +186,6 @@ each lands in its own pull request once its trigger fires.
 | Runtime code names `docs/contracts` by a path relative to the working directory | 8 modules: 2 in `application`, 6 in `platform`; each names a schema as the default target of the function that writes it or as a constant the tests read, and none reads it when it runs ([contracts guide](docs/contracts/README.md)) | A ratchet that allowlists the 8 modules, so that no ninth appears | Phase 2 |
 | The CP-SAT driver has no public port | 19 private names imported from `optimization.optimizer`: 5 by `planning/optimizer.py`, 7 by `scenarios/optimization.py`, 7 by `scenarios/rank.py` | A public solver driver in `optimization` | Phase 3 |
 | Ports are declared in an adapter ring | 15 of the 24 typed Protocols under `src/squadopt` are in `platform`; 3 are in `application` | Use-case ports move to `application` | Phase 3 |
-| Laboratory modules live in the use-case ring | Six `football_*_experiment` modules in `application`, imported only by tests; the run-boundary probe reports them as laboratory if a product entry point loads one | Move them to `experiments`, with no re-export | Phase 2, after agreement on issue #1012 |
 | `platform` mixes deployment roles | 54 Python files in one flat package: weekly batch, API side, queue and worker, captures, club news, storage and CLI | Split by deployment unit (ADR 0008, M6) | Phase 3, needs a new ADR |
 | `integration` is a use-case module placed as its own layer | `src/squadopt/integration.py` sits between `evaluation` and `optimization` in the layer order | Fold it into `application`, with a one-release re-export | Phase 2 |
 | `scripts/` is outside the import contracts | mypy checks 7 script files; `lint-imports` checks none | Operator logic moves into the installed package, the direction ADR 0007 set | Phase 3 |

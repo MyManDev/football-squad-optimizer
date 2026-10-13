@@ -145,7 +145,7 @@ def case_week_documents(
     *,
     labels: Mapping[int, int | None] | None = None,
 ) -> tuple[tuple[dict[str, object], tuple[MinuteFixture, ...]], ...]:
-    from squadopt.application.football_flag_experiment import native_basis_digest
+    from squadopt.experiments.football_flag_experiment import native_basis_digest
 
     basis = native_basis_digest(case.components)
     label_by_id = {p: int(100 * value) for p, value in case.captured_availability.items()}

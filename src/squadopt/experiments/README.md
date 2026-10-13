@@ -70,9 +70,13 @@ module that imports it.
 | Phase C to E readings and the shadow report | `phase_c_ablation`, `phase_c_reporting`, `component_squad_calibration`, `phase_e_shadow`, `shadow_report` |
 | Benchmark V2 | `benchmark_v2`, `benchmark_v2_live` |
 | Football studies | `football_components`, `football_defcon`, `football_minutes`, `football_share_sizing`, `football_windows` |
+| Private football model experiments | `football_flag_experiment`, `football_load_experiment`, `football_phase_experiment`, `football_score_state_experiment`, `football_tactical_experiment`, `football_unit_experiment` |
 | Single gate readings | `defcon_component_reading`, `rank_tail_selector` |
 
 Each module's docstring states its study; the runner that calls it is in the
-[script catalogue](../../../scripts/README.md). Six private football experiments still live in
-`squadopt.application` (the `football_*_experiment` modules); they move here in Phase 2, once
-that is agreed on issue #1012.
+[script catalogue](../../../scripts/README.md). The six private football model experiments
+have no runner: only tests import them, and the tests of five of them take their synthetic
+bases from the `football_*_fixtures.py` modules in `tests/fixtures/`. They lived in
+`squadopt.application` until Phase 2 of
+[ADR 0010](../../../docs/architecture/decisions/0010-clean-architecture-rings-and-repository-layout.md)
+moved them here with no re-export.

@@ -12,7 +12,7 @@ domain records import no process, thread, event-loop or command-line module" in
 `source_revision()` in `squadopt.data.source_revision`, which runs `git`; ARCHITECTURE.md lists
 it as a known violation.
 
-Its 66 Python files, 62 at the top level and four in the `strategies/` subpackage, sit in one
+Its 60 Python files, 56 at the top level and four in the `strategies/` subpackage, sit in one
 folder. This page places every one of them in exactly one family. Review: the owner
 ([ownership](../../../docs/architecture/ownership.md)).
 
@@ -114,7 +114,9 @@ The static JSON trees the website reads: the per-member league trees and the sea
 
 The experimental football model a member can choose in place of the current model
 (`PREDICTION_MODELS` in `advice_capabilities.py`). These modules are product code and are
-opt-in.
+opt-in. The lane's private model experiments, the `football_*_experiment` modules, are
+laboratory code and live in [`squadopt.experiments`](../experiments/README.md); no module here
+may end in `_experiment` (`tests/architecture/test_run_boundary.py`).
 
 | Module | What it does |
 | --- | --- |
@@ -125,23 +127,6 @@ opt-in.
 | `football_information.py` | The public conditional plan explanation, with base points apart from choice utility. |
 | `football_candidate.py` | The read-only football candidate handoff: forecasts, plans, shared worlds and rival utility. |
 | `football_window_review.py` | Shared match-world evaluation across complete three- and five-week candidate plans. |
-
-## Laboratory modules in the use-case ring, until Phase 2
-
-These six modules are private football model experiments. They are imported only by tests, they
-are laboratory code in a product package, and
-`tests/architecture/test_run_boundary.py` reports any of them that a product entry point or an
-operational command loads. ARCHITECTURE.md lists them as a known violation; they move to
-`squadopt.experiments` once that is agreed on issue #1012.
-
-| Module | What it does |
-| --- | --- |
-| `football_flag_experiment.py` | Private flag replacement using a learned whole-week minute distribution. |
-| `football_load_experiment.py` | Private all-competition minute-law composition on a captured basis. |
-| `football_phase_experiment.py` | Private phase allocation, weekly eligibility and a fixed-fifteen role adapter. |
-| `football_score_state_experiment.py` | Private score-process composition on an unchanged captured minute law. |
-| `football_tactical_experiment.py` | Private explicit tactical replacement and a bounded fixed-fifteen comparison. |
-| `football_unit_experiment.py` | An explicit private unit experiment over retained conditional fixture components. |
 
 ## Package surface
 
@@ -162,4 +147,3 @@ ARCHITECTURE.md measures and schedules these; this list says where they are.
   as the default target of `write_ui_view_schema`, and `chip_forecast.py` names
   `docs/contracts/chip_forecast_v1.schema.json` as a constant the tests read. Neither reads the
   file when it runs.
-- **Laboratory modules.** The six `_experiment` modules above.

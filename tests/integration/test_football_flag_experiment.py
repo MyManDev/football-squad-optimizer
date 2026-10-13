@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 import pytest
 from pandas.testing import assert_frame_equal
-from tests.football_flag_fixtures import (
+from tests.fixtures.football_flag_fixtures import (
     BENCH,
     DEADLINE_AT,
     DECISION_AT,
@@ -31,14 +31,14 @@ from tests.football_flag_fixtures import (
     week_state_oracle,
 )
 
-from squadopt.application.football_flag_experiment import (
+from squadopt.data.errors import DataError
+from squadopt.evaluation.models import EvaluationValidationError
+from squadopt.experiments.football_flag_experiment import (
     RECEIPT_ATTR,
     compose_flag_experiment,
     native_basis_digest,
     plan_flag_fixed_fifteen,
 )
-from squadopt.data.errors import DataError
-from squadopt.evaluation.models import EvaluationValidationError
 from squadopt.features.football_flag_inputs import read_flag_week_source
 from squadopt.prediction.football_flag_minutes import FlagMinutesModel
 

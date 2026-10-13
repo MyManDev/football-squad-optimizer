@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 import pytest
 from pandas.testing import assert_frame_equal
-from tests.football_score_state_fixtures import (
+from tests.fixtures.football_score_state_fixtures import (
     BENCH,
     DEADLINE,
     DECISION,
@@ -28,14 +28,14 @@ from tests.football_score_state_fixtures import (
     parse_snapshot,
 )
 
-from squadopt.application.football_score_state_experiment import (
+from squadopt.evaluation.models import EvaluationValidationError
+from squadopt.experiments.football_score_state_experiment import (
     EXPERIMENT_VERSION,
     RECEIPT_ATTR,
     compose_score_state_experiment,
     native_basis_digest,
     plan_score_state_fixed_fifteen,
 )
-from squadopt.evaluation.models import EvaluationValidationError
 from squadopt.prediction.football import FOOTBALL_MODEL_VERSION
 from squadopt.prediction.football_minutes_role import ROLE_COMPONENT_COLUMNS
 from squadopt.prediction.football_score_state import ScoreStateModel

@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 import pytest
 from pandas.testing import assert_frame_equal
-from tests.football_load_fixtures import (
+from tests.fixtures.football_load_fixtures import (
     BENCH,
     DEADLINE,
     DECISION,
@@ -29,14 +29,14 @@ from tests.football_load_fixtures import (
     training_inputs,
 )
 
-from squadopt.application.football_load_experiment import (
+from squadopt.data.errors import DataError
+from squadopt.evaluation.models import EvaluationValidationError
+from squadopt.experiments.football_load_experiment import (
     RECEIPT_ATTR,
     compose_load_experiment,
     native_basis_digest,
     plan_load_fixed_fifteen,
 )
-from squadopt.data.errors import DataError
-from squadopt.evaluation.models import EvaluationValidationError
 from squadopt.features.football_load_inputs import (
     native_joint_law_digest,
     read_load_snapshot,

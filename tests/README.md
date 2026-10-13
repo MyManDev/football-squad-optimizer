@@ -11,8 +11,7 @@ archive nor the network. The website's tests live beside their code under `web/`
 | `unit/` | Tests of one module or one behaviour, in a flat folder; `unit/conftest.py` holds shared setup for the member-menu HTTP and publication checks |
 | `architecture/` | The architecture fitness functions: the rings and the documents that state them, imports of the `data` package root, import boundaries at run time, documentation paths and links, the measurements index, record provenance, the type-checked file set, dependency pins, the operations documents and the roadmap ([architecture overview](../ARCHITECTURE.md#6-enforcement-map)) |
 | [`integration/`](integration/README.md) | End-to-end chains across packages and processes, including the opt-in acceptance probes |
-| `fixtures/` | Shared synthetic data and helpers, imported as `tests.fixtures` |
-| `football_*_fixtures.py` | Synthetic bases and numerical oracles for the football experiment tests |
+| `fixtures/` | Shared synthetic data and helpers, imported as `tests.fixtures`, including the synthetic bases and numerical oracles of the football experiment tests (`football_*_fixtures.py`) |
 | `conftest.py` | Shared pytest fixtures, and the hook that marks every test under `integration/` |
 
 ## Running the suite
