@@ -116,7 +116,8 @@ function gather(ROOT: string): Tree {
     const squad = squadOf(entryId);
     if (squad === null) throw new Error(`entry ${entryId} is listed without an entry document`);
     const base: AdviceRequest = {
-      leagueId: document.league_id,
+      // The shipped tree's copy (v1) names its league.
+      leagueId: document.league_id!,
       entryId,
       strategy: "saf-puan",
       window: 1,

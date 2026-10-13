@@ -8,13 +8,14 @@ directory whole. Beside the trees, one device-plan table per capture lives under
 ``data/device/<capture>/device-plan.json``: the same table for every league of the run.
 A directory line names its league's table under ``device_plan`` and the sha256 of the
 table file's bytes under ``device_plan_sha256``. The path is the capture's, but the table
-is replaced when the week is published again from that capture, so a reader fetches it
-with the digest as its version and checks the bytes against it; the path alone is never
-cached as unchanging. A line from before the table has neither. Readers read the
-directory first; a site from before it carried one league under ``data/league/`` and is
-read as a directory of one, and the first publication into the new layout adopts that
-tree as the league's own. Every writer and reader of a league tree takes its path from
-here, so no module spells the layout.
+is replaced when the week is published again from that capture, so the digest is its
+version: a reader asks for it at that digest and checks the bytes against it. The site
+lets a browser keep the path for a year whatever the query, so the bare path can still
+serve an earlier table of the capture. A line from before the table has neither. Readers
+read the directory first; a site from before it carried one league under
+``data/league/`` and is read as a directory of one, and the first publication into the
+new layout adopts that tree as the league's own. Every writer and reader of a league tree
+takes its path from here, so no module spells the layout.
 """
 
 from __future__ import annotations

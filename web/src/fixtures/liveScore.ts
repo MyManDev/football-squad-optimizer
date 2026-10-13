@@ -1,4 +1,4 @@
-import type { ViewEnvelope } from "../data/client";
+import type { ViewEnvelope } from "../data/envelope";
 import type { LiveScoreView } from "../data/liveScore";
 import { unsettledRecommendationFixture } from "./settledRecommendation";
 

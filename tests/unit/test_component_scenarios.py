@@ -12,6 +12,7 @@ sampling rules.
 import pandas as pd
 import pytest
 
+from squadopt.prediction.components import DIRECT_CONTROL_ROUTE
 from squadopt.prediction.integration import PredictionProvenance, prepare_optimizer_projection
 from squadopt.scenarios import (
     ScenarioConfig,
@@ -24,7 +25,6 @@ from squadopt.scenarios.components import (
     ComponentScenarioDraw,
     ComponentScenarioInputs,
     ComponentScenarioProvenance,
-    component_input_summary,
     paired_conditional_residuals,
     sample_component_scenarios,
 )
@@ -447,15 +447,6 @@ def test_an_out_of_range_appearance_probability_is_refused(probability: float) -
         )
 
 
-def test_the_summary_counts_routes_without_naming_players() -> None:
-    summary = component_input_summary(_inputs())
-
-    assert summary["rows"] == 3
-    assert summary["component_model_rows"] == 3
-    assert summary["direct_control_rows"] == 0
-    assert "player_id" not in summary
-
-
 # --- 15. V1 is untouched -----------------------------------------------------
 
 
@@ -539,7 +530,8 @@ def test_a_direct_control_row_is_refused_by_the_sampler_rather_than_sampled_as_z
     ] = float("nan")
 
     inputs = ComponentScenarioInputs(table=frame, provenance=_provenance())
-    assert component_input_summary(inputs)["direct_control_rows"] == 1  # it did survive input
+    route = inputs.table["composition_route"].astype("string")
+    assert int((route == DIRECT_CONTROL_ROUTE).sum()) == 1  # it did survive input
 
     with pytest.raises(ScenarioValidationError, match="no exact-key control fallback"):
         _sample(inputs=inputs)

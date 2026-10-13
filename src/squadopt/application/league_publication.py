@@ -483,17 +483,29 @@ def remove_device_tables(site_data_root: Path, *, keep: str | None = None) -> li
     return removed
 
 
+#: The site builder's way out of a capture table that differs. Removing the table by hand
+#: is none on a site with two or more leagues: a build of one league then refuses every
+#: other line whose table is gone (``leagues_beside``).
+BUILDER_TABLE_REMEDY = (
+    "Rebuild every league with the weekly run's league list, or let the weekly run "
+    "rebuild the week."
+)
+
+
 def check_device_plan_table(
-    site_data_root: Path, snapshot_id: str, document: Mapping[str, object]
+    site_data_root: Path, snapshot_id: str, document: Mapping[str, object], *, remedy: str
 ) -> Path:
     """The capture's table path; refuse one already on disk that holds another payload.
 
     Within one run every league shares the capture's table, so a second league finds it
     written and leaves it. A table from an earlier build of the same capture that differs,
     which a changed handoff, the Top 100 inputs or a code change can produce, is refused
-    rather than overwritten, before any member is solved: the weekly run removes its own
-    capture's table at the start of its league stage and never meets this; by hand, remove
-    ``data/device/<capture>/`` in the candidate and rebuild every league of the list.
+    rather than overwritten, before any member is solved. The weekly run removes its own
+    capture's table at the start of its league stage and never meets this. The refusal
+    ends with ``remedy``, the caller's own way out: the site builder names the weekly
+    run's league list (``BUILDER_TABLE_REMEDY``), and ``scripts/add_device_plan_inputs.py``,
+    which never reads the other leagues' lines, names removing ``data/device/<capture>/``
+    and running the script again for every league of the list.
     """
 
     target = Path(site_data_root) / Path(*device_plan_path(snapshot_id).parts)
@@ -505,23 +517,27 @@ def check_device_plan_table(
         if not isinstance(existing, dict) or existing.get("payload") != dict(document):
             raise DataError(
                 f"{target} already holds another device-plan table for capture {snapshot_id}; "
-                "a table is written once per capture. Remove that directory in the candidate "
-                "and rebuild every league of the list, or let the weekly run rebuild the week."
+                f"a table is written once per capture. {remedy}"
             )
     return target
 
 
 def write_device_plan_table(
-    site_data_root: Path, snapshot_id: str, document: Mapping[str, object], *, generated_at_utc: str
+    site_data_root: Path,
+    snapshot_id: str,
+    document: Mapping[str, object],
+    *,
+    generated_at_utc: str,
+    remedy: str,
 ) -> Path:
     """Write the capture's device-plan table once, under ``data/device/<capture>/``.
 
     A table already on disk with the same payload is left as it is, so the publication
-    stamp stays the first league's; one with another payload is refused
-    (``check_device_plan_table``).
+    stamp stays the first league's; one with another payload is refused with the
+    caller's ``remedy`` (``check_device_plan_table``).
     """
 
-    target = check_device_plan_table(site_data_root, snapshot_id, document)
+    target = check_device_plan_table(site_data_root, snapshot_id, document, remedy=remedy)
     if target.is_file():
         return target
     envelope = {
@@ -676,7 +692,9 @@ def publish_prepared_league(
         bootstrap=snapshot.payloads[BOOTSTRAP_PAYLOAD],
         top100=top100_counts,
     )
-    check_device_plan_table(site_data, request.snapshot_id, table_payload)
+    check_device_plan_table(
+        site_data, request.snapshot_id, table_payload, remedy=BUILDER_TABLE_REMEDY
+    )
     # This league's own root in the record store, derived once: the record is written there,
     # the histories read it, and the outputs list it. Every league records and renders its
     # histories; the league the store has always held keeps the store's root.
@@ -741,6 +759,7 @@ def publish_prepared_league(
         request.snapshot_id,
         table_payload,
         generated_at_utc=report.generated_at_utc,
+        remedy=BUILDER_TABLE_REMEDY,
     )
     outputs.append(table_file)
     if history_root is not None:

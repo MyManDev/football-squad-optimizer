@@ -10,8 +10,10 @@ import json
 from pathlib import Path
 from typing import Any, Final
 
+from squadopt.contracts.schema_paths import contract_schema_path
+
 UI_VIEW_CONTRACT_VERSION: Final = "ui_view_v1"
-UI_VIEW_SCHEMA_PATH: Final = Path("docs") / "contracts" / "ui_view_v1.schema.json"
+UI_VIEW_SCHEMA_PATH: Final = contract_schema_path(UI_VIEW_CONTRACT_VERSION)
 
 _STR = {"type": "string"}
 _INT = {"type": "integer"}

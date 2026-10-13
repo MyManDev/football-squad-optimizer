@@ -22,8 +22,6 @@ from squadopt.preflight.models import (
 )
 from squadopt.preflight.validator import _is_utc_timestamp
 
-MEASUREMENT_PREFLIGHT_CONTRACT_VERSION: Final = "measurement_artifact_preflight_v1"
-
 MEASUREMENT_KINDS: Final[Mapping[str, tuple[str, ...]]] = {
     "baseline_bayesopt": (
         "run_fingerprint",

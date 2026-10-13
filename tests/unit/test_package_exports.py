@@ -53,7 +53,7 @@ providers = {
         'complete_optimization_decision', 'evaluate_prepared_folds',
         'score_frozen_squad_decision', 'score_realized_squad_points',
     ),
-    'squadopt.integration': ('optimize_squad_from_csv',),
+    'squadopt.application.projection_csv': ('optimize_squad_from_csv',),
     'squadopt.optimization': (
         'InsufficientPlayerPoolError', 'InvalidConfigurationError', 'InvalidPlayerDataError',
         'OptimizationConfig', 'OptimizationResult', 'OptimizationValidationError',

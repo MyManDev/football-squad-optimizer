@@ -22,7 +22,6 @@ Two honest limits, stated rather than hidden:
   representative opponent, not the whole league.
 """
 
-from collections.abc import Mapping
 from typing import Final
 
 import pandas as pd
@@ -147,28 +146,8 @@ def _id_rank(player_id: object) -> float:
         return float(sum(ord(character) for character in str(player_id)))
 
 
-def template_rival_diagnostics(pool: pd.DataFrame, rival: RivalSquad) -> Mapping[str, object]:
-    """What the template is made of, for the artifact beside a measurement."""
-
-    frame = pool.set_index("player_id")
-    starters = list(rival.starter_ids)
-    ownership = [float(str(frame.at[player, "ownership"])) for player in starters]
-    positions = [str(frame.at[player, "position"]) for player in starters]
-    return {
-        "contract_version": TEMPLATE_RIVAL_CONTRACT_VERSION,
-        "label": rival.label,
-        "starters": len(starters),
-        "formation": {position: int(positions.count(position)) for position in POSITIONS},
-        "mean_ownership": float(sum(ownership) / len(ownership)) if ownership else 0.0,
-        "minimum_ownership": float(min(ownership)) if ownership else 0.0,
-        "captain_rule": "most_owned_starter",
-        "captaincy_share_available": False,
-    }
-
-
 __all__ = [
     "TEMPLATE_RIVAL_CONTRACT_VERSION",
     "TEMPLATE_RIVAL_LABEL",
-    "template_rival_diagnostics",
     "template_rival_from_ownership",
 ]

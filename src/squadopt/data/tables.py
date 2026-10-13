@@ -6,7 +6,7 @@ operating system as much as the table. Every table whose `table_sha256` is recor
 written through here so the terminator is settled once, for every platform.
 
 Rounding the values is the caller's job; how far a value must be rounded to survive a
-LAPACK last-bit difference is measured in `squadopt.backtest.export_precision`. A hash means
+LAPACK last-bit difference is measured in `docs/export_precision.md`. A hash means
 "the same table" only when both halves are settled.
 """
 

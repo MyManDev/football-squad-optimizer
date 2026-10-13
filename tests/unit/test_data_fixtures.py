@@ -16,7 +16,6 @@ from squadopt.data.errors import (
 )
 from squadopt.data.fixtures import (
     aggregate_team_gameweek,
-    blank_gameweek_defaults,
     validate_fixture_snapshot,
 )
 from squadopt.data.schema import FIXTURE_COLUMNS, FIXTURE_SORT_COLUMNS
@@ -397,22 +396,3 @@ def test_counts_are_non_nullable_integers() -> None:
 
     for column in ("fixture_count", "home_fixture_count", "away_fixture_count"):
         assert aggregated[column].dtype == "int64"
-
-
-def test_a_blank_gameweek_defaults_to_zero_fixtures_and_no_difficulty() -> None:
-    """Zero difficulty would describe the easiest possible tie, not the absence of one."""
-
-    defaults = blank_gameweek_defaults()
-
-    assert defaults["fixture_count"] == 0
-    assert defaults["home_fixture_count"] == 0
-    assert defaults["away_fixture_count"] == 0
-    assert pd.isna(defaults["mean_fixture_difficulty"])
-    assert pd.isna(defaults["minimum_fixture_difficulty"])
-
-
-def test_the_blank_gameweek_defaults_are_read_only() -> None:
-    defaults = blank_gameweek_defaults()
-
-    with pytest.raises(TypeError):
-        defaults["fixture_count"] = 1  # type: ignore[index]

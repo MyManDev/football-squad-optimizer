@@ -190,7 +190,7 @@ def test_a_table_of_another_payload_already_on_the_site_is_refused_untouched(
     table.parent.mkdir(parents=True)
     table.write_text(json.dumps({"payload": {"contract_version": "other"}}), encoding="utf-8")
     before = {p: p.read_bytes() for p in built.rglob("*.json")}
-    with pytest.raises(DataError, match="already holds another device-plan table"):
+    with pytest.raises(DataError, match="already holds another device-plan table") as refused:
         add_device_plan_inputs(
             snapshot_root=world["snapshot_root"],
             snapshot_id=world["gw2_id"],
@@ -199,3 +199,10 @@ def test_a_table_of_another_payload_already_on_the_site_is_refused_untouched(
             out=io.StringIO(),
         )
     assert {p: p.read_bytes() for p in built.rglob("*.json")} == before
+    # The script names its own way out, which works because it never reads the other
+    # leagues' lines: remove the capture's directory and run it for every league again.
+    assert str(refused.value).endswith(
+        f"a table is written once per capture. Remove {table.parent} and run "
+        "scripts/add_device_plan_inputs.py again for every league of the list (--league)."
+    )
+    assert "weekly run" not in str(refused.value)

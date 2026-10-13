@@ -27,8 +27,9 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, replace
 from datetime import datetime
-from pathlib import Path
 from typing import Final, Literal, TypeAlias
+
+from squadopt.contracts.schema_paths import contract_schema_path
 
 BACKEND_JOBS_CONTRACT_VERSION: Final = "backend_jobs_v1"
 
@@ -295,7 +296,7 @@ class AdviceJob:
 #: The whole machine, readable at a glance and importable by the queue and its tests.
 ALLOWED_TRANSITIONS: Final[frozenset[tuple[str, str]]] = _TRANSITIONS
 
-BACKEND_JOBS_SCHEMA_PATH: Final = Path("docs") / "contracts" / "backend_jobs_v1.schema.json"
+BACKEND_JOBS_SCHEMA_PATH: Final = contract_schema_path(BACKEND_JOBS_CONTRACT_VERSION)
 
 
 def backend_jobs_schema() -> dict[str, object]:

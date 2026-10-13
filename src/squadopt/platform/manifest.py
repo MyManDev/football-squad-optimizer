@@ -13,10 +13,11 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Final
 
+from squadopt.contracts.schema_paths import contract_schema_path
 from squadopt.platform.context import RUN_CONTEXT_CONTRACT_VERSION, RunContext
 
 RUN_MANIFEST_CONTRACT_VERSION: Final = "run_manifest_v1"
-RUN_MANIFEST_SCHEMA_PATH: Final = Path("docs") / "contracts" / "run_manifest_v1.schema.json"
+RUN_MANIFEST_SCHEMA_PATH: Final = contract_schema_path(RUN_MANIFEST_CONTRACT_VERSION)
 
 
 class RunManifestError(ValueError):

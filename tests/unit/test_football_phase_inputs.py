@@ -4,7 +4,7 @@ from copy import deepcopy
 from dataclasses import FrozenInstanceError, replace
 
 import pytest
-from tests.football_phase_fixtures import (
+from tests.fixtures.football_phase_fixtures import (
     DECISION,
     SEASON,
     bootstrap_document,

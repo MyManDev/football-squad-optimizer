@@ -307,18 +307,23 @@ one. Previews spend from the same day and stop at eight; on a busy day the previ
 before 06:00 UTC, leaving two production slots. Check what the day has spent before dispatching.
 
 `deploy.sh <tag>` is the second stage. `verify_live.py <accepted-generated-at-ISO> [--settled <gameweek>]`
-retains the smoke checks (the routes, the documents, the two absent ones and every asset the shell reaches) and the content checks, and a settled release names the gameweek it settles so the verifier asserts it. `queue2.sh <PR>...` is the separate
-develop queue: it rebases existing PR worktrees, waits for clean checks and squash
-merges with `clean_body.py` removing attribution lines. It is not the release-to-main
-path. These are operator commands, not scheduled jobs; inspect their output and stop
+retains the smoke checks (the routes, the documents, the two absent ones and every asset the shell reaches) and the content checks, and a settled release names the gameweek it settles so the verifier asserts it.
+
+None of these scripts merges into develop. Develop merges through the GitHub merge queue, which
+is not the release-to-main path, and the queue's squash commit takes the pull request's own
+title and body, so the body is cleaned by hand before the pull request enters the queue: save
+the body to a file, run `python scripts/release/clean_body.py <file>` (it rewrites the file in
+place, dropping attribution lines and replacing long dashes), push it back with
+`gh pr edit <n> --body-file <file>`, and once the checks are clean enqueue the pull request
+with the GraphQL `enqueuePullRequest` mutation.
+
+The release scripts are operator commands, not scheduled jobs; inspect their output and stop
 on any refusal. GitHub CLI is found on PATH, with the usual Windows installation as
 a fallback. No machine-specific repository or scratch path is required.
 The scripts prefer the checkout's `.venv/Scripts/python.exe` or `.venv/bin/python`,
 then Python on PATH, and verify that the interpreter starts before waiting or
 changing anything. Missing GitHub CLI refuses immediately. The three release waits
 are bounded to 60 minutes for the site PR, 45 for the release PR and 40 for main CI.
-Interrupting the queue stops it and cleans up its temporary bodies. A body that
-cannot be read or is empty after cleaning is never merged.
 
 After the public release verifies, the owner runs these from PowerShell in the clean
 main checkout on `develop`. **First check the backend is answering**, with a single local

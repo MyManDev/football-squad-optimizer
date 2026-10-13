@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from enum import StrEnum
 from math import isclose, isfinite
@@ -599,47 +599,3 @@ def evaluate_transfer_candidates(
             else f"{chosen.label} has the highest net utility on the shared draw"
         ),
     )
-
-
-def selection_record(selection: TransferScenarioSelection) -> Mapping[str, object]:
-    """A JSON-shaped view of a selection for ledgers and diagnostics; no member-facing field."""
-
-    return {
-        "contract_version": selection.contract_version,
-        "utility_contract_version": selection.utility_contract_version,
-        "status": selection.status.value,
-        "reason": selection.reason,
-        "selected_rank": selection.selected_rank,
-        "selected_label": selection.selected.label,
-        "control_label": selection.control.label,
-        "candidate_count": selection.candidate_count,
-        "candidate_count_scored": selection.candidate_count_scored,
-        "start_state_fingerprint": selection.start_state_fingerprint,
-        "sampler_contract_version": selection.sampler_contract_version,
-        "scenario_fingerprint": selection.scenario_fingerprint,
-        "component_fingerprint": selection.component_fingerprint,
-        "candidates": [
-            {
-                "rank": record.rank,
-                "label": record.label,
-                "squad_ids": [str(value) for value in record.squad_ids],
-                "starting_ids": [str(value) for value in record.starting_ids],
-                "captain_id": str(record.captain_id),
-                "transfers_in": [str(value) for value in record.transfers_in],
-                "transfers_out": [str(value) for value in record.transfers_out],
-                "chip": record.chip,
-                "transfer_hit_points": record.transfer_hit_points,
-                "planner_status": record.planner_status,
-                "planner_objective": record.planner_objective,
-                "squad_overlap": record.squad_overlap,
-                "same_captain": record.same_captain,
-                "supported": record.supported,
-                "covered": record.covered,
-                "mean_net_of_hit": record.mean,
-                "cvar_net_of_hit": record.cvar,
-                "utility_int": record.utility_int,
-                "reason": record.reason,
-            }
-            for record in selection.diagnostics
-        ],
-    }

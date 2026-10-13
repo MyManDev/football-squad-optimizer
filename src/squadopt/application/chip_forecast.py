@@ -57,14 +57,14 @@ This module is wired into nothing: no publication, no route, no page.
 import math
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Final
 
+from squadopt.contracts.schema_paths import contract_schema_path
 from squadopt.live.rules import CHIP_NAMES
 
 CHIP_FORECAST_CONTRACT_VERSION: Final = "chip_forecast_v1"
-CHIP_FORECAST_SCHEMA_PATH: Final = Path("docs") / "contracts" / "chip_forecast_v1.schema.json"
+CHIP_FORECAST_SCHEMA_PATH: Final = contract_schema_path(CHIP_FORECAST_CONTRACT_VERSION)
 
 THRESHOLD_FIXED: Final = "fixed"
 THRESHOLD_DECAYING: Final = "decaying"

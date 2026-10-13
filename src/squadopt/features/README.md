@@ -1,0 +1,100 @@
+# `squadopt.features`
+
+The feature engineering of the model lane (R2, [ARCHITECTURE.md](../../../ARCHITECTURE.md)):
+leakage-safe features built only from gameweeks before the target, the deadline-safe evidence
+tables a decision reads, the record of what happened, and the inputs of the private football
+models. Every time-dependent aggregation of the feature builder passes through one
+shifted-rolling primitive, so the timing rule has one implementation. Its callers are `prediction`, `live`, `application`, `platform`,
+the laboratory and the scripts.
+
+Its 21 Python files sit in one folder. This page places every one of them in exactly one
+family.
+
+Review: İbrahim, the data side ([ownership](../../../docs/architecture/ownership.md)).
+
+## The boundary
+
+- **It imports inward only.** The layers list in `pyproject.toml` places it below `prediction`
+  and above `data`, so it may import `data` and `contracts`; today it imports `data` only.
+- **Storage imports are held to today's.** "Use cases, domain records and features import no
+  storage or source module" fails on any new import of the storage half of `squadopt.data`;
+  today's are listed below, and `tests/architecture/test_storage_imports.py` refuses an import
+  of the `data` package root.
+- **No laboratory, no outside world.** It imports no laboratory module ("Product does not import
+  the laboratory"), no web framework, network client, model SDK or `sqlite3` ("Frameworks,
+  network and databases stay in api and platform"), no repository script ("The package never
+  imports the repository scripts") and no `ortools` ("The CP-SAT solver stays in the decision
+  core").
+
+Of third-party libraries it imports pandas and NumPy.
+
+## Leakage-safe features
+
+| Module | What it does |
+| --- | --- |
+| `builder.py` | Attaches leakage-safe rolling features to a canonical player-gameweek dataset: every aggregation is grouped by season and player and shifted by one gameweek before its window. |
+| `rolling.py` | The single shifted-rolling primitive: every time-dependent aggregation goes through it, so there is one place to audit the timing rule. |
+| `config.py` | Explicit configuration and naming of the rolling features, with the windows declared rather than inlined so they can be experimental factors; and the package's errors (`FeatureError`, `FeatureConfigurationError`). |
+| `fixtures.py` | Attaches a gameweek's fixture context to the player-gameweek panel: how many fixtures, at home and away, and their difficulty. |
+| `strength.py` | Opponent strength estimated from shifted results we hold, rather than taken from the source's difficulty rating. |
+| `cross_season.py` | Carries a player's earlier-season record into a new season, where the rolling features reset. |
+
+## Deadline evidence
+
+Tables a decision reads, each built from what was knowable before the deadline, and the readers
+that check them before a row is returned.
+
+| Module | What it does |
+| --- | --- |
+| `evidence.py` | The deadline-safe player evidence table Phase C reads (`player_evidence_v1`): one row per player per decision week, with a flag wherever a value could be missing. |
+| `evidence_artifact.py` | Reads the identity-free Phase B artifact Phase C consumes (`player_evidence_export_v1`). |
+| `rotation_evidence.py` | What a club said about who will start, as a table a decision can be made from (`rotation_evidence_v4`): one row per roster player in the decision capture, with absent kept apart from zero. |
+| `rotation_evidence_artifact.py` | Reads a `rotation_evidence_v4` pair or a supported legacy pair, checking its digest, manifest, columns and vocabularies, or refuses it. |
+
+## What happened
+
+| Module | What it does |
+| --- | --- |
+| `component_targets.py` | The Phase C component targets derived from realized outcomes (`phase_c_component_targets_v1`); it refuses to invent the one the canonical panel cannot supply. |
+| `settled_outcomes.py` | The prospective record of what actually happened, week by week, from our own captures (`settled_outcome_v1`), and the reader of its exported artifact. |
+
+## Inputs of the private football models
+
+Each private model of the football lane in [`squadopt.prediction`](../prediction/README.md)
+reads its inputs from here. Outside this package, the first six are imported only by their
+model in `prediction` and its `football_*_experiment` module in
+[`squadopt.experiments`](../experiments/README.md); the last two parse private bytes for the
+club-unit experiment and are called only by tests today.
+
+| Module | What it does |
+| --- | --- |
+| `football_flag_inputs.py` | Captured flag facts and supplied pre-decision native minute supports (`football_flag_week_input_v1`); no reader touches a network, a file or an outcome it was not given. |
+| `football_load_inputs.py` | Immutable all-competition workload and native-law source contracts (`football_load_week_input_v1`). |
+| `football_phase_inputs.py` | Causal inputs for phase-specific credited goal and assist allocation (`football_phase_inputs_v1`). |
+| `football_score_state_inputs.py` | Strict score-process inputs (`football_score_fixture_input_v1`); a receipt assertion does not admit real data. |
+| `football_tactical_inputs.py` | Named tactical facts and supplied paired pre-decision states (`football_tactical_inputs_v1`). |
+| `football_unit_inputs.py` | Immutable inputs of the separately invoked club-unit experiment (`football_unit_inputs_v1`). |
+| `football_unit_catalog.py` | The strict private JSON input boundary of the club-unit experiment; it touches no network or file. |
+| `football_fm_attributes.py` | Reads a private, explicitly mapped Football Manager attribute export without inferring identities (`football_fm_csv_attributes_v1`). |
+
+## Package surface
+
+| Module | What it does |
+| --- | --- |
+| `__init__.py` | Re-exports names from `builder`, `config`, `cross_season`, `fixtures`, `rolling` and `strength`. |
+
+## Known violations here
+
+ARCHITECTURE.md measures and schedules these; this list says where they are.
+
+- **Storage imports.** 4 modules import the storage half of `squadopt.data` directly: 16 edges
+  from `evidence`, `football_phase_inputs`, `rotation_evidence` and
+  `rotation_evidence_artifact` to `data.snapshots`, `data._long_paths`,
+  `data.sources.fpl_live`, `data.sources.fpl_set_pieces` and five `data.sources.club_news*`
+  modules. Each edge is an `ignore_imports` entry of "Use cases, domain records and features
+  import no storage or source module" and may only go. The remedy is storage ports declared in
+  `squadopt.application`, with file adapters in `platform` (Phase 3).
+- **File access.** `evidence_artifact.py`, `rotation_evidence_artifact.py` and
+  `settled_outcomes.py` read their artifacts' manifests and tables themselves. The remedy is the
+  same storage ports (Phase 3). Until then `tests/architecture/test_use_case_file_io.py`
+  allowlists these 3, and fails on any other module here that reads or writes a file.

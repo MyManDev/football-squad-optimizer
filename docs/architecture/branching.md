@@ -18,7 +18,17 @@ latest successful immutable `site-...` deployment tag, so production may deliber
 
 ## Protection
 
-Both branches are protected, with strict up-to-date branches. The required checks are
+Since 2026-09-26 (#867) `develop` merges through a GitHub merge queue. A pull request whose
+checks are green is enqueued with the GraphQL `enqueuePullRequest` mutation; the repository
+does not allow auto-merge. The queue runs the required checks again on the `merge_group` event
+against the grouped merge, then makes the squash commit from the pull request's title and body.
+`main` has no queue: it moves by release merge only.
+
+Both branches have branch protection with required checks. On `main` it also requires a branch
+to be up to date before it merges; on `develop` it does not, and the queue tests each pull
+request against the grouped merge. Two rulesets apply to `develop`: `develop merge queue` holds
+the queue, and `Protect main`, which despite its name targets the default branch, `develop`,
+refuses deletion and force pushes and requires resolved review threads. The required checks are
 not listed here, because a copy in a document goes stale when the setting moves: this
 section used to name three contexts for `develop` after the fourth had been added. Read
 them from GitHub:
@@ -45,9 +55,9 @@ closed.
 
 ## The gates
 
-Five exist today. The first four are also documented in `../../README.md` under Quality checks,
-`../handoff_acceptance_checklist.md:36` item 16, and `../recalibration_runbook.md`; the fifth is
-the layering contract in [dependency rules](dependency_rules.md). CI enforces all five:
+Five exist today. All five are also listed in `../../CONTRIBUTING.md`; the first four appear in
+`../handoff_acceptance_checklist.md:36` item 16 and in `../recalibration_runbook.md`; the fifth
+is the layering contract in [dependency rules](dependency_rules.md). CI enforces all five:
 
 | # | Gate | Command |
 | --- | --- | --- |
@@ -146,8 +156,8 @@ better trade than a gate that is fast and occasionally wrong.
 `tmp_path`, and the repository paths tests touch (`docs/`, `web/public/data/`) are read-only; no
 test opens a socket or binds a port, and `tests/integration/test_backend_api.py` uses FastAPI's
 in-process `TestClient`. The determinism constraint is unaffected because it applies *within* a
-solve — CP-SAT is pinned to `num_search_workers = 1`
-(`src/squadopt/optimization/optimizer.py`) — not across tests.
+solve, where CP-SAT is pinned to `num_search_workers = 1`
+(`configure_solver` in `src/squadopt/optimization/cpsat.py`), not across tests.
 
 **The gate is green at deliberate oversubscription, and that is how a defect was found.**
 `pytest -n 16 --dist loadscope` puts two workers on every core. It ran 133 s, 135 s and 135 s
@@ -183,7 +193,7 @@ ranges) and 3.13 (the pinned measurement environment in `constraints.txt`).
 
 A dependency added to `pyproject.toml` is still not *automatically* added to
 `constraints.txt` — `scipy` arrived that way in #139 — but the two are no longer kept in step
-by hand alone. `tests/unit/test_dependency_pins.py` fails when a declared dependency has no
+by hand alone. `tests/architecture/test_dependency_pins.py` fails when a declared dependency has no
 pin, and fails again when a pin falls outside the range it is declared with, which is the same
 drift running the other way. Adding the dependency to both files is still a manual step; going
 on to merge with only one of them done is not.

@@ -31,13 +31,15 @@ function advicePlayer(player: DevicePlanPlayer): AdvicePlayer {
 
 /**
  * The advice envelope for a plan the member's device solved. `generatedAt` is the
- * instant the device finished, which the panel prints as the result's date.
+ * instant the device finished, which the panel prints as the result's date. `leagueId` is
+ * the league whose tree the page reads: the capture's table names no league.
  */
 export function deviceAdviceEnvelope(
   document: DevicePlanDocument,
   squad: Pick<EntrySquad, "entry" | "free_transfers_known" | "purchase_prices_known" | "chips">,
   answer: DevicePlanAnswer,
   generatedAt: Date,
+  leagueId: number,
 ): LeagueViewEnvelope<EntryAdvice> {
   // As the advice derives them: a count or a price the source did not state is named.
   const missing: string[] = [];
@@ -50,7 +52,7 @@ export function deviceAdviceEnvelope(
   };
   const gameweek = document.gameweek;
   const payload: EntryAdvice = {
-    league_id: document.league_id,
+    league_id: leagueId,
     season: document.season,
     gameweek,
     entry_id: squad.entry.entry_id,

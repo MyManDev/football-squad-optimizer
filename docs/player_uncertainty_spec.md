@@ -8,6 +8,10 @@ Sprint 5 implements two separate, composable contracts:
 - player-adaptive uncertainty: `player_adaptive_uncertainty_v1`;
 - development screening: `player_risk_screening_v1`.
 
+The player-adaptive uncertainty and the development screening were removed on 2026-10-12
+with the `squadopt.uncertainty` and `squadopt.risk` packages and the screening runner; the
+prediction-to-optimization boundary is still in `squadopt.prediction`.
+
 The implementation remains model-neutral. It does not train a learned point-prediction
 model. The real-data benchmark routes the existing deterministic baseline through the new
 boundary to test integration and provenance. A future model may produce the same prediction
@@ -143,6 +147,9 @@ players, temporal drift, injuries, and changing roles can violate.
 
 ## Public interface
 
+The `squadopt.uncertainty` package has been removed (2026-10-12); this section records the
+interface it had.
+
 ```python
 from squadopt.prediction import PredictionProvenance, prepare_optimizer_projection
 from squadopt.uncertainty import (
@@ -171,6 +178,9 @@ mean and downside realized scores, exact-fold differences, feasibility, and squa
 changes. These are diagnostics only; there is no automatic promotion threshold or selected
 winner.
 
+The runner has been removed (2026-10-12) with the `squadopt.risk` and `squadopt.uncertainty`
+packages; the Retired runners table in `scripts/README.md` says how to restore and run it.
+The commands were:
 ```powershell
 .venv\Scripts\python -m scripts.fetch_historical_data
 .venv\Scripts\python -m scripts.run_player_risk_screening

@@ -272,4 +272,4 @@ def test_tick_dry_run_needs_no_network_capture(tmp_path: Path) -> None:
 
     assert result.dry_run
     assert result.action_count == 0
-    assert result.final_plan.wants_capture
+    assert result.plans[-1].wants_capture

@@ -28,13 +28,9 @@ SCRIPTS = Path(__file__).resolve().parents[2] / "scripts"
 #: attached rather than a default nobody notices.
 NOT_YET_NAMED: frozenset[str] = frozenset()
 
-#: Solved under a budget of its own, measured and recorded rather than inherited. The rank
-#: objective has carried its own deterministic budget since #244, so the squad model's number
-#: does not apply to it (#621), and the member window's budget is the subject of the
-#: measurement that uses it rather than a limit on it.
-OWN_BUDGET: frozenset[str] = frozenset(
-    {"measure_windowed_rank.py", "measure_member_window_proofs.py"}
-)
+#: Solved under a budget of its own, measured and recorded rather than inherited. The member
+#: window's budget is the subject of the measurement that uses it rather than a limit on it.
+OWN_BUDGET: frozenset[str] = frozenset({"measure_member_window_proofs.py"})
 
 
 def _calls(tree: ast.AST, name: str) -> list[ast.Call]:
@@ -127,7 +123,6 @@ def test_the_converted_runners_name_the_measurement_configuration() -> None:
         "run_season_chain_seasons.py",
         "run_transfer_discipline_seasons.py",
         "probe_phase_e_runtime.py",
-        "run_scenario_benchmark.py",
         # The last three, and the two the exemption list took longest over: these build an
         # `EvaluationConfig` rather than solving directly, so the limit reaches the solve
         # through `optimization_config` and nowhere else.
