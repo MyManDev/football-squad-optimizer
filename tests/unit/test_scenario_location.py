@@ -2,22 +2,42 @@
 
 The default must stay bit-identical to the original centered behavior; only an
 explicit shrinkage value may move a player's scenario distribution, and only by that
-player's own shrunk historical mean residual — never by a neighbor's.
+player's own shrunk historical mean residual, never by a neighbor's. The audit that
+measured the component against history was removed with its runner
+(docs/scenario_calibration_correction_note.md keeps the reading), so these tests read the
+generator directly.
 """
 
+from dataclasses import replace
+
+import numpy as np
 import pandas as pd
 import pytest
 from tests.fixtures.synthetic_gameweeks import SEASON, make_canonical_gameweeks
 
-from squadopt.experiments import (
-    ScenarioPolicyObjective,
-    ScenarioPolicyObjectiveConfig,
-    audit_scenario_calibration,
+from squadopt.backtest import DecisionPoint, baseline_projection_builder, rows_through
+from squadopt.prediction import (
+    PredictionProvenance,
+    PredictionSnapshot,
+    prepare_optimizer_projection,
 )
-from squadopt.scenarios import ScenarioConfig, ScenarioConfigurationError
+from squadopt.scenarios import (
+    ScenarioConfig,
+    ScenarioConfigurationError,
+    ScenarioSet,
+    ScenarioTarget,
+    generate_scenarios,
+)
 
 HISTORY_GAMEWEEKS = (2, 3, 4, 5, 6)
 PLAYER_BIAS = {0: -2.0, 1: 0.0, 2: 1.0, 3: -1.0}
+TARGET = ScenarioTarget(SEASON, 8)
+CONFIG = ScenarioConfig(
+    scenario_count=64,
+    deterministic_seed=11,
+    min_history_folds=3,
+    min_player_observations=2,
+)
 
 
 def _history() -> pd.DataFrame:
@@ -48,26 +68,48 @@ def _history() -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def _config(shrinkage: float | None) -> ScenarioPolicyObjectiveConfig:
-    return ScenarioPolicyObjectiveConfig(
-        development_seasons=(SEASON,),
-        scenario_count=32,
-        min_history_folds=3,
-        min_player_observations=2,
-        player_location_shrinkage=shrinkage,
+def _snapshot() -> PredictionSnapshot:
+    panel = make_canonical_gameweeks()
+    decision = DecisionPoint(SEASON, TARGET.gameweek)
+    projection = baseline_projection_builder(rows_through(panel, decision), decision)
+    provenance = PredictionProvenance(
+        model_name="synthetic-location-model",
+        model_version="1.0.0",
+        feature_contract_version="synthetic-location-features-v1",
+        training_cutoff=f"{SEASON}:GW07",
+        training_data_fingerprint="b" * 64,
+    )
+    return prepare_optimizer_projection(
+        projection.drop(columns="expected_points"),
+        projection.loc[:, ["player_id", "expected_points"]],
+        provenance,
     )
 
 
-def _audit_bias(shrinkage: float | None) -> float:
-    objective = ScenarioPolicyObjective(make_canonical_gameweeks(), _history(), _config(shrinkage))
-    audit = audit_scenario_calibration(
-        objective,
+def _scenarios(shrinkage: float | None) -> ScenarioSet:
+    return generate_scenarios(
+        _snapshot(),
         _history(),
-        form_window=5,
-        bench_weight=0.1,
-        points_threshold=30.0,
+        TARGET,
+        replace(CONFIG, player_location_shrinkage=shrinkage),
     )
-    return audit.mean_score_bias
+
+
+def _shift(located: ScenarioSet, centered: ScenarioSet) -> pd.Series:
+    """Each player's scenario mean under the component minus the centered one."""
+
+    return located.scenario_points.mean(axis=0) - centered.scenario_points.mean(axis=0)
+
+
+def _expected_location(shrinkage: float) -> dict[int, float]:
+    """`n / (n + shrinkage)` times the player's own mean residual, as the docstring says."""
+
+    grouped = _history().groupby("player_id")["residual"]
+    means, counts = grouped.mean(), grouped.size()
+    return {
+        int(player): float(counts[player] / (counts[player] + shrinkage) * means[player])
+        for player in means.index
+    }
 
 
 def test_the_default_keeps_scenarios_centered_on_projections() -> None:
@@ -75,27 +117,65 @@ def test_the_default_keeps_scenarios_centered_on_projections() -> None:
 
     assert config.player_location_shrinkage is None
 
-
-def test_the_location_component_moves_the_scenario_mean_toward_reality() -> None:
-    """With systematic per-player bias in history, the shrunk location must shrink
-    the decision-level gap between scenario means and realized scores."""
-
-    centered_bias = _audit_bias(None)
-    located_bias = _audit_bias(2.0)
-
-    assert abs(located_bias) < abs(centered_bias)
+    centered = _scenarios(None)
+    assert centered.diagnostics["player_location_shrinkage"] is None
+    assert centered.diagnostics["players_with_location_history"] == 0
+    assert centered.diagnostics["mean_absolute_player_location"] == 0.0
 
 
-def test_the_location_component_changes_the_configuration_fingerprint() -> None:
-    assert _config(None).configuration_fingerprint != _config(2.0).configuration_fingerprint
-    assert _config(2.0).configuration_fingerprint == _config(2.0).configuration_fingerprint
+def test_the_location_component_moves_each_player_by_its_own_shrunk_mean_residual() -> None:
+    """The draws are the same under both settings, so the whole difference between the two
+    scenario sets is the location: one constant per player, its own shrunk mean residual."""
+
+    centered = _scenarios(None)
+    located = _scenarios(2.0)
+    expected = _expected_location(2.0)
+
+    difference = located.scenario_points - centered.scenario_points
+    np.testing.assert_allclose(
+        difference.to_numpy(), np.broadcast_to(difference.iloc[0].to_numpy(), difference.shape)
+    )
+    shift = _shift(located, centered)
+    players = [int(player) for player in shift.index]
+    assert located.diagnostics["players_with_location_history"] == sum(
+        player in expected for player in players
+    )
+    assert located.diagnostics["players_with_location_history"] > 0
+    for player, moved in zip(players, shift.to_numpy(), strict=True):
+        assert moved == pytest.approx(expected.get(player, 0.0), abs=1e-9)
+    assert located.diagnostics["mean_absolute_player_location"] == pytest.approx(
+        float(np.abs(shift.to_numpy()).mean()), abs=1e-9
+    )
+
+
+def test_the_location_component_moves_the_scenario_mean_toward_each_players_bias() -> None:
+    """Players the history over-projects move down and players it under-projects move up."""
+
+    shift = _shift(_scenarios(2.0), _scenarios(None))
+    groups = {
+        bias: [float(shift[player]) for player in shift.index if int(player) % 4 == key]
+        for key, bias in PLAYER_BIAS.items()
+    }
+
+    assert np.mean(groups[-2.0]) < np.mean(groups[-1.0]) < 0.0
+    assert np.mean(groups[1.0]) > 0.0
+
+
+def test_the_location_component_changes_the_scenario_fingerprint() -> None:
+    assert _scenarios(None).scenario_fingerprint != _scenarios(2.0).scenario_fingerprint
+    assert _scenarios(2.0).scenario_fingerprint == _scenarios(2.0).scenario_fingerprint
 
 
 def test_zero_shrinkage_is_full_player_mean_not_off() -> None:
     """k=0 keeps the component on at full weight; only None disables it."""
 
-    assert _config(0.0).player_location_shrinkage == 0.0
-    assert _config(None).player_location_shrinkage is None
+    assert ScenarioConfig(player_location_shrinkage=0.0).player_location_shrinkage == 0.0
+
+    shift = _shift(_scenarios(0.0), _scenarios(None))
+    full_mean = _expected_location(0.0)
+    assert any(abs(value) > 0.0 for value in full_mean.values())
+    for player, moved in shift.items():
+        assert moved == pytest.approx(full_mean.get(int(player), 0.0), abs=1e-9)
 
 
 def test_a_negative_shrinkage_is_refused() -> None:

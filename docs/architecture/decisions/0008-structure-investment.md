@@ -85,7 +85,8 @@ reasons are in "Rejected" below.
 
 **M1. The laboratory contract covers `risk` and `uncertainty`.** Landed 2026-09-15. Two entries
 in `forbidden_modules` plus the paragraph in the dependency rules. Zero imports changed, three
-contracts still kept. Reversible by revert.
+contracts still kept. Reversible by revert. Both packages have since been removed with their
+runners (2026-10-12), and their entries left the contracts with them.
 
 **M2. Extract only AST-identical functions from the measurement runners.** `scripts/` only. The
 shared body goes into `scripts/_experiment_cli.py`, which already exists and is imported by 74
@@ -132,7 +133,9 @@ script by filename. One nuance worth recording because it was measured and contr
 no document under `docs/` contains the string `measure_anchored_calibration`; the citations are to
 the artifact stem, not the script name. The single genuine command-provenance link in the
 repository is `docs/route_a_declaration.json`, `"produced_by": "scripts/build_opponent_signal.py"`,
-and nothing guards it. The no-rename rule holds either way, and that one link is now known.
+and nothing guards it. The no-rename rule holds either way, and that one link is now known. That
+runner has since been removed with the retired Route A study (2026-10-12); the record keeps the
+link, and the Retired runners table in `scripts/README.md` says how to restore and run it.
 
 **Deleting `integration.py` as dead code.** See Context. If it goes at all, it goes as its own
 change with a one-release re-export, not inside a sweep.

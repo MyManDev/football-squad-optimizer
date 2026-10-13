@@ -1,22 +1,17 @@
-"""Leakage-safe walk-forward benchmark for the Ridge reference projection."""
+"""Leakage-safe Ridge reference projection, and the paired metrics benchmarks share with it."""
 
 import math
-from collections.abc import Callable, Mapping
-from dataclasses import dataclass, field
-from numbers import Integral
+from collections.abc import Callable
+from dataclasses import dataclass
 from statistics import fmean
-from types import MappingProxyType
 from typing import Final
 
 import pandas as pd
 
-from squadopt.backtest.folds import build_walk_forward_folds, make_baseline_projection_builder
 from squadopt.backtest.splits import BacktestConfigurationError, DecisionPoint, rows_before
 from squadopt.evaluation import (
-    EvaluationConfig,
     EvaluationFold,
     EvaluationResult,
-    evaluate_prepared_folds,
 )
 from squadopt.features import (
     PRIOR_MINUTES_COLUMN,
@@ -25,7 +20,6 @@ from squadopt.features import (
     build_feature_dataset,
 )
 from squadopt.features.cross_season import carry_over_as_of
-from squadopt.optimization import OptimizationConfig
 from squadopt.prediction import (
     PredictionProvenance,
     PredictionSnapshot,
@@ -41,14 +35,6 @@ from squadopt.prediction.learned import (
     predict_ridge_expected_points,
 )
 
-LEARNED_BENCHMARK_CONTRACT_VERSION: Final = "learned_vs_baseline_v1"
-DEFAULT_LEARNED_BENCHMARK_SEASONS: Final = (
-    "2021-22",
-    "2022-23",
-    "2023-24",
-    "2024-25",
-)
-LOCKED_HOLDOUT_SEASON: Final = "2025-26"
 RESIDUAL_COLUMNS: Final = (
     "fold_id",
     "season",
@@ -60,53 +46,6 @@ RESIDUAL_COLUMNS: Final = (
     "realized_points",
     "residual",
 )
-
-
-@dataclass(frozen=True, slots=True)
-class LearnedBenchmarkConfig:
-    """Development-only controls for the paired baseline/Ridge benchmark."""
-
-    seasons: tuple[str, ...] = DEFAULT_LEARNED_BENCHMARK_SEASONS
-    min_prior_gameweeks_in_season: int = 1
-    ridge_config: RidgeProjectionConfig = field(default_factory=RidgeProjectionConfig)
-    cross_season_config: CrossSeasonConfig = field(default_factory=CrossSeasonConfig)
-    optimization_config: OptimizationConfig = field(default_factory=OptimizationConfig)
-    run_metadata: Mapping[str, object] = field(default_factory=dict)
-
-    def __post_init__(self) -> None:
-        if not isinstance(self.seasons, tuple) or not self.seasons:
-            raise BacktestConfigurationError("seasons must be a non-empty tuple.")
-        if any(not isinstance(season, str) for season in self.seasons):
-            raise BacktestConfigurationError("seasons entries must be strings.")
-        seasons = tuple(season.strip() for season in self.seasons)
-        if any(not season for season in seasons) or len(set(seasons)) != len(seasons):
-            raise BacktestConfigurationError("seasons must contain unique non-empty labels.")
-        if LOCKED_HOLDOUT_SEASON in seasons:
-            raise BacktestConfigurationError(
-                f"{LOCKED_HOLDOUT_SEASON} is the locked holdout and cannot be read by "
-                "the Sprint 6 development benchmark."
-            )
-        minimum = self.min_prior_gameweeks_in_season
-        if isinstance(minimum, bool) or not isinstance(minimum, Integral):
-            raise BacktestConfigurationError("min_prior_gameweeks_in_season must be an integer.")
-        normalized_minimum = int(minimum)
-        if normalized_minimum < 1:
-            raise BacktestConfigurationError(
-                "The learned benchmark excludes opening gameweeks; minimum must be at least 1."
-            )
-        if not isinstance(self.ridge_config, RidgeProjectionConfig):
-            raise BacktestConfigurationError("ridge_config must be a RidgeProjectionConfig.")
-        if not isinstance(self.cross_season_config, CrossSeasonConfig):
-            raise BacktestConfigurationError("cross_season_config must be a CrossSeasonConfig.")
-        if not isinstance(self.optimization_config, OptimizationConfig):
-            raise BacktestConfigurationError("optimization_config must be an OptimizationConfig.")
-        frozen_metadata = EvaluationConfig(
-            optimization_config=self.optimization_config,
-            run_metadata=self.run_metadata,
-        ).run_metadata
-        object.__setattr__(self, "seasons", seasons)
-        object.__setattr__(self, "min_prior_gameweeks_in_season", normalized_minimum)
-        object.__setattr__(self, "run_metadata", frozen_metadata)
 
 
 @dataclass(frozen=True, slots=True)
@@ -150,28 +89,6 @@ class PairedDecisionMetrics:
     captain_changed_folds: int
     mean_squad_entries: float | None
     mean_starting_xi_entries: float | None
-
-
-@dataclass(frozen=True, slots=True)
-class LearnedBenchmarkResult:
-    """Complete paired benchmark plus learned out-of-sample residual history."""
-
-    config: LearnedBenchmarkConfig
-    baseline: EvaluationResult
-    learned: EvaluationResult
-    baseline_prediction_metrics: PredictionMetrics
-    learned_prediction_metrics: PredictionMetrics
-    decision_metrics: PairedDecisionMetrics
-    residuals: pd.DataFrame
-    diagnostics: Mapping[str, object]
-
-    def __post_init__(self) -> None:
-        if tuple(self.residuals.columns) != RESIDUAL_COLUMNS:
-            raise BacktestConfigurationError(
-                "residuals do not match the learned benchmark contract."
-            )
-        object.__setattr__(self, "residuals", self.residuals.copy(deep=True))
-        object.__setattr__(self, "diagnostics", MappingProxyType(dict(self.diagnostics)))
 
 
 def _training_cutoff(training: pd.DataFrame) -> str:
@@ -421,65 +338,4 @@ def paired_decision_metrics(
         captain_changed_folds=captain_changed,
         mean_squad_entries=fmean(squad_entries) if squad_entries else None,
         mean_starting_xi_entries=fmean(starting_entries) if starting_entries else None,
-    )
-
-
-def run_learned_benchmark(
-    panel: pd.DataFrame,
-    config: LearnedBenchmarkConfig | None = None,
-) -> LearnedBenchmarkResult:
-    """Compare baseline and expanding-window Ridge on identical development folds."""
-
-    settings = LearnedBenchmarkConfig() if config is None else config
-    if not isinstance(settings, LearnedBenchmarkConfig):
-        raise BacktestConfigurationError("config must be a LearnedBenchmarkConfig.")
-    baseline_folds = build_walk_forward_folds(
-        panel,
-        seasons=settings.seasons,
-        min_prior_gameweeks_in_season=settings.min_prior_gameweeks_in_season,
-        projection_builder=make_baseline_projection_builder(
-            form_window=settings.ridge_config.form_window,
-            cross_season=settings.cross_season_config,
-        ),
-    )
-    learned_folds = build_walk_forward_folds(
-        panel,
-        seasons=settings.seasons,
-        min_prior_gameweeks_in_season=settings.min_prior_gameweeks_in_season,
-        projection_builder=make_ridge_projection_builder(
-            config=settings.ridge_config,
-            cross_season=settings.cross_season_config,
-        ),
-    )
-    metadata = {
-        **dict(settings.run_metadata),
-        "benchmark_contract_version": LEARNED_BENCHMARK_CONTRACT_VERSION,
-        "evaluation_seasons": settings.seasons,
-        "locked_holdout_season": LOCKED_HOLDOUT_SEASON,
-        "form_window": settings.ridge_config.form_window,
-        "ridge_alpha": settings.ridge_config.alpha,
-    }
-    evaluation_config = EvaluationConfig(
-        optimization_config=settings.optimization_config,
-        run_metadata=metadata,
-    )
-    baseline = evaluate_prepared_folds(baseline_folds, evaluation_config)
-    learned = evaluate_prepared_folds(learned_folds, evaluation_config)
-    baseline_residuals = build_residual_history(baseline_folds)
-    learned_residuals = build_residual_history(learned_folds)
-    return LearnedBenchmarkResult(
-        config=settings,
-        baseline=baseline,
-        learned=learned,
-        baseline_prediction_metrics=prediction_metrics(baseline_residuals),
-        learned_prediction_metrics=prediction_metrics(learned_residuals),
-        decision_metrics=paired_decision_metrics(baseline, learned),
-        residuals=learned_residuals,
-        diagnostics={
-            "benchmark_contract_version": LEARNED_BENCHMARK_CONTRACT_VERSION,
-            "paired_fold_ids": tuple(fold.fold_id for fold in baseline.folds),
-            "residual_definition": "realized_points_minus_predicted_points",
-            "automatic_promotion": False,
-            "holdout_accessed": False,
-        },
     )

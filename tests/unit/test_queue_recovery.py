@@ -240,7 +240,7 @@ def test_corrupt_job_is_retained_and_blocks_only_its_own_reservation(tmp_path: P
         queue.submit_unique(job("duplicate"))
     assert queue.load("duplicate") is None
     assert path.read_bytes() == b'{"truncated":'
-    assert queue.integrity_issues()
+    assert list((tmp_path / "integrity").glob("*.bin"))
     assert any(p.read_bytes() == path.read_bytes() for p in (tmp_path / "integrity").glob("*.bin"))
 
 

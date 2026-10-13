@@ -75,18 +75,6 @@ class SpendingPower:
             MappingProxyType({int(k): int(v) for k, v in dict(self.sell_prices_tenths).items()}),
         )
 
-    @property
-    def spendable_tenths(self) -> int:
-        """The bank plus every held player's sell price: a whole-squad rebuild's budget."""
-
-        return int(self.bank_tenths) + sum(self.sell_prices_tenths.values())
-
-    @property
-    def squad_sell_value_known(self) -> bool:
-        """Whether the source stated what the fifteen are worth to sell."""
-
-        return self.stated_squad_sell_value_tenths is not None
-
 
 def _non_negative(value: object, name: str) -> int:
     if isinstance(value, bool) or not isinstance(value, Integral) or int(value) < 0:

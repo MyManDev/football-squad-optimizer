@@ -162,8 +162,8 @@ The default summaries are:
 
 ## Real-data smoke benchmark
 
-Run:
-
+The runner has been removed (2026-10-12); the Retired runners table in `scripts/README.md` says
+how to restore and run it. It was run as:
 ```powershell
 .venv\Scripts\python -m scripts.run_scenario_benchmark
 ```

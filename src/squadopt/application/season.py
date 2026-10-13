@@ -104,10 +104,6 @@ class TickResult:
     dry_run: bool
 
     @property
-    def final_plan(self) -> TickPlan:
-        return self.plans[-1]
-
-    @property
     def action_count(self) -> int:
         return len(self.performed)
 

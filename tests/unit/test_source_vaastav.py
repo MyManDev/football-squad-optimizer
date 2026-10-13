@@ -18,7 +18,6 @@ from squadopt.data.sources.vaastav import (
     collapse_to_player_gameweek,
     drop_non_player_rows,
     load_season,
-    load_upcoming_roster,
 )
 
 SEASON = SUPPORTED_SEASONS[0]
@@ -356,51 +355,6 @@ def test_a_changed_archive_layout_names_the_pinned_commit(tmp_path: Path) -> Non
 def test_an_empty_season_request_is_refused(tmp_path: Path) -> None:
     with pytest.raises(DataSourceError, match="At least one season"):
         build_panel(_archive(tmp_path, [_gameweek_row()]), seasons=[])
-
-
-def test_the_upcoming_roster_exposes_the_pool_and_opening_prices(tmp_path: Path) -> None:
-    """A season with no completed gameweeks still has an unambiguous starting price."""
-
-    root = _archive(tmp_path, [_gameweek_row()])
-
-    roster = load_upcoming_roster(root, SEASON)
-
-    assert list(roster.columns) == ["code", "web_name", "team", "now_cost", "position"]
-    assert len(roster) == 2
-
-
-def test_the_upcoming_roster_translates_numeric_position_codes(tmp_path: Path) -> None:
-    """A platform's encoding is source knowledge, so it is resolved here."""
-
-    root = _archive(tmp_path, [_gameweek_row()])
-
-    # The loader reads text by design, so codes arrive as strings; canonical typing
-    # happens later, in the projection layer.
-    roster = load_upcoming_roster(root, SEASON).set_index("code")
-
-    assert roster.loc["900001", "position"] == "GK"
-    assert roster.loc["900002", "position"] == "MID"
-
-
-def test_the_upcoming_roster_drops_non_player_entries(tmp_path: Path) -> None:
-    """Element type 5 is a manager, not a squad-eligible player."""
-
-    root = _archive(
-        tmp_path,
-        [_gameweek_row()],
-        roster_rows=[
-            [1, 900001, 1, 10, 45, "Keeper"],
-            [2, 900002, 3, 11, 80, "Mid"],
-            [3, 900003, 5, 12, 15, "Boss"],
-        ],
-    )
-
-    roster = load_upcoming_roster(root, SEASON)
-
-    # Compared as text, because an integer would never match and the assertion
-    # would pass without testing anything.
-    assert set(roster["code"]) == {"900001", "900002"}
-    assert len(roster) == 2
 
 
 def test_collapse_is_idempotent_on_already_unique_rows() -> None:

@@ -19,13 +19,6 @@ import { ContractMismatchError, type Loaded, type ViewEnvelope } from "./envelop
 import { readLiveScore, type LiveScoreView } from "./liveScore";
 import { discardBody } from "./request";
 
-// Compatibility re-export, 2026-09-26: the envelope types and `ContractMismatchError` moved
-// to `./envelope` so the live score reader stops importing this client (a value import
-// cycle). Kept for one release (docs/architecture/dependency_rules.md, rule 2); remove in
-// the release after the one that ships this move.
-export { ContractMismatchError } from "./envelope";
-export type { Loaded, ViewEnvelope } from "./envelope";
-
 export const UI_VIEW_CONTRACT_VERSION = "ui_view_v1";
 
 export interface DataClient {

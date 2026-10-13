@@ -151,7 +151,7 @@ def test_every_mode_gets_advice_and_prices_are_against_the_pure_pick() -> None:
     assert result.contract_version == MEMBER_MODE_SELECTION_CONTRACT_VERSION
     assert result.gameweek == GAMEWEEK
     assert {item.mode for item in result.advice} == set(MODE_SLUGS.values())
-    by_mode = result.by_mode()
+    by_mode = {item.mode: item for item in result.advice}
     assert by_mode["saf-puan"].expected_points_cost == 0.0
     assert by_mode["saf-puan"].rival_label is None
     for slug in ("garantici", "agresif", "asiri-agresif"):
@@ -199,7 +199,7 @@ def test_every_mode_now_picks_the_expected_points_winner() -> None:
 
     result = select_member_modes(menu, paths, rival)  # type: ignore[arg-type]
 
-    by_mode = result.by_mode()
+    by_mode = {item.mode: item for item in result.advice}
     for slug in ("garantici", "agresif", "asiri-agresif", "saf-puan"):
         assert by_mode[slug].decision.name == "risky"  # type: ignore[attr-defined]
         assert by_mode[slug].expected_points_cost == 0.0

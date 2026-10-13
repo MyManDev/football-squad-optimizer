@@ -5,7 +5,6 @@ from pathlib import Path
 
 import pytest
 
-from squadopt.experiments.shadow_calibration import PREREG_GATES
 from squadopt.experiments.shadow_report import (
     LOCKED_HOLDOUT_SEASON,
     PREREG_GATE_FAMILIES,
@@ -18,11 +17,10 @@ from squadopt.experiments.shadow_report import (
     ShadowGateResult,
     ShadowReportError,
     ShadowResidualSource,
+    load_shadow_bytes,
     load_shadow_report,
-    read_shadow_report,
     replay_identity_of,
     report_to_dict,
-    write_shadow_report,
     write_shadow_report_once,
 )
 
@@ -78,7 +76,7 @@ def _report(**overrides: object) -> ShadowCalibrationReport:
 def test_a_valid_report_round_trips_with_missing_kept_as_null(tmp_path: Path) -> None:
     report = _report()
     out = tmp_path / "shadow" / "report.json"
-    write_shadow_report(report, out)
+    assert write_shadow_report_once(report, out) == "written"
     document = json.loads(out.read_text(encoding="utf-8"))
     assert document["contract_version"] == SHADOW_CALIBRATION_CONTRACT_VERSION
     # The unmeasured diagnostic stayed null — missing is not zero.
@@ -168,16 +166,16 @@ def test_an_unevaluable_gate_cannot_pass() -> None:
 
 def test_the_writer_refuses_the_published_site_tree(tmp_path: Path) -> None:
     target = tmp_path / "web" / "public" / "data" / "shadow.json"
-    with pytest.raises(ShadowReportError, match="web/public"):
-        write_shadow_report(_report(), target)
+    with pytest.raises(ShadowReportError, match="published site tree"):
+        write_shadow_report_once(_report(), target)
     assert not target.exists()
 
 
 def test_serialization_is_deterministic(tmp_path: Path) -> None:
     first = tmp_path / "a.json"
     second = tmp_path / "b.json"
-    write_shadow_report(_report(), first)
-    write_shadow_report(_report(), second)
+    write_shadow_report_once(_report(), first)
+    write_shadow_report_once(_report(), second)
     assert first.read_bytes() == second.read_bytes()
     assert b"\r" not in first.read_bytes()
 
@@ -230,12 +228,6 @@ def test_the_default_contract_version_is_still_v1() -> None:
 
     assert SHADOW_CALIBRATION_CONTRACT_VERSION == SHADOW_CALIBRATION_CONTRACT_V1
     assert _report().contract_version == SHADOW_CALIBRATION_CONTRACT_V1
-
-
-def test_the_runner_and_the_contract_name_one_gate_set() -> None:
-    """Two lists of the same pre-registered families are two lists that can drift."""
-
-    assert PREREG_GATES is PREREG_GATE_FAMILIES
 
 
 def test_a_v1_report_may_not_declare_gates() -> None:
@@ -397,11 +389,10 @@ def test_the_recorded_v1_measurement_still_loads_and_reserializes_byte_for_byte(
     """The point of versioning: the committed artifact is not changed by v2 existing."""
 
     raw = _RECORDED_V1.read_text(encoding="utf-8")
-    report, digest = read_shadow_report(_RECORDED_V1)
+    report = load_shadow_bytes(_RECORDED_V1.read_bytes(), label=str(_RECORDED_V1))
     assert report.contract_version == SHADOW_CALIBRATION_CONTRACT_V1
     assert report.shadow_status == "abstained"
     assert report.declared_gates == ()
-    assert len(digest) == 64
     again = json.dumps(report_to_dict(report), indent=2, sort_keys=True, allow_nan=False) + "\n"
     assert again == raw
 
@@ -410,7 +401,7 @@ def test_the_earliest_v1_artifact_is_refused_rather_than_completed() -> None:
     """It predates the execution block; loading it would mean inventing one."""
 
     with pytest.raises(ShadowReportError, match="no execution block"):
-        read_shadow_report(_PRE_EXECUTION_V1)
+        load_shadow_bytes(_PRE_EXECUTION_V1.read_bytes(), label=str(_PRE_EXECUTION_V1))
 
 
 def test_create_once_writes_then_replays_then_refuses_a_different_measurement(
@@ -559,7 +550,7 @@ def test_a_document_that_repeats_a_key_is_refused(tmp_path: Path) -> None:
     path = tmp_path / "doubled.json"
     path.write_text(doubled + "\n", encoding="utf-8")
     with pytest.raises(ShadowReportError, match="repeats the key"):
-        read_shadow_report(path)
+        load_shadow_bytes(path.read_bytes(), label=str(path))
 
 
 @pytest.mark.parametrize(

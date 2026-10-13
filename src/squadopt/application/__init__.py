@@ -11,7 +11,6 @@ Entry points adapt these services; they do not import one another or implement e
 from squadopt.application.build import (
     ledger_view,
     pool_view,
-    recommendation_view,
     recommendation_view_from_ledger,
     status_view,
 )
@@ -143,7 +142,6 @@ __all__ = [
     "plan_horizon_batch",
     "plan_season_tick",
     "pool_view",
-    "recommendation_view",
     "recommendation_view_from_ledger",
     "roll",
     "run_season_tick",

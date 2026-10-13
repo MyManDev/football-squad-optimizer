@@ -9,7 +9,6 @@ from squadopt.planning.horizon import (
 )
 from squadopt.planning.models import (
     CHIP_NAMES,
-    CHIP_NAMES_V1,
     CHIP_NAMES_V2,
     PLANNING_HORIZON_COLUMNS,
     PLANNING_HORIZON_CONTRACT_VERSION,
@@ -32,7 +31,6 @@ from squadopt.planning.pricing import SpendingPower, sell_price_tenths, spending
 
 __all__ = [
     "CHIP_NAMES",
-    "CHIP_NAMES_V1",
     "CHIP_NAMES_V2",
     "PLANNING_HORIZON_COLUMNS",
     "PLANNING_HORIZON_CONTRACT_VERSION",
