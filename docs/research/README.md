@@ -15,6 +15,7 @@ runners live in `scripts/`, and its records are committed under `docs/`.
 | Prospective benchmark of the live decisions (the Phase A exit) | [Benchmark V2 pre-registration](../benchmark_v2_prereg.md) |
 | Experimental football model: development, results and the served model | [Implementation and evidence contract](football_candidate_development.md), [results and rejected ablations](football_candidate_results.md), [experimental football model in member advice](../live-football-model.md) |
 | Football prospective reading | [Football prospective pre-registration](../football_prospective_prereg.md) |
+| Price changes at later deadlines (#1013 step 1a) | [Price change pre-registration](../price_change_prereg.md) |
 | Multi-week planning and lookahead | [Planner state and learning](planner_state_and_learning.md), [explicit lookahead measurement](explicit_lookahead_measurement.md), [observed rollout](observed_rollout.md), [temporal refinement](temporal_refinement.md), [incumbent protection](incumbent_protection_design.md), [purchase basis](acquisition_accounting.md) |
 | Human decisions over computed alternatives | [Human decision board](human_decision_board.md) |
 
