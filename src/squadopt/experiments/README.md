@@ -72,8 +72,9 @@ module that imports it.
 | Football studies | `football_components`, `football_defcon`, `football_minutes`, `football_share_sizing`, `football_windows` |
 | Private football model experiments | `football_flag_experiment`, `football_load_experiment`, `football_phase_experiment`, `football_score_state_experiment`, `football_tactical_experiment`, `football_unit_experiment` |
 | Single gate readings | `defcon_component_reading`, `rank_tail_selector` |
+| The package root, an interface (see above) | `__init__` |
 
-Each module's docstring states its study; the runner that calls it is in the
+Each study module's docstring states its study; the runner that calls it is in the
 [script catalogue](../../../scripts/README.md). The six private football model experiments
 have no runner: only tests import them, and the tests of five of them take their synthetic
 bases from the `football_*_fixtures.py` modules in `tests/fixtures/`. They lived in

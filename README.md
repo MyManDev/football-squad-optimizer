@@ -28,7 +28,7 @@ every package.
 | [`deploy/`](deploy/README.md) | Deployment configuration for the separate API and worker processes |
 | [`config/`](config/README.md) | Operator configuration read at run time: the list of leagues the site serves |
 | [`tests/`](tests/README.md) | Offline unit tests, architecture fitness functions, shared fixtures and opt-in acceptance probes |
-| [`docs/`](docs/README.md) | Product, operations, architecture, contracts and scientific evidence |
+| [`docs/`](docs/README.md) | Product, operations, architecture, specifications, contracts and scientific evidence |
 | [`data/`](data/README.md) | Private local operational state; a Git checkout is not its backup |
 | `.github/` | CI, the Pages deployment, the backend uptime check, the Windows script checks, the probe deployment, Dependabot and code owners |
 | `constraints.txt` | Pinned package versions the container and measurement checks install |

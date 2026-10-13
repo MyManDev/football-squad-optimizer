@@ -159,6 +159,10 @@ The tests in `tests/architecture/` hold the rules that an import graph cannot se
 | `tests/architecture/test_layer_contracts.py` | Moved symbols keep their compatibility imports and their deterministic outputs. |
 | `tests/architecture/test_documentation_paths.py` | A source path or command cited in the documentation exists. |
 | `tests/architecture/test_markdown_links.py` | Every relative link in a tracked Markdown file resolves. |
+| `tests/architecture/test_docs_reachable.py` | Every Markdown document under `docs/` is reached by a chain of relative links from the [documentation guide](docs/README.md), apart from the 192 unreachable on 2026-10-13, two frozen lists that only shrink. |
+| `tests/architecture/test_docs_root.py` | No new living document is written directly under `docs/`: the 106 there on 2026-10-13 are a frozen list that only shrinks, and a new one goes in `architecture/`, `operations/`, `product/`, `research/` or `specs/`. |
+| `tests/architecture/test_scripts_catalogue.py` | Every file under `scripts/` has exactly one row in the [script catalogue](scripts/README.md), every row outside its two retired sections names a file that is there, and a retired row names one that is gone. |
+| `tests/architecture/test_package_maps.py` | The guide of each package that has one (`platform`, `application`, `experiments`, `live`, `data`, `prediction`, `features`) places every module of its package in exactly one family and names no module that is not there. |
 | `tests/architecture/test_measurements_index.py` | Every committed record at the root of `docs/`, in `docs/architecture/` and in `docs/research/` has a row in the measurements index (ADR 0003, rule 1), found by a backticked name or a link target. |
 | `tests/architecture/test_records_name_their_code.py` | A committed record at the root of `docs/` or in `docs/research/` names the commit that produced it; the exceptions, one frozen list per folder, only shrink. |
 | `tests/architecture/test_mypy_file_set_is_described.py` | The scripts the type gate checks are the ones the PR discipline names. |
@@ -205,17 +209,24 @@ with its ring, layer and contract keys (the test fails until all three agree), a
 **A module.** Put it in the package whose ring matches what it does, not where its first caller
 lives. A module whose job is to talk to the outside world, such as a network client, a process
 launcher or a store, is an adapter and belongs in `platform`, or in the storage half of `data`
-for captured inputs. A module that only measures belongs in the research arm.
+for captured inputs. A module that only measures belongs in the research arm. When the package
+has a guide, add the module's row to its family there in the same pull request;
+`tests/architecture/test_package_maps.py` fails until the guide places it.
 
 **A script.** Add one row to the [script catalogue](scripts/README.md) in the same pull request;
-every file under `scripts/` has exactly one. An operational command imports product packages
-only; `tests/architecture/test_run_boundary.py` imports every `.py` row of the operational table,
-apart from the three laboratory tools it names, and fails if the laboratory loads. A measurement
-runner writes its record to `docs/` and adds the row to the measurements index.
+every file under `scripts/` has exactly one, which `tests/architecture/test_scripts_catalogue.py`
+holds. An operational command imports product packages only;
+`tests/architecture/test_run_boundary.py` imports every `.py` row of the operational table, apart
+from the three laboratory tools it names, and fails if the laboratory loads. A measurement runner
+writes its record to `docs/` and adds the row to the measurements index.
 
 **A document.** Follow the naming key in the [documentation guide](docs/README.md). A record is
 a JSON file and its Markdown twin with an index row; a pre-registration ends in `_prereg.md` and
-is frozen when it merges; anything else is a living document in the folder of its audience.
+is frozen when it merges; anything else is a living document in the folder of its audience
+(`docs/architecture`, `docs/operations`, `docs/product`, `docs/research`, or `docs/specs` for a
+specification), never directly under `docs/` (`tests/architecture/test_docs_root.py`). Link it
+from that folder's guide: `tests/architecture/test_docs_reachable.py` fails on a document under
+`docs/` that no chain of links from the documentation guide reaches.
 
 **A deployable.** A new process, Worker or hosted service needs a row in the deployment units
 table, its configuration under `deploy/` or its own folder, and an ADR when it changes where

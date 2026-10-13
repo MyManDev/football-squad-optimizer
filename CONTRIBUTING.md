@@ -49,15 +49,16 @@ agreements live under [`docs/architecture/`](docs/architecture/README.md). Start
 
 | New file | Goes in | Also update |
 | --- | --- | --- |
-| A Python module | The package of its ring in `src/squadopt/` ([architecture overview](ARCHITECTURE.md#2-rings)) | Nothing, if the import contracts pass |
+| A Python module | The package of its ring in `src/squadopt/` ([architecture overview](ARCHITECTURE.md#2-rings)) | Its row in the package's guide, when the package has one (`tests/architecture/test_package_maps.py`) |
 | A Python package | `src/squadopt/<package>/` | The layers list and contracts in `pyproject.toml`, the ring table in the architecture overview, `RINGS` in `tests/architecture/test_architecture_rings.py`, the [package map](src/squadopt/README.md), `.github/CODEOWNERS` |
 | A unit test | `tests/unit/test_<module>.py`, or `test_<module>_<topic>.py` | Nothing |
 | An architecture rule as a test | `tests/architecture/` | The enforcement map in the architecture overview |
 | An end-to-end or opt-in probe | `tests/integration/` | The [integration guide](tests/integration/README.md) for an opt-in probe |
-| A repository command or runner | `scripts/` | One row in the [script catalogue](scripts/README.md) |
+| A repository command or runner | `scripts/` | One row in the [script catalogue](scripts/README.md) (`tests/architecture/test_scripts_catalogue.py`) |
 | A measurement record | Where its runner writes it under `docs/` | A row in the [measurements index](docs/measurements_index.md) |
 | A pre-registration | `docs/research/<name>_prereg.md` | Frozen when it merges |
-| A living document | The `docs/` folder of its audience ([documentation guide](docs/README.md)) | That folder's guide |
+| A specification | `docs/specs/<name>_spec.md` | A row in the [specifications guide](docs/specs/README.md) |
+| A living document | The `docs/` folder of its audience: `architecture/`, `operations/`, `product/`, `research/` or `specs/` ([documentation guide](docs/README.md)); never the root of `docs/` (`tests/architecture/test_docs_root.py`) | A link from that folder's guide (`tests/architecture/test_docs_reachable.py`) |
 | A public schema | `docs/contracts/<contract>_v<N>.schema.json` | The code that validates it and, for `ui_view_v1`, `npm run gen:types` |
 | A website module | The zone of `web/src/` it belongs to ([web guide](web/README.md)) | Nothing, if the web architecture tests pass |
 | Operator configuration | `config/` ([configuration guide](config/README.md)) | The contract that reads it |

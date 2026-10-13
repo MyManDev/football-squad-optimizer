@@ -4,8 +4,9 @@ The repository's commands that are not part of the installed package: operator c
 release recipe, the Windows backend scripts, measurement runners, generators and the helpers
 they import. **Every file under `scripts/` has exactly one row in this catalogue**, keyed by its
 path relative to this folder, and a pull request that adds, removes or renames a file edits its
-row in the same change. A row is classified by what the code does, not by what its name
-suggests.
+row in the same change; `tests/architecture/test_scripts_catalogue.py` fails until it does, and
+holds a row of the two retired sections to a file that is gone. A row is classified by what the
+code does, not by what its name suggests.
 
 Run a Python script as `python -m scripts.<name>` from the repository root, a file under
 `release/` as `python scripts/release/<name>.py` or `sh scripts/release/<name>.sh`, and a

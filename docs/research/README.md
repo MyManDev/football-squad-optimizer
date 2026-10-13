@@ -25,6 +25,9 @@ runners live in `scripts/`, and its records are committed under `docs/`.
 | Fixture football candidate and observed planning | [Implementation and evidence contract](football_candidate_development.md) |
 | Private set-piece duties candidate | [Source, learned allocation, synthetic checks and real-use gates](football_set_piece_duties.md) |
 | Private tactical matchup candidate | [Source, model, synthetic checks and real-use gates](football_tactical_matchup_development.md) |
+| Private flagged-player participation and minutes candidate | [Learned flagged-player participation and minutes](football_flag_minutes_development.md) |
+| Private all-competition workload candidate | [Private all-competition workload and weekly minutes](football_load_minutes_development.md) |
+| Private score-state candidate | [Private learned score-state football experiment](football_score_state_development.md) |
 | Football candidate development measurements | [Results and rejected ablations](football_candidate_results.md) |
 | Private projected club units and replacement quality | [Model and integration boundaries](football_projected_unit_strength.md) |
 | Football Manager source and training feasibility | [Sources, schemas and admission gates](football_fm_source_feasibility.md) |

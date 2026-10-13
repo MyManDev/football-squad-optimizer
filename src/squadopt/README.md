@@ -66,7 +66,8 @@ so the research arm is checked from both sides.
 
 A family is a set of modules that share a name prefix or a job. `platform`, `application`,
 `experiments`, `live`, `prediction`, `features` and `data` have their own guides, which place
-every module.
+every module; `tests/architecture/test_package_maps.py` fails when a module of one of those
+packages has no row in its guide, has two, or a row names a module that is not there.
 
 | Package | Families |
 | --- | --- |
