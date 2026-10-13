@@ -232,12 +232,13 @@ is covered by `tests/architecture/test_layer_contracts.py` and the existing cons
 6. `The decision core imports no OS or process module`: `contracts`, `optimization`,
    `planning`, `scenarios` and `evaluation` import no `os`, `shutil`, `tempfile` or
    `subprocess`.
-7. `The decision core and prediction import no storage or source module`: the same five
-   packages and `prediction` import none of the storage and source modules of `data`.
+7. `The decision core imports no storage or source module`: the same five packages import
+   none of the storage and source modules of `data`.
 8. `The CP-SAT solver stays in the decision core`: only `optimization`, `planning`,
    `scenarios`, `evaluation` and `backtest` may import `ortools`.
-9. `Use cases and domain records start no processes or threads`: `application` and `live`
-   import no process, thread, signal, command-line or event-loop module.
+9. `Use cases and domain records import no process, thread, event-loop or command-line module`:
+   `application` and `live` import no process, thread, signal, command-line or event-loop
+   module directly.
 
 The last three state rings of [ADR 0010](decisions/0010-clean-architecture-rings-and-repository-layout.md).
 The [architecture overview](../../ARCHITECTURE.md) gives what each contract holds in its

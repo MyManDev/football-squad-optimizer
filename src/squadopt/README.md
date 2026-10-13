@@ -39,7 +39,7 @@ to `pyproject.toml`.
 | `evaluation` | R2 | 12 | the owner | C1, C2, C4, C5, C6, C7 | none |
 | `integration` | R3 | 13 | the owner | C1, C2, C4, C5, C8 | a use-case module placed as its own layer |
 | `optimization` | R2 | 14 | the owner; `config.py` both | C1, C2, C4, C5, C6, C7 | the CP-SAT driver has no public port |
-| `prediction` | R2 | 15 | İbrahim | C1, C2, C4, C5, C7, C8 | none |
+| `prediction` | R2 | 15 | İbrahim | C1, C2, C4, C5, C8 | none |
 | `features` | R2 | 16 | İbrahim | C1, C2, C4, C5, C8 | imports the storage half of `data` |
 | `data` | R1, R4 | 17 | İbrahim; `schema.py` both | C1, C2, C4, C5, C8 | one package in two rings, at the bottom of the layer order |
 | `contracts` | R1 | 18 | both | C1, C2, C4, C5, C6, C7, C8 | reads and writes files (`league_list.py`, `league_tree.py`) |
@@ -54,9 +54,9 @@ The import contracts, in the order `pyproject.toml` declares them:
 | C4 | Frameworks, network and databases stay in api and platform |
 | C5 | The package never imports the repository scripts |
 | C6 | The decision core imports no OS or process module |
-| C7 | The decision core and prediction import no storage or source module |
+| C7 | The decision core imports no storage or source module |
 | C8 | The CP-SAT solver stays in the decision core |
-| C9 | Use cases and domain records start no processes or threads |
+| C9 | Use cases and domain records import no process, thread, event-loop or command-line module |
 
 The research packages are also the forbidden side of C2: no product package may import them,
 so the research arm is checked from both sides.

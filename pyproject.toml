@@ -298,14 +298,17 @@ allow_indirect_imports = true
 
 # The rings of ADR 0010 (ARCHITECTURE.md). The storage and source modules of `data` are the R4
 # half of that package: they read captures, write files atomically and ask git for the source
-# revision. The decision core and `prediction` reach them only through a caller in an outer ring,
-# so a direct import from these sources fails the gate. `features`, `live` and `application`
-# import them today and are not sources; that is a known violation in ARCHITECTURE.md with its
-# remedy. File IO written with pathlib or json directly is outside an import contract, which is
-# why the name claims imports only. `prediction` is the data owner's zone and is a source at
-# zero violations; the data owner confirms it in review.
+# revision. The decision core reaches them only through a caller in an outer ring, so a direct
+# import from these sources fails the gate. `features`, `live` and `application` import them
+# today and are not sources; that is a known violation in ARCHITECTURE.md with its remedy.
+# `prediction` imports none of them either, but it is the data owner's zone, so it becomes a
+# source only when that owner agrees. File IO written with pathlib or json directly is outside
+# an import contract, which is why the name claims imports only. The contract sees import
+# statements, and `data/__init__.py` re-exports names from the storage modules, so an import of
+# the package root reaches them indirectly and passes here;
+# `tests/architecture/test_storage_imports.py` refuses that import from these sources.
 [[tool.importlinter.contracts]]
-name = "The decision core and prediction import no storage or source module"
+name = "The decision core imports no storage or source module"
 type = "forbidden"
 source_modules = [
     "squadopt.contracts",
@@ -313,7 +316,6 @@ source_modules = [
     "squadopt.planning",
     "squadopt.scenarios",
     "squadopt.evaluation",
-    "squadopt.prediction",
 ]
 forbidden_modules = [
     "squadopt.data.snapshots",
@@ -357,9 +359,12 @@ allow_indirect_imports = true
 
 # Processes, threads, signals and the command line belong to the composition roots in `platform`,
 # `api` and `scripts/`, which wire the use cases into a run. A use case or a domain record that
-# started a process or a thread would hide a deployment decision inside the inner rings.
+# started a process or a thread would hide a deployment decision inside the inner rings. The
+# contract sees direct imports only, which is why the name claims imports:
+# `application/advice_record.py` calls `data/source_revision.py`, which runs git through
+# `subprocess`, a known violation in ARCHITECTURE.md.
 [[tool.importlinter.contracts]]
-name = "Use cases and domain records start no processes or threads"
+name = "Use cases and domain records import no process, thread, event-loop or command-line module"
 type = "forbidden"
 source_modules = ["squadopt.application", "squadopt.live"]
 forbidden_modules = [
