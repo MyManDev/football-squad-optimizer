@@ -178,20 +178,38 @@ export function useDevicePlan(
     setState({ phase: "idle" });
   }, [setState, stopSolving]);
 
-  // A new selection stops the old one's solve, as a reset does.
+  // The effects below follow the selection and the page's life, not the caller's timers:
+  // they read the latest stop through a ref, so timers passed inline do not re-run them.
+  const stop = useRef(stopSolving);
   useEffect(() => {
-    generation.current += 1;
-    stopSolving();
-  }, [requestKey, stopSolving]);
+    stop.current = stopSolving;
+  }, [stopSolving]);
+
+  // Leaving a selection stops its run, as a reset does: its worker is ended, and a run it
+  // leaves loading or solving reads idle, so a return to that selection finds no busy
+  // phase that nothing will finish. This is the old selection's cleanup, so it runs before
+  // any effect of the new one, and a run started there is not the one stopped.
+  useEffect(
+    () => () => {
+      generation.current += 1;
+      stop.current();
+      setHeld((last) =>
+        last.state.phase === "loading" || last.state.phase === "solving"
+          ? { key: last.key, state: { phase: "idle" } }
+          : last,
+      );
+    },
+    [requestKey],
+  );
 
   // An unmounted page keeps no worker.
   useEffect(
     () => () => {
-      stopSolving();
+      stop.current();
       solver.current?.terminate();
       solver.current = null;
     },
-    [stopSolving],
+    [],
   );
 
   const run = useCallback(() => {

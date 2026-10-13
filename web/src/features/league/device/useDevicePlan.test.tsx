@@ -20,7 +20,11 @@ import { LeagueDataError, LeagueDataMissing } from "../dataErrors";
 import type { EntrySquad, LeagueViewEnvelope } from "../types";
 import type { DevicePlanReply, DevicePlanRequest } from "./deviceSolver.worker";
 import type { LpSolver } from "./lp/problem";
-import { DEVICE_REPLY_GRACE_SECONDS, DEVICE_SOLVE_CEILING_SECONDS } from "./solve/ceiling";
+import {
+  DEVICE_LOAD_ALLOWANCE_SECONDS,
+  DEVICE_REPLY_GRACE_SECONDS,
+  DEVICE_SOLVE_CEILING_SECONDS,
+} from "./solve/ceiling";
 import { solvePlan } from "./solve/week";
 import type { DevicePlanDocument, DevicePlanEntry } from "./types";
 import {
@@ -137,6 +141,17 @@ class SilentSolver implements DeviceSolver {
   }
 }
 
+/** A worker that never loads: it answers nothing, not even that it is ready. */
+class MuteSolver implements DeviceSolver {
+  onmessage: ((event: MessageEvent<DevicePlanReply>) => void) | null = null;
+  onerror: ((event: unknown) => void) | null = null;
+  terminated = false;
+  postMessage(): void {}
+  terminate(): void {
+    this.terminated = true;
+  }
+}
+
 function Harness({
   squad,
   request,
@@ -146,6 +161,7 @@ function Harness({
   rivals,
   createSolver,
   timers,
+  inlineTimers = false,
 }: {
   squad: EntrySquad;
   request: AdviceRequest;
@@ -155,7 +171,18 @@ function Harness({
   rivals?: readonly number[];
   createSolver?: () => DeviceSolver;
   timers?: HandTimers;
+  /** Pass the timers as new functions on every render, as a caller writing them inline does. */
+  inlineTimers?: boolean;
 }) {
+  const timerDependencies = !timers
+    ? {}
+    : inlineTimers
+      ? {
+          setTimer: (callback: () => void, milliseconds: number) =>
+            timers.set(callback, milliseconds),
+          clearTimer: (handle: unknown) => timers.clear(handle),
+        }
+      : { setTimer: timers.set, clearTimer: timers.clear };
   const device = useDevicePlan(
     squad,
     request,
@@ -163,7 +190,7 @@ function Harness({
       loadDocument,
       createSolver: createSolver ?? (() => solver),
       now: () => new Date("2026-10-03T01:02:03Z"),
-      ...(timers ? { setTimer: timers.set, clearTimer: timers.clear } : {}),
+      ...timerDependencies,
     },
     rivals,
   );
@@ -565,16 +592,50 @@ describe("a solve on the device", () => {
 });
 
 describe("a solve that runs too long, or is no longer wanted", () => {
+  /** A page whose workers load and never answer, each kept in `created`. */
+  function silentPage(
+    timers: HandTimers,
+    created: DeviceSolver[],
+    request: AdviceRequest = REQUEST,
+    loadDocument: () => Promise<LeagueViewEnvelope<DevicePlanDocument>> = async () =>
+      envelope(document),
+  ) {
+    return withLeague(
+      <Harness
+        squad={squadWith(entry)}
+        request={request}
+        loadDocument={loadDocument}
+        solver={new SilentSolver()}
+        createSolver={() => {
+          const made = new SilentSolver();
+          created.push(made);
+          return made;
+        }}
+        timers={timers}
+        onState={() => {}}
+      />,
+    );
+  }
+
   async function solving(timers: HandTimers, created: DeviceSolver[]) {
-    const view = render(
+    const view = render(silentPage(timers, created));
+    await act(async () => screen.getByText("run").click());
+    await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("solving"));
+    return view;
+  }
+
+  it("ends a worker that never loads, after the load's allowance and a grace, and fails the run", async () => {
+    const timers = new HandTimers();
+    const created: MuteSolver[] = [];
+    render(
       withLeague(
         <Harness
           squad={squadWith(entry)}
           request={REQUEST}
           loadDocument={async () => envelope(document)}
-          solver={new SilentSolver()}
+          solver={new MuteSolver()}
           createSolver={() => {
-            const made = new SilentSolver();
+            const made = new MuteSolver();
             created.push(made);
             return made;
           }}
@@ -584,9 +645,80 @@ describe("a solve that runs too long, or is no longer wanted", () => {
       ),
     );
     await act(async () => screen.getByText("run").click());
-    await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("solving"));
-    return view;
-  }
+    await waitFor(() => expect(timers.waiting.size).toBe(1));
+    expect(screen.getByTestId("phase")).toHaveTextContent("loading");
+    // Until the solver says it is ready, the one watchdog waits the load's allowance and
+    // the grace, not the solve's ceiling.
+    expect([...timers.waiting.values()].map((timer) => timer.milliseconds)).toEqual([
+      (DEVICE_LOAD_ALLOWANCE_SECONDS + DEVICE_REPLY_GRACE_SECONDS) * 1000,
+    ]);
+    await act(async () => timers.fireAll());
+    await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("failed"));
+    expect(created).toHaveLength(1);
+    expect(created[0]!.terminated).toBe(true);
+    expect(timers.waiting.size).toBe(0);
+  });
+
+  it("leaves no solving phase behind a selection the member leaves and returns to", async () => {
+    const timers = new HandTimers();
+    const created: SilentSolver[] = [];
+    const { rerender } = await solving(timers, created);
+    rerender(silentPage(timers, created, { ...REQUEST, window: 3 }));
+    rerender(silentPage(timers, created, REQUEST));
+    expect(screen.getByTestId("phase")).toHaveTextContent("idle");
+    expect(created).toHaveLength(1);
+    expect(created[0]!.terminated).toBe(true);
+    expect(timers.waiting.size).toBe(0);
+  });
+
+  it("leaves no loading phase behind a selection left while its inputs were still read", async () => {
+    let release: (() => void) | null = null;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const loader = async () => {
+      await gate;
+      return envelope(document);
+    };
+    const timers = new HandTimers();
+    const created: SilentSolver[] = [];
+    const { rerender } = render(silentPage(timers, created, REQUEST, loader));
+    await act(async () => screen.getByText("run").click());
+    expect(screen.getByTestId("phase")).toHaveTextContent("loading");
+    rerender(silentPage(timers, created, { ...REQUEST, window: 3 }, loader));
+    rerender(silentPage(timers, created, REQUEST, loader));
+    expect(screen.getByTestId("phase")).toHaveTextContent("idle");
+    await act(async () => {
+      release!();
+      await gate;
+      await Promise.resolve();
+    });
+    expect(screen.getByTestId("phase")).toHaveTextContent("idle");
+    expect(created).toHaveLength(0);
+    expect(timers.waiting.size).toBe(0);
+  });
+
+  it("keeps a run going when the caller passes new timer functions on every render", async () => {
+    const timers = new HandTimers();
+    const solver = new InProcessSolver();
+    render(
+      withLeague(
+        <Harness
+          squad={squadWith(entry)}
+          request={REQUEST}
+          loadDocument={async () => envelope(document)}
+          solver={solver}
+          timers={timers}
+          inlineTimers
+          onState={() => {}}
+        />,
+      ),
+    );
+    await act(async () => screen.getByText("run").click());
+    await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("done"));
+    expect(solver.terminated).toBe(false);
+    expect(timers.waiting.size).toBe(0);
+  });
 
   it("ends a worker that never answers, after the solve's ceiling and a grace, and fails the run", async () => {
     const timers = new HandTimers();
