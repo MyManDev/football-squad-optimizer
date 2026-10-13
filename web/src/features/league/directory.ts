@@ -59,8 +59,9 @@ function record(value: unknown): value is Record<string, unknown> {
 /**
  * The table a line names, or undefined where it names none or names it unusably: the
  * league is still read, from its tree's own copy, as a line from before the table is.
+ * The shipped-tree check holds every published line to this same rule.
  */
-function devicePlanTable(path: unknown, sha256: unknown): DevicePlanTableRef | undefined {
+export function devicePlanTable(path: unknown, sha256: unknown): DevicePlanTableRef | undefined {
   if (
     typeof path !== "string" ||
     !/^device\/[A-Za-z0-9._-]+\/device-plan\.json$/.test(path) ||

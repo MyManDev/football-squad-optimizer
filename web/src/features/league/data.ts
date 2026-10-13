@@ -1,4 +1,4 @@
-import type { RequestOptions } from "../../data/request";
+import { isTimeoutError, type RequestOptions } from "../../data/request";
 import { LeagueDataError, LeagueDataMissing } from "./dataErrors";
 import { findLeague, loadLeagueDirectory, type LeagueRef, type PublishedLeague } from "./directory";
 import { fetchPublishedBytes, fetchPublishedJson } from "./publishedJson";
@@ -148,7 +148,8 @@ export function createLeagueTree(league: LeagueRef): LeagueTree {
    * version, held to that digest byte for byte, and to the table's contract. Anything else
    * (no table named, a missing or changed file, a browser without a digest, another
    * shape) reads as null, and the tree's own copy is read instead. An abort is not a
-   * fallback.
+   * fallback, and neither is a read that ran out of time: the copy is on the same site, and
+   * a second full deadline would double the member's wait.
    */
   async function loadCaptureTable(
     options?: RequestOptions,
@@ -171,8 +172,9 @@ export function createLeagueTree(league: LeagueRef): LeagueTree {
         return null;
       }
       return envelope as LeagueViewEnvelope<DevicePlanDocument>;
-    } catch {
+    } catch (error) {
       options?.signal?.throwIfAborted();
+      if (isTimeoutError(error)) throw error;
       return null;
     }
   }

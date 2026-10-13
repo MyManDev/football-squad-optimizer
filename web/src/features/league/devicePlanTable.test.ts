@@ -201,6 +201,23 @@ describe("tree.devicePlan", () => {
     ).rejects.toThrow();
     expect(fetcher.mock.calls.map(([url]) => url)).toEqual([`/data/${TABLE_PATH}?v=${TABLE_SHA}`]);
   });
+
+  it("does not give the copy a second deadline when the table's read ran out of time", async () => {
+    // The copy is on the same site: a table that answers nothing within the deadline
+    // fails the read there, instead of making the member wait a second deadline.
+    const fetcher = vi.fn((url: string) =>
+      url.includes("/data/device/")
+        ? new Promise<Response>(() => {})
+        : Promise.resolve(jsonResponse(COPY)),
+    );
+    vi.stubGlobal("fetch", fetcher);
+    await expect(
+      createLeagueTree(league({ path: TABLE_PATH, sha256: TABLE_SHA })).devicePlan({
+        timeoutMs: 20,
+      }),
+    ).rejects.toMatchObject({ name: "TimeoutError" });
+    expect(fetcher.mock.calls.map(([url]) => url)).toEqual([`/data/${TABLE_PATH}?v=${TABLE_SHA}`]);
+  });
 });
 
 describe("the device-plan validator", () => {

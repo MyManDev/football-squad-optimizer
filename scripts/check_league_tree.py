@@ -10,8 +10,9 @@ the chip menu are read as the producer writes them: their absences are not check
 reason.
 
 Where the site publishes a directory, every line that names a device-plan table is checked
-before the trees: the table is there, on disk or live, and the sha256 of its bytes is the
-one the line names. A line from before the table names none and is not checked.
+before the trees: it names the table in the form the page reads, the table is there, on
+disk or live, and the sha256 of its bytes is the one the line names. A line from before
+the table names none and is not checked.
 """
 
 import argparse
@@ -48,6 +49,11 @@ QUOTE_FORBIDDEN = re.compile(
     r"|\b50\s*[-/]\s*50\b|fifty[\s-]fifty",
     re.IGNORECASE,
 )
+#: A directory line's table as the page reads it (``devicePlanTable`` in
+#: ``web/src/features/league/directory.ts``): a line naming it in any other form is read
+#: from its tree's copy without a word, so the release check holds it to the same rule.
+DEVICE_PLAN_PATH = re.compile(r"device/[A-Za-z0-9._-]+/device-plan\.json")
+DEVICE_PLAN_SHA256 = re.compile(r"[0-9a-f]{64}")
 #: The pure-points strategy, whose longer windows need no rival.
 PURE = "saf-puan"
 #: The Top 100 weights beyond the published plan (``TOP100_WEIGHTS`` without zero). The
@@ -871,20 +877,37 @@ def table_sha256(root: str, device_plan: str) -> str | None:
     return hashlib.sha256(raw).hexdigest()
 
 
+def page_reads_device_plan(table: object, digest: object) -> bool:
+    """Whether the page reads the table a line names: a path ``device/<capture>/
+    device-plan.json`` whose capture is a name, not ``.`` or ``..``, and a sha256 of 64
+    lower-case hex characters."""
+
+    return (
+        isinstance(table, str)
+        and DEVICE_PLAN_PATH.fullmatch(table) is not None
+        and table.split("/")[1] not in (".", "..")
+        and isinstance(digest, str)
+        and DEVICE_PLAN_SHA256.fullmatch(digest) is not None
+    )
+
+
 def device_plan_problem(root: str, line: dict[str, Any]) -> str | None:
     """What is wrong with the table a line names, or None when its bytes are the ones the
     line's ``device_plan_sha256`` names."""
 
-    table = line["device_plan"]
-    if not _usable_path(table):
-        return f"names no usable device plan {table!r}"
+    table = line.get("device_plan")
+    expected = line.get("device_plan_sha256")
+    if not isinstance(table, str) or not page_reads_device_plan(table, expected):
+        return (
+            f"names device plan {table!r} with sha256 {expected!r}, which the page does not "
+            "read: it reads the tree's copy instead"
+        )
     try:
         actual = table_sha256(root, table)
     except (OSError, ValueError) as error:
         return f"{table} could not be read: {error}"
     if actual is None:
         return f"{table} is missing"
-    expected = line.get("device_plan_sha256")
     if actual != expected:
         return f"{table} has sha256 {actual}, the line names {expected}"
     return None
@@ -893,12 +916,16 @@ def device_plan_problem(root: str, line: dict[str, Any]) -> str | None:
 def check_device_plans(root: str, lines: list[dict[str, Any]]) -> list[str]:
     """Check the table every directory line names; return every finding.
 
-    A line from before the per-capture table names none and is not checked. Nothing is
-    printed for a site whose lines name no table.
+    A line from before the per-capture table names neither a table nor a digest and is not
+    checked. Nothing is printed for a site whose lines name none.
     """
 
     problems: list[str] = []
-    named = [line for line in lines if line.get("device_plan") is not None]
+    named = [
+        line
+        for line in lines
+        if line.get("device_plan") is not None or line.get("device_plan_sha256") is not None
+    ]
     if named:
         print("== device-plan tables")
     for line in named:

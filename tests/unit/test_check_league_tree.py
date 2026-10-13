@@ -639,6 +639,69 @@ def test_each_line_finds_its_device_plan_table_with_the_sha256_it_names(
 
 
 @pytest.mark.parametrize(
+    ("device_plan", "digest"),
+    [
+        ("device/cap/sub/device-plan.json", "same"),
+        ("plans/cap/device-plan.json", "same"),
+        ("device/./device-plan.json", "same"),
+        ("device/c a p/device-plan.json", "same"),
+        ("device/cap/device-plan.json", "upper"),
+        ("device/cap/device-plan.json", "long"),
+        ("device/cap/device-plan.json", None),
+        (None, "same"),
+        (7, "same"),
+    ],
+    ids=[
+        "a nested capture",
+        "no capture table",
+        "a capture that is the directory itself",
+        "a capture the page's characters do not name",
+        "an upper-case digest",
+        "a 65-character digest",
+        "no digest",
+        "a digest alone",
+        "a path that is no text",
+    ],
+)
+def test_a_line_naming_its_table_in_a_form_the_page_does_not_read_fails(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], device_plan: object, digest: str | None
+) -> None:
+    """The page reads a line's table only at ``device/<capture>/device-plan.json`` with a
+    sha256 of 64 lower-case hex characters, and reads the tree's copy for any other line
+    without a word. The release check fails such a line even where the file it names is
+    there with the bytes its digest names."""
+
+    _tree(tmp_path)
+    (tmp_path / "leagues").mkdir()
+    (tmp_path / "league").rename(tmp_path / "leagues" / "9")
+    body = b'{"payload": {"players": []}}\n'
+    sha = hashlib.sha256(body).hexdigest()
+    if isinstance(device_plan, str):
+        target = tmp_path.joinpath(*device_plan.split("/"))
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(body)
+    line: dict[str, Any] = {
+        "league_id": 9,
+        "league_name": "Nine",
+        "season": "2026-27",
+        "gameweek": 1,
+        "path": "leagues/9",
+    }
+    if device_plan is not None:
+        line["device_plan"] = device_plan
+    if digest is not None:
+        line["device_plan_sha256"] = {"same": sha, "upper": sha.upper(), "long": f"{sha}0"}[digest]
+    directory = {"contract_version": "league_directory_v1", "payload": {"leagues": [line]}}
+    (tmp_path / "leagues.json").write_text(json.dumps(directory), encoding="utf-8")
+
+    assert main([str(tmp_path)]) == 1
+    output = capsys.readouterr().out
+    assert f"  BAD league 9: names device plan {device_plan!r} with sha256 " in output
+    assert "which the page does not read: it reads the tree's copy instead" in output
+    assert output.rstrip().endswith("FINAL: FAILURE(S)")
+
+
+@pytest.mark.parametrize(
     ("changes", "clean"),
     [
         # A ceiling over a control that was found without a proof is a figure nothing
