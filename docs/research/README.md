@@ -1,8 +1,27 @@
 # Research and evidence
 
+The research arm measures candidate models, policies and planners, and records what it found
+whether the result is positive or not. Its code is the laboratory side tree of the package
+(`experiments`, `backtest`, `bayesopt`, `recalibration`, `preflight`; see the
+[architecture overview](../../ARCHITECTURE.md#3-the-research-arm-and-the-three-tiers)), its
+runners live in `scripts/`, and its records are committed under `docs/`.
+
+## Programmes
+
+| Programme | Entry point |
+| --- | --- |
+| Product and research phases A to H, and where each stands | [Roadmap](../product/roadmap.md) |
+| Prediction research programme | [Research agenda](../prediction_research_agenda.md) |
+| Prospective benchmark of the live decisions (the Phase A exit) | [Benchmark V2 pre-registration](../benchmark_v2_prereg.md) |
+| Experimental football model: development, results and the served model | [Implementation and evidence contract](football_candidate_development.md), [results and rejected ablations](football_candidate_results.md), [experimental football model in member advice](../live-football-model.md) |
+| Football prospective reading | [Football prospective pre-registration](../football_prospective_prereg.md) |
+| Multi-week planning and lookahead | [Planner state and learning](planner_state_and_learning.md), [explicit lookahead measurement](explicit_lookahead_measurement.md), [observed rollout](observed_rollout.md), [temporal refinement](temporal_refinement.md), [incumbent protection](incumbent_protection_design.md), [purchase basis](acquisition_accounting.md) |
+| Human decisions over computed alternatives | [Human decision board](human_decision_board.md) |
+
+## Topics
+
 | Topic | Entry point |
 | --- | --- |
-| Prediction research programme | [Research agenda](../prediction_research_agenda.md) |
 | Fixture football candidate and observed planning | [Implementation and evidence contract](football_candidate_development.md) |
 | Private set-piece duties candidate | [Source, learned allocation, synthetic checks and real-use gates](football_set_piece_duties.md) |
 | Private tactical matchup candidate | [Source, model, synthetic checks and real-use gates](football_tactical_matchup_development.md) |
@@ -17,13 +36,56 @@
 | Residual exports | [Residual contract](../residual_export_contract.md) |
 | How records and larger expansions are stored | [Measurement artifacts](../architecture/decisions/0003-measurement-artifacts.md) |
 
+## Pre-registrations
+
+A pre-registration fixes a protocol before its measurement runs, and it is frozen when it
+merges. Where it has a status line, that line states the protocol's status on the day it was
+frozen and is not updated afterwards; the current state is read from the record that fulfils it
+and from that record's row in the [measurements index](../measurements_index.md).
+Pre-registrations are at the root of `docs/` (`*_prereg.md`) and in this folder (`*_prereg.md`
+and `*_protocol.md`).
+
+| Protocol in this folder | Reading |
+| --- | --- |
+| [Continuation diagnostic](continuation_diagnostic_protocol.md) | Recorded in [continuation diagnostic](continuation_diagnostic.md) |
+| [Certified lookahead budget](lookahead_budget_protocol.md) | Recorded in [results of 2026-09-30](lookahead_budget_results_2026-09-30.md) |
+| [Single sequential seed](single_seed_lookahead_protocol.md) | Recorded in [results of 2026-10-01](single_seed_lookahead_results_2026-10-01.md) |
+| [Three-week repair](triple_repair_protocol.md) | Recorded in [triple refinement measurement](triple_refinement_measurement.md) |
+| [Planner policy chain](planner_policy_chain_prereg.md) | Read after GW20 (interim) and GW38 (final); no record yet |
+| [Published fixture difficulty, live](published_difficulty_live_prereg.md) | Runner described in [the live runner](published_difficulty_live_runner.md); no record yet |
+| [Available attacking shares](football_available_shares_prereg.md) | No record names it yet |
+
+## Reproducing a record
+
+1. Find the record's row in the [measurements index](../measurements_index.md), and its runner
+   in the [script catalogue](../../scripts/README.md), which names the record each measurement
+   runner writes. A runner removed since is listed under "Retired runners" there, with how to
+   restore it.
+2. Read the commit the record names (`repository_commit`, `producer_repository_commit` or
+   `repo_commit`) and check that commit out in a separate worktree. The JSON records at the
+   root of `docs/` that name no commit are on the frozen list in
+   `tests/architecture/test_records_name_their_code.py`; most records in this folder name none
+   yet. For such a record, the commit that added it (`git log --diff-filter=A -- <record>`) is
+   the nearest evidence of the code that produced it.
+3. Provide the private inputs the record names (captures under `data/`, the historical archive
+   under `data/raw/`) and run the runner as `python -m scripts.<name>` with the arguments the
+   record or its protocol states.
+4. Compare the regenerated record with the committed one. A regenerated record of a kind that
+   `squadopt.preflight.measurement.MEASUREMENT_KINDS` names must still pass
+   `python -m scripts.run_measurement_preflight`.
+
+A pre-registered gate is read once. Re-running its measurement after the verdict to replace
+the record is what pre-registration exists to prevent
+([branching](../architecture/branching.md)); a reproduction checks the committed record and
+replaces nothing.
+
 Keep implementation, operational selection and measured benefit separate. An available model
 or a positive development result does not by itself justify promotion. Preserve chronological
 splits, matched populations, negative results and the declared calibration/holdout boundaries.
 
-New research explanations can live here. Existing machine-readable records stay at their
-established paths; moving or regenerating them can change fingerprints and test fixtures.
-Inactive or superseded topic branches can be recovered from the preserved archive using its
-commit manifest; do not merge the aggregate archive as a research result.
+New research explanations and protocols belong in this folder. Existing machine-readable
+records stay at their established paths; moving or regenerating them can change fingerprints
+and test fixtures. Inactive or superseded topic branches can be recovered from the preserved
+archive using its commit manifest; do not merge the aggregate archive as a research result.
 
 [All documentation](../README.md).

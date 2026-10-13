@@ -82,5 +82,6 @@ host nobody read. A reading is relied on for 90 days, so a host whose date is ol
 `null`, is not contacted; [the terms reading](../../docs/club_news_sources.md#when-a-reading-ages)
 states the rule and how to renew a reading.
 
-Two real hosts are registered, Liverpool and Newcastle, each read and signed in that
-document. The `club.example` entry is a placeholder that no request is ever made for.
+Three real hosts are registered, Liverpool, Newcastle and Crystal Palace, each read and
+recorded, with its date and review record, in that document. The `club.example` entry is a
+placeholder that no request is ever made for.

@@ -42,22 +42,68 @@ and a protocol's author has less to check a path against than anyone, not more.
 A command is a citation too. When the manual capture shell was removed with 1.0.0 the live
 runbooks kept telling an operator to run it, because the check above reads only backticked
 rooted `.py` paths and a runbook writes `python -m scripts.<name>`. The second check reads that
-form, a backticked `scripts.<name>`, and any `scripts/<name>.py`, in every document under
-`docs/` and in both READMEs. A dated record keeps the command that was run on its day, so the
-records are excused by name, and a living document may name a removed module only in the
-paragraph that says it was removed: the same name on any other line of that document is
-reported.
+form, a backticked `scripts.<name>`, and any `scripts/<name>.py`. A dated record keeps the
+command that was run on its day, so the records are excused by name, and a living document may
+name a removed module only in the paragraph that says it was removed: the same name on any
+other line of that document is reported.
+
+Both checks read the same documents: every Markdown file under `docs/`, the two root guides
+`ARCHITECTURE.md` and `CONTRIBUTING.md`, and every `README.md` in the repository. A folder guide
+cites modules and commands as often as a runbook does, and a reader takes either at its word.
+The guides are found through git (tracked files and untracked ones it does not ignore), so a
+dependency's README under an ignored folder is not read and a guide written in the same pull
+request is.
 """
 
 from __future__ import annotations
 
 import ast
 import re
+import subprocess
 from pathlib import Path
 from typing import NamedTuple
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 DOCS = REPOSITORY_ROOT / "docs"
+
+#: The guides outside `docs/` that both checks read beside the documentation tree.
+ROOT_GUIDES = ("ARCHITECTURE.md", "CONTRIBUTING.md")
+
+
+def _folder_guides() -> list[Path]:
+    """Every `README.md` git lists: tracked, or untracked and not ignored."""
+
+    listing = subprocess.run(
+        [
+            "git",
+            "--no-optional-locks",
+            "-C",
+            str(REPOSITORY_ROOT),
+            "ls-files",
+            "-z",
+            "--cached",
+            "--others",
+            "--exclude-standard",
+            "--",
+            "README.md",
+            "*/README.md",
+        ],
+        check=True,
+        capture_output=True,
+    ).stdout.decode("utf-8")
+    return [REPOSITORY_ROOT / path for path in listing.split("\0") if path]
+
+
+#: Every document both checks read, each once.
+DOCUMENTS = tuple(
+    sorted(
+        {
+            *DOCS.rglob("*.md"),
+            *(REPOSITORY_ROOT / name for name in ROOT_GUIDES),
+            *_folder_guides(),
+        }
+    )
+)
 
 #: Directories that exist at the repository root. A citation starting with one of these is
 #: claiming a path from the root rather than using a relative shorthand.
@@ -77,6 +123,14 @@ PROPOSED: dict[str, str] = {
     # imports the optimizer tests in that directory.
     "tests/unit/__init__.py": "proposed in docs/data_followups.md item 12, deliberately absent",
 }
+
+#: Wrong citations in a guide under `scripts/`, which a pull request outside a release window
+#: does not edit: the backend restart compares `src`, `scripts` and `docs/contracts` with the
+#: live release (ADR 0010, context). Each entry is the document and the citation, with the path
+#: it should name; the next change to that document fixes it and deletes the entry, and the
+#: test below fails once an entry excuses nothing. It is empty: the one entry, a rooted
+#: `data/sources/vaastav.py` in `scripts/README.md`, was corrected with the catalogue's rows.
+RELEASED_PATH_CITATIONS: dict[tuple[str, str], str] = {}
 
 
 #: Where a measurement runner lives. Only a citation under one of these can be the forward
@@ -110,7 +164,7 @@ def _is_a_runner_a_dated_record_ran(document: Path, raw: str) -> bool:
 
 def _cited_paths() -> list[tuple[Path, int, str]]:
     found: list[tuple[Path, int, str]] = []
-    for document in sorted(DOCS.rglob("*.md")):
+    for document in DOCUMENTS:
         for number, line in enumerate(document.read_text(encoding="utf-8").splitlines(), 1):
             for raw in CITATION.findall(line):
                 if PLACEHOLDER.search(raw) or "/" not in raw:
@@ -134,6 +188,7 @@ def test_every_rooted_python_path_cited_in_docs_is_a_file_that_exists() -> None:
         if raw not in PROPOSED
         and not _is_a_runner_a_protocol_has_not_had_written_yet(document, raw)
         and not _is_a_runner_a_dated_record_ran(document, raw)
+        and (document.relative_to(REPOSITORY_ROOT).as_posix(), raw) not in RELEASED_PATH_CITATIONS
         and not (REPOSITORY_ROOT / raw).exists()
     ]
     assert not missing, "\n".join(
@@ -142,6 +197,24 @@ def test_every_rooted_python_path_cited_in_docs_is_a_file_that_exists() -> None:
             *missing,
         ]
     )
+
+
+def test_a_released_path_allowance_still_excuses_a_wrong_citation() -> None:
+    """The allowance waits for the next edit of a released guide; it does not outlive it."""
+
+    unresolved = {
+        (document.relative_to(REPOSITORY_ROOT).as_posix(), raw)
+        for document, _, raw in _cited_paths()
+        if not (REPOSITORY_ROOT / raw).exists()
+    }
+    stale = [
+        f"{document} {raw}"
+        for document, raw in RELEASED_PATH_CITATIONS
+        if (document, raw) not in unresolved
+    ]
+    assert not stale, "these allowances excuse nothing; delete them: " + ", ".join(stale)
+    for corrected in RELEASED_PATH_CITATIONS.values():
+        assert (REPOSITORY_ROOT / corrected).is_file(), corrected
 
 
 def test_a_proposed_path_is_listed_only_while_it_does_not_exist() -> None:
@@ -161,11 +234,7 @@ def test_a_proposed_path_is_listed_only_while_it_does_not_exist() -> None:
 SCRIPTS = REPOSITORY_ROOT / "scripts"
 
 #: Every document a reader follows to run something.
-COMMAND_DOCUMENTS = (
-    *sorted(DOCS.rglob("*.md")),
-    REPOSITORY_ROOT / "README.md",
-    SCRIPTS / "README.md",
-)
+COMMAND_DOCUMENTS = DOCUMENTS
 
 #: `python -m scripts.<name>`: the whole dotted name must be a module.
 COMMAND = re.compile(r"python3?(?:\.exe)?\s+-m\s+scripts\.([\w.<>{}*]+)")

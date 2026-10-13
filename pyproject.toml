@@ -120,7 +120,9 @@ include_external_packages = true
 # import lower ones, never the reverse. There are no baseline exceptions; a new
 # violation fails the gate. `exhaustive` means every package directly under `squadopt` must
 # be named here, so a new one fails the gate until it is placed. `integration` imports only
-# `data` and `optimization`, so it sits directly above `optimization`.
+# `data` and `optimization`, so it sits directly above `optimization`. The laboratory
+# (`experiments` to `bayesopt`) sits above `live`, so this contract also refuses a `live` import
+# of the laboratory (ADR 0010); the contract below refuses it for the packages above.
 [[tool.importlinter.contracts]]
 name = "Layered architecture"
 type = "layers"
@@ -130,12 +132,12 @@ layers = [
     "api",
     "platform",
     "application",
-    "live",
     "experiments",
     "backtest",
     "recalibration",
     "preflight",
     "bayesopt",
+    "live",
     "planning",
     "scenarios",
     "evaluation",
@@ -150,8 +152,9 @@ layers = [
 # Neither the product nor the domain imports the measurement laboratory. The layers contract
 # above is a valid linear extension and stays as the tie-break; this contract is the rule it
 # could not express (docs/architecture/dependency_rules.md). Every package outside the
-# laboratory is a source, so the rule does not depend on the layer order: `live` sits above
-# `experiments` there, and only this contract refuses that import.
+# laboratory is a source, so the rule does not depend on the layer order: `application`,
+# `platform` and `api` sit above the laboratory there, and only this contract refuses their
+# imports of it.
 [[tool.importlinter.contracts]]
 name = "Product does not import the laboratory"
 type = "forbidden"
@@ -291,4 +294,86 @@ source_modules = [
     "squadopt.evaluation",
 ]
 forbidden_modules = ["os", "shutil", "tempfile", "subprocess"]
+allow_indirect_imports = true
+
+# The rings of ADR 0010 (ARCHITECTURE.md). The storage and source modules of `data` are the R4
+# half of that package: they read captures, write files atomically and ask git for the source
+# revision. The decision core reaches them only through a caller in an outer ring, so a direct
+# import from these sources fails the gate. `features`, `live` and `application` import them
+# today and are not sources; that is a known violation in ARCHITECTURE.md with its remedy.
+# `prediction` imports none of them either, but it is the data owner's zone, so it becomes a
+# source only when that owner agrees. File IO written with pathlib or json directly is outside
+# an import contract, which is why the name claims imports only. The contract sees import
+# statements, and `data/__init__.py` re-exports names from the storage modules, so an import of
+# the package root reaches them indirectly and passes here;
+# `tests/architecture/test_storage_imports.py` refuses that import from these sources.
+[[tool.importlinter.contracts]]
+name = "The decision core imports no storage or source module"
+type = "forbidden"
+source_modules = [
+    "squadopt.contracts",
+    "squadopt.optimization",
+    "squadopt.planning",
+    "squadopt.scenarios",
+    "squadopt.evaluation",
+]
+forbidden_modules = [
+    "squadopt.data.snapshots",
+    "squadopt.data.sources",
+    "squadopt.data.atomic",
+    "squadopt.data.loaders",
+    "squadopt.data.adapters",
+    "squadopt.data.checksums",
+    "squadopt.data.tables",
+    "squadopt.data.pipeline",
+    "squadopt.data.source_revision",
+    "squadopt.data._long_paths",
+]
+allow_indirect_imports = true
+
+# OR-Tools is imported by the decision core (`optimization`, `planning`, `scenarios`,
+# `evaluation`) and by `backtest`, which reads only its version string to record the
+# environment of a judging run (`backtest/production_reporting.py`).
+# Every other package reaches the solver through the decision core. The graph holds an external
+# package by its top-level name, so `ortools` is forbidden whole.
+[[tool.importlinter.contracts]]
+name = "The CP-SAT solver stays in the decision core"
+type = "forbidden"
+source_modules = [
+    "squadopt.contracts",
+    "squadopt.data",
+    "squadopt.features",
+    "squadopt.prediction",
+    "squadopt.live",
+    "squadopt.integration",
+    "squadopt.application",
+    "squadopt.platform",
+    "squadopt.api",
+    "squadopt.experiments",
+    "squadopt.bayesopt",
+    "squadopt.recalibration",
+    "squadopt.preflight",
+]
+forbidden_modules = ["ortools"]
+allow_indirect_imports = true
+
+# Processes, threads, signals and the command line belong to the composition roots in `platform`,
+# `api` and `scripts/`, which wire the use cases into a run. A use case or a domain record that
+# started a process or a thread would hide a deployment decision inside the inner rings. The
+# contract sees direct imports only, which is why the name claims imports:
+# `application/advice_record.py` calls `data/source_revision.py`, which runs git through
+# `subprocess`, a known violation in ARCHITECTURE.md.
+[[tool.importlinter.contracts]]
+name = "Use cases and domain records import no process, thread, event-loop or command-line module"
+type = "forbidden"
+source_modules = ["squadopt.application", "squadopt.live"]
+forbidden_modules = [
+    "subprocess",
+    "multiprocessing",
+    "concurrent",
+    "threading",
+    "signal",
+    "argparse",
+    "asyncio",
+]
 allow_indirect_imports = true

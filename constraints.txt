@@ -10,7 +10,7 @@
 # versions that date claims, since no record of them at that date exists. Nothing here
 # affects the committed measurement artifacts -- no measurement script imports jsonschema --
 # but the 3.13 gate installs it, so leaving it unpinned left the pinned job unpinned.
-# tests/unit/test_dependency_pins.py now fails if a declared dependency is missing.
+# tests/architecture/test_dependency_pins.py now fails if a declared dependency is missing.
 #
 # A second younger group, for the same reason and dated the same way: anthropic and its three
 # requirements that nothing else here already pinned (docstring_parser, jiter, sniffio) arrived

@@ -1,4 +1,14 @@
-"""Versioned Sprint 2 screening DoE and frozen holdout interface."""
+"""The measurement laboratory's studies: designs, readings and reports behind committed records.
+
+Runners in ``scripts/`` call these modules and write the records under ``docs/`` (ADR 0003).
+No product package may import this package, directly or through another module: the contract
+"Product does not import the laboratory" in ``pyproject.toml`` refuses it.
+
+The names below are the package's interface, imported from the package root by runners and
+tests. Five of them are defined in ``squadopt.evaluation`` and re-exported here, and
+``tests/architecture/test_layer_contracts.py`` holds three of those to the evaluation objects,
+so a name is added here freely but removed or repointed only together with its importers.
+"""
 
 from squadopt.evaluation.promotion import (
     ExperimentConfigurationError,

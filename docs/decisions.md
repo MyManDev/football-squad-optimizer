@@ -36,6 +36,25 @@ Source: [PR #716](https://github.com/MyManDev/football-squad-optimizer/pull/716)
 [PR #815](https://github.com/MyManDev/football-squad-optimizer/pull/815) and
 [PR #854](https://github.com/MyManDev/football-squad-optimizer/pull/854).
 
+## 2026-10-12: An enterprise system with a research arm
+
+Decision: the project is treated as an enterprise and academic system, not an experimental
+one, and the codebase is to read that way. From this date, new work follows clean-architecture
+and scalable-architecture principles. Experimental code whose study has concluded leaves
+develop, and research that continues stays clearly separated from the product.
+
+Reason: the system is now documented and reported on as a whole, so its layout, names and
+enforced boundaries are part of how it is judged.
+
+What follows from it: #1080 removes dead code and the runners of concluded studies. The
+repository map, the folder guides and the named rings arrive with
+[ADR 0010](architecture/decisions/0010-clean-architecture-rings-and-repository-layout.md),
+which the owner accepted on 2026-10-13: the named rings, their enforcement, the ratchet rule and
+the deferred moves with their triggers.
+
+Source: the owner's direction to the maintainers on 2026-10-12, and
+[PR #1080](https://github.com/MyManDev/football-squad-optimizer/pull/1080).
+
 ## 2026-10-07: Weekly operation and the next development steps
 
 Decision:
