@@ -154,10 +154,12 @@ a capture, call FPL, or read element-summary. Required later captures must be
 retained by the weekly operator in an authorized root.
 
 For origin g use the last pre-deadline `fpl-live` decision capture targeting g.
-Require its own season and deadline to match. For both origins and targets, the
-capture instant is the UTC time in `metadata.json`, not the directory name.
-Two distinct captures at the same
-latest instant refuse that origin; never choose by outcome. All features, P and
+Require its own season and deadline to match, and require it to pass the schedule
+and update checks below with deadline g in place of the target deadline. If it fails,
+that origin is missing and counted, and no earlier capture replaces it. For both
+origins and targets, the capture instant is the UTC time in `metadata.json`, not
+the directory name. Two distinct captures at the same latest instant refuse that
+origin; never choose by outcome. All features, P and
 candidate B fields come from this one origin capture.
 
 For target g+h, select the latest `fpl-live` capture strictly before its deadline,
@@ -178,7 +180,7 @@ the capture follows it and the next scheduled change follows the deadline.
 
 This rule accepts a fixed UTC clock or London midnight, including the one-hour
 shift on 2026-10-25. That shift is not a changed schedule and needs no amendment.
-Apply the same night-date and update rule to every target; do not infer a clock
+Apply the same night-date and update rule to every origin and target; do not infer a clock
 from its price label. If a schedule, metadata, update or identity check fails,
 the target deadline is missing and counted. Do not interpolate a gap or use an
 after-deadline price.
