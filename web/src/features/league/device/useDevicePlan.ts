@@ -324,7 +324,13 @@ export function useDevicePlan(
       } else {
         setState({
           phase: "done",
-          envelope: deviceAdviceEnvelope(document, squad, reply.answer, now()),
+          envelope: deviceAdviceEnvelope(
+            document,
+            squad,
+            reply.answer,
+            now(),
+            tree.league.leagueId,
+          ),
           seconds: reply.answer.seconds,
         });
       }
@@ -342,6 +348,7 @@ export function useDevicePlan(
     setTimer,
     clearTimer,
     stopSolving,
+    tree.league.leagueId,
   ]);
 
   return { available, state, run, reset };

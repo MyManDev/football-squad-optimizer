@@ -8,9 +8,15 @@ fails the page's assertAdviceIndex (the envelope is not checked) or a Top 100 me
 ``unavailable`` row or a refused member stated without its reason. The manager's word and
 the chip menu are read as the producer writes them: their absences are not checked for a
 reason.
+
+Where the site publishes a directory, every line that names a device-plan table is checked
+before the trees: it names the table in the form the page reads, the table is there, on
+disk or live, and the sha256 of its bytes is the one the line names. A line from before
+the table names none and is not checked.
 """
 
 import argparse
+import hashlib
 import json
 import math
 import re
@@ -30,6 +36,7 @@ from squadopt.contracts.league_tree import (
     LEAGUE_DIRECTORY_CONTRACT_VERSION,
     LEAGUE_DIRECTORY_FILE,
     LEGACY_TREE,
+    device_plan_sha256,
 )
 
 LIMIT = re.compile(
@@ -42,6 +49,11 @@ QUOTE_FORBIDDEN = re.compile(
     r"|\b50\s*[-/]\s*50\b|fifty[\s-]fifty",
     re.IGNORECASE,
 )
+#: A directory line's table as the page reads it (``devicePlanTable`` in
+#: ``web/src/features/league/directory.ts``): a line naming it in any other form is read
+#: from its tree's copy without a word, so the release check holds it to the same rule.
+DEVICE_PLAN_PATH = re.compile(r"device/[A-Za-z0-9._-]+/device-plan\.json")
+DEVICE_PLAN_SHA256 = re.compile(r"[0-9a-f]{64}")
 #: The pure-points strategy, whose longer windows need no rival.
 PURE = "saf-puan"
 #: The Top 100 weights beyond the published plan (``TOP100_WEIGHTS`` without zero). The
@@ -776,8 +788,20 @@ def check_publication(tree: Tree) -> list[str]:
     return []
 
 
-def published_trees(root: str) -> list[str]:
-    """The trees the site publishes: every line of its directory, else the legacy tree.
+def _usable_path(path: object) -> bool:
+    """A path under the site's ``data/``: a non-empty string, not rooted, not climbing out."""
+
+    return (
+        isinstance(path, str)
+        and bool(path)
+        and not path.startswith("/")
+        and ".." not in path.split("/")
+    )
+
+
+def directory_lines(root: str) -> list[dict[str, Any]] | None:
+    """The lines of the site's directory, each with a usable tree path, or None where the
+    site publishes no directory and its one tree is the legacy tree.
 
     A directory that cannot be read, or lists a line that is not a published league, is a
     ``ValueError`` naming the problem; the caller prints it as the finding it is.
@@ -793,14 +817,14 @@ def published_trees(root: str) -> list[str]:
                 raw = response.read().decode("utf-8")
         except urllib.error.HTTPError as error:
             if error.code == 404:
-                return [LEGACY_TREE]
+                return None
             raise ValueError(f"{LEAGUE_DIRECTORY_FILE} answered HTTP {error.code}") from error
         except (urllib.error.URLError, OSError) as error:
             raise ValueError(f"{LEAGUE_DIRECTORY_FILE} could not be read: {error}") from error
     else:
         target = Path(root) / LEAGUE_DIRECTORY_FILE
         if not target.is_file():
-            return [LEGACY_TREE]
+            return None
         raw = target.read_text(encoding="utf-8")
     try:
         document = json.loads(raw)
@@ -813,15 +837,108 @@ def published_trees(root: str) -> list[str]:
         or not isinstance(document["payload"].get("leagues"), list)
     ):
         raise ValueError(f"{LEAGUE_DIRECTORY_FILE} is not a league directory")
-    paths: list[str] = []
+    lines: list[dict[str, Any]] = []
     for row in document["payload"]["leagues"]:
-        path = row.get("path") if isinstance(row, dict) else None
-        if not isinstance(path, str) or not path or path.startswith("/") or ".." in path.split("/"):
+        if not isinstance(row, dict) or not _usable_path(row.get("path")):
             raise ValueError(f"{LEAGUE_DIRECTORY_FILE} lists a line without a usable tree path")
-        paths.append(path)
-    if not paths:
+        lines.append(row)
+    if not lines:
         raise ValueError(f"{LEAGUE_DIRECTORY_FILE} lists no league")
-    return paths
+    return lines
+
+
+def table_sha256(root: str, device_plan: str) -> str | None:
+    """The sha256 of the bytes of the table a directory line names, or None where the site
+    has no such table.
+
+    On disk it is the contract's own digest of ``<root>/<device_plan>``. Live it is the
+    digest of ``<origin>/data/<device_plan>`` as served; a 404, or a body that does not
+    parse as JSON (the host's fallback page), is a missing table, as ``Tree.read`` reads a
+    missing document. Any other failure to read raises.
+    """
+
+    root = root.rstrip("/")
+    if not root.startswith(("https://", "http://")):
+        return device_plan_sha256(Path(root), device_plan)
+    request = urllib.request.Request(
+        f"{root}/data/{device_plan}", headers={"User-Agent": "squadopt-verify/1.0"}
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            raw = response.read()
+    except urllib.error.HTTPError as error:
+        if error.code == 404:
+            return None
+        raise
+    try:
+        json.loads(raw)
+    except ValueError:
+        return None
+    return hashlib.sha256(raw).hexdigest()
+
+
+def page_reads_device_plan(table: object, digest: object) -> bool:
+    """Whether the page reads the table a line names: a path ``device/<capture>/
+    device-plan.json`` whose capture is a name, not ``.`` or ``..``, and a sha256 of 64
+    lower-case hex characters."""
+
+    return (
+        isinstance(table, str)
+        and DEVICE_PLAN_PATH.fullmatch(table) is not None
+        and table.split("/")[1] not in (".", "..")
+        and isinstance(digest, str)
+        and DEVICE_PLAN_SHA256.fullmatch(digest) is not None
+    )
+
+
+def device_plan_problem(root: str, line: dict[str, Any]) -> str | None:
+    """What is wrong with the table a line names, or None when its bytes are the ones the
+    line's ``device_plan_sha256`` names."""
+
+    table = line.get("device_plan")
+    expected = line.get("device_plan_sha256")
+    if not isinstance(table, str) or not page_reads_device_plan(table, expected):
+        return (
+            f"names device plan {table!r} with sha256 {expected!r}, which the page does not "
+            "read: it reads the tree's copy instead"
+        )
+    try:
+        actual = table_sha256(root, table)
+    except (OSError, ValueError) as error:
+        return f"{table} could not be read: {error}"
+    if actual is None:
+        return f"{table} is missing"
+    if actual != expected:
+        return f"{table} has sha256 {actual}, the line names {expected}"
+    return None
+
+
+def check_device_plans(root: str, lines: list[dict[str, Any]]) -> list[str]:
+    """Check the table every directory line names; return every finding.
+
+    A line from before the per-capture table names neither a table nor a digest and is not
+    checked. Nothing is printed for a site whose lines name none.
+    """
+
+    problems: list[str] = []
+    named = [
+        line
+        for line in lines
+        if line.get("device_plan") is not None or line.get("device_plan_sha256") is not None
+    ]
+    if named:
+        print("== device-plan tables")
+    for line in named:
+        problem = device_plan_problem(root, line)
+        if problem is None:
+            print(
+                f"  ok  league {line.get('league_id')}: {line['device_plan']} has the sha256 "
+                "its line names"
+            )
+            continue
+        problems.append(f"league {line.get('league_id')}: {problem}")
+        print(f"  BAD {problems[-1]}")
+    return problems
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -833,10 +950,16 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     failed = False
     try:
-        trees = published_trees(args.root)
+        lines = directory_lines(args.root)
     except ValueError as error:
         print(f"BAD {error}")
         return 1
+    if lines is None:
+        trees = [LEGACY_TREE]
+    else:
+        trees = [line["path"] for line in lines]
+        if check_device_plans(args.root, lines):
+            failed = True
     for path in trees:
         tree = Tree(args.root, path)
         if not tree.live and not (tree.directory / "members.json").is_file():

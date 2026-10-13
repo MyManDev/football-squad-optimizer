@@ -4,7 +4,8 @@ SquadOpt turns captured Fantasy Premier League data into reproducible squad deci
 published league-member views. It combines a Python decision engine, a React member website
 and an optional advice API with independent workers.
 
-Start with the [documentation guide](docs/README.md), the
+Start with the [architecture overview](ARCHITECTURE.md), the
+[documentation guide](docs/README.md), the
 [current system map](docs/architecture/system_map.md) or the
 [product and research roadmap](docs/product/roadmap.md).
 [ADR 0007](docs/architecture/decisions/0007-enterprise-transition.md) records the enterprise
@@ -12,23 +13,29 @@ transition: what it changed, what was accepted and what still waits on a real en
 
 ## Repository layout
 
+The installed Python package is `squadopt`, arranged in dependency rings from R1 (innermost) to
+R5; `scripts/` and `tests/` sit outside it. [ARCHITECTURE.md](ARCHITECTURE.md) gives the ring of
+every package.
+
 | Path | Responsibility |
 | --- | --- |
-| `src/squadopt/contracts/` | Shared player vocabulary and canonical ordering |
-| `src/squadopt/` engine packages | Captures, projections, optimization, planning and evaluation |
-| `src/squadopt/application/` | Typed advice, evidence and publication workflows |
-| `src/squadopt/platform/` | Queue, workers, storage, capture adapters and operational entry points |
-| `src/squadopt/api/` | Optional HTTP adapter over application/platform contracts |
-| `scripts/` | Compatible repository commands and research entry points |
-| `web/` | Member website, runtime publication validation and browser tests |
-| `workers/` | Cloudflare Workers deployed separately from the static site (today only the [FPL probe](docs/fpl_forwarder_probe.md)) |
-| `deploy/` | Deployment configuration for separate API and worker processes |
-| `tests/` | Offline fixtures, unit tests and opt-in acceptance probes |
-| `docs/` | Product, operations, architecture, contracts and scientific evidence |
-| `data/` | Private local operational state; a Git checkout is not its backup |
+| [`ARCHITECTURE.md`](ARCHITECTURE.md) | Rings, deployment units, scaling seams, enforcement and known violations |
+| [`src/squadopt/`](src/squadopt/README.md): product rings | `contracts` and the schema half of `data` (R1, vocabulary); `features`, `prediction`, `optimization`, `planning`, `scenarios`, `evaluation` and `live` (R2, domain); `application` and `integration` (R3, use cases); `platform`, `api` and the storage half of `data` (R4 adapters and R5 composition) |
+| `src/squadopt/`: research arm | `experiments`, `backtest`, `bayesopt`, `recalibration` and `preflight`, the measurement laboratory; no product package may import it |
+| [`scripts/`](scripts/README.md) | Repository commands, measurement runners, fixture generators and the release recipe, catalogued by role |
+| [`web/`](web/README.md) | Member website, runtime publication validation, the in-browser device solver and browser tests |
+| [`workers/`](workers/README.md) | Cloudflare Workers deployed separately from the static site (today only the [FPL probe](docs/fpl_forwarder_probe.md)) |
+| [`deploy/`](deploy/README.md) | Deployment configuration for the separate API and worker processes |
+| [`config/`](config/README.md) | Operator configuration read at run time: the list of leagues the site serves |
+| [`tests/`](tests/README.md) | Offline unit tests, architecture fitness functions, shared fixtures and opt-in acceptance probes |
+| [`docs/`](docs/README.md) | Product, operations, architecture, contracts and scientific evidence |
+| [`data/`](data/README.md) | Private local operational state; a Git checkout is not its backup |
+| `.github/` | CI, the Pages deployment, the backend uptime check, the Windows script checks, the probe deployment, Dependabot and code owners |
 | `constraints.txt` | Pinned package versions the container and measurement checks install |
-| `artifacts/` | Git-ignored local experiment outputs; generated, never source |
-| `.codex-tmp/` | Git-ignored agent worktrees and scratch; not project content |
+
+Two more folders appear in a working checkout and are local and ignored by Git: `artifacts/`
+holds regenerable experiment outputs, and `.codex-tmp/` holds agent worktrees and scratch.
+Neither is project content.
 
 ## Where to make a change
 
@@ -43,7 +50,7 @@ transition: what it changed, what was accepted and what still waits on a real en
 | Weekly commands and publication | [CLI](src/squadopt/platform/cli.py), [weekly operations](src/squadopt/platform/weekly_operations.py) and [weekly runbook](docs/weekly_runbook.md) |
 | HTTP requests and queued advice | [API](src/squadopt/api/), [advice worker](src/squadopt/platform/advice_worker.py) and [backend runbook](docs/backend_runbook.md) |
 | Research or reproducing a measurement | [Experiments](src/squadopt/experiments/), [script catalog](scripts/README.md) and [evidence index](docs/measurements_index.md) |
-| Tests | [Python unit](tests/unit/), [integration](tests/integration/) and frontend tests beside their features |
+| Tests | [Test guide](tests/README.md): [Python unit](tests/unit/), [architecture](tests/architecture/), [integration](tests/integration/), and frontend tests beside their features |
 
 Use the [dependency rules](docs/architecture/dependency_rules.md) before moving Python modules.
 The [script catalog](scripts/README.md) separates operational commands, research runners and

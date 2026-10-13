@@ -99,19 +99,29 @@ the league directory (`data/leagues.json`) names it under `device_plan`
 (`device/<capture>/device-plan.json`, relative to `data/`) and the sha256 of the file's
 bytes under `device_plan_sha256`. The path carries the capture, but the table changes when
 the week is published again from the same capture, which rewrites every tree too. So the
-path alone is never cached as unchanging: a page fetches the table with the digest as its
-version and checks the bytes against it. Within a run the first league writes it and every later league finds it and
+digest, not the path, is the table's version: the page always asks for the table with the
+digest as its version and checks the bytes against it, so a table a browser kept is the one
+the line names. The host keeps `/data/device/*` for a year whatever the query (below), so
+the bare path, opened without the digest, can still show an earlier table of the same
+capture. Within a run the first league writes it and every later league finds it and
 leaves it; a table already on disk with another payload (an earlier build of the same
 capture with another handoff, other Top 100 inputs or other code) is refused before any
 member is solved (`league_publication.check_device_plan_table`). The weekly run removes
 every table at the start of its league stage, after the preview is seeded, and writes its
-own capture's again (`remove_device_tables`); by hand, the operator removes
-`data/device/<capture>/` in the candidate and rebuilds every league of the list. A build of
-one league refuses a directory line whose table is another capture's, or is no per-capture
-table, as it refuses a tree rendered from another capture, and one whose table's bytes are
-not the ones its digest names (`leagues_beside`). The tree keeps its own v1 copy during the
-transition, for pages from before the per-capture table; the copy stops with #981 step 8,
-after GW20, with the owner's yes.
+own capture's again (`remove_device_tables`). By hand, each caller's refusal names its own
+way out. `scripts/build_league_site.py` names the weekly run's league list: removing the
+table does not help it on a site with two or more leagues, because a build of one league
+then refuses every other line whose table is gone (below).
+`scripts/add_device_plan_inputs.py` never reads the other lines, so it names removing
+`data/device/<capture>/` in the candidate and running the script again for every league of
+the list. A build of one league refuses a directory line whose table is another capture's,
+or is no per-capture table, as it refuses a tree rendered from another capture, and one
+whose table's bytes are not the ones its digest names (`leagues_beside`). The release check
+(`scripts/check_league_tree.py`), on a candidate or on the live site, fails a line that
+names its table in a form the page does not read, and one whose table is missing or whose
+bytes have another sha256 than the line names. The tree keeps
+its own v1 copy during the transition, for pages from before the per-capture table; the
+copy stops with #981 step 8, after GW20, with the owner's yes.
 
 The producer is `squadopt.application.device_plan.device_plan_capture_table`, which the
 site builder and `scripts/add_device_plan_inputs.py` share. The document is the shared
@@ -127,7 +137,14 @@ document above with these differences:
 | `rules.transfers_cap` | The game's cap on transfers in one week, or null where the rules state none, beside `rules.max_free_transfers`, the policy's cap on banked free transfers. |
 
 Every other field, the order of `players` and the solver rules are the shared document's.
-The page reads the v1 copy until #981 step 2 makes it read the per-capture table.
+Since #981 step 2 the page reads the per-capture table where its league's directory line
+names one (`web/src/features/league/data.ts`): it asks for `data/<device_plan>?v=<device_plan_sha256>`,
+holds the bytes to that sha256 and the payload to this contract, and otherwise reads the
+tree's v1 copy. A missing or changed table, a payload of another shape or a browser without
+a digest all fall back to the copy; a read that runs out of its time does not, because the
+copy is on the same site and a second wait would double the member's. A table from another
+capture is still refused by the device solve, as the copy is. Because the address carries
+the digest, `web/public/_headers` lets a browser keep `/data/device/*` for a year.
 
 ## What the device answers
 

@@ -531,33 +531,37 @@ def test_the_capture_s_device_plan_table_is_written_once_and_never_replaced(
 ) -> None:
     payload = {"contract_version": "league_device_plan_v2", "players": [{"id": 1}]}
     stamp = "2026-10-11T10:00:00Z"
-    first = write_device_plan_table(tmp_path, "cap", payload, generated_at_utc=stamp)
+    # Each caller names its own way out; the refusal ends with it.
+    remedy = "Do what this caller says."
+    first = write_device_plan_table(tmp_path, "cap", payload, generated_at_utc=stamp, remedy=remedy)
     assert first == tmp_path / "device" / "cap" / "device-plan.json"
     # The second league of the run finds the table and keeps the first stamp.
-    again = write_device_plan_table(tmp_path, "cap", dict(payload), generated_at_utc="later")
+    again = write_device_plan_table(
+        tmp_path, "cap", dict(payload), generated_at_utc="later", remedy=remedy
+    )
     assert again == first
     envelope = json.loads(first.read_text(encoding="utf-8"))
     assert envelope["generated_at_utc"] == stamp
     assert envelope["contract_version"] == "provisional_league_ui_v1"
     assert envelope["payload"] == payload
-    with pytest.raises(DataError, match="written once per capture"):
+    with pytest.raises(DataError, match=r"written once per capture\. Do what this caller says\.$"):
         write_device_plan_table(
-            tmp_path, "cap", {**payload, "players": []}, generated_at_utc="later"
+            tmp_path, "cap", {**payload, "players": []}, generated_at_utc="later", remedy=remedy
         )
     assert json.loads(first.read_text(encoding="utf-8")) == envelope
     # The check alone names the path and refuses the same way, before anything is written.
-    assert check_device_plan_table(tmp_path, "cap", payload) == first
-    assert check_device_plan_table(tmp_path, "other", payload) == (
+    assert check_device_plan_table(tmp_path, "cap", payload, remedy=remedy) == first
+    assert check_device_plan_table(tmp_path, "other", payload, remedy=remedy) == (
         tmp_path / "device" / "other" / "device-plan.json"
     )
     assert not (tmp_path / "device" / "other").exists()
-    with pytest.raises(DataError, match="Remove that directory"):
-        check_device_plan_table(tmp_path, "cap", {**payload, "players": []})
+    with pytest.raises(DataError, match=r"once per capture\. Do what this caller says\.$"):
+        check_device_plan_table(tmp_path, "cap", {**payload, "players": []}, remedy=remedy)
     # A table that cannot be read as an envelope is refused the same way, with the remedy.
     for broken in ("", '{"payload": ', "[]", "null", '"text"'):
         first.write_text(broken, encoding="utf-8")
-        with pytest.raises(DataError, match="Remove that directory"):
-            check_device_plan_table(tmp_path, "cap", payload)
+        with pytest.raises(DataError, match=r"once per capture\. Do what this caller says\.$"):
+            check_device_plan_table(tmp_path, "cap", payload, remedy=remedy)
 
 
 def test_a_table_of_another_payload_refuses_the_publication_before_any_member_is_solved(
@@ -575,8 +579,16 @@ def test_a_table_of_another_payload_refuses_the_publication_before_any_member_is
 
     monkeypatch.setattr(league_views, "build_league_views", no_solve)
     monkeypatch.setattr("squadopt.application.league_publication.build_league_views", no_solve)
-    with pytest.raises(DataError, match="already holds another device-plan table"):
+    with pytest.raises(DataError, match="already holds another device-plan table") as refused:
         publish_league(request)
+    # The builder names the weekly run's league list. Removing the table by hand is no way
+    # out for it on a site with two or more leagues: a build of one league then refuses
+    # every other line whose table is gone.
+    assert str(refused.value).endswith(
+        "a table is written once per capture. Rebuild every league with the weekly run's "
+        "league list, or let the weekly run rebuild the week."
+    )
+    assert "Remove" not in str(refused.value)
     assert solved == []
     assert not (request.out_dir / "data" / "leagues" / "352490" / "members.json").exists()
 

@@ -20,7 +20,9 @@ available in Git at `6ca49686:docs/architecture/system_map.md`.
 | `application` | Typed workflows, publication/evidence builders and advice capabilities; no platform or script imports |
 | `platform` | Filesystem, capture, queue, process pool, metrics, backup and command adapters |
 | `api` | HTTP translation; engine access goes through platform/application boundaries |
+| `integration` | One module that optimizes a squad from a canonical projection CSV; imports only `data` and `optimization` |
 | `web` | Static publication reader, validated HTTP advice client, member selection and rendering |
+| Device solver | The member's one-week plan solved in the browser with HiGHS, from the published device-plan table; lives in `web/src/features/league/device/` |
 | Measurement preflight | Required root fields declared per artifact kind in `preflight.measurement`; checks declared governance, proves nothing about the actions. See [evidence validation](evidence_validation.md) |
 | Solver helpers | Squad/lineup invariants shared by the live squad and transfer paths through `optimization.decisions`. See [solver boundaries](solver_boundaries.md) |
 
@@ -50,6 +52,33 @@ queue transitions; recovery retains queued intent and isolates corrupt records. 
 identity fences stale workers from writing a terminal response. See
 [queue recovery](queue_recovery.md) and [advice boundaries](advice_boundaries.md).
 Worker counters remain in the worker process and are scraped independently from the API.
+
+## Device solve
+
+```mermaid
+flowchart LR
+    R[Weekly run] --> T[Device-plan table per capture]
+    T --> P[Published views]
+    W[Member website] --> P
+    W --> D[Web Worker with HiGHS]
+    D --> V[One-week plan on the member's device]
+```
+
+The weekly run publishes, once per capture, the inputs the server's own solver receives for a
+member's one-week plan ([`league_device_plan_v1`](../contracts/league_device_plan_v1.md)). The
+member page states the same problem in a Web Worker and solves it with HiGHS compiled to
+WebAssembly, so a one-week plan, a chip week, a rival strategy and a Top 100 weight need no
+backend. Three- and five-week windows are still answered by the advice backend. The direction
+is device-first computation (issue #978).
+
+## Deployment units
+
+The system runs as separate units: the static website on Cloudflare Pages, the device solver in
+the member's browser, the weekly run and the installed CLI on the operator's machine, the advice
+API and its worker processes from one container image or natively on the owner's PC, the FPL
+probe Worker, and the scheduled backend uptime check on GitHub Actions. The
+[architecture overview](../../ARCHITECTURE.md#4-deployment-units) gives each unit's code, entry
+point, state and present host.
 
 ## Publication and recovery
 

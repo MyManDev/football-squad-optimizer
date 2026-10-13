@@ -90,7 +90,7 @@ still stop at the package boundary are:
   `check_league_tree.py`, `release/clean_body.py`) and the three shells that write the
   published trees (`build_site.py`, `build_league_site.py`, `build_scoreboard.py`); CI runs
   `python -m mypy` so it checks that complete set, and
-  `tests/unit/test_mypy_file_set_is_described.py` fails when this list and that set differ.
+  `tests/architecture/test_mypy_file_set_is_described.py` fails when this list and that set differ.
   The 19 September scan of all 121 scripts, using `--explicit-package-bases` to resolve
   duplicate-module discovery, found 125 errors in 26 files; measurement runners remain
   outside this task;

@@ -375,6 +375,8 @@ def test_small_horizons_solve_to_the_same_value_under_both_encodings(
 
 FROZEN = _tables([[60, 50, 70]] * 3, [[52, 50, 66]] * 3)
 MOVING = _tables([[60, 50, 70], [61, 50, 70], [61, 50, 70]], [[52, 50, 66]] * 3)
+# A price that moves only in the last week: a frozen check that stops early would miss it.
+LATE = _tables([[60, 50, 70], [60, 50, 70], [61, 50, 70]], [[52, 50, 66]] * 3)
 
 
 @pytest.mark.parametrize(
@@ -384,6 +386,7 @@ MOVING = _tables([[60, 50, 70], [61, 50, 70], [61, 50, 70]], [[52, 50, 66]] * 3)
         (FROZEN, [True, True, False], True, "acquisition_week"),
         (FROZEN, None, False, "acquisition_week"),
         (MOVING, [True, True, False], False, "acquisition_week"),
+        (LATE, [True, True, False], False, "acquisition_week"),
         (FROZEN[:1], [True, True, False], False, "original_held"),
     ],
 )
