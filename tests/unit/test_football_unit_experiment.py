@@ -15,7 +15,7 @@ import pytest
 from pandas.testing import assert_frame_equal
 from tests.unit.test_football_unit_strength import T, observations, projection, unit
 
-from squadopt.application.football_unit_experiment import (
+from squadopt.experiments.football_unit_experiment import (
     UNIT_COMPONENT_VERSION,
     unit_fixed_fifteen_decision,
     unit_fixture_components,

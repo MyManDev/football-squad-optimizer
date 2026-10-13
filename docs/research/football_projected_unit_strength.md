@@ -85,7 +85,7 @@ lambda_opponent = sum_s w_s * lambda_opponent,s
 replacement_gap = projected mean rate - supplied causal baseline rate
 ```
 
-`application.football_unit_experiment` explicitly composes the result with retained
+`experiments.football_unit_experiment` explicitly composes the result with retained
 conditional native v1 fixture components. Player goal and assist shares remain
 unchanged; their total credited masses scale by the own-club rate ratio. This
 preserves `sum(player goals) <= team goals` and `sum(assists) <= sum(goals)` before

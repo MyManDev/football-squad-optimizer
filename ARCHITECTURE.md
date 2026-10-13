@@ -56,8 +56,8 @@ under [known violations](#7-known-violations).
 | `scenarios` | R2 | Joint point scenarios, scenario paths, rival squads and fixed-decision scoring. |
 | `planning` | R2 | Deterministic multi-gameweek transfer planning and chip timing. |
 | `live` | R2 | Domain records of the live season: recommendation, ledger, tick, settlement, transfers and the per-member plan selection. It reads captured snapshots, never a live endpoint. |
-| `integration` | R3 | One module, `integration.py`: optimizes a squad from a canonical projection CSV. The package root re-exports it lazily. |
-| `application` | R3 | Use cases: typed advice, evidence, league and site publication, settlement, scoreboard and chip workflows, and the strategy catalogue. It imports no platform or script code. |
+| `integration` | R3 | One module, `integration.py`: a one-release re-export of `optimize_squad_from_csv` from `application.projection_csv`, removed in the release after the next `site-*` tag. |
+| `application` | R3 | Use cases: typed advice, evidence, league and site publication, settlement, scoreboard and chip workflows, the strategy catalogue, and squad optimization from a canonical projection CSV (`projection_csv`, which the package root re-exports lazily). It imports no platform or script code. |
 | `api` | R4, R5 | The FastAPI driving adapter, and the API process's composition (`squadopt.api.runtime:build_app`). It reaches the engine only through `platform` and `application`. |
 | `platform` | R4, R5 | Driven adapters (file job queue and cache, captures, club-news model clients, storage, backup) and composition roots (the installed CLI, the weekly runner, the advice worker). |
 | `experiments` | Research | The measurement programmes: designs, readings and reports behind the committed records. |
@@ -68,10 +68,8 @@ under [known violations](#7-known-violations).
 
 The rings are a reading of the enforced layer order, not a replacement for it. Read from the
 bottom, the layer order in `pyproject.toml` reaches each product package only after every
-package of an inner ring, with one exception, `integration` (see
-[known violations](#7-known-violations)), and reaches the research arm only after every R2
-package. Within a ring the order is the tie-break
-([dependency rules](docs/architecture/dependency_rules.md)).
+package of an inner ring, and reaches the research arm only after every R2 package. Within a
+ring the order is the tie-break ([dependency rules](docs/architecture/dependency_rules.md)).
 `tests/architecture/test_architecture_rings.py` holds this table, the layer order, the
 laboratory contract and the run-boundary probe to one mapping.
 
@@ -132,7 +130,8 @@ only** when the boundary is stated but the code behind it is not built.
 ## 6. Enforcement map
 
 The import-linter contracts in `pyproject.toml` run as the fifth CI gate (`lint-imports`). Each
-one has a row below, and none has an `ignore_imports` entry.
+one has a row below. Only the last has `ignore_imports` entries: today's storage imports, held
+under the ratchet rule of ADR 0010 (Decision 4), so the list can only shrink.
 
 | Contract | What it holds |
 | --- | --- |
@@ -145,19 +144,28 @@ one has a row below, and none has an `ignore_imports` entry.
 | The decision core imports no storage or source module | `contracts`, `optimization`, `planning`, `scenarios` and `evaluation` import none of the storage and source modules of `data`: `snapshots`, `sources`, `atomic`, `loaders`, `adapters`, `checksums`, `tables`, `pipeline`, `source_revision` and `_long_paths`. `prediction` imports none of them either, and becomes a source when its zone owner agrees. |
 | The CP-SAT solver stays in the decision core | Every package except `optimization`, `planning`, `scenarios`, `evaluation` and `backtest` is refused `ortools`; `backtest` imports it only to record its version. |
 | Use cases and domain records import no process, thread, event-loop or command-line module | `application` and `live` import none of `subprocess`, `multiprocessing`, `concurrent`, `threading`, `signal`, `argparse` or `asyncio`; processes, threads and the command line belong to the composition roots. The contract sees direct imports only: one use case reaches `subprocess` through `data` (see known violations). |
+| Use cases, domain records and features import no storage or source module | `application`, `live` and `features` import none of the storage and source modules of `data`, apart from today's 122 direct import edges from 43 modules, each an `ignore_imports` entry. A new edge fails the gate, and so does an entry whose edge is gone; `tests/architecture/test_storage_ratchet.py` holds the entries to a frozen copy that gives each its remedy and phase and pins its size by package, so the list only shrinks. |
 
 The tests in `tests/architecture/` hold the rules that an import graph cannot see:
 
 | Test | What it holds |
 | --- | --- |
 | `tests/architecture/test_architecture_rings.py` | The ring table above, the layer order, the laboratory contract and the run-boundary probe agree with one mapping, and every contract has a row in the map above. |
-| `tests/architecture/test_storage_imports.py` | No source of the storage contract imports the `data` package root, which re-exports storage names, so the contract sees every `data` module those sources import. |
-| `tests/architecture/test_run_boundary.py` | The product entry points and every operational command load no laboratory module when they run; a module of `application` whose name ends in `_experiment` is reported as laboratory. |
+| `tests/architecture/test_storage_imports.py` | No source of the two storage contracts imports the `data` package root, which re-exports storage names, so the contracts see every `data` module those sources import. |
+| `tests/architecture/test_storage_ratchet.py` | The `ignore_imports` entries of the storage ratchet are exactly a frozen baseline of today's direct storage imports, each with its remedy and phase; a new import, a new entry or an entry whose import is gone fails, and the size of the baseline is pinned by package. |
+| `tests/architecture/test_core_file_io.py` | `contracts`, `optimization`, `planning`, `scenarios`, `evaluation` and `prediction` touch the file system only in 9 allowlisted functions of 3 modules; the allowlist only shrinks, and its size is pinned. The scan finds the `open` builtin, the file methods of `Path`, the pandas readers and writers it lists (a writer such as `to_csv` only when it is given a target), the file functions of `os`, `glob`, NumPy and joblib, also through an alias or an import by name, and any import of `shutil`, `tempfile` or `glob`. |
+| `tests/architecture/test_use_case_file_io.py` | The same scan finds file access in `application`, `live` and `features` only in 33 allowlisted modules: 24 in `application`, 6 in `live` and 3 in `features`. The allowlist only shrinks, and its size is pinned by package. |
+| `tests/architecture/test_runtime_contract_paths.py` | Only 8 allowlisted modules under `src/squadopt`, 2 in `application` and 6 in `platform`, name a path into `docs/contracts`; the allowlist only shrinks, and its size is pinned by package. |
+| `tests/architecture/test_run_boundary.py` | The product entry points and every operational command load no laboratory module when they run; a module of `application` whose name ends in `_experiment` is reported as laboratory, and `application` holds none. |
 | `tests/architecture/test_layer_contracts.py` | Moved symbols keep their compatibility imports and their deterministic outputs. |
 | `tests/architecture/test_documentation_paths.py` | A source path or command cited in the documentation exists. |
 | `tests/architecture/test_markdown_links.py` | Every relative link in a tracked Markdown file resolves. |
-| `tests/architecture/test_measurements_index.py` | Every committed record has a row in the measurements index (ADR 0003, rule 1). |
-| `tests/architecture/test_records_name_their_code.py` | A committed record names the commit that produced it; the exceptions only shrink. |
+| `tests/architecture/test_docs_reachable.py` | Every Markdown document under `docs/` is reached by a chain of relative links from the [documentation guide](docs/README.md), apart from the 192 unreachable on 2026-10-13, two frozen lists that only shrink and whose sizes are pinned. |
+| `tests/architecture/test_docs_root.py` | No new living document is written directly under `docs/`: the 106 there on 2026-10-13 are a frozen list that only shrinks and whose size is pinned, and a new one goes in `architecture/`, `operations/`, `product/`, `research/` or `specs/`. |
+| `tests/architecture/test_scripts_catalogue.py` | Every file under `scripts/` has exactly one row in the [script catalogue](scripts/README.md), every row outside its two retired sections names a file that is there, and a retired row names one that is gone. |
+| `tests/architecture/test_package_maps.py` | The guide of each package that has one (`platform`, `application`, `experiments`, `live`, `data`, `prediction`, `features`) places every module of its package in exactly one family and names no module that is not there. |
+| `tests/architecture/test_measurements_index.py` | Every committed record at the root of `docs/`, in `docs/architecture/` and in `docs/research/` has a row in the measurements index (ADR 0003, rule 1), found by a backticked name or a link target. |
+| `tests/architecture/test_records_name_their_code.py` | A committed record at the root of `docs/` or in `docs/research/` names the commit that produced it; the exceptions, one frozen list per folder, only shrink, and their sizes are pinned. |
 | `tests/architecture/test_mypy_file_set_is_described.py` | The scripts the type gate checks are the ones the PR discipline names. |
 | `tests/architecture/test_dependency_pins.py` | Every declared dependency is pinned inside its declared range. |
 | `tests/architecture/test_operations_docs_match_the_workflows.py` | The operations documents name the variables and steps the workflows use. |
@@ -172,23 +180,24 @@ between features. The [web guide](web/README.md) maps the zones to the rings.
 
 Each entry was measured on this tree: the import counts with an AST scan that includes imports
 inside functions, the other rows by reading the cited files. Phase 1 is the change that added this
-overview; Phases 2 and 3 are the deferred moves of ADR 0010, accepted with their triggers, and
-each lands in its own pull request once its trigger fires.
+overview. Phase 2 is the deferred moves of ADR 0010 that this tree holds: on the owner's
+direction of 2026-10-13 they were made together, without waiting for their triggers
+([decisions record](docs/decisions.md)). Phase 3 is the moves that remain; each lands in its own
+pull request once its trigger fires.
 
 | Violation | Measured | Remedy | Phase |
 | --- | --- | --- | --- |
-| Use cases and domain records import the storage half of `data` | `application`: 88 import statements in 29 modules; `live`: 17 in 9; `features`: 16 in 4 | Storage ports declared in `application`, with file adapters in `platform` | Phase 2: a shrink-only ratchet. Phase 3: the ports, triggered by ADR 0005 or issue #1010 |
-| `data` holds both R1 vocabulary and R4 storage, and sits at the bottom of the layer order | One package, two rings; `src/squadopt/data/__init__.py` imports `adapters`, `loaders`, `pipeline` and `snapshots`, so importing any `data` module loads those four at run time | The contract "The decision core imports no storage or source module" keeps the import statements of the packages that are clean today off the storage half, and `tests/architecture/test_storage_imports.py` refuses their import of the package root; neither stops the run-time load | The contract and the test are in force (Phase 1); the split itself is an open question in ADR 0010 |
+| Use cases and domain records import the storage half of `data` | `application`: 89 import statements in 30 modules; `live`: 17 in 9; `features`: 16 in 4; together 122 direct import edges from 43 modules | Storage ports declared in `application`, with file adapters in `platform` | Phase 2: the ratchet is in force, the contract "Use cases, domain records and features import no storage or source module" with one `ignore_imports` entry per edge. Phase 3: the ports, triggered by ADR 0005 or issue #1010 |
+| Use cases, domain records and features read and write files themselves | The file-access scan of `tests/architecture/test_core_file_io.py`, which `tests/architecture/test_use_case_file_io.py` runs over these packages, finds file reads or writes in 24 modules of `application`, 6 of `live` (`ledger`, `recommendation`, `calibration`, `football_artifact`, `risk`, `tick`) and 3 of `features` (`evidence_artifact`, `rotation_evidence_artifact`, `settled_outcomes`) | File adapters in `platform` behind the storage ports of the first entry, so these packages receive and return records rather than paths | Phase 2: the ratchet is in force (`tests/architecture/test_use_case_file_io.py` allowlists the 33 modules, so no other module of these packages reads or writes a file; a new access inside a listed module is not seen). Phase 3: with the storage ports |
+| `data` holds both R1 vocabulary and R4 storage, and sits at the bottom of the layer order | One package, two rings; `src/squadopt/data/__init__.py` imports `adapters`, `loaders`, `pipeline` and `snapshots`, so importing any `data` module loads those four at run time | The contract "The decision core imports no storage or source module" keeps the import statements of the packages that are clean today off the storage half, and `tests/architecture/test_storage_imports.py` refuses an import of the package root from them and from the sources of the storage ratchet; neither stops the run-time load | The contract and the test are in force (Phase 1); the split itself is an open question in ADR 0010 |
 | Three vocabulary modules of `data` import its storage half | `claim_identity` imports `RosterPlayer` from `data.sources.club_news`, `cleaning` imports `PriceUnit` from `data.adapters`, and `cohorts` imports `LeagueStandingsPage` from `data.sources.fpl_live` | Move the three types into the vocabulary half, with a one-release re-export | With the split of `data`, an open question in ADR 0010; the data owner decides |
-| `contracts` reads and writes files | `LEAGUE_LIST_FILE` and `read_league_list` in `src/squadopt/contracts/league_list.py`; `read_league_directory` and `write_league_directory` in `src/squadopt/contracts/league_tree.py` | Move the file IO to an adapter, with a one-release re-export | Phase 2: ratchet; Phase 3: after issue #981 |
-| The decision core reads files | `_manifest`, `_read_csv`, `_sha256` and `_file_sha256` in `src/squadopt/evaluation/component_handoff.py` read the Phase C manifest, its two tables and their bytes; a search of the rest of `optimization`, `planning`, `scenarios` and `evaluation` finds no other file read or write | Move `read_phase_c_component_handoff` to an adapter, so `evaluation` receives the parsed tables | Phase 2: a ratchet that allowlists the module |
+| `contracts` reads and writes files | `LEAGUE_LIST_FILE` and `read_league_list` in `src/squadopt/contracts/league_list.py`; `device_plan_sha256`, `read_league_directory`, `write_league_directory` and `legacy_tree_league_id` in `src/squadopt/contracts/league_tree.py` | Move the file IO to an adapter, with a one-release re-export | Phase 2: the ratchet is in force (`tests/architecture/test_core_file_io.py` allowlists the 5 functions). Phase 3: after issue #981 |
+| The decision core reads files | `_manifest`, `_read_csv`, `_sha256` and `_file_sha256` in `src/squadopt/evaluation/component_handoff.py` read the Phase C manifest, its two tables and their bytes; a search of the rest of `optimization`, `planning`, `scenarios` and `evaluation`, and of `prediction`, finds no other file read or write | Move `read_phase_c_component_handoff` to an adapter, so `evaluation` receives the parsed tables | Phase 2: the ratchet is in force (`tests/architecture/test_core_file_io.py` allowlists the 4 functions). Phase 3: the move |
 | A use case starts a process through `data` | `src/squadopt/application/advice_record.py` calls `source_revision()` in `src/squadopt/data/source_revision.py`, which runs `git` with `subprocess.run`; the process contract sees direct imports only | The composition root resolves the revision and passes it in, or a revision port with its adapter in `platform` | Phase 3, with the storage ports (an open question in ADR 0010) |
-| Runtime code names `docs/contracts` by a path relative to the working directory | 8 modules: 2 in `application`, 6 in `platform`; each names a schema as the default target of the function that writes it or as a constant the tests read, and none reads it when it runs ([contracts guide](docs/contracts/README.md)) | A ratchet that allowlists the 8 modules, so that no ninth appears | Phase 2 |
+| Runtime code names `docs/contracts` by a path relative to the working directory | 8 modules: 2 in `application`, 6 in `platform`; each names a schema as the default target of the function that writes it or as a constant the tests read, and none reads it when it runs ([contracts guide](docs/contracts/README.md)) | The script or test that writes or compares a schema passes its path, so the module names no repository folder | Phase 2: the ratchet is in force (`tests/architecture/test_runtime_contract_paths.py` allowlists the 8 modules, so no ninth appears). Phase 3: the move |
 | The CP-SAT driver has no public port | 19 private names imported from `optimization.optimizer`: 5 by `planning/optimizer.py`, 7 by `scenarios/optimization.py`, 7 by `scenarios/rank.py` | A public solver driver in `optimization` | Phase 3 |
 | Ports are declared in an adapter ring | 15 of the 24 typed Protocols under `src/squadopt` are in `platform`; 3 are in `application` | Use-case ports move to `application` | Phase 3 |
-| Laboratory modules live in the use-case ring | Six `football_*_experiment` modules in `application`, imported only by tests; the run-boundary probe reports them as laboratory if a product entry point loads one | Move them to `experiments`, with no re-export | Phase 2, after agreement on issue #1012 |
 | `platform` mixes deployment roles | 54 Python files in one flat package: weekly batch, API side, queue and worker, captures, club news, storage and CLI | Split by deployment unit (ADR 0008, M6) | Phase 3, needs a new ADR |
-| `integration` is a use-case module placed as its own layer | `src/squadopt/integration.py` sits between `evaluation` and `optimization` in the layer order | Fold it into `application`, with a one-release re-export | Phase 2 |
 | `scripts/` is outside the import contracts | mypy checks 7 script files; `lint-imports` checks none | Operator logic moves into the installed package, the direction ADR 0007 set | Phase 3 |
 
 ## 8. How to add
@@ -203,17 +212,27 @@ with its ring, layer and contract keys (the test fails until all three agree), a
 **A module.** Put it in the package whose ring matches what it does, not where its first caller
 lives. A module whose job is to talk to the outside world, such as a network client, a process
 launcher or a store, is an adapter and belongs in `platform`, or in the storage half of `data`
-for captured inputs. A module that only measures belongs in the research arm.
+for captured inputs. A module that only measures belongs in the research arm. When the package
+has a guide, add the module's row to its family there in the same pull request;
+`tests/architecture/test_package_maps.py` fails until the guide places it.
 
 **A script.** Add one row to the [script catalogue](scripts/README.md) in the same pull request;
-every file under `scripts/` has exactly one. An operational command imports product packages
-only; `tests/architecture/test_run_boundary.py` imports every `.py` row of the operational table,
-apart from the three laboratory tools it names, and fails if the laboratory loads. A measurement
-runner writes its record to `docs/` and adds the row to the measurements index.
+every file under `scripts/` has exactly one, which `tests/architecture/test_scripts_catalogue.py`
+holds. An operational command imports product packages only;
+`tests/architecture/test_run_boundary.py` imports every `.py` row of the operational table, apart
+from the three laboratory tools it names, and fails if the laboratory loads. A measurement runner
+writes its record to `docs/`, and the row it adds to the measurements index links the record's
+Markdown twin: `tests/architecture/test_docs_reachable.py` follows links, not backticked names.
 
 **A document.** Follow the naming key in the [documentation guide](docs/README.md). A record is
-a JSON file and its Markdown twin with an index row; a pre-registration ends in `_prereg.md` and
-is frozen when it merges; anything else is a living document in the folder of its audience.
+a JSON file and its Markdown twin with an index row that links the twin; a pre-registration ends
+in `_prereg.md`, is linked from the [research guide](docs/research/README.md) or from its row in
+the measurements index, and is frozen when it merges; anything else is a living document in the
+folder of its audience (`docs/architecture`, `docs/operations`, `docs/product`, `docs/research`,
+or `docs/specs` for a specification), never directly under `docs/`
+(`tests/architecture/test_docs_root.py`). Link it from that folder's guide:
+`tests/architecture/test_docs_reachable.py` fails on a document under `docs/` that no chain of
+links from the documentation guide reaches.
 
 **A deployable.** A new process, Worker or hosted service needs a row in the deployment units
 table, its configuration under `deploy/` or its own folder, and an ADR when it changes where
@@ -229,7 +248,11 @@ state lives.
 - [Architecture decision records](docs/architecture/decisions/README.md)
 - [Package map](src/squadopt/README.md), with the guides to
   [platform](src/squadopt/platform/README.md),
-  [application](src/squadopt/application/README.md) and
-  [experiments](src/squadopt/experiments/README.md)
+  [application](src/squadopt/application/README.md),
+  [experiments](src/squadopt/experiments/README.md),
+  [live](src/squadopt/live/README.md),
+  [prediction](src/squadopt/prediction/README.md),
+  [features](src/squadopt/features/README.md) and
+  [data](src/squadopt/data/README.md)
 - [Contracts guide](docs/contracts/README.md)
 - [Script catalogue](scripts/README.md), [test guide](tests/README.md) and [web guide](web/README.md)

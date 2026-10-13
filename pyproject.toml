@@ -119,8 +119,9 @@ include_external_packages = true
 # The layered modular monolith (docs/architecture/dependency_rules.md). Higher layers may
 # import lower ones, never the reverse. There are no baseline exceptions; a new
 # violation fails the gate. `exhaustive` means every package directly under `squadopt` must
-# be named here, so a new one fails the gate until it is placed. `integration` imports only
-# `data` and `optimization`, so it sits directly above `optimization`. The laboratory
+# be named here, so a new one fails the gate until it is placed. `integration` is a
+# one-release re-export of `application.projection_csv`, so it sits directly above
+# `application` until the release after the next `site-*` tag removes it. The laboratory
 # (`experiments` to `bayesopt`) sits above `live`, so this contract also refuses a `live` import
 # of the laboratory (ADR 0010); the contract below refuses it for the packages above.
 [[tool.importlinter.contracts]]
@@ -131,6 +132,7 @@ exhaustive = true
 layers = [
     "api",
     "platform",
+    "integration",
     "application",
     "experiments",
     "backtest",
@@ -141,7 +143,6 @@ layers = [
     "planning",
     "scenarios",
     "evaluation",
-    "integration",
     "optimization",
     "prediction",
     "features",
@@ -300,13 +301,15 @@ allow_indirect_imports = true
 # half of that package: they read captures, write files atomically and ask git for the source
 # revision. The decision core reaches them only through a caller in an outer ring, so a direct
 # import from these sources fails the gate. `features`, `live` and `application` import them
-# today and are not sources; that is a known violation in ARCHITECTURE.md with its remedy.
-# `prediction` imports none of them either, but it is the data owner's zone, so it becomes a
-# source only when that owner agrees. File IO written with pathlib or json directly is outside
-# an import contract, which is why the name claims imports only. The contract sees import
-# statements, and `data/__init__.py` re-exports names from the storage modules, so an import of
-# the package root reaches them indirectly and passes here;
-# `tests/architecture/test_storage_imports.py` refuses that import from these sources.
+# today, a known violation in ARCHITECTURE.md with its remedy; the last contract below holds
+# them to today's imports. `prediction` imports none of them either, but it is the data owner's
+# zone, so it becomes a source only when that owner agrees. File IO written with pathlib or
+# pandas directly is outside an import contract, which is why the name claims imports only;
+# `tests/architecture/test_core_file_io.py` holds those calls in these sources and
+# `prediction` to today's allowlist. The contract sees import statements, and
+# `data/__init__.py` re-exports names from the storage modules, so an import of the package
+# root reaches them indirectly and passes here; `tests/architecture/test_storage_imports.py`
+# refuses that import from these sources.
 [[tool.importlinter.contracts]]
 name = "The decision core imports no storage or source module"
 type = "forbidden"
@@ -375,5 +378,163 @@ forbidden_modules = [
     "signal",
     "argparse",
     "asyncio",
+]
+allow_indirect_imports = true
+
+# The storage ratchet (ADR 0010, Decision 4). The rule of "The decision core imports no storage
+# or source module", that an inner ring reaches the storage and source modules of `data` only
+# through an outer one, is broken today by `application`, `live` and `features`, so this
+# contract states it for them with today's imports as its baseline. Each `ignore_imports`
+# entry is one direct import edge, from one module to one module, that exists today: 122 edges
+# from 43 modules. A new edge fails the gate, and so does an entry whose edge is gone, because
+# import-linter refuses an entry that matches no import; the entry then leaves this list. The
+# list may only shrink: `tests/architecture/test_storage_ratchet.py` holds it to a frozen copy
+# that gives each entry its remedy and phase, and `tests/architecture/test_storage_imports.py`
+# refuses an import of the `data` package root from these sources, which would reach the
+# storage modules unseen. The remedy is storage ports with file adapters in `platform`, in
+# Phase 3 (ARCHITECTURE.md, known violations); `advice_record` reaching `source_revision` has
+# its own row there.
+[[tool.importlinter.contracts]]
+name = "Use cases, domain records and features import no storage or source module"
+type = "forbidden"
+source_modules = ["squadopt.application", "squadopt.live", "squadopt.features"]
+forbidden_modules = [
+    "squadopt.data.snapshots",
+    "squadopt.data.sources",
+    "squadopt.data.atomic",
+    "squadopt.data.loaders",
+    "squadopt.data.adapters",
+    "squadopt.data.checksums",
+    "squadopt.data.tables",
+    "squadopt.data.pipeline",
+    "squadopt.data.source_revision",
+    "squadopt.data._long_paths",
+]
+ignore_imports = [
+    # application: 89 edges from 30 modules
+    "squadopt.application.advice -> squadopt.data.snapshots",
+    "squadopt.application.advice_record -> squadopt.data._long_paths",
+    "squadopt.application.advice_record -> squadopt.data.atomic",
+    "squadopt.application.advice_record -> squadopt.data.source_revision",
+    "squadopt.application.capture_entries -> squadopt.data.sources.fpl_live",
+    "squadopt.application.chip_forecast_publication -> squadopt.data.snapshots",
+    "squadopt.application.chip_forecast_publication -> squadopt.data.sources.fpl_live",
+    "squadopt.application.commands -> squadopt.data.snapshots",
+    "squadopt.application.commands -> squadopt.data.sources",
+    "squadopt.application.commands -> squadopt.data.sources.fpl_live",
+    "squadopt.application.commands -> squadopt.data.sources.vaastav",
+    "squadopt.application.defcon_component -> squadopt.data.snapshots",
+    "squadopt.application.defcon_component -> squadopt.data.sources.fpl_live",
+    "squadopt.application.device_plan -> squadopt.data.sources.fpl_live",
+    "squadopt.application.entries -> squadopt.data.sources.fpl_live",
+    "squadopt.application.fixtures_view -> squadopt.data.snapshots",
+    "squadopt.application.fixtures_view -> squadopt.data.sources.fpl_live",
+    "squadopt.application.football_live -> squadopt.data.snapshots",
+    "squadopt.application.football_live -> squadopt.data.sources.football_history",
+    "squadopt.application.football_live -> squadopt.data.sources.fpl_live",
+    "squadopt.application.football_live -> squadopt.data.sources.fpl_set_pieces",
+    "squadopt.application.horizon_plans -> squadopt.data.snapshots",
+    "squadopt.application.horizon_plans -> squadopt.data.sources",
+    "squadopt.application.league -> squadopt.data.snapshots",
+    "squadopt.application.league -> squadopt.data.sources.fpl_live",
+    "squadopt.application.league_publication -> squadopt.data.atomic",
+    "squadopt.application.league_publication -> squadopt.data.snapshots",
+    "squadopt.application.league_publication -> squadopt.data.sources",
+    "squadopt.application.league_publication -> squadopt.data.sources.fpl_live",
+    "squadopt.application.league_publication -> squadopt.data.sources.vaastav",
+    "squadopt.application.league_tree_identity -> squadopt.data._long_paths",
+    "squadopt.application.league_tree_identity -> squadopt.data.atomic",
+    "squadopt.application.live_score -> squadopt.data.snapshots",
+    "squadopt.application.live_score -> squadopt.data.sources.fpl_live",
+    "squadopt.application.manager_words -> squadopt.data._long_paths",
+    "squadopt.application.manager_words -> squadopt.data.snapshots",
+    "squadopt.application.manager_words -> squadopt.data.sources.club_news",
+    "squadopt.application.manager_words -> squadopt.data.sources.club_news_capture",
+    "squadopt.application.manager_words -> squadopt.data.sources.club_news_coding",
+    "squadopt.application.manager_words -> squadopt.data.sources.club_news_metadata",
+    "squadopt.application.manager_words -> squadopt.data.sources.club_news_scope",
+    "squadopt.application.manager_words -> squadopt.data.sources.fpl_live",
+    "squadopt.application.player_catalog -> squadopt.data.snapshots",
+    "squadopt.application.player_catalog -> squadopt.data.sources.fpl_live",
+    "squadopt.application.player_evidence -> squadopt.data.atomic",
+    "squadopt.application.player_evidence -> squadopt.data.checksums",
+    "squadopt.application.player_evidence -> squadopt.data.snapshots",
+    "squadopt.application.player_evidence -> squadopt.data.tables",
+    "squadopt.application.projection_csv -> squadopt.data.loaders",
+    "squadopt.application.projection_handoff -> squadopt.data.snapshots",
+    "squadopt.application.projection_handoff -> squadopt.data.sources",
+    "squadopt.application.projection_handoff -> squadopt.data.sources.fpl_live",
+    "squadopt.application.projection_handoff -> squadopt.data.sources.vaastav",
+    "squadopt.application.rotation_export -> squadopt.data._long_paths",
+    "squadopt.application.rotation_export -> squadopt.data.atomic",
+    "squadopt.application.rotation_export -> squadopt.data.snapshots",
+    "squadopt.application.rotation_export -> squadopt.data.sources.club_news",
+    "squadopt.application.rotation_export -> squadopt.data.sources.club_news_capture",
+    "squadopt.application.rotation_export -> squadopt.data.sources.club_news_claims",
+    "squadopt.application.rotation_export -> squadopt.data.sources.club_news_coding",
+    "squadopt.application.rotation_export -> squadopt.data.tables",
+    "squadopt.application.scoreboard -> squadopt.data._long_paths",
+    "squadopt.application.scoreboard -> squadopt.data.snapshots",
+    "squadopt.application.scoreboard -> squadopt.data.sources",
+    "squadopt.application.scoreboard -> squadopt.data.sources.fpl_live",
+    "squadopt.application.scoreboard_baselines -> squadopt.data.snapshots",
+    "squadopt.application.scoreboard_baselines -> squadopt.data.sources.fpl_live",
+    "squadopt.application.season -> squadopt.data.snapshots",
+    "squadopt.application.season -> squadopt.data.sources",
+    "squadopt.application.season -> squadopt.data.sources.vaastav",
+    "squadopt.application.settled_outcomes -> squadopt.data.atomic",
+    "squadopt.application.settled_outcomes -> squadopt.data.checksums",
+    "squadopt.application.settled_outcomes -> squadopt.data.snapshots",
+    "squadopt.application.settled_outcomes -> squadopt.data.sources",
+    "squadopt.application.settled_outcomes -> squadopt.data.sources.fpl_live",
+    "squadopt.application.settled_outcomes -> squadopt.data.tables",
+    "squadopt.application.settled_publication -> squadopt.data.atomic",
+    "squadopt.application.settled_publication -> squadopt.data.snapshots",
+    "squadopt.application.settled_publication -> squadopt.data.sources",
+    "squadopt.application.settled_publication -> squadopt.data.sources.fpl_live",
+    "squadopt.application.site -> squadopt.data.atomic",
+    "squadopt.application.site -> squadopt.data.snapshots",
+    "squadopt.application.site_publication -> squadopt.data.snapshots",
+    "squadopt.application.site_publication -> squadopt.data.sources",
+    "squadopt.application.weekly_plan -> squadopt.data.snapshots",
+    "squadopt.application.weekly_plan -> squadopt.data.sources",
+    "squadopt.application.weekly_plan -> squadopt.data.sources.fpl_live",
+    "squadopt.application.weekly_suggestion_eval -> squadopt.data.snapshots",
+    "squadopt.application.weekly_suggestion_eval -> squadopt.data.sources.fpl_live",
+    # live: 17 edges from 9 modules
+    "squadopt.live.banking -> squadopt.data.sources.fpl_live",
+    "squadopt.live.calibration -> squadopt.data.snapshots",
+    "squadopt.live.free_hit -> squadopt.data.sources.fpl_live",
+    "squadopt.live.horizon -> squadopt.data.snapshots",
+    "squadopt.live.horizon -> squadopt.data.sources.fpl_live",
+    "squadopt.live.ledger -> squadopt.data._long_paths",
+    "squadopt.live.ledger -> squadopt.data.atomic",
+    "squadopt.live.ledger -> squadopt.data.snapshots",
+    "squadopt.live.ledger -> squadopt.data.sources.fpl_live",
+    "squadopt.live.purchase_prices -> squadopt.data.sources.fpl_live",
+    "squadopt.live.recommendation -> squadopt.data.snapshots",
+    "squadopt.live.recommendation -> squadopt.data.sources.fpl_information",
+    "squadopt.live.recommendation -> squadopt.data.sources.fpl_live",
+    "squadopt.live.rules -> squadopt.data.snapshots",
+    "squadopt.live.rules -> squadopt.data.sources.fpl_live",
+    "squadopt.live.tick -> squadopt.data.snapshots",
+    "squadopt.live.tick -> squadopt.data.sources.fpl_live",
+    # features: 16 edges from 4 modules
+    "squadopt.features.evidence -> squadopt.data.snapshots",
+    "squadopt.features.evidence -> squadopt.data.sources.fpl_live",
+    "squadopt.features.football_phase_inputs -> squadopt.data.snapshots",
+    "squadopt.features.football_phase_inputs -> squadopt.data.sources.fpl_live",
+    "squadopt.features.football_phase_inputs -> squadopt.data.sources.fpl_set_pieces",
+    "squadopt.features.rotation_evidence -> squadopt.data.snapshots",
+    "squadopt.features.rotation_evidence -> squadopt.data.sources.club_news",
+    "squadopt.features.rotation_evidence -> squadopt.data.sources.club_news_claims",
+    "squadopt.features.rotation_evidence -> squadopt.data.sources.club_news_coding",
+    "squadopt.features.rotation_evidence -> squadopt.data.sources.club_news_metadata",
+    "squadopt.features.rotation_evidence -> squadopt.data.sources.club_news_scope",
+    "squadopt.features.rotation_evidence -> squadopt.data.sources.fpl_live",
+    "squadopt.features.rotation_evidence_artifact -> squadopt.data._long_paths",
+    "squadopt.features.rotation_evidence_artifact -> squadopt.data.sources.club_news",
+    "squadopt.features.rotation_evidence_artifact -> squadopt.data.sources.club_news_metadata",
+    "squadopt.features.rotation_evidence_artifact -> squadopt.data.sources.club_news_scope",
 ]
 allow_indirect_imports = true

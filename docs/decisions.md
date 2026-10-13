@@ -55,6 +55,33 @@ the deferred moves with their triggers.
 Source: the owner's direction to the maintainers on 2026-10-12, and
 [PR #1080](https://github.com/MyManDev/football-squad-optimizer/pull/1080).
 
+## 2026-10-13: The Phase 2 moves of ADR 0010 land now
+
+Decision: the Phase 2 moves of
+[ADR 0010](architecture/decisions/0010-clean-architecture-rings-and-repository-layout.md) are
+not held for their triggers. The six laboratory modules leave `application`, `integration.py`
+folds into `application`, `live`, `data`, `prediction` and `features` get their guides, the
+record tests read `docs/research`, the ratchets come into force, and the tests that keep the
+script catalogue, the package guides and the documentation complete are added. They are made
+together on one branch rather than each in its own pull request after the GW7 publish. The
+accepted record is not edited; this entry is where its timing changed.
+
+What still holds is every condition that is not about time:
+
+- The completeness tests fail pull requests in flight, so they are announced on issues #1012
+  and #978 before they merge.
+- The guides of `data`, `prediction` and `features` are in the data owner's zone and need his
+  agreement.
+- The change touches `live/` and `prediction/`, so it does not merge inside the
+  [live-path freeze window](architecture/ownership.md#live-path-freeze-window), and it does not
+  merge while a weekly publish run is in progress: a merge during a run stops that run's
+  publication.
+
+Reason: on 2026-10-13, after accepting ADR 0010, the owner asked for Phase 2 to be done now and
+said that fixing the architecture directly is the top priority.
+
+Source: the owner's direction to the maintainers on 2026-10-13.
+
 ## 2026-10-07: Weekly operation and the next development steps
 
 Decision:

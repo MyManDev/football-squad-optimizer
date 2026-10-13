@@ -6,7 +6,7 @@ from itertools import product
 
 import pandas as pd
 import pytest
-from tests.football_phase_fixtures import (
+from tests.fixtures.football_phase_fixtures import (
     BENCH,
     DECISION,
     XI,
@@ -16,13 +16,13 @@ from tests.football_phase_fixtures import (
     read_projection,
 )
 
-from squadopt.application.football_phase_experiment import (
+from squadopt.evaluation.models import FrozenSquadDecision
+from squadopt.evaluation.scoring import score_frozen_squad_decision
+from squadopt.experiments.football_phase_experiment import (
     phase_fixed_fifteen_decision,
     phase_fixture_components,
     phase_weekly_forecast,
 )
-from squadopt.evaluation.models import FrozenSquadDecision
-from squadopt.evaluation.scoring import score_frozen_squad_decision
 from squadopt.prediction.football import FOOTBALL_MODEL_VERSION
 
 

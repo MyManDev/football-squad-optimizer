@@ -20,27 +20,31 @@ contracts
     features
       prediction
         optimization
-          integration
-            evaluation
-              scenarios
-                planning
-                  live
-                    bayesopt
-                      preflight
-                        recalibration
-                          backtest
-                            experiments
-                              application
+          evaluation
+            scenarios
+              planning
+                live
+                  bayesopt
+                    preflight
+                      recalibration
+                        backtest
+                          experiments
+                            application
+                              integration
                                 platform
                                   api / entry points
 ```
 
-`integration` is one module, `src/squadopt/integration.py`, which optimizes a squad from a
-canonical projection CSV. It imports only `data` and `optimization`, so it sits directly above
-`optimization` as a layer of its own.
+`integration` is one module, `src/squadopt/integration.py`. The use case it held, optimizing
+a squad from a canonical projection CSV, lives in `src/squadopt/application/projection_csv.py`
+since 2026-10-13, and `integration.py` re-exports `optimize_squad_from_csv` from there for one
+release (rule 2 below). It imports only `application`, so it sits directly above `application`
+as a layer of its own, and the layer goes with the module in the release after the next
+`site-*` tag.
 
 `application`, `platform`, and the optional `api` adapter now exist and are enforced as the
-three highest package layers in `pyproject.toml`. `contracts` is the lowest package and
+highest package layers in `pyproject.toml`, with only the one-release `integration` layer
+between `application` and `platform`. `contracts` is the lowest package and
 imports no other `squadopt` layer; `application` may reach everything below it; and `platform` may consume
 application contracts without allowing HTTP, persistence, queue, authentication, or
 deployment concerns to flow back into them. `api` is the concrete FastAPI entry point and may
@@ -186,6 +190,7 @@ exhaustive = true
 layers = [
     "api",
     "platform",
+    "integration",
     "application",
     "experiments",
     "backtest",
@@ -196,7 +201,6 @@ layers = [
     "planning",
     "scenarios",
     "evaluation",
-    "integration",
     "optimization",
     "prediction",
     "features",
@@ -211,7 +215,7 @@ the contract is exhaustive, a new package directly under `squadopt` fails the ga
 placed in this list. `squadopt.api` is listed above `squadopt.platform`, which is listed
 above `squadopt.application`; the API therefore cannot be imported back into runtime or
 application code. The platform's first package contract is the versioned run context and
-manifest. No baseline violation remains and there are no `ignore_imports` entries. Every
+manifest. The layers contract has no baseline violation and no `ignore_imports` entry. Every
 new upward dependency fails the same contract.
 
 A separate forbidden-import contract lists `squadopt.api` as its source, every engine package
@@ -223,7 +227,8 @@ The original five-edge baseline was measured against `b031ef1` (PR #110). The sh
 extraction verifies the zero-exception contract with `lint-imports`; behavior compatibility
 is covered by `tests/architecture/test_layer_contracts.py` and the existing consumer suites.
 
-`lint-imports` runs every contract in `pyproject.toml`, and none has an `ignore_imports` entry:
+`lint-imports` runs every contract in `pyproject.toml`. Only the tenth has `ignore_imports`
+entries, and they may only shrink (rule 1 above):
 
 1. `Layered architecture`: the order at the top of this document.
 2. `Product does not import the laboratory`: see [the groups the order encodes](#the-groups-the-order-encodes).
@@ -242,10 +247,17 @@ is covered by `tests/architecture/test_layer_contracts.py` and the existing cons
 9. `Use cases and domain records import no process, thread, event-loop or command-line module`:
    `application` and `live` import no process, thread, signal, command-line or event-loop
    module directly.
+10. `Use cases, domain records and features import no storage or source module`:
+    `application`, `live` and `features` import none of the storage and source modules of
+    `data` beyond the 122 direct import edges from 43 modules they have today, each an
+    `ignore_imports` entry; `tests/architecture/test_storage_ratchet.py` holds the entries to
+    a frozen copy whose size it pins by package, so the list only shrinks.
 
-The last three enforce the rings that
+The last four enforce the rings that
 [ADR 0010](decisions/0010-clean-architecture-rings-and-repository-layout.md), an accepted record,
-names.
+names. The tenth is a ratchet under that record's ratchet rule (Decision 4): its allowlist
+holds exactly the storage imports of 2026-10-13, each with its remedy and phase, and a new
+one fails the gate.
 The [architecture overview](../../ARCHITECTURE.md) gives what each contract holds in its
 enforcement map, and `tests/architecture/test_architecture_rings.py` checks that every contract in
 `pyproject.toml` is named in this list and has a row in that map.
@@ -297,7 +309,9 @@ gives the ring of every package, the contracts that enforce them and the known v
 groups above correspond as follows: `contracts` and the schema half of `data` are R1
 (vocabulary); the domain group is R2; the use cases group is R3; `api`, `platform` and the
 storage half of `data` are R4 (adapters) and, for their entry points, R5 (composition). The
-laboratory is the research side tree. The rings changed one thing in the order: the laboratory
-now sits above `live`. The layers contract remains the executable statement and the tie-break
-within a ring, and `tests/architecture/test_architecture_rings.py` checks that the order reads
-the rings from the inside out, with `integration` as its one listed exception.
+laboratory is the research side tree. Naming the rings changed one thing in the order: the
+laboratory now sits above `live`. Folding `integration` into `application` later moved the
+`integration` layer from above `optimization` to above `application`. The layers contract
+remains the executable statement and the tie-break within a ring, and
+`tests/architecture/test_architecture_rings.py` checks that the order reads the rings from the
+inside out, with no exception.

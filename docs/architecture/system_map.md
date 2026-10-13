@@ -17,10 +17,10 @@ available in Git at `6ca49686:docs/architecture/system_map.md`.
 | `scenarios` | Joint point scenarios, scenario paths and rival squads; domain, not research: `live` (plan selection, report, risk) and `application` import it |
 | Research packages | Search, preflight, recalibration, backtests and experiments; obey the declared layer order |
 | `live` | Domain records, decisions, advice and settled operational calculations |
-| `application` | Typed workflows, publication/evidence builders and advice capabilities; no platform or script imports |
+| `application` | Typed workflows, publication/evidence builders, advice capabilities and squad optimization from a canonical projection CSV (`projection_csv`); no platform or script imports |
 | `platform` | Filesystem, capture, queue, process pool, metrics, backup and command adapters |
 | `api` | HTTP translation; engine access goes through platform/application boundaries |
-| `integration` | One module that optimizes a squad from a canonical projection CSV; imports only `data` and `optimization` |
+| `integration` | One module that re-exports `optimize_squad_from_csv` from `application.projection_csv` for one release; imports only `application` |
 | `web` | Static publication reader, validated HTTP advice client, member selection and rendering |
 | Device solver | The member's one-week plan solved in the browser with HiGHS, from the published device-plan table; lives in `web/src/features/league/device/` |
 | Measurement preflight | Required root fields declared per artifact kind in `preflight.measurement`; checks declared governance, proves nothing about the actions. See [evidence validation](evidence_validation.md) |

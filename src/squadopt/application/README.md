@@ -12,7 +12,7 @@ domain records import no process, thread, event-loop or command-line module" in
 `source_revision()` in `squadopt.data.source_revision`, which runs `git`; ARCHITECTURE.md lists
 it as a known violation.
 
-Its 66 Python files, 62 at the top level and four in the `strategies/` subpackage, sit in one
+Its 61 Python files, 57 at the top level and four in the `strategies/` subpackage, sit in one
 folder. This page places every one of them in exactly one family. Review: the owner
 ([ownership](../../../docs/architecture/ownership.md)).
 
@@ -67,6 +67,12 @@ word.
 | `horizon_publish.py` | Validates planning evidence before it is attached to a public ledger view. |
 | `planner_review.py` | Offline decision review with explicit information provenance and member-owned weights. |
 
+## Squad optimization from a projection CSV
+
+| Module | What it does |
+| --- | --- |
+| `projection_csv.py` | Reads a canonical projection CSV and optimizes one squad from it (`optimize_squad_from_csv`). The package root re-exports it lazily, and `squadopt.integration` re-exports it until the release after the next `site-*` tag. |
+
 ## League and site publication
 
 The static JSON trees the website reads: the per-member league trees and the season site.
@@ -114,7 +120,9 @@ The static JSON trees the website reads: the per-member league trees and the sea
 
 The experimental football model a member can choose in place of the current model
 (`PREDICTION_MODELS` in `advice_capabilities.py`). These modules are product code and are
-opt-in.
+opt-in. The lane's private model experiments, the `football_*_experiment` modules, are
+laboratory code and live in [`squadopt.experiments`](../experiments/README.md); no module here
+may end in `_experiment` (`tests/architecture/test_run_boundary.py`).
 
 | Module | What it does |
 | --- | --- |
@@ -125,23 +133,6 @@ opt-in.
 | `football_information.py` | The public conditional plan explanation, with base points apart from choice utility. |
 | `football_candidate.py` | The read-only football candidate handoff: forecasts, plans, shared worlds and rival utility. |
 | `football_window_review.py` | Shared match-world evaluation across complete three- and five-week candidate plans. |
-
-## Laboratory modules in the use-case ring, until Phase 2
-
-These six modules are private football model experiments. They are imported only by tests, they
-are laboratory code in a product package, and
-`tests/architecture/test_run_boundary.py` reports any of them that a product entry point or an
-operational command loads. ARCHITECTURE.md lists them as a known violation; they move to
-`squadopt.experiments` once that is agreed on issue #1012.
-
-| Module | What it does |
-| --- | --- |
-| `football_flag_experiment.py` | Private flag replacement using a learned whole-week minute distribution. |
-| `football_load_experiment.py` | Private all-competition minute-law composition on a captured basis. |
-| `football_phase_experiment.py` | Private phase allocation, weekly eligibility and a fixed-fifteen role adapter. |
-| `football_score_state_experiment.py` | Private score-process composition on an unchanged captured minute law. |
-| `football_tactical_experiment.py` | Private explicit tactical replacement and a bounded fixed-fifteen comparison. |
-| `football_unit_experiment.py` | An explicit private unit experiment over retained conditional fixture components. |
 
 ## Package surface
 
@@ -155,11 +146,19 @@ ARCHITECTURE.md measures and schedules these; this list says where they are.
 
 - **Storage imports.** Modules here import the storage half of `squadopt.data` (captures,
   atomic writes, loaders) directly. The remedy is storage ports declared here with file adapters
-  in `platform` (Phase 3).
+  in `platform` (Phase 3). Until then the contract "Use cases, domain records and features
+  import no storage or source module" holds them to today's imports: 89 edges from 30 modules,
+  each an `ignore_imports` entry that may only go.
+- **File access.** 24 modules here read or write files themselves, among them
+  `league_publication.py`, `league_views.py` and `site.py` (the published trees),
+  `advice_record.py`, and `player_evidence.py` and `rotation_export.py` (the evidence exports).
+  The remedy is the same storage ports (Phase 3). Until then
+  `tests/architecture/test_use_case_file_io.py` allowlists the 24, and fails on any other
+  module here that reads or writes a file.
 - **Ports.** Three typed ports are declared here: `DecisionVerifier` in `commands.py`,
   `EntryPicksProvider` in `entries.py` and `TickObserver` in `season.py`.
 - **Paths to `docs/contracts`.** `contract.py` names `docs/contracts/ui_view_v1.schema.json`
   as the default target of `write_ui_view_schema`, and `chip_forecast.py` names
   `docs/contracts/chip_forecast_v1.schema.json` as a constant the tests read. Neither reads the
-  file when it runs.
-- **Laboratory modules.** The six `_experiment` modules above.
+  file when it runs. `tests/architecture/test_runtime_contract_paths.py` allowlists both, with
+  the six in `platform`, and fails on any other module that names the folder.

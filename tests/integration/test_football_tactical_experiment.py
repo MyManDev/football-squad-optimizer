@@ -12,7 +12,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 import pytest
-from tests.football_tactical_fixtures import (
+from tests.fixtures.football_tactical_fixtures import (
     BENCH,
     CAPTURED,
     CUTOFF,
@@ -29,8 +29,8 @@ from tests.football_tactical_fixtures import (
     world,
 )
 
-import squadopt.application.football_tactical_experiment as experiment
-from squadopt.application.football_tactical_experiment import (
+import squadopt.experiments.football_tactical_experiment as experiment
+from squadopt.experiments.football_tactical_experiment import (
     compose_tactical_candidate,
     plan_tactical_fixed_fifteen,
 )

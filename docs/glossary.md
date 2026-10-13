@@ -37,7 +37,7 @@ the two differ.
 | Name | Meanings |
 | --- | --- |
 | data | (1) `data/`, the private operational state at the repository root; (2) `squadopt.data`, the canonical data package; (3) `web/public/data`, the published views the website reads; (4) `web/src/data`, the website's data client and generated schema types. |
-| fixtures | (1) test fixtures: `tests/fixtures/` and the `tests/football_*_fixtures.py` modules; (2) `web/src/fixtures/`, the website's test and development data; (3) football fixtures, the matches of a gameweek: `squadopt.data.fixtures`, `web/src/features/fixtures/` and the [fixture list](fixtures_view.md). |
+| fixtures | (1) test fixtures: `tests/fixtures/`, including its `football_*_fixtures.py` modules; (2) `web/src/fixtures/`, the website's test and development data; (3) football fixtures, the matches of a gameweek: `squadopt.data.fixtures`, `web/src/features/fixtures/` and the [fixture list](fixtures_view.md). |
 | contracts | (1) `squadopt.contracts`, the vocabulary package; (2) `docs/contracts/`, the versioned public schemas the code and the website validate against. |
 | preflight | (1) `squadopt.preflight`, the laboratory's validator for residual exports and measurement records; (2) the first stage of the weekly run, which checks the checkout and the inputs before anything is spent. |
 | scripts | (1) `scripts/`, the repository's commands and measurement runners; (2) `web/scripts/`, the website's build and deployment checks; (3) `workers/fpl-probe/scripts/`, the probe's deployment steps. |

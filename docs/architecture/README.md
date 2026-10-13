@@ -7,8 +7,10 @@ is the summary; the [decision records](decisions/README.md) explain why.
 
 A document marked in the last column is read by a test, so a change to its wording can fail
 the build. The test named there says what it holds. Every Markdown file in the repository is
-also read by `tests/architecture/test_markdown_links.py`, and every document under `docs/` by
-`tests/architecture/test_documentation_paths.py`; those two are not repeated below.
+also read by `tests/architecture/test_markdown_links.py`, every document under `docs/` by
+`tests/architecture/test_documentation_paths.py`, and the links of every document reached from
+the documentation guide by `tests/architecture/test_docs_reachable.py`; those three are not
+repeated below.
 
 ## Structure
 
