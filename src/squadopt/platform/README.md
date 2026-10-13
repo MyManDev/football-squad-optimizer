@@ -7,10 +7,11 @@ with `squadopt.api`, that may import web frameworks, network clients, model SDKs
 (the contract "Frameworks, network and databases stay in api and platform"). No package below
 it in the layer order imports it, and it imports no laboratory module.
 
-Its 54 Python files sit in one flat folder and serve several deployment units. Splitting the
-package by unit is deferred (ADR 0008, M6) and is an open question in
-[ADR 0010](../../../docs/architecture/decisions/0010-clean-architecture-rings-and-repository-layout.md),
-so this page is the map until then: every module is in exactly one family below.
+Its 54 Python files sit in one flat folder and serve several deployment units.
+[ADR 0011](../../../docs/architecture/decisions/0011-storage-ports-and-platform-split.md)
+splits the package into seven subpackages by deployment unit in Phase 3 and keeps every
+command as it is; until those moves land this page is the map: every module is in exactly one
+family below.
 
 Review: either owner approves a change here; the `club_news_*` modules are İbrahim's zone
 ([ownership](../../../docs/architecture/ownership.md)).
@@ -24,6 +25,12 @@ Review: either owner approves a change here; the `club_news_*` modules are İbra
 | Advice worker | `python -m squadopt.platform.advice_worker` | Advice queue and workers, with the services `backend_runtime` builds |
 | Installed CLI | the `squadopt` console script (`squadopt.platform.cli:main`) | Installed CLI, run records, `fpl_capture` |
 | Club news capture | `python -m scripts.capture_club_news` | Club news and the model adapter |
+
+Before the moves, `tests/architecture/test_platform_entry_points.py` pins the operator surface
+ADR 0011 keeps: the `--help` usage lines and `main` of the seven `python -m` commands (`cli`,
+`weekly_operations`, `advice_worker`, `advice_load`, `backup_recovery`, `benchmark_capture`,
+`capture_measurement`), the console script's target, the backend restart's import smoke,
+`build_app` as a factory with no arguments, and the tree `package_fingerprint()` hashes.
 
 ## Weekly run
 
