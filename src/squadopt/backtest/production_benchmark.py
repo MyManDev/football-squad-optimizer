@@ -45,7 +45,6 @@ from squadopt.backtest.production import (
     PRODUCTION_FEATURE_CONTRACT_VERSION,
     PRODUCTION_MODEL_NAME,
     PRODUCTION_MODEL_VERSION,
-    make_production_projection_builder,
 )
 from squadopt.backtest.splits import BacktestConfigurationError
 from squadopt.evaluation import (
@@ -717,29 +716,3 @@ def _judge_prepared_candidates(
         residuals=residuals[PRODUCTION_LABEL],
         candidate_declaration=settings.candidate_declaration,
     )
-
-
-def run_production_benchmark(
-    panel: pd.DataFrame,
-    fixtures: pd.DataFrame,
-    team_codes: pd.DataFrame,
-    config: ProductionBenchmarkConfig | None = None,
-) -> ProductionBenchmarkResult:
-    """Run the current production candidate over the frozen development gate."""
-
-    settings = ProductionBenchmarkConfig() if config is None else config
-    if not isinstance(settings, ProductionBenchmarkConfig):
-        raise BacktestConfigurationError("config must be a ProductionBenchmarkConfig.")
-    candidate_builder = make_production_projection_builder(
-        fixtures=fixtures,
-        team_codes=team_codes,
-        config=settings.production_config,
-        cross_season=settings.cross_season_config,
-    )
-    return run_declared_candidate_benchmark(panel, candidate_builder, settings)
-
-
-def candidate_labels() -> Sequence[str]:
-    """The three candidates a judging run compares, in report order."""
-
-    return (BASELINE_LABEL, RIDGE_LABEL, PRODUCTION_LABEL)

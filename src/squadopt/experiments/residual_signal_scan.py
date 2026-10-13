@@ -1,7 +1,7 @@
 """Which signals the archive already holds does the control still leave in its residuals?
 
 The prediction side asked one version of this question for opponent strength
-(`backtest.opponent_strength_signal`) and found the residuals still move with it. This
+(`docs/opponent_strength_signal.md`) and found the residuals still move with it. This
 module asks it for the enrichment fields the archive carries but the canonical panel does
 not: expected goal involvement, recent luck (returns above expected), ownership, the
 source's own point expectation, and whether a player has just changed club. Every

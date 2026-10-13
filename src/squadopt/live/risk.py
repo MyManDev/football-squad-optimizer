@@ -226,9 +226,9 @@ DEVELOPMENT_SELECTION_OPTIMISM: Final = SelectionOptimism(
     per_starter_points=2.951,
     captain_points=3.863,
     source="selection_optimism_profile_v1 (control, 147 development folds, fw06)",
-    # The historical runner calls build_projection_table with FormWindowMapping(6),
-    # as in scenario_audit. It does not apply live captured availability or use the
-    # opening carry-over / in-season / Phase C estimator. Do not alias these models.
+    # The removed historical runner (record commit 1580edfa) used FormWindowMapping(6) as the
+    # scenario audit did: no live captured availability, no opening carry-over / in-season /
+    # Phase C estimator. Do not alias these models.
     model_name="deterministic_baseline",
     model_version="form_window_06_v1",
     feature_contract_version="form_window_v1",

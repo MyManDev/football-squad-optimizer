@@ -299,16 +299,13 @@ then reads the archive builds it again. These build it more than once in one run
   `--live-components`, once more for each `--live-decision`, through the same
   `_component_table`.
 
-Two callers build it in a process pool's initializer, once per worker process:
-
-- the member-publication workers (`platform/publication_workers.py`), beside the parent's
-  own build (`application/league_publication.py`). A league stage run with N workers above
-  one cleans the archive at most N + 1 times, the workers in parallel (the spawned pool
-  starts a worker only while members are waiting, so a league with fewer members than
-  workers starts fewer). With one worker there is no pool, and the parent cleans it once.
-- the season workers of `scripts/run_chip_bayesopt.py` (`_init_worker`, four by default),
-  which clean it at most once each and nowhere else; with one worker the script runs the
-  same initializer in its own process, once.
+One caller builds it in a process pool's initializer, once per worker process: the
+member-publication workers (`platform/publication_workers.py`), beside the parent's own build
+(`application/league_publication.py`). A league stage run with N workers above one cleans the
+archive at most N + 1 times, the workers in parallel (the spawned pool starts a worker only
+while members are waiting, so a league with fewer members than workers starts fewer). With one
+worker there is no pool, and the parent cleans it once. The season workers of the chip Bayesian
+search were the second caller until that runner was removed on 2026-10-12.
 
 That is still about a second of cleaning per build, and a weekly run makes at most four in
 its own process and one in each league worker, against a league stage the runbook

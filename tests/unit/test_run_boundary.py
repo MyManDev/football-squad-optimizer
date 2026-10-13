@@ -31,8 +31,6 @@ LABORATORY = (
     "bayesopt",
     "recalibration",
     "preflight",
-    "risk",
-    "uncertainty",
 )
 
 PRODUCT_ENTRY_POINTS = (

@@ -20,7 +20,6 @@ TRANSFER_PLANNING_CONTRACT_VERSION: Final = "deterministic_transfer_planning_v3"
 # The chips this planner models. Free hit arrived with contract v2: it makes one week's
 # squad temporary and restores the previous squad and bank the week after, which the
 # model carries as a per-week "base" state that reverts under the chip.
-CHIP_NAMES_V1: Final = ("bboost", "3xc", "wildcard")
 CHIP_NAMES_V2: Final = ("bboost", "3xc", "wildcard", "freehit")
 CHIP_NAMES: Final = CHIP_NAMES_V2
 PLANNING_HORIZON_COLUMNS: Final = (

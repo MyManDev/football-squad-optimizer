@@ -12,8 +12,6 @@ from ortools.sat.python import cp_model
 from squadopt.contracts import order_outfield_bench
 from squadopt.optimization.coefficients import (
     objective_coefficients,
-    scale_bench_coefficient,
-    scale_expected_points,
     sort_players_by_id,
 )
 from squadopt.optimization.config import OptimizationConfig
@@ -37,18 +35,6 @@ from squadopt.optimization.validation import validate_players
 CP_SAT_SAFE_INTEGER_MAX = (1 << 62) - 1
 MIN_TIEBREAK_TIME_SECONDS = 0.001
 MIN_TIEBREAK_DETERMINISTIC_TIME = 1e-9
-
-
-def _scale_expected_points(value: object, scale: int) -> int:
-    """Backward-compatible private alias for the shared scaling contract."""
-
-    return scale_expected_points(value, scale)
-
-
-def _scale_bench_coefficient(scaled_points: int, bench_weight: float) -> int:
-    """Backward-compatible private alias for the shared scaling contract."""
-
-    return scale_bench_coefficient(scaled_points, bench_weight)
 
 
 @dataclass(frozen=True, slots=True)

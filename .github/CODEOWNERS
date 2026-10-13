@@ -29,9 +29,7 @@
 # --- optimization / evaluation
 /src/squadopt/optimization/        @ErtugrulS32175
 /src/squadopt/evaluation/          @ErtugrulS32175
-/src/squadopt/uncertainty/         @ErtugrulS32175
 /src/squadopt/scenarios/           @ErtugrulS32175
-/src/squadopt/risk/                @ErtugrulS32175
 /src/squadopt/planning/            @ErtugrulS32175
 /src/squadopt/bayesopt/            @ErtugrulS32175
 /src/squadopt/preflight/           @ErtugrulS32175

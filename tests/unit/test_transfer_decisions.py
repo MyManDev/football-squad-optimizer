@@ -5,7 +5,6 @@ reused. The member holds players 1 to 13 plus 16 and 17, so every candidate that
 draw must move 16 and 17 out and 14 and 15 in: two transfers, one of them paid.
 """
 
-import json
 from dataclasses import replace
 from types import SimpleNamespace
 
@@ -24,7 +23,6 @@ from squadopt.scenarios import (
     evaluate_transfer_candidates,
     integer_mean_cvar,
     score_component_scenario_decision,
-    selection_record,
     transfer_candidate_from_plan,
 )
 from squadopt.scenarios.components import (
@@ -125,10 +123,7 @@ def test_candidates_share_one_draw_and_pay_the_hit_exactly_once() -> None:
     assert first.utility_int > second.utility_int
     assert selection.selected_rank == 0 and selection.selected is control
     assert "control has the highest net utility" in selection.reason
-    record = selection_record(selection)
-    json.dumps(record, allow_nan=False)
-    assert record["status"] == "SELECTED" and len(record["candidates"]) == 2
-    assert record["candidates"][0]["mean_net_of_hit"] == pytest.approx(first.mean)
+    assert selection.status.value == "SELECTED" and len(selection.diagnostics) == 2
 
 
 def test_a_wildcard_pays_no_hit_and_a_misreported_hit_is_refused() -> None:

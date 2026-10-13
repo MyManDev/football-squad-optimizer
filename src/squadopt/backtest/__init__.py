@@ -1,11 +1,5 @@
 """Leakage-safe walk-forward preparation and baseline benchmarking."""
 
-from squadopt.backtest.benchmark import (
-    BASELINE_BENCHMARK_CONTRACT_VERSION,
-    DEFAULT_BENCHMARK_SEASONS,
-    BaselineBenchmarkConfig,
-    run_baseline_benchmark,
-)
 from squadopt.backtest.folds import (
     ProjectionBuilder,
     baseline_projection_builder,
@@ -14,23 +8,13 @@ from squadopt.backtest.folds import (
     make_baseline_projection_builder,
 )
 from squadopt.backtest.learned import (
-    DEFAULT_LEARNED_BENCHMARK_SEASONS,
-    LEARNED_BENCHMARK_CONTRACT_VERSION,
-    LOCKED_HOLDOUT_SEASON,
     RESIDUAL_COLUMNS,
-    LearnedBenchmarkConfig,
-    LearnedBenchmarkResult,
     PairedDecisionMetrics,
     PositionPredictionMetrics,
     PredictionMetrics,
     build_residual_history,
     build_ridge_prediction_snapshot,
     make_ridge_projection_builder,
-    run_learned_benchmark,
-)
-from squadopt.backtest.learned_reporting import (
-    learned_benchmark_to_dict,
-    learned_benchmark_to_markdown,
 )
 from squadopt.backtest.opening_prior import (
     DEFAULT_OPENING_PRIOR_HOLDOUT_SEASON,
@@ -54,21 +38,13 @@ from squadopt.backtest.splits import (
 )
 
 __all__ = [
-    "BASELINE_BENCHMARK_CONTRACT_VERSION",
-    "DEFAULT_BENCHMARK_SEASONS",
-    "DEFAULT_LEARNED_BENCHMARK_SEASONS",
     "DEFAULT_OPENING_PRIOR_HOLDOUT_SEASON",
     "DEFAULT_OPENING_PRIOR_TRAINING_SEASONS",
-    "LEARNED_BENCHMARK_CONTRACT_VERSION",
-    "LOCKED_HOLDOUT_SEASON",
     "OPENING_PRIOR_BACKTEST_CONTRACT_VERSION",
     "RESIDUAL_COLUMNS",
     "BacktestConfigurationError",
     "BacktestError",
-    "BaselineBenchmarkConfig",
     "DecisionPoint",
-    "LearnedBenchmarkConfig",
-    "LearnedBenchmarkResult",
     "OpeningPriorBacktestConfig",
     "OpeningPriorBacktestResult",
     "OpeningPriorMetrics",
@@ -82,15 +58,11 @@ __all__ = [
     "build_walk_forward_fold",
     "build_walk_forward_folds",
     "fit_opening_price_coefficient",
-    "learned_benchmark_to_dict",
-    "learned_benchmark_to_markdown",
     "make_baseline_projection_builder",
     "make_ridge_projection_builder",
     "realized_points_at",
     "rows_before",
     "rows_through",
-    "run_baseline_benchmark",
-    "run_learned_benchmark",
     "run_opening_prior_backtest",
     "season_ranks",
     "walk_forward_decision_points",

@@ -20,11 +20,11 @@ reference (the risk-neutral squad's), so a menu can be swept: "60% for -0.8 xP, 
 Rival and self are scored in the same scenarios, so shared players cancel exactly and
 only the differential is uncertain. The selection-optimism shift is not applied to
 either side — both squads were selected; it cancels in the difference. Everything here
-is a measurement instrument until the goal-menu report is verified against a ledger.
+is a measurement instrument until a reading of it is verified against a ledger.
 """
 
 import math
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from time import perf_counter
 from types import MappingProxyType
@@ -592,100 +592,3 @@ def optimize_rank_probability_squad(
         comparison=comparison,
         diagnostics=diagnostics,
     )
-
-
-@dataclass(frozen=True, slots=True)
-class GoalMenuEntry:
-    """One line of the goal menu: a budget, and what it buys against the rival."""
-
-    expected_points_budget: float | None
-    probability_ahead: float | None
-    probability_ahead_interval: tuple[float, float] | None
-    scenario_mean_score: float | None
-    expected_points_cost: float | None
-    starters_changed: int | None
-    captain_changed: bool | None
-    solver_status: str
-
-
-def goal_menu(
-    scenarios: ScenarioSet,
-    rival: RivalSquad,
-    reference: OptimizationResult,
-    optimization_config: OptimizationConfig,
-    budgets: Sequence[float | None] = (0.0, 1.0, 2.0, 4.0, 8.0, None),
-    *,
-    margin_points: float = 0.0,
-    rival_edge_points: float = 0.0,
-    rival_edge_samples: tuple[float, ...] = (),
-    rival_edge_weeks: int = 1,
-    rival_edge_seed: int = 0,
-) -> tuple[tuple[GoalMenuEntry, RankOptimizationResult], ...]:
-    """Sweep the expected-points budget and return the menu against one rival.
-
-    ``reference`` is the risk-neutral decision; its scenario-mean score anchors the
-    budgets and its eleven anchors "starters changed". A budget of None is unconstrained.
-    """
-
-    if not isinstance(reference, OptimizationResult) or not reference.has_solution:
-        raise ScenarioValidationError("reference must be a feasible OptimizationResult.")
-    verified = scenarios.validated_copy()
-    player_ids = verified.projections.table["player_id"].tolist()
-    column = {p: i for i, p in enumerate(player_ids)}
-    matrix = verified.scenario_points.to_numpy(dtype="float64", copy=False)
-    reference_starters = reference.starting_xi["player_id"].tolist()
-    assert reference.captain is not None
-    reference_captain = reference.captain["player_id"]
-    reference_mean = float(
-        (
-            matrix[:, [column[p] for p in reference_starters]].sum(axis=1)
-            + matrix[:, column[reference_captain]]
-        ).mean()
-    )
-    entries: list[tuple[GoalMenuEntry, RankOptimizationResult]] = []
-    for budget in budgets:
-        result = optimize_rank_probability_squad(
-            verified,
-            rival,
-            optimization_config,
-            RankObjectiveConfig(
-                margin_points=margin_points,
-                expected_points_budget=budget,
-                rival_edge_points=rival_edge_points,
-                rival_edge_samples=rival_edge_samples,
-                rival_edge_weeks=rival_edge_weeks,
-                rival_edge_seed=rival_edge_seed,
-            ),
-            reference_expected_points=reference_mean,
-        )
-        if result.has_solution:
-            chosen = result.optimization_result
-            assert chosen.captain is not None
-            changed = len(set(chosen.starting_xi["player_id"]) - set(reference_starters))
-            entry = GoalMenuEntry(
-                expected_points_budget=budget,
-                probability_ahead=result.probability_ahead,
-                probability_ahead_interval=result.probability_ahead_interval,
-                scenario_mean_score=result.scenario_mean_score,
-                expected_points_cost=(
-                    None
-                    if result.scenario_mean_score is None
-                    else reference_mean - result.scenario_mean_score
-                ),
-                starters_changed=changed,
-                captain_changed=chosen.captain["player_id"] != reference_captain,
-                solver_status=chosen.solver_status.name,
-            )
-        else:
-            entry = GoalMenuEntry(
-                budget,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                result.optimization_result.solver_status.name,
-            )
-        entries.append((entry, result))
-    return tuple(entries)

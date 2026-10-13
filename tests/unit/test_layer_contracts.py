@@ -116,9 +116,6 @@ def test_projection_and_policy_fingerprints_preserve_pre_extraction_values() -> 
 # (docs/architecture/dependency_rules.md, rule 2). Each old module maps to the names it no
 # longer serves; the names live in `data`, `contracts`, `evaluation` and `application` now.
 _REMOVED_RE_EXPORTS: dict[str, frozenset[str]] = {
-    "squadopt.backtest.export_precision": frozenset(
-        {"EXPORT_LINE_TERMINATOR", "write_export_table"}
-    ),
     "squadopt.bayesopt.models": frozenset(
         {
             "BayesianFactor",
@@ -148,7 +145,10 @@ _REMOVED_RE_EXPORTS: dict[str, frozenset[str]] = {
     ),
     "squadopt.preflight.validator": frozenset({"compute_table_sha256"}),
 }
-_REMOVED_MODULES = ("squadopt.platform._long_paths",)
+# Modules removed outright. `backtest.export_precision` also carried the 2026-09-10
+# re-exports of `EXPORT_LINE_TERMINATOR` and `write_export_table`; the module itself went with
+# its runner on 2026-10-12, so no import from it can resolve.
+_REMOVED_MODULES = ("squadopt.backtest.export_precision", "squadopt.platform._long_paths")
 _REPOSITORY = Path(__file__).resolve().parents[2]
 
 

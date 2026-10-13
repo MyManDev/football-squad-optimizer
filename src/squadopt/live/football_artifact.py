@@ -31,7 +31,6 @@ from squadopt.prediction.football_team_form import (
     team_form_metadata,
 )
 
-FOOTBALL_CHOICE = "football"
 ARTIFACT_CONTRACT = "live_football_forecast_v1"
 FEATURE_CONTRACT = "causal_football_fixture_features_v1"
 

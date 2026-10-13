@@ -32,7 +32,6 @@ from squadopt.backtest.production_benchmark import (
     _non_deterministic_truncations,
     _relative_change,
     _validate_candidate_provenance,
-    candidate_labels,
 )
 from squadopt.backtest.production_reporting import judgement_to_dict, judgement_to_markdown
 from squadopt.backtest.splits import BacktestConfigurationError
@@ -330,10 +329,6 @@ def test_the_report_makes_the_frozen_candidate_change_visible() -> None:
 
 
 # --- configuration ----------------------------------------------------------
-
-
-def test_the_candidates_are_named_in_report_order() -> None:
-    assert tuple(candidate_labels()) == ("baseline", "ridge", "production")
 
 
 def test_the_default_seasons_exclude_the_holdout() -> None:

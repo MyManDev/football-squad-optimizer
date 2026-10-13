@@ -21,7 +21,6 @@ from squadopt.application import (
     build_site,
     ledger_view,
     pool_view,
-    recommendation_view,
     recommendation_view_from_ledger,
     status_view,
     ui_view_schema,
@@ -81,43 +80,39 @@ def test_the_committed_schema_file_is_the_generator_output() -> None:
     assert json.loads(UI_VIEW_SCHEMA_PATH.read_text(encoding="utf-8")) == ui_view_schema()
 
 
-def test_a_recommendation_view_matches_the_ledger_view_of_the_same_decision(
+def test_the_ledger_view_matches_the_decision_it_records(
     world: tuple[Recommendation, Projection, Path, Any],
 ) -> None:
     recommendation, projection, root, _ = world
-    in_memory = recommendation_view(recommendation)
     record_decision(root, recommendation, projection, report_text=render(recommendation))
-    from_ledger = recommendation_view_from_ledger(load_entry(root, SEASON, 1))
+    view = recommendation_view_from_ledger(load_entry(root, SEASON, 1))
 
-    for view in (in_memory, from_ledger):
-        payload = view.to_dict()
-        _validate(payload, "RecommendationView")
-        json.dumps(payload)  # JSON-native only
-        assert len(view.starting_xi) == 11 and len(view.bench) == 4 and len(view.squad) == 15
-        assert sum(p.is_captain for p in view.starting_xi) == 1
-        assert view.captain_player_id == int(recommendation.captain["player_id"])
-        assert view.decision_kind == "opening" and view.transfers is None
-        assert view.solver_proved_optimal is True
-        assert [p.position for p in view.starting_xi] == sorted(
-            [p.position for p in view.starting_xi], key=["GK", "DEF", "MID", "FWD"].index
-        )
-        assert [p.bench_order for p in view.bench] == [1, 2, 3, 4]
-    # Everything the ledger freezes agrees between the two paths.
-    for name in (
-        "season",
-        "gameweek",
-        "snapshot_id",
-        "prediction_fingerprint",
-        "solver_status",
-        "captain_player_id",
-        "total_cost_tenths",
-        "projected_score",
-    ):
-        assert getattr(in_memory, name) == getattr(from_ledger, name)
-    assert [p.player_id for p in in_memory.squad] == [p.player_id for p in from_ledger.squad]
-    # GW1's honest risk state: not requested, said in words on both paths.
-    assert in_memory.risk.status == from_ledger.risk.status == "not_requested"
-    assert from_ledger.risk.stated_limits and in_memory.risk.reason
+    payload = view.to_dict()
+    _validate(payload, "RecommendationView")
+    json.dumps(payload)  # JSON-native only
+    assert len(view.starting_xi) == 11 and len(view.bench) == 4 and len(view.squad) == 15
+    assert sum(p.is_captain for p in view.starting_xi) == 1
+    assert view.captain_player_id == int(recommendation.captain["player_id"])
+    assert view.decision_kind == "opening" and view.transfers is None
+    assert view.solver_proved_optimal is True
+    assert [p.position for p in view.starting_xi] == sorted(
+        [p.position for p in view.starting_xi], key=["GK", "DEF", "MID", "FWD"].index
+    )
+    assert [p.bench_order for p in view.bench] == [1, 2, 3, 4]
+    # Everything the ledger freezes agrees with the recommendation it was recorded from.
+    assert view.season == recommendation.season
+    assert view.gameweek == int(recommendation.gameweek)
+    assert view.snapshot_id == recommendation.snapshot_id
+    assert view.prediction_fingerprint == recommendation.prediction_fingerprint
+    assert view.solver_status == recommendation.solver_status
+    assert view.total_cost_tenths == int(recommendation.total_cost_tenths)
+    assert view.projected_score == float(recommendation.projected_score)
+    assert {p.player_id for p in view.squad} == {
+        int(v) for v in recommendation.squad["player_id"].tolist()
+    }
+    # GW1's honest risk state: not requested, said in words.
+    assert view.risk.status == recommendation.risk.status.value == "not_requested"
+    assert view.risk.stated_limits and recommendation.risk.reason
 
 
 def test_the_public_recommendation_only_exposes_allowlisted_ledger_metadata(

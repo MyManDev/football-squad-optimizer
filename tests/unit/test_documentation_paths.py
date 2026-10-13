@@ -31,8 +31,9 @@ deliberate rather than an oversight in the ordering of the clauses. **A protocol
 it merges.** It names what the runner was called at pre-registration, and if the runner is later
 renamed the protocol is still an accurate record of what was registered; making this check drag
 protocols after a rename would have it demand edits to pre-registered documents, which is the
-one thing a pre-registration exists to prevent. Records, plans and notes are not frozen and are
-checked in full.
+one thing a pre-registration exists to prevent. Plans and notes are not frozen and are checked in
+full. A dated record listed in `RECORDS` is checked in full except for a runner it names: it says
+what was run on its day, so a runner retired since stays cited, as the command check excuses it.
 
 The allowance is confined to the two directories a runner lives in. A protocol citing
 `data/snapshots.py` is the ambiguity above, nothing about being a protocol makes it less wrong,
@@ -94,6 +95,19 @@ def _is_a_runner_a_protocol_has_not_had_written_yet(document: Path, raw: str) ->
     return document.name.endswith("_prereg.md") and raw.startswith(RUNNER_ROOTS)
 
 
+def _is_a_runner_a_dated_record_ran(document: Path, raw: str) -> bool:
+    """A dated record may name the runner that produced it after that runner is retired.
+
+    The record states what was run on its day, which is why the command check below excuses
+    the documents listed in `RECORDS`; rewriting the record to follow a retirement would edit
+    evidence. The allowance is confined to the directories a runner lives in, so a record citing
+    `data/snapshots.py` is still the ambiguity above.
+    """
+
+    relative = document.relative_to(REPOSITORY_ROOT).as_posix()
+    return relative in RECORDS and raw.startswith(RUNNER_ROOTS)
+
+
 def _cited_paths() -> list[tuple[Path, int, str]]:
     found: list[tuple[Path, int, str]] = []
     for document in sorted(DOCS.rglob("*.md")):
@@ -119,6 +133,7 @@ def test_every_rooted_python_path_cited_in_docs_is_a_file_that_exists() -> None:
         for document, number, raw in cited
         if raw not in PROPOSED
         and not _is_a_runner_a_protocol_has_not_had_written_yet(document, raw)
+        and not _is_a_runner_a_dated_record_ran(document, raw)
         and not (REPOSITORY_ROOT / raw).exists()
     ]
     assert not missing, "\n".join(
@@ -163,18 +178,41 @@ SCRIPT_PATH = re.compile(r"(?<![\w./-])scripts/([\w./<>{}*-]+?)\.py\b")
 #: Dated records. Each keeps the commands of its day, and a command removed since is still
 #: what was run then, so the whole document is excused.
 RECORDS: dict[str, str] = {
+    "docs/baseline_benchmark.md": "the real-data baseline benchmark of 2026-08-12",
+    "docs/candidate_runtime.md": "the #43 candidate timing of 2026-08-16",
+    "docs/chip_bayesopt_note.md": "the chip Bayesian search of 2026-08-18",
+    "docs/fixture_group_conformal_note.md": "the fixture-group conformal reading of 2026-08-18",
+    "docs/fw10_holdout_plan.md": "the form_window=10 locked-holdout plan of 2026-08-15",
     "docs/gw1_run_sheet.md": "the order of commands for Friday 2026-08-21",
     "docs/gw2_run_sheet.md": "the order of commands for Friday 2026-08-28",
     "docs/handover_2026-08-23.md": "the data and prediction handover of 2026-08-22",
+    "docs/horizon_decay.md": "the horizon decay measurement of 2026-08-16",
+    "docs/in_season_residual_export.md": "the in-season residual export of 2026-08-23",
+    "docs/measurement_instrument.md": "the measurement instrument run of 2026-09-13",
+    "docs/opening_newcomer_note.md": "the opening newcomer study of 2026-08-19",
+    "docs/opponent_signal.md": "the opponent signal build of 2026-08-21",
+    "docs/projection_uncertainty_v2_declaration.md": "the v2 uncertainty declaration of 2026-08-18",
+    "docs/rank_objective_rehearsal_note.md": "the rank-objective rehearsal of 2026-08-18",
+    "docs/route_a_declaration.md": "the Route A declaration of 2026-08-23",
+    "docs/scenario_calibration_correction_note.md": "the corrected scenario audit of 2026-08-18",
 }
 
 #: A living document may name a removed module in the note that says it was removed. Only
 #: these names are excused, and only on the lines of that note: the same name on any other
 #: line of the document is checked like every other citation.
 REMOVAL_NOTES: dict[str, frozenset[str]] = {
+    "docs/architecture/decisions/0008-structure-investment.md": frozenset(
+        {"build_opponent_signal"}
+    ),
     "docs/architecture/platform_runtime.md": frozenset(
         {"run_gameweek_ops", "run_season_tick", "capture_deadline_snapshot"}
     ),
+    "docs/experimentation_spec.md": frozenset({"run_screening_doe", "run_frozen_holdout"}),
+    "docs/learned_prediction_spec.md": frozenset({"run_learned_benchmark"}),
+    "docs/player_uncertainty_spec.md": frozenset({"run_player_risk_screening"}),
+    "docs/risk_optimization_spec.md": frozenset({"run_risk_screening"}),
+    "docs/scenario_spec.md": frozenset({"run_scenario_benchmark"}),
+    "docs/uncertainty_spec.md": frozenset({"run_uncertainty_benchmark"}),
 }
 
 #: What makes a paragraph (a run of non-blank lines) a removal note. It is looked for in the
@@ -381,16 +419,16 @@ def test_a_name_cited_in_a_module_is_one_the_module_binds() -> None:
 
     text = "\n".join(
         [
-            "See `scripts.run_frozen_holdout.main` here.",
-            "See `scripts.run_frozen_holdout.no_such_name` here.",
+            "See `scripts.run_measurement_preflight.main` here.",
+            "See `scripts.run_measurement_preflight.no_such_name` here.",
             "See `scripts.no_such_module.main` here.",
         ]
     )
     cited = _scripts_cited_in(REPOSITORY_ROOT / "README.md", text)
 
     assert [(c.name, c.resolves) for c in cited] == [
-        ("run_frozen_holdout.main", True),
-        ("run_frozen_holdout.no_such_name", False),
+        ("run_measurement_preflight.main", True),
+        ("run_measurement_preflight.no_such_name", False),
         ("no_such_module.main", False),
     ]
 
@@ -470,3 +508,17 @@ def test_the_protocol_allowance_covers_a_runner_and_nothing_else() -> None:
     assert not _is_a_runner_a_protocol_has_not_had_written_yet(
         record, "scripts/measure_positional_defence.py"
     )
+
+
+def test_the_record_allowance_covers_a_runner_and_nothing_else() -> None:
+    """A dated record keeps the runner of its day; nothing else in it is excused, and a living
+    document that cites the same retired runner is reported."""
+
+    record = DOCS / "route_a_declaration.md"
+    living = DOCS / "architecture" / "system_map.md"
+
+    assert record.relative_to(REPOSITORY_ROOT).as_posix() in RECORDS
+    assert _is_a_runner_a_dated_record_ran(record, "scripts/build_opponent_signal.py")
+    # The ambiguity this file exists to catch, inside a record.
+    assert not _is_a_runner_a_dated_record_ran(record, "data/snapshots.py")
+    assert not _is_a_runner_a_dated_record_ran(living, "scripts/build_opponent_signal.py")

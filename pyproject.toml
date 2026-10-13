@@ -137,9 +137,7 @@ layers = [
     "preflight",
     "bayesopt",
     "planning",
-    "risk",
     "scenarios",
-    "uncertainty",
     "evaluation",
     "integration",
     "optimization",
@@ -152,8 +150,8 @@ layers = [
 # Neither the product nor the domain imports the measurement laboratory. The layers contract
 # above is a valid linear extension and stays as the tie-break; this contract is the rule it
 # could not express (docs/architecture/dependency_rules.md). Every package outside the
-# laboratory is a source, so the rule does not depend on the layer order: `scenarios` sits
-# above `uncertainty` there, and only this contract refuses that import.
+# laboratory is a source, so the rule does not depend on the layer order: `live` sits above
+# `experiments` there, and only this contract refuses that import.
 [[tool.importlinter.contracts]]
 name = "Product does not import the laboratory"
 type = "forbidden"
@@ -178,13 +176,6 @@ forbidden_modules = [
     "squadopt.bayesopt",
     "squadopt.recalibration",
     "squadopt.preflight",
-    # Laboratory by use, not by name. Outside its own package nothing under src imports
-    # `risk` at all, and `uncertainty` is imported only by `risk` and by one experiments
-    # module, so both are research surfaces the contract classified as product. Listing them
-    # costs no import change today and refuses the first product import rather than the
-    # ninth, which is the lesson ADR 0001 recorded when the original eight were removed.
-    "squadopt.risk",
-    "squadopt.uncertainty",
 ]
 allow_indirect_imports = false
 # No baseline: the eight original ignore_imports entries have all been removed (ADR 0001);
@@ -202,9 +193,7 @@ forbidden_modules = [
     "squadopt.preflight",
     "squadopt.bayesopt",
     "squadopt.planning",
-    "squadopt.risk",
     "squadopt.scenarios",
-    "squadopt.uncertainty",
     "squadopt.evaluation",
     "squadopt.optimization",
     "squadopt.prediction",
@@ -231,9 +220,7 @@ source_modules = [
     "squadopt.preflight",
     "squadopt.bayesopt",
     "squadopt.planning",
-    "squadopt.risk",
     "squadopt.scenarios",
-    "squadopt.uncertainty",
     "squadopt.evaluation",
     "squadopt.integration",
     "squadopt.optimization",
@@ -276,9 +263,7 @@ source_modules = [
     "squadopt.preflight",
     "squadopt.bayesopt",
     "squadopt.planning",
-    "squadopt.risk",
     "squadopt.scenarios",
-    "squadopt.uncertainty",
     "squadopt.evaluation",
     "squadopt.integration",
     "squadopt.optimization",
@@ -304,8 +289,6 @@ source_modules = [
     "squadopt.planning",
     "squadopt.scenarios",
     "squadopt.evaluation",
-    "squadopt.uncertainty",
-    "squadopt.risk",
 ]
 forbidden_modules = ["os", "shutil", "tempfile", "subprocess"]
 allow_indirect_imports = true
