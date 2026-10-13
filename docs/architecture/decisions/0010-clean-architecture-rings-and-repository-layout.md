@@ -14,8 +14,9 @@
 
 On 2026-10-12 the owner directed that the project is an enterprise and academic system, that
 the codebase must read that way, and that clean-architecture and scalable-architecture
-principles apply from that date. This record cites that direction as its context; the direction
-is not an acceptance of this record.
+principles apply from that date ([decisions record](../../decisions.md), entry of 2026-10-12).
+This record cites that direction as its context; the direction is not an acceptance of this
+record.
 
 The repository already had an enforced shape. ADR 0001 made it one layered package checked by
 import-linter, and `pyproject.toml` held six contracts with no `ignore_imports` entry. ADR 0008
