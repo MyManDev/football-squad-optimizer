@@ -4,10 +4,13 @@ The use-case ring (R3, [ARCHITECTURE.md](../../../ARCHITECTURE.md)): transport-n
 operations that compose the domain packages into a member's advice, the published league and
 site trees, settlement, the scoreboard and the chip and strategy menus. Entry points in
 `squadopt.platform`, `squadopt.api` and `scripts/` call these services; they do not reimplement
-them. The package imports no platform, API or script code and no web framework or network
-client, and it starts no process or thread (the contracts "Layered architecture", "Frameworks,
-network and databases stay in api and platform" and "Use cases and domain records start no
-processes or threads" in `pyproject.toml`).
+them. The package imports no platform, API or script code, no web framework or network client,
+and no process, thread, event-loop or command-line module (the contracts "Layered
+architecture", "Frameworks, network and databases stay in api and platform" and "Use cases and
+domain records import no process, thread, event-loop or command-line module" in
+`pyproject.toml`). One module still starts a process indirectly: `advice_record.py` calls
+`source_revision()` in `squadopt.data.source_revision`, which runs `git`; ARCHITECTURE.md lists
+it as a known violation.
 
 Its 66 Python files, 62 at the top level and four in the `strategies/` subpackage, sit in one
 folder. This page places every one of them in exactly one family. Review: the owner

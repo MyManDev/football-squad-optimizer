@@ -15,7 +15,7 @@ also read by `tests/architecture/test_markdown_links.py`, and every document und
 | Document | What it settles | Read by a test |
 | --- | --- | --- |
 | [System map](system_map.md) | The package boundaries, the advice request path, publication and recovery | |
-| [Dependency rules](dependency_rules.md) | The import order, the laboratory boundary and the rules for changing either | |
+| [Dependency rules](dependency_rules.md) | The import order, the laboratory boundary and the rules for changing either | `tests/architecture/test_architecture_rings.py` holds the contract list in its Verification section |
 | [Solver boundaries](solver_boundaries.md) | The squad and lineup invariants the live squad and transfer paths share | |
 | [Platform and runtime boundary](platform_runtime.md) | How the engine becomes a runtime without infrastructure leaking into it | Its removal note is an allowance in `tests/architecture/test_documentation_paths.py` |
 | [Decision records](decisions/README.md) | Why the structure is what it is | ADR 0003 is read by `tests/architecture/test_measurements_index.py` |

@@ -41,8 +41,8 @@ study produces into three tiers:
 - **Records** are committed under `docs/`, usually a JSON file beside its Markdown twin, with a
   row in the [measurements index](../../../docs/measurements_index.md). Research programme
   records live under `docs/research/`. A record names the commit that produced it, with a list
-  of exceptions that may only shrink (`tests/architecture/test_records_name_their_code.py`),
-  and records never move.
+  of exceptions that may only shrink (`tests/architecture/test_records_name_their_code.py`).
+  A record stays at its path: moving one is a code change under ADR 0003, rule 5.
 - **Evidence**, the per-fold or per-scenario expansion behind a record, goes to the git-ignored
   `artifacts/` folder or to an output directory the operator names.
 - **Operational state** under `data/` is the third tier; it is backed up, not committed.

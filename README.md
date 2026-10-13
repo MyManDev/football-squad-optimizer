@@ -13,8 +13,9 @@ transition: what it changed, what was accepted and what still waits on a real en
 
 ## Repository layout
 
-The Python code is one installed package, `squadopt`, arranged in dependency rings from R1
-(innermost) to R5. [ARCHITECTURE.md](ARCHITECTURE.md) gives the ring of every package.
+The installed Python package is `squadopt`, arranged in dependency rings from R1 (innermost) to
+R5; `scripts/` and `tests/` sit outside it. [ARCHITECTURE.md](ARCHITECTURE.md) gives the ring of
+every package.
 
 | Path | Responsibility |
 | --- | --- |

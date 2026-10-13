@@ -19,12 +19,16 @@ latest successful immutable `site-...` deployment tag, so production may deliber
 ## Protection
 
 Since 2026-09-26 (#867) `develop` merges through a GitHub merge queue. A pull request whose
-checks are green is enqueued, with the GraphQL `enqueuePullRequest` mutation or with
-`gh pr merge`, which lands in the same queue. The queue runs the required checks again on the
-`merge_group` event against the grouped merge, then makes the squash commit from the pull
-request's title and body. `main` has no queue: it moves by release merge only.
+checks are green is enqueued with the GraphQL `enqueuePullRequest` mutation; the repository
+does not allow auto-merge. The queue runs the required checks again on the `merge_group` event
+against the grouped merge, then makes the squash commit from the pull request's title and body.
+`main` has no queue: it moves by release merge only.
 
-Both branches are protected, with strict up-to-date branches. The required checks are
+Both branches have branch protection with required checks. On `main` it also requires a branch
+to be up to date before it merges; on `develop` it does not, and the queue tests each pull
+request against the grouped merge. Two rulesets apply to `develop`: `develop merge queue` holds
+the queue, and `Protect main`, which despite its name targets the default branch, `develop`,
+refuses deletion and force pushes and requires resolved review threads. The required checks are
 not listed here, because a copy in a document goes stale when the setting moves: this
 section used to name three contexts for `develop` after the fourth had been added. Read
 them from GitHub:

@@ -27,7 +27,7 @@ to `pyproject.toml`.
 | --- | --- | --- | --- | --- | --- |
 | `api` | R4, R5 | 1 | either | C1, C2, C3, C5, C8 | none |
 | `platform` | R4, R5 | 2 | either; the `club_news_*` modules are İbrahim's zone | C1, C2, C5, C8 | declares 15 of the package's 24 typed ports; mixes deployment roles; 6 modules name `docs/contracts` by a relative path |
-| `application` | R3 | 3 | the owner | C1, C2, C4, C5, C8, C9 | imports the storage half of `data`; holds six laboratory modules; 2 modules name `docs/contracts` by a relative path; declares 3 ports |
+| `application` | R3 | 3 | the owner | C1, C2, C4, C5, C8, C9 | imports the storage half of `data`; holds six laboratory modules; 2 modules name `docs/contracts` by a relative path; declares 3 ports; starts `git` through `data.source_revision` |
 | `experiments` | Research | 4 | the owner | C1, C4, C5, C8 | none |
 | `backtest` | Research | 5 | both | C1, C4, C5 | none |
 | `recalibration` | Research | 6 | the owner | C1, C4, C5, C8 | none |
@@ -36,12 +36,12 @@ to `pyproject.toml`.
 | `live` | R2 | 9 | the owner; `ledger.py`, `tick.py` and `recommendation.py` either | C1, C2, C4, C5, C8, C9 | imports the storage half of `data` |
 | `planning` | R2 | 10 | the owner | C1, C2, C4, C5, C6, C7 | imports private names of `optimization.optimizer` |
 | `scenarios` | R2 | 11 | the owner | C1, C2, C4, C5, C6, C7 | imports private names of `optimization.optimizer` |
-| `evaluation` | R2 | 12 | the owner | C1, C2, C4, C5, C6, C7 | none |
+| `evaluation` | R2 | 12 | the owner | C1, C2, C4, C5, C6, C7 | reads files (`component_handoff.py`) |
 | `integration` | R3 | 13 | the owner | C1, C2, C4, C5, C8 | a use-case module placed as its own layer |
 | `optimization` | R2 | 14 | the owner; `config.py` both | C1, C2, C4, C5, C6, C7 | the CP-SAT driver has no public port |
 | `prediction` | R2 | 15 | İbrahim | C1, C2, C4, C5, C8 | none |
 | `features` | R2 | 16 | İbrahim | C1, C2, C4, C5, C8 | imports the storage half of `data` |
-| `data` | R1, R4 | 17 | İbrahim; `schema.py` both | C1, C2, C4, C5, C8 | one package in two rings, at the bottom of the layer order |
+| `data` | R1, R4 | 17 | İbrahim; `schema.py` both | C1, C2, C4, C5, C8 | one package in two rings, at the bottom of the layer order; three vocabulary modules import the storage half |
 | `contracts` | R1 | 18 | both | C1, C2, C4, C5, C6, C7, C8 | reads and writes files (`league_list.py`, `league_tree.py`) |
 
 The import contracts, in the order `pyproject.toml` declares them:

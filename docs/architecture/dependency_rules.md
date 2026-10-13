@@ -76,18 +76,21 @@ The shared-contract and evaluation extraction subsequently removed those five ex
 ### Where the order is genuinely free
 
 Some packages are independent of each other and their relative position is arbitrary. Do not
-read meaning into it, and do not "fix" it:
+read meaning into it, and do not "fix" it. One constraint has held over all of them since the
+rings were named ([ADR 0010](decisions/0010-clean-architecture-rings-and-repository-layout.md),
+proposed): every laboratory package sits above every R2 package, and so above `live`, and
+`tests/architecture/test_architecture_rings.py` fails otherwise. What stays free is the order of
+the laboratory packages among themselves, subject to their imports:
 
-- `bayesopt` imports only `contracts`. It could sit immediately above it.
+- `bayesopt` imports only `contracts`.
 - `preflight` imports only `data`.
-- `recalibration` imports `data`, `features` and `scenarios`, so it needs to be above
-  `scenarios` but is otherwise unconstrained.
+- `recalibration` imports `data`, `features` and `scenarios`.
 - `planning` imports `optimization`, `contracts` (`DecisionPreferences` from
   `contracts.preferences`, in `planning/chip_strategy.py:6` and `planning/optimizer.py:15`)
   and `scenarios`: three modules import `scenarios.expected_lineup`
   (`planning/expected_swap.py:31`, `planning/football_exact_lineup.py:17` and
   `planning/lineup_utility.py:21`). So `planning` must sit above `scenarios` and below `live`
-  and `experiments`, which import it; no import fixes its position relative to `bayesopt`,
+  and `experiments`, which import it; the ring rule above also places it below `bayesopt`,
   `preflight`, `recalibration` and `backtest`.
 
 If a future import makes one of these positions load-bearing, say so here at the same time.
@@ -240,7 +243,9 @@ is covered by `tests/architecture/test_layer_contracts.py` and the existing cons
    `application` and `live` import no process, thread, signal, command-line or event-loop
    module directly.
 
-The last three state rings of [ADR 0010](decisions/0010-clean-architecture-rings-and-repository-layout.md).
+The last three enforce the rings that
+[ADR 0010](decisions/0010-clean-architecture-rings-and-repository-layout.md), a proposed record,
+names.
 The [architecture overview](../../ARCHITECTURE.md) gives what each contract holds in its
 enforcement map, and `tests/architecture/test_architecture_rings.py` checks that every contract in
 `pyproject.toml` is named in this list and has a row in that map.
@@ -264,10 +269,10 @@ product group (adapters, runtime, use cases, or domain) may import it. The linea
 could not say this: it placed the laboratory below `application`, so the deployed advice worker
 was loading 43 laboratory modules, and a product decision (`plan_selection`) was living in the
 lab. The contract `Product does not import the laboratory` in `pyproject.toml` states the rule
-directly, and the layers contract stays as the tie-break within each group. Since ADR 0010 the
-layer order also places the laboratory above `live`, so for `live` and every package below it
-the layers contract refuses an import of the laboratory as well; for `application`, `platform`
-and `api` the forbidden contract alone refuses it.
+directly, and the layers contract stays as the tie-break within each group. Since the rings were
+named (ADR 0010, proposed), the layer order also places the laboratory above `live`, so for
+`live` and every package below it the layers contract refuses an import of the laboratory as
+well; for `application`, `platform` and `api` the forbidden contract alone refuses it.
 
 That contract started with eight `ignore_imports` entries, all in `application`, each annotated
 with the follow-up PR that removed it. The last (`mode_selection` to `experiments.plan_selection`)
@@ -286,13 +291,13 @@ been removed with their runners (2026-10-12), and their entries left the contrac
 
 ## Rings
 
-[ADR 0010](decisions/0010-clean-architecture-rings-and-repository-layout.md) names the rings
-these groups map to, and the [architecture overview](../../ARCHITECTURE.md) gives the ring of
-every package, the contracts that enforce them and the known violations. The groups above
-correspond as follows: `contracts` and the schema half of `data` are R1 (vocabulary); the domain
-group is R2; the use cases group is R3; `api`, `platform` and the storage half of `data` are R4
-(adapters) and, for their entry points, R5 (composition). The laboratory is the research side
-tree. The rings changed one thing in the order: the laboratory now sits above `live`. The
-layers contract remains the executable statement and the tie-break within a ring, and
-`tests/architecture/test_architecture_rings.py` checks that the order reads the rings from the
-inside out, with `integration` as its one listed exception.
+[ADR 0010](decisions/0010-clean-architecture-rings-and-repository-layout.md), a proposed record,
+names the rings these groups map to, and the [architecture overview](../../ARCHITECTURE.md)
+gives the ring of every package, the contracts that enforce them and the known violations. The
+groups above correspond as follows: `contracts` and the schema half of `data` are R1
+(vocabulary); the domain group is R2; the use cases group is R3; `api`, `platform` and the
+storage half of `data` are R4 (adapters) and, for their entry points, R5 (composition). The
+laboratory is the research side tree. The rings changed one thing in the order: the laboratory
+now sits above `live`. The layers contract remains the executable statement and the tie-break
+within a ring, and `tests/architecture/test_architecture_rings.py` checks that the order reads
+the rings from the inside out, with `integration` as its one listed exception.

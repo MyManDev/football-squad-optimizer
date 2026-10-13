@@ -17,7 +17,7 @@ its header.
 | [0007](0007-enterprise-transition.md) | Move the operational scripts into the installed package, in one change | 2026-09-10 | Accepted | None |
 | [0008](0008-structure-investment.md) | Spend the structure budget on repetition and boundaries, not on renames | 2026-09-15 | Accepted | None |
 | [0009](0009-advice-backend-hosting-options.md) | Where the advice backend runs, five options compared for the owner's decision | 2026-09-25 | Proposed | None |
-| [0010](0010-clean-architecture-rings-and-repository-layout.md) | Clean-architecture rings and the repository layout | 2026-10-13 | Accepted (owner direction 2026-10-12); its deferred moves are open questions | None |
+| [0010](0010-clean-architecture-rings-and-repository-layout.md) | Clean-architecture rings and the repository layout | 2026-10-13 | Proposed; follows the owner direction of 2026-10-12 | None |
 
 ADR 0004's own revisit condition led to ADR 0006, which keeps the static site and adds the
 backend beside it. ADR 0010 builds on ADRs 0001 and 0008 and leaves their decisions standing.

@@ -50,7 +50,7 @@ agreements live under [`docs/architecture/`](docs/architecture/README.md). Start
 | New file | Goes in | Also update |
 | --- | --- | --- |
 | A Python module | The package of its ring in `src/squadopt/` ([architecture overview](ARCHITECTURE.md#2-rings)) | Nothing, if the import contracts pass |
-| A Python package | `src/squadopt/<package>/` | The layers list and contracts in `pyproject.toml`, the ring table, `.github/CODEOWNERS` |
+| A Python package | `src/squadopt/<package>/` | The layers list and contracts in `pyproject.toml`, the ring table in the architecture overview, `RINGS` in `tests/architecture/test_architecture_rings.py`, the [package map](src/squadopt/README.md), `.github/CODEOWNERS` |
 | A unit test | `tests/unit/test_<module>.py`, or `test_<module>_<topic>.py` | Nothing |
 | An architecture rule as a test | `tests/architecture/` | The enforcement map in the architecture overview |
 | An end-to-end or opt-in probe | `tests/integration/` | The [integration guide](tests/integration/README.md) for an opt-in probe |

@@ -9,7 +9,7 @@ archive nor the network. The website's tests live beside their code under `web/`
 | Path | Holds |
 | --- | --- |
 | `unit/` | Tests of one module or one behaviour, in a flat folder; `unit/conftest.py` holds shared setup for the member-menu HTTP and publication checks |
-| `architecture/` | The architecture fitness functions: import boundaries at run time, documentation paths and links, the measurements index, record provenance, the type-checked file set, dependency pins, the operations documents and the roadmap ([architecture overview](../ARCHITECTURE.md#6-enforcement-map)) |
+| `architecture/` | The architecture fitness functions: the rings and the documents that state them, imports of the `data` package root, import boundaries at run time, documentation paths and links, the measurements index, record provenance, the type-checked file set, dependency pins, the operations documents and the roadmap ([architecture overview](../ARCHITECTURE.md#6-enforcement-map)) |
 | [`integration/`](integration/README.md) | End-to-end chains across packages and processes, including the opt-in acceptance probes |
 | `fixtures/` | Shared synthetic data and helpers, imported as `tests.fixtures` |
 | `football_*_fixtures.py` | Synthetic bases and numerical oracles for the football experiment tests |
@@ -57,9 +57,10 @@ deliberately absent file.
 
 ## Replay pins
 
-Two tests pin a recorded live decision to literal values. A change that moves either one
-changes a live decision, and the pull request must say so and update the literals in the same
-commit ([PR discipline](../docs/architecture/pr_discipline.md#the-live-path)):
+Two tests pin a recorded live decision to literal values. If either one moves, either the
+change altered a live decision, which the pull request says explicitly, with the live-path
+owner's agreement and the literals updated in the same commit, or it is a bug
+([PR discipline](../docs/architecture/pr_discipline.md#the-live-path)):
 
 | Test | File | Pins |
 | --- | --- | --- |
