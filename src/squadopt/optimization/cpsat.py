@@ -59,8 +59,8 @@ def configure_solver(
 ) -> None:
     """Apply this repository's solver settings; the single place they are decided.
 
-    Public because three packages outside this one call it — `planning`, and both
-    `scenarios` solvers — and a name that three packages consume is not private.
+    Public because three packages outside this one call it (`planning`, and both
+    `scenarios` solvers), and a name that three packages consume is not private.
 
     Single search worker: CP-SAT's parallel search is nondeterministic, so a repeated
     solve would not be a repeated answer. Callers that record what produced a result read

@@ -152,9 +152,12 @@ no adapter yet: each group lands in its own pull request.
 
 ## Ports declared here
 
-15 of the 24 typed `Protocol` classes under `src/squadopt` are declared in this package. A port
-that a use case needs belongs in `squadopt.application` (R3); moving them there is Phase 3 work
-in ARCHITECTURE.md's known violations.
+15 of the 24 typed `Protocol` classes under `src/squadopt` are declared in this package. The
+first eight rows are the use-case ports of the advice backend. A port that a use case needs
+belongs in `squadopt.application` (R3): these eight move there with the read and submit use
+cases that consume them if #988 keeps the backend, and are deleted with it if #988 retires it
+([ADR 0011](../../../docs/architecture/decisions/0011-storage-ports-and-platform-split.md),
+decision 7). The other seven are seams inside an adapter and stay here by design.
 
 | Port | Module | What it stands for | Adapter in the repository |
 | --- | --- | --- | --- |

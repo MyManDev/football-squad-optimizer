@@ -6,8 +6,9 @@ that caller without any contract saying so. `planning` and both `scenarios` solv
 with the CP-SAT driver of `optimization.optimizer`, 19 names in three modules, until
 ADR 0011 (decision 5) published the driver as `optimization.cpsat`. The 20 crossings that
 remain are held here under the ratchet rule of ADR 0010 (Decision 4): `ALLOWLIST` holds
-exactly today's crossings, each with its remedy, and may only shrink. The remedy is always the
-same shape: the owning module publishes the name and keeps the private alias for one release
+exactly today's crossings, each with its remedy, and may only shrink: `CROSSINGS_2026_10_13`
+freezes its keys, so an entry can be deleted and none added. The remedy is always the same
+shape: the owning module publishes the name and keeps the private alias for one release
 (dependency rule 2), and the caller imports the public one.
 
 The scan reads every Python file under `src/squadopt`, imports inside functions included, and
@@ -128,6 +129,77 @@ ALLOWLIST: dict[tuple[str, str, str], str] = {
     ): FROZEN_DECISION,
 }
 
+#: The keys of `ALLOWLIST` on 2026-10-13, frozen. An entry of `ALLOWLIST` may be deleted and
+#: none added: a new crossing fails `test_the_allowlist_only_shrinks` even with a remedy above.
+CROSSINGS_2026_10_13: frozenset[tuple[str, str, str]] = frozenset(
+    {
+        ("squadopt.bayesopt.models", "squadopt.contracts.factors", "_integer"),
+        ("squadopt.experiments.football_components", "squadopt.prediction.football", "_fit"),
+        ("squadopt.experiments.football_components", "squadopt.prediction.football", "_matrix"),
+        ("squadopt.experiments.football_components", "squadopt.prediction.football", "_pipeline"),
+        (
+            "squadopt.experiments.football_flag_experiment",
+            "squadopt.live.minute_evidence",
+            "_validate_components",
+        ),
+        (
+            "squadopt.experiments.football_load_experiment",
+            "squadopt.live.minute_evidence",
+            "_score_components",
+        ),
+        (
+            "squadopt.experiments.football_load_experiment",
+            "squadopt.live.minute_evidence",
+            "_validate_components",
+        ),
+        ("squadopt.experiments.football_minutes", "squadopt.prediction.football", "_fit"),
+        ("squadopt.experiments.football_minutes", "squadopt.prediction.football", "_matrix"),
+        ("squadopt.experiments.football_minutes", "squadopt.prediction.football", "_pipeline"),
+        (
+            "squadopt.experiments.football_score_state_experiment",
+            "squadopt.live.minute_evidence",
+            "_validate_components",
+        ),
+        (
+            "squadopt.experiments.football_unit_experiment",
+            "squadopt.live.minute_evidence",
+            "_validate_components",
+        ),
+        ("squadopt.experiments.phase_e_shadow", "squadopt.evaluation.statistics", "_percentile"),
+        (
+            "squadopt.planning.football_exact_lineup",
+            "squadopt.scenarios.expected_lineup",
+            "_autosub_multipliers",
+        ),
+        (
+            "squadopt.planning.football_exact_lineup",
+            "squadopt.scenarios.expected_lineup",
+            "_Decision",
+        ),
+        (
+            "squadopt.planning.football_exact_lineup",
+            "squadopt.scenarios.expected_lineup",
+            "_Inputs",
+        ),
+        (
+            "squadopt.planning.football_exact_lineup",
+            "squadopt.scenarios.expected_lineup",
+            "_prepare",
+        ),
+        ("squadopt.planning.football_exact_lineup", "squadopt.scenarios.expected_lineup", "_score"),
+        (
+            "squadopt.platform.weekly_operations",
+            "squadopt.application.weekly_plan",
+            "_require_capture_name",
+        ),
+        (
+            "squadopt.scenarios.expected_lineup",
+            "squadopt.evaluation.scoring",
+            "_validate_frozen_decision",
+        ),
+    }
+)
+
 
 def _is_private(name: str) -> bool:
     return name.startswith("_") and not name.startswith("__")
@@ -195,6 +267,14 @@ def test_private_names_cross_packages_exactly_where_the_allowlist_says() -> None
     )
     assert sorted(key for key in ALLOWLIST if key not in offending) == [], (
         "this private name is no longer imported across packages: delete its entry from ALLOWLIST"
+    )
+
+
+def test_the_allowlist_only_shrinks() -> None:
+    assert len(CROSSINGS_2026_10_13) == 20
+    assert set(ALLOWLIST) <= CROSSINGS_2026_10_13, (
+        "a crossing that was not there on 2026-10-13 is not allowlisted: publish the name in "
+        "its owner and import the public one"
     )
 
 
