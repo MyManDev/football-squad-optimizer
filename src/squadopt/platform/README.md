@@ -158,4 +158,6 @@ directory: `api_contract.py`, `artifacts.py` and `manifest.py` as the default ta
 function that writes the committed schema, `history_documents.py` in `write_history_schema`,
 and `advice_documents.py` and `jobs_contract.py` as constants the tests read. No module reads a
 schema from that folder: the validators that run are built from the schema functions in code.
+`tests/architecture/test_runtime_contract_paths.py` allowlists these six and the two in
+`squadopt.application`, and fails when any other module under `src/squadopt` names the folder.
 The [contracts guide](../../../docs/contracts/README.md) lists every schema with its producer.

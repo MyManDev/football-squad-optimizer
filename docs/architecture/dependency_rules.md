@@ -215,7 +215,7 @@ the contract is exhaustive, a new package directly under `squadopt` fails the ga
 placed in this list. `squadopt.api` is listed above `squadopt.platform`, which is listed
 above `squadopt.application`; the API therefore cannot be imported back into runtime or
 application code. The platform's first package contract is the versioned run context and
-manifest. No baseline violation remains and there are no `ignore_imports` entries. Every
+manifest. The layers contract has no baseline violation and no `ignore_imports` entry. Every
 new upward dependency fails the same contract.
 
 A separate forbidden-import contract lists `squadopt.api` as its source, every engine package
@@ -227,7 +227,8 @@ The original five-edge baseline was measured against `b031ef1` (PR #110). The sh
 extraction verifies the zero-exception contract with `lint-imports`; behavior compatibility
 is covered by `tests/architecture/test_layer_contracts.py` and the existing consumer suites.
 
-`lint-imports` runs every contract in `pyproject.toml`, and none has an `ignore_imports` entry:
+`lint-imports` runs every contract in `pyproject.toml`. Only the tenth has `ignore_imports`
+entries, and they may only shrink (rule 1 above):
 
 1. `Layered architecture`: the order at the top of this document.
 2. `Product does not import the laboratory`: see [the groups the order encodes](#the-groups-the-order-encodes).
@@ -246,10 +247,17 @@ is covered by `tests/architecture/test_layer_contracts.py` and the existing cons
 9. `Use cases and domain records import no process, thread, event-loop or command-line module`:
    `application` and `live` import no process, thread, signal, command-line or event-loop
    module directly.
+10. `Use cases, domain records and features import no storage or source module`:
+    `application`, `live` and `features` import none of the storage and source modules of
+    `data` beyond the 122 direct import edges from 43 modules they have today, each an
+    `ignore_imports` entry; `tests/architecture/test_storage_ratchet.py` holds the entries to
+    a frozen copy, so the list only shrinks.
 
-The last three enforce the rings that
+The last four enforce the rings that
 [ADR 0010](decisions/0010-clean-architecture-rings-and-repository-layout.md), an accepted record,
-names.
+names. The tenth is a ratchet under that record's ratchet rule (Decision 4): its allowlist
+holds exactly the storage imports of 2026-10-13, each with its remedy and phase, and a new
+one fails the gate.
 The [architecture overview](../../ARCHITECTURE.md) gives what each contract holds in its
 enforcement map, and `tests/architecture/test_architecture_rings.py` checks that every contract in
 `pyproject.toml` is named in this list and has a row in that map.

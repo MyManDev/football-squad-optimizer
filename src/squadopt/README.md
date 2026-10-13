@@ -28,19 +28,19 @@ to `pyproject.toml`.
 | `api` | R4, R5 | 1 | either | C1, C2, C3, C5, C8 | none |
 | `platform` | R4, R5 | 2 | either; the `club_news_*` modules are İbrahim's zone | C1, C2, C5, C8 | declares 15 of the package's 24 typed ports; mixes deployment roles; 6 modules name `docs/contracts` by a relative path |
 | `integration` | R3 | 3 | the owner | C1, C2, C4, C5, C8 | none; a one-release re-export, removed in the release after the next `site-*` tag |
-| `application` | R3 | 4 | the owner | C1, C2, C4, C5, C8, C9 | imports the storage half of `data`; 2 modules name `docs/contracts` by a relative path; declares 3 ports; starts `git` through `data.source_revision` |
+| `application` | R3 | 4 | the owner | C1, C2, C4, C5, C8, C9, C10 | imports the storage half of `data`; 2 modules name `docs/contracts` by a relative path; declares 3 ports; starts `git` through `data.source_revision` |
 | `experiments` | Research | 5 | the owner | C1, C4, C5, C8 | none |
 | `backtest` | Research | 6 | both | C1, C4, C5 | none |
 | `recalibration` | Research | 7 | the owner | C1, C4, C5, C8 | none |
 | `preflight` | Research | 8 | the owner | C1, C4, C5, C8 | none |
 | `bayesopt` | Research | 9 | the owner | C1, C4, C5, C8 | none |
-| `live` | R2 | 10 | the owner; `ledger.py`, `tick.py` and `recommendation.py` either | C1, C2, C4, C5, C8, C9 | imports the storage half of `data` |
+| `live` | R2 | 10 | the owner; `ledger.py`, `tick.py` and `recommendation.py` either | C1, C2, C4, C5, C8, C9, C10 | imports the storage half of `data` |
 | `planning` | R2 | 11 | the owner | C1, C2, C4, C5, C6, C7 | imports private names of `optimization.optimizer` |
 | `scenarios` | R2 | 12 | the owner | C1, C2, C4, C5, C6, C7 | imports private names of `optimization.optimizer` |
 | `evaluation` | R2 | 13 | the owner | C1, C2, C4, C5, C6, C7 | reads files (`component_handoff.py`) |
 | `optimization` | R2 | 14 | the owner; `config.py` both | C1, C2, C4, C5, C6, C7 | the CP-SAT driver has no public port |
 | `prediction` | R2 | 15 | İbrahim | C1, C2, C4, C5, C8 | none |
-| `features` | R2 | 16 | İbrahim | C1, C2, C4, C5, C8 | imports the storage half of `data` |
+| `features` | R2 | 16 | İbrahim | C1, C2, C4, C5, C8, C10 | imports the storage half of `data` |
 | `data` | R1, R4 | 17 | İbrahim; `schema.py` both | C1, C2, C4, C5, C8 | one package in two rings, at the bottom of the layer order; three vocabulary modules import the storage half |
 | `contracts` | R1 | 18 | both | C1, C2, C4, C5, C6, C7, C8 | reads and writes files (`league_list.py`, `league_tree.py`) |
 
@@ -57,6 +57,7 @@ The import contracts, in the order `pyproject.toml` declares them:
 | C7 | The decision core imports no storage or source module |
 | C8 | The CP-SAT solver stays in the decision core |
 | C9 | Use cases and domain records import no process, thread, event-loop or command-line module |
+| C10 | Use cases, domain records and features import no storage or source module |
 
 The research packages are also the forbidden side of C2: no product package may import them,
 so the research arm is checked from both sides.

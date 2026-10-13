@@ -146,10 +146,13 @@ ARCHITECTURE.md measures and schedules these; this list says where they are.
 
 - **Storage imports.** Modules here import the storage half of `squadopt.data` (captures,
   atomic writes, loaders) directly. The remedy is storage ports declared here with file adapters
-  in `platform` (Phase 3).
+  in `platform` (Phase 3). Until then the contract "Use cases, domain records and features
+  import no storage or source module" holds them to today's imports: 89 edges from 30 modules,
+  each an `ignore_imports` entry that may only go.
 - **Ports.** Three typed ports are declared here: `DecisionVerifier` in `commands.py`,
   `EntryPicksProvider` in `entries.py` and `TickObserver` in `season.py`.
 - **Paths to `docs/contracts`.** `contract.py` names `docs/contracts/ui_view_v1.schema.json`
   as the default target of `write_ui_view_schema`, and `chip_forecast.py` names
   `docs/contracts/chip_forecast_v1.schema.json` as a constant the tests read. Neither reads the
-  file when it runs.
+  file when it runs. `tests/architecture/test_runtime_contract_paths.py` allowlists both, with
+  the six in `platform`, and fails on any other module that names the folder.
