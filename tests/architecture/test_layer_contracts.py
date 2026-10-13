@@ -7,7 +7,9 @@ import pandas as pd
 import pytest
 from pandas.testing import assert_frame_equal
 
+import squadopt.integration
 from squadopt import OptimizationConfig
+from squadopt.application import projection_csv
 from squadopt.backtest.production_benchmark import ProductionBenchmarkConfig
 from squadopt.contracts import POSITIONS, REQUIRED_COLUMNS, Position, sort_players_by_id
 from squadopt.data import schema
@@ -33,6 +35,14 @@ def test_legacy_imports_reexport_the_shared_objects() -> None:
     assert PromotionPolicy is promotion.PromotionPolicy
     assert ExperimentError is promotion.ExperimentError
     assert ExperimentConfigurationError is promotion.ExperimentConfigurationError
+
+
+def test_the_integration_module_re_exports_the_projection_csv_use_case() -> None:
+    # One release only (docs/architecture/dependency_rules.md, rule 2): the function lives in
+    # `application.projection_csv`, and the package root resolves it there.
+    moved = projection_csv.optimize_squad_from_csv
+    assert squadopt.integration.optimize_squad_from_csv is moved
+    assert squadopt.optimize_squad_from_csv is moved
 
 
 @pytest.mark.parametrize(

@@ -12,7 +12,7 @@ domain records import no process, thread, event-loop or command-line module" in
 `source_revision()` in `squadopt.data.source_revision`, which runs `git`; ARCHITECTURE.md lists
 it as a known violation.
 
-Its 60 Python files, 56 at the top level and four in the `strategies/` subpackage, sit in one
+Its 61 Python files, 57 at the top level and four in the `strategies/` subpackage, sit in one
 folder. This page places every one of them in exactly one family. Review: the owner
 ([ownership](../../../docs/architecture/ownership.md)).
 
@@ -66,6 +66,12 @@ word.
 | `horizon_batch.py` | Runs the one-, three- and five-week planning evidence together. |
 | `horizon_publish.py` | Validates planning evidence before it is attached to a public ledger view. |
 | `planner_review.py` | Offline decision review with explicit information provenance and member-owned weights. |
+
+## Squad optimization from a projection CSV
+
+| Module | What it does |
+| --- | --- |
+| `projection_csv.py` | Reads a canonical projection CSV and optimizes one squad from it (`optimize_squad_from_csv`). The package root re-exports it lazily, and `squadopt.integration` re-exports it until the release after the next `site-*` tag. |
 
 ## League and site publication
 

@@ -56,8 +56,8 @@ under [known violations](#7-known-violations).
 | `scenarios` | R2 | Joint point scenarios, scenario paths, rival squads and fixed-decision scoring. |
 | `planning` | R2 | Deterministic multi-gameweek transfer planning and chip timing. |
 | `live` | R2 | Domain records of the live season: recommendation, ledger, tick, settlement, transfers and the per-member plan selection. It reads captured snapshots, never a live endpoint. |
-| `integration` | R3 | One module, `integration.py`: optimizes a squad from a canonical projection CSV. The package root re-exports it lazily. |
-| `application` | R3 | Use cases: typed advice, evidence, league and site publication, settlement, scoreboard and chip workflows, and the strategy catalogue. It imports no platform or script code. |
+| `integration` | R3 | One module, `integration.py`: a one-release re-export of `optimize_squad_from_csv` from `application.projection_csv`, removed in the release after the next `site-*` tag. |
+| `application` | R3 | Use cases: typed advice, evidence, league and site publication, settlement, scoreboard and chip workflows, the strategy catalogue, and squad optimization from a canonical projection CSV (`projection_csv`, which the package root re-exports lazily). It imports no platform or script code. |
 | `api` | R4, R5 | The FastAPI driving adapter, and the API process's composition (`squadopt.api.runtime:build_app`). It reaches the engine only through `platform` and `application`. |
 | `platform` | R4, R5 | Driven adapters (file job queue and cache, captures, club-news model clients, storage, backup) and composition roots (the installed CLI, the weekly runner, the advice worker). |
 | `experiments` | Research | The measurement programmes: designs, readings and reports behind the committed records. |
@@ -68,10 +68,8 @@ under [known violations](#7-known-violations).
 
 The rings are a reading of the enforced layer order, not a replacement for it. Read from the
 bottom, the layer order in `pyproject.toml` reaches each product package only after every
-package of an inner ring, with one exception, `integration` (see
-[known violations](#7-known-violations)), and reaches the research arm only after every R2
-package. Within a ring the order is the tie-break
-([dependency rules](docs/architecture/dependency_rules.md)).
+package of an inner ring, and reaches the research arm only after every R2 package. Within a
+ring the order is the tie-break ([dependency rules](docs/architecture/dependency_rules.md)).
 `tests/architecture/test_architecture_rings.py` holds this table, the layer order, the
 laboratory contract and the run-boundary probe to one mapping.
 
@@ -177,7 +175,7 @@ each lands in its own pull request once its trigger fires.
 
 | Violation | Measured | Remedy | Phase |
 | --- | --- | --- | --- |
-| Use cases and domain records import the storage half of `data` | `application`: 88 import statements in 29 modules; `live`: 17 in 9; `features`: 16 in 4 | Storage ports declared in `application`, with file adapters in `platform` | Phase 2: a shrink-only ratchet. Phase 3: the ports, triggered by ADR 0005 or issue #1010 |
+| Use cases and domain records import the storage half of `data` | `application`: 89 import statements in 30 modules; `live`: 17 in 9; `features`: 16 in 4 | Storage ports declared in `application`, with file adapters in `platform` | Phase 2: a shrink-only ratchet. Phase 3: the ports, triggered by ADR 0005 or issue #1010 |
 | `data` holds both R1 vocabulary and R4 storage, and sits at the bottom of the layer order | One package, two rings; `src/squadopt/data/__init__.py` imports `adapters`, `loaders`, `pipeline` and `snapshots`, so importing any `data` module loads those four at run time | The contract "The decision core imports no storage or source module" keeps the import statements of the packages that are clean today off the storage half, and `tests/architecture/test_storage_imports.py` refuses their import of the package root; neither stops the run-time load | The contract and the test are in force (Phase 1); the split itself is an open question in ADR 0010 |
 | Three vocabulary modules of `data` import its storage half | `claim_identity` imports `RosterPlayer` from `data.sources.club_news`, `cleaning` imports `PriceUnit` from `data.adapters`, and `cohorts` imports `LeagueStandingsPage` from `data.sources.fpl_live` | Move the three types into the vocabulary half, with a one-release re-export | With the split of `data`, an open question in ADR 0010; the data owner decides |
 | `contracts` reads and writes files | `LEAGUE_LIST_FILE` and `read_league_list` in `src/squadopt/contracts/league_list.py`; `read_league_directory` and `write_league_directory` in `src/squadopt/contracts/league_tree.py` | Move the file IO to an adapter, with a one-release re-export | Phase 2: ratchet; Phase 3: after issue #981 |
@@ -187,7 +185,6 @@ each lands in its own pull request once its trigger fires.
 | The CP-SAT driver has no public port | 19 private names imported from `optimization.optimizer`: 5 by `planning/optimizer.py`, 7 by `scenarios/optimization.py`, 7 by `scenarios/rank.py` | A public solver driver in `optimization` | Phase 3 |
 | Ports are declared in an adapter ring | 15 of the 24 typed Protocols under `src/squadopt` are in `platform`; 3 are in `application` | Use-case ports move to `application` | Phase 3 |
 | `platform` mixes deployment roles | 54 Python files in one flat package: weekly batch, API side, queue and worker, captures, club news, storage and CLI | Split by deployment unit (ADR 0008, M6) | Phase 3, needs a new ADR |
-| `integration` is a use-case module placed as its own layer | `src/squadopt/integration.py` sits between `evaluation` and `optimization` in the layer order | Fold it into `application`, with a one-release re-export | Phase 2 |
 | `scripts/` is outside the import contracts | mypy checks 7 script files; `lint-imports` checks none | Operator logic moves into the installed package, the direction ADR 0007 set | Phase 3 |
 
 ## 8. How to add

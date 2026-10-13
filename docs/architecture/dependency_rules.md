@@ -20,27 +20,31 @@ contracts
     features
       prediction
         optimization
-          integration
-            evaluation
-              scenarios
-                planning
-                  live
-                    bayesopt
-                      preflight
-                        recalibration
-                          backtest
-                            experiments
-                              application
+          evaluation
+            scenarios
+              planning
+                live
+                  bayesopt
+                    preflight
+                      recalibration
+                        backtest
+                          experiments
+                            application
+                              integration
                                 platform
                                   api / entry points
 ```
 
-`integration` is one module, `src/squadopt/integration.py`, which optimizes a squad from a
-canonical projection CSV. It imports only `data` and `optimization`, so it sits directly above
-`optimization` as a layer of its own.
+`integration` is one module, `src/squadopt/integration.py`. The use case it held, optimizing
+a squad from a canonical projection CSV, lives in `src/squadopt/application/projection_csv.py`
+since 2026-10-13, and `integration.py` re-exports `optimize_squad_from_csv` from there for one
+release (rule 2 below). It imports only `application`, so it sits directly above `application`
+as a layer of its own, and the layer goes with the module in the release after the next
+`site-*` tag.
 
 `application`, `platform`, and the optional `api` adapter now exist and are enforced as the
-three highest package layers in `pyproject.toml`. `contracts` is the lowest package and
+highest package layers in `pyproject.toml`, with only the one-release `integration` layer
+between `application` and `platform`. `contracts` is the lowest package and
 imports no other `squadopt` layer; `application` may reach everything below it; and `platform` may consume
 application contracts without allowing HTTP, persistence, queue, authentication, or
 deployment concerns to flow back into them. `api` is the concrete FastAPI entry point and may
@@ -186,6 +190,7 @@ exhaustive = true
 layers = [
     "api",
     "platform",
+    "integration",
     "application",
     "experiments",
     "backtest",
@@ -196,7 +201,6 @@ layers = [
     "planning",
     "scenarios",
     "evaluation",
-    "integration",
     "optimization",
     "prediction",
     "features",
@@ -297,7 +301,9 @@ gives the ring of every package, the contracts that enforce them and the known v
 groups above correspond as follows: `contracts` and the schema half of `data` are R1
 (vocabulary); the domain group is R2; the use cases group is R3; `api`, `platform` and the
 storage half of `data` are R4 (adapters) and, for their entry points, R5 (composition). The
-laboratory is the research side tree. The rings changed one thing in the order: the laboratory
-now sits above `live`. The layers contract remains the executable statement and the tie-break
-within a ring, and `tests/architecture/test_architecture_rings.py` checks that the order reads
-the rings from the inside out, with `integration` as its one listed exception.
+laboratory is the research side tree. Naming the rings changed one thing in the order: the
+laboratory now sits above `live`. Folding `integration` into `application` later moved the
+`integration` layer from above `optimization` to above `application`. The layers contract
+remains the executable statement and the tie-break within a ring, and
+`tests/architecture/test_architecture_rings.py` checks that the order reads the rings from the
+inside out, with no exception.

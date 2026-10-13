@@ -119,8 +119,9 @@ include_external_packages = true
 # The layered modular monolith (docs/architecture/dependency_rules.md). Higher layers may
 # import lower ones, never the reverse. There are no baseline exceptions; a new
 # violation fails the gate. `exhaustive` means every package directly under `squadopt` must
-# be named here, so a new one fails the gate until it is placed. `integration` imports only
-# `data` and `optimization`, so it sits directly above `optimization`. The laboratory
+# be named here, so a new one fails the gate until it is placed. `integration` is a
+# one-release re-export of `application.projection_csv`, so it sits directly above
+# `application` until the release after the next `site-*` tag removes it. The laboratory
 # (`experiments` to `bayesopt`) sits above `live`, so this contract also refuses a `live` import
 # of the laboratory (ADR 0010); the contract below refuses it for the packages above.
 [[tool.importlinter.contracts]]
@@ -131,6 +132,7 @@ exhaustive = true
 layers = [
     "api",
     "platform",
+    "integration",
     "application",
     "experiments",
     "backtest",
@@ -141,7 +143,6 @@ layers = [
     "planning",
     "scenarios",
     "evaluation",
-    "integration",
     "optimization",
     "prediction",
     "features",

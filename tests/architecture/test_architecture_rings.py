@@ -11,8 +11,8 @@ file holds the five to one another:
 - the mapping names exactly the entries under `src/squadopt` (the packages and the one
   top-level module, `integration.py`), and exactly the packages of the exhaustive layers list;
 - read from the bottom, the layer order reaches each product package only after every package
-  of an inner ring, and reaches the research arm only after every R2 package. `integration`
-  is the one exception, listed with its remedy, and the list may only shrink;
+  of an inner ring, with no exception, and reaches the research arm only after every R2
+  package;
 - the research ring is the forbidden list of "Product does not import the laboratory", every
   other package is a source of that contract, and the research ring is also the `LABORATORY`
   list the run-boundary probe reads;
@@ -66,15 +66,6 @@ RINGS: dict[str, str] = {
     "bayesopt": RESEARCH,
     "recalibration": RESEARCH,
     "preflight": RESEARCH,
-}
-
-#: Product packages the layer order places below a package of an inner ring. Each entry is a
-#: known violation in ARCHITECTURE.md with its remedy; the list may only shrink.
-ORDER_EXCEPTIONS: dict[str, str] = {
-    "integration": (
-        "a use-case module placed as its own layer between `evaluation` and `optimization`; "
-        "Phase 2 folds it into `application`"
-    ),
 }
 
 LAYERS_CONTRACT = "Layered architecture"
@@ -144,20 +135,8 @@ def test_the_layer_order_reads_the_rings_from_the_inside_out() -> None:
     innermost_first = list(reversed(_layers()))
     product = [name for name in innermost_first if RINGS[name] != RESEARCH]
 
-    def in_ring_order(names: list[str]) -> bool:
-        depths = [_depth(RINGS[name]) for name in names]
-        return depths == sorted(depths)
-
-    assert in_ring_order([name for name in product if name not in ORDER_EXCEPTIONS])
-    # An exception whose package now sits in ring order excuses nothing.
-    stale = [
-        exception
-        for exception in ORDER_EXCEPTIONS
-        if in_ring_order(
-            [name for name in product if name not in ORDER_EXCEPTIONS.keys() - {exception}]
-        )
-    ]
-    assert not stale, f"these packages sit in ring order now; delete their exceptions: {stale}"
+    depths = [_depth(RINGS[name]) for name in product]
+    assert depths == sorted(depths), list(zip(product, depths, strict=True))
 
     research = [innermost_first.index(name) for name in RINGS if RINGS[name] == RESEARCH]
     domain = [innermost_first.index(name) for name in RINGS if RINGS[name] == "R2"]
