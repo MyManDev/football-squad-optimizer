@@ -36,6 +36,24 @@ the code writes conflates writes with references -- it returns ``data_contract.m
 only read. The alternative is an allowlist of some fifty prose documents, which would rot. So the
 limit is asserted by a test rather than left for a reader to assume, and the twinless records
 that matter are pinned by name.
+
+## Records under `docs/research`
+
+Records are read from three folders: the root of `docs/`, `docs/architecture/` and, since
+2026-10-13, `docs/research/` (a deferred move of ADR 0010). A record below the root is named by
+its path relative to `docs/`, such as ``research/calendar_chip_tail.json``, and the twin rule
+pairs a Markdown file only with the JSON of the same stem in the same folder.
+
+The research rows name their records by a Markdown link, ``[record](research/<name>.json)``,
+more often than by a backticked name, so the matcher reads link targets as well. Read by
+backticks alone, 13 of the 20 JSON records in `docs/research/` had no row; with link targets,
+two did (`football_complete_policy_acceptance` and `football_information_worlds`), and they
+were given rows in the same change, so no research record is on the debt tuple. The matcher
+still reduces every name to a bare stem, which is only sound while no two records share one,
+and a test holds that.
+
+`docs/research/evidence/` is not read: it holds a committed copy of one measurement's receipts,
+which its readout, `football_joint_role_minutes_2026_10_02.md`, cites and which has its own row.
 """
 
 import json
@@ -80,6 +98,8 @@ GRANDFATHERED_BY_RULE_4: tuple[str, ...] = (
 # Growing it turns a governance rule back into a suggestion, which is the state this test
 # exists to leave behind. These are measurements this side did not run, so the findings are not
 # ours to phrase and the rows are not ours to write; the tuple is the record of what is owed.
+# Widening the check to `docs/research/` on 2026-10-13 added nothing here: the two research
+# records without a row were given rows in the same change.
 UNLISTED_AT_THE_TIME_OF_WRITING: tuple[str, ...] = ()
 
 EXEMPT: tuple[str, ...] = GRANDFATHERED_BY_RULE_4 + UNLISTED_AT_THE_TIME_OF_WRITING
@@ -99,50 +119,87 @@ def _exempt_stems() -> set[str]:
     return {Path(name).stem for name in EXEMPT}
 
 
-def _committed_artifacts() -> list[str]:
-    """The committed record files rule 1 applies to.
+# The folders whose JSON files are records, relative to ``docs/`` ("" is the root). Not
+# ``docs/**``: rule 1 has no directory clause, but ``docs/contracts/*.schema.json`` are schemas
+# the code validates against, not measurements, and a recursive glob would demand rows for them.
+# The first artifact to land outside ``docs/`` was a serving-capacity record under
+# ``docs/architecture/``, and the glob missed it for a day; the record tier is named by
+# content, not by directory. ``docs/research/`` joined on 2026-10-13 (see the module docstring).
+RECORD_FOLDERS: tuple[str, ...] = ("", "architecture", "research")
 
-    JSON, plus markdown that has a committed JSON of the same stem: one artifact in two forms,
-    one row. Twinless markdown is out of scope on purpose -- see the module docstring, and the
-    test that asserts the limit rather than leaving it implied.
-    """
 
-    # ``docs/`` and ``docs/architecture/``, not ``docs/**``: rule 1 has no directory clause,
-    # but ``docs/contracts/*.schema.json`` are schemas the code validates against, not
-    # measurements, and a recursive glob would demand rows for them. The first artifact to
-    # land outside ``docs/`` was a serving-capacity record under ``docs/architecture/``, and
-    # this glob missed it for a day; the record tier is named by content, not by directory.
-    json_paths = sorted(
+def _record_name(path: Path) -> str:
+    """A record's path relative to ``docs/``: a bare name at the root, with its folder below."""
+
+    return path.relative_to(DOCS).as_posix()
+
+
+def _record_json() -> list[Path]:
+    """Every committed JSON record in the record folders."""
+
+    return sorted(
         path
-        for pattern in ("*.json", "architecture/*.json")
-        for path in DOCS.glob(pattern)
+        for folder in RECORD_FOLDERS
+        for path in (DOCS / folder).glob("*.json")
         if not path.name.endswith(".schema.json")
     )
-    json_names = [path.name for path in json_paths]
-    stems = {path.stem for path in json_paths}
+
+
+def _committed_artifacts() -> list[str]:
+    """The committed record files rule 1 applies to, named relative to ``docs/``.
+
+    JSON, plus markdown that has a committed JSON of the same stem in the same folder: one
+    artifact in two forms, one row. Twinless markdown is out of scope on purpose -- see the
+    module docstring, and the test that asserts the limit rather than leaving it implied.
+    """
+
+    json_paths = _record_json()
+    twins = {path.with_suffix(".md") for path in json_paths}
     twinned = sorted(
-        path.name
-        for pattern in ("*.md", "architecture/*.md")
-        for path in DOCS.glob(pattern)
-        if path.stem in stems
+        _record_name(path)
+        for folder in RECORD_FOLDERS
+        for path in (DOCS / folder).glob("*.md")
+        if path in twins
     )
-    return json_names + twinned + sorted(TWINLESS_RECORDS_PINNED_BY_NAME)
+    return (
+        [_record_name(path) for path in json_paths]
+        + twinned
+        + sorted(TWINLESS_RECORDS_PINNED_BY_NAME)
+    )
+
+
+def _stem(reference: str) -> str:
+    """A name or link target from the index, reduced to a bare stem."""
+
+    path = reference.split("#", 1)[0].rsplit("/", 1)[-1]
+    return path.removesuffix(".json").removesuffix(".md")
+
+
+def _backticked_names(text: str) -> set[str]:
+    """Every backticked name in `text`, as a bare stem."""
+
+    return {_stem(name) for name in re.findall(r"`([A-Za-z0-9_./-]+)`", text)}
+
+
+def _linked_names(text: str) -> set[str]:
+    """Every Markdown link target in `text`, without its anchor, as a bare stem."""
+
+    return {_stem(target) for target in re.findall(r"\]\(<?([^)\s>]+)>?(?:\s[^)]*)?\)", text)}
 
 
 def _names_in_index() -> set[str]:
-    """Every backticked name anywhere in the index, reduced to a bare stem.
+    """Every backticked name and every link target anywhere in the index, as bare stems.
 
     Every occurrence, not only the first cell of each row, because rows legitimately name
     more than one artifact -- ``fw10_screening`` + ``fw10_frozen_candidate`` is one row for
     two files. A matcher that read only the first cell reported 8 unlisted artifacts when the
     real number was 22, which is the kind of wrong answer that looks like a passing check.
+    Link targets count because the research rows name their records by a link
+    (``[record](research/<name>.json)``) more often than by a backticked name.
     """
 
     text = INDEX.read_text(encoding="utf-8")
-    return {
-        name.rsplit("/", 1)[-1].removesuffix(".json").removesuffix(".md")
-        for name in re.findall(r"`([A-Za-z0-9_./-]+)`", text)
-    }
+    return _backticked_names(text) | _linked_names(text)
 
 
 def unlisted_artifacts() -> list[str]:
@@ -273,6 +330,35 @@ def test_the_settle_records_that_found_this_gap_stay_listed() -> None:
     assert "season_ledger_2026-27" in named
 
 
+def test_the_research_records_are_in_scope() -> None:
+    """`docs/research/` holds records too, named by their path below `docs/`.
+
+    A readout with no JSON of its own stem stays out, as at the root, and so does the copied
+    receipt under `docs/research/evidence/`, which its readout's row covers.
+    """
+
+    covered = set(_committed_artifacts())
+
+    assert "research/calendar_chip_tail.json" in covered
+    assert "research/calendar_chip_tail.md" in covered
+    assert "research/football_information_worlds.json" in covered
+    assert "research/football_candidate_results.md" not in covered
+    assert not [name for name in covered if name.startswith("research/evidence/")]
+    assert len([name for name in covered if name.startswith("research/")]) >= 20
+
+
+def test_a_stem_names_one_record() -> None:
+    """The matcher reduces every name to a bare stem, which is only sound while stems differ.
+
+    If a record in one folder shared its stem with a record in another, a row for either would
+    excuse both, and the check would pass on a record nobody listed.
+    """
+
+    stems = [path.stem for path in _record_json()]
+
+    assert sorted({stem for stem in stems if stems.count(stem) > 1}) == []
+
+
 # --- the check itself has to be able to fail ---------------------------------
 
 
@@ -292,6 +378,21 @@ def test_the_matcher_would_notice_an_unlisted_artifact() -> None:
 
     assert "fw10_holdout" in named
     assert "an_artifact_nobody_committed" not in named
+
+
+def test_the_matcher_reads_a_markdown_link_target() -> None:
+    """The research rows name `calendar_chip_tail` only by links, never in backticks."""
+
+    text = INDEX.read_text(encoding="utf-8")
+
+    assert "calendar_chip_tail" not in _backticked_names(text)
+    assert "calendar_chip_tail" in _linked_names(text)
+    assert "calendar_chip_tail" in _names_in_index()
+    assert _linked_names("[a](research/x.json#top) [b](<y.md>) [c](../z.md 'title')") == {
+        "x",
+        "y",
+        "z",
+    }
 
 
 def test_the_index_exists_and_carries_rows() -> None:
@@ -339,10 +440,11 @@ def test_every_artifact_that_flags_a_holdout_read_is_named_in_the_header() -> No
     """
 
     header = INDEX.read_text(encoding="utf-8").split("## ", 1)[0]
+    documents = {path.stem: json.loads(path.read_text(encoding="utf-8")) for path in _record_json()}
     flagged = sorted(
-        path.stem
-        for path in DOCS.glob("*.json")
-        if json.loads(path.read_text(encoding="utf-8")).get("locked_holdout_accessed") is True
+        stem
+        for stem, document in documents.items()
+        if isinstance(document, dict) and document.get("locked_holdout_accessed") is True
     )
     unnamed = [stem for stem in flagged if f"`{stem}`" not in header]
 

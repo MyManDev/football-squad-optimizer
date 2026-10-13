@@ -62,11 +62,13 @@ and `*_protocol.md`).
    runner writes. A runner removed since is listed under "Retired runners" there, with how to
    restore it.
 2. Read the commit the record names (`repository_commit`, `producer_repository_commit` or
-   `repo_commit`) and check that commit out in a separate worktree. The JSON records at the
-   root of `docs/` that name no commit are on the frozen list in
-   `tests/architecture/test_records_name_their_code.py`; most records in this folder name none
-   yet. For such a record, the commit that added it (`git log --diff-filter=A -- <record>`) is
-   the nearest evidence of the code that produced it.
+   `repo_commit`) and check that commit out in a separate worktree. The JSON records that name
+   no commit are on two frozen lists in `tests/architecture/test_records_name_their_code.py`,
+   one for the root of `docs/` and one for this folder, which holds 19 of the 20 here.
+   Some of those name a commit under another key, such as `source_commit` or `base_commit`,
+   which may be the code that ran or a base the run changed, so read the record before relying
+   on it. For such a record, the commit that added it (`git log --diff-filter=A -- <record>`)
+   is the nearest evidence of the code that produced it.
 3. Provide the private inputs the record names (captures under `data/`, the historical archive
    under `data/raw/`) and run the runner as `python -m scripts.<name>` with the arguments the
    record or its protocol states.

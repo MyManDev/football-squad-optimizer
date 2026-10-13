@@ -28,19 +28,19 @@ to `pyproject.toml`.
 | `api` | R4, R5 | 1 | either | C1, C2, C3, C5, C8 | none |
 | `platform` | R4, R5 | 2 | either; the `club_news_*` modules are İbrahim's zone | C1, C2, C5, C8 | declares 15 of the package's 24 typed ports; mixes deployment roles; 6 modules name `docs/contracts` by a relative path |
 | `integration` | R3 | 3 | the owner | C1, C2, C4, C5, C8 | none; a one-release re-export, removed in the release after the next `site-*` tag |
-| `application` | R3 | 4 | the owner | C1, C2, C4, C5, C8, C9, C10 | imports the storage half of `data`; 2 modules name `docs/contracts` by a relative path; declares 3 ports; starts `git` through `data.source_revision` |
+| `application` | R3 | 4 | the owner | C1, C2, C4, C5, C8, C9, C10 | imports the storage half of `data`; reads and writes files; 2 modules name `docs/contracts` by a relative path; declares 3 ports; starts `git` through `data.source_revision` |
 | `experiments` | Research | 5 | the owner | C1, C4, C5, C8 | none |
 | `backtest` | Research | 6 | both | C1, C4, C5 | none |
 | `recalibration` | Research | 7 | the owner | C1, C4, C5, C8 | none |
 | `preflight` | Research | 8 | the owner | C1, C4, C5, C8 | none |
 | `bayesopt` | Research | 9 | the owner | C1, C4, C5, C8 | none |
-| `live` | R2 | 10 | the owner; `ledger.py`, `tick.py` and `recommendation.py` either | C1, C2, C4, C5, C8, C9, C10 | imports the storage half of `data` |
+| `live` | R2 | 10 | the owner; `ledger.py`, `tick.py` and `recommendation.py` either | C1, C2, C4, C5, C8, C9, C10 | imports the storage half of `data`; reads and writes files |
 | `planning` | R2 | 11 | the owner | C1, C2, C4, C5, C6, C7 | imports private names of `optimization.optimizer` |
 | `scenarios` | R2 | 12 | the owner | C1, C2, C4, C5, C6, C7 | imports private names of `optimization.optimizer` |
 | `evaluation` | R2 | 13 | the owner | C1, C2, C4, C5, C6, C7 | reads files (`component_handoff.py`) |
 | `optimization` | R2 | 14 | the owner; `config.py` both | C1, C2, C4, C5, C6, C7 | the CP-SAT driver has no public port |
 | `prediction` | R2 | 15 | İbrahim | C1, C2, C4, C5, C8 | none |
-| `features` | R2 | 16 | İbrahim | C1, C2, C4, C5, C8, C10 | imports the storage half of `data` |
+| `features` | R2 | 16 | İbrahim | C1, C2, C4, C5, C8, C10 | imports the storage half of `data`; reads files |
 | `data` | R1, R4 | 17 | İbrahim; `schema.py` both | C1, C2, C4, C5, C8 | one package in two rings, at the bottom of the layer order; three vocabulary modules import the storage half |
 | `contracts` | R1 | 18 | both | C1, C2, C4, C5, C6, C7, C8 | reads and writes files (`league_list.py`, `league_tree.py`) |
 
@@ -64,8 +64,9 @@ so the research arm is checked from both sides.
 
 ## Module families
 
-A family is a set of modules that share a name prefix or a job. `platform`, `application` and
-`experiments` have their own guides, which place every module.
+A family is a set of modules that share a name prefix or a job. `platform`, `application`,
+`experiments`, `live`, `prediction`, `features` and `data` have their own guides, which place
+every module.
 
 | Package | Families |
 | --- | --- |
@@ -77,15 +78,15 @@ A family is a set of modules that share a name prefix or a job. `platform`, `app
 | `recalibration` | `study`, `measurement`, `models`, `reporting` |
 | `preflight` | `validator` (residual-export handoffs), `measurement` (committed records), `models`, `reporting` |
 | `bayesopt` | `optimizer`, `evaluation`, `models`, and `football_search` for the football component study |
-| `live` | The season ledger and the decision loop (`ledger`, `tick`, `recommendation`, `transfers`, `settlement`, `report`, `horizon`, `calibration`); the game's rules and money (`rules`, `errors`, `banking`, `purchase_prices`, `free_hit`); plan choice (`plan_selection`, `chip_strategy`, `risk`); the football lane's inputs and records (`football_artifact`, `football_horizon`, `football_observations`, `minute_evidence`) |
+| `live` | Deciding a deadline (`recommendation`, `transfers`, `horizon`, `report`, `risk`, `plan_selection`, `chip_strategy`); the game's rules and money (`rules`, `banking`, `purchase_prices`, `free_hit`, `errors`); the season record (`ledger`, `settlement`, `tick`, `calibration`); the football lane (`football_artifact`, `football_horizon`, `football_observations`, `minute_evidence`): [live guide](live/README.md) |
 | `planning` | The CP-SAT horizon planner (`optimizer`, `horizon`, `models`); lookahead and repair (`lookahead`, `guarded`, `segmented`, `refinement`, `recourse`, `recourse_chips`, `observed`); chips (`chip_strategy`, `chip_tail`); expected values and pricing (`expected_swap`, `expected_window`, `lineup_utility`, `pricing`, `acquisition`); policy comparison (`policy_comparison`, `policy_seed`); `football_exact_lineup` |
 | `scenarios` | Scenario generation and paths (`generator`, `paths`, `models`, `components`, `decomposition`); scoring and selection (`evaluation`, `decision_scoring`, `selection`, `expected_lineup`, `transfer_decisions`); rivals and rank (`rivals`, `rank`, `optimization`); `reporting`; the football lane (`football`, `football_diagnostics`, `football_lineups`) |
 | `evaluation` | Fold scoring and inference (`evaluator`, `scoring`, `statistics`, `promotion`, `benchmarks`, `models`, `cohorts`); component evaluation (`component_decisions`, `component_handoff`, `component_metrics`); audits and gates (`appearance`, `appearance_recalibration`, `live_projection_audit`, `live_series`, `participation_composition`, `prediction_gate`, `prior_minutes_level`, `projection_level`, `rotation_ceiling`, `top100_effect`) |
 | `integration` | One module, `integration.py`: a one-release re-export of `application.projection_csv` |
 | `optimization` | The CP-SAT driver (`optimizer`); configuration, validation and results (`config`, `validation`, `models`); objective coefficients and top-K candidates (`coefficients`, `candidates`); the squad constraints shared with every CP-SAT consumer (`decisions`) |
-| `prediction` | The control and production projection (`baseline`, `production`, `projection`, `config`, `factors`, `integration`, `availability`, `minutes`, `opening`, `in_season`, `participation`, `participation_updates`, `elite_evidence`); the component model (`components`, `component_dataset`, `component_models`, `defcon_component`); the learned candidate (`learned`, `learned_rate`); the football lane (15 `football*` modules) |
-| `features` | Feature building (`builder`, `rolling`, `strength`, `fixtures`, `cross_season`, `config`); evidence tables (`evidence`, `evidence_artifact`, `rotation_evidence`, `rotation_evidence_artifact`, `settled_outcomes`, `component_targets`); the football lane's inputs (8 `football_*` modules) |
-| `data` | Vocabulary (`schema`, `errors`, `timestamps`, `identity`, `claim_identity`, `validation`, `cleaning`, `cohorts`, `fixtures`); storage (`snapshots`, `loaders`, `atomic`, `adapters`, `checksums`, `tables`, `pipeline`, `source_revision`, `_long_paths`); `sources/`: the FPL API (`fpl_live`, `fpl_information`, `fpl_set_pieces`), the historical archive (`vaastav`, `football_history`), club news (8 `club_news*` modules) and the official injury list (`premier_league_injuries`) |
+| `prediction` | The projection table and its hand-off (`projection`, `baseline`, `integration`, `components`, `config`, `factors`); the operational control (`opening`, `in_season`, `component_dataset`, `component_models`, `elite_evidence`); adjustments to a projection (`availability`, `participation_updates`, `defcon_component`); candidates measured against the control (`production`, `minutes`, `participation`, `learned`, `learned_rate`); the football lane (15 `football*` modules, six of them private models): [prediction guide](prediction/README.md) |
+| `features` | Leakage-safe features (`builder`, `rolling`, `config`, `fixtures`, `strength`, `cross_season`); deadline evidence (`evidence`, `evidence_artifact`, `rotation_evidence`, `rotation_evidence_artifact`); what happened (`component_targets`, `settled_outcomes`); the inputs of the private football models (8 `football_*` modules): [features guide](features/README.md) |
+| `data` | Vocabulary (`schema`, `errors`, `timestamps`, `identity`, `claim_identity`, `validation`, `cleaning`, `cohorts`, `fixtures`); storage (`snapshots`, `loaders`, `atomic`, `adapters`, `checksums`, `tables`, `pipeline`, `source_revision`, `_long_paths`); `sources/`: the FPL API (`fpl_live`, `fpl_information`, `fpl_set_pieces`), the historical archive (`vaastav`, `football_history`), club news (8 `club_news*` modules) and the official injury list (`premier_league_injuries`): [data guide](data/README.md) |
 | `contracts` | Shared vocabulary (`players`, `factors`, `preferences`, `information`, `injuries`, `run_logs`); league identity (`league`, `league_list`, `league_tree`, `league_publication_identity`); football point accounting and explanations (`football_point_accounting`, `football_explanations`); `honesty_stems`, generated by `scripts/generate_honesty_stems.py` |
 
 ## Two cross-cutting names

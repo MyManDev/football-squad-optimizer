@@ -159,8 +159,8 @@ The tests in `tests/architecture/` hold the rules that an import graph cannot se
 | `tests/architecture/test_layer_contracts.py` | Moved symbols keep their compatibility imports and their deterministic outputs. |
 | `tests/architecture/test_documentation_paths.py` | A source path or command cited in the documentation exists. |
 | `tests/architecture/test_markdown_links.py` | Every relative link in a tracked Markdown file resolves. |
-| `tests/architecture/test_measurements_index.py` | Every committed record has a row in the measurements index (ADR 0003, rule 1). |
-| `tests/architecture/test_records_name_their_code.py` | A committed record names the commit that produced it; the exceptions only shrink. |
+| `tests/architecture/test_measurements_index.py` | Every committed record at the root of `docs/`, in `docs/architecture/` and in `docs/research/` has a row in the measurements index (ADR 0003, rule 1), found by a backticked name or a link target. |
+| `tests/architecture/test_records_name_their_code.py` | A committed record at the root of `docs/` or in `docs/research/` names the commit that produced it; the exceptions, one frozen list per folder, only shrink. |
 | `tests/architecture/test_mypy_file_set_is_described.py` | The scripts the type gate checks are the ones the PR discipline names. |
 | `tests/architecture/test_dependency_pins.py` | Every declared dependency is pinned inside its declared range. |
 | `tests/architecture/test_operations_docs_match_the_workflows.py` | The operations documents name the variables and steps the workflows use. |
@@ -181,6 +181,7 @@ each lands in its own pull request once its trigger fires.
 | Violation | Measured | Remedy | Phase |
 | --- | --- | --- | --- |
 | Use cases and domain records import the storage half of `data` | `application`: 89 import statements in 30 modules; `live`: 17 in 9; `features`: 16 in 4; together 122 direct import edges from 43 modules | Storage ports declared in `application`, with file adapters in `platform` | Phase 2: the ratchet is in force, the contract "Use cases, domain records and features import no storage or source module" with one `ignore_imports` entry per edge. Phase 3: the ports, triggered by ADR 0005 or issue #1010 |
+| Use cases, domain records and features read and write files themselves | The file-access scan of `tests/architecture/test_core_file_io.py`, run over packages it does not hold, finds file reads or writes in 24 modules of `application`, 6 of `live` (`ledger`, `recommendation`, `calibration`, `football_artifact`, `risk`, `tick`) and 3 of `features` (`evidence_artifact`, `rotation_evidence_artifact`, `settled_outcomes`); it also matches `to_csv` calls that only serialize a frame in memory, which is all it finds in `live/report.py` | File adapters in `platform` behind the storage ports of the first entry, so these packages receive and return records rather than paths | Phase 3, with the storage ports; no check holds it today |
 | `data` holds both R1 vocabulary and R4 storage, and sits at the bottom of the layer order | One package, two rings; `src/squadopt/data/__init__.py` imports `adapters`, `loaders`, `pipeline` and `snapshots`, so importing any `data` module loads those four at run time | The contract "The decision core imports no storage or source module" keeps the import statements of the packages that are clean today off the storage half, and `tests/architecture/test_storage_imports.py` refuses an import of the package root from them and from the sources of the storage ratchet; neither stops the run-time load | The contract and the test are in force (Phase 1); the split itself is an open question in ADR 0010 |
 | Three vocabulary modules of `data` import its storage half | `claim_identity` imports `RosterPlayer` from `data.sources.club_news`, `cleaning` imports `PriceUnit` from `data.adapters`, and `cohorts` imports `LeagueStandingsPage` from `data.sources.fpl_live` | Move the three types into the vocabulary half, with a one-release re-export | With the split of `data`, an open question in ADR 0010; the data owner decides |
 | `contracts` reads and writes files | `LEAGUE_LIST_FILE` and `read_league_list` in `src/squadopt/contracts/league_list.py`; `device_plan_sha256`, `read_league_directory`, `write_league_directory` and `legacy_tree_league_id` in `src/squadopt/contracts/league_tree.py` | Move the file IO to an adapter, with a one-release re-export | Phase 2: the ratchet is in force (`tests/architecture/test_core_file_io.py` allowlists the 5 functions). Phase 3: after issue #981 |
@@ -230,7 +231,11 @@ state lives.
 - [Architecture decision records](docs/architecture/decisions/README.md)
 - [Package map](src/squadopt/README.md), with the guides to
   [platform](src/squadopt/platform/README.md),
-  [application](src/squadopt/application/README.md) and
-  [experiments](src/squadopt/experiments/README.md)
+  [application](src/squadopt/application/README.md),
+  [experiments](src/squadopt/experiments/README.md),
+  [live](src/squadopt/live/README.md),
+  [prediction](src/squadopt/prediction/README.md),
+  [features](src/squadopt/features/README.md) and
+  [data](src/squadopt/data/README.md)
 - [Contracts guide](docs/contracts/README.md)
 - [Script catalogue](scripts/README.md), [test guide](tests/README.md) and [web guide](web/README.md)

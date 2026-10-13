@@ -149,6 +149,10 @@ ARCHITECTURE.md measures and schedules these; this list says where they are.
   in `platform` (Phase 3). Until then the contract "Use cases, domain records and features
   import no storage or source module" holds them to today's imports: 89 edges from 30 modules,
   each an `ignore_imports` entry that may only go.
+- **File access.** 24 modules here read or write files themselves, among them
+  `league_publication.py`, `league_views.py` and `site.py` (the published trees),
+  `advice_record.py`, and `player_evidence.py` and `rotation_export.py` (the evidence exports).
+  The remedy is the same storage ports (Phase 3); no check holds it today.
 - **Ports.** Three typed ports are declared here: `DecisionVerifier` in `commands.py`,
   `EntryPicksProvider` in `entries.py` and `TickObserver` in `season.py`.
 - **Paths to `docs/contracts`.** `contract.py` names `docs/contracts/ui_view_v1.schema.json`
