@@ -20,6 +20,7 @@ import { LeagueDataError, LeagueDataMissing } from "../dataErrors";
 import type { EntrySquad, LeagueViewEnvelope } from "../types";
 import type { DevicePlanReply, DevicePlanRequest } from "./deviceSolver.worker";
 import type { LpSolver } from "./lp/problem";
+import { DEVICE_REPLY_GRACE_SECONDS, DEVICE_SOLVE_CEILING_SECONDS } from "./solve/ceiling";
 import { solvePlan } from "./solve/week";
 import type { DevicePlanDocument, DevicePlanEntry } from "./types";
 import {
@@ -99,6 +100,43 @@ function envelope(payload: DevicePlanDocument): LeagueViewEnvelope<DevicePlanDoc
   };
 }
 
+/** Timers the test fires by hand: each callback with the delay it was set for. */
+class HandTimers {
+  private next = 0;
+  readonly waiting = new Map<number, { callback: () => void; milliseconds: number }>();
+  readonly set = (callback: () => void, milliseconds: number): unknown => {
+    this.next += 1;
+    this.waiting.set(this.next, { callback, milliseconds });
+    return this.next;
+  };
+  readonly clear = (handle: unknown): void => {
+    this.waiting.delete(handle as number);
+  };
+  /** Fire every timer still set, as if its delay had passed. */
+  fireAll(): void {
+    const due = [...this.waiting.values()];
+    this.waiting.clear();
+    for (const timer of due) timer.callback();
+  }
+}
+
+/** A worker that loads and then never answers. */
+class SilentSolver implements DeviceSolver {
+  onmessage: ((event: MessageEvent<DevicePlanReply>) => void) | null = null;
+  onerror: ((event: unknown) => void) | null = null;
+  terminated = false;
+  postMessage(request: DevicePlanRequest): void {
+    queueMicrotask(() =>
+      this.onmessage?.({
+        data: { id: request.id, kind: "ready" },
+      } as MessageEvent<DevicePlanReply>),
+    );
+  }
+  terminate(): void {
+    this.terminated = true;
+  }
+}
+
 function Harness({
   squad,
   request,
@@ -106,6 +144,8 @@ function Harness({
   solver,
   onState,
   rivals,
+  createSolver,
+  timers,
 }: {
   squad: EntrySquad;
   request: AdviceRequest;
@@ -113,14 +153,17 @@ function Harness({
   solver: DeviceSolver;
   onState: (state: DevicePlanPhase) => void;
   rivals?: readonly number[];
+  createSolver?: () => DeviceSolver;
+  timers?: HandTimers;
 }) {
   const device = useDevicePlan(
     squad,
     request,
     {
       loadDocument,
-      createSolver: () => solver,
+      createSolver: createSolver ?? (() => solver),
       now: () => new Date("2026-10-03T01:02:03Z"),
+      ...(timers ? { setTimer: timers.set, clearTimer: timers.clear } : {}),
     },
     rivals,
   );
@@ -147,6 +190,13 @@ describe("the worker", () => {
     expect(source).not.toContain("devicePlan.worker");
     expect(existsSync(join(__dirname, "deviceSolver.worker.ts"))).toBe(true);
     expect(existsSync(join(__dirname, "devicePlan.worker.ts"))).toBe(false);
+  });
+
+  it("solves every request within the device's ceiling", () => {
+    // The worker cannot load here (its wasm comes from the built assets), so its wiring is
+    // read from its source; the ceiling itself is tested in solve/ceiling.test.ts.
+    const source = readFileSync(join(__dirname, "deviceSolver.worker.ts"), "utf8");
+    expect(source).toContain("solveRequest(withinCeiling(loaded), event.data)");
   });
 });
 
@@ -511,5 +561,102 @@ describe("a solve on the device", () => {
     await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("done"));
     await act(async () => screen.getByText("reset").click());
     expect(screen.getByTestId("phase")).toHaveTextContent("idle");
+  });
+});
+
+describe("a solve that runs too long, or is no longer wanted", () => {
+  async function solving(timers: HandTimers, created: DeviceSolver[]) {
+    const view = render(
+      withLeague(
+        <Harness
+          squad={squadWith(entry)}
+          request={REQUEST}
+          loadDocument={async () => envelope(document)}
+          solver={new SilentSolver()}
+          createSolver={() => {
+            const made = new SilentSolver();
+            created.push(made);
+            return made;
+          }}
+          timers={timers}
+          onState={() => {}}
+        />,
+      ),
+    );
+    await act(async () => screen.getByText("run").click());
+    await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("solving"));
+    return view;
+  }
+
+  it("ends a worker that never answers, after the solve's ceiling and a grace, and fails the run", async () => {
+    const timers = new HandTimers();
+    const created: SilentSolver[] = [];
+    await solving(timers, created);
+    // Once the solver has loaded, the watchdog waits the ceiling and the grace, no less.
+    expect([...timers.waiting.values()].map((timer) => timer.milliseconds)).toEqual([
+      (DEVICE_SOLVE_CEILING_SECONDS + DEVICE_REPLY_GRACE_SECONDS) * 1000,
+    ]);
+    await act(async () => timers.fireAll());
+    await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("failed"));
+    expect(created).toHaveLength(1);
+    expect(created[0]!.terminated).toBe(true);
+  });
+
+  it("ends the worker of a solve that a reset interrupts, and the next run makes a fresh one", async () => {
+    const timers = new HandTimers();
+    const created: SilentSolver[] = [];
+    await solving(timers, created);
+    await act(async () => screen.getByText("reset").click());
+    expect(screen.getByTestId("phase")).toHaveTextContent("idle");
+    expect(created[0]!.terminated).toBe(true);
+    expect(timers.waiting.size).toBe(0);
+    await act(async () => screen.getByText("run").click());
+    await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("solving"));
+    expect(created).toHaveLength(2);
+    expect(created[1]!.terminated).toBe(false);
+  });
+
+  it("ends the worker of a solve that a new selection interrupts", async () => {
+    const timers = new HandTimers();
+    const created: SilentSolver[] = [];
+    const { rerender } = await solving(timers, created);
+    rerender(
+      withLeague(
+        <Harness
+          squad={squadWith(entry)}
+          request={{ ...REQUEST, window: 3 }}
+          loadDocument={async () => envelope(document)}
+          solver={new SilentSolver()}
+          createSolver={() => new SilentSolver()}
+          timers={timers}
+          onState={() => {}}
+        />,
+      ),
+    );
+    expect(screen.getByTestId("phase")).toHaveTextContent("idle");
+    expect(created[0]!.terminated).toBe(true);
+    expect(timers.waiting.size).toBe(0);
+  });
+
+  it("does not end a worker whose solve has already answered", async () => {
+    const timers = new HandTimers();
+    const solver = new InProcessSolver();
+    render(
+      withLeague(
+        <Harness
+          squad={squadWith(entry)}
+          request={REQUEST}
+          loadDocument={async () => envelope(document)}
+          solver={solver}
+          timers={timers}
+          onState={() => {}}
+        />,
+      ),
+    );
+    await act(async () => screen.getByText("run").click());
+    await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("done"));
+    expect(timers.waiting.size).toBe(0);
+    await act(async () => screen.getByText("reset").click());
+    expect(solver.terminated).toBe(false);
   });
 });

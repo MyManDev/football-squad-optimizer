@@ -6,7 +6,10 @@
  * chip the member still holds played that week, a rival strategy against a named rival
  * whose entry document gives their eleven, or a Top 100 weight the member block names. The shared document (and the rival's) is read
  * when the member asks, the solve runs in a worker, and the answer is shown as the advice
- * document the page already reads. A new selection starts clean.
+ * document the page already reads. A new selection starts clean, and a reset or a new
+ * selection stops a solve still running: its worker is ended, not left computing an
+ * answer nobody will read. A worker that does not answer within the solve's ceiling, and
+ * a grace beyond it, is ended too and the run fails.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -16,6 +19,11 @@ import type { EntryAdvice, EntrySquad, LeagueViewEnvelope } from "../types";
 import type { AdviceRequest } from "../advice/adviceClient";
 import { LeagueDataMissing } from "../dataErrors";
 import { deviceAdviceEnvelope } from "./deviceAdvice";
+import {
+  DEVICE_LOAD_ALLOWANCE_SECONDS,
+  DEVICE_REPLY_GRACE_SECONDS,
+  DEVICE_SOLVE_CEILING_SECONDS,
+} from "./solve/ceiling";
 import type { DevicePlanReply, DevicePlanRequest } from "./deviceSolver.worker";
 import { deviceSelection, offeredDeviceSelection, rivalFromSquad } from "./selection";
 import { isDevicePlanEntry, type DevicePlanDocument, type DevicePlanEntry } from "./types";
@@ -69,6 +77,18 @@ export interface DevicePlanDependencies {
   loadRival?: (entryId: number) => Promise<LeagueViewEnvelope<EntrySquad>>;
   createSolver?: () => DeviceSolver;
   now?: () => Date;
+  /** Timers, for tests; the page's own otherwise. */
+  setTimer?: (callback: () => void, milliseconds: number) => unknown;
+  clearTimer?: (handle: unknown) => void;
+}
+
+// Module-level, so the hook's callbacks keep one identity from render to render.
+function startTimer(callback: () => void, milliseconds: number): unknown {
+  return setTimeout(callback, milliseconds);
+}
+
+function stopTimer(handle: unknown): void {
+  clearTimeout(handle as ReturnType<typeof setTimeout>);
 }
 
 function createWorker(): DeviceSolver {
@@ -99,6 +119,8 @@ export function useDevicePlan(
     loadRival = (entryId: number) => tree.entrySquad(entryId),
     createSolver = createWorker,
     now = () => new Date(),
+    setTimer = startTimer,
+    clearTimer = stopTimer,
   } = dependencies;
   const entry: DevicePlanEntry | null = isDevicePlanEntry(squad.device_plan)
     ? squad.device_plan
@@ -113,6 +135,11 @@ export function useDevicePlan(
   });
   const solver = useRef<DeviceSolver | null>(null);
   const generation = useRef(0);
+  // The run a worker is solving now: how to end its wait, and its watchdog.
+  const pending = useRef<{
+    settle: (reply: DevicePlanReply | null) => void;
+    timer: unknown;
+  } | null>(null);
   const requestKey = JSON.stringify([
     squad.source_snapshot_id,
     request.leagueId,
@@ -134,18 +161,37 @@ export function useDevicePlan(
     (next: DevicePlanPhase) => setHeld({ key: requestKey, state: next }),
     [requestKey],
   );
+  /** End a solve still running: its worker is terminated and its wait settles empty. */
+  const stopSolving = useCallback(() => {
+    const running = pending.current;
+    if (running === null) return;
+    pending.current = null;
+    clearTimer(running.timer);
+    solver.current?.terminate();
+    solver.current = null;
+    running.settle(null);
+  }, [clearTimer]);
+
   const reset = useCallback(() => {
     generation.current += 1;
+    stopSolving();
     setState({ phase: "idle" });
-  }, [setState]);
+  }, [setState, stopSolving]);
+
+  // A new selection stops the old one's solve, as a reset does.
+  useEffect(() => {
+    generation.current += 1;
+    stopSolving();
+  }, [requestKey, stopSolving]);
 
   // An unmounted page keeps no worker.
   useEffect(
     () => () => {
+      stopSolving();
       solver.current?.terminate();
       solver.current = null;
     },
-    [],
+    [stopSolving],
   );
 
   const run = useCallback(() => {
@@ -205,18 +251,39 @@ export function useDevicePlan(
         return;
       }
       const reply = await new Promise<DevicePlanReply | null>((resolve) => {
+        // A worker that never answers is ended: the load gets its allowance, and the
+        // solves their ceiling, each with a grace beyond it.
+        const watch = (seconds: number) =>
+          setTimer(
+            () => {
+              if (pending.current?.settle === settle) stopSolving();
+            },
+            (seconds + DEVICE_REPLY_GRACE_SECONDS) * 1000,
+          );
+        const settle = (value: DevicePlanReply | null) => {
+          if (pending.current?.settle === settle) {
+            clearTimer(pending.current.timer);
+            pending.current = null;
+          }
+          resolve(value);
+        };
+        pending.current = { settle, timer: watch(DEVICE_LOAD_ALLOWANCE_SECONDS) };
         worker.onmessage = (event) => {
           if (event.data.id !== run) return;
           if (event.data.kind === "ready") {
+            if (pending.current?.settle === settle) {
+              clearTimer(pending.current.timer);
+              pending.current.timer = watch(DEVICE_SOLVE_CEILING_SECONDS);
+            }
             if (alive()) setState({ phase: "solving" });
             return;
           }
-          resolve(event.data);
+          settle(event.data);
         };
         worker.onerror = () => {
           solver.current?.terminate();
           solver.current = null;
-          resolve(null);
+          settle(null);
         };
         try {
           worker.postMessage({
@@ -228,7 +295,7 @@ export function useDevicePlan(
             top100Weight: selection.kind === "top100" ? selection.weight : 0,
           });
         } catch {
-          resolve(null);
+          settle(null);
         }
       });
       if (!alive()) return;
@@ -244,7 +311,20 @@ export function useDevicePlan(
         });
       }
     })();
-  }, [available, entry, selection, loadDocument, loadRival, createSolver, now, setState, squad]);
+  }, [
+    available,
+    entry,
+    selection,
+    loadDocument,
+    loadRival,
+    createSolver,
+    now,
+    setState,
+    squad,
+    setTimer,
+    clearTimer,
+    stopSolving,
+  ]);
 
   return { available, state, run, reset };
 }
