@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 
-from squadopt.platform import backup_recovery as backup
+from squadopt.platform.storage import backup_recovery as backup
 
 
 @pytest.fixture

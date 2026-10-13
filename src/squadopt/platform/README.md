@@ -44,7 +44,6 @@ optional football inputs it seals.
 | `weekly_journal.py` | Durable sequential stage execution: ownership lock, input and output fingerprints, resume. |
 | `weekly_publish.py` | Publishes one gameweek's site view: worktree, copy, commit, push and pull request in one command. |
 | `publication_workers.py` | Process scheduling for the member publication service. |
-| `projection_retention.py` | Retains a handoff's exact bytes by capture before the gameweek alias is published. |
 | `football_bundle.py` | Validates existing football inputs and publishes one immutable ready marker last. |
 | `football_minute_basis.py` | Reads an optional fixture basis beside a served football forecast, without fitting a model. |
 | `football_publication.py` | Validates and publishes capture-bound football documents without fitting a model. |
@@ -80,11 +79,9 @@ The file job queue, the worker loop and what keeps them observable and recoverab
 | `advice_job_spec.py` | What a queued job is for, stored beside the queue rather than inside it. |
 | `advice_cache.py` | The immutable-key answer cache behind a protocol, and the cache key. |
 | `_damaged_entry.py` | Moves aside bytes at a create-once address that do not parse, rather than answering from them. |
-| `_queue_lock.py` | Short metadata transactions under an OS lock that is released when its process dies; also used by `weekly_journal` and `benchmark_capture`. |
 | `worker_heartbeat.py` | Each worker reports that it is alive, and readiness asks whether any worker is. |
 | `worker_metrics.py` | A worker-owned Prometheus listener; no counters are shared with the API process. |
 | `advice_observability.py` | Structured log lines, counters and readiness for the advice backend. |
-| `store_probe.py` | Proves that the shared store provides what the adapters rely on before the backend serves. |
 | `advice_load.py` | A bounded HTTP capacity probe of an explicitly selected advice deployment. |
 
 ## Captures
@@ -128,7 +125,6 @@ Provenance for every installed run, and the offline backup of private state.
 | `manifest.py` | Deterministic `run_manifest_v1` serialization. |
 | `artifacts.py` | Immutable artifact records and a file-backed provenance registry (`artifact_record_v1`). |
 | `runlog.py` | Structured run logging for the live path. |
-| `backup_recovery.py` | Offline, checksummed copies of explicitly selected private roots. |
 
 ## Storage adapters
 
@@ -137,11 +133,47 @@ each exports a stateless frozen slots dataclass singleton annotated with its por
 `data` functions unchanged or holds code moved verbatim, and is wired into the use cases by the
 composition roots (`weekly_operations.py`, `cli.py`, `publication_workers.py` and the scripts).
 `tests/architecture/test_storage_ports.py` holds each adapter to its port. The subpackage holds
-no adapter yet: each group lands in its own pull request.
+no adapter yet: each group lands in its own pull request. It already holds the shared
+durable-state primitives every unit above it uses (ADR 0011, decision 3): the queue lock, the
+store probe, handoff retention and the backup command.
 
 | Module | What it does |
 | --- | --- |
 | `storage/__init__.py` | The package file, a docstring that names the adapter groups and the rule each adapter follows. |
+| `storage/_queue_lock.py` | Short metadata transactions under an OS lock that is released when its process dies; also used by `weekly_journal` and `benchmark_capture`. |
+| `storage/store_probe.py` | Proves that the shared store provides what the adapters rely on before the backend serves. |
+| `storage/projection_retention.py` | Retains a handoff's exact bytes by capture before the gameweek alias is published. |
+| `storage/backup_recovery.py` | Offline, checksummed copies of explicitly selected private roots; `python -m squadopt.platform.backup_recovery` reaches it through the permanent alias. |
+
+## Deployment units
+
+The seven subpackages of ADR 0011 (decision 3), one layer each in the contract "Platform
+deployment units import only the shared adapters below them": `operations` and `backend` at
+the top, then `football`, `club_news`, `capture`, `runs` and `storage`. Six hold their package
+file only until their modules move, one pull request per unit.
+
+| Module | What it does |
+| --- | --- |
+| `runs/__init__.py` | Run identity, provenance and the stage journal; empty until its modules move. |
+| `capture/__init__.py` | FPL network captures; empty until its modules move. |
+| `club_news/__init__.py` | Club pages, the official injury capture and the model clients; empty until its modules move. |
+| `football/__init__.py` | Football input artifacts; empty until its modules move. |
+| `backend/__init__.py` | The API and worker cluster; empty until its modules move. |
+| `operations/__init__.py` | The CLI, the weekly run and the publication workers; empty until its modules move. |
+
+## Aliases at the old paths
+
+The moves above leave a file at each old path (ADR 0011, decision 8): three one-release
+aliases that re-export the moved names and go in the release after the next `site-*` tag, and
+one permanent entry alias. `tests/architecture/test_platform_layout.py` holds each alias to the
+moved object and refuses a new importer of an old path.
+
+| Module | What it does |
+| --- | --- |
+| `_queue_lock.py` | One-release alias of `storage/_queue_lock.py`. |
+| `store_probe.py` | One-release alias of `storage/store_probe.py`. |
+| `projection_retention.py` | One-release alias of `storage/projection_retention.py`. |
+| `backup_recovery.py` | Permanent entry alias: `python -m squadopt.platform.backup_recovery` runs `storage/backup_recovery.py`'s `main`. |
 
 ## Installed CLI and package surface
 

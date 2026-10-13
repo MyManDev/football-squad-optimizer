@@ -26,7 +26,7 @@ to `pyproject.toml`.
 | Package | Ring | Layer | Owner | Checked by | Known violation |
 | --- | --- | --- | --- | --- | --- |
 | `api` | R4, R5 | 1 | either | C1, C2, C3, C5, C8 | none |
-| `platform` | R4, R5 | 2 | either; the `club_news_*` modules are İbrahim's zone | C1, C2, C5, C8 | declares 15 of the package's 24 typed ports, 8 of them use-case ports of the advice backend that wait on #988; mixes deployment roles; `history_documents.py` names `docs/contracts` by a relative path; imports a private name of `application.weekly_plan` |
+| `platform` | R4, R5 | 2 | either; the `club_news_*` modules are İbrahim's zone | C1, C2, C5, C8, C11 | declares 15 of the package's 24 typed ports, 8 of them use-case ports of the advice backend that wait on #988; mixes deployment roles (49 flat modules; the four shared durable-state modules are in `storage/`, the other six units hold their package file); `history_documents.py` names `docs/contracts` by a relative path; imports a private name of `application.weekly_plan` |
 | `integration` | R3 | 3 | the owner | C1, C2, C4, C5, C8 | none; a one-release re-export, removed in the release after the next `site-*` tag |
 | `application` | R3 | 4 | the owner | C1, C2, C4, C5, C8, C9, C10 | imports the storage half of `data`; reads and writes files; declares 3 ports; starts `git` through `data.source_revision` |
 | `experiments` | Research | 5 | the owner | C1, C4, C5, C8 | imports private names of `prediction.football`, `live.minute_evidence` and `evaluation.statistics` |
@@ -58,6 +58,7 @@ The import contracts, in the order `pyproject.toml` declares them:
 | C8 | The CP-SAT solver stays in the decision core |
 | C9 | Use cases and domain records import no process, thread, event-loop or command-line module |
 | C10 | Use cases, domain records and features import no storage or source module |
+| C11 | Platform deployment units import only the shared adapters below them |
 
 The research packages are also the forbidden side of C2: no product package may import them,
 so the research arm is checked from both sides. C7 also holds one subpackage as a source,
@@ -75,7 +76,7 @@ packages has no row in its guide, has two, or a row names a module that is not t
 | Package | Families |
 | --- | --- |
 | `api` | `app` (the FastAPI routes), `runtime` (`build_app`, the API process's composition), `views` (published-view reads), `contributions` (community observations) |
-| `platform` | Weekly run, advice API services, advice queue and workers, captures, club news and the model adapter, run records and recovery, the storage adapters (`storage/`, the home ADR 0011 gives the file adapters, empty today), the installed CLI: [platform guide](platform/README.md) |
+| `platform` | Weekly run, advice API services, advice queue and workers, captures, club news and the model adapter, run records and recovery, the storage adapters (`storage/`, the home ADR 0011 gives the file adapters; it holds the queue lock, the store probe, handoff retention and the backup command, and no adapter yet), the six other deployment units (package files only), the aliases at the old paths, the installed CLI: [platform guide](platform/README.md) |
 | `application` | Member advice, chips and strategies, the device plan, weekly and multi-week planning, squad optimization from a projection CSV, league and site publication, the season ledger and settlement, evidence exports, the football lane, the storage ports (`ports/`, the home ADR 0011 gives the use-case ports, empty today): [application guide](application/README.md) |
 | `experiments` | The screening design and its runner, the season chain, Phase C to E readings, Benchmark V2, the football studies and the private football experiments, chip timing: [experiments guide](experiments/README.md) |
 | `backtest` | Walk-forward `folds` and `splits`; the production benchmark (`production`, `production_benchmark`, `production_reporting`); the learned candidate (`learned`, `learned_candidate`); `candidate_residuals`, `horizon_decay`, `opening_prior` |

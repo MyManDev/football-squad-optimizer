@@ -37,7 +37,7 @@ from squadopt.platform.backend_runtime import (
     computable_strategies,
     configuration_fingerprint,
 )
-from squadopt.platform.store_probe import StoreProbeResult
+from squadopt.platform.storage.store_probe import StoreProbeResult
 from squadopt.platform.worker_heartbeat import WorkerHeartbeat
 
 SEASON = world_module.SEASON

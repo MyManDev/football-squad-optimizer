@@ -542,3 +542,79 @@ ignore_imports = [
     "squadopt.features.rotation_evidence_artifact -> squadopt.data.sources.club_news_scope",
 ]
 allow_indirect_imports = true
+
+# The platform splits by deployment unit (ADR 0011, decision 3): seven subpackages, each a
+# layer, so a unit imports only the shared adapters below it and never a sibling above it.
+# `exhaustive` with the flat module names ignored: every subpackage must be placed, while the
+# flat modules that have not moved yet, and the aliases left at the old paths, sit outside the
+# layers until their own move. `tests/architecture/test_platform_layout.py` holds the ignore
+# list to exactly the flat modules, so a move must shorten it and a new flat module must be
+# placed on purpose. The top-level layered contract is unchanged.
+[[tool.importlinter.contracts]]
+name = "Platform deployment units import only the shared adapters below them"
+type = "layers"
+containers = ["squadopt.platform"]
+exhaustive = true
+exhaustive_ignores = [
+    "_damaged_entry",
+    "_queue_lock",
+    "advice_cache",
+    "advice_documents",
+    "advice_job_spec",
+    "advice_load",
+    "advice_observability",
+    "advice_queue",
+    "advice_read",
+    "advice_submit",
+    "advice_switches",
+    "advice_worker",
+    "api_contract",
+    "artifacts",
+    "backend_runtime",
+    "backup_recovery",
+    "benchmark_capture",
+    "capture_context",
+    "capture_measurement",
+    "cli",
+    "club_news_acquire",
+    "club_news_coverage",
+    "club_news_fetch",
+    "club_news_gemini",
+    "club_news_model",
+    "club_news_openai",
+    "club_news_provider",
+    "club_news_settings",
+    "cohort_capture",
+    "context",
+    "contributions",
+    "elite_capture",
+    "file_advice_queue",
+    "football_bundle",
+    "football_minute_basis",
+    "football_publication",
+    "fpl_capture",
+    "history_documents",
+    "jobs_contract",
+    "manifest",
+    "official_injury_capture",
+    "projection_retention",
+    "publication_workers",
+    "queries",
+    "queue_contracts",
+    "runlog",
+    "runtime",
+    "store_probe",
+    "weekly_journal",
+    "weekly_operations",
+    "weekly_publish",
+    "worker_heartbeat",
+    "worker_metrics",
+]
+layers = [
+    "operations | backend",
+    "football",
+    "club_news",
+    "capture",
+    "runs",
+    "storage",
+]

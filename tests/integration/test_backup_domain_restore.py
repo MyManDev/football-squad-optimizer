@@ -12,8 +12,8 @@ from squadopt.application.advice_record import load_member_advice_record
 from squadopt.application.entries import EntryRegistry
 from squadopt.data.snapshots import read_snapshot
 from squadopt.live import load_entry, read_projection_handoff
-from squadopt.platform.backup_recovery import create_backup, restore_backup
-from squadopt.platform.projection_retention import publish_retained_handoff
+from squadopt.platform.storage.backup_recovery import create_backup, restore_backup
+from squadopt.platform.storage.projection_retention import publish_retained_handoff
 
 world = live_world._world
 
