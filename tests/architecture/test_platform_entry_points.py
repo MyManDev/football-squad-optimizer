@@ -26,11 +26,12 @@ usage line, the console script's target, the import smoke or the hashed tree fai
   by the same rule, so the hashed tree is the whole package.
 
 All seven commands build an `argparse` parser today, so each pins its usage line as well as
-its `main`. argparse wraps usage at the terminal width, so `COLUMNS` is fixed at 80 and the
-first line of the help is compared. Four other `platform` modules carry a `__main__` guard
-(`club_news_acquire`, `cohort_capture`, `elite_capture` and `weekly_publish`); the runbook
-reaches them through their `scripts/` shims and ADR 0011 does not list them, so this file
-does not read them.
+its `main`. argparse wraps usage at the terminal width, and the wrap point moved between
+Python 3.11 and 3.13 (3.13 fits one more option on the first line), so `COLUMNS` is fixed
+at 80 and the first line of the help must start with the pinned prefix. Four other
+`platform` modules carry a `__main__` guard (`club_news_acquire`, `cohort_capture`,
+`elite_capture` and `weekly_publish`); the runbook reaches them through their `scripts/`
+shims and ADR 0011 does not list them, so this file does not read them.
 """
 
 from __future__ import annotations
@@ -57,9 +58,9 @@ RESTART_SCRIPT = REPOSITORY_ROOT / "scripts" / "release" / "restart_backend.ps1"
 LOCAL_LAUNCHER = REPOSITORY_ROOT / "scripts" / "run_backend_local.ps1"
 COMPOSE = REPOSITORY_ROOT / "deploy" / "compose.yaml"
 
-#: The first line each command prints for `--help` at 80 columns: the prog name, which
-#: argparse takes from the module's file name unless the parser sets it, as `cli` does, and
-#: the options that fit on that line.
+#: The start of the first line each command prints for `--help` at 80 columns: the prog
+#: name, which argparse takes from the module's file name unless the parser sets it, as
+#: `cli` does, and the options that fit on that line under every supported Python.
 USAGE_LINES: dict[str, str] = {
     "cli": "usage: squadopt [-h] {gameweek,season} ...",
     "weekly_operations": (
@@ -109,7 +110,8 @@ def test_each_command_answers_help_with_its_usage_line(command: str) -> None:
     result = _run(["-m", f"squadopt.platform.{command}", "--help"])
 
     assert result.returncode == 0, result.stdout + result.stderr
-    assert result.stdout.splitlines()[:1] == [USAGE_LINES[command]]
+    first_line = result.stdout.splitlines()[0]
+    assert first_line.startswith(USAGE_LINES[command]), first_line
 
 
 @pytest.mark.parametrize("command", COMMANDS)
