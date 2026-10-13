@@ -7,11 +7,12 @@ with `squadopt.api`, that may import web frameworks, network clients, model SDKs
 (the contract "Frameworks, network and databases stay in api and platform"). No package below
 it in the layer order imports it, and it imports no laboratory module.
 
-Its 54 Python files sit in one flat folder and serve several deployment units.
+Its 55 Python files, 54 in one flat folder and the package file of `storage/`, serve several
+deployment units.
 [ADR 0011](../../../docs/architecture/decisions/0011-storage-ports-and-platform-split.md)
 splits the package into seven subpackages by deployment unit in Phase 3 and keeps every
-command as it is; until those moves land this page is the map: every module is in exactly one
-family below.
+command as it is; `storage/`, the lowest of the seven, exists and holds no adapter yet. Until
+the moves land this page is the map: every module is in exactly one family below.
 
 Review: either owner approves a change here; the `club_news_*` modules are İbrahim's zone
 ([ownership](../../../docs/architecture/ownership.md)).
@@ -128,6 +129,19 @@ Provenance for every installed run, and the offline backup of private state.
 | `artifacts.py` | Immutable artifact records and a file-backed provenance registry (`artifact_record_v1`). |
 | `runlog.py` | Structured run logging for the live path. |
 | `backup_recovery.py` | Offline, checksummed copies of explicitly selected private roots. |
+
+## Storage adapters
+
+The file adapters behind the storage ports of ADR 0011 (decision 1), one module per port group:
+each exports a stateless frozen slots dataclass singleton annotated with its port, calls the
+`data` functions unchanged or holds code moved verbatim, and is wired into the use cases by the
+composition roots (`weekly_operations.py`, `cli.py`, `publication_workers.py` and the scripts).
+`tests/architecture/test_storage_ports.py` holds each adapter to its port. The subpackage holds
+no adapter yet: each group lands in its own pull request.
+
+| Module | What it does |
+| --- | --- |
+| `storage/__init__.py` | The package file, a docstring that names the adapter groups and the rule each adapter follows. |
 
 ## Installed CLI and package surface
 

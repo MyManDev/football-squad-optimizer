@@ -60,7 +60,10 @@ The import contracts, in the order `pyproject.toml` declares them:
 | C10 | Use cases, domain records and features import no storage or source module |
 
 The research packages are also the forbidden side of C2: no product package may import them,
-so the research arm is checked from both sides.
+so the research arm is checked from both sides. C7 also holds one subpackage as a source,
+`squadopt.application.ports`, the home ADR 0011 gives the use-case storage ports; the table
+above lists whole packages, which is how `tests/architecture/test_architecture_rings.py` reads
+it, so `application` is checked by C10 and not by C7.
 
 ## Module families
 
@@ -72,8 +75,8 @@ packages has no row in its guide, has two, or a row names a module that is not t
 | Package | Families |
 | --- | --- |
 | `api` | `app` (the FastAPI routes), `runtime` (`build_app`, the API process's composition), `views` (published-view reads), `contributions` (community observations) |
-| `platform` | Weekly run, advice API services, advice queue and workers, captures, club news and the model adapter, run records and recovery, the installed CLI: [platform guide](platform/README.md) |
-| `application` | Member advice, chips and strategies, the device plan, weekly and multi-week planning, squad optimization from a projection CSV, league and site publication, the season ledger and settlement, evidence exports, the football lane: [application guide](application/README.md) |
+| `platform` | Weekly run, advice API services, advice queue and workers, captures, club news and the model adapter, run records and recovery, the storage adapters (`storage/`, the home ADR 0011 gives the file adapters, empty today), the installed CLI: [platform guide](platform/README.md) |
+| `application` | Member advice, chips and strategies, the device plan, weekly and multi-week planning, squad optimization from a projection CSV, league and site publication, the season ledger and settlement, evidence exports, the football lane, the storage ports (`ports/`, the home ADR 0011 gives the use-case ports, empty today): [application guide](application/README.md) |
 | `experiments` | The screening design and its runner, the season chain, Phase C to E readings, Benchmark V2, the football studies and the private football experiments, chip timing: [experiments guide](experiments/README.md) |
 | `backtest` | Walk-forward `folds` and `splits`; the production benchmark (`production`, `production_benchmark`, `production_reporting`); the learned candidate (`learned`, `learned_candidate`); `candidate_residuals`, `horizon_decay`, `opening_prior` |
 | `recalibration` | `study`, `measurement`, `models`, `reporting` |

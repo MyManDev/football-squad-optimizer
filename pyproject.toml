@@ -309,7 +309,10 @@ allow_indirect_imports = true
 # `prediction` to today's allowlist. The contract sees import statements, and
 # `data/__init__.py` re-exports names from the storage modules, so an import of the package
 # root reaches them indirectly and passes here; `tests/architecture/test_storage_imports.py`
-# refuses that import from these sources.
+# refuses that import from these sources. `squadopt.application.ports`, the home ADR 0011
+# (decision 1) gives the storage ports only the use cases consume, is a source as well: a port
+# names what a use case asks of durable state, never the storage module that answers it, so the
+# package starts clean and stays clean while the rest of `application` is under the ratchet.
 [[tool.importlinter.contracts]]
 name = "The decision core imports no storage or source module"
 type = "forbidden"
@@ -319,6 +322,7 @@ source_modules = [
     "squadopt.planning",
     "squadopt.scenarios",
     "squadopt.evaluation",
+    "squadopt.application.ports",
 ]
 forbidden_modules = [
     "squadopt.data.snapshots",

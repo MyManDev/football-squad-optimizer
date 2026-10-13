@@ -39,7 +39,7 @@ SOURCES = ("squadopt.application", "squadopt.live", "squadopt.features")
 #: The remedy and phase of an entry, as ARCHITECTURE.md's known violations write them.
 STORAGE_PORTS = (
     "Storage ports declared in application, with file adapters in platform; Phase 3, "
-    "triggered by ADR 0005 or issue #1010"
+    "under ADR 0011 (decision 1)"
 )
 SOURCE_REVISION = (
     "The composition root resolves the source revision and passes it in, or a revision port "
