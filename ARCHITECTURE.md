@@ -180,8 +180,10 @@ between features. The [web guide](web/README.md) maps the zones to the rings.
 
 Each entry was measured on this tree: the import counts with an AST scan that includes imports
 inside functions, the other rows by reading the cited files. Phase 1 is the change that added this
-overview; Phases 2 and 3 are the deferred moves of ADR 0010, accepted with their triggers, and
-each lands in its own pull request once its trigger fires.
+overview. Phase 2 is the deferred moves of ADR 0010 that this tree holds: on the owner's
+direction of 2026-10-13 they were made together, without waiting for their triggers
+([decisions record](docs/decisions.md)). Phase 3 is the moves that remain; each lands in its own
+pull request once its trigger fires.
 
 | Violation | Measured | Remedy | Phase |
 | --- | --- | --- | --- |
@@ -219,15 +221,18 @@ every file under `scripts/` has exactly one, which `tests/architecture/test_scri
 holds. An operational command imports product packages only;
 `tests/architecture/test_run_boundary.py` imports every `.py` row of the operational table, apart
 from the three laboratory tools it names, and fails if the laboratory loads. A measurement runner
-writes its record to `docs/` and adds the row to the measurements index.
+writes its record to `docs/`, and the row it adds to the measurements index links the record's
+Markdown twin: `tests/architecture/test_docs_reachable.py` follows links, not backticked names.
 
 **A document.** Follow the naming key in the [documentation guide](docs/README.md). A record is
-a JSON file and its Markdown twin with an index row; a pre-registration ends in `_prereg.md` and
-is frozen when it merges; anything else is a living document in the folder of its audience
-(`docs/architecture`, `docs/operations`, `docs/product`, `docs/research`, or `docs/specs` for a
-specification), never directly under `docs/` (`tests/architecture/test_docs_root.py`). Link it
-from that folder's guide: `tests/architecture/test_docs_reachable.py` fails on a document under
-`docs/` that no chain of links from the documentation guide reaches.
+a JSON file and its Markdown twin with an index row that links the twin; a pre-registration ends
+in `_prereg.md`, is linked from the [research guide](docs/research/README.md) or from its row in
+the measurements index, and is frozen when it merges; anything else is a living document in the
+folder of its audience (`docs/architecture`, `docs/operations`, `docs/product`, `docs/research`,
+or `docs/specs` for a specification), never directly under `docs/`
+(`tests/architecture/test_docs_root.py`). Link it from that folder's guide:
+`tests/architecture/test_docs_reachable.py` fails on a document under `docs/` that no chain of
+links from the documentation guide reaches.
 
 **A deployable.** A new process, Worker or hosted service needs a row in the deployment units
 table, its configuration under `deploy/` or its own folder, and an ADR when it changes where

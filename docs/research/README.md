@@ -46,7 +46,10 @@ merges. Where it has a status line, that line states the protocol's status on th
 frozen and is not updated afterwards; the current state is read from the record that fulfils it
 and from that record's row in the [measurements index](../measurements_index.md).
 Pre-registrations are at the root of `docs/` (`*_prereg.md`) and in this folder (`*_prereg.md`
-and `*_protocol.md`).
+and `*_protocol.md`). A new one is linked from this guide (the table below, or the programmes
+table for one at the root of `docs/`) or from its row in the measurements index, in the same
+pull request: `tests/architecture/test_docs_reachable.py` fails on a document that no link
+reaches, and a backticked name is not a link.
 
 | Protocol in this folder | Reading |
 | --- | --- |

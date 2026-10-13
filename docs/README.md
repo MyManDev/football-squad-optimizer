@@ -53,7 +53,8 @@ A schema file under `contracts/` is named after its contract version, `<contract
 ## Where a new document goes
 
 - A new **record** goes where its runner writes it (the root of `docs/` or `research/`), with
-  its index row in the same pull request.
+  its index row in the same pull request; the row links the record's Markdown twin, because a
+  backticked name is not a link.
 - A new **research** protocol or explanation goes in `research/`.
 - A new **operational** procedure goes in `operations/`; a new **product** document in
   `product/`; a new **architecture** agreement in `architecture/`; a new **specification** in

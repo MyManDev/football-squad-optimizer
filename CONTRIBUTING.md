@@ -55,8 +55,8 @@ agreements live under [`docs/architecture/`](docs/architecture/README.md). Start
 | An architecture rule as a test | `tests/architecture/` | The enforcement map in the architecture overview |
 | An end-to-end or opt-in probe | `tests/integration/` | The [integration guide](tests/integration/README.md) for an opt-in probe |
 | A repository command or runner | `scripts/` | One row in the [script catalogue](scripts/README.md) (`tests/architecture/test_scripts_catalogue.py`) |
-| A measurement record | Where its runner writes it under `docs/` | A row in the [measurements index](docs/measurements_index.md) |
-| A pre-registration | `docs/research/<name>_prereg.md` | Frozen when it merges |
+| A measurement record | Where its runner writes it under `docs/` | A row in the [measurements index](docs/measurements_index.md) that links the record's Markdown twin; a backticked name is not a link, and `tests/architecture/test_docs_reachable.py` fails on a twin no link reaches |
+| A pre-registration | `docs/research/<name>_prereg.md` | A link from the [research guide](docs/research/README.md) or from its row in the measurements index (`tests/architecture/test_docs_reachable.py`); frozen when it merges |
 | A specification | `docs/specs/<name>_spec.md` | A row in the [specifications guide](docs/specs/README.md) |
 | A living document | The `docs/` folder of its audience: `architecture/`, `operations/`, `product/`, `research/` or `specs/` ([documentation guide](docs/README.md)); never the root of `docs/` (`tests/architecture/test_docs_root.py`) | A link from that folder's guide (`tests/architecture/test_docs_reachable.py`) |
 | A public schema | `docs/contracts/<contract>_v<N>.schema.json` | The code that validates it and, for `ui_view_v1`, `npm run gen:types` |
