@@ -174,11 +174,15 @@ in ARCHITECTURE.md's known violations.
 
 ## Runtime paths to `docs/contracts`
 
-Six modules here name a schema under `docs/contracts` by a path relative to the working
-directory: `api_contract.py`, `artifacts.py` and `manifest.py` as the default target of the
-function that writes the committed schema, `history_documents.py` in `write_history_schema`,
-and `advice_documents.py` and `jobs_contract.py` as constants the tests read. No module reads a
-schema from that folder: the validators that run are built from the schema functions in code.
-`tests/architecture/test_runtime_contract_paths.py` allowlists these six and the two in
-`squadopt.application`, and fails when any other module under `src/squadopt` names the folder.
-The [contracts guide](../../../docs/contracts/README.md) lists every schema with its producer.
+Five modules here take the path of a schema under `docs/contracts` from `contract_schema_path`
+in `squadopt.contracts.schema_paths`, the one resolver of ADR 0011 (decision 6), which answers
+the same path relative to the working directory each built before: `api_contract.py`,
+`artifacts.py` and `manifest.py` as the default target of the function that writes the
+committed schema, and `advice_documents.py` and `jobs_contract.py` as constants the tests read.
+`history_documents.py` still builds its path itself in `write_history_schema`, and takes it from
+the resolver once #969, which edits that module, has merged. No module reads a schema from that
+folder: the validators that run are built from the schema functions in code.
+`tests/architecture/test_contract_schema_paths.py` pins each constant to its former literal,
+holds `history_documents.py` on a shrink-only allowlist, and fails when any other module under
+`src/squadopt` names the folder. The [contracts guide](../../../docs/contracts/README.md) lists
+every schema with its producer.

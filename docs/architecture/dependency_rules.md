@@ -150,6 +150,11 @@ Only vocabulary. Nothing that computes a decision, and nothing that imports anyt
   that the football prediction families and the live native integration both score with
   (#1070). It imports nothing else in `squadopt` and turns caller-supplied moments into
   expected points, not a decision. Both owners placed it here on 2026-10-10 (#1071).
+- `CONTRACT_SCHEMA_DIRECTORY` and `contract_schema_path` in `contracts/schema_paths.py`: the
+  one place that names the folder of the committed schemas, `docs/contracts`, relative to the
+  working directory as every schema writer and test used it before
+  ([ADR 0011](decisions/0011-storage-ports-and-platform-split.md), decision 6). It imports
+  nothing else in `squadopt` and refuses a name that is not `<name>_v<N>`.
 - Identity and fingerprint primitives and the contract-version registry remain future
   candidates under [ADR 0002](decisions/0002-contract-versioning.md); they are not moved by
   this extraction.

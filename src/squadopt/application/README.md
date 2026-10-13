@@ -172,8 +172,9 @@ ARCHITECTURE.md measures and schedules these; this list says where they are.
   module here that reads or writes a file.
 - **Ports.** Three typed ports are declared here: `DecisionVerifier` in `commands.py`,
   `EntryPicksProvider` in `entries.py` and `TickObserver` in `season.py`.
-- **Paths to `docs/contracts`.** `contract.py` names `docs/contracts/ui_view_v1.schema.json`
-  as the default target of `write_ui_view_schema`, and `chip_forecast.py` names
-  `docs/contracts/chip_forecast_v1.schema.json` as a constant the tests read. Neither reads the
-  file when it runs. `tests/architecture/test_runtime_contract_paths.py` allowlists both, with
-  the six in `platform`, and fails on any other module that names the folder.
+- **Paths to `docs/contracts`.** Closed here under ADR 0011 (decision 6): `contract.py` takes
+  the default target of `write_ui_view_schema`, and `chip_forecast.py` the constant the tests
+  read, from `contract_schema_path` in `squadopt.contracts.schema_paths`, the same relative
+  path each built before. Neither reads the file when it runs.
+  `tests/architecture/test_contract_schema_paths.py` pins both constants to their former
+  literals and fails on any module here that names the folder itself.

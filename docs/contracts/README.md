@@ -21,6 +21,15 @@ the notes that define a contract in prose. A contract's version is part of its n
   test support imports `honesty_words.json` directly, and the backend restart
   (`scripts/release/restart_backend.ps1`) refuses, unless `-Force`, when `docs/contracts`
   differs from the live `site-*` release.
+- **The package names this folder in one place.** `contract_schema_path(contract_version)` in
+  `src/squadopt/contracts/schema_paths.py` answers `docs/contracts/<name>_v<N>.schema.json`,
+  relative to the working directory, and refuses any other name
+  ([ADR 0011](../architecture/decisions/0011-storage-ports-and-platform-split.md), decision 6).
+  The default targets of the schema writers and the `*_SCHEMA_PATH` constants the tests read
+  come from it; `write_history_schema` in `src/squadopt/platform/history_documents.py` still
+  builds its path itself until #969 merges. `tests/architecture/test_contract_schema_paths.py`
+  pins each constant to the path it had before the resolver and refuses the folder anywhere
+  else under `src/squadopt`.
 
 No module of the package reads a schema from this folder when it runs. The validators the API
 runs are built from the same Python functions. The published site carries its own copies of

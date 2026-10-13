@@ -21,10 +21,11 @@ from typing import Any, Final, Literal, Protocol, TypeAlias
 
 from squadopt.contracts.preferences import NO_PREFERENCES, preferences_schema
 from squadopt.contracts.preferences import DecisionPreferences as DecisionPreferences
+from squadopt.contracts.schema_paths import contract_schema_path
 
 BACKEND_API_CONTRACT_VERSION: Final = "backend_api_v1"
 BACKEND_API_VERSION: Final = "v1"
-BACKEND_API_SCHEMA_PATH: Final = Path("docs") / "contracts" / "backend_api_v1.schema.json"
+BACKEND_API_SCHEMA_PATH: Final = contract_schema_path(BACKEND_API_CONTRACT_VERSION)
 
 ApiOperation: TypeAlias = Literal[
     "gameweek.decide", "gameweek.settle", "season.tick", "league.advise"
