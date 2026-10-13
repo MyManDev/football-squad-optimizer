@@ -30,7 +30,14 @@ export { LeagueDataError, LeagueDataMissing } from "./dataErrors";
  */
 export interface LeagueTree {
   readonly league: LeagueRef;
-  devicePlan(options?: RequestOptions): Promise<LeagueViewEnvelope<DevicePlanDocument>>;
+  /**
+   * The device's inputs for the capture the member's page shows (`source_snapshot_id`;
+   * null, which names no table, where the page names none).
+   */
+  devicePlan(
+    capture: string | null,
+    options?: RequestOptions,
+  ): Promise<LeagueViewEnvelope<DevicePlanDocument>>;
   members(): Promise<LeagueViewEnvelope<LeagueMembers>>;
   entrySquad(entryId: number): Promise<LeagueViewEnvelope<EntrySquad>>;
   entryAdvice(
@@ -147,15 +154,18 @@ export function createLeagueTree(league: LeagueRef): LeagueTree {
    * The capture's own table, where the directory line names one: read at its digest as the
    * version, held to that digest byte for byte, and to the table's contract. Anything else
    * (no table named, a missing or changed file, a browser without a digest, another
-   * shape) reads as null, and the tree's own copy is read instead. An abort is not a
-   * fallback, and neither is a read that ran out of time: the copy is on the same site, and
-   * a second full deadline would double the member's wait.
+   * shape) reads as null, and the tree's own copy is read instead. So does a table of
+   * another capture than the member's page: the directory was read before a later publish,
+   * and a browser may still keep that table, while the copy is read as the tree is now. An
+   * abort is not a fallback, and neither is a read that ran out of time: the copy is on the
+   * same site, and a second full deadline would double the member's wait.
    */
   async function loadCaptureTable(
+    capture: string | null,
     options?: RequestOptions,
   ): Promise<LeagueViewEnvelope<DevicePlanDocument> | null> {
     const table = league.devicePlan;
-    if (table === undefined) return null;
+    if (table === undefined || table.path.split("/")[1] !== capture) return null;
     try {
       const bytes = await fetchPublishedBytes(
         `${import.meta.env.BASE_URL}data/`,
@@ -181,15 +191,17 @@ export function createLeagueTree(league: LeagueRef): LeagueTree {
 
   /**
    * The capture's table and rules for a solve on the member's own device: the capture's
-   * own table where the directory names it, else the copy published beside members.json by
-   * the same build; absent on a tree from before it, which reads as `LeagueDataMissing`.
+   * own table where the directory names it for the member's capture, else the copy
+   * published beside members.json by the same build; absent on a tree from before it,
+   * which reads as `LeagueDataMissing`.
    * There is no example document: the page offers the device solve only where the
    * publisher wrote its inputs.
    */
   async function loadDevicePlan(
+    capture: string | null,
     options?: RequestOptions,
   ): Promise<LeagueViewEnvelope<DevicePlanDocument>> {
-    const shared = await loadCaptureTable(options);
+    const shared = await loadCaptureTable(capture, options);
     if (shared !== null) return shared;
     const envelope = await read<unknown>("device-plan.json", options);
     if (

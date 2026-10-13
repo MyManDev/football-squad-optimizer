@@ -115,7 +115,7 @@ export function useDevicePlan(
 ): DevicePlan {
   const { tree } = useLeague();
   const {
-    loadDocument = () => tree.devicePlan(),
+    loadDocument = () => tree.devicePlan(squad.source_snapshot_id),
     loadRival = (entryId: number) => tree.entrySquad(entryId),
     createSolver = createWorker,
     now = () => new Date(),
