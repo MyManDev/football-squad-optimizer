@@ -1,8 +1,9 @@
 # ADR 0010: Clean-architecture rings and the repository layout
 
-- **Status:** proposed. It follows the owner's direction of 2026-10-12 and becomes accepted
-  only when the owner accepts it in writing. The deferred moves listed below are open questions
-  for the owner; this record does not decide them.
+- **Status:** accepted by the owner on 2026-10-13, following his direction of 2026-10-12. The
+  decisions and the deferred moves with their triggers are accepted; each move lands in its own
+  pull request once its trigger fires. The open questions at the end stay open until the owner
+  answers them.
 - **Date:** 2026-10-13
 - **Decider:** Ertuğrul (repository owner)
 - **Related:** [ADR 0001](0001-modular-monolith.md), [ADR 0003](0003-measurement-artifacts.md),
@@ -107,8 +108,8 @@ contracts that hold no exceptions today keep none.
 
 ## Deferred moves and their triggers
 
-The overview lists the known violations with their remedies. Each row below is a proposed move
-with a proposed trigger; none is decided until the owner agrees to it.
+The overview lists the known violations with their remedies. Each row below is an accepted move
+with its trigger; it lands in its own pull request once the trigger fires.
 
 | Move | Trigger |
 | --- | --- |

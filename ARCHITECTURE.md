@@ -5,7 +5,7 @@ dependencies point, where each part runs, how the shape is enforced, and where t
 not yet conform. It is the entry point for architectural questions. The decisions behind it are
 recorded in the [architecture decision records](docs/architecture/decisions/README.md), and
 [ADR 0010](docs/architecture/decisions/0010-clean-architecture-rings-and-repository-layout.md),
-proposed for the owner's acceptance, names the rings used below.
+accepted by the owner on 2026-10-13, names the rings used below.
 
 ## 1. What the system is
 
@@ -172,8 +172,8 @@ between features. The [web guide](web/README.md) maps the zones to the rings.
 
 Each entry was measured on this tree: the import counts with an AST scan that includes imports
 inside functions, the other rows by reading the cited files. Phase 1 is the change that added this
-overview; Phases 2 and 3 are proposed, like the deferred moves of ADR 0010, and each needs the
-owner's agreement.
+overview; Phases 2 and 3 are the deferred moves of ADR 0010, accepted with their triggers, and
+each lands in its own pull request once its trigger fires.
 
 | Violation | Measured | Remedy | Phase |
 | --- | --- | --- | --- |

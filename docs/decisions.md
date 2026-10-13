@@ -49,7 +49,8 @@ enforced boundaries are part of how it is judged.
 What follows from it: #1080 removes dead code and the runners of concluded studies. The
 repository map, the folder guides and the named rings arrive with
 [ADR 0010](architecture/decisions/0010-clean-architecture-rings-and-repository-layout.md),
-which is proposed: its specific moves and ratchets still need the owner's acceptance.
+which the owner accepted on 2026-10-13: the named rings, their enforcement, the ratchet rule and
+the deferred moves with their triggers.
 
 Source: the owner's direction to the maintainers on 2026-10-12, and
 [PR #1080](https://github.com/MyManDev/football-squad-optimizer/pull/1080).

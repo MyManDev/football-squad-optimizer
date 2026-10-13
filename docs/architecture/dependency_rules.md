@@ -78,7 +78,7 @@ The shared-contract and evaluation extraction subsequently removed those five ex
 Some packages are independent of each other and their relative position is arbitrary. Do not
 read meaning into it, and do not "fix" it. One constraint has held over all of them since the
 rings were named ([ADR 0010](decisions/0010-clean-architecture-rings-and-repository-layout.md),
-proposed): every laboratory package sits above every R2 package, and so above `live`, and
+accepted): every laboratory package sits above every R2 package, and so above `live`, and
 `tests/architecture/test_architecture_rings.py` fails otherwise. What stays free is the order of
 the laboratory packages among themselves, subject to their imports:
 
@@ -244,7 +244,7 @@ is covered by `tests/architecture/test_layer_contracts.py` and the existing cons
    module directly.
 
 The last three enforce the rings that
-[ADR 0010](decisions/0010-clean-architecture-rings-and-repository-layout.md), a proposed record,
+[ADR 0010](decisions/0010-clean-architecture-rings-and-repository-layout.md), an accepted record,
 names.
 The [architecture overview](../../ARCHITECTURE.md) gives what each contract holds in its
 enforcement map, and `tests/architecture/test_architecture_rings.py` checks that every contract in
@@ -270,7 +270,7 @@ could not say this: it placed the laboratory below `application`, so the deploye
 was loading 43 laboratory modules, and a product decision (`plan_selection`) was living in the
 lab. The contract `Product does not import the laboratory` in `pyproject.toml` states the rule
 directly, and the layers contract stays as the tie-break within each group. Since the rings were
-named (ADR 0010, proposed), the layer order also places the laboratory above `live`, so for
+named (ADR 0010, accepted), the layer order also places the laboratory above `live`, so for
 `live` and every package below it the layers contract refuses an import of the laboratory as
 well; for `application`, `platform` and `api` the forbidden contract alone refuses it.
 
@@ -291,7 +291,7 @@ been removed with their runners (2026-10-12), and their entries left the contrac
 
 ## Rings
 
-[ADR 0010](decisions/0010-clean-architecture-rings-and-repository-layout.md), a proposed record,
+[ADR 0010](decisions/0010-clean-architecture-rings-and-repository-layout.md), an accepted record,
 names the rings these groups map to, and the [architecture overview](../../ARCHITECTURE.md)
 gives the ring of every package, the contracts that enforce them and the known violations. The
 groups above correspond as follows: `contracts` and the schema half of `data` are R1
