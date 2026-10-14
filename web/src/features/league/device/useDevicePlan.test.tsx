@@ -1,8 +1,8 @@
 /**
  * The device solve on the page: offered for the one selection the publisher wrote inputs
  * for, run through a worker, shown as the advice document the page reads, held to the
- * capture on screen, started once while a run loads or solves, and dropped by a new
- * selection or a service computation.
+ * capture on screen, started once while a run loads or solves, dropped by a new
+ * selection or a service computation, and marked on the page's timeline.
  */
 
 import { existsSync, readFileSync } from "node:fs";
@@ -35,6 +35,7 @@ import {
   useDevicePlan,
   type DeviceSolver,
   type DevicePlanPhase,
+  type DeviceTimeline,
 } from "./useDevicePlan";
 
 afterEach(cleanup);
@@ -170,6 +171,27 @@ class HeldSolver implements DeviceSolver {
   terminate(): void {}
 }
 
+/** A timeline kept in order; a measure needs both its marks, as User Timing's does. */
+class KeptTimeline implements DeviceTimeline {
+  readonly marks: string[] = [];
+  readonly measures: { name: string; start: string; end: string }[] = [];
+  mark(name: string): void {
+    this.marks.push(name);
+  }
+  measure(name: string, start: string, end: string): void {
+    if (!this.marks.includes(start) || !this.marks.includes(end)) {
+      throw new Error(`no mark ${start} or ${end}`);
+    }
+    this.measures.push({ name, start, end });
+  }
+}
+
+/** The names the marks of the run whose press is `press` take: `device:<n>:<point>`. */
+function marksOf(press: string): (point: string) => string {
+  const run = /^device:(\d+):press$/.exec(press)?.[1];
+  return (point) => `device:${run}:${point}`;
+}
+
 /** A worker that never loads: it answers nothing, not even that it is ready. */
 class MuteSolver implements DeviceSolver {
   onmessage: ((event: MessageEvent<DevicePlanReply>) => void) | null = null;
@@ -191,6 +213,7 @@ function Harness({
   createSolver,
   timers,
   inlineTimers = false,
+  timeline,
 }: {
   squad: EntrySquad;
   request: AdviceRequest;
@@ -203,6 +226,8 @@ function Harness({
   timers?: HandTimers;
   /** Pass the timers as new functions on every render, as a caller writing them inline does. */
   inlineTimers?: boolean;
+  /** Absent, the page's own User Timing. */
+  timeline?: DeviceTimeline;
 }) {
   const timerDependencies = !timers
     ? {}
@@ -221,6 +246,7 @@ function Harness({
       createSolver: createSolver ?? (() => solver),
       now: () => new Date("2026-10-03T01:02:03Z"),
       ...timerDependencies,
+      timeline,
     },
     rivals,
   );
@@ -1037,5 +1063,188 @@ describe("a run asked for again while one is in flight", () => {
     await pressTwice();
     await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent(ending));
     expect(reads).toBe(2);
+  });
+});
+
+describe("the marks a run leaves", () => {
+  const FINISHED = ["press", "inputs", "posted", "ready", "answer"];
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("marks each stage of a finished run in order and measures the three between them", async () => {
+    const timeline = new KeptTimeline();
+    render(
+      withLeague(
+        <Harness
+          squad={squadWith(entry)}
+          request={REQUEST}
+          loadDocument={async () => envelope(document)}
+          solver={new InProcessSolver()}
+          timeline={timeline}
+          onState={() => {}}
+        />,
+      ),
+    );
+    await act(async () => screen.getByText("run").click());
+    await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("done"));
+    const at = marksOf(timeline.marks[0]!);
+    expect(timeline.marks).toEqual(FINISHED.map(at));
+    expect(timeline.measures).toEqual([
+      { name: "device:inputs", start: at("press"), end: at("inputs") },
+      { name: "device:load", start: at("posted"), end: at("ready") },
+      { name: "device:solve", start: at("ready"), end: at("answer") },
+    ]);
+  });
+
+  it("leaves no solve measured when the load's watchdog ends the run", async () => {
+    const timers = new HandTimers();
+    const timeline = new KeptTimeline();
+    render(
+      withLeague(
+        <Harness
+          squad={squadWith(entry)}
+          request={REQUEST}
+          loadDocument={async () => envelope(document)}
+          solver={new MuteSolver()}
+          timers={timers}
+          timeline={timeline}
+          onState={() => {}}
+        />,
+      ),
+    );
+    await act(async () => screen.getByText("run").click());
+    await waitFor(() => expect(timers.waiting.size).toBe(1));
+    await act(async () => timers.fireAll());
+    await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("failed"));
+    const at = marksOf(timeline.marks[0]!);
+    expect(timeline.marks).toEqual(["press", "inputs", "posted", "failed"].map(at));
+    expect(timeline.measures.map((measure) => measure.name)).toEqual(["device:inputs"]);
+  });
+
+  it("marks a refusal as the reply that ended the solve", async () => {
+    const timeline = new KeptTimeline();
+    const refusing = new InProcessSolver((request) => ({
+      id: request.id,
+      kind: "refused",
+      status: "Infeasible",
+      stage: "plan",
+    }));
+    render(
+      withLeague(
+        <Harness
+          squad={squadWith(entry)}
+          request={REQUEST}
+          loadDocument={async () => envelope(document)}
+          solver={refusing}
+          timeline={timeline}
+          onState={() => {}}
+        />,
+      ),
+    );
+    await act(async () => screen.getByText("run").click());
+    await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("refused"));
+    const at = marksOf(timeline.marks[0]!);
+    expect(timeline.marks).toEqual(["press", "inputs", "posted", "ready", "refused"].map(at));
+    expect(timeline.measures.at(-1)).toEqual({
+      name: "device:solve",
+      start: at("ready"),
+      end: at("refused"),
+    });
+  });
+
+  it("keeps two runs apart: one a reset ended leaves only its press, the next its own marks", async () => {
+    const gates: (() => void)[] = [];
+    const loadDocument = () =>
+      new Promise<LeagueViewEnvelope<DevicePlanDocument>>((resolve) => {
+        gates.push(() => resolve(envelope(document)));
+      });
+    const timeline = new KeptTimeline();
+    render(
+      withLeague(
+        <Harness
+          squad={squadWith(entry)}
+          request={REQUEST}
+          loadDocument={loadDocument}
+          solver={new InProcessSolver()}
+          timeline={timeline}
+          onState={() => {}}
+        />,
+      ),
+    );
+    await act(async () => screen.getByText("run").click());
+    await act(async () => screen.getByText("reset").click());
+    await act(async () => screen.getByText("run").click());
+    // The ended run's inputs land while the next run is still reading its own.
+    await act(async () => gates[0]!());
+    await act(async () => gates[1]!());
+    await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("done"));
+    const first = marksOf(timeline.marks[0]!);
+    const next = marksOf(timeline.marks[1]!);
+    expect(next("press")).not.toBe(first("press"));
+    expect(timeline.marks).toEqual([first("press"), ...FINISHED.map(next)]);
+    expect(timeline.measures.map(({ start, end }) => [start, end])).toEqual([
+      [next("press"), next("inputs")],
+      [next("posted"), next("ready")],
+      [next("ready"), next("answer")],
+    ]);
+  });
+
+  it("finishes a run whose timeline throws on every call as it finishes one whose does not", async () => {
+    const answer = solvePlan(highs, document, entry, () => 0);
+    const calls = { count: 0 };
+    const throwing: DeviceTimeline = {
+      mark: () => {
+        calls.count += 1;
+        throw new Error("no marks here");
+      },
+      measure: () => {
+        calls.count += 1;
+        throw new Error("no measures here");
+      },
+    };
+    async function finished(timeline: DeviceTimeline): Promise<DevicePlanPhase> {
+      const seen = { latest: { phase: "idle" } as DevicePlanPhase };
+      render(
+        withLeague(
+          <Harness
+            squad={squadWith(entry)}
+            request={REQUEST}
+            loadDocument={async () => envelope(document)}
+            solver={new InProcessSolver((request) => ({ id: request.id, kind: "answer", answer }))}
+            timeline={timeline}
+            onState={(state) => {
+              seen.latest = state;
+            }}
+          />,
+        ),
+      );
+      await act(async () => screen.getByText("run").click());
+      await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("done"));
+      cleanup();
+      return seen.latest;
+    }
+    const kept = await finished(new KeptTimeline());
+    expect(await finished(throwing)).toEqual(kept);
+    // Five marks and three measures were asked for, and every one of them threw.
+    expect(calls.count).toBe(8);
+  });
+
+  it("finishes a run on a page whose browser has no User Timing", async () => {
+    vi.stubGlobal("performance", { now: performance.now.bind(performance) });
+    render(
+      withLeague(
+        <Harness
+          squad={squadWith(entry)}
+          request={REQUEST}
+          loadDocument={async () => envelope(document)}
+          solver={new InProcessSolver()}
+          onState={() => {}}
+        />,
+      ),
+    );
+    await act(async () => screen.getByText("run").click());
+    await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("done"));
   });
 });
