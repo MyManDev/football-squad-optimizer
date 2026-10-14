@@ -19,9 +19,10 @@ const ENTRY = 35249001;
 const member = fixture.members[2]!;
 
 /**
- * One JSON line on stdout after a test that finished a device run (#981 step 4): the
- * run's `device:*` measures from the page, and the wasm's fetch from the worker's own
- * timeline, or null where no worker can be read. It asserts nothing.
+ * One JSON line on stdout after each test, every one of which finishes a device run (#981
+ * step 4): the run's `device:*` measures from the page, an empty list where it kept none,
+ * and the wasm's fetch from the worker's own timeline, or null where no worker can be read.
+ * It asserts nothing.
  */
 async function printDeviceTimings(page: Page, testInfo: TestInfo): Promise<void> {
   const measures = await page
@@ -32,7 +33,6 @@ async function printDeviceTimings(page: Page, testInfo: TestInfo): Promise<void>
         .map(({ name, startTime, duration }) => ({ name, startTime, duration })),
     )
     .catch(() => []);
-  if (measures.length === 0) return;
   let wasm: Record<string, number> | null = null;
   for (const worker of page.workers()) {
     wasm ??= await worker
