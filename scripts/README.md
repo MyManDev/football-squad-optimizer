@@ -55,7 +55,7 @@ column is the author date of the file's last commit when this catalogue was last
 | `capture_elite_picks.py` | shim | `squadopt.platform.elite_capture`; `docs/weekly_runbook.md` | 2026-09-10 |
 | `capture_official_injuries.py` | shim | `squadopt.platform.official_injury_capture`; `docs/operations/official_injury_discovery.md` | 2026-10-02 |
 | `capture_top100_cohort.py` | shim | `squadopt.platform.cohort_capture`; `docs/weekly_runbook.md` | 2026-09-10 |
-| `check_football_prospective_inputs.py` | operational | an outcome-free readiness audit of a named offline capture inventory, printed; writes nothing; `docs/football_prospective_input_check.md` | 2026-09-28 |
+| `check_football_prospective_inputs.py` | operational | an outcome-free readiness audit of a named offline capture inventory, printed; writes nothing; pairs the current arm by the rule of `docs/football_prospective_pairing_note.md` through `football_prospective_inputs.py`, without the backend; `docs/football_prospective_input_check.md` | 2026-10-14 |
 | `check_league_tree.py` | operational | the league tree release checks on a site's data directory or its origin URL; writes nothing; `docs/weekly_runbook.md`, `docs/deployment_runbook.md`; imported by `build_settled_site.py` | 2026-10-11 |
 | `export_player_evidence.py` | shim | `squadopt.application.player_evidence`; `docs/weekly_runbook.md` | 2026-09-26 |
 | `export_rotation_evidence.py` | shim | `squadopt.application.rotation_export`; `docs/weekly_runbook.md` | 2026-09-26 |
@@ -227,6 +227,7 @@ allowing the web formatter's layout.
 | `_phase_e_inputs.py` | helper | imported by the Phase E runners and helpers | 2026-09-07 |
 | `_phase_e_live.py` | helper | imported by `probe_phase_e_runtime`, `_phase_e_shadow_live` | 2026-09-07 |
 | `_phase_e_shadow_live.py` | helper | imported by `run_phase_e_live_shadow` | 2026-09-07 |
+| `football_prospective_inputs.py` | helper | imported by `check_football_prospective_inputs` and the prospective runner `docs/football_prospective_prereg.md` names: the scored capture, the shadow artifact with its receipt, and default 1 of `docs/football_prospective_pairing_note.md`; imports nothing from `squadopt.platform` | 2026-10-14 |
 | `_provenance.py` | helper | imported by `_experiment_cli` and by the operational commands that must not load the laboratory: repository root, git revision, `write_json`, `write_text`; standard library only | 2026-10-13 |
 
 ## Retired compatibility commands
