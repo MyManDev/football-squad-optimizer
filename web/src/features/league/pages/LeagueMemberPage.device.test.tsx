@@ -1,8 +1,8 @@
 /**
  * The device solve on the member page: offered where the publisher wrote the member's
  * inputs, the plan it proves shown as a computation result, one answer at a time with
- * the service, a solve still running ended by a new selection and by no read that lands,
- * and nothing offered where the inputs are absent.
+ * the service, a solve still running or a plan it finished ended by a new selection and by
+ * no read that lands, and nothing offered where the inputs are absent.
  */
 
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
@@ -284,40 +284,55 @@ const ALL_READ: Reads = {
   index: INDEX,
 };
 
-describe("a device solve still running on the member page", () => {
-  /** The page as its reads land, its device solving in a worker that does not answer. */
+/** The published plan for the selection, held to the capture the device's inputs are from. */
+const PUBLISHED_ADVICE = (() => {
+  const published = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1);
+  return {
+    ...published,
+    payload: { ...published.payload, source_snapshot_id: document.source_snapshot_id },
+  };
+})();
+const PUBLISHED_READ: Reads = { ...ALL_READ, advice: PUBLISHED_ADVICE, adviceIssue: undefined };
+
+/** The member page as its reads land, its device solving in the workers it creates. */
+function memberPage(createSolver: () => DeviceSolver) {
+  const squad = squadWith(entryBlock);
+  const client = new ServiceClient();
+  return (reads: Reads) => (
+    <LanguageProvider initialLanguage="tr">
+      <MemoryRouter initialEntries={[`/league/352490/members/${ENTRY}?mode=saf-puan&window=1`]}>
+        <SwitchWindow />
+        {withLeague(
+          <LeagueMemberView
+            squad={squad}
+            members={MEMBERS}
+            client={client}
+            deviceDependencies={{
+              loadDocument: deviceDocument,
+              // Written inline, as a caller may: the device's reset is new on every render.
+              setTimer: (callback: () => void, milliseconds: number) =>
+                setTimeout(callback, milliseconds),
+              clearTimer: (handle: unknown) =>
+                clearTimeout(handle as ReturnType<typeof setTimeout>),
+              createSolver,
+            }}
+            {...reads}
+          />,
+        )}
+      </MemoryRouter>
+    </LanguageProvider>
+  );
+}
+
+describe("a device solve on the member page as the page's reads land", () => {
+  /** The page from its first reads, its device solving in a worker that does not answer. */
   async function solvingFrom(first: Reads) {
     const workers: StillSolving[] = [];
-    const squad = squadWith(entryBlock);
-    const client = new ServiceClient();
-    const page = (reads: Reads) => (
-      <LanguageProvider initialLanguage="tr">
-        <MemoryRouter initialEntries={[`/league/352490/members/${ENTRY}?mode=saf-puan&window=1`]}>
-          <SwitchWindow />
-          {withLeague(
-            <LeagueMemberView
-              squad={squad}
-              members={MEMBERS}
-              client={client}
-              deviceDependencies={{
-                loadDocument: deviceDocument,
-                // Written inline, as a caller may: the device's reset is new on every render.
-                setTimer: (callback: () => void, milliseconds: number) =>
-                  setTimeout(callback, milliseconds),
-                clearTimer: (handle: unknown) =>
-                  clearTimeout(handle as ReturnType<typeof setTimeout>),
-                createSolver: () => {
-                  const made = new StillSolving();
-                  workers.push(made);
-                  return made;
-                },
-              }}
-              {...reads}
-            />,
-          )}
-        </MemoryRouter>
-      </LanguageProvider>
-    );
+    const page = memberPage(() => {
+      const made = new StillSolving();
+      workers.push(made);
+      return made;
+    });
     const { container, rerender } = render(page(first));
     await act(async () => deviceButton()!.click());
     await waitFor(() =>
@@ -352,5 +367,16 @@ describe("a device solve still running on the member page", () => {
     expect(workers).toHaveLength(1);
     expect(workers[0]!.terminated).toBe(false);
     await endsWithTheSelection(container, workers[0]!);
+  });
+
+  it("keeps the plan it finished when the published plan lands after it", async () => {
+    const page = memberPage(() => new CannedSolver());
+    const { container, rerender } = render(page(READING_INDEX));
+    await act(async () => deviceButton()!.click());
+    await waitFor(() => expect(container).toHaveTextContent(copy.deviceDone("0,4")));
+    rerender(page(PUBLISHED_READ));
+    await act(async () => {});
+    expect(container).toHaveTextContent(copy.deviceDone("0,4"));
+    expect(container).toHaveTextContent(copy.computeEcho(copy.computeEchoStates.device));
   });
 });
