@@ -26,7 +26,7 @@ to `pyproject.toml`.
 | Package | Ring | Layer | Owner | Checked by | Known violation |
 | --- | --- | --- | --- | --- | --- |
 | `api` | R4, R5 | 1 | either | C1, C2, C3, C5, C8 | none |
-| `platform` | R4, R5 | 2 | either; the `club_news_*` modules are İbrahim's zone | C1, C2, C5, C8, C11 | declares 15 of the package's 24 typed ports, 8 of them use-case ports of the advice backend that wait on #988; mixes deployment roles (49 flat modules; the four shared durable-state modules are in `storage/`, the other six units hold their package file); `history_documents.py` names `docs/contracts` by a relative path; imports a private name of `application.weekly_plan` |
+| `platform` | R4, R5 | 2 | either; the `club_news_*` modules are İbrahim's zone | C1, C2, C5, C8, C11 | declares 15 of the package's 24 typed ports, 8 of them use-case ports of the advice backend that wait on #988; mixes deployment roles (53 flat files: 49 implementation modules and 4 aliases at old paths; the four shared durable-state modules are in `storage/`, the other six units hold their package file); `history_documents.py` names `docs/contracts` by a relative path; imports a private name of `application.weekly_plan` |
 | `integration` | R3 | 3 | the owner | C1, C2, C4, C5, C8 | none; a one-release re-export, removed in the release after the next `site-*` tag |
 | `application` | R3 | 4 | the owner | C1, C2, C4, C5, C8, C9, C10 | imports the storage half of `data`; reads and writes files; declares 3 ports; starts `git` through `data.source_revision` |
 | `experiments` | Research | 5 | the owner | C1, C4, C5, C8 | imports private names of `prediction.football`, `live.minute_evidence` and `evaluation.statistics` |

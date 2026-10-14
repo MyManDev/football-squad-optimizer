@@ -7,12 +7,15 @@ with `squadopt.api`, that may import web frameworks, network clients, model SDKs
 (the contract "Frameworks, network and databases stay in api and platform"). No package below
 it in the layer order imports it, and it imports no laboratory module.
 
-Its 55 Python files, 54 in one flat folder and the package file of `storage/`, serve several
-deployment units.
+Its 65 Python files serve several deployment units: 49 implementation modules and 4
+aliases at old paths in the flat folder, the package file, and the seven subpackages of ADR
+0011, of which `storage/` holds the four shared durable-state modules and the six others their
+package file only.
 [ADR 0011](../../../docs/architecture/decisions/0011-storage-ports-and-platform-split.md)
 splits the package into seven subpackages by deployment unit in Phase 3 and keeps every
-command as it is; `storage/`, the lowest of the seven, exists and holds no adapter yet. Until
-the moves land this page is the map: every module is in exactly one family below.
+command as it is; the first unit pull request moved the shared durable-state modules into
+`storage/`, which holds no adapter yet. Until the other moves land this page is the map: every
+module is in exactly one family below.
 
 Review: either owner approves a change here; the `club_news_*` modules are İbrahim's zone
 ([ownership](../../../docs/architecture/ownership.md)).
@@ -164,8 +167,8 @@ file only until their modules move, one pull request per unit.
 ## Aliases at the old paths
 
 The moves above leave a file at each old path (ADR 0011, decision 8): three one-release
-aliases that re-export the moved names and go in the release after the next `site-*` tag, and
-one permanent entry alias. `tests/architecture/test_platform_layout.py` holds each alias to the
+`sys.modules` aliases, each the moved module itself under its old name, which go in the first
+pull request after the next `site-*` release, and one permanent entry alias. `tests/architecture/test_platform_layout.py` holds each alias to the
 moved object and refuses a new importer of an old path.
 
 | Module | What it does |

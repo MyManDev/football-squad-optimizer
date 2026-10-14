@@ -1,25 +1,26 @@
 """The platform's deployment units: what has moved, what the old path still answers, who imports it.
 
 ADR 0011 (decision 3) splits `squadopt.platform` into seven subpackages, one pull request per
-unit, and (decision 8) leaves an alias at each old path: a one-release re-export for most
-modules, a permanent entry file for the operator commands. This file holds the moves done so
-far to one registry, `MOVED`, and checks:
+unit, and (decision 8) leaves an alias at each old path: a `sys.modules` alias for a moved
+module, so private names and monkeypatches reach the one module through either path, and a
+permanent entry file for an operator command. This file holds the moves done so far to one
+registry, `MOVED`, and checks:
 
-- every name the alias at the old path exports is the moved object itself, so a caller that
-  still uses the old path and a caller on the new one share one class, one function and one
-  constant;
-- no code under `src`, `scripts` or `tests` imports an old path, apart from the alias files,
-  so the aliases carry only callers the repository does not control;
-- the units contract in `pyproject.toml` ignores exactly the flat modules that have not moved,
-  so a move must shorten the list and a new flat module must be placed on purpose;
-- each unit has its package file, and the platform guide places every moved module under
-  `storage/` and names each alias once.
+- the old path and the new path are one module object, and the file at the old path is the
+  alias the decision describes (the entry alias runs `main` only as `__main__`);
+- no code under `src`, `scripts` or `tests` imports an old path, in any statement form, or
+  names it in a string (a monkeypatch target), apart from the alias files, so the aliases
+  carry only callers the repository does not control;
+- the units contract in `pyproject.toml` ignores exactly the flat modules, aliases included,
+  so the list changes only when an alias goes or a new flat module is placed on purpose;
+- each unit has its package file, only `storage` holds modules yet, and the platform guide
+  places every moved module under `storage/` and names each alias once with its kind.
 """
 
 from __future__ import annotations
 
+import ast
 import importlib
-import re
 import tomllib
 from pathlib import Path
 
@@ -33,7 +34,8 @@ UNITS_CONTRACT = "Platform deployment units import only the shared adapters belo
 UNITS = ("storage", "runs", "capture", "club_news", "football", "backend", "operations")
 
 #: Each move done so far: the old module, its new module and the alias left at the old path
-#: ("one release" goes in the release after the next `site-*` tag; "permanent entry" stays).
+#: ("one release" goes in the first pull request after the next `site-*` release; "permanent
+#: entry" stays).
 MOVED: dict[str, tuple[str, str]] = {
     "squadopt.platform._queue_lock": ("squadopt.platform.storage._queue_lock", "one release"),
     "squadopt.platform.projection_retention": (
@@ -47,34 +49,11 @@ MOVED: dict[str, tuple[str, str]] = {
     ),
 }
 
-#: The names each alias re-exports, as its `__all__` states them.
-EXPORTS: dict[str, tuple[str, ...]] = {
-    "squadopt.platform._queue_lock": ("QueueFileLock", "QueueLockTimeout"),
-    "squadopt.platform.projection_retention": (
-        "ProjectionRetentionError",
-        "publish_retained_handoff",
-        "retained_handoff_path",
-    ),
-    "squadopt.platform.store_probe": ("StoreProbeResult", "probe_store"),
-    "squadopt.platform.backup_recovery": (
-        "BACKUP_SCHEMA_VERSION",
-        "MANIFEST_NAME",
-        "BackupError",
-        "BackupReceipt",
-        "create_backup",
-        "main",
-        "restore_backup",
-        "verify_backup",
-    ),
-}
-
 SCANNED = ("src", "scripts", "tests")
-OLD_IMPORT = re.compile(
-    r"^\s*(?:from\s+(squadopt\.platform\.[A-Za-z_]+)\s+import"
-    r"|import\s+(squadopt\.platform\.[A-Za-z_]+)"
-    r"|from\s+squadopt\.platform\s+import\s+([^\n]+))",
-    re.MULTILINE,
-)
+
+
+def _alias_file(old: str) -> Path:
+    return PLATFORM / f"{old.rsplit('.', 1)[1]}.py"
 
 
 def _units_contract() -> dict[str, object]:
@@ -88,55 +67,69 @@ def _units_contract() -> dict[str, object]:
 
 
 @pytest.mark.parametrize("old", sorted(MOVED))
-def test_every_name_the_alias_exports_is_the_moved_object(old: str) -> None:
-    alias = importlib.import_module(old)
+def test_the_old_path_and_the_new_path_are_one_module(old: str) -> None:
     new, _ = MOVED[old]
     moved = importlib.import_module(new)
 
-    assert tuple(alias.__all__) == EXPORTS[old]
-    for name in EXPORTS[old]:
-        assert getattr(alias, name) is getattr(moved, name), f"{old}.{name}"
-    assert alias.__file__ is not None and moved.__file__ is not None
-    assert Path(moved.__file__).parent == PLATFORM / "storage"
-    assert Path(alias.__file__).parent == PLATFORM
+    assert importlib.import_module(old) is moved
+    assert moved.__name__ == new
+    assert moved.__file__ is not None
+    assert Path(moved.__file__).resolve().parent == (PLATFORM / "storage").resolve()
+    assert _alias_file(old).is_file()
 
 
-def test_the_permanent_entry_alias_runs_main_only_as_main() -> None:
-    entry = [old for old, (_, kind) in MOVED.items() if kind == "permanent entry"]
-    assert entry == ["squadopt.platform.backup_recovery"]
-    source = (PLATFORM / "backup_recovery.py").read_text(encoding="utf-8")
-    assert 'if __name__ == "__main__":\n    raise SystemExit(main())' in source
-    for old, (_, kind) in MOVED.items():
-        if kind == "one release":
-            text = (PLATFORM / f"{old.rsplit('.', 1)[1]}.py").read_text(encoding="utf-8")
-            assert "__main__" not in text, old
+@pytest.mark.parametrize("old", sorted(MOVED))
+def test_the_file_at_the_old_path_is_the_alias_the_decision_describes(old: str) -> None:
+    new, kind = MOVED[old]
+    source = _alias_file(old).read_text(encoding="utf-8")
+    unit, _, basename = new.rpartition(".")
+
+    assert f"from {unit} import {basename} as _moved" in source
+    if kind == "permanent entry":
+        assert f'if __name__ == "{old}":\n    sys.modules[__name__] = _moved' in source
+        assert 'if __name__ == "__main__":\n    raise SystemExit(_moved.main())' in source
+    else:
+        assert "sys.modules[__name__] = _moved" in source
+        assert "__main__" not in source
 
 
-def test_no_code_outside_the_aliases_imports_an_old_path() -> None:
-    aliases = {PLATFORM / f"{old.rsplit('.', 1)[1]}.py" for old in MOVED}
-    old_names = {old.rsplit(".", 1)[1] for old in MOVED}
+def _old_path_uses(path: Path) -> list[str]:
+    """Every import of an old path in `path`, and every string that names one."""
+
+    old_names = {old.rsplit(".", 1)[1]: old for old in MOVED}
+    found: list[str] = []
+    for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+        if isinstance(node, ast.ImportFrom) and node.module is not None:
+            if node.module in MOVED:
+                found.append(f"{node.lineno}: from {node.module} import ...")
+            elif node.module == "squadopt.platform":
+                for alias in node.names:
+                    if alias.name in old_names:
+                        found.append(f"{node.lineno}: from squadopt.platform import {alias.name}")
+        elif isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name in MOVED or alias.name.rpartition(".")[0] in MOVED:
+                    found.append(f"{node.lineno}: import {alias.name}")
+        elif isinstance(node, ast.Constant) and isinstance(node.value, str):
+            text = node.value
+            if text in MOVED or any(text.startswith(f"{old}.") for old in MOVED):
+                found.append(f"{node.lineno}: {text!r}")
+    return found
+
+
+def test_no_code_outside_the_aliases_imports_or_names_an_old_path() -> None:
+    aliases = {_alias_file(old).resolve() for old in MOVED}
     found: list[str] = []
     for top in SCANNED:
-        for path in (REPOSITORY_ROOT / top).rglob("*.py"):
-            if path in aliases or path == Path(__file__) or "__pycache__" in path.parts:
+        for path in sorted((REPOSITORY_ROOT / top).rglob("*.py")):
+            if path.resolve() in aliases or path.resolve() == Path(__file__).resolve():
                 continue
-            text = path.read_text(encoding="utf-8")
-            for match in OLD_IMPORT.finditer(text):
-                dotted = match.group(1) or match.group(2)
-                if dotted is not None and dotted in MOVED:
-                    found.append(f"{path.relative_to(REPOSITORY_ROOT).as_posix()}: {dotted}")
-                elif match.group(3) is not None:
-                    imported = {
-                        part.strip().split(" as ")[0].strip("() ")
-                        for part in match.group(3).split(",")
-                    }
-                    for name in sorted(imported & old_names):
-                        found.append(
-                            f"{path.relative_to(REPOSITORY_ROOT).as_posix()}: "
-                            f"squadopt.platform.{name}"
-                        )
+            if "__pycache__" in path.parts:
+                continue
+            where = path.relative_to(REPOSITORY_ROOT).as_posix()
+            found.extend(f"{where}:{use}" for use in _old_path_uses(path))
     assert found == [], "\n".join(
-        ["An old platform path is imported outside its alias; use the new path:", *found]
+        ["An old platform path is imported or named outside its alias; use the new path:", *found]
     )
 
 
@@ -166,9 +159,8 @@ def test_each_unit_has_its_package_file_and_only_storage_holds_modules() -> None
         if any(path.name != "__init__.py" for path in (PLATFORM / unit).glob("*.py"))
     }
     assert populated == {"storage"}
-    moved = {
-        f"squadopt.platform.storage.{path.stem}" for path in (PLATFORM / "storage").glob("*.py")
-    }
+    storage = (PLATFORM / "storage").glob("*.py")
+    moved = {f"squadopt.platform.storage.{path.stem}" for path in storage}
     assert moved - {"squadopt.platform.storage.__init__"} == {new for new, _ in MOVED.values()}
 
 

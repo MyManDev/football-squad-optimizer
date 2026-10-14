@@ -123,7 +123,7 @@ landing, or **boundary only** when the boundary is stated but the code behind it
 | --- | --- | --- |
 | A stateless API and a pool of worker processes over a file job queue ([ADR 0006](docs/architecture/decisions/0006-backend-hosting.md)) | Implemented on one host | `FileJobQueue` and the answer cache in `platform`; workers scale by adding processes, because CP-SAT runs one search worker per solve. No multi-host deployment has been accepted. |
 | The advice queue, cache and job specifications behind typed ports ([ADR 0005](docs/architecture/decisions/0005-persistence-boundaries.md)) | Implemented, file adapters only | `JobQueue`, `AdviceCacheRepository`, `AdviceJobSpecStore` and `PublishedViewStore` are Protocols in `platform`, each with a file adapter. |
-| Captures, the ledger and handoffs behind ports | In progress (ADR 0011) | The homes exist and hold no module yet: `squadopt.application.ports` for the ports only the use cases consume, one module per group, and `squadopt.platform.storage` for the file adapters; `tests/architecture/test_storage_ports.py` holds each adapter to its port as the groups land. Use cases still read the storage modules of `data` directly (see known violations). |
+| Captures, the ledger and handoffs behind ports | In progress (ADR 0011) | The homes exist: `squadopt.application.ports`, for the ports only the use cases consume, one module per group, holds no module yet; `squadopt.platform.storage`, for the file adapters, holds the four shared durable-state modules (the queue lock, the store probe, handoff retention, the backup command) and no adapter yet; `tests/architecture/test_storage_ports.py` holds each adapter to its port as the groups land. Use cases still read the storage modules of `data` directly (see known violations). |
 | Device-first computation (issue #978) | Implemented for the one-week plan | The browser solves one-week plans, chips, rival strategies and the Top 100 weight with HiGHS; three- and five-week windows are still solved on the server. |
 | More than one league, by `config/leagues.json` | Implemented in the weekly run | The capture and the weekly run take their leagues from the list (`league_list_v1`); the list names one league today, and the member page admits that league only. |
 | Deterministic solver budgets | Implemented | CP-SAT runs with one search worker and a fixed seed (`configure_solver` in `optimization.cpsat`, the public driver). The advice, live and planning paths pass a deterministic time limit beside the wall-clock limit, so a search that its deterministic budget stops ends at a point fixed by its inputs. The wall clock can still stop a search first: `wall_clock_stopped_the_search` flags such a result as not reproducible, and the advice paths record the flag. |
@@ -131,8 +131,9 @@ landing, or **boundary only** when the boundary is stated but the code behind it
 ## 6. Enforcement map
 
 The import-linter contracts in `pyproject.toml` run as the fifth CI gate (`lint-imports`). Each
-one has a row below. Only the last has `ignore_imports` entries: today's storage imports, held
-under the ratchet rule of ADR 0010 (Decision 4), so the list can only shrink.
+one has a row below. Only the tenth, the storage ratchet, has `ignore_imports` entries:
+today's storage imports, held under the ratchet rule of ADR 0010 (Decision 4), so the list can
+only shrink.
 
 | Contract | What it holds |
 | --- | --- |

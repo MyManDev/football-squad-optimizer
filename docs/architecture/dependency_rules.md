@@ -173,6 +173,10 @@ place. If a symbol is not vocabulary that at least two layers need, it does not 
 2. **Re-exports live exactly one release.** When a symbol moves, the old location keeps
    re-exporting it so no import breaks in the same PR that moves it. The re-export is removed
    in a later, separate PR. This is what makes each migration step reviewable in isolation.
+   ADR 0011 (decision 8) writes two exceptions here: an operator entry point keeps a permanent
+   alias at its old path (`squadopt.platform.backup_recovery` since the first unit pull
+   request), and the names frozen until the planner chain's final reading after GW38 stay as
+   that record lists them.
 3. **Boundary files change only by joint approval** — see [ownership](ownership.md).
 4. **The order is a claim about the code, so it is verified, not trusted.** Any change here
    comes with the regenerated numbers.

@@ -1,18 +1,13 @@
-"""One-release alias (ADR 0011, decision 8): retention lives in
-`squadopt.platform.storage.projection_retention`. Removed in the release after the next `site-*`
-tag.
+"""One-release alias (ADR 0011, decision 8): handoff retention lives in
+`squadopt.platform.storage.projection_retention`, and this name is that module itself, registered
+under the old dotted path in `sys.modules`, so a private name or a monkeypatch through either
+path reaches the one module. Removed in the first pull request after the next `site-*` release.
 """
 
 from __future__ import annotations
 
-from squadopt.platform.storage.projection_retention import (
-    ProjectionRetentionError as ProjectionRetentionError,
-)
-from squadopt.platform.storage.projection_retention import (
-    publish_retained_handoff as publish_retained_handoff,
-)
-from squadopt.platform.storage.projection_retention import (
-    retained_handoff_path as retained_handoff_path,
-)
+import sys
 
-__all__ = ["ProjectionRetentionError", "publish_retained_handoff", "retained_handoff_path"]
+from squadopt.platform.storage import projection_retention as _moved
+
+sys.modules[__name__] = _moved

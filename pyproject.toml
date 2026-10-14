@@ -548,8 +548,9 @@ allow_indirect_imports = true
 # `exhaustive` with the flat module names ignored: every subpackage must be placed, while the
 # flat modules that have not moved yet, and the aliases left at the old paths, sit outside the
 # layers until their own move. `tests/architecture/test_platform_layout.py` holds the ignore
-# list to exactly the flat modules, so a move must shorten it and a new flat module must be
-# placed on purpose. The top-level layered contract is unchanged.
+# list to exactly the flat modules, aliases included, so the list changes only when an alias at
+# an old path goes or a new flat module is placed on purpose. The top-level layered contract is
+# unchanged.
 [[tool.importlinter.contracts]]
 name = "Platform deployment units import only the shared adapters below them"
 type = "layers"
