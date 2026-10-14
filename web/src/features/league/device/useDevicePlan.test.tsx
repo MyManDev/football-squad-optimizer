@@ -1,7 +1,8 @@
 /**
  * The device solve on the page: offered for the one selection the publisher wrote inputs
  * for, run through a worker, shown as the advice document the page reads, held to the
- * capture on screen, and dropped by a new selection or a service computation.
+ * capture on screen, started once while a run loads or solves, and dropped by a new
+ * selection or a service computation.
  */
 
 import { existsSync, readFileSync } from "node:fs";
@@ -867,6 +868,16 @@ describe("a run asked for again while one is in flight", () => {
     return { reads, loadDocument, release };
   }
 
+  /** Reads of the inputs that each wait on a gate of their own, released one at a time. */
+  function gatedReads() {
+    const gates: (() => void)[] = [];
+    const loadDocument = () =>
+      new Promise<LeagueViewEnvelope<DevicePlanDocument>>((resolve) => {
+        gates.push(() => resolve(envelope(document)));
+      });
+    return { gates, loadDocument };
+  }
+
   async function pressTwice() {
     await act(async () => {
       screen.getByText("run").click();
@@ -957,6 +968,37 @@ describe("a run asked for again while one is in flight", () => {
     await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("done"));
     expect(reads.count).toBe(2);
   });
+
+  it.each(["a reset", "a new selection"])(
+    "still starts nothing beside the run after %s when the run it ended settles late",
+    async (cause) => {
+      const { gates, loadDocument } = gatedReads();
+      const page = (request: AdviceRequest) =>
+        withLeague(
+          <Harness
+            squad={squadWith(entry)}
+            request={request}
+            loadDocument={loadDocument}
+            solver={new InProcessSolver()}
+            onState={() => {}}
+          />,
+        );
+      const { rerender } = render(page(REQUEST));
+      await act(async () => screen.getByText("run").click());
+      if (cause === "a reset") await act(async () => screen.getByText("reset").click());
+      else rerender(page({ ...REQUEST, gameweek: 9 }));
+      await act(async () => screen.getByText("run").click());
+      expect(gates).toHaveLength(2);
+      // The ended run's read lands and that run settles while the next is still reading.
+      await act(async () => gates[0]!());
+      expect(screen.getByTestId("phase")).toHaveTextContent("loading");
+      await act(async () => screen.getByText("run").click());
+      expect(gates).toHaveLength(2);
+      await act(async () => gates[1]!());
+      await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("done"));
+      expect(gates).toHaveLength(2);
+    },
+  );
 
   it.each([
     { ending: "done", answer: undefined },
