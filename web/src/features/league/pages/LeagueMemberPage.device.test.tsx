@@ -2,7 +2,8 @@
  * The device solve on the member page: offered where the publisher wrote the member's
  * inputs, the plan it proves shown as a computation result, one answer at a time with
  * the service, a solve still running or a plan it finished ended by a new selection and by
- * no read that lands, and nothing offered where the inputs are absent.
+ * no read that lands, and nothing offered where the inputs are absent or the manager's word
+ * is on.
  */
 
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
@@ -28,7 +29,7 @@ import type {
 import type { DevicePlanReply, DevicePlanRequest } from "../device/deviceSolver.worker";
 import type { DevicePlanDocument, DevicePlanEntry } from "../device/types";
 import type { DeviceSolver } from "../device/useDevicePlan";
-import type { EntrySquad, LeagueViewEnvelope } from "../types";
+import type { EntryAdviceIndex, EntrySquad, LeagueViewEnvelope } from "../types";
 import { LeagueMemberView } from "./LeagueMemberPage";
 import type { LeagueMemberViewProps } from "./memberPageTypes";
 import { exampleTree, withLeague } from "../../../testSupport/league";
@@ -40,6 +41,19 @@ afterEach(cleanup);
 const ENTRY = 35249001;
 const MEMBERS = mockLeagueMembersEnvelope.payload.members;
 const INDEX = mockEntryAdviceIndex(ENTRY).payload;
+/** The same publish with the manager's word solved for the member. */
+const WORD_INDEX: EntryAdviceIndex = {
+  ...INDEX,
+  evidence: {
+    available: true,
+    path: `advice/${ENTRY}/saf-puan/1/hoca-sozu.json`,
+    applied_count: 1,
+    source_kind: "synthetic_fixture",
+    source_label: "club_news_v1.fixture.json",
+    clubs_covered: ["Arsenal"],
+    rule_version: "managers_word_rule_v1",
+  },
+};
 const copy = MESSAGES.tr.leagueMembers;
 const PLAN_SHOWN = copy.squadAfterTitle;
 const document = fixture.document as unknown as DevicePlanDocument;
@@ -135,6 +149,21 @@ function SwitchWindow() {
   );
 }
 
+/** Switches the manager's word on, through the URL as the page does. */
+function SwitchWord() {
+  const [params, setParams] = useSearchParams();
+  const on = () => {
+    const next = new URLSearchParams(params);
+    next.set("llm", "on");
+    setParams(next);
+  };
+  return (
+    <button type="button" onClick={on}>
+      word-on
+    </button>
+  );
+}
+
 class ServiceClient implements AdviceClient {
   async readAdvice(): Promise<AdviceReadResult> {
     return { kind: "not-computed" };
@@ -169,18 +198,20 @@ function renderView(
   squad: LeagueViewEnvelope<EntrySquad>,
   search = "mode=saf-puan&window=1",
   hold = false,
+  index: EntryAdviceIndex = INDEX,
 ) {
   return render(
     <LanguageProvider initialLanguage="tr">
       <MemoryRouter initialEntries={[`/league/352490/members/${ENTRY}?${search}`]}>
         <SwitchWindow />
+        <SwitchWord />
         {withLeague(
           <LeagueMemberView
             squad={squad}
             advice={null}
             adviceIssue="not-listed"
             members={MEMBERS}
-            index={INDEX}
+            index={index}
             client={new ServiceClient()}
             deviceDependencies={{
               loadDocument: deviceDocument,
@@ -205,6 +236,30 @@ describe("the device solve on the member page", () => {
     expect(deviceButton()).toBeNull();
     cleanup();
     renderView(squadWith(entryBlock), "mode=saf-puan&window=3");
+    expect(deviceButton()).toBeNull();
+  });
+
+  it("is not offered while the manager's word is on, which only the service solves", () => {
+    renderView(squadWith(entryBlock), "mode=saf-puan&window=1", false, WORD_INDEX);
+    expect(deviceButton()).not.toBeNull();
+    cleanup();
+    renderView(squadWith(entryBlock), "mode=saf-puan&window=1&llm=on", false, WORD_INDEX);
+    expect(deviceButton()).toBeNull();
+  });
+
+  it("does not keep a plan it proved once the manager's word is switched on", async () => {
+    const { container } = renderView(
+      squadWith(entryBlock),
+      "mode=saf-puan&window=1",
+      false,
+      WORD_INDEX,
+    );
+    await act(async () => deviceButton()!.click());
+    await waitFor(() => expect(container).toHaveTextContent(copy.deviceDone("0,4")));
+    await act(async () => screen.getByText("word-on").click());
+    expect(container).not.toHaveTextContent(copy.deviceDone("0,4"));
+    expect(container).not.toHaveTextContent(copy.computeEcho(copy.computeEchoStates.device));
+    expect(screen.queryByText(PLAN_SHOWN)).toBeNull();
     expect(deviceButton()).toBeNull();
   });
 
