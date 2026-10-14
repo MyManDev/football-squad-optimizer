@@ -87,9 +87,11 @@ export interface DevicePlanDependencies {
 }
 
 /**
- * User Timing, as a run writes it. A run marks the press, its inputs read, its request
- * posted, the worker ready and the reply (`answer`, `refused` or `failed`), each mark
- * named for the run (`device:<n>:press`), and measures `device:inputs` (press to inputs),
+ * User Timing, as a run writes it. A run marks, as far as it gets, the press, its inputs
+ * read, its request posted, the worker ready and the reply (`answer`, `refused` or
+ * `failed`, as a watchdog or a worker error also ends it), each mark named for the run
+ * (`device:<n>:press`). A run that ends before it posts its request, or that a reset or a
+ * new selection ends, has no reply mark. It measures `device:inputs` (press to inputs),
  * `device:load` (posted to ready) and `device:solve` (ready to reply) between its own marks.
  */
 export interface DeviceTimeline {

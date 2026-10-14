@@ -175,10 +175,13 @@ class HeldSolver implements DeviceSolver {
 class KeptTimeline implements DeviceTimeline {
   readonly marks: string[] = [];
   readonly measures: { name: string; start: string; end: string }[] = [];
+  /** Every measure asked for, kept or not. */
+  readonly asked: string[] = [];
   mark(name: string): void {
     this.marks.push(name);
   }
   measure(name: string, start: string, end: string): void {
+    this.asked.push(name);
     if (!this.marks.includes(start) || !this.marks.includes(end)) {
       throw new Error(`no mark ${start} or ${end}`);
     }
@@ -1121,7 +1124,69 @@ describe("the marks a run leaves", () => {
     const at = marksOf(timeline.marks[0]!);
     expect(timeline.marks).toEqual(["press", "inputs", "posted", "failed"].map(at));
     expect(timeline.measures.map((measure) => measure.name)).toEqual(["device:inputs"]);
+    // Not asked for at all, rather than asked for and lost for want of its start.
+    expect(timeline.asked).toEqual(["device:inputs"]);
   });
+
+  it("measures the solve to the failure when the solve's watchdog ends the run", async () => {
+    const timers = new HandTimers();
+    const timeline = new KeptTimeline();
+    render(
+      withLeague(
+        <Harness
+          squad={squadWith(entry)}
+          request={REQUEST}
+          loadDocument={async () => envelope(document)}
+          solver={new SilentSolver()}
+          timers={timers}
+          timeline={timeline}
+          onState={() => {}}
+        />,
+      ),
+    );
+    await act(async () => screen.getByText("run").click());
+    await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("solving"));
+    await act(async () => timers.fireAll());
+    await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("failed"));
+    const at = marksOf(timeline.marks[0]!);
+    expect(timeline.marks).toEqual(["press", "inputs", "posted", "ready", "failed"].map(at));
+    expect(timeline.measures.at(-1)).toEqual({
+      name: "device:solve",
+      start: at("ready"),
+      end: at("failed"),
+    });
+  });
+
+  it.each(["a reset", "a new selection"])(
+    "leaves no reply mark and no solve measured for a run %s ends while it solves",
+    async (cause) => {
+      const timers = new HandTimers();
+      const timeline = new KeptTimeline();
+      const page = (request: AdviceRequest) =>
+        withLeague(
+          <Harness
+            squad={squadWith(entry)}
+            request={request}
+            loadDocument={async () => envelope(document)}
+            solver={new SilentSolver()}
+            timers={timers}
+            timeline={timeline}
+            onState={() => {}}
+          />,
+        );
+      const { rerender } = render(page(REQUEST));
+      await act(async () => screen.getByText("run").click());
+      await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("solving"));
+      if (cause === "a reset") await act(async () => screen.getByText("reset").click());
+      else rerender(page({ ...REQUEST, window: 3 }));
+      // The ended run's wait settles empty, and the run goes no further.
+      await act(async () => {});
+      expect(screen.getByTestId("phase")).toHaveTextContent("idle");
+      const at = marksOf(timeline.marks[0]!);
+      expect(timeline.marks).toEqual(["press", "inputs", "posted", "ready"].map(at));
+      expect(timeline.asked).toEqual(["device:inputs", "device:load"]);
+    },
+  );
 
   it("marks a refusal as the reply that ended the solve", async () => {
     const timeline = new KeptTimeline();
@@ -1191,6 +1256,53 @@ describe("the marks a run leaves", () => {
     ]);
   });
 
+  it("marks nothing for a press the run in flight ignores", async () => {
+    const timeline = new KeptTimeline();
+    render(
+      withLeague(
+        <Harness
+          squad={squadWith(entry)}
+          request={REQUEST}
+          loadDocument={async () => envelope(document)}
+          solver={new InProcessSolver()}
+          timeline={timeline}
+          onState={() => {}}
+        />,
+      ),
+    );
+    await act(async () => {
+      screen.getByText("run").click();
+      screen.getByText("run").click();
+    });
+    await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("done"));
+    expect(timeline.marks).toEqual(FINISHED.map(marksOf(timeline.marks[0]!)));
+  });
+
+  it("names a run's marks apart from those of a run on the page before it was mounted again", async () => {
+    const timeline = new KeptTimeline();
+    for (let mounted = 0; mounted < 2; mounted += 1) {
+      render(
+        withLeague(
+          <Harness
+            squad={squadWith(entry)}
+            request={REQUEST}
+            loadDocument={async () => envelope(document)}
+            solver={new InProcessSolver()}
+            timeline={timeline}
+            onState={() => {}}
+          />,
+        ),
+      );
+      await act(async () => screen.getByText("run").click());
+      await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("done"));
+      cleanup();
+    }
+    const first = marksOf(timeline.marks[0]!);
+    const next = marksOf(timeline.marks[FINISHED.length]!);
+    expect(next("press")).not.toBe(first("press"));
+    expect(timeline.marks).toEqual([...FINISHED.map(first), ...FINISHED.map(next)]);
+  });
+
   it("finishes a run whose timeline throws on every call as it finishes one whose does not", async () => {
     const answer = solvePlan(highs, document, entry, () => 0);
     const calls = { count: 0 };
@@ -1229,6 +1341,32 @@ describe("the marks a run leaves", () => {
     expect(await finished(throwing)).toEqual(kept);
     // Five marks and three measures were asked for, and every one of them threw.
     expect(calls.count).toBe(8);
+  });
+
+  it("leaves its marks and measures on the page's own User Timing when given no timeline", async () => {
+    performance.clearMarks();
+    performance.clearMeasures();
+    render(
+      withLeague(
+        <Harness
+          squad={squadWith(entry)}
+          request={REQUEST}
+          loadDocument={async () => envelope(document)}
+          solver={new InProcessSolver()}
+          onState={() => {}}
+        />,
+      ),
+    );
+    await act(async () => screen.getByText("run").click());
+    await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("done"));
+    const named = (type: string) =>
+      performance
+        .getEntriesByType(type)
+        .map(({ name }) => name)
+        .filter((name) => name.startsWith("device:"));
+    expect(named("measure")).toEqual(["device:inputs", "device:load", "device:solve"]);
+    const marks = named("mark");
+    expect(marks).toEqual(FINISHED.map(marksOf(marks[0]!)));
   });
 
   it("finishes a run on a page whose browser has no User Timing", async () => {
