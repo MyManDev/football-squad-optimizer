@@ -1,29 +1,365 @@
 {
   "contract_version": "weekly_suggestion_history_v1",
-  "generated_at_utc": "2026-10-10T03:57:32.746463Z",
+  "generated_at_utc": "2026-10-14T13:59:21.062647Z",
   "payload": {
     "league_id": 352490,
     "entry_id": 5662073,
     "season": "2026-27",
-    "as_of_snapshot_id": "fpl-live-20261010T035732Z-c77d032165af",
+    "as_of_snapshot_id": "fpl-live-20261014T135921Z-a48d1521c87f",
     "weeks": [
       {
-        "gameweek": 6,
+        "gameweek": 7,
         "status": "unsettled",
         "reason": "not_settled",
-        "deadline_utc": "2026-10-10T10:00:00Z",
-        "advice_snapshot_id": "fpl-live-20261010T035732Z-c77d032165af",
-        "advice_captured_at_utc": "2026-10-10T03:57:32.746463Z",
-        "advice_generated_at_utc": "2026-10-10T06:07:04Z",
-        "advice_sha256": "80e20056501ca992bc37816a2e59097dcb8e27b87062ee20580c3a666c294e9c",
+        "deadline_utc": "2026-10-17T10:00:00Z",
+        "advice_snapshot_id": "fpl-live-20261014T135921Z-a48d1521c87f",
+        "advice_captured_at_utc": "2026-10-14T13:59:21.062647Z",
+        "advice_generated_at_utc": "2026-10-14T14:20:21Z",
+        "advice_sha256": "fb48852418b4451d3e591ca089367c1d021710d1f44dbc05c69d526a2a47e17a",
         "outcome_snapshot_id": null,
         "outcome_captured_at_utc": null,
-        "expected_own_points": 50.44900560347879,
+        "expected_own_points": 51.22088564166699,
         "suggested": null,
         "actual": null,
         "actual_reason": null,
         "net_difference": null,
         "players": [],
+        "recorded_plans": [
+          {
+            "published_path": "advice/5662073/saf-puan/1.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Bruno Borges Fernandes",
+            "moves": [
+              {
+                "player_out": "Morgan Rogers",
+                "player_in": "Bruno Borges Fernandes"
+              }
+            ],
+            "expected_points_cost": 0.0
+          },
+          {
+            "published_path": "advice/5662073/ortak-koru/1/vs-2281624.json",
+            "strategy": "ortak-koru",
+            "window": 1,
+            "rival_entry_id": 2281624,
+            "chip": null,
+            "captain": "Cole Palmer",
+            "moves": [
+              {
+                "player_out": "Nicolas Jackson",
+                "player_in": "Yoane Wissa"
+              }
+            ],
+            "expected_points_cost": 2.6675611732527003,
+            "expected_points_cost_ceiling": 2.6675611732527003
+          },
+          {
+            "published_path": "advice/5662073/fark-yarat/1/vs-2281624.json",
+            "strategy": "fark-yarat",
+            "window": 1,
+            "rival_entry_id": 2281624,
+            "chip": null,
+            "captain": "Bruno Borges Fernandes",
+            "moves": [
+              {
+                "player_out": "Morgan Rogers",
+                "player_in": "Bruno Borges Fernandes"
+              }
+            ],
+            "expected_points_cost": 0.0,
+            "expected_points_cost_ceiling": 0.0
+          },
+          {
+            "published_path": "advice/5662073/saf-puan/1/hoca-sozu.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Bruno Borges Fernandes",
+            "moves": [
+              {
+                "player_out": "Morgan Rogers",
+                "player_in": "Bruno Borges Fernandes"
+              }
+            ],
+            "expected_points_cost": 0.0,
+            "expected_points_cost_ceiling": 0.0,
+            "managers_word": true
+          },
+          {
+            "published_path": "advice/5662073/saf-puan/1/chip-bboost.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": "bboost",
+            "captain": "Bruno Borges Fernandes",
+            "moves": [
+              {
+                "player_out": "Morgan Rogers",
+                "player_in": "Bruno Borges Fernandes"
+              }
+            ],
+            "expected_points_cost": 0.0
+          },
+          {
+            "published_path": "advice/5662073/saf-puan/1/chip-3xc.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": "3xc",
+            "captain": "Bruno Borges Fernandes",
+            "moves": [
+              {
+                "player_out": "Morgan Rogers",
+                "player_in": "Bruno Borges Fernandes"
+              }
+            ],
+            "expected_points_cost": 0.0
+          }
+        ]
+      },
+      {
+        "gameweek": 6,
+        "status": "available",
+        "reason": null,
+        "deadline_utc": "2026-10-10T10:00:00Z",
+        "advice_snapshot_id": "fpl-live-20261010T035732Z-c77d032165af",
+        "advice_captured_at_utc": "2026-10-10T03:57:32.746463Z",
+        "advice_generated_at_utc": "2026-10-10T06:07:04Z",
+        "advice_sha256": "80e20056501ca992bc37816a2e59097dcb8e27b87062ee20580c3a666c294e9c",
+        "outcome_snapshot_id": "fpl-live-20261014T135921Z-a48d1521c87f",
+        "outcome_captured_at_utc": "2026-10-14T13:59:21.062647Z",
+        "expected_own_points": 50.44900560347879,
+        "suggested": {
+          "gross_points": 74.0,
+          "transfer_hit_points": 0.0,
+          "net_points": 74.0,
+          "captain_bonus_points": 1.0,
+          "autosub_points": 0.0,
+          "chip": null
+        },
+        "actual": {
+          "gross_points": 88.0,
+          "transfer_hit_points": 0.0,
+          "net_points": 88.0
+        },
+        "actual_reason": null,
+        "net_difference": -14.0,
+        "players": [
+          {
+            "player_id": 204936,
+            "name": "Gianluigi Donnarumma",
+            "position": "GK",
+            "role": "starter",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 3.082495342651006,
+            "realized_points": 9.0,
+            "minutes": 90,
+            "multiplier": 1,
+            "counted_points": 9.0,
+            "forecast_error": 5.917504657348994
+          },
+          {
+            "player_id": 477424,
+            "name": "Joško Gvardiol",
+            "position": "DEF",
+            "role": "starter",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 3.6993157992754457,
+            "realized_points": 4.0,
+            "minutes": 24,
+            "multiplier": 1,
+            "counted_points": 4.0,
+            "forecast_error": 0.30068420072455426
+          },
+          {
+            "player_id": 466075,
+            "name": "Riccardo Calafiori",
+            "position": "DEF",
+            "role": "starter",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 3.59365129554469,
+            "realized_points": 9.0,
+            "minutes": 81,
+            "multiplier": 1,
+            "counted_points": 9.0,
+            "forecast_error": 5.40634870445531
+          },
+          {
+            "player_id": 465730,
+            "name": "Maxim De Cuyper",
+            "position": "DEF",
+            "role": "starter",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 3.347197728858024,
+            "realized_points": 15.0,
+            "minutes": 67,
+            "multiplier": 1,
+            "counted_points": 15.0,
+            "forecast_error": 11.652802271141976
+          },
+          {
+            "player_id": 141746,
+            "name": "Bruno Borges Fernandes",
+            "position": "MID",
+            "role": "starter",
+            "captain": true,
+            "vice_captain": false,
+            "expected_points": 6.348841464940458,
+            "realized_points": 1.0,
+            "minutes": 90,
+            "multiplier": 2,
+            "counted_points": 2.0,
+            "forecast_error": -5.348841464940458
+          },
+          {
+            "player_id": 244850,
+            "name": "Morgan Rogers",
+            "position": "MID",
+            "role": "starter",
+            "captain": false,
+            "vice_captain": true,
+            "expected_points": 4.596795481290255,
+            "realized_points": 9.0,
+            "minutes": 83,
+            "multiplier": 1,
+            "counted_points": 9.0,
+            "forecast_error": 4.403204518709745
+          },
+          {
+            "player_id": 222531,
+            "name": "Morgan Gibbs-White",
+            "position": "MID",
+            "role": "starter",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 4.3555732521106405,
+            "realized_points": 2.0,
+            "minutes": 90,
+            "multiplier": 1,
+            "counted_points": 2.0,
+            "forecast_error": -2.3555732521106405
+          },
+          {
+            "player_id": 466052,
+            "name": "Rayan Cherki",
+            "position": "MID",
+            "role": "starter",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 4.01664109658441,
+            "realized_points": 10.0,
+            "minutes": 90,
+            "multiplier": 1,
+            "counted_points": 10.0,
+            "forecast_error": 5.98335890341559
+          },
+          {
+            "player_id": 184029,
+            "name": "Martin Ødegaard",
+            "position": "MID",
+            "role": "starter",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 3.9797310309386273,
+            "realized_points": 1.0,
+            "minutes": 89,
+            "multiplier": 1,
+            "counted_points": 1.0,
+            "forecast_error": -2.9797310309386273
+          },
+          {
+            "player_id": 475168,
+            "name": "João Pedro Junqueira de Jesus",
+            "position": "FWD",
+            "role": "starter",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 3.822253355001549,
+            "realized_points": 12.0,
+            "minutes": 71,
+            "multiplier": 1,
+            "counted_points": 12.0,
+            "forecast_error": 8.17774664499845
+          },
+          {
+            "player_id": 647850,
+            "name": "Charalampos Kostoulas",
+            "position": "FWD",
+            "role": "starter",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 3.257668291343226,
+            "realized_points": 1.0,
+            "minutes": 59,
+            "multiplier": 1,
+            "counted_points": 1.0,
+            "forecast_error": -2.257668291343226
+          },
+          {
+            "player_id": 489639,
+            "name": "Bart Verbruggen",
+            "position": "GK",
+            "role": "bench",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 2.7749400703238383,
+            "realized_points": 9.0,
+            "minutes": 90,
+            "multiplier": 0,
+            "counted_points": 0.0,
+            "forecast_error": 6.225059929676162
+          },
+          {
+            "player_id": 224967,
+            "name": "Vitalii Mykolenko",
+            "position": "DEF",
+            "role": "bench",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 2.189752413531977,
+            "realized_points": 0.0,
+            "minutes": 0,
+            "multiplier": 0,
+            "counted_points": 0.0,
+            "forecast_error": -2.189752413531977
+          },
+          {
+            "player_id": 199798,
+            "name": "Ezri Konsa Ngoyo",
+            "position": "DEF",
+            "role": "bench",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 1.9747000311138394,
+            "realized_points": 4.0,
+            "minutes": 90,
+            "multiplier": 0,
+            "counted_points": 0.0,
+            "forecast_error": 2.0252999688861606
+          },
+          {
+            "player_id": 219168,
+            "name": "Alexander Isak",
+            "position": "FWD",
+            "role": "bench",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 0.0,
+            "realized_points": 0.0,
+            "minutes": 0,
+            "multiplier": 0,
+            "counted_points": 0.0,
+            "forecast_error": 0.0
+          }
+        ],
         "recorded_plans": [
           {
             "published_path": "advice/5662073/saf-puan/1.json",
@@ -544,8 +880,8 @@
         "advice_captured_at_utc": "2026-09-18T12:25:16.241963Z",
         "advice_generated_at_utc": "2026-09-18T14:05:59Z",
         "advice_sha256": "0f1fd2c74c12ae4d93062d410fc79e26c3e17a202a2f23580e20534a78938397",
-        "outcome_snapshot_id": "fpl-live-20261010T035732Z-c77d032165af",
-        "outcome_captured_at_utc": "2026-10-10T03:57:32.746463Z",
+        "outcome_snapshot_id": "fpl-live-20261014T135921Z-a48d1521c87f",
+        "outcome_captured_at_utc": "2026-10-14T13:59:21.062647Z",
         "expected_own_points": 52.212768401589024,
         "suggested": {
           "gross_points": 61.0,
@@ -784,8 +1120,8 @@
         "advice_captured_at_utc": "2026-09-12T10:00:00.227050Z",
         "advice_generated_at_utc": "2026-09-12T10:50:08Z",
         "advice_sha256": "ae9ce84c9f3b2da8bd8dba847063e58c33d439b9f52bc6a08bbd2422264e0c30",
-        "outcome_snapshot_id": "fpl-live-20261010T035732Z-c77d032165af",
-        "outcome_captured_at_utc": "2026-10-10T03:57:32.746463Z",
+        "outcome_snapshot_id": "fpl-live-20261014T135921Z-a48d1521c87f",
+        "outcome_captured_at_utc": "2026-10-14T13:59:21.062647Z",
         "expected_own_points": 56.39662659504266,
         "suggested": {
           "gross_points": 69.0,
