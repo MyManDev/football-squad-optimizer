@@ -9,7 +9,8 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { DataClient, Loaded } from "../../../data/client";
+import type { DataClient } from "../../../data/client";
+import type { Loaded } from "../../../data/envelope";
 import { DataClientContext } from "../../../data/queries";
 import type { LeagueView, LedgerView, SiteIndex } from "../../../data/schema";
 import { unsettledLedgerFixture } from "../../../fixtures/ledger";

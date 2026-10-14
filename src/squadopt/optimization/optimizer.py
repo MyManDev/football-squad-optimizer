@@ -12,13 +12,31 @@ from ortools.sat.python import cp_model
 from squadopt.contracts import order_outfield_bench
 from squadopt.optimization.coefficients import (
     objective_coefficients,
-    scale_bench_coefficient,
-    scale_expected_points,
     sort_players_by_id,
 )
 from squadopt.optimization.config import OptimizationConfig
+
+# The driver lives in `optimization.cpsat` (ADR 0011, decision 5). The private names stay
+# bound here for this module's own call sites and for the test that patches `_solve` on it;
+# `configure_solver` and the three constants stay importable from here, as `X as X` re-exports.
+from squadopt.optimization.cpsat import CP_SAT_SAFE_INTEGER_MAX as CP_SAT_SAFE_INTEGER_MAX
+from squadopt.optimization.cpsat import (
+    MIN_TIEBREAK_DETERMINISTIC_TIME as MIN_TIEBREAK_DETERMINISTIC_TIME,
+)
+from squadopt.optimization.cpsat import MIN_TIEBREAK_TIME_SECONDS as MIN_TIEBREAK_TIME_SECONDS
+from squadopt.optimization.cpsat import configure_solver as configure_solver
+from squadopt.optimization.cpsat import deterministic_time_used as _deterministic_time_used
+from squadopt.optimization.cpsat import map_solver_status as _map_solver_status
+from squadopt.optimization.cpsat import raw_status_name as _raw_status_name
+from squadopt.optimization.cpsat import (
+    remaining_deterministic_time as _remaining_deterministic_time,
+)
+from squadopt.optimization.cpsat import solve as _solve
 from squadopt.optimization.decisions import (
     add_decision_constraints as _add_decision_constraints,
+)
+from squadopt.optimization.decisions import (
+    add_tiebreak_objective as _add_tiebreak_objective,
 )
 from squadopt.optimization.decisions import (
     selected_indices as _selected_indices,
@@ -32,23 +50,10 @@ from squadopt.optimization.models import (
     SolverExecutionError,
     SolverStatus,
 )
+from squadopt.optimization.models import (
+    empty_result as _empty_result,
+)
 from squadopt.optimization.validation import validate_players
-
-CP_SAT_SAFE_INTEGER_MAX = (1 << 62) - 1
-MIN_TIEBREAK_TIME_SECONDS = 0.001
-MIN_TIEBREAK_DETERMINISTIC_TIME = 1e-9
-
-
-def _scale_expected_points(value: object, scale: int) -> int:
-    """Backward-compatible private alias for the shared scaling contract."""
-
-    return scale_expected_points(value, scale)
-
-
-def _scale_bench_coefficient(scaled_points: int, bench_weight: float) -> int:
-    """Backward-compatible private alias for the shared scaling contract."""
-
-    return scale_bench_coefficient(scaled_points, bench_weight)
 
 
 @dataclass(frozen=True, slots=True)
@@ -118,83 +123,6 @@ def _build_model(
     )
 
 
-def _raw_status_name(raw_status: int) -> str:
-    names: dict[int, str] = {
-        int(cp_model.OPTIMAL): "OPTIMAL",
-        int(cp_model.FEASIBLE): "FEASIBLE",
-        int(cp_model.INFEASIBLE): "INFEASIBLE",
-        int(cp_model.UNKNOWN): "UNKNOWN",
-        int(cp_model.MODEL_INVALID): "MODEL_INVALID",
-    }
-    return names.get(raw_status, f"UNRECOGNIZED({raw_status})")
-
-
-def _map_solver_status(raw_status: int) -> SolverStatus:
-    """Map a CP-SAT status to the solver-independent public status."""
-
-    if raw_status == cp_model.OPTIMAL:
-        return SolverStatus.OPTIMAL
-    if raw_status == cp_model.FEASIBLE:
-        return SolverStatus.FEASIBLE
-    if raw_status == cp_model.INFEASIBLE:
-        return SolverStatus.INFEASIBLE
-    if raw_status == cp_model.UNKNOWN:
-        return SolverStatus.UNKNOWN
-    if raw_status == cp_model.MODEL_INVALID:
-        raise SolverExecutionError("CP-SAT rejected the generated model as invalid.")
-    raise SolverExecutionError(f"CP-SAT returned an unrecognized status: {raw_status!r}.")
-
-
-def configure_solver(
-    solver: cp_model.CpSolver,
-    config: OptimizationConfig,
-    time_limit_seconds: float,
-    deterministic_time_limit: float | None,
-) -> None:
-    """Apply this repository's solver settings; the single place they are decided.
-
-    Public because three packages outside this one call it — `planning`, and both
-    `scenarios` solvers — and a name that three packages consume is not private.
-
-    Single search worker: CP-SAT's parallel search is nondeterministic, so a repeated
-    solve would not be a repeated answer. Callers that record what produced a result read
-    the value back from the configured solver rather than writing `1` beside it, so a
-    provenance record cannot go on claiming a property this function has stopped providing.
-    """
-
-    solver.parameters.max_time_in_seconds = time_limit_seconds
-    if deterministic_time_limit is not None:
-        solver.parameters.max_deterministic_time = deterministic_time_limit
-    solver.parameters.num_search_workers = 1
-    solver.parameters.random_seed = config.deterministic_seed
-
-
-def _deterministic_time_used(solver: cp_model.CpSolver, raw_status: int) -> float:
-    """Return CP-SAT deterministic work consumed by a completed solve."""
-
-    try:
-        return float(solver.response_proto.deterministic_time)
-    except RuntimeError as error:
-        # An UNKNOWN result can be injected by a solver boundary test before a response
-        # exists. Real CP-SAT calls always attach a response, including UNKNOWN ones.
-        if raw_status == cp_model.UNKNOWN:
-            return 0.0
-        raise SolverExecutionError(
-            "CP-SAT returned a status without response diagnostics."
-        ) from error
-
-
-def _remaining_deterministic_time(
-    configured_limit: float | None,
-    consumed: float,
-) -> float | None:
-    """Return the deterministic budget left for a secondary solve."""
-
-    if configured_limit is None:
-        return None
-    return max(0.0, configured_limit - consumed)
-
-
 def wall_clock_stopped_the_search(
     status: SolverStatus,
     diagnostics: Mapping[str, object],
@@ -231,16 +159,6 @@ def wall_clock_stopped_the_search(
     return diagnostics.get("deterministic_time_budget_exhausted") is not True
 
 
-def _solve(model: cp_model.CpModel, solver: cp_model.CpSolver) -> int:
-    validation_message = model.validate()
-    if validation_message:
-        raise SolverExecutionError(f"CP-SAT rejected the generated model: {validation_message}")
-    try:
-        return int(solver.solve(model))
-    except Exception as error:
-        raise SolverExecutionError("CP-SAT failed while solving the squad model.") from error
-
-
 def _evaluate_primary(
     solver: cp_model.CpSolver,
     artifacts: _ModelArtifacts,
@@ -257,42 +175,6 @@ def _evaluate_primary(
             zip(artifacts.scaled_points, artifacts.bench_coefficients, strict=True)
         )
     )
-
-
-def _add_tiebreak_objective(
-    model: cp_model.CpModel,
-    squad_vars: list[cp_model.IntVar],
-    starter_vars: list[cp_model.IntVar],
-    captain_vars: list[cp_model.IntVar],
-    primary_objective: cp_model.LinearExpr,
-    config: OptimizationConfig,
-    primary_value: int,
-) -> None:
-    player_count = len(squad_vars)
-    largest_rank = max(0, player_count - 1)
-    max_squad_rank_sum = config.squad_size * largest_rank
-    max_starter_rank_sum = config.starting_size * largest_rank
-    starter_weight = max_squad_rank_sum + 1
-    captain_weight = starter_weight * (max_starter_rank_sum + 1)
-    conservative_tiebreak_bound = (
-        captain_weight * largest_rank + starter_weight * max_starter_rank_sum + max_squad_rank_sum
-    )
-    if conservative_tiebreak_bound > CP_SAT_SAFE_INTEGER_MAX:
-        raise SolverExecutionError(
-            "Deterministic tie-break coefficients exceed the safe CP-SAT integer range."
-        )
-
-    model.add(primary_objective == primary_value)
-    tiebreak_terms: list[cp_model.LinearExpr] = []
-    for rank in range(player_count):
-        tiebreak_terms.extend(
-            (
-                rank * squad_vars[rank],
-                starter_weight * rank * starter_vars[rank],
-                captain_weight * rank * captain_vars[rank],
-            )
-        )
-    model.minimize(cp_model.LinearExpr.sum(tiebreak_terms))
 
 
 def _add_decision_exclusions(
@@ -349,25 +231,6 @@ def _add_decision_exclusions(
         terms.extend(artifacts.starter_vars[index_by_id[player_id]] for player_id in starter_ids)
         terms.append(artifacts.captain_vars[index_by_id[captain_id]])
         artifacts.model.add(cp_model.LinearExpr.sum(terms) <= bound)
-
-
-def _empty_result(
-    players: pd.DataFrame,
-    status: SolverStatus,
-    diagnostics: dict[str, object],
-) -> OptimizationResult:
-    empty = players.iloc[0:0].reset_index(drop=True).copy(deep=True)
-    return OptimizationResult(
-        solver_status=status,
-        selected_squad=empty.copy(deep=True),
-        starting_xi=empty.copy(deep=True),
-        bench=empty.copy(deep=True),
-        captain=None,
-        total_cost_tenths=None,
-        projected_score=None,
-        objective_value=None,
-        diagnostics=diagnostics,
-    )
 
 
 def _validated_objective_points(

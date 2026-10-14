@@ -635,25 +635,6 @@ class TeamRatingStudy:
     diagnostics: Mapping[str, object]
 
 
-def _baseline_rates(
-    history: pd.DataFrame, decay_per_day: float, as_of: pd.Timestamp
-) -> tuple[float, float]:
-    """The league's own home and away scoring averages, decayed the same way the rating is."""
-
-    age = (as_of - history["kickoff"]).dt.total_seconds().to_numpy(dtype="float64") / 86400.0
-    weights = np.exp(-decay_per_day * np.clip(age, 0.0, None))
-    total = float(weights.sum())
-    if total <= 0.0:
-        raise ExperimentExecutionError("The baseline has no weighted matches to average.")
-    home = float(np.sum(weights * history["home_goals"].to_numpy(dtype="float64")) / total)
-    away = float(np.sum(weights * history["away_goals"].to_numpy(dtype="float64")) / total)
-    return max(home, 1e-6), max(away, 1e-6)
-
-
-def _poisson_log_pmf(goals: int, rate: float) -> float:
-    return goals * math.log(max(rate, 1e-12)) - rate - math.lgamma(goals + 1)
-
-
 def _fit_logistic(design: np.ndarray, target: np.ndarray) -> np.ndarray:
     """Newton's method on a small logistic, with a whisper of ridge for conditioning."""
 
@@ -673,34 +654,6 @@ def _fit_logistic(design: np.ndarray, target: np.ndarray) -> np.ndarray:
 def _logit(probability: np.ndarray | float) -> np.ndarray:
     clipped = np.clip(np.asarray(probability, dtype="float64"), 1e-6, 1.0 - 1e-6)
     return np.asarray(np.log(clipped / (1.0 - clipped)), dtype="float64")
-
-
-def _logistic_on_published_difficulty(matches: pd.DataFrame) -> tuple[float, float, float]:
-    """Fit ``clean sheet ~ difficulty + venue`` on past matches.
-
-    A logistic on the published rating is the fairest comparison available: it lets the
-    opaque one-to-five scale be mapped to probabilities as well as any monotone map can,
-    rather than being compared against a probability model on a scale it never claimed.
-    The rating gets exactly the same courtesy in ``fit_clean_sheet_calibration``.
-    """
-
-    difficulty = np.concatenate(
-        [
-            matches["home_difficulty"].to_numpy(dtype="float64"),
-            matches["away_difficulty"].to_numpy(dtype="float64"),
-        ]
-    )
-    at_home = np.concatenate([np.ones(len(matches)), np.zeros(len(matches))])
-    clean = np.concatenate(
-        [
-            (matches["away_goals"].to_numpy(dtype="int64") == 0).astype("float64"),
-            (matches["home_goals"].to_numpy(dtype="int64") == 0).astype("float64"),
-        ]
-    )
-    keep = np.isfinite(difficulty)
-    design = np.column_stack([np.ones(int(keep.sum())), difficulty[keep], at_home[keep]])
-    theta = _fit_logistic(design, clean[keep])
-    return float(theta[0]), float(theta[1]), float(theta[2])
 
 
 def fit_clean_sheet_calibration(
@@ -791,33 +744,12 @@ def calibrated_clean_sheet(coefficients: tuple[float, float], probability: float
     return _calibrated_clean_sheet(coefficients, probability)
 
 
-def _published_clean_sheet(
-    coefficients: tuple[float, float, float], difficulty: float, *, is_home: bool
-) -> float:
-    intercept, slope, venue = coefficients
-    if not math.isfinite(difficulty):
-        difficulty = 3.0
-    value = intercept + slope * difficulty + venue * (1.0 if is_home else 0.0)
-    return float(1.0 / (1.0 + math.exp(-max(min(value, 30.0), -30.0))))
-
-
 def _spearman(left: np.ndarray, right: np.ndarray) -> float:
     if left.size < 5 or np.unique(left).size < 2 or np.unique(right).size < 2:
         return 0.0
     frame = pd.DataFrame({"left": left, "right": right})
     value = float(str(frame.corr(method="spearman").iloc[0, 1]))
     return value if math.isfinite(value) else 0.0
-
-
-def _bootstrap(values: np.ndarray, *, resamples: int, seed: int) -> tuple[float, float]:
-    if values.size == 0:
-        return (0.0, 0.0)
-    generator = np.random.default_rng(seed)
-    draws = np.empty(resamples, dtype="float64")
-    for index in range(resamples):
-        sample = generator.integers(0, values.size, values.size)
-        draws[index] = float(values[sample].mean())
-    return (float(np.quantile(draws, 0.05)), float(np.quantile(draws, 0.95)))
 
 
 def player_fixture_rows(archive_root: Path | str, seasons: Sequence[str]) -> pd.DataFrame:
@@ -845,299 +777,6 @@ def player_fixture_rows(archive_root: Path | str, seasons: Sequence[str]) -> pd.
     # A double gameweek gives a player two opponent rows; the panel already summed his
     # points across both, so each row is kept and the pair share the same outcome.
     return panel.merge(schedule, on=["season", "gameweek", "club"], how="inner")
-
-
-def _fixture_lookup(matches: pd.DataFrame) -> Mapping[tuple[int, int, int], Mapping[str, float]]:
-    """Index a season's fixtures by gameweek and the unordered pair of clubs."""
-
-    lookup: dict[tuple[int, int, int], Mapping[str, float]] = {}
-    for record in matches.to_dict("records"):
-        home = int(record["home_club"])
-        away = int(record["away_club"])
-        gameweek = int(record["gameweek"])
-        lookup[(gameweek, home, away)] = {
-            "home_difficulty": float(record["home_difficulty"]),
-            "away_difficulty": float(record["away_difficulty"]),
-        }
-    return lookup
-
-
-def run_team_rating_study(
-    archive_root: Path | str, config: TeamRatingStudyConfig | None = None
-) -> TeamRatingStudy:
-    """Fit the rating forward and judge it on goals, on clean sheets, and on players."""
-
-    settings = TeamRatingStudyConfig() if config is None else config
-    root = Path(archive_root)
-    matches = load_match_results(root, settings.seasons)
-    promoted = promoted_clubs(matches)
-    players = player_fixture_rows(root, settings.evaluated_seasons)
-    scorecards: list[SeasonScorecard] = []
-    pooled_likelihood: list[float] = []
-    pooled_brier: list[float] = []
-    reliability_rows: list[dict[str, float]] = []
-    example: dict[str, object] = {}
-    selected: dict[str, DixonColesConfig] = {}
-    for season in settings.evaluated_seasons:
-        earlier = [value for value in settings.seasons if value < season]
-        chosen = select_dixon_coles_config(
-            matches.loc[matches["season"].isin(earlier)],
-            earlier,
-            half_life_grid=settings.half_life_grid,
-            ridge_grid=settings.ridge_grid,
-            first_gameweek=settings.first_evaluated_gameweek,
-            base=settings.dixon_coles,
-        )
-        selected[season] = chosen
-        prior = measure_promoted_prior(matches, earlier, chosen)
-        published = _logistic_on_published_difficulty(matches.loc[matches["season"].isin(earlier)])
-        calibration = fit_clean_sheet_calibration(
-            matches.loc[matches["season"].isin(earlier)],
-            earlier[1:],
-            chosen,
-            first_gameweek=settings.first_evaluated_gameweek,
-        )
-        arrivals = promoted.get(season, ())
-        judged = matches.loc[matches["season"] == season]
-        lookup = _fixture_lookup(judged)
-        gameweeks = sorted(
-            int(value)
-            for value in judged["gameweek"].unique()
-            if int(value) >= settings.first_evaluated_gameweek
-        )
-        likelihood_difference: list[float] = []
-        brier_difference: list[float] = []
-        rating_likelihood: list[float] = []
-        baseline_likelihood: list[float] = []
-        rating_brier: list[float] = []
-        raw_brier: list[float] = []
-        published_brier: list[float] = []
-        clean_probabilities: list[float] = []
-        clean_realized: list[float] = []
-        attacking: list[tuple[float, float, float]] = []
-        defensive: list[tuple[float, float, float]] = []
-        refits = 0
-        for gameweek in gameweeks:
-            block = judged.loc[judged["gameweek"] == gameweek]
-            as_of = pd.Timestamp(block["kickoff"].min())
-            history = matches.loc[matches["kickoff"] < as_of]
-            if history.empty:
-                continue
-            rating = fit_dixon_coles(
-                matches,
-                as_of=as_of,
-                config=chosen,
-                promoted_prior=prior,
-                newly_promoted=arrivals,
-            )
-            refits += 1
-            if not example:
-                example = {
-                    "season": season,
-                    "gameweek": gameweek,
-                    "matches_used": rating.matches_used,
-                    "home_advantage": rating.home_advantage,
-                    "rho": rating.rho,
-                    "promoted_attack_prior": rating.promoted_attack_prior,
-                    "promoted_defence_prior": rating.promoted_defence_prior,
-                }
-            home_rate, away_rate = _baseline_rates(history, chosen.decay_per_day, as_of)
-            for record in block.to_dict("records"):
-                home_club = int(record["home_club"])
-                away_club = int(record["away_club"])
-                home_goals = int(record["home_goals"])
-                away_goals = int(record["away_goals"])
-                matrix = rating.score_matrix(home_club, away_club)
-                observed = float(
-                    matrix[min(home_goals, MAXIMUM_GOALS), min(away_goals, MAXIMUM_GOALS)]
-                )
-                rating_value = math.log(max(observed, 1e-12))
-                baseline_value = _poisson_log_pmf(home_goals, home_rate) + _poisson_log_pmf(
-                    away_goals, away_rate
-                )
-                rating_likelihood.append(rating_value)
-                baseline_likelihood.append(baseline_value)
-                likelihood_difference.append(rating_value - baseline_value)
-                sides = (
-                    (True, home_club, away_club, away_goals, float(record["home_difficulty"])),
-                    (False, away_club, home_club, home_goals, float(record["away_difficulty"])),
-                )
-                for is_home, club, opponent, conceded, difficulty in sides:
-                    raw = rating.clean_sheet_probability(club, opponent, is_home=is_home)
-                    probability = _calibrated_clean_sheet(calibration, raw)
-                    realized = 1.0 if conceded == 0 else 0.0
-                    reference = _published_clean_sheet(published, difficulty, is_home=is_home)
-                    rating_brier.append((probability - realized) ** 2)
-                    raw_brier.append((raw - realized) ** 2)
-                    published_brier.append((reference - realized) ** 2)
-                    brier_difference.append(
-                        (reference - realized) ** 2 - (probability - realized) ** 2
-                    )
-                    clean_probabilities.append(probability)
-                    clean_realized.append(realized)
-                    reliability_rows.append(
-                        {
-                            "probability": probability,
-                            "realized": realized,
-                            "published": reference,
-                        }
-                    )
-            block_players = players.loc[
-                (players["season"] == season) & (players["gameweek"] == gameweek)
-            ]
-            for record in block_players.to_dict("records"):
-                club = int(record["club"])
-                opponent = int(record["opponent"])
-                is_home = bool(record["is_home"])
-                points = float(record["total_points"])
-                home_key = (gameweek, club, opponent) if is_home else (gameweek, opponent, club)
-                fixture = lookup.get(home_key)
-                if fixture is None:
-                    continue
-                difficulty = float(
-                    fixture["home_difficulty"] if is_home else fixture["away_difficulty"]
-                )
-                position = str(record["position"])
-                if position in ATTACKING_POSITIONS:
-                    # The published rating scores a *fixture*, not an opponent: it already
-                    # folds in where the match is played. The rating's like-for-like answer
-                    # is therefore how many goals it expects the player's club to score in
-                    # this fixture, not the opponent's defence in isolation.
-                    home_rate, away_rate = (
-                        rating.expected_goals(club, opponent)
-                        if is_home
-                        else rating.expected_goals(opponent, club)
-                    )
-                    attacking.append((home_rate if is_home else away_rate, -difficulty, points))
-                elif position in DEFENSIVE_POSITIONS:
-                    # Recalibration is monotone, so it cannot change an ordering; the raw
-                    # probability is used here and the two agree by construction.
-                    defensive.append(
-                        (
-                            rating.clean_sheet_probability(club, opponent, is_home=is_home),
-                            -difficulty,
-                            points,
-                        )
-                    )
-        if not rating_likelihood:
-            continue
-        attacking_array = np.asarray(attacking, dtype="float64")
-        defensive_array = np.asarray(defensive, dtype="float64")
-        scorecards.append(
-            SeasonScorecard(
-                season=season,
-                fixtures=len(rating_likelihood),
-                rating_log_likelihood=float(np.mean(rating_likelihood)),
-                baseline_log_likelihood=float(np.mean(baseline_likelihood)),
-                rating_clean_sheet_brier=float(np.mean(rating_brier)),
-                uncalibrated_clean_sheet_brier=float(np.mean(raw_brier)),
-                published_clean_sheet_brier=float(np.mean(published_brier)),
-                rating_attacking_correlation=(
-                    _spearman(attacking_array[:, 0], attacking_array[:, 2])
-                    if attacking_array.size
-                    else 0.0
-                ),
-                published_attacking_correlation=(
-                    _spearman(attacking_array[:, 1], attacking_array[:, 2])
-                    if attacking_array.size
-                    else 0.0
-                ),
-                rating_defensive_correlation=(
-                    _spearman(defensive_array[:, 0], defensive_array[:, 2])
-                    if defensive_array.size
-                    else 0.0
-                ),
-                published_defensive_correlation=(
-                    _spearman(defensive_array[:, 1], defensive_array[:, 2])
-                    if defensive_array.size
-                    else 0.0
-                ),
-                mean_clean_sheet_probability=float(np.mean(clean_probabilities)),
-                realized_clean_sheet_rate=float(np.mean(clean_realized)),
-                refits=refits,
-            )
-        )
-        pooled_likelihood.extend(likelihood_difference)
-        pooled_brier.extend(brier_difference)
-    if not scorecards:
-        raise ExperimentExecutionError("No season could be judged.")
-    likelihood_array = np.asarray(pooled_likelihood, dtype="float64")
-    brier_array = np.asarray(pooled_brier, dtype="float64")
-    pooled = {
-        "log_likelihood_improvement": float(likelihood_array.mean()),
-        "brier_improvement": float(brier_array.mean()),
-        "rating_attacking_correlation": float(
-            np.mean([card.rating_attacking_correlation for card in scorecards])
-        ),
-        "published_attacking_correlation": float(
-            np.mean([card.published_attacking_correlation for card in scorecards])
-        ),
-        "rating_defensive_correlation": float(
-            np.mean([card.rating_defensive_correlation for card in scorecards])
-        ),
-        "published_defensive_correlation": float(
-            np.mean([card.published_defensive_correlation for card in scorecards])
-        ),
-    }
-    intervals = {
-        "log_likelihood_improvement": _bootstrap(
-            likelihood_array,
-            resamples=settings.bootstrap_resamples,
-            seed=settings.deterministic_seed,
-        ),
-        "brier_improvement": _bootstrap(
-            brier_array,
-            resamples=settings.bootstrap_resamples,
-            seed=settings.deterministic_seed + 1,
-        ),
-    }
-    return TeamRatingStudy(
-        contract_version=TEAM_RATING_STUDY_CONTRACT_VERSION,
-        config=settings,
-        seasons=tuple(scorecards),
-        pooled=pooled,
-        intervals=intervals,
-        reliability=_reliability(reliability_rows),
-        example_rating=example,
-        verdict=rating_gate_verdict(tuple(scorecards), pooled, intervals),
-        diagnostics={
-            "seasons": list(settings.seasons),
-            "evaluated_seasons": list(settings.evaluated_seasons),
-            "first_evaluated_gameweek": settings.first_evaluated_gameweek,
-            "selected_half_life_days": {
-                season: value.half_life_days for season, value in selected.items()
-            },
-            "selected_ridge": {season: value.ridge for season, value in selected.items()},
-            "locked_holdout_accessed": False,
-            "refits": sum(card.refits for card in scorecards),
-        },
-    )
-
-
-def _reliability(
-    rows: Sequence[Mapping[str, float]], bins: int = 10
-) -> tuple[Mapping[str, float], ...]:
-    """Predicted against realized clean-sheet rate, in equal-width probability bins."""
-
-    if not rows:
-        return ()
-    frame = pd.DataFrame(list(rows))
-    edges = np.linspace(0.0, 1.0, bins + 1)
-    frame["bin"] = np.clip(np.digitize(frame["probability"], edges[1:-1]), 0, bins - 1)
-    summary: list[Mapping[str, float]] = []
-    for index, block in frame.groupby("bin", sort=True):
-        position = int(str(index))
-        summary.append(
-            {
-                "bin_low": float(edges[position]),
-                "bin_high": float(edges[position + 1]),
-                "rows": float(len(block)),
-                "mean_predicted": float(block["probability"].mean()),
-                "mean_published": float(block["published"].mean()),
-                "realized": float(block["realized"].mean()),
-            }
-        )
-    return tuple(summary)
 
 
 def rating_gate_verdict(
@@ -1299,7 +938,6 @@ __all__ = [
     "player_fixture_rows",
     "promoted_clubs",
     "rating_gate_verdict",
-    "run_team_rating_study",
     "select_dixon_coles_config",
     "study_to_markdown",
     "walk_forward_log_likelihood",

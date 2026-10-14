@@ -92,9 +92,6 @@ class MemberModeSelection:
     """Internal only — carries the raw selection record including probabilities.
     Nothing here may reach a published payload; the site ships price tags."""
 
-    def by_mode(self) -> Mapping[str, ModeAdvice]:
-        return MappingProxyType({item.mode: item for item in self.advice})
-
 
 def rival_squad_from_picks(picks: EntryPicks, *, label: str) -> RivalSquad:
     """A member's public eleven as the fixed rival the scenario scorer prices."""

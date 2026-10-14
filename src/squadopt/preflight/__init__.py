@@ -3,7 +3,6 @@
 from squadopt.data.checksums import compute_table_sha256
 from squadopt.preflight.measurement import (
     MEASUREMENT_KINDS,
-    MEASUREMENT_PREFLIGHT_CONTRACT_VERSION,
     check_measurement_artifact,
     run_measurement_preflight,
 )
@@ -38,7 +37,6 @@ __all__ = [
     "MANIFEST_IDENTITY_FIELDS",
     "MANIFEST_REQUIRED_FIELDS",
     "MEASUREMENT_KINDS",
-    "MEASUREMENT_PREFLIGHT_CONTRACT_VERSION",
     "PREFLIGHT_CONTRACT_VERSION",
     "RESIDUAL_EXPORT_COLUMNS",
     "RESIDUAL_EXPORT_CONTRACT_VERSION",

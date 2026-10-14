@@ -569,33 +569,3 @@ def build_fixture_panel(root: Path | str, *, seasons: Sequence[str] | None = Non
 
     frames = [load_fixture_snapshot(root, season) for season in requested]
     return validate_fixture_snapshot(pd.concat(frames, ignore_index=True))
-
-
-def load_upcoming_roster(root: Path | str, season: str) -> pd.DataFrame:
-    """Load a season's roster before it starts: the player pool and opening prices.
-
-    A season with no completed gameweeks has no ``merged_gw.csv``, but its
-    ``players_raw.csv`` already lists the pool with ``now_cost``. That price is
-    unambiguous — the season has not begun, so nothing can have moved it — which
-    makes it the right source for an opening-gameweek decision.
-
-    Numeric position codes are translated here rather than downstream, because a
-    platform's encoding is source knowledge and the canonical schema deliberately
-    knows nothing about it. Non-player entries — element types outside the four
-    squad-eligible positions, such as managers — are dropped for the same reason they
-    are dropped from gameweek rows.
-    """
-
-    path = season_directory(root, season) / ROSTER_FILE
-    roster = _read_required(
-        path, ("id", "code", "element_type", "team", "now_cost", "web_name"), f"{season} roster"
-    )
-
-    selected = roster.loc[:, ["code", "web_name", "team", "element_type", "now_cost"]].copy(
-        deep=True
-    )
-    selected["position"] = [
-        POSITION_CODES.get(str(value).strip().upper()) for value in selected["element_type"]
-    ]
-    players_only = selected.loc[selected["position"].notna()].copy(deep=True)
-    return players_only.drop(columns=["element_type"]).reset_index(drop=True)

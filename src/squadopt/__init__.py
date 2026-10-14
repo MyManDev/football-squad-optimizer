@@ -6,6 +6,7 @@ from importlib.metadata import version as _distribution_version
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from squadopt.application.projection_csv import optimize_squad_from_csv
     from squadopt.evaluation import (
         EvaluationConfig,
         EvaluationError,
@@ -23,7 +24,6 @@ if TYPE_CHECKING:
         score_frozen_squad_decision,
         score_realized_squad_points,
     )
-    from squadopt.integration import optimize_squad_from_csv
     from squadopt.optimization import (
         InsufficientPlayerPoolError,
         InvalidConfigurationError,
@@ -109,7 +109,7 @@ _EXPORT_MODULES = {
     "complete_optimization_decision": "squadopt.evaluation",
     "evaluate_prepared_folds": "squadopt.evaluation",
     "optimize_squad": "squadopt.optimization",
-    "optimize_squad_from_csv": "squadopt.integration",
+    "optimize_squad_from_csv": "squadopt.application.projection_csv",
     "score_frozen_squad_decision": "squadopt.evaluation",
     "score_realized_squad_points": "squadopt.evaluation",
 }

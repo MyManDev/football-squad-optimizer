@@ -1,5 +1,6 @@
 """Weekly service composition keeps provenance, preflight and preview semantics."""
 
+import hashlib
 import json
 import re
 import shutil
@@ -1390,11 +1391,43 @@ def test_a_league_dropped_from_the_list_leaves_the_site_with_its_tree(tmp_path: 
     dropped = operation.paths.out / "data" / "leagues" / "9"
     (dropped / "entries").mkdir(parents=True)
     (dropped / "members.json").write_text("{}", encoding="utf-8")
+    # An earlier build's device-plan table, seeded from the published tree, goes the same
+    # way, whatever its capture: the run writes this capture's table again.
+    stale = operation.paths.out / "data" / "device" / "fpl-live-earlier" / "device-plan.json"
+    stale.parent.mkdir(parents=True)
+    stale.write_text("{}", encoding="utf-8")
+    # This capture's own table from an earlier build goes too, and is written again: a
+    # republished week carries the table its code writes now, not the earlier build's.
+    own = operation.request.snapshot_id
+    earlier = operation.paths.out / "data" / "device" / own / "device-plan.json"
+    earlier.parent.mkdir(parents=True)
+    earlier.write_text(json.dumps({"payload": {"contract_version": "other"}}), encoding="utf-8")
     doc = json.loads(operation.execute().read_bytes())
     league = {stage["name"]: stage["value"] for stage in doc["stages"]}["league"]
-    assert league["removed_trees"] == ["leagues/9"]
-    assert not dropped.exists()
+    assert league["removed_trees"] == [
+        "leagues/9",
+        *sorted(["device/fpl-live-earlier", f"device/{own}"]),
+    ]
+    assert not dropped.exists() and not stale.parent.exists()
+    assert json.loads(earlier.read_text(encoding="utf-8"))["payload"]["contract_version"] == (
+        "league_device_plan_v2"
+    )
     assert (operation.paths.out / "data" / "leagues" / "352490" / "members.json").is_file()
+    # This week's table is written once under its capture and journaled with the stage,
+    # and the directory names it with the digest of the bytes written now.
+    table = operation.paths.out / "data" / "device" / league["snapshot_id"] / "device-plan.json"
+    assert table.is_file()
+    listed = json.loads((operation.paths.out / "data" / "leagues.json").read_text("utf-8"))
+    assert [line["device_plan_sha256"] for line in listed["payload"]["leagues"]] == [
+        hashlib.sha256(table.read_bytes()).hexdigest()
+    ]
+    recorded = [
+        row["path"]
+        for stage in doc["stages"]
+        if stage["name"] == "league"
+        for row in stage["outputs"]
+    ]
+    assert str(table) in recorded
 
 
 def test_a_league_the_registry_was_not_seeded_from_stops_a_one_league_run(
@@ -1405,3 +1438,15 @@ def test_a_league_the_registry_was_not_seeded_from_stops_a_one_league_run(
         operation.execute()
     # The seed command it names seeds exactly the run's leagues.
     assert "seed_entry_registry --league 7 --snapshot-id" in str(refused.value)
+
+
+def test_completed_preview_league_and_scoreboard_share_valid_identity(tmp_path):
+    from squadopt.application.league_tree_identity import check_tree_identity
+
+    operation = world(tmp_path)
+    operation.execute()
+    tree = operation.paths.out / "data/leagues/352490"
+    identity = check_tree_identity(tree)
+    assert identity is not None
+    assert "scoreboard.json" in identity["files"]
+    assert identity["source_snapshot_id"] == operation.request.snapshot_id

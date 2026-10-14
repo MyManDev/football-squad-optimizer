@@ -1,4 +1,6 @@
-import { expect, test } from "@playwright/test";
+import { createHash } from "node:crypto";
+
+import { expect, test, type Page } from "@playwright/test";
 
 import { chipPath } from "../src/features/league/advice/chipChoice";
 import fixture from "../src/fixtures/device-plan/instances.json" with { type: "json" };
@@ -6,6 +8,7 @@ import {
   mockEntryAdviceChipEnvelope,
   mockEntryAdviceIndex,
   mockEntrySquadEnvelopes,
+  mockLeagueMembersEnvelope,
 } from "../src/fixtures/league";
 import { installLeagueMocks } from "./leagueMocks";
 
@@ -289,4 +292,152 @@ test("a Top 100 weight is solved on the device and priced on the base points", a
   await expect(page.locator("main")).toContainText(
     `~${reference.expected_points_cost.toFixed(1).replace(".", ",")} beklenen puan`,
   );
+});
+
+// The capture's own table (#981 step 2): the directory line names it under `data/device/`
+// with the sha256 of its bytes, and the page reads it at that digest before the tree's copy.
+const CAPTURE = fixture.document.source_snapshot_id;
+const TABLE_PATH = `device/${CAPTURE}/device-plan.json`;
+
+/** The table as the run publishes it: the copy without its league, four fields more. */
+function tableBytes(): string {
+  const { league_id: _league, ...shared } = fixture.document;
+  const payload = {
+    ...shared,
+    contract_version: "league_device_plan_v2",
+    rules: { ...shared.rules, chips: [], transfers_cap: null },
+    players: shared.players.map((player, index) => ({
+      ...player,
+      element_id: index + 1,
+      start_tenths: player.buy_tenths,
+    })),
+  };
+  const envelope = {
+    contract_version: "provisional_league_ui_v1",
+    generated_at_utc: "2026-10-03T00:00:00Z",
+    source_kind: "live",
+    payload,
+  };
+  return `${JSON.stringify(envelope, null, 2)}\n`;
+}
+
+function sha256(text: string): string {
+  return createHash("sha256").update(text, "utf8").digest("hex");
+}
+
+/**
+ * The member's page under a directory whose line names the capture's table with `digest`,
+ * the table served as `bytes` and the tree's copy beside it. Returns every read of either,
+ * as path and query, in the order the page asked.
+ */
+async function withCaptureTable(page: Page, digest: string, bytes: string): Promise<string[]> {
+  await installLeagueMocks(page);
+  const { league_id, league_name, season, gameweek } = mockLeagueMembersEnvelope.payload;
+  await page.route("**/data/leagues.json", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        contract_version: "league_directory_v1",
+        generated_at_utc: mockLeagueMembersEnvelope.generated_at_utc,
+        source_kind: "live",
+        payload: {
+          leagues: [
+            {
+              league_id,
+              league_name,
+              season,
+              gameweek,
+              path: "league",
+              device_plan: TABLE_PATH,
+              device_plan_sha256: digest,
+            },
+          ],
+        },
+      }),
+    }),
+  );
+  const squad = mockEntrySquadEnvelopes[ENTRY]!;
+  await page.route(/\/data\/league\/entries\/35249001\.json(?:\?.*)?$/, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        ...squad,
+        payload: { ...squad.payload, source_snapshot_id: CAPTURE, device_plan: member.entry },
+      }),
+    }),
+  );
+  const reads: string[] = [];
+  const local = (url: string) => {
+    const { pathname, search } = new URL(url);
+    return `${pathname}${search}`;
+  };
+  await page.route(/\/data\/device\//, (route) => {
+    reads.push(local(route.request().url()));
+    return route.fulfill({ status: 200, contentType: "application/json", body: bytes });
+  });
+  await page.route(/\/data\/league\/device-plan\.json(?:\?.*)?$/, (route) => {
+    reads.push(local(route.request().url()));
+    return route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        contract_version: "provisional_league_ui_v1",
+        generated_at_utc: "2026-10-03T00:00:00Z",
+        source_kind: "live",
+        payload: { ...fixture.document, league_id: squad.payload.league_id },
+      }),
+    });
+  });
+  return reads;
+}
+
+/** Press compute, wait for the plan, and return every request made from the press on. */
+async function solveOnDevice(page: Page): Promise<string[]> {
+  const requested: string[] = [];
+  let pressed = false;
+  page.on("request", (request) => {
+    if (pressed) requested.push(request.url());
+  });
+  await page.goto(`/league/352490/members/${ENTRY}?mode=saf-puan&window=1`);
+  const button = page.getByRole("button", { name: "Bu cihazda hesapla" });
+  await expect(button).toBeVisible();
+  pressed = true;
+  await button.click();
+  await expect(page.locator("[data-device-state='done']")).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByText("Hesap sonucu")).toBeVisible();
+  const names = new Map(fixture.document.players.map((p) => [p.id, p.name]));
+  for (const move of member.reference.moves) {
+    await expect(page.getByText(names.get(move.in!)!).first()).toBeVisible();
+  }
+  return requested;
+}
+
+test("the capture's table its directory line names is read at its digest, and the copy is not", async ({
+  page,
+}) => {
+  const bytes = tableBytes();
+  const digest = sha256(bytes);
+  const reads = await withCaptureTable(page, digest, bytes);
+  const requested = await solveOnDevice(page);
+  // One read of the table, at its digest as the version; the tree's copy is never asked for.
+  expect(reads).toEqual([`/data/${TABLE_PATH}?v=${digest}`]);
+  // Nothing left the site: from the press on, every request went to the site's own origin.
+  const origin = new URL(page.url()).origin;
+  expect(requested.length).toBeGreaterThan(0);
+  expect(requested.filter((url) => new URL(url).origin !== origin)).toEqual([]);
+});
+
+test("a table whose bytes are not the ones its line names falls back to the tree's copy", async ({
+  page,
+}) => {
+  const bytes = tableBytes();
+  // The line names the digest of other bytes: the table was replaced since it was written.
+  const digest = sha256(`${bytes} `);
+  const reads = await withCaptureTable(page, digest, bytes);
+  const requested = await solveOnDevice(page);
+  expect(reads).toEqual([`/data/${TABLE_PATH}?v=${digest}`, "/data/league/device-plan.json"]);
+  const origin = new URL(page.url()).origin;
+  expect(requested.filter((url) => new URL(url).origin !== origin)).toEqual([]);
 });

@@ -29,3 +29,23 @@ export async function fetchPublishedJson(
     }
   }, options);
 }
+
+/**
+ * One published file's bytes at a versioned address: the browser may keep it, because the
+ * address changes whenever the bytes do. Missing reads as `LeagueDataMissing`.
+ */
+export async function fetchPublishedBytes(
+  base: string,
+  relative: string,
+  options?: RequestOptions,
+): Promise<ArrayBuffer> {
+  return withRequestDeadline(async (signal) => {
+    const response = await fetch(`${base}${relative}`, { signal });
+    if (!response.ok) {
+      await discardBody(response);
+      if (response.status === 404) throw new LeagueDataMissing(relative);
+      throw new LeagueDataError(`League data is not available (${response.status}).`);
+    }
+    return response.arrayBuffer();
+  }, options);
+}

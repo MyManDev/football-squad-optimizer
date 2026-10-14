@@ -78,8 +78,8 @@ ORDERING_TOLERANCE: Final = 0.010
 #: rank correlation on this population, so nothing can be rescued that is not exactly on the
 #: line. It was fixed before the run and before any result was visible.
 #:
-#: ``opening_two_part`` carries the same constant and does not have this problem, because its
-#: runner passes the pooled shortfall in as a value and the comparison meets an exact float.
+#: ``opening_two_part`` (removed) carried the same constant without this problem: its runner
+#: passed the pooled shortfall in as a value, so the comparison met an exact float.
 #: Here the shortfall is computed from two correlations, so the boundary is reachable in a way
 #: it was not there. **Same constant, different exposure**, which is worth saying because the
 #: next protocol to carry 0.010 across will inherit the number and not the exposure.

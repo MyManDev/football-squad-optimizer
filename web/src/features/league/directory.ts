@@ -11,10 +11,22 @@ import { LeagueDataError, LeagueDataMissing } from "./dataErrors";
 import { fetchPublishedJson } from "./publishedJson";
 import type { LeagueViewEnvelope } from "./types";
 
+/**
+ * The capture's device-plan table a directory line names: its path under `data/` and the
+ * sha256 of its bytes. The file at a path is replaced when its capture is published again,
+ * so the digest is its version.
+ */
+export interface DevicePlanTableRef {
+  path: string;
+  sha256: string;
+}
+
 /** One published league: its number and the tree's path under `data/`, no trailing slash. */
 export interface LeagueRef {
   leagueId: number;
   path: string;
+  /** The capture's table, where the line names one; the tree's own copy otherwise. */
+  devicePlan?: DevicePlanTableRef;
 }
 
 export interface PublishedLeague extends LeagueRef {
@@ -44,6 +56,24 @@ function record(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+/**
+ * The table a line names, or undefined where it names none or names it unusably: the
+ * league is still read, from its tree's own copy, as a line from before the table is.
+ * The shipped-tree check holds every published line to this same rule.
+ */
+export function devicePlanTable(path: unknown, sha256: unknown): DevicePlanTableRef | undefined {
+  if (
+    typeof path !== "string" ||
+    !/^device\/[A-Za-z0-9._-]+\/device-plan\.json$/.test(path) ||
+    path.split("/").includes("..") ||
+    typeof sha256 !== "string" ||
+    !/^[0-9a-f]{64}$/.test(sha256)
+  ) {
+    return undefined;
+  }
+  return { path, sha256 };
+}
+
 function publishedLeague(value: unknown): PublishedLeague | null {
   if (!record(value)) return null;
   const { league_id, league_name, season, gameweek, path } = value;
@@ -58,12 +88,14 @@ function publishedLeague(value: unknown): PublishedLeague | null {
   ) {
     return null;
   }
+  const devicePlan = devicePlanTable(value.device_plan, value.device_plan_sha256);
   return {
     leagueId: league_id as number,
     leagueName: league_name,
     season,
     gameweek: gameweek as number,
     path,
+    ...(devicePlan === undefined ? {} : { devicePlan }),
   };
 }
 

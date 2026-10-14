@@ -49,9 +49,6 @@ from squadopt.application.weekly_plan import (
 from squadopt.application.weekly_plan import (
     rotation_artifact as rotation_artifact,
 )
-from squadopt.application.weekly_plan import (
-    rules_before_capture as rules_before_capture,
-)
 from squadopt.platform.weekly_operations import main as _main
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]

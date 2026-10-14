@@ -44,10 +44,8 @@ from squadopt.scenarios.paths import (
 from squadopt.scenarios.rank import (
     CLAIM_SCENARIO_MODES,
     RANK_OBJECTIVE_CONTRACT_VERSION,
-    GoalMenuEntry,
     RankObjectiveConfig,
     RankOptimizationResult,
-    goal_menu,
     optimize_rank_probability_squad,
 )
 from squadopt.scenarios.reporting import (
@@ -56,7 +54,6 @@ from squadopt.scenarios.reporting import (
 )
 from squadopt.scenarios.rivals import (
     TEMPLATE_RIVAL_CONTRACT_VERSION,
-    template_rival_diagnostics,
     template_rival_from_ownership,
 )
 from squadopt.scenarios.selection import (
@@ -77,7 +74,6 @@ from squadopt.scenarios.transfer_decisions import (
     TransferSelectionStatus,
     TransferStartState,
     evaluate_transfer_candidates,
-    selection_record,
     transfer_candidate_from_plan,
 )
 
@@ -98,7 +94,6 @@ __all__ = [
     "UNSUPPORTED_CHIPS",
     "ComponentDecisionDistributionReadout",
     "ComponentDecisionScoringResult",
-    "GoalMenuEntry",
     "PhaseECandidateDiagnostic",
     "PhaseESelectionResult",
     "PhaseESelectionStatus",
@@ -130,7 +125,6 @@ __all__ = [
     "evaluate_transfer_candidates",
     "generate_scenario_paths",
     "generate_scenarios",
-    "goal_menu",
     "integer_mean_cvar",
     "optimize_rank_probability_squad",
     "optimize_scenario_aware_squad",
@@ -138,9 +132,7 @@ __all__ = [
     "scenario_result_to_markdown",
     "score_component_scenario_decision",
     "select_phase_e_candidate",
-    "selection_record",
     "summarize_component_decision_distribution",
-    "template_rival_diagnostics",
     "template_rival_from_ownership",
     "transfer_candidate_from_plan",
     "validate_residual_history",

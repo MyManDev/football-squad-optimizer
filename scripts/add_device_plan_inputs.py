@@ -4,18 +4,23 @@
         --snapshot-id <capture> --handoff <exact-handoff> --site-data-root <candidate>/data
 
 The league site builder writes ``device-plan.json`` and a ``device_plan`` block on every entry
-document (``docs/contracts/league_device_plan_v1.md``). A tree built before that carries the
+document (``docs/contracts/league_device_plan_v1.md``), and the capture's own table once
+under ``data/device/<capture>/device-plan.json``. A tree built before that carries the
 members' plans and nothing for a device to solve from. This writes exactly what the builder
 would have written for that tree: the capture's table from the handoff the plans were
-computed from, and each member's side from the entry document itself, under the tree's
-own publication stamp. Nothing is solved and no plan changes; the plans stay the bytes
-the advice record holds.
+computed from, the per-capture table beside the trees, and each member's side from the
+entry document itself, under the tree's own publication stamp; where the site has a league
+directory, the league's line gains the table's path. Nothing is solved and no plan changes;
+the plans stay the bytes the advice record holds.
 
-Refused: a tree whose members or entries name another capture than the one given, a
-handoff for another capture or gameweek, a member whose fifteen the capture does not
-price. With ``--verify`` every member's problem is rebuilt from the written documents and
-solved with the repository's planner, and the transfers, captain and eleven must be the
-published ones.
+Refused, with the tree untouched: a tree whose members or entries name another capture
+than the one given, a handoff for another capture or gameweek, a member whose fifteen the
+capture does not price, and a per-capture table already on the site that differs from the
+one this would write. That refusal names this script's way out: remove the capture's
+directory under ``data/device/`` and run this again for every league of the list, which
+writes one table that every line names. With ``--verify`` every member's problem is
+rebuilt from the written documents and solved with the repository's planner, and the
+transfers, captain and eleven must be the published ones.
 """
 
 from __future__ import annotations
@@ -23,20 +28,34 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 import pandas as pd
 
 from squadopt.application.device_plan import (
     DEVICE_PLAN_DOCUMENT,
+    device_plan_capture_table,
     device_plan_entry,
     device_plan_table,
 )
 from squadopt.application.entries import EntryError
+from squadopt.application.league_publication import (
+    check_device_plan_table,
+    write_device_plan_table,
+)
 from squadopt.contracts.league import LEAGUE_VIEW_CONTRACT_VERSION
-from squadopt.contracts.league_tree import single_league_tree
+from squadopt.contracts.league_tree import (
+    LEAGUE_DIRECTORY_FILE,
+    device_plan_path,
+    device_plan_sha256,
+    read_league_directory,
+    single_league_tree,
+    write_league_directory,
+)
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import read_snapshot
+from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD
 from squadopt.live import read_inputs, read_season_rules
 from squadopt.live.recommendation import project, read_projection_handoff
 from squadopt.live.transfers import HeldSquad
@@ -98,6 +117,22 @@ def _held_from_entry(entry: dict, prices: dict[int, int]) -> HeldSquad:
     )
 
 
+def _table_remedy(site_data_root: Path, snapshot_id: str) -> str:
+    """This script's way out of a capture table that differs from the one it would write.
+
+    The script never reads the other leagues' lines, so removing the table and running it
+    again for every league of the list writes one table that every line names. The site
+    builder names another way out (``BUILDER_TABLE_REMEDY``): a build of one league refuses
+    every other line whose table is gone.
+    """
+
+    directory = Path(site_data_root) / Path(*device_plan_path(snapshot_id).parent.parts)
+    return (
+        f"Remove {directory} and run scripts/add_device_plan_inputs.py again for every "
+        "league of the list (--league)."
+    )
+
+
 def add_device_plan_inputs(
     *,
     snapshot_root: Path,
@@ -108,8 +143,10 @@ def add_device_plan_inputs(
     out=sys.stdout,
     league_id: int | None = None,
 ) -> list[str]:
-    """Write the two documents into the tree; return the relative paths written. The tree
-    is ``league_id``'s, or the only one the site publishes when it is not named."""
+    """Write the two documents into the tree and the capture's table beside the trees;
+    return the paths written, relative to the tree for its documents and to the site's
+    data root for the table. The tree is ``league_id``'s, or the only one the site
+    publishes when it is not named."""
 
     league_dir = single_league_tree(site_data_root, league_id)
     members_envelope = _read(league_dir / "members.json")
@@ -136,6 +173,11 @@ def add_device_plan_inputs(
         for _, row in inputs.players.iterrows()
     }
 
+    table_document = device_plan_capture_table(
+        inputs, projection, rules, bootstrap=snapshot.payloads[BOOTSTRAP_PAYLOAD]
+    )
+    remedy = _table_remedy(site_data_root, snapshot_id)
+    check_device_plan_table(site_data_root, snapshot_id, table_document, remedy=remedy)
     written: list[str] = []
     entries = sorted((league_dir / "entries").glob("*.json"))
     for path in entries:
@@ -179,6 +221,30 @@ def add_device_plan_inputs(
         f"entry blocks under stamp {stamp} for capture {snapshot_id}.",
         file=out,
     )
+    table = device_plan_path(snapshot_id)
+    write_device_plan_table(
+        site_data_root, snapshot_id, table_document, generated_at_utc=stamp, remedy=remedy
+    )
+    written.append(table.as_posix())
+    lines = read_league_directory(site_data_root)
+    if lines:
+        # The directory keeps its own stamp, the latest league's: the release check reads it.
+        directory = _read(site_data_root / LEAGUE_DIRECTORY_FILE)
+        # The line names the table with the sha256 of its bytes, the table's version.
+        digest = device_plan_sha256(site_data_root, table.as_posix())
+        write_league_directory(
+            site_data_root,
+            [
+                replace(line, device_plan=table.as_posix(), device_plan_sha256=digest)
+                if line.league_id == league_id
+                else line
+                for line in lines
+            ],
+            generated_at_utc=str(directory["generated_at_utc"]),
+            source_kind=str(directory.get("source_kind", "live")),
+        )
+        written.append(LEAGUE_DIRECTORY_FILE)
+    print(f"Wrote {table.as_posix()} for capture {snapshot_id}.", file=out)
     if verify:
         _verify(league_dir, document, out)
     return written

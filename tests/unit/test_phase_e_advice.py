@@ -18,7 +18,7 @@ from squadopt.optimization import SolverStatus
 from squadopt.planning import PlanningWeekResult, TransferPlanningConfig, TransferPlanResult
 from squadopt.scenarios.components import _component_fingerprint
 from squadopt.scenarios.models import ScenarioValidationError
-from squadopt.scenarios.transfer_decisions import TransferSelectionStatus, selection_record
+from squadopt.scenarios.transfer_decisions import TransferSelectionStatus
 
 HELD = (*range(1, 14), 16, 17)
 
@@ -170,7 +170,7 @@ def test_advice_keeps_control_bytes_and_compute_counts_while_recording_a_better_
                 TARGET.season, TARGET.gameweek, HELD, 25, 1
             ).squad_player_ids
         )
-        records.append(selection_record(evaluate(*loader())))
+        records.append(evaluate(*loader()))
 
     request = advice.AdviseEntryRequest(TARGET.season, TARGET.gameweek, 352490, 101)
 
@@ -202,14 +202,13 @@ def test_advice_keeps_control_bytes_and_compute_counts_while_recording_a_better_
     assert observed["transfer_hit_points"] == hit
     assert provider.picks.call_count == solve.call_count == 3
     loader.assert_called_once_with()
-    record = records[0]
-    assert record["status"] == TransferSelectionStatus.SELECTED
-    assert record["selected_rank"] == 1  # Internal winner never replaces member advice.
-    assert record["candidates"][0]["transfer_hit_points"] == hit
-    assert (
-        record["candidates"][1]["mean_net_of_hit"] - record["candidates"][0]["mean_net_of_hit"]
-        == hit
-    )
+    selection = records[0]
+    assert selection.status is TransferSelectionStatus.SELECTED
+    assert selection.selected_rank == 1  # Internal winner never replaces member advice.
+    first, second = selection.diagnostics
+    assert first.transfer_hit_points == hit
+    assert second.mean is not None and first.mean is not None
+    assert second.mean - first.mean == hit
     failed_hook = Mock(side_effect=RuntimeError("diagnostic store unavailable"))
     assert call(failed_hook) == baseline
     failed_hook.assert_called_once()

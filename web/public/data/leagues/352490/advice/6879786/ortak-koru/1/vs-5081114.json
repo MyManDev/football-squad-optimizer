@@ -1,18 +1,18 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-10-10T06:07:04Z",
+  "generated_at_utc": "2026-10-14T14:20:21Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
-    "gameweek": 6,
+    "gameweek": 7,
     "entry_id": 6879786,
     "league_id": 352490,
     "mode": "ortak-koru",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20261010T035732Z-c77d032165af",
+    "source_snapshot_id": "fpl-live-20261014T135921Z-a48d1521c87f",
     "moves": [
       {
-        "move_id": "gw06-1",
+        "move_id": "gw07-1",
         "player_out": {
           "player_id": 219168,
           "name": "Alexander Isak",
@@ -27,33 +27,33 @@
           "position": "FWD",
           "team": "Brentford"
         },
-        "expected_points_delta": 0.8701955320636046,
+        "expected_points_delta": 1.3235121763607225,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 0.8701955320636046,
-    "expected_points_cost": 0.43034888327939314,
+    "expected_gain_vs_hold": 1.3235121763607225,
+    "expected_points_cost": 0.49983122219823173,
     "rival_label": "entry-5081114",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
     "wall_clock_stopped_the_search": false,
-    "expected_own_points": 48.08163080141249,
+    "expected_own_points": 48.49269190776481,
     "captain": {
       "player_id": 244851,
       "name": "Cole Palmer",
       "short_name": "Palmer",
       "position": "MID",
       "team": "Chelsea",
-      "expected_points": 5.323025429413814
+      "expected_points": 4.960279398950454
     },
     "vice_captain": {
-      "player_id": 226597,
-      "name": "Gabriel dos Santos Magalh\u00e3es",
-      "short_name": "Magalh\u00e3es",
-      "position": "DEF",
-      "team": "Arsenal",
-      "expected_points": 4.557988193553639
+      "player_id": 222531,
+      "name": "Morgan Gibbs-White",
+      "short_name": "Gibbs-White",
+      "position": "MID",
+      "team": "Nott'm Forest",
+      "expected_points": 4.637008159112412
     },
     "starting_xi": [
       {
@@ -62,7 +62,7 @@
         "short_name": "Mart\u00edn",
         "position": "GK",
         "team": "Arsenal",
-        "expected_points": 3.937285604836277
+        "expected_points": 3.568590651677484
       },
       {
         "player_id": 226597,
@@ -70,7 +70,15 @@
         "short_name": "Magalh\u00e3es",
         "position": "DEF",
         "team": "Arsenal",
-        "expected_points": 4.557988193553639
+        "expected_points": 4.142429251761448
+      },
+      {
+        "player_id": 465730,
+        "name": "Maxim De Cuyper",
+        "short_name": "Cuyper",
+        "position": "DEF",
+        "team": "Brighton",
+        "expected_points": 3.7099911306959767
       },
       {
         "player_id": 466075,
@@ -78,15 +86,7 @@
         "short_name": "Calafiori",
         "position": "DEF",
         "team": "Arsenal",
-        "expected_points": 3.59365129554469
-      },
-      {
-        "player_id": 437499,
-        "name": "Maxence Lacroix",
-        "short_name": "Lacroix",
-        "position": "DEF",
-        "team": "Chelsea",
-        "expected_points": 2.891931282741331
+        "expected_points": 3.45141576840743
       },
       {
         "player_id": 244851,
@@ -94,7 +94,7 @@
         "short_name": "Palmer",
         "position": "MID",
         "team": "Chelsea",
-        "expected_points": 5.323025429413814
+        "expected_points": 4.960279398950454
       },
       {
         "player_id": 222531,
@@ -102,7 +102,7 @@
         "short_name": "Gibbs-White",
         "position": "MID",
         "team": "Nott'm Forest",
-        "expected_points": 4.3555732521106405
+        "expected_points": 4.637008159112412
       },
       {
         "player_id": 466052,
@@ -110,7 +110,7 @@
         "short_name": "Cherki",
         "position": "MID",
         "team": "Man City",
-        "expected_points": 4.01664109658441
+        "expected_points": 4.6328600123123
       },
       {
         "player_id": 195546,
@@ -118,15 +118,7 @@
         "short_name": "Stati",
         "position": "MID",
         "team": "Aston Villa",
-        "expected_points": 3.412700201099913
-      },
-      {
-        "player_id": 475168,
-        "name": "Jo\u00e3o Pedro Junqueira de Jesus",
-        "short_name": "Jesus",
-        "position": "FWD",
-        "team": "Chelsea",
-        "expected_points": 3.822253355001549
+        "expected_points": 3.131855558339411
       },
       {
         "player_id": 502500,
@@ -134,7 +126,15 @@
         "short_name": "Rodrigues",
         "position": "FWD",
         "team": "Brentford",
-        "expected_points": 3.7306746247680795
+        "expected_points": 4.158490726136929
+      },
+      {
+        "player_id": 475168,
+        "name": "Jo\u00e3o Pedro Junqueira de Jesus",
+        "short_name": "Jesus",
+        "position": "FWD",
+        "team": "Chelsea",
+        "expected_points": 3.7922402069442094
       },
       {
         "player_id": 216646,
@@ -142,7 +142,7 @@
         "short_name": "Wissa",
         "position": "FWD",
         "team": "Newcastle",
-        "expected_points": 3.116881036344326
+        "expected_points": 3.347251644476302
       }
     ],
     "bench": [
@@ -152,7 +152,7 @@
         "short_name": "Pickford",
         "position": "GK",
         "team": "Everton",
-        "expected_points": 3.2270932946705697
+        "expected_points": 3.358913058715954
       },
       {
         "player_id": 249231,
@@ -160,7 +160,15 @@
         "short_name": "Lewis-Potter",
         "position": "MID",
         "team": "Brentford",
-        "expected_points": 2.860479092704474
+        "expected_points": 2.8349785497762054
+      },
+      {
+        "player_id": 437499,
+        "name": "Maxence Lacroix",
+        "short_name": "Lacroix",
+        "position": "DEF",
+        "team": "Chelsea",
+        "expected_points": 2.5191169665441646
       },
       {
         "player_id": 83299,
@@ -168,15 +176,7 @@
         "short_name": "Dunk",
         "position": "DEF",
         "team": "Brighton",
-        "expected_points": 2.052330027063414
-      },
-      {
-        "player_id": 441302,
-        "name": "Ian Maatsen",
-        "short_name": "Maatsen",
-        "position": "DEF",
-        "team": "Aston Villa",
-        "expected_points": 0.0
+        "expected_points": 1.825505398975884
       }
     ],
     "chip": null,
@@ -188,20 +188,20 @@
     "missing_fields": [],
     "squad_basis": "captured",
     "rival_entry_id": 5081114,
-    "expected_points_cost_ceiling": 0.43034888327939314,
-    "overlap_count": 2,
+    "expected_points_cost_ceiling": 0.49983122219823173,
+    "overlap_count": 3,
     "transfer_cap": 1,
     "overlap_target": 9,
-    "overlap_applied": 2,
+    "overlap_applied": 3,
     "plan_kind": "within_free_transfers",
     "alternative_plan": {
       "kind": "with_hits",
       "overlap_applied": 9,
-      "transfer_hit_points": 28.0,
-      "expected_points_cost": 24.01166147755916,
-      "expected_points_cost_ceiling": 24.01166147755916
+      "transfer_hit_points": 24.0,
+      "expected_points_cost": 18.580018088118138,
+      "expected_points_cost_ceiling": 18.580018088118138
     },
-    "expected_gap_vs_rival": -4.063533371181109,
+    "expected_gap_vs_rival": -5.250773400082153,
     "captain_agreement": false,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0

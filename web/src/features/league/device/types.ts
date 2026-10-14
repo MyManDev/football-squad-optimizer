@@ -4,6 +4,11 @@
  */
 
 export const DEVICE_PLAN_CONTRACT_VERSION = "league_device_plan_v1";
+/**
+ * The capture's own table (#981 step 1): the same document once per capture, under
+ * `data/device/<capture>/`, with no league in it and four fields more.
+ */
+export const DEVICE_PLAN_TABLE_CONTRACT_VERSION = "league_device_plan_v2";
 
 /** The chips a member may play in the decided week, as the game names them. */
 export const DEVICE_CHIPS = ["wildcard", "freehit", "bboost", "3xc"] as const;
@@ -35,6 +40,10 @@ export interface DevicePlanPlayer {
   top100_count?: number;
   /** With `rules.top100`: his weighted points on the integer scale, by weight as text. */
   top100_scaled?: Record<string, number>;
+  /** On the capture's table: the game's per-season element id. */
+  element_id?: number;
+  /** On the capture's table: his price at the season's first deadline, in tenths. */
+  start_tenths?: number;
 }
 
 export interface DevicePlanRules {
@@ -65,12 +74,20 @@ export interface DevicePlanRules {
     table_sha256: string;
     picks_gameweek: number;
   };
+  /** On the capture's table: the season's chip windows as the rules state them. */
+  chips?: unknown[];
+  /** On the capture's table: the game's cap on transfers in one week, or null. */
+  transfers_cap?: number | null;
 }
 
-/** `league/device-plan.json`: the capture's table in solver order, and the rules as numbers. */
+/**
+ * The capture's table in solver order, and the rules as numbers: the league tree's copy
+ * (`device-plan.json`, v1, naming its league) or the capture's own table (v2, naming none).
+ */
 export interface DevicePlanDocument {
-  contract_version: typeof DEVICE_PLAN_CONTRACT_VERSION;
-  league_id: number;
+  contract_version: typeof DEVICE_PLAN_CONTRACT_VERSION | typeof DEVICE_PLAN_TABLE_CONTRACT_VERSION;
+  /** The league the tree's copy belongs to; absent on the capture's table. */
+  league_id?: number;
   season: string;
   gameweek: number;
   source_snapshot_id: string;
@@ -190,9 +207,10 @@ function numberMap(value: unknown): value is Record<string, number> {
   return record(value) && Object.values(value).every(finite);
 }
 
-function isPlayer(value: unknown): value is DevicePlanPlayer {
+function isPlayer(value: unknown, table: boolean): value is DevicePlanPlayer {
   if (!record(value)) return false;
   return (
+    (!table || (finite(value.element_id) && finite(value.start_tenths))) &&
     finite(value.id) &&
     typeof value.name === "string" &&
     typeof value.short_name === "string" &&
@@ -231,12 +249,22 @@ function isBands(value: unknown): boolean {
   );
 }
 
+/**
+ * The league tree's copy names its league; the capture's table names none, and carries
+ * each player's element id and start price and the season's chip windows and transfer cap.
+ */
 export function isDevicePlanDocument(value: unknown): value is DevicePlanDocument {
-  if (!record(value) || value.contract_version !== DEVICE_PLAN_CONTRACT_VERSION) return false;
+  if (!record(value)) return false;
+  const table = value.contract_version === DEVICE_PLAN_TABLE_CONTRACT_VERSION;
+  if (!table && value.contract_version !== DEVICE_PLAN_CONTRACT_VERSION) return false;
   const rules = value.rules;
   if (!record(rules)) return false;
   return (
-    finite(value.league_id) &&
+    (table
+      ? value.league_id === undefined &&
+        Array.isArray(rules.chips) &&
+        (rules.transfers_cap === null || finite(rules.transfers_cap))
+      : finite(value.league_id)) &&
     typeof value.season === "string" &&
     finite(value.gameweek) &&
     typeof value.source_snapshot_id === "string" &&
@@ -257,7 +285,7 @@ export function isDevicePlanDocument(value: unknown): value is DevicePlanDocumen
     rules.expected_points_scale > 0 &&
     Array.isArray(value.players) &&
     value.players.length > 0 &&
-    value.players.every(isPlayer)
+    value.players.every((player) => isPlayer(player, table))
   );
 }
 

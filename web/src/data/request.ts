@@ -11,6 +11,18 @@ export function isAbortError(error: unknown): boolean {
 }
 
 /**
+ * A request `withRequestDeadline` stopped because its deadline passed. Read by name: the
+ * reason is a DOMException, which is no `Error` where the DOM is another realm's.
+ */
+export function isTimeoutError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    (error as { name?: unknown }).name === "TimeoutError"
+  );
+}
+
+/**
  * Read and drop the body of a response the caller will not use. Chromium keeps a response
  * whose body is never read open until it is collected, so a refused 404 left the page
  * holding the request and never network-idle. A refusal's body is small; one that fails to

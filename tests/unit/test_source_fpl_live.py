@@ -30,7 +30,6 @@ from squadopt.data.sources.fpl_live import (
     element_prices,
     entry_endpoint_paths,
     entry_history_payload,
-    entry_label,
     entry_payload,
     entry_picks_payload,
     entry_transfer_history,
@@ -957,10 +956,6 @@ def _paged_standings_payload(*, page: int = 1, start_rank: int = 1, has_next: bo
     ).encode("utf-8")
 
 
-def _entry_payload(*, entry_id: int = 11, name: str = "First XI") -> bytes:
-    return json.dumps({"id": entry_id, "name": name, "current_event": 1}).encode("utf-8")
-
-
 def test_every_built_payload_name_stays_inside_the_snapshot_grammar() -> None:
     names = [
         entry_payload(11),
@@ -1137,20 +1132,6 @@ def test_a_renamed_standings_field_stops_the_run_and_names_itself(field: str) ->
     del row[field]
     with pytest.raises(DataSourceError, match=field):
         fpl_league_standings(_standings_payload(results=[row]), league_id=352490)
-
-
-def test_the_entry_summary_supplies_the_registry_label() -> None:
-    assert entry_label(_entry_payload(), entry_id=11) == "First XI"
-
-
-def test_an_entry_payload_describing_another_entry_is_rejected() -> None:
-    with pytest.raises(DataSourceError, match="declares entry 99"):
-        entry_label(_entry_payload(entry_id=99), entry_id=11)
-
-
-def test_a_nameless_entry_is_rejected() -> None:
-    with pytest.raises(InvalidValueError, match="empty team name"):
-        entry_label(_entry_payload(name="  "), entry_id=11)
 
 
 def test_the_picks_document_becomes_a_fifteen_player_squad_starting_eleven() -> None:

@@ -36,7 +36,6 @@ recorded v1 documents still round-trip byte for byte.
 """
 
 import contextlib
-import hashlib
 import json
 import math
 import re
@@ -483,21 +482,6 @@ def report_to_dict(report: ShadowCalibrationReport) -> dict[str, object]:
     return document
 
 
-def write_shadow_report(report: ShadowCalibrationReport, path: Path) -> None:
-    """Write one report as stable LF JSON — and refuse the published site tree."""
-
-    resolved = path.resolve()
-    _require(
-        "web/public" not in resolved.as_posix(),
-        f"{resolved} sits inside a published site tree; shadow artifacts are "
-        "internal-only and may never be written under web/public.",
-    )
-    payload = _validated_payload(report)
-    resolved.parent.mkdir(parents=True, exist_ok=True)
-    with resolved.open("wb") as handle:
-        handle.write(payload)
-
-
 def write_shadow_report_once(report: ShadowCalibrationReport, path: Path) -> str:
     """Publish a report atomically, exactly once, and say which of two happened.
 
@@ -855,21 +839,6 @@ def load_shadow_report(document: Mapping[str, object]) -> ShadowCalibrationRepor
         declared_gates=(() if declared is None else _text_tuple(declared, "declared_gates")),
         contract_version=_text(document, "contract_version"),
     )
-
-
-def read_shadow_report(path: Path) -> tuple[ShadowCalibrationReport, str]:
-    """Load a recorded report and the SHA-256 of the exact bytes that produced it.
-
-    The digest is returned beside the report rather than recomputed later, because a
-    reader that hashes the file a second time is hashing whatever is there then, not
-    what it read.
-    """
-
-    try:
-        raw = path.read_bytes()
-    except OSError as error:
-        raise ShadowReportError(f"{path} could not be read: {error}") from error
-    return load_shadow_bytes(raw, label=str(path)), hashlib.sha256(raw).hexdigest()
 
 
 def load_shadow_bytes(raw: bytes, *, label: str) -> ShadowCalibrationReport:

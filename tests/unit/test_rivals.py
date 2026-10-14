@@ -10,7 +10,6 @@ from squadopt.optimization import OptimizationConfig
 from squadopt.scenarios.models import ScenarioValidationError
 from squadopt.scenarios.rivals import (
     TEMPLATE_RIVAL_LABEL,
-    template_rival_diagnostics,
     template_rival_from_ownership,
 )
 
@@ -107,14 +106,3 @@ def test_a_duplicated_player_is_refused() -> None:
     pool = pd.concat([_pool(), _pool().iloc[[0]]], ignore_index=True)
     with pytest.raises(ScenarioValidationError, match="more than once"):
         template_rival_from_ownership(pool)
-
-
-def test_diagnostics_describe_the_eleven() -> None:
-    pool = _pool()
-    rival = template_rival_from_ownership(pool)
-    diagnostics = template_rival_diagnostics(pool, rival)
-    assert diagnostics["starters"] == 11
-    assert sum(dict(diagnostics["formation"]).values()) == 11
-    assert diagnostics["captain_rule"] == "most_owned_starter"
-    assert diagnostics["captaincy_share_available"] is False
-    assert float(diagnostics["mean_ownership"]) > float(diagnostics["minimum_ownership"])

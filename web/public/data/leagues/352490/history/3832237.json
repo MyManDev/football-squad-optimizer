@@ -1,29 +1,548 @@
 {
   "contract_version": "weekly_suggestion_history_v1",
-  "generated_at_utc": "2026-10-10T03:57:32.746463Z",
+  "generated_at_utc": "2026-10-14T13:59:21.062647Z",
   "payload": {
     "league_id": 352490,
     "entry_id": 3832237,
     "season": "2026-27",
-    "as_of_snapshot_id": "fpl-live-20261010T035732Z-c77d032165af",
+    "as_of_snapshot_id": "fpl-live-20261014T135921Z-a48d1521c87f",
     "weeks": [
       {
-        "gameweek": 6,
+        "gameweek": 7,
         "status": "unsettled",
         "reason": "not_settled",
-        "deadline_utc": "2026-10-10T10:00:00Z",
-        "advice_snapshot_id": "fpl-live-20261010T035732Z-c77d032165af",
-        "advice_captured_at_utc": "2026-10-10T03:57:32.746463Z",
-        "advice_generated_at_utc": "2026-10-10T06:07:04Z",
-        "advice_sha256": "6070fa5b874734e4221fcf07083f75e91a8df083d6673c4b73730b6995e93f12",
+        "deadline_utc": "2026-10-17T10:00:00Z",
+        "advice_snapshot_id": "fpl-live-20261014T135921Z-a48d1521c87f",
+        "advice_captured_at_utc": "2026-10-14T13:59:21.062647Z",
+        "advice_generated_at_utc": "2026-10-14T14:20:21Z",
+        "advice_sha256": "bf365eeadbce5860ac677e4d2cb53b0e074cb6d688ea1c87c6ee3825547cdef2",
         "outcome_snapshot_id": null,
         "outcome_captured_at_utc": null,
-        "expected_own_points": 55.13888696273176,
+        "expected_own_points": 55.859259896228295,
         "suggested": null,
         "actual": null,
         "actual_reason": null,
         "net_difference": null,
         "players": [],
+        "recorded_plans": [
+          {
+            "published_path": "advice/3832237/saf-puan/1.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ollie Watkins",
+                "player_in": "Erling Haaland"
+              },
+              {
+                "player_out": "Gabriel dos Santos Magalhães",
+                "player_in": "Ainsley Maitland-Niles"
+              },
+              {
+                "player_out": "Dominik Szoboszlai",
+                "player_in": "Pascal Groß"
+              },
+              {
+                "player_out": "Pedro Porro Sauceda",
+                "player_in": "Jay Dasilva"
+              },
+              {
+                "player_out": "Nico O'Reilly",
+                "player_in": "Jayden Bogle"
+              }
+            ],
+            "expected_points_cost": 0.0
+          },
+          {
+            "published_path": "advice/3832237/ortak-koru/1/vs-5081114.json",
+            "strategy": "ortak-koru",
+            "window": 1,
+            "rival_entry_id": 5081114,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ollie Watkins",
+                "player_in": "Erling Haaland"
+              },
+              {
+                "player_out": "Gabriel dos Santos Magalhães",
+                "player_in": "Daniel Muñoz Mejía"
+              },
+              {
+                "player_out": "Dominik Szoboszlai",
+                "player_in": "Mohamed Belloumi"
+              },
+              {
+                "player_out": "Bryan Mbeumo",
+                "player_in": "Josh King"
+              },
+              {
+                "player_out": "Nico O'Reilly",
+                "player_in": "Maxim De Cuyper"
+              }
+            ],
+            "expected_points_cost": 3.5712237311164756,
+            "expected_points_cost_ceiling": 3.5712237311164756
+          },
+          {
+            "published_path": "advice/3832237/fark-yarat/1/vs-5081114.json",
+            "strategy": "fark-yarat",
+            "window": 1,
+            "rival_entry_id": 5081114,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ollie Watkins",
+                "player_in": "Erling Haaland"
+              },
+              {
+                "player_out": "Gabriel dos Santos Magalhães",
+                "player_in": "Ainsley Maitland-Niles"
+              },
+              {
+                "player_out": "Dominik Szoboszlai",
+                "player_in": "Pascal Groß"
+              },
+              {
+                "player_out": "Pedro Porro Sauceda",
+                "player_in": "Jay Dasilva"
+              },
+              {
+                "player_out": "Nico O'Reilly",
+                "player_in": "Jayden Bogle"
+              }
+            ],
+            "expected_points_cost": 0.0,
+            "expected_points_cost_ceiling": 0.0
+          },
+          {
+            "published_path": "advice/3832237/saf-puan/1/hoca-sozu.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ollie Watkins",
+                "player_in": "Erling Haaland"
+              },
+              {
+                "player_out": "Gabriel dos Santos Magalhães",
+                "player_in": "Ainsley Maitland-Niles"
+              },
+              {
+                "player_out": "Dominik Szoboszlai",
+                "player_in": "Pascal Groß"
+              },
+              {
+                "player_out": "Pedro Porro Sauceda",
+                "player_in": "Jay Dasilva"
+              },
+              {
+                "player_out": "Nico O'Reilly",
+                "player_in": "Jayden Bogle"
+              }
+            ],
+            "expected_points_cost": 0.0,
+            "expected_points_cost_ceiling": 0.0,
+            "managers_word": true
+          },
+          {
+            "published_path": "advice/3832237/saf-puan/1/chip-wildcard.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": "wildcard",
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Granit Xhaka",
+                "player_in": "Pascal Groß"
+              },
+              {
+                "player_out": "Michael Keane",
+                "player_in": "James Tarkowski"
+              },
+              {
+                "player_out": "David Raya Martín",
+                "player_in": "Michael Zetterer"
+              },
+              {
+                "player_out": "Oli McBurnie",
+                "player_in": "Erling Haaland"
+              },
+              {
+                "player_out": "Ollie Watkins",
+                "player_in": "Vakhtang Salia"
+              },
+              {
+                "player_out": "Gianluigi Donnarumma",
+                "player_in": "Bart Verbruggen"
+              },
+              {
+                "player_out": "Gabriel dos Santos Magalhães",
+                "player_in": "Ainsley Maitland-Niles"
+              },
+              {
+                "player_out": "Ferdi Kadıoğlu",
+                "player_in": "Jay Dasilva"
+              },
+              {
+                "player_out": "Dominik Szoboszlai",
+                "player_in": "Morgan Gibbs-White"
+              },
+              {
+                "player_out": "Pedro Porro Sauceda",
+                "player_in": "Milan van Ewijk"
+              },
+              {
+                "player_out": "Bryan Mbeumo",
+                "player_in": "Rayan Cherki"
+              },
+              {
+                "player_out": "Nico O'Reilly",
+                "player_in": "Maxim De Cuyper"
+              }
+            ],
+            "expected_points_cost": 0.0
+          },
+          {
+            "published_path": "advice/3832237/saf-puan/1/chip-freehit.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": "freehit",
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Granit Xhaka",
+                "player_in": "Pascal Groß"
+              },
+              {
+                "player_out": "Michael Keane",
+                "player_in": "James Tarkowski"
+              },
+              {
+                "player_out": "David Raya Martín",
+                "player_in": "Michael Zetterer"
+              },
+              {
+                "player_out": "Oli McBurnie",
+                "player_in": "Erling Haaland"
+              },
+              {
+                "player_out": "Ollie Watkins",
+                "player_in": "Vakhtang Salia"
+              },
+              {
+                "player_out": "Gianluigi Donnarumma",
+                "player_in": "Bart Verbruggen"
+              },
+              {
+                "player_out": "Gabriel dos Santos Magalhães",
+                "player_in": "Ainsley Maitland-Niles"
+              },
+              {
+                "player_out": "Ferdi Kadıoğlu",
+                "player_in": "Jay Dasilva"
+              },
+              {
+                "player_out": "Dominik Szoboszlai",
+                "player_in": "Morgan Gibbs-White"
+              },
+              {
+                "player_out": "Pedro Porro Sauceda",
+                "player_in": "Milan van Ewijk"
+              },
+              {
+                "player_out": "Bryan Mbeumo",
+                "player_in": "Rayan Cherki"
+              },
+              {
+                "player_out": "Nico O'Reilly",
+                "player_in": "Maxim De Cuyper"
+              }
+            ],
+            "expected_points_cost": 0.0
+          },
+          {
+            "published_path": "advice/3832237/saf-puan/1/chip-bboost.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": "bboost",
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ollie Watkins",
+                "player_in": "Erling Haaland"
+              },
+              {
+                "player_out": "Gabriel dos Santos Magalhães",
+                "player_in": "Ainsley Maitland-Niles"
+              },
+              {
+                "player_out": "Dominik Szoboszlai",
+                "player_in": "Pascal Groß"
+              },
+              {
+                "player_out": "Pedro Porro Sauceda",
+                "player_in": "Jay Dasilva"
+              },
+              {
+                "player_out": "Nico O'Reilly",
+                "player_in": "Jayden Bogle"
+              }
+            ],
+            "expected_points_cost": 0.0
+          }
+        ]
+      },
+      {
+        "gameweek": 6,
+        "status": "available",
+        "reason": null,
+        "deadline_utc": "2026-10-10T10:00:00Z",
+        "advice_snapshot_id": "fpl-live-20261010T035732Z-c77d032165af",
+        "advice_captured_at_utc": "2026-10-10T03:57:32.746463Z",
+        "advice_generated_at_utc": "2026-10-10T06:07:04Z",
+        "advice_sha256": "6070fa5b874734e4221fcf07083f75e91a8df083d6673c4b73730b6995e93f12",
+        "outcome_snapshot_id": "fpl-live-20261014T135921Z-a48d1521c87f",
+        "outcome_captured_at_utc": "2026-10-14T13:59:21.062647Z",
+        "expected_own_points": 55.13888696273176,
+        "suggested": {
+          "gross_points": 61.0,
+          "transfer_hit_points": 0.0,
+          "net_points": 61.0,
+          "captain_bonus_points": 6.0,
+          "autosub_points": 9.0,
+          "chip": null
+        },
+        "actual": {
+          "gross_points": 51.0,
+          "transfer_hit_points": 0.0,
+          "net_points": 51.0
+        },
+        "actual_reason": null,
+        "net_difference": 10.0,
+        "players": [
+          {
+            "player_id": 154561,
+            "name": "David Raya Martín",
+            "position": "GK",
+            "role": "starter",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 3.937285604836277,
+            "realized_points": 3.0,
+            "minutes": 90,
+            "multiplier": 1,
+            "counted_points": 3.0,
+            "forecast_error": -0.9372856048362772
+          },
+          {
+            "player_id": 226597,
+            "name": "Gabriel dos Santos Magalhães",
+            "position": "DEF",
+            "role": "starter",
+            "captain": false,
+            "vice_captain": true,
+            "expected_points": 4.557988193553639,
+            "realized_points": 2.0,
+            "minutes": 90,
+            "multiplier": 1,
+            "counted_points": 2.0,
+            "forecast_error": -2.557988193553639
+          },
+          {
+            "player_id": 477424,
+            "name": "Joško Gvardiol",
+            "position": "DEF",
+            "role": "starter",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 3.6993157992754457,
+            "realized_points": 4.0,
+            "minutes": 24,
+            "multiplier": 1,
+            "counted_points": 4.0,
+            "forecast_error": 0.30068420072455426
+          },
+          {
+            "player_id": 154043,
+            "name": "Ainsley Maitland-Niles",
+            "position": "DEF",
+            "role": "starter",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 3.5856327971518893,
+            "realized_points": 4.0,
+            "minutes": 77,
+            "multiplier": 1,
+            "counted_points": 4.0,
+            "forecast_error": 0.4143672028481107
+          },
+          {
+            "player_id": 446008,
+            "name": "Bryan Mbeumo",
+            "position": "MID",
+            "role": "starter",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 4.514593666623016,
+            "realized_points": 8.0,
+            "minutes": 90,
+            "multiplier": 1,
+            "counted_points": 8.0,
+            "forecast_error": 3.485406333376984
+          },
+          {
+            "player_id": 430871,
+            "name": "Matheus Santos Carneiro da Cunha",
+            "position": "MID",
+            "role": "starter",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 4.4635446562597805,
+            "realized_points": 10.0,
+            "minutes": 90,
+            "multiplier": 1,
+            "counted_points": 10.0,
+            "forecast_error": 5.5364553437402195
+          },
+          {
+            "player_id": 60307,
+            "name": "Pascal Groß",
+            "position": "MID",
+            "role": "starter",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 4.161023508047467,
+            "realized_points": 6.0,
+            "minutes": 90,
+            "multiplier": 1,
+            "counted_points": 6.0,
+            "forecast_error": 1.8389764919525327
+          },
+          {
+            "player_id": 424876,
+            "name": "Dominik Szoboszlai",
+            "position": "MID",
+            "role": "starter",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 3.858004507173562,
+            "realized_points": 0.0,
+            "minutes": 0,
+            "multiplier": 0,
+            "counted_points": 0.0,
+            "forecast_error": -3.858004507173562
+          },
+          {
+            "player_id": 84450,
+            "name": "Granit Xhaka",
+            "position": "MID",
+            "role": "starter",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 3.2945342332333203,
+            "realized_points": 2.0,
+            "minutes": 90,
+            "multiplier": 1,
+            "counted_points": 2.0,
+            "forecast_error": -1.2945342332333203
+          },
+          {
+            "player_id": 223094,
+            "name": "Erling Haaland",
+            "position": "FWD",
+            "role": "starter",
+            "captain": true,
+            "vice_captain": false,
+            "expected_points": 7.9988702038468515,
+            "realized_points": 6.0,
+            "minutes": 79,
+            "multiplier": 2,
+            "counted_points": 12.0,
+            "forecast_error": -1.9988702038468515
+          },
+          {
+            "player_id": 169432,
+            "name": "Oli McBurnie",
+            "position": "FWD",
+            "role": "starter",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 3.069223588883662,
+            "realized_points": 1.0,
+            "minutes": 90,
+            "multiplier": 1,
+            "counted_points": 1.0,
+            "forecast_error": -2.069223588883662
+          },
+          {
+            "player_id": 204936,
+            "name": "Gianluigi Donnarumma",
+            "position": "GK",
+            "role": "bench",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 3.082495342651006,
+            "realized_points": 9.0,
+            "minutes": 90,
+            "multiplier": 0,
+            "counted_points": 0.0,
+            "forecast_error": 5.917504657348994
+          },
+          {
+            "player_id": 231416,
+            "name": "Ferdi Kadıoğlu",
+            "position": "DEF",
+            "role": "bench",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 2.2778581774368583,
+            "realized_points": 9.0,
+            "minutes": 90,
+            "multiplier": 1,
+            "counted_points": 9.0,
+            "forecast_error": 6.722141822563142
+          },
+          {
+            "player_id": 601767,
+            "name": "Vakhtang Salia",
+            "position": "FWD",
+            "role": "bench",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 1.3473254086181279,
+            "realized_points": 0.0,
+            "minutes": 0,
+            "multiplier": 0,
+            "counted_points": 0.0,
+            "forecast_error": -1.3473254086181279
+          },
+          {
+            "player_id": 106611,
+            "name": "Michael Keane",
+            "position": "DEF",
+            "role": "bench",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 0.11929007215421392,
+            "realized_points": 1.0,
+            "minutes": 90,
+            "multiplier": 0,
+            "counted_points": 0.0,
+            "forecast_error": 0.8807099278457861
+          }
+        ],
         "recorded_plans": [
           {
             "published_path": "advice/3832237/saf-puan/1.json",
@@ -1135,8 +1654,8 @@
         "advice_captured_at_utc": "2026-09-18T12:25:16.241963Z",
         "advice_generated_at_utc": "2026-09-18T14:05:59Z",
         "advice_sha256": "ce6eb2340cdf8d467ea9416917d533661134c24a6d3b4b55468ad86be5245ed9",
-        "outcome_snapshot_id": "fpl-live-20261010T035732Z-c77d032165af",
-        "outcome_captured_at_utc": "2026-10-10T03:57:32.746463Z",
+        "outcome_snapshot_id": "fpl-live-20261014T135921Z-a48d1521c87f",
+        "outcome_captured_at_utc": "2026-10-14T13:59:21.062647Z",
         "expected_own_points": 54.03405326604533,
         "suggested": {
           "gross_points": 52.0,
@@ -1375,8 +1894,8 @@
         "advice_captured_at_utc": "2026-09-12T10:00:00.227050Z",
         "advice_generated_at_utc": "2026-09-12T10:50:08Z",
         "advice_sha256": "b860656d5dd21970f99d0add9fe9d8c1a9ea14c01101d37c0d736ca056813001",
-        "outcome_snapshot_id": "fpl-live-20261010T035732Z-c77d032165af",
-        "outcome_captured_at_utc": "2026-10-10T03:57:32.746463Z",
+        "outcome_snapshot_id": "fpl-live-20261014T135921Z-a48d1521c87f",
+        "outcome_captured_at_utc": "2026-10-14T13:59:21.062647Z",
         "expected_own_points": 51.90067139132923,
         "suggested": {
           "gross_points": 44.0,

@@ -31,6 +31,7 @@ from squadopt.scenarios import (
     optimize_scenario_aware_squad,
     scenario_result_to_dict,
     scenario_result_to_markdown,
+    validate_residual_history,
 )
 from squadopt.scenarios.evaluation import RivalSquad
 
@@ -246,6 +247,29 @@ def test_target_or_future_residuals_are_rejected() -> None:
             TARGET,
             SMALL_CONFIG,
         )
+
+
+@pytest.mark.parametrize(
+    "label",
+    [
+        pytest.param("2022-23-gw03", id="another-season"),
+        pytest.param(f"{SEASON}-gw07", id="another-gameweek"),
+    ],
+)
+def test_a_fold_id_that_disagrees_with_its_season_and_gameweek_is_refused(label: str) -> None:
+    """The season and gameweek columns are what the generator orders by, and the fold id is a
+    label. A history selected by one key and checked by the other is how a held-out season's
+    rows get into a history that looks frozen, so a row whose label names another fold is
+    refused by this layer on its own, whatever the caller checked."""
+
+    snapshot = _snapshot()
+    history = _residual_history(snapshot)
+    mislabelled = history.assign(fold_id=history["fold_id"].where(history["gameweek"] != 3, label))
+
+    with pytest.raises(ScenarioValidationError, match="fold_id must match its season"):
+        validate_residual_history(mislabelled, snapshot, TARGET, SMALL_CONFIG)
+    with pytest.raises(ScenarioValidationError, match="fold_id must match its season"):
+        generate_scenarios(snapshot, mislabelled, TARGET, SMALL_CONFIG)
 
 
 def test_insufficient_historical_folds_are_rejected() -> None:
@@ -612,8 +636,8 @@ def test_against_its_own_template_the_rank_objective_finds_a_differential_and_re
 
 
 @pytest.mark.slow
-def test_the_expected_points_budget_binds_and_a_menu_is_monotone_in_the_budget() -> None:
-    from squadopt.scenarios import RankObjectiveConfig, goal_menu, optimize_rank_probability_squad
+def test_the_expected_points_budget_binds_and_probability_is_monotone_in_the_budget() -> None:
+    from squadopt.scenarios import RankObjectiveConfig, optimize_rank_probability_squad
 
     _, scenarios, (reference, rival) = _rank_world()
     with pytest.raises(ScenarioConfigurationError, match="reference_expected_points"):
@@ -621,25 +645,36 @@ def test_the_expected_points_budget_binds_and_a_menu_is_monotone_in_the_budget()
             scenarios, rival, OptimizationConfig(), RankObjectiveConfig(expected_points_budget=1.0)
         )
 
-    menu = goal_menu(
-        scenarios, rival, reference, OptimizationConfig(), budgets=(0.0, 0.5, 2.0, None)
-    )
-    entries = [entry for entry, _ in menu]
-    assert [e.expected_points_budget for e in entries] == [0.0, 0.5, 2.0, None]
-    probabilities = [e.probability_ahead for e in entries]
-    costs = [e.expected_points_cost for e in entries]
-    assert all(p is not None for p in probabilities)
+    # The risk-neutral reference's scenario-mean score anchors every budget.
+    matrix = scenarios.scenario_points.to_numpy(dtype="float64", copy=False)
+    column = {p: i for i, p in enumerate(scenarios.projections.table["player_id"].tolist())}
+    assert reference.captain is not None
+    starters = [column[p] for p in reference.starting_xi["player_id"].tolist()]
+    captain = column[reference.captain["player_id"]]
+    reference_mean = float((matrix[:, starters].sum(axis=1) + matrix[:, captain]).mean())
+    budgets = (0.0, 0.5, 2.0, None)
+    results = [
+        optimize_rank_probability_squad(
+            scenarios,
+            rival,
+            OptimizationConfig(),
+            RankObjectiveConfig(expected_points_budget=budget),
+            reference_expected_points=reference_mean,
+        )
+        for budget in budgets
+    ]
+    assert all(r.has_solution and r.probability_ahead is not None for r in results)
+    statuses = [r.optimization_result.solver_status.name for r in results]
+    assert all(status in {"OPTIMAL", "FEASIBLE"} for status in statuses)
     # More budget can only widen the feasible set: among proven optima, probability
     # ahead never falls with the budget.
-    proven = [e.probability_ahead for e in entries if e.solver_status == "OPTIMAL"]
+    proven = [r.probability_ahead for r, s in zip(results, statuses, strict=True) if s == "OPTIMAL"]
     assert proven == sorted(proven)  # type: ignore[type-var]
     assert len(proven) >= 2
-    # And each cost respects its budget (the unconstrained entry has no cap).
-    for entry in entries[:-1]:
-        assert entry.expected_points_cost is not None and entry.expected_points_budget is not None
-        assert entry.expected_points_cost <= entry.expected_points_budget + 1e-6
-    assert all(cost is not None for cost in costs)
-    assert all(e.solver_status in {"OPTIMAL", "FEASIBLE"} for e in entries)
+    # And each cost respects its budget (the unconstrained run has no cap).
+    for budget, result in zip(budgets[:-1], results[:-1], strict=True):
+        assert budget is not None and result.scenario_mean_score is not None
+        assert reference_mean - result.scenario_mean_score <= budget + 1e-6
 
 
 @pytest.mark.slow

@@ -3,7 +3,7 @@
 ``_experiment_cli`` imports ``squadopt.experiments`` for its measurement helpers, so an
 operational command that took these names from it loaded the laboratory as well. They live
 here, and ``_experiment_cli`` imports them back, so the runners that use it get the same
-objects and write the same bytes. ``tests/unit/test_run_boundary.py`` fails when an
+objects and write the same bytes. ``tests/architecture/test_run_boundary.py`` fails when an
 operational command loads a laboratory module.
 """
 

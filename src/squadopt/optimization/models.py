@@ -63,3 +63,22 @@ class OptimizationResult:
         """Return whether the result contains a feasible squad."""
 
         return self.solver_status in {SolverStatus.OPTIMAL, SolverStatus.FEASIBLE}
+
+
+def empty_result(
+    players: pd.DataFrame,
+    status: SolverStatus,
+    diagnostics: dict[str, object],
+) -> OptimizationResult:
+    empty = players.iloc[0:0].reset_index(drop=True).copy(deep=True)
+    return OptimizationResult(
+        solver_status=status,
+        selected_squad=empty.copy(deep=True),
+        starting_xi=empty.copy(deep=True),
+        bench=empty.copy(deep=True),
+        captain=None,
+        total_cost_tenths=None,
+        projected_score=None,
+        objective_value=None,
+        diagnostics=diagnostics,
+    )

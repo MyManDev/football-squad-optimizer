@@ -26,7 +26,6 @@ from squadopt.experiments import SCREENING_EXPERIMENT_CONTRACT_VERSION
 from squadopt.optimization import OptimizationConfig
 from squadopt.prediction import FEATURE_GENERATION_CONTRACT_VERSION
 
-DEFAULT_ARTIFACT_ROOT = REPOSITORY_ROOT / "artifacts" / "sprint2"
 MANIFEST_PATH = REPOSITORY_ROOT / "data" / "sources" / "vaastav_fpl_manifest.json"
 DEVELOPMENT_SEASONS = ("2021-22", "2022-23", "2023-24", "2024-25")
 BOOTSTRAP_DRAWS = 2_000

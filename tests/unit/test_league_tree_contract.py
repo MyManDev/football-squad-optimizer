@@ -1,5 +1,6 @@
 """The league tree contract: where a league's tree is, and the directory of leagues."""
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -11,6 +12,9 @@ from squadopt.contracts.league_tree import (
     LEGACY_TREE,
     LeagueDirectoryError,
     PublishedLeague,
+    device_plan_capture,
+    device_plan_path,
+    device_plan_sha256,
     find_league_tree,
     league_tree,
     league_tree_dir,
@@ -142,3 +146,84 @@ def test_the_legacy_tree_is_adopted_once_and_refused_when_it_is_not_the_leagues(
     leftover = _legacy(tmp_path, 352490)
     assert adopt_legacy_tree(tmp_path, 352490) == ("removed", leftover)
     assert not leftover.exists()
+
+
+def test_a_capture_s_device_plan_table_lives_under_device_by_its_capture() -> None:
+    assert device_plan_path("fpl-live-20261010T035732Z-c77d032165af").as_posix() == (
+        "device/fpl-live-20261010T035732Z-c77d032165af/device-plan.json"
+    )
+    assert device_plan_capture("device/cap/device-plan.json") == "cap"
+    assert device_plan_capture("leagues/352490/device-plan.json") is None
+    assert device_plan_capture("device/cap/other.json") is None
+    for bad in ("", " cap", "a/b", "..", ".", 7):
+        with pytest.raises(LeagueDirectoryError):
+            device_plan_path(bad)  # type: ignore[arg-type]
+
+
+def test_a_directory_line_names_its_device_plan_table_and_two_leagues_may_share_it(
+    tmp_path: Path,
+) -> None:
+    table = device_plan_path("cap").as_posix()
+    digest = "0123456789abcdef" * 4
+    named = {"device_plan": table, "device_plan_sha256": digest}
+    with_table = [_league(7, **named), _league(9, **named)]
+    write_league_directory(tmp_path, with_table, generated_at_utc="2026-10-11T10:00:00Z")
+    rows = json.loads((tmp_path / LEAGUE_DIRECTORY_FILE).read_text(encoding="utf-8"))
+    assert [row["device_plan"] for row in rows["payload"]["leagues"]] == [table, table]
+    assert [row["device_plan_sha256"] for row in rows["payload"]["leagues"]] == [digest] * 2
+    assert read_league_directory(tmp_path) == with_table
+    # A line from before the table has no key at all, and reads back as None.
+    write_league_directory(tmp_path, [_league(9)], generated_at_utc="2026-10-11T10:00:00Z")
+    rows = json.loads((tmp_path / LEAGUE_DIRECTORY_FILE).read_text(encoding="utf-8"))
+    assert "device_plan" not in rows["payload"]["leagues"][0]
+    assert "device_plan_sha256" not in rows["payload"]["leagues"][0]
+    assert read_league_directory(tmp_path)[0].device_plan is None
+    assert read_league_directory(tmp_path)[0].device_plan_sha256 is None
+    # Sharing a table is not sharing a tree.
+    with pytest.raises(LeagueDirectoryError, match="share a tree"):
+        write_league_directory(
+            tmp_path,
+            [_league(7, **named), _league(9, path="leagues/7", **named)],
+            generated_at_utc="x",
+        )
+
+
+@pytest.mark.parametrize("device_plan", ["", "/device/cap/device-plan.json", "../x.json", 7])
+def test_a_directory_line_with_an_unusable_device_plan_is_refused(
+    tmp_path: Path, device_plan: object
+) -> None:
+    with pytest.raises(LeagueDirectoryError, match="device plan"):
+        write_league_directory(
+            tmp_path,
+            [_league(7, device_plan=device_plan, device_plan_sha256="a" * 64)],
+            generated_at_utc="x",
+        )
+
+
+@pytest.mark.parametrize(
+    "named",
+    [
+        {"device_plan": "device/cap/device-plan.json"},
+        {"device_plan_sha256": "a" * 64},
+        {"device_plan": "device/cap/device-plan.json", "device_plan_sha256": "A" * 64},
+        {"device_plan": "device/cap/device-plan.json", "device_plan_sha256": "a" * 63},
+        {"device_plan": "device/cap/device-plan.json", "device_plan_sha256": "a" * 65},
+        {"device_plan": "device/cap/device-plan.json", "device_plan_sha256": 7},
+    ],
+)
+def test_a_directory_line_names_its_device_plan_with_the_sha256_of_its_bytes(
+    tmp_path: Path, named: dict[str, object]
+) -> None:
+    # The table at a path is replaced when its capture is published again, so a line
+    # that names it carries its version too, and only with it.
+    with pytest.raises(LeagueDirectoryError, match="sha256 of its bytes"):
+        write_league_directory(tmp_path, [_league(7, **named)], generated_at_utc="x")
+
+
+def test_the_device_plan_digest_is_the_sha256_of_the_table_file(tmp_path: Path) -> None:
+    table = device_plan_path("cap").as_posix()
+    assert device_plan_sha256(tmp_path, table) is None
+    (tmp_path / "device" / "cap").mkdir(parents=True)
+    body = b'{"payload": {}}\n'
+    (tmp_path / table).write_bytes(body)
+    assert device_plan_sha256(tmp_path, table) == hashlib.sha256(body).hexdigest()

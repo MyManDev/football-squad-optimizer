@@ -135,10 +135,6 @@ class FileJobQueue:
                 "advice_queue_integrity_issue", source=path.name, sha256=digest
             )
 
-    def integrity_issues(self) -> tuple[str, ...]:
-        """Stable evidence filenames for operator reporting; originals remain in place."""
-        return tuple(sorted(p.name for p in (self._root / "integrity").glob("*.bin")))
-
     def load(self, job_id: str) -> AdviceJob | None:
         """The job's record, from ``jobs/`` or, once it has been archived, from the archive."""
 

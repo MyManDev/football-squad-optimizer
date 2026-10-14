@@ -9,6 +9,60 @@ replaces any of them.
 Versions follow [semantic versioning](https://semver.org/). `docs/architecture/branching.md`
 records how the `v<semver>` tag namespace relates to the operational `run-*` and `site-*` ones.
 
+## Unreleased
+
+Changes on `develop` since 1.0.0 that no software version names yet. The project version stays
+`1.0.0` until the owner decides whether the next one is 2.0.0, an open question in
+[ADR 0010](docs/architecture/decisions/0010-clean-architecture-rings-and-repository-layout.md).
+
+### Site releases since 1.0.0
+
+The code on `develop` reached members through the operational `site-*` tags below. Each names a
+deployed site artifact, not a software version, and each decision it published is identified
+by its own `model_version`, `prediction_fingerprint` and `repository_commit`. The list is the
+`site-*` tags on GitHub dated after `v1.0.0`, as read on 2026-10-13; `branching.md` explains why
+the tag list is not a complete record of what was deployed.
+
+| Tag | Tagged | Release commit |
+| --- | --- | --- |
+| `site-2026-27-gw01-settled` | 2026-08-25 | Pull request #252 |
+| `site-2026-27-gw04-decision` | 2026-09-09 | Release commit: the gameweek 4 decision view and the day's fixes |
+| `site-2026-27-gw04-settled` | 2026-09-16 | Pull request #574 |
+| `site-2026-27-gw04-settled-2` | 2026-09-17 | Pull request #593; its dispatch was refused and it deployed nothing (`branching.md`, tag namespaces) |
+| `site-2026-27-gw05-decision` | 2026-09-18 | Pull request #619 |
+| `site-2026-27-gw05-settled` | 2026-09-22 | Pull request #780 |
+| `site-2026-27-gw06-decision` | 2026-09-23 | Pull request #784 |
+| `site-2026-27-gw06-fix1` | 2026-09-25 | Pull request #805, the direction D site |
+| `site-2026-27-gw06-fix2` | 2026-09-26 | Pull request #852 |
+| `site-2026-27-gw06-fix3` | 2026-09-26 | Pull request #868 |
+| `site-2026-27-gw06-fix4` | 2026-09-28 | Pull request #882: scoring consistency and mobile decision clarity |
+| `site-2026-27-gw06-fix5` | 2026-09-29 | Pull request #892: visible member plan settings |
+| `site-2026-27-gw06-fix6` | 2026-10-01 | Pull request #908: guarded football planning |
+| `site-2026-27-gw06-fix7` | 2026-10-01 | Pull request #910: conditional football information planning |
+| `site-2026-27-gw06-fix8` | 2026-10-01 | Pull request #913: complete football policy comparisons |
+| `site-2026-27-gw06-fix9` | 2026-10-01 | Pull request #916 |
+| `site-2026-27-gw06-fix10` | 2026-10-02 | Pull request #918: football news integration |
+| `site-2026-27-gw06-fix11` | 2026-10-02 | Pull request #920: official FPL information and football decision improvements |
+| `site-2026-27-gw06-fix12` | 2026-10-02 | Pull request #928: the current experimental football model for GW6 |
+| `site-2026-27-gw06-fix13` | 2026-10-03 | Pull request #947 |
+| `site-2026-27-gw06-fix14` | 2026-10-03 | Pull request #952 |
+| `site-2026-27-gw06-fix15` | 2026-10-04 | Pull request #965 |
+| `site-2026-27-gw06-fix16` | 2026-10-05 | Pull request #970 |
+| `site-2026-27-gw06-fix17` | 2026-10-10 | Pull request #1073 |
+
+### Removed (pull request #1080)
+
+- 44 retired measurement and artifact runners, each listed under "Retired runners" in the
+  [script catalogue](scripts/README.md) with how to restore and run it, and
+  `scripts/release/queue2.sh`, unused since `develop` merges through the merge queue.
+- The `squadopt.risk` and `squadopt.uncertainty` packages, and the laboratory modules only the
+  retired runners used, including the shadow calibration lane.
+- 49 unused definitions in kept modules, with their tests.
+- The unused web dependencies `dompurify`, `marked` and `@types/react-router`.
+- `notebooks/` and six unreferenced pull request screenshots.
+
+Committed records under `docs/` stay as evidence (ADR 0003).
+
 ## 1.0.0
 
 **What this release is: the first software release cut after the system's first live decision.**

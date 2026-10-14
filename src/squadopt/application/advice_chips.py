@@ -190,13 +190,16 @@ def chip_week_points(week: PlanningWeekResult) -> float:
 
 
 def _published_chip_points(payload: Mapping[str, object], chip: str) -> float:
-    """The chip week's total, re-added from the rows the document itself publishes."""
+    """The chip total, from explicit lineup expectation or legacy published rows."""
 
     own = payload.get("expected_own_points")
     captain = payload.get("captain")
     bench = payload.get("bench")
     if not isinstance(own, float) or not isinstance(captain, dict) or not isinstance(bench, list):
         raise EntryError("A chip document needs its lineup; the plan published none.")
+    if isinstance(payload.get("lineup_expectation"), dict):
+        # Expected-lineup publication already includes the chip and vice recovery.
+        return own
     if chip == "3xc":
         return own + float(str(captain["expected_points"]))
     if chip == "bboost":
@@ -297,9 +300,10 @@ def advise_with_chip(
     **What is published** is the one-week shape the card already renders, with ``chip``
     naming the chip and every total on the basis the chip week scores on: a Triple
     Captain's ``expected_own_points`` counts the captain three times, a Bench Boost's
-    adds the bench, and their move rows and gain against holding are restated on the same
-    basis (``_rows_on_chip_basis``), so the rows still add up to the plan's gain and the
-    gain to the lineup total. A Wildcard and a Free Hit score as any week does.
+    adds the bench. Legacy move rows and gain against holding are restated on the same
+    basis (``_rows_on_chip_basis``). Expected-lineup decisions include reserve and vice
+    recovery and withhold those legacy deltas. A Wildcard and a Free Hit score as any
+    week does, using the same scoring basis as their no-chip control.
 
     **What stands where a price would** is ``chip_choice.gain_vs_no_chip``: the chip
     week's expected points minus the member's own no-chip control's, both net of the hits
@@ -339,7 +343,13 @@ def advise_with_chip(
     }
     held = held_squad_from_picks(picks, current_prices=prices)
     plan, decision, _config = plan_transfers(
-        inputs, projection, held, rules, optimization=CHIP_OPTIMIZATION, chip=chip
+        inputs,
+        projection,
+        held,
+        rules,
+        optimization=CHIP_OPTIMIZATION,
+        chip=chip,
+        expected_lineups=solved.plan.weeks[0].lineup_expectation is not None,
     )
     if wall_clock_stopped_the_search(plan.solver_status, plan.diagnostics):
         raise SolverExecutionError(
@@ -379,9 +389,11 @@ def advise_with_chip(
             f"planner counted {chip_points!r}."
         )
     payload["expected_own_points"] = published
-    if chip in _RESCORED_CHIPS:
+    if chip in _RESCORED_CHIPS and week.lineup_expectation is None:
         _rows_on_chip_basis(payload, picks, projection, chip)
-    chip_net = net_expected_points(plan) + (chip_points - float(week.projected_score))
+    chip_net = net_expected_points(plan)
+    if week.lineup_expectation is None:
+        chip_net += chip_points - float(week.projected_score)
     gain = chip_net - net_expected_points(solved.plan)
     notes: list[str] = []
     if gain < 0.0:

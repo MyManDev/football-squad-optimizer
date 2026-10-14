@@ -1,6 +1,10 @@
 """Release checks keep their findings when run through one command."""
 
+import hashlib
 import json
+import shutil
+import urllib.error
+from email.message import Message
 from io import BytesIO
 from pathlib import Path
 from typing import Any
@@ -194,7 +198,7 @@ def _refuse(root: Path, entry: int, reason: str) -> None:
 
 
 @pytest.mark.parametrize("defect", [None, "variants", "top100", "word"])
-def test_the_three_checks_keep_their_clean_and_defective_outcomes(
+def test_the_four_checks_keep_their_clean_and_defective_outcomes(
     tmp_path: Path, defect: str | None, capsys: pytest.CaptureFixture[str]
 ) -> None:
     _tree(tmp_path)
@@ -212,13 +216,17 @@ def test_the_three_checks_keep_their_clean_and_defective_outcomes(
         _write(tmp_path, "advice/1/saf-puan/1/hoca-sozu.json", {})
     assert main([str(tmp_path)]) == (0 if defect is None else 1)
     output = capsys.readouterr().out
-    assert all(f"Checking {name}" in output for name in ("variants", "top100", "word"))
+    assert all(
+        f"Checking {name}" in output
+        for name in ("publication identity", "variants", "top100", "word")
+    )
+    assert output.rstrip().endswith("FINAL: ALL GOOD" if defect is None else "FINAL: FAILURE(S)")
     if defect is None:
-        assert output.count("ALL GOOD") == 3
+        assert output.splitlines().count("ALL GOOD") == 3
         assert "('ortak-koru', 3, True)" in output
         assert "non-binding keeps the captain" in output
     else:
-        assert output.count("ALL GOOD") == 2
+        assert output.splitlines().count("ALL GOOD") == 2
 
 
 def test_a_skip_top100_tree_with_a_refused_member_passes_and_names_both_absences(
@@ -229,7 +237,7 @@ def test_a_skip_top100_tree_with_a_refused_member_passes_and_names_both_absences
     _refuse(tmp_path, 3, "No current price for player 7.")
     assert main([str(tmp_path)]) == 0
     output = capsys.readouterr().out
-    assert output.count("ALL GOOD") == 3
+    assert output.splitlines().count("ALL GOOD") == 3
     # The variants and Top 100 checks each name both absences, and neither is a finding.
     assert output.count(f"1 member(s): Top 100 menu not published: {NO_TOP100_THIS_RUN} (1)") == 2
     assert output.count("1 member(s): no advice this week: No current price for player 7. (3)") == 2
@@ -269,7 +277,7 @@ def test_a_document_the_index_lists_and_the_tree_lacks_is_still_a_finding(
     assert main([str(tmp_path)]) == 1
     output = capsys.readouterr().out
     assert f"1: {missing} not published" in output
-    assert output.count("ALL GOOD") == 2
+    assert output.splitlines().count("ALL GOOD") == 2
 
 
 #: A Top 100 entry that is neither a menu nor an absence stated in the producer's shape.
@@ -434,7 +442,7 @@ def test_what_the_index_states_unavailable_is_satisfied_and_what_it_omits_is_not
     _write(tmp_path, "advice/1/index.json", index)
     assert main([str(tmp_path)]) == 0
     output = capsys.readouterr().out
-    assert output.count("ALL GOOD") == 3
+    assert output.splitlines().count("ALL GOOD") == 3
     assert "1 member(s): saf-puan window 5 not solved: not_solved (1)" in output
     assert "1 member(s): ortak-koru window 1 vs 2 not solved: not_solved (1)" in output
     assert "1 member(s): Top 100 plain 20 not solved: not_solved (1)" in output
@@ -462,7 +470,7 @@ def test_a_truncated_unavailable_word_file_is_still_a_file(tmp_path, capsys):
     assert main([str(tmp_path)]) == 1
     output = capsys.readouterr().out
     assert "BAD 1: unavailable" in output
-    assert output.count("ALL GOOD") == 2
+    assert output.splitlines().count("ALL GOOD") == 2
 
 
 def test_invalid_json_and_wrong_root_name_the_problem(tmp_path, capsys):
@@ -525,7 +533,7 @@ def test_a_site_with_a_directory_is_checked_tree_by_tree(tmp_path, capsys):
     assert main([str(tmp_path)]) == 0
     output = capsys.readouterr().out
     assert "== leagues/9" in output
-    assert output.count("ALL GOOD") == 3
+    assert output.splitlines().count("ALL GOOD") == 3
 
     # A second listed league whose tree is missing names the tree, not the legacy path.
     directory["payload"]["leagues"].append(
@@ -541,6 +549,156 @@ def test_a_site_with_a_directory_is_checked_tree_by_tree(tmp_path, capsys):
     assert main([str(tmp_path)]) == 1
     output = capsys.readouterr().out
     assert "leagues" in output and "10" in output and "members.json" in output
+
+
+ORIGIN = "https://site.example"
+
+
+def _serve(monkeypatch: pytest.MonkeyPatch, data: Path) -> list[str]:
+    """Serve ``data`` as the live site's ``data/``: a file that is not there answers 404.
+    Returns the URLs asked for."""
+
+    asked: list[str] = []
+
+    def urlopen(request, timeout):
+        asked.append(request.full_url)
+        target = data / request.full_url.removeprefix(f"{ORIGIN}/data/")
+        if not target.is_file():
+            raise urllib.error.HTTPError(request.full_url, 404, "Not Found", Message(), None)
+        return BytesIO(target.read_bytes())
+
+    monkeypatch.setattr("urllib.request.urlopen", urlopen)
+    return asked
+
+
+@pytest.mark.parametrize("live", [False, True], ids=["on-disk", "live"])
+def test_each_line_finds_its_device_plan_table_with_the_sha256_it_names(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch, live: bool
+) -> None:
+    """The table is checked on disk and live alike; a line from before the table is not."""
+
+    _tree(tmp_path)
+    (tmp_path / "leagues").mkdir()
+    (tmp_path / "league").rename(tmp_path / "leagues" / "9")
+    shutil.copytree(tmp_path / "leagues" / "9", tmp_path / "leagues" / "10")
+    table = tmp_path / "device" / "cap" / "device-plan.json"
+    table.parent.mkdir(parents=True)
+    table.write_bytes(b'{"payload": {"players": []}}\n')
+    digest = hashlib.sha256(table.read_bytes()).hexdigest()
+    line = {"season": "2026-27", "gameweek": 1}
+    directory = {
+        "contract_version": "league_directory_v1",
+        "payload": {
+            "leagues": [
+                {
+                    **line,
+                    "league_id": 9,
+                    "league_name": "Nine",
+                    "path": "leagues/9",
+                    "device_plan": "device/cap/device-plan.json",
+                    "device_plan_sha256": digest,
+                },
+                # A line from before the per-capture table names none.
+                {**line, "league_id": 10, "league_name": "Ten", "path": "leagues/10"},
+            ]
+        },
+    }
+    (tmp_path / "leagues.json").write_text(json.dumps(directory), encoding="utf-8")
+    asked = _serve(monkeypatch, tmp_path) if live else []
+    root = ORIGIN if live else str(tmp_path)
+
+    # The table the line names, with its bytes: the site passes.
+    assert main([root]) == 0
+    output = capsys.readouterr().out
+    assert "  ok  league 9: device/cap/device-plan.json has the sha256 its line names" in output
+    assert "league 10" not in output
+    assert output.rstrip().endswith("FINAL: ALL GOOD")
+    if live:
+        assert [url for url in asked if "/data/device/" in url] == [
+            f"{ORIGIN}/data/device/cap/device-plan.json"
+        ]
+
+    # A table replaced since the line was written is not the one the line names.
+    table.write_bytes(b'{"payload": {"players": [1]}}\n')
+    changed = hashlib.sha256(table.read_bytes()).hexdigest()
+    assert main([root]) == 1
+    output = capsys.readouterr().out
+    assert (
+        f"  BAD league 9: device/cap/device-plan.json has sha256 {changed}, the line names {digest}"
+    ) in output
+    assert "league 10" not in output
+    assert output.rstrip().endswith("FINAL: FAILURE(S)")
+
+    # A table that is gone fails the same way.
+    table.unlink()
+    assert main([root]) == 1
+    output = capsys.readouterr().out
+    assert "  BAD league 9: device/cap/device-plan.json is missing" in output
+    assert "league 10" not in output
+    assert output.rstrip().endswith("FINAL: FAILURE(S)")
+
+
+@pytest.mark.parametrize(
+    ("device_plan", "digest"),
+    [
+        ("device/cap/sub/device-plan.json", "same"),
+        ("plans/cap/device-plan.json", "same"),
+        ("device/./device-plan.json", "same"),
+        ("device/c a p/device-plan.json", "same"),
+        ("device/cap/device-plan.json", "upper"),
+        ("device/cap/device-plan.json", "long"),
+        ("device/cap/device-plan.json", None),
+        (None, "same"),
+        (7, "same"),
+    ],
+    ids=[
+        "a nested capture",
+        "no capture table",
+        "a capture that is the directory itself",
+        "a capture the page's characters do not name",
+        "an upper-case digest",
+        "a 65-character digest",
+        "no digest",
+        "a digest alone",
+        "a path that is no text",
+    ],
+)
+def test_a_line_naming_its_table_in_a_form_the_page_does_not_read_fails(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], device_plan: object, digest: str | None
+) -> None:
+    """The page reads a line's table only at ``device/<capture>/device-plan.json`` with a
+    sha256 of 64 lower-case hex characters, and reads the tree's copy for any other line
+    without a word. The release check fails such a line even where the file it names is
+    there with the bytes its digest names."""
+
+    _tree(tmp_path)
+    (tmp_path / "leagues").mkdir()
+    (tmp_path / "league").rename(tmp_path / "leagues" / "9")
+    body = b'{"payload": {"players": []}}\n'
+    sha = hashlib.sha256(body).hexdigest()
+    if isinstance(device_plan, str):
+        target = tmp_path.joinpath(*device_plan.split("/"))
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(body)
+    line: dict[str, Any] = {
+        "league_id": 9,
+        "league_name": "Nine",
+        "season": "2026-27",
+        "gameweek": 1,
+        "path": "leagues/9",
+    }
+    if device_plan is not None:
+        line["device_plan"] = device_plan
+    if digest is not None:
+        line["device_plan_sha256"] = {"same": sha, "upper": sha.upper(), "long": f"{sha}0"}[digest]
+    directory = {"contract_version": "league_directory_v1", "payload": {"leagues": [line]}}
+    (tmp_path / "leagues.json").write_text(json.dumps(directory), encoding="utf-8")
+
+    assert main([str(tmp_path)]) == 1
+    output = capsys.readouterr().out
+    assert f"  BAD league 9: names device plan {device_plan!r} with sha256 " in output
+    assert "which the page does not read: it reads the tree's copy instead" in output
+    assert output.rstrip().endswith("FINAL: FAILURE(S)")
 
 
 @pytest.mark.parametrize(
@@ -574,7 +732,7 @@ def test_a_ceiling_is_the_price_under_a_proven_control_and_absent_otherwise(
         path.write_text(json.dumps(document), encoding="utf-8")
     assert main([str(tmp_path)]) == (0 if clean else 1)
     output = capsys.readouterr().out
-    assert output.count("ALL GOOD") == (3 if clean else 1)
+    assert output.splitlines().count("ALL GOOD") == (3 if clean else 1)
 
 
 @pytest.mark.parametrize("status", ["FEASIBLE", "OPTIMAL"])

@@ -193,6 +193,11 @@ fixed Friday run would decide the week on a capture more than five days stale â€
 news, before injuries, before price changes. Move the decision run to the day before the
 deadline for those five and keep the capture lead time from `docs/weekly_runbook.md`.
 
+The owner runs the Tuesday settle and the Friday publish through GW20, whose deadline is
+2027-01-05T18:00:00Z, including the midweek GW13, GW18 and GW20 decision runs. A delegated
+stage requires the owner's approval for that run. After GW20 the weekly run moves off
+the owner's PC, tracked in #1010. This operator decision was recorded in #1005.
+
 **The Tuesday run may publish nothing, and that is a pass, not a failure.** A gameweek counts as
 settled only when the source says both `finished` and `data_checked`
 (`application/scoreboard.py`), so a Tuesday that arrives before the check publishes "not settled
@@ -302,18 +307,23 @@ one. Previews spend from the same day and stop at eight; on a busy day the previ
 before 06:00 UTC, leaving two production slots. Check what the day has spent before dispatching.
 
 `deploy.sh <tag>` is the second stage. `verify_live.py <accepted-generated-at-ISO> [--settled <gameweek>]`
-retains the smoke checks (the routes, the documents, the two absent ones and every asset the shell reaches) and the content checks, and a settled release names the gameweek it settles so the verifier asserts it. `queue2.sh <PR>...` is the separate
-develop queue: it rebases existing PR worktrees, waits for clean checks and squash
-merges with `clean_body.py` removing attribution lines. It is not the release-to-main
-path. These are operator commands, not scheduled jobs; inspect their output and stop
+retains the smoke checks (the routes, the documents, the two absent ones and every asset the shell reaches) and the content checks, and a settled release names the gameweek it settles so the verifier asserts it.
+
+None of these scripts merges into develop. Develop merges through the GitHub merge queue, which
+is not the release-to-main path, and the queue's squash commit takes the pull request's own
+title and body, so the body is cleaned by hand before the pull request enters the queue: save
+the body to a file, run `python scripts/release/clean_body.py <file>` (it rewrites the file in
+place, dropping attribution lines and replacing long dashes), push it back with
+`gh pr edit <n> --body-file <file>`, and once the checks are clean enqueue the pull request
+with the GraphQL `enqueuePullRequest` mutation.
+
+The release scripts are operator commands, not scheduled jobs; inspect their output and stop
 on any refusal. GitHub CLI is found on PATH, with the usual Windows installation as
 a fallback. No machine-specific repository or scratch path is required.
 The scripts prefer the checkout's `.venv/Scripts/python.exe` or `.venv/bin/python`,
 then Python on PATH, and verify that the interpreter starts before waiting or
 changing anything. Missing GitHub CLI refuses immediately. The three release waits
 are bounded to 60 minutes for the site PR, 45 for the release PR and 40 for main CI.
-Interrupting the queue stops it and cleans up its temporary bodies. A body that
-cannot be read or is empty after cleaning is never merged.
 
 After the public release verifies, the owner runs these from PowerShell in the clean
 main checkout on `develop`. **First check the backend is answering**, with a single local
@@ -638,7 +648,7 @@ Run the smoke command immediately against the production alias printed by Wrangl
 
 ## Back up irreplaceable data
 
-From the source checkout, run `powershell -ExecutionPolicy Bypass -File scripts\backup_data.ps1 -Destination '<existing-backup-directory>' -DryRun`, then remove `-DryRun` to copy snapshots, ledger, handoffs, advice records and entries. Choose a second physical drive outside every repository worktree; synced folders such as OneDrive can carry reparse-point attributes and are deliberately refused; all five source trees must exist, and reparse points are refused. The script never reads runtime/raw or changes the source, never deletes old backups, and preserves conflicts as stamped files named by that run's manifest. A new conflict exits nonzero and lists the finding; an existing variant with the same hash is reused. Paths with any dot-prefixed component are transient by repository convention and are excluded, including from older manifests. Each run reports the excluded source count and a bounded sample, plus the count ignored from an older manifest. Source files missing since the last manifest raise a nonzero alarm with a bounded sample and total count; new files still copy additively, but no new manifest is written. Restore the lost files or explicitly run `-AcceptMissing` to acknowledge the listed loss and write a new manifest; it never deletes old backup files or manifests. `-AcceptMissing` is never part of the scheduled task: a person types it only after inspecting the loss list. Run the same command with `-Verify` to compare both sides with the latest manifest; a missing, changed or unrecorded source file fails. To restore, stop writers first, copy each manifest entry's `destination_path` from the backup to its `path` under the restored checkout's `data`, then run `-Verify -Manifest <that-manifest-name>`; the name must be a `manifest-*.json` file within the backup directory. After restoring an older recovery point, a plain backup can report newer files as missing against the latest manifest: inspect that list, then use `-AcceptMissing` if the older state is intentional. Do not blindly copy a stale canonical file over its newer conflict variant. The first real backup and restore have **never been exercised** here: only temporary fixtures were used. The scheduled task must run as the owner with Git on PATH. The scheduled action appends output to a log outside the repository and preserves the exit code; Task Scheduler alone retains only the last result. Scheduling is the owner's action; after replacing all three path placeholders, this PowerShell line registers a daily action (it does not run the backup now):
+From the source checkout, run `powershell -ExecutionPolicy Bypass -File scripts\backup_data.ps1 -Destination '<existing-backup-directory>' -DryRun`, then remove `-DryRun` to copy snapshots, ledger, handoffs, advice records and entries, plus the private Benchmark V2 captures (`benchmark_v2_captures`) when that optional tree exists. Choose a second physical drive outside every repository worktree; synced folders such as OneDrive can carry reparse-point attributes and are deliberately refused; the five required source trees must exist, and reparse points are refused. The script never reads runtime/raw or changes the source, never deletes old backups, and preserves conflicts as stamped files named by that run's manifest. A new conflict exits nonzero and lists the finding; an existing variant with the same hash is reused. Paths with any dot-prefixed component are transient by repository convention and are excluded, including from older manifests. Each run reports the excluded source count and a bounded sample, plus the count ignored from an older manifest. Source files missing since the last manifest raise a nonzero alarm with a bounded sample and total count; new files still copy additively, but no new manifest is written. Restore the lost files or explicitly run `-AcceptMissing` to acknowledge the listed loss and write a new manifest; it never deletes old backup files or manifests. `-AcceptMissing` is never part of the scheduled task: a person types it only after inspecting the loss list. Run the same command with `-Verify` to compare both sides with the latest manifest; a missing, changed or unrecorded source file fails. To restore, stop writers first, copy each manifest entry's `destination_path` from the backup to its `path` under the restored checkout's `data`, then run `-Verify -Manifest <that-manifest-name>`; the name must be a `manifest-*.json` file within the backup directory. After restoring an older recovery point, a plain backup can report newer files as missing against the latest manifest: inspect that list, then use `-AcceptMissing` if the older state is intentional. Do not blindly copy a stale canonical file over its newer conflict variant. The first real backup and restore have **never been exercised** here: only temporary fixtures were used. The scheduled task must run as the owner with Git on PATH. The scheduled action appends output to a log outside the repository and preserves the exit code; Task Scheduler alone retains only the last result. Scheduling is the owner's action; after replacing all three path placeholders, this PowerShell line registers a daily action (it does not run the backup now):
 
 ```powershell
 Register-ScheduledTask -TaskName 'SquadOptDataBackup' -Action (New-ScheduledTaskAction -Execute 'powershell.exe' -Argument '-NoProfile -Command "& powershell.exe -NoProfile -ExecutionPolicy Bypass -File ''<repo>\scripts\backup_data.ps1'' -Destination ''<backup>'' *>> ''<outside-repository-log>''; exit $LASTEXITCODE"') -Trigger (New-ScheduledTaskTrigger -Daily -At '03:00')

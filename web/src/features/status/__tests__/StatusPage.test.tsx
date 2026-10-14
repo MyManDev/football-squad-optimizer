@@ -14,7 +14,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import indexFixture from "../../../../public/data/index.json";
 import publishedStatus from "../../../../public/data/2026-27/status.json";
-import type { DataClient, Loaded } from "../../../data/client";
+import type { DataClient } from "../../../data/client";
+import type { Loaded } from "../../../data/envelope";
 import { DataClientContext } from "../../../data/queries";
 import type { SiteIndex, StatusView, TickActionView } from "../../../data/schema";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";

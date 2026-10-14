@@ -24,10 +24,17 @@ from tests.unit.test_league_views import (
 from squadopt.application.device_plan import (
     DEVICE_PLAN_CONTRACT_VERSION,
     DEVICE_PLAN_DOCUMENT,
+    DEVICE_PLAN_TABLE_CONTRACT_VERSION,
+    device_plan_capture_table,
     device_plan_entry,
+    device_plan_table,
 )
 from squadopt.application.entries import EntryPicks, EntryRegistration, held_squad_from_picks
 from squadopt.application.league_views import build_league_views
+from squadopt.data.errors import DataSourceError
+from squadopt.data.snapshots import read_snapshot
+from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, element_prices, player_codes
+from squadopt.live.rules import rules_to_dict
 from squadopt.live.transfers import MEMBER_PLANNING_POLICY, member_planning_inputs
 from squadopt.optimization import OptimizationConfig
 from squadopt.optimization.coefficients import objective_coefficients, scale_expected_points
@@ -39,7 +46,13 @@ from squadopt.planning import (
 )
 from squadopt.planning.pricing import sell_price_tenths
 
-world = world_module._world  # re-register the fixture in this module
+
+@pytest.fixture(name="world")
+def _world(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
+    """The shared world whose bootstrap carries ``cost_change_start``, as a real one does,
+    so the per-capture device-plan table can read each player's start price."""
+
+    return world_module.build_world(tmp_path, start_prices=True)
 
 
 def _prices(projection: Any) -> dict[int, int]:
@@ -353,3 +366,64 @@ def test_the_member_block_names_every_input_the_device_needs(
 ) -> None:
     _, entry, _ = _build(world, tmp_path / "league")
     assert field in entry["payload"]["device_plan"]
+
+
+def _bootstrap_bytes(world: dict[str, Any]) -> bytes:
+    return read_snapshot(world["snapshot_root"], world["gw2_id"]).payloads[BOOTSTRAP_PAYLOAD]
+
+
+def test_the_per_capture_table_is_the_shared_document_without_a_league_plus_the_bootstrap_s_facts(
+    world: dict[str, Any],
+) -> None:
+    """Contract v2 (#981 step 1): the same players, order, numbers and rules as the league
+    tree's copy, no league in it, each player's element id and start price from the
+    bootstrap, and the season's chip windows and weekly transfer cap beside the policy."""
+
+    inputs, projection, rules = _world_context(world)
+    bootstrap = _bootstrap_bytes(world)
+    per_league = device_plan_table(inputs, projection, rules, league_id=352490)
+    table = device_plan_capture_table(inputs, projection, rules, bootstrap=bootstrap)
+
+    assert table["contract_version"] == DEVICE_PLAN_TABLE_CONTRACT_VERSION
+    assert "league_id" not in table
+    for field in ("season", "gameweek", "source_snapshot_id", "policy_id"):
+        assert table[field] == per_league[field], field
+    # The league tree's copy is unchanged by the second table.
+    assert per_league["contract_version"] == DEVICE_PLAN_CONTRACT_VERSION
+    assert per_league["league_id"] == 352490
+    assert all("element_id" not in player for player in per_league["players"])
+    assert "chips" not in per_league["rules"] and "transfers_cap" not in per_league["rules"]
+
+    codes = player_codes(bootstrap)
+    elements = {code: element for element, code in codes.items()}
+    prices = element_prices(bootstrap)
+    assert [p["id"] for p in table["players"]] == [p["id"] for p in per_league["players"]]
+    for shared, own in zip(per_league["players"], table["players"], strict=True):
+        assert own["element_id"] == elements[own["id"]]
+        assert own["start_tenths"] == prices[own["element_id"]].start_tenths
+        assert own["buy_tenths"] == prices[own["element_id"]].current_tenths
+        assert {k: v for k, v in own.items() if k not in ("element_id", "start_tenths")} == shared
+    # The start prices moved: the world shifts them down one, not at all and up one.
+    assert {p["buy_tenths"] - p["start_tenths"] for p in table["players"]} == {-1, 0, 1}
+
+    expected_rules = dict(per_league["rules"])
+    expected_rules["chips"] = rules_to_dict(rules)["chips"]
+    expected_rules["transfers_cap"] = rules.transfers.transfers_cap
+    assert table["rules"] == expected_rules
+    assert table["rules"]["chips"] and all(
+        set(window) == {"name", "number", "start_event", "stop_event", "chip_type"}
+        for window in table["rules"]["chips"]
+    )
+    assert table["rules"]["max_free_transfers"] == rules.transfers.max_free_transfers
+
+
+def test_the_per_capture_table_refuses_a_player_the_bootstrap_does_not_name(
+    world: dict[str, Any],
+) -> None:
+    inputs, projection, rules = _world_context(world)
+    document = json.loads(_bootstrap_bytes(world).decode("utf-8"))
+    document["elements"] = [e for e in document["elements"] if e["code"] != 1001]
+    with pytest.raises(DataSourceError, match="names no element for player code 1001"):
+        device_plan_capture_table(
+            inputs, projection, rules, bootstrap=json.dumps(document).encode("utf-8")
+        )

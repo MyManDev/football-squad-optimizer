@@ -229,8 +229,8 @@ The JSON records include:
 - coefficient signatures and reuse diagnostics;
 - paired differences, confidence intervals, main effects, interactions, and decision reason.
 
-Run the two stages explicitly:
-
+Both stage runners have been removed (2026-10-12); the Retired runners table in
+`scripts/README.md` says how to restore and run each. The two stages were run explicitly:
 ```powershell
 .venv\Scripts\python -m scripts.run_screening_doe
 .venv\Scripts\python -m scripts.run_frozen_holdout
