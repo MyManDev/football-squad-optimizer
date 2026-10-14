@@ -126,9 +126,10 @@ export function useMemberAdviceView(
     reset();
     if (computeAvailable) resume?.(resumable.current);
   }, [requestKey, computeAvailable, reset, resume]);
-  // A run on the device ends with the member's selection and nothing else: a late index or
-  // advice read, or a baseline the service may now offer, leaves it solving. The reset is
-  // read through a ref, so a caller's timers passed inline do not end it either.
+  // A run on the device, solving or finished, ends with a new selection here and when the
+  // member asks the service (below); a late index or advice read, or a baseline the service
+  // may now offer, leaves it as it is. The reset is read through a ref, so a caller's timers
+  // passed inline do not end it either.
   useEffect(() => {
     endDeviceRun.current();
   }, [selectionKey]);

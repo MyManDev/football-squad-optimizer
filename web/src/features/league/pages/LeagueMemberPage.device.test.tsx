@@ -309,7 +309,8 @@ function memberPage(createSolver: () => DeviceSolver) {
             client={client}
             deviceDependencies={{
               loadDocument: deviceDocument,
-              // Written inline, as a caller may: the device's reset is new on every render.
+              // Written inline, as a caller may: each rerender of the page gives the device
+              // new timers, and so a new reset.
               setTimer: (callback: () => void, milliseconds: number) =>
                 setTimeout(callback, milliseconds),
               clearTimer: (handle: unknown) =>
@@ -341,6 +342,10 @@ describe("a device solve on the member page as the page's reads land", () => {
     return { container, workers, land: (reads: Reads) => rerender(page(reads)) };
   }
 
+  /**
+   * A new selection still ends the solve. The device's own cleanup ends it before the page's
+   * reset runs; the page's reset is what "is dropped by a new selection" above shows.
+   */
   async function endsWithTheSelection(container: HTMLElement, worker: StillSolving) {
     await act(async () => screen.getByText("to-3").click());
     expect(worker.terminated).toBe(true);
@@ -349,7 +354,7 @@ describe("a device solve on the member page as the page's reads land", () => {
     expect(deviceButton()).toBeEnabled();
   }
 
-  it("goes on when the index read lands after it began, and ends with the selection", async () => {
+  it("goes on solving when the index read lands after it began", async () => {
     const { container, workers, land } = await solvingFrom(READING_INDEX);
     land(READING_ADVICE);
     await act(async () => {});
@@ -359,7 +364,7 @@ describe("a device solve on the member page as the page's reads land", () => {
     await endsWithTheSelection(container, workers[0]!);
   });
 
-  it("goes on when the advice read lands and the service may now be asked", async () => {
+  it("goes on solving when the advice read lands and the service may now be asked", async () => {
     const { container, workers, land } = await solvingFrom(READING_ADVICE);
     land(ALL_READ);
     await act(async () => {});
