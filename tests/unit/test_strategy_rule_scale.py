@@ -655,3 +655,177 @@ def test_invalid_history_value_ends_in_the_one_line_refusal(
     error = capsys.readouterr().err
     assert error == "Measurement refused: The capture has invalid standings or history rows.\n"
     assert not (tmp_path / "docs").exists()
+
+
+# The later checkpoints of #1044: GW12 and GW19 write their own records and leave the GW6
+# record and every earlier checkpoint byte for byte as written.
+
+
+def _failed_control_payloads_through(n: int) -> dict[str, bytes]:
+    payloads = _payloads(n)
+    history = json.loads(payloads["entry-3-history.json"])
+    history["current"][0]["points"] = 99
+    payloads["entry-3-history.json"] = _bytes(history)
+    return payloads
+
+
+@pytest.mark.parametrize("checkpoint,n", [("gw12", 12), ("gw19", 19)])
+def test_checkpoint_writes_its_own_aggregate_twins_in_numeric_week_order(
+    tmp_path: Path, checkpoint: str, n: int
+) -> None:
+    record = {**_provenance(_measure(_payloads(n), n)), "checkpoint": checkpoint}
+    measurement.write_records(record, tmp_path, checkpoint)
+    json_path, markdown_path = measurement.record_paths(tmp_path, checkpoint)
+    assert json_path == tmp_path / f"docs/strategy_rule_scale_{checkpoint}.json"
+    assert markdown_path == tmp_path / f"docs/strategy_rule_scale_{checkpoint}.md"
+    assert not (tmp_path / "docs/strategy_rule_scale.json").exists()
+    assert not (tmp_path / "docs/strategy_rule_scale.md").exists()
+    written = json.loads(json_path.read_text())
+    text = markdown_path.read_text()
+    assert written["checkpoint"] == checkpoint
+    assert written["through_gameweek"] == n
+    assert [row["gameweek"] for row in written["by_gameweek"]] == list(range(1, n + 1))
+    assert text.startswith(f"# Strategy rule scale checkpoint {checkpoint.upper()}\n")
+    single = text.split("## Single gameweeks")[1].split("## Prefixes")[0]
+    rendered = [
+        int(line.split("|")[1].strip())
+        for line in single.splitlines()
+        if line.startswith("| ") and line.split("|")[1].strip().isdigit()
+    ]
+    assert rendered == list(range(1, n + 1))
+    serialized = json.dumps(written) + text
+    assert all(
+        word not in serialized
+        for word in ("entry_id", "entry_name", "player_name", "Synthetic", "per_member")
+    )
+
+
+def test_checkpoint_leaves_the_gw6_record_and_earlier_checkpoints_untouched(
+    tmp_path: Path,
+) -> None:
+    measurement.write_records(_provenance(_measure(_payloads(6), 6)), tmp_path)
+    measurement.write_records(
+        {**_provenance(_measure(_payloads(12), 12)), "checkpoint": "gw12"}, tmp_path, "gw12"
+    )
+    earlier = {
+        path: path.read_bytes()
+        for path in (
+            *measurement.record_paths(tmp_path),
+            *measurement.record_paths(tmp_path, "gw12"),
+        )
+    }
+    measurement.write_records(
+        {**_provenance(_measure(_payloads(19), 19)), "checkpoint": "gw19"}, tmp_path, "gw19"
+    )
+    assert {path: path.read_bytes() for path in earlier} == earlier
+    assert sorted(path.name for path in (tmp_path / "docs").iterdir()) == [
+        "strategy_rule_scale.json",
+        "strategy_rule_scale.md",
+        "strategy_rule_scale_gw12.json",
+        "strategy_rule_scale_gw12.md",
+        "strategy_rule_scale_gw19.json",
+        "strategy_rule_scale_gw19.md",
+    ]
+
+
+def test_unknown_checkpoint_name_has_no_record_paths(tmp_path: Path) -> None:
+    with pytest.raises(measurement.ScaleMeasurementError, match="Unknown checkpoint"):
+        measurement.record_paths(tmp_path, "gw6")
+
+
+@pytest.mark.parametrize("checkpoint,through", [("gw12", 6), ("gw12", 19), ("gw19", 12)])
+def test_checkpoint_refuses_another_through_gameweek_before_any_read(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    checkpoint: str,
+    through: int,
+) -> None:
+    def forbidden(*args: Any, **kwargs: Any) -> Any:
+        pytest.fail("A checkpoint of the wrong gameweek must not open inputs.")
+
+    monkeypatch.setattr(measurement, "preregistration_gate", forbidden)
+    monkeypatch.setattr(measurement, "read_snapshot", forbidden)
+    assert (
+        measurement.main(
+            [
+                "--snapshot-root",
+                str(tmp_path),
+                "--snapshot-id",
+                "fpl-live-20261130T120000Z-" + "a" * 12,
+                "--league",
+                "352490",
+                "--through-gameweek",
+                str(through),
+                "--checkpoint",
+                checkpoint,
+            ]
+        )
+        == 1
+    )
+    expected = measurement.CHECKPOINTS[checkpoint]
+    assert f"The {checkpoint} checkpoint is the record through GW{expected}." in (
+        capsys.readouterr().err
+    )
+    assert not (tmp_path / "docs").exists()
+
+
+def test_checkpoint_name_is_one_of_the_two_declared(tmp_path: Path) -> None:
+    with pytest.raises(SystemExit) as refused:
+        measurement.main(
+            [
+                "--snapshot-root",
+                str(tmp_path),
+                "--snapshot-id",
+                "fpl-live-20261130T120000Z-" + "a" * 12,
+                "--league",
+                "352490",
+                "--through-gameweek",
+                "12",
+                "--checkpoint",
+                "gw6",
+            ]
+        )
+    assert refused.value.code == 2
+
+
+def test_checkpoint_run_through_the_store_writes_its_own_record_only(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    metadata = _stored_capture(monkeypatch, tmp_path, _payloads(12))
+    record = measurement.run_measurement(
+        snapshot_root=tmp_path / "captures",
+        snapshot_id=metadata.snapshot_id,
+        league=measurement.PRIMARY_LEAGUE,
+        through_gameweek=12,
+        checkpoint="gw12",
+    )
+    assert record["checkpoint"] == "gw12"
+    assert record["through_gameweek"] == 12
+    assert (tmp_path / "docs/strategy_rule_scale_gw12.json").is_file()
+    assert (tmp_path / "docs/strategy_rule_scale_gw12.md").is_file()
+    assert not (tmp_path / "docs/strategy_rule_scale.json").exists()
+
+
+def test_failed_control_at_a_checkpoint_writes_its_record_and_exits_three(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    metadata = _stored_capture(monkeypatch, tmp_path, _failed_control_payloads_through(19))
+    assert (
+        measurement.main(
+            [
+                *_main_arguments(tmp_path, metadata.snapshot_id)[:6],
+                "--through-gameweek",
+                "19",
+                "--checkpoint",
+                "gw19",
+            ]
+        )
+        == measurement.CONTROL_FAILED_EXIT
+    )
+    assert "Step 4 is held" in capsys.readouterr().err
+    written = json.loads((tmp_path / "docs/strategy_rule_scale_gw19.json").read_text())
+    assert written["control_failed"] is True
+    assert written["checkpoint"] == "gw19"
+    assert "Control: failed" in (tmp_path / "docs/strategy_rule_scale_gw19.md").read_text()
+    assert not (tmp_path / "docs/strategy_rule_scale.json").exists()

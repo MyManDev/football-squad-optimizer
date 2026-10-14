@@ -159,7 +159,7 @@ do not move.
 | `measure_scenario_path_dependence.py` | measurement runner | `docs/scenario_path_dependence.json` | 2026-08-19 |
 | `measure_shortlist_matrix.py` | measurement runner | a fresh output directory; `docs/research/planning_shortlist_matrix.json` records this file's hash; four other runners import its `audit_plan` | 2026-09-28 |
 | `measure_strategy_bench.py` | measurement runner | `docs/strategy_bench.json` | 2026-09-26 |
-| `measure_strategy_rule_scale.py` | measurement runner | `docs/strategy_rule_scale.json`, `docs/strategy_rule_scale.md` | 2026-10-11 |
+| `measure_strategy_rule_scale.py` | measurement runner | `docs/strategy_rule_scale.json`, `docs/strategy_rule_scale.md`; with `--checkpoint gw12` or `gw19`, `docs/strategy_rule_scale_gw12.*` or `_gw19.*` and never the earlier records | 2026-10-11 |
 | `measure_strategy_screening.py` | measurement runner | `docs/strategy_screening.json` | 2026-09-26 |
 | `measure_template_rival.py` | measurement runner | `docs/template_rival_strength.json` (+ per-season variants) | 2026-09-19 |
 | `measure_temporal_refinement.py` | measurement runner | a fresh output directory; `docs/research/temporal_refinement_measurement.json` and `docs/research/triple_refinement_measurement.json` each record this file's hash | 2026-09-30 |
