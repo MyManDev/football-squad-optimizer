@@ -1,7 +1,8 @@
 import { createContext, useContext } from "react";
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 
-import type { DataClient, Loaded } from "./client";
+import type { DataClient } from "./client";
+import type { Loaded } from "./envelope";
 import { StaticDataClient } from "./client";
 import type { LiveScoreView } from "./liveScore";
 import type {

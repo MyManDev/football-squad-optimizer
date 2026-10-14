@@ -324,7 +324,7 @@ def test_a_damaged_queue_record_is_set_aside_by_the_scan_and_not_counted(
     liveness = WorkerLiveness(root, queue, clock=lambda: NOW, recheck_seconds=0.0)
 
     assert liveness.checks() == (True, True)
-    assert len(queue.integrity_issues()) == 1
+    assert len(list((tmp_path / "jobs" / "integrity").glob("*.bin"))) == 1
 
 
 @pytest.mark.parametrize("fails", ["at_the_call", "partway"])

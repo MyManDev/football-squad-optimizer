@@ -30,7 +30,6 @@ from squadopt.data.errors import (
 )
 from squadopt.data.fixtures import (
     aggregate_team_gameweek,
-    blank_gameweek_defaults,
     validate_fixture_snapshot,
 )
 from squadopt.data.loaders import (
@@ -137,7 +136,6 @@ __all__ = [
     "SourceAdapter",
     "aggregate_team_gameweek",
     "apply_adapter",
-    "blank_gameweek_defaults",
     "build_canonical_dataset",
     "build_snapshot_id",
     "canonical_column_order",

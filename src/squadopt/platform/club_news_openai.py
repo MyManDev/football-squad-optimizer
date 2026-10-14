@@ -38,8 +38,6 @@ from squadopt.data.sources.club_news_coding import (
     response_schema,
 )
 
-OPENAI_PROVIDER: Final = "openai"
-OPENAI_COMPATIBLE_PROVIDER: Final = "openai-compatible"
 DEFAULT_OPENAI_BASE_URL: Final = "https://api.openai.com/v1"
 DEFAULT_MAX_COMPLETION_TOKENS: Final = 16_000
 MAX_COMPLETION_TOKENS: Final = 16_000

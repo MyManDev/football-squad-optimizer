@@ -1,17 +1,29 @@
 {
   "contract_version": "ui_view_v1",
-  "generated_at_utc": "2026-10-10T06:07:22Z",
+  "generated_at_utc": "2026-10-14T14:20:38Z",
   "payload": {
     "actions": [
       {
         "gameweek": 6,
         "handoff_path": null,
         "kind": "wait",
-        "reason": "gameweek 6 deadline in 3.9 h; capture opens 3 h before it",
+        "reason": "gameweek 6 deadline 2026-10-10T10:00:00Z closed with no decision recorded (missed); nothing can be decided for it now",
+        "reason_code": "deadline_missed",
+        "reason_params": {
+          "deadline_utc": "2026-10-10T10:00:00Z",
+          "gameweek": 6
+        },
+        "snapshot_id": null
+      },
+      {
+        "gameweek": 7,
+        "handoff_path": null,
+        "kind": "wait",
+        "reason": "gameweek 7 deadline in 67.7 h; capture opens 3 h before it",
         "reason_code": "before_window",
         "reason_params": {
-          "gameweek": 6,
-          "hours_left": 3.9,
+          "gameweek": 7,
+          "hours_left": 67.7,
           "window_hours": 3.0
         },
         "snapshot_id": null
@@ -22,12 +34,12 @@
       4,
       5
     ],
-    "hours_to_deadline": 3.88,
+    "hours_to_deadline": 67.66,
     "is_idle": true,
-    "latest_capture": "fpl-live-20261010T035732Z-c77d032165af",
-    "next_deadline_utc": "2026-10-10T10:00:00Z",
-    "next_gameweek": 6,
-    "now_utc": "2026-10-10T06:07:22Z",
+    "latest_capture": "fpl-live-20261014T135921Z-a48d1521c87f",
+    "next_deadline_utc": "2026-10-17T10:00:00Z",
+    "next_gameweek": 7,
+    "now_utc": "2026-10-14T14:20:38Z",
     "recent_events": [
       {
         "fields": {
@@ -35,8 +47,8 @@
         },
         "level": "INFO",
         "message": "tick.week.stage.start",
-        "run_id": "2026-27-gw06-decision-20261010",
-        "ts": "2026-10-10T06:07:22.292+00:00"
+        "run_id": "2026-27-gw07-settled6-20261014",
+        "ts": "2026-10-14T14:20:36.045+00:00"
       },
       {
         "fields": {
@@ -44,8 +56,8 @@
         },
         "level": "INFO",
         "message": "tick.week.stage.done",
-        "run_id": "2026-27-gw06-decision-20261010",
-        "ts": "2026-10-10T06:07:22.291+00:00"
+        "run_id": "2026-27-gw07-settled6-20261014",
+        "ts": "2026-10-14T14:20:36.044+00:00"
       },
       {
         "fields": {
@@ -53,8 +65,8 @@
         },
         "level": "INFO",
         "message": "tick.week.stage.start",
-        "run_id": "2026-27-gw06-decision-20261010",
-        "ts": "2026-10-10T05:02:54.276+00:00"
+        "run_id": "2026-27-gw07-settled6-20261014",
+        "ts": "2026-10-14T13:59:58.641+00:00"
       },
       {
         "fields": {
@@ -62,8 +74,8 @@
         },
         "level": "INFO",
         "message": "tick.week.stage.done",
-        "run_id": "2026-27-gw06-decision-20261010",
-        "ts": "2026-10-10T05:02:54.276+00:00"
+        "run_id": "2026-27-gw07-settled6-20261014",
+        "ts": "2026-10-14T13:59:57.655+00:00"
       },
       {
         "fields": {
@@ -71,8 +83,8 @@
         },
         "level": "INFO",
         "message": "tick.week.stage.start",
-        "run_id": "2026-27-gw06-decision-20261010",
-        "ts": "2026-10-10T05:02:53.974+00:00"
+        "run_id": "2026-27-gw07-settled6-20261014",
+        "ts": "2026-10-14T13:59:33.523+00:00"
       },
       {
         "fields": {
@@ -80,8 +92,8 @@
         },
         "level": "INFO",
         "message": "tick.week.stage.done",
-        "run_id": "2026-27-gw06-decision-20261010",
-        "ts": "2026-10-10T05:02:53.974+00:00"
+        "run_id": "2026-27-gw07-settled6-20261014",
+        "ts": "2026-10-14T13:59:33.523+00:00"
       },
       {
         "fields": {
@@ -89,8 +101,8 @@
         },
         "level": "INFO",
         "message": "tick.week.stage.start",
-        "run_id": "2026-27-gw06-decision-20261010",
-        "ts": "2026-10-10T05:02:53.876+00:00"
+        "run_id": "2026-27-gw07-settled6-20261014",
+        "ts": "2026-10-14T13:59:32.822+00:00"
       },
       {
         "fields": {
@@ -98,8 +110,8 @@
         },
         "level": "INFO",
         "message": "tick.week.stage.done",
-        "run_id": "2026-27-gw06-decision-20261010",
-        "ts": "2026-10-10T05:02:53.876+00:00"
+        "run_id": "2026-27-gw07-settled6-20261014",
+        "ts": "2026-10-14T13:59:32.822+00:00"
       },
       {
         "fields": {
@@ -107,8 +119,8 @@
         },
         "level": "INFO",
         "message": "tick.week.stage.start",
-        "run_id": "2026-27-gw06-decision-20261010",
-        "ts": "2026-10-10T05:02:51.554+00:00"
+        "run_id": "2026-27-gw07-settled6-20261014",
+        "ts": "2026-10-14T13:59:24.505+00:00"
       },
       {
         "fields": {
@@ -116,8 +128,8 @@
         },
         "level": "INFO",
         "message": "tick.week.stage.done",
-        "run_id": "2026-27-gw06-decision-20261010",
-        "ts": "2026-10-10T05:02:51.554+00:00"
+        "run_id": "2026-27-gw07-settled6-20261014",
+        "ts": "2026-10-14T13:59:24.504+00:00"
       },
       {
         "fields": {
@@ -125,8 +137,8 @@
         },
         "level": "INFO",
         "message": "tick.week.stage.start",
-        "run_id": "2026-27-gw06-decision-20261010",
-        "ts": "2026-10-10T05:02:51.463+00:00"
+        "run_id": "2026-27-gw07-settled6-20261014",
+        "ts": "2026-10-14T13:59:02.720+00:00"
       },
       {
         "fields": {
@@ -134,8 +146,8 @@
         },
         "level": "INFO",
         "message": "tick.week.stage.done",
-        "run_id": "2026-27-gw06-decision-20261010",
-        "ts": "2026-10-10T05:02:51.462+00:00"
+        "run_id": "2026-27-gw07-settled6-20261014",
+        "ts": "2026-10-14T13:59:02.720+00:00"
       },
       {
         "fields": {
@@ -143,8 +155,8 @@
         },
         "level": "INFO",
         "message": "tick.week.stage.start",
-        "run_id": "2026-27-gw06-decision-20261010",
-        "ts": "2026-10-10T05:02:51.357+00:00"
+        "run_id": "2026-27-gw07-settled6-20261014",
+        "ts": "2026-10-14T13:59:02.403+00:00"
       },
       {
         "fields": {
@@ -152,8 +164,8 @@
         },
         "level": "INFO",
         "message": "tick.week.stage.done",
-        "run_id": "2026-27-gw06-decision-20261010",
-        "ts": "2026-10-10T05:02:51.357+00:00"
+        "run_id": "2026-27-gw07-settled6-20261014",
+        "ts": "2026-10-14T13:59:02.402+00:00"
       },
       {
         "fields": {
@@ -161,8 +173,8 @@
         },
         "level": "INFO",
         "message": "tick.week.stage.start",
-        "run_id": "2026-27-gw06-decision-20261010",
-        "ts": "2026-10-10T05:02:51.249+00:00"
+        "run_id": "2026-27-gw07-settled6-20261014",
+        "ts": "2026-10-14T13:58:23.132+00:00"
       },
       {
         "fields": {
@@ -170,8 +182,8 @@
         },
         "level": "INFO",
         "message": "tick.week.stage.done",
-        "run_id": "2026-27-gw06-decision-20261010",
-        "ts": "2026-10-10T05:02:51.249+00:00"
+        "run_id": "2026-27-gw07-settled6-20261014",
+        "ts": "2026-10-14T13:58:23.132+00:00"
       },
       {
         "fields": {
@@ -179,8 +191,8 @@
         },
         "level": "INFO",
         "message": "tick.week.stage.start",
-        "run_id": "2026-27-gw06-decision-20261010",
-        "ts": "2026-10-10T05:02:51.242+00:00"
+        "run_id": "2026-27-gw07-settled6-20261014",
+        "ts": "2026-10-14T13:58:21.806+00:00"
       },
       {
         "fields": {
@@ -188,8 +200,8 @@
         },
         "level": "INFO",
         "message": "tick.week.stage.done",
-        "run_id": "2026-27-gw06-decision-20261010",
-        "ts": "2026-10-10T05:02:51.241+00:00"
+        "run_id": "2026-27-gw07-settled6-20261014",
+        "ts": "2026-10-14T13:58:21.806+00:00"
       },
       {
         "fields": {
@@ -197,16 +209,16 @@
         },
         "level": "INFO",
         "message": "tick.week.stage.start",
-        "run_id": "2026-27-gw06-decision-20261010",
-        "ts": "2026-10-10T05:02:51.152+00:00"
+        "run_id": "2026-27-gw07-settled6-20261014",
+        "ts": "2026-10-14T13:58:19.094+00:00"
       },
       {
         "fields": {
-          "gameweek": 6,
+          "gameweek": 7,
           "leagues": [
             352490
           ],
-          "resume": true,
+          "resume": false,
           "season": "2026-27",
           "stages": [
             "preflight",
@@ -225,8 +237,8 @@
         },
         "level": "INFO",
         "message": "tick.week.plan",
-        "run_id": "2026-27-gw06-decision-20261010",
-        "ts": "2026-10-10T05:02:51.149+00:00"
+        "run_id": "2026-27-gw07-settled6-20261014",
+        "ts": "2026-10-14T13:58:19.090+00:00"
       }
     ],
     "season": "2026-27",

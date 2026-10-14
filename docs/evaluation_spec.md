@@ -124,8 +124,9 @@ controls, environment versions, aggregate distributions, and one result row per 
 - Walk-forward folds accept either a canonical projection DataFrame or a fingerprinted
   `PredictionSnapshot`. Learned-model training remains external, while its prediction and
   training provenance can cross this model-neutral boundary without changing evaluation.
-- Player-level uncertainty calibration is implemented by the separate
-  `squadopt.uncertainty` package; this evaluator still scores frozen squad decisions only.
+- Player-level uncertainty calibration was implemented by the separate
+  `squadopt.uncertainty` package, removed on 2026-10-12; this evaluator scores frozen squad
+  decisions only.
 - There is no automatic-substitution or bench-order scoring.
 - The Sprint 2 DoE is implemented separately; there is no Bayesian Optimization loop or
   experiment storage backend.

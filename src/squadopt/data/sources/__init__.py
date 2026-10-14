@@ -37,7 +37,6 @@ from squadopt.data.sources.vaastav import (
     load_fixture_snapshot,
     load_season,
     load_team_codes,
-    load_upcoming_roster,
     shift_price_to_deadline,
 )
 
@@ -64,7 +63,6 @@ __all__ = [
     "load_fixture_snapshot",
     "load_season",
     "load_team_codes",
-    "load_upcoming_roster",
     "player_snapshot",
     "shift_price_to_deadline",
     "team_codes",

@@ -12,8 +12,8 @@ Three claims are attacked here, and nothing else:
   ``declared_gates`` tuple builds a v2 report — attacking v1 with a v2 field would only
   ever measure the version freeze.
 * **The boundary holds in both directions.** A squad report may not validate against the
-  member-facing ``ui_view_v1`` contract, may not carry probability prose, may not be
-  written under ``web/public``, and may not widen the strategy catalogue's envelope.
+  member-facing ``ui_view_v1`` contract, may not be written under ``web/public``, and
+  may not widen the strategy catalogue's envelope.
 * **A recorded result is not overwritten.** ``write_shadow_report_once`` publishes once,
   replays an identical measurement, refuses a different one, and leaves no residue —
   including under concurrent writers.
@@ -27,19 +27,15 @@ two ``FINDING``-named cases that remain are the site-tree guard's casing rule an
 publishable-name meta-gate's scope, and they are still open.
 
 Every fixture is synthetic. Nothing here reads an archive, a residual export, or any
-2025-26 file, and the only production behaviour replaced is ``_read_fold`` — the
-solver-and-scenario step — so that the *real* gate ids, threshold prose, diagnostic
-names and verdict still come from the module under review.
+2025-26 file. The squad instrument and its full-protocol combiner have been removed, so
+the squad gate ids and diagnostic names are pinned from its committed record instead.
 """
 
-import itertools
 import json
-import re
 from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-import pandas as pd
 import pytest
 
 from squadopt.application.strategies import (
@@ -51,8 +47,6 @@ from squadopt.application.strategies import (
     StrategyConfigurationError,
 )
 from squadopt.application.strategies.catalog import FORBIDDEN_FIELD_PATTERN
-from squadopt.experiments import shadow_squad_calibration as squad
-from squadopt.experiments.shadow_calibration import PREREG_GATES
 from squadopt.experiments.shadow_report import (
     PREREG_GATE_FAMILIES,
     SHADOW_CALIBRATION_CONTRACT_V1,
@@ -74,6 +68,20 @@ COMMITTED_ARTIFACTS = (
     REPOSITORY_ROOT / "docs" / "shadow_calibration_in_season_corrected.json",
 )
 _SHA = "ab" * 32
+
+#: The squad gate ids and the diagnostics the squad instrument recorded
+#: (``docs/shadow_calibration_squad.json``). The instrument itself has been removed; the
+#: contract and the publication boundary below are still judged on what it wrote.
+S1_GATE = "S1_squad_pit_location"
+S2_GATE = "S2_squad_lower_tail"
+_SQUAD_DIAGNOSTICS: dict[str, float | None] = {
+    "evaluation_folds": 37.0,
+    "frozen_shift_points": -7.43,
+    "mean_probability_integral_transform": 0.492,
+    "realized_below_lower_quantile_folds": 8.0,
+    "realized_below_lower_quantile_rate": 0.216,
+    "shift_fit_folds": 102.0,
+}
 
 #: The published envelope as it stands before any squad verdict exists. Written out
 #: rather than imported so that a widening shows up here as a diff, not as a pass.
@@ -133,12 +141,6 @@ _PUBLISHED_ENVELOPE = frozenset(
     }
 )
 
-#: The site guard's own words (``tests/unit/test_public_probability_guards.py``) plus the
-#: percent sign: an internal squad artifact may not read as member-facing probability
-#: prose even by accident. The Turkish word is spelled with dots for the dotless i.
-_MEMBER_FACING_PROSE = re.compile(r"olas.l.k|\bP\(|%", re.IGNORECASE)
-
-
 # --- builders -------------------------------------------------------------------------
 
 
@@ -185,7 +187,7 @@ def _p1_sub_gates() -> tuple[ShadowGateResult, ...]:
 
 
 def _squad_gate_pair() -> tuple[ShadowGateResult, ...]:
-    return (_gate(squad.S1_GATE, observed=0.50), _gate(squad.S2_GATE, observed=0.108))
+    return (_gate(S1_GATE, observed=0.50), _gate(S2_GATE, observed=0.108))
 
 
 def _report(**overrides: object) -> ShadowCalibrationReport:
@@ -284,106 +286,6 @@ def _rebuild(document: Mapping[str, object]) -> ShadowCalibrationReport:
     )
 
 
-def _synthetic_squad_gates(
-    monkeypatch: pytest.MonkeyPatch,
-) -> tuple[tuple[ShadowGateResult, ...], dict[str, float | None]]:
-    """The real S1/S2 gate objects and diagnostics, from synthetic per-fold readings.
-
-    Only ``_read_fold`` is replaced — the step that would need the solver, the scenario
-    generator and a residual export. The gate ids, the threshold prose, the bounds, the
-    diagnostic names and the verdict are still produced by the module under review, and
-    those are exactly what the publication boundary is judged on.
-    """
-
-    frame = pd.DataFrame({"player_id": [1], "expected_points": [5.0]})
-    folds = tuple(
-        squad.SquadFold(
-            fold_id=f"2024-25-gw{gameweek:02d}",
-            season="2024-25",
-            gameweek=gameweek,
-            projections=frame,
-            realized_points=frame,
-            prior_fold_ids=(),
-        )
-        for gameweek in range(2, 39)
-    )
-    residuals = pd.DataFrame(
-        {
-            "season": ["2021-22", "2022-23", "2023-24"],
-            "fold_id": ["2021-22-gw10", "2022-23-gw20", "2023-24-gw38"],
-        }
-    )
-    counter = itertools.count()
-
-    def read(
-        fold: squad.SquadFold,
-        _residuals: pd.DataFrame,
-        _history: object,
-        _provenance: object,
-        _config: squad.SquadShadowConfig,
-        *,
-        shift_points: float,
-        fixture_counts: object,
-    ) -> tuple[squad.SquadFoldReading, float]:
-        index = next(counter)
-        reading = squad.SquadFoldReading(
-            fold_id=fold.fold_id,
-            realized_score=50.0,
-            scenario_mean_score=51.0,
-            lower_quantile_score=40.0,
-            probability_integral_transform=0.5,
-            below_lower_quantile=index % 10 == 0,
-        )
-        return reading, 1.0
-
-    monkeypatch.setattr(squad, "_read_fold", read)
-    shift = squad.FrozenShift(
-        shift_points=-1.25,
-        fold_count=111,
-        first_fold_id="2021-22-gw02",
-        last_fold_id="2023-24-gw38",
-        seasons=tuple(squad.FIT_SEASONS),
-    )
-    # The second amendment froze every control, so the configuration takes no arguments
-    # at all: a test that named one would be choosing a control nobody pre-registered.
-    config = squad.SquadShadowConfig()
-    gates, _readings, diagnostics = squad.evaluate_squad_gates(
-        folds, residuals, None, config, shift
-    )
-    return gates, diagnostics
-
-
-def _combine(
-    player_gates: tuple[ShadowGateResult, ...],
-    squad_gates: tuple[ShadowGateResult, ...],
-    **overrides: object,
-) -> ShadowCalibrationReport:
-    values: dict[str, object] = {
-        "generated_at_utc": "2026-08-28T12:00:00+00:00",
-        "execution": _execution(),
-        "residual_source": _source(),
-        "calibration_diagnostics": {},
-        "interval_diagnostics": {},
-        "evaluation_folds": 37,
-        "provenance_fingerprints": {"repository_commit": "f12aeb0"},
-    }
-    values.update(overrides)
-    return squad.combine_full_protocol(
-        # The merge takes bound evidence rather than a bare gate sequence: a caller
-        # with no recorded player report can no longer call it at all.
-        player=squad.PlayerEvidence(
-            gates=player_gates,
-            calibration_diagnostics={},
-            interval_diagnostics={},
-            provenance={"player_report_sha256": "e" * 64},
-            abstentions=(),
-            sample_size=37,
-        ),
-        squad_gates=squad_gates,
-        **values,  # type: ignore[arg-type]
-    )
-
-
 def _residue(directory: Path) -> list[str]:
     return sorted(entry.name for entry in directory.iterdir() if ".tmp-" in entry.name)
 
@@ -408,24 +310,24 @@ def test_an_empty_declared_gate_set_is_refused_outright_not_only_on_a_pass() -> 
     with pytest.raises(
         ShadowReportError, match=f"declared_gates is a {SHADOW_CALIBRATION_CONTRACT_V2} field"
     ):
-        _report(declared_gates=PREREG_GATES)
+        _report(declared_gates=PREREG_GATE_FAMILIES)
 
 
 def test_only_the_squad_gates_cannot_claim_the_full_protocol() -> None:
     with pytest.raises(ShadowReportError, match="has no entry in gate_results"):
-        _v2_claims_a_pass(gate_results=_squad_gate_pair(), declared_gates=PREREG_GATES)
+        _v2_claims_a_pass(gate_results=_squad_gate_pair(), declared_gates=PREREG_GATE_FAMILIES)
 
 
 def test_only_p1_cannot_claim_the_full_protocol() -> None:
     with pytest.raises(ShadowReportError, match="has no entry in gate_results"):
-        _v2_claims_a_pass(gate_results=_p1_sub_gates(), declared_gates=PREREG_GATES)
+        _v2_claims_a_pass(gate_results=_p1_sub_gates(), declared_gates=PREREG_GATE_FAMILIES)
 
 
 def test_p1_and_s1_without_s2_cannot_claim_the_full_protocol() -> None:
     with pytest.raises(ShadowReportError, match="has no entry in gate_results"):
         _v2_claims_a_pass(
-            gate_results=(*_p1_sub_gates(), _gate(squad.S1_GATE)),
-            declared_gates=PREREG_GATES,
+            gate_results=(*_p1_sub_gates(), _gate(S1_GATE)),
+            declared_gates=PREREG_GATE_FAMILIES,
         )
 
 
@@ -433,7 +335,7 @@ def test_a_declared_family_with_no_matching_entry_is_refused() -> None:
     """The protocol is declared in full and one of its families is left unanswered."""
 
     with pytest.raises(ShadowReportError, match="has no entry in gate_results"):
-        _v2_claims_a_pass(gate_results=(*_p1_sub_gates(), _gate(squad.S1_GATE)))
+        _v2_claims_a_pass(gate_results=(*_p1_sub_gates(), _gate(S1_GATE)))
 
 
 def test_a_declaration_naming_a_family_the_protocol_never_fixed_is_refused() -> None:
@@ -447,7 +349,7 @@ def test_a_declaration_naming_a_family_the_protocol_never_fixed_is_refused() -> 
     with pytest.raises(ShadowReportError, match="does not pre-register"):
         _v2_claims_a_pass(
             gate_results=(*_p1_sub_gates(), *_squad_gate_pair()),
-            declared_gates=(*PREREG_GATES, "S3_squad_upper_tail"),
+            declared_gates=(*PREREG_GATE_FAMILIES, "S3_squad_upper_tail"),
         )
 
 
@@ -457,23 +359,23 @@ def test_a_gate_entry_matching_no_declared_family_is_refused() -> None:
     with pytest.raises(ShadowReportError, match="matches no declared family"):
         _v2_claims_a_pass(
             gate_results=(*_p1_sub_gates(), *_squad_gate_pair(), _gate("X_convenient_extra")),
-            declared_gates=PREREG_GATES,
+            declared_gates=PREREG_GATE_FAMILIES,
         )
 
 
 def test_the_three_p1_sub_gates_satisfy_their_family() -> None:
     report = _v2_claims_a_pass(
         gate_results=(*_p1_sub_gates(), *_squad_gate_pair()),
-        declared_gates=PREREG_GATES,
+        declared_gates=PREREG_GATE_FAMILIES,
     )
     assert report.shadow_status == "calibrated_internal"
-    assert report.declared_gates == PREREG_GATES
+    assert report.declared_gates == PREREG_GATE_FAMILIES
 
 
 def test_a_family_is_also_satisfied_by_one_entry_of_its_own_name() -> None:
     report = _v2_claims_a_pass(
         gate_results=(_gate("P1_player_coverage"), *_squad_gate_pair()),
-        declared_gates=PREREG_GATES,
+        declared_gates=PREREG_GATE_FAMILIES,
     )
     assert report.shadow_status == "calibrated_internal"
 
@@ -495,7 +397,7 @@ def test_a_typo_in_a_sub_gate_id_does_not_satisfy_its_family() -> None:
                 _gate("P1_playercoverage_double_plus"),
                 *_squad_gate_pair(),
             ),
-            declared_gates=PREREG_GATES,
+            declared_gates=PREREG_GATE_FAMILIES,
         )
 
 
@@ -515,13 +417,13 @@ def test_a_family_prefix_without_the_separator_does_not_match() -> None:
     with pytest.raises(ShadowReportError, match="does not pre-register"):
         _v2_claims_a_pass(
             gate_results=(*_p1_sub_gates(), *_squad_gate_pair()),
-            declared_gates=(*PREREG_GATES, "P1_player_cov"),
+            declared_gates=(*PREREG_GATE_FAMILIES, "P1_player_cov"),
         )
 
 
 def test_declared_gates_may_not_repeat_a_family() -> None:
     with pytest.raises(ShadowReportError, match="repeats a family"):
-        _v2_report(declared_gates=(*PREREG_GATES, PREREG_GATES[0]))
+        _v2_report(declared_gates=(*PREREG_GATE_FAMILIES, PREREG_GATE_FAMILIES[0]))
 
 
 def test_a_declared_family_may_not_be_an_empty_name() -> None:
@@ -540,11 +442,11 @@ def test_a_failing_gate_still_cannot_pass_even_with_a_complete_declaration() -> 
 
     failing = (
         *_p1_sub_gates(),
-        _gate(squad.S1_GATE, passes=False, observed=0.31),
-        _gate(squad.S2_GATE),
+        _gate(S1_GATE, passes=False, observed=0.31),
+        _gate(S2_GATE),
     )
     with pytest.raises(ShadowReportError, match="failed as measured, so this report"):
-        _v2_claims_a_pass(gate_results=failing, declared_gates=PREREG_GATES)
+        _v2_claims_a_pass(gate_results=failing, declared_gates=PREREG_GATE_FAMILIES)
     with pytest.raises(ShadowReportError, match="every pre-registered gate"):
         _claims_a_pass(gate_results=failing)
 
@@ -557,19 +459,16 @@ def test_a_self_declared_two_thirds_protocol_is_refused_by_the_contract() -> Non
 
     A report that declares only the two squad families, and measures exactly those two,
     would otherwise be a ``calibrated_internal`` verdict on two thirds of the protocol
-    with P1 never asked. Completeness may not rest on the caller remembering to pass
-    ``PREREG_GATES``: the contract holds ``PREREG_GATE_FAMILIES`` itself, so a second
-    runner that declares its own subset inherits the protection rather than having to
-    reproduce it.
+    with P1 never asked. Completeness may not rest on the caller remembering to pass the
+    full family set: the contract holds ``PREREG_GATE_FAMILIES`` itself, so a runner that
+    declares its own subset inherits the protection rather than having to reproduce it.
     """
 
     with pytest.raises(ShadowReportError, match="omits pre-registered families"):
         _v2_claims_a_pass(
             gate_results=_squad_gate_pair(),
-            declared_gates=(squad.S1_GATE, squad.S2_GATE),
+            declared_gates=(S1_GATE, S2_GATE),
         )
-    # The families named in the refusal are the contract's own, and they are the prereg.
-    assert PREREG_GATE_FAMILIES == PREREG_GATES
 
 
 def test_a_meaningless_declared_family_is_refused_by_the_contract() -> None:
@@ -617,41 +516,6 @@ def test_a_bare_string_declared_gate_set_is_refused() -> None:
 # --- 2. the three terminal states -----------------------------------------------------
 
 
-def test_a_complete_passing_protocol_is_calibrated_internal() -> None:
-    report = _combine(_p1_sub_gates(), _squad_gate_pair())
-    assert report.shadow_status == "calibrated_internal"
-    # The full-protocol combiner records under v2, which is the version whose rules the
-    # verdict was actually checked against; a v1 pass would be a weaker claim.
-    assert report.contract_version == SHADOW_CALIBRATION_CONTRACT_V2
-    assert report.declared_gates == PREREG_GATES
-    assert report.point_estimate is None
-    assert "unlocks the internal status and nothing else" in report.reasons[0]
-
-
-def test_one_failing_gate_fails_the_whole_protocol() -> None:
-    failing = _gate(squad.S1_GATE, passes=False, observed=0.31)
-    report = _combine(_p1_sub_gates(), (failing, _gate(squad.S2_GATE)))
-    assert report.shadow_status == "failed"
-    assert report.reasons[0] == f"{squad.S1_GATE} failed as measured."
-    assert "no retry, re-tune or reinterpretation" in report.reasons[-1]
-
-
-def test_a_failure_outranks_an_unasked_family_without_hiding_it() -> None:
-    """A negative is the verdict even when the protocol is incomplete — and both are said.
-
-    The status is ``failed``: a measured negative is a result, not an abstention. But
-    the incompleteness does not stop being true because something else also went wrong,
-    and a reader of this report would otherwise be told S1 failed and never told that
-    P1 was never asked. The verdict leads; the missing family is still named.
-    """
-
-    report = _combine((), (_gate(squad.S1_GATE, passes=False, observed=0.31),))
-    assert report.shadow_status == "failed"
-    assert "failed as measured" in report.reasons[0]
-    assert any("partial protocol" in reason for reason in report.reasons)
-    assert any("P1_player_coverage" in reason for reason in report.reasons)
-
-
 def test_failed_may_not_be_claimed_without_a_gate_that_failed_as_measured() -> None:
     """The status-consistency rule runs in both directions, so neither can be dressed up.
 
@@ -666,58 +530,6 @@ def test_failed_may_not_be_claimed_without_a_gate_that_failed_as_measured() -> N
             shadow_status="failed",
             reasons=("the run preferred to record a negative",),
         )
-
-
-def test_an_unasked_family_with_everything_else_passing_abstains_and_names_it() -> None:
-    report = _combine((), _squad_gate_pair())
-    assert report.shadow_status == "abstained"
-    assert "P1_player_coverage" in report.reasons[-1]
-    assert "calibrated_internal is not claimable" in report.reasons[-1]
-
-
-def test_no_gates_at_all_abstains_naming_every_family() -> None:
-    report = _combine((), ())
-    assert report.shadow_status == "abstained"
-    assert all(family in report.reasons[-1] for family in PREREG_GATES)
-
-
-def test_a_thin_sample_abstains_even_when_every_measured_gate_passed() -> None:
-    report = _combine(
-        _p1_sub_gates(),
-        _squad_gate_pair(),
-        abstention_reasons=("29 evaluation folds are fewer than the minimum of 30.",),
-    )
-    assert report.shadow_status == "abstained"
-    assert report.reasons[0].startswith("29 evaluation folds")
-
-
-def test_a_passing_gate_outside_every_family_cannot_be_combined_into_a_pass() -> None:
-    """The contract, not the combiner, is what refuses — and it refuses loudly."""
-
-    with pytest.raises(ShadowReportError, match="matches no declared family"):
-        _combine(_p1_sub_gates(), (*_squad_gate_pair(), _gate("S9_bonus_gate")))
-
-
-def test_an_unevaluable_gate_is_reported_as_abstained_rather_than_failed() -> None:
-    """Missing evidence is not a negative result, and the combiner keeps the two apart.
-
-    The pre-registration separates them — a failing gate is ``failed``, a missing gate
-    or sample is ``abstained``. A gate entry with no observed value cannot pass by
-    contract, so the naive reading drags the verdict to ``failed`` with the "failed as
-    measured" wording though nothing was measured. The squad instrument never emits such
-    an entry (a thin sample returns no gates at all, which does abstain), so this is
-    reachable only through the shared combiner's other callers — which is exactly why
-    the classification belongs in the combiner rather than in one runner's care.
-    """
-
-    unevaluable = ShadowGateResult(
-        gate=squad.S2_GATE, passes=False, observed=None, threshold="not evaluable"
-    )
-    report = _combine(_p1_sub_gates(), (_gate(squad.S1_GATE), unevaluable))
-    assert report.shadow_status == "abstained"
-    named = f"{squad.S2_GATE} was not evaluable and carries no observation."
-    assert report.reasons[-1] == named
-    assert not any("failed as measured" in reason for reason in report.reasons)
 
 
 # --- 3. backward compatibility --------------------------------------------------------
@@ -1035,87 +847,33 @@ def test_a_differing_declaration_is_a_conflict_not_a_replay(tmp_path: Path) -> N
 # --- 6. public isolation --------------------------------------------------------------
 
 
-def test_the_public_site_schema_rejects_a_squad_report(monkeypatch: pytest.MonkeyPatch) -> None:
+def _calibrated_squad_report() -> ShadowCalibrationReport:
+    """A full-protocol pass carrying the squad instrument's recorded diagnostics."""
+
+    return _v2_claims_a_pass(
+        gate_results=(*_p1_sub_gates(), *_squad_gate_pair()),
+        calibration_diagnostics=_SQUAD_DIAGNOSTICS,
+    )
+
+
+def test_the_public_site_schema_rejects_a_squad_report() -> None:
     jsonschema = pytest.importorskip("jsonschema")
     schema_path = REPOSITORY_ROOT / "docs" / "contracts" / "ui_view_v1.schema.json"
     schema = json.loads(schema_path.read_text(encoding="utf-8"))
-    gates, diagnostics = _synthetic_squad_gates(monkeypatch)
-    report = _combine(_p1_sub_gates(), gates, calibration_diagnostics=diagnostics)
+    report = _calibrated_squad_report()
     assert report.shadow_status == "calibrated_internal"
     with pytest.raises(jsonschema.ValidationError):
         jsonschema.validate(report_to_dict(report), schema)
 
 
-def test_a_squad_report_carries_no_member_facing_probability_prose(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    gates, diagnostics = _synthetic_squad_gates(monkeypatch)
-    report = _combine(_p1_sub_gates(), gates, calibration_diagnostics=diagnostics)
-    text = json.dumps(report_to_dict(report), indent=2, sort_keys=True)
-    assert _MEMBER_FACING_PROSE.findall(text) == []
-    # The gates are still fully named internally — silence is not the mechanism.
-    assert squad.S1_GATE in text
-    assert "mean PIT in [0.43, 0.57] inclusive" in text
-    assert "realized-below-q10 rate in [0.04, 0.16] inclusive" in text
-
-
-def test_the_abstained_squad_report_the_cli_writes_carries_no_prose_either(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """The shipped shape: the squad CLI passes no player gates, so P1 is always unasked."""
-
-    gates, diagnostics = _synthetic_squad_gates(monkeypatch)
-    report = _combine((), gates, calibration_diagnostics=diagnostics)
-    assert report.shadow_status == "abstained"
-    text = json.dumps(report_to_dict(report), indent=2, sort_keys=True)
-    assert _MEMBER_FACING_PROSE.findall(text) == []
-
-
-def test_the_two_replay_identity_helpers_have_not_drifted(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Two runners must not disagree about what a replay may differ by.
-
-    ``shadow_calibration.replay_identity`` (the player CLI's own create-once) and
-    ``shadow_report.replay_identity_of`` (the new atomic writer) are duplicate
-    definitions of the same rule. This pins them together on the committed artifacts and
-    on a squad document so a change to one shows up as a failure rather than as two
-    runners quietly disagreeing.
-    """
-
-    from squadopt.experiments.shadow_calibration import replay_identity
-
-    gates, diagnostics = _synthetic_squad_gates(monkeypatch)
-    squad_document = report_to_dict(
-        _combine(_p1_sub_gates(), gates, calibration_diagnostics=diagnostics)
-    )
-    documents = [squad_document, report_to_dict(_report())]
-    documents.extend(json.loads(path.read_text(encoding="utf-8")) for path in COMMITTED_ARTIFACTS)
-    for document in documents:
-        assert replay_identity(document) == replay_identity_of(document)
-
-
-def test_a_squad_report_may_not_be_written_under_the_published_site(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    gates, diagnostics = _synthetic_squad_gates(monkeypatch)
-    report = _combine(_p1_sub_gates(), gates, calibration_diagnostics=diagnostics)
-    target = tmp_path / "web" / "public" / "data" / "shadow_squad.json"
-    with pytest.raises(ShadowReportError, match="published site tree"):
-        write_shadow_report_once(report, target)
-    assert not (tmp_path / "web").exists()
-
-
 # --- 7. the strategy catalogue is untouched by a squad verdict ------------------------
 
 
-def test_a_calibrated_internal_squad_verdict_widens_nothing_publishable(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_a_calibrated_internal_squad_verdict_widens_nothing_publishable() -> None:
     before_fields = frozenset(PUBLISHABLE_FIELDS)
     before_pattern = FORBIDDEN_FIELD_PATTERN.pattern
-    gates, diagnostics = _synthetic_squad_gates(monkeypatch)
-    report = _combine(_p1_sub_gates(), gates, calibration_diagnostics=diagnostics)
+    report = _calibrated_squad_report()
+    diagnostics = _SQUAD_DIAGNOSTICS
 
     assert report.shadow_status == "calibrated_internal"
     assert frozenset(PUBLISHABLE_FIELDS) == before_fields == _PUBLISHED_ENVELOPE
@@ -1124,12 +882,10 @@ def test_a_calibrated_internal_squad_verdict_widens_nothing_publishable(
         assert name not in PUBLISHABLE_FIELDS
 
 
-def test_no_squad_diagnostic_can_be_declared_publishable(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_no_squad_diagnostic_can_be_declared_publishable() -> None:
     """The closed envelope — not the name pattern — is what stops every one of them."""
 
-    _gates, diagnostics = _synthetic_squad_gates(monkeypatch)
+    diagnostics = _SQUAD_DIAGNOSTICS
     assert set(diagnostics) >= {
         "mean_probability_integral_transform",
         "realized_below_lower_quantile_rate",
@@ -1145,9 +901,7 @@ def test_no_squad_diagnostic_can_be_declared_publishable(
             )
 
 
-def test_the_meta_gate_alone_would_stop_only_the_probability_named_diagnostics(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_the_meta_gate_alone_would_stop_only_the_probability_named_diagnostics() -> None:
     """FINDING (scope): the name meta-gate is narrower than the envelope it backs up.
 
     If ``PUBLISHABLE_FIELDS`` were ever widened by hand, the existing meta-gate would
@@ -1159,7 +913,7 @@ def test_the_meta_gate_alone_would_stop_only_the_probability_named_diagnostics(
     which is the accident that makes the point: the pattern reads names, not meanings.
     """
 
-    _gates, diagnostics = _synthetic_squad_gates(monkeypatch)
+    diagnostics = _SQUAD_DIAGNOSTICS
     blocked = {name for name in diagnostics if FORBIDDEN_FIELD_PATTERN.search(name)}
     assert blocked == {
         "mean_probability_integral_transform",

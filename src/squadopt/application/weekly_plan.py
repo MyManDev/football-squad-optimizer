@@ -22,7 +22,6 @@ from squadopt.live import (
     chip_availability_for,
     held_squad_from_ledger,
     load_ledger,
-    read_season_rules,
 )
 from squadopt.optimization import OptimizationConfig
 from squadopt.planning import CHIP_NAMES as PLANNER_CHIP_NAMES
@@ -562,21 +561,6 @@ def latest_live_snapshot(root: Path) -> str | None:
 
     live = list_snapshot_ids(root, source=FPL_LIVE_SOURCE)
     return live[-1] if live else None
-
-
-def rules_before_capture(root: Path, snapshot_id: str | None, season: str) -> SeasonRules | None:
-    """The season rules the chip pre-flight reads, from a capture already on disk.
-
-    This week's capture does not exist yet when the pre-flight runs — that is the point
-    of running it first — so the chip windows come from the capture the caller reuses, or
-    failing that from the most recent live one held. Chip windows are the season's, not
-    the week's: the same ``game_config`` block every capture of the season carries.
-    """
-
-    identifier = snapshot_id or latest_live_snapshot(root)
-    if identifier is None:
-        return None
-    return read_season_rules(read_snapshot(root, identifier), season=season)
 
 
 def capture_deadline(root: Path, snapshot_id: str) -> tuple[int, str, str]:

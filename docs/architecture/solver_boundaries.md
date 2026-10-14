@@ -9,6 +9,7 @@ Those helpers live in `optimization.decisions`; planning imports that module dir
 | `add_decision_constraints` | Squad/XI/captain counts and nesting, position quotas, team limits and optional static affordability. |
 | `selected_indices` | Read selected variables in their existing model order. |
 | `verify_solution` | Check the same solved squad invariants, with the same optional static budget. |
+| `add_tiebreak_objective` | Fix the proven primary value and minimize the canonical rank-weighted tie-break among squads of equal objective value. |
 
 The helpers previously lived inside `optimization.optimizer` and were already shared by
 these consumers. Extraction makes that ownership explicit; it introduces no second
@@ -22,8 +23,21 @@ prices, free transfers and chip transitions. Disabling static affordability does
 the other squad checks.
 
 Model variable creation, constraint insertion order, objective coefficients, deterministic
-seed/settings, time budgets, tie-breaks, fingerprints and result arithmetic remain at their
-existing call sites. The shared helper performs no solve and makes no strategy decision.
+seed/settings, time budgets, tie-breaks, fingerprints and result arithmetic remained at their
+existing call sites when the three helpers were extracted. The shared helpers perform no solve
+and make no strategy decision.
+
+The solver itself has one public port since [ADR 0011](decisions/0011-storage-ports-and-platform-split.md)
+(decision 5): `optimization.cpsat` holds `configure_solver`, `solve`, `raw_status_name`,
+`map_solver_status`, `deterministic_time_used`, `remaining_deterministic_time` and the three
+budget constants, bodies moved unchanged from `optimization.optimizer`; the tie-break objective
+joined `optimization.decisions` as `add_tiebreak_objective`, and the empty result
+`optimization.models` as `empty_result`. Each consumer (`optimization.optimizer`,
+`planning.optimizer`, `scenarios.optimization`, `scenarios.rank`) binds the public names to the
+module-level private names it had, so the tests that patch `_solve` or
+`_deterministic_time_used` on a consumer keep their seams; `tests/unit/test_cpsat_driver.py`
+holds the bindings, and `tests/architecture/test_private_imports.py` refuses a new private
+import across packages. The solve sequences (probe, primary, tie-break) stay with their callers.
 
 Output assembly is intentionally outside this boundary. Baseline optimization orders its
 bench goalkeeper first and outfield players by descending expected points, then player ID;

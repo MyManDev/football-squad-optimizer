@@ -4,10 +4,10 @@
 
 Stage B of `docs/candidate_declaration_review.md`. `docs/candidate_gate_spec.md:63` says
 "run `run_declared_candidate_benchmark` exactly once for the formal development result", and
-until now nothing did: the function had no caller outside its own module, and
-`scripts/run_production_benchmark.py` hard-wires the two-stage builder and falls back to the
-old `two_stage_calendar_candidate_v1` declaration. A formal run through that script would
-have measured the wrong candidate under the wrong declaration.
+until now nothing did: the function had no caller outside its own module, and the production
+benchmark runner (since removed) hard-wired the two-stage builder and fell back to the old
+`two_stage_calendar_candidate_v1` declaration. A formal run through that script would have
+measured the wrong candidate under the wrong declaration.
 
 **This command has no tuning knobs, by construction.** The benchmark configuration is
 whatever `scripts/freeze_candidate_declaration.benchmark_config()` returns, and the

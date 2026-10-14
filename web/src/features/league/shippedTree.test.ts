@@ -27,6 +27,10 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { isRefusedMemberIndex, refusedMemberIndex } from "../../testSupport/refusedMember";
+import {
+  devicePlanTableProblems,
+  shippedDevicePlanLines,
+} from "../../testSupport/shippedDevicePlanTables";
 import { shippedTrees } from "../../testSupport/shippedTrees";
 import { resolvePublishedAdvice } from "./advice/adviceSelection";
 import { isAdvicePayload } from "./advice/adviceShape";
@@ -318,4 +322,20 @@ describe.each(shippedTrees())("the shipped league tree $path", ({ root: ROOT }) 
     expect(refused).toEqual([]);
     // Well over a thousand documents; a loaded machine needs more than the default.
   }, 180_000);
+});
+
+describe("the shipped device-plan tables", () => {
+  // Once a directory line names the capture's table, the page solves from it and falls back
+  // to the tree's copy without a word on any refusal. Vacuous until a publish writes one.
+  const lines = shippedDevicePlanLines();
+  if (lines.length === 0) {
+    it.skip("are not checked: no directory line names one", () => {});
+    return;
+  }
+  it.each(lines.map((line) => [String(line.leagueId), String(line.devicePlan), line] as const))(
+    "league %s: %s is the table the page reads, and the tree's copy plus its own fields",
+    (_, __, line) => {
+      expect(devicePlanTableProblems(line)).toEqual([]);
+    },
+  );
 });

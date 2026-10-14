@@ -17,8 +17,10 @@ from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from typing import Final, Literal
 
+from squadopt.contracts.schema_paths import contract_schema_path
+
 ARTIFACT_RECORD_CONTRACT_VERSION: Final = "artifact_record_v1"
-ARTIFACT_RECORD_SCHEMA_PATH: Final = Path("docs") / "contracts" / "artifact_record_v1.schema.json"
+ARTIFACT_RECORD_SCHEMA_PATH: Final = contract_schema_path(ARTIFACT_RECORD_CONTRACT_VERSION)
 ARTIFACT_RECORD_DIRECTORY: Final = "records"
 
 ArtifactRole = Literal["input", "output"]

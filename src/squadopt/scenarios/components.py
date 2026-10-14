@@ -28,7 +28,6 @@ double counts is the failure this avoids.
 import hashlib
 import json
 import math
-from collections.abc import Mapping
 from dataclasses import dataclass
 from numbers import Integral
 from typing import Final
@@ -1001,18 +1000,3 @@ def _draw_seed(
         )
     ).encode("utf-8")
     return int.from_bytes(hashlib.sha256(payload).digest()[:8], "big", signed=False)
-
-
-def component_input_summary(inputs: ComponentScenarioInputs) -> Mapping[str, object]:
-    """Counts a caller can log without touching identities."""
-
-    route = inputs.table["composition_route"].astype("string")
-    status = inputs.table["evidence_status"].astype("string")
-    return {
-        "rows": len(inputs.table),
-        "component_model_rows": int((route == COMPONENT_MODEL_ROUTE).sum()),
-        "direct_control_rows": int((route == DIRECT_CONTROL_ROUTE).sum()),
-        "evidence_status_counts": {
-            str(name): int(value) for name, value in status.value_counts().items()
-        },
-    }

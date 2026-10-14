@@ -10,6 +10,7 @@ import wasmUrl from "highs/runtime?url";
 
 import type { LpSolver } from "./lp/problem";
 import { solveRequest, type DevicePlanRequest } from "./requests";
+import { withinCeiling } from "./solve/ceiling";
 import { DevicePlanRefused } from "./solve/week";
 import type { DevicePlanAnswer } from "./types";
 
@@ -41,7 +42,8 @@ self.onmessage = async (event: MessageEvent<DevicePlanRequest>) => {
     const loaded = await highs();
     // The page shows the solver as loading until here, and as computing from here.
     self.postMessage({ id, kind: "ready" } satisfies DevicePlanReply);
-    reply = { id, kind: "answer", answer: solveRequest(loaded, event.data) };
+    // Every solve of the request shares one ceiling; a solve it stops is refused.
+    reply = { id, kind: "answer", answer: solveRequest(withinCeiling(loaded), event.data) };
   } catch (error) {
     reply =
       error instanceof DevicePlanRefused

@@ -17,12 +17,9 @@ from squadopt import (
     optimize_squad,
 )
 from squadopt.live.report import live_optimization_config
-from squadopt.optimization.optimizer import (
-    _map_solver_status,
-    _scale_bench_coefficient,
-    _scale_expected_points,
-    wall_clock_stopped_the_search,
-)
+from squadopt.optimization.coefficients import scale_bench_coefficient, scale_expected_points
+from squadopt.optimization.cpsat import map_solver_status
+from squadopt.optimization.optimizer import wall_clock_stopped_the_search
 
 
 def _ids(frame: pd.DataFrame) -> set[object]:
@@ -225,11 +222,11 @@ def test_integer_price_handling(
     ],
 )
 def test_expected_points_scaling_precision(value: float, scale: int, expected: int) -> None:
-    assert _scale_expected_points(value, scale) == expected
+    assert scale_expected_points(value, scale) == expected
 
 
 def test_bench_coefficient_uses_round_half_up() -> None:
-    assert _scale_bench_coefficient(6238, 0.1) == 624
+    assert scale_bench_coefficient(6238, 0.1) == 624
 
 
 @pytest.mark.parametrize(
@@ -242,12 +239,12 @@ def test_bench_coefficient_uses_round_half_up() -> None:
     ],
 )
 def test_maps_solver_statuses(raw_status: int, expected: SolverStatus) -> None:
-    assert _map_solver_status(raw_status) is expected
+    assert map_solver_status(raw_status) is expected
 
 
 def test_model_invalid_status_is_an_execution_error() -> None:
     with pytest.raises(SolverExecutionError):
-        _map_solver_status(cp_model.MODEL_INVALID)
+        map_solver_status(cp_model.MODEL_INVALID)
 
 
 def test_preserves_extra_input_columns(

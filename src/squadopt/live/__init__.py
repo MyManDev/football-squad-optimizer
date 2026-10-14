@@ -1,8 +1,11 @@
-"""Recommending a squad for a real, upcoming deadline.
+"""The domain records of the live season: a real deadline's decision and what follows it.
 
-Everything here reads a captured snapshot rather than a live endpoint: capture is a
-deliberate step in a script, and what arrives here is bytes that were written down. That
-is what lets a past recommendation be rebuilt exactly, and what keeps every test offline.
+The modules here turn a captured deadline snapshot into a squad decision, from the opening
+squad to a mid-season transfer plan, freeze it in the season ledger, settle it against what
+happened, and read the season's rules from the capture. Nothing here calls a live endpoint:
+the capture is taken by `squadopt.platform.fpl_capture`, and what arrives here is bytes that
+were written down. That is what lets a past recommendation be rebuilt exactly, and what lets
+the tests of this package run offline.
 """
 
 from squadopt.live.calibration import (

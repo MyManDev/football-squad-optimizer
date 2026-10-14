@@ -7,6 +7,7 @@ and the fixture is carried by rerunning ``scripts/export_device_plan_fixture.py`
 
 import json
 
+import pytest
 from scripts.export_device_plan_fixture import FIXTURE, build_fixture
 
 
@@ -46,6 +47,75 @@ def test_the_recorded_answers_are_the_planner_s() -> None:
         assert differences == [], (fresh["entry_id"], differences)
     assert _same(rebuilt["chips"], recorded["chips"], "chips") == []
     assert _same(rebuilt["rivals"], recorded["rivals"], "rivals") == []
+    assert _same(rebuilt["preferences"], recorded["preferences"], "preferences") == []
+
+
+def test_preferences_hold_every_constraint_and_prove_the_infeasible_case() -> None:
+    recorded = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    cases = recorded["preferences"]["cases"]
+    assert {case["name"] for case in cases} == {
+        "keep-held",
+        "avoid-held",
+        "avoid-not-held",
+        "no-hits-zero-free",
+        "no-hits-wildcard",
+        "no-hits-freehit",
+        "save-chips",
+        "keep-freehit",
+        "avoid-top100",
+        "infeasible-no-hits-sale",
+    }
+    points = {
+        row["id"]: row["expected_points"] for row in recorded["preferences"]["document"]["players"]
+    }
+    plain = next(row["reference"] for row in recorded["members"] if row["entry_id"] == 2)
+    freehit = next(
+        row["reference"]
+        for row in recorded["chips"]
+        if row["entry_id"] == 2 and row["chip"] == "freehit"
+    )
+    for case in cases:
+        preferences, reference = case["preferences"], case["reference"]
+        if case["name"] == "infeasible-no-hits-sale":
+            assert reference == {"refused": True, "solver_status": "INFEASIBLE"}
+            continue
+        assert reference["refused"] is False
+        assert reference["solver_status"] == "OPTIMAL"
+        if case["chip"] is None:
+            assert reference["expected_own_points"] == pytest.approx(
+                sum(points[p] for p in reference["starting_xi"]) + points[reference["captain"]],
+                abs=1e-9,
+            )
+        if case["name"] in {"keep-held", "keep-freehit"}:
+            baseline = freehit if case["chip"] == "freehit" else plain
+            kept = preferences["keep_players"][0]
+            assert kept not in baseline["squad"]
+            assert kept in reference["squad"]
+        if case["name"] == "avoid-not-held":
+            avoided = preferences["avoid_players"][0]
+            assert avoided not in case["entry"]["held"]
+            assert avoided in plain["squad"]
+            assert avoided not in reference["squad"]
+        if case["name"] in {"avoid-held", "avoid-top100"}:
+            # Avoiding a held player forces his sale, where the plan without it keeps him.
+            avoided = preferences["avoid_players"][0]
+            assert avoided in case["entry"]["held"]
+            assert avoided in plain["squad"]
+            assert avoided in reference["transfers_out"]
+        assert set(preferences["keep_players"]) <= set(reference["squad"])
+        assert not set(preferences["avoid_players"]) & set(reference["squad"])
+        if preferences["no_hits"]:
+            assert reference["transfer_hit_points"] == 0
+        if case["name"] == "no-hits-zero-free":
+            assert reference["transfers_in"] == reference["transfers_out"] == []
+        if case["name"] in {"no-hits-wildcard", "no-hits-freehit"}:
+            assert case["entry"]["free_transfers"] == 0
+            assert len(reference["transfers_in"]) > 0
+    weighted = next(case for case in cases if case["name"] == "avoid-top100")
+    assert weighted["top100_weight"] == 20
+    assert all(
+        "20" in player["top100_scaled"] for player in recorded["preferences"]["document"]["players"]
+    )
 
 
 def test_the_fixture_covers_a_paid_transfer_and_every_free_transfer_count() -> None:
@@ -122,3 +192,22 @@ def test_the_rival_cases_exercise_both_decisions_and_a_refusal() -> None:
     # Every player in the world is on his own number, so no tie decides a case.
     points = [p["expected_points"] for p in world["document"]["players"]]
     assert len(set(points)) == len(points)
+
+
+def test_weighted_preferences_publish_base_vice_and_bench_order_and_source_fields() -> None:
+    recorded = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    world = recorded["preferences"]
+    players = {row["id"]: row for row in world["document"]["players"]}
+    case = next(row for row in world["cases"] if row["name"] == "avoid-top100")
+    reference = case["reference"]
+    eligible = [p for p in reference["starting_xi"] if p != reference["captain"]]
+    assert reference["vice_captain"] == min(
+        eligible, key=lambda p: (-players[p]["expected_points"], p)
+    )
+    outfield = [p for p in reference["bench"] if players[p]["position"] != "GK"]
+    assert outfield == sorted(outfield, key=lambda p: (-players[p]["expected_points"], p))
+    source = world["document"]["rules"]["top100"]
+    assert source["cohort_snapshot_id"] == "synthetic-preference-cohort"
+    assert source["picks_snapshot_id"] == "synthetic-preference-picks"
+    assert source["table_sha256"] == "synthetic-preference-counts"
+    assert source["picks_gameweek"] == 6

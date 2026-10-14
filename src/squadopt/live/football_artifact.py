@@ -19,9 +19,18 @@ from squadopt.prediction.football import (
     JOINT_ROLE_RETAINED_HISTORY_MODEL_VERSION,
 )
 from squadopt.prediction.football_contextual import CONTEXTUAL_MODEL_VERSION
+from squadopt.prediction.football_match_context import (
+    MATCH_CONTEXT_FEATURE_VERSION,
+    MATCH_CONTEXT_MODEL_VERSION,
+    match_context_metadata,
+)
 from squadopt.prediction.football_minutes_role import RETAINED_HISTORY_ROLE_FEATURE_VERSION
+from squadopt.prediction.football_team_form import (
+    TEAM_FORM_FEATURE_VERSION,
+    TEAM_FORM_MODEL_VERSION,
+    team_form_metadata,
+)
 
-FOOTBALL_CHOICE = "football"
 ARTIFACT_CONTRACT = "live_football_forecast_v1"
 FEATURE_CONTRACT = "causal_football_fixture_features_v1"
 
@@ -83,9 +92,31 @@ def read_football_forecast(path: Path, inputs: RecommendationInputs) -> Football
     if version not in (
         FOOTBALL_MODEL_VERSION,
         CONTEXTUAL_MODEL_VERSION,
+        MATCH_CONTEXT_MODEL_VERSION,
         *JOINT_ROLE_MODEL_VERSIONS,
+        TEAM_FORM_MODEL_VERSION,
     ):
         raise ValueError("Football forecast has an unsupported model_version.")
+    form = version == TEAM_FORM_MODEL_VERSION
+    if form and (
+        document.get("feature_contract_version") != TEAM_FORM_FEATURE_VERSION
+        or document.get("team_form_metadata") != team_form_metadata()
+    ):
+        raise ValueError("Team form forecast requires its explicit feature identity and metadata.")
+    match_context = version == MATCH_CONTEXT_MODEL_VERSION
+    if match_context and (
+        document.get("feature_contract_version") != MATCH_CONTEXT_FEATURE_VERSION
+        or json.dumps(document.get("match_context_metadata"), sort_keys=True)
+        != json.dumps(match_context_metadata(), sort_keys=True)
+    ):
+        raise ValueError("Match-context forecast requires its exact feature and head metadata.")
+    feature_contract = (
+        TEAM_FORM_FEATURE_VERSION
+        if form
+        else MATCH_CONTEXT_FEATURE_VERSION
+        if match_context
+        else FEATURE_CONTRACT
+    )
     if version in JOINT_ROLE_MODEL_VERSIONS and not isinstance(document.get("role_metadata"), dict):
         raise ValueError("Joint role forecast requires its training metadata.")
     if (
@@ -117,7 +148,7 @@ def read_football_forecast(path: Path, inputs: RecommendationInputs) -> Football
         inputs.snapshot_id,
         "fixture_football_candidate",
         version,
-        FEATURE_CONTRACT,
+        feature_contract,
         "fixture_sum_blank_zero_v1",
         # Both producers carry appearance probabilities. Retain them through the
         # horizon boundary so availability-conditioned windows do not lose minutes.
@@ -157,7 +188,7 @@ def read_football_forecast(path: Path, inputs: RecommendationInputs) -> Football
                     ),
                     "model_name": "fixture_football_candidate",
                     "model_version": version,
-                    "feature_contract_version": FEATURE_CONTRACT,
+                    "feature_contract_version": feature_contract,
                     "projection_source": "live_football_artifact",
                     "projection_handoff_fingerprint": document["fingerprint"],
                     "projection_evidence_fingerprint": None,
