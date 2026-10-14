@@ -58,6 +58,7 @@ export interface DevicePlan {
   /** Whether this selection is one the device can solve from the published inputs. */
   available: boolean;
   state: DevicePlanPhase;
+  /** Starts a run; while this selection's run is loading or solving, it starts nothing. */
   run: () => void;
   reset: () => void;
 }
@@ -140,6 +141,10 @@ export function useDevicePlan(
     settle: (reply: DevicePlanReply | null) => void;
     timer: unknown;
   } | null>(null);
+  // The run still loading or solving, by its generation. A run asked for meanwhile starts
+  // nothing: it reads no inputs and posts no message. A reset or a new selection moves the
+  // generation on, so the run after it starts at once.
+  const inFlight = useRef<number | null>(null);
   const requestKey = JSON.stringify([
     squad.source_snapshot_id,
     request.leagueId,
@@ -214,7 +219,9 @@ export function useDevicePlan(
 
   const run = useCallback(() => {
     if (!available || entry === null || selection === null) return;
+    if (inFlight.current === generation.current) return;
     const run = ++generation.current;
+    inFlight.current = run;
     const alive = () => generation.current === run;
     setState({ phase: "loading" });
     void (async () => {
@@ -334,7 +341,9 @@ export function useDevicePlan(
           seconds: reply.answer.seconds,
         });
       }
-    })();
+    })().finally(() => {
+      if (inFlight.current === run) inFlight.current = null;
+    });
   }, [
     available,
     entry,

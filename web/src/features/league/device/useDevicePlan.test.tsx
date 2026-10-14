@@ -143,6 +143,32 @@ class SilentSolver implements DeviceSolver {
   }
 }
 
+/** A worker that loads and answers only when the test says, keeping each request posted to it. */
+class HeldSolver implements DeviceSolver {
+  onmessage: ((event: MessageEvent<DevicePlanReply>) => void) | null = null;
+  onerror: ((event: unknown) => void) | null = null;
+  readonly posted: DevicePlanRequest[] = [];
+  postMessage(request: DevicePlanRequest): void {
+    this.posted.push(request);
+    queueMicrotask(() =>
+      this.onmessage?.({
+        data: { id: request.id, kind: "ready" },
+      } as MessageEvent<DevicePlanReply>),
+    );
+  }
+  /** Answer a request posted earlier with the real solver's plan. */
+  answer(request: DevicePlanRequest): void {
+    this.onmessage?.({
+      data: {
+        id: request.id,
+        kind: "answer",
+        answer: solvePlan(highs, request.document, request.entry, () => 0),
+      },
+    } as MessageEvent<DevicePlanReply>);
+  }
+  terminate(): void {}
+}
+
 /** A worker that never loads: it answers nothing, not even that it is ready. */
 class MuteSolver implements DeviceSolver {
   onmessage: ((event: MessageEvent<DevicePlanReply>) => void) | null = null;
@@ -822,5 +848,152 @@ describe("a solve that runs too long, or is no longer wanted", () => {
     expect(timers.waiting.size).toBe(0);
     await act(async () => screen.getByText("reset").click());
     expect(solver.terminated).toBe(false);
+  });
+});
+
+describe("a run asked for again while one is in flight", () => {
+  /** A gate the inputs' read waits on, and how many reads were made. */
+  function heldReads() {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const reads = { count: 0 };
+    const loadDocument = async () => {
+      reads.count += 1;
+      await gate;
+      return envelope(document);
+    };
+    return { reads, loadDocument, release };
+  }
+
+  async function pressTwice() {
+    await act(async () => {
+      screen.getByText("run").click();
+      screen.getByText("run").click();
+    });
+  }
+
+  it("posts nothing more to a worker that is solving, and the first run still finishes", async () => {
+    const timers = new HandTimers();
+    const created: HeldSolver[] = [];
+    let reads = 0;
+    render(
+      withLeague(
+        <Harness
+          squad={squadWith(entry)}
+          request={REQUEST}
+          loadDocument={async () => {
+            reads += 1;
+            return envelope(document);
+          }}
+          solver={new HeldSolver()}
+          createSolver={() => {
+            const made = new HeldSolver();
+            created.push(made);
+            return made;
+          }}
+          timers={timers}
+          onState={() => {}}
+        />,
+      ),
+    );
+    await act(async () => screen.getByText("run").click());
+    await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("solving"));
+    await act(async () => screen.getByText("run").click());
+    expect(screen.getByTestId("phase")).toHaveTextContent("solving");
+    expect(created).toHaveLength(1);
+    expect(created[0]!.posted).toHaveLength(1);
+    expect(reads).toBe(1);
+    await act(async () => created[0]!.answer(created[0]!.posted[0]!));
+    await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("done"));
+    expect(timers.waiting.size).toBe(0);
+  });
+
+  it("reads the inputs once when asked again while they are still being read", async () => {
+    const { reads, loadDocument, release } = heldReads();
+    render(
+      withLeague(
+        <Harness
+          squad={squadWith(entry)}
+          request={REQUEST}
+          loadDocument={loadDocument}
+          solver={new InProcessSolver()}
+          onState={() => {}}
+        />,
+      ),
+    );
+    await act(async () => screen.getByText("run").click());
+    await act(async () => screen.getByText("run").click());
+    expect(screen.getByTestId("phase")).toHaveTextContent("loading");
+    expect(reads.count).toBe(1);
+    await act(async () => release());
+    await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("done"));
+    expect(reads.count).toBe(1);
+  });
+
+  it.each(["a reset", "a new selection"])("starts one new run at once after %s", async (cause) => {
+    const { reads, loadDocument, release } = heldReads();
+    const page = (request: AdviceRequest) =>
+      withLeague(
+        <Harness
+          squad={squadWith(entry)}
+          request={request}
+          loadDocument={loadDocument}
+          solver={new InProcessSolver()}
+          onState={() => {}}
+        />,
+      );
+    const { rerender } = render(page(REQUEST));
+    await act(async () => screen.getByText("run").click());
+    // The first run is still reading its inputs when it is interrupted.
+    if (cause === "a reset") await act(async () => screen.getByText("reset").click());
+    else rerender(page({ ...REQUEST, gameweek: 9 }));
+    expect(screen.getByTestId("phase")).toHaveTextContent("idle");
+    await pressTwice();
+    expect(screen.getByTestId("phase")).toHaveTextContent("loading");
+    expect(reads.count).toBe(2);
+    await act(async () => release());
+    await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("done"));
+    expect(reads.count).toBe(2);
+  });
+
+  it.each([
+    { ending: "done", answer: undefined },
+    {
+      ending: "failed",
+      answer: (request: DevicePlanRequest): DevicePlanReply => ({ id: request.id, kind: "failed" }),
+    },
+    {
+      ending: "refused",
+      answer: (request: DevicePlanRequest): DevicePlanReply => ({
+        id: request.id,
+        kind: "refused",
+        status: "Infeasible",
+        stage: "plan",
+      }),
+    },
+  ])("starts one new run at once after a run that ended $ending", async ({ ending, answer }) => {
+    let reads = 0;
+    render(
+      withLeague(
+        <Harness
+          squad={squadWith(entry)}
+          request={REQUEST}
+          loadDocument={async () => {
+            reads += 1;
+            return envelope(document);
+          }}
+          solver={new InProcessSolver(answer)}
+          onState={() => {}}
+        />,
+      ),
+    );
+    await act(async () => screen.getByText("run").click());
+    await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent(ending));
+    expect(reads).toBe(1);
+    await pressTwice();
+    await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent(ending));
+    expect(reads).toBe(2);
   });
 });
