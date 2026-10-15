@@ -166,6 +166,10 @@ def _attributes(value: object) -> PlayerAttributes:
 
 
 def _catalog(value: object) -> UnitInputCatalog:
+    # Dataclass callers may serialize the new absent optional receipt. The
+    # legacy JSON boundary never admits an actual retrospective replay.
+    if isinstance(value, dict) and "replay" in value and value["replay"] is None:
+        value = {key: item for key, item in value.items() if key != "replay"}
     row = _object(
         value,
         (
@@ -297,6 +301,8 @@ def read_unit_projection(payload: bytes) -> UnitProjection:
 def read_unit_observations(payload: bytes) -> tuple[UnitObservation, ...]:
     result = []
     for item in _list(_document(payload, "observations", "observations"), "observations"):
+        if isinstance(item, dict) and "exposure_clock" in item and item["exposure_clock"] is None:
+            item = {key: value for key, value in item.items() if key != "exposure_clock"}
         row = _object(
             item,
             (

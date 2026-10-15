@@ -12,20 +12,30 @@ import json
 import math
 import re
 from collections.abc import Mapping, Sequence
-from datetime import datetime
+from datetime import datetime, timedelta
 from numbers import Integral, Real
 from types import MappingProxyType
+from typing import Any
 
 import numpy as np
 import pandas as pd
 from numpy.typing import ArrayLike
 
-from squadopt.features.football_unit_inputs import UNIT_INPUT_VERSION
+from squadopt.features.football_unit_inputs import (
+    UNIT_INPUT_VERSION,
+    UNIT_PREFIX_CLOCK_VERSION,
+    SourceRecord,
+    UnitExposureClock,
+    UnitHistoricalReplay,
+    scope,
+    utc_time,
+)
 from squadopt.live.minute_evidence import COMPONENT_COLUMNS, IDENTITY_COLUMNS, _validate_components
 from squadopt.prediction.football import FOOTBALL_MODEL_VERSION
 from squadopt.prediction.football_unit_strength import (
     UNIT_FEATURE_VERSION,
     UNIT_MODEL_VERSION,
+    UNIT_REPLAY_FIT_VERSION,
     UnitStrengthResult,
 )
 from squadopt.scenarios.expected_lineup import ExpectedLineupSearchResult, improve_expected_lineup
@@ -49,6 +59,200 @@ def _finite(value: object) -> float:
 def _same(actual: ArrayLike, expected: ArrayLike) -> None:
     if not np.allclose(actual, expected, rtol=1e-10, atol=1e-10):
         raise ValueError("Unit experiment receipts do not match their retained component basis.")
+
+
+def _replay_fit_receipts(
+    metadata: Mapping[str, object],
+    training_cutoff: datetime,
+    sources: tuple[Any, ...],
+    *,
+    target_season: str,
+    target_gameweek: int,
+) -> None:
+    contract = metadata.get("fit_contract")
+    replay_keys = {
+        "training_exposure_clock",
+        "training_selection",
+        "training_replay_receipts",
+        "training_exposure_receipts",
+        "exposure_semantics",
+        "projection_extrapolation",
+        "fm_game_vintage",
+        "fm_effective_semantics",
+    }
+    if contract is None:
+        if (replay_keys | {"allow_released_2025_26"}) & metadata.keys():
+            raise ValueError("Replay evidence requires its explicit fitting contract.")
+        return
+    released = metadata.get("allow_released_2025_26")
+    if type(released) is not bool:
+        raise ValueError("Unit result requires its explicit released-season policy.")
+    if contract == "football_unit_explicit_release_fit_v1":
+        if released is not True or replay_keys & metadata.keys():
+            raise ValueError("Explicit release contract has inconsistent replay evidence.")
+        return
+    if (
+        contract != UNIT_REPLAY_FIT_VERSION
+        or metadata.get("training_exposure_clock") != UNIT_PREFIX_CLOCK_VERSION
+        or metadata.get("fm_game_vintage") != "unknown"
+        or not replay_keys <= metadata.keys()
+    ):
+        raise ValueError("Unit result requires its declared replay and quantized clock contract.")
+    replays, exposures = (
+        metadata.get("training_replay_receipts"),
+        metadata.get("training_exposure_receipts"),
+    )
+    if (
+        not isinstance(replays, tuple)
+        or not isinstance(exposures, tuple)
+        or not replays
+        or len(replays) != len(exposures)
+        or len(replays) != len(sources)
+        or metadata.get("training_rows") != 2 * len(replays)
+    ):
+        raise ValueError(
+            "Unit replay result requires one source and exposure receipt per interval."
+        )
+
+    def pairs(items: list[tuple[str, Any]]) -> dict[str, Any]:
+        if len(dict(items)) != len(items):
+            raise ValueError("Duplicate replay receipt fields are refused.")
+        return dict(items)
+
+    def document(value: object) -> dict[str, Any]:
+        if not isinstance(value, str):
+            raise ValueError("Unit replay receipt must be immutable JSON text.")
+        parsed = json.loads(value, object_pairs_hook=pairs)
+        if not isinstance(parsed, dict):
+            raise ValueError("Unit replay receipt must be an object.")
+        return parsed
+
+    def instant(value: Any) -> datetime:
+        return utc_time(datetime.fromisoformat(value), "replay receipt time")
+
+    seen = set()
+    spans: dict[tuple[str, int], list[tuple[float, float]]] = {}
+    week_cutoffs: dict[tuple[str, int], datetime] = {}
+    fixture_bases: dict[tuple[str, int], tuple[object, ...]] = {}
+    try:
+        for replay_text, exposure_text, group in zip(replays, exposures, sources, strict=True):
+            envelope, exposure = document(replay_text), document(exposure_text)
+            if set(envelope) != {
+                "replay",
+                "decision_cutoff",
+                "baseline_source_id",
+                "reference_source_id",
+            }:
+                raise ValueError("Unit replay envelope fields are invalid.")
+            raw = envelope["replay"]
+            replay = UnitHistoricalReplay(
+                **{
+                    **raw,
+                    **{
+                        key: instant(raw[key])
+                        for key in (
+                            "recorded_at",
+                            "retrieved_at",
+                            "feature_cutoff",
+                            "latest_history_kickoff",
+                            "generated_at",
+                        )
+                    },
+                    "source_hashes": tuple(tuple(item) for item in raw["source_hashes"]),
+                }
+            )
+            records = {
+                row[0]: SourceRecord(
+                    row[0],
+                    row[1],
+                    row[3],
+                    row[2],
+                    row[4],
+                    instant(row[5]),
+                    instant(row[6]),
+                    instant(row[7]),
+                    instant(row[8]),
+                    row[9],
+                    True,
+                )
+                for row in group
+            }
+            decision = instant(envelope["decision_cutoff"])
+            replay.validate_sources(
+                records,
+                decision=decision,
+                baseline_source_id=envelope["baseline_source_id"],
+                reference_source_id=envelope["reference_source_id"],
+            )
+            if replay.generated_at >= training_cutoff:
+                raise ValueError("Replayed features were generated after fitting.")
+            if set(exposure) != {
+                "clock",
+                "season",
+                "gameweek",
+                "fixture_id",
+                "start_minute",
+                "minutes",
+                "kickoff",
+                "outcome_source",
+                "outcome_available_at",
+            }:
+                raise ValueError("Unit exposure envelope fields are invalid.")
+            clock = UnitExposureClock(**exposure["clock"])
+            source_raw = exposure["outcome_source"]
+            source = SourceRecord(
+                **{
+                    **source_raw,
+                    **{
+                        key: instant(source_raw[key])
+                        for key in ("published_at", "captured_at", "effective_at", "valid_until")
+                    },
+                }
+            )
+            available, kickoff = (
+                instant(exposure["outcome_available_at"]),
+                instant(exposure["kickoff"]),
+            )
+            source.available_at(available)
+            start, minutes = _finite(exposure["start_minute"]), _finite(exposure["minutes"])
+            scope(exposure["season"], exposure["gameweek"], exposure["fixture_id"])
+            season, gameweek = exposure["season"], exposure["gameweek"]
+            identity = clock.source_sha256, clock.interval_id
+            if (
+                clock.source_sha256 != source.sha256
+                or identity in seen
+                or not start.is_integer()
+                or not minutes.is_integer()
+                or start < 0
+                or minutes <= 0
+                or start + minutes > 40
+                or not decision < kickoff
+                or available < kickoff + timedelta(hours=3)
+                or available >= training_cutoff
+                or (exposure["season"] == "2025-26" and released is not True)
+                or season > target_season
+                or (season == target_season and gameweek >= target_gameweek)
+            ):
+                raise ValueError(
+                    "Unit result exposure disagrees with its source or fitting policy."
+                )
+            seen.add(identity)
+            week_key = season, gameweek
+            if week_cutoffs.setdefault(week_key, decision) != decision:
+                raise ValueError(
+                    "Unit replay fixtures in one gameweek require one decision cutoff."
+                )
+            fixture_key = season, exposure["fixture_id"]
+            basis = (gameweek, decision, kickoff, replay_text, group)
+            if fixture_bases.setdefault(fixture_key, basis) != basis:
+                raise ValueError("Unit replay fixture intervals must retain one historical basis.")
+            end = start + minutes
+            for previous in spans.setdefault(fixture_key, []):
+                if max(start, previous[0]) < min(end, previous[1]):
+                    raise ValueError("Unit replay exposure intervals overlap.")
+            spans[fixture_key].append((start, end))
+    except (KeyError, TypeError, AttributeError, OverflowError) as error:
+        raise ValueError("Malformed unit replay or exposure receipt.") from error
 
 
 def _result_receipt(result: UnitStrengthResult) -> str:
@@ -145,6 +349,13 @@ def _result_receipt(result: UnitStrengthResult) -> str:
         raise ValueError("Historical source receipt groups are required.")
     for group in training_sources:
         source_group(group, training_cutoff, current=False)
+    _replay_fit_receipts(
+        metadata,
+        training_cutoff,
+        training_sources,
+        target_season=result.season,
+        target_gameweek=result.gameweek,
+    )
     projection_ids = source_group(
         metadata.get("projection_source_receipts"), result.decision_cutoff, current=True
     )
