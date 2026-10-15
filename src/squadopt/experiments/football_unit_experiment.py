@@ -48,12 +48,20 @@ from squadopt.prediction.football_unit_strength import (
     UNIT_PHYSICAL_PROJECTION,
     UNIT_PHYSICAL_SELECTION,
     UNIT_PHYSICAL_SEMANTICS,
+    UNIT_POOLED_FEATURE_VERSION,
+    UNIT_POOLED_IDENTITY_POLICY,
+    UNIT_POOLED_MODEL_VERSION,
+    UNIT_POOLED_OBJECTIVE,
+    UNIT_POOLED_PRIOR,
+    UNIT_POOLED_SCALING,
     UNIT_REPLAY_FIT_VERSION,
     UNIT_RESIDUAL_MISSINGNESS_SEMANTICS,
     UNIT_SOURCE_MISSINGNESS_FEATURE_VERSION,
     UNIT_SOURCE_MISSINGNESS_MODEL_VERSION,
     UNIT_SOURCE_MISSINGNESS_POLICY,
     UnitStrengthResult,
+    pooled_feature_columns,
+    pooled_identity_columns,
     source_attribute_groups,
     source_missingness_base_columns,
 )
@@ -361,8 +369,17 @@ def _missingness_feature_receipt(result: UnitStrengthResult) -> None:
         return
     if (
         result.model_version
-        not in (UNIT_SOURCE_MISSINGNESS_MODEL_VERSION, UNIT_PHYSICAL_MODEL_VERSION)
-        or metadata.get("feature_version") != UNIT_SOURCE_MISSINGNESS_FEATURE_VERSION
+        not in (
+            UNIT_SOURCE_MISSINGNESS_MODEL_VERSION,
+            UNIT_PHYSICAL_MODEL_VERSION,
+            UNIT_POOLED_MODEL_VERSION,
+        )
+        or metadata.get("feature_version")
+        != (
+            UNIT_POOLED_FEATURE_VERSION
+            if result.model_version == UNIT_POOLED_MODEL_VERSION
+            else UNIT_SOURCE_MISSINGNESS_FEATURE_VERSION
+        )
         or metadata.get("missingness_policy") != UNIT_SOURCE_MISSINGNESS_POLICY
         or metadata.get("all_unobserved_semantics") != UNIT_ALL_UNOBSERVED_SEMANTICS
         or metadata.get("residual_missingness_semantics") != UNIT_RESIDUAL_MISSINGNESS_SEMANTICS
@@ -398,13 +415,68 @@ def _missingness_feature_receipt(result: UnitStrengthResult) -> None:
     )
     base = source_missingness_base_columns(vocabulary, attributes)
     expected = base + tuple(f"home_interaction:{column}" for column in base)
+    if result.model_version == UNIT_POOLED_MODEL_VERSION:
+        expected = pooled_feature_columns(vocabulary, attributes)
     if metadata.get("source_attribute_groups") != groups or result.feature_contract != expected:
         raise ValueError("Source missingness features disagree with their declared source groups.")
 
 
+def _identity_feature_receipt(result: UnitStrengthResult) -> None:
+    metadata = result.metadata
+    keys = {
+        "identity_policy",
+        "identity_feature_columns",
+        "player_home_interactions",
+        "feature_scales",
+        "training_scaler_scales",
+        "regularization_objective",
+        "identity_prior",
+        "training_offset_sum",
+        "raw_identity_count_prior_precision",
+    }
+    if result.model_version != UNIT_POOLED_MODEL_VERSION:
+        if keys & metadata.keys() or metadata.get("scaling") == UNIT_POOLED_SCALING:
+            raise ValueError("Pooled identity evidence requires its explicit model version.")
+        return
+    if (
+        not keys <= metadata.keys()
+        or metadata.get("identity_policy") != UNIT_POOLED_IDENTITY_POLICY
+        or metadata.get("player_home_interactions") is not False
+        or metadata.get("scaling") != UNIT_POOLED_SCALING
+        or metadata.get("regularization_objective") != UNIT_POOLED_OBJECTIVE
+        or metadata.get("identity_prior") != UNIT_POOLED_PRIOR
+    ):
+        raise ValueError("Pooled identity requires its exact raw prior and scaling policy.")
+    vocabulary = metadata.get("player_vocabulary")
+    assert isinstance(vocabulary, tuple)
+    identities = pooled_identity_columns(vocabulary)
+    if metadata.get("identity_feature_columns") != identities:
+        raise ValueError("Pooled identity columns must match the fitted vocabulary.")
+    identity_set = set(identities)
+    scales, observed = metadata.get("feature_scales"), metadata.get("training_scaler_scales")
+    if (
+        not isinstance(scales, tuple)
+        or not isinstance(observed, tuple)
+        or len(scales) != len(result.feature_contract)
+        or len(observed) != len(scales)
+    ):
+        raise ValueError("Pooled identity requires one applied and observed scale per feature.")
+    for name, scale, original in zip(result.feature_contract, scales, observed, strict=True):
+        if _finite(scale) <= 0 or _finite(original) <= 0:
+            raise ValueError("Pooled identity feature scales must be positive.")
+        if scale != (1.0 if name in identity_set else original):
+            raise ValueError(
+                "Pooled identity scales must be one; shared training scales stay exact."
+            )
+    total = _finite(metadata.get("training_offset_sum"))
+    precision = _finite(metadata.get("raw_identity_count_prior_precision"))
+    if total <= 0 or precision != 0.1 * total:
+        raise ValueError("Pooled identity prior precision must equal alpha times total offset.")
+
+
 def _result_receipt(result: UnitStrengthResult) -> str:
     metadata = result.metadata
-    if (result.model_version == UNIT_PHYSICAL_MODEL_VERSION) != (
+    if (result.model_version in (UNIT_PHYSICAL_MODEL_VERSION, UNIT_POOLED_MODEL_VERSION)) != (
         metadata.get("fit_contract") == UNIT_PHYSICAL_FIT_VERSION
     ):
         raise ValueError("Physical fitting and model versions must agree.")
@@ -418,6 +490,7 @@ def _result_receipt(result: UnitStrengthResult) -> str:
     ):
         raise ValueError("Unit results require their immutable declared feature contract.")
     _missingness_feature_receipt(result)
+    _identity_feature_receipt(result)
     try:
         training_cutoff = datetime.fromisoformat(str(metadata["training_cutoff"]))
     except (KeyError, ValueError) as error:
@@ -510,7 +583,11 @@ def _result_receipt(result: UnitStrengthResult) -> str:
     projection_ids = source_group(
         metadata.get("projection_source_receipts"), result.decision_cutoff, current=True
     )
-    if result.model_version in (UNIT_SOURCE_MISSINGNESS_MODEL_VERSION, UNIT_PHYSICAL_MODEL_VERSION):
+    if result.model_version in (
+        UNIT_SOURCE_MISSINGNESS_MODEL_VERSION,
+        UNIT_PHYSICAL_MODEL_VERSION,
+        UNIT_POOLED_MODEL_VERSION,
+    ):
         attribute_contract = metadata["attribute_contract"]
         assert isinstance(attribute_contract, tuple)
         families = {(row[0], row[6], row[7]) for row in attribute_contract}
@@ -545,7 +622,11 @@ def _result_receipt(result: UnitStrengthResult) -> str:
             for s in result.state_rates
         ],
     }
-    if result.model_version in (UNIT_SOURCE_MISSINGNESS_MODEL_VERSION, UNIT_PHYSICAL_MODEL_VERSION):
+    if result.model_version in (
+        UNIT_SOURCE_MISSINGNESS_MODEL_VERSION,
+        UNIT_PHYSICAL_MODEL_VERSION,
+        UNIT_POOLED_MODEL_VERSION,
+    ):
         payload["model_version"] = result.model_version
     return json.dumps(payload, sort_keys=True, allow_nan=False)
 
@@ -617,6 +698,7 @@ def unit_fixture_components(
             UNIT_MODEL_VERSION,
             UNIT_SOURCE_MISSINGNESS_MODEL_VERSION,
             UNIT_PHYSICAL_MODEL_VERSION,
+            UNIT_POOLED_MODEL_VERSION,
         ):
             raise ValueError("An explicitly identified unit-strength result is required.")
         model_versions.add(result.model_version)

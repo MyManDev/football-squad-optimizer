@@ -49,6 +49,19 @@ UNIT_LEGACY_EXPOSURE_POLICY = "reported_minutes_over_90_v1"
 UNIT_PHYSICAL_EXPOSURE_POLICY = "physical_seconds_over_forecast_duration_v1"
 UNIT_PHYSICAL_MODEL_VERSION = "football_projected_unit_physical_source_missingness_v3"
 UNIT_PHYSICAL_FIT_VERSION = "football_unit_public_replay_physical_duration_fit_v1"
+UNIT_LEGACY_IDENTITY_POLICY = "exposure_standardized_v1"
+UNIT_POOLED_IDENTITY_POLICY = "raw_identity_pooled_no_home_v1"
+UNIT_POOLED_MODEL_VERSION = "football_projected_unit_pooled_identity_v4"
+UNIT_POOLED_FEATURE_VERSION = "reference_relative_source_missingness_raw_identity_v3"
+UNIT_POOLED_SCALING = "raw identity scale=1; train-only exposure-weighted shared SD; no centering"
+UNIT_POOLED_OBJECTIVE = (
+    "sum(offset * exp(eta) - goals * eta) / sum(offset) "
+    "+ alpha / 2 * squared coefficient norm; no intercept"
+)
+UNIT_POOLED_PRIOR = (
+    "zero-centered raw identity Gaussian MAP precision alpha * sum(offset); "
+    "shared coefficients retain their standardized-coordinate penalty; no posterior uncertainty"
+)
 UNIT_PHYSICAL_OFFSET = (
     "physical seconds / (causal forecast duration minutes * 60) "
     "* supplied whole-fixture native mean"
@@ -114,6 +127,20 @@ def source_missingness_base_columns(
             ),
         )
     )
+
+
+def pooled_identity_columns(vocabulary: tuple[int, ...]) -> tuple[str, ...]:
+    return tuple(
+        f"{side}_player_{identity}" for side in ("own", "opponent") for identity in vocabulary
+    )
+
+
+def pooled_feature_columns(
+    vocabulary: tuple[int, ...], attributes: tuple[NumericAttributeSpec, ...]
+) -> tuple[str, ...]:
+    base = source_missingness_base_columns(vocabulary, attributes)
+    identities = set(pooled_identity_columns(vocabulary))
+    return base + tuple(f"home_interaction:{column}" for column in base if column not in identities)
 
 
 def _canonical(value: Any) -> str:
@@ -223,6 +250,7 @@ class FootballUnitStrengthModel:
         allow_released_2025_26: bool = False,
         missingness_policy: str = UNIT_LEGACY_MISSINGNESS_POLICY,
         exposure_policy: str = UNIT_LEGACY_EXPOSURE_POLICY,
+        identity_policy: str = UNIT_LEGACY_IDENTITY_POLICY,
     ):
         utc_time(cutoff, "fitting cutoff")
         if type(allow_released_2025_26) is not bool:
@@ -242,6 +270,16 @@ class FootballUnitStrengthModel:
         ):
             raise ValueError("Unit exposure requires an explicitly supported fitting policy.")
         physical = exposure_policy == UNIT_PHYSICAL_EXPOSURE_POLICY
+        if type(identity_policy) is not str or identity_policy not in (
+            UNIT_LEGACY_IDENTITY_POLICY,
+            UNIT_POOLED_IDENTITY_POLICY,
+        ):
+            raise ValueError("Unit identity requires an explicitly supported pooling policy.")
+        pooled = identity_policy == UNIT_POOLED_IDENTITY_POLICY
+        if pooled and (not physical or missingness_policy != UNIT_SOURCE_MISSINGNESS_POLICY):
+            raise ValueError(
+                "Pooled identity requires physical exposure and source missingness v2."
+            )
         if physical:
             if missingness_policy != UNIT_SOURCE_MISSINGNESS_POLICY:
                 raise ValueError(
@@ -249,6 +287,10 @@ class FootballUnitStrengthModel:
                 )
             self.exposure_policy = exposure_policy
             self.model_version = UNIT_PHYSICAL_MODEL_VERSION
+        if pooled:
+            self.identity_policy = identity_policy
+            self.model_version = UNIT_POOLED_MODEL_VERSION
+            self.feature_version = UNIT_POOLED_FEATURE_VERSION
         observations = tuple(
             sorted(observations, key=lambda x: (x.season, x.fixture_id, x.start_minute, x.own.club))
         )
@@ -458,6 +500,20 @@ class FootballUnitStrengthModel:
         self.feature_contract = self._base_columns + tuple(
             f"home_interaction:{column}" for column in self._base_columns
         )
+        if pooled:
+            identities = set(pooled_identity_columns(self.player_vocabulary))
+            self.feature_contract = pooled_feature_columns(self.player_vocabulary, self.attributes)
+            self._pooled_identity_indexes = tuple(
+                index for index, column in enumerate(self._base_columns) if column in identities
+            )
+            self._pooled_home_indexes = {
+                index: len(self._base_columns) + home_index
+                for home_index, index in enumerate(
+                    index
+                    for index, column in enumerate(self._base_columns)
+                    if column not in identities
+                )
+            }
         rows: list[Any] = []
         targets: list[float] = []
         weights: list[float] = []
@@ -526,6 +582,14 @@ class FootballUnitStrengthModel:
         self._scaler: Any = StandardScaler(with_mean=False)
         with np.errstate(over="ignore", invalid="ignore", divide="ignore"):
             standardized = self._scaler.fit_transform(x, sample_weight=np.asarray(weights))
+        if pooled:
+            # Keep the observed training statistics distinct from applied prior scales.
+            self._feature_scales = np.asarray(self._scaler.scale_, dtype=float).copy()
+            self._feature_scales[list(self._pooled_identity_indexes)] = 1.0
+            self._training_offset_sum = float(np.asarray(weights).sum())
+            if not math.isfinite(self._training_offset_sum) or self._training_offset_sum <= 0:
+                raise ValueError("Pooled identity requires finite positive total offset exposure.")
+            standardized = self._transform(x)
         if not all(
             np.isfinite(a).all()
             for a in (standardized.data, self._scaler.var_, self._scaler.scale_)
@@ -657,7 +721,14 @@ class FootballUnitStrengthModel:
                 if relative:
                     values[offset + index] = relative
                     if home:
-                        values[len(self._base_columns) + offset + index] = relative
+                        if getattr(self, "identity_policy", UNIT_LEGACY_IDENTITY_POLICY) == (
+                            UNIT_POOLED_IDENTITY_POLICY
+                        ):
+                            home_index = self._pooled_home_indexes.get(offset + index)
+                            if home_index is not None:
+                                values[home_index] = relative
+                        else:
+                            values[len(self._base_columns) + offset + index] = relative
         indexes = sorted(values)
         data = np.asarray([values[index] for index in indexes], dtype=float)
         if not np.isfinite(data).all():
@@ -666,6 +737,14 @@ class FootballUnitStrengthModel:
             (data, (np.zeros(len(indexes), dtype=int), indexes)),
             shape=(1, len(self.feature_contract)),
         )
+
+    def _transform(self, matrix: Any) -> Any:
+        if (
+            getattr(self, "identity_policy", UNIT_LEGACY_IDENTITY_POLICY)
+            == UNIT_POOLED_IDENTITY_POLICY
+        ):
+            return matrix.multiply(1 / self._feature_scales).tocsr()
+        return self._scaler.transform(matrix)
 
     def _state_rates(self, projection: UnitProjection, state: ProjectedUnitState) -> UnitStateRate:
         forward = self._relative(
@@ -685,7 +764,7 @@ class FootballUnitStrengthModel:
             not projection.home,
         )
         ratios = np.asarray(
-            self._head.predict(self._scaler.transform(vstack((forward, reverse), format="csr"))),
+            self._head.predict(self._transform(vstack((forward, reverse), format="csr"))),
             dtype=float,
         )
         rates = ratios * np.asarray(
@@ -738,6 +817,24 @@ class FootballUnitStrengthModel:
                 "all_unobserved_semantics": UNIT_ALL_UNOBSERVED_SEMANTICS,
                 "residual_missingness_semantics": UNIT_RESIDUAL_MISSINGNESS_SEMANTICS,
             }
+        identity_metadata: dict[str, object] = {}
+        if (
+            getattr(self, "identity_policy", UNIT_LEGACY_IDENTITY_POLICY)
+            == UNIT_POOLED_IDENTITY_POLICY
+        ):
+            identity_metadata = {
+                "identity_policy": UNIT_POOLED_IDENTITY_POLICY,
+                "identity_feature_columns": pooled_identity_columns(self.player_vocabulary),
+                "player_home_interactions": False,
+                "scaling": UNIT_POOLED_SCALING,
+                "feature_scales": tuple(float(value) for value in self._feature_scales),
+                "training_scaler_scales": tuple(float(value) for value in self._scaler.scale_),
+                "regularization_objective": UNIT_POOLED_OBJECTIVE,
+                "identity_prior": UNIT_POOLED_PRIOR,
+                "training_offset_sum": self._training_offset_sum,
+                "raw_identity_count_prior_precision": self.regularization
+                * self._training_offset_sum,
+            }
         metadata: Mapping[str, object] = MappingProxyType(
             {
                 "input_version": UNIT_INPUT_VERSION,
@@ -788,6 +885,7 @@ class FootballUnitStrengthModel:
                 "fitting_semantics": "observational associations, not identified causal effects",
                 **self._replay_metadata,
                 **missingness_metadata,
+                **identity_metadata,
             }
         )
         return UnitStrengthResult(
