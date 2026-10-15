@@ -201,11 +201,9 @@ jobs:
             workers/fpl-probe/test/probe.test.mjs \
             workers/fpl-probe/test/deploy-steps.test.mjs
 
+      # Built without an advice origin, so the site is static (ADR 0006): the published
+      # tree plus the device. The way back is in docs/backend_free_hosting.md, section 3.
       - name: Build
-        env:
-          # Unset or empty is the static site, byte for byte (ADR 0006). A repository
-          # variable, not a secret: the value ships in the bundle.
-          VITE_ADVICE_API_ORIGIN: ${{ vars.ADVICE_API_ORIGIN }}
         run: npm run build
 
       - name: Deployment assets
@@ -230,8 +228,6 @@ jobs:
 
       - name: Playwright smoke
         timeout-minutes: 8
-        env:
-          VITE_ADVICE_API_ORIGIN: ${{ vars.ADVICE_API_ORIGIN }}
         run: npm run e2e
 
       - name: Python publication and browser API worker acceptance

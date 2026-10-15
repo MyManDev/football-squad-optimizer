@@ -62,8 +62,8 @@ export function openCalendar() {
 /**
  * The published league, served from the fixtures, with the advice API refused.
  *
- * CI builds the site with the production API origin (`VITE_ADVICE_API_ORIGIN`), so a member
- * page asks that backend for its capabilities as soon as it opens. No spec may reach it:
+ * CI builds the site without an advice origin. A build with one (`VITE_ADVICE_API_ORIGIN`)
+ * makes a member page ask that backend for its capabilities at once. No spec may reach it:
  * every `/api/v1/` request is aborted as a refused connection, which the page reads as a
  * backend that is down. The abort is registered first, and Playwright tries the most
  * recently registered route first, so a spec that needs the API routes it after this call.

@@ -134,17 +134,15 @@ create another tunnel or change DNS merely because the PC changed.
 cloudflared tunnel ingress validate
 cloudflared tunnel ingress rule https://squadopt-api.mymandev.com/metrics
 cloudflared tunnel ingress rule https://squadopt-api.mymandev.com/ready
-gh variable get ADVICE_API_ORIGIN --repo MyManDev/football-squad-optimizer
 ```
 
 The `/metrics` check must report the `http_status:404` rule and the `/ready` check the
 `http://127.0.0.1:8000` rule: metrics never leave the machine, readiness is served.
-CI maps `ADVICE_API_ORIGIN`
-to `VITE_ADVICE_API_ORIGIN` when it builds the site. Setting the variable does not change
-an already published bundle; a different backend origin needs a normal approved site
-release. Only if the hostname changed, set the new public value with
-`gh variable set ADVICE_API_ORIGIN --repo MyManDev/football-squad-optimizer --body "<new-public-origin>"`.
-Reusing the current origin requires no configuration write or site deployment for this recovery.
+Since route 1 of #988, CI builds the site without an advice origin, so a site released
+since then calls no backend and a rebuilt PC needs no site build setting or site release.
+Pointing the site at a backend again is a normal approved site release; section 3 of
+[backend free hosting](backend_free_hosting.md#3-tell-the-site-build-where-the-api-is)
+says what it changes.
 Credential transfer and tunnel operation on a replacement PC are **never exercised**.
 
 ## 5. Start, inspect, then register the watch

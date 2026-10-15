@@ -42,7 +42,7 @@ async function openRequestsAfter(page: Page, path: string): Promise<string[]> {
 }
 
 test.beforeEach(async ({ page }) => {
-  // CI builds with the production API origin; no spec may reach it (e2e/leagueMocks.ts).
+  // A build with an advice origin calls its API; no spec may reach it (e2e/leagueMocks.ts).
   await page.route("**/api/v1/**", (route) => route.abort("connectionrefused"));
 });
 

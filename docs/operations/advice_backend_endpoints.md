@@ -18,8 +18,8 @@ not restate its steps.
   composition always mounts the router (`src/squadopt/api/runtime.py:114`).
 - The site reads `VITE_ADVICE_API_ORIGIN` in three places: `createAdviceClient`
   (`adviceClient.ts:476-483`), `ContributePage.tsx:23` and `DecisionPreferencesPanel.tsx:43`.
-  CI passes `vars.ADVICE_API_ORIGIN` to the site build and to the e2e run
-  (`.github/workflows/ci.yml:196` and `:222`).
+  CI passed `vars.ADVICE_API_ORIGIN` to the `Build` and `Playwright smoke` steps of
+  `.github/workflows/ci.yml` until route 1 took it out of both.
 - Short names: `adviceClient.ts`, `useAdviceJob.ts`, `adviceSelection.ts`,
   `DecisionPreferencesPanel.tsx`, `ModelComparison.tsx` and `OfficialInformationCard.tsx`
   are in `web/src/features/league/advice/`. `useLeagueMemberData.ts`,
@@ -72,19 +72,20 @@ Also outside the site:
   `run_backend_local.ps1:68-70`). The default is no listener. It is not the API.
 - The local smoke and the load tool also call the advice GET, POST and job routes
   (`smoke_backend_local.py:158`, `:188` and `:224`; `advice_load.py:127` and `:147`).
-- CI's browser acceptance step (`.github/workflows/ci.yml:225-233`) runs on every pull
+- CI's browser acceptance step in `.github/workflows/ci.yml` runs on every pull
   request. It builds the site against its own local backend, not the repository variable
   (`tests/integration/test_advice_browser.py`, `web/playwright.backend.config.ts:30`). It
   calls `/ready` (`test_advice_browser.py:425`, `advice-backend.spec.ts:285`), the
   capabilities (`advice-backend.spec.ts:97`), the advice GET and POST (the route at `:65`)
   and the job route (`:164`). The route 1 pull request that removes the API removes this
   step and both files with it.
-- CI's Playwright smoke (`ci.yml:219-223`) serves the site built at `ci.yml:192-196` and
-  passes the variable to the run at `:222`. With the origin unset, 8 tests that mock the API
+- CI's `Playwright smoke` step serves the site the `Build` step built. Route 1 took the
+  origin out of both, so 8 tests that mock the API
   skip without failing: 2 in `web/e2e/news-decision.spec.ts:14`, 4 in
   `web/e2e/information-review.spec.ts:232` and 2 in `web/e2e/member-mobile.spec.ts:210-213`.
-  A route 1 pull request either retires them with the compute path or keeps them on a
-  stubbed origin. #1001 step 4 covers only `web/e2e/contributions.spec.ts`.
+  They are left to skip; none is kept on a stubbed origin. #1001 step 4 covers only
+  `web/e2e/contributions.spec.ts`, whose 2 contribution journeys also skip without an
+  origin (#1022).
 - The manual live smoke reads the capabilities when they answer. With
   `LIVE_SMOKE_COMPUTE=1` it requires them (`web/e2e/live-smoke.spec.ts:161-165`), so that
   option cannot pass on a site built without an origin. `docs/deployment_runbook.md:552`
@@ -142,18 +143,18 @@ to the release.
   the API reads it (`contributions.py:28`). #1001 step 3 reads the avoid list from the
   published device table instead.
 - **The release without an origin.** The release deploys the `site` artifact that CI built
-  and tested (`.github/workflows/deploy-pages.yml:146-152` and `:422-430`). How the origin
-  leaves that build is open, and the sources differ. ADR 0009
-  (`docs/architecture/decisions/0009-advice-backend-hosting-options.md:153-154`) and
-  `docs/backend_free_hosting.md` section 3 say to delete the repository variable
-  `ADVICE_API_ORIGIN`, which is a repository setting, not a pull request. #1001 step 4
-  assumes that #988 removes `ci.yml:196` and `:222`, which is a pull request. Either way,
-  the 8 Playwright tests under "Also outside the site" then skip. The docs that name the
-  variable change with it:
-  `docs/architecture/operations_inventory.md`, `docs/backend_free_hosting.md` section 3 and
-  `docs/rebuild_production.md:135-144`. The release needs the owner's yes, as every
-  release does. Per #988 (comment 6045439960), it waits for #1001 steps 1 to 4 to merge,
-  unless the owner records on #988 that it ships without them.
+  and tested (`.github/workflows/deploy-pages.yml:146-152` and `:422-430`). The origin
+  left that build in a pull request, as #1001 step 4 assumed: the `Build` and
+  `Playwright smoke` steps of `.github/workflows/ci.yml` no longer set it, so the artifact
+  CI builds is the static site and the 8 Playwright tests under "Also outside the site"
+  skip. ADR 0009 says to delete the repository variable `ADVICE_API_ORIGIN` instead
+  (`docs/architecture/decisions/0009-advice-backend-hosting-options.md:153-154`). No
+  workflow reads it now, and deleting it is the owner's step after the release. The docs
+  that named it as the build's input say so: `docs/architecture/operations_inventory.md`,
+  `docs/backend_free_hosting.md` section 3 and `docs/rebuild_production.md` section 4. The
+  release needs the owner's yes, as every release does. Per #988 (comment 6045439960), it
+  waits for #1001 steps 1 to 4 to merge, unless the owner records on #988 that it ships
+  without them.
 - **The order of the uptime schedule and the backend stop.** #988 route 1 turns off the
   schedule of `backend-uptime.yml`, which asks for `/health` and `/ready` on a `*/15`
   schedule (`backend-uptime.yml:6-7`). Its runs land hours apart

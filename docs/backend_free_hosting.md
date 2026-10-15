@@ -412,6 +412,12 @@ uvicorn does not read `CF-Connecting-IP`. The local run above confirmed the beha
 
 ### 3. Tell the site build where the api is
 
+The production build no longer sets the origin. Route 1 of #988 took it out of the `Build`
+and `Playwright smoke` steps of `ci.yml`'s `web` job, so a release built since then is the
+static site (ADR 0006), the published tree plus the device, and calls no backend. The
+repository variable `ADVICE_API_ORIGIN` may still exist, but no workflow reads it. The rest
+of this section is how the build takes an origin and how to give it one again.
+
 `createAdviceClient` reads `import.meta.env.VITE_ADVICE_API_ORIGIN`
 (`web/src/features/league/advice/adviceClient.ts`). Vite substitutes it **at build time**,
 and the production site is not built by the deploy workflow: `deploy-pages.yml` downloads
@@ -427,13 +433,21 @@ repository **variable** so it can be changed or emptied without a commit:
 gh variable set ADVICE_API_ORIGIN --repo MyManDev/football-squad-optimizer --body "https://squadopt-api.mymandev.com"
 ```
 
-The wiring is already present in `.github/workflows/ci.yml`:
+Then put the `env` lines back in both steps of `.github/workflows/ci.yml`, in a pull
+request. The smoke needs the same value as the build: the specs that mock the API run only
+when it is set, and the navigation checks expect the Contribute link only then.
 
 ```yaml
 - name: Build
   env:
     VITE_ADVICE_API_ORIGIN: ${{ vars.ADVICE_API_ORIGIN }}
   run: npm run build
+
+- name: Playwright smoke
+  timeout-minutes: 8
+  env:
+    VITE_ADVICE_API_ORIGIN: ${{ vars.ADVICE_API_ORIGIN }}
+  run: npm run e2e
 ```
 
 An unset variable expands to the empty string, and `createAdviceClient` treats empty as no
@@ -605,8 +619,9 @@ The `Backend uptime` workflow asks for public `/health` and `/ready` on a `*/15`
 
 **Current route: (a).** Keep the PC awake and logged in, use the logon watch script, and
 coordinate publication with the backend code revision. The existing tunnel hostname is
-`squadopt-api.mymandev.com`; the build variable is already wired. With the PC off the
-published static plans remain available. This runbook does not authorize a live restart.
+`squadopt-api.mymandev.com`; the site build no longer takes it (section 3). With the PC
+off the published static plans remain available. This runbook does not authorize a live
+restart.
 
 **Conditional next route: (b), only after the owner confirms an Oracle account exists.**
 No migration work is authorized before that decision. Oracle's A1 instance
