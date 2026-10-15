@@ -7,7 +7,7 @@ measures against the control, and the models of the experimental football lane. 
 are `live`, `scenarios` and `evaluation` in the domain ring, `application`, `platform`, the
 laboratory and the scripts.
 
-Its 40 Python files sit in one folder. This page places every one of them in exactly one
+Its 41 Python files sit in one folder. This page places every one of them in exactly one
 family.
 
 Review: İbrahim, the data side ([ownership](../../../docs/architecture/ownership.md)). Within 24
@@ -127,6 +127,14 @@ The following standalone model has its own source contract:
 | Module | What it does |
 | --- | --- |
 | `football_observed_load.py` | Observed non-PL reported-record tilt of the whole native weekly law, with distinct missing-value features and no product caller (`src/squadopt/prediction/football_observed_load.py:272`). |
+A separate observed-scope model has no runtime caller in this change. Its allocation carries
+paired rates and recipient marginals, with its explicit context policy in metadata
+(`src/squadopt/prediction/football_observed_tactical.py:180`,
+`src/squadopt/prediction/football_observed_tactical.py:212`).
+
+| Module | What it does |
+| --- | --- |
+| `football_observed_tactical.py` | Fits paired Poisson rates and conditional goal/assist recipients at full-roster native marginal context, with training-only observed-value transforms and missingness masks; exposes recipient-only inference without the count head (`src/squadopt/prediction/football_observed_tactical.py:91`, `src/squadopt/prediction/football_observed_tactical.py:413`, `src/squadopt/prediction/football_observed_tactical.py:590`). |
 
 ## Package surface
 

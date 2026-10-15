@@ -7,7 +7,7 @@ models. Every time-dependent aggregation of the feature builder passes through o
 shifted-rolling primitive, so the timing rule has one implementation. Its callers are `prediction`, `live`, `application`, `platform`,
 the laboratory and the scripts.
 
-Its 29 Python files sit in one folder. This page places every one of them in exactly one
+Its 31 Python files sit in one folder. This page places every one of them in exactly one
 family.
 
 Review: İbrahim, the data side ([ownership](../../../docs/architecture/ownership.md)).
@@ -96,6 +96,8 @@ The standalone observed workload model has a separate input boundary:
 | Module | What it does |
 | --- | --- |
 | `football_observed_load.py` | Observed non-PL reported-record inputs and retrospective provenance, preserving missing values and complete native PL support (`src/squadopt/features/football_observed_load.py:104`). |
+| `football_observed_tactical_inputs.py` | Separate full-roster native marginal context with four observed event channels, nullable FM traits and prior provider roles; explicit historical replay retains actual acquisition clocks (`src/squadopt/features/football_observed_tactical_inputs.py:133`, `src/squadopt/features/football_observed_tactical_inputs.py:385`). |
+| `football_observed_tactical_readers.py` | Pure byte readers for typed observed-tactical envelopes, complete selected event rows, exact FM rows and provider roles; supplied SHA256 checks establish byte integrity (`src/squadopt/features/football_observed_tactical_readers.py:45`, `src/squadopt/features/football_observed_tactical_readers.py:155`, `src/squadopt/features/football_observed_tactical_readers.py:276`, `src/squadopt/features/football_observed_tactical_readers.py:406`). |
 
 ## Package surface
 
