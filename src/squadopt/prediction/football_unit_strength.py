@@ -143,6 +143,95 @@ def pooled_feature_columns(
     return base + tuple(f"home_interaction:{column}" for column in base if column not in identities)
 
 
+def pooled_relative_features(
+    catalog: UnitInputCatalog,
+    own: ClubUnit,
+    opponent: ClubUnit,
+    reference_own: ClubUnit,
+    reference_opponent: ClubUnit,
+    home: bool,
+    *,
+    vocabulary: tuple[int, ...],
+    attributes: tuple[NumericAttributeSpec, ...],
+) -> Any:
+    """The full and compact v4 paths share this exact sparse feature arithmetic."""
+    identity_indexes = {identity: index for index, identity in enumerate(vocabulary)}
+    groups = source_attribute_groups(attributes)
+    base = source_missingness_base_columns(vocabulary, attributes)
+    width = len(base) // 2
+    identities = set(pooled_identity_columns(vocabulary))
+    home_indexes = {
+        index: len(base) + home_index
+        for home_index, index in enumerate(
+            index for index, column in enumerate(base) if column not in identities
+        )
+    }
+    values: dict[int, float] = {}
+    for offset, actual, reference in (
+        (0, own, reference_own),
+        (width, opponent, reference_opponent),
+    ):
+        actual_values = _source_unit_values(catalog, actual, identity_indexes, groups)
+        reference_values = _source_unit_values(catalog, reference, identity_indexes, groups)
+        for index in actual_values.keys() | reference_values.keys():
+            relative = actual_values.get(index, 0.0) - reference_values.get(index, 0.0)
+            if relative:
+                values[offset + index] = relative
+                home_index = home_indexes.get(offset + index)
+                if home and home_index is not None:
+                    values[home_index] = relative
+    indexes = sorted(values)
+    data = np.asarray([values[index] for index in indexes], dtype=float)
+    if not np.isfinite(data).all():
+        raise ValueError("Unit-relative features must remain finite.")
+    return csr_matrix(
+        (data, (np.zeros(len(indexes), dtype=int), indexes)),
+        shape=(1, len(base) + len(home_indexes)),
+    )
+
+
+def _source_unit_values(
+    catalog: UnitInputCatalog,
+    unit: ClubUnit,
+    identity_indexes: Mapping[int, int],
+    groups: tuple[tuple[str, tuple[NumericAttributeSpec, ...]], ...],
+) -> dict[int, float]:
+    values = {
+        identity_indexes[x.player_id]: 1.0 for x in unit.players if x.player_id in identity_indexes
+    }
+    offset = len(identity_indexes)
+    for position in POSITIONS:
+        players = [x.player_id for x in unit.players if x.position == position]
+        if players:
+            values[offset] = len(players) / 11
+        offset += 1
+        for _, specs in groups:
+            profiles = [
+                tuple(catalog.value(identity, spec) for spec in specs) for identity in players
+            ]
+            observed = [any(value is not None for value in row) for row in profiles]
+            all_unobserved = sum(not present for present in observed) / 11
+            if all_unobserved:
+                values[offset] = all_unobserved
+            offset += 1
+            for index, _ in enumerate(specs):
+                numeric = [row[index] for row in profiles]
+                measured = math.fsum(value / 11 for value in numeric if value is not None)
+                residual_missing = (
+                    sum(
+                        present and row[index] is None
+                        for present, row in zip(observed, profiles, strict=True)
+                    )
+                    / 11
+                )
+                if measured:
+                    values[offset] = measured
+                if residual_missing:
+                    values[offset + 1] = residual_missing
+                offset += 2
+    return values
+
+
 def _canonical(value: Any) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), default=str)
 
@@ -658,42 +747,9 @@ class FootballUnitStrengthModel:
         return values
 
     def _source_unit_values(self, catalog: UnitInputCatalog, unit: ClubUnit) -> dict[int, float]:
-        values = {
-            self._identity_indexes[x.player_id]: 1.0
-            for x in unit.players
-            if x.player_id in self._identity_indexes
-        }
-        offset = len(self.player_vocabulary)
-        for position in POSITIONS:
-            players = [x.player_id for x in unit.players if x.position == position]
-            if players:
-                values[offset] = len(players) / 11
-            offset += 1
-            for _, specs in self._source_attribute_groups:
-                profiles = [
-                    tuple(catalog.value(identity, spec) for spec in specs) for identity in players
-                ]
-                observed = [any(value is not None for value in row) for row in profiles]
-                all_unobserved = sum(not present for present in observed) / 11
-                if all_unobserved:
-                    values[offset] = all_unobserved
-                offset += 1
-                for index, _ in enumerate(specs):
-                    numeric = [row[index] for row in profiles]
-                    measured = math.fsum(value / 11 for value in numeric if value is not None)
-                    residual_missing = (
-                        sum(
-                            present and row[index] is None
-                            for present, row in zip(observed, profiles, strict=True)
-                        )
-                        / 11
-                    )
-                    if measured:
-                        values[offset] = measured
-                    if residual_missing:
-                        values[offset + 1] = residual_missing
-                    offset += 2
-        return values
+        return _source_unit_values(
+            catalog, unit, self._identity_indexes, self._source_attribute_groups
+        )
 
     def _unit(self, catalog: UnitInputCatalog, unit: ClubUnit) -> list[float]:
         """Dense single-unit inspection only; fitting and prediction stay sparse."""
@@ -709,6 +765,20 @@ class FootballUnitStrengthModel:
         reference_opponent: ClubUnit,
         home: bool,
     ) -> Any:
+        if (
+            getattr(self, "identity_policy", UNIT_LEGACY_IDENTITY_POLICY)
+            == UNIT_POOLED_IDENTITY_POLICY
+        ):
+            return pooled_relative_features(
+                catalog,
+                own,
+                opponent,
+                reference_own,
+                reference_opponent,
+                home,
+                vocabulary=self.player_vocabulary,
+                attributes=self.attributes,
+            )
         values: dict[int, float] = {}
         for offset, actual, reference in (
             (0, own, reference_own),

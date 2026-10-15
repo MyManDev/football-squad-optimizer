@@ -5,8 +5,8 @@ exposure and source missingness v2. It creates
 `football_projected_unit_pooled_identity_v4`; the default remains
 `exposure_standardized_v1`, preserving earlier versions
 (`src/squadopt/prediction/football_unit_strength.py:52`,
-`src/squadopt/prediction/football_unit_strength.py:253`,
-`src/squadopt/prediction/football_unit_strength.py:273`).
+`src/squadopt/prediction/football_unit_strength.py:342`,
+`src/squadopt/prediction/football_unit_strength.py:362`).
 
 Player presence differences retain their raw values of minus one, zero or one.
 Their applied scale is exactly one. Shared FM, position and source missingness
@@ -14,8 +14,8 @@ features retain the training exposure weighted standard deviations without
 centering. Player by home interaction columns are absent; shared home columns
 remain. Observed scaler statistics and applied feature scales are stored
 separately (`src/squadopt/prediction/football_unit_strength.py:132`,
-`src/squadopt/prediction/football_unit_strength.py:502`,
-`src/squadopt/prediction/football_unit_strength.py:586`).
+`src/squadopt/prediction/football_unit_strength.py:591`,
+`src/squadopt/prediction/football_unit_strength.py:675`).
 
 For goals `y_i`, physical causal offset `e_i`, shared features `z_i`, raw identity
 differences `d_i`, and `W=sum(e_i)`, the declared objective is:
@@ -28,14 +28,14 @@ J = sum(e_i exp(eta_i) - y_i eta_i) / W
 
 The code passes `y_i/e_i` with sample weight `e_i` to the same Poisson head,
 without an intercept and with fixed alpha 0.1
-(`src/squadopt/prediction/football_unit_strength.py:565`,
-`src/squadopt/prediction/football_unit_strength.py:598`). The loss convention is
+(`src/squadopt/prediction/football_unit_strength.py:654`,
+`src/squadopt/prediction/football_unit_strength.py:687`). The loss convention is
 the sample weight normalized objective in the
 [official sklearn implementation](https://github.com/scikit-learn/scikit-learn/blob/1.9.0/sklearn/linear_model/_glm/glm.py).
 Consequently the equivalent raw identity Gaussian MAP precision on the
 unnormalized count likelihood scale is `0.1*W`. The result records both `W` and
 that precision (`src/squadopt/prediction/football_unit_strength.py:57`,
-`src/squadopt/prediction/football_unit_strength.py:834`). It does not claim that
+`src/squadopt/prediction/football_unit_strength.py:904`). It does not claim that
 alpha 0.1 is an absolute Bayesian prior precision or that posterior uncertainty
 was estimated.
 

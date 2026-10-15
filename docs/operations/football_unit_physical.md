@@ -6,8 +6,8 @@ requires the source missingness v2 features and declares model version
 `football_projected_unit_physical_source_missingness_v3`. The default exposure
 policy retains `minutes / 90 * supplied causal baseline`.
 (`src/squadopt/prediction/football_unit_strength.py:49`,
-`src/squadopt/prediction/football_unit_strength.py:245`,
-`src/squadopt/prediction/football_unit_strength.py:552`)
+`src/squadopt/prediction/football_unit_strength.py:334`,
+`src/squadopt/prediction/football_unit_strength.py:641`)
 
 ## Prepare the source receipts
 
@@ -63,8 +63,8 @@ catalog and duration forecast. Mixed physical and reported minute populations
 are refused. The 2025-26 release remains an explicit boolean.
 (`src/squadopt/features/football_unit_inputs.py:456`,
 `src/squadopt/features/football_unit_inputs.py:464`,
-`src/squadopt/prediction/football_unit_strength.py:245`,
-`src/squadopt/prediction/football_unit_strength.py:319`)
+`src/squadopt/prediction/football_unit_strength.py:334`,
+`src/squadopt/prediction/football_unit_strength.py:408`)
 
 For an interval of `s` observed seconds, forecast duration `d` minutes and
 supplied native whole fixture mean `b`, the Poisson offset is
@@ -73,9 +73,9 @@ it is never the denominator. Train only scaling and fixed `alpha=0.1` remain in
 place. Current prediction still multiplies the supplied whole fixture means by
 reference relative unit effects. Identical projected and reference units remain
 neutral. These are fitted observational associations.
-(`src/squadopt/prediction/football_unit_strength.py:552`,
-`src/squadopt/prediction/football_unit_strength.py:584`,
-`src/squadopt/prediction/football_unit_strength.py:875`,
+(`src/squadopt/prediction/football_unit_strength.py:641`,
+`src/squadopt/prediction/football_unit_strength.py:673`,
+`src/squadopt/prediction/football_unit_strength.py:945`,
 `tests/unit/test_football_unit_physical.py:222`,
 `tests/unit/test_football_unit_physical.py:242`)
 
@@ -88,8 +88,8 @@ versions, all required clock fields, source hash bindings, temporal population
 rules and complete physical partitions. It continues to bind attribute source
 families to every historical and current source group. A current projection
 still refuses a historical replay catalog.
-(`src/squadopt/prediction/football_unit_strength.py:391`,
-`src/squadopt/prediction/football_unit_strength.py:438`,
+(`src/squadopt/prediction/football_unit_strength.py:480`,
+`src/squadopt/prediction/football_unit_strength.py:527`,
 `src/squadopt/experiments/football_unit_experiment.py:91`,
 `src/squadopt/experiments/football_unit_experiment.py:477`,
 `src/squadopt/experiments/football_unit_experiment.py:586`,

@@ -6,7 +6,7 @@ position. The default remains `per_attribute_v1`. The new policy declares model
 version `football_projected_unit_source_missingness_v2` and feature version
 `reference_relative_unit_source_missingness_v2`.
 (`src/squadopt/prediction/football_unit_strength.py:44`,
-`src/squadopt/prediction/football_unit_strength.py:245`)
+`src/squadopt/prediction/football_unit_strength.py:334`)
 
 ## Feature meaning
 
@@ -26,7 +26,7 @@ missingness meaning. Values remain unfilled. Player identity, position count and
 venue interaction features retain their existing roles.
 (`src/squadopt/prediction/football_unit_strength.py:83`,
 `src/squadopt/prediction/football_unit_strength.py:101`,
-`src/squadopt/prediction/football_unit_strength.py:660`,
+`src/squadopt/prediction/football_unit_strength.py:193`,
 `tests/unit/test_football_unit_source_missingness.py:78`,
 `tests/unit/test_football_unit_source_missingness.py:118`,
 `tests/unit/test_football_unit_source_missingness.py:157`)
@@ -40,9 +40,9 @@ squared penalty at `n * (B / n)^2 = B^2 / n`. Repeating the same absence signal
 therefore changes its effective penalty. The new source count removes that
 particular repetition. Other trait correlations and limited observations still
 require assessment; this change does not establish predictive improvement.
-(`src/squadopt/prediction/football_unit_strength.py:648`,
-`src/squadopt/prediction/football_unit_strength.py:580`,
-`src/squadopt/prediction/football_unit_strength.py:598`,
+(`src/squadopt/prediction/football_unit_strength.py:737`,
+`src/squadopt/prediction/football_unit_strength.py:669`,
+`src/squadopt/prediction/football_unit_strength.py:687`,
 `tests/unit/test_football_unit_source_missingness.py:133`)
 
 ## Fit and retain the version
@@ -61,10 +61,10 @@ scaler, fixed regularization `alpha=0.1` and Poisson objective are unchanged. Ke
 the original training observations and source receipts, and record a new actual
 fit cutoff for this model version. Historical replay and current projection
 continue to use their separate input contracts.
-(`src/squadopt/prediction/football_unit_strength.py:245`,
-`src/squadopt/prediction/football_unit_strength.py:552`,
-`src/squadopt/prediction/football_unit_strength.py:580`,
-`src/squadopt/prediction/football_unit_strength.py:598`,
+(`src/squadopt/prediction/football_unit_strength.py:334`,
+`src/squadopt/prediction/football_unit_strength.py:641`,
+`src/squadopt/prediction/football_unit_strength.py:669`,
+`src/squadopt/prediction/football_unit_strength.py:687`,
 `src/squadopt/features/football_unit_inputs.py:761`)
 
 Result metadata records the policy, source attribute groups and both missingness
@@ -74,8 +74,8 @@ artifact must use one declared unit model version. Every attribute source family
 must match both current and historical source receipts. Reference neutrality and paired
 reversal remain required; the new policy retains the existing independent native
 focal minute law.
-(`src/squadopt/prediction/football_unit_strength.py:807`,
-`src/squadopt/prediction/football_unit_strength.py:883`,
+(`src/squadopt/prediction/football_unit_strength.py:877`,
+`src/squadopt/prediction/football_unit_strength.py:953`,
 `src/squadopt/experiments/football_unit_experiment.py:354`,
 `src/squadopt/experiments/football_unit_experiment.py:585`,
 `src/squadopt/experiments/football_unit_experiment.py:723`,
