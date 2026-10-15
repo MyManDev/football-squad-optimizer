@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-10-14T14:20:21Z",
+  "generated_at_utc": "2026-10-15T14:15:28Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "saf-puan",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20261014T135921Z-a48d1521c87f",
+    "source_snapshot_id": "fpl-live-20261015T130038Z-7a7a388a3a43",
     "moves": [
       {
         "move_id": "gw07-1",
@@ -52,25 +52,6 @@
       {
         "move_id": "gw07-3",
         "player_out": {
-          "player_id": 154561,
-          "name": "David Raya Mart\u00edn",
-          "short_name": "Mart\u00edn",
-          "position": "GK",
-          "team": "Arsenal"
-        },
-        "player_in": {
-          "player_id": 155465,
-          "name": "Michael Zetterer",
-          "short_name": "Zetterer",
-          "position": "GK",
-          "team": "Leeds"
-        },
-        "expected_points_delta": -0.01933103366804545,
-        "reason_code": "points_gain"
-      },
-      {
-        "move_id": "gw07-4",
-        "player_out": {
           "player_id": 169432,
           "name": "Oli McBurnie",
           "short_name": "McBurnie",
@@ -84,11 +65,11 @@
           "position": "FWD",
           "team": "Man City"
         },
-        "expected_points_delta": 8.988174414508698,
+        "expected_points_delta": 8.988174414508691,
         "reason_code": "points_gain"
       },
       {
-        "move_id": "gw07-5",
+        "move_id": "gw07-4",
         "player_out": {
           "player_id": 178301,
           "name": "Ollie Watkins",
@@ -107,7 +88,7 @@
         "reason_code": "points_gain"
       },
       {
-        "move_id": "gw07-6",
+        "move_id": "gw07-5",
         "player_out": {
           "player_id": 204936,
           "name": "Gianluigi Donnarumma",
@@ -116,17 +97,17 @@
           "team": "Man City"
         },
         "player_in": {
-          "player_id": 489639,
-          "name": "Bart Verbruggen",
-          "short_name": "Verbruggen",
+          "player_id": 80201,
+          "name": "Bernd Leno",
+          "short_name": "Leno",
           "position": "GK",
-          "team": "Brighton"
+          "team": "Fulham"
         },
-        "expected_points_delta": -0.3012300895468627,
+        "expected_points_delta": 0.0,
         "reason_code": "points_gain"
       },
       {
-        "move_id": "gw07-7",
+        "move_id": "gw07-6",
         "player_out": {
           "player_id": 226597,
           "name": "Gabriel dos Santos Magalh\u00e3es",
@@ -145,7 +126,7 @@
         "reason_code": "points_gain"
       },
       {
-        "move_id": "gw07-8",
+        "move_id": "gw07-7",
         "player_out": {
           "player_id": 231416,
           "name": "Ferdi Kad\u0131o\u011flu",
@@ -164,7 +145,7 @@
         "reason_code": "points_gain"
       },
       {
-        "move_id": "gw07-9",
+        "move_id": "gw07-8",
         "player_out": {
           "player_id": 424876,
           "name": "Dominik Szoboszlai",
@@ -183,7 +164,7 @@
         "reason_code": "points_gain"
       },
       {
-        "move_id": "gw07-10",
+        "move_id": "gw07-9",
         "player_out": {
           "player_id": 441164,
           "name": "Pedro Porro Sauceda",
@@ -192,17 +173,17 @@
           "team": "Spurs"
         },
         "player_in": {
-          "player_id": 451284,
-          "name": "Milan van Ewijk",
-          "short_name": "Ewijk",
+          "player_id": 455084,
+          "name": "Leif Davis",
+          "short_name": "Davis",
           "position": "DEF",
-          "team": "Coventry City"
+          "team": "Ipswich Town"
         },
         "expected_points_delta": 0.0,
         "reason_code": "points_gain"
       },
       {
-        "move_id": "gw07-11",
+        "move_id": "gw07-10",
         "player_out": {
           "player_id": 446008,
           "name": "Bryan Mbeumo",
@@ -221,7 +202,7 @@
         "reason_code": "points_gain"
       },
       {
-        "move_id": "gw07-12",
+        "move_id": "gw07-11",
         "player_out": {
           "player_id": 472769,
           "name": "Nico O'Reilly",
@@ -238,16 +219,35 @@
         },
         "expected_points_delta": 1.0922119362748504,
         "reason_code": "points_gain"
+      },
+      {
+        "move_id": "gw07-12",
+        "player_out": {
+          "player_id": 502500,
+          "name": "Igor Thiago Nascimento Rodrigues",
+          "short_name": "Rodrigues",
+          "position": "FWD",
+          "team": "Brentford"
+        },
+        "player_in": {
+          "player_id": 647850,
+          "name": "Charalampos Kostoulas",
+          "short_name": "Kostoulas",
+          "position": "FWD",
+          "team": "Brighton"
+        },
+        "expected_points_delta": -0.6475341769973397,
+        "reason_code": "points_gain"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 15.736860022736757,
+    "expected_gain_vs_hold": 15.409886968954318,
     "expected_points_cost": 0.0,
     "rival_label": null,
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
     "wall_clock_stopped_the_search": false,
-    "expected_own_points": 59.38456827192718,
+    "expected_own_points": 59.05759521814474,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
@@ -266,12 +266,12 @@
     },
     "starting_xi": [
       {
-        "player_id": 489639,
-        "name": "Bart Verbruggen",
-        "short_name": "Verbruggen",
+        "player_id": 154561,
+        "name": "David Raya Mart\u00edn",
+        "short_name": "Mart\u00edn",
         "position": "GK",
-        "team": "Brighton",
-        "expected_points": 3.2480295284625815
+        "team": "Arsenal",
+        "expected_points": 3.568590651677484
       },
       {
         "player_id": 17761,
@@ -346,22 +346,22 @@
         "expected_points": 8.35545188174385
       },
       {
-        "player_id": 502500,
-        "name": "Igor Thiago Nascimento Rodrigues",
-        "short_name": "Rodrigues",
+        "player_id": 647850,
+        "name": "Charalampos Kostoulas",
+        "short_name": "Kostoulas",
         "position": "FWD",
-        "team": "Brentford",
-        "expected_points": 4.158490726136929
+        "team": "Brighton",
+        "expected_points": 3.5109565491395935
       }
     ],
     "bench": [
       {
-        "player_id": 155465,
-        "name": "Michael Zetterer",
-        "short_name": "Zetterer",
+        "player_id": 80201,
+        "name": "Bernd Leno",
+        "short_name": "Leno",
         "position": "GK",
-        "team": "Leeds",
-        "expected_points": 1.1976225854383358
+        "team": "Fulham",
+        "expected_points": 2.895968560754154
       },
       {
         "player_id": 173878,
@@ -372,12 +372,12 @@
         "expected_points": 2.617779194421131
       },
       {
-        "player_id": 451284,
-        "name": "Milan van Ewijk",
-        "short_name": "Ewijk",
+        "player_id": 455084,
+        "name": "Leif Davis",
+        "short_name": "Davis",
         "position": "DEF",
-        "team": "Coventry City",
-        "expected_points": 1.4066334647628316
+        "team": "Ipswich Town",
+        "expected_points": 2.590615382532553
       },
       {
         "player_id": 601767,
@@ -401,7 +401,7 @@
     "control_optimality_gap": 0.0,
     "chip_choice": {
       "chip": "freehit",
-      "gain_vs_no_chip": 3.52530837569887,
+      "gain_vs_no_chip": 3.1983353219164457,
       "basis": "one_week_expected_points_v1",
       "windows_left": {
         "first_half": {

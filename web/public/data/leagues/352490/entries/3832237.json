@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-10-14T14:20:21Z",
+  "generated_at_utc": "2026-10-15T14:15:28Z",
   "source_kind": "live",
   "payload": {
     "league_id": 352490,
@@ -197,7 +197,7 @@
         "short_name": "Sauceda",
         "position": "DEF",
         "team": "Spurs",
-        "price_tenths": 54,
+        "price_tenths": 53,
         "expected_points": 0.0,
         "event_points": null,
         "is_captain": false,
@@ -307,13 +307,21 @@
     "squad_basis": "captured",
     "active_chip": null,
     "purchase_prices_known": true,
-    "squad_sell_value_tenths": 978,
-    "spendable_budget_tenths": 983,
-    "source_snapshot_id": "fpl-live-20261014T135921Z-a48d1521c87f",
+    "squad_sell_value_tenths": 977,
+    "spendable_budget_tenths": 982,
+    "source_snapshot_id": "fpl-live-20261015T130038Z-7a7a388a3a43",
     "squadopt_comparison": null,
     "data_quality": "complete",
     "missing_fields": [],
     "device_plan": {
+      "top100_weights": [
+        5,
+        10,
+        20,
+        30,
+        40,
+        50
+      ],
       "held": [
         154561,
         226597,
@@ -346,7 +354,7 @@
         "169432": 55,
         "502500": 78,
         "204936": 55,
-        "441164": 54,
+        "441164": 53,
         "424876": 69,
         "178301": 78
       }
