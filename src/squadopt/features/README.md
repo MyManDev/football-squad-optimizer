@@ -81,7 +81,7 @@ The standalone observed workload model has a separate input boundary:
 
 | Module | What it does |
 | --- | --- |
-| `football_observed_load.py` | Observed non-PL reported-record inputs and retrospective provenance, preserving missing values and complete native PL support (`src/squadopt/features/football_observed_load.py:104`). |
+| `football_observed_load.py` | Observed non-PL reported-record inputs and retrospective provenance, preserving missing values and complete native PL support (`src/squadopt/features/football_observed_load.py:127`). |
 
 ## Package surface
 

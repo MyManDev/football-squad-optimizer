@@ -5,8 +5,9 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import re
 from collections.abc import Sequence
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, fields
 from datetime import datetime
 from typing import Any
 
@@ -35,6 +36,7 @@ from squadopt.features.football_observed_load import (
 )
 
 MODEL_VERSION = "football_observed_non_pl_load_v1"
+SERVING_VERSION = "football_observed_non_pl_load_serving_v1"
 FloatArray = NDArray[np.float64]
 HEADS = (
     "weekly_appearance",
@@ -104,6 +106,27 @@ class ObservedLoadPrediction:
     fixture_probabilities: tuple[tuple[float, ...], ...]
     model_sha256: str
     input_sha256: str
+
+
+@dataclass(frozen=True, slots=True)
+class ObservedLoadServingParameters:
+    model_sha256: str
+    model_version: str
+    feature_version: str
+    coverage_kind: str
+    minute_definition: str
+    feature_names: tuple[str, ...]
+    design_names: tuple[str, ...]
+    cutoff: str
+    target_season: str
+    target_gameweeks: tuple[int, ...]
+    allow_released_2025_26: bool
+    transform: ObservedLoadTransform
+    coefficients: tuple[float, ...]
+    observed_competition_scopes: tuple[tuple[str, ...], ...]
+    native_mass_policy: str
+    eligibility_policy: str
+    version: str = SERVING_VERSION
 
 
 @dataclass(frozen=True)
@@ -395,47 +418,224 @@ class ObservedLoadModel:
     def predict(
         self, week: ObservedLoadWeek, *, zero_coefficients: bool = False
     ) -> ObservedLoadPrediction:
-        if type(zero_coefficients) is not bool:
-            raise ValueError("Observed load zero-coefficient option must be Boolean.")
         fitted = self._require()
-        validate_observed_load_week(
-            week, allow_released_2025_26=fitted.metadata.allow_released_2025_26
+        return _predict(
+            week, fitted.metadata, fitted.coefficients, fitted.sha256, zero_coefficients
         )
-        if week.provenance.kind != "prospective":
-            raise ValueError("Observed load prediction requires a prospective source.")
+
+
+def _predict(
+    week: ObservedLoadWeek,
+    parameters: ObservedLoadMetadata | ObservedLoadServingParameters,
+    coefficients: FloatArray,
+    model_sha256: str,
+    zero_coefficients: bool,
+) -> ObservedLoadPrediction:
+    if type(zero_coefficients) is not bool:
+        raise ValueError("Observed load zero-coefficient option must be Boolean.")
+    validate_observed_load_week(week, allow_released_2025_26=parameters.allow_released_2025_26)
+    if week.provenance.kind != "prospective":
+        raise ValueError("Observed load prediction requires a prospective source.")
+    if (
+        week.season != parameters.target_season
+        or week.gameweek not in parameters.target_gameweeks
+        or _clock(week.decision_at, "decision") < _clock(parameters.cutoff, "fit cutoff")
+    ):
+        raise ValueError("Observed load prediction is outside its fitted target.")
+    if tuple(sorted(week.competitions)) not in parameters.observed_competition_scopes:
+        raise ValueError("Observed load prediction changes its trained competition scope.")
+    if zero_coefficients:
+        probabilities = np.asarray(week.native.probabilities, dtype=float)
+        probabilities /= math.fsum(float(p) for p in probabilities)
+    else:
+        example = _example(week, parameters.transform)
+        probabilities = _tilt(example, coefficients)
+    states = week.native.states
+    marginal = tuple(
+        tuple(
+            math.fsum(float(probabilities[i]) for i, state in enumerate(states) if state[j] == k)
+            for k in range(7)
+        )
+        for j in range(len(week.native.fixtures))
+    )
+    appearance = math.fsum(float(probabilities[i]) for i, state in enumerate(states) if any(state))
+    return ObservedLoadPrediction(
+        week,
+        states,
+        tuple(float(p) for p in probabilities),
+        appearance,
+        marginal,
+        model_sha256,
+        observed_load_digest(week),
+    )
+
+
+def export_observed_load_serving_result(model: ObservedLoadModel) -> str:
+    """Export inference fields with the unchanged full training-metadata identity."""
+    metadata = model.metadata
+    parameters = ObservedLoadServingParameters(
+        model.model_sha256,
+        metadata.model_version,
+        metadata.feature_version,
+        metadata.coverage_kind,
+        metadata.minute_definition,
+        metadata.feature_names,
+        metadata.design_names,
+        metadata.cutoff,
+        metadata.target_season,
+        metadata.target_gameweeks,
+        metadata.allow_released_2025_26,
+        metadata.transform,
+        metadata.coefficients,
+        metadata.observed_competition_scopes,
+        metadata.native_mass_policy,
+        metadata.eligibility_policy,
+    )
+    return _encode(parameters)
+
+
+@dataclass(frozen=True, slots=True)
+class ObservedLoadServingModel:
+    """Read-only inference result; the supplied result hash authenticates its bytes."""
+
+    parameters: ObservedLoadServingParameters
+    _coefficients: FloatArray
+    result_json: str
+    result_sha256: str
+
+    @property
+    def model_sha256(self) -> str:
+        return self.parameters.model_sha256
+
+    def predict(
+        self, week: ObservedLoadWeek, *, zero_coefficients: bool = False
+    ) -> ObservedLoadPrediction:
         if (
-            week.season != fitted.metadata.target_season
-            or week.gameweek not in fitted.metadata.target_gameweeks
-            or _clock(week.decision_at, "decision") < _clock(fitted.metadata.cutoff, "fit cutoff")
+            _encode(self.parameters) != self.result_json
+            or hashlib.sha256(self.result_json.encode()).hexdigest() != self.result_sha256
+            or tuple(float(v) for v in self._coefficients) != self.parameters.coefficients
         ):
-            raise ValueError("Observed load prediction is outside its fitted target.")
-        if tuple(sorted(week.competitions)) not in fitted.metadata.observed_competition_scopes:
-            raise ValueError("Observed load prediction changes its trained competition scope.")
-        if zero_coefficients:
-            probabilities = np.asarray(week.native.probabilities, dtype=float)
-            probabilities /= math.fsum(float(p) for p in probabilities)
-        else:
-            example = _example(week, fitted.metadata.transform)
-            probabilities = _tilt(example, fitted.coefficients)
-        states = week.native.states
-        marginal = tuple(
-            tuple(
-                math.fsum(
-                    float(probabilities[i]) for i, state in enumerate(states) if state[j] == k
-                )
-                for k in range(7)
-            )
-            for j in range(len(week.native.fixtures))
+            raise ValueError("Observed load serving result integrity mismatch.")
+        return _predict(
+            week, self.parameters, self._coefficients, self.model_sha256, zero_coefficients
         )
-        appearance = math.fsum(
-            float(probabilities[i]) for i, state in enumerate(states) if any(state)
+
+
+def _result_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for name, value in pairs:
+        if name in result:
+            raise ValueError("Observed load result contains a duplicate JSON key.")
+        result[name] = value
+    return result
+
+
+def _result_real(value: Any) -> float:
+    if type(value) not in (int, float):
+        raise ValueError("Observed load serving parameters require finite real numbers.")
+    try:
+        result = float(value)
+    except (ValueError, OverflowError) as error:
+        raise ValueError("Observed load serving parameters require finite real numbers.") from error
+    if not math.isfinite(result):
+        raise ValueError("Observed load serving parameters require finite real numbers.")
+    return result
+
+
+def read_observed_load_serving_result(raw: bytes, *, sha256: str) -> ObservedLoadServingModel:
+    """Read compact inference bytes, not absent full training provenance bytes."""
+    if (
+        type(raw) is not bytes
+        or not 0 < len(raw) <= 128 * 1024
+        or not isinstance(sha256, str)
+        or re.fullmatch(r"[a-f0-9]{64}", sha256) is None
+        or hashlib.sha256(raw).hexdigest() != sha256
+    ):
+        raise ValueError("Observed load serving result bytes/digest mismatch.")
+    try:
+        document = json.loads(raw, object_pairs_hook=_result_pairs)
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise ValueError("Observed load serving result is not valid JSON.") from error
+    if type(document) is not dict or set(document) != {
+        f.name for f in fields(ObservedLoadServingParameters)
+    }:
+        raise ValueError("Observed load serving result has an unexpected field inventory.")
+    expected = {
+        "version": SERVING_VERSION,
+        "model_version": MODEL_VERSION,
+        "feature_version": FEATURE_VERSION,
+        "coverage_kind": COVERAGE_KIND,
+        "minute_definition": MINUTE_DEFINITION,
+        "feature_names": list(FEATURE_NAMES),
+        "design_names": list(DESIGN_NAMES),
+        "native_mass_policy": "normalize_once_after_1e-12_validation_preserve_structural_zeros",
+        "eligibility_policy": "not_applied",
+    }
+    if any(document[name] != value for name, value in expected.items()):
+        raise ValueError("Observed load serving result version, features or policies differ.")
+    if (
+        not isinstance(document["model_sha256"], str)
+        or re.fullmatch(r"[a-f0-9]{64}", document["model_sha256"]) is None
+    ):
+        raise ValueError("Observed load serving result lacks a full metadata identity.")
+    _clock(document["cutoff"], "serving fit cutoff")
+    if type(document["target_gameweeks"]) is not list:
+        raise ValueError("Observed load serving targets require a list.")
+    targets = tuple(document["target_gameweeks"])
+    validate_targets(document["target_season"], targets)
+    if type(document["allow_released_2025_26"]) is not bool:
+        raise ValueError("Observed load serving released-season option must be Boolean.")
+    transform = document["transform"]
+    if type(transform) is not dict or set(transform) != {"means", "scales", "known_counts"}:
+        raise ValueError("Observed load serving transform inventory differs.")
+    if any(type(v) is not list or len(v) != len(FEATURE_NAMES) for v in transform.values()):
+        raise ValueError("Observed load serving transform shape differs.")
+    means = tuple(_result_real(v) for v in transform["means"])
+    scales = tuple(_result_real(v) for v in transform["scales"])
+    counts = tuple(transform["known_counts"])
+    if (
+        any(type(v) is not int or v < 0 for v in counts)
+        or any(v < 0 for v in means)
+        or any(v <= 0 for v in scales)
+        or any(n == 0 and (m != 0 or s != 1) for m, s, n in zip(means, scales, counts, strict=True))
+    ):
+        raise ValueError("Observed load serving transform support is invalid.")
+    values = document["coefficients"]
+    if type(values) is not list or len(values) != len(DESIGN_NAMES):
+        raise ValueError("Observed load serving coefficient shape differs.")
+    coefficients = tuple(_result_real(v) for v in values)
+    if any(abs(v) > 20 for v in coefficients):
+        raise ValueError("Observed load serving coefficients exceed fitted bounds.")
+    scopes = document["observed_competition_scopes"]
+    if (
+        type(scopes) is not list
+        or not scopes
+        or any(
+            type(scope) is not list
+            or not scope
+            or any(type(name) is not str or not name.strip() for name in scope)
+            or scope != sorted(set(scope))
+            for scope in scopes
         )
-        return ObservedLoadPrediction(
-            week,
-            states,
-            tuple(float(p) for p in probabilities),
-            appearance,
-            marginal,
-            fitted.sha256,
-            observed_load_digest(week),
+    ):
+        raise ValueError("Observed load serving competition scopes are invalid.")
+    frozen_scopes = tuple(tuple(scope) for scope in scopes)
+    if frozen_scopes != tuple(sorted(set(frozen_scopes))):
+        raise ValueError("Observed load serving competition scopes duplicate or reorder.")
+    parameters = ObservedLoadServingParameters(
+        **dict(
+            document,
+            feature_names=FEATURE_NAMES,
+            design_names=DESIGN_NAMES,
+            target_gameweeks=targets,
+            transform=ObservedLoadTransform(means, scales, counts),
+            coefficients=coefficients,
+            observed_competition_scopes=frozen_scopes,
         )
+    )
+    encoded = _encode(parameters)
+    # Canonical serving bytes have one identity and are the exporter's exact form.
+    if raw != encoded.encode():
+        raise ValueError("Observed load serving result is not canonically encoded.")
+    array = np.frombuffer(np.asarray(coefficients, dtype=np.float64).tobytes(), dtype=np.float64)
+    return ObservedLoadServingModel(parameters, array, encoded, sha256)

@@ -117,7 +117,7 @@ The following standalone model has its own source contract:
 
 | Module | What it does |
 | --- | --- |
-| `football_observed_load.py` | Observed non-PL reported-record tilt of the whole native weekly law, with distinct missing-value features and no product caller (`src/squadopt/prediction/football_observed_load.py:272`). |
+| `football_observed_load.py` | Observed non-PL reported-record tilt of the whole native weekly law, with distinct missing-value features and no product caller (`src/squadopt/prediction/football_observed_load.py:295`). |
 
 ## Package surface
 
