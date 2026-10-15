@@ -22,15 +22,28 @@ read. Reconstruction then excludes repeated, target and future gameweeks
 (`scripts/build_football_forecast.py:24`,
 `src/squadopt/application/football_live.py:582`).
 
+This clock preflight excludes every GW1 pair: its pre-decision capture must
+precede the first deadline, so it cannot satisfy `first_deadline <= captured`
+(`scripts/build_football_forecast.py:41`,
+`src/squadopt/features/football_flag_captures.py:117`,
+`src/squadopt/application/football_live.py:630`).
+
 Each historical native model sees the explicitly selected archives and the
 captured season. The retained role model also accepts 2025-26 when it is named;
 omitting it retains the three-archive population
 (`src/squadopt/application/football_live.py:238`,
-`scripts/build_football_forecast.py:148`). The historical flag reference clock
-is explicitly deadline minus one second. It is an out-of-fold reconstruction,
-with the actual capture clock retained separately; it is not a claim that the
-forecast was produced at that earlier time
-(`src/squadopt/application/football_live.py:582`).
+`scripts/build_football_forecast.py:148`). Historical `capture_age_hours` and
+`news_age_hours` are fitted against deadline minus one second. At serving time,
+both ages use the explicit actual decision time. This declares a train/serve
+age shift: historical rows approach the deadline, while served rows can be
+earlier. The historical clock is an out-of-fold reconstruction with the actual
+capture clock retained separately. It does not claim an original forecast at
+that time or introduce later flags or news into the earlier capture
+(`src/squadopt/application/football_live.py:591`,
+`src/squadopt/application/football_live.py:630`,
+`src/squadopt/application/football_live.py:708`,
+`src/squadopt/features/football_flag_captures.py:167`,
+`src/squadopt/features/football_flag_captures.py:182`).
 
 The original FPL person code, full captured club calendar, categorical status,
 nullable next-event label and seven native minute states are checked together.
@@ -57,7 +70,7 @@ $env:PYTHONPATH = 'src'
   --snapshot-root data/snapshots `
   --snapshot-id TARGET_CAPTURE `
   --archive-root data/raw/vaastav-fpl `
-  --artifact-root .codex-tmp/retained-flag-review `
+  --artifact-root data/artifacts/retained-football `
   --training-season 2022-23 --training-season 2023-24 `
   --training-season 2024-25 --training-season 2025-26 --training-season 2026-27 `
   --role-minutes --retained-role-history --with-components `
