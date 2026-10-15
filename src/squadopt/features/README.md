@@ -7,7 +7,7 @@ models. Every time-dependent aggregation of the feature builder passes through o
 shifted-rolling primitive, so the timing rule has one implementation. Its callers are `prediction`, `live`, `application`, `platform`,
 the laboratory and the scripts.
 
-Its 21 Python files sit in one folder. This page places every one of them in exactly one
+Its 23 Python files sit in one folder. This page places every one of them in exactly one
 family.
 
 Review: İbrahim, the data side ([ownership](../../../docs/architecture/ownership.md)).
@@ -63,14 +63,17 @@ that check them before a row is returned.
 Each private model of the football lane in [`squadopt.prediction`](../prediction/README.md)
 reads its inputs from here. Outside this package, the first six are imported only by their
 model in `prediction` and its `football_*_experiment` module in
-[`squadopt.experiments`](../experiments/README.md); the last two parse private bytes for the
-club-unit experiment and are called only by tests today.
+[`squadopt.experiments`](../experiments/README.md). The unit catalogue and FM readers parse
+private bytes for the club-unit experiment. The phase replay and credit readers below prepare
+historical source inputs (`football_phase_replay.py:122`, `football_phase_credits.py:106`).
 
 | Module | What it does |
 | --- | --- |
 | `football_flag_inputs.py` | Captured flag facts and supplied pre-decision native minute supports (`football_flag_week_input_v1`); no reader touches a network, a file or an outcome it was not given. |
 | `football_load_inputs.py` | Immutable all-competition workload and native-law source contracts (`football_load_week_input_v1`). |
 | `football_phase_inputs.py` | Causal inputs for phase-specific credited goal and assist allocation (`football_phase_inputs_v1`). |
+| `football_phase_replay.py` | Reads exact public-revision duty CSV bytes while retaining separate original-recording and actual-retrieval clocks (`football_phase_replay.py:122`). |
+| `football_phase_credits.py` | Binds final FPL assists only when independent totals force a unique event assignment; refuses ambiguous assignments (`football_phase_credits.py:106`). |
 | `football_score_state_inputs.py` | Strict score-process inputs (`football_score_fixture_input_v1`); a receipt assertion does not admit real data. |
 | `football_tactical_inputs.py` | Named tactical facts and supplied paired pre-decision states (`football_tactical_inputs_v1`). |
 | `football_unit_inputs.py` | Immutable inputs of the separately invoked club-unit experiment (`football_unit_inputs_v1`). |
