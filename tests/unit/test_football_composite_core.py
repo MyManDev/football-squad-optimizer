@@ -226,6 +226,7 @@ def case():
         decision_at=stamp(decision),
         feature_cutoff=stamp(decision - timedelta(minutes=1)),
         generated_at=stamp(generated),
+        native_source=replace(original.native_source, sha256="f" * 64),
         home=sides[0],
         away=sides[1],
         roster=tuple(
@@ -575,5 +576,61 @@ def test_cross_family_source_mismatch_refuses_before_stages(models, damage):
         )
     elif damage == "late_unit":
         x = replace(x, unit=replace(x.unit, captured_at=x.unit.kickoff))
+    with pytest.raises(ValueError):
+        compose_fixture(x, models)
+
+
+@pytest.mark.parametrize("target", ["root", "score", "tactical"])
+def test_original_native_artifact_identity_must_match_across_families(models, target):
+    x = case()
+    if target == "root":
+        x = replace(x, native_basis_sha256="0" * 64)
+    elif target == "score":
+        x = replace(x, score=replace(x.score, native_basis_sha256="0" * 64))
+    else:
+        x = replace(
+            x,
+            tactical=replace(
+                x.tactical, native_source=replace(x.tactical.native_source, sha256="0" * 64)
+            ),
+        )
+    with pytest.raises(ValueError, match="original native artifact identities"):
+        compose_fixture(x, models)
+
+
+@pytest.mark.parametrize(
+    "target", ["duties", "duration_generation", "duration_capture", "tactical"]
+)
+def test_source_available_before_decision_but_after_assembly_refuses(models, target):
+    x = case()
+    generated = x.unit.decision_cutoff - timedelta(minutes=10)
+    later = stamp(generated + timedelta(minutes=5))
+    x = replace(
+        x,
+        unit=replace(x.unit, captured_at=generated),
+        generated_at=stamp(generated),
+        tactical=replace(x.tactical, generated_at=stamp(generated)),
+        duration=replace(x.duration, generated_at=stamp(generated)),
+    )
+    compose_fixture(x, models)
+    if target == "duties":
+        x = replace(
+            x,
+            phase=(
+                replace(x.phase[0], duties=replace(x.phase[0].duties, captured_at=later)),
+                x.phase[1],
+            ),
+        )
+    elif target == "duration_generation":
+        x = replace(x, duration=replace(x.duration, generated_at=later))
+    elif target == "duration_capture":
+        x = replace(x, duration=replace(x.duration, source_captured_at=later))
+    else:
+        x = replace(
+            x,
+            tactical=replace(
+                x.tactical, roster_source=replace(x.tactical.roster_source, retrieved_at=later)
+            ),
+        )
     with pytest.raises(ValueError):
         compose_fixture(x, models)

@@ -323,6 +323,8 @@ def _validate(
     for digest in (score.native_basis_sha256, score.source_sha256):
         _sha(digest)
     validate_tactical_projection(tactical)
+    if not x.native_basis_sha256 == score.native_basis_sha256 == tactical.native_source.sha256:
+        raise ValueError("Composite original native artifact identities differ.")
     if tactical.replay is not None or unit.catalog.replay is not None:
         raise ValueError("Composite needs home-oriented current source templates without replay.")
     scope = (score.season, score.gameweek, score.fixture_id)
@@ -331,6 +333,8 @@ def _validate(
     if (
         generated > decision
         or unit.captured_at > generated
+        or _clock(x.duration.generated_at) > generated
+        or _clock(x.duration.source_captured_at) > generated
         or _clock(score.native_basis_fit_cutoff) >= decision
         or not decision < _clock(score.deadline_at) < _clock(score.kickoff)
     ):
@@ -350,6 +354,16 @@ def _validate(
         or any(s.captured_at > generated for s in unit.catalog.sources)
     ):
         raise ValueError("Composite family source scope or chronology differs.")
+    tactical_sources = [tactical.native_source, tactical.roster_source]
+    for side in (tactical.home, tactical.away):
+        tactical_sources.extend(f.source for f in side.observed_fixtures)
+        for player in side.players:
+            profile = player.profile
+            if profile.trait_source is not None:
+                tactical_sources.append(profile.trait_source)
+            tactical_sources.extend(role.source for role in profile.role_history)
+    if any(_clock(source.retrieved_at) > generated for source in tactical_sources):
+        raise ValueError("Composite assembly precedes a tactical source acquisition.")
     if type(x.phase) is not tuple or len(x.phase) != 2:
         raise ValueError("Composite phase sources must cover both oriented sides.")
     for i, phase in enumerate(x.phase):
@@ -361,6 +375,7 @@ def _validate(
             or _clock(phase.decision_at) != decision
             or _clock(phase.kickoff) != unit.kickoff
             or _clock(phase.source.captured_at) > generated
+            or _clock(phase.duties.captured_at) > generated
         ):
             raise ValueError("Composite phase source scope or chronology differs.")
     if type(x.final_minutes) is not tuple or any(
