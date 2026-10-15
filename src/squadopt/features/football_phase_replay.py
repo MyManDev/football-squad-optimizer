@@ -14,6 +14,7 @@ import re
 from squadopt.data.errors import DataError
 from squadopt.data.timestamps import as_instant, normalize_utc_timestamp
 from squadopt.features.football_phase_inputs import (
+    PROTECTED_SEASON,
     TAKER_FIELDS,
     PhaseDutyCapture,
     PhaseDutyPlayer,
@@ -129,6 +130,7 @@ def read_replayed_phase_duties(
     replay: PhaseReplay,
     model_use_approved: bool,
     model_use_evidence_ref: str,
+    allow_released_2025_26: bool = False,
 ) -> PhaseDutyCapture:
     """Preserve original ranks, exact source bytes and the actual retrieval time.
 
@@ -137,6 +139,10 @@ def read_replayed_phase_duties(
     Other missing-value spellings, zero and fractional ranks are refused.
     """
     validate_phase_season(season)
+    if type(allow_released_2025_26) is not bool:
+        raise ValueError("The released season selection must be an explicit Boolean.")
+    if season == PROTECTED_SEASON and not allow_released_2025_26:
+        raise ValueError("The declared phase source season is protected or unselected.")
     if model_use_approved is not True:
         raise ValueError("Replayed duties require explicit admitted model-use evidence.")
     if (

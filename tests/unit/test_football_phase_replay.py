@@ -50,8 +50,36 @@ def _read(players=PLAYERS, teams=TEAMS, **overrides):
         "replay": _replay(players, teams),
         "model_use_approved": True,
         "model_use_evidence_ref": "synthetic-only",
+        "allow_released_2025_26": True,
     }
     return read_replayed_phase_duties(players, teams, **(arguments | overrides))
+
+
+def test_protected_season_requires_opt_in_before_decoding_duties():
+    with pytest.raises(ValueError, match="protected"):
+        read_replayed_phase_duties(
+            b"\xff",
+            b"\xff",
+            season="2025-26",
+            decision_at=DECISION,
+            valid_until=DECISION,
+            replay=_replay(),
+            model_use_approved=True,
+            model_use_evidence_ref="synthetic-only",
+        )
+    with pytest.raises(ValueError, match="protected"):
+        _read(allow_released_2025_26=False)
+
+
+@pytest.mark.parametrize("selection", [None, 0, 1, "True"])
+def test_released_season_selection_requires_a_strict_boolean(selection):
+    with pytest.raises(ValueError, match="explicit Boolean"):
+        _read(allow_released_2025_26=selection)
+
+
+def test_other_season_does_not_require_release_opt_in():
+    capture = _read(season="2024-25", allow_released_2025_26=False)
+    assert capture.season == "2024-25"
 
 
 def test_public_version_duties_preserve_actual_acquisition_and_nullable_ranks():
