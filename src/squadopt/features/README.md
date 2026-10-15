@@ -7,7 +7,7 @@ models. Every time-dependent aggregation of the feature builder passes through o
 shifted-rolling primitive, so the timing rule has one implementation. Its callers are `prediction`, `live`, `application`, `platform`,
 the laboratory and the scripts.
 
-Its 22 Python files sit in one folder. This page places every one of them in exactly one
+Its 23 Python files sit in one folder. This page places every one of them in exactly one
 family.
 
 Review: İbrahim, the data side ([ownership](../../../docs/architecture/ownership.md)).
@@ -64,7 +64,7 @@ The football models in [`squadopt.prediction`](../prediction/README.md) read the
 The retained flag adapter also supplies the optional live producer
 (`src/squadopt/application/football_live.py:582`). The other five families retain their private
 `football_*_experiment` callers in [`squadopt.experiments`](../experiments/README.md);
-the last two modules parse private bytes for the club-unit experiment.
+The unit catalogue and FM readers parse private bytes for the club-unit experiment.
 
 | Module | What it does |
 | --- | --- |
@@ -77,6 +77,7 @@ the last two modules parse private bytes for the club-unit experiment.
 | `football_unit_inputs.py` | Immutable inputs of the separately invoked club-unit experiment (`football_unit_inputs_v1`). |
 | `football_unit_catalog.py` | The strict private JSON input boundary of the club-unit experiment; it touches no network or file. |
 | `football_fm_attributes.py` | Reads a full private FM export and prepares its exact active player/club scope for a catalog (`football_fm_csv_attributes_v1`, `football_fm_scoped_attributes_v1`), retaining unknown traits and refusing inferred identity or absent mapped UIDs (`src/squadopt/features/football_fm_attributes.py:204`). |
+| `football_unit_point.py` | Declared deterministic XI point from complete native starter probabilities, with exact structural support and a retained basis receipt (`src/squadopt/features/football_unit_point.py:48`). |
 
 ## Package surface
 
