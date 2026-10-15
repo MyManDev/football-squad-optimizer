@@ -7,7 +7,7 @@ measures against the control, and the models of the experimental football lane. 
 are `live`, `scenarios` and `evaluation` in the domain ring, `application`, `platform`, the
 laboratory and the scripts.
 
-Its 39 Python files sit in one folder. This page places every one of them in exactly one
+Its 40 Python files sit in one folder. This page places every one of them in exactly one
 family.
 
 Review: İbrahim, the data side ([ownership](../../../docs/architecture/ownership.md)). Within 24
@@ -122,6 +122,11 @@ The compact inference boundary has its own result receipt
 | Module | What it does |
 | --- | --- |
 | `football_unit_serving.py` | Exports and strictly reads immutable pooled v4 parameters, then predicts paired rates from current typed unit inputs (`src/squadopt/prediction/football_unit_serving.py:290`, `src/squadopt/prediction/football_unit_serving.py:394`, `src/squadopt/prediction/football_unit_serving.py:470`). |
+The following standalone model has its own source contract:
+
+| Module | What it does |
+| --- | --- |
+| `football_observed_load.py` | Observed non-PL reported-record tilt of the whole native weekly law, with distinct missing-value features and no product caller (`src/squadopt/prediction/football_observed_load.py:272`). |
 
 ## Package surface
 
