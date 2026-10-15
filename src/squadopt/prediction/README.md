@@ -7,7 +7,7 @@ measures against the control, and the models of the experimental football lane. 
 are `live`, `scenarios` and `evaluation` in the domain ring, `application`, `platform`, the
 laboratory and the scripts.
 
-Its 41 Python files sit in one folder. This page places every one of them in exactly one
+Its 42 Python files sit in one folder. This page places every one of them in exactly one
 family.
 
 Review: İbrahim, the data side ([ownership](../../../docs/architecture/ownership.md)). Within 24
@@ -135,6 +135,7 @@ paired rates and recipient marginals, with its explicit context policy in metada
 | Module | What it does |
 | --- | --- |
 | `football_observed_tactical.py` | Fits paired Poisson rates and conditional goal/assist recipients at full-roster native marginal context, with training-only observed-value transforms and missingness masks; exposes recipient-only inference without the count head (`src/squadopt/prediction/football_observed_tactical.py:91`, `src/squadopt/prediction/football_observed_tactical.py:413`, `src/squadopt/prediction/football_observed_tactical.py:590`). |
+| `football_joint_week_law.py` | Pure whole-week flag/LOAD transport and explicit evidence interventions with immutable joint support and lineage (`src/squadopt/prediction/football_joint_week_law.py:37`). |
 
 ## Package surface
 
