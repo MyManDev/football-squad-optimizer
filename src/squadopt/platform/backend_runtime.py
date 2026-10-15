@@ -75,7 +75,7 @@ from squadopt.platform.capture_context import (
     load_capture_context,
     load_capture_identity,
 )
-from squadopt.platform.store_probe import StoreProbeResult, probe_store
+from squadopt.platform.storage.store_probe import StoreProbeResult, probe_store
 from squadopt.platform.worker_heartbeat import WORKER_DIRECTORY, WorkerLiveness
 
 __all__ = [

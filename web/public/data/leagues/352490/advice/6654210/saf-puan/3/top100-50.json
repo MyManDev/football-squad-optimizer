@@ -1,51 +1,51 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-10-10T06:07:04Z",
+  "generated_at_utc": "2026-10-15T14:15:28Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
-    "gameweek": 6,
+    "gameweek": 7,
     "entry_id": 6654210,
     "league_id": 352490,
     "mode": "saf-puan",
     "window": 3,
-    "source_snapshot_id": "fpl-live-20261010T035732Z-c77d032165af",
+    "source_snapshot_id": "fpl-live-20261015T130038Z-7a7a388a3a43",
     "moves": [
       {
-        "move_id": "gw06-1",
+        "move_id": "gw07-1",
         "player_out": {
-          "player_id": 439509,
-          "name": "Christos Tzolis",
-          "short_name": "Tzolis",
-          "position": "MID",
-          "team": "Arsenal"
+          "player_id": 97032,
+          "name": "Virgil van Dijk",
+          "short_name": "Dijk",
+          "position": "DEF",
+          "team": "Liverpool"
         },
         "player_in": {
-          "player_id": 513418,
-          "name": "Kevin Schade",
-          "short_name": "Schade",
-          "position": "MID",
-          "team": "Brentford"
+          "player_id": 465730,
+          "name": "Maxim De Cuyper",
+          "short_name": "Cuyper",
+          "position": "DEF",
+          "team": "Brighton"
         },
-        "expected_points_delta": 1.4646317883080684,
-        "reason_code": "window_value"
+        "expected_points_delta": 0.09757342393687907,
+        "reason_code": "top100_preference"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 1.4646317883080684,
-    "expected_points_cost": 0.0,
+    "expected_gain_vs_hold": 0.09757342393687907,
+    "expected_points_cost": 3.54329859066695,
     "rival_label": null,
     "solver_status": "OPTIMAL",
     "optimality_gap": null,
     "wall_clock_stopped_the_search": false,
-    "expected_own_points": 55.14709216499182,
+    "expected_own_points": 54.71139116878861,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
       "short_name": "Haaland",
       "position": "FWD",
       "team": "Man City",
-      "expected_points": 7.9988702038468515
+      "expected_points": 8.35545188174385
     },
     "vice_captain": {
       "player_id": 141746,
@@ -53,7 +53,7 @@
       "short_name": "Fernandes",
       "position": "MID",
       "team": "Man Utd",
-      "expected_points": 6.348841464940458
+      "expected_points": 6.012000284303428
     },
     "starting_xi": [
       {
@@ -62,23 +62,15 @@
         "short_name": "Mart\u00edn",
         "position": "GK",
         "team": "Arsenal",
-        "expected_points": 3.937285604836277
+        "expected_points": 3.568590651677484
       },
       {
-        "player_id": 97032,
-        "name": "Virgil van Dijk",
-        "short_name": "Dijk",
+        "player_id": 465730,
+        "name": "Maxim De Cuyper",
+        "short_name": "Cuyper",
         "position": "DEF",
-        "team": "Liverpool",
-        "expected_points": 4.022055479126265
-      },
-      {
-        "player_id": 244723,
-        "name": "Tyrick Mitchell",
-        "short_name": "Mitchell",
-        "position": "DEF",
-        "team": "Crystal Palace",
-        "expected_points": 3.0234430953770723
+        "team": "Brighton",
+        "expected_points": 3.7099911306959767
       },
       {
         "player_id": 220237,
@@ -86,7 +78,7 @@
         "short_name": "Botman",
         "position": "DEF",
         "team": "Newcastle",
-        "expected_points": 2.6661832060505506
+        "expected_points": 3.159225872367363
       },
       {
         "player_id": 191866,
@@ -94,7 +86,15 @@
         "short_name": "Ajer",
         "position": "DEF",
         "team": "Brentford",
-        "expected_points": 2.6426087370777522
+        "expected_points": 2.921268919302201
+      },
+      {
+        "player_id": 244723,
+        "name": "Tyrick Mitchell",
+        "short_name": "Mitchell",
+        "position": "DEF",
+        "team": "Crystal Palace",
+        "expected_points": 2.742248299250839
       },
       {
         "player_id": 141746,
@@ -102,15 +102,7 @@
         "short_name": "Fernandes",
         "position": "MID",
         "team": "Man Utd",
-        "expected_points": 6.348841464940458
-      },
-      {
-        "player_id": 446008,
-        "name": "Bryan Mbeumo",
-        "short_name": "Mbeumo",
-        "position": "MID",
-        "team": "Man Utd",
-        "expected_points": 4.514593666623016
+        "expected_points": 6.012000284303428
       },
       {
         "player_id": 60307,
@@ -118,7 +110,15 @@
         "short_name": "Gro\u00df",
         "position": "MID",
         "team": "Brighton",
-        "expected_points": 4.161023508047467
+        "expected_points": 4.658321948335153
+      },
+      {
+        "player_id": 446008,
+        "name": "Bryan Mbeumo",
+        "short_name": "Mbeumo",
+        "position": "MID",
+        "team": "Man Utd",
+        "expected_points": 4.380344943521542
       },
       {
         "player_id": 513418,
@@ -126,7 +126,7 @@
         "short_name": "Schade",
         "position": "MID",
         "team": "Brentford",
-        "expected_points": 4.011063640217713
+        "expected_points": 3.056255148902708
       },
       {
         "player_id": 223094,
@@ -134,7 +134,7 @@
         "short_name": "Haaland",
         "position": "FWD",
         "team": "Man City",
-        "expected_points": 7.9988702038468515
+        "expected_points": 8.35545188174385
       },
       {
         "player_id": 475168,
@@ -142,7 +142,7 @@
         "short_name": "Jesus",
         "position": "FWD",
         "team": "Chelsea",
-        "expected_points": 3.822253355001549
+        "expected_points": 3.7922402069442094
       }
     ],
     "bench": [
@@ -152,7 +152,7 @@
         "short_name": "Dubravka",
         "position": "GK",
         "team": "Spurs",
-        "expected_points": 0.08206076680465356
+        "expected_points": 0.10027015579447286
       },
       {
         "player_id": 513545,
@@ -160,7 +160,7 @@
         "short_name": "Sangar\u00e9",
         "position": "MID",
         "team": "Brentford",
-        "expected_points": 2.5464318519096447
+        "expected_points": 2.4643705729200827
       },
       {
         "player_id": 449429,
@@ -168,7 +168,7 @@
         "short_name": "Greaves",
         "position": "DEF",
         "team": "Ipswich Town",
-        "expected_points": 1.383487962059073
+        "expected_points": 0.4785423632272898
       },
       {
         "player_id": 631786,
@@ -176,88 +176,88 @@
         "short_name": "Kusi-Asare",
         "position": "FWD",
         "team": "Fulham",
-        "expected_points": 0.10433696207867905
+        "expected_points": 0.11895417311970728
       }
     ],
     "chip": null,
     "plan_weeks": [
       {
-        "gameweek": 6,
-        "transfers_in": [
-          {
-            "player_id": 513418,
-            "name": "Kevin Schade",
-            "short_name": "Schade",
-            "position": "MID",
-            "team": "Brentford"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 439509,
-            "name": "Christos Tzolis",
-            "short_name": "Tzolis",
-            "position": "MID",
-            "team": "Arsenal"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 2,
-        "free_transfers_after": 2,
-        "expected_points": 55.14709216499182
-      },
-      {
         "gameweek": 7,
         "transfers_in": [
           {
-            "player_id": 154043,
-            "name": "Ainsley Maitland-Niles",
-            "short_name": "Maitland-Niles",
+            "player_id": 465730,
+            "name": "Maxim De Cuyper",
+            "short_name": "Cuyper",
             "position": "DEF",
-            "team": "Everton"
+            "team": "Brighton"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 220237,
-            "name": "Sven Botman",
-            "short_name": "Botman",
+            "player_id": 97032,
+            "name": "Virgil van Dijk",
+            "short_name": "Dijk",
             "position": "DEF",
-            "team": "Newcastle"
+            "team": "Liverpool"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 2,
         "free_transfers_after": 2,
-        "expected_points": 56.06654175609316
+        "expected_points": 54.711391168788595
       },
       {
         "gameweek": 8,
         "transfers_in": [
           {
-            "player_id": 201666,
-            "name": "Harvey Barnes",
-            "short_name": "Barnes",
-            "position": "MID",
-            "team": "Newcastle"
+            "player_id": 466075,
+            "name": "Riccardo Calafiori",
+            "short_name": "Calafiori",
+            "position": "DEF",
+            "team": "Arsenal"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 513545,
-            "name": "Mamadou Sangar\u00e9",
-            "short_name": "Sangar\u00e9",
-            "position": "MID",
-            "team": "Brentford"
+            "player_id": 244723,
+            "name": "Tyrick Mitchell",
+            "short_name": "Mitchell",
+            "position": "DEF",
+            "team": "Crystal Palace"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 2,
         "free_transfers_after": 2,
-        "expected_points": 57.07147172271187
+        "expected_points": 55.42055863794519
+      },
+      {
+        "gameweek": 9,
+        "transfers_in": [
+          {
+            "player_id": 244850,
+            "name": "Morgan Rogers",
+            "short_name": "Rogers",
+            "position": "MID",
+            "team": "Chelsea"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 446008,
+            "name": "Bryan Mbeumo",
+            "short_name": "Mbeumo",
+            "position": "MID",
+            "team": "Man Utd"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 2,
+        "free_transfers_after": 2,
+        "expected_points": 55.43637369082735
       }
     ],
     "stated_limits": [
@@ -273,17 +273,17 @@
     "data_quality": "complete",
     "missing_fields": [],
     "squad_basis": "captured",
-    "expected_points_cost_ceiling": 0.0,
+    "expected_points_cost_ceiling": 3.54329859066695,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0,
     "top100": {
       "weight": 50,
-      "changed": false,
+      "changed": true,
       "price_basis": "base_model_pure_points_v1",
-      "cohort_snapshot_id": "fpl-top100-20261010T035646Z-dd2c93bfbf7c",
-      "picks_snapshot_id": "fpl-elite-picks-20261010T035709Z-d37e85839162",
-      "table_sha256": "33d1971e73b3f8278f3f35eb18d9e6a315d7ce3ebef593d6ed5a6fed8b624ad7",
-      "picks_gameweek": 5
+      "cohort_snapshot_id": "fpl-top100-20261015T125956Z-62eac7653b23",
+      "picks_snapshot_id": "fpl-elite-picks-20261015T130016Z-f74142d5b421",
+      "table_sha256": "0a890f659631183ae43ffe18feb2530d6b0c3b18a22958933876121eb5c9028d",
+      "picks_gameweek": 6
     }
   }
 }

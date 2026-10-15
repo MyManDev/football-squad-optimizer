@@ -70,11 +70,14 @@ from squadopt.features.evidence_artifact import read_player_evidence_artifact
 from squadopt.features.rotation_evidence_artifact import read_rotation_evidence_artifact
 from squadopt.live import handoff_path_for, load_entry, read_projection_handoff, read_season_rules
 from squadopt.platform import benchmark_capture, cohort_capture, elite_capture
-from squadopt.platform._queue_lock import QueueFileLock
 from squadopt.platform.fpl_capture import capture
-from squadopt.platform.projection_retention import publish_retained_handoff, retained_handoff_path
 from squadopt.platform.publication_workers import league_mapper
 from squadopt.platform.runlog import RunLog, configure_run_logging
+from squadopt.platform.storage._queue_lock import QueueFileLock
+from squadopt.platform.storage.projection_retention import (
+    publish_retained_handoff,
+    retained_handoff_path,
+)
 from squadopt.platform.weekly_journal import (
     WeeklyJournalError,
     WeeklyRun,

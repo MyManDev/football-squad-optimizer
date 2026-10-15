@@ -34,7 +34,7 @@ from squadopt.live import infer_season, read_inputs, read_projection_handoff
 from squadopt.live.football_artifact import football_artifact_path, read_football_forecast
 from squadopt.platform.football_minute_basis import _basis_from_snapshot, football_components_path
 from squadopt.platform.official_injury_capture import REPORT_PAYLOAD, read_official_injury_capture
-from squadopt.platform.projection_retention import _safe
+from squadopt.platform.storage.projection_retention import _safe
 from squadopt.platform.weekly_journal import WeeklyJournalError, fingerprint_paths
 
 CONTRACT_VERSION = "football_ready_bundle_v1"

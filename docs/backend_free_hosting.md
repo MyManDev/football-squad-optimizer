@@ -1,6 +1,14 @@
 # Hosting the advice backend for nothing
 
-The advice backend runs on the owner's Windows PC behind a Cloudflare Tunnel
+**Since 2026-10-15 the advice backend runs on a VM, not on the PC.** The two Compose
+services of the [backend runbook](backend_runbook.md) run on an Azure for Students virtual
+machine as the only connector of the `squadopt-api` tunnel; the PC runs no backend, watcher
+or connector, only the weekly runs (`scripts\weekly_run_friday.ps1`,
+`scripts\weekly_run_tuesday.ps1`), and after each release `bash scripts/vm_push.sh <tag>`
+moves the VM to the release. The sections below describe the PC route as it ran from
+18 September to 15 October 2026 and stay as the fallback.
+
+The advice backend ran on the owner's Windows PC behind a Cloudflare Tunnel
 ([backend runbook](backend_runbook.md), [ADR 0006](architecture/decisions/0006-backend-hosting.md)).
 ADR 0006 chose Azure Container Apps with an Azure Files NFS share, and applying that creates
 paid resources. This document is the zero-cost route: what can carry the same two processes

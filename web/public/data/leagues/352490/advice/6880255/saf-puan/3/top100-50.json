@@ -1,18 +1,18 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-10-10T06:07:04Z",
+  "generated_at_utc": "2026-10-15T14:15:28Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
-    "gameweek": 6,
+    "gameweek": 7,
     "entry_id": 6880255,
     "league_id": 352490,
     "mode": "saf-puan",
     "window": 3,
-    "source_snapshot_id": "fpl-live-20261010T035732Z-c77d032165af",
+    "source_snapshot_id": "fpl-live-20261015T130038Z-7a7a388a3a43",
     "moves": [
       {
-        "move_id": "gw06-1",
+        "move_id": "gw07-1",
         "player_out": {
           "player_id": 449434,
           "name": "Anthony Elanga",
@@ -27,25 +27,25 @@
           "position": "MID",
           "team": "Brighton"
         },
-        "expected_points_delta": 2.473216536888401,
+        "expected_points_delta": 3.534652205370378,
         "reason_code": "window_value"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 2.473216536888401,
-    "expected_points_cost": 0.0,
+    "expected_gain_vs_hold": 3.534652205370378,
+    "expected_points_cost": 1.6048282415785025,
     "rival_label": null,
     "solver_status": "OPTIMAL",
     "optimality_gap": null,
     "wall_clock_stopped_the_search": false,
-    "expected_own_points": 51.10618735218126,
+    "expected_own_points": 52.534318717882044,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
       "short_name": "Haaland",
       "position": "FWD",
       "team": "Man City",
-      "expected_points": 7.9988702038468515
+      "expected_points": 8.35545188174385
     },
     "vice_captain": {
       "player_id": 141746,
@@ -53,7 +53,7 @@
       "short_name": "Fernandes",
       "position": "MID",
       "team": "Man Utd",
-      "expected_points": 6.348841464940458
+      "expected_points": 6.012000284303428
     },
     "starting_xi": [
       {
@@ -62,7 +62,7 @@
         "short_name": "Verbruggen",
         "position": "GK",
         "team": "Brighton",
-        "expected_points": 2.7749400703238383
+        "expected_points": 3.2480295284625815
       },
       {
         "player_id": 226597,
@@ -70,7 +70,7 @@
         "short_name": "Magalh\u00e3es",
         "position": "DEF",
         "team": "Arsenal",
-        "expected_points": 4.557988193553639
+        "expected_points": 4.142429251761448
       },
       {
         "player_id": 469142,
@@ -78,7 +78,7 @@
         "short_name": "Hecke",
         "position": "DEF",
         "team": "Spurs",
-        "expected_points": 3.0229760360404394
+        "expected_points": 3.3062096448282863
       },
       {
         "player_id": 219924,
@@ -86,7 +86,7 @@
         "short_name": "Diop",
         "position": "DEF",
         "team": "Ipswich Town",
-        "expected_points": 2.4616547540334794
+        "expected_points": 2.1748575911872456
       },
       {
         "player_id": 141746,
@@ -94,7 +94,7 @@
         "short_name": "Fernandes",
         "position": "MID",
         "team": "Man Utd",
-        "expected_points": 6.348841464940458
+        "expected_points": 6.012000284303428
       },
       {
         "player_id": 60307,
@@ -102,7 +102,7 @@
         "short_name": "Gro\u00df",
         "position": "MID",
         "team": "Brighton",
-        "expected_points": 4.161023508047467
+        "expected_points": 4.658321948335153
       },
       {
         "player_id": 184029,
@@ -110,7 +110,7 @@
         "short_name": "\u00d8degaard",
         "position": "MID",
         "team": "Arsenal",
-        "expected_points": 3.9797310309386273
+        "expected_points": 3.3818815752983595
       },
       {
         "player_id": 514254,
@@ -118,7 +118,7 @@
         "short_name": "Amarilla",
         "position": "MID",
         "team": "Brighton",
-        "expected_points": 2.910076221499663
+        "expected_points": 3.195907550097591
       },
       {
         "player_id": 508395,
@@ -126,7 +126,7 @@
         "short_name": "Yarmoliuk",
         "position": "MID",
         "team": "Brentford",
-        "expected_points": 1.903478848322938
+        "expected_points": 2.552809170960097
       },
       {
         "player_id": 223094,
@@ -134,7 +134,7 @@
         "short_name": "Haaland",
         "position": "FWD",
         "team": "Man City",
-        "expected_points": 7.9988702038468515
+        "expected_points": 8.35545188174385
       },
       {
         "player_id": 551466,
@@ -142,7 +142,7 @@
         "short_name": "Garc\u00eda",
         "position": "FWD",
         "team": "Fulham",
-        "expected_points": 2.98773681678701
+        "expected_points": 3.15096840916015
       }
     ],
     "bench": [
@@ -152,7 +152,7 @@
         "short_name": "Dubravka",
         "position": "GK",
         "team": "Spurs",
-        "expected_points": 0.08206076680465356
+        "expected_points": 0.10027015579447286
       },
       {
         "player_id": 106760,
@@ -160,7 +160,7 @@
         "short_name": "Shaw",
         "position": "DEF",
         "team": "Man Utd",
-        "expected_points": 1.6878069711590642
+        "expected_points": 1.123669742964781
       },
       {
         "player_id": 167512,
@@ -168,7 +168,7 @@
         "short_name": "O'Nien",
         "position": "DEF",
         "team": "Sunderland",
-        "expected_points": 0.12527297188789496
+        "expected_points": 0.07797659864353394
       },
       {
         "player_id": 219168,
@@ -182,7 +182,7 @@
     "chip": null,
     "plan_weeks": [
       {
-        "gameweek": 6,
+        "gameweek": 7,
         "transfers_in": [
           {
             "player_id": 60307,
@@ -203,12 +203,12 @@
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
-        "free_transfers_before": 2,
-        "free_transfers_after": 2,
-        "expected_points": 51.106187352181266
+        "free_transfers_before": 3,
+        "free_transfers_after": 3,
+        "expected_points": 52.534318717882044
       },
       {
-        "gameweek": 7,
+        "gameweek": 8,
         "transfers_in": [
           {
             "player_id": 475168,
@@ -229,19 +229,19 @@
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
-        "free_transfers_before": 2,
-        "free_transfers_after": 2,
-        "expected_points": 53.024961858859875
+        "free_transfers_before": 3,
+        "free_transfers_after": 3,
+        "expected_points": 53.773749753866156
       },
       {
-        "gameweek": 8,
+        "gameweek": 9,
         "transfers_in": [
           {
-            "player_id": 17761,
-            "name": "James Tarkowski",
-            "short_name": "Tarkowski",
+            "player_id": 466075,
+            "name": "Riccardo Calafiori",
+            "short_name": "Calafiori",
             "position": "DEF",
-            "team": "Everton"
+            "team": "Arsenal"
           }
         ],
         "transfers_out": [
@@ -255,9 +255,9 @@
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
-        "free_transfers_before": 2,
-        "free_transfers_after": 2,
-        "expected_points": 54.673259505777075
+        "free_transfers_before": 3,
+        "free_transfers_after": 3,
+        "expected_points": 55.05030793108634
       }
     ],
     "stated_limits": [
@@ -273,17 +273,17 @@
     "data_quality": "complete",
     "missing_fields": [],
     "squad_basis": "captured",
-    "expected_points_cost_ceiling": 0.0,
+    "expected_points_cost_ceiling": 1.6048282415785025,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0,
     "top100": {
       "weight": 50,
-      "changed": false,
+      "changed": true,
       "price_basis": "base_model_pure_points_v1",
-      "cohort_snapshot_id": "fpl-top100-20261010T035646Z-dd2c93bfbf7c",
-      "picks_snapshot_id": "fpl-elite-picks-20261010T035709Z-d37e85839162",
-      "table_sha256": "33d1971e73b3f8278f3f35eb18d9e6a315d7ce3ebef593d6ed5a6fed8b624ad7",
-      "picks_gameweek": 5
+      "cohort_snapshot_id": "fpl-top100-20261015T125956Z-62eac7653b23",
+      "picks_snapshot_id": "fpl-elite-picks-20261015T130016Z-f74142d5b421",
+      "table_sha256": "0a890f659631183ae43ffe18feb2530d6b0c3b18a22958933876121eb5c9028d",
+      "picks_gameweek": 6
     }
   }
 }

@@ -173,6 +173,10 @@ place. If a symbol is not vocabulary that at least two layers need, it does not 
 2. **Re-exports live exactly one release.** When a symbol moves, the old location keeps
    re-exporting it so no import breaks in the same PR that moves it. The re-export is removed
    in a later, separate PR. This is what makes each migration step reviewable in isolation.
+   ADR 0011 (decision 8) writes two exceptions here: an operator entry point keeps a permanent
+   alias at its old path (`squadopt.platform.backup_recovery` since the first unit pull
+   request), and the names frozen until the planner chain's final reading after GW38 stay as
+   that record lists them.
 3. **Boundary files change only by joint approval** — see [ownership](ownership.md).
 4. **The order is a claim about the code, so it is verified, not trusted.** Any change here
    comes with the regenerated numbers.
@@ -265,12 +269,18 @@ entries, and they may only shrink (rule 1 above):
     `data` beyond the 122 direct import edges from 43 modules they have today, each an
     `ignore_imports` entry; `tests/architecture/test_storage_ratchet.py` holds the entries to
     a frozen copy whose size it pins by package, so the list only shrinks.
+11. `Platform deployment units import only the shared adapters below them`: inside `platform`,
+    the seven subpackages of ADR 0011 (decision 3) are layers, `operations` and `backend` at
+    the top, then `football`, `club_news`, `capture`, `runs` and `storage`; the flat modules
+    that have not moved yet are ignored by name, and
+    `tests/architecture/test_platform_layout.py` holds that list to exactly the flat modules.
 
-The last four enforce the rings that
+The seventh to the tenth enforce the rings that
 [ADR 0010](decisions/0010-clean-architecture-rings-and-repository-layout.md), an accepted record,
 names. The tenth is a ratchet under that record's ratchet rule (Decision 4): its allowlist
 holds exactly the storage imports of 2026-10-13, each with its remedy and phase, and a new
-one fails the gate.
+one fails the gate. The eleventh enforces the platform split of
+[ADR 0011](decisions/0011-storage-ports-and-platform-split.md), decision 3, one unit at a time.
 The [architecture overview](../../ARCHITECTURE.md) gives what each contract holds in its
 enforcement map, and `tests/architecture/test_architecture_rings.py` checks that every contract in
 `pyproject.toml` is named in this list and has a row in that map.
