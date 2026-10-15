@@ -7,7 +7,7 @@ measures against the control, and the models of the experimental football lane. 
 are `live`, `scenarios` and `evaluation` in the domain ring, `application`, `platform`, the
 laboratory and the scripts.
 
-Its 35 Python files sit in one folder. This page places every one of them in exactly one
+Its 36 Python files sit in one folder. This page places every one of them in exactly one
 family.
 
 Review: İbrahim, the data side ([ownership](../../../docs/architecture/ownership.md)). Within 24
@@ -86,7 +86,7 @@ under `scripts/` import these modules by their module path; the
 The models of the experimental football model a member can choose in place of the current
 model; the [package map](../README.md#two-cross-cutting-names) describes the lane as a whole.
 
-These nine are imported by `live`, `application` or `platform`, directly or through one
+These eleven are imported by `live`, `application` or `platform`, directly or through one
 another:
 
 | Module | What it does |
@@ -95,18 +95,19 @@ another:
 | `football_features.py` | History-only fixture features for the football candidate; target rows supply identity, position and venue only. |
 | `football_minutes_role.py` | Joint starting role and fixture minutes (`joint_start_cameo_minutes_v1`), fitted only on known past labels. |
 | `football_components.py` | The v1 model's per-fixture components for one capture (`football_fixture_components_v1`), bound to the served forecast of the same producer call. |
+| `football_flag_components.py` | Converts a learned whole-week flag law into fixture minutes and nonlinear scoring, conserving each complete club's attacking mass (`src/squadopt/prediction/football_flag_components.py:84`, `src/squadopt/prediction/football_flag_components.py:162`). |
+| `football_flag_minutes.py` | A categorical-flag weekly hurdle and conditional fixture-minute model (`football_flag_minutes_v1`), fitted offline by the optional retained-capture producer; source labels remain categories (`src/squadopt/application/football_live.py:686`). |
 | `football_contextual.py` | The opt-in contextual extension of the frozen fixture model (`football_contextual_v3`): captured availability enters once, as an eligibility multiplier. |
 | `football_strength.py` | A sequential, opponent-adjusted Gamma filter of team scoring strength, used by the contextual extension. |
 | `football_match_context.py` | A separate Premier League workload and venue candidate (`football_match_context_v1`). |
 | `football_match_context_features.py` | Causal Premier League workload and venue context from recorded player-fixture history, for `football_match_context.py`. |
 | `football_team_form.py` | Causal club form for an explicitly selected fixture-football experiment (`football_team_form_v1`). |
 
-These six are private models: outside this package, each is imported only by its
+These five are private models: outside this package, each is imported only by its
 `football_*_experiment` module in [`squadopt.experiments`](../experiments/README.md).
 
 | Module | What it does |
 | --- | --- |
-| `football_flag_minutes.py` | A categorical-flag weekly hurdle and conditional fixture-minute model (`football_flag_minutes_v1`); source labels are categories, never percentages. |
 | `football_load_minutes.py` | A whole-week workload tilt over an admitted native minute law (`football_all_competition_load_v1`); it never applies player eligibility. |
 | `football_phase_duties.py` | Learned goal and assist marginals with conserved full-club attacking mass (`football_phase_duties_v1`); captured ranks are explanatory observations. |
 | `football_score_state.py` | A paired score process with fitted lead and trail intensities in three thirds of the match clock (`football_score_state_v1`). |
