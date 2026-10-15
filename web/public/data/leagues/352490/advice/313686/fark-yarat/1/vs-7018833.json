@@ -1,18 +1,18 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-10-10T06:07:04Z",
+  "generated_at_utc": "2026-10-15T14:15:28Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
-    "gameweek": 6,
+    "gameweek": 7,
     "entry_id": 313686,
     "league_id": 352490,
     "mode": "fark-yarat",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20261010T035732Z-c77d032165af",
+    "source_snapshot_id": "fpl-live-20261015T130038Z-7a7a388a3a43",
     "moves": [
       {
-        "move_id": "gw06-1",
+        "move_id": "gw07-1",
         "player_out": {
           "player_id": 551210,
           "name": "Jorrel Hato",
@@ -21,31 +21,31 @@
           "team": "Chelsea"
         },
         "player_in": {
-          "player_id": 154043,
-          "name": "Ainsley Maitland-Niles",
-          "short_name": "Maitland-Niles",
+          "player_id": 17761,
+          "name": "James Tarkowski",
+          "short_name": "Tarkowski",
           "position": "DEF",
           "team": "Everton"
         },
-        "expected_points_delta": 0.7834876343951578,
+        "expected_points_delta": 1.8281528551472945,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 0.7834876343951578,
+    "expected_gain_vs_hold": 1.8281528551472945,
     "expected_points_cost": 0.0,
     "rival_label": "entry-7018833",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
     "wall_clock_stopped_the_search": false,
-    "expected_own_points": 56.43947555743522,
+    "expected_own_points": 58.20318064017789,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
       "short_name": "Haaland",
       "position": "FWD",
       "team": "Man City",
-      "expected_points": 7.9988702038468515
+      "expected_points": 8.35545188174385
     },
     "vice_captain": {
       "player_id": 141746,
@@ -53,7 +53,7 @@
       "short_name": "Fernandes",
       "position": "MID",
       "team": "Man Utd",
-      "expected_points": 6.348841464940458
+      "expected_points": 6.012000284303428
     },
     "starting_xi": [
       {
@@ -62,23 +62,15 @@
         "short_name": "Verbruggen",
         "position": "GK",
         "team": "Brighton",
-        "expected_points": 2.7749400703238383
+        "expected_points": 3.2480295284625815
       },
       {
-        "player_id": 466075,
-        "name": "Riccardo Calafiori",
-        "short_name": "Calafiori",
-        "position": "DEF",
-        "team": "Arsenal",
-        "expected_points": 3.59365129554469
-      },
-      {
-        "player_id": 154043,
-        "name": "Ainsley Maitland-Niles",
-        "short_name": "Maitland-Niles",
+        "player_id": 17761,
+        "name": "James Tarkowski",
+        "short_name": "Tarkowski",
         "position": "DEF",
         "team": "Everton",
-        "expected_points": 3.5856327971518893
+        "expected_points": 4.323742971600514
       },
       {
         "player_id": 465730,
@@ -86,7 +78,15 @@
         "short_name": "Cuyper",
         "position": "DEF",
         "team": "Brighton",
-        "expected_points": 3.347197728858024
+        "expected_points": 3.7099911306959767
+      },
+      {
+        "player_id": 466075,
+        "name": "Riccardo Calafiori",
+        "short_name": "Calafiori",
+        "position": "DEF",
+        "team": "Arsenal",
+        "expected_points": 3.45141576840743
       },
       {
         "player_id": 141746,
@@ -94,7 +94,7 @@
         "short_name": "Fernandes",
         "position": "MID",
         "team": "Man Utd",
-        "expected_points": 6.348841464940458
+        "expected_points": 6.012000284303428
       },
       {
         "player_id": 244851,
@@ -102,15 +102,7 @@
         "short_name": "Palmer",
         "position": "MID",
         "team": "Chelsea",
-        "expected_points": 5.323025429413814
-      },
-      {
-        "player_id": 222531,
-        "name": "Morgan Gibbs-White",
-        "short_name": "Gibbs-White",
-        "position": "MID",
-        "team": "Nott'm Forest",
-        "expected_points": 4.3555732521106405
+        "expected_points": 4.960279398950454
       },
       {
         "player_id": 60307,
@@ -118,15 +110,23 @@
         "short_name": "Gro\u00df",
         "position": "MID",
         "team": "Brighton",
-        "expected_points": 4.161023508047467
+        "expected_points": 4.658321948335153
       },
       {
-        "player_id": 424876,
-        "name": "Dominik Szoboszlai",
-        "short_name": "Szoboszlai",
+        "player_id": 222531,
+        "name": "Morgan Gibbs-White",
+        "short_name": "Gibbs-White",
         "position": "MID",
-        "team": "Liverpool",
-        "expected_points": 3.858004507173562
+        "team": "Nott'm Forest",
+        "expected_points": 4.637008159112412
+      },
+      {
+        "player_id": 577725,
+        "name": "Josh King",
+        "short_name": "King",
+        "position": "MID",
+        "team": "Fulham",
+        "expected_points": 3.1261265197771366
       },
       {
         "player_id": 223094,
@@ -134,7 +134,7 @@
         "short_name": "Haaland",
         "position": "FWD",
         "team": "Man City",
-        "expected_points": 7.9988702038468515
+        "expected_points": 8.35545188174385
       },
       {
         "player_id": 586309,
@@ -142,7 +142,7 @@
         "short_name": "Barry",
         "position": "FWD",
         "team": "Everton",
-        "expected_points": 3.0938450961771364
+        "expected_points": 3.3653611670450987
       }
     ],
     "bench": [
@@ -152,15 +152,7 @@
         "short_name": "Palmer",
         "position": "GK",
         "team": "Ipswich Town",
-        "expected_points": 0.10027015579447286
-      },
-      {
-        "player_id": 108416,
-        "name": "John Egan",
-        "short_name": "Egan",
-        "position": "DEF",
-        "team": "Hull City",
-        "expected_points": 2.802145162756736
+        "expected_points": 0.08206076680465356
       },
       {
         "player_id": 199798,
@@ -168,7 +160,15 @@
         "short_name": "Ngoyo",
         "position": "DEF",
         "team": "Arsenal",
-        "expected_points": 1.9747000311138394
+        "expected_points": 2.4955901164532333
+      },
+      {
+        "player_id": 108416,
+        "name": "John Egan",
+        "short_name": "Egan",
+        "position": "DEF",
+        "team": "Hull City",
+        "expected_points": 2.29477999569297
       },
       {
         "player_id": 631786,
@@ -176,7 +176,7 @@
         "short_name": "Kusi-Asare",
         "position": "FWD",
         "team": "Fulham",
-        "expected_points": 0.10433696207867905
+        "expected_points": 0.11895417311970728
       }
     ],
     "chip": null,
@@ -201,7 +201,7 @@
       "expected_points_cost": 0.0,
       "expected_points_cost_ceiling": 0.0
     },
-    "expected_gap_vs_rival": 9.292545221240111,
+    "expected_gap_vs_rival": 5.166830283571727,
     "captain_agreement": true,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0

@@ -35,8 +35,8 @@ from squadopt.data.sources.fpl_live import (
 from squadopt.data.timestamps import as_instant
 from squadopt.live.ledger import LedgerError, verify_manifest
 from squadopt.optimization import OptimizationConfig
-from squadopt.platform._queue_lock import QueueFileLock
 from squadopt.platform.fpl_capture import BASE_URL, fetch
+from squadopt.platform.storage._queue_lock import QueueFileLock
 
 SEASON = "2026-27"
 CONTRACT = "benchmark_v2_capture_v1"

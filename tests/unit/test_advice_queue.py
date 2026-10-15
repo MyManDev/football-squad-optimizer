@@ -318,7 +318,7 @@ LOCK_TIMEOUT = 0.3
 
 def _worker_queue(root: Path, monkeypatch: pytest.MonkeyPatch) -> FileJobQueue:
     from squadopt.platform import file_advice_queue
-    from squadopt.platform._queue_lock import QueueFileLock
+    from squadopt.platform.storage._queue_lock import QueueFileLock
 
     with monkeypatch.context() as patch:
         patch.setattr(
@@ -332,7 +332,7 @@ def _worker_queue(root: Path, monkeypatch: pytest.MonkeyPatch) -> FileJobQueue:
 def _hold_the_lock(root: Path, seconds: float) -> threading.Thread:
     """Another process's transaction, as the OS sees it: the same lock file, held."""
 
-    from squadopt.platform._queue_lock import QueueFileLock
+    from squadopt.platform.storage._queue_lock import QueueFileLock
 
     taken = threading.Event()
 
