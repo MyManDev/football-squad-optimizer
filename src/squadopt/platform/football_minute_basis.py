@@ -1,4 +1,4 @@
-"""Read an optional fixture basis beside a served forecast, without fitting a model."""
+"""Read a fixture basis beside a served forecast, without fitting a model."""
 
 from __future__ import annotations
 
@@ -135,7 +135,9 @@ def load_football_minute_basis(
     inputs: RecommendationInputs,
     football: FootballForecast,
 ) -> FootballMinuteBasisLoad:
-    """A missing or refused optional companion cannot disable the served forecast.
+    """Return the verified companion or its refusal for the caller's capability policy.
+
+    Composite forecasts require this basis; legacy versions may serve without it.
 
     The raw digest addresses every readable candidate, including invalid JSON. The
     verified document fingerprint remains inside ``basis``. No producer, archive,

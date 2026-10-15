@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Final
@@ -112,6 +113,18 @@ class SwitchInputUnavailable(ValueError):
         self.switch = switch
 
 
+def _composite_identity(football: FootballForecast) -> dict[str, str]:
+    if not football_capabilities(football.horizon.model_version).requires_reprojection:
+        return {}
+    fingerprint = football.projection.diagnostics.get("composite_reprojection_fingerprint")
+    if not isinstance(fingerprint, str) or re.fullmatch(r"[0-9a-f]{64}", fingerprint) is None:
+        raise SwitchInputUnavailable(MODEL_SWITCH, "Composite reprojection is unbound.")
+    return {
+        "reprojection_version": COMPOSITE_REPROJECTION_VERSION,
+        "reprojection_fingerprint": fingerprint,
+    }
+
+
 @dataclass(frozen=True, slots=True)
 class AdviceSwitchInputs:
     """What one capture offers the switches; every field may be absent."""
@@ -141,6 +154,7 @@ class AdviceSwitchInputs:
             "participation": FOOTBALL_PARTICIPATION_VERSION,
             "ready_bundle": self.football_bundle_sha256,
         }
+        identity.update(_composite_identity(self.football))
         if self.rotation_table_sha256 is not None:
             # The same news read under a different rule is different information: a plan
             # shown under the old rule must be told it is stale. Only where news is bound,
@@ -197,14 +211,7 @@ def switch_identity(
             "rotation_table_sha256": inputs.rotation_table_sha256,
             "ready_bundle_sha256": inputs.football_bundle_sha256,
         }
-        if football_capabilities(inputs.football.horizon.model_version).requires_reprojection:
-            reprojection = inputs.football.projection.diagnostics.get(
-                "composite_reprojection_fingerprint"
-            )
-            if not isinstance(reprojection, str) or len(reprojection) != 64:
-                raise SwitchInputUnavailable(MODEL_SWITCH, "Composite reprojection is unbound.")
-            identity[MODEL_SWITCH]["reprojection_version"] = COMPOSITE_REPROJECTION_VERSION
-            identity[MODEL_SWITCH]["reprojection_fingerprint"] = reprojection
+        identity[MODEL_SWITCH].update(_composite_identity(inputs.football))
         if inputs.rotation_table_sha256 is not None:
             # Which statements bind is the reader's rule, and the same table read under a
             # different rule is a different input. Named only where news is bound, so a
