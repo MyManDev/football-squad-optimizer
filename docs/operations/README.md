@@ -4,6 +4,7 @@
 | --- | --- |
 | Construct explicit joint participation states for phase allocation | [Phase participation coupling](football_phase_coupling.md) |
 | Compose flag, LOAD and verified evidence on one weekly minute law | [Joint weekly law](football_joint_week_law.md) (`src/squadopt/prediction/football_joint_week_law.py:370`) |
+| Compose a complete declared roster across captured fixture weeks | [Composite weekly population](football_composite_weeks.md) (`src/squadopt/prediction/football_composite_weeks.py:359`) |
 | Inspect discovered infrastructure and start the prepared API/worker deployment | [Operations inventory](../architecture/operations_inventory.md) |
 | Prepare the standalone observed non-PL record workload model | [Observed workload contract](football_observed_load.md) (`src/squadopt/prediction/football_observed_load.py:295`) |
 | Create, verify and restore private backups | [Backup and recovery](../architecture/backup_recovery.md) |
