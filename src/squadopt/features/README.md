@@ -7,7 +7,7 @@ models. Every time-dependent aggregation of the feature builder passes through o
 shifted-rolling primitive, so the timing rule has one implementation. Its callers are `prediction`, `live`, `application`, `platform`,
 the laboratory and the scripts.
 
-Its 21 Python files sit in one folder. This page places every one of them in exactly one
+Its 22 Python files sit in one folder. This page places every one of them in exactly one
 family.
 
 Review: İbrahim, the data side ([ownership](../../../docs/architecture/ownership.md)).
@@ -66,6 +66,11 @@ model in `prediction` and its `football_*_experiment` module in
 [`squadopt.experiments`](../experiments/README.md); the last two parse private bytes for the
 club-unit experiment and are called only by tests today.
 
+The additional score replay contract is a training input with separate historical feature
+and later retrieval clocks. It carries roster identities without a fabricated player minute
+law (`src/squadopt/features/football_score_replay.py:49`,
+`src/squadopt/features/football_score_replay.py:75`).
+
 | Module | What it does |
 | --- | --- |
 | `football_flag_inputs.py` | Captured flag facts and supplied pre-decision native minute supports (`football_flag_week_input_v1`); no reader touches a network, a file or an outcome it was not given. |
@@ -76,6 +81,7 @@ club-unit experiment and are called only by tests today.
 | `football_unit_inputs.py` | Immutable inputs of the separately invoked club-unit experiment (`football_unit_inputs_v1`). |
 | `football_unit_catalog.py` | The strict private JSON input boundary of the club-unit experiment; it touches no network or file. |
 | `football_fm_attributes.py` | Reads a full private FM export and prepares its exact active player/club scope for a catalog (`football_fm_csv_attributes_v1`, `football_fm_scoped_attributes_v1`), retaining unknown traits and refusing inferred identity or absent mapped UIDs (`src/squadopt/features/football_fm_attributes.py:204`). |
+| `football_score_replay.py` | Frozen historical score training records, explicit 2025-26 opt-in and declared native/duration source bindings (`src/squadopt/features/football_score_replay.py:120`); [operator contract](../../../docs/operations/football_score_replay.md). |
 
 ## Package surface
 

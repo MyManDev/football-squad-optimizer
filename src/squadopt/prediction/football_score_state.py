@@ -22,7 +22,17 @@ from numpy.typing import NDArray
 from scipy.optimize import minimize
 from scipy.sparse import bmat, csc_matrix, diags, eye
 
+from squadopt.features.football_score_replay import (
+    REPLAY_FIT_VERSION,
+    ScoreReplayBasis,
+    ScoreReplayObservation,
+    ScoreReplayProvenance,
+    score_replay_basis_digest,
+    validate_score_replay_header,
+    validate_score_replay_observation,
+)
 from squadopt.features.football_score_state_inputs import (
+    PhysicalGoal,
     ScoreFixture,
     TrainingScoreFixture,
     score_input_digest,
@@ -75,6 +85,13 @@ class ScoreStateMetadata:
     native_offset: str = "original_whole_fixture_goals_divided_by_forecast_physical_duration"
     playing_interval_policy: str = "frozen_predecision_normal_exit_no_learned_substitution"
     numerical_method: str = "sparse_piecewise_uniformization_exact_difference_poisson_tail_bound"
+
+
+@dataclass(frozen=True)
+class ScoreReplayMetadata(ScoreStateMetadata):
+    fit_contract: str = REPLAY_FIT_VERSION
+    allow_released_2025_26: bool = False
+    replay_receipts: tuple[tuple[str, ScoreReplayProvenance], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -162,19 +179,37 @@ def _breaks(start: float, end: float, horizon: float) -> tuple[float, ...]:
     return (start, *(point for point in (horizon / 3, 2 * horizon / 3) if start < point < end), end)
 
 
-def training_design(row: TrainingScoreFixture) -> ScoreTrainingExample:
+def training_design(row: TrainingScoreFixture | ScoreReplayObservation) -> ScoreTrainingExample:
     """Build the event likelihood after its source has been fully validated."""
-    horizon = row.input.forecast_duration
-    home_rate = row.input.native_home_goals / horizon
-    away_rate = row.input.native_away_goals / horizon
+    basis = row.basis if isinstance(row, ScoreReplayObservation) else row.input
+    return _training_design(
+        basis.native_home_goals,
+        basis.native_away_goals,
+        basis.forecast_duration,
+        basis.home_club_code,
+        row.actual_duration,
+        row.goals,
+    )
+
+
+def _training_design(
+    native_home_goals: float,
+    native_away_goals: float,
+    horizon: float,
+    home_club_code: int,
+    actual_duration: float,
+    goals: tuple[PhysicalGoal, ...],
+) -> ScoreTrainingExample:
+    home_rate = native_home_goals / horizon
+    away_rate = native_away_goals / horizon
     masses: list[float] = []
     exposure: list[tuple[float, ...]] = []
     offsets: list[float] = []
     events: list[tuple[float, ...]] = []
     difference = 0
     previous = 0.0
-    for goal in (*row.goals, None):
-        elapsed = row.actual_duration if goal is None else goal.elapsed
+    for goal in (*goals, None):
+        elapsed = actual_duration if goal is None else goal.elapsed
         points = _breaks(previous, elapsed, horizon)
         for left, right in pairwise(points):
             phase = _phase((left + right) / 2, horizon)
@@ -183,7 +218,7 @@ def training_design(row: TrainingScoreFixture) -> ScoreTrainingExample:
                 exposure.append(_features(sign, phase))
         if goal is None:
             break
-        is_home = goal.beneficiary_club_code == row.input.home_club_code
+        is_home = goal.beneficiary_club_code == home_club_code
         rate = home_rate if is_home else away_rate
         if rate <= 0:
             raise ValueError("historical physical goal has no native intensity support")
@@ -192,6 +227,24 @@ def training_design(row: TrainingScoreFixture) -> ScoreTrainingExample:
         difference += 1 if is_home else -1
         previous = elapsed
     return ScoreTrainingExample(tuple(masses), tuple(exposure), tuple(offsets), tuple(events))
+
+
+def _training_basis(
+    row: TrainingScoreFixture | ScoreReplayObservation,
+) -> ScoreFixture | ScoreReplayBasis:
+    if type(row) is ScoreReplayObservation and type(row.basis) is ScoreReplayBasis:
+        return row.basis
+    if type(row) is TrainingScoreFixture and type(row.input) is ScoreFixture:
+        return row.input
+    raise ValueError("score training requires declared source types")
+
+
+def _basis_digest(
+    row: TrainingScoreFixture | ScoreReplayObservation, allow_released_2025_26: bool
+) -> str:
+    if isinstance(row, ScoreReplayObservation):
+        return score_replay_basis_digest(row.basis, allow_released_2025_26=allow_released_2025_26)
+    return score_input_digest(row.input)
 
 
 def objective_gradient(
@@ -432,7 +485,7 @@ class ScoreStateModel:
 
     def fit(
         self,
-        observations: Sequence[TrainingScoreFixture],
+        observations: Sequence[TrainingScoreFixture | ScoreReplayObservation],
         *,
         cutoff: str,
         target_season: str,
@@ -440,8 +493,11 @@ class ScoreStateModel:
         allowed_seasons: tuple[str, ...],
         l2: float = 1.0,
         max_iterations: int = MAX_ITERATIONS,
+        allow_released_2025_26: bool = False,
     ) -> ScoreStateModel:
         _targets(target_season, target_gameweeks)
+        if type(allow_released_2025_26) is not bool:
+            raise ValueError("score released-season selection must be Boolean")
         fit_time = _utc(cutoff)
         canonical_cutoff = fit_time.isoformat().replace("+00:00", "Z")
         if (
@@ -452,7 +508,9 @@ class ScoreStateModel:
             raise ValueError("score allowed seasons must be a nonempty unique tuple")
         for season in allowed_seasons:
             _season(season)
-            if season == "2025-26" or _season(season) > _season(target_season):
+            if (season == "2025-26" and not allow_released_2025_26) or _season(season) > _season(
+                target_season
+            ):
                 raise ValueError("score allowed season is protected or future")
         if (
             not isinstance(l2, (int, float))
@@ -469,38 +527,55 @@ class ScoreStateModel:
         clocks: dict[tuple[str, int], datetime] = {}
         identities: set[tuple[str, int]] = set()
         for row in rows:
-            if not isinstance(row, TrainingScoreFixture) or not isinstance(row.input, ScoreFixture):
-                raise ValueError("score training requires declared source types")
-            season = row.input.season
+            basis = _training_basis(row)
+            season = basis.season
             if (
-                season == "2025-26"
+                (season == "2025-26" and not allow_released_2025_26)
                 or season not in allowed_seasons
                 or _season(season) > _season(target_season)
-                or (season == target_season and row.input.gameweek >= min(target_gameweeks))
+                or (season == target_season and basis.gameweek >= min(target_gameweeks))
             ):
                 raise ValueError("score causal training season or gameweek is excluded")
-            validate_training_score_header(
-                row,
-                fit_cutoff=canonical_cutoff,
-                target_season=target_season,
-                target_gameweeks=target_gameweeks,
-            )
-            key = (season, row.input.gameweek)
-            decision = _utc(row.input.decision_at)
+            if isinstance(row, ScoreReplayObservation):
+                validate_score_replay_header(
+                    row,
+                    fit_cutoff=canonical_cutoff,
+                    target_season=target_season,
+                    target_gameweeks=target_gameweeks,
+                    allow_released_2025_26=allow_released_2025_26,
+                )
+            else:
+                validate_training_score_header(
+                    row,
+                    fit_cutoff=canonical_cutoff,
+                    target_season=target_season,
+                    target_gameweeks=target_gameweeks,
+                )
+            key = (season, basis.gameweek)
+            decision = _utc(basis.decision_at)
             if key in clocks and clocks[key] != decision:
                 raise ValueError("score historical gameweek requires one original decision clock")
             clocks[key] = decision
-            identity = (season, row.input.fixture_id)
+            identity = (season, basis.fixture_id)
             if identity in identities:
                 raise ValueError("score training fixture identity is duplicated")
             identities.add(identity)
         for row in rows:
-            validate_training_score_fixture(
-                row,
-                fit_cutoff=canonical_cutoff,
-                target_season=target_season,
-                target_gameweeks=target_gameweeks,
-            )
+            if isinstance(row, ScoreReplayObservation):
+                validate_score_replay_observation(
+                    row,
+                    fit_cutoff=canonical_cutoff,
+                    target_season=target_season,
+                    target_gameweeks=target_gameweeks,
+                    allow_released_2025_26=allow_released_2025_26,
+                )
+            else:
+                validate_training_score_fixture(
+                    row,
+                    fit_cutoff=canonical_cutoff,
+                    target_season=target_season,
+                    target_gameweeks=target_gameweeks,
+                )
         examples = tuple(training_design(row) for row in rows)
 
         def objective(values: NDArray[np.float64]) -> tuple[float, NDArray[np.float64]]:
@@ -536,7 +611,7 @@ class ScoreStateModel:
             self.max_difference,
             tuple(
                 (
-                    score_input_digest(row.input),
+                    _basis_digest(row, allow_released_2025_26),
                     row.outcome_sha256,
                     row.settled_at,
                     hashlib.sha256(
@@ -551,6 +626,16 @@ class ScoreStateModel:
                 for row in rows
             ),
         )
+        if allow_released_2025_26 or any(isinstance(row, ScoreReplayObservation) for row in rows):
+            metadata = ScoreReplayMetadata(
+                **asdict(metadata),
+                allow_released_2025_26=allow_released_2025_26,
+                replay_receipts=tuple(
+                    (_basis_digest(row, allow_released_2025_26), row.basis.provenance)
+                    for row in rows
+                    if isinstance(row, ScoreReplayObservation)
+                ),
+            )
         encoded = json.dumps(
             asdict(metadata), sort_keys=True, separators=(",", ":"), allow_nan=False
         )
