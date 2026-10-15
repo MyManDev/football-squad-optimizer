@@ -7,7 +7,7 @@ models. Every time-dependent aggregation of the feature builder passes through o
 shifted-rolling primitive, so the timing rule has one implementation. Its callers are `prediction`, `live`, `application`, `platform`,
 the laboratory and the scripts.
 
-Its 21 Python files sit in one folder. This page places every one of them in exactly one
+Its 22 Python files sit in one folder. This page places every one of them in exactly one
 family.
 
 Review: İbrahim, the data side ([ownership](../../../docs/architecture/ownership.md)).
@@ -63,7 +63,7 @@ that check them before a row is returned.
 Each private model of the football lane in [`squadopt.prediction`](../prediction/README.md)
 reads its inputs from here. Outside this package, the first six are imported only by their
 model in `prediction` and its `football_*_experiment` module in
-[`squadopt.experiments`](../experiments/README.md); the last two parse private bytes for the
+[`squadopt.experiments`](../experiments/README.md); the JSON and FM readers parse private bytes for the
 club-unit experiment and are called only by tests today.
 
 | Module | What it does |
@@ -76,6 +76,7 @@ club-unit experiment and are called only by tests today.
 | `football_unit_inputs.py` | Immutable inputs of the separately invoked club-unit experiment (`football_unit_inputs_v1`). |
 | `football_unit_catalog.py` | The strict private JSON input boundary of the club-unit experiment; it touches no network or file. |
 | `football_fm_attributes.py` | Reads a private, explicitly mapped Football Manager attribute export without inferring identities (`football_fm_csv_attributes_v1`). |
+| `football_unit_point.py` | Declared deterministic XI point from complete native starter probabilities, with exact structural support and a retained basis receipt (`src/squadopt/features/football_unit_point.py:48`). |
 
 ## Package surface
 
