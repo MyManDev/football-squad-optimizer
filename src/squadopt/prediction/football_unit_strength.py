@@ -25,14 +25,17 @@ from sklearn.preprocessing import StandardScaler  # type: ignore[import-untyped]
 from squadopt.features.football_unit_inputs import (
     POSITIONS,
     UNIT_INPUT_VERSION,
+    UNIT_PHYSICAL_CLOCK_VERSION,
     UNIT_PREFIX_CLOCK_VERSION,
     ClubUnit,
     NumericAttributeSpec,
     ProjectedUnitState,
     UnitInputCatalog,
     UnitObservation,
+    UnitPhysicalExposureClock,
     UnitProjection,
     utc_time,
+    validate_physical_partition,
 )
 
 UNIT_MODEL_VERSION = "football_projected_unit_strength_v1"
@@ -42,6 +45,21 @@ UNIT_LEGACY_MISSINGNESS_POLICY = "per_attribute_v1"
 UNIT_SOURCE_MISSINGNESS_POLICY = "source_all_unobserved_residual_v2"
 UNIT_SOURCE_MISSINGNESS_MODEL_VERSION = "football_projected_unit_source_missingness_v2"
 UNIT_SOURCE_MISSINGNESS_FEATURE_VERSION = "reference_relative_unit_source_missingness_v2"
+UNIT_LEGACY_EXPOSURE_POLICY = "reported_minutes_over_90_v1"
+UNIT_PHYSICAL_EXPOSURE_POLICY = "physical_seconds_over_forecast_duration_v1"
+UNIT_PHYSICAL_MODEL_VERSION = "football_projected_unit_physical_source_missingness_v3"
+UNIT_PHYSICAL_FIT_VERSION = "football_unit_public_replay_physical_duration_fit_v1"
+UNIT_PHYSICAL_OFFSET = (
+    "physical seconds / (causal forecast duration minutes * 60) "
+    "* supplied whole-fixture native mean"
+)
+UNIT_PHYSICAL_SELECTION = "source-validated complete observed physical matches"
+UNIT_PHYSICAL_SEMANTICS = (
+    "exact integer physical seconds; actual duration only establishes the observed partition"
+)
+UNIT_PHYSICAL_PROJECTION = (
+    "reference-relative associations modify supplied whole-fixture native means"
+)
 UNIT_ALL_UNOBSERVED_SEMANTICS = "all declared attributes of this source unobserved; count / 11"
 UNIT_RESIDUAL_MISSINGNESS_SEMANTICS = (
     "missing trait among players with at least one observed declared attribute of this source; "
@@ -185,8 +203,9 @@ class UnitStrengthResult:
 class FootballUnitStrengthModel:
     """A fixed regularized Poisson offset head, independent of accepted forecasts.
 
-    For segment t and supplied causal baseline b, count y has mean
-        (t / 90) * b * exp(beta * (unit - reference)).
+    The legacy segment offset is (minutes / 90) * supplied baseline.
+    Explicit physical exposure uses seconds / forecast duration seconds instead.
+    Count y has mean offset * exp(beta * (unit - reference)).
     PoissonRegressor receives y / exposure with sample weight exposure. Scaling
     preserves zero, so identical projected and reference units reproduce b exactly.
     The declared reference must be known at the observation's decision cutoff.
@@ -203,6 +222,7 @@ class FootballUnitStrengthModel:
         cutoff: datetime,
         allow_released_2025_26: bool = False,
         missingness_policy: str = UNIT_LEGACY_MISSINGNESS_POLICY,
+        exposure_policy: str = UNIT_LEGACY_EXPOSURE_POLICY,
     ):
         utc_time(cutoff, "fitting cutoff")
         if type(allow_released_2025_26) is not bool:
@@ -216,11 +236,32 @@ class FootballUnitStrengthModel:
         if missingness_policy == UNIT_SOURCE_MISSINGNESS_POLICY:
             self.model_version = UNIT_SOURCE_MISSINGNESS_MODEL_VERSION
             self.feature_version = UNIT_SOURCE_MISSINGNESS_FEATURE_VERSION
+        if type(exposure_policy) is not str or exposure_policy not in (
+            UNIT_LEGACY_EXPOSURE_POLICY,
+            UNIT_PHYSICAL_EXPOSURE_POLICY,
+        ):
+            raise ValueError("Unit exposure requires an explicitly supported fitting policy.")
+        physical = exposure_policy == UNIT_PHYSICAL_EXPOSURE_POLICY
+        if physical:
+            if missingness_policy != UNIT_SOURCE_MISSINGNESS_POLICY:
+                raise ValueError(
+                    "Physical exposure requires the source missingness v2 feature policy."
+                )
+            self.exposure_policy = exposure_policy
+            self.model_version = UNIT_PHYSICAL_MODEL_VERSION
         observations = tuple(
             sorted(observations, key=lambda x: (x.season, x.fixture_id, x.start_minute, x.own.club))
         )
         if not observations:
             raise ValueError("Unit-strength fitting requires historical exposure observations.")
+        if any(
+            isinstance(x.exposure_clock, UnitPhysicalExposureClock) != physical
+            for x in observations
+        ):
+            raise ValueError(
+                "Physical, reported-prefix and legacy exposure populations "
+                "require separate explicit fits."
+            )
         replayed = tuple(x.catalog.replay is not None for x in observations)
         if any(replayed) and not all(replayed):
             raise ValueError(
@@ -237,6 +278,8 @@ class FootballUnitStrengthModel:
         spans: dict[tuple[str, int], list[tuple[float, float]]] = {}
         week_cutoffs: dict[tuple[str, int], datetime] = {}
         fixture_bases: dict[tuple[str, int], tuple[object, ...]] = {}
+        physical_spans: dict[tuple[str, int], list[tuple[int, int]]] = {}
+        physical_totals: dict[tuple[str, int], int] = {}
         for observation in observations:
             if observation.season == "2025-26" and not allow_released_2025_26:
                 raise ValueError("Locked 2025-26 outcomes are excluded from unit-strength fitting.")
@@ -259,7 +302,7 @@ class FootballUnitStrengthModel:
             ):
                 raise ValueError("Every fixture in one gameweek must share its decision cutoff.")
             key = observation.season, observation.fixture_id
-            basis = (
+            basis: tuple[object, ...] = (
                 observation.gameweek,
                 observation.decision_cutoff,
                 observation.kickoff,
@@ -270,15 +313,26 @@ class FootballUnitStrengthModel:
                 observation.causal_baseline_opponent_goal_rate,
                 _fingerprint(observation.catalog),
             )
+            if isinstance(observation.exposure_clock, UnitPhysicalExposureClock):
+                clock = observation.exposure_clock
+                basis += (clock.fixture_basis(),)
+                physical_spans.setdefault(key, []).append((clock.start_seconds, clock.end_seconds))
+                physical_totals[key] = clock.actual_duration_seconds
             if fixture_bases.setdefault(key, basis) != basis:
                 raise ValueError(
                     "One fixture must retain the same predecision reference and baseline."
                 )
-            segment = observation.start_minute, observation.start_minute + observation.minutes
+            segment = (
+                (observation.exposure_clock.start_seconds, observation.exposure_clock.end_seconds)
+                if isinstance(observation.exposure_clock, UnitPhysicalExposureClock)
+                else (observation.start_minute, observation.start_minute + observation.minutes)
+            )
             for previous in spans.setdefault(key, []):
                 if max(segment[0], previous[0]) < min(segment[1], previous[1]):
                     raise ValueError("Duplicated or overlapping fixture exposure observations.")
             spans[key].append(segment)
+        for key, segments in physical_spans.items():
+            validate_physical_partition(segments, physical_totals[key])
         self.cutoff = cutoff
         self._observations = observations
         self._attribute_contract = contract
@@ -337,6 +391,17 @@ class FootballUnitStrengthModel:
                     "fm_effective_semantics": (
                         "published frozen feature eligibility, not game/save date"
                     ),
+                }
+            )
+        if physical:
+            self._replay_metadata.update(
+                {
+                    "fit_contract": UNIT_PHYSICAL_FIT_VERSION,
+                    "training_exposure_clock": UNIT_PHYSICAL_CLOCK_VERSION,
+                    "training_selection": UNIT_PHYSICAL_SELECTION,
+                    "exposure_semantics": UNIT_PHYSICAL_SEMANTICS,
+                    "projection_extrapolation": UNIT_PHYSICAL_PROJECTION,
+                    "exposure_policy": UNIT_PHYSICAL_EXPOSURE_POLICY,
                 }
             )
         self.attributes = tuple(
@@ -428,7 +493,16 @@ class FootballUnitStrengthModel:
                     if reverse
                     else observation.causal_baseline_own_goal_rate
                 )
-                exposure = observation.minutes / 90 * baseline
+                if physical:
+                    physical_clock = observation.exposure_clock
+                    assert isinstance(physical_clock, UnitPhysicalExposureClock)
+                    exposure = (
+                        (physical_clock.end_seconds - physical_clock.start_seconds)
+                        / (physical_clock.forecast_duration_minutes * 60)
+                        * baseline
+                    )
+                else:
+                    exposure = observation.minutes / 90 * baseline
                 if not math.isfinite(exposure) or exposure <= 0:
                     raise ValueError("Baseline-weighted exposure must remain finite and positive.")
                 try:
@@ -701,7 +775,10 @@ class FootballUnitStrengthModel:
                     for s in sorted(projection.catalog.sources, key=lambda s: s.source_id)
                 ),
                 "regularization": self.regularization,
-                "offset": "minutes / 90 * supplied causal baseline",
+                "offset": UNIT_PHYSICAL_OFFSET
+                if getattr(self, "exposure_policy", UNIT_LEGACY_EXPOSURE_POLICY)
+                == UNIT_PHYSICAL_EXPOSURE_POLICY
+                else "minutes / 90 * supplied causal baseline",
                 "scaling": "train-only exposure-weighted StandardScaler(with_mean=False)",
                 "reference": "complete supplied contemporaneous paired units",
                 "projection": "supplied complete joint unit states; probability average of rates",

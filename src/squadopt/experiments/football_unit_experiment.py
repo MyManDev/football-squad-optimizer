@@ -12,6 +12,7 @@ import json
 import math
 import re
 from collections.abc import Mapping, Sequence
+from dataclasses import fields
 from datetime import datetime, timedelta
 from numbers import Integral, Real
 from types import MappingProxyType
@@ -23,13 +24,16 @@ from numpy.typing import ArrayLike
 
 from squadopt.features.football_unit_inputs import (
     UNIT_INPUT_VERSION,
+    UNIT_PHYSICAL_CLOCK_VERSION,
     UNIT_PREFIX_CLOCK_VERSION,
     NumericAttributeSpec,
     SourceRecord,
     UnitExposureClock,
     UnitHistoricalReplay,
+    UnitPhysicalExposureClock,
     scope,
     utc_time,
+    validate_physical_partition,
 )
 from squadopt.live.minute_evidence import COMPONENT_COLUMNS, IDENTITY_COLUMNS, _validate_components
 from squadopt.prediction.football import FOOTBALL_MODEL_VERSION
@@ -37,6 +41,13 @@ from squadopt.prediction.football_unit_strength import (
     UNIT_ALL_UNOBSERVED_SEMANTICS,
     UNIT_FEATURE_VERSION,
     UNIT_MODEL_VERSION,
+    UNIT_PHYSICAL_EXPOSURE_POLICY,
+    UNIT_PHYSICAL_FIT_VERSION,
+    UNIT_PHYSICAL_MODEL_VERSION,
+    UNIT_PHYSICAL_OFFSET,
+    UNIT_PHYSICAL_PROJECTION,
+    UNIT_PHYSICAL_SELECTION,
+    UNIT_PHYSICAL_SEMANTICS,
     UNIT_REPLAY_FIT_VERSION,
     UNIT_RESIDUAL_MISSINGNESS_SEMANTICS,
     UNIT_SOURCE_MISSINGNESS_FEATURE_VERSION,
@@ -78,6 +89,7 @@ def _replay_fit_receipts(
     target_gameweek: int,
 ) -> None:
     contract = metadata.get("fit_contract")
+    physical = contract == UNIT_PHYSICAL_FIT_VERSION
     replay_keys = {
         "training_exposure_clock",
         "training_selection",
@@ -89,23 +101,40 @@ def _replay_fit_receipts(
         "fm_effective_semantics",
     }
     if contract is None:
-        if (replay_keys | {"allow_released_2025_26"}) & metadata.keys():
+        if (replay_keys | {"allow_released_2025_26", "exposure_policy"}) & metadata.keys():
             raise ValueError("Replay evidence requires its explicit fitting contract.")
         return
     released = metadata.get("allow_released_2025_26")
     if type(released) is not bool:
         raise ValueError("Unit result requires its explicit released-season policy.")
     if contract == "football_unit_explicit_release_fit_v1":
-        if released is not True or replay_keys & metadata.keys():
+        if released is not True or (replay_keys | {"exposure_policy"}) & metadata.keys():
             raise ValueError("Explicit release contract has inconsistent replay evidence.")
         return
     if (
-        contract != UNIT_REPLAY_FIT_VERSION
-        or metadata.get("training_exposure_clock") != UNIT_PREFIX_CLOCK_VERSION
+        contract not in (UNIT_REPLAY_FIT_VERSION, UNIT_PHYSICAL_FIT_VERSION)
+        or metadata.get("training_exposure_clock")
+        != (UNIT_PHYSICAL_CLOCK_VERSION if physical else UNIT_PREFIX_CLOCK_VERSION)
         or metadata.get("fm_game_vintage") != "unknown"
         or not replay_keys <= metadata.keys()
     ):
-        raise ValueError("Unit result requires its declared replay and quantized clock contract.")
+        raise ValueError("Unit result requires its declared replay and observed clock contract.")
+    if physical:
+        if any(
+            metadata.get(key) != value
+            for key, value in {
+                "exposure_policy": UNIT_PHYSICAL_EXPOSURE_POLICY,
+                "offset": UNIT_PHYSICAL_OFFSET,
+                "training_selection": UNIT_PHYSICAL_SELECTION,
+                "exposure_semantics": UNIT_PHYSICAL_SEMANTICS,
+                "projection_extrapolation": UNIT_PHYSICAL_PROJECTION,
+            }.items()
+        ):
+            raise ValueError(
+                "Physical unit fitting requires its exact exposure and duration policy."
+            )
+    elif "exposure_policy" in metadata:
+        raise ValueError("Reported-prefix results cannot claim a physical exposure policy.")
     replays, exposures = (
         metadata.get("training_replay_receipts"),
         metadata.get("training_exposure_receipts"),
@@ -142,6 +171,8 @@ def _replay_fit_receipts(
     spans: dict[tuple[str, int], list[tuple[float, float]]] = {}
     week_cutoffs: dict[tuple[str, int], datetime] = {}
     fixture_bases: dict[tuple[str, int], tuple[object, ...]] = {}
+    physical_spans: dict[tuple[str, int], list[tuple[int, int]]] = {}
+    physical_totals: dict[tuple[str, int], int] = {}
     try:
         for replay_text, exposure_text, group in zip(replays, exposures, sources, strict=True):
             envelope, exposure = document(replay_text), document(exposure_text)
@@ -206,7 +237,40 @@ def _replay_fit_receipts(
                 "outcome_available_at",
             }:
                 raise ValueError("Unit exposure envelope fields are invalid.")
-            clock = UnitExposureClock(**exposure["clock"])
+            clock: UnitExposureClock | UnitPhysicalExposureClock
+            if physical:
+                raw_clock = exposure["clock"]
+                if not isinstance(raw_clock, dict) or set(raw_clock) != {
+                    field.name for field in fields(UnitPhysicalExposureClock)
+                }:
+                    raise ValueError(
+                        "Physical exposure receipt requires every declared clock field."
+                    )
+                clock = UnitPhysicalExposureClock(
+                    **{
+                        **raw_clock,
+                        **{
+                            key: instant(raw_clock[key])
+                            for key in (
+                                "feature_cutoff",
+                                "latest_history_settlement_bound",
+                                "duration_source_captured_at",
+                                "generated_at",
+                            )
+                        },
+                        "history_fixtures": tuple(
+                            tuple(item) for item in raw_clock["history_fixtures"]
+                        ),
+                    }
+                )
+                clock.validate_replay(
+                    replay,
+                    season=exposure["season"],
+                    gameweek=exposure["gameweek"],
+                    fixture_id=exposure["fixture_id"],
+                )
+            else:
+                clock = UnitExposureClock(**exposure["clock"])
             source_raw = exposure["outcome_source"]
             source = SourceRecord(
                 **{
@@ -226,14 +290,20 @@ def _replay_fit_receipts(
             scope(exposure["season"], exposure["gameweek"], exposure["fixture_id"])
             season, gameweek = exposure["season"], exposure["gameweek"]
             identity = clock.source_sha256, clock.interval_id
-            if (
-                clock.source_sha256 != source.sha256
-                or identity in seen
-                or not start.is_integer()
+            bad_span = (
+                start != clock.start_seconds / 60
+                or minutes != (clock.end_seconds - clock.start_seconds) / 60
+                if isinstance(clock, UnitPhysicalExposureClock)
+                else not start.is_integer()
                 or not minutes.is_integer()
                 or start < 0
                 or minutes <= 0
                 or start + minutes > 40
+            )
+            if (
+                clock.source_sha256 != source.sha256
+                or identity in seen
+                or bad_span
                 or not decision < kickoff
                 or available < kickoff + timedelta(hours=3)
                 or available >= training_cutoff
@@ -251,14 +321,24 @@ def _replay_fit_receipts(
                     "Unit replay fixtures in one gameweek require one decision cutoff."
                 )
             fixture_key = season, exposure["fixture_id"]
-            basis = (gameweek, decision, kickoff, replay_text, group)
+            basis: tuple[object, ...] = (gameweek, decision, kickoff, replay_text, group)
+            if isinstance(clock, UnitPhysicalExposureClock):
+                basis += (clock.fixture_basis(),)
+                physical_spans.setdefault(fixture_key, []).append(
+                    (clock.start_seconds, clock.end_seconds)
+                )
+                physical_totals[fixture_key] = clock.actual_duration_seconds
             if fixture_bases.setdefault(fixture_key, basis) != basis:
                 raise ValueError("Unit replay fixture intervals must retain one historical basis.")
             end = start + minutes
+            if isinstance(clock, UnitPhysicalExposureClock):
+                start, end = clock.start_seconds, clock.end_seconds
             for previous in spans.setdefault(fixture_key, []):
                 if max(start, previous[0]) < min(end, previous[1]):
                     raise ValueError("Unit replay exposure intervals overlap.")
             spans[fixture_key].append((start, end))
+        for key, segments in physical_spans.items():
+            validate_physical_partition(segments, physical_totals[key])
     except (KeyError, TypeError, AttributeError, OverflowError) as error:
         raise ValueError("Malformed unit replay or exposure receipt.") from error
 
@@ -280,7 +360,8 @@ def _missingness_feature_receipt(result: UnitStrengthResult) -> None:
             raise ValueError("Legacy unit results cannot claim source missingness features.")
         return
     if (
-        result.model_version != UNIT_SOURCE_MISSINGNESS_MODEL_VERSION
+        result.model_version
+        not in (UNIT_SOURCE_MISSINGNESS_MODEL_VERSION, UNIT_PHYSICAL_MODEL_VERSION)
         or metadata.get("feature_version") != UNIT_SOURCE_MISSINGNESS_FEATURE_VERSION
         or metadata.get("missingness_policy") != UNIT_SOURCE_MISSINGNESS_POLICY
         or metadata.get("all_unobserved_semantics") != UNIT_ALL_UNOBSERVED_SEMANTICS
@@ -323,6 +404,10 @@ def _missingness_feature_receipt(result: UnitStrengthResult) -> None:
 
 def _result_receipt(result: UnitStrengthResult) -> str:
     metadata = result.metadata
+    if (result.model_version == UNIT_PHYSICAL_MODEL_VERSION) != (
+        metadata.get("fit_contract") == UNIT_PHYSICAL_FIT_VERSION
+    ):
+        raise ValueError("Physical fitting and model versions must agree.")
     if (
         not isinstance(metadata, MappingProxyType)
         or metadata.get("input_version") != UNIT_INPUT_VERSION
@@ -425,7 +510,7 @@ def _result_receipt(result: UnitStrengthResult) -> str:
     projection_ids = source_group(
         metadata.get("projection_source_receipts"), result.decision_cutoff, current=True
     )
-    if result.model_version == UNIT_SOURCE_MISSINGNESS_MODEL_VERSION:
+    if result.model_version in (UNIT_SOURCE_MISSINGNESS_MODEL_VERSION, UNIT_PHYSICAL_MODEL_VERSION):
         attribute_contract = metadata["attribute_contract"]
         assert isinstance(attribute_contract, tuple)
         families = {(row[0], row[6], row[7]) for row in attribute_contract}
@@ -460,7 +545,7 @@ def _result_receipt(result: UnitStrengthResult) -> str:
             for s in result.state_rates
         ],
     }
-    if result.model_version == UNIT_SOURCE_MISSINGNESS_MODEL_VERSION:
+    if result.model_version in (UNIT_SOURCE_MISSINGNESS_MODEL_VERSION, UNIT_PHYSICAL_MODEL_VERSION):
         payload["model_version"] = result.model_version
     return json.dumps(payload, sort_keys=True, allow_nan=False)
 
@@ -531,6 +616,7 @@ def unit_fixture_components(
         if not isinstance(result, UnitStrengthResult) or result.model_version not in (
             UNIT_MODEL_VERSION,
             UNIT_SOURCE_MISSINGNESS_MODEL_VERSION,
+            UNIT_PHYSICAL_MODEL_VERSION,
         ):
             raise ValueError("An explicitly identified unit-strength result is required.")
         model_versions.add(result.model_version)

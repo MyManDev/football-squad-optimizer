@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import math
 import re
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, fields, replace
 from datetime import datetime, timedelta
 from types import MappingProxyType
@@ -17,6 +17,8 @@ from typing import Literal, cast
 UNIT_INPUT_VERSION = "football_unit_inputs_v1"
 UNIT_REPLAY_VERSION = "football_unit_public_revision_replay_v1"
 UNIT_PREFIX_CLOCK_VERSION = "reported_first_half_minute_bins_0_to_40_v1"
+UNIT_PHYSICAL_CLOCK_VERSION = "pannadata_paired_periods_nonzero_event_seconds_fullmatch_v1"
+UNIT_DURATION_POLICY = "past_verified_nonzero_period_end_seconds_arithmetic_mean_v1"
 POSITIONS = ("GK", "DEF", "MID", "FWD")
 
 
@@ -338,6 +340,141 @@ class UnitExposureClock:
 
 
 @dataclass(frozen=True)
+class UnitPhysicalExposureClock:
+    """Observed physical seconds with a separate past-only duration forecast."""
+
+    source_sha256: str
+    interval_id: str
+    selection_reference: str
+    start_seconds: int
+    end_seconds: int
+    actual_duration_seconds: int
+    forecast_duration_minutes: float
+    duration_forecast_sha256: str
+    duration_history_sha256: str
+    duration_source_sha256: str
+    feature_cutoff: datetime
+    latest_history_settlement_bound: datetime
+    duration_source_captured_at: datetime
+    generated_at: datetime
+    history_fixtures: tuple[tuple[str, int, int], ...]
+    duration_policy: str = UNIT_DURATION_POLICY
+    version: str = UNIT_PHYSICAL_CLOCK_VERSION
+
+    def __post_init__(self) -> None:
+        if (
+            self.version != UNIT_PHYSICAL_CLOCK_VERSION
+            or self.duration_policy != UNIT_DURATION_POLICY
+        ):
+            raise ValueError(
+                "Physical unit exposure requires its declared clock and duration policy."
+            )
+        for name in (
+            "source_sha256",
+            "duration_forecast_sha256",
+            "duration_history_sha256",
+            "duration_source_sha256",
+        ):
+            value = getattr(self, name)
+            if not isinstance(value, str) or not re.fullmatch(r"[a-f0-9]{64}", value):
+                raise ValueError(
+                    "Physical exposure needs exact outcome and duration source hashes."
+                )
+        if not all(
+            isinstance(value, str) and value.strip()
+            for value in (self.interval_id, self.selection_reference)
+        ):
+            raise ValueError("Physical exposure needs exact interval and selection evidence.")
+        if any(
+            type(value) is not int
+            for value in (self.start_seconds, self.end_seconds, self.actual_duration_seconds)
+        ) or not (
+            0 <= self.start_seconds < self.end_seconds <= self.actual_duration_seconds <= 7200
+        ):
+            raise ValueError(
+                "Physical exposure requires exact integer second bounds within the match."
+            )
+        finite_number(self.forecast_duration_minutes, "forecast physical duration", positive=True)
+        if self.forecast_duration_minutes > 120:
+            raise ValueError("Forecast physical duration exceeds the supported match duration.")
+        for name in (
+            "feature_cutoff",
+            "latest_history_settlement_bound",
+            "duration_source_captured_at",
+            "generated_at",
+        ):
+            utc_time(getattr(self, name), name)
+        if not (
+            self.latest_history_settlement_bound
+            <= self.feature_cutoff
+            < self.duration_source_captured_at
+            <= self.generated_at
+        ):
+            raise ValueError(
+                "Physical duration needs past settlement and actual later acquisition clocks."
+            )
+        if not isinstance(self.history_fixtures, tuple) or not self.history_fixtures:
+            raise ValueError("Physical duration requires its nonempty past fixture population.")
+        for item in self.history_fixtures:
+            if not isinstance(item, tuple) or len(item) != 3:
+                raise ValueError(
+                    "Duration history requires immutable season, gameweek and fixture identities."
+                )
+            scope(*item)
+        if len(set(self.history_fixtures)) != len(self.history_fixtures) or len(
+            {(s, f) for s, _, f in self.history_fixtures}
+        ) != len(self.history_fixtures):
+            raise ValueError("Duration history cannot repeat a fixture under another gameweek.")
+        object.__setattr__(self, "history_fixtures", tuple(sorted(self.history_fixtures)))
+
+    def validate_replay(
+        self, replay: UnitHistoricalReplay, *, season: str, gameweek: int, fixture_id: int
+    ) -> None:
+        hashes = dict(replay.source_hashes)
+        expected = {
+            "duration_forecast.json": self.duration_forecast_sha256,
+            "duration_history.json": self.duration_history_sha256,
+            "duration_clock_source.json": self.duration_source_sha256,
+        }
+        if any(hashes.get(name) != digest for name, digest in expected.items()):
+            raise ValueError("Physical duration receipts must bind the replay source hashes.")
+        if (
+            self.feature_cutoff != replay.feature_cutoff
+            or self.latest_history_settlement_bound > replay.recorded_at
+            or self.generated_at > replay.generated_at
+        ):
+            raise ValueError("Physical duration clocks disagree with the original replay basis.")
+        if any(
+            s > season or (s == season and (gw >= gameweek or fid == fixture_id))
+            for s, gw, fid in self.history_fixtures
+        ):
+            raise ValueError(
+                "Physical duration history must exclude the target whole gameweek "
+                "and future fixtures."
+            )
+
+    def fixture_basis(self) -> tuple[object, ...]:
+        return tuple(
+            getattr(self, item.name)
+            for item in fields(self)
+            if item.name not in {"interval_id", "start_seconds", "end_seconds"}
+        )
+
+
+def validate_physical_partition(spans: Sequence[tuple[int, int]], duration_seconds: int) -> None:
+    """Require an observed whole-match partition in its exact physical clock."""
+    cursor = 0
+    for start, end in sorted(spans):
+        if start != cursor or end <= start:
+            raise ValueError(
+                "Physical exposures must form a complete nonoverlapping match partition."
+            )
+        cursor = end
+    if cursor != duration_seconds:
+        raise ValueError("Physical exposures must cover the full declared observed duration.")
+
+
+@dataclass(frozen=True)
 class UnitInputCatalog:
     season: str
     gameweek: int
@@ -493,7 +630,7 @@ class UnitObservation:
     opponent_goals: int
     causal_baseline_own_goal_rate: float
     causal_baseline_opponent_goal_rate: float
-    exposure_clock: UnitExposureClock | None = None
+    exposure_clock: UnitExposureClock | UnitPhysicalExposureClock | None = None
 
     def __post_init__(self) -> None:
         scope(self.season, self.gameweek, self.fixture_id)
@@ -523,11 +660,33 @@ class UnitObservation:
         )
         finite_number(self.start_minute, "start_minute")
         finite_number(self.minutes, "minutes", positive=True)
-        if self.start_minute < 0 or self.start_minute + self.minutes > 120:
+        if not isinstance(self.exposure_clock, UnitPhysicalExposureClock) and (
+            self.start_minute < 0 or self.start_minute + self.minutes > 120
+        ):
             raise ValueError("Exposure segments must be within the supported match duration.")
         if self.catalog.replay is not None and self.exposure_clock is None:
-            raise ValueError("Historical unit replay requires its reported prefix exposure clock.")
-        if self.exposure_clock is not None:
+            raise ValueError(
+                "Historical unit replay requires its declared observed exposure clock."
+            )
+        if isinstance(self.exposure_clock, UnitPhysicalExposureClock):
+            if self.catalog.replay is None:
+                raise ValueError("Physical historical exposure requires its original replay basis.")
+            self.exposure_clock.validate_replay(
+                self.catalog.replay,
+                season=self.season,
+                gameweek=self.gameweek,
+                fixture_id=self.fixture_id,
+            )
+            if (
+                self.exposure_clock.source_sha256 != self.outcome_source.sha256
+                or self.start_minute != self.exposure_clock.start_seconds / 60
+                or self.minutes
+                != (self.exposure_clock.end_seconds - self.exposure_clock.start_seconds) / 60
+            ):
+                raise ValueError(
+                    "Physical exposure minutes must equal its exact source second bounds."
+                )
+        elif self.exposure_clock is not None:
             if not isinstance(self.exposure_clock, UnitExposureClock):
                 raise ValueError("Unit exposure clock must be a typed immutable receipt.")
             if self.catalog.replay is None:
