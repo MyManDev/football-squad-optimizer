@@ -541,8 +541,12 @@ def _phase_moments(
     masses = {head: 0.0 for head in total}
     physical = 0.0
     state_results = []
+    # Validation fixes the ordered roster, positions and captured duties across states.
+    # Rank features vary only with the active roster; exposure still uses actual minutes.
+    feature_cache: dict[tuple[str | None, tuple[bool, ...]], Array] = {}
     for state in projection.states:
         players = tuple(sorted(state.players, key=lambda player: player.player_code))
+        active_players = tuple(player.minutes > 0 for player in players)
         allocated = {}
         shares = {}
         for head, mass in (("goals", state.goal_mass), ("assists", state.assist_mass)):
@@ -554,7 +558,12 @@ def _phase_moments(
             for phase, phase_share in zip(PHASES, composition, strict=True):
                 if phase_share == 0:
                     continue
-                features, _ = _features(players, projection.duties, head=head, phase=phase)
+                field = _rank_field(head, phase)
+                feature_key = (field, active_players if field is not None else ())
+                features = feature_cache.get(feature_key)
+                if features is None:
+                    features, _ = _features(players, projection.duties, head=head, phase=phase)
+                    feature_cache[feature_key] = features
                 probabilities = _probabilities(features, exposure, coefficients[head, phase])
                 if mass > 0 and not probabilities.any():
                     raise ValueError("Positive phase mass has no projected recipient exposure.")
