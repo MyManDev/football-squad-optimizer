@@ -40,6 +40,7 @@ runners live in `scripts/`, and its records are committed under `docs/`.
 | Rotation/news evidence | [Rotation contract](../rotation_evidence_contract.md) |
 | Residual exports | [Residual contract](../residual_export_contract.md) |
 | How records and larger expansions are stored | [Measurement artifacts](../architecture/decisions/0003-measurement-artifacts.md) |
+| October 2026 member web practice review | [Existing capabilities, interface sources and ranked experience choices](web_experience_review_2026_10.md) |
 
 ## Pre-registrations
 
