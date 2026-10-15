@@ -28,6 +28,7 @@ from squadopt.live.minute_evidence import (
     FixtureComponentBasis,
     apply_explicit_minute_evidence,
 )
+from squadopt.prediction.football import JOINT_ROLE_FLAG_MODEL_VERSION
 from squadopt.prediction.participation_updates import (
     PARTICIPATION_UPDATE_CONTRACT,
     ParticipationEvidence,
@@ -420,9 +421,14 @@ def bind_football_participation(
     stated = inputs.availability.set_index("player_id").chance_of_playing
     percentages = pd.to_numeric(stated, errors="coerce")
     base["availability_multiplier"] = base.player_id.map(percentages).div(100.0)
+    learned_flags = football.horizon.model_version == JOINT_ROLE_FLAG_MODEL_VERSION
+    if learned_flags:
+        # These labels have already entered the learned categorical head. They
+        # are not another eligibility probability to audit or apply numerically.
+        base["availability_multiplier"] = 1.0
     captured: list[ParticipationEvidence] = []
     for player_id, percentage in stated.items():
-        if pd.isna(percentage):
+        if learned_flags or pd.isna(percentage):
             continue
         captured.append(
             ParticipationEvidence(

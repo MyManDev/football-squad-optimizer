@@ -99,7 +99,10 @@ from squadopt.platform.worker_heartbeat import (
     prune_stale_heartbeats,
 )
 from squadopt.platform.worker_metrics import serve_worker_metrics
-from squadopt.prediction.football import FOOTBALL_MODEL_VERSION, JOINT_ROLE_MODEL_VERSIONS
+from squadopt.prediction.football import (
+    FOOTBALL_MODEL_VERSION,
+    JOINT_ROLE_MODEL_VERSIONS,
+)
 from squadopt.prediction.football_match_context import MATCH_CONTEXT_MODEL_VERSION
 from squadopt.prediction.football_team_form import TEAM_FORM_MODEL_VERSION
 

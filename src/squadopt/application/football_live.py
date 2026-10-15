@@ -21,6 +21,8 @@ from squadopt.data.sources.football_history import (
 )
 from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD
 from squadopt.data.sources.fpl_set_pieces import TAKER_FIELDS, captured_taker_priorities
+from squadopt.features.football_flag_captures import captured_flag_outcome, captured_flag_weeks
+from squadopt.features.football_flag_inputs import TrainingWeek
 from squadopt.live import RecommendationInputs, infer_season, read_inputs
 from squadopt.live.football_artifact import (
     ARTIFACT_CONTRACT,
@@ -31,6 +33,7 @@ from squadopt.live.football_horizon import build_football_horizon
 from squadopt.prediction.availability import apply_availability
 from squadopt.prediction.football import (
     FOOTBALL_MODEL_VERSION,
+    JOINT_ROLE_FLAG_MODEL_VERSION,
     JOINT_ROLE_MODEL_VERSION,
     JOINT_ROLE_RETAINED_HISTORY_MODEL_VERSION,
     FixtureFootballModel,
@@ -48,6 +51,22 @@ from squadopt.prediction.football_contextual import (
     ContextualFootballModel,
 )
 from squadopt.prediction.football_features import football_features
+from squadopt.prediction.football_flag_components import (
+    FLAG_SCOPE_LIMITATION,
+    LIVE_FLAG_CONTRACT,
+    apply_flag_predictions,
+    flag_weekly_chances,
+    native_flag_supports,
+)
+from squadopt.prediction.football_flag_minutes import (
+    FEATURE_VERSION as FLAG_FEATURE_VERSION,
+)
+from squadopt.prediction.football_flag_minutes import (
+    MODEL_VERSION as FLAG_HEAD_VERSION,
+)
+from squadopt.prediction.football_flag_minutes import (
+    FlagMinutesModel,
+)
 from squadopt.prediction.football_match_context import (
     MATCH_CONTEXT_FEATURE_VERSION,
     MATCH_CONTEXT_MODEL_VERSION,
@@ -216,9 +235,15 @@ def _forecast_and_components(
     cutoff = pd.Timestamp(inputs.captured_at_utc)
     first = int(inputs.deadline.gameweek)
     archives, include_current = _training_sources(training_seasons, season)
-    if role_minutes and (archives != ("2022-23", "2023-24", "2024-25") or not include_current):
+    role_archives = (
+        (TEAM_FORM_ARCHIVE_SEASONS, ARCHIVE_SEASONS)
+        if retained_role_history
+        else (TEAM_FORM_ARCHIVE_SEASONS,)
+    )
+    if role_minutes and (archives not in role_archives or not include_current):
         raise ValueError(
-            "Joint role minutes require exactly 2022-23, 2023-24, 2024-25 and the captured season."
+            "Joint role minutes require exactly the three permitted archives and captured season; "
+            "retained history also permits explicitly selected 2025-26."
         )
     if team_form and not set(archives) <= set(TEAM_FORM_ARCHIVE_SEASONS):
         raise ValueError(
@@ -551,4 +576,199 @@ def produce_football_components(
         )
         companion["feature_contract_version"] = document["feature_contract_version"]
     companion["fingerprint"] = forecast_digest(companion)
+    return document, companion
+
+
+def reconstruct_flag_training(
+    target: CapturedSnapshot,
+    archive_root: Path,
+    pairs: Sequence[tuple[CapturedSnapshot, CapturedSnapshot]],
+    *,
+    include_2025_26_history: bool = False,
+) -> tuple[TrainingWeek, ...]:
+    """Reconstruct one causal native fold per retained current-season decision.
+
+    The historical reference clock is explicitly deadline minus one second. No
+    original live forecast is claimed, and no later capture supplies input flags.
+    """
+    season = infer_season(target)
+    if season == LOCKED_OUTCOME_SEASON:
+        raise ValueError("Protected outcomes cannot enter retained flag reconstruction.")
+    if type(include_2025_26_history) is not bool:
+        raise ValueError("The optional 2025-26 history selection must be explicit Boolean.")
+    archives = ARCHIVE_SEASONS if include_2025_26_history else TEAM_FORM_ARCHIVE_SEASONS
+    inputs = read_inputs(target, season=season)
+    rows: list[TrainingWeek] = []
+    seen = set()
+    for before, after in pairs:
+        if infer_season(before) != season or infer_season(after) != season:
+            raise ValueError("Retained flag reconstruction requires the same captured season.")
+        original = read_inputs(before, season=season)
+        gameweek = int(original.deadline.gameweek)
+        if gameweek >= inputs.deadline.gameweek or gameweek in seen:
+            raise ValueError("Historical decisions must be unique and exclude target/future weeks.")
+        seen.add(gameweek)
+        if pd.Timestamp(after.metadata.captured_at_utc) >= pd.Timestamp(inputs.captured_at_utc):
+            raise ValueError("Training settlement must precede the target capture.")
+        _forecast, companion = produce_football_components(
+            before,
+            archive_root,
+            gameweeks=(gameweek,),
+            training_seasons=(*archives, season),
+            role_minutes=True,
+            retained_role_history=True,
+        )
+        supports = native_flag_supports(
+            pd.DataFrame(companion["rows"]), [int(p) for p in original.players.player_id]
+        )
+        weeks = captured_flag_weeks(
+            bootstrap=before.payloads[BOOTSTRAP_PAYLOAD],
+            fixtures=before.payloads[FIXTURES_PAYLOAD],
+            season=season,
+            gameweek=gameweek,
+            captured_at=before.metadata.captured_at_utc,
+            decision_at=(
+                pd.Timestamp(original.deadline.deadline_utc) - pd.Timedelta(seconds=1)
+            ).isoformat(),
+            native_fixtures=supports,
+            native_basis_sha256=companion["fingerprint"],
+            native_fit_cutoff=before.metadata.captured_at_utc,
+            reconstructed=True,
+        )
+        rows.extend(
+            captured_flag_outcome(
+                week,
+                bootstrap=after.payloads[BOOTSTRAP_PAYLOAD],
+                fixtures=after.payloads[FIXTURES_PAYLOAD],
+                event=after.payloads[f"event-gw{gameweek:02d}-live.json"],
+                captured_at=after.metadata.captured_at_utc,
+                fit_cutoff=inputs.captured_at_utc,
+                target_season=season,
+                target_gameweeks=(int(inputs.deadline.gameweek),),
+            )
+            for week in weeks
+        )
+    if not rows:
+        raise ValueError(
+            "At least one complete original training/settlement capture pair is required."
+        )
+    return tuple(rows)
+
+
+def produce_flagged_football_components(
+    snapshot: CapturedSnapshot,
+    archive_root: Path,
+    *,
+    training: Sequence[TrainingWeek],
+    decision_at: str,
+    include_2025_26_history: bool = False,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Fit retained flags offline, replacing only the named capture's first-week law.
+
+    Later gameweeks keep the existing captured rule. A next-event label is never
+    relabeled as a future week's fact. Historical native bases must be genuinely
+    causal reconstructions with original source bytes retained by their producer.
+    """
+    season = infer_season(snapshot)
+    if season == LOCKED_OUTCOME_SEASON:
+        raise ValueError("Protected outcomes cannot enter the learned flag producer.")
+    if type(include_2025_26_history) is not bool:
+        raise ValueError("The optional 2025-26 history selection must be explicit Boolean.")
+    archives = ARCHIVE_SEASONS if include_2025_26_history else TEAM_FORM_ARCHIVE_SEASONS
+    inputs = read_inputs(snapshot, season=season)
+    first = int(inputs.deadline.gameweek)
+    if (
+        not pd.Timestamp(inputs.captured_at_utc)
+        < pd.Timestamp(decision_at)
+        < pd.Timestamp(inputs.deadline.deadline_utc)
+    ):
+        raise ValueError("The flag decision must follow its capture and precede its deadline.")
+    model = FlagMinutesModel(
+        training,
+        fit_cutoff=inputs.captured_at_utc,
+        target_season=season,
+        target_gameweeks=(first,),
+    )
+    document, companion = produce_football_components(
+        snapshot,
+        archive_root,
+        training_seasons=(*archives, season),
+        role_minutes=True,
+        retained_role_history=True,
+    )
+    components = pd.DataFrame(companion["rows"])
+    selected = components.loc[components.GW.eq(first)].copy()
+    players = [int(row["player_id"]) for row in document["rows"] if row["gameweek"] == first]
+    supports = native_flag_supports(selected, players)
+    weeks = captured_flag_weeks(
+        bootstrap=snapshot.payloads[BOOTSTRAP_PAYLOAD],
+        fixtures=snapshot.payloads[FIXTURES_PAYLOAD],
+        season=season,
+        gameweek=first,
+        captured_at=document["captured_at_utc"],
+        decision_at=decision_at,
+        native_fixtures=supports,
+        native_basis_sha256=companion["fingerprint"],
+        native_fit_cutoff=document["captured_at_utc"],
+        reconstructed=False,
+    )
+    predictions = [model.predict(week) for week in weeks]
+    changed, laws = apply_flag_predictions(
+        selected,
+        predictions,
+        season=season,
+        gameweek=first,
+        players=players,
+    )
+    metadata = {
+        "contract_version": LIVE_FLAG_CONTRACT,
+        "gameweek": first,
+        "head_version": FLAG_HEAD_VERSION,
+        "feature_version": FLAG_FEATURE_VERSION,
+        "model_sha256": model.model_sha256,
+        "fit_cutoff": document["captured_at_utc"],
+        "decision_at": weeks[0].decision_at,
+        "deadline_at": weeks[0].deadline_at,
+        "native_forecast_fingerprint": document["fingerprint"],
+        "native_components_fingerprint": companion["fingerprint"],
+        "training_rows": len(training),
+        "training_seasons": sorted({row.input.season for row in training}),
+        "native_training_seasons": document["training_selection"]["allowed_seasons"],
+        "training_gameweeks": sorted(
+            {row.input.gameweek for row in training if row.input.season == season}
+        ),
+        "training_receipts_sha256": hashlib.sha256(
+            json.dumps(model.metadata.training_receipts).encode()
+        ).hexdigest(),
+        "later_weeks": "legacy_captured_rule",
+        "weekly_laws": laws,
+        "calibration": "independent_superiority_unverified",
+    }
+    chance = {
+        prediction.week.player_code: prediction.weekly_appearance for prediction in predictions
+    }
+    sums = (
+        changed.groupby("player_code").expected_points.sum()
+        if not changed.empty
+        else pd.Series(dtype=float)
+    )
+    for row in document["rows"]:
+        if row["gameweek"] == first:
+            row["expected_points"] = float(sums.get(row["player_id"], 0.0))
+            row["appearance_probability"] = chance[row["player_id"]]
+    document["model_version"] = JOINT_ROLE_FLAG_MODEL_VERSION
+    document["flag_metadata"] = metadata
+    document["limitations"].append(FLAG_SCOPE_LIMITATION)
+    document["fingerprint"] = forecast_digest(document)
+    combined = pd.concat([changed, components.loc[components.GW.ne(first)]], ignore_index=True)
+    combined["model_version"] = JOINT_ROLE_FLAG_MODEL_VERSION
+    companion["model_version"] = JOINT_ROLE_FLAG_MODEL_VERSION
+    companion["flag_metadata"] = json.loads(json.dumps(metadata))
+    companion["forecast_fingerprint"] = document["fingerprint"]
+    companion["limitations"] = [*document["limitations"], *COMPONENT_LIMITATIONS]
+    companion["rows"] = component_rows(
+        combined, model_version=JOINT_ROLE_FLAG_MODEL_VERSION, players=players
+    )
+    companion["fingerprint"] = forecast_digest(companion)
+    flag_weekly_chances(document, components=combined)
     return document, companion

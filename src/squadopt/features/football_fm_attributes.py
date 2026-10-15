@@ -2,9 +2,9 @@
 
 The supplied source receipt must cover model development and the exact CSV bytes.
 Successful parsing does not prove provider permission. Only blanks mean unknown.
-This separately invoked preparer retains every declared UID. Native integration
-and the exact temporal catalog scope/filter remain the separately reviewed second
-step. No actual dataset admission is established by this reader.
+The full reader retains every declared UID. The scoped reader returns only active
+caller-supplied mappings and their attributes for a catalog. Neither reader admits
+an actual dataset or infers player identities, club membership or source rights.
 """
 
 from __future__ import annotations
@@ -14,15 +14,19 @@ import hashlib
 import io
 import re
 from collections.abc import Mapping
+from dataclasses import dataclass
 from datetime import datetime
 
 from squadopt.features.football_unit_inputs import (
     NumericAttributeSpec,
     PlayerAttributes,
+    PlayerMapping,
     SourceRecord,
+    utc_time,
 )
 
 FM_ATTRIBUTES_INPUT_VERSION = "football_fm_csv_attributes_v1"
+FM_SCOPED_ATTRIBUTES_VERSION = "football_fm_scoped_attributes_v1"
 _UID = re.compile(r"[1-9][0-9]*\Z")
 _ATTRIBUTE = re.compile(r"(?:[1-9]|1[0-9]|20)\Z")
 
@@ -147,3 +151,92 @@ def read_fm_attributes(
     if not snapshots:
         raise ValueError("FM CSV must contain at least one explicit UID row.")
     return tuple(snapshots.values())
+
+
+@dataclass(frozen=True, slots=True)
+class ScopedFMAttributes:
+    """Exact source receipt and cutoff-bound rows, ready to combine with a catalog.
+
+    ``source_player_count`` counts parsed unique UIDs before scoping. Unmapped or
+    inactive source rows are omitted, while selected unknown values remain None.
+    This receipt records preparation, not source or model admission.
+    """
+
+    source: SourceRecord
+    cutoff: datetime
+    mappings: tuple[PlayerMapping, ...]
+    player_attributes: tuple[PlayerAttributes, ...]
+    source_player_count: int
+    contract_version: str = FM_SCOPED_ATTRIBUTES_VERSION
+
+
+def _active_mappings(
+    source: SourceRecord, cutoff: datetime, mappings: tuple[PlayerMapping, ...]
+) -> tuple[PlayerMapping, ...]:
+    if not isinstance(source, SourceRecord) or source.kind != "fm":
+        raise ValueError("Scoped FM attributes need an explicit FM source receipt.")
+    utc_time(cutoff, "FM scope cutoff")
+    source.available_at(cutoff)
+    if type(mappings) is not tuple or not mappings:
+        raise ValueError("Scoped FM attributes need immutable explicit player mappings.")
+    by_uid: dict[str, list[PlayerMapping]] = {}
+    active: dict[int, PlayerMapping] = {}
+    for mapping in mappings:
+        if not isinstance(mapping, PlayerMapping) or mapping.source_id != source.source_id:
+            raise ValueError("Every FM scope mapping must belong to the exact supplied source.")
+        if not _UID.fullmatch(mapping.source_player_id):
+            raise ValueError("FM scope mappings require canonical positive decimal UIDs.")
+        for previous in by_uid.setdefault(mapping.source_player_id, []):
+            if max(previous.valid_from, mapping.valid_from) <= min(
+                previous.valid_until, mapping.valid_until
+            ):
+                raise ValueError("FM scope mappings contain overlapping UID validity intervals.")
+        by_uid[mapping.source_player_id].append(mapping)
+        if mapping.valid_from <= cutoff <= mapping.valid_until:
+            if mapping.player_id in active:
+                raise ValueError("An active FPL person cannot have two FM UIDs in one source.")
+            active[mapping.player_id] = mapping
+    if not active:
+        raise ValueError("No supplied FM player mapping is active at the explicit cutoff.")
+    return tuple(sorted(active.values(), key=lambda item: int(item.source_player_id)))
+
+
+def read_scoped_fm_attributes(
+    payload: bytes,
+    *,
+    source: SourceRecord,
+    cutoff: datetime,
+    mappings: tuple[PlayerMapping, ...],
+    attributes: tuple[NumericAttributeSpec, ...],
+    attribute_columns: Mapping[str, str],
+    uid_column: str,
+    allow_unnamed_index: bool = False,
+) -> ScopedFMAttributes:
+    """Verify a complete export, then select exactly the active source UID mappings.
+
+    Scope and source clocks are checked before CSV decoding. The existing full
+    reader still validates the original-byte hash, every UID and selected trait
+    cell in every row. An unmapped malformed row cannot hide behind this filter.
+    Missing mapped UIDs refuse. The result carries just the active mappings, so
+    inactive attributes cannot leak into UnitInputCatalog through a wider export.
+    """
+    active = _active_mappings(source, cutoff, mappings)
+    parsed = read_fm_attributes(
+        payload,
+        source=source,
+        cutoff=cutoff,
+        attributes=attributes,
+        attribute_columns=attribute_columns,
+        uid_column=uid_column,
+        allow_unnamed_index=allow_unnamed_index,
+    )
+    by_uid = {item.source_player_id: item for item in parsed}
+    if any(mapping.source_player_id not in by_uid for mapping in active):
+        raise ValueError("An active FM scope mapping names a UID absent from the verified export.")
+    return ScopedFMAttributes(
+        source,
+        cutoff,
+        active,
+        tuple(by_uid[mapping.source_player_id] for mapping in active),
+        len(parsed),
+    )
