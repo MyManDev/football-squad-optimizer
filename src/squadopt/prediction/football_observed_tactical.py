@@ -292,6 +292,38 @@ def _verify(fitted: _Fitted) -> None:
         raise ValueError("Observed tactical fitted coefficients and metadata differ.")
 
 
+class ObservedTacticalOptimizationError(ValueError):
+    """Rejected optimizer output, with safe exact diagnostic declarations retained."""
+
+    def __init__(self, message: str, diagnostics: dict[str, object]):
+        super().__init__(message)
+        self.diagnostics = diagnostics
+
+
+def _optimizer_failure(
+    result: Any, raw: Array, *, head: str, max_iter: int, reason: str
+) -> ObservedTacticalOptimizationError:
+    values: dict[str, object] = {"head": head, "max_iter": max_iter, "reason": reason}
+    for name in ("status", "nit", "nfev"):
+        value = getattr(result, name, None)
+        values[name] = value if type(value) is int else None
+    success = getattr(result, "success", None)
+    values["success"] = bool(success) if isinstance(success, (bool, np.bool_)) else None
+    message, objective = getattr(result, "message", None), getattr(result, "fun", None)
+    values["message"] = message[:1024] if type(message) is str else None
+    values["reported_objective"] = (
+        float(objective)
+        if isinstance(objective, (float, np.floating)) and math.isfinite(float(objective))
+        else None
+    )
+    values["coefficient_dtype"] = str(raw.dtype)
+    values["coefficient_shape"] = tuple(int(n) for n in raw.shape)
+    values["coefficients_finite"] = (
+        bool(np.isfinite(raw).all()) if raw.dtype.kind in "fiu" else False
+    )
+    return ObservedTacticalOptimizationError(reason, values)
+
+
 def _optimize(
     objective: Callable[[Array], tuple[float, Array]], width: int, max_iter: int, head: str
 ) -> tuple[Array, TacticalOptimizerReceipt]:
@@ -304,7 +336,13 @@ def _optimize(
     )
     raw_coefficients = np.asarray(getattr(result, "x", ()))
     if raw_coefficients.dtype.kind not in "fiu":
-        raise ValueError("Observed tactical optimizer coefficients must be real numeric values.")
+        raise _optimizer_failure(
+            result,
+            raw_coefficients,
+            head=head,
+            max_iter=max_iter,
+            reason="Observed tactical optimizer coefficients must be real numeric values.",
+        )
     coefficients = raw_coefficients.astype(float, copy=False)
     if (
         not isinstance(getattr(result, "success", None), (bool, np.bool_))
@@ -318,10 +356,22 @@ def _optimize(
         or coefficients.shape != (width,)
         or not np.isfinite(coefficients).all()
     ):
-        raise ValueError("Observed tactical optimizer did not converge finitely.")
+        raise _optimizer_failure(
+            result,
+            raw_coefficients,
+            head=head,
+            max_iter=max_iter,
+            reason="Observed tactical optimizer did not converge finitely.",
+        )
     value, gradient = objective(coefficients)
     if not math.isfinite(value) or gradient.shape != (width,) or not np.isfinite(gradient).all():
-        raise ValueError("Observed tactical objective/gradient is not finite.")
+        raise _optimizer_failure(
+            result,
+            raw_coefficients,
+            head=head,
+            max_iter=max_iter,
+            reason="Observed tactical objective/gradient is not finite.",
+        )
     return _immutable(coefficients), TacticalOptimizerReceipt(
         head,
         "L-BFGS-B",
@@ -373,6 +423,190 @@ def _receipt(o: ObservedTacticalObservation) -> ObservedTacticalTrainingReceipt:
     )
 
 
+def _recipient_sides(
+    p: ObservedTacticalProjection,
+    *,
+    goal_transform: ObservedTacticalTransform,
+    assist_transform: ObservedTacticalTransform,
+    goal_events: int,
+    assist_events: int,
+    gammas: Mapping[str, Array],
+    control: bool,
+) -> tuple[ObservedTacticalRecipientSide, ObservedTacticalRecipientSide]:
+    """Shared exact conditional allocation, without a count head or training receipt."""
+    result = []
+    for i, side in enumerate((p.home, p.away)):
+        players = sorted(side.players, key=lambda x: x.profile.player_code)
+        heads = {}
+        for head, fraction, transform in (
+            ("goals", side.scored_fraction, goal_transform),
+            ("assists", side.scored_fraction * side.assist_fraction, assist_transform),
+        ):
+            if (
+                not control
+                and fraction > 0
+                and (goal_events if head == "goals" else assist_events) == 0
+            ):
+                raise ValueError("Observed tactical head has no historical credited-event support.")
+            shares = np.asarray(
+                [
+                    getattr(x, "native_goal_share" if head == "goals" else "native_assist_share")
+                    for x in players
+                ]
+            )
+            probabilities = (
+                shares
+                if control
+                else _recipient_probabilities(
+                    shares[None, :],
+                    transform.apply(
+                        [recipient_features(p, x, home=i == 0, head=head) for x in players]
+                    )[None, :, :],
+                    gammas[head],
+                )[0][0]
+            )
+            if (
+                probabilities.shape != shares.shape
+                or not np.isfinite(probabilities).all()
+                or np.any(probabilities < 0)
+                or np.any(probabilities > 1)
+                or np.any(probabilities[shares == 0] != 0)
+                or not math.isclose(math.fsum(probabilities), 1.0, rel_tol=1e-12, abs_tol=1e-12)
+            ):
+                raise ValueError("Observed tactical recipient shares violate support or mass.")
+            heads[head] = probabilities
+        allocated = []
+        for player, goals, assists in zip(players, heads["goals"], heads["assists"], strict=True):
+            physical_fraction = side.scored_fraction * (goals + side.assist_fraction * assists)
+            if physical_fraction > 1 and not math.isclose(
+                float(physical_fraction), 1.0, rel_tol=1e-12, abs_tol=1e-12
+            ):
+                raise ValueError("Observed tactical player G+A exceeds physical goal share.")
+            allocated.append(
+                ObservedTacticalRecipient(
+                    player.profile.player_code,
+                    side.club,
+                    player.profile.fpl_position,
+                    float(goals),
+                    float(assists),
+                )
+            )
+        result.append(ObservedTacticalRecipientSide(side.club, tuple(allocated)))
+    return result[0], result[1]
+
+
+def _validated_training(
+    observations: tuple[ObservedTacticalObservation, ...],
+    *,
+    cutoff: str,
+    target_season: str,
+    target_gameweek: int,
+    allowed_seasons: tuple[str, ...],
+    allow_released_2025_26: bool,
+) -> list[ObservedTacticalObservation]:
+    if type(observations) is not tuple or not observations:
+        raise ValueError("Observed tactical fit requires immutable nonempty observations.")
+    seen: set[tuple[str, int]] = set()
+    clocks: dict[tuple[str, int], datetime] = {}
+    for o in observations:
+        validate_header(
+            o,
+            cutoff=cutoff,
+            target_season=target_season,
+            target_gameweek=target_gameweek,
+            allowed_seasons=allowed_seasons,
+            allow_released_2025_26=allow_released_2025_26,
+        )
+        p = o.projection
+        if (p.season, p.fixture) in seen:
+            raise ValueError("Observed tactical training repeats a paired fixture.")
+        seen.add((p.season, p.fixture))
+        key, clock = (p.season, p.gameweek), instant(p.decision_at)
+        if key in clocks and clocks[key] != clock:
+            raise ValueError("Observed tactical historical GW requires one original decision.")
+        clocks[key] = clock
+    for o in observations:
+        validate_outcome(o)
+    return sorted(observations, key=lambda o: (o.projection.season, o.projection.fixture))
+
+
+def _fit_recipients(
+    ordered: Sequence[ObservedTacticalObservation],
+    *,
+    alpha: float,
+    max_iter: int,
+) -> tuple[
+    dict[str, ObservedTacticalTransform],
+    dict[str, Array],
+    dict[str, int],
+    list[TacticalOptimizerReceipt],
+]:
+    optimizers: list[TacticalOptimizerReceipt] = []
+    transforms, gammas, counts = {}, {}, {}
+    for head in HEADS:
+        feature_rows: list[dict[str, float | None]] = []
+        feature_weights: list[float] = []
+        bases, labels, sizes = [], [], []
+        for o in ordered:
+            credit = {c.player_code: getattr(c, head) for c in o.credits}
+            for home, side in ((True, o.projection.home), (False, o.projection.away)):
+                players = sorted(side.players, key=lambda p: p.profile.player_code)
+                shares = np.asarray(
+                    [
+                        getattr(
+                            p, "native_goal_share" if head == "goals" else "native_assist_share"
+                        )
+                        for p in players
+                    ]
+                )
+                feature_rows.extend(
+                    recipient_features(o.projection, p, home=home, head=head) for p in players
+                )
+                feature_weights.extend(float(s) / 2 for s in shares)
+                bases.append(shares)
+                labels.append(np.asarray([credit[p.profile.player_code] for p in players], float))
+                sizes.append(len(players))
+        rt = fit_transform(
+            feature_rows,
+            feature_weights,
+            weighting="one_paired_fixture_native_marginal_context_native_share_half_per_side_no_labels",
+        )
+        transformed = rt.apply(feature_rows)
+        groups, offset = [], 0
+        for shares, label, size in zip(bases, labels, sizes, strict=True):
+            if label.sum() > 0:
+                groups.append(
+                    _RecipientGroup(
+                        transformed[offset : offset + size][None, :, :],
+                        shares[None, :],
+                        np.ones(1),
+                        label,
+                    )
+                )
+            offset += size
+        transforms[head] = rt
+        counts[head] = sum(int(label.sum()) for label in labels)
+
+        def recipient_objective(
+            gamma: Array, fitting_groups: tuple[_RecipientGroup, ...] = tuple(groups)
+        ) -> tuple[float, Array]:
+            value, gradient = alpha * float(gamma @ gamma) / 2, alpha * gamma.copy()
+            for group in fitting_groups:
+                likelihood, score = _recipient_terms(group, gamma)
+                value -= likelihood
+                gradient += score
+            return value, gradient
+
+        if groups:
+            gammas[head], optimizer = _optimize(
+                recipient_objective, transformed.shape[1], max_iter, head
+            )
+            optimizers.append(optimizer)
+        else:
+            gammas[head] = _immutable(np.zeros(transformed.shape[1]))
+    return transforms, gammas, counts, optimizers
+
+
 class ObservedTacticalModel:
     """Learn only the distinct declared observed-source effects, never missing facts."""
 
@@ -420,30 +654,14 @@ class ObservedTacticalModel:
         allowed_seasons: tuple[str, ...],
         allow_released_2025_26: bool = False,
     ) -> ObservedTacticalModel:
-        if type(observations) is not tuple or not observations:
-            raise ValueError("Observed tactical fit requires immutable nonempty observations.")
-        seen: set[tuple[str, int]] = set()
-        clocks: dict[tuple[str, int], datetime] = {}
-        for o in observations:
-            validate_header(
-                o,
-                cutoff=cutoff,
-                target_season=target_season,
-                target_gameweek=target_gameweek,
-                allowed_seasons=allowed_seasons,
-                allow_released_2025_26=allow_released_2025_26,
-            )
-            p = o.projection
-            if (p.season, p.fixture) in seen:
-                raise ValueError("Observed tactical training repeats a paired fixture.")
-            seen.add((p.season, p.fixture))
-            key, clock = (p.season, p.gameweek), instant(p.decision_at)
-            if key in clocks and clocks[key] != clock:
-                raise ValueError("Observed tactical historical GW requires one original decision.")
-            clocks[key] = clock
-        for o in observations:
-            validate_outcome(o)
-        ordered = sorted(observations, key=lambda o: (o.projection.season, o.projection.fixture))
+        ordered = _validated_training(
+            observations,
+            cutoff=cutoff,
+            target_season=target_season,
+            target_gameweek=target_gameweek,
+            allowed_seasons=allowed_seasons,
+            allow_released_2025_26=allow_released_2025_26,
+        )
         raw = [team_features(o.projection, home=home) for o in ordered for home in (True, False)]
         transform = fit_transform(
             raw,
@@ -474,70 +692,12 @@ class ObservedTacticalModel:
             pair_objective, matrix.shape[1], self._max_iter, "physical_pair"
         )
         optimizers = [optimizer]
-        transforms, gammas, counts = {}, {}, {}
-        for head in HEADS:
-            feature_rows: list[dict[str, float | None]] = []
-            feature_weights: list[float] = []
-            bases, labels, sizes = [], [], []
-            for o in ordered:
-                credit = {c.player_code: getattr(c, head) for c in o.credits}
-                for home, side in ((True, o.projection.home), (False, o.projection.away)):
-                    players = sorted(side.players, key=lambda p: p.profile.player_code)
-                    shares = np.asarray(
-                        [
-                            getattr(
-                                p, "native_goal_share" if head == "goals" else "native_assist_share"
-                            )
-                            for p in players
-                        ]
-                    )
-                    feature_rows.extend(
-                        recipient_features(o.projection, p, home=home, head=head) for p in players
-                    )
-                    feature_weights.extend(float(s) / 2 for s in shares)
-                    bases.append(shares)
-                    labels.append(
-                        np.asarray([credit[p.profile.player_code] for p in players], float)
-                    )
-                    sizes.append(len(players))
-            rt = fit_transform(
-                feature_rows,
-                feature_weights,
-                weighting="one_paired_fixture_native_marginal_context_native_share_half_per_side_no_labels",
-            )
-            transformed = rt.apply(feature_rows)
-            groups, offset = [], 0
-            for shares, label, size in zip(bases, labels, sizes, strict=True):
-                if label.sum() > 0:
-                    groups.append(
-                        _RecipientGroup(
-                            transformed[offset : offset + size][None, :, :],
-                            shares[None, :],
-                            np.ones(1),
-                            label,
-                        )
-                    )
-                offset += size
-            transforms[head] = rt
-            counts[head] = sum(int(label.sum()) for label in labels)
-
-            def recipient_objective(
-                gamma: Array, fitting_groups: tuple[_RecipientGroup, ...] = tuple(groups)
-            ) -> tuple[float, Array]:
-                value, gradient = alpha * float(gamma @ gamma) / 2, alpha * gamma.copy()
-                for group in fitting_groups:
-                    likelihood, score = _recipient_terms(group, gamma)
-                    value -= likelihood
-                    gradient += score
-                return value, gradient
-
-            if groups:
-                gammas[head], optimizer = _optimize(
-                    recipient_objective, transformed.shape[1], self._max_iter, head
-                )
-                optimizers.append(optimizer)
-            else:
-                gammas[head] = _immutable(np.zeros(transformed.shape[1]))
+        transforms, gammas, counts, recipient_optimizers = _fit_recipients(
+            ordered,
+            alpha=alpha,
+            max_iter=self._max_iter,
+        )
+        optimizers.extend(recipient_optimizers)
         metadata = ObservedTacticalMetadata(
             MODEL_VERSION,
             FEATURE_VERSION,
@@ -593,70 +753,15 @@ class ObservedTacticalModel:
         """Apply only conditional recipient heads, without evaluating the paired-rate head."""
         fitted = self._serving_context(p, control)
         m = fitted.metadata
-        result = []
-        for i, side in enumerate((p.home, p.away)):
-            players = sorted(side.players, key=lambda x: x.profile.player_code)
-            heads = {}
-            for head, fraction, transform in (
-                ("goals", side.scored_fraction, m.goal_transform),
-                ("assists", side.scored_fraction * side.assist_fraction, m.assist_transform),
-            ):
-                if (
-                    not control
-                    and fraction > 0
-                    and (m.goal_events if head == "goals" else m.assist_events) == 0
-                ):
-                    raise ValueError(
-                        "Observed tactical head has no historical credited-event support."
-                    )
-                shares = np.asarray(
-                    [
-                        getattr(
-                            x, "native_goal_share" if head == "goals" else "native_assist_share"
-                        )
-                        for x in players
-                    ]
-                )
-                probabilities = (
-                    shares
-                    if control
-                    else _recipient_probabilities(
-                        shares[None, :],
-                        transform.apply(
-                            [recipient_features(p, x, home=i == 0, head=head) for x in players]
-                        )[None, :, :],
-                        fitted.gammas[head],
-                    )[0][0]
-                )
-                if (
-                    probabilities.shape != shares.shape
-                    or not np.isfinite(probabilities).all()
-                    or np.any(probabilities < 0)
-                    or np.any(probabilities > 1)
-                    or np.any(probabilities[shares == 0] != 0)
-                    or not math.isclose(math.fsum(probabilities), 1.0, rel_tol=1e-12, abs_tol=1e-12)
-                ):
-                    raise ValueError("Observed tactical recipient shares violate support or mass.")
-                heads[head] = probabilities
-            allocated = []
-            for player, goals, assists in zip(
-                players, heads["goals"], heads["assists"], strict=True
-            ):
-                physical_fraction = side.scored_fraction * (goals + side.assist_fraction * assists)
-                if physical_fraction > 1 and not math.isclose(
-                    float(physical_fraction), 1.0, rel_tol=1e-12, abs_tol=1e-12
-                ):
-                    raise ValueError("Observed tactical player G+A exceeds physical goal share.")
-                allocated.append(
-                    ObservedTacticalRecipient(
-                        player.profile.player_code,
-                        side.club,
-                        player.profile.fpl_position,
-                        float(goals),
-                        float(assists),
-                    )
-                )
-            result.append(ObservedTacticalRecipientSide(side.club, tuple(allocated)))
+        result = _recipient_sides(
+            p,
+            goal_transform=m.goal_transform,
+            assist_transform=m.assist_transform,
+            goal_events=m.goal_events,
+            assist_events=m.assist_events,
+            gammas=fitted.gammas,
+            control=control,
+        )
         return ObservedTacticalRecipientAllocation(
             result[0],
             result[1],
