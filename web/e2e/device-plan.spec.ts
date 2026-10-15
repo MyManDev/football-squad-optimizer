@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page, type TestInfo } from "@playwright/test";
 
 import { chipPath } from "../src/features/league/advice/chipChoice";
 import fixture from "../src/fixtures/device-plan/instances.json" with { type: "json" };
@@ -17,6 +17,41 @@ import { installLeagueMocks } from "./leagueMocks";
 // instance is the parity fixture's, so the answer on screen is the server's.
 const ENTRY = 35249001;
 const member = fixture.members[2]!;
+
+/**
+ * One JSON line on stdout after each test, every one of which finishes a device run (#981
+ * step 4): the run's `device:*` measures from the page, an empty list where it kept none,
+ * and the wasm's fetch from the worker's own timeline, or null where no worker can be read.
+ * It asserts nothing.
+ */
+async function printDeviceTimings(page: Page, testInfo: TestInfo): Promise<void> {
+  const measures = await page
+    .evaluate(() =>
+      performance
+        .getEntriesByType("measure")
+        .filter((entry) => entry.name.startsWith("device:"))
+        .map(({ name, startTime, duration }) => ({ name, startTime, duration })),
+    )
+    .catch(() => []);
+  let wasm: Record<string, number> | null = null;
+  for (const worker of page.workers()) {
+    wasm ??= await worker
+      .evaluate(() => {
+        const resources = performance.getEntriesByType("resource") as PerformanceResourceTiming[];
+        const entry = resources.find((resource) => resource.name.endsWith(".wasm"));
+        if (!entry) return null;
+        const { transferSize, encodedBodySize, decodedBodySize, duration } = entry;
+        return { transferSize, encodedBodySize, decodedBodySize, duration };
+      })
+      .catch(() => null);
+  }
+  const { project, title, retry } = testInfo;
+  console.log(JSON.stringify({ project: project.name, title, retry, measures, wasm }));
+}
+
+test.afterEach(async ({ page }, testInfo) => {
+  await printDeviceTimings(page, testInfo);
+});
 
 test("a member's plan is solved on the device and drawn as a computation result", async ({
   page,

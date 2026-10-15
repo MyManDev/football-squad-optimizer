@@ -9,7 +9,8 @@
  * document the page already reads. A new selection starts clean, and a reset or a new
  * selection stops a solve still running: its worker is ended, not left computing an
  * answer nobody will read. A worker that does not answer within the solve's ceiling, and
- * a grace beyond it, is ended too and the run fails.
+ * a grace beyond it, is ended too and the run fails. Each run leaves User Timing marks and
+ * measures of its stages (`DeviceTimeline`); the device spec prints the measures.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -81,6 +82,22 @@ export interface DevicePlanDependencies {
   /** Timers, for tests; the page's own otherwise. */
   setTimer?: (callback: () => void, milliseconds: number) => unknown;
   clearTimer?: (handle: unknown) => void;
+  /** Where a run leaves its marks and measures, for tests; the page's own otherwise. */
+  timeline?: DeviceTimeline;
+}
+
+/**
+ * User Timing, as a run writes it. A run marks, as far as it gets, the press, its inputs
+ * read, its request posted, the worker ready and the reply (`answer`, `refused` or
+ * `failed`, as a watchdog or a worker error also ends it), each mark named for the run
+ * (`device:<n>:press`). A run that ends before it posts its request, or that a reset or a
+ * new selection ends, has no reply mark. It measures `device:inputs` (press to inputs),
+ * `device:load` (posted to ready) and `device:solve` (ready to reply) between its own marks.
+ */
+export interface DeviceTimeline {
+  mark(name: string): void;
+  /** A measure from the mark named `start` to the mark named `end`. */
+  measure(name: string, start: string, end: string): void;
 }
 
 // Module-level, so the hook's callbacks keep one identity from render to render.
@@ -90,6 +107,38 @@ function startTimer(callback: () => void, milliseconds: number): unknown {
 
 function stopTimer(handle: unknown): void {
   clearTimeout(handle as ReturnType<typeof setTimeout>);
+}
+
+// The page's own User Timing; a browser without it keeps no marks.
+const pageTimeline: DeviceTimeline = {
+  mark(name) {
+    globalThis.performance?.mark?.(name);
+  },
+  measure(name, start, end) {
+    globalThis.performance?.measure?.(name, start, end);
+  },
+};
+
+// Runs are numbered across the page, not by a hook's generation, so a page that mounts
+// the hook again never names two runs' marks alike.
+let runsMarked = 0;
+
+/** A new run's marks and measures. A timeline that throws loses that write, never the run. */
+function runTimeline(timeline: DeviceTimeline) {
+  const run = ++runsMarked;
+  const named = (point: string) => `device:${run}:${point}`;
+  const quietly = (write: () => void) => {
+    try {
+      write();
+    } catch {
+      // The run goes on unmarked.
+    }
+  };
+  return {
+    mark: (point: string) => quietly(() => timeline.mark(named(point))),
+    measure: (name: string, from: string, to: string) =>
+      quietly(() => timeline.measure(`device:${name}`, named(from), named(to))),
+  };
 }
 
 function createWorker(): DeviceSolver {
@@ -122,6 +171,7 @@ export function useDevicePlan(
     now = () => new Date(),
     setTimer = startTimer,
     clearTimer = stopTimer,
+    timeline = pageTimeline,
   } = dependencies;
   const entry: DevicePlanEntry | null = isDevicePlanEntry(squad.device_plan)
     ? squad.device_plan
@@ -223,6 +273,8 @@ export function useDevicePlan(
     const run = ++generation.current;
     inFlight.current = run;
     const alive = () => generation.current === run;
+    const timing = runTimeline(timeline);
+    timing.mark("press");
     setState({ phase: "loading" });
     void (async () => {
       let document: DevicePlanDocument;
@@ -259,6 +311,8 @@ export function useDevicePlan(
         return;
       }
       if (!alive()) return;
+      timing.mark("inputs");
+      timing.measure("inputs", "press", "inputs");
       // The inputs are held to the capture on screen exactly as a published plan is.
       if (document.source_snapshot_id !== squad.source_snapshot_id) {
         setState({ phase: "other-capture" });
@@ -275,6 +329,8 @@ export function useDevicePlan(
         setState({ phase: "failed" });
         return;
       }
+      // Whether the worker said it was ready: only then is there a solve to measure.
+      let ready = false;
       const reply = await new Promise<DevicePlanReply | null>((resolve) => {
         // A worker that never answers is ended: the load gets its allowance, and the
         // solves their ceiling, each with a grace beyond it.
@@ -296,6 +352,9 @@ export function useDevicePlan(
         worker.onmessage = (event) => {
           if (event.data.id !== run) return;
           if (event.data.kind === "ready") {
+            ready = true;
+            timing.mark("ready");
+            timing.measure("load", "posted", "ready");
             if (pending.current?.settle === settle) {
               clearTimer(pending.current.timer);
               pending.current.timer = watch(DEVICE_SOLVE_CEILING_SECONDS);
@@ -310,6 +369,7 @@ export function useDevicePlan(
           solver.current = null;
           settle(null);
         };
+        timing.mark("posted");
         try {
           worker.postMessage({
             id: run,
@@ -324,6 +384,9 @@ export function useDevicePlan(
         }
       });
       if (!alive()) return;
+      const ending = reply === null || reply.kind === "ready" ? "failed" : reply.kind;
+      timing.mark(ending);
+      if (ready) timing.measure("solve", "ready", ending);
       if (reply === null || reply.kind === "failed" || reply.kind === "ready") {
         setState({ phase: "failed" });
       } else if (reply.kind === "refused") {
@@ -356,6 +419,7 @@ export function useDevicePlan(
     squad,
     setTimer,
     clearTimer,
+    timeline,
     stopSolving,
     tree.league.leagueId,
   ]);
