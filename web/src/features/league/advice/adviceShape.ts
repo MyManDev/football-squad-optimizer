@@ -34,6 +34,7 @@ const predictionModel: Predicate = (value) =>
       "football_match_context_v1",
       "football_joint_role_minutes_v1",
       "football_joint_role_retained_history_v1",
+      "football_joint_role_retained_flags_v1",
       "football_team_form_v1",
     ),
     experimental: oneOf(true),
@@ -269,6 +270,7 @@ const roleForecast: Predicate = (value) =>
     model_version: oneOf(
       "football_joint_role_minutes_v1",
       "football_joint_role_retained_history_v1",
+      "football_joint_role_retained_flags_v1",
     ),
     calibration: oneOf("not_independently_verified"),
     scope: oneOf("current_gameweek_fixtures"),

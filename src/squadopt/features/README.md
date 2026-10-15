@@ -7,7 +7,7 @@ models. Every time-dependent aggregation of the feature builder passes through o
 shifted-rolling primitive, so the timing rule has one implementation. Its callers are `prediction`, `live`, `application`, `platform`,
 the laboratory and the scripts.
 
-Its 21 Python files sit in one folder. This page places every one of them in exactly one
+Its 22 Python files sit in one folder. This page places every one of them in exactly one
 family.
 
 Review: İbrahim, the data side ([ownership](../../../docs/architecture/ownership.md)).
@@ -60,15 +60,16 @@ that check them before a row is returned.
 
 ## Inputs of the private football models
 
-Each private model of the football lane in [`squadopt.prediction`](../prediction/README.md)
-reads its inputs from here. Outside this package, the first six are imported only by their
-model in `prediction` and its `football_*_experiment` module in
-[`squadopt.experiments`](../experiments/README.md); the last two parse private bytes for the
-club-unit experiment and are called only by tests today.
+The football models in [`squadopt.prediction`](../prediction/README.md) read these inputs.
+The retained flag adapter also supplies the optional live producer
+(`src/squadopt/application/football_live.py:582`). The other five families retain their private
+`football_*_experiment` callers in [`squadopt.experiments`](../experiments/README.md);
+the last two modules parse private bytes for the club-unit experiment.
 
 | Module | What it does |
 | --- | --- |
 | `football_flag_inputs.py` | Captured flag facts and supplied pre-decision native minute supports (`football_flag_week_input_v1`); no reader touches a network, a file or an outcome it was not given. |
+| `football_flag_captures.py` | Binds original retained FPL flags and explicit settled start/minute labels to causal native supports (`retained_fpl_flag_inputs_v1`), keeping reconstructed decisions distinct from live forecasts (`src/squadopt/features/football_flag_captures.py:96`, `src/squadopt/features/football_flag_captures.py:201`). |
 | `football_load_inputs.py` | Immutable all-competition workload and native-law source contracts (`football_load_week_input_v1`). |
 | `football_phase_inputs.py` | Causal inputs for phase-specific credited goal and assist allocation (`football_phase_inputs_v1`). |
 | `football_score_state_inputs.py` | Strict score-process inputs (`football_score_fixture_input_v1`); a receipt assertion does not admit real data. |
