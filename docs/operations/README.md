@@ -30,6 +30,7 @@
 | Fit exact physical unit exposures with a separate causal duration forecast (`src/squadopt/features/football_unit_inputs.py:343`, `src/squadopt/prediction/football_unit_strength.py:334`) | [Unit physical exposure](football_unit_physical.md) |
 | Fit raw player residuals with shared FM context and explicit exposure pooling (`src/squadopt/prediction/football_unit_strength.py:342`) | [Unit player residual pooling](football_unit_pooled_identity.md) |
 | Export and read compact pooled v4 unit parameters with a distinct inference receipt (`src/squadopt/prediction/football_unit_serving.py:394`, `src/squadopt/prediction/football_unit_serving.py:470`) | [Compact unit inference](football_unit_serving.md) |
+| Compose one complete fixture from final minute marginals and current compact family models (`src/squadopt/prediction/football_composite_core.py:597`) | [Composite fixture inference](football_composite_core.md) |
 | Prepare a historical score training record with declared source clocks and explicit released-season opt-in (`src/squadopt/features/football_score_replay.py:120`) | [Score replay contract](football_score_replay.md) |
 | Inspect the separately certified bounded fallback for a score fit (`src/squadopt/prediction/football_score_state.py:296`) | [Score solver receipt](football_score_solver.md) |
 | Inspect the explicit forecast-clock approximation for native player intervals (`src/squadopt/features/football_score_projection.py:173`) | [Score interval projection](football_score_projection.md) |
