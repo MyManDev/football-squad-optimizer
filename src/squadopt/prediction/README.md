@@ -7,7 +7,7 @@ measures against the control, and the models of the experimental football lane. 
 are `live`, `scenarios` and `evaluation` in the domain ring, `application`, `platform`, the
 laboratory and the scripts.
 
-Its 35 Python files sit in one folder. This page places every one of them in exactly one
+Its 37 Python files sit in one folder. This page places every one of them in exactly one
 family.
 
 Review: İbrahim, the data side ([ownership](../../../docs/architecture/ownership.md)). Within 24
@@ -118,6 +118,7 @@ The following standalone model has its own source contract:
 | Module | What it does |
 | --- | --- |
 | `football_observed_load.py` | Observed non-PL reported-record tilt of the whole native weekly law, with distinct missing-value features and no product caller (`src/squadopt/prediction/football_observed_load.py:295`). |
+| `football_joint_week_law.py` | Pure whole-week flag/LOAD transport and explicit evidence interventions with immutable joint support and lineage (`src/squadopt/prediction/football_joint_week_law.py:37`). |
 
 ## Package surface
 
