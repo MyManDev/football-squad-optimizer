@@ -572,6 +572,20 @@ mistaken for a backend release; see [backend hosting](backend_free_hosting.md).
 The readiness field `league_tree_matches_capture` checks season and gameweek only;
 the release restart command separately checks the public/local capture IDs.
 
+## From the planner, on the PC
+
+Since 2026-10-15 the advice backend runs on a VM and the owner's PC runs only the weekly
+runs, started from his planner's Start button. The button runs
+`scripts\weekly_run_friday.ps1` (the decision run) or `scripts\weekly_run_tuesday.ps1`
+(the next gameweek's run carrying the settled week), which read the open gameweek from the
+published fixtures document, refuse a dirty checkout, a checkout off `develop` or a run in
+progress, fast-forward `develop` and run the weekly command above with the cadence's
+arguments, writing everything to `data\logs\weekly\<run id>.log`. The script ends with the
+site pull request, the exact `ship.sh` line with the first unused tag under the naming rule,
+and the VM sync (`bash scripts/vm_push.sh <tag>`) that follows the release. `-DryRun`
+prints the plan and runs nothing. The release, the restart and the sync remain a person's
+acts, as below.
+
 ## What stays a person's act
 
 The owner runs the Tuesday settle and the Friday publish through GW20 (deadline
