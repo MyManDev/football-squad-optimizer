@@ -212,6 +212,7 @@ it.each([
   "football_joint_role_minutes_v1",
   "football_joint_role_retained_history_v1",
   "football_joint_role_retained_flags_v1",
+  "football_composite_v1",
 ] as const)("reads the same restricted role explanation for %s", (version) => {
   const view = example();
   view.role_forecast!.model_version = version;

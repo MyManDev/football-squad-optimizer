@@ -462,7 +462,8 @@ export interface EntryAdvice {
     model_version:
       | "football_joint_role_minutes_v1"
       | "football_joint_role_retained_history_v1"
-      | "football_joint_role_retained_flags_v1";
+      | "football_joint_role_retained_flags_v1"
+      | "football_composite_v1";
     calibration: "not_independently_verified";
     scope: "current_gameweek_fixtures";
     rows: {
