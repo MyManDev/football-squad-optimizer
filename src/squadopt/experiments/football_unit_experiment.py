@@ -12,21 +12,58 @@ import json
 import math
 import re
 from collections.abc import Mapping, Sequence
-from datetime import datetime
+from dataclasses import fields
+from datetime import datetime, timedelta
 from numbers import Integral, Real
 from types import MappingProxyType
+from typing import Any
 
 import numpy as np
 import pandas as pd
 from numpy.typing import ArrayLike
 
-from squadopt.features.football_unit_inputs import UNIT_INPUT_VERSION
+from squadopt.features.football_unit_inputs import (
+    UNIT_INPUT_VERSION,
+    UNIT_PHYSICAL_CLOCK_VERSION,
+    UNIT_PREFIX_CLOCK_VERSION,
+    NumericAttributeSpec,
+    SourceRecord,
+    UnitExposureClock,
+    UnitHistoricalReplay,
+    UnitPhysicalExposureClock,
+    scope,
+    utc_time,
+    validate_physical_partition,
+)
 from squadopt.live.minute_evidence import COMPONENT_COLUMNS, IDENTITY_COLUMNS, _validate_components
 from squadopt.prediction.football import FOOTBALL_MODEL_VERSION
 from squadopt.prediction.football_unit_strength import (
+    UNIT_ALL_UNOBSERVED_SEMANTICS,
     UNIT_FEATURE_VERSION,
     UNIT_MODEL_VERSION,
+    UNIT_PHYSICAL_EXPOSURE_POLICY,
+    UNIT_PHYSICAL_FIT_VERSION,
+    UNIT_PHYSICAL_MODEL_VERSION,
+    UNIT_PHYSICAL_OFFSET,
+    UNIT_PHYSICAL_PROJECTION,
+    UNIT_PHYSICAL_SELECTION,
+    UNIT_PHYSICAL_SEMANTICS,
+    UNIT_POOLED_FEATURE_VERSION,
+    UNIT_POOLED_IDENTITY_POLICY,
+    UNIT_POOLED_MODEL_VERSION,
+    UNIT_POOLED_OBJECTIVE,
+    UNIT_POOLED_PRIOR,
+    UNIT_POOLED_SCALING,
+    UNIT_REPLAY_FIT_VERSION,
+    UNIT_RESIDUAL_MISSINGNESS_SEMANTICS,
+    UNIT_SOURCE_MISSINGNESS_FEATURE_VERSION,
+    UNIT_SOURCE_MISSINGNESS_MODEL_VERSION,
+    UNIT_SOURCE_MISSINGNESS_POLICY,
     UnitStrengthResult,
+    pooled_feature_columns,
+    pooled_identity_columns,
+    source_attribute_groups,
+    source_missingness_base_columns,
 )
 from squadopt.scenarios.expected_lineup import ExpectedLineupSearchResult, improve_expected_lineup
 
@@ -51,18 +88,409 @@ def _same(actual: ArrayLike, expected: ArrayLike) -> None:
         raise ValueError("Unit experiment receipts do not match their retained component basis.")
 
 
+def _replay_fit_receipts(
+    metadata: Mapping[str, object],
+    training_cutoff: datetime,
+    sources: tuple[Any, ...],
+    *,
+    target_season: str,
+    target_gameweek: int,
+) -> None:
+    contract = metadata.get("fit_contract")
+    physical = contract == UNIT_PHYSICAL_FIT_VERSION
+    replay_keys = {
+        "training_exposure_clock",
+        "training_selection",
+        "training_replay_receipts",
+        "training_exposure_receipts",
+        "exposure_semantics",
+        "projection_extrapolation",
+        "fm_game_vintage",
+        "fm_effective_semantics",
+    }
+    if contract is None:
+        if (replay_keys | {"allow_released_2025_26", "exposure_policy"}) & metadata.keys():
+            raise ValueError("Replay evidence requires its explicit fitting contract.")
+        return
+    released = metadata.get("allow_released_2025_26")
+    if type(released) is not bool:
+        raise ValueError("Unit result requires its explicit released-season policy.")
+    if contract == "football_unit_explicit_release_fit_v1":
+        if released is not True or (replay_keys | {"exposure_policy"}) & metadata.keys():
+            raise ValueError("Explicit release contract has inconsistent replay evidence.")
+        return
+    if (
+        contract not in (UNIT_REPLAY_FIT_VERSION, UNIT_PHYSICAL_FIT_VERSION)
+        or metadata.get("training_exposure_clock")
+        != (UNIT_PHYSICAL_CLOCK_VERSION if physical else UNIT_PREFIX_CLOCK_VERSION)
+        or metadata.get("fm_game_vintage") != "unknown"
+        or not replay_keys <= metadata.keys()
+    ):
+        raise ValueError("Unit result requires its declared replay and observed clock contract.")
+    if physical:
+        if any(
+            metadata.get(key) != value
+            for key, value in {
+                "exposure_policy": UNIT_PHYSICAL_EXPOSURE_POLICY,
+                "offset": UNIT_PHYSICAL_OFFSET,
+                "training_selection": UNIT_PHYSICAL_SELECTION,
+                "exposure_semantics": UNIT_PHYSICAL_SEMANTICS,
+                "projection_extrapolation": UNIT_PHYSICAL_PROJECTION,
+            }.items()
+        ):
+            raise ValueError(
+                "Physical unit fitting requires its exact exposure and duration policy."
+            )
+    elif "exposure_policy" in metadata:
+        raise ValueError("Reported-prefix results cannot claim a physical exposure policy.")
+    replays, exposures = (
+        metadata.get("training_replay_receipts"),
+        metadata.get("training_exposure_receipts"),
+    )
+    if (
+        not isinstance(replays, tuple)
+        or not isinstance(exposures, tuple)
+        or not replays
+        or len(replays) != len(exposures)
+        or len(replays) != len(sources)
+        or metadata.get("training_rows") != 2 * len(replays)
+    ):
+        raise ValueError(
+            "Unit replay result requires one source and exposure receipt per interval."
+        )
+
+    def pairs(items: list[tuple[str, Any]]) -> dict[str, Any]:
+        if len(dict(items)) != len(items):
+            raise ValueError("Duplicate replay receipt fields are refused.")
+        return dict(items)
+
+    def document(value: object) -> dict[str, Any]:
+        if not isinstance(value, str):
+            raise ValueError("Unit replay receipt must be immutable JSON text.")
+        parsed = json.loads(value, object_pairs_hook=pairs)
+        if not isinstance(parsed, dict):
+            raise ValueError("Unit replay receipt must be an object.")
+        return parsed
+
+    def instant(value: Any) -> datetime:
+        return utc_time(datetime.fromisoformat(value), "replay receipt time")
+
+    seen = set()
+    spans: dict[tuple[str, int], list[tuple[float, float]]] = {}
+    week_cutoffs: dict[tuple[str, int], datetime] = {}
+    fixture_bases: dict[tuple[str, int], tuple[object, ...]] = {}
+    physical_spans: dict[tuple[str, int], list[tuple[int, int]]] = {}
+    physical_totals: dict[tuple[str, int], int] = {}
+    try:
+        for replay_text, exposure_text, group in zip(replays, exposures, sources, strict=True):
+            envelope, exposure = document(replay_text), document(exposure_text)
+            if set(envelope) != {
+                "replay",
+                "decision_cutoff",
+                "baseline_source_id",
+                "reference_source_id",
+            }:
+                raise ValueError("Unit replay envelope fields are invalid.")
+            raw = envelope["replay"]
+            replay = UnitHistoricalReplay(
+                **{
+                    **raw,
+                    **{
+                        key: instant(raw[key])
+                        for key in (
+                            "recorded_at",
+                            "retrieved_at",
+                            "feature_cutoff",
+                            "latest_history_kickoff",
+                            "generated_at",
+                        )
+                    },
+                    "source_hashes": tuple(tuple(item) for item in raw["source_hashes"]),
+                }
+            )
+            records = {
+                row[0]: SourceRecord(
+                    row[0],
+                    row[1],
+                    row[3],
+                    row[2],
+                    row[4],
+                    instant(row[5]),
+                    instant(row[6]),
+                    instant(row[7]),
+                    instant(row[8]),
+                    row[9],
+                    True,
+                )
+                for row in group
+            }
+            decision = instant(envelope["decision_cutoff"])
+            replay.validate_sources(
+                records,
+                decision=decision,
+                baseline_source_id=envelope["baseline_source_id"],
+                reference_source_id=envelope["reference_source_id"],
+            )
+            if replay.generated_at >= training_cutoff:
+                raise ValueError("Replayed features were generated after fitting.")
+            if set(exposure) != {
+                "clock",
+                "season",
+                "gameweek",
+                "fixture_id",
+                "start_minute",
+                "minutes",
+                "kickoff",
+                "outcome_source",
+                "outcome_available_at",
+            }:
+                raise ValueError("Unit exposure envelope fields are invalid.")
+            clock: UnitExposureClock | UnitPhysicalExposureClock
+            if physical:
+                raw_clock = exposure["clock"]
+                if not isinstance(raw_clock, dict) or set(raw_clock) != {
+                    field.name for field in fields(UnitPhysicalExposureClock)
+                }:
+                    raise ValueError(
+                        "Physical exposure receipt requires every declared clock field."
+                    )
+                clock = UnitPhysicalExposureClock(
+                    **{
+                        **raw_clock,
+                        **{
+                            key: instant(raw_clock[key])
+                            for key in (
+                                "feature_cutoff",
+                                "latest_history_settlement_bound",
+                                "duration_source_captured_at",
+                                "generated_at",
+                            )
+                        },
+                        "history_fixtures": tuple(
+                            tuple(item) for item in raw_clock["history_fixtures"]
+                        ),
+                    }
+                )
+                clock.validate_replay(
+                    replay,
+                    season=exposure["season"],
+                    gameweek=exposure["gameweek"],
+                    fixture_id=exposure["fixture_id"],
+                )
+            else:
+                clock = UnitExposureClock(**exposure["clock"])
+            source_raw = exposure["outcome_source"]
+            source = SourceRecord(
+                **{
+                    **source_raw,
+                    **{
+                        key: instant(source_raw[key])
+                        for key in ("published_at", "captured_at", "effective_at", "valid_until")
+                    },
+                }
+            )
+            available, kickoff = (
+                instant(exposure["outcome_available_at"]),
+                instant(exposure["kickoff"]),
+            )
+            source.available_at(available)
+            start, minutes = _finite(exposure["start_minute"]), _finite(exposure["minutes"])
+            scope(exposure["season"], exposure["gameweek"], exposure["fixture_id"])
+            season, gameweek = exposure["season"], exposure["gameweek"]
+            identity = clock.source_sha256, clock.interval_id
+            bad_span = (
+                start != clock.start_seconds / 60
+                or minutes != (clock.end_seconds - clock.start_seconds) / 60
+                if isinstance(clock, UnitPhysicalExposureClock)
+                else not start.is_integer()
+                or not minutes.is_integer()
+                or start < 0
+                or minutes <= 0
+                or start + minutes > 40
+            )
+            if (
+                clock.source_sha256 != source.sha256
+                or identity in seen
+                or bad_span
+                or not decision < kickoff
+                or available < kickoff + timedelta(hours=3)
+                or available >= training_cutoff
+                or (exposure["season"] == "2025-26" and released is not True)
+                or season > target_season
+                or (season == target_season and gameweek >= target_gameweek)
+            ):
+                raise ValueError(
+                    "Unit result exposure disagrees with its source or fitting policy."
+                )
+            seen.add(identity)
+            week_key = season, gameweek
+            if week_cutoffs.setdefault(week_key, decision) != decision:
+                raise ValueError(
+                    "Unit replay fixtures in one gameweek require one decision cutoff."
+                )
+            fixture_key = season, exposure["fixture_id"]
+            basis: tuple[object, ...] = (gameweek, decision, kickoff, replay_text, group)
+            if isinstance(clock, UnitPhysicalExposureClock):
+                basis += (clock.fixture_basis(),)
+                physical_spans.setdefault(fixture_key, []).append(
+                    (clock.start_seconds, clock.end_seconds)
+                )
+                physical_totals[fixture_key] = clock.actual_duration_seconds
+            if fixture_bases.setdefault(fixture_key, basis) != basis:
+                raise ValueError("Unit replay fixture intervals must retain one historical basis.")
+            end = start + minutes
+            if isinstance(clock, UnitPhysicalExposureClock):
+                start, end = clock.start_seconds, clock.end_seconds
+            for previous in spans.setdefault(fixture_key, []):
+                if max(start, previous[0]) < min(end, previous[1]):
+                    raise ValueError("Unit replay exposure intervals overlap.")
+            spans[fixture_key].append((start, end))
+        for key, segments in physical_spans.items():
+            validate_physical_partition(segments, physical_totals[key])
+    except (KeyError, TypeError, AttributeError, OverflowError) as error:
+        raise ValueError("Malformed unit replay or exposure receipt.") from error
+
+
+def _missingness_feature_receipt(result: UnitStrengthResult) -> None:
+    metadata = result.metadata
+    keys = {
+        "missingness_policy",
+        "source_attribute_groups",
+        "all_unobserved_semantics",
+        "residual_missingness_semantics",
+    }
+    if result.model_version == UNIT_MODEL_VERSION:
+        if (
+            metadata.get("feature_version") != UNIT_FEATURE_VERSION
+            or keys & metadata.keys()
+            or any(name.endswith(":all_attributes_unobserved") for name in result.feature_contract)
+        ):
+            raise ValueError("Legacy unit results cannot claim source missingness features.")
+        return
+    if (
+        result.model_version
+        not in (
+            UNIT_SOURCE_MISSINGNESS_MODEL_VERSION,
+            UNIT_PHYSICAL_MODEL_VERSION,
+            UNIT_POOLED_MODEL_VERSION,
+        )
+        or metadata.get("feature_version")
+        != (
+            UNIT_POOLED_FEATURE_VERSION
+            if result.model_version == UNIT_POOLED_MODEL_VERSION
+            else UNIT_SOURCE_MISSINGNESS_FEATURE_VERSION
+        )
+        or metadata.get("missingness_policy") != UNIT_SOURCE_MISSINGNESS_POLICY
+        or metadata.get("all_unobserved_semantics") != UNIT_ALL_UNOBSERVED_SEMANTICS
+        or metadata.get("residual_missingness_semantics") != UNIT_RESIDUAL_MISSINGNESS_SEMANTICS
+        or metadata.get("regularization") != 0.1
+    ):
+        raise ValueError("Unit source missingness requires its exact version and policy.")
+    vocabulary, contract = metadata.get("player_vocabulary"), metadata.get("attribute_contract")
+    if (
+        not isinstance(vocabulary, tuple)
+        or not vocabulary
+        or tuple(sorted({_positive_id(x) for x in vocabulary})) != vocabulary
+        or not isinstance(contract, tuple)
+    ):
+        raise ValueError("Source missingness requires its fitted identity and attribute contract.")
+    specs = []
+    for item in contract:
+        if (
+            not isinstance(item, tuple)
+            or len(item) != 8
+            or not isinstance(item[6], str)
+            or not item[6]
+            or item[7] not in ("synthetic", "provider", "fm")
+        ):
+            raise ValueError("Malformed source attribute contract.")
+        source_id, name, minimum, maximum, unit, definition, _, _ = item
+        specs.append(NumericAttributeSpec(name, source_id, minimum, maximum, unit, definition))
+    if len({(s.source_id, s.name) for s in specs}) != len(specs):
+        raise ValueError("Source attribute contract contains duplicated definitions.")
+    attributes = tuple(specs)
+    groups = tuple(
+        (identity, tuple(spec.name for spec in group))
+        for identity, group in source_attribute_groups(attributes)
+    )
+    base = source_missingness_base_columns(vocabulary, attributes)
+    expected = base + tuple(f"home_interaction:{column}" for column in base)
+    if result.model_version == UNIT_POOLED_MODEL_VERSION:
+        expected = pooled_feature_columns(vocabulary, attributes)
+    if metadata.get("source_attribute_groups") != groups or result.feature_contract != expected:
+        raise ValueError("Source missingness features disagree with their declared source groups.")
+
+
+def _identity_feature_receipt(result: UnitStrengthResult) -> None:
+    metadata = result.metadata
+    keys = {
+        "identity_policy",
+        "identity_feature_columns",
+        "player_home_interactions",
+        "feature_scales",
+        "training_scaler_scales",
+        "regularization_objective",
+        "identity_prior",
+        "training_offset_sum",
+        "raw_identity_count_prior_precision",
+    }
+    if result.model_version != UNIT_POOLED_MODEL_VERSION:
+        if keys & metadata.keys() or metadata.get("scaling") == UNIT_POOLED_SCALING:
+            raise ValueError("Pooled identity evidence requires its explicit model version.")
+        return
+    if (
+        not keys <= metadata.keys()
+        or metadata.get("identity_policy") != UNIT_POOLED_IDENTITY_POLICY
+        or metadata.get("player_home_interactions") is not False
+        or metadata.get("scaling") != UNIT_POOLED_SCALING
+        or metadata.get("regularization_objective") != UNIT_POOLED_OBJECTIVE
+        or metadata.get("identity_prior") != UNIT_POOLED_PRIOR
+    ):
+        raise ValueError("Pooled identity requires its exact raw prior and scaling policy.")
+    vocabulary = metadata.get("player_vocabulary")
+    assert isinstance(vocabulary, tuple)
+    identities = pooled_identity_columns(vocabulary)
+    if metadata.get("identity_feature_columns") != identities:
+        raise ValueError("Pooled identity columns must match the fitted vocabulary.")
+    identity_set = set(identities)
+    scales, observed = metadata.get("feature_scales"), metadata.get("training_scaler_scales")
+    if (
+        not isinstance(scales, tuple)
+        or not isinstance(observed, tuple)
+        or len(scales) != len(result.feature_contract)
+        or len(observed) != len(scales)
+    ):
+        raise ValueError("Pooled identity requires one applied and observed scale per feature.")
+    for name, scale, original in zip(result.feature_contract, scales, observed, strict=True):
+        if _finite(scale) <= 0 or _finite(original) <= 0:
+            raise ValueError("Pooled identity feature scales must be positive.")
+        if scale != (1.0 if name in identity_set else original):
+            raise ValueError(
+                "Pooled identity scales must be one; shared training scales stay exact."
+            )
+    total = _finite(metadata.get("training_offset_sum"))
+    precision = _finite(metadata.get("raw_identity_count_prior_precision"))
+    if total <= 0 or precision != 0.1 * total:
+        raise ValueError("Pooled identity prior precision must equal alpha times total offset.")
+
+
 def _result_receipt(result: UnitStrengthResult) -> str:
     metadata = result.metadata
+    if (result.model_version in (UNIT_PHYSICAL_MODEL_VERSION, UNIT_POOLED_MODEL_VERSION)) != (
+        metadata.get("fit_contract") == UNIT_PHYSICAL_FIT_VERSION
+    ):
+        raise ValueError("Physical fitting and model versions must agree.")
     if (
         not isinstance(metadata, MappingProxyType)
         or metadata.get("input_version") != UNIT_INPUT_VERSION
-        or metadata.get("feature_version") != UNIT_FEATURE_VERSION
         or not result.feature_contract
         or len(set(result.feature_contract)) != len(result.feature_contract)
         or any(not isinstance(x, str) or not x for x in result.feature_contract)
         or metadata.get("feature_columns") != result.feature_contract
     ):
         raise ValueError("Unit results require their immutable declared feature contract.")
+    _missingness_feature_receipt(result)
+    _identity_feature_receipt(result)
     try:
         training_cutoff = datetime.fromisoformat(str(metadata["training_cutoff"]))
     except (KeyError, ValueError) as error:
@@ -145,9 +573,29 @@ def _result_receipt(result: UnitStrengthResult) -> str:
         raise ValueError("Historical source receipt groups are required.")
     for group in training_sources:
         source_group(group, training_cutoff, current=False)
+    _replay_fit_receipts(
+        metadata,
+        training_cutoff,
+        training_sources,
+        target_season=result.season,
+        target_gameweek=result.gameweek,
+    )
     projection_ids = source_group(
         metadata.get("projection_source_receipts"), result.decision_cutoff, current=True
     )
+    if result.model_version in (
+        UNIT_SOURCE_MISSINGNESS_MODEL_VERSION,
+        UNIT_PHYSICAL_MODEL_VERSION,
+        UNIT_POOLED_MODEL_VERSION,
+    ):
+        attribute_contract = metadata["attribute_contract"]
+        assert isinstance(attribute_contract, tuple)
+        families = {(row[0], row[6], row[7]) for row in attribute_contract}
+        for group in (*training_sources, metadata["projection_source_receipts"]):
+            assert isinstance(group, tuple)
+            actual_families = {(row[0], row[1], row[2]) for row in group}
+            if not families <= actual_families:
+                raise ValueError("Attribute source families must match every source receipt group.")
     for name in ("baseline_source_id", "reference_source_id", "projection_source_id"):
         if not isinstance(metadata.get(name), str) or not metadata[name]:
             raise ValueError("Unit results require named source families.")
@@ -174,6 +622,12 @@ def _result_receipt(result: UnitStrengthResult) -> str:
             for s in result.state_rates
         ],
     }
+    if result.model_version in (
+        UNIT_SOURCE_MISSINGNESS_MODEL_VERSION,
+        UNIT_PHYSICAL_MODEL_VERSION,
+        UNIT_POOLED_MODEL_VERSION,
+    ):
+        payload["model_version"] = result.model_version
     return json.dumps(payload, sort_keys=True, allow_nan=False)
 
 
@@ -238,9 +692,16 @@ def unit_fixture_components(
     by_fixture = {}
     cutoffs: dict[int, datetime] = {}
     receipts = []
+    model_versions = set()
     for result in results:
-        if not isinstance(result, UnitStrengthResult) or result.model_version != UNIT_MODEL_VERSION:
+        if not isinstance(result, UnitStrengthResult) or result.model_version not in (
+            UNIT_MODEL_VERSION,
+            UNIT_SOURCE_MISSINGNESS_MODEL_VERSION,
+            UNIT_PHYSICAL_MODEL_VERSION,
+            UNIT_POOLED_MODEL_VERSION,
+        ):
             raise ValueError("An explicitly identified unit-strength result is required.")
+        model_versions.add(result.model_version)
         _positive_id(result.fixture_id)
         for identity in (result.gameweek, result.club, result.opponent):
             _positive_id(identity)
@@ -259,6 +720,8 @@ def unit_fixture_components(
         if result.fixture_id in by_fixture:
             raise ValueError("Only one paired unit result per fixture is permitted.")
         by_fixture[result.fixture_id] = result
+    if len(model_versions) != 1:
+        raise ValueError("One component artifact requires one declared unit model version.")
     if set(by_fixture) != set(out.fixture):
         raise ValueError("Every retained fixture requires exactly one paired unit result.")
     for fixture, rows in out.groupby("fixture", sort=False):
@@ -367,7 +830,7 @@ def unit_fixture_components(
     out["expected_points"] = np.maximum(raw, 0)
     if not np.isfinite(out[["goals", "assists", "raw_expected_points"]]).all().all():
         raise ValueError("Adjusted component calculations must remain finite.")
-    out["model_version"] = UNIT_MODEL_VERSION
+    out["model_version"] = next(iter(model_versions))
     out.attrs["component_version"] = UNIT_COMPONENT_VERSION
     out.attrs["minute_state_relation"] = "retained native minutes independent of unit states"
     out.attrs["decision_cutoffs"] = tuple(sorted(cutoffs.items()))
