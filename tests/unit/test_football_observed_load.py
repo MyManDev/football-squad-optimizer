@@ -22,6 +22,7 @@ from squadopt.features.football_load_inputs import (
 )
 from squadopt.features.football_observed_load import (
     FEATURE_NAMES,
+    ObservedLoadCapturedNativeBasis,
     ObservedLoadNativeBasis,
     ObservedLoadOutcome,
     ObservedLoadProvenance,
@@ -37,7 +38,9 @@ from squadopt.prediction import football_observed_load as module
 from squadopt.prediction.football_observed_load import (
     ObservedLoadExample,
     ObservedLoadModel,
+    export_observed_load_serving_result,
     objective_gradient,
+    read_observed_load_serving_result,
 )
 
 CUTOFF = "2026-10-02T00:00:00Z"
@@ -638,3 +641,186 @@ def test_outcome_header_clocks_precede_label_array_conversion() -> None:
             target_season="2026-27",
             target_gameweeks=(1,),
         )
+
+
+def captured_week(*, count: int = 1) -> ObservedLoadWeek:
+    source = week(target=True, count=count)
+    values = asdict(source.native)
+    values.pop("original_revision")
+    values["fixtures"] = source.native.fixtures
+    native = ObservedLoadCapturedNativeBasis(
+        **values,
+        source_snapshot_id="fpl-live-20261002T090000Z-ffffffffffff",
+        source_fingerprint="f" * 64,
+        native_generated_at="2026-10-03T08:20:00Z",
+    )
+    return replace(
+        source,
+        native=native,
+        provenance=replace(
+            source.provenance,
+            source_hashes=(*source.provenance.source_hashes, ("snapshot_fingerprint", "f" * 64)),
+        ),
+    )
+
+
+def test_captured_native_roundtrip_and_legacy_law_equivalence() -> None:
+    source = captured_week(count=2)
+    raw = json.dumps(asdict(source)).encode()
+    assert read_observed_load_snapshot(raw, sha256=hashlib.sha256(raw).hexdigest()) == source
+    assert "original_revision" not in asdict(source.native)
+    model = fit((outcome(week(count=2)),))
+    legacy = model.predict(week(target=True, count=2))
+    captured = model.predict(source)
+    assert captured.probabilities == legacy.probabilities
+    assert captured.fixture_probabilities == legacy.fixture_probabilities
+    assert captured.input_sha256 != legacy.input_sha256
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("version", "captured_snapshot_v2"),
+        ("source_snapshot_id", "fpl-live-20261003T090000Z-ffffffffffff"),
+        ("source_snapshot_id", "fpl-live-20261002T090000Z-aaaaaaaaaaaa"),
+        ("source_fingerprint", "f" * 12),
+        ("source_fingerprint", "8" * 64),
+        ("recorded_at", "2026-10-03T08:16:00Z"),
+        ("retrieved_at", "2026-10-03T08:21:00Z"),
+        ("native_generated_at", "2026-10-03T08:14:00Z"),
+        ("native_generated_at", "2026-10-03T08:31:00Z"),
+        ("fit_information_cutoff", "2026-10-03T08:21:00Z"),
+    ],
+)
+def test_captured_native_identity_and_declared_clocks_refuse(field: str, value: Any) -> None:
+    source = captured_week()
+    with pytest.raises((ValueError, DataError)):
+        validate_observed_load_week(
+            replace(source, native=replace(source.native, **{field: value}))
+        )
+
+
+def test_captured_is_prospective_only_and_disjoint_from_git_schema() -> None:
+    source = captured_week()
+    replay = replace(
+        source,
+        provenance=replace(
+            source.provenance,
+            kind="public_revision_replay",
+            retrieved_at="2026-10-04T00:00:00Z",
+            generated_at="2026-10-05T00:00:00Z",
+        ),
+    )
+    with pytest.raises(ValueError, match="prospective source variant"):
+        validate_observed_load_week(replay)
+    for base, extra in ((source, {"original_revision": "a" * 40}), (week(), {"version": "x"})):
+        document = asdict(base)
+        document["native"].update(extra)
+        raw = json.dumps(document).encode()
+        with pytest.raises((ValueError, DataError)):
+            read_observed_load_snapshot(raw, sha256=hashlib.sha256(raw).hexdigest())
+
+
+@pytest.mark.parametrize("count", [0, 1, 2])
+def test_compact_serving_preserves_fitted_predictions_without_fitting(
+    count: int, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    model = fit((outcome(week(count=count)),))
+    before = model.metadata_json
+    raw = export_observed_load_serving_result(model).encode()
+    document = json.loads(raw)
+    assert "training_receipts" not in document
+    assert "optimizer_iterations" not in document
+    assert document["model_sha256"] == hashlib.sha256(before.encode()).hexdigest()
+
+    def forbidden(*args: Any, **kwargs: Any) -> Any:
+        raise AssertionError("Serving cannot fit.")
+
+    monkeypatch.setattr(module, "minimize", forbidden)
+    serving = read_observed_load_serving_result(raw, sha256=hashlib.sha256(raw).hexdigest())
+    assert not hasattr(serving, "fit")
+    for source in (week(target=True, count=count), captured_week(count=count)):
+        assert serving.predict(source) == model.predict(source)
+        assert serving.predict(source, zero_coefficients=True) == model.predict(
+            source, zero_coefficients=True
+        )
+    assert model.metadata_json == before
+    with pytest.raises(FrozenInstanceError):
+        serving.parameters.cutoff = "changed"  # type: ignore[misc]
+    with pytest.raises(ValueError):
+        serving._coefficients.setflags(write=True)
+    with pytest.raises(ValueError, match="integrity"):
+        replace(serving, result_json=serving.result_json + " ").predict(captured_week(count=count))
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("version", "unexpected_v1"),
+        ("model_sha256", "a" * 63),
+        ("target_gameweeks", [True]),
+        ("allow_released_2025_26", 1),
+        ("coefficients", [0.0]),
+        ("coefficients", [True] * len(module.DESIGN_NAMES)),
+        ("coefficients", [float("nan")] * len(module.DESIGN_NAMES)),
+        ("coefficients", [21.0] * len(module.DESIGN_NAMES)),
+        ("coefficients", [10**400] + [0.0] * (len(module.DESIGN_NAMES) - 1)),
+        ("observed_competition_scopes", []),
+        ("observed_competition_scopes", [["efl-cup", "efl-cup"]]),
+        ("observed_competition_scopes", [["efl-cup"], ["efl-cup"]]),
+        ("observed_competition_scopes", [["z", "a"]]),
+    ],
+)
+def test_serving_reader_refuses_malformed_parameters(field: str, value: Any) -> None:
+    document = json.loads(export_observed_load_serving_result(fit()))
+    document[field] = value
+    raw = json.dumps(document, sort_keys=True, separators=(",", ":")).encode()
+    with pytest.raises((ValueError, DataError)):
+        read_observed_load_serving_result(raw, sha256=hashlib.sha256(raw).hexdigest())
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("means", []),
+        ("means", [-1.0] * 24),
+        ("scales", [0.0] * 24),
+        ("known_counts", [True] * 24),
+        ("known_counts", [-1] * 24),
+        ("known_counts", [0] * 24),
+    ],
+)
+def test_serving_reader_refuses_invalid_transform(field: str, value: Any) -> None:
+    document = json.loads(export_observed_load_serving_result(fit()))
+    document["transform"][field] = value
+    raw = json.dumps(document, sort_keys=True, separators=(",", ":")).encode()
+    with pytest.raises(ValueError):
+        read_observed_load_serving_result(raw, sha256=hashlib.sha256(raw).hexdigest())
+
+
+def test_serving_bytes_inventory_digest_and_canonical_identity() -> None:
+    raw = export_observed_load_serving_result(fit()).encode()
+    with pytest.raises(ValueError, match="digest"):
+        read_observed_load_serving_result(raw + b" ", sha256=hashlib.sha256(raw).hexdigest())
+    for bad in (
+        raw + b" ",
+        raw.replace(b"{", b'{"version":"duplicate",', 1),
+        raw.replace(b"{", b'{"unexpected":0,', 1),
+        b"null",
+        b"not JSON",
+    ):
+        with pytest.raises(ValueError):
+            read_observed_load_serving_result(bad, sha256=hashlib.sha256(bad).hexdigest())
+
+
+def test_serving_retains_prediction_target_scope_and_support_guards() -> None:
+    raw = export_observed_load_serving_result(fit((outcome(week(missing=True)),))).encode()
+    serving = read_observed_load_serving_result(raw, sha256=hashlib.sha256(raw).hexdigest())
+    for source, message in (
+        (week(), "prospective"),
+        (replace(captured_week(), gameweek=2), "calendar"),
+        (replace(captured_week(), competitions=("efl-cup", "cup")), "scope"),
+        (captured_week(), "training support"),
+    ):
+        with pytest.raises(ValueError, match=message):
+            serving.predict(source)

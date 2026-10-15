@@ -95,7 +95,7 @@ The standalone observed workload model has a separate input boundary:
 
 | Module | What it does |
 | --- | --- |
-| `football_observed_load.py` | Observed non-PL reported-record inputs and retrospective provenance, preserving missing values and complete native PL support (`src/squadopt/features/football_observed_load.py:104`). |
+| `football_observed_load.py` | Observed non-PL reported-record inputs and retrospective provenance, preserving missing values and complete native PL support (`src/squadopt/features/football_observed_load.py:127`). |
 | `football_observed_tactical_inputs.py` | Separate full-roster native marginal context with four observed event channels, nullable FM traits and prior provider roles; explicit historical replay retains actual acquisition clocks (`src/squadopt/features/football_observed_tactical_inputs.py:133`, `src/squadopt/features/football_observed_tactical_inputs.py:385`). |
 | `football_observed_tactical_readers.py` | Pure byte readers for typed observed-tactical envelopes, complete selected event rows, exact FM rows and provider roles; supplied SHA256 checks establish byte integrity (`src/squadopt/features/football_observed_tactical_readers.py:45`, `src/squadopt/features/football_observed_tactical_readers.py:155`, `src/squadopt/features/football_observed_tactical_readers.py:276`, `src/squadopt/features/football_observed_tactical_readers.py:406`). |
 

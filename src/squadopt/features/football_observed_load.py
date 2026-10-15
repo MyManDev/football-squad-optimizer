@@ -34,6 +34,7 @@ OUTCOME_VERSION = "football_observed_non_pl_load_outcome_v1"
 FEATURE_VERSION = "observed_non_pl_reported_records_v1"
 COVERAGE_KIND = "observed_provider_player_records_not_complete_history"
 MINUTE_DEFINITION = "provider_reported_minutes_not_physical_elapsed"
+CAPTURED_NATIVE_VERSION = "captured_snapshot_v1"
 FEATURE_NAMES = tuple(
     f"observed_non_pl_{name}_{days}d"
     for days in (7, 14, 28)
@@ -101,6 +102,28 @@ class ObservedLoadNativeBasis:
 
 
 @dataclass(frozen=True, slots=True)
+class ObservedLoadCapturedNativeBasis:
+    fixtures: tuple[LoadFixture, ...]
+    states: tuple[tuple[int, ...], ...]
+    probabilities: tuple[float, ...]
+    law_sha256: str
+    basis_sha256: str
+    model_version: str
+    fit_information_cutoff: str
+    history_completed_by: str
+    source_snapshot_id: str
+    source_fingerprint: str
+    recorded_at: str
+    retrieved_at: str
+    native_generated_at: str
+    calendar_complete: bool
+    covered_gameweeks: tuple[int, ...]
+    calendar_sha256: str
+    evidence_ref: str
+    version: str = CAPTURED_NATIVE_VERSION
+
+
+@dataclass(frozen=True, slots=True)
 class ObservedLoadWeek:
     season: str
     gameweek: int
@@ -110,7 +133,7 @@ class ObservedLoadWeek:
     deadline_at: str
     competitions: tuple[str, ...]
     records: tuple[ObservedLoadRecord, ...]
-    native: ObservedLoadNativeBasis
+    native: ObservedLoadNativeBasis | ObservedLoadCapturedNativeBasis
     provenance: ObservedLoadProvenance
     version: str = INPUT_VERSION
     coverage_kind: str = COVERAGE_KIND
@@ -246,7 +269,7 @@ def validate_observed_load_week(
         raise ValueError("Observed load requires declared operator source-use approval.")
     _text(p.model_use_evidence_ref, "operator source-use evidence")
     native = week.native
-    if type(native) is not ObservedLoadNativeBasis:
+    if type(native) not in (ObservedLoadNativeBasis, ObservedLoadCapturedNativeBasis):
         raise ValueError("Observed load requires a separate native basis.")
     _validate_native_law(native.fixtures, native.states, native.probabilities, deadline=deadline)
     if native.calendar_complete is not True:
@@ -267,10 +290,29 @@ def validate_observed_load_week(
     _text(native.model_version, "native model version")
     if re.fullmatch(r"[a-z][a-z0-9_]*_v[0-9]+", native.model_version) is None:
         raise ValueError("Native model needs an exact versioned identifier.")
-    _revision(native.original_revision)
     native_recorded = _clock(native.recorded_at, "native revision recorded")
     native_retrieved = _clock(native.retrieved_at, "native retrieved")
     native_fit = _clock(native.fit_information_cutoff, "native fit information cutoff")
+    if isinstance(native, ObservedLoadCapturedNativeBasis):
+        if native.version != CAPTURED_NATIVE_VERSION or p.kind != "prospective":
+            raise ValueError("Captured native basis requires its prospective source variant.")
+        _sha(native.source_fingerprint, "native snapshot fingerprint")
+        expected_id = (
+            "fpl-live-"
+            + native_recorded.strftime("%Y%m%dT%H%M%SZ")
+            + "-"
+            + native.source_fingerprint[:12]
+        )
+        if native.source_snapshot_id != expected_id or native.source_fingerprint not in hashes:
+            raise ValueError("Captured native snapshot identity lacks its source binding.")
+        native_generated = _clock(native.native_generated_at, "native generation")
+        if not (
+            native_recorded <= native_retrieved <= native_generated <= generated <= feature
+            and native_fit <= native_generated
+        ):
+            raise ValueError("Captured native generation is outside its source chronology.")
+    else:
+        _revision(native.original_revision)
     if not (
         _clock(native.history_completed_by, "native history completion") < native_fit <= feature
         and native_recorded <= feature
@@ -441,11 +483,10 @@ def read_observed_load_snapshot(
     document = _object(
         _json(raw, sha256), {f.name for f in fields(ObservedLoadWeek)}, "observed week"
     )
-    native = dict(
-        _object(
-            document["native"], {f.name for f in fields(ObservedLoadNativeBasis)}, "native basis"
-        )
-    )
+    source_native = document["native"]
+    captured = isinstance(source_native, dict) and "version" in source_native
+    native_fields = fields(ObservedLoadCapturedNativeBasis if captured else ObservedLoadNativeBasis)
+    native = dict(_object(source_native, {f.name for f in native_fields}, "native basis"))
     native["fixtures"] = tuple(
         _record(
             LoadFixture,
@@ -475,7 +516,11 @@ def read_observed_load_snapshot(
         ObservedLoadWeek,
         dict(
             document,
-            native=_record(ObservedLoadNativeBasis, native),
+            native=(
+                _record(ObservedLoadCapturedNativeBasis, native)
+                if captured
+                else _record(ObservedLoadNativeBasis, native)
+            ),
             provenance=_record(ObservedLoadProvenance, provenance),
             competitions=tuple(_list(document["competitions"], "competitions")),
             records=tuple(
