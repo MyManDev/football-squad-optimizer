@@ -80,9 +80,9 @@ Also outside the site:
   and the job route (`:164`). The route 1 pull request that removes the API removes this
   step and both files with it.
 - CI's `Playwright smoke` step serves the site the `Build` step built. Route 1 took the
-  origin out of both, so 8 tests that mock the API
-  skip without failing: 2 in `web/e2e/news-decision.spec.ts:14`, 4 in
-  `web/e2e/information-review.spec.ts:232` and 2 in `web/e2e/member-mobile.spec.ts:210-213`.
+  origin out of both, so 8 tests that mock the API skip without failing: 2 in
+  `web/e2e/news-decision.spec.ts:14`, 4 in `web/e2e/information-review.spec.ts:232` and 2
+  in `web/e2e/member-mobile.spec.ts:210-213`.
   They are left to skip; none is kept on a stubbed origin. #1001 step 4 covers only
   `web/e2e/contributions.spec.ts`, whose 2 contribution journeys also skip without an
   origin (#1022).
