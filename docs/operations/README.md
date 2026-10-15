@@ -2,6 +2,7 @@
 
 | Task | Procedure |
 | --- | --- |
+| Construct explicit joint participation states for phase allocation | [Phase participation coupling](football_phase_coupling.md) |
 | Inspect discovered infrastructure and start the prepared API/worker deployment | [Operations inventory](../architecture/operations_inventory.md) |
 | Create, verify and restore private backups | [Backup and recovery](../architecture/backup_recovery.md) |
 | Observe and resume a journaled weekly run | [Installed weekly operations](../architecture/weekly_operations.md) |

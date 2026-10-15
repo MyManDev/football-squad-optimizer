@@ -7,7 +7,7 @@ models. Every time-dependent aggregation of the feature builder passes through o
 shifted-rolling primitive, so the timing rule has one implementation. Its callers are `prediction`, `live`, `application`, `platform`,
 the laboratory and the scripts.
 
-Its 22 Python files sit in one folder. This page places every one of them in exactly one
+Its 23 Python files sit in one folder. This page places every one of them in exactly one
 family.
 
 Review: İbrahim, the data side ([ownership](../../../docs/architecture/ownership.md)).
@@ -64,7 +64,7 @@ The football models in [`squadopt.prediction`](../prediction/README.md) read the
 The retained flag adapter also supplies the optional live producer
 (`src/squadopt/application/football_live.py:582`). The other five families retain their private
 `football_*_experiment` callers in [`squadopt.experiments`](../experiments/README.md);
-the last two modules parse private bytes for the club-unit experiment.
+The unit catalogue and FM readers parse private bytes for the club-unit experiment.
 
 | Module | What it does |
 | --- | --- |
@@ -72,6 +72,7 @@ the last two modules parse private bytes for the club-unit experiment.
 | `football_flag_captures.py` | Binds original retained FPL flags and explicit settled start/minute labels to causal native supports (`retained_fpl_flag_inputs_v1`), keeping reconstructed decisions distinct from live forecasts (`src/squadopt/features/football_flag_captures.py:96`, `src/squadopt/features/football_flag_captures.py:201`). |
 | `football_load_inputs.py` | Immutable all-competition workload and native-law source contracts (`football_load_week_input_v1`). |
 | `football_phase_inputs.py` | Causal inputs for phase-specific credited goal and assist allocation (`football_phase_inputs_v1`). |
+| `football_phase_coupling.py` | Explicit circular joint participation construction preserving supplied seven-state native marginals; dependence is imposed by persistent identity order (`src/squadopt/features/football_phase_coupling.py:91`). |
 | `football_score_state_inputs.py` | Strict score-process inputs (`football_score_fixture_input_v1`); a receipt assertion does not admit real data. |
 | `football_tactical_inputs.py` | Named tactical facts and supplied paired pre-decision states (`football_tactical_inputs_v1`). |
 | `football_unit_inputs.py` | Immutable inputs of the separately invoked club-unit experiment (`football_unit_inputs_v1`). |
