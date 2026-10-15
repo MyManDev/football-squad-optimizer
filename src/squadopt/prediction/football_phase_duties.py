@@ -26,6 +26,7 @@ from squadopt.features.football_phase_inputs import (
     PhaseObservation,
     PhasePlayer,
     PhaseProjection,
+    PhaseReplay,
     PhaseSource,
     observation_digest,
     projection_digest,
@@ -97,6 +98,7 @@ class PhaseTrainingReceipt:
     phase_definition_version: str
     rules_version: str
     complete_coverage: bool
+    replay: PhaseReplay | None = None
 
 
 @dataclass(frozen=True)
@@ -116,6 +118,7 @@ class PhaseModelMetadata:
     alpha: float
     max_iter: int
     recipient_heads: tuple[PhaseHeadMetadata, ...]
+    released_2025_26: bool = False
     penalty_miss_treatment: str = PENALTY_MISS_POLICY
     output_scope: str = "separate_expected_scoring_marginals"
     physical_check: str = "per_state_player_goals_plus_assists_not_above_physical_goals"
@@ -328,6 +331,7 @@ class PhaseDutyModel:
         allowed_seasons: tuple[str, ...],
         target_season: str,
         target_gameweek: int,
+        allow_released_2025_26: bool = False,
     ) -> PhaseDutyModel:
         if not isinstance(observations, tuple) or not observations:
             raise ValueError("Phase fitting requires nonempty immutable observations.")
@@ -352,6 +356,7 @@ class PhaseDutyModel:
                 training_cutoff=cutoff,
                 allowed_seasons=allowed_seasons,
                 excluded_target=(target_season, target_gameweek),
+                allow_released_2025_26=allow_released_2025_26,
             )
             if observation.season > target_season or (
                 observation.season == target_season and observation.gameweek >= target_gameweek
@@ -369,6 +374,7 @@ class PhaseDutyModel:
                 training_cutoff=cutoff,
                 allowed_seasons=allowed_seasons,
                 excluded_target=(target_season, target_gameweek),
+                allow_released_2025_26=allow_released_2025_26,
             )
         ordered = tuple(sorted(observations, key=lambda row: (row.season, row.fixture, row.club)))
         alpha, max_iter = self.alpha, self.max_iter
@@ -423,7 +429,11 @@ class PhaseDutyModel:
             phase_shares[head] = phase_counts / total if total else phase_counts
             event_totals[head] = total
         metadata = PhaseModelMetadata(
-            contract_version="football_phase_duty_fit_v1",
+            contract_version=(
+                "football_phase_duty_replay_fit_v1"
+                if any(row.replay is not None for row in ordered) or allow_released_2025_26
+                else "football_phase_duty_fit_v1"
+            ),
             cutoff=cutoff,
             target_season=target_season,
             target_gameweek=target_gameweek,
@@ -449,6 +459,7 @@ class PhaseDutyModel:
                     phase_definition_version=row.phase_definition_version,
                     rules_version=row.rules_version,
                     complete_coverage=row.complete_coverage,
+                    replay=row.replay,
                 )
                 for row in ordered
             ),
@@ -459,6 +470,7 @@ class PhaseDutyModel:
             alpha=alpha,
             max_iter=max_iter,
             recipient_heads=tuple(fitted_heads),
+            released_2025_26=allow_released_2025_26,
         )
         self._fitted = _FittedState(
             metadata=metadata,

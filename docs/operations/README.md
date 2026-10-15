@@ -20,6 +20,7 @@
 | Capture club news within its model-call allowance, and read how FPL player facts and coach news reach the football forecast and the decision | [FPL facts, coach news and football decisions](fpl_news_decisions.md) |
 | Prepare the optional first-week categorical flag/minute forecast from original retained capture pairs | [Retained flag forecasts](retained_flag_forecasts.md) |
 | Check why the official injury source is disabled for production, and seal a prepared football decision bundle | [Official injury discovery and current club-news selection](official_injury_discovery.md) |
+| Prepare historical public-revision facts for experimental phase training | [Phase training from original revisions](phase_training_replay.md) |
 | Cut a release, deploy a `site-*` tag and verify the live site with the release recipe (`scripts/release/ship.sh`, `deploy.sh`, `verify_live.py`, `clean_body.py`) | [Release in one command](../deployment_runbook.md#release-in-one-command) |
 | Restart a running backend on the code of the live release (`scripts/release/restart_backend.ps1`), or start a stopped one from that release | [The release window](../deployment_runbook.md#the-release-window-is-closed-to-develop) and [a stopped backend](../deployment_runbook.md#a-stopped-backend-starts-from-the-release) |
 | Register or remove the `SquadOptBackendWatch` scheduled task, which starts the backend and its tunnel at logon and restarts a missing component | [Backend free hosting, starting the backend](../backend_free_hosting.md#1-start-the-backend) |

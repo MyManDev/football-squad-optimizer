@@ -7,7 +7,7 @@ import json
 import math
 import re
 from dataclasses import asdict, dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Literal, TypedDict, cast
 
 import pandas as pd
@@ -22,7 +22,8 @@ from squadopt.data.snapshots import (
     snapshot_fingerprint,
 )
 from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FPL_LIVE_SOURCE
-from squadopt.data.sources.fpl_set_pieces import TAKER_FIELDS, captured_taker_priorities
+from squadopt.data.sources.fpl_set_pieces import TAKER_FIELDS as TAKER_FIELDS
+from squadopt.data.sources.fpl_set_pieces import captured_taker_priorities
 from squadopt.data.timestamps import as_instant, normalize_utc_timestamp
 
 PHASE_INPUT_VERSION = "football_phase_inputs_v1"
@@ -107,6 +108,20 @@ class PhaseTotal:
 
 
 @dataclass(frozen=True, slots=True)
+class PhaseReplay:
+    """Public revision facts reconstructed now, never an original held forecast."""
+
+    revision: str
+    recorded_at: str
+    retrieved_at: str
+    source_hashes: tuple[tuple[str, str], ...]
+    feature_cutoff: str
+    latest_history_kickoff: str
+    generated_at: str
+    version: str = "football_phase_public_revision_replay_v1"
+
+
+@dataclass(frozen=True, slots=True)
 class PhaseObservation:
     season: str
     gameweek: int
@@ -127,6 +142,7 @@ class PhaseObservation:
     phase_definition_version: str
     rules_version: str
     complete_coverage: bool
+    replay: PhaseReplay | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -229,7 +245,9 @@ def _context(value: PhaseObservation | PhaseProjection) -> None:
         raise ValueError("A phase kickoff falls outside its declared season.")
 
 
-def _duties(capture: PhaseDutyCapture, *, season: str, decision_at: str) -> None:
+def _duties(
+    capture: PhaseDutyCapture, *, season: str, decision_at: str, recorded_at: str | None = None
+) -> None:
     if not isinstance(capture, PhaseDutyCapture) or capture.season != season:
         raise ValueError("A duty capture has the wrong season identity.")
     _text(capture.snapshot_id, "snapshot_id")
@@ -241,6 +259,11 @@ def _duties(capture: PhaseDutyCapture, *, season: str, decision_at: str) -> None
     if type(capture.model_use_approved) is not bool or not capture.model_use_approved:
         raise ValueError("Duty captures need admitted model-use evidence.")
     captured = as_instant(_time(capture.captured_at, "duty captured_at"))
+    if recorded_at is not None:
+        recorded = as_instant(_time(recorded_at, "duty revision recorded_at"))
+        if recorded > captured:
+            raise ValueError("A duty revision cannot follow its actual retrieval.")
+        captured = recorded
     expiry = as_instant(_time(capture.valid_until, "duty valid_until"))
     decision = as_instant(_time(decision_at, "duty decision_at"))
     if not captured <= decision <= expiry:
@@ -286,19 +309,24 @@ def validate_observation_header(
     training_cutoff: str,
     allowed_seasons: tuple[str, ...],
     excluded_target: tuple[str, int] | None = None,
+    allow_released_2025_26: bool = False,
 ) -> None:
     """Check all causal headers before inspecting credited outcome records."""
     if not isinstance(observation, PhaseObservation):
         raise ValueError("A phase observation is required.")
+    if type(allow_released_2025_26) is not bool:
+        raise ValueError("The released season selection must be an explicit Boolean.")
     if type(allowed_seasons) is not tuple or not allowed_seasons:
         raise ValueError("Phase training requires an explicit immutable season allowlist.")
     if len(set(allowed_seasons)) != len(allowed_seasons):
         raise ValueError("The phase season allowlist repeats a season.")
     for season in allowed_seasons:
         validate_phase_season(season)
-        if season == PROTECTED_SEASON:
+        if season == PROTECTED_SEASON and not allow_released_2025_26:
             raise ValueError("The protected season is excluded from phase training.")
-    if observation.season == PROTECTED_SEASON or observation.season not in allowed_seasons:
+    if (
+        observation.season == PROTECTED_SEASON and not allow_released_2025_26
+    ) or observation.season not in allowed_seasons:
         raise ValueError("A phase observation belongs to a protected or unselected season.")
     if excluded_target == (observation.season, observation.gameweek):
         raise ValueError("The whole target gameweek is excluded from phase training.")
@@ -311,8 +339,18 @@ def validate_observation_header(
         or not as_instant(_time(observation.kickoff, "kickoff")) < available < cutoff
     ):
         raise ValueError("Phase outcomes were not settled strictly before training cutoff.")
-    _duties(observation.duties, season=observation.season, decision_at=observation.decision_at)
-    source_receipt(observation.baseline_source, cutoff=observation.decision_at, kind="baseline")
+    if observation.replay is None:
+        _duties(observation.duties, season=observation.season, decision_at=observation.decision_at)
+        source_receipt(observation.baseline_source, cutoff=observation.decision_at, kind="baseline")
+    else:
+        _replayed_basis(
+            observation.duties,
+            observation.baseline_source,
+            observation.replay,
+            season=observation.season,
+            decision_at=observation.decision_at,
+            training_cutoff=training_cutoff,
+        )
     source_receipt(observation.outcome_source, cutoff=training_cutoff, kind="phase-events")
     source_receipt(observation.totals_source, cutoff=training_cutoff, kind="fpl-totals")
     for source in (observation.outcome_source, observation.totals_source):
@@ -333,18 +371,87 @@ def validate_observation_header(
         raise ValueError("Unknown phase coverage cannot become a zero-event fixture.")
 
 
+def _replayed_basis(
+    duties: PhaseDutyCapture,
+    baseline: PhaseSource,
+    replay: PhaseReplay,
+    *,
+    season: str,
+    decision_at: str,
+    training_cutoff: str,
+) -> None:
+    if (
+        not isinstance(replay, PhaseReplay)
+        or replay.version != "football_phase_public_revision_replay_v1"
+    ):
+        raise ValueError("An explicit versioned phase replay receipt is required.")
+    if not isinstance(replay.revision, str) or not re.fullmatch(r"[0-9a-f]{40}", replay.revision):
+        raise ValueError("Replay must name the immutable original Git revision.")
+    if type(replay.source_hashes) is not tuple or not replay.source_hashes:
+        raise ValueError("Replay requires immutable original source hashes.")
+    hashes = {}
+    for item in replay.source_hashes:
+        if type(item) is not tuple or len(item) != 2:
+            raise ValueError("Replay requires named original source hashes.")
+        name, digest = item
+        _text(name, "replay source path")
+        if (
+            name in hashes
+            or not isinstance(digest, str)
+            or not re.fullmatch(r"[0-9a-f]{64}", digest)
+        ):
+            raise ValueError("Replay source hashes must be unique full SHA256 receipts.")
+        hashes[name] = digest
+    if not {"players_raw.csv", "teams.csv", "fixtures.csv", "gws/merged_gw.csv"} <= hashes.keys():
+        raise ValueError("Replay must bind original roster, clubs, calendar and history.")
+    clocks = {
+        name: as_instant(_time(getattr(replay, name), name))
+        for name in (
+            "recorded_at",
+            "retrieved_at",
+            "feature_cutoff",
+            "latest_history_kickoff",
+            "generated_at",
+        )
+    }
+    decision = as_instant(_time(decision_at, "decision_at"))
+    cutoff = as_instant(_time(training_cutoff, "training_cutoff"))
+    if not (
+        clocks["recorded_at"] <= clocks["feature_cutoff"] <= decision
+        and decision < clocks["retrieved_at"] <= clocks["generated_at"] < cutoff
+        and clocks["latest_history_kickoff"] < clocks["recorded_at"]
+        and clocks["latest_history_kickoff"] + timedelta(hours=3) < clocks["feature_cutoff"]
+    ):
+        raise ValueError(
+            "Replay clocks do not establish settled predecision features and actual acquisition."
+        )
+    _duties(duties, season=season, decision_at=decision_at, recorded_at=replay.recorded_at)
+    source_receipt(baseline, cutoff=training_cutoff, kind="baseline")
+    if (
+        duties.snapshot_id != "git:" + replay.revision
+        or duties.source_fingerprint != hashes["players_raw.csv"]
+        or as_instant(_time(duties.captured_at, "duty retrieval")) != clocks["retrieved_at"]
+        or as_instant(_time(baseline.captured_at, "baseline generation")) != clocks["generated_at"]
+        or as_instant(_time(baseline.published_at, "baseline publication"))
+        != clocks["generated_at"]
+    ):
+        raise ValueError("Replay does not bind the actual duty and generated baseline receipts.")
+
+
 def validate_observation(
     observation: PhaseObservation,
     *,
     training_cutoff: str,
     allowed_seasons: tuple[str, ...],
     excluded_target: tuple[str, int] | None = None,
+    allow_released_2025_26: bool = False,
 ) -> None:
     validate_observation_header(
         observation,
         training_cutoff=training_cutoff,
         allowed_seasons=allowed_seasons,
         excluded_target=excluded_target,
+        allow_released_2025_26=allow_released_2025_26,
     )
     _players(observation.players, observation.duties, observation.club)
     if type(observation.events) is not tuple or type(observation.totals) is not tuple:
@@ -445,7 +552,10 @@ def validate_projection(projection: PhaseProjection, *, model_cutoff: str) -> No
 
 
 def _digest(value: PhaseObservation | PhaseProjection) -> str:
-    content = json.dumps(asdict(value), sort_keys=True, separators=(",", ":"), allow_nan=False)
+    document = asdict(value)
+    if isinstance(value, PhaseObservation) and value.replay is None:
+        document.pop("replay")
+    content = json.dumps(document, sort_keys=True, separators=(",", ":"), allow_nan=False)
     return hashlib.sha256(content.encode("utf-8")).hexdigest()
 
 
@@ -633,6 +743,8 @@ def read_phase_observation(
     training_cutoff: str,
     allowed_seasons: tuple[str, ...],
     excluded_target: tuple[str, int] | None = None,
+    allow_released_2025_26: bool = False,
+    replay: PhaseReplay | None = None,
 ) -> PhaseObservation:
     """Read three separately bound documents after source-header preflight.
 
@@ -641,9 +753,11 @@ def read_phase_observation(
     """
     validate_phase_season(season)
     _id(gameweek, "gameweek")
+    if type(allow_released_2025_26) is not bool:
+        raise ValueError("The released season selection must be an explicit Boolean.")
     if (
         type(allowed_seasons) is not tuple
-        or season == PROTECTED_SEASON
+        or (season == PROTECTED_SEASON and not allow_released_2025_26)
         or season not in allowed_seasons
     ):
         raise ValueError("The declared phase source season is protected or unselected.")
@@ -651,7 +765,7 @@ def read_phase_observation(
         raise ValueError("The whole target gameweek is excluded before decoding outcomes.")
     for selected in allowed_seasons:
         validate_phase_season(selected)
-        if selected == PROTECTED_SEASON:
+        if selected == PROTECTED_SEASON and not allow_released_2025_26:
             raise ValueError("The protected season cannot enter the phase source allowlist.")
     # Reject unavailable source headers before decoding any credited outcomes.
     source_receipt(outcome_source, cutoff=training_cutoff, kind="phase-events")
@@ -675,8 +789,18 @@ def read_phase_observation(
     if context["season"] != season or context["gameweek"] != gameweek:
         raise ValueError("The phase source header and payload scope disagree.")
     decision_at = context["decision_at"]
-    source_receipt(baseline_source, cutoff=decision_at, kind="baseline")
-    _duties(duties, season=season, decision_at=decision_at)
+    if replay is None:
+        source_receipt(baseline_source, cutoff=decision_at, kind="baseline")
+        _duties(duties, season=season, decision_at=decision_at)
+    else:
+        _replayed_basis(
+            duties,
+            baseline_source,
+            replay,
+            season=season,
+            decision_at=decision_at,
+            training_cutoff=training_cutoff,
+        )
     events = _source_json(
         event_payload, outcome_source, cutoff=training_cutoff, kind="phase-events"
     )
@@ -786,12 +910,14 @@ def read_phase_observation(
         ),
         rules_version=rules,
         complete_coverage=_boolean(events["complete_coverage"], "complete_coverage"),
+        replay=replay,
     )
     validate_observation(
         observation,
         training_cutoff=training_cutoff,
         allowed_seasons=allowed_seasons,
         excluded_target=excluded_target,
+        allow_released_2025_26=allow_released_2025_26,
     )
     return observation
 
