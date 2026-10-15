@@ -6,7 +6,7 @@ import hashlib
 import json
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pandas as pd
 
@@ -20,6 +20,13 @@ from squadopt.prediction.football import (
     JOINT_ROLE_MODEL_VERSIONS,
     JOINT_ROLE_RETAINED_HISTORY_MODEL_VERSION,
 )
+from squadopt.prediction.football_capabilities import (
+    COMPOSITE_AVAILABILITY_POLICY,
+    COMPOSITE_FEATURE_VERSION,
+    COMPOSITE_MODEL_VERSION,
+    football_capabilities,
+)
+from squadopt.prediction.football_composite_contract import composite_weekly_chances
 from squadopt.prediction.football_contextual import CONTEXTUAL_MODEL_VERSION
 from squadopt.prediction.football_flag_components import flag_weekly_chances
 from squadopt.prediction.football_match_context import (
@@ -99,6 +106,7 @@ def read_football_forecast(path: Path, inputs: RecommendationInputs) -> Football
         *JOINT_ROLE_MODEL_VERSIONS,
         JOINT_ROLE_FLAG_MODEL_VERSION,
         TEAM_FORM_MODEL_VERSION,
+        COMPOSITE_MODEL_VERSION,
     ):
         raise ValueError("Football forecast has an unsupported model_version.")
     form = version == TEAM_FORM_MODEL_VERSION
@@ -115,7 +123,9 @@ def read_football_forecast(path: Path, inputs: RecommendationInputs) -> Football
     ):
         raise ValueError("Match-context forecast requires its exact feature and head metadata.")
     feature_contract = (
-        TEAM_FORM_FEATURE_VERSION
+        COMPOSITE_FEATURE_VERSION
+        if version == COMPOSITE_MODEL_VERSION
+        else TEAM_FORM_FEATURE_VERSION
         if form
         else MATCH_CONTEXT_FEATURE_VERSION
         if match_context
@@ -132,6 +142,12 @@ def read_football_forecast(path: Path, inputs: RecommendationInputs) -> Football
     ):
         raise ValueError("Retained-history forecast requires its explicit role feature identity.")
     learned_chances = flag_weekly_chances(document)
+    composite_chances = composite_weekly_chances(document)
+    capabilities = football_capabilities(version)
+    if composite_chances is not None and pd.Timestamp(
+        document["composite_metadata"]["decision_at"]
+    ) >= pd.Timestamp(inputs.deadline.deadline_utc):
+        raise ValueError("Composite decision must precede the source deadline.")
     if learned_chances is not None and pd.Timestamp(
         document["flag_metadata"]["deadline_at"]
     ) != pd.Timestamp(inputs.deadline.deadline_utc):
@@ -182,7 +198,7 @@ def read_football_forecast(path: Path, inputs: RecommendationInputs) -> Football
         chance = pd.to_numeric(frame["appearance_probability"], errors="raise")
         if not chance.between(0, 1).all():
             raise ValueError("Football appearance probability outside [0, 1].")
-        learned = learned_chances is not None and week == first
+        learned = capabilities.includes_eligibility(int(cast(int, week)), first)
         result = None if contextual or learned else apply_availability(frame, inputs.availability)
         adjusted_frame = frame if result is None else result.table
         adjusted.append(adjusted_frame)
@@ -195,7 +211,9 @@ def read_football_forecast(path: Path, inputs: RecommendationInputs) -> Football
                 {
                     **(
                         {
-                            "availability_application": "learned_flag_week_law_once"
+                            "availability_application": COMPOSITE_AVAILABILITY_POLICY
+                            if composite_chances is not None
+                            else "learned_flag_week_law_once"
                             if learned
                             else "before_team_shares_v1"
                         }
@@ -209,6 +227,11 @@ def read_football_forecast(path: Path, inputs: RecommendationInputs) -> Football
                     "projection_handoff_fingerprint": document["fingerprint"],
                     "projection_evidence_fingerprint": None,
                     "experimental": True,
+                    **(
+                        {"composite_metadata": document["composite_metadata"]}
+                        if composite_chances is not None
+                        else {}
+                    ),
                 },
             )
     assert first_projection is not None

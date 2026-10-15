@@ -189,7 +189,7 @@ def validate_source(source: ObservedTacticalSource, available_by: str) -> None:
         raise ValueError("Observed tactical source clocks are inconsistent.")
 
 
-def _release(season: str, flag: bool) -> None:
+def validate_training_release(season: str, flag: bool) -> None:
     if type(flag) is not bool:
         raise ValueError("Observed tactical released-season opt-in must be Boolean.")
     _season(season)
@@ -387,7 +387,7 @@ def validate_projection(
 ) -> None:
     if type(p) is not ObservedTacticalProjection:
         raise ValueError("A distinct observed tactical projection is required.")
-    _release(p.season, allow_released_2025_26)
+    validate_training_release(p.season, allow_released_2025_26)
     if (
         p.version != INPUT_VERSION
         or p.context_policy != CONTEXT_POLICY
@@ -488,7 +488,7 @@ def validate_header(
 ) -> None:
     if type(o) is not ObservedTacticalObservation:
         raise ValueError("Observed tactical training requires its distinct immutable DTO.")
-    _release(target_season, allow_released_2025_26)
+    validate_training_release(target_season, allow_released_2025_26)
     if type(target_gameweek) is not int or not 1 <= target_gameweek <= 38:
         raise ValueError("Observed tactical fit target gameweek is invalid.")
     if (
@@ -498,7 +498,7 @@ def validate_header(
     ):
         raise ValueError("Observed tactical fit requires an explicit season allowlist.")
     for season in allowed_seasons:
-        _release(season, allow_released_2025_26)
+        validate_training_release(season, allow_released_2025_26)
         if season > target_season:
             raise ValueError("Observed tactical allowlist contains a future season.")
     p = o.projection

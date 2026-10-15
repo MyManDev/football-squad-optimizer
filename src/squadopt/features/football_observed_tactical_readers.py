@@ -18,11 +18,11 @@ from squadopt.features.football_observed_tactical_inputs import (
     ObservedTacticalProfile,
     ObservedTacticalProjection,
     ObservedTacticalSource,
-    _release,
     sha,
     validate_header,
     validate_outcome,
     validate_projection,
+    validate_training_release,
 )
 from squadopt.features.football_tactical_inputs import TRAITS, _fields, _id, _raw_json, _text
 
@@ -176,7 +176,7 @@ def read_observed_event_fixture(
     The caller's inventory/bridge hashes are provenance declarations; this reader
     verifies retained event bytes and exact selected-row identity, not those external proofs.
     """
-    _release(season, allow_released_2025_26)
+    validate_training_release(season, allow_released_2025_26)
     sha(bridge_sha256)
     sha(complete_inventory_sha256)
     raw = _raw_json(verified_bytes(payload, source.sha256))
@@ -352,7 +352,7 @@ def read_observed_role_rows(
     allow_released_2025_26: bool = False,
 ) -> tuple[ObservedRole, ...]:
     """Read confirmed provider G/D/M/F positions using an explicit per-fixture bridge."""
-    _release(season, allow_released_2025_26)
+    validate_training_release(season, allow_released_2025_26)
     rows = _csv(verified_bytes(payload, source.sha256))
     clubs, identities = dict(club_by_team_side), dict(people)
     if (
@@ -419,7 +419,7 @@ def read_observed_panna_roles(
     allow_released_2025_26: bool = False,
 ) -> tuple[ObservedRole, ...]:
     """Read named provider roles; a Substitute row supplies no positional evidence."""
-    _release(season, allow_released_2025_26)
+    validate_training_release(season, allow_released_2025_26)
     raw = _raw_json(verified_bytes(payload, source.sha256))
     if type(raw) is not list or not 1 <= len(raw) <= 100000:
         raise ValueError("Panna role records require a bounded retained row array.")

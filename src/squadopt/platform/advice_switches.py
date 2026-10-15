@@ -73,7 +73,10 @@ from squadopt.platform.football_minute_basis import (
     football_components_path,
     load_football_minute_basis,
 )
-from squadopt.prediction.football import JOINT_ROLE_COMPONENT_MODEL_VERSIONS
+from squadopt.prediction.football_capabilities import (
+    COMPOSITE_REPROJECTION_VERSION,
+    football_capabilities,
+)
 
 __all__ = [
     "CHIP_SWITCH",
@@ -194,6 +197,14 @@ def switch_identity(
             "rotation_table_sha256": inputs.rotation_table_sha256,
             "ready_bundle_sha256": inputs.football_bundle_sha256,
         }
+        if football_capabilities(inputs.football.horizon.model_version).requires_reprojection:
+            reprojection = inputs.football.projection.diagnostics.get(
+                "composite_reprojection_fingerprint"
+            )
+            if not isinstance(reprojection, str) or len(reprojection) != 64:
+                raise SwitchInputUnavailable(MODEL_SWITCH, "Composite reprojection is unbound.")
+            identity[MODEL_SWITCH]["reprojection_version"] = COMPOSITE_REPROJECTION_VERSION
+            identity[MODEL_SWITCH]["reprojection_fingerprint"] = reprojection
         if inputs.rotation_table_sha256 is not None:
             # Which statements bind is the reader's rule, and the same table read under a
             # different rule is a different input. Named only where news is bound, so a
@@ -593,7 +604,10 @@ def load_switch_inputs(
         football = read_football_forecast(
             football_artifact_path(artifact_root, inputs.snapshot_id), inputs
         )
-        if football.horizon.model_version in JOINT_ROLE_COMPONENT_MODEL_VERSIONS and bundle is None:
+        if (
+            football_capabilities(football.horizon.model_version).requires_ready_bundle
+            and bundle is None
+        ):
             raise ValueError("The joint-role model requires a complete ready bundle.")
         minute_input = load_football_minute_basis(
             artifact_root=artifact_root,

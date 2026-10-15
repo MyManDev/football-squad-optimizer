@@ -7,7 +7,7 @@ measures against the control, and the models of the experimental football lane. 
 are `live`, `scenarios` and `evaluation` in the domain ring, `application`, `platform`, the
 laboratory and the scripts.
 
-Its 45 Python files sit in one folder. This page places every one of them in exactly one
+Its 47 Python files sit in one folder. This page places every one of them in exactly one
 family.
 
 Review: İbrahim, the data side ([ownership](../../../docs/architecture/ownership.md)). Within 24
@@ -41,6 +41,8 @@ Of third-party libraries it imports pandas, NumPy, SciPy and scikit-learn.
 | `baseline.py` | The deterministic baseline expected-points projection: a scoring rate scaled by expected playing time, simple enough to verify by hand. |
 | `integration.py` | The model-neutral hand-off from predicted points to the optimizer contract (`prediction_to_optimization_v1`): `PredictionProvenance`, `PredictionSnapshot` and `prepare_optimizer_projection`. |
 | `components.py` | Typed component predictions before the point-estimate hand-off (`component_prediction_v1`). |
+| `football_capabilities.py` | Code-owned dispatch for role components, applied eligibility and required composite reprojection (`src/squadopt/prediction/football_capabilities.py:43`). |
+| `football_composite_contract.py` | Validates the six-family public manifest and binds served appearance to every final weekly law receipt (`src/squadopt/prediction/football_composite_contract.py:52`). |
 | `config.py` | Explicit configuration of the baseline projection, its coefficients and fallbacks, and the package's errors (`PredictionError`, `PredictionConfigurationError`). |
 | `factors.py` | Maps experiment factors to prediction configuration (`FormWindowMapping`, `form_window_v1`). |
 

@@ -11,10 +11,9 @@ import pandas as pd
 from squadopt.live import RecommendationInputs
 from squadopt.live.minute_evidence import FixtureComponentBasis
 from squadopt.prediction.football import (
-    JOINT_ROLE_COMPONENT_MODEL_VERSIONS,
-    JOINT_ROLE_FLAG_MODEL_VERSION,
     JOINT_ROLE_MODEL_VERSION,
 )
+from squadopt.prediction.football_capabilities import football_capabilities
 
 
 def _point_components(row: Mapping[str, Any], season: str, eligibility: float) -> dict[str, float]:
@@ -42,7 +41,7 @@ def fixture_role_estimates(
     applied_fixtures: Set[tuple[int, int]] = frozenset(),
 ) -> list[dict[str, Any]]:
     """Keep source eligibility separate from model roles; never infer a role from minutes."""
-    if basis is None or basis.companion["model_version"] not in JOINT_ROLE_COMPONENT_MODEL_VERSIONS:
+    if basis is None or not football_capabilities(basis.companion["model_version"]).role_components:
         return []
     rows = basis.fixture_rows if revised_rows is None else revised_rows
     multipliers = {
@@ -56,7 +55,9 @@ def fixture_role_estimates(
         source_eligibility = multipliers[int(row["player_code"])]
         eligibility = (
             1.0
-            if basis.served["model_version"] == JOINT_ROLE_FLAG_MODEL_VERSION
+            if football_capabilities(basis.served["model_version"]).includes_eligibility(
+                int(row["GW"]), int(inputs.deadline.gameweek)
+            )
             else source_eligibility
         )
         estimates.append(
@@ -164,7 +165,7 @@ def role_forecast_summary(
     *,
     model_version: str = JOINT_ROLE_MODEL_VERSION,
 ) -> dict[str, Any] | None:
-    if model_version not in JOINT_ROLE_COMPONENT_MODEL_VERSIONS:
+    if not football_capabilities(model_version).role_components:
         return None
     rows = diagnostics.get("fixture_role_estimates")
     if not isinstance(rows, list):

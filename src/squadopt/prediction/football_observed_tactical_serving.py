@@ -20,11 +20,11 @@ from squadopt.features.football_observed_tactical_inputs import (
     ROLES,
     STYLE_VERSION,
     ObservedTacticalProjection,
-    _release,
     digest,
     instant,
     sha,
     validate_projection,
+    validate_training_release,
 )
 from squadopt.features.football_tactical_inputs import (
     ATTACK_TRAITS,
@@ -228,7 +228,7 @@ def _validate(m: ObservedTacticalServingMetadata) -> None:
     sha(m.original_metadata_sha256)
     instant(m.cutoff)
     observations = _count(m.observation_count, 1)
-    _release(m.target_season, m.allow_released_2025_26)
+    validate_training_release(m.target_season, m.allow_released_2025_26)
     if not 1 <= _count(m.target_gameweek) <= 38:
         raise ValueError("Observed tactical serving target gameweek is invalid.")
     if (
@@ -238,7 +238,7 @@ def _validate(m: ObservedTacticalServingMetadata) -> None:
     ):
         raise ValueError("Observed tactical serving season allowlist is invalid.")
     for season in m.allowed_seasons:
-        _release(season, m.allow_released_2025_26)
+        validate_training_release(season, m.allow_released_2025_26)
         if season > m.target_season:
             raise ValueError("Observed tactical serving includes a future training season.")
     for head, transform, gamma, events in (

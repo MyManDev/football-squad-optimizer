@@ -2,6 +2,7 @@
 
 | Task | Procedure |
 | --- | --- |
+| Inspect composite family identities and runtime dispatch (`src/squadopt/prediction/football_capabilities.py:43`) | [Composite runtime contract](football_composite_runtime.md) |
 | Construct explicit joint participation states for phase allocation | [Phase participation coupling](football_phase_coupling.md) |
 | Compose flag, LOAD and verified evidence on one weekly minute law | [Joint weekly law](football_joint_week_law.md) (`src/squadopt/prediction/football_joint_week_law.py:370`) |
 | Inspect discovered infrastructure and start the prepared API/worker deployment | [Operations inventory](../architecture/operations_inventory.md) |
