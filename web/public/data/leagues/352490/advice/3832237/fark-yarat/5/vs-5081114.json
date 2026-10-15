@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-10-14T14:20:21Z",
+  "generated_at_utc": "2026-10-15T14:15:28Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "fark-yarat",
     "window": 5,
-    "source_snapshot_id": "fpl-live-20261014T135921Z-a48d1521c87f",
+    "source_snapshot_id": "fpl-live-20261015T130038Z-7a7a388a3a43",
     "moves": [
       {
         "move_id": "gw07-1",
@@ -36,7 +36,7 @@
     "expected_points_cost": 0.0,
     "rival_label": "entry-5081114",
     "solver_status": "FEASIBLE",
-    "optimality_gap": 12.837999999999965,
+    "optimality_gap": 10.267999999999972,
     "wall_clock_stopped_the_search": false,
     "expected_own_points": 46.38563201772037,
     "captain": {
@@ -211,6 +211,58 @@
         "gameweek": 8,
         "transfers_in": [
           {
+            "player_id": 17761,
+            "name": "James Tarkowski",
+            "short_name": "Tarkowski",
+            "position": "DEF",
+            "team": "Everton"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 472769,
+            "name": "Nico O'Reilly",
+            "short_name": "O'Reilly",
+            "position": "DEF",
+            "team": "Man City"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 5,
+        "free_transfers_after": 5,
+        "expected_points": 48.27169553187337
+      },
+      {
+        "gameweek": 9,
+        "transfers_in": [
+          {
+            "player_id": 444102,
+            "name": "Francisco Evanilson de Lima Barbosa",
+            "short_name": "Barbosa",
+            "position": "FWD",
+            "team": "Bournemouth"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 178301,
+            "name": "Ollie Watkins",
+            "short_name": "Watkins",
+            "position": "FWD",
+            "team": "Aston Villa"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 5,
+        "free_transfers_after": 5,
+        "expected_points": 49.199524388900095
+      },
+      {
+        "gameweek": 10,
+        "transfers_in": [
+          {
             "player_id": 154043,
             "name": "Ainsley Maitland-Niles",
             "short_name": "Maitland-Niles",
@@ -231,85 +283,33 @@
         "chip": null,
         "free_transfers_before": 5,
         "free_transfers_after": 5,
-        "expected_points": 47.671765270820366
-      },
-      {
-        "gameweek": 9,
-        "transfers_in": [
-          {
-            "player_id": 173878,
-            "name": "Jay Dasilva",
-            "short_name": "Dasilva",
-            "position": "DEF",
-            "team": "Coventry City"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 472769,
-            "name": "Nico O'Reilly",
-            "short_name": "O'Reilly",
-            "position": "DEF",
-            "team": "Man City"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 5,
-        "free_transfers_after": 5,
-        "expected_points": 47.671765270820366
-      },
-      {
-        "gameweek": 10,
-        "transfers_in": [
-          {
-            "player_id": 631786,
-            "name": "Jonah Kusi-Asare",
-            "short_name": "Kusi-Asare",
-            "position": "FWD",
-            "team": "Fulham"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 178301,
-            "name": "Ollie Watkins",
-            "short_name": "Watkins",
-            "position": "FWD",
-            "team": "Aston Villa"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 5,
-        "free_transfers_after": 5,
-        "expected_points": 47.671765270820366
+        "expected_points": 50.13806829910656
       },
       {
         "gameweek": 11,
         "transfers_in": [
           {
-            "player_id": 223094,
-            "name": "Erling Haaland",
-            "short_name": "Haaland",
-            "position": "FWD",
-            "team": "Man City"
+            "player_id": 141746,
+            "name": "Bruno Borges Fernandes",
+            "short_name": "Fernandes",
+            "position": "MID",
+            "team": "Man Utd"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 502500,
-            "name": "Igor Thiago Nascimento Rodrigues",
-            "short_name": "Rodrigues",
-            "position": "FWD",
-            "team": "Brentford"
+            "player_id": 446008,
+            "name": "Bryan Mbeumo",
+            "short_name": "Mbeumo",
+            "position": "MID",
+            "team": "Man Utd"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 5,
         "free_transfers_after": 5,
-        "expected_points": 55.17698248965584
+        "expected_points": 52.73452810567659
       }
     ],
     "stated_limits": [
@@ -325,7 +325,7 @@
     "missing_fields": [],
     "squad_basis": "captured",
     "control_solver_status": "FEASIBLE",
-    "control_optimality_gap": 12.837999999999965,
+    "control_optimality_gap": 10.267999999999972,
     "rival_entry_id": 5081114,
     "overlap_count": 2,
     "transfer_cap": 1,
@@ -333,7 +333,7 @@
     "overlap_applied": 5,
     "plan_kind": "within_free_transfers",
     "alternative_plan": null,
-    "expected_gap_vs_rival": -7.357833290126592,
+    "expected_gap_vs_rival": -7.3154631060915705,
     "captain_agreement": false
   }
 }

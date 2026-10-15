@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-10-14T14:20:21Z",
+  "generated_at_utc": "2026-10-15T14:15:28Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "ortak-koru",
     "window": 5,
-    "source_snapshot_id": "fpl-live-20261014T135921Z-a48d1521c87f",
+    "source_snapshot_id": "fpl-live-20261015T130038Z-7a7a388a3a43",
     "moves": [
       {
         "move_id": "gw07-1",
@@ -27,13 +27,13 @@
           "position": "DEF",
           "team": "Spurs"
         },
-        "expected_points_delta": 0.58068578395239,
+        "expected_points_delta": 0.6230559679874261,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 0.58068578395239,
-    "expected_points_cost": 0.3913615126452328,
+    "expected_gain_vs_hold": 0.6230559679874261,
+    "expected_points_cost": 0.0,
     "rival_label": "entry-6880255",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
@@ -220,18 +220,18 @@
         ],
         "transfers_out": [
           {
-            "player_id": 540324,
-            "name": "Mohamed Belloumi",
-            "short_name": "Belloumi",
+            "player_id": 577725,
+            "name": "Josh King",
+            "short_name": "King",
             "position": "MID",
-            "team": "Hull City"
+            "team": "Fulham"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 56.249058316717594
+        "expected_points": 56.094295619539864
       },
       {
         "gameweek": 9,
@@ -257,7 +257,7 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 57.47728091081187
+        "expected_points": 57.32251821363414
       },
       {
         "gameweek": 10,
@@ -283,33 +283,33 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 57.61320686969876
+        "expected_points": 57.45844417252103
       },
       {
         "gameweek": 11,
         "transfers_in": [
           {
-            "player_id": 215413,
-            "name": "Kiernan Dewsbury-Hall",
-            "short_name": "Dewsbury-Hall",
-            "position": "MID",
+            "player_id": 17761,
+            "name": "James Tarkowski",
+            "short_name": "Tarkowski",
+            "position": "DEF",
             "team": "Everton"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 577725,
-            "name": "Josh King",
-            "short_name": "King",
-            "position": "MID",
-            "team": "Fulham"
+            "player_id": 469142,
+            "name": "Jan Paul van Hecke",
+            "short_name": "Hecke",
+            "position": "DEF",
+            "team": "Spurs"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 58.429558166521616
+        "expected_points": 58.47597749929325
       }
     ],
     "stated_limits": [
@@ -325,7 +325,7 @@
     "missing_fields": [],
     "squad_basis": "captured",
     "control_solver_status": "FEASIBLE",
-    "control_optimality_gap": 1.3450000000000273,
+    "control_optimality_gap": 3.1899999999999977,
     "rival_entry_id": 6880255,
     "overlap_count": 4,
     "transfer_cap": 1,

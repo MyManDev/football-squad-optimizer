@@ -39,7 +39,7 @@ from squadopt.application.projection_handoff import (
 from squadopt.application.projection_handoff import (
     build as _build_handoff,
 )
-from squadopt.platform.projection_retention import publish_retained_handoff
+from squadopt.platform.storage.projection_retention import publish_retained_handoff
 
 
 def build(*args, **kwargs):

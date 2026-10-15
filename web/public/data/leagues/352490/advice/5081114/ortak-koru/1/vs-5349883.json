@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-10-14T14:20:21Z",
+  "generated_at_utc": "2026-10-15T14:15:28Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "ortak-koru",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20261014T135921Z-a48d1521c87f",
+    "source_snapshot_id": "fpl-live-20261015T130038Z-7a7a388a3a43",
     "moves": [
       {
         "move_id": "gw07-1",
@@ -27,18 +27,18 @@
           "position": "DEF",
           "team": "Spurs"
         },
-        "expected_points_delta": 0.8106195283750424,
+        "expected_points_delta": 0.8106195283750566,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 0.8106195283750424,
-    "expected_points_cost": 0.41760306571922,
+    "expected_gain_vs_hold": 0.8106195283750566,
+    "expected_points_cost": 0.4176030657192342,
     "rival_label": "entry-5349883",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
     "wall_clock_stopped_the_search": false,
-    "expected_own_points": 54.792033935404504,
+    "expected_own_points": 54.74966375136948,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
@@ -86,7 +86,7 @@
         "short_name": "Mej\u00eda",
         "position": "DEF",
         "team": "Nott'm Forest",
-        "expected_points": 2.725523860875885
+        "expected_points": 2.6831536768408566
       },
       {
         "player_id": 141746,
@@ -188,7 +188,7 @@
     "missing_fields": [],
     "squad_basis": "captured",
     "rival_entry_id": 5349883,
-    "expected_points_cost_ceiling": 0.41760306571922,
+    "expected_points_cost_ceiling": 0.4176030657192342,
     "overlap_count": 2,
     "transfer_cap": 1,
     "overlap_target": 9,
@@ -198,10 +198,10 @@
       "kind": "with_hits",
       "overlap_applied": 9,
       "transfer_hit_points": 28.0,
-      "expected_points_cost": 27.70891372856788,
-      "expected_points_cost_ceiling": 27.70891372856788
+      "expected_points_cost": 28.028612998800995,
+      "expected_points_cost_ceiling": 28.028612998800995
     },
-    "expected_gap_vs_rival": 9.024603625871201,
+    "expected_gap_vs_rival": 8.982233441836179,
     "captain_agreement": false,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0

@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-10-14T14:20:21Z",
+  "generated_at_utc": "2026-10-15T14:15:28Z",
   "source_kind": "live",
   "payload": {
     "league_id": 352490,
@@ -55,8 +55,8 @@
         "short_name": "Mej\u00eda",
         "position": "DEF",
         "team": "Nott'm Forest",
-        "price_tenths": 54,
-        "expected_points": 2.725523860875885,
+        "price_tenths": 53,
+        "expected_points": 2.6831536768408566,
         "event_points": null,
         "is_captain": false,
         "is_vice_captain": false,
@@ -303,13 +303,21 @@
     "squad_basis": "captured",
     "active_chip": null,
     "purchase_prices_known": true,
-    "squad_sell_value_tenths": 988,
-    "spendable_budget_tenths": 992,
-    "source_snapshot_id": "fpl-live-20261014T135921Z-a48d1521c87f",
+    "squad_sell_value_tenths": 987,
+    "spendable_budget_tenths": 991,
+    "source_snapshot_id": "fpl-live-20261015T130038Z-7a7a388a3a43",
     "squadopt_comparison": null,
     "data_quality": "complete",
     "missing_fields": [],
     "device_plan": {
+      "top100_weights": [
+        5,
+        10,
+        20,
+        30,
+        40,
+        50
+      ],
       "held": [
         154561,
         146426,
@@ -332,7 +340,7 @@
       "sell_tenths": {
         "154561": 60,
         "146426": 42,
-        "247348": 54,
+        "247348": 53,
         "465730": 50,
         "141746": 119,
         "223340": 95,

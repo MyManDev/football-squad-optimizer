@@ -21,7 +21,8 @@ file holds the five to one another:
   `docs/architecture/dependency_rules.md`;
 - the package map's table matches the mapping row for row, gives each package its position in
   the layers list, and names, by the keys of its contract table, exactly the contracts that hold
-  the package as a source (the layers contract holds every package).
+  the package as a source (a layers contract holds the packages under its containers: the
+  top-level one every package, the platform units one only `platform`).
 
 A package that spans two rings, such as `data` (vocabulary and storage), is written with both
 rings, innermost first, exactly as the table writes it, and is placed by its innermost ring.
@@ -91,6 +92,14 @@ def _layers() -> list[str]:
     assert contract["exhaustive"] is True
     layers: list[str] = contract["layers"]
     return layers
+
+
+def _covers(container: str, package: str) -> bool:
+    """Whether a layers contract with this container holds `package`."""
+
+    return container in ("squadopt", f"squadopt.{package}") or container.startswith(
+        f"squadopt.{package}."
+    )
 
 
 def _depth(ring: str) -> int:
@@ -190,7 +199,10 @@ def test_the_package_map_places_every_package_by_ring_layer_and_contract() -> No
             {
                 contract["name"]
                 for contract in contracts
-                if contract["type"] == "layers"
+                if (
+                    contract["type"] == "layers"
+                    and any(_covers(container, name) for container in contract["containers"])
+                )
                 or f"squadopt.{name}" in contract.get("source_modules", [])
             },
         )

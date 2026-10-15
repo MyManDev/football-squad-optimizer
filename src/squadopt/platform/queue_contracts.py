@@ -4,9 +4,9 @@ from collections.abc import Callable
 from contextlib import AbstractContextManager
 from typing import Final, Protocol
 
-from squadopt.platform._queue_lock import QueueLockTimeout as QueueLockTimeout
 from squadopt.platform.advice_cache import AdviceCacheRepository
 from squadopt.platform.jobs_contract import AdviceJob
+from squadopt.platform.storage._queue_lock import QueueLockTimeout as QueueLockTimeout
 
 DEFAULT_LEASE_SECONDS: Final = 300.0
 #: How long a finished job (completed or failed) stays among the queue's records before it

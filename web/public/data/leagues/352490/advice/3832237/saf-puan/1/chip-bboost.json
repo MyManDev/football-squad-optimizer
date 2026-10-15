@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-10-14T14:20:21Z",
+  "generated_at_utc": "2026-10-15T14:15:28Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "saf-puan",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20261014T135921Z-a48d1521c87f",
+    "source_snapshot_id": "fpl-live-20261015T130038Z-7a7a388a3a43",
     "moves": [
       {
         "move_id": "gw07-1",
@@ -97,24 +97,24 @@
           "team": "Man City"
         },
         "player_in": {
-          "player_id": 226182,
-          "name": "Jayden Bogle",
-          "short_name": "Bogle",
+          "player_id": 220627,
+          "name": "James Justin",
+          "short_name": "Justin",
           "position": "DEF",
           "team": "Leeds"
         },
-        "expected_points_delta": 0.904070005213157,
+        "expected_points_delta": 0.5327973799199697,
         "reason_code": "points_gain"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 17.504864371922714,
+    "expected_gain_vs_hold": 17.133591746629527,
     "expected_points_cost": 0.0,
     "rival_label": null,
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
     "wall_clock_stopped_the_search": false,
-    "expected_own_points": 65.23271538163195,
+    "expected_own_points": 64.86144275633875,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
@@ -149,12 +149,12 @@
         "expected_points": 3.7238127105475085
       },
       {
-        "player_id": 226182,
-        "name": "Jayden Bogle",
-        "short_name": "Bogle",
+        "player_id": 220627,
+        "name": "James Justin",
+        "short_name": "Justin",
         "position": "DEF",
         "team": "Leeds",
-        "expected_points": 3.3417494626606894
+        "expected_points": 2.970476837367497
       },
       {
         "player_id": 231416,
@@ -267,7 +267,7 @@
     "control_optimality_gap": 0.0,
     "chip_choice": {
       "chip": "bboost",
-      "gain_vs_no_chip": 9.373455485403653,
+      "gain_vs_no_chip": 9.002182860110452,
       "basis": "one_week_expected_points_v1",
       "windows_left": {
         "first_half": {

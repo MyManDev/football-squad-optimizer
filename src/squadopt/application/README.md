@@ -160,8 +160,8 @@ ARCHITECTURE.md measures and schedules these; this list says where they are.
 
 - **Storage imports.** Modules here import the storage half of `squadopt.data` (captures,
   atomic writes, loaders) directly. The remedy is storage ports declared in `ports/`, with
-  file adapters in `squadopt.platform.storage` (ADR 0011, decision 1; both homes exist and
-  hold no module yet). Until then the contract "Use cases, domain records and features
+  file adapters in `squadopt.platform.storage` (ADR 0011, decision 1; both homes exist, and `storage` holds the shared durable-state
+  modules but no adapter yet). Until then the contract "Use cases, domain records and features
   import no storage or source module" holds them to today's imports: 89 edges from 30 modules,
   each an `ignore_imports` entry that may only go.
 - **File access.** 24 modules here read or write files themselves, among them
