@@ -14,12 +14,23 @@ import types
 from contextlib import suppress
 from dataclasses import fields, is_dataclass
 from datetime import datetime
+from functools import lru_cache
 from typing import Any, Literal, TypeVar, Union, cast, get_args, get_origin, get_type_hints
 
 T = TypeVar("T")
 MAX_SOURCE_BYTES = 8 * 1024 * 1024
 MAX_VECTOR_ITEMS = 20000
 MAX_DEPTH = 24
+
+
+@lru_cache(maxsize=128)
+def _declared_fields(expected: type[Any]) -> tuple[tuple[str, Any], ...]:
+    """Cache only code-selected DTO schemas, never a payload-selected type."""
+    names = tuple(field.name for field in fields(expected))
+    hints = get_type_hints(expected)
+    if set(hints) != set(names):
+        raise ValueError("Composite source type lacks exact field annotations.")
+    return tuple((name, hints[name]) for name in names)
 
 
 def _object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
@@ -58,15 +69,12 @@ def _decode(value: Any, expected: Any, depth: int = 0) -> Any:
             _decode(item, item_type, depth + 1) for item, item_type in zip(value, args, strict=True)
         )
     if isinstance(expected, type) and is_dataclass(expected):
-        names = {field.name for field in fields(expected)}
-        if type(value) is not dict or set(value) != names:
+        declared = _declared_fields(expected)
+        if type(value) is not dict or set(value) != {name for name, _ in declared}:
             raise ValueError("Composite source fields differ from the declared DTO.")
-        hints = get_type_hints(expected)
-        if set(hints) != names:
-            raise ValueError("Composite source type lacks exact field annotations.")
         try:
             return expected(
-                **{name: _decode(value[name], hints[name], depth + 1) for name in names}
+                **{name: _decode(value[name], hint, depth + 1) for name, hint in declared}
             )
         except (TypeError, OverflowError, AttributeError) as error:
             raise ValueError("Composite source DTO failed construction.") from error
