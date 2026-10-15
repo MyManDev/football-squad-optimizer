@@ -24,6 +24,7 @@ from numpy.typing import ArrayLike
 from squadopt.features.football_unit_inputs import (
     UNIT_INPUT_VERSION,
     UNIT_PREFIX_CLOCK_VERSION,
+    NumericAttributeSpec,
     SourceRecord,
     UnitExposureClock,
     UnitHistoricalReplay,
@@ -33,10 +34,17 @@ from squadopt.features.football_unit_inputs import (
 from squadopt.live.minute_evidence import COMPONENT_COLUMNS, IDENTITY_COLUMNS, _validate_components
 from squadopt.prediction.football import FOOTBALL_MODEL_VERSION
 from squadopt.prediction.football_unit_strength import (
+    UNIT_ALL_UNOBSERVED_SEMANTICS,
     UNIT_FEATURE_VERSION,
     UNIT_MODEL_VERSION,
     UNIT_REPLAY_FIT_VERSION,
+    UNIT_RESIDUAL_MISSINGNESS_SEMANTICS,
+    UNIT_SOURCE_MISSINGNESS_FEATURE_VERSION,
+    UNIT_SOURCE_MISSINGNESS_MODEL_VERSION,
+    UNIT_SOURCE_MISSINGNESS_POLICY,
     UnitStrengthResult,
+    source_attribute_groups,
+    source_missingness_base_columns,
 )
 from squadopt.scenarios.expected_lineup import ExpectedLineupSearchResult, improve_expected_lineup
 
@@ -255,18 +263,76 @@ def _replay_fit_receipts(
         raise ValueError("Malformed unit replay or exposure receipt.") from error
 
 
+def _missingness_feature_receipt(result: UnitStrengthResult) -> None:
+    metadata = result.metadata
+    keys = {
+        "missingness_policy",
+        "source_attribute_groups",
+        "all_unobserved_semantics",
+        "residual_missingness_semantics",
+    }
+    if result.model_version == UNIT_MODEL_VERSION:
+        if (
+            metadata.get("feature_version") != UNIT_FEATURE_VERSION
+            or keys & metadata.keys()
+            or any(name.endswith(":all_attributes_unobserved") for name in result.feature_contract)
+        ):
+            raise ValueError("Legacy unit results cannot claim source missingness features.")
+        return
+    if (
+        result.model_version != UNIT_SOURCE_MISSINGNESS_MODEL_VERSION
+        or metadata.get("feature_version") != UNIT_SOURCE_MISSINGNESS_FEATURE_VERSION
+        or metadata.get("missingness_policy") != UNIT_SOURCE_MISSINGNESS_POLICY
+        or metadata.get("all_unobserved_semantics") != UNIT_ALL_UNOBSERVED_SEMANTICS
+        or metadata.get("residual_missingness_semantics") != UNIT_RESIDUAL_MISSINGNESS_SEMANTICS
+        or metadata.get("regularization") != 0.1
+    ):
+        raise ValueError("Unit source missingness requires its exact version and policy.")
+    vocabulary, contract = metadata.get("player_vocabulary"), metadata.get("attribute_contract")
+    if (
+        not isinstance(vocabulary, tuple)
+        or not vocabulary
+        or tuple(sorted({_positive_id(x) for x in vocabulary})) != vocabulary
+        or not isinstance(contract, tuple)
+    ):
+        raise ValueError("Source missingness requires its fitted identity and attribute contract.")
+    specs = []
+    for item in contract:
+        if (
+            not isinstance(item, tuple)
+            or len(item) != 8
+            or not isinstance(item[6], str)
+            or not item[6]
+            or item[7] not in ("synthetic", "provider", "fm")
+        ):
+            raise ValueError("Malformed source attribute contract.")
+        source_id, name, minimum, maximum, unit, definition, _, _ = item
+        specs.append(NumericAttributeSpec(name, source_id, minimum, maximum, unit, definition))
+    if len({(s.source_id, s.name) for s in specs}) != len(specs):
+        raise ValueError("Source attribute contract contains duplicated definitions.")
+    attributes = tuple(specs)
+    groups = tuple(
+        (identity, tuple(spec.name for spec in group))
+        for identity, group in source_attribute_groups(attributes)
+    )
+    base = source_missingness_base_columns(vocabulary, attributes)
+    expected = base + tuple(f"home_interaction:{column}" for column in base)
+    if metadata.get("source_attribute_groups") != groups or result.feature_contract != expected:
+        raise ValueError("Source missingness features disagree with their declared source groups.")
+
+
 def _result_receipt(result: UnitStrengthResult) -> str:
     metadata = result.metadata
     if (
         not isinstance(metadata, MappingProxyType)
         or metadata.get("input_version") != UNIT_INPUT_VERSION
-        or metadata.get("feature_version") != UNIT_FEATURE_VERSION
         or not result.feature_contract
         or len(set(result.feature_contract)) != len(result.feature_contract)
         or any(not isinstance(x, str) or not x for x in result.feature_contract)
         or metadata.get("feature_columns") != result.feature_contract
     ):
         raise ValueError("Unit results require their immutable declared feature contract.")
+    _missingness_feature_receipt(result)
     try:
         training_cutoff = datetime.fromisoformat(str(metadata["training_cutoff"]))
     except (KeyError, ValueError) as error:
@@ -359,6 +425,15 @@ def _result_receipt(result: UnitStrengthResult) -> str:
     projection_ids = source_group(
         metadata.get("projection_source_receipts"), result.decision_cutoff, current=True
     )
+    if result.model_version == UNIT_SOURCE_MISSINGNESS_MODEL_VERSION:
+        attribute_contract = metadata["attribute_contract"]
+        assert isinstance(attribute_contract, tuple)
+        families = {(row[0], row[6], row[7]) for row in attribute_contract}
+        for group in (*training_sources, metadata["projection_source_receipts"]):
+            assert isinstance(group, tuple)
+            actual_families = {(row[0], row[1], row[2]) for row in group}
+            if not families <= actual_families:
+                raise ValueError("Attribute source families must match every source receipt group.")
     for name in ("baseline_source_id", "reference_source_id", "projection_source_id"):
         if not isinstance(metadata.get(name), str) or not metadata[name]:
             raise ValueError("Unit results require named source families.")
@@ -385,6 +460,8 @@ def _result_receipt(result: UnitStrengthResult) -> str:
             for s in result.state_rates
         ],
     }
+    if result.model_version == UNIT_SOURCE_MISSINGNESS_MODEL_VERSION:
+        payload["model_version"] = result.model_version
     return json.dumps(payload, sort_keys=True, allow_nan=False)
 
 
@@ -449,9 +526,14 @@ def unit_fixture_components(
     by_fixture = {}
     cutoffs: dict[int, datetime] = {}
     receipts = []
+    model_versions = set()
     for result in results:
-        if not isinstance(result, UnitStrengthResult) or result.model_version != UNIT_MODEL_VERSION:
+        if not isinstance(result, UnitStrengthResult) or result.model_version not in (
+            UNIT_MODEL_VERSION,
+            UNIT_SOURCE_MISSINGNESS_MODEL_VERSION,
+        ):
             raise ValueError("An explicitly identified unit-strength result is required.")
+        model_versions.add(result.model_version)
         _positive_id(result.fixture_id)
         for identity in (result.gameweek, result.club, result.opponent):
             _positive_id(identity)
@@ -470,6 +552,8 @@ def unit_fixture_components(
         if result.fixture_id in by_fixture:
             raise ValueError("Only one paired unit result per fixture is permitted.")
         by_fixture[result.fixture_id] = result
+    if len(model_versions) != 1:
+        raise ValueError("One component artifact requires one declared unit model version.")
     if set(by_fixture) != set(out.fixture):
         raise ValueError("Every retained fixture requires exactly one paired unit result.")
     for fixture, rows in out.groupby("fixture", sort=False):
@@ -578,7 +662,7 @@ def unit_fixture_components(
     out["expected_points"] = np.maximum(raw, 0)
     if not np.isfinite(out[["goals", "assists", "raw_expected_points"]]).all().all():
         raise ValueError("Adjusted component calculations must remain finite.")
-    out["model_version"] = UNIT_MODEL_VERSION
+    out["model_version"] = next(iter(model_versions))
     out.attrs["component_version"] = UNIT_COMPONENT_VERSION
     out.attrs["minute_state_relation"] = "retained native minutes independent of unit states"
     out.attrs["decision_cutoffs"] = tuple(sorted(cutoffs.items()))

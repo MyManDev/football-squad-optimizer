@@ -27,6 +27,7 @@ from squadopt.features.football_unit_inputs import (
     UNIT_INPUT_VERSION,
     UNIT_PREFIX_CLOCK_VERSION,
     ClubUnit,
+    NumericAttributeSpec,
     ProjectedUnitState,
     UnitInputCatalog,
     UnitObservation,
@@ -37,6 +38,64 @@ from squadopt.features.football_unit_inputs import (
 UNIT_MODEL_VERSION = "football_projected_unit_strength_v1"
 UNIT_FEATURE_VERSION = "reference_relative_unit_identity_attributes_v1"
 UNIT_REPLAY_FIT_VERSION = "football_unit_public_replay_quantized_prefix_fit_v1"
+UNIT_LEGACY_MISSINGNESS_POLICY = "per_attribute_v1"
+UNIT_SOURCE_MISSINGNESS_POLICY = "source_all_unobserved_residual_v2"
+UNIT_SOURCE_MISSINGNESS_MODEL_VERSION = "football_projected_unit_source_missingness_v2"
+UNIT_SOURCE_MISSINGNESS_FEATURE_VERSION = "reference_relative_unit_source_missingness_v2"
+UNIT_ALL_UNOBSERVED_SEMANTICS = "all declared attributes of this source unobserved; count / 11"
+UNIT_RESIDUAL_MISSINGNESS_SEMANTICS = (
+    "missing trait among players with at least one observed declared attribute of this source; "
+    "count / 11"
+)
+
+
+def source_attribute_groups(
+    attributes: tuple[NumericAttributeSpec, ...],
+) -> tuple[tuple[str, tuple[NumericAttributeSpec, ...]], ...]:
+    """Group only attributes of the same logical source identity."""
+    return tuple(
+        (
+            source_id,
+            tuple(
+                sorted(
+                    (spec for spec in attributes if spec.source_id == source_id),
+                    key=lambda spec: spec.name,
+                )
+            ),
+        )
+        for source_id in sorted({spec.source_id for spec in attributes})
+    )
+
+
+def source_missingness_base_columns(
+    vocabulary: tuple[int, ...], attributes: tuple[NumericAttributeSpec, ...]
+) -> tuple[str, ...]:
+    return tuple(
+        column
+        for side in ("own", "opponent")
+        for column in (
+            *(f"{side}_player_{identity}" for identity in vocabulary),
+            *(
+                f"{side}_{position}_{label}"
+                for position in POSITIONS
+                for label in (
+                    "count",
+                    *(
+                        label
+                        for source_id, specs in source_attribute_groups(attributes)
+                        for label in (
+                            f"{source_id}:all_attributes_unobserved",
+                            *(
+                                f"{source_id}:{spec.name}_{suffix}"
+                                for spec in specs
+                                for suffix in ("value", "residual_missing")
+                            ),
+                        )
+                    ),
+                )
+            ),
+        )
+    )
 
 
 def _canonical(value: Any) -> str:
@@ -143,10 +202,20 @@ class FootballUnitStrengthModel:
         *,
         cutoff: datetime,
         allow_released_2025_26: bool = False,
+        missingness_policy: str = UNIT_LEGACY_MISSINGNESS_POLICY,
     ):
         utc_time(cutoff, "fitting cutoff")
         if type(allow_released_2025_26) is not bool:
             raise ValueError("Released season use must be an explicit boolean.")
+        if type(missingness_policy) is not str or missingness_policy not in (
+            UNIT_LEGACY_MISSINGNESS_POLICY,
+            UNIT_SOURCE_MISSINGNESS_POLICY,
+        ):
+            raise ValueError("Unit missingness requires an explicitly supported policy.")
+        self.missingness_policy = missingness_policy
+        if missingness_policy == UNIT_SOURCE_MISSINGNESS_POLICY:
+            self.model_version = UNIT_SOURCE_MISSINGNESS_MODEL_VERSION
+            self.feature_version = UNIT_SOURCE_MISSINGNESS_FEATURE_VERSION
         observations = tuple(
             sorted(observations, key=lambda x: (x.season, x.fixture_id, x.start_minute, x.own.club))
         )
@@ -313,6 +382,12 @@ class FootballUnitStrengthModel:
                 ),
             )
         )
+        if missingness_policy == UNIT_SOURCE_MISSINGNESS_POLICY:
+            self._source_attribute_groups = source_attribute_groups(self.attributes)
+            self._base_columns = source_missingness_base_columns(
+                self.player_vocabulary, self.attributes
+            )
+            self._unit_width = len(self._base_columns) // 2
         # Venue modifies unit gaps. An uncentered home/intercept term would alter
         # an identical reference and double count baseline venue information.
         self.feature_contract = self._base_columns + tuple(
@@ -416,6 +491,10 @@ class FootballUnitStrengthModel:
         )
 
     def _unit_values(self, catalog: UnitInputCatalog, unit: ClubUnit) -> dict[int, float]:
+        if getattr(self, "missingness_policy", UNIT_LEGACY_MISSINGNESS_POLICY) == (
+            UNIT_SOURCE_MISSINGNESS_POLICY
+        ):
+            return self._source_unit_values(catalog, unit)
         values = {
             self._identity_indexes[x.player_id]: 1.0
             for x in unit.players
@@ -438,6 +517,44 @@ class FootballUnitStrengthModel:
                 if missing:
                     values[offset + 1] = missing
                 offset += 2
+        return values
+
+    def _source_unit_values(self, catalog: UnitInputCatalog, unit: ClubUnit) -> dict[int, float]:
+        values = {
+            self._identity_indexes[x.player_id]: 1.0
+            for x in unit.players
+            if x.player_id in self._identity_indexes
+        }
+        offset = len(self.player_vocabulary)
+        for position in POSITIONS:
+            players = [x.player_id for x in unit.players if x.position == position]
+            if players:
+                values[offset] = len(players) / 11
+            offset += 1
+            for _, specs in self._source_attribute_groups:
+                profiles = [
+                    tuple(catalog.value(identity, spec) for spec in specs) for identity in players
+                ]
+                observed = [any(value is not None for value in row) for row in profiles]
+                all_unobserved = sum(not present for present in observed) / 11
+                if all_unobserved:
+                    values[offset] = all_unobserved
+                offset += 1
+                for index, _ in enumerate(specs):
+                    numeric = [row[index] for row in profiles]
+                    measured = math.fsum(value / 11 for value in numeric if value is not None)
+                    residual_missing = (
+                        sum(
+                            present and row[index] is None
+                            for present, row in zip(observed, profiles, strict=True)
+                        )
+                        / 11
+                    )
+                    if measured:
+                        values[offset] = measured
+                    if residual_missing:
+                        values[offset + 1] = residual_missing
+                    offset += 2
         return values
 
     def _unit(self, catalog: UnitInputCatalog, unit: ClubUnit) -> list[float]:
@@ -534,6 +651,19 @@ class FootballUnitStrengthModel:
         state_rates = tuple(self._state_rates(projection, state) for state in states)
         own_rate = math.fsum(x.probability * x.own_goal_rate for x in state_rates)
         opponent_rate = math.fsum(x.probability * x.opponent_goal_rate for x in state_rates)
+        missingness_metadata: dict[str, object] = {}
+        if getattr(self, "missingness_policy", UNIT_LEGACY_MISSINGNESS_POLICY) == (
+            UNIT_SOURCE_MISSINGNESS_POLICY
+        ):
+            missingness_metadata = {
+                "missingness_policy": UNIT_SOURCE_MISSINGNESS_POLICY,
+                "source_attribute_groups": tuple(
+                    (source_id, tuple(spec.name for spec in specs))
+                    for source_id, specs in self._source_attribute_groups
+                ),
+                "all_unobserved_semantics": UNIT_ALL_UNOBSERVED_SEMANTICS,
+                "residual_missingness_semantics": UNIT_RESIDUAL_MISSINGNESS_SEMANTICS,
+            }
         metadata: Mapping[str, object] = MappingProxyType(
             {
                 "input_version": UNIT_INPUT_VERSION,
@@ -580,6 +710,7 @@ class FootballUnitStrengthModel:
                 "partial_units": "not supported; this version requires eleven players per club",
                 "fitting_semantics": "observational associations, not identified causal effects",
                 **self._replay_metadata,
+                **missingness_metadata,
             }
         )
         return UnitStrengthResult(

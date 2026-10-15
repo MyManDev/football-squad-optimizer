@@ -39,7 +39,7 @@ FM game or save vintage remains `unknown`.
    (`src/squadopt/features/football_unit_inputs.py:158`,
    `src/squadopt/features/football_unit_inputs.py:180`,
    `src/squadopt/features/football_unit_inputs.py:446`,
-   `src/squadopt/prediction/football_unit_strength.py:430`)
+   `src/squadopt/prediction/football_unit_strength.py:510`)
 
 The historical catalog may set `projection_source_id=None` when it carries its
 typed replay receipt. Additional sources still pass the ordinary availability
@@ -65,9 +65,9 @@ settled outcome receipts exist. For an explicitly released 2025-26 training
 population, use the boolean argument shown below. Its default remains `False`.
 The constructor rejects reused interval identities, overlapping fixture intervals
 and differing decision cutoffs within one gameweek.
-(`src/squadopt/prediction/football_unit_strength.py:140`,
-`src/squadopt/prediction/football_unit_strength.py:160`,
-`src/squadopt/prediction/football_unit_strength.py:172`)
+(`src/squadopt/prediction/football_unit_strength.py:199`,
+`src/squadopt/prediction/football_unit_strength.py:229`,
+`src/squadopt/prediction/football_unit_strength.py:237`)
 
 ```python
 model = FootballUnitStrengthModel(observations, cutoff=fit_cutoff, allow_released_2025_26=True)
@@ -79,9 +79,9 @@ without replay uses `football_unit_explicit_release_fit_v1`. The former records
 the clock, source selection, unknown FM vintage and the assumption that whole
 match rates extrapolate associations fitted on selected first half prefixes.
 The numerical exposure offset remains `minutes / 90 * baseline`.
-(`src/squadopt/prediction/football_unit_strength.py:217`,
-`src/squadopt/prediction/football_unit_strength.py:260`,
-`src/squadopt/prediction/football_unit_strength.py:356`)
+(`src/squadopt/prediction/football_unit_strength.py:287`,
+`src/squadopt/prediction/football_unit_strength.py:332`,
+`src/squadopt/prediction/football_unit_strength.py:431`)
 
 ## Verify before composition
 
@@ -90,9 +90,9 @@ identity, overlap, shared gameweek decision cutoff and exclusion of the target o
 future gameweek. Current projection still requires its own complete supplied unit
 states. The native focal minute law remains independent of those supplied unit
 states in this model version.
-(`src/squadopt/experiments/football_unit_experiment.py:64`,
+(`src/squadopt/experiments/football_unit_experiment.py:72`,
 `src/squadopt/features/football_unit_inputs.py:620`,
-`src/squadopt/prediction/football_unit_strength.py:579`)
+`src/squadopt/prediction/football_unit_strength.py:709`)
 
 The legacy version one JSON boundary accepts the new optional fields only when
 they are null. Build historical replay through the typed records. Regression
