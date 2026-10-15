@@ -7,7 +7,7 @@ measures against the control, and the models of the experimental football lane. 
 are `live`, `scenarios` and `evaluation` in the domain ring, `application`, `platform`, the
 laboratory and the scripts.
 
-Its 38 Python files sit in one folder. This page places every one of them in exactly one
+Its 39 Python files sit in one folder. This page places every one of them in exactly one
 family.
 
 Review: İbrahim, the data side ([ownership](../../../docs/architecture/ownership.md)). Within 24
@@ -112,6 +112,7 @@ These five are private models: outside this package, each is imported only by it
 | `football_phase_duties.py` | Learned goal and assist marginals with conserved full-club attacking mass (`football_phase_duties_v1`); captured ranks are explanatory observations. |
 | `football_phase_serving.py` | Compact phase parameter export and byte-checked restoration with a distinct serving receipt; shares allocation arithmetic with the fitted model (`src/squadopt/prediction/football_phase_serving.py:255`, `src/squadopt/prediction/football_phase_serving.py:287`, `src/squadopt/prediction/football_phase_serving.py:337`). |
 | `football_score_state.py` | A paired score process with fitted lead and trail intensities in three thirds of the match clock (`football_score_state_v1`). |
+| `football_score_serving.py` | Strict compact score parameters with a separate artifact digest and inference receipt (`football_score_serving_v1`). |
 | `football_tactical_matchup.py` | Learned paired intensities and conditional tactical recipient marginals from supplied pre-decision states (`football_tactical_matchup_v1`). |
 | `football_unit_strength.py` | A baseline-relative projected club-unit model with private inputs (`football_projected_unit_strength_v1`). |
 

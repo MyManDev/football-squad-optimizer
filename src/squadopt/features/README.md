@@ -7,7 +7,7 @@ models. Every time-dependent aggregation of the feature builder passes through o
 shifted-rolling primitive, so the timing rule has one implementation. Its callers are `prediction`, `live`, `application`, `platform`,
 the laboratory and the scripts.
 
-Its 26 Python files sit in one folder. This page places every one of them in exactly one
+Its 28 Python files sit in one folder. This page places every one of them in exactly one
 family.
 
 Review: İbrahim, the data side ([ownership](../../../docs/architecture/ownership.md)).
@@ -68,6 +68,11 @@ The unit catalogue and FM readers parse private bytes for the club-unit experime
 The phase replay and credit readers prepare historical source inputs
 (`football_phase_replay.py:122`, `football_phase_credits.py:106`).
 
+The additional score replay contract is a training input with separate historical feature
+and later retrieval clocks. It carries roster identities without a fabricated player minute
+law (`src/squadopt/features/football_score_replay.py:49`,
+`src/squadopt/features/football_score_replay.py:75`).
+
 | Module | What it does |
 | --- | --- |
 | `football_flag_inputs.py` | Captured flag facts and supplied pre-decision native minute supports (`football_flag_week_input_v1`); no reader touches a network, a file or an outcome it was not given. |
@@ -78,11 +83,13 @@ The phase replay and credit readers prepare historical source inputs
 | `football_phase_credits.py` | Binds final FPL assists only when independent totals force a unique event assignment; refuses ambiguous assignments (`football_phase_credits.py:106`). |
 | `football_phase_coupling.py` | Explicit circular joint participation construction preserving supplied seven-state native marginals; dependence is imposed by persistent identity order (`src/squadopt/features/football_phase_coupling.py:91`). |
 | `football_score_state_inputs.py` | Strict score-process inputs (`football_score_fixture_input_v1`); a receipt assertion does not admit real data. |
+| `football_score_projection.py` | Explicit uniform forecast-clock point intervals preserve supplied native minute atoms; past duration receipts and approximation assumptions remain separate from a learned substitution law (`football_score_projection.py:173`). |
 | `football_tactical_inputs.py` | Named tactical facts and supplied paired pre-decision states (`football_tactical_inputs_v1`). |
 | `football_unit_inputs.py` | Immutable inputs of the separately invoked club-unit experiment (`football_unit_inputs_v1`). |
 | `football_unit_catalog.py` | The strict private JSON input boundary of the club-unit experiment; it touches no network or file. |
 | `football_fm_attributes.py` | Reads a full private FM export and prepares its exact active player/club scope for a catalog (`football_fm_csv_attributes_v1`, `football_fm_scoped_attributes_v1`), retaining unknown traits and refusing inferred identity or absent mapped UIDs (`src/squadopt/features/football_fm_attributes.py:204`). |
 | `football_unit_point.py` | Declared deterministic XI point from complete native starter probabilities, with exact structural support and a retained basis receipt (`src/squadopt/features/football_unit_point.py:48`). |
+| `football_score_replay.py` | Frozen historical score training records, explicit 2025-26 opt-in and declared native/duration source bindings (`src/squadopt/features/football_score_replay.py:120`); [operator contract](../../../docs/operations/football_score_replay.md). |
 
 ## Package surface
 
