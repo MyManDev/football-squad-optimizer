@@ -18,6 +18,7 @@ RAW_SCORE_SNAPSHOT_VERSION = "football_score_snapshot_v1"
 RAW_SCORE_OUTCOME_VERSION = "football_score_outcomes_v1"
 CLOCK_VERSION = "physical_playing_minutes_including_stoppage_excluding_breaks_v1"
 PROTECTED_SEASON = "2025-26"
+COMPOSITE_OFFSET_VERSION = "football_composite_unit_offset_v1"
 NATIVE_MODEL_VERSIONS = (
     "football_team_share_v1",
     "football_joint_role_minutes_v1",
@@ -296,10 +297,15 @@ def validate_score_fixture(fixture: ScoreFixture) -> None:
     horizon = _number(fixture.forecast_duration, "forecast_duration", minimum=1, maximum=180)
     if fixture.clock_version != CLOCK_VERSION:
         _fail("Unknown physical forecast clock normalization.")
-    if fixture.native_model_version not in NATIVE_MODEL_VERSIONS:
+    if fixture.native_model_version not in (*NATIVE_MODEL_VERSIONS, COMPOSITE_OFFSET_VERSION):
         _fail("Unknown native model version.")
     if fixture.native_basis_kind not in ("out_of_fold", "prospective"):
         _fail("Native basis must be explicitly out_of_fold or prospective.")
+    if (
+        fixture.native_model_version == COMPOSITE_OFFSET_VERSION
+        and fixture.native_basis_kind != "prospective"
+    ):
+        _fail("Composite unit offsets are prospective inference only.")
     if _clock(fixture.native_basis_fit_cutoff, "native fit cutoff") >= decision:
         _fail("Native fitting must precede the original decision.")
     for field in ("native_basis_sha256", "source_sha256"):
@@ -371,6 +377,8 @@ def validate_training_score_header(
         _fail("Training must use frozen TrainingScoreFixture records.")
     fixture = row.input
     validate_score_fixture(fixture)
+    if fixture.native_model_version == COMPOSITE_OFFSET_VERSION:
+        _fail("Composite unit offsets cannot establish a historical training basis.")
     if (fit_cutoff is None) != (target_season is None):
         _fail("Target season and fit cutoff must be supplied together.")
     targets = _tuple(target_gameweeks, "target_gameweeks", 38)
