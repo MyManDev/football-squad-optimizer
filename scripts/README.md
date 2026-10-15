@@ -44,7 +44,7 @@ column is the author date of the file's last commit when this catalogue was last
 | --- | --- | --- | --- |
 | `add_device_plan_inputs.py` | operational | `docs/contracts/league_device_plan_v1.md`; `docs/weekly_runbook.md` | 2026-10-12 |
 | `backend_status.py` | operational | reads the backend's `/ready`, `/metrics` and `/health` answers and the operator logs under `data/runtime/backend/logs`, and prints a summary; `docs/backend_runbook.md`, `docs/deployment_runbook.md` | 2026-09-28 |
-| `build_football_forecast.py` | operational | the optional football forecast of one capture, under `--artifact-root` through `squadopt.platform.football_publication`; never replaces the projection handoff; `docs/weekly_runbook.md` | 2026-10-11 |
+| `build_football_forecast.py` | operational | the optional football forecast of one capture, under `--artifact-root` through `squadopt.platform.football_publication`; explicit paired retained captures can fit first-week categorical flags (`scripts/build_football_forecast.py:88`); [procedure](../docs/operations/retained_flag_forecasts.md) | 2026-10-15 |
 | `build_league_site.py` | shim | `squadopt.application.league_publication`; `docs/weekly_runbook.md` | 2026-10-09 |
 | `build_player_catalog.py` | operational | `data/players.json` under the site directory `--out`, for the contribution form; `docs/contributions.md`, `docs/deployment_runbook.md` | 2026-09-22 |
 | `build_projection_handoff.py` | shim | `squadopt.application.projection_handoff`; `docs/weekly_runbook.md` | 2026-10-02 |
@@ -84,6 +84,8 @@ request to merge, cuts the release and calls `deploy.sh` and `verify_live.py`, a
 | `release/clean_body.py` | release recipe | rewrites a pull request body file in place, dropping attribution lines and replacing long dashes, before the pull request enters the merge queue; `docs/deployment_runbook.md` | 2026-09-19 |
 | `release/deploy.sh` | release recipe | refuses unless `main` is a two-parent merge whose tree is `develop`'s; waits for main's push CI and its single `site` artifact, tags, dispatches the Pages workflow and watches the run | 2026-09-26 |
 | `release/restart_backend.ps1` | release recipe | verifies the published site, fast-forwards `develop` and restarts the recorded backend; refuses, unless `-Force`, when `develop` differs from the live `site-*` release in `src`, `scripts` or `docs/contracts` | 2026-10-05 |
+| `vm_push.sh` | release recipe | after a release, from the PC: streams the captures, handoffs and the per-capture artifacts to the backend VM in one tar over SSH, then runs `vm_sync.sh` there; host and key from `SQUADOPT_VM_HOST` and `SQUADOPT_VM_KEY`, no secret inside; `docs/backend_free_hosting.md` | 2026-10-15 |
+| `vm_sync.sh` | release recipe | on the VM: checks the release tag out, refreshes the site data the backend reads, rebuilds the image for the tag and restarts the two Compose services, then prints readiness and the capabilities | 2026-10-15 |
 | `release/ship.sh` | release recipe | waits for the site pull request, cuts the release to `main` as a two-parent merge whose tree is `develop`'s, then runs `deploy.sh` and `verify_live.py` | 2026-10-04 |
 | `release/verify_live.py` | release recipe | checks the live site's routes, documents, assets and content after a deploy; a test holds its route list equal to `web/scripts/smoke-deployment.mjs` | 2026-10-04 |
 
@@ -101,6 +103,9 @@ do not move.
 | `backend_parentage.ps1` | Windows backend | dot-sourced by `run_backend_local.ps1` and `release/restart_backend.ps1`; refuses to start the backend from an agent application's process tree | 2026-10-05 |
 | `backup_data.ps1` | Windows backend | additive, checksummed copy of the private `data/` trees to a destination outside every worktree, or `-Verify` of the latest manifest; `docs/deployment_runbook.md` | 2026-10-11 |
 | `run_backend_local.ps1` | Windows backend | one API and N workers from the repository's `.venv` over one local store, recorded in `<store>\run\backend.pids.json`; `-Status` and `-Stop`; writes only under git-ignored `data/runtime/backend`; `docs/backend_free_hosting.md` | 2026-10-05 |
+| `weekly_run.ps1` | Windows weekly run | one weekly run on this PC as the planner's Start button runs it: reads the open gameweek from the published fixtures document, refuses a dirty checkout, a checkout off `develop` or a run in progress, fast-forwards `develop`, runs the weekly command with the cadence's arguments into `data/logs/weekly/<run id>.log`, and ends with the site pull request, the `ship.sh` line and the VM sync; `-DryRun` prints the plan; `docs/weekly_runbook.md` | 2026-10-15 |
+| `weekly_run_friday.ps1` | Windows weekly run | `weekly_run.ps1 -Kind friday`: the decision run, tag `site-<season>-gw<open>-decision` or the next fix tag | 2026-10-15 |
+| `weekly_run_tuesday.ps1` | Windows weekly run | `weekly_run.ps1 -Kind tuesday`: the next gameweek's run carrying the settled week, tag `site-<season>-gw<settled>-settled` or the next fix tag | 2026-10-15 |
 | `start_backend_at_logon.ps1` | Windows backend | starts whichever of the backend and its Cloudflare Tunnel connector is not running; with `-Watch` it checks every 60 seconds; `docs/backend_free_hosting.md` | 2026-10-05 |
 
 ## Measurement runners
