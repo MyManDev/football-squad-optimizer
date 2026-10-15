@@ -6,6 +6,7 @@ import hashlib
 import json
 import math
 import re
+from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime, timedelta
 
@@ -670,11 +671,47 @@ def recipient_features(
     own = p.home if home else p.away
     if player not in own.players:
         raise ValueError("Observed tactical recipient is outside the supplied roster.")
-    values = {
+    return _recipient_values(p, player, _recipient_context(p, home), head)
+
+
+def _recipient_context(p: ObservedTacticalProjection, home: bool) -> dict[str, float | None]:
+    return {
         k: v
         for k, v in _team_terms(p, home).items()
         if k.startswith("opponent_") or k.startswith("own_observed_")
     }
+
+
+def recipient_feature_rows(
+    p: ObservedTacticalProjection,
+    players: Sequence[ObservedTacticalPlayer],
+    *,
+    home: bool,
+) -> dict[str, tuple[dict[str, float | None], ...]]:
+    """Build both recipient heads with one side context and independent ordered rows.
+
+    As with ``recipient_features``, the prediction caller validates the complete
+    projection first. This batch retains its roster membership check and the
+    supplied player order without caching any source or projection across calls.
+    """
+    own = p.home if home else p.away
+    ordered = tuple(players)
+    if any(player not in own.players for player in ordered):
+        raise ValueError("Observed tactical recipient is outside the supplied roster.")
+    context = _recipient_context(p, home)
+    return {
+        head: tuple(_recipient_values(p, player, context, head) for player in ordered)
+        for head in ("goals", "assists")
+    }
+
+
+def _recipient_values(
+    p: ObservedTacticalProjection,
+    player: ObservedTacticalPlayer,
+    context: dict[str, float | None],
+    head: str,
+) -> dict[str, float | None]:
+    values = dict(context)
     traits = ATTACK_TRAITS if head == "goals" else DELIVERY_TRAITS
     for name in traits:
         value = player.profile.attributes[TRAITS.index(name)]

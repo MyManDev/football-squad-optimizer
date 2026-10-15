@@ -23,6 +23,7 @@ from squadopt.features.football_observed_tactical_inputs import (
     ObservedTacticalProjection,
     digest,
     instant,
+    recipient_feature_rows,
     recipient_features,
     team_features,
     validate_header,
@@ -438,6 +439,7 @@ def _recipient_sides(
     for i, side in enumerate((p.home, p.away)):
         players = sorted(side.players, key=lambda x: x.profile.player_code)
         heads = {}
+        feature_rows = None
         for head, fraction, transform in (
             ("goals", side.scored_fraction, goal_transform),
             ("assists", side.scored_fraction * side.assist_fraction, assist_transform),
@@ -454,17 +456,16 @@ def _recipient_sides(
                     for x in players
                 ]
             )
-            probabilities = (
-                shares
-                if control
-                else _recipient_probabilities(
+            if control:
+                probabilities = shares
+            else:
+                if feature_rows is None:
+                    feature_rows = recipient_feature_rows(p, players, home=i == 0)
+                probabilities = _recipient_probabilities(
                     shares[None, :],
-                    transform.apply(
-                        [recipient_features(p, x, home=i == 0, head=head) for x in players]
-                    )[None, :, :],
+                    transform.apply(feature_rows[head])[None, :, :],
                     gammas[head],
                 )[0][0]
-            )
             if (
                 probabilities.shape != shares.shape
                 or not np.isfinite(probabilities).all()
@@ -793,6 +794,7 @@ class ObservedTacticalModel:
         for i, side in enumerate((p.home, p.away)):
             players = sorted(side.players, key=lambda x: x.profile.player_code)
             expectations = {}
+            feature_rows = None
             for head, fraction, transform in (
                 ("goals", side.scored_fraction, m.goal_transform),
                 ("assists", side.scored_fraction * side.assist_fraction, m.assist_transform),
@@ -814,17 +816,16 @@ class ObservedTacticalModel:
                         for x in players
                     ]
                 )
-                probabilities = (
-                    shares
-                    if control
-                    else _recipient_probabilities(
+                if control:
+                    probabilities = shares
+                else:
+                    if feature_rows is None:
+                        feature_rows = recipient_feature_rows(p, players, home=i == 0)
+                    probabilities = _recipient_probabilities(
                         shares[None, :],
-                        transform.apply(
-                            [recipient_features(p, x, home=i == 0, head=head) for x in players]
-                        )[None, :, :],
+                        transform.apply(feature_rows[head])[None, :, :],
                         fitted.gammas[head],
                     )[0][0]
-                )
                 expectations[head] = mass * probabilities
                 if not math.isclose(
                     math.fsum(expectations[head]), mass, rel_tol=1e-12, abs_tol=1e-12
