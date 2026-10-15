@@ -522,6 +522,27 @@ def test_default_compact_receipts_preserve_all_stage_hashes_and_results(models):
     assert len(composite_bytes(compact.receipt)) < 8000
 
 
+def test_native_artifact_envelope_model_version_does_not_require_row_injection(models):
+    x = case()
+    original = json.loads(x.native_rows_json)
+    rows = [{k: v for k, v in row.items() if k != "model_version"} for row in original]
+    exact = json.dumps(rows, indent=2)
+    x = replace(x, native_rows_json=exact)
+    assert compose_fixture(x, None, bypass=True).rows_json is exact
+    result = compose_fixture(x, models)
+    assert all(
+        row["model_version"] == "football_composite_v1" for row in json.loads(result.rows_json)
+    )
+    assert result.receipt.original_native_rows_sha256 == hashlib.sha256(exact.encode()).hexdigest()
+    original[0]["model_version"] = "unsupported-model"
+    with pytest.raises(ValueError, match="fixture scope differs"):
+        compose_fixture(replace(x, native_rows_json=json.dumps(original)), models)
+    with pytest.raises(ValueError, match="original prospective source contexts"):
+        compose_fixture(
+            replace(x, score=replace(x.score, native_model_version="unsupported-model")), models
+        )
+
+
 @pytest.mark.parametrize(
     "damage",
     [
