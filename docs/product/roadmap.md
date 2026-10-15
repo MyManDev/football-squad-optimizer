@@ -112,9 +112,11 @@ What a strategy may publish is a closed list with no probability and no spread i
   cannot show whether it has been done. `scripts/release/restart_backend.ps1` restarts the
   recorded backend on a new release (#663; the same fix in #813).
 - **The uptime check.** The `Backend uptime` workflow opens a `backend-down` issue when
-  `/health` fails and closes it on recovery (#676). Its schedule fires hours apart, not every
-  fifteen minutes (measured in the hosting document). Its issues are the outage record, read
-  with `gh issue list --label backend-down --state all`: on 26 September 2026 that listed four
+  `/health` fails and closes it on recovery (#676). It runs only when dispatched, by hand or
+  by the logon watcher, so no new issue opens for a retired backend (#988 route 1); its former
+  schedule fired hours apart, not every fifteen minutes (measured in the hosting document).
+  Its issues are the outage record, read with
+  `gh issue list --label backend-down --state all`: on 26 September 2026 that listed four
   (#747, #787, #795, #821), each closed by the workflow with the time health came back.
 
 ### Where the evidence stands

@@ -76,7 +76,7 @@ is device-first computation (issue #978).
 The system runs as separate units: the static website on Cloudflare Pages, the device solver in
 the member's browser, the weekly run and the installed CLI on the operator's machine, the advice
 API and its worker processes from one container image or natively on the owner's PC, the FPL
-probe Worker, and the scheduled backend uptime check on GitHub Actions. The
+probe Worker, and the backend uptime check on GitHub Actions, run only when dispatched. The
 [architecture overview](../../ARCHITECTURE.md#4-deployment-units) gives each unit's code, entry
 point, state and present host.
 

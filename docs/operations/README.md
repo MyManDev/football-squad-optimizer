@@ -30,7 +30,7 @@
 | --- | --- | --- |
 | [`CI`](../../.github/workflows/ci.yml) | Pull requests and pushes to `develop` and `main`, the `develop` merge queue, manual dispatch | The five Python gates on Python 3.11 and 3.13, the container build and smoke, and the web checks; uploads the `site` artifact |
 | [`Deploy Pages`](../../.github/workflows/deploy-pages.yml) | A completed CI run, or a manual dispatch with a `site-*` tag | Deploys a pull request preview, or the tagged production artifact after its checks |
-| [`Backend uptime`](../../.github/workflows/backend-uptime.yml) | A schedule every 15 minutes, or a manual dispatch | Probes the backend's health and readiness and opens or closes a `backend-down` issue |
+| [`Backend uptime`](../../.github/workflows/backend-uptime.yml) | A dispatch, by hand or from the logon watcher (`scripts/start_backend_at_logon.ps1`); no schedule | Probes the backend's health and readiness and opens or closes a `backend-down` issue |
 | [`Windows scripts`](../../.github/workflows/windows-scripts.yml) | Pull requests and pushes that touch the PowerShell scripts, the release recipe or their tests | Parses the PowerShell scripts and runs their tests on Windows |
 | [`Deploy FPL probe`](../../.github/workflows/deploy-fpl-probe.yml) | Manual dispatch from the default branch | Deploys or deletes the FPL probe Worker ([FPL forwarder probe](../fpl_forwarder_probe.md)) |
 

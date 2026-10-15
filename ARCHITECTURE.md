@@ -105,7 +105,7 @@ updated and the bytes regenerated.
 | Advice API | `squadopt.api` | `uvicorn --factory squadopt.api.runtime:build_app` | Reads the published tree, snapshots, handoffs and the answer cache; writes jobs to the shared store | The owner's PC, behind the `squadopt-api` Cloudflare Tunnel ([backend free hosting](docs/backend_free_hosting.md)) |
 | Advice worker | `squadopt.platform.advice_worker` | `python -m squadopt.platform.advice_worker` | Claims jobs from the shared store and writes the answer cache | The owner's PC, several processes beside the API |
 | FPL probe | `workers/fpl-probe/` | The `Deploy FPL probe` workflow, dispatched by hand | A Workers KV namespace | Cloudflare Workers, only while deployed ([FPL forwarder probe](docs/fpl_forwarder_probe.md)) |
-| Backend uptime check | `.github/workflows/backend-uptime.yml` | A schedule every 15 minutes | Opens and closes `backend-down` issues | GitHub Actions |
+| Backend uptime check | `.github/workflows/backend-uptime.yml` | Dispatched by hand or by the logon watcher (`scripts/start_backend_at_logon.ps1`); no schedule | Opens and closes `backend-down` issues | GitHub Actions |
 
 [ADR 0006](docs/architecture/decisions/0006-backend-hosting.md) decides that the API and the
 worker are one container image run as two processes (`deploy/compose.yaml`).

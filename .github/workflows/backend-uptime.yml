@@ -3,8 +3,6 @@
 name: Backend uptime
 
 on:
-  schedule:
-    - cron: "*/15 * * * *"
   workflow_dispatch:
     inputs:
       dry_run:
@@ -167,8 +165,8 @@ jobs:
                 created = (await github.rest.issues.create(issue)).data;
               }
               if (!exercise) {
-                // A red run is what reaches the owner: GitHub mails a failed scheduled run to whoever
-                // last edited the schedule. Only a transition fails, so an outage mails once.
+                // A red run is what reaches a person: GitHub mails a failed run to whoever
+                // dispatched it. Only a transition fails, so an outage mails once.
                 core.setFailed(`The backend is down: ${failure}.`);
                 return;
               }

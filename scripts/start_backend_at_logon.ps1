@@ -223,8 +223,8 @@ function Test-BackendReady {
 
 # What the watcher sees but must not repair reaches the owner within minutes: the
 # repository's uptime check is asked to run now, and it opens the backend-down incident,
-# assigned to the owner, in a red run GitHub mails, instead of waiting for the schedule's
-# next slot, hours apart (docs/backend_free_hosting.md). Asked once per episode, and once
+# assigned to the owner, in a red run GitHub mails. The check has no schedule, so only a
+# request runs it (docs/backend_free_hosting.md). Asked once per episode, and once
 # more when the backend is ready again, so the incident closes. $requestTaken says
 # whether GitHub took the request (a return value would carry the logged lines too). A
 # refused or failed request is tried again at the fifth call after it, so a broken CLI
