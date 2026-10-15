@@ -7,7 +7,7 @@ measures against the control, and the models of the experimental football lane. 
 are `live`, `scenarios` and `evaluation` in the domain ring, `application`, `platform`, the
 laboratory and the scripts.
 
-Its 47 Python files sit in one folder. This page places every one of them in exactly one
+Its 48 Python files sit in one folder. This page places every one of them in exactly one
 family.
 
 Review: İbrahim, the data side ([ownership](../../../docs/architecture/ownership.md)). Within 24
@@ -141,6 +141,7 @@ paired rates and recipient marginals, with its explicit context policy in metada
 | `football_observed_tactical.py` | Fits paired Poisson rates and conditional goal/assist recipients at full-roster native marginal context, with training-only observed-value transforms and missingness masks; exposes recipient-only inference without the count head (`src/squadopt/prediction/football_observed_tactical.py:91`, `src/squadopt/prediction/football_observed_tactical.py:647`, `src/squadopt/prediction/football_observed_tactical.py:750`). |
 | `football_observed_tactical_recipients.py` | Fits only conditional goal/assist recipient heads under a distinct metadata contract, retaining native offsets, training receipts and diagnostics (`src/squadopt/prediction/football_observed_tactical_recipients.py:41`, `src/squadopt/prediction/football_observed_tactical_recipients.py:134`). |
 | `football_observed_tactical_serving.py` | Exports and restores compact recipient parameters with explicit byte integrity and separate original-model provenance; reuses the pure recipient allocator (`src/squadopt/prediction/football_observed_tactical_serving.py:64`, `src/squadopt/prediction/football_observed_tactical_serving.py:329`, `src/squadopt/prediction/football_observed_tactical_serving.py:387`). |
+| `football_composite_weeks.py` | Validates the full declared captured roster and calendar before composing original-native LOAD, first-week flag or later shared eligibility, and verified evidence (`src/squadopt/prediction/football_composite_weeks.py:359`). |
 
 ## Package surface
 
