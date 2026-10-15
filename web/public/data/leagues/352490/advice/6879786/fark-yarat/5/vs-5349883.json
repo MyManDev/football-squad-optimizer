@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-10-14T14:20:21Z",
+  "generated_at_utc": "2026-10-15T14:15:28Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "fark-yarat",
     "window": 5,
-    "source_snapshot_id": "fpl-live-20261014T135921Z-a48d1521c87f",
+    "source_snapshot_id": "fpl-live-20261015T130038Z-7a7a388a3a43",
     "moves": [
       {
         "move_id": "gw07-1",
@@ -21,11 +21,11 @@
           "team": "Liverpool"
         },
         "player_in": {
-          "player_id": 661313,
-          "name": "Juan Angulo",
-          "short_name": "Angulo",
+          "player_id": 601767,
+          "name": "Vakhtang Salia",
+          "short_name": "Salia",
           "position": "FWD",
-          "team": "Sunderland"
+          "team": "Newcastle"
         },
         "expected_points_delta": 0.0,
         "reason_code": "mode_tradeoff"
@@ -36,7 +36,7 @@
     "expected_points_cost": 0.0,
     "rival_label": "entry-5349883",
     "solver_status": "FEASIBLE",
-    "optimality_gap": 3.937000000000012,
+    "optimality_gap": 3.2590000000000146,
     "wall_clock_stopped_the_search": false,
     "expected_own_points": 47.169179731404085,
     "captain": {
@@ -171,12 +171,12 @@
         "expected_points": 1.825505398975884
       },
       {
-        "player_id": 661313,
-        "name": "Juan Angulo",
-        "short_name": "Angulo",
+        "player_id": 601767,
+        "name": "Vakhtang Salia",
+        "short_name": "Salia",
         "position": "FWD",
-        "team": "Sunderland",
-        "expected_points": 1.3119278147917366
+        "team": "Newcastle",
+        "expected_points": 1.3473254086181279
       }
     ],
     "chip": null,
@@ -185,11 +185,11 @@
         "gameweek": 7,
         "transfers_in": [
           {
-            "player_id": 661313,
-            "name": "Juan Angulo",
-            "short_name": "Angulo",
+            "player_id": 601767,
+            "name": "Vakhtang Salia",
+            "short_name": "Salia",
             "position": "FWD",
-            "team": "Sunderland"
+            "team": "Newcastle"
           }
         ],
         "transfers_out": [
@@ -325,7 +325,7 @@
     "missing_fields": [],
     "squad_basis": "captured",
     "control_solver_status": "FEASIBLE",
-    "control_optimality_gap": 3.937000000000012,
+    "control_optimality_gap": 3.2590000000000146,
     "rival_entry_id": 5349883,
     "overlap_count": 2,
     "transfer_cap": 1,

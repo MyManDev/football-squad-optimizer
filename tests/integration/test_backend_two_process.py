@@ -27,7 +27,7 @@ from tests.fixtures.backend_app import app_for_capture
 
 from squadopt.application.advice import COMPUTED_MODE, COMPUTED_WINDOW
 from squadopt.platform.backend_runtime import BackendConfig, StoreProbeGate, build_backend
-from squadopt.platform.store_probe import StoreProbeResult, probe_store
+from squadopt.platform.storage.store_probe import StoreProbeResult, probe_store
 
 LEAGUE_ID = deployment_module.LEAGUE_ID
 ENTRY_ID = deployment_module.ENTRY_ID

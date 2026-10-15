@@ -1,21 +1,21 @@
 {
   "contract_version": "weekly_suggestion_history_v1",
-  "generated_at_utc": "2026-10-14T13:59:21.062647Z",
+  "generated_at_utc": "2026-10-15T13:00:38.913788Z",
   "payload": {
     "league_id": 352490,
     "entry_id": 8548384,
     "season": "2026-27",
-    "as_of_snapshot_id": "fpl-live-20261014T135921Z-a48d1521c87f",
+    "as_of_snapshot_id": "fpl-live-20261015T130038Z-7a7a388a3a43",
     "weeks": [
       {
         "gameweek": 7,
         "status": "unsettled",
         "reason": "not_settled",
         "deadline_utc": "2026-10-17T10:00:00Z",
-        "advice_snapshot_id": "fpl-live-20261014T135921Z-a48d1521c87f",
-        "advice_captured_at_utc": "2026-10-14T13:59:21.062647Z",
-        "advice_generated_at_utc": "2026-10-14T14:20:21Z",
-        "advice_sha256": "99b9da66448f4a06e9d22e3a5cf81421b0576f78205bf5a381abba7709dd0dc1",
+        "advice_snapshot_id": "fpl-live-20261015T130038Z-7a7a388a3a43",
+        "advice_captured_at_utc": "2026-10-15T13:00:38.913788Z",
+        "advice_generated_at_utc": "2026-10-15T14:15:28Z",
+        "advice_sha256": "f5c5dc5367124597a44a90a67fe62d73e7889c4155354ec81e539f8165038163",
         "outcome_snapshot_id": null,
         "outcome_captured_at_utc": null,
         "expected_own_points": 56.28227061445796,
@@ -104,6 +104,516 @@
             "expected_points_cost": 0.0,
             "expected_points_cost_ceiling": 0.0,
             "managers_word": true
+          },
+          {
+            "published_path": "advice/8548384/saf-puan/1/top100-5.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Martin Ødegaard",
+                "player_in": "Pascal Groß"
+              },
+              {
+                "player_out": "Ronald Araujo",
+                "player_in": "James Tarkowski"
+              }
+            ],
+            "expected_points_cost": 0.0,
+            "expected_points_cost_ceiling": 0.0,
+            "top100_weight": 5
+          },
+          {
+            "published_path": "advice/8548384/saf-puan/1/top100-5-hoca-sozu.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Martin Ødegaard",
+                "player_in": "Pascal Groß"
+              },
+              {
+                "player_out": "Ronald Araujo",
+                "player_in": "James Tarkowski"
+              }
+            ],
+            "expected_points_cost": 0.0,
+            "expected_points_cost_ceiling": 0.0,
+            "top100_weight": 5,
+            "managers_word": true
+          },
+          {
+            "published_path": "advice/8548384/saf-puan/1/top100-10.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Martin Ødegaard",
+                "player_in": "Pascal Groß"
+              },
+              {
+                "player_out": "Ronald Araujo",
+                "player_in": "James Tarkowski"
+              }
+            ],
+            "expected_points_cost": 0.0,
+            "expected_points_cost_ceiling": 0.0,
+            "top100_weight": 10
+          },
+          {
+            "published_path": "advice/8548384/saf-puan/1/top100-10-hoca-sozu.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Martin Ødegaard",
+                "player_in": "Pascal Groß"
+              },
+              {
+                "player_out": "Ronald Araujo",
+                "player_in": "James Tarkowski"
+              }
+            ],
+            "expected_points_cost": 0.0,
+            "expected_points_cost_ceiling": 0.0,
+            "top100_weight": 10,
+            "managers_word": true
+          },
+          {
+            "published_path": "advice/8548384/saf-puan/1/top100-20.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ronald Araujo",
+                "player_in": "Maxim De Cuyper"
+              },
+              {
+                "player_out": "Josh King",
+                "player_in": "Pascal Groß"
+              }
+            ],
+            "expected_points_cost": 0.357996785383321,
+            "expected_points_cost_ceiling": 0.357996785383321,
+            "top100_weight": 20
+          },
+          {
+            "published_path": "advice/8548384/saf-puan/1/top100-20-hoca-sozu.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ronald Araujo",
+                "player_in": "Maxim De Cuyper"
+              },
+              {
+                "player_out": "Josh King",
+                "player_in": "Pascal Groß"
+              }
+            ],
+            "expected_points_cost": 0.357996785383321,
+            "expected_points_cost_ceiling": 0.357996785383321,
+            "top100_weight": 20,
+            "managers_word": true
+          },
+          {
+            "published_path": "advice/8548384/saf-puan/1/top100-30.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ronald Araujo",
+                "player_in": "Maxim De Cuyper"
+              },
+              {
+                "player_out": "Josh King",
+                "player_in": "Pascal Groß"
+              }
+            ],
+            "expected_points_cost": 0.357996785383321,
+            "expected_points_cost_ceiling": 0.357996785383321,
+            "top100_weight": 30
+          },
+          {
+            "published_path": "advice/8548384/saf-puan/1/top100-30-hoca-sozu.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ronald Araujo",
+                "player_in": "Maxim De Cuyper"
+              },
+              {
+                "player_out": "Josh King",
+                "player_in": "Pascal Groß"
+              }
+            ],
+            "expected_points_cost": 0.357996785383321,
+            "expected_points_cost_ceiling": 0.357996785383321,
+            "top100_weight": 30,
+            "managers_word": true
+          },
+          {
+            "published_path": "advice/8548384/saf-puan/1/top100-40.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ronald Araujo",
+                "player_in": "Maxim De Cuyper"
+              },
+              {
+                "player_out": "Josh King",
+                "player_in": "Pascal Groß"
+              }
+            ],
+            "expected_points_cost": 0.357996785383321,
+            "expected_points_cost_ceiling": 0.357996785383321,
+            "top100_weight": 40
+          },
+          {
+            "published_path": "advice/8548384/saf-puan/1/top100-40-hoca-sozu.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ronald Araujo",
+                "player_in": "Maxim De Cuyper"
+              },
+              {
+                "player_out": "Josh King",
+                "player_in": "Pascal Groß"
+              }
+            ],
+            "expected_points_cost": 0.357996785383321,
+            "expected_points_cost_ceiling": 0.357996785383321,
+            "top100_weight": 40,
+            "managers_word": true
+          },
+          {
+            "published_path": "advice/8548384/saf-puan/1/top100-50.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ronald Araujo",
+                "player_in": "Maxim De Cuyper"
+              },
+              {
+                "player_out": "Josh King",
+                "player_in": "Pascal Groß"
+              }
+            ],
+            "expected_points_cost": 0.357996785383321,
+            "expected_points_cost_ceiling": 0.357996785383321,
+            "top100_weight": 50
+          },
+          {
+            "published_path": "advice/8548384/saf-puan/1/top100-50-hoca-sozu.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ronald Araujo",
+                "player_in": "Maxim De Cuyper"
+              },
+              {
+                "player_out": "Josh King",
+                "player_in": "Pascal Groß"
+              }
+            ],
+            "expected_points_cost": 0.357996785383321,
+            "expected_points_cost_ceiling": 0.357996785383321,
+            "top100_weight": 50,
+            "managers_word": true
+          },
+          {
+            "published_path": "advice/8548384/ortak-koru/1/vs-6654210/top100-5.json",
+            "strategy": "ortak-koru",
+            "window": 1,
+            "rival_entry_id": 6654210,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ronald Araujo",
+                "player_in": "Sven Botman"
+              },
+              {
+                "player_out": "Josh King",
+                "player_in": "Pascal Groß"
+              }
+            ],
+            "expected_points_cost": 0.908762043711917,
+            "expected_points_cost_ceiling": 0.908762043711917,
+            "top100_weight": 5
+          },
+          {
+            "published_path": "advice/8548384/ortak-koru/1/vs-6654210/top100-10.json",
+            "strategy": "ortak-koru",
+            "window": 1,
+            "rival_entry_id": 6654210,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ronald Araujo",
+                "player_in": "Sven Botman"
+              },
+              {
+                "player_out": "Josh King",
+                "player_in": "Pascal Groß"
+              }
+            ],
+            "expected_points_cost": 0.908762043711917,
+            "expected_points_cost_ceiling": 0.908762043711917,
+            "top100_weight": 10
+          },
+          {
+            "published_path": "advice/8548384/ortak-koru/1/vs-6654210/top100-20.json",
+            "strategy": "ortak-koru",
+            "window": 1,
+            "rival_entry_id": 6654210,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ronald Araujo",
+                "player_in": "Sven Botman"
+              },
+              {
+                "player_out": "Josh King",
+                "player_in": "Pascal Groß"
+              }
+            ],
+            "expected_points_cost": 0.908762043711917,
+            "expected_points_cost_ceiling": 0.908762043711917,
+            "top100_weight": 20
+          },
+          {
+            "published_path": "advice/8548384/ortak-koru/1/vs-6654210/top100-30.json",
+            "strategy": "ortak-koru",
+            "window": 1,
+            "rival_entry_id": 6654210,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ronald Araujo",
+                "player_in": "Sven Botman"
+              },
+              {
+                "player_out": "Josh King",
+                "player_in": "Pascal Groß"
+              }
+            ],
+            "expected_points_cost": 0.908762043711917,
+            "expected_points_cost_ceiling": 0.908762043711917,
+            "top100_weight": 30
+          },
+          {
+            "published_path": "advice/8548384/ortak-koru/1/vs-6654210/top100-40.json",
+            "strategy": "ortak-koru",
+            "window": 1,
+            "rival_entry_id": 6654210,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ronald Araujo",
+                "player_in": "Sven Botman"
+              },
+              {
+                "player_out": "Josh King",
+                "player_in": "Pascal Groß"
+              }
+            ],
+            "expected_points_cost": 0.908762043711917,
+            "expected_points_cost_ceiling": 0.908762043711917,
+            "top100_weight": 40
+          },
+          {
+            "published_path": "advice/8548384/ortak-koru/1/vs-6654210/top100-50.json",
+            "strategy": "ortak-koru",
+            "window": 1,
+            "rival_entry_id": 6654210,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ronald Araujo",
+                "player_in": "Sven Botman"
+              },
+              {
+                "player_out": "Josh King",
+                "player_in": "Pascal Groß"
+              }
+            ],
+            "expected_points_cost": 0.908762043711917,
+            "expected_points_cost_ceiling": 0.908762043711917,
+            "top100_weight": 50
+          },
+          {
+            "published_path": "advice/8548384/fark-yarat/1/vs-6654210/top100-5.json",
+            "strategy": "fark-yarat",
+            "window": 1,
+            "rival_entry_id": 6654210,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Virgil van Dijk",
+                "player_in": "Maxim De Cuyper"
+              },
+              {
+                "player_out": "Will Hughes",
+                "player_in": "Pascal Groß"
+              }
+            ],
+            "expected_points_cost": 0.8442879723652794,
+            "expected_points_cost_ceiling": 0.8442879723652794,
+            "top100_weight": 5
+          },
+          {
+            "published_path": "advice/8548384/fark-yarat/1/vs-6654210/top100-10.json",
+            "strategy": "fark-yarat",
+            "window": 1,
+            "rival_entry_id": 6654210,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Virgil van Dijk",
+                "player_in": "Maxim De Cuyper"
+              },
+              {
+                "player_out": "Will Hughes",
+                "player_in": "Pascal Groß"
+              }
+            ],
+            "expected_points_cost": 0.8442879723652794,
+            "expected_points_cost_ceiling": 0.8442879723652794,
+            "top100_weight": 10
+          },
+          {
+            "published_path": "advice/8548384/fark-yarat/1/vs-6654210/top100-20.json",
+            "strategy": "fark-yarat",
+            "window": 1,
+            "rival_entry_id": 6654210,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Virgil van Dijk",
+                "player_in": "Maxim De Cuyper"
+              },
+              {
+                "player_out": "Will Hughes",
+                "player_in": "Pascal Groß"
+              }
+            ],
+            "expected_points_cost": 0.8442879723652794,
+            "expected_points_cost_ceiling": 0.8442879723652794,
+            "top100_weight": 20
+          },
+          {
+            "published_path": "advice/8548384/fark-yarat/1/vs-6654210/top100-30.json",
+            "strategy": "fark-yarat",
+            "window": 1,
+            "rival_entry_id": 6654210,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Virgil van Dijk",
+                "player_in": "Maxim De Cuyper"
+              },
+              {
+                "player_out": "Will Hughes",
+                "player_in": "Pascal Groß"
+              }
+            ],
+            "expected_points_cost": 0.8442879723652794,
+            "expected_points_cost_ceiling": 0.8442879723652794,
+            "top100_weight": 30
+          },
+          {
+            "published_path": "advice/8548384/fark-yarat/1/vs-6654210/top100-40.json",
+            "strategy": "fark-yarat",
+            "window": 1,
+            "rival_entry_id": 6654210,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Virgil van Dijk",
+                "player_in": "Maxim De Cuyper"
+              },
+              {
+                "player_out": "Will Hughes",
+                "player_in": "Pascal Groß"
+              }
+            ],
+            "expected_points_cost": 0.8442879723652794,
+            "expected_points_cost_ceiling": 0.8442879723652794,
+            "top100_weight": 40
+          },
+          {
+            "published_path": "advice/8548384/fark-yarat/1/vs-6654210/top100-50.json",
+            "strategy": "fark-yarat",
+            "window": 1,
+            "rival_entry_id": 6654210,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Virgil van Dijk",
+                "player_in": "Maxim De Cuyper"
+              },
+              {
+                "player_out": "Will Hughes",
+                "player_in": "Pascal Groß"
+              }
+            ],
+            "expected_points_cost": 0.8442879723652794,
+            "expected_points_cost_ceiling": 0.8442879723652794,
+            "top100_weight": 50
           },
           {
             "published_path": "advice/8548384/saf-puan/1/chip-wildcard.json",
@@ -269,8 +779,8 @@
         "advice_captured_at_utc": "2026-10-10T03:57:32.746463Z",
         "advice_generated_at_utc": "2026-10-10T06:07:04Z",
         "advice_sha256": "078d8273ecc3aad2d223ea3ae0fc519dec16028576db4b178a93890ebc9a1b82",
-        "outcome_snapshot_id": "fpl-live-20261014T135921Z-a48d1521c87f",
-        "outcome_captured_at_utc": "2026-10-14T13:59:21.062647Z",
+        "outcome_snapshot_id": "fpl-live-20261015T130038Z-7a7a388a3a43",
+        "outcome_captured_at_utc": "2026-10-15T13:00:38.913788Z",
         "expected_own_points": 55.851408028923146,
         "suggested": {
           "gross_points": 57.0,
@@ -1122,8 +1632,8 @@
         "advice_captured_at_utc": "2026-09-18T12:25:16.241963Z",
         "advice_generated_at_utc": "2026-09-18T14:05:59Z",
         "advice_sha256": "6d9934d94df23350433b8be24db958ab21d087d6775d5b1b9c9dc693cc564728",
-        "outcome_snapshot_id": "fpl-live-20261014T135921Z-a48d1521c87f",
-        "outcome_captured_at_utc": "2026-10-14T13:59:21.062647Z",
+        "outcome_snapshot_id": "fpl-live-20261015T130038Z-7a7a388a3a43",
+        "outcome_captured_at_utc": "2026-10-15T13:00:38.913788Z",
         "expected_own_points": 56.40185326010834,
         "suggested": {
           "gross_points": 62.0,
@@ -1362,8 +1872,8 @@
         "advice_captured_at_utc": "2026-09-12T10:00:00.227050Z",
         "advice_generated_at_utc": "2026-09-12T10:50:08Z",
         "advice_sha256": "93a12668b6b8e292e3716dbc9de407a2244caf5536170225dbf04020f1dfa37f",
-        "outcome_snapshot_id": "fpl-live-20261014T135921Z-a48d1521c87f",
-        "outcome_captured_at_utc": "2026-10-14T13:59:21.062647Z",
+        "outcome_snapshot_id": "fpl-live-20261015T130038Z-7a7a388a3a43",
+        "outcome_captured_at_utc": "2026-10-15T13:00:38.913788Z",
         "expected_own_points": 55.66145744298164,
         "suggested": {
           "gross_points": 90.0,

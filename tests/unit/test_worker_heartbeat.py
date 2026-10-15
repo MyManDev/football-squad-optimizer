@@ -31,7 +31,6 @@ import squadopt.platform.worker_heartbeat as heartbeat_module
 from squadopt.api.runtime import app_for_backend
 from squadopt.data.atomic import replace_retrying
 from squadopt.platform import ApiServiceInfo
-from squadopt.platform._queue_lock import QueueFileLock, QueueLockTimeout
 from squadopt.platform.advice_cache import FileAdviceCache
 from squadopt.platform.advice_observability import AdviceLog
 from squadopt.platform.advice_queue import FileJobQueue
@@ -43,6 +42,7 @@ from squadopt.platform.advice_worker import (
 from squadopt.platform.backend_runtime import BackendConfig, build_backend
 from squadopt.platform.jobs_contract import AdviceJob
 from squadopt.platform.queue_contracts import DEFAULT_LEASE_SECONDS
+from squadopt.platform.storage._queue_lock import QueueFileLock, QueueLockTimeout
 from squadopt.platform.worker_heartbeat import (
     HEARTBEAT_CONTRACT_VERSION,
     PULSE_SECONDS,

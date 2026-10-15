@@ -66,6 +66,16 @@ class Registration(NamedTuple):
 #: registered by the pull request that lands it.
 REGISTRY: tuple[Registration, ...] = ()
 
+#: The shared durable-state primitives `platform.storage` holds beside the adapters (ADR 0011,
+#: decision 3; moved there by the first unit pull request): the queue lock, the store probe,
+#: handoff retention and the backup command. They are not adapters of a port, so the
+#: adapter-side checks below leave them out. `tests/architecture/test_platform_layout.py`
+#: holds the moves themselves.
+SHARED_PRIMITIVES = frozenset(
+    f"squadopt.platform.storage.{name}"
+    for name in ("_queue_lock", "backup_recovery", "projection_retention", "store_probe")
+)
+
 
 def _modules(home: Path) -> set[str]:
     """The dotted names of the modules under a home, apart from its package file."""
@@ -126,8 +136,9 @@ def test_a_home_is_a_docstring_only_with_no_barrel(home: ModuleType) -> None:
 def test_the_registry_covers_every_module_of_both_homes() -> None:
     """A port module or an adapter module lands with its registration.
 
-    The adapter side is exact: every module of `platform.storage` holds a registered adapter,
-    and every registered adapter lives there. The port side is a subset, because
+    The adapter side is exact: every module of `platform.storage` beyond the shared primitives
+    holds a registered adapter, and every registered adapter lives there. The port side is a
+    subset, because
     `CaptureReader` and `LedgerStore` are declared in `data` and `live`, where the other
     consumers of those ports sit.
     """
@@ -136,7 +147,8 @@ def test_the_registry_covers_every_module_of_both_homes() -> None:
     registered_adapters = {type(entry.adapter).__module__ for entry in REGISTRY}
 
     assert _modules(PORTS) <= registered_ports
-    assert _modules(STORAGE) == registered_adapters
+    assert _modules(STORAGE) - SHARED_PRIMITIVES == registered_adapters
+    assert _modules(STORAGE) >= SHARED_PRIMITIVES
     assert [
         module
         for module in sorted(registered_ports)
@@ -145,15 +157,16 @@ def test_the_registry_covers_every_module_of_both_homes() -> None:
 
 
 def test_the_homes_hold_no_module_until_the_first_group_lands() -> None:
-    """The one test the first group's pull request deletes: both homes are empty today.
+    """The one test the first group's pull request deletes: both homes hold no adapter today.
 
     It states the empty registry as a fact of this tree, rather than leaving it to a
     parametrize that matched nothing; the coverage test above keeps the registry and the homes
-    in step once it goes.
+    in step once it goes. The storage home already holds the shared primitives, which are not
+    adapters.
     """
 
     assert _modules(PORTS) == set()
-    assert _modules(STORAGE) == set()
+    assert _modules(STORAGE) == SHARED_PRIMITIVES
     assert REGISTRY == ()
 
 
