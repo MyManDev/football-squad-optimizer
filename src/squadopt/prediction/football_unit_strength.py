@@ -25,6 +25,7 @@ from sklearn.preprocessing import StandardScaler  # type: ignore[import-untyped]
 from squadopt.features.football_unit_inputs import (
     POSITIONS,
     UNIT_INPUT_VERSION,
+    UNIT_PREFIX_CLOCK_VERSION,
     ClubUnit,
     ProjectedUnitState,
     UnitInputCatalog,
@@ -35,6 +36,7 @@ from squadopt.features.football_unit_inputs import (
 
 UNIT_MODEL_VERSION = "football_projected_unit_strength_v1"
 UNIT_FEATURE_VERSION = "reference_relative_unit_identity_attributes_v1"
+UNIT_REPLAY_FIT_VERSION = "football_unit_public_replay_quantized_prefix_fit_v1"
 
 
 def _canonical(value: Any) -> str:
@@ -43,6 +45,8 @@ def _canonical(value: Any) -> str:
 
 def _fingerprint(catalog: UnitInputCatalog) -> str:
     payload = asdict(catalog)
+    if catalog.replay is None:
+        payload.pop("replay")
     for key in ("sources", "attributes", "mappings", "player_attributes"):
         payload[key] = sorted(payload[key], key=_canonical)
     return hashlib.sha256(_canonical(payload).encode()).hexdigest()
@@ -50,7 +54,16 @@ def _fingerprint(catalog: UnitInputCatalog) -> str:
 
 def _observation_fingerprint(observation: UnitObservation) -> str:
     payload = asdict(observation)
+    if observation.exposure_clock is None:
+        payload.pop("exposure_clock")
     payload["catalog"] = _fingerprint(observation.catalog)
+    return hashlib.sha256(_canonical(payload).encode()).hexdigest()
+
+
+def _projection_fingerprint(projection: UnitProjection) -> str:
+    payload = asdict(projection)
+    if projection.catalog.replay is None:
+        payload["catalog"].pop("replay")
     return hashlib.sha256(_canonical(payload).encode()).hexdigest()
 
 
@@ -124,20 +137,47 @@ class FootballUnitStrengthModel:
     feature_version = UNIT_FEATURE_VERSION
     regularization = 0.1
 
-    def __init__(self, observations: tuple[UnitObservation, ...], *, cutoff: datetime):
+    def __init__(
+        self,
+        observations: tuple[UnitObservation, ...],
+        *,
+        cutoff: datetime,
+        allow_released_2025_26: bool = False,
+    ):
         utc_time(cutoff, "fitting cutoff")
+        if type(allow_released_2025_26) is not bool:
+            raise ValueError("Released season use must be an explicit boolean.")
         observations = tuple(
             sorted(observations, key=lambda x: (x.season, x.fixture_id, x.start_minute, x.own.club))
         )
         if not observations:
             raise ValueError("Unit-strength fitting requires historical exposure observations.")
+        replayed = tuple(x.catalog.replay is not None for x in observations)
+        if any(replayed) and not all(replayed):
+            raise ValueError(
+                "Reported prefix replay and legacy exposure need separate fit contracts."
+            )
+        exposure_ids = [
+            (x.exposure_clock.source_sha256, x.exposure_clock.interval_id)
+            for x in observations
+            if x.exposure_clock is not None
+        ]
+        if len(set(exposure_ids)) != len(exposure_ids):
+            raise ValueError("Reported source interval identities must not be reused.")
         contract = _attribute_contract(observations[0].catalog)
         spans: dict[tuple[str, int], list[tuple[float, float]]] = {}
         week_cutoffs: dict[tuple[str, int], datetime] = {}
         fixture_bases: dict[tuple[str, int], tuple[object, ...]] = {}
         for observation in observations:
-            if observation.season == "2025-26":
+            if observation.season == "2025-26" and not allow_released_2025_26:
                 raise ValueError("Locked 2025-26 outcomes are excluded from unit-strength fitting.")
+            if (
+                observation.catalog.replay is not None
+                and observation.catalog.replay.generated_at >= cutoff
+            ):
+                raise ValueError(
+                    "Reconstructed unit features must exist before the fitting cutoff."
+                )
             if observation.outcome_available_at >= cutoff:
                 raise ValueError("Historical outcome was unavailable at the fitting cutoff.")
             if _attribute_contract(observation.catalog) != contract:
@@ -173,6 +213,63 @@ class FootballUnitStrengthModel:
         self.cutoff = cutoff
         self._observations = observations
         self._attribute_contract = contract
+        self._replay_metadata: dict[str, object] = {}
+        if allow_released_2025_26 or any(replayed):
+            self._replay_metadata = {
+                "fit_contract": (
+                    UNIT_REPLAY_FIT_VERSION
+                    if any(replayed)
+                    else "football_unit_explicit_release_fit_v1"
+                ),
+                "allow_released_2025_26": allow_released_2025_26,
+            }
+        if any(replayed):
+            self._replay_metadata.update(
+                {
+                    "training_exposure_clock": UNIT_PREFIX_CLOCK_VERSION,
+                    "training_selection": "source-validated first-half reported minute bins 0..40",
+                    "training_replay_receipts": tuple(
+                        _canonical(
+                            {
+                                "replay": asdict(x.catalog.replay),
+                                "decision_cutoff": x.decision_cutoff,
+                                "baseline_source_id": x.catalog.baseline_source_id,
+                                "reference_source_id": x.catalog.reference_source_id,
+                            }
+                        )
+                        for x in observations
+                        if x.catalog.replay is not None
+                    ),
+                    "training_exposure_receipts": tuple(
+                        _canonical(
+                            {
+                                "clock": asdict(x.exposure_clock),
+                                "season": x.season,
+                                "gameweek": x.gameweek,
+                                "fixture_id": x.fixture_id,
+                                "start_minute": x.start_minute,
+                                "minutes": x.minutes,
+                                "kickoff": x.kickoff,
+                                "outcome_source": asdict(x.outcome_source),
+                                "outcome_available_at": x.outcome_available_at,
+                            }
+                        )
+                        for x in observations
+                        if x.exposure_clock is not None
+                    ),
+                    "exposure_semantics": (
+                        "quantized observed intervals, not exact physical seconds"
+                    ),
+                    "projection_extrapolation": (
+                        "whole-match rates extrapolate associations fitted on "
+                        "selected first-half prefixes"
+                    ),
+                    "fm_game_vintage": "unknown",
+                    "fm_effective_semantics": (
+                        "published frozen feature eligibility, not game/save date"
+                    ),
+                }
+            )
         self.attributes = tuple(
             sorted(observations[0].catalog.attributes, key=lambda x: (x.source_id, x.name))
         )
@@ -450,9 +547,7 @@ class FootballUnitStrengthModel:
                 "training_observation_sha256": self._observation_receipts,
                 "training_source_receipts": self._source_receipts,
                 "projection_catalog_sha256": _fingerprint(projection.catalog),
-                "projection_sha256": hashlib.sha256(
-                    _canonical(asdict(projection)).encode()
-                ).hexdigest(),
+                "projection_sha256": _projection_fingerprint(projection),
                 "reference_unit_identity": tuple(
                     (u.club, tuple((p.player_id, p.position) for p in u.players))
                     for u in (projection.reference_own, projection.reference_opponent)
@@ -484,6 +579,7 @@ class FootballUnitStrengthModel:
                 "minute_state_relation": "native minute law independent of supplied unit state",
                 "partial_units": "not supported; this version requires eleven players per club",
                 "fitting_semantics": "observational associations, not identified causal effects",
+                **self._replay_metadata,
             }
         )
         return UnitStrengthResult(
