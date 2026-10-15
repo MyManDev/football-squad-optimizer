@@ -7,7 +7,7 @@ models. Every time-dependent aggregation of the feature builder passes through o
 shifted-rolling primitive, so the timing rule has one implementation. Its callers are `prediction`, `live`, `application`, `platform`,
 the laboratory and the scripts.
 
-Its 21 Python files sit in one folder. This page places every one of them in exactly one
+Its 23 Python files sit in one folder. This page places every one of them in exactly one
 family.
 
 Review: İbrahim, the data side ([ownership](../../../docs/architecture/ownership.md)).
@@ -76,6 +76,8 @@ club-unit experiment and are called only by tests today.
 | `football_unit_inputs.py` | Immutable inputs of the separately invoked club-unit experiment (`football_unit_inputs_v1`). |
 | `football_unit_catalog.py` | The strict private JSON input boundary of the club-unit experiment; it touches no network or file. |
 | `football_fm_attributes.py` | Reads a full private FM export and prepares its exact active player/club scope for a catalog (`football_fm_csv_attributes_v1`, `football_fm_scoped_attributes_v1`), retaining unknown traits and refusing inferred identity or absent mapped UIDs (`src/squadopt/features/football_fm_attributes.py:204`). |
+| `football_observed_tactical_inputs.py` | Separate full-roster native marginal context with four observed event channels, nullable FM traits and prior provider roles; explicit historical replay retains actual acquisition clocks (`src/squadopt/features/football_observed_tactical_inputs.py:133`, `src/squadopt/features/football_observed_tactical_inputs.py:385`). |
+| `football_observed_tactical_readers.py` | Pure byte readers for typed observed-tactical envelopes, complete selected event rows, exact FM rows and provider roles; supplied SHA256 checks establish byte integrity (`src/squadopt/features/football_observed_tactical_readers.py:45`, `src/squadopt/features/football_observed_tactical_readers.py:155`, `src/squadopt/features/football_observed_tactical_readers.py:276`, `src/squadopt/features/football_observed_tactical_readers.py:406`). |
 
 ## Package surface
 
