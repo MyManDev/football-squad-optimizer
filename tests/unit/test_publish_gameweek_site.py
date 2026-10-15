@@ -22,7 +22,7 @@ from tests.unit.test_weekly_operations import (
 )
 
 from squadopt.platform import weekly_operations, weekly_publish
-from squadopt.platform._queue_lock import QueueFileLock
+from squadopt.platform.storage._queue_lock import QueueFileLock
 from squadopt.platform.weekly_journal import WeeklyRun, WeeklyStageResult
 from squadopt.platform.weekly_publish import WEEKLY_RUNS, copy_preview_builder, tree_digests
 
