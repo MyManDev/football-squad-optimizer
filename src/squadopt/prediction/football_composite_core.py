@@ -423,7 +423,7 @@ def _validate(
         if (
             row["fixture"] != score.fixture_id
             or row["GW"] != score.gameweek
-            or row["model_version"] != score.native_model_version
+            or row.get("model_version", score.native_model_version) != score.native_model_version
             or row["club"] not in clubs
             or row["opponent"] != clubs[1 - clubs.index(row["club"])]
             or row["home"] != int(row["club"] == clubs[0])
