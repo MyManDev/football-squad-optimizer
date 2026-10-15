@@ -814,41 +814,61 @@ class ScoreStateModel:
         ):
             raise ValueError("score prediction target or decision precedes the fit contract")
         coefficients = np.zeros(6) if zero_coefficients else fitted.coefficients
-        process = _Process(
+        return _predict_score_process(
             fixture,
             coefficients,
-            fitted.metadata.numerical_tolerance,
-            fitted.metadata.max_difference,
+            numerical_tolerance=fitted.metadata.numerical_tolerance,
+            max_difference=fitted.metadata.max_difference,
+            model_sha256=fitted.sha256,
+            zero_coefficients=zero_coefficients,
         )
-        home, away = process.goals()
-        players = []
-        for player in sorted(fixture.players, key=lambda item: item.player_code):
-            values = tuple(
-                0.0 if policy == "not_playing" else process.survival(player.club_code, start, end)
-                for start, end, policy in zip(
-                    player.physical_on, player.physical_off, player.exit_policies, strict=True
-                )
+
+
+def _predict_score_process(
+    fixture: ScoreFixture,
+    coefficients: NDArray[np.float64],
+    *,
+    numerical_tolerance: float,
+    max_difference: int,
+    model_sha256: str,
+    zero_coefficients: bool,
+) -> ScoreStatePrediction:
+    """Shared numerical kernel after either full or compact contract validation."""
+    process = _Process(
+        fixture,
+        coefficients,
+        numerical_tolerance,
+        max_difference,
+    )
+    home, away = process.goals()
+    players = []
+    for player in sorted(fixture.players, key=lambda item: item.player_code):
+        values = tuple(
+            0.0 if policy == "not_playing" else process.survival(player.club_code, start, end)
+            for start, end, policy in zip(
+                player.physical_on, player.physical_off, player.exit_policies, strict=True
             )
-            players.append(PlayerCleanSheet(player.player_code, player.club_code, values))
-        probabilities = process.entry(fixture.forecast_duration)
-        retained = float(probabilities.sum())
-        overflow = 1 - retained
-        if overflow < -ROUNDING_BOUND or overflow > process.mass_bound:
-            raise ValueError("score retained probability mass violates declared numerical bound")
-        return ScoreStatePrediction(
-            fixture,
-            home,
-            away,
-            tuple(players),
-            tuple(int(state) for state in process.states),
-            tuple(float(probability) for probability in probabilities),
-            max(0.0, overflow),
-            process.mass_bound,
-            process.moment_bound,
-            fitted.sha256,
-            score_input_digest(fixture),
-            zero_coefficients,
-            process.mean,
-            len(process.intervals),
-            process.exponentials,
         )
+        players.append(PlayerCleanSheet(player.player_code, player.club_code, values))
+    probabilities = process.entry(fixture.forecast_duration)
+    retained = float(probabilities.sum())
+    overflow = 1 - retained
+    if overflow < -ROUNDING_BOUND or overflow > process.mass_bound:
+        raise ValueError("score retained probability mass violates declared numerical bound")
+    return ScoreStatePrediction(
+        fixture,
+        home,
+        away,
+        tuple(players),
+        tuple(int(state) for state in process.states),
+        tuple(float(probability) for probability in probabilities),
+        max(0.0, overflow),
+        process.mass_bound,
+        process.moment_bound,
+        model_sha256,
+        score_input_digest(fixture),
+        zero_coefficients,
+        process.mean,
+        len(process.intervals),
+        process.exponentials,
+    )

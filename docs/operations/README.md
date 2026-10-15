@@ -22,6 +22,7 @@
 | Prepare a historical score training record with declared source clocks and explicit released-season opt-in (`src/squadopt/features/football_score_replay.py:120`) | [Score replay contract](football_score_replay.md) |
 | Inspect the separately certified bounded fallback for a score fit (`src/squadopt/prediction/football_score_state.py:296`) | [Score solver receipt](football_score_solver.md) |
 | Inspect the explicit forecast-clock approximation for native player intervals (`src/squadopt/features/football_score_projection.py:173`) | [Score interval projection](football_score_projection.md) |
+| Export and read compact score-process parameters (`src/squadopt/prediction/football_score_serving.py:183`) | [Compact score serving](football_score_serving.md) |
 | Cut a release, deploy a `site-*` tag and verify the live site with the release recipe (`scripts/release/ship.sh`, `deploy.sh`, `verify_live.py`, `clean_body.py`) | [Release in one command](../deployment_runbook.md#release-in-one-command) |
 | Restart a running backend on the code of the live release (`scripts/release/restart_backend.ps1`), or start a stopped one from that release | [The release window](../deployment_runbook.md#the-release-window-is-closed-to-develop) and [a stopped backend](../deployment_runbook.md#a-stopped-backend-starts-from-the-release) |
 | Register or remove the `SquadOptBackendWatch` scheduled task, which starts the backend and its tunnel at logon and restarts a missing component | [Backend free hosting, starting the backend](../backend_free_hosting.md#1-start-the-backend) |
