@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-10-14T14:20:21Z",
+  "generated_at_utc": "2026-10-15T14:15:28Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,16 +9,16 @@
     "league_id": 352490,
     "mode": "saf-puan",
     "window": 5,
-    "source_snapshot_id": "fpl-live-20261014T135921Z-a48d1521c87f",
+    "source_snapshot_id": "fpl-live-20261015T130038Z-7a7a388a3a43",
     "moves": [
       {
         "move_id": "gw07-1",
         "player_out": {
-          "player_id": 244723,
-          "name": "Tyrick Mitchell",
-          "short_name": "Mitchell",
+          "player_id": 219924,
+          "name": "Issa Diop",
+          "short_name": "Diop",
           "position": "DEF",
-          "team": "Crystal Palace"
+          "team": "Ipswich Town"
         },
         "player_in": {
           "player_id": 17761,
@@ -36,7 +36,7 @@
     "expected_points_cost": 0.0,
     "rival_label": null,
     "solver_status": "FEASIBLE",
-    "optimality_gap": 1.259999999999991,
+    "optimality_gap": 1.795000000000016,
     "wall_clock_stopped_the_search": false,
     "expected_own_points": 58.47493112126904,
     "captain": {
@@ -155,20 +155,20 @@
         "expected_points": 0.10027015579447286
       },
       {
+        "player_id": 244723,
+        "name": "Tyrick Mitchell",
+        "short_name": "Mitchell",
+        "position": "DEF",
+        "team": "Crystal Palace",
+        "expected_points": 2.742248299250839
+      },
+      {
         "player_id": 146426,
         "name": "Semi Ajayi",
         "short_name": "Ajayi",
         "position": "DEF",
         "team": "Hull City",
         "expected_points": 2.25764101727074
-      },
-      {
-        "player_id": 219924,
-        "name": "Issa Diop",
-        "short_name": "Diop",
-        "position": "DEF",
-        "team": "Ipswich Town",
-        "expected_points": 2.1748575911872456
       },
       {
         "player_id": 661313,
@@ -194,11 +194,11 @@
         ],
         "transfers_out": [
           {
-            "player_id": 244723,
-            "name": "Tyrick Mitchell",
-            "short_name": "Mitchell",
+            "player_id": 219924,
+            "name": "Issa Diop",
+            "short_name": "Diop",
             "position": "DEF",
-            "team": "Crystal Palace"
+            "team": "Ipswich Town"
           }
         ],
         "transfer_hit_points": 0.0,
@@ -237,37 +237,11 @@
         "gameweek": 9,
         "transfers_in": [
           {
-            "player_id": 444102,
-            "name": "Francisco Evanilson de Lima Barbosa",
-            "short_name": "Barbosa",
-            "position": "FWD",
-            "team": "Bournemouth"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 475168,
-            "name": "Jo\u00e3o Pedro Junqueira de Jesus",
-            "short_name": "Jesus",
-            "position": "FWD",
-            "team": "Chelsea"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 58.43887335817281
-      },
-      {
-        "gameweek": 10,
-        "transfers_in": [
-          {
-            "player_id": 141746,
-            "name": "Bruno Borges Fernandes",
-            "short_name": "Fernandes",
+            "player_id": 466052,
+            "name": "Rayan Cherki",
+            "short_name": "Cherki",
             "position": "MID",
-            "team": "Man Utd"
+            "team": "Man City"
           }
         ],
         "transfers_out": [
@@ -283,17 +257,17 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 60.0705286989547
+        "expected_points": 58.88026624641732
       },
       {
-        "gameweek": 11,
+        "gameweek": 10,
         "transfers_in": [
           {
-            "player_id": 466052,
-            "name": "Rayan Cherki",
-            "short_name": "Cherki",
+            "player_id": 223340,
+            "name": "Bukayo Saka",
+            "short_name": "Saka",
             "position": "MID",
-            "team": "Man City"
+            "team": "Arsenal"
           }
         ],
         "transfers_out": [
@@ -309,7 +283,33 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 60.3072287148633
+        "expected_points": 59.395376109642044
+      },
+      {
+        "gameweek": 11,
+        "transfers_in": [
+          {
+            "player_id": 502500,
+            "name": "Igor Thiago Nascimento Rodrigues",
+            "short_name": "Rodrigues",
+            "position": "FWD",
+            "team": "Brentford"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 475168,
+            "name": "Jo\u00e3o Pedro Junqueira de Jesus",
+            "short_name": "Jesus",
+            "position": "FWD",
+            "team": "Chelsea"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 1,
+        "free_transfers_after": 1,
+        "expected_points": 59.76162662883476
       }
     ],
     "stated_limits": [

@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-10-14T14:20:21Z",
+  "generated_at_utc": "2026-10-15T14:15:28Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "ortak-koru",
     "window": 5,
-    "source_snapshot_id": "fpl-live-20261014T135921Z-a48d1521c87f",
+    "source_snapshot_id": "fpl-live-20261015T130038Z-7a7a388a3a43",
     "moves": [
       {
         "move_id": "gw07-1",
@@ -33,7 +33,7 @@
     ],
     "transfer_hit_points": 0.0,
     "expected_gain_vs_hold": 0.0,
-    "expected_points_cost": 2.4451580277763014,
+    "expected_points_cost": 2.3699453031453004,
     "rival_label": "entry-4287206",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
@@ -324,7 +324,7 @@
     "data_quality": "complete",
     "missing_fields": [],
     "squad_basis": "captured",
-    "expected_points_cost_ceiling": 2.4451580277763014,
+    "expected_points_cost_ceiling": 2.3699453031453004,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0,
     "rival_entry_id": 4287206,
