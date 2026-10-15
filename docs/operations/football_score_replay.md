@@ -47,7 +47,7 @@ The likelihood divides each native whole-fixture mean by forecast physical durat
 target duration supplies realized likelihood exposure only. Feeding that target outcome into
 the duration forecast's declared history is rejected. Equal numerical values for forecast and
 realized duration can occur with valid separate history and are allowed
-(`src/squadopt/prediction/football_score_state.py:195`,
+(`src/squadopt/prediction/football_score_state.py:216`,
 `tests/unit/test_football_score_replay.py:144`,
 `tests/unit/test_football_score_replay.py:154`,
 `tests/unit/test_football_score_replay.py:290`).
@@ -59,8 +59,8 @@ gameweeks. Released 2025-26 observations additionally require
 `allow_released_2025_26=True`; its default is `False`. Every row's source and population
 headers are checked before any row's labels. Acquisition and generation must precede fitting;
 target and later gameweeks are excluded
-(`src/squadopt/prediction/football_score_state.py:486`,
-`src/squadopt/prediction/football_score_state.py:529`,
+(`src/squadopt/prediction/football_score_state.py:594`,
+`src/squadopt/prediction/football_score_state.py:637`,
 `src/squadopt/features/football_score_replay.py:239`).
 
 Replay fits record `football_score_public_replay_fit_v1`, the released-season choice and
@@ -69,8 +69,8 @@ with the default option retain the original metadata schema and canonical serial
 Both paths use the same likelihood builder. The experiment receipt and fixed-fifteen reader
 accept the new serialized metadata
 (`src/squadopt/prediction/football_score_state.py:91`,
-`src/squadopt/prediction/football_score_state.py:182`,
-`src/squadopt/prediction/football_score_state.py:596`,
+`src/squadopt/prediction/football_score_state.py:203`,
+`src/squadopt/prediction/football_score_state.py:737`,
 `tests/unit/test_football_score_replay.py:160`,
 `tests/integration/test_football_score_state_experiment.py:47`).
 
@@ -80,7 +80,7 @@ requires a live `ScoreFixture` with its separately supplied player interval law
 (`src/squadopt/features/football_score_state_inputs.py:159`,
 `src/squadopt/features/football_score_state_inputs.py:273`,
 `src/squadopt/features/football_score_state_inputs.py:570`,
-`src/squadopt/prediction/football_score_state.py:652`,
+`src/squadopt/prediction/football_score_state.py:803`,
 `tests/unit/test_football_score_replay.py:219`).
 
 ## Meaning of the receipts

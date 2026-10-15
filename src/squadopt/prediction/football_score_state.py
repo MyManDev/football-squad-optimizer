@@ -12,7 +12,7 @@ import hashlib
 import json
 import math
 from collections.abc import Sequence
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, fields
 from datetime import UTC, datetime
 from itertools import pairwise
 from typing import Any
@@ -92,6 +92,27 @@ class ScoreReplayMetadata(ScoreStateMetadata):
     fit_contract: str = REPLAY_FIT_VERSION
     allow_released_2025_26: bool = False
     replay_receipts: tuple[tuple[str, ScoreReplayProvenance], ...] = ()
+
+
+@dataclass(frozen=True)
+class ScoreSolverReceipt:
+    original_status: int
+    original_iterations: int
+    coordinate_iterations: tuple[int, ...]
+    projected_gradient_max_abs: float
+    method: str = "separable_bounded_derivative_bisection_v1"
+    original_method: str = "L-BFGS-B"
+    kkt_tolerance: float = 1e-8
+
+
+@dataclass(frozen=True, kw_only=True)
+class ScoreSolvedMetadata(ScoreStateMetadata):
+    solver_receipt: ScoreSolverReceipt
+
+
+@dataclass(frozen=True, kw_only=True)
+class ScoreSolvedReplayMetadata(ScoreReplayMetadata):
+    solver_receipt: ScoreSolverReceipt
 
 
 @dataclass(frozen=True)
@@ -270,6 +291,93 @@ def objective_gradient(
 
 def _immutable(values: NDArray[np.float64]) -> NDArray[np.float64]:
     return np.frombuffer(values.astype(np.float64).tobytes(), dtype=np.float64)
+
+
+def _separable_solution(
+    examples: Sequence[ScoreTrainingExample], l2: float
+) -> tuple[NDArray[np.float64], tuple[int, ...]]:
+    """Solve the unchanged bounded objective only for exact zero/one-hot designs."""
+    if isinstance(l2, bool) or not isinstance(l2, (int, float)) or not math.isfinite(l2) or l2 < 0:
+        raise ValueError("Separable score fitting requires finite nonnegative l2.")
+    masses: list[list[float]] = [[] for _ in range(6)]
+    counts = [0] * 6
+    for example in examples:
+        for values, vectors, is_event in (
+            (example.exposure_masses, example.exposure_features, False),
+            (example.event_log_offsets, example.event_features, True),
+        ):
+            if len(values) != len(vectors):
+                raise ValueError("Separable score design lengths differ.")
+            for value, vector in zip(values, vectors, strict=True):
+                if (
+                    isinstance(value, bool)
+                    or not isinstance(value, (int, float))
+                    or not math.isfinite(value)
+                    or (not is_event and value < 0)
+                    or len(vector) != 6
+                    or any(
+                        isinstance(item, bool)
+                        or not isinstance(item, (int, float))
+                        or item not in (0.0, 1.0)
+                        for item in vector
+                    )
+                    or sum(vector) > 1
+                ):
+                    raise ValueError("Separable score design must be finite zero/one-hot rows.")
+                if 1.0 in vector:
+                    index = vector.index(1.0)
+                    if is_event:
+                        counts[index] += 1
+                    else:
+                        masses[index].append(float(value))
+    coefficients = np.zeros(6, dtype=float)
+    iterations = []
+    for index in range(6):
+        try:
+            mass = math.fsum(masses[index])
+        except OverflowError as error:
+            raise ValueError("Separable score exposure exceeds finite support.") from error
+
+        def derivative(value: float, mass: float = mass, count: int = counts[index]) -> float:
+            gradient = mass * math.exp(value) - count + l2 * value
+            if not math.isfinite(gradient):
+                raise ValueError("Separable score derivative exceeds finite support.")
+            return gradient
+
+        lower, upper = -COEFFICIENT_BOUND, COEFFICIENT_BOUND
+        steps = 0
+        if mass == counts[index] == l2 == 0:
+            optimum = 0.0
+        elif derivative(lower) >= 0:
+            optimum = lower
+        elif derivative(upper) <= 0:
+            optimum = upper
+        else:
+            for _ in range(128):
+                steps += 1
+                middle = lower + (upper - lower) / 2
+                gradient = derivative(middle)
+                if gradient == 0 or middle in (lower, upper):
+                    break
+                if gradient < 0:
+                    lower = middle
+                else:
+                    upper = middle
+            optimum = min((lower, middle, upper), key=lambda value: (abs(derivative(value)), value))
+        coefficients[index] = optimum
+        iterations.append(steps)
+    return coefficients, tuple(iterations)
+
+
+def _projected_gradient(coefficients: NDArray[np.float64], gradient: NDArray[np.float64]) -> float:
+    if coefficients.shape != (6,) or gradient.shape != (6,) or not np.isfinite(gradient).all():
+        raise ValueError("Score KKT certification requires six finite gradients.")
+    residual = np.where(
+        coefficients == -COEFFICIENT_BOUND,
+        np.minimum(gradient, 0),
+        np.where(coefficients == COEFFICIENT_BOUND, np.maximum(gradient, 0), gradient),
+    )
+    return float(np.max(np.abs(residual)))
 
 
 def _verify(fitted: _Fitted) -> None:
@@ -589,9 +697,42 @@ class ScoreStateModel:
             bounds=[(-COEFFICIENT_BOUND, COEFFICIENT_BOUND)] * 6,
             options={"maxiter": max_iterations, "ftol": 1e-13, "gtol": 1e-8},
         )
-        if not result.success or not np.isfinite(result.x).all():
+        try:
+            raw_coefficients = np.asarray(getattr(result, "x", ()))
+            if raw_coefficients.dtype.kind not in "fiu":
+                raise ValueError("optimizer coefficients must be real numeric values")
+            coefficients = raw_coefficients.astype(float)
+        except (TypeError, ValueError, OverflowError) as error:
+            raise ValueError("score intensity optimizer did not converge finitely") from error
+        iterations = getattr(result, "nit", None)
+        success = getattr(result, "success", None)
+        status = getattr(result, "status", None)
+        if (
+            not isinstance(success, (bool, np.bool_))
+            or type(status) is not int
+            or (success and status != 0)
+            or isinstance(iterations, bool)
+            or not isinstance(iterations, (int, np.integer))
+            or not 0 <= iterations <= max_iterations
+            or coefficients.shape != (6,)
+            or not np.isfinite(coefficients).all()
+            or np.any(np.abs(coefficients) > COEFFICIENT_BOUND)
+        ):
             raise ValueError("score intensity optimizer did not converge finitely")
-        coefficients = np.asarray(result.x, dtype=float)
+        solver_receipt = None
+        if not success:
+            if status != 2 or iterations >= max_iterations:
+                raise ValueError("score intensity optimizer did not converge finitely")
+            coefficients, coordinate_iterations = _separable_solution(examples, float(l2))
+            _, certified_gradient = objective(coefficients)
+            residual = _projected_gradient(coefficients, certified_gradient)
+            if residual > 1e-8:
+                raise ValueError(
+                    "Separable score solution failed the original objective KKT check."
+                )
+            solver_receipt = ScoreSolverReceipt(
+                status, int(iterations), coordinate_iterations, residual
+            )
         loss, gradient = objective(coefficients)
         metadata = ScoreStateMetadata(
             MODEL_VERSION,
@@ -635,6 +776,16 @@ class ScoreStateModel:
                     for row in rows
                     if isinstance(row, ScoreReplayObservation)
                 ),
+            )
+        if solver_receipt is not None:
+            metadata_type = (
+                ScoreSolvedReplayMetadata
+                if isinstance(metadata, ScoreReplayMetadata)
+                else ScoreSolvedMetadata
+            )
+            metadata = metadata_type(
+                **{item.name: getattr(metadata, item.name) for item in fields(metadata)},
+                solver_receipt=solver_receipt,
             )
         encoded = json.dumps(
             asdict(metadata), sort_keys=True, separators=(",", ":"), allow_nan=False
