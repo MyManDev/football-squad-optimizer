@@ -27,6 +27,9 @@ from tests.fixtures.football_score_state_fixtures import (
     native_moments,
     parse_snapshot,
 )
+from tests.unit.test_football_score_replay import fit as fit_replay
+from tests.unit.test_football_score_replay import replay
+from tests.unit.test_football_score_state import observation
 
 from squadopt.evaluation.models import EvaluationValidationError
 from squadopt.experiments.football_score_state_experiment import (
@@ -39,6 +42,18 @@ from squadopt.experiments.football_score_state_experiment import (
 from squadopt.prediction.football import FOOTBALL_MODEL_VERSION
 from squadopt.prediction.football_minutes_role import ROLE_COMPONENT_COLUMNS
 from squadopt.prediction.football_score_state import ScoreStateModel
+
+
+def test_replay_metadata_survives_experiment_receipt_and_fixed_fifteen_read() -> None:
+    replay_model = fit_replay(tuple(replay(observation(i)) for i in range(3)))
+    candidate = compose(invented_case(), replay_model)
+    receipt = json.loads(candidate.receipt_json)
+    assert receipt["process_model_metadata_json"] == replay_model.metadata_json
+    metadata = json.loads(receipt["process_model_metadata_json"])
+    assert metadata["fit_contract"] == "football_score_public_replay_fit_v1"
+    assert len(metadata["replay_receipts"]) == 3
+    decision = plan(candidate, max_evaluations=1, locked_first=True)
+    assert math.isfinite(decision.search.best.expected_net_points)
 
 
 @pytest.fixture(scope="module")
