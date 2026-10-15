@@ -113,6 +113,12 @@ These six are private models: outside this package, each is imported only by its
 | `football_tactical_matchup.py` | Learned paired intensities and conditional tactical recipient marginals from supplied pre-decision states (`football_tactical_matchup_v1`). |
 | `football_unit_strength.py` | A baseline-relative projected club-unit model with private inputs (`football_projected_unit_strength_v1`). |
 
+The following standalone model has its own source contract:
+
+| Module | What it does |
+| --- | --- |
+| `football_observed_load.py` | Observed non-PL reported-record tilt of the whole native weekly law, with distinct missing-value features and no product caller (`src/squadopt/prediction/football_observed_load.py:272`). |
+
 ## Package surface
 
 | Module | What it does |

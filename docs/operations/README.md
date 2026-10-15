@@ -3,6 +3,7 @@
 | Task | Procedure |
 | --- | --- |
 | Inspect discovered infrastructure and start the prepared API/worker deployment | [Operations inventory](../architecture/operations_inventory.md) |
+| Prepare the standalone observed non-PL record workload model | [Observed workload contract](football_observed_load.md) (`src/squadopt/prediction/football_observed_load.py:272`) |
 | Create, verify and restore private backups | [Backup and recovery](../architecture/backup_recovery.md) |
 | Observe and resume a journaled weekly run | [Installed weekly operations](../architecture/weekly_operations.md) |
 | Reproduce advice load and inspect measured resource use | [Capacity acceptance](../architecture/advice_capacity.md) |

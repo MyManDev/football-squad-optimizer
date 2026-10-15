@@ -77,6 +77,12 @@ club-unit experiment and are called only by tests today.
 | `football_unit_catalog.py` | The strict private JSON input boundary of the club-unit experiment; it touches no network or file. |
 | `football_fm_attributes.py` | Reads a full private FM export and prepares its exact active player/club scope for a catalog (`football_fm_csv_attributes_v1`, `football_fm_scoped_attributes_v1`), retaining unknown traits and refusing inferred identity or absent mapped UIDs (`src/squadopt/features/football_fm_attributes.py:204`). |
 
+The standalone observed workload model has a separate input boundary:
+
+| Module | What it does |
+| --- | --- |
+| `football_observed_load.py` | Observed non-PL reported-record inputs and retrospective provenance, preserving missing values and complete native PL support (`src/squadopt/features/football_observed_load.py:104`). |
+
 ## Package surface
 
 | Module | What it does |
