@@ -26,7 +26,7 @@ the original full metadata digest is named separately. It does not impersonate
 a full training result
 (`src/squadopt/prediction/football_score_serving.py:59`,
 `src/squadopt/prediction/football_score_serving.py:135`,
-`src/squadopt/prediction/football_score_state.py:832`).
+`src/squadopt/prediction/football_score_state.py:827`).
 
 The tests compare full and compact process outputs exactly apart from that
 deliberately distinct digest, cover explicit released-season replay provenance,
