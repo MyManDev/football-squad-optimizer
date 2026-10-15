@@ -30,7 +30,6 @@ from pathlib import Path
 from typing import Final
 
 from squadopt.data.atomic import replace_retrying
-from squadopt.platform._queue_lock import QueueFileLock
 from squadopt.platform.advice_cache import AdviceCacheRepository
 from squadopt.platform.advice_observability import AdviceLog
 from squadopt.platform.jobs_contract import (
@@ -47,6 +46,7 @@ from squadopt.platform.queue_contracts import (
     AdviceQueueError,
     AdviceQueueIntegrityError,
 )
+from squadopt.platform.storage._queue_lock import QueueFileLock
 
 #: At most this many records move per ``archive`` call, and the call stops early once it
 #: has held the lock for ``DEFAULT_ARCHIVE_BUDGET_SECONDS``: every other queue transaction

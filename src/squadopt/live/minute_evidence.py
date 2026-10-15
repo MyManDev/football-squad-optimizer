@@ -24,10 +24,12 @@ from scipy.stats import nbinom
 from squadopt.live.football_artifact import ARTIFACT_CONTRACT, forecast_digest
 from squadopt.prediction.football import (
     FOOTBALL_MODEL_VERSION,
-    JOINT_ROLE_MODEL_VERSIONS,
+    JOINT_ROLE_COMPONENT_MODEL_VERSIONS,
+    JOINT_ROLE_FLAG_MODEL_VERSION,
     JOINT_ROLE_RETAINED_HISTORY_MODEL_VERSION,
 )
 from squadopt.prediction.football_components import role_component_record
+from squadopt.prediction.football_flag_components import flag_weekly_chances
 from squadopt.prediction.football_match_context import (
     MATCH_CONTEXT_FEATURE_VERSION,
     MATCH_CONTEXT_MODEL_VERSION,
@@ -367,7 +369,12 @@ def _validate_components(frame: pd.DataFrame, season: str, *, joint_role: bool =
 
 
 def _weekly_from_fixture_rows(
-    weekly: pd.DataFrame, rows: pd.DataFrame, multipliers: Mapping[int, float]
+    weekly: pd.DataFrame,
+    rows: pd.DataFrame,
+    multipliers: Mapping[int, float],
+    *,
+    learned_week: int | None = None,
+    learned_chances: Mapping[int, float] | None = None,
 ) -> pd.DataFrame:
     """Shared eligibility a times [1-product(1-q_fixture)], never product(1-a*q)."""
     out = weekly.copy(deep=True)
@@ -377,7 +384,8 @@ def _weekly_from_fixture_rows(
     }
     for index, row in out.iterrows():
         group = lookup.get((int(row.gameweek), int(row.player_id)))
-        a = multipliers[int(row.player_id)]
+        learned = learned_chances is not None and row.gameweek == learned_week
+        a = 1.0 if learned else multipliers[int(row.player_id)]
         out.at[index, "expected_points"] = (
             0.0 if group is None else a * float(group.expected_points.sum())
         )
@@ -386,6 +394,8 @@ def _weekly_from_fixture_rows(
             if group is None
             else a * (1 - float((1 - group.appearance_probability.to_numpy(float)).prod()))
         )
+        if learned and learned_chances is not None:
+            out.at[index, "appearance_probability"] = learned_chances[int(row.player_id)]
     return out
 
 
@@ -415,7 +425,7 @@ class FixtureComponentBasis:
             not in (
                 FOOTBALL_MODEL_VERSION,
                 MATCH_CONTEXT_MODEL_VERSION,
-                *JOINT_ROLE_MODEL_VERSIONS,
+                *JOINT_ROLE_COMPONENT_MODEL_VERSIONS,
                 TEAM_FORM_MODEL_VERSION,
             )
             or companion.get("model_version") != served.get("model_version")
@@ -437,7 +447,10 @@ class FixtureComponentBasis:
                 "Match-context components require their exact feature and head metadata."
             )
         role_metadata = served.get("role_metadata")
-        if served["model_version"] == JOINT_ROLE_RETAINED_HISTORY_MODEL_VERSION and (
+        if served["model_version"] in (
+            JOINT_ROLE_RETAINED_HISTORY_MODEL_VERSION,
+            JOINT_ROLE_FLAG_MODEL_VERSION,
+        ) and (
             not isinstance(role_metadata, dict)
             or role_metadata.get("role_feature_version") != RETAINED_HISTORY_ROLE_FEATURE_VERSION
         ):
@@ -452,6 +465,8 @@ class FixtureComponentBasis:
             raise ValueError("Companion training selection differs from the served forecast.")
         if companion.get("role_metadata") != served.get("role_metadata"):
             raise ValueError("Companion role-minute metadata differs from the served forecast.")
+        if companion.get("flag_metadata") != served.get("flag_metadata"):
+            raise ValueError("Companion learned flag metadata differs from the served forecast.")
         weekly = pd.DataFrame(cast(list[dict[str, object]], served["rows"]))
         required = {
             "gameweek",
@@ -553,9 +568,16 @@ class FixtureComponentBasis:
         _validate_components(
             rows,
             str(served["season"]),
-            joint_role=served["model_version"] in JOINT_ROLE_MODEL_VERSIONS,
+            joint_role=served["model_version"] in JOINT_ROLE_COMPONENT_MODEL_VERSIONS,
         )
-        aggregate = _weekly_from_fixture_rows(weekly, rows, dict.fromkeys(players, 1.0))
+        learned_chances = flag_weekly_chances(served, components=rows)
+        aggregate = _weekly_from_fixture_rows(
+            weekly,
+            rows,
+            dict.fromkeys(players, 1.0),
+            learned_week=int(cast(int, served["gameweek"])),
+            learned_chances=learned_chances,
+        )
         for col in ("expected_points", "appearance_probability"):
             _close(weekly[col], aggregate[col], "served weekly " + col)
         counts = rows.groupby(["GW", "player_code"]).agg(
@@ -581,7 +603,9 @@ class FixtureComponentBasis:
     def fixture_rows(self) -> pd.DataFrame:
         frame = pd.DataFrame(cast(list[dict[str, object]], self.companion["rows"]))
         frame.attrs["season"] = str(self.served["season"])
-        frame.attrs["joint_role"] = self.served["model_version"] in JOINT_ROLE_MODEL_VERSIONS
+        frame.attrs["joint_role"] = (
+            self.served["model_version"] in JOINT_ROLE_COMPONENT_MODEL_VERSIONS
+        )
         return frame
 
     @property
@@ -589,8 +613,14 @@ class FixtureComponentBasis:
         # Use original weekly floats for a true no-evidence identity, not recomputed sums.
         frame = pd.DataFrame(cast(list[dict[str, object]], self.served["rows"]))
         lookup = _availability_multipliers(self.companion)
+        learned_chances = flag_weekly_chances(self.served)
         for column in ("expected_points", "appearance_probability"):
-            frame[column] = frame[column] * frame.player_id.map(lookup)
+            multiplier = frame.player_id.map(lookup)
+            if learned_chances is not None:
+                multiplier = multiplier.mask(
+                    frame.gameweek.eq(cast(int, self.served["gameweek"])), 1.0
+                )
+            frame[column] = frame[column] * multiplier
         return frame
 
 
@@ -722,7 +752,13 @@ def apply_explicit_minute_evidence(
         changed_players.update(int(p) for p in side.player_code)
     if evidence:
         multipliers = _availability_multipliers(basis.companion)
-        computed = _weekly_from_fixture_rows(weekly, adjusted, multipliers)
+        computed = _weekly_from_fixture_rows(
+            weekly,
+            adjusted,
+            multipliers,
+            learned_week=int(cast(int, basis.served["gameweek"])),
+            learned_chances=flag_weekly_chances(basis.served),
+        )
         mask = weekly.gameweek.eq(cast(int, basis.served["gameweek"])) & weekly.player_id.isin(
             changed_players
         )

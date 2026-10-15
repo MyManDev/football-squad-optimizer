@@ -30,8 +30,9 @@ from squadopt.experiments import opponent_projection
 from squadopt.live import InSeasonProjection, read_projection_handoff, recommendation
 from squadopt.live.tick import handoff_path_for
 from squadopt.optimization import OptimizationConfig, SolverStatus, optimizer
-from squadopt.platform import capture_context, fpl_capture, projection_retention
+from squadopt.platform import capture_context, fpl_capture
 from squadopt.platform.backend_runtime import BackendConfig, BackendConfigError
+from squadopt.platform.storage import projection_retention
 
 REPOSITORY = Path(__file__).resolve().parents[2]
 PROTOCOL = REPOSITORY / "docs" / "research" / "published_difficulty_live_prereg.md"

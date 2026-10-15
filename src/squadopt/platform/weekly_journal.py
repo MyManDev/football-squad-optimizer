@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Any
 
 from squadopt.data.atomic import replace_retrying
-from squadopt.platform._queue_lock import QueueFileLock, QueueLockTimeout
+from squadopt.platform.storage._queue_lock import QueueFileLock, QueueLockTimeout
 
 SCHEMA_VERSION = "weekly_run_v1"
 _IDENTIFIER = re.compile(r"[a-zA-Z0-9][a-zA-Z0-9_-]{0,95}")

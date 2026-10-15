@@ -29,7 +29,7 @@ from squadopt.data.errors import DataSourceError
 from squadopt.data.snapshots import write_snapshot
 from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD
 from squadopt.live import CONTROL_MODEL_NAME, handoff_path_for, read_projection_handoff
-from squadopt.platform.projection_retention import publish_retained_handoff
+from squadopt.platform.storage.projection_retention import publish_retained_handoff
 from squadopt.prediction.component_dataset import (
     COMPONENT_HISTORY_WINDOW,
     component_feature_columns,

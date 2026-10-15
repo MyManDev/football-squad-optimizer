@@ -1,59 +1,59 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-10-10T06:07:04Z",
+  "generated_at_utc": "2026-10-15T14:15:28Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
-    "gameweek": 6,
+    "gameweek": 7,
     "entry_id": 3832237,
     "league_id": 352490,
     "mode": "ortak-koru",
     "window": 5,
-    "source_snapshot_id": "fpl-live-20261010T035732Z-c77d032165af",
+    "source_snapshot_id": "fpl-live-20261015T130038Z-7a7a388a3a43",
     "moves": [
       {
-        "move_id": "gw06-1",
+        "move_id": "gw07-1",
         "player_out": {
-          "player_id": 441164,
-          "name": "Pedro Porro Sauceda",
-          "short_name": "Sauceda",
-          "position": "DEF",
-          "team": "Spurs"
+          "player_id": 178301,
+          "name": "Ollie Watkins",
+          "short_name": "Watkins",
+          "position": "FWD",
+          "team": "Aston Villa"
         },
         "player_in": {
-          "player_id": 146426,
-          "name": "Semi Ajayi",
-          "short_name": "Ajayi",
-          "position": "DEF",
-          "team": "Hull City"
+          "player_id": 177815,
+          "name": "Dominic Calvert-Lewin",
+          "short_name": "Calvert-Lewin",
+          "position": "FWD",
+          "team": "Leeds"
         },
-        "expected_points_delta": 1.8075477695636906,
+        "expected_points_delta": 1.6711654915886527,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 1.8075477695636906,
-    "expected_points_cost": 0.0,
+    "expected_gain_vs_hold": 1.6711654915886527,
+    "expected_points_cost": 1.6141324241963844,
     "rival_label": "entry-5081114",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
     "wall_clock_stopped_the_search": false,
-    "expected_own_points": 44.7298812058485,
+    "expected_own_points": 45.318873740779075,
     "captain": {
-      "player_id": 226597,
-      "name": "Gabriel dos Santos Magalh\u00e3es",
-      "short_name": "Magalh\u00e3es",
-      "position": "DEF",
-      "team": "Arsenal",
-      "expected_points": 4.557988193553639
+      "player_id": 437730,
+      "name": "Antoine Semenyo",
+      "short_name": "Semenyo",
+      "position": "MID",
+      "team": "Man City",
+      "expected_points": 5.047195818515282
     },
     "vice_captain": {
-      "player_id": 446008,
-      "name": "Bryan Mbeumo",
-      "short_name": "Mbeumo",
+      "player_id": 430871,
+      "name": "Matheus Santos Carneiro da Cunha",
+      "short_name": "Cunha",
       "position": "MID",
       "team": "Man Utd",
-      "expected_points": 4.514593666623016
+      "expected_points": 4.534211502720818
     },
     "starting_xi": [
       {
@@ -62,7 +62,7 @@
         "short_name": "Mart\u00edn",
         "position": "GK",
         "team": "Arsenal",
-        "expected_points": 3.937285604836277
+        "expected_points": 3.568590651677484
       },
       {
         "player_id": 226597,
@@ -70,15 +70,7 @@
         "short_name": "Magalh\u00e3es",
         "position": "DEF",
         "team": "Arsenal",
-        "expected_points": 4.557988193553639
-      },
-      {
-        "player_id": 146426,
-        "name": "Semi Ajayi",
-        "short_name": "Ajayi",
-        "position": "DEF",
-        "team": "Hull City",
-        "expected_points": 2.87417591857242
+        "expected_points": 4.142429251761448
       },
       {
         "player_id": 231416,
@@ -86,31 +78,15 @@
         "short_name": "Kad\u0131o\u011flu",
         "position": "DEF",
         "team": "Brighton",
-        "expected_points": 2.2778581774368583
+        "expected_points": 2.9503695682841418
       },
       {
-        "player_id": 446008,
-        "name": "Bryan Mbeumo",
-        "short_name": "Mbeumo",
-        "position": "MID",
-        "team": "Man Utd",
-        "expected_points": 4.514593666623016
-      },
-      {
-        "player_id": 430871,
-        "name": "Matheus Santos Carneiro da Cunha",
-        "short_name": "Cunha",
-        "position": "MID",
-        "team": "Man Utd",
-        "expected_points": 4.4635446562597805
-      },
-      {
-        "player_id": 424876,
-        "name": "Dominik Szoboszlai",
-        "short_name": "Szoboszlai",
-        "position": "MID",
-        "team": "Liverpool",
-        "expected_points": 3.858004507173562
+        "player_id": 472769,
+        "name": "Nico O'Reilly",
+        "short_name": "O'Reilly",
+        "position": "DEF",
+        "team": "Man City",
+        "expected_points": 2.4376794574475213
       },
       {
         "player_id": 437730,
@@ -118,7 +94,23 @@
         "short_name": "Semenyo",
         "position": "MID",
         "team": "Man City",
-        "expected_points": 3.594009840954244
+        "expected_points": 5.047195818515282
+      },
+      {
+        "player_id": 430871,
+        "name": "Matheus Santos Carneiro da Cunha",
+        "short_name": "Cunha",
+        "position": "MID",
+        "team": "Man Utd",
+        "expected_points": 4.534211502720818
+      },
+      {
+        "player_id": 446008,
+        "name": "Bryan Mbeumo",
+        "short_name": "Mbeumo",
+        "position": "MID",
+        "team": "Man Utd",
+        "expected_points": 4.380344943521542
       },
       {
         "player_id": 84450,
@@ -126,7 +118,7 @@
         "short_name": "Xhaka",
         "position": "MID",
         "team": "Sunderland",
-        "expected_points": 3.2945342332333203
+        "expected_points": 2.785268800341046
       },
       {
         "player_id": 502500,
@@ -134,7 +126,15 @@
         "short_name": "Rodrigues",
         "position": "FWD",
         "team": "Brentford",
-        "expected_points": 3.7306746247680795
+        "expected_points": 4.158490726136929
+      },
+      {
+        "player_id": 177815,
+        "name": "Dominic Calvert-Lewin",
+        "short_name": "Calvert-Lewin",
+        "position": "FWD",
+        "team": "Leeds",
+        "expected_points": 3.59156367139386
       },
       {
         "player_id": 169432,
@@ -142,7 +142,7 @@
         "short_name": "McBurnie",
         "position": "FWD",
         "team": "Hull City",
-        "expected_points": 3.069223588883662
+        "expected_points": 2.675533530463721
       }
     ],
     "bench": [
@@ -152,15 +152,15 @@
         "short_name": "Donnarumma",
         "position": "GK",
         "team": "Man City",
-        "expected_points": 3.082495342651006
+        "expected_points": 3.5492596180094336
       },
       {
-        "player_id": 472769,
-        "name": "Nico O'Reilly",
-        "short_name": "O'Reilly",
-        "position": "DEF",
-        "team": "Man City",
-        "expected_points": 1.066628149008732
+        "player_id": 424876,
+        "name": "Dominik Szoboszlai",
+        "short_name": "Szoboszlai",
+        "position": "MID",
+        "team": "Liverpool",
+        "expected_points": 1.9203981798052088
       },
       {
         "player_id": 106611,
@@ -168,28 +168,80 @@
         "short_name": "Keane",
         "position": "DEF",
         "team": "Everton",
-        "expected_points": 0.11929007215421392
+        "expected_points": 0.530883142509363
       },
       {
-        "player_id": 178301,
-        "name": "Ollie Watkins",
-        "short_name": "Watkins",
-        "position": "FWD",
-        "team": "Aston Villa",
+        "player_id": 441164,
+        "name": "Pedro Porro Sauceda",
+        "short_name": "Sauceda",
+        "position": "DEF",
+        "team": "Spurs",
         "expected_points": 0.0
       }
     ],
     "chip": null,
     "plan_weeks": [
       {
-        "gameweek": 6,
+        "gameweek": 7,
         "transfers_in": [
           {
-            "player_id": 146426,
-            "name": "Semi Ajayi",
-            "short_name": "Ajayi",
+            "player_id": 177815,
+            "name": "Dominic Calvert-Lewin",
+            "short_name": "Calvert-Lewin",
+            "position": "FWD",
+            "team": "Leeds"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 178301,
+            "name": "Ollie Watkins",
+            "short_name": "Watkins",
+            "position": "FWD",
+            "team": "Aston Villa"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 5,
+        "free_transfers_after": 5,
+        "expected_points": 45.318873740779075
+      },
+      {
+        "gameweek": 8,
+        "transfers_in": [
+          {
+            "player_id": 60307,
+            "name": "Pascal Gro\u00df",
+            "short_name": "Gro\u00df",
+            "position": "MID",
+            "team": "Brighton"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 424876,
+            "name": "Dominik Szoboszlai",
+            "short_name": "Szoboszlai",
+            "position": "MID",
+            "team": "Liverpool"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 5,
+        "free_transfers_after": 5,
+        "expected_points": 47.30166215865051
+      },
+      {
+        "gameweek": 9,
+        "transfers_in": [
+          {
+            "player_id": 154043,
+            "name": "Ainsley Maitland-Niles",
+            "short_name": "Maitland-Niles",
             "position": "DEF",
-            "team": "Hull City"
+            "team": "Everton"
           }
         ],
         "transfers_out": [
@@ -205,15 +257,41 @@
         "chip": null,
         "free_transfers_before": 5,
         "free_transfers_after": 5,
-        "expected_points": 44.72988120584849
+        "expected_points": 48.5877954117505
       },
       {
-        "gameweek": 7,
+        "gameweek": 10,
         "transfers_in": [
           {
-            "player_id": 154043,
-            "name": "Ainsley Maitland-Niles",
-            "short_name": "Maitland-Niles",
+            "player_id": 141746,
+            "name": "Bruno Borges Fernandes",
+            "short_name": "Fernandes",
+            "position": "MID",
+            "team": "Man Utd"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 446008,
+            "name": "Bryan Mbeumo",
+            "short_name": "Mbeumo",
+            "position": "MID",
+            "team": "Man Utd"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 5,
+        "free_transfers_after": 5,
+        "expected_points": 51.18425521832053
+      },
+      {
+        "gameweek": 11,
+        "transfers_in": [
+          {
+            "player_id": 17761,
+            "name": "James Tarkowski",
+            "short_name": "Tarkowski",
             "position": "DEF",
             "team": "Everton"
           }
@@ -231,85 +309,7 @@
         "chip": null,
         "free_transfers_before": 5,
         "free_transfers_after": 5,
-        "expected_points": 46.037655825563526
-      },
-      {
-        "gameweek": 8,
-        "transfers_in": [
-          {
-            "player_id": 141746,
-            "name": "Bruno Borges Fernandes",
-            "short_name": "Fernandes",
-            "position": "MID",
-            "team": "Man Utd"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 437730,
-            "name": "Antoine Semenyo",
-            "short_name": "Semenyo",
-            "position": "MID",
-            "team": "Man City"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 5,
-        "free_transfers_after": 5,
-        "expected_points": 50.583340720936555
-      },
-      {
-        "gameweek": 9,
-        "transfers_in": [
-          {
-            "player_id": 475168,
-            "name": "Jo\u00e3o Pedro Junqueira de Jesus",
-            "short_name": "Jesus",
-            "position": "FWD",
-            "team": "Chelsea"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 178301,
-            "name": "Ollie Watkins",
-            "short_name": "Watkins",
-            "position": "FWD",
-            "team": "Aston Villa"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 5,
-        "free_transfers_after": 5,
-        "expected_points": 51.33637048705444
-      },
-      {
-        "gameweek": 10,
-        "transfers_in": [
-          {
-            "player_id": 226182,
-            "name": "Jayden Bogle",
-            "short_name": "Bogle",
-            "position": "DEF",
-            "team": "Leeds"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 106611,
-            "name": "Michael Keane",
-            "short_name": "Keane",
-            "position": "DEF",
-            "team": "Everton"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 5,
-        "free_transfers_after": 5,
-        "expected_points": 51.6754364995461
+        "expected_points": 52.722729389579996
       }
     ],
     "stated_limits": [
@@ -325,7 +325,7 @@
     "missing_fields": [],
     "squad_basis": "captured",
     "control_solver_status": "FEASIBLE",
-    "control_optimality_gap": 11.245999999999981,
+    "control_optimality_gap": 10.267999999999972,
     "rival_entry_id": 5081114,
     "overlap_count": 3,
     "transfer_cap": 1,
@@ -333,7 +333,7 @@
     "overlap_applied": 3,
     "plan_kind": "within_free_transfers",
     "alternative_plan": null,
-    "expected_gap_vs_rival": -7.415282966745096,
+    "expected_gap_vs_rival": -8.382221383032864,
     "captain_agreement": false
   }
 }

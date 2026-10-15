@@ -10,7 +10,11 @@ import pandas as pd
 
 from squadopt.live import RecommendationInputs
 from squadopt.live.minute_evidence import FixtureComponentBasis
-from squadopt.prediction.football import JOINT_ROLE_MODEL_VERSION, JOINT_ROLE_MODEL_VERSIONS
+from squadopt.prediction.football import (
+    JOINT_ROLE_COMPONENT_MODEL_VERSIONS,
+    JOINT_ROLE_FLAG_MODEL_VERSION,
+    JOINT_ROLE_MODEL_VERSION,
+)
 
 
 def _point_components(row: Mapping[str, Any], season: str, eligibility: float) -> dict[str, float]:
@@ -38,7 +42,7 @@ def fixture_role_estimates(
     applied_fixtures: Set[tuple[int, int]] = frozenset(),
 ) -> list[dict[str, Any]]:
     """Keep source eligibility separate from model roles; never infer a role from minutes."""
-    if basis is None or basis.companion["model_version"] not in JOINT_ROLE_MODEL_VERSIONS:
+    if basis is None or basis.companion["model_version"] not in JOINT_ROLE_COMPONENT_MODEL_VERSIONS:
         return []
     rows = basis.fixture_rows if revised_rows is None else revised_rows
     multipliers = {
@@ -49,7 +53,12 @@ def fixture_role_estimates(
     season = str(basis.served["season"])
     estimates = []
     for row in rows.loc[rows.GW.eq(inputs.deadline.gameweek)].to_dict("records"):
-        eligibility = multipliers[int(row["player_code"])]
+        source_eligibility = multipliers[int(row["player_code"])]
+        eligibility = (
+            1.0
+            if basis.served["model_version"] == JOINT_ROLE_FLAG_MODEL_VERSION
+            else source_eligibility
+        )
         estimates.append(
             {
                 "player_id": int(row["player_code"]),
@@ -68,7 +77,7 @@ def fixture_role_estimates(
                 "unknown_role_probability": float(row["unknown_role_probability"]) * eligibility,
                 "expected_minutes": float(row["expected_minutes"]) * eligibility,
                 "sixty_minute_probability": float(row["p60"]) * eligibility,
-                "captured_eligibility_multiplier": eligibility,
+                "captured_eligibility_multiplier": source_eligibility,
                 "news_applied": (int(row["player_code"]), int(row["fixture"])) in applied_fixtures,
                 "point_components": _point_components(
                     cast(Mapping[str, Any], row), season, eligibility
@@ -155,7 +164,7 @@ def role_forecast_summary(
     *,
     model_version: str = JOINT_ROLE_MODEL_VERSION,
 ) -> dict[str, Any] | None:
-    if model_version not in JOINT_ROLE_MODEL_VERSIONS:
+    if model_version not in JOINT_ROLE_COMPONENT_MODEL_VERSIONS:
         return None
     rows = diagnostics.get("fixture_role_estimates")
     if not isinstance(rows, list):

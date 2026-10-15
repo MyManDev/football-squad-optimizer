@@ -44,7 +44,7 @@ column is the author date of the file's last commit when this catalogue was last
 | --- | --- | --- | --- |
 | `add_device_plan_inputs.py` | operational | `docs/contracts/league_device_plan_v1.md`; `docs/weekly_runbook.md` | 2026-10-12 |
 | `backend_status.py` | operational | reads the backend's `/ready`, `/metrics` and `/health` answers and the operator logs under `data/runtime/backend/logs`, and prints a summary; `docs/backend_runbook.md`, `docs/deployment_runbook.md` | 2026-09-28 |
-| `build_football_forecast.py` | operational | the optional football forecast of one capture, under `--artifact-root` through `squadopt.platform.football_publication`; never replaces the projection handoff; `docs/weekly_runbook.md` | 2026-10-11 |
+| `build_football_forecast.py` | operational | the optional football forecast of one capture, under `--artifact-root` through `squadopt.platform.football_publication`; explicit paired retained captures can fit first-week categorical flags (`scripts/build_football_forecast.py:88`); [procedure](../docs/operations/retained_flag_forecasts.md) | 2026-10-15 |
 | `build_league_site.py` | shim | `squadopt.application.league_publication`; `docs/weekly_runbook.md` | 2026-10-09 |
 | `build_player_catalog.py` | operational | `data/players.json` under the site directory `--out`, for the contribution form; `docs/contributions.md`, `docs/deployment_runbook.md` | 2026-09-22 |
 | `build_projection_handoff.py` | shim | `squadopt.application.projection_handoff`; `docs/weekly_runbook.md` | 2026-10-02 |
@@ -55,7 +55,7 @@ column is the author date of the file's last commit when this catalogue was last
 | `capture_elite_picks.py` | shim | `squadopt.platform.elite_capture`; `docs/weekly_runbook.md` | 2026-09-10 |
 | `capture_official_injuries.py` | shim | `squadopt.platform.official_injury_capture`; `docs/operations/official_injury_discovery.md` | 2026-10-02 |
 | `capture_top100_cohort.py` | shim | `squadopt.platform.cohort_capture`; `docs/weekly_runbook.md` | 2026-09-10 |
-| `check_football_prospective_inputs.py` | operational | an outcome-free readiness audit of a named offline capture inventory, printed; writes nothing; `docs/football_prospective_input_check.md` | 2026-09-28 |
+| `check_football_prospective_inputs.py` | operational | an outcome-free readiness audit of a named offline capture inventory, printed; writes nothing; pairs the current arm by the rule of `docs/football_prospective_pairing_note.md` through `football_prospective_inputs.py`, without the backend; `docs/football_prospective_input_check.md` | 2026-10-14 |
 | `check_league_tree.py` | operational | the league tree release checks on a site's data directory or its origin URL; writes nothing; `docs/weekly_runbook.md`, `docs/deployment_runbook.md`; imported by `build_settled_site.py` | 2026-10-11 |
 | `export_player_evidence.py` | shim | `squadopt.application.player_evidence`; `docs/weekly_runbook.md` | 2026-09-26 |
 | `export_rotation_evidence.py` | shim | `squadopt.application.rotation_export`; `docs/weekly_runbook.md` | 2026-09-26 |
@@ -84,6 +84,8 @@ request to merge, cuts the release and calls `deploy.sh` and `verify_live.py`, a
 | `release/clean_body.py` | release recipe | rewrites a pull request body file in place, dropping attribution lines and replacing long dashes, before the pull request enters the merge queue; `docs/deployment_runbook.md` | 2026-09-19 |
 | `release/deploy.sh` | release recipe | refuses unless `main` is a two-parent merge whose tree is `develop`'s; waits for main's push CI and its single `site` artifact, tags, dispatches the Pages workflow and watches the run | 2026-09-26 |
 | `release/restart_backend.ps1` | release recipe | verifies the published site, fast-forwards `develop` and restarts the recorded backend; refuses, unless `-Force`, when `develop` differs from the live `site-*` release in `src`, `scripts` or `docs/contracts` | 2026-10-05 |
+| `vm_push.sh` | release recipe | after a release, from the PC: streams the captures, handoffs and the per-capture artifacts to the backend VM in one tar over SSH, then runs `vm_sync.sh` there; host and key from `SQUADOPT_VM_HOST` and `SQUADOPT_VM_KEY`, no secret inside; `docs/backend_free_hosting.md` | 2026-10-15 |
+| `vm_sync.sh` | release recipe | on the VM: checks the release tag out, refreshes the site data the backend reads, rebuilds the image for the tag and restarts the two Compose services, then prints readiness and the capabilities | 2026-10-15 |
 | `release/ship.sh` | release recipe | waits for the site pull request, cuts the release to `main` as a two-parent merge whose tree is `develop`'s, then runs `deploy.sh` and `verify_live.py` | 2026-10-04 |
 | `release/verify_live.py` | release recipe | checks the live site's routes, documents, assets and content after a deploy; a test holds its route list equal to `web/scripts/smoke-deployment.mjs` | 2026-10-04 |
 
@@ -101,6 +103,9 @@ do not move.
 | `backend_parentage.ps1` | Windows backend | dot-sourced by `run_backend_local.ps1` and `release/restart_backend.ps1`; refuses to start the backend from an agent application's process tree | 2026-10-05 |
 | `backup_data.ps1` | Windows backend | additive, checksummed copy of the private `data/` trees to a destination outside every worktree, or `-Verify` of the latest manifest; `docs/deployment_runbook.md` | 2026-10-11 |
 | `run_backend_local.ps1` | Windows backend | one API and N workers from the repository's `.venv` over one local store, recorded in `<store>\run\backend.pids.json`; `-Status` and `-Stop`; writes only under git-ignored `data/runtime/backend`; `docs/backend_free_hosting.md` | 2026-10-05 |
+| `weekly_run.ps1` | Windows weekly run | one weekly run on this PC as the planner's Start button runs it: reads the open gameweek from the published fixtures document, refuses a dirty checkout, a checkout off `develop` or a run in progress, fast-forwards `develop`, runs the weekly command with the cadence's arguments into `data/logs/weekly/<run id>.log`, and ends with the site pull request, the `ship.sh` line and the VM sync; `-DryRun` prints the plan; `docs/weekly_runbook.md` | 2026-10-15 |
+| `weekly_run_friday.ps1` | Windows weekly run | `weekly_run.ps1 -Kind friday`: the decision run, tag `site-<season>-gw<open>-decision` or the next fix tag | 2026-10-15 |
+| `weekly_run_tuesday.ps1` | Windows weekly run | `weekly_run.ps1 -Kind tuesday`: the next gameweek's run carrying the settled week, tag `site-<season>-gw<settled>-settled` or the next fix tag | 2026-10-15 |
 | `start_backend_at_logon.ps1` | Windows backend | starts whichever of the backend and its Cloudflare Tunnel connector is not running; with `-Watch` it checks every 60 seconds; `docs/backend_free_hosting.md` | 2026-10-05 |
 
 ## Measurement runners
@@ -159,7 +164,7 @@ do not move.
 | `measure_scenario_path_dependence.py` | measurement runner | `docs/scenario_path_dependence.json` | 2026-08-19 |
 | `measure_shortlist_matrix.py` | measurement runner | a fresh output directory; `docs/research/planning_shortlist_matrix.json` records this file's hash; four other runners import its `audit_plan` | 2026-09-28 |
 | `measure_strategy_bench.py` | measurement runner | `docs/strategy_bench.json` | 2026-09-26 |
-| `measure_strategy_rule_scale.py` | measurement runner | `docs/strategy_rule_scale.json`, `docs/strategy_rule_scale.md` | 2026-10-11 |
+| `measure_strategy_rule_scale.py` | measurement runner | `docs/strategy_rule_scale.json`, `docs/strategy_rule_scale.md`; with `--checkpoint gw12` or `gw19`, `docs/strategy_rule_scale_gw12.*` or `_gw19.*` and never the earlier records | 2026-10-11 |
 | `measure_strategy_screening.py` | measurement runner | `docs/strategy_screening.json` | 2026-09-26 |
 | `measure_template_rival.py` | measurement runner | `docs/template_rival_strength.json` (+ per-season variants) | 2026-09-19 |
 | `measure_temporal_refinement.py` | measurement runner | a fresh output directory; `docs/research/temporal_refinement_measurement.json` and `docs/research/triple_refinement_measurement.json` each record this file's hash | 2026-09-30 |
@@ -227,6 +232,7 @@ allowing the web formatter's layout.
 | `_phase_e_inputs.py` | helper | imported by the Phase E runners and helpers | 2026-09-07 |
 | `_phase_e_live.py` | helper | imported by `probe_phase_e_runtime`, `_phase_e_shadow_live` | 2026-09-07 |
 | `_phase_e_shadow_live.py` | helper | imported by `run_phase_e_live_shadow` | 2026-09-07 |
+| `football_prospective_inputs.py` | helper | imported by `check_football_prospective_inputs` and the prospective runner `docs/football_prospective_prereg.md` names: the scored capture, the shadow artifact with its receipt, and default 1 of `docs/football_prospective_pairing_note.md`; imports nothing from `squadopt.platform` | 2026-10-14 |
 | `_provenance.py` | helper | imported by `_experiment_cli` and by the operational commands that must not load the laboratory: repository root, git revision, `write_json`, `write_text`; standard library only | 2026-10-13 |
 
 ## Retired compatibility commands

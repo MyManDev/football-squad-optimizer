@@ -1,0 +1,209 @@
+{
+  "contract_version": "provisional_league_ui_v1",
+  "generated_at_utc": "2026-10-15T14:15:28Z",
+  "source_kind": "live",
+  "payload": {
+    "season": "2026-27",
+    "gameweek": 7,
+    "entry_id": 313686,
+    "league_id": 352490,
+    "mode": "ortak-koru",
+    "window": 1,
+    "source_snapshot_id": "fpl-live-20261015T130038Z-7a7a388a3a43",
+    "moves": [
+      {
+        "move_id": "gw07-1",
+        "player_out": {
+          "player_id": 551210,
+          "name": "Jorrel Hato",
+          "short_name": "Hato",
+          "position": "DEF",
+          "team": "Chelsea"
+        },
+        "player_in": {
+          "player_id": 469142,
+          "name": "Jan Paul van Hecke",
+          "short_name": "Hecke",
+          "position": "DEF",
+          "team": "Spurs"
+        },
+        "expected_points_delta": 0.8106195283750566,
+        "reason_code": "mode_tradeoff"
+      }
+    ],
+    "transfer_hit_points": 0.0,
+    "expected_gain_vs_hold": 0.8106195283750566,
+    "expected_points_cost": 1.017533326772238,
+    "rival_label": "entry-5349883",
+    "solver_status": "OPTIMAL",
+    "optimality_gap": 0.0,
+    "wall_clock_stopped_the_search": false,
+    "expected_own_points": 57.18564731340565,
+    "captain": {
+      "player_id": 223094,
+      "name": "Erling Haaland",
+      "short_name": "Haaland",
+      "position": "FWD",
+      "team": "Man City",
+      "expected_points": 8.35545188174385
+    },
+    "vice_captain": {
+      "player_id": 141746,
+      "name": "Bruno Borges Fernandes",
+      "short_name": "Fernandes",
+      "position": "MID",
+      "team": "Man Utd",
+      "expected_points": 6.012000284303428
+    },
+    "starting_xi": [
+      {
+        "player_id": 489639,
+        "name": "Bart Verbruggen",
+        "short_name": "Verbruggen",
+        "position": "GK",
+        "team": "Brighton",
+        "expected_points": 3.2480295284625815
+      },
+      {
+        "player_id": 465730,
+        "name": "Maxim De Cuyper",
+        "short_name": "Cuyper",
+        "position": "DEF",
+        "team": "Brighton",
+        "expected_points": 3.7099911306959767
+      },
+      {
+        "player_id": 466075,
+        "name": "Riccardo Calafiori",
+        "short_name": "Calafiori",
+        "position": "DEF",
+        "team": "Arsenal",
+        "expected_points": 3.45141576840743
+      },
+      {
+        "player_id": 469142,
+        "name": "Jan Paul van Hecke",
+        "short_name": "Hecke",
+        "position": "DEF",
+        "team": "Spurs",
+        "expected_points": 3.3062096448282863
+      },
+      {
+        "player_id": 141746,
+        "name": "Bruno Borges Fernandes",
+        "short_name": "Fernandes",
+        "position": "MID",
+        "team": "Man Utd",
+        "expected_points": 6.012000284303428
+      },
+      {
+        "player_id": 244851,
+        "name": "Cole Palmer",
+        "short_name": "Palmer",
+        "position": "MID",
+        "team": "Chelsea",
+        "expected_points": 4.960279398950454
+      },
+      {
+        "player_id": 60307,
+        "name": "Pascal Gro\u00df",
+        "short_name": "Gro\u00df",
+        "position": "MID",
+        "team": "Brighton",
+        "expected_points": 4.658321948335153
+      },
+      {
+        "player_id": 222531,
+        "name": "Morgan Gibbs-White",
+        "short_name": "Gibbs-White",
+        "position": "MID",
+        "team": "Nott'm Forest",
+        "expected_points": 4.637008159112412
+      },
+      {
+        "player_id": 577725,
+        "name": "Josh King",
+        "short_name": "King",
+        "position": "MID",
+        "team": "Fulham",
+        "expected_points": 3.1261265197771366
+      },
+      {
+        "player_id": 223094,
+        "name": "Erling Haaland",
+        "short_name": "Haaland",
+        "position": "FWD",
+        "team": "Man City",
+        "expected_points": 8.35545188174385
+      },
+      {
+        "player_id": 586309,
+        "name": "Thierno Barry",
+        "short_name": "Barry",
+        "position": "FWD",
+        "team": "Everton",
+        "expected_points": 3.3653611670450987
+      }
+    ],
+    "bench": [
+      {
+        "player_id": 112520,
+        "name": "Alex Palmer",
+        "short_name": "Palmer",
+        "position": "GK",
+        "team": "Ipswich Town",
+        "expected_points": 0.08206076680465356
+      },
+      {
+        "player_id": 199798,
+        "name": "Ezri Konsa Ngoyo",
+        "short_name": "Ngoyo",
+        "position": "DEF",
+        "team": "Arsenal",
+        "expected_points": 2.4955901164532333
+      },
+      {
+        "player_id": 108416,
+        "name": "John Egan",
+        "short_name": "Egan",
+        "position": "DEF",
+        "team": "Hull City",
+        "expected_points": 2.29477999569297
+      },
+      {
+        "player_id": 631786,
+        "name": "Jonah Kusi-Asare",
+        "short_name": "Kusi-Asare",
+        "position": "FWD",
+        "team": "Fulham",
+        "expected_points": 0.11895417311970728
+      }
+    ],
+    "chip": null,
+    "stated_limits": [
+      "No chip is offered inside the window. A finite window counts nothing for holding a chip back, so a planner that could reach one would spend it; chip timing is a season-long decision this window cannot price.",
+      "The current model was trained on seasons that awarded no defensive-contribution (DEFCON) points, so it does not forecast those points."
+    ],
+    "data_quality": "complete",
+    "missing_fields": [],
+    "squad_basis": "captured",
+    "rival_entry_id": 5349883,
+    "expected_points_cost_ceiling": 1.017533326772238,
+    "overlap_count": 3,
+    "transfer_cap": 1,
+    "overlap_target": 9,
+    "overlap_applied": 3,
+    "plan_kind": "within_free_transfers",
+    "alternative_plan": {
+      "kind": "with_hits",
+      "overlap_applied": 9,
+      "transfer_hit_points": 24.0,
+      "expected_points_cost": 25.101895720748786,
+      "expected_points_cost_ceiling": 25.101895720748786
+    },
+    "expected_gap_vs_rival": 11.41821700387235,
+    "captain_agreement": false,
+    "control_solver_status": "OPTIMAL",
+    "control_optimality_gap": 0.0
+  }
+}
