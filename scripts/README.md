@@ -44,7 +44,7 @@ column is the author date of the file's last commit when this catalogue was last
 | --- | --- | --- | --- |
 | `add_device_plan_inputs.py` | operational | `docs/contracts/league_device_plan_v1.md`; `docs/weekly_runbook.md` | 2026-10-12 |
 | `backend_status.py` | operational | reads the backend's `/ready`, `/metrics` and `/health` answers and the operator logs under `data/runtime/backend/logs`, and prints a summary; `docs/backend_runbook.md`, `docs/deployment_runbook.md` | 2026-09-28 |
-| `build_football_forecast.py` | operational | the optional football forecast of one capture, under `--artifact-root` through `squadopt.platform.football_publication`; never replaces the projection handoff; `docs/weekly_runbook.md` | 2026-10-11 |
+| `build_football_forecast.py` | operational | the optional football forecast of one capture, under `--artifact-root` through `squadopt.platform.football_publication`; explicit paired retained captures can fit first-week categorical flags (`scripts/build_football_forecast.py:88`); [procedure](../docs/operations/retained_flag_forecasts.md) | 2026-10-15 |
 | `build_league_site.py` | shim | `squadopt.application.league_publication`; `docs/weekly_runbook.md` | 2026-10-09 |
 | `build_player_catalog.py` | operational | `data/players.json` under the site directory `--out`, for the contribution form; `docs/contributions.md`, `docs/deployment_runbook.md` | 2026-09-22 |
 | `build_projection_handoff.py` | shim | `squadopt.application.projection_handoff`; `docs/weekly_runbook.md` | 2026-10-02 |

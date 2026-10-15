@@ -99,7 +99,12 @@ from squadopt.platform.worker_heartbeat import (
     prune_stale_heartbeats,
 )
 from squadopt.platform.worker_metrics import serve_worker_metrics
-from squadopt.prediction.football import FOOTBALL_MODEL_VERSION, JOINT_ROLE_MODEL_VERSIONS
+from squadopt.prediction.football import (
+    FOOTBALL_MODEL_VERSION,
+    JOINT_ROLE_FLAG_MODEL_VERSION,
+    JOINT_ROLE_MODEL_VERSIONS,
+)
+from squadopt.prediction.football_flag_components import FLAG_SCOPE_LIMITATION
 from squadopt.prediction.football_match_context import MATCH_CONTEXT_MODEL_VERSION
 from squadopt.prediction.football_team_form import TEAM_FORM_MODEL_VERSION
 
@@ -411,6 +416,11 @@ def build_advice_compute(
             advice["stated_limits"] = [
                 *(existing_limits if isinstance(existing_limits, list) else []),
                 "Experimental football model; independent predictive superiority is unverified.",
+                *(
+                    [FLAG_SCOPE_LIMITATION]
+                    if football.horizon.model_version == JOINT_ROLE_FLAG_MODEL_VERSION
+                    else []
+                ),
                 *(
                     [INHERITED_ZERO_LIMIT]
                     if isinstance(participation_assumptions, list)
