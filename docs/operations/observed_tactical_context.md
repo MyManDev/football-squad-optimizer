@@ -65,8 +65,8 @@ and one-half native share for recipient context. Missing values occupy a neutral
 numeric coordinate with a separate observed mask. A column with no observed training
 support stays disabled at prediction, even if later evidence appears
 (`src/squadopt/prediction/football_observed_tactical.py:91`,
-`src/squadopt/prediction/football_observed_tactical.py:451`,
-`src/squadopt/prediction/football_observed_tactical.py:479`).
+`src/squadopt/prediction/football_observed_tactical.py:669`,
+`src/squadopt/prediction/football_observed_tactical.py:533`).
 
 Allocation returns paired physical goal rates and player goal/assist expectations only.
 Clean-sheet calculations belong to a separately composed score and minute-law path.
@@ -74,7 +74,7 @@ Control preserves native rates and shares. Learned allocation refuses an unsuppo
 positive recipient head, broken full-club mass conservation or a player's G+A exceeding
 physical goal intensity; it does not clip those cases
 (`src/squadopt/prediction/football_observed_tactical.py:212`,
-`src/squadopt/prediction/football_observed_tactical.py:672`).
+`src/squadopt/prediction/football_observed_tactical.py:777`).
 
 `predict_recipients` is the separately versioned
 `native_offset_observed_tactical_recipient_only_v1` inference path. It evaluates only
@@ -88,8 +88,8 @@ combined physical goal fraction. Native control returns the supplied shares unch
 These checks leave final team rates and score composition to the caller
 (`src/squadopt/prediction/football_observed_tactical.py:47`,
 `src/squadopt/prediction/football_observed_tactical.py:240`,
-`src/squadopt/prediction/football_observed_tactical.py:338`,
-`src/squadopt/prediction/football_observed_tactical.py:590`).
+`src/squadopt/prediction/football_observed_tactical.py:388`,
+`src/squadopt/prediction/football_observed_tactical.py:750`).
 
 ## Clocks, integrity and integration boundary
 
@@ -100,8 +100,8 @@ later retrieval and input-generation clocks. Current prediction refuses a replay
 (`src/squadopt/features/football_observed_tactical_inputs.py:192`,
 `src/squadopt/features/football_observed_tactical_inputs.py:385`,
 `src/squadopt/features/football_observed_tactical_inputs.py:480`,
-`src/squadopt/prediction/football_observed_tactical.py:427`,
-`src/squadopt/prediction/football_observed_tactical.py:672`).
+`src/squadopt/prediction/football_observed_tactical.py:498`,
+`src/squadopt/prediction/football_observed_tactical.py:777`).
 
 The pure readers accept supplied bytes and compare their SHA256 with the caller's
 expected value. Canonical envelope readers validate declared schemas, clocks, identities
