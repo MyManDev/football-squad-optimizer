@@ -543,3 +543,46 @@ def test_external_capture_requirements_cannot_be_omitted(cached_basis):
         module.CompositeComponentBasis.from_documents(
             served, companion, fixture_calendar=pd.DataFrame(), roster_clubs={}
         )
+
+
+@pytest.mark.parametrize(
+    "cutoff",
+    ["2026-10-15T00:00:00Z", "2026-10-15T13:00:00Z", "2026-10-15T16:00:00+03:00"],
+)
+def test_native_envelope_preserves_earlier_fit_cutoff_and_accepts_equivalent_instants(cutoff):
+    envelope, native, components, inventory = envelope_case()
+    envelope["fit_information_cutoff"] = cutoff
+    inventory = replace(inventory, native_basis_sha256=digest(envelope))
+    module._native_envelope(envelope, native, components, inventory, inventory.decision_at)
+    assert envelope["fit_information_cutoff"] == cutoff
+    assert native["captured_at_utc"] == "2026-10-15T13:00:00Z"
+
+
+@pytest.mark.parametrize(
+    "cutoff",
+    [
+        "2026-10-15T13:00:00.000001Z",  # After capture, before all producer clocks.
+        "2026-10-14T23:00:00Z",  # Equal to the native three-hour history bound.
+        "2026-10-14T22:59:59Z",  # Before history, otherwise before capture/production.
+        "2026-10-15T00:00:00",  # Naive timestamp.
+        "NaT",
+        "Infinity",
+        None,
+        False,
+        0,
+    ],
+)
+def test_native_envelope_refuses_invalid_fit_clock_after_resigning_only_its_digest(cutoff):
+    envelope, native, components, inventory = envelope_case()
+    envelope["fit_information_cutoff"] = cutoff
+    inventory = replace(inventory, native_basis_sha256=digest(envelope))
+    with pytest.raises(ValueError):
+        module._native_envelope(envelope, native, components, inventory, inventory.decision_at)
+
+
+def test_native_envelope_requires_fit_cutoff_even_with_a_matching_digest():
+    envelope, native, components, inventory = envelope_case()
+    del envelope["fit_information_cutoff"]
+    inventory = replace(inventory, native_basis_sha256=digest(envelope))
+    with pytest.raises(ValueError):
+        module._native_envelope(envelope, native, components, inventory, inventory.decision_at)

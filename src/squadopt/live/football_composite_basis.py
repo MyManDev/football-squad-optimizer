@@ -249,7 +249,7 @@ def _native_envelope(
         or envelope["source_fingerprint"] != inventory.source_fingerprint
         or envelope["source_snapshot_id"] != inventory.source_snapshot_id
         or envelope["original_captured_at"] != inventory.captured_at
-        or envelope["fit_information_cutoff"] != native["captured_at_utc"]
+        or _clock(envelope["fit_information_cutoff"]) > _clock(native["captured_at_utc"])
         or envelope["gameweeks"] != list(inventory.gameweeks)
         or envelope["players"] != [p.player_code for p in inventory.roster]
         or _digest(envelope) != inventory.native_basis_sha256
@@ -258,7 +258,8 @@ def _native_envelope(
             "Composite weekly native reconstruction envelope differs from its originals."
         )
     if not (
-        _clock(envelope["fit_information_cutoff"])
+        _clock(envelope["native_history_admission_bound"])
+        < _clock(envelope["fit_information_cutoff"])
         <= _clock(envelope["native_original_fit_generated_at"])
         <= _clock(envelope["native_retrieved_at"])
         <= _clock(envelope["native_generated_at"])

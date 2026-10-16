@@ -60,10 +60,10 @@ historical training boundaries (`tests/unit/test_football_composite_core.py:1`).
 Both duty contexts must name the exact retained FPL snapshot, fingerprint and capture
 time. The recipe refuses another capture even when its clocks would otherwise pass;
 the fixture core also rejects Git replay identities and mixed duty captures
-(`src/squadopt/live/football_composite_basis.py:280`,
+(`src/squadopt/live/football_composite_basis.py:281`,
 `src/squadopt/prediction/football_composite_core.py:370`).
 Family targets are bound to the first captured forecast week before the recipe is
-recomputed (`src/squadopt/live/football_composite_basis.py:293`).
+recomputed (`src/squadopt/live/football_composite_basis.py:294`).
 
 The tactical recipient and phase models were fitted with native share offsets, then
 their corrections are stacked here: tactical shares become the phase offsets.
