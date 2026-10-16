@@ -3,9 +3,12 @@
 The feature engineering of the model lane (R2, [ARCHITECTURE.md](../../../ARCHITECTURE.md)):
 leakage-safe features built only from gameweeks before the target, the deadline-safe evidence
 tables a decision reads, the record of what happened, and the inputs of the private football
-models. Every time-dependent aggregation of the feature builder passes through one
-shifted-rolling primitive, so the timing rule has one implementation. Its callers are `prediction`, `live`, `application`, `platform`,
-the laboratory and the scripts.
+models. Every time-dependent aggregation of the feature builder and of `strength.py` passes
+through one shifted-rolling primitive, so the timing rule has one implementation there. The
+football lane takes its own windows (`src/squadopt/prediction/football_features.py:116`,
+`src/squadopt/prediction/football.py:130`), so its timing is audited in `prediction`. Its
+callers are `prediction`, `evaluation`, `live`, `application`, `platform`, the laboratory and
+the scripts.
 
 Its 31 Python files sit in one folder. This page places every one of them in exactly one
 family.
@@ -33,7 +36,7 @@ Of third-party libraries it imports pandas and NumPy.
 | Module | What it does |
 | --- | --- |
 | `builder.py` | Attaches leakage-safe rolling features to a canonical player-gameweek dataset: every aggregation is grouped by season and player and shifted by one gameweek before its window. |
-| `rolling.py` | The single shifted-rolling primitive: every time-dependent aggregation goes through it, so there is one place to audit the timing rule. |
+| `rolling.py` | The shifted-rolling primitive: every time-dependent aggregation of the feature builder and `strength.py` goes through it, so there is one place to audit their timing rule. The football lane in `prediction` builds its own windows. |
 | `config.py` | Explicit configuration and naming of the rolling features, with the windows declared rather than inlined so they can be experimental factors; and the package's errors (`FeatureError`, `FeatureConfigurationError`). |
 | `fixtures.py` | Attaches a gameweek's fixture context to the player-gameweek panel: how many fixtures, at home and away, and their difficulty. |
 | `strength.py` | Opponent strength estimated from shifted results we hold, rather than taken from the source's difficulty rating. |
@@ -60,14 +63,20 @@ that check them before a row is returned.
 
 ## Inputs of the football models
 
-The retained flag adapter supplies the optional live producer. The composite recipe also
-uses the unit, score, tactical, workload and phase contracts, while the experiment
-interfaces retain their training paths (`src/squadopt/application/football_live.py:24`,
-`src/squadopt/live/football_composite_basis.py:44`,
-`src/squadopt/prediction/football_composite_core.py:21`).
-The phase replay and credit readers prepare historical source inputs
-(`src/squadopt/features/football_phase_replay.py:123`,
-`src/squadopt/features/football_phase_credits.py:106`).
+Who imports these modules:
+
+- `football_flag_captures.py`: only the retained flag producer
+  (`src/squadopt/application/football_live.py:24`).
+- The live composite recipe: `live.football_composite_basis` reads the score replay contract
+  (`src/squadopt/live/football_composite_basis.py:22`), and `prediction.football_composite_core`
+  reads the unit, unit point, score, score projection, phase, phase coupling and observed
+  tactical inputs (`src/squadopt/prediction/football_composite_core.py:21-50`).
+- The other input modules: their `prediction` models and the `football_*_experiment` modules of
+  the laboratory.
+- `football_unit_catalog.py`, `football_fm_attributes.py`, `football_phase_replay.py`,
+  `football_phase_credits.py` and `football_observed_tactical_readers.py`: no module under
+  `src`. Tests and offline operators call them to prepare historical source inputs
+  (`football_phase_replay.py:123`, `football_phase_credits.py:106`).
 
 The additional score replay contract is a training input with separate historical feature
 and later retrieval clocks. It carries roster identities without a fabricated player minute
@@ -79,20 +88,20 @@ law (`src/squadopt/features/football_score_replay.py:50`,
 | `football_flag_inputs.py` | Captured flag facts and supplied pre-decision native minute supports (`football_flag_week_input_v1`); no reader touches a network, a file or an outcome it was not given. |
 | `football_flag_captures.py` | Binds original retained FPL flags and explicit settled start/minute labels to causal native supports (`retained_fpl_flag_inputs_v2`), keeping reconstructed decisions distinct from live forecasts (`src/squadopt/features/football_flag_captures.py:97`, `src/squadopt/features/football_flag_captures.py:207`). |
 | `football_load_inputs.py` | Immutable all-competition workload and native-law source contracts (`football_load_week_input_v1`). |
-| `football_phase_inputs.py` | Causal inputs for phase-specific credited goal and assist allocation (`football_phase_inputs_v1`). |
+| `football_phase_inputs.py` | Causal inputs for phase-specific credited goal and assist allocation (`football_phase_inputs_v1`). A replayed public-revision duty capture enters through `PhaseReplay`, and 2025-26 only with `allow_released_2025_26`; a fit on either is a `football_phase_duty_replay_fit_v2` ([operator contract](../../../docs/operations/phase_training_replay.md)). |
 | `football_phase_replay.py` | Reads exact public-revision duty CSV bytes while retaining separate original-recording and actual-retrieval clocks (`football_phase_replay.py:123`). |
 | `football_phase_credits.py` | Binds final FPL assists only when independent totals force a unique event assignment; refuses ambiguous assignments (`football_phase_credits.py:106`). |
 | `football_phase_coupling.py` | Explicit circular joint participation construction preserving supplied seven-state native marginals; dependence is imposed by persistent identity order (`src/squadopt/features/football_phase_coupling.py:103`). |
 | `football_score_state_inputs.py` | Strict score-process inputs (`football_score_fixture_input_v1`); a receipt assertion does not admit real data. |
 | `football_score_projection.py` | Explicit uniform forecast-clock point intervals preserve supplied native minute atoms; past duration receipts and approximation assumptions remain separate from a learned substitution law (`football_score_projection.py:174`). |
 | `football_tactical_inputs.py` | Named tactical facts and supplied paired pre-decision states (`football_tactical_inputs_v1`). |
-| `football_unit_inputs.py` | Immutable inputs of the separately invoked club-unit experiment (`football_unit_inputs_v1`). |
+| `football_unit_inputs.py` | Immutable inputs of the club-unit models (`football_unit_inputs_v1`). Replayed public-revision observations and 2025-26 enter only with `allow_released_2025_26`, and a fit on them records the unit replay fit contracts of `prediction.football_unit_strength` ([operator contract](../../../docs/operations/football_unit_replay.md)). |
 | `football_unit_catalog.py` | The strict private JSON input boundary of the club-unit experiment; it touches no network or file. |
 | `football_fm_attributes.py` | Reads a full private FM export and prepares its exact active player/club scope for a catalog (`football_fm_csv_attributes_v1`, `football_fm_scoped_attributes_v1`), retaining unknown traits and refusing inferred identity or absent mapped UIDs (`src/squadopt/features/football_fm_attributes.py:296`). |
 | `football_unit_point.py` | Declared deterministic XI point from complete native starter probabilities, with exact structural support and a retained basis receipt (`src/squadopt/features/football_unit_point.py:48`). |
 | `football_score_replay.py` | Frozen historical score training records, explicit 2025-26 opt-in and declared native/duration source bindings (`src/squadopt/features/football_score_replay.py:121`); [operator contract](../../../docs/operations/football_score_replay.md). |
 
-Observed workload and tactical context have separate typed input boundaries
+Observed workload and tactical context, and their readers, have separate typed input boundaries
 (`src/squadopt/features/football_observed_load.py:130`,
 `src/squadopt/features/football_observed_tactical_inputs.py:134`):
 
@@ -117,8 +126,12 @@ ARCHITECTURE.md measures and schedules these; this list says where they are.
   `rotation_evidence_artifact` to `data.snapshots`, `data._long_paths`,
   `data.sources.fpl_live`, `data.sources.fpl_set_pieces` and five `data.sources.club_news*`
   modules. Each edge is an `ignore_imports` entry of "Use cases, domain records and features
-  import no storage or source module" and may only go. The remedy is storage ports declared in
-  `squadopt.application`, with file adapters in `platform` (Phase 3).
+  import no storage or source module" and may only go. By the count of
+  [ADR 0011](../../../docs/architecture/decisions/0011-storage-ports-and-platform-split.md), 15
+  of the 16 import vocabulary rather than IO, and its decision 2 is their remedy: the parsers
+  and types they need move into the named vocabulary modules of `data`. Only the edge from
+  `rotation_evidence_artifact` to `data._long_paths` is IO; a port declared in `application`
+  could not serve it, since `features` sits below `application` in the layers list.
 - **File access.** `evidence_artifact.py`, `rotation_evidence_artifact.py` and
   `settled_outcomes.py` read their artifacts' manifests and tables themselves. The remedy is the
   same storage ports (Phase 3). Until then `tests/architecture/test_use_case_file_io.py`
