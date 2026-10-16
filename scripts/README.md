@@ -133,6 +133,7 @@ do not move.
 | `measure_defcon_component.py` | measurement runner | outcome-free identity check; one owner-authorized `docs/research/defcon_component_reading.{json,md}` record under #1000 | 2026-10-11 |
 | `measure_double_reduction.py` | measurement runner | `docs/double_reduction.json`, `docs/double_reduction.md` | 2026-09-26 |
 | `measure_explicit_lookahead.py` | measurement runner | a fresh output directory; `docs/research/explicit_lookahead_measurement.json` records this file's hash | 2026-10-05 |
+| `measure_feed_freshness.py` | measurement runner | `docs/feed_freshness.json`; also `docs/feed_freshness.md` | 2026-10-16 |
 | `measure_football_components.py` | measurement runner | a fresh output directory (component losses and search trials); its command is in `docs/research/football_component_ablation.md` | 2026-09-22 |
 | `measure_football_contextual.py` | measurement runner | a fresh `--output` directory; the reproduction entry point of `docs/research/football_contextual_development.md` | 2026-09-22 |
 | `measure_football_defcon.py` | measurement runner | a fresh `--output` directory; `docs/research/football_defcon_development.json` records this file's hash; scope `docs/research/football_defcon_development_scope.md` | 2026-09-28 |
