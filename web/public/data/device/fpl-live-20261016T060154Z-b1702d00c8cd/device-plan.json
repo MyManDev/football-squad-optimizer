@@ -1,12 +1,12 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-10-15T14:15:28Z",
+  "generated_at_utc": "2026-10-16T07:13:49Z",
   "source_kind": "live",
   "payload": {
     "contract_version": "league_device_plan_v2",
     "season": "2026-27",
     "gameweek": 7,
-    "source_snapshot_id": "fpl-live-20261015T130038Z-7a7a388a3a43",
+    "source_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd",
     "policy_id": "member_planning_policy_v2",
     "rules": {
       "squad_size": 15,
@@ -55,9 +55,9 @@
           50
         ],
         "cohort_size": 100,
-        "cohort_snapshot_id": "fpl-top100-20261015T125956Z-62eac7653b23",
-        "picks_snapshot_id": "fpl-elite-picks-20261015T130016Z-f74142d5b421",
-        "table_sha256": "0a890f659631183ae43ffe18feb2530d6b0c3b18a22958933876121eb5c9028d",
+        "cohort_snapshot_id": "fpl-top100-20261016T060118Z-ae3db8c93137",
+        "picks_snapshot_id": "fpl-elite-picks-20261016T060136Z-8b4c3667de56",
+        "table_sha256": "2818a2e18bb44ede2d2baa84576d374ea81f0c3b4f9ba8a9ece1068a577408e5",
         "picks_gameweek": 6
       },
       "transfers_cap": 20,
@@ -2580,20 +2580,20 @@
         "position": "DEF",
         "buy_tenths": 44,
         "start_tenths": 45,
-        "expected_points": 0.8657663586154893,
+        "expected_points": 0.0,
         "coefficients": [
-          87,
-          779,
-          866
+          0,
+          0,
+          0
         ],
         "top100_count": 0,
         "top100_scaled": {
-          "5": 866,
-          "10": 866,
-          "20": 866,
-          "30": 866,
-          "40": 866,
-          "50": 866
+          "5": 0,
+          "10": 0,
+          "20": 0,
+          "30": 0,
+          "40": 0,
+          "50": 0
         }
       },
       {
@@ -5130,20 +5130,20 @@
         "position": "MID",
         "buy_tenths": 59,
         "start_tenths": 60,
-        "expected_points": 0.9362240059623504,
+        "expected_points": 1.2482986746164673,
         "coefficients": [
-          94,
-          842,
-          936
+          125,
+          1123,
+          1248
         ],
         "top100_count": 0,
         "top100_scaled": {
-          "5": 936,
-          "10": 936,
-          "20": 936,
-          "30": 936,
-          "40": 936,
-          "50": 936
+          "5": 1248,
+          "10": 1248,
+          "20": 1248,
+          "30": 1248,
+          "40": 1248,
+          "50": 1248
         }
       },
       {
@@ -7480,20 +7480,20 @@
         "position": "FWD",
         "buy_tenths": 55,
         "start_tenths": 55,
-        "expected_points": 2.165641556435869,
+        "expected_points": 1.0828207782179344,
         "coefficients": [
-          217,
-          1949,
-          2166
+          108,
+          975,
+          1083
         ],
         "top100_count": 0,
         "top100_scaled": {
-          "5": 2166,
-          "10": 2166,
-          "20": 2166,
-          "30": 2166,
-          "40": 2166,
-          "50": 2166
+          "5": 1083,
+          "10": 1083,
+          "20": 1083,
+          "30": 1083,
+          "40": 1083,
+          "50": 1083
         }
       },
       {
@@ -7628,7 +7628,7 @@
         "short_name": "Tzolis",
         "team": "Arsenal",
         "position": "MID",
-        "buy_tenths": 63,
+        "buy_tenths": 62,
         "start_tenths": 65,
         "expected_points": 0.0,
         "coefficients": [
@@ -7780,20 +7780,20 @@
         "position": "FWD",
         "buy_tenths": 57,
         "start_tenths": 60,
-        "expected_points": 0.0,
+        "expected_points": 2.5569995635856677,
         "coefficients": [
-          0,
-          0,
-          0
+          256,
+          2301,
+          2557
         ],
         "top100_count": 0,
         "top100_scaled": {
-          "5": 0,
-          "10": 0,
-          "20": 0,
-          "30": 0,
-          "40": 0,
-          "50": 0
+          "5": 2557,
+          "10": 2557,
+          "20": 2557,
+          "30": 2557,
+          "40": 2557,
+          "50": 2557
         }
       },
       {
@@ -10153,7 +10153,7 @@
         "short_name": "Cruz",
         "team": "Nott'm Forest",
         "position": "FWD",
-        "buy_tenths": 58,
+        "buy_tenths": 57,
         "start_tenths": 60,
         "expected_points": 0.0,
         "coefficients": [
@@ -10328,7 +10328,7 @@
         "short_name": "Sesko",
         "team": "Man Utd",
         "position": "FWD",
-        "buy_tenths": 70,
+        "buy_tenths": 69,
         "start_tenths": 70,
         "expected_points": 0.0,
         "coefficients": [
@@ -10655,20 +10655,20 @@
         "position": "MID",
         "buy_tenths": 48,
         "start_tenths": 50,
-        "expected_points": 0.1048507608220288,
+        "expected_points": 0.13980101442937173,
         "coefficients": [
-          11,
-          94,
-          105
+          14,
+          126,
+          140
         ],
         "top100_count": 0,
         "top100_scaled": {
-          "5": 105,
-          "10": 105,
-          "20": 105,
-          "30": 105,
-          "40": 105,
-          "50": 105
+          "5": 140,
+          "10": 140,
+          "20": 140,
+          "30": 140,
+          "40": 140,
+          "50": 140
         }
       },
       {
@@ -12580,20 +12580,20 @@
         "position": "MID",
         "buy_tenths": 59,
         "start_tenths": 60,
-        "expected_points": 0.1574408417255119,
+        "expected_points": 0.20992112230068252,
         "coefficients": [
-          16,
-          141,
-          157
+          21,
+          189,
+          210
         ],
         "top100_count": 0,
         "top100_scaled": {
-          "5": 157,
-          "10": 157,
-          "20": 157,
-          "30": 157,
-          "40": 157,
-          "50": 157
+          "5": 210,
+          "10": 210,
+          "20": 210,
+          "30": 210,
+          "40": 210,
+          "50": 210
         }
       },
       {
@@ -13130,20 +13130,20 @@
         "position": "MID",
         "buy_tenths": 53,
         "start_tenths": 55,
-        "expected_points": 0.0,
+        "expected_points": 0.1978670934519321,
         "coefficients": [
-          0,
-          0,
-          0
+          20,
+          178,
+          198
         ],
         "top100_count": 0,
         "top100_scaled": {
-          "5": 0,
-          "10": 0,
-          "20": 0,
-          "30": 0,
-          "40": 0,
-          "50": 0
+          "5": 198,
+          "10": 198,
+          "20": 198,
+          "30": 198,
+          "40": 198,
+          "50": 198
         }
       },
       {
