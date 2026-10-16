@@ -39,7 +39,8 @@ describe("nested published advice", () => {
       "football_match_context_v1",
       "football_joint_role_minutes_v1",
       "football_joint_role_retained_history_v1",
-      "football_joint_role_retained_flags_v1",
+      "football_joint_role_retained_flags_v2",
+      "football_composite_v1",
       "football_team_form_v1",
     ]) {
       const joint = {
@@ -52,7 +53,12 @@ describe("nested published advice", () => {
       expect(checkedAdvice(joint, { ...request, model: "football" })).toBe(joint);
       expect(() => checkedAdvice(joint, request)).toThrow(AdviceResponseError);
     }
-    for (const patch of [{ fingerprint: "" }, { experimental: false }, { version: "other" }]) {
+    for (const patch of [
+      { fingerprint: "" },
+      { experimental: false },
+      { version: "other" },
+      { version: "football_joint_role_retained_flags_v1" },
+    ]) {
       expect(() =>
         checkedAdvice(
           {

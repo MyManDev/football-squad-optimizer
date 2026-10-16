@@ -6,6 +6,7 @@ import hashlib
 import itertools
 import json
 import math
+from copy import copy
 from dataclasses import FrozenInstanceError, replace
 from typing import Any
 
@@ -345,6 +346,7 @@ def test_metadata_and_parameters_are_immutable_and_content_bound(model: FlagMinu
     payload = json.loads(model.metadata_json)
     assert payload["model_version"] == MODEL_VERSION
     assert payload["feature_version"] == FEATURE_VERSION
+    assert FEATURE_VERSION == "causal_categorical_flag_minutes_features_v2"
     assert (
         payload["availability_application"] == "learned_weekly_hurdle_once_no_raw_label_multiplier"
     )
@@ -364,6 +366,29 @@ def test_metadata_and_parameters_are_immutable_and_content_bound(model: FlagMinu
             values.setflags(write=True)
         with pytest.raises(ValueError):
             values[0] = 100
+
+
+@pytest.mark.parametrize("zero_coefficients", [False, True])
+def test_legacy_feature_head_is_not_silently_read_as_deadline_relative(
+    model: FlagMinutesModel, zero_coefficients: bool
+) -> None:
+    payload = json.loads(model.metadata_json)
+    payload["feature_version"] = "causal_categorical_flag_minutes_features_v1"
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False)
+    old_digest = hashlib.sha256(encoded.encode()).hexdigest()
+    assert old_digest != model.model_sha256
+    retained = copy(model)
+    retained._fitted = replace(
+        model._fitted,
+        metadata=replace(
+            model.metadata,
+            feature_version=payload["feature_version"],
+            metadata_json=encoded,
+            model_sha256=old_digest,
+        ),
+    )
+    with pytest.raises(ValueError, match="current fitted feature version"):
+        retained.predict(_week(), zero_coefficients=zero_coefficients)
 
 
 def test_failed_refit_preserves_complete_previous_state(model: FlagMinutesModel) -> None:

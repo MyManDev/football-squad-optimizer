@@ -242,9 +242,17 @@ def _score_components(frame: pd.DataFrame) -> pd.DataFrame:
             where=out.appearance_probability.to_numpy(float) > 0,
         )
     opponent = out.opponent_goal_rate.to_numpy(float)
-    out["clean_sheet_probability"] = sum(
-        p[:, b] * np.exp(-opponent * m[:, b] / 90) for b in np.flatnonzero(bins >= 2)
-    )
+    if out.attrs.get("score_process", False):
+        if joint is None:
+            raise ValueError("Score-process components require the seven-atom role law.")
+        survival = out[[f"score_survival_{b}" for b in range(7)]].to_numpy(float)
+        if not np.isfinite(survival).all() or ((survival < 0) | (survival > 1)).any():
+            raise ValueError("Score-process atom survival must be a finite probability.")
+        out["clean_sheet_probability"] = (p[:, bins >= 2] * survival[:, bins >= 2]).sum(axis=1)
+    else:
+        out["clean_sheet_probability"] = sum(
+            p[:, b] * np.exp(-opponent * m[:, b] / 90) for b in np.flatnonzero(bins >= 2)
+        )
     rate = out.defcon_rate90.to_numpy(float)
     size = out.defcon_dispersion.to_numpy(float)
     threshold = np.where(out.position.eq("DEF"), 10, 12)
@@ -274,13 +282,22 @@ def _score_components(frame: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-def _validate_components(frame: pd.DataFrame, season: str, *, joint_role: bool = False) -> None:
+def _validate_components(
+    frame: pd.DataFrame, season: str, *, joint_role: bool = False, score_process: bool = False
+) -> None:
     if not set(COMPONENT_COLUMNS) <= set(frame):
         raise ValueError("The companion is missing a required scoring component.")
     if joint_role:
         for record in frame.to_dict("records"):
             role_component_record({str(key): value for key, value in record.items()})
     frame.attrs["joint_role"] = joint_role
+    frame.attrs["score_process"] = score_process
+    if score_process:
+        if not joint_role or not {f"score_survival_{b}" for b in range(7)} <= set(frame):
+            raise ValueError("Score-process components require all seven survival atoms.")
+        for value in frame[[f"score_survival_{b}" for b in range(7)]].to_numpy(object).flat:
+            if isinstance(value, bool) or not isinstance(value, Real) or not math.isfinite(value):
+                raise ValueError("Score-process survival requires finite non-Boolean numbers.")
     if frame.duplicated(["fixture", "player_code"]).any():
         raise ValueError("Repeated player-fixture component rows.")
     if not frame.position.isin(("GK", "DEF", "MID", "FWD")).all():
@@ -358,7 +375,10 @@ def _validate_components(frame: pd.DataFrame, season: str, *, joint_role: bool =
         for head in ("goals", "assists"):
             share = side[head + "_share"].to_numpy(float)
             mass = float(side[head].sum())
-            _close(share.sum(), float(side.expected_minutes.gt(0).any()), head + " share coverage")
+            expected_share = (
+                0.0 if score_process and mass == 0 else float(side.expected_minutes.gt(0).any())
+            )
+            _close(share.sum(), expected_share, head + " share coverage")
             _close(side[head], mass * share, head + " allocation")
             if (share[side.expected_minutes.eq(0).to_numpy()] != 0).any():
                 raise ValueError("A zero-minute row has a positive attacking share.")

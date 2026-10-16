@@ -8,13 +8,17 @@ import math
 import re
 from dataclasses import asdict, dataclass, fields
 from datetime import UTC, datetime
-from typing import Any, NoReturn
+from typing import TYPE_CHECKING, Any, NoReturn
+
+if TYPE_CHECKING:
+    from squadopt.features.football_score_replay import ScoreReplayObservation
 
 SCORE_INPUT_VERSION = "football_score_fixture_input_v1"
 RAW_SCORE_SNAPSHOT_VERSION = "football_score_snapshot_v1"
 RAW_SCORE_OUTCOME_VERSION = "football_score_outcomes_v1"
 CLOCK_VERSION = "physical_playing_minutes_including_stoppage_excluding_breaks_v1"
 PROTECTED_SEASON = "2025-26"
+COMPOSITE_OFFSET_VERSION = "football_composite_unit_offset_v1"
 NATIVE_MODEL_VERSIONS = (
     "football_team_share_v1",
     "football_joint_role_minutes_v1",
@@ -293,10 +297,15 @@ def validate_score_fixture(fixture: ScoreFixture) -> None:
     horizon = _number(fixture.forecast_duration, "forecast_duration", minimum=1, maximum=180)
     if fixture.clock_version != CLOCK_VERSION:
         _fail("Unknown physical forecast clock normalization.")
-    if fixture.native_model_version not in NATIVE_MODEL_VERSIONS:
+    if fixture.native_model_version not in (*NATIVE_MODEL_VERSIONS, COMPOSITE_OFFSET_VERSION):
         _fail("Unknown native model version.")
     if fixture.native_basis_kind not in ("out_of_fold", "prospective"):
         _fail("Native basis must be explicitly out_of_fold or prospective.")
+    if (
+        fixture.native_model_version == COMPOSITE_OFFSET_VERSION
+        and fixture.native_basis_kind != "prospective"
+    ):
+        _fail("Composite unit offsets are prospective inference only.")
     if _clock(fixture.native_basis_fit_cutoff, "native fit cutoff") >= decision:
         _fail("Native fitting must precede the original decision.")
     for field in ("native_basis_sha256", "source_sha256"):
@@ -368,6 +377,8 @@ def validate_training_score_header(
         _fail("Training must use frozen TrainingScoreFixture records.")
     fixture = row.input
     validate_score_fixture(fixture)
+    if fixture.native_model_version == COMPOSITE_OFFSET_VERSION:
+        _fail("Composite unit offsets cannot establish a historical training basis.")
     if (fit_cutoff is None) != (target_season is None):
         _fail("Target season and fit cutoff must be supplied together.")
     targets = _tuple(target_gameweeks, "target_gameweeks", 38)
@@ -405,6 +416,24 @@ def validate_training_score_fixture(
     validate_training_score_header(
         row, fit_cutoff=fit_cutoff, target_season=target_season, target_gameweeks=target_gameweeks
     )
+    _validate_score_outcome(
+        row,
+        players={p.player_code: p.club_code for p in row.input.players},
+        home=row.input.home_club_code,
+        away=row.input.away_club_code,
+        kickoff=row.input.kickoff,
+    )
+
+
+def _validate_score_outcome(
+    row: TrainingScoreFixture | ScoreReplayObservation,
+    *,
+    players: dict[int, int],
+    home: int,
+    away: int,
+    kickoff: str,
+) -> None:
+    """Shared physical/FPL checks after the caller validates its distinct headers."""
     actual = _number(row.actual_duration, "actual_duration", minimum=1, maximum=180)
     periods = _tuple(row.periods, "periods", 2)
     if (
@@ -421,10 +450,9 @@ def validate_training_score_fixture(
     ):
         _fail("Actual physical duration must reconcile both periods.")
     if (
-        _clock(row.settled_at, "settled_at") - _clock(row.input.kickoff, "kickoff")
+        _clock(row.settled_at, "settled_at") - _clock(kickoff, "kickoff")
     ).total_seconds() / 60 < actual:
         _fail("Finalization cannot precede the recorded physical playing duration.")
-    players = {p.player_code: p for p in row.input.players}
     exposures = _tuple(row.exposures, "observed exposures", MAX_PLAYERS)
     seen: set[int] = set()
     for exposure in exposures:
@@ -434,7 +462,7 @@ def validate_training_score_fixture(
         if (
             code in seen
             or code not in players
-            or _integer(exposure.club_code, "exposure club") != players[code].club_code
+            or _integer(exposure.club_code, "exposure club") != players[code]
         ):
             _fail("Observed exposure has duplicate or contradictory persistent identity.")
         seen.add(code)
@@ -456,7 +484,7 @@ def validate_training_score_fixture(
     goals = _tuple(row.goals, "physical goals", MAX_GOALS)
     goal_ids: set[str] = set()
     previous_elapsed, previous_ordinal, previous_period = -1.0, 0, 1
-    score = {row.input.home_club_code: 0, row.input.away_club_code: 0}
+    score = {home: 0, away: 0}
     for goal in goals:
         if type(goal) is not PhysicalGoal:
             _fail("Physical goals must use frozen original event records.")
@@ -485,7 +513,7 @@ def validate_training_score_fixture(
             _fail("Own goals must benefit the opposing physical club.")
         if goal.scorer_player_code is not None:
             code = _integer(goal.scorer_player_code, "physical scorer")
-            if code not in players or players[code].club_code != scorer_club:
+            if code not in players or players[code] != scorer_club:
                 _fail("Physical scorer contradicts persistent club/person identity.")
             exposure = exposure_by_player[code]
             if not (
@@ -494,11 +522,9 @@ def validate_training_score_fixture(
             ):
                 _fail("A known physical scorer must be on the pitch at the recorded goal.")
         score[beneficiary] += 1
-    if score[row.input.home_club_code] != _integer(
-        row.final_home_goals, "final home goals", 0, MAX_GOALS
-    ) or score[row.input.away_club_code] != _integer(
-        row.final_away_goals, "final away goals", 0, MAX_GOALS
-    ):
+    if score[home] != _integer(row.final_home_goals, "final home goals", 0, MAX_GOALS) or score[
+        away
+    ] != _integer(row.final_away_goals, "final away goals", 0, MAX_GOALS):
         _fail("Complete ordered physical goals must reconcile the final score.")
     credits = _tuple(row.fpl_credits, "final FPL credits", MAX_GOALS)
     if len(credits) != len(goals) or any(type(c) is not FPLCredit for c in credits):
@@ -522,10 +548,7 @@ def validate_training_score_fixture(
         for credit_code in (credit.scorer_player_code, credit.assist_player_code):
             if credit_code is not None:
                 _integer(credit_code, "FPL credited player")
-                if (
-                    credit_code not in players
-                    or players[credit_code].club_code != goal.beneficiary_club_code
-                ):
+                if credit_code not in players or players[credit_code] != goal.beneficiary_club_code:
                     _fail("FPL credited identity must belong to the beneficiary club.")
                 credited_exposure = exposure_by_player[credit_code]
                 if credited_exposure.physical_on >= credited_exposure.physical_off:
@@ -603,6 +626,8 @@ def read_score_snapshot(
         _fail("Native basis cannot be captured after its containing source snapshot.")
     keys = {f.name for f in fields(ScoreFixture)} - {"source_sha256"}
     projection = dict(_object(doc["projection"], keys, "projection"))
+    if projection["native_model_version"] == COMPOSITE_OFFSET_VERSION:
+        _fail("Raw score inputs cannot mint a derived composite unit offset.")
     for field, expected in (
         ("season", season),
         ("gameweek", gameweek),

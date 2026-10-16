@@ -1,4 +1,4 @@
-"""Read an optional fixture basis beside a served forecast, without fitting a model."""
+"""Read a fixture basis beside a served forecast, without fitting a model."""
 
 from __future__ import annotations
 
@@ -16,8 +16,10 @@ from squadopt.data.snapshots import CapturedSnapshot, read_snapshot
 from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD
 from squadopt.live import RecommendationInputs
 from squadopt.live.football_artifact import FootballForecast, football_artifact_path
+from squadopt.live.football_composite_basis import CompositeComponentBasis
 from squadopt.live.minute_evidence import FixtureComponentBasis
 from squadopt.prediction.availability import apply_availability
+from squadopt.prediction.football_capabilities import COMPOSITE_MODEL_VERSION
 
 
 @dataclass(frozen=True, slots=True)
@@ -80,9 +82,26 @@ def _basis_from_snapshot(
         ],
         ignore_index=True,
     )
-    basis = FixtureComponentBasis.from_documents(
-        served, companion, fixture_calendar=calendar, roster_clubs=roster_clubs
-    )
+    basis: FixtureComponentBasis
+    if served.get("model_version") == COMPOSITE_MODEL_VERSION:
+        positions = {1: "GK", 2: "DEF", 3: "MID", 4: "FWD"}
+        basis = CompositeComponentBasis.from_documents(
+            served,
+            companion,
+            fixture_calendar=calendar,
+            roster_clubs=roster_clubs,
+            roster_positions={
+                p["code"]: positions[p["element_type"]] for p in bootstrap["elements"]
+            },
+            deadline_by_gameweek={e["id"]: e["deadline_time"] for e in bootstrap["events"]},
+            captured_calendar_sha256=hashlib.sha256(
+                snapshot.payloads[FIXTURES_PAYLOAD]
+            ).hexdigest(),
+        )
+    else:
+        basis = FixtureComponentBasis.from_documents(
+            served, companion, fixture_calendar=calendar, roster_clubs=roster_clubs
+        )
     # Check the captured multiplier even for zero-point/zero-q players, for whom a
     # comparison of scaled points alone cannot detect a mismatched header.
     actual = (
@@ -116,7 +135,9 @@ def load_football_minute_basis(
     inputs: RecommendationInputs,
     football: FootballForecast,
 ) -> FootballMinuteBasisLoad:
-    """A missing or refused optional companion cannot disable the served forecast.
+    """Return the verified companion or its refusal for the caller's capability policy.
+
+    Composite forecasts require this basis; legacy versions may serve without it.
 
     The raw digest addresses every readable candidate, including invalid JSON. The
     verified document fingerprint remains inside ``basis``. No producer, archive,

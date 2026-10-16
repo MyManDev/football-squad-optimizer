@@ -22,6 +22,7 @@ from squadopt.data.snapshots import read_snapshot, write_snapshot
 from squadopt.live import InSeasonProjection, read_inputs, write_projection_handoff
 from squadopt.live.football_artifact import (
     ARTIFACT_CONTRACT,
+    SHARES_BEFORE_AVAILABILITY_LIMIT,
     forecast_digest,
     read_football_forecast,
 )
@@ -43,8 +44,7 @@ from squadopt.prediction.football_flag_minutes import FlagMinutesModel
 from squadopt.prediction.football_minutes_role import RETAINED_HISTORY_ROLE_FEATURE_VERSION
 
 
-@pytest.fixture(scope="module")
-def live_case(tmp_path_factory):
+def make_live_case(tmp_path_factory, *, fit_cutoff=None):
     case = native_case(double=True)
     frames = []
     for week in range(6, 11):
@@ -227,6 +227,11 @@ def live_case(tmp_path_factory):
         "produce_football_components",
         lambda *a, **kw: (copy.deepcopy(original), copy.deepcopy(companion)),
     )
+    if fit_cutoff is not None:
+        retained = FlagMinutesModel(
+            training_weeks(), fit_cutoff=fit_cutoff, target_season="2026-27", target_gameweeks=(6,)
+        )
+        patch.setattr(football_live, "FlagMinutesModel", lambda *a, **kw: retained)
     try:
         document, result = football_live.produce_flagged_football_components(
             snapshot,
@@ -237,6 +242,11 @@ def live_case(tmp_path_factory):
     finally:
         patch.undo()
     return root, snapshot, inputs, document, result, original, calendar, case
+
+
+@pytest.fixture(scope="module")
+def live_case(tmp_path_factory):
+    return make_live_case(tmp_path_factory)
 
 
 def loaded(live_case, *, document=None, companion=None):
@@ -254,6 +264,13 @@ def test_actual_fitted_head_round_trips_without_another_fit_or_flag_multiplier(
     live_case, monkeypatch
 ):
     root, snapshot, inputs, document, companion, _, _, _ = live_case
+    assert document["model_version"] == "football_joint_role_retained_flags_v2"
+    assert document["flag_metadata"]["contract_version"] == "football_first_week_flags_v2"
+    assert (
+        document["flag_metadata"]["feature_version"]
+        == "causal_categorical_flag_minutes_features_v2"
+    )
+    assert document["flag_metadata"]["fit_cutoff"] == document["captured_at_utc"]
     monkeypatch.setattr(
         FlagMinutesModel, "fit", lambda *a, **kw: pytest.fail("Reading must never fit")
     )
@@ -283,6 +300,26 @@ def test_actual_fitted_head_round_trips_without_another_fit_or_flag_multiplier(
         1 - math.prod(1 - float(q) for q in fixture_q),
         abs_tol=1e-9,
     )
+
+
+def test_reused_older_fitted_head_preserves_original_cutoff_and_round_trips(tmp_path_factory):
+    cutoff = "2026-09-22T10:30:00+00:00"
+    case = make_live_case(tmp_path_factory, fit_cutoff=cutoff)
+    _, _, _, document, companion, _, _, _ = case
+    assert document["flag_metadata"]["fit_cutoff"] == cutoff
+    assert companion["flag_metadata"]["fit_cutoff"] == cutoff
+    football, basis = loaded(case)
+    assert football.horizon.model_version == JOINT_ROLE_FLAG_MODEL_VERSION
+    assert basis is not None
+
+
+def test_missing_fitted_flag_cutoff_is_refused(live_case):
+    _, _, _, original, original_companion, _, _, _ = live_case
+    document, companion = copy.deepcopy(original), copy.deepcopy(original_companion)
+    del document["flag_metadata"]["fit_cutoff"]
+    reseal(document, companion)
+    with pytest.raises(ValueError, match="clocks"):
+        loaded(live_case, document=document, companion=companion)
 
 
 @pytest.mark.parametrize("window", [1, 3, 5])
@@ -322,6 +359,7 @@ def test_minute_news_preserves_the_learned_joint_week_hurdle_and_role_explanatio
         basis, inputs, revised_rows=result.fixture_rows, applied_fixtures=frozenset({(3, 62)})
     )
     role = next(row for row in roles if row["player_id"] == 3 and row["fixture_id"] == 62)
+    # This field quotes the captured input; the learned law is already scaled.
     assert role["captured_eligibility_multiplier"] == 0.75
     assert role["expected_minutes"] < old.expected_minutes
     revised = result.fixture_rows.loc[lambda f: f.player_code.eq(3) & f.fixture.eq(62)].iloc[0]
@@ -342,8 +380,9 @@ def test_participation_binding_does_not_reinterpret_the_categorical_inputs_as_pr
     assert audit["captured_percentages"] == []
 
 
+@pytest.mark.parametrize("window", [1, 3, 5])
 def test_sealed_learned_flags_reach_the_http_worker_and_its_cached_member_answer(
-    live_case, tmp_path, monkeypatch
+    live_case, tmp_path, monkeypatch, window
 ):
     root, snapshot, inputs, document, companion, _, _, _ = live_case
     artifact_root, handoffs, site = tmp_path / "artifacts", tmp_path / "handoffs", tmp_path / "site"
@@ -419,7 +458,7 @@ def test_sealed_learned_flags_reach_the_http_worker_and_its_cached_member_answer
     )
     client = TestClient(app_for_capture(backend, inputs.captured_at_utc))
     route = "/api/v1/leagues/1/entries/101/advice"
-    body = {"strategy": "saf-puan", "window": 1, "model": "football"}
+    body = {"strategy": "saf-puan", "window": window, "model": "football"}
     accepted = client.post(route, json=body)
     assert accepted.status_code == 202, accepted.text
     job = run_advice_worker_once(
@@ -435,6 +474,8 @@ def test_sealed_learned_flags_reach_the_http_worker_and_its_cached_member_answer
     assert payload["prediction_model"]["version"] == JOINT_ROLE_FLAG_MODEL_VERSION
     assert payload["prediction_model"]["fingerprint"] == document["fingerprint"]
     assert payload["role_forecast"]["model_version"] == JOINT_ROLE_FLAG_MODEL_VERSION
+    assert companion["limitations"].count(SHARES_BEFORE_AVAILABILITY_LIMIT) == 1
+    assert payload["stated_limits"].count(SHARES_BEFORE_AVAILABILITY_LIMIT) == (window > 1)
     assert backend.contexts.identity().inputs.snapshot_id == inputs.snapshot_id
     capture = backend.contexts.capture(backend.contexts.current())
     assert capture.switches.football_bundle_sha256 == sealed.fingerprint
@@ -462,10 +503,39 @@ def test_a_rehashed_joint_law_with_changed_role_marginals_still_refuses(live_cas
 
 
 @pytest.mark.parametrize(
+    "field,legacy",
+    [
+        ("contract_version", "football_first_week_flags_v1"),
+        ("feature_version", "causal_categorical_flag_minutes_features_v1"),
+    ],
+)
+def test_rehashed_legacy_flag_metadata_is_refused(live_case, field, legacy):
+    _, _, _, original, original_companion, _, _, _ = live_case
+    document, companion = copy.deepcopy(original), copy.deepcopy(original_companion)
+    document["flag_metadata"][field] = legacy
+    reseal(document, companion)
+    with pytest.raises(ValueError, match="exact scope and metadata"):
+        loaded(live_case, document=document, companion=companion)
+
+
+def test_legacy_flag_model_is_refused_even_with_current_metadata(live_case):
+    _, _, _, original, original_companion, _, _, _ = live_case
+    document, companion = copy.deepcopy(original), copy.deepcopy(original_companion)
+    document["model_version"] = companion["model_version"] = "football_joint_role_retained_flags_v1"
+    reseal(document, companion)
+    with pytest.raises(ValueError, match="unsupported model_version"):
+        loaded(live_case, document=document, companion=companion)
+
+
+@pytest.mark.parametrize(
     "field,value",
     [
         ("gameweek", 7),
         ("fit_cutoff", "2026-09-22T12:00:00Z"),
+        ("fit_cutoff", "2026-09-22T11:00:01Z"),
+        ("fit_cutoff", "NaT"),
+        ("fit_cutoff", "2026-09-22T10:30:00"),
+        ("fit_cutoff", None),
         ("later_weeks", "reuse_next_event_label"),
         ("training_seasons", ["2025-26"]),
         ("training_gameweeks", [6]),

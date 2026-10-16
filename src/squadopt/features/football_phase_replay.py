@@ -115,7 +115,7 @@ def _replay_headers(
             "valid_until",
         )
     )
-    if not recorded <= feature <= decision < retrieved <= generated or decision > expiry:
+    if not recorded <= feature <= decision <= expiry < retrieved <= generated:
         raise ValueError("Phase replay public recording, retrieval and decision clocks disagree.")
     return hashes, times["retrieved_at"], times["valid_until"]
 

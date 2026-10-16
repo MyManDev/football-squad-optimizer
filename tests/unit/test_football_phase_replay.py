@@ -196,6 +196,12 @@ def test_model_use_and_scope_are_explicit(overrides):
         _read(**overrides)
 
 
+@pytest.mark.parametrize("expiry", ["2026-10-15T10:00:00Z", "2027-07-01T00:00:00Z"])
+def test_replayed_duty_expiry_must_precede_actual_retrieval(expiry):
+    with pytest.raises(ValueError, match="clocks disagree"):
+        _read(valid_until=expiry)
+
+
 def test_bom_and_optional_team_code_are_supported_without_guessing_clubs():
     players = b"\xef\xbb\xbf" + PLAYERS.replace(b",team_code", b"")
     for code, team, club in ((1001, 1, 3), (1002, 1, 3), (1003, 2, 7)):
