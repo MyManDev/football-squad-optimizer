@@ -42,8 +42,7 @@ Of third-party libraries it imports pandas and NumPy.
 | Importer | Vocabulary half | Storage half |
 | --- | --- | --- |
 | `contracts` | No: it sits below `data` in the layer order | No |
-| `optimization`, `planning`, `scenarios`, `evaluation` | Yes | No: "The decision core imports no storage or source module" |
-| `prediction` | Yes | Imports none today; it becomes a source of that contract when its owner agrees |
+| `optimization`, `planning`, `scenarios`, `evaluation`, `prediction` | Yes | No: "The decision core imports no storage or source module" |
 | `features`, `live`, `application` | Yes | Only today's 122 direct import edges: "Use cases, domain records and features import no storage or source module" |
 | `platform`, `integration`, the laboratory, `scripts/` | Yes | Yes |
 | `api` | No: "HTTP adapter uses only public boundaries" | No |

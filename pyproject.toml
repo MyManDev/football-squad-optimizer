@@ -302,8 +302,8 @@ allow_indirect_imports = true
 # revision. The decision core reaches them only through a caller in an outer ring, so a direct
 # import from these sources fails the gate. `features`, `live` and `application` import them
 # today, a known violation in ARCHITECTURE.md with its remedy; the last contract below holds
-# them to today's imports. `prediction` imports none of them either, but it is the data owner's
-# zone, so it becomes a source only when that owner agrees. File IO written with pathlib or
+# them to today's imports. `prediction`, the data owner's zone, is a source with that owner's
+# agreement (#1081): it imports only vocabulary modules of `data`. File IO written with pathlib or
 # pandas directly is outside an import contract, which is why the name claims imports only;
 # `tests/architecture/test_core_file_io.py` holds those calls in these sources and
 # `prediction` to today's allowlist. The contract sees import statements, and
@@ -322,6 +322,7 @@ source_modules = [
     "squadopt.planning",
     "squadopt.scenarios",
     "squadopt.evaluation",
+    "squadopt.prediction",
     "squadopt.application.ports",
 ]
 forbidden_modules = [
