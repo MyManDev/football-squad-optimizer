@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-10-15T14:15:28Z",
+  "generated_at_utc": "2026-10-16T07:13:49Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "fark-yarat",
     "window": 5,
-    "source_snapshot_id": "fpl-live-20261015T130038Z-7a7a388a3a43",
+    "source_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd",
     "moves": [
       {
         "move_id": "gw07-1",
@@ -21,24 +21,24 @@
           "team": "Man City"
         },
         "player_in": {
-          "player_id": 154043,
-          "name": "Ainsley Maitland-Niles",
-          "short_name": "Maitland-Niles",
+          "player_id": 17761,
+          "name": "James Tarkowski",
+          "short_name": "Tarkowski",
           "position": "DEF",
           "team": "Everton"
         },
-        "expected_points_delta": 0.15282005635754103,
-        "reason_code": "mode_tradeoff"
+        "expected_points_delta": 0.7527503174105448,
+        "reason_code": "top100_preference"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 0.15282005635754103,
-    "expected_points_cost": 9.703099622120362,
+    "expected_gain_vs_hold": 0.7527503174105448,
+    "expected_points_cost": 7.309674241740311,
     "rival_label": "entry-2281624",
     "solver_status": "FEASIBLE",
     "optimality_gap": null,
     "wall_clock_stopped_the_search": false,
-    "expected_own_points": 48.404914435224974,
+    "expected_own_points": 49.00484469627798,
     "captain": {
       "player_id": 244851,
       "name": "Cole Palmer",
@@ -65,12 +65,12 @@
         "expected_points": 3.2480295284625815
       },
       {
-        "player_id": 154043,
-        "name": "Ainsley Maitland-Niles",
-        "short_name": "Maitland-Niles",
+        "player_id": 17761,
+        "name": "James Tarkowski",
+        "short_name": "Tarkowski",
         "position": "DEF",
         "team": "Everton",
-        "expected_points": 3.7238127105475085
+        "expected_points": 4.323742971600514
       },
       {
         "player_id": 465730,
@@ -185,9 +185,9 @@
         "gameweek": 7,
         "transfers_in": [
           {
-            "player_id": 154043,
-            "name": "Ainsley Maitland-Niles",
-            "short_name": "Maitland-Niles",
+            "player_id": 17761,
+            "name": "James Tarkowski",
+            "short_name": "Tarkowski",
             "position": "DEF",
             "team": "Everton"
           }
@@ -205,33 +205,33 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 48.40491443522497
+        "expected_points": 49.00484469627798
       },
       {
         "gameweek": 8,
         "transfers_in": [
           {
-            "player_id": 101282,
-            "name": "Matt Crooks",
-            "short_name": "Crooks",
+            "player_id": 204580,
+            "name": "Vitaly Janelt",
+            "short_name": "Janelt",
             "position": "MID",
-            "team": "Hull City"
+            "team": "Brentford"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 222531,
-            "name": "Morgan Gibbs-White",
-            "short_name": "Gibbs-White",
+            "player_id": 244851,
+            "name": "Cole Palmer",
+            "short_name": "Palmer",
             "position": "MID",
-            "team": "Nott'm Forest"
+            "team": "Chelsea"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 47.07951297515043
+        "expected_points": 46.79205259381864
       },
       {
         "gameweek": 9,
@@ -257,7 +257,7 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 55.5185306406498
+        "expected_points": 55.79518966186477
       },
       {
         "gameweek": 10,
@@ -283,7 +283,7 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 55.372935258555316
+        "expected_points": 55.64959427977027
       },
       {
         "gameweek": 11,
@@ -298,18 +298,18 @@
         ],
         "transfers_out": [
           {
-            "player_id": 466052,
-            "name": "Rayan Cherki",
-            "short_name": "Cherki",
+            "player_id": 184029,
+            "name": "Martin \u00d8degaard",
+            "short_name": "\u00d8degaard",
             "position": "MID",
-            "team": "Man City"
+            "team": "Arsenal"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 55.398397194578166
+        "expected_points": 56.92603465280706
       }
     ],
     "stated_limits": [
@@ -326,9 +326,8 @@
     "data_quality": "complete",
     "missing_fields": [],
     "squad_basis": "captured",
-    "expected_points_cost_ceiling": 9.703099622120362,
-    "control_solver_status": "OPTIMAL",
-    "control_optimality_gap": 0.0,
+    "control_solver_status": "FEASIBLE",
+    "control_optimality_gap": 3.7759999999999536,
     "rival_entry_id": 2281624,
     "overlap_count": 7,
     "transfer_cap": 1,
@@ -336,15 +335,15 @@
     "overlap_applied": 7,
     "plan_kind": "within_free_transfers",
     "alternative_plan": null,
-    "expected_gap_vs_rival": 0.5571263080479767,
+    "expected_gap_vs_rival": 1.1570565691009804,
     "captain_agreement": false,
     "top100": {
       "weight": 30,
       "changed": true,
       "price_basis": "base_model_pure_points_v1",
-      "cohort_snapshot_id": "fpl-top100-20261015T125956Z-62eac7653b23",
-      "picks_snapshot_id": "fpl-elite-picks-20261015T130016Z-f74142d5b421",
-      "table_sha256": "0a890f659631183ae43ffe18feb2530d6b0c3b18a22958933876121eb5c9028d",
+      "cohort_snapshot_id": "fpl-top100-20261016T060118Z-ae3db8c93137",
+      "picks_snapshot_id": "fpl-elite-picks-20261016T060136Z-8b4c3667de56",
+      "table_sha256": "2818a2e18bb44ede2d2baa84576d374ea81f0c3b4f9ba8a9ece1068a577408e5",
       "picks_gameweek": 6
     }
   }

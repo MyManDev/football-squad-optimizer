@@ -179,6 +179,7 @@ def _production_identity(forecast: Mapping[str, Any]) -> dict[str, Any]:
         "archive_hashes",
         "training_selection",
         "role_metadata",
+        "composite_metadata",
     )
     return {field: forecast[field] for field in fields if field in forecast}
 

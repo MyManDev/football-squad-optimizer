@@ -53,8 +53,10 @@ export function memberSelection({
 }
 
 /**
- * What the device is asked for: the selection's request with the chip and the Top 100
- * weight the page shows. Without the service's capabilities the request carries neither.
+ * What the device is asked for: the selection's request with the chip, the Top 100 weight
+ * and the manager's word the page shows. Without the service's capabilities the request
+ * carries none of them, and a word left out would have the device solve the plain plan
+ * in its place.
  */
 export function deviceRequestFor(selection: PublishedAdviceSelection): AdviceRequest {
   const { request } = selection;
@@ -62,5 +64,6 @@ export function deviceRequestFor(selection: PublishedAdviceSelection): AdviceReq
     ...request,
     chip: request.chip ?? selection.chip.chip,
     top100Weight: request.top100Weight ?? selection.top100.weight,
+    managersWord: (request.managersWord ?? false) || selection.evidence.on,
   };
 }

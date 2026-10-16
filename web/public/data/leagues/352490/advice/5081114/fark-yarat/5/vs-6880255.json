@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-10-15T14:15:28Z",
+  "generated_at_utc": "2026-10-16T07:13:49Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,36 +9,36 @@
     "league_id": 352490,
     "mode": "fark-yarat",
     "window": 5,
-    "source_snapshot_id": "fpl-live-20261015T130038Z-7a7a388a3a43",
+    "source_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd",
     "moves": [
       {
         "move_id": "gw07-1",
         "player_out": {
-          "player_id": 223340,
-          "name": "Bukayo Saka",
-          "short_name": "Saka",
-          "position": "MID",
-          "team": "Arsenal"
+          "player_id": 247348,
+          "name": "Daniel Mu\u00f1oz Mej\u00eda",
+          "short_name": "Mej\u00eda",
+          "position": "DEF",
+          "team": "Nott'm Forest"
         },
         "player_in": {
-          "player_id": 437730,
-          "name": "Antoine Semenyo",
-          "short_name": "Semenyo",
-          "position": "MID",
-          "team": "Man City"
+          "player_id": 154043,
+          "name": "Ainsley Maitland-Niles",
+          "short_name": "Maitland-Niles",
+          "position": "DEF",
+          "team": "Everton"
         },
-        "expected_points_delta": 0.13592595888687242,
+        "expected_points_delta": 1.0406590337066461,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 0.13592595888687242,
+    "expected_gain_vs_hold": 1.0406590337066461,
     "expected_points_cost": 0.0,
     "rival_label": "entry-6880255",
     "solver_status": "FEASIBLE",
-    "optimality_gap": 3.1899999999999977,
+    "optimality_gap": 1.6550000000000296,
     "wall_clock_stopped_the_search": false,
-    "expected_own_points": 54.0749701818813,
+    "expected_own_points": 54.97970325670107,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
@@ -65,20 +65,20 @@
         "expected_points": 3.568590651677484
       },
       {
+        "player_id": 154043,
+        "name": "Ainsley Maitland-Niles",
+        "short_name": "Maitland-Niles",
+        "position": "DEF",
+        "team": "Everton",
+        "expected_points": 3.7238127105475085
+      },
+      {
         "player_id": 465730,
         "name": "Maxim De Cuyper",
         "short_name": "Cuyper",
         "position": "DEF",
         "team": "Brighton",
         "expected_points": 3.7099911306959767
-      },
-      {
-        "player_id": 247348,
-        "name": "Daniel Mu\u00f1oz Mej\u00eda",
-        "short_name": "Mej\u00eda",
-        "position": "DEF",
-        "team": "Nott'm Forest",
-        "expected_points": 2.6831536768408566
       },
       {
         "player_id": 199798,
@@ -97,12 +97,12 @@
         "expected_points": 6.012000284303428
       },
       {
-        "player_id": 437730,
-        "name": "Antoine Semenyo",
-        "short_name": "Semenyo",
+        "player_id": 223340,
+        "name": "Bukayo Saka",
+        "short_name": "Saka",
         "position": "MID",
-        "team": "Man City",
-        "expected_points": 5.047195818515282
+        "team": "Arsenal",
+        "expected_points": 4.9112698596284075
       },
       {
         "player_id": 577725,
@@ -185,6 +185,58 @@
         "gameweek": 7,
         "transfers_in": [
           {
+            "player_id": 154043,
+            "name": "Ainsley Maitland-Niles",
+            "short_name": "Maitland-Niles",
+            "position": "DEF",
+            "team": "Everton"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 247348,
+            "name": "Daniel Mu\u00f1oz Mej\u00eda",
+            "short_name": "Mej\u00eda",
+            "position": "DEF",
+            "team": "Nott'm Forest"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 1,
+        "free_transfers_after": 1,
+        "expected_points": 54.979703256701086
+      },
+      {
+        "gameweek": 8,
+        "transfers_in": [
+          {
+            "player_id": 60307,
+            "name": "Pascal Gro\u00df",
+            "short_name": "Gro\u00df",
+            "position": "MID",
+            "team": "Brighton"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 540324,
+            "name": "Mohamed Belloumi",
+            "short_name": "Belloumi",
+            "position": "MID",
+            "team": "Hull City"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 1,
+        "free_transfers_after": 1,
+        "expected_points": 56.666661382436814
+      },
+      {
+        "gameweek": 9,
+        "transfers_in": [
+          {
             "player_id": 437730,
             "name": "Antoine Semenyo",
             "short_name": "Semenyo",
@@ -205,69 +257,17 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 54.07497018188131
-      },
-      {
-        "gameweek": 8,
-        "transfers_in": [
-          {
-            "player_id": 60307,
-            "name": "Pascal Gro\u00df",
-            "short_name": "Gro\u00df",
-            "position": "MID",
-            "team": "Brighton"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 577725,
-            "name": "Josh King",
-            "short_name": "King",
-            "position": "MID",
-            "team": "Fulham"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 55.60716561043931
-      },
-      {
-        "gameweek": 9,
-        "transfers_in": [
-          {
-            "player_id": 17761,
-            "name": "James Tarkowski",
-            "short_name": "Tarkowski",
-            "position": "DEF",
-            "team": "Everton"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 247348,
-            "name": "Daniel Mu\u00f1oz Mej\u00eda",
-            "short_name": "Mej\u00eda",
-            "position": "DEF",
-            "team": "Nott'm Forest"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 57.24775490519896
+        "expected_points": 56.80258734132369
       },
       {
         "gameweek": 10,
         "transfers_in": [
           {
-            "player_id": 154043,
-            "name": "Ainsley Maitland-Niles",
-            "short_name": "Maitland-Niles",
+            "player_id": 610799,
+            "name": "Luka Vu\u0161kovi\u0107",
+            "short_name": "Vu\u0161kovi\u0107",
             "position": "DEF",
-            "team": "Everton"
+            "team": "Brighton"
           }
         ],
         "transfers_out": [
@@ -283,33 +283,33 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 58.47597749929325
+        "expected_points": 57.909318052781614
       },
       {
         "gameweek": 11,
         "transfers_in": [
           {
-            "player_id": 168144,
-            "name": "Matt Grimes",
-            "short_name": "Grimes",
+            "player_id": 201666,
+            "name": "Harvey Barnes",
+            "short_name": "Barnes",
             "position": "MID",
-            "team": "Coventry City"
+            "team": "Newcastle"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 540324,
-            "name": "Mohamed Belloumi",
-            "short_name": "Belloumi",
+            "player_id": 577725,
+            "name": "Josh King",
+            "short_name": "King",
             "position": "MID",
-            "team": "Hull City"
+            "team": "Fulham"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 57.96575120043845
+        "expected_points": 58.60728554240676
       }
     ],
     "stated_limits": [
@@ -325,7 +325,7 @@
     "missing_fields": [],
     "squad_basis": "captured",
     "control_solver_status": "FEASIBLE",
-    "control_optimality_gap": 3.1899999999999977,
+    "control_optimality_gap": 1.6550000000000296,
     "rival_entry_id": 6880255,
     "overlap_count": 3,
     "transfer_cap": 1,
@@ -333,7 +333,7 @@
     "overlap_applied": 5,
     "plan_kind": "within_free_transfers",
     "alternative_plan": null,
-    "expected_gap_vs_rival": 9.288326299352029,
+    "expected_gap_vs_rival": 10.193059374171803,
     "captain_agreement": false
   }
 }

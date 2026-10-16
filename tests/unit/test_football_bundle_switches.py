@@ -247,6 +247,25 @@ def test_present_invalid_marker_never_falls_back_to_partial_v1_inputs(case, dama
     assert_frame_equal(projection.table, before, check_exact=True)
 
 
+def test_shared_data_error_withholds_only_optional_football(case, monkeypatch):
+    from squadopt.data.errors import DataError
+
+    seal_football_bundle(**case)
+    inputs, projection = baseline(case)
+    before = projection.table.copy(deep=True)
+
+    def malformed_clock(*args, **kwargs):
+        raise DataError("Malformed retained LOAD clock")
+
+    monkeypatch.setattr(switches, "bind_football_participation", malformed_clock)
+    selected = load(case, inputs=inputs, projection=projection)
+    assert selected.football is None
+    assert not selected.football_components_bound
+    assert any("Malformed retained LOAD clock" in note for note in selected.notes)
+    assert switches.switch_identity(selected, model="current") == {}
+    assert_frame_equal(projection.table, before, check_exact=True)
+
+
 def test_marker_digest_changes_football_identity_and_revision_but_not_current_identity(case):
     legacy = load(case)
     legacy_identity = switches.switch_identity(legacy, model="football")

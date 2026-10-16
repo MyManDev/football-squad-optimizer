@@ -6,7 +6,7 @@ import hashlib
 import json
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pandas as pd
 
@@ -15,10 +15,20 @@ from squadopt.planning.horizon import APPEARANCE_HORIZON_CONTRACT_VERSION, Proje
 from squadopt.prediction.availability import apply_availability
 from squadopt.prediction.football import (
     FOOTBALL_MODEL_VERSION,
+    JOINT_ROLE_COMPONENT_MODEL_VERSIONS,
+    JOINT_ROLE_FLAG_MODEL_VERSION,
     JOINT_ROLE_MODEL_VERSIONS,
     JOINT_ROLE_RETAINED_HISTORY_MODEL_VERSION,
 )
+from squadopt.prediction.football_capabilities import (
+    COMPOSITE_AVAILABILITY_POLICY,
+    COMPOSITE_FEATURE_VERSION,
+    COMPOSITE_MODEL_VERSION,
+    football_capabilities,
+)
+from squadopt.prediction.football_composite_contract import composite_weekly_chances
 from squadopt.prediction.football_contextual import CONTEXTUAL_MODEL_VERSION
+from squadopt.prediction.football_flag_components import flag_weekly_chances
 from squadopt.prediction.football_match_context import (
     MATCH_CONTEXT_FEATURE_VERSION,
     MATCH_CONTEXT_MODEL_VERSION,
@@ -94,7 +104,9 @@ def read_football_forecast(path: Path, inputs: RecommendationInputs) -> Football
         CONTEXTUAL_MODEL_VERSION,
         MATCH_CONTEXT_MODEL_VERSION,
         *JOINT_ROLE_MODEL_VERSIONS,
+        JOINT_ROLE_FLAG_MODEL_VERSION,
         TEAM_FORM_MODEL_VERSION,
+        COMPOSITE_MODEL_VERSION,
     ):
         raise ValueError("Football forecast has an unsupported model_version.")
     form = version == TEAM_FORM_MODEL_VERSION
@@ -111,20 +123,35 @@ def read_football_forecast(path: Path, inputs: RecommendationInputs) -> Football
     ):
         raise ValueError("Match-context forecast requires its exact feature and head metadata.")
     feature_contract = (
-        TEAM_FORM_FEATURE_VERSION
+        COMPOSITE_FEATURE_VERSION
+        if version == COMPOSITE_MODEL_VERSION
+        else TEAM_FORM_FEATURE_VERSION
         if form
         else MATCH_CONTEXT_FEATURE_VERSION
         if match_context
         else FEATURE_CONTRACT
     )
-    if version in JOINT_ROLE_MODEL_VERSIONS and not isinstance(document.get("role_metadata"), dict):
+    if version in JOINT_ROLE_COMPONENT_MODEL_VERSIONS and not isinstance(
+        document.get("role_metadata"), dict
+    ):
         raise ValueError("Joint role forecast requires its training metadata.")
     if (
-        version == JOINT_ROLE_RETAINED_HISTORY_MODEL_VERSION
+        version in (JOINT_ROLE_RETAINED_HISTORY_MODEL_VERSION, JOINT_ROLE_FLAG_MODEL_VERSION)
         and document["role_metadata"].get("role_feature_version")
         != RETAINED_HISTORY_ROLE_FEATURE_VERSION
     ):
         raise ValueError("Retained-history forecast requires its explicit role feature identity.")
+    learned_chances = flag_weekly_chances(document)
+    composite_chances = composite_weekly_chances(document)
+    capabilities = football_capabilities(version)
+    if composite_chances is not None and pd.Timestamp(
+        document["composite_metadata"]["decision_at"]
+    ) >= pd.Timestamp(inputs.deadline.deadline_utc):
+        raise ValueError("Composite decision must precede the source deadline.")
+    if learned_chances is not None and pd.Timestamp(
+        document["flag_metadata"]["deadline_at"]
+    ) != pd.Timestamp(inputs.deadline.deadline_utc):
+        raise ValueError("Learned flag deadline differs from its original source capture.")
     if contextual and (
         document.get("availability_application") != "before_team_shares_v1"
         or document.get("projection_contract") != APPEARANCE_HORIZON_CONTRACT_VERSION
@@ -171,7 +198,8 @@ def read_football_forecast(path: Path, inputs: RecommendationInputs) -> Football
         chance = pd.to_numeric(frame["appearance_probability"], errors="raise")
         if not chance.between(0, 1).all():
             raise ValueError("Football appearance probability outside [0, 1].")
-        result = None if contextual else apply_availability(frame, inputs.availability)
+        learned = capabilities.includes_eligibility(int(cast(int, week)), first)
+        result = None if contextual or learned else apply_availability(frame, inputs.availability)
         adjusted_frame = frame if result is None else result.table
         adjusted.append(adjusted_frame)
         if week == first:
@@ -182,7 +210,13 @@ def read_football_forecast(path: Path, inputs: RecommendationInputs) -> Football
                 else result.unavailable_players,
                 {
                     **(
-                        {"availability_application": "before_team_shares_v1"}
+                        {
+                            "availability_application": COMPOSITE_AVAILABILITY_POLICY
+                            if composite_chances is not None
+                            else "learned_flag_week_law_once"
+                            if learned
+                            else "before_team_shares_v1"
+                        }
                         if result is None
                         else dict(result.diagnostics)
                     ),
@@ -193,6 +227,11 @@ def read_football_forecast(path: Path, inputs: RecommendationInputs) -> Football
                     "projection_handoff_fingerprint": document["fingerprint"],
                     "projection_evidence_fingerprint": None,
                     "experimental": True,
+                    **(
+                        {"composite_metadata": document["composite_metadata"]}
+                        if composite_chances is not None
+                        else {}
+                    ),
                 },
             )
     assert first_projection is not None

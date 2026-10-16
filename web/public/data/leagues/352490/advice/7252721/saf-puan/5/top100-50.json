@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-10-15T14:15:28Z",
+  "generated_at_utc": "2026-10-16T07:13:49Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "saf-puan",
     "window": 5,
-    "source_snapshot_id": "fpl-live-20261015T130038Z-7a7a388a3a43",
+    "source_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd",
     "moves": [
       {
         "move_id": "gw07-1",
@@ -33,7 +33,7 @@
     ],
     "transfer_hit_points": 0.0,
     "expected_gain_vs_hold": 0.7091674691565828,
-    "expected_points_cost": 7.326784279330582,
+    "expected_points_cost": 3.6633524792616754,
     "rival_label": null,
     "solver_status": "FEASIBLE",
     "optimality_gap": null,
@@ -237,37 +237,11 @@
         "gameweek": 9,
         "transfers_in": [
           {
-            "player_id": 215413,
-            "name": "Kiernan Dewsbury-Hall",
-            "short_name": "Dewsbury-Hall",
-            "position": "MID",
-            "team": "Everton"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 446008,
-            "name": "Bryan Mbeumo",
-            "short_name": "Mbeumo",
-            "position": "MID",
-            "team": "Man Utd"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 57.48800803099246
-      },
-      {
-        "gameweek": 10,
-        "transfers_in": [
-          {
-            "player_id": 17761,
-            "name": "James Tarkowski",
-            "short_name": "Tarkowski",
+            "player_id": 487838,
+            "name": "Lewis Hall",
+            "short_name": "Hall",
             "position": "DEF",
-            "team": "Everton"
+            "team": "Newcastle"
           }
         ],
         "transfers_out": [
@@ -283,33 +257,59 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 58.240758348403006
+        "expected_points": 57.83224817980239
       },
       {
-        "gameweek": 11,
+        "gameweek": 10,
         "transfers_in": [
           {
-            "player_id": 184029,
-            "name": "Martin \u00d8degaard",
-            "short_name": "\u00d8degaard",
+            "player_id": 466052,
+            "name": "Rayan Cherki",
+            "short_name": "Cherki",
             "position": "MID",
-            "team": "Arsenal"
+            "team": "Man City"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 215413,
-            "name": "Kiernan Dewsbury-Hall",
-            "short_name": "Dewsbury-Hall",
+            "player_id": 446008,
+            "name": "Bryan Mbeumo",
+            "short_name": "Mbeumo",
             "position": "MID",
-            "team": "Everton"
+            "team": "Man Utd"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 56.55592154907373
+        "expected_points": 58.08476324859315
+      },
+      {
+        "gameweek": 11,
+        "transfers_in": [
+          {
+            "player_id": 155465,
+            "name": "Michael Zetterer",
+            "short_name": "Zetterer",
+            "position": "GK",
+            "team": "Leeds"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 67089,
+            "name": "Martin Dubravka",
+            "short_name": "Dubravka",
+            "position": "GK",
+            "team": "Spurs"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 1,
+        "free_transfers_after": 1,
+        "expected_points": 58.08476324859315
       }
     ],
     "stated_limits": [
@@ -326,14 +326,14 @@
     "missing_fields": [],
     "squad_basis": "captured",
     "control_solver_status": "FEASIBLE",
-    "control_optimality_gap": 1.795000000000016,
+    "control_optimality_gap": 5.572999999999979,
     "top100": {
       "weight": 50,
       "changed": true,
       "price_basis": "base_model_pure_points_v1",
-      "cohort_snapshot_id": "fpl-top100-20261015T125956Z-62eac7653b23",
-      "picks_snapshot_id": "fpl-elite-picks-20261015T130016Z-f74142d5b421",
-      "table_sha256": "0a890f659631183ae43ffe18feb2530d6b0c3b18a22958933876121eb5c9028d",
+      "cohort_snapshot_id": "fpl-top100-20261016T060118Z-ae3db8c93137",
+      "picks_snapshot_id": "fpl-elite-picks-20261016T060136Z-8b4c3667de56",
+      "table_sha256": "2818a2e18bb44ede2d2baa84576d374ea81f0c3b4f9ba8a9ece1068a577408e5",
       "picks_gameweek": 6
     }
   }

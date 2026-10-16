@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-10-15T14:15:28Z",
+  "generated_at_utc": "2026-10-16T07:13:49Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "ortak-koru",
     "window": 5,
-    "source_snapshot_id": "fpl-live-20261015T130038Z-7a7a388a3a43",
+    "source_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd",
     "moves": [
       {
         "move_id": "gw07-1",
@@ -33,10 +33,10 @@
     ],
     "transfer_hit_points": 0.0,
     "expected_gain_vs_hold": 1.2551265838140466,
-    "expected_points_cost": 0.9079161345287048,
+    "expected_points_cost": 0.9904743322008471,
     "rival_label": "entry-313686",
-    "solver_status": "FEASIBLE",
-    "optimality_gap": 1.6379999999999768,
+    "solver_status": "OPTIMAL",
+    "optimality_gap": 0.0,
     "wall_clock_stopped_the_search": false,
     "expected_own_points": 55.51485136802074,
     "captain": {
@@ -211,32 +211,6 @@
         "gameweek": 8,
         "transfers_in": [
           {
-            "player_id": 17761,
-            "name": "James Tarkowski",
-            "short_name": "Tarkowski",
-            "position": "DEF",
-            "team": "Everton"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 466075,
-            "name": "Riccardo Calafiori",
-            "short_name": "Calafiori",
-            "position": "DEF",
-            "team": "Arsenal"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 56.38717857121382
-      },
-      {
-        "gameweek": 9,
-        "transfers_in": [
-          {
             "player_id": 154043,
             "name": "Ainsley Maitland-Niles",
             "short_name": "Maitland-Niles",
@@ -257,43 +231,43 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 57.3687429825105
+        "expected_points": 56.49641577931742
       },
       {
-        "gameweek": 10,
+        "gameweek": 9,
         "transfers_in": [
           {
-            "player_id": 647850,
-            "name": "Charalampos Kostoulas",
-            "short_name": "Kostoulas",
-            "position": "FWD",
-            "team": "Brighton"
+            "player_id": 17761,
+            "name": "James Tarkowski",
+            "short_name": "Tarkowski",
+            "position": "DEF",
+            "team": "Everton"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 475168,
-            "name": "Jo\u00e3o Pedro Junqueira de Jesus",
-            "short_name": "Jesus",
-            "position": "FWD",
-            "team": "Chelsea"
+            "player_id": 466075,
+            "name": "Riccardo Calafiori",
+            "short_name": "Calafiori",
+            "position": "DEF",
+            "team": "Arsenal"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 57.087459324705875
+        "expected_points": 57.3687429825105
       },
       {
-        "gameweek": 11,
+        "gameweek": 10,
         "transfers_in": [
           {
-            "player_id": 466052,
-            "name": "Rayan Cherki",
-            "short_name": "Cherki",
+            "player_id": 201666,
+            "name": "Harvey Barnes",
+            "short_name": "Barnes",
             "position": "MID",
-            "team": "Man City"
+            "team": "Newcastle"
           }
         ],
         "transfers_out": [
@@ -309,7 +283,33 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 58.37306769254188
+        "expected_points": 57.8455853474365
+      },
+      {
+        "gameweek": 11,
+        "transfers_in": [
+          {
+            "player_id": 502500,
+            "name": "Igor Thiago Nascimento Rodrigues",
+            "short_name": "Rodrigues",
+            "position": "FWD",
+            "team": "Brentford"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 475168,
+            "name": "Jo\u00e3o Pedro Junqueira de Jesus",
+            "short_name": "Jesus",
+            "position": "FWD",
+            "team": "Chelsea"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 1,
+        "free_transfers_after": 1,
+        "expected_points": 58.211835866629215
       }
     ],
     "stated_limits": [
@@ -325,7 +325,7 @@
     "missing_fields": [],
     "squad_basis": "captured",
     "control_solver_status": "FEASIBLE",
-    "control_optimality_gap": 1.752999999999986,
+    "control_optimality_gap": 0.9869999999999663,
     "rival_entry_id": 313686,
     "overlap_count": 7,
     "transfer_cap": 1,
