@@ -1,7 +1,7 @@
 # Retained categorical flags in an optional football forecast
 
 The explicit retained-capture selection produces
-`football_joint_role_retained_flags_v1`. Its learned whole-week appearance and
+`football_joint_role_retained_flags_v2`. Its learned whole-week appearance and
 starting/cameo minute law replace the captured eligibility rule in the first
 gameweek. Later weeks retain the existing rule, because a next-event label is
 only evidence about that named event (`src/squadopt/application/football_live.py:658`,
@@ -48,7 +48,21 @@ at that time or introduce later flags or news into the earlier capture
 `src/squadopt/features/football_flag_captures.py:134`,
 `src/squadopt/features/football_flag_captures.py:173`,
 `src/squadopt/features/football_flag_captures.py:188`,
-`tests/unit/test_football_flag_captures.py:127`).
+`tests/unit/test_football_flag_captures.py:130`).
+
+The deadline-relative age semantics carry distinct versions:
+`retained_fpl_flag_inputs_v2`, `causal_categorical_flag_minutes_features_v2`,
+`football_first_week_flags_v2` and `football_joint_role_retained_flags_v2`.
+The adapter version enters each native-basis receipt, and the feature version
+enters the fitted model digest. The reader refuses legacy v1 forecasts or flag
+metadata; prediction also refuses a retained head with the old feature version.
+Rebuild affected records from their retained inputs instead of relabeling an
+old artifact as v2 (`src/squadopt/features/football_flag_captures.py:30`,
+`src/squadopt/features/football_flag_captures.py:194`,
+`src/squadopt/prediction/football_flag_minutes.py:453`,
+`src/squadopt/prediction/football_flag_minutes.py:516`,
+`src/squadopt/prediction/football_flag_components.py:345`,
+`src/squadopt/live/football_artifact.py:101`).
 
 A retained fitted flag head may serve a later capture of its same target week;
 the serialized cutoff preserves the head's actual fitted cutoff and the reader
@@ -107,11 +121,11 @@ minute-only news preserves its weekly appearance hurdle
 The synthetic integration checks exercise 1/3/5-week reads, first-week double
 dependence, explicit minute news, single application of flag inputs and the
 sealed HTTP/worker/cache path. These are behavior checks; they establish no
-accuracy improvement (`tests/integration/test_live_football_flags.py:254`,
-`tests/integration/test_live_football_flags.py:290`,
-`tests/integration/test_live_football_flags.py:303`,
-`tests/integration/test_live_football_flags.py:333`,
-`tests/integration/test_live_football_flags.py:348`).
+accuracy improvement (`tests/integration/test_live_football_flags.py:263`,
+`tests/integration/test_live_football_flags.py:326`,
+`tests/integration/test_live_football_flags.py:339`,
+`tests/integration/test_live_football_flags.py:369`,
+`tests/integration/test_live_football_flags.py:384`).
 
 Two original synthetic capture pairs also pass through the real training-row
 reconstruction and capture readers with only native model fitting substituted.
@@ -122,6 +136,6 @@ clock-invariance check fits varied capture ages from 2 to 48 hours, so it can
 detect decision-time dependence in the learned law
 (`tests/integration/test_reconstruct_football_flags.py:44`,
 `tests/integration/test_reconstruct_football_flags.py:144`,
-`tests/unit/test_football_flag_captures.py:127`,
-`tests/unit/test_football_flag_captures.py:152`,
-`tests/unit/test_football_flag_captures.py:163`).
+`tests/unit/test_football_flag_captures.py:130`,
+`tests/unit/test_football_flag_captures.py:155`,
+`tests/unit/test_football_flag_captures.py:166`).

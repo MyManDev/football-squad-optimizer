@@ -29,7 +29,7 @@ FOOTBALL_MODEL_VERSION = "football_team_share_v1"
 ROLE_MODEL_VERSION = "football_team_share_role_transition_v2"
 JOINT_ROLE_MODEL_VERSION = "football_joint_role_minutes_v1"
 JOINT_ROLE_RETAINED_HISTORY_MODEL_VERSION = "football_joint_role_retained_history_v1"
-JOINT_ROLE_FLAG_MODEL_VERSION = "football_joint_role_retained_flags_v1"
+JOINT_ROLE_FLAG_MODEL_VERSION = "football_joint_role_retained_flags_v2"
 JOINT_ROLE_MODEL_VERSIONS = (
     JOINT_ROLE_MODEL_VERSION,
     JOINT_ROLE_RETAINED_HISTORY_MODEL_VERSION,

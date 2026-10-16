@@ -27,7 +27,7 @@ from squadopt.features.football_flag_inputs import (
     validate_week_input,
 )
 
-CAPTURE_ADAPTER_VERSION = "retained_fpl_flag_inputs_v1"
+CAPTURE_ADAPTER_VERSION = "retained_fpl_flag_inputs_v2"
 
 
 def _json(raw: bytes) -> Any:

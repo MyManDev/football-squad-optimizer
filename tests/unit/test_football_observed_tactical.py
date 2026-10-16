@@ -1149,3 +1149,55 @@ def test_each_role_finish_clause_refuses_independently(clause: str) -> None:
         validate_projection(
             replace(p, home=replace(p.home, players=(changed, *p.home.players[1:])))
         )
+
+
+@pytest.mark.parametrize("after_cutoff", [timedelta(0), timedelta(hours=1)])
+def test_replayed_role_finish_must_precede_feature_cutoff(after_cutoff: timedelta) -> None:
+    p = replayed().projection
+    assert p.replay is not None
+    cutoff = datetime.fromisoformat(p.feature_cutoff.replace("Z", "+00:00"))
+    first = p.home.players[0]
+    role = replace(
+        projection().home.players[0].profile.role_history[0],
+        season=p.season,
+        kickoff=clock(cutoff - timedelta(hours=2)),
+        finished_at=clock(cutoff - timedelta(seconds=1)),
+        source=source("replayed-role", p.replay.retrieved_at),
+    )
+
+    def with_role(value: ObservedRole) -> ObservedTacticalProjection:
+        changed = replace(first, profile=replace(first.profile, role_history=(value,)))
+        return replace(p, home=replace(p.home, players=(changed, *p.home.players[1:])))
+
+    validate_projection(with_role(role), allow_released_2025_26=True)
+    with pytest.raises(
+        ValueError, match=r"^Provider role is unconfirmed, future or unavailable\.$"
+    ):
+        validate_projection(
+            with_role(replace(role, finished_at=clock(cutoff + after_cutoff))),
+            allow_released_2025_26=True,
+        )
+
+
+@pytest.mark.parametrize("after_cutoff", [timedelta(0), timedelta(hours=1)])
+def test_replayed_event_finish_must_precede_feature_cutoff(after_cutoff: timedelta) -> None:
+    p = replayed().projection
+    assert p.replay is not None
+    cutoff = datetime.fromisoformat(p.feature_cutoff.replace("Z", "+00:00"))
+    fixture = replace(
+        projection().home.observed_fixtures[0],
+        season=p.season,
+        kickoff=clock(cutoff - timedelta(hours=2)),
+        finished_at=clock(cutoff - timedelta(seconds=1)),
+        source=source("replayed-events", p.replay.retrieved_at),
+    )
+    valid = replace(p, home=replace(p.home, observed_fixtures=(fixture,)))
+    validate_projection(valid, allow_released_2025_26=True)
+    changed = replace(fixture, finished_at=clock(cutoff + after_cutoff))
+    with pytest.raises(
+        ValueError, match=r"^Observed event fixture is outside the prior28day finished window\.$"
+    ):
+        validate_projection(
+            replace(p, home=replace(p.home, observed_fixtures=(changed,))),
+            allow_released_2025_26=True,
+        )

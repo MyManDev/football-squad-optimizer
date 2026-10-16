@@ -42,7 +42,7 @@ def test_json_number_overflow_is_not_a_finite_prediction() -> None:
     [
         "football_joint_role_minutes_v1",
         "football_joint_role_retained_history_v1",
-        "football_joint_role_retained_flags_v1",
+        "football_joint_role_retained_flags_v2",
         "football_composite_v1",
     ],
 )
@@ -90,7 +90,8 @@ def test_football_model_and_role_breakdown_cross_the_advice_boundary(version: st
         ("prediction_model", "version"),
         ("role_forecast", "model_version"),
     ):
-        payload[section][field] = "unknown_model_v1"
-        with pytest.raises(AdviceDocumentError):
-            validate_advice_document(json.dumps(document).encode())
+        for invalid in ("unknown_model_v1", "football_joint_role_retained_flags_v1"):
+            payload[section][field] = invalid
+            with pytest.raises(AdviceDocumentError):
+                validate_advice_document(json.dumps(document).encode())
         payload[section][field] = version

@@ -31,7 +31,7 @@ from squadopt.prediction.football_flag_minutes import (
 
 GOAL_POINTS = {"GK": 6, "DEF": 6, "MID": 5, "FWD": 4}
 CS_POINTS = {"GK": 4, "DEF": 4, "MID": 1, "FWD": 0}
-LIVE_FLAG_CONTRACT = "football_first_week_flags_v1"
+LIVE_FLAG_CONTRACT = "football_first_week_flags_v2"
 FLAG_SCOPE_LIMITATION = (
     "Learned categorical flags replace eligibility only in the first week; "
     "later weeks retain the captured rule. Independent calibration is unverified."

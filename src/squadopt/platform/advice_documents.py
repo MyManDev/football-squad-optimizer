@@ -279,7 +279,7 @@ def advice_read_schema() -> dict[str, Any]:
                             "football_match_context_v1",
                             "football_joint_role_minutes_v1",
                             "football_joint_role_retained_history_v1",
-                            "football_joint_role_retained_flags_v1",
+                            "football_joint_role_retained_flags_v2",
                             "football_composite_v1",
                             "football_team_form_v1",
                         ]

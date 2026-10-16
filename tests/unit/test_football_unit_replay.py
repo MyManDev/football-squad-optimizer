@@ -16,6 +16,7 @@ from tests.unit.test_football_unit_strength import (
     observation,
     observations,
     projection,
+    source,
     unit,
 )
 
@@ -202,6 +203,45 @@ def fitted():
     )
 
 
+def released_observation(week):
+    cutoff = D + timedelta(days=7 * (week - 1))
+    return replace(
+        observation(week, replacement=week == 2),
+        season="2025-26",
+        decision_cutoff=cutoff,
+        kickoff=cutoff + timedelta(hours=2),
+        outcome_available_at=cutoff + timedelta(hours=6),
+        outcome_source=source(cutoff + timedelta(hours=6)),
+        catalog=catalog(week=week, fixture=week, cutoff=cutoff, season="2025-26"),
+    )
+
+
+@pytest.fixture(scope="module")
+def release_only_result():
+    first = replace(released_observation(1), minutes=45)
+    # Reversed input order and two intervals in one week pin canonical unique scopes.
+    rows = (
+        released_observation(2),
+        replace(first, start_minute=45),
+        first,
+        observation(1, replacement=False),
+    )
+    decision = D + timedelta(days=14)
+    target = replace(
+        projection(),
+        season="2025-26",
+        gameweek=3,
+        fixture_id=3,
+        decision_cutoff=decision,
+        kickoff=decision + timedelta(hours=2),
+        captured_at=decision,
+        catalog=catalog(week=3, fixture=3, cutoff=decision, season="2025-26"),
+    )
+    return FootballUnitStrengthModel(
+        rows, cutoff=decision - timedelta(hours=1), allow_released_2025_26=True
+    ).predict(target)
+
+
 def test_replay_keeps_distinct_actual_source_clocks_and_missing_fm():
     c = replay_catalog()
     assert c.sources[0].captured_at < c.sources[1].captured_at < c.sources[2].captured_at
@@ -372,6 +412,15 @@ def test_result_boundary_revalidates_replay_receipts(mutation):
         _result_receipt(replace(result, metadata=MappingProxyType(metadata)))
 
 
+@pytest.mark.parametrize("vintage", ["2022-06-27", "FM23", None])
+def test_result_boundary_refuses_a_claimed_fm_game_vintage_independently(vintage):
+    result = fitted().predict(current_projection())
+    assert _result_receipt(result)
+    metadata = {**result.metadata, "fm_game_vintage": vintage}
+    with pytest.raises(ValueError, match="declared replay and observed clock contract"):
+        _result_receipt(replace(result, metadata=MappingProxyType(metadata)))
+
+
 def test_legacy_fingerprints_and_none_json_roundtrips_stay_identical():
     c, o, p = catalog(), observations()[0], projection()
     old_catalog = asdict(c)
@@ -407,7 +456,7 @@ def test_legacy_json_boundary_refuses_nonnull_replay_fields(field):
         read_unit_observations(document("observations", [value]))
 
 
-def test_legacy_metadata_bytes_and_release_only_policy_are_distinct():
+def test_unused_release_opt_in_preserves_legacy_metadata_bytes():
     rows = observations()
     cutoff = rows[0].decision_cutoff + timedelta(days=43)
     legacy = FootballUnitStrengthModel(rows, cutoff=cutoff).predict(projection())
@@ -418,6 +467,9 @@ def test_legacy_metadata_bytes_and_release_only_policy_are_distinct():
         projection()
     )
     assert dict(explicit.metadata) == dict(legacy.metadata)
+    assert "fit_contract" not in explicit.metadata
+    assert "allow_released_2025_26" not in explicit.metadata
+    assert "training_scopes" not in explicit.metadata
     assert "training_exposure_clock" not in explicit.metadata
     assert _result_receipt(explicit)
     for result in (legacy, explicit):
@@ -425,6 +477,80 @@ def test_legacy_metadata_bytes_and_release_only_policy_are_distinct():
         changed["training_exposure_receipts"] = ()
         with pytest.raises(ValueError):
             _result_receipt(replace(result, metadata=MappingProxyType(changed)))
+
+
+def test_nonreplayed_released_rows_require_opt_in():
+    with pytest.raises(ValueError, match="Locked 2025-26"):
+        FootballUnitStrengthModel((released_observation(1),), cutoff=D + timedelta(days=1))
+
+
+def test_release_only_fit_records_actual_scopes_with_v2_contract(release_only_result):
+    result = release_only_result
+    assert result.metadata["fit_contract"] == "football_unit_explicit_release_fit_v2"
+    assert result.metadata["allow_released_2025_26"] is True
+    assert result.metadata["training_scopes"] == (
+        ("2024-25", 1),
+        ("2025-26", 1),
+        ("2025-26", 2),
+    )
+    assert result.metadata["training_rows"] == 8
+    assert (
+        not {
+            "training_exposure_clock",
+            "training_replay_receipts",
+            "training_exposure_receipts",
+            "fm_game_vintage",
+        }
+        & result.metadata.keys()
+    )
+    retained = json.loads(_result_receipt(result))["metadata"]
+    assert retained["fit_contract"] == "football_unit_explicit_release_fit_v2"
+    assert retained["training_scopes"] == [["2024-25", 1], ["2025-26", 1], ["2025-26", 2]]
+
+
+@pytest.mark.parametrize(
+    "changes,message",
+    [
+        ({"fit_contract": None}, "explicit fitting contract"),
+        ({"fit_contract": "football_unit_explicit_release_fit_v3"}, "declared replay"),
+        ({"allow_released_2025_26": False}, "inconsistent replay evidence"),
+        ({"allow_released_2025_26": 1}, "explicit released-season policy"),
+        ({"allow_released_2025_26": "true"}, "explicit released-season policy"),
+        ({"allow_released_2025_26": None}, "explicit released-season policy"),
+        ({"training_scopes": None}, "actual training scopes"),
+        ({"training_scopes": ()}, "actual training scopes"),
+        ({"training_scopes": [("2025-26", 1)]}, "actual training scopes"),
+        ({"training_scopes": (["2025-26", 1],)}, "immutable pairs"),
+        ({"training_scopes": (("2025-26", 1, 1),)}, "immutable pairs"),
+        ({"training_scopes": (("2025", 1),)}, "Season must identify both years"),
+        ({"training_scopes": (("2025-27", 1),)}, "Season years must be consecutive"),
+        ({"training_scopes": (("2025-26", True),)}, "positive persistent integer"),
+        ({"training_scopes": (("2025-26", 0),)}, "positive persistent integer"),
+        ({"training_scopes": (("2025-26", 39),)}, "supported league calendar"),
+        ({"training_scopes": (("2025-26", 3),)}, "precede the target week"),
+        ({"training_scopes": (("2025-26", 4),)}, "precede the target week"),
+        ({"training_scopes": (("2026-27", 1),)}, "precede the target week"),
+        ({"training_scopes": (("2024-25", 1),)}, "actual released-season rows"),
+        ({"fm_game_vintage": "unknown"}, "inconsistent replay evidence"),
+        ({"exposure_policy": "physical"}, "inconsistent replay evidence"),
+        ({"training_replay_receipts": ()}, "inconsistent replay evidence"),
+    ],
+)
+def test_release_only_result_revalidates_its_version_scopes_and_policy(
+    release_only_result, changes, message
+):
+    metadata = {**release_only_result.metadata, **changes}
+    with pytest.raises(ValueError, match=message):
+        _result_receipt(replace(release_only_result, metadata=MappingProxyType(metadata)))
+
+
+def test_release_only_v2_requires_scopes_but_legacy_v1_remains_readable(release_only_result):
+    metadata = dict(release_only_result.metadata)
+    metadata.pop("training_scopes")
+    with pytest.raises(ValueError, match="actual training scopes"):
+        _result_receipt(replace(release_only_result, metadata=MappingProxyType(metadata)))
+    metadata["fit_contract"] = "football_unit_explicit_release_fit_v1"
+    assert _result_receipt(replace(release_only_result, metadata=MappingProxyType(metadata)))
 
 
 @pytest.mark.parametrize("mutation", ["overlap", "week_cutoff", "target", "future"])

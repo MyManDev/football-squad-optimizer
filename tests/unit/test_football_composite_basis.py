@@ -13,6 +13,7 @@ import pytest
 from pandas.testing import assert_frame_equal
 from tests.unit.test_football_composite_weeks import population, serving
 
+from squadopt.features.football_load_inputs import native_joint_law_digest
 from squadopt.live import football_composite_basis as module
 from squadopt.live.football_artifact import forecast_digest
 from squadopt.prediction.football_capabilities import (
@@ -23,8 +24,16 @@ from squadopt.prediction.football_capabilities import (
     COMPOSITE_REPROJECTION_VERSION,
 )
 from squadopt.prediction.football_composite_core import CompositeFixtureResult, CompositeReceipt
-from squadopt.prediction.football_composite_weeks import compose_composite_weeks
-from squadopt.prediction.football_joint_week_law import VerifiedWeekEvidence, joint_week_marginals
+from squadopt.prediction.football_composite_weeks import (
+    compose_composite_weeks,
+    composite_native_sources,
+)
+from squadopt.prediction.football_joint_week_law import (
+    VerifiedWeekEvidence,
+    joint_week_marginals,
+    make_joint_week_law,
+    model_week_law,
+)
 
 
 def canonical(value):
@@ -83,16 +92,22 @@ def test_missing_duplicate_or_reordered_model_assets_refuse_before_any_reader(ro
 def real_assets():
     from tests.unit.test_football_composite_core import models as core_models
     from tests.unit.test_football_observed_tactical import fit, observation
+    from tests.unit.test_football_score_replay import fit as score_fit
+    from tests.unit.test_football_score_replay import replay
+    from tests.unit.test_football_score_state import observation as score_observation
 
     from squadopt.prediction.football_observed_tactical_serving import (
         export_observed_tactical_serving_model,
     )
+    from squadopt.prediction.football_score_serving import export_score_serving_model
 
     models = core_models.__wrapped__()
     values = {
         "load": canonical(asdict(serving().parameters)),
         "unit": canonical(asdict(models.unit.metadata)),
-        "score": canonical(asdict(models.score.metadata)),
+        "score": export_score_serving_model(
+            score_fit(tuple(replay(score_observation(i)) for i in range(3)))
+        ).decode(),
         "phase": canonical(asdict(models.phase.metadata)),
         "tactical": export_observed_tactical_serving_model(
             fit(tuple(observation(i) for i in range(3)))
@@ -206,6 +221,319 @@ def test_compact_family_target_is_bound_to_first_week(real_assets, family, misma
     models, _ = module._models(assets_with_target(family))
     with pytest.raises(ValueError, match="first captured gameweek"):
         module._bind_model_targets(models, inventory)
+
+
+def changed_asset(assets, role, **changes):
+    result = []
+    for asset in assets:
+        if asset.role == role:
+            value = module.json.loads(asset.payload_json)
+            value.update(changes)
+            asset = replace(asset, payload_json=canonical(value), sha256=digest(value))
+        result.append(asset)
+    return tuple(result)
+
+
+@pytest.fixture
+def boundary_case(real_assets, monkeypatch):
+    """Public recipe path with real codecs, family readers and source/target guards.
+
+    Only the previously validated original component reader and expensive physical
+    fixture executor are doubles. The recipe restore, weekly composition, source
+    binding, duty binding and model target/fit binding run unchanged.
+    """
+    from tests.unit.test_football_composite_core import case
+
+    inventory, source_weeks = population()
+    inventory = replace(
+        inventory,
+        gameweeks=(7,),
+        calendar=inventory.calendar[:1],
+        deadlines=inventory.deadlines[:1],
+    )
+    source_weeks = tuple(row for row in source_weeks if row.native.gameweek == 7)
+    normalized_weeks = []
+    for row in source_weeks:
+        basis = row.load_week.native
+        fixtures = tuple(
+            replace(f, minutes=tuple(float(v) for v in f.minutes)) for f in basis.fixtures
+        )
+        normalized_weeks.append(
+            replace(
+                row,
+                load_week=replace(
+                    row.load_week,
+                    native=replace(
+                        basis,
+                        fixtures=fixtures,
+                        law_sha256=native_joint_law_digest(
+                            fixtures, basis.states, basis.probabilities
+                        ),
+                    ),
+                ),
+            )
+        )
+    source_weeks = tuple(normalized_weeks)
+    native = dict(
+        season=inventory.season,
+        gameweek=7,
+        source_snapshot_id=inventory.source_snapshot_id,
+        source_fingerprint=inventory.source_fingerprint,
+        captured_at_utc=inventory.captured_at,
+        training_latest_kickoff="2026-10-14T20:00:00Z",
+        model_version=module.JOINT_ROLE_RETAINED_HISTORY_MODEL_VERSION,
+        rows=[
+            dict(
+                gameweek=7, player_id=row.native.player_code, fixture_count=len(row.native.fixtures)
+            )
+            for row in source_weeks
+        ],
+    )
+    native["fingerprint"] = forecast_digest(native)
+    rows = []
+    for row in source_weeks:
+        for fixture in row.load_week.native.fixtures:
+            values = dict(GW=7, fixture=fixture.fixture_id, player_code=row.native.player_code)
+            values["zero_probability"] = fixture.probabilities[0]
+            for role, offset in (("start", 0), ("cameo", 3)):
+                for index in (1, 2, 3):
+                    values[f"{role}_minute_probability_{index}"] = fixture.probabilities[
+                        offset + index
+                    ]
+                    values[f"{role}_minute_value_{index}"] = fixture.minutes[offset + index]
+            rows.append(values)
+    components = dict(
+        rows=rows,
+        role_metadata={"synthetic_orchestration_fixture": True},
+        captured_availability={
+            "multipliers": [
+                dict(player_code=p.player_code, multiplier=p.captured_eligibility)
+                for p in inventory.roster
+            ]
+        },
+    )
+    components["fingerprint"] = forecast_digest(components)
+    flag = dict(
+        native,
+        model_version=module.JOINT_ROLE_FLAG_MODEL_VERSION,
+        flag_metadata=dict(
+            native_forecast_fingerprint=native["fingerprint"],
+            native_components_fingerprint=components["fingerprint"],
+            model_sha256="a" * 64,
+            decision_at=inventory.decision_at,
+            weekly_laws=[
+                dict(
+                    player_code=row.native.player_code,
+                    fixture_ids=[f.fixture_id for f in row.native.fixtures],
+                    probabilities=list(row.first_week_flag.probabilities),
+                )
+                for row in source_weeks
+            ],
+        ),
+    )
+    flag["fingerprint"] = forecast_digest(flag)
+    envelope = envelope_case()[0]
+    envelope.update(
+        gameweeks=[7],
+        source_component_sha256=digest(components),
+        source_forecast_sha256=digest(native),
+    )
+    inventory = replace(
+        inventory,
+        native_components_sha256=digest(components),
+        role_metadata_sha256=digest(components["role_metadata"]),
+        captured_eligibility_sha256=digest(components["captured_availability"]),
+        first_week_flag_result_sha256=digest(flag),
+        native_basis_sha256=digest(envelope),
+    )
+    weeks = []
+    for row in source_weeks:
+        old = row.load_week.native
+        law = make_joint_week_law(
+            season=inventory.season,
+            gameweek=7,
+            player_code=row.native.player_code,
+            position=row.native.position,
+            fixtures=old.fixtures,
+            states=old.states,
+            probabilities=old.probabilities,
+            role_metadata_sha256=inventory.role_metadata_sha256,
+            sources=composite_native_sources(inventory),
+        )
+        learned = model_week_law(
+            law,
+            law.states,
+            row.first_week_flag.probabilities,
+            kind="flag",
+            sources=(("retained_flag_result", inventory.first_week_flag_result_sha256),),
+        )
+        weeks.append(
+            replace(
+                row,
+                native=law,
+                first_week_flag=learned,
+                captured_eligibility_source_sha256=inventory.captured_eligibility_sha256,
+                load_week=replace(
+                    row.load_week,
+                    native=replace(
+                        old,
+                        basis_sha256=inventory.native_basis_sha256,
+                        model_version=native["model_version"],
+                        native_generated_at=envelope["native_generated_at"],
+                    ),
+                    provenance=replace(
+                        row.load_week.provenance, source_hashes=composite_native_sources(inventory)
+                    ),
+                ),
+            )
+        )
+    context = case()
+    context = replace(
+        context,
+        native_rows_json=canonical(rows),
+        native_basis_sha256=inventory.native_components_sha256,
+        score=replace(context.score, gameweek=7, fixture_id=100, decision_at=inventory.decision_at),
+        final_minutes=(),
+        phase=tuple(
+            replace(
+                phase,
+                duties=replace(
+                    phase.duties,
+                    snapshot_id=inventory.source_snapshot_id,
+                    source_fingerprint=inventory.source_fingerprint,
+                    captured_at=inventory.captured_at,
+                ),
+            )
+            for phase in context.phase
+        ),
+        generated_at=inventory.decision_at,
+    )
+    assets = real_assets
+    for family in ("unit", "score", "tactical", "phase"):
+        field = "target_gameweeks" if family == "score" else "target_gameweek"
+        assets = changed_asset(assets, family, **{field: [7] if family == "score" else 7})
+    monkeypatch.setattr(module.FixtureComponentBasis, "from_documents", lambda *a, **k: None)
+    monkeypatch.setattr(module, "compose_fixture", executor)
+    return dict(
+        native_forecast=native,
+        native_components=components,
+        flag_forecast=flag,
+        flag_components=deepcopy(components),
+        native_basis_document=envelope,
+        model_assets=assets,
+        inventory=inventory,
+        weeks=tuple(weeks),
+        fixtures=(context,),
+        fixture_calendar=pd.DataFrame(
+            [
+                dict(
+                    GW=7,
+                    fixture=100,
+                    kickoff=inventory.calendar[0].kickoff,
+                    club=10,
+                    opponent=20,
+                    home=1,
+                )
+            ]
+        ),
+        roster_clubs={p.player_code: p.club_code for p in inventory.roster},
+        roster_positions={p.player_code: p.position for p in inventory.roster},
+        deadline_by_gameweek={7: inventory.deadlines[0].deadline_at},
+        captured_calendar_sha256=inventory.calendar_sha256,
+        generated_at=inventory.decision_at,
+        decision_at=inventory.decision_at,
+    )
+
+
+def public_boundary(entry, source, **changes):
+    if entry == "build":
+        return module.build_composite_documents(**dict(source, **changes))
+    served, companion = module.build_composite_documents(**source)
+    recipe = companion["recipe"]
+    for name, value in changes.items():
+        if name == "model_assets":
+            recipe["models"] = [asdict(asset) for asset in value]
+        elif name == "fixtures":
+            recipe["fixtures"] = [module._pack_source(context) for context in value]
+        else:
+            raise AssertionError("Undeclared test mutation")
+    companion["fingerprint"] = forecast_digest(companion)
+    return module.CompositeComponentBasis.from_documents(
+        served,
+        companion,
+        **{
+            key: source[key]
+            for key in (
+                "fixture_calendar",
+                "roster_clubs",
+                "roster_positions",
+                "deadline_by_gameweek",
+                "captured_calendar_sha256",
+            )
+        },
+    )
+
+
+@pytest.mark.parametrize("entry", ["build", "read"])
+def test_public_recipe_accepts_current_fit_contracts(boundary_case, entry):
+    assert public_boundary(entry, boundary_case) is not None
+
+
+@pytest.mark.parametrize("entry", ["build", "read"])
+@pytest.mark.parametrize("family", ["unit", "score", "tactical", "phase"])
+def test_public_recipe_calls_family_target_binding(boundary_case, entry, family):
+    field = "target_gameweeks" if family == "score" else "target_gameweek"
+    assets = changed_asset(
+        boundary_case["model_assets"], family, **{field: [6] if family == "score" else 6}
+    )
+    with pytest.raises(
+        ValueError, match=r"^Composite family fit targets must equal its first captured gameweek\.$"
+    ):
+        public_boundary(entry, boundary_case, model_assets=assets)
+
+
+@pytest.mark.parametrize("entry", ["build", "read"])
+@pytest.mark.parametrize(
+    "family,field,contract,reason",
+    [
+        (
+            "unit",
+            "fit_contract_version",
+            "football_unit_public_replay_physical_duration_fit_v1",
+            "v2 physical unit",
+        ),
+        ("score", "fit_contract", "football_score_state_fit_v1", "v2 replay score"),
+        ("score", "fit_contract", "football_score_public_replay_fit_v1", "v2 replay score"),
+        ("phase", "fit_contract_version", "football_phase_duty_fit_v1", "v2 phase"),
+        ("phase", "fit_contract_version", "football_phase_duty_replay_fit_v1", "v2 phase"),
+    ],
+)
+def test_public_recipe_refuses_legacy_fits_standalone_readers_still_accept(
+    boundary_case, entry, family, field, contract, reason
+):
+    assets = changed_asset(boundary_case["model_assets"], family, **{field: contract})
+    models, _ = module._models(assets)
+    assert getattr(getattr(models, family).metadata, field) == contract
+    with pytest.raises(ValueError, match=rf"^Composite requires (the|a) {reason} fit contract\.$"):
+        public_boundary(entry, boundary_case, model_assets=assets)
+
+
+@pytest.mark.parametrize("entry", ["build", "read"])
+@pytest.mark.parametrize("field", ["snapshot_id", "source_fingerprint", "captured_at"])
+@pytest.mark.parametrize("side", [0, 1])
+def test_public_recipe_calls_exact_duty_capture_binding(boundary_case, entry, field, side):
+    context = boundary_case["fixtures"][0]
+    phases = list(context.phase)
+    bad = {
+        "snapshot_id": "another-capture",
+        "source_fingerprint": "e" * 64,
+        "captured_at": "2026-10-15T01:00:00Z",
+    }[field]
+    phases[side] = replace(phases[side], duties=replace(phases[side].duties, **{field: bad}))
+    with pytest.raises(
+        ValueError, match=r"^Composite duties differ from the exact retained capture\.$"
+    ):
+        public_boundary(entry, boundary_case, fixtures=(replace(context, phase=tuple(phases)),))
 
 
 def envelope_case():

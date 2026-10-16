@@ -13,7 +13,7 @@ Its 23 Python files sit in one folder. This page places every one of them in exa
 family.
 
 Review: the owner ([ownership](../../../docs/architecture/ownership.md)). `ledger.py`, `tick.py`
-and `recommendation.py` also list Ä°brahim in `.github/CODEOWNERS` as an alternative reviewer,
+and `recommendation.py` also list İbrahim in `.github/CODEOWNERS` as an alternative reviewer,
 so either approval is enough for those three. Within 24 hours either side of a deadline only a
 blocker fix merges here
 ([live-path freeze window](../../../docs/architecture/ownership.md#live-path-freeze-window)).

@@ -11,7 +11,7 @@ from tests.fixtures.football_flag_fixtures import training_weeks
 
 from squadopt.data.errors import DataError
 from squadopt.features.football_flag_captures import captured_flag_outcome, captured_flag_weeks
-from squadopt.features.football_flag_inputs import MinuteFixture
+from squadopt.features.football_flag_inputs import MinuteFixture, input_digest
 from squadopt.prediction.football_flag_minutes import FlagMinutesModel
 
 CAPTURE = "2024-10-04T10:00:00Z"
@@ -120,6 +120,9 @@ def test_original_next_round_category_and_actual_clock_are_retained():
     assert week.news_age_hours == (48 * 3600 - 1) / 3600
     assert week.decision_at == DECISION
     assert week.native_basis_kind == "out_of_fold"
+    assert week.native_basis_evidence_ref == "retained_fpl_flag_inputs_v2:" + "b" * 64
+    legacy = replace(week, native_basis_evidence_ref="retained_fpl_flag_inputs_v1:" + "b" * 64)
+    assert input_digest(week) != input_digest(legacy)
     assert week.history_covered is False and week.label_changed is None
     assert read(reconstructed=False)[0].native_basis_kind == "prospective"
 

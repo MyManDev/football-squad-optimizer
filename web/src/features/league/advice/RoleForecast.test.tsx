@@ -211,7 +211,7 @@ it.each([
 it.each([
   "football_joint_role_minutes_v1",
   "football_joint_role_retained_history_v1",
-  "football_joint_role_retained_flags_v1",
+  "football_joint_role_retained_flags_v2",
   "football_composite_v1",
 ] as const)("reads the same restricted role explanation for %s", (version) => {
   const view = example();
@@ -224,12 +224,14 @@ it.each([
   );
   expect(screen.getByTestId("role-forecast")).toHaveTextContent("Expected minutes: 34.0");
   expect(screen.getByTestId("role-forecast").textContent).not.toMatch(AS_A_CHANCE);
-  expect(
-    isAdvicePayload({
-      ...view,
-      role_forecast: { ...view.role_forecast, model_version: "unknown" },
-    }),
-  ).toBe(false);
+  for (const invalid of ["unknown", "football_joint_role_retained_flags_v1"]) {
+    expect(
+      isAdvicePayload({
+        ...view,
+        role_forecast: { ...view.role_forecast, model_version: invalid },
+      }),
+    ).toBe(false);
+  }
   expect(
     isAdvicePayload({
       ...view,

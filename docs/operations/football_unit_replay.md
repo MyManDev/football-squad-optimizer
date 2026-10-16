@@ -55,9 +55,9 @@ baseline after retrieval merely by dropping the replay field
 
 The owner explicitly authorized 2025-26 training for the experimental football
 model in the task conversation on 2026-10-16, accepting that the season loses its
-independent test status. The retained decision is in
-`.codex-tmp/football-live-families/progress.json:6`, and the integration disclosure
-is [PR #1120](https://github.com/MyManDev/football-squad-optimizer/pull/1120).
+independent test status. The public record of that decision is the owner-training
+disclosure in the description of
+[PR #1120](https://github.com/MyManDev/football-squad-optimizer/pull/1120).
 This paragraph records that user decision; it is not a GitHub reviewer approval
 or authorization for a new accuracy measurement.
 
@@ -80,9 +80,12 @@ such rows does not create a release-only contract. The default remains false
 The result boundary rechecks source identities, acquisition and fitting clocks,
 exposure identity, fixture basis, nonoverlap, shared gameweek decision and exclusion
 of target or later training weeks. It requires the exact exposure, extrapolation
-and FM eligibility statements. Legacy v1 result contracts remain readable with
-their original option semantics; v2 declarations must match the actual exposure
-population. This is receipt validation, with no forecast accuracy claim
+and FM eligibility statements. Legacy v1 result contracts retain their original
+option semantics, but their replay receipts must also satisfy the current timing
+rules above. A previously accepted v1 receipt that violates those rules is refused;
+v1 readability does not preserve its former admission behavior. V2 declarations
+must match the actual exposure population. This is receipt validation, with no
+forecast accuracy claim
 (`src/squadopt/experiments/football_unit_experiment.py:98`,
 `src/squadopt/experiments/football_unit_experiment.py:158`,
 `src/squadopt/experiments/football_unit_experiment.py:402`).

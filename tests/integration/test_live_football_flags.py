@@ -264,6 +264,12 @@ def test_actual_fitted_head_round_trips_without_another_fit_or_flag_multiplier(
     live_case, monkeypatch
 ):
     root, snapshot, inputs, document, companion, _, _, _ = live_case
+    assert document["model_version"] == "football_joint_role_retained_flags_v2"
+    assert document["flag_metadata"]["contract_version"] == "football_first_week_flags_v2"
+    assert (
+        document["flag_metadata"]["feature_version"]
+        == "causal_categorical_flag_minutes_features_v2"
+    )
     assert document["flag_metadata"]["fit_cutoff"] == document["captured_at_utc"]
     monkeypatch.setattr(
         FlagMinutesModel, "fit", lambda *a, **kw: pytest.fail("Reading must never fit")
@@ -493,6 +499,31 @@ def test_a_rehashed_joint_law_with_changed_role_marginals_still_refuses(live_cas
     law["probabilities"][10] += delta
     reseal(document, companion)
     with pytest.raises(ValueError, match="marginals"):
+        loaded(live_case, document=document, companion=companion)
+
+
+@pytest.mark.parametrize(
+    "field,legacy",
+    [
+        ("contract_version", "football_first_week_flags_v1"),
+        ("feature_version", "causal_categorical_flag_minutes_features_v1"),
+    ],
+)
+def test_rehashed_legacy_flag_metadata_is_refused(live_case, field, legacy):
+    _, _, _, original, original_companion, _, _, _ = live_case
+    document, companion = copy.deepcopy(original), copy.deepcopy(original_companion)
+    document["flag_metadata"][field] = legacy
+    reseal(document, companion)
+    with pytest.raises(ValueError, match="exact scope and metadata"):
+        loaded(live_case, document=document, companion=companion)
+
+
+def test_legacy_flag_model_is_refused_even_with_current_metadata(live_case):
+    _, _, _, original, original_companion, _, _, _ = live_case
+    document, companion = copy.deepcopy(original), copy.deepcopy(original_companion)
+    document["model_version"] = companion["model_version"] = "football_joint_role_retained_flags_v1"
+    reseal(document, companion)
+    with pytest.raises(ValueError, match="unsupported model_version"):
         loaded(live_case, document=document, companion=companion)
 
 

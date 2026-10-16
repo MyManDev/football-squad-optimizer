@@ -77,7 +77,7 @@ law (`src/squadopt/features/football_score_replay.py:50`,
 | Module | What it does |
 | --- | --- |
 | `football_flag_inputs.py` | Captured flag facts and supplied pre-decision native minute supports (`football_flag_week_input_v1`); no reader touches a network, a file or an outcome it was not given. |
-| `football_flag_captures.py` | Binds original retained FPL flags and explicit settled start/minute labels to causal native supports (`retained_fpl_flag_inputs_v1`), keeping reconstructed decisions distinct from live forecasts (`src/squadopt/features/football_flag_captures.py:97`, `src/squadopt/features/football_flag_captures.py:207`). |
+| `football_flag_captures.py` | Binds original retained FPL flags and explicit settled start/minute labels to causal native supports (`retained_fpl_flag_inputs_v2`), keeping reconstructed decisions distinct from live forecasts (`src/squadopt/features/football_flag_captures.py:97`, `src/squadopt/features/football_flag_captures.py:207`). |
 | `football_load_inputs.py` | Immutable all-competition workload and native-law source contracts (`football_load_week_input_v1`). |
 | `football_phase_inputs.py` | Causal inputs for phase-specific credited goal and assist allocation (`football_phase_inputs_v1`). |
 | `football_phase_replay.py` | Reads exact public-revision duty CSV bytes while retaining separate original-recording and actual-retrieval clocks (`football_phase_replay.py:123`). |

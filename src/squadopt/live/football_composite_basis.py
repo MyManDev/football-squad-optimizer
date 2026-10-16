@@ -19,6 +19,7 @@ from typing import Any, TypeVar, cast
 
 import pandas as pd
 
+from squadopt.features.football_score_replay import REPLAY_FIT_VERSION as SCORE_REPLAY_FIT_VERSION
 from squadopt.live.football_artifact import forecast_digest
 from squadopt.live.football_composite_codec import composite_source_bytes, read_composite_source
 from squadopt.live.minute_evidence import FixtureComponentBasis
@@ -65,6 +66,7 @@ from squadopt.prediction.football_observed_tactical_serving import (
 from squadopt.prediction.football_phase_serving import read_phase_serving_model
 from squadopt.prediction.football_score_serving import read_score_serving_model
 from squadopt.prediction.football_unit_serving import UNIT_SERVING_VERSION, read_unit_serving_model
+from squadopt.prediction.football_unit_strength import UNIT_PHYSICAL_FIT_VERSION
 
 COMPONENT_CONTRACT = "football_composite_components_v1"
 RECIPE_VERSION = "football_composite_retained_recipe_v1"
@@ -299,6 +301,15 @@ def _bind_model_targets(models: CompositeModels, inventory: CompositeWeekInvento
     target = inventory.season, inventory.gameweeks[0]
     if models.unit.metadata.contract_version != UNIT_SERVING_VERSION:
         raise ValueError("Composite requires an explicit target-bound unit serving artifact.")
+    if models.unit.metadata.fit_contract_version != UNIT_PHYSICAL_FIT_VERSION:
+        raise ValueError("Composite requires the v2 physical unit fit contract.")
+    if models.score.metadata.fit_contract != SCORE_REPLAY_FIT_VERSION:
+        raise ValueError("Composite requires the v2 replay score fit contract.")
+    if models.phase.metadata.fit_contract_version not in (
+        "football_phase_duty_fit_v2",
+        "football_phase_duty_replay_fit_v2",
+    ):
+        raise ValueError("Composite requires a v2 phase fit contract.")
     targets = (
         (models.unit.metadata.target_season, models.unit.metadata.target_gameweek),
         (models.score.metadata.target_season, min(models.score.metadata.target_gameweeks)),
