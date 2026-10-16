@@ -31,7 +31,10 @@ from squadopt.features.football_load_inputs import (
 
 INPUT_VERSION = "football_observed_non_pl_load_input_v1"
 OUTCOME_VERSION = "football_observed_non_pl_load_outcome_v1"
-FEATURE_VERSION = "observed_non_pl_reported_records_v1"
+FEATURE_VERSION = "observed_non_pl_deadline_relative_records_v2"
+OBSERVED_COMPETITIONS = frozenset(
+    {"champions-league", "conference-league", "efl-cup", "europa-league"}
+)
 COVERAGE_KIND = "observed_provider_player_records_not_complete_history"
 MINUTE_DEFINITION = "provider_reported_minutes_not_physical_elapsed"
 CAPTURED_NATIVE_VERSION = "captured_snapshot_v1"
@@ -236,14 +239,10 @@ def validate_observed_load_week(
         raise ValueError("Observed load needs an explicit observed competition scope.")
     for competition in week.competitions:
         _text(competition, "competition")
-        if competition.lower().replace("_", "-").replace(" ", "-") in (
-            "prem",
-            "pl",
-            "epl",
-            "premier-league",
-        ):
-            raise ValueError("Observed non-PL scope cannot include Premier League.")
-    if len(set(week.competitions)) != len(week.competitions):
+        if competition.lower().replace("_", "-").replace(" ", "-") not in OBSERVED_COMPETITIONS:
+            raise ValueError("Observed non-PL scope requires a named supported competition.")
+    normalized = tuple(c.lower().replace("_", "-").replace(" ", "-") for c in week.competitions)
+    if len(set(normalized)) != len(normalized):
         raise ValueError("Observed load competition scope contains duplicates.")
     p = week.provenance
     if type(p) is not ObservedLoadProvenance:
@@ -259,6 +258,8 @@ def validate_observed_load_week(
         if not generated <= feature:
             raise ValueError("Prospective observed load must be prepared before feature use.")
     elif p.kind == "public_revision_replay":
+        if recorded > feature:
+            raise ValueError("Replayed source revision was recorded after feature use.")
         if not decision < retrieved:
             raise ValueError("Replayed observed load must retain actual later acquisition.")
     else:
@@ -343,7 +344,7 @@ def validate_observed_load_week(
         kickoff = _clock(row.kickoff, "observed kickoff")
         completed = _clock(row.completed_by, "original finished observation bound")
         if (
-            not decision - timedelta(days=28) <= kickoff < completed < feature
+            not feature - timedelta(days=28) <= kickoff < completed < feature
             or completed > recorded
         ):
             raise ValueError("Observed record lacks prior completed 28-day exposure.")
@@ -364,14 +365,14 @@ def validate_observed_load_week(
 
 
 def observed_load_features(week: ObservedLoadWeek) -> tuple[float | None, ...]:
-    """Summarize a validated week; an absent record is never a nonappearance."""
-    decision = _clock(week.decision_at, "decision")
+    """Use the fixed deadline reference; an absent record is never a nonappearance."""
+    reference = _clock(week.deadline_at, "deadline") - timedelta(seconds=1)
     result: list[float | None] = []
     for days in (7, 14, 28):
         rows = [
             r
             for r in week.records
-            if _clock(r.kickoff, "kickoff") >= decision - timedelta(days=days)
+            if _clock(r.kickoff, "kickoff") >= reference - timedelta(days=days)
         ]
         minutes = [float(r.reported_minutes) for r in rows if r.reported_minutes is not None]
         starts = [r.confirmed_start for r in rows if r.confirmed_start is not None]
@@ -386,7 +387,7 @@ def observed_load_features(week: ObservedLoadWeek) -> tuple[float | None, ...]:
                 float(len(starts)),
                 float(len(rows) - len(starts)),
                 float(sum(starts)) if starts else None,
-                (decision - latest).total_seconds() / 3600 if latest is not None else None,
+                (reference - latest).total_seconds() / 3600 if latest is not None else None,
             )
         )
     return tuple(result)

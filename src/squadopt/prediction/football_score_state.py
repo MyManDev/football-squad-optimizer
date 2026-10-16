@@ -27,6 +27,8 @@ from squadopt.features.football_score_replay import (
     ScoreReplayBasis,
     ScoreReplayObservation,
     ScoreReplayProvenance,
+    canonical_score_replay_basis,
+    canonical_score_replay_observation,
     score_replay_basis_digest,
     validate_score_replay_header,
     validate_score_replay_observation,
@@ -684,6 +686,12 @@ class ScoreStateModel:
                     target_season=target_season,
                     target_gameweeks=target_gameweeks,
                 )
+        rows = tuple(
+            canonical_score_replay_observation(row, allow_released_2025_26=allow_released_2025_26)
+            if isinstance(row, ScoreReplayObservation)
+            else row
+            for row in rows
+        )
         examples = tuple(training_design(row) for row in rows)
 
         def objective(values: NDArray[np.float64]) -> tuple[float, NDArray[np.float64]]:
@@ -772,7 +780,12 @@ class ScoreStateModel:
                 **asdict(metadata),
                 allow_released_2025_26=allow_released_2025_26,
                 replay_receipts=tuple(
-                    (_basis_digest(row, allow_released_2025_26), row.basis.provenance)
+                    (
+                        _basis_digest(row, allow_released_2025_26),
+                        canonical_score_replay_basis(
+                            row.basis, allow_released_2025_26=allow_released_2025_26
+                        ).provenance,
+                    )
                     for row in rows
                     if isinstance(row, ScoreReplayObservation)
                 ),

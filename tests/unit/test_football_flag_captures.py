@@ -7,10 +7,12 @@ from dataclasses import replace
 from typing import Any
 
 import pytest
+from tests.fixtures.football_flag_fixtures import training_weeks
 
 from squadopt.data.errors import DataError
 from squadopt.features.football_flag_captures import captured_flag_outcome, captured_flag_weeks
 from squadopt.features.football_flag_inputs import MinuteFixture
+from squadopt.prediction.football_flag_minutes import FlagMinutesModel
 
 CAPTURE = "2024-10-04T10:00:00Z"
 DECISION = "2024-10-04T12:00:00Z"
@@ -114,11 +116,54 @@ def observed(week=None, *, minutes: Any = 75, starts: Any = 1, **changes: Any):
 def test_original_next_round_category_and_actual_clock_are_retained():
     week = read()[0]
     assert week.label == week.legacy_next_round_label == 75
-    assert week.capture_age_hours == 2
-    assert week.news_age_hours == 26
+    assert week.capture_age_hours == (24 * 3600 - 1) / 3600
+    assert week.news_age_hours == (48 * 3600 - 1) / 3600
+    assert week.decision_at == DECISION
     assert week.native_basis_kind == "out_of_fold"
     assert week.history_covered is False and week.label_changed is None
     assert read(reconstructed=False)[0].native_basis_kind == "prospective"
+
+
+def test_fitted_law_is_invariant_to_operator_clock_with_varied_training_ages():
+    training = training_weeks(varied_ages=True)
+    assert len({row.input.capture_age_hours for row in training}) == 20
+    assert len({row.input.news_age_hours for row in training}) == 21
+    model = FlagMinutesModel(
+        training, fit_cutoff=CAPTURE, target_season="2024-25", target_gameweeks=(10,)
+    )
+    early = read(decision_at="2024-10-04T11:00:00Z", reconstructed=False)[0]
+    late = read(decision_at="2024-10-05T09:59:59Z", reconstructed=False)[0]
+    early_law, late_law = model.predict(early), model.predict(late)
+    assert early.decision_at != late.decision_at
+    assert early_law.input_sha256 != late_law.input_sha256  # Decision provenance remains bound.
+    assert early_law.probabilities == late_law.probabilities
+    assert early_law.fixture_probabilities == late_law.fixture_probabilities
+    assert early_law.weekly_appearance == late_law.weekly_appearance
+    old_early_clock = replace(early, capture_age_hours=1.0, news_age_hours=25.0)
+    assert abs(model.predict(old_early_clock).weekly_appearance - late_law.weekly_appearance) > 0.01
+
+
+def test_capture_inside_the_fixed_reference_second_is_refused():
+    with pytest.raises(DataError, match="deadline minus one second"):
+        read(captured_at="2024-10-05T09:59:59Z", decision_at="2024-10-05T09:59:59.5Z")
+
+
+@pytest.mark.parametrize("change", ["missing", "extra"])
+def test_native_calendar_requires_all_and_only_captured_fixtures(change):
+    _, _, support = source()
+    supports = () if change == "missing" else (support, replace(support, fixture=102))
+    with pytest.raises(DataError, match="complete club calendar"):
+        read(native_fixtures={1001: supports})
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [{"club": 21}, {"opponent": 31}, {"home": 0}, {"kickoff": "2024-10-05T16:00:00Z"}],
+)
+def test_native_fixture_identity_requires_matching_clubs_side_and_kickoff(changes):
+    _, _, support = source()
+    with pytest.raises(DataError, match="captured fixture identity"):
+        read(native_fixtures={1001: (replace(support, **changes),)})
 
 
 @pytest.mark.parametrize(

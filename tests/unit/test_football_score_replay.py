@@ -71,7 +71,9 @@ def replay(
         native_fit_information_cutoff=before(2),
         latest_native_history_settled_at=before(24),
         duration_history_latest_settled_at=before(24),
-        duration_history_fixtures=(("2022-23", 38, 999),),
+        duration_history_fixtures=(
+            ("2022-23", 38, 999, "2023-05-28T15:30:00Z", "2023-05-28T19:00:00Z"),
+        ),
         source_hashes=tuple(sorted(hashes.items())),
         native_implementation_sha256="a" * 64,
         duration_implementation_sha256="b" * 64,
@@ -283,13 +285,22 @@ def test_target_population_and_outcome_source_headers_precede_all_labels() -> No
     ],
 )
 def test_duration_forecast_refuses_empty_target_future_or_duplicate_history(inventory) -> None:
+    inventory = tuple(
+        (*item, f"{item[0][:4]}-08-01T12:00:00Z", f"{item[0][:4]}-08-01T15:00:00Z")
+        for item in inventory
+    )
     with pytest.raises(ValueError, match=r"[Dd]uration"):
         validate_score_replay_basis(provenance(replay(), duration_history_fixtures=inventory).basis)
 
 
 def test_target_fixture_cannot_be_hidden_under_an_earlier_gameweek() -> None:
     row = replay(observation(3))
-    changed = provenance(row, duration_history_fixtures=(("2024-25", 1, row.basis.fixture_id),))
+    changed = provenance(
+        row,
+        duration_history_fixtures=(
+            ("2024-25", 1, row.basis.fixture_id, "2024-08-01T12:00:00Z", "2024-08-01T15:00:00Z"),
+        ),
+    )
     with pytest.raises(ValueError, match="target"):
         validate_score_replay_basis(changed.basis)
 
@@ -342,3 +353,124 @@ def test_malformed_model_and_roster_labels_refuse_as_header_errors() -> None:
     for basis in invalid:
         with pytest.raises(ValueError, match="nonempty"):
             validate_score_replay_basis(basis)
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("gameweek_first_kickoff", "2024-08-31T12:00:00Z"),
+        ("gameweek_first_kickoff", "2024-09-01T13:00:00Z"),
+        ("season", "2023-24"),
+    ],
+)
+def test_each_calendar_clause_refuses_independently(field: str, value: str) -> None:
+    with pytest.raises(ValueError, match="calendar disagree"):
+        validate_score_replay_basis(replace(replay().basis, **{field: value}))
+
+
+def test_distinct_clubs_and_each_roster_clause_refuse_independently() -> None:
+    basis = replay().basis
+    with pytest.raises(ValueError, match="distinct clubs"):
+        validate_score_replay_basis(replace(basis, away_club_code=basis.home_club_code))
+    first, *rest = basis.players
+    for players in (
+        (first, first, *rest),
+        (replace(first, club_code=999), *rest),
+        (replace(first, position="manager"), *rest),
+    ):
+        with pytest.raises(ValueError, match="contradictory identities"):
+            validate_score_replay_basis(replace(basis, players=players))
+    with pytest.raises(ValueError, match="both original clubs"):
+        validate_score_replay_basis(replace(basis, players=basis.players[:2]))
+    with pytest.raises(ValueError, match="supported frozen provenance"):
+        validate_score_replay_basis(
+            provenance(replay(), version="football_score_public_revision_replay_v1").basis
+        )
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"feature_cutoff": "2024-08-31T13:00:00Z"},
+        {"generated_at": "2026-09-14T23:59:59Z"},
+    ],
+)
+def test_feature_decision_and_acquisition_generation_clauses_are_independent(changes) -> None:
+    with pytest.raises(ValueError, match="recording, reference"):
+        validate_score_replay_basis(provenance(replay(), **changes).basis)
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"settled_at": "2024-09-01T12:00:00Z"},
+        {"settled_at": "2026-09-15T01:00:00Z"},
+        {"outcome_retrieved_at": "2026-09-18T00:00:00Z"},
+        {"outcome_generated_at": CUTOFF},
+    ],
+)
+def test_each_outcome_chronology_clause_refuses_before_labels(changes) -> None:
+    row = replace(replay(), goals=object(), **changes)
+    with pytest.raises(ValueError, match="precede fitting"):
+        validate_score_replay_observation(row, **HEADER)
+
+
+def test_duration_history_requires_actual_clocks_even_for_an_earlier_gameweek() -> None:
+    row = replay(observation(19))
+    basis = replace(row.basis, gameweek=20)
+    for kickoff, completed in (
+        (basis.decision_at, basis.kickoff),
+        ("2024-08-01T12:00:00Z", "2024-08-01T12:00:00Z"),
+        ("2023-08-01T12:00:00Z", "2023-08-01T15:00:00Z"),
+    ):
+        changed = replace(
+            basis.provenance, duration_history_fixtures=(("2024-25", 19, 999, kickoff, completed),)
+        )
+        with pytest.raises(ValueError, match="chronology"):
+            validate_score_replay_basis(replace(basis, provenance=changed))
+    with pytest.raises(ValueError, match="completion bound"):
+        validate_score_replay_basis(
+            replace(
+                basis,
+                provenance=replace(
+                    basis.provenance, duration_history_fixtures=(("2024-25", 19, 999),)
+                ),
+            )
+        )
+
+
+def test_replay_digest_and_fitted_receipts_canonicalize_equivalent_utc_and_hash_order() -> None:
+    row = replay()
+    p = row.basis.provenance
+    changes = {
+        name: getattr(p, name).replace("Z", "+00:00")
+        for name in (
+            "recorded_at",
+            "retrieved_at",
+            "generated_at",
+            "feature_cutoff",
+            "native_fit_information_cutoff",
+            "latest_native_history_settled_at",
+            "duration_history_latest_settled_at",
+        )
+    }
+    changed = provenance(
+        row,
+        **changes,
+        source_hashes=tuple(reversed(p.source_hashes)),
+        duration_history_fixtures=tuple(
+            (*item[:3], item[3].replace("Z", "+00:00"), item[4].replace("Z", "+00:00"))
+            for item in p.duration_history_fixtures
+        ),
+    )
+    changed = replace(
+        changed,
+        basis=replace(
+            changed.basis,
+            decision_at=changed.basis.decision_at.replace("Z", "+00:00"),
+            gameweek_first_kickoff=changed.basis.gameweek_first_kickoff.replace("Z", "+00:00"),
+            kickoff=changed.basis.kickoff.replace("Z", "+00:00"),
+        ),
+    )
+    assert score_replay_basis_digest(row.basis) == score_replay_basis_digest(changed.basis)
+    assert fit((row,)).metadata_json == fit((changed,)).metadata_json

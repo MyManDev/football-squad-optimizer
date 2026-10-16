@@ -59,12 +59,34 @@ def test_released_replay_fit_exports_actual_contract_and_original_digest() -> No
     )
     compact = load(export_score_serving_model(model))
     assert compact.metadata.allow_released_2025_26
-    assert compact.metadata.fit_contract == "football_score_public_replay_fit_v1"
+    assert compact.metadata.fit_contract == "football_score_public_replay_fit_v2"
     assert compact.metadata.original_metadata_sha256 == model.model_sha256
     result = compact.predict(fixture(target=True))
     assert replace(result.prediction, model_sha256=model.model_sha256) == model.predict(
         fixture(target=True)
     )
+
+
+def test_prior_v1_replay_compact_artifact_keeps_its_explicit_contract(
+    fitted: ScoreStateModel,
+) -> None:
+    body = json.loads(export_score_serving_model(fitted))
+    body.update(fit_contract="football_score_public_replay_fit_v1", allow_released_2025_26=True)
+    compact = load(json.dumps(body, sort_keys=True, separators=(",", ":")).encode())
+    assert compact.metadata.fit_contract == "football_score_public_replay_fit_v1"
+    compact.predict(fixture(target=True))
+
+
+def test_valid_current_fixture_before_fit_cutoff_is_refused(fitted: ScoreStateModel) -> None:
+    source = fixture(target=True)
+    body = json.loads(export_score_serving_model(fitted))
+    body["cutoff"] = "2026-10-10T13:00:00Z"
+    compact = load(json.dumps(body, sort_keys=True, separators=(",", ":")).encode())
+    from squadopt.features.football_score_state_inputs import validate_score_fixture
+
+    validate_score_fixture(source)
+    with pytest.raises(ValueError, match="precedes its fit contract"):
+        compact.predict(source)
 
 
 @pytest.mark.parametrize(

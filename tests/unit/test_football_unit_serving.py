@@ -17,10 +17,13 @@ from tests.unit.test_football_unit_strength import unit
 from squadopt.features.football_unit_inputs import ProjectedUnitState
 from squadopt.prediction.football_unit_serving import (
     MAX_ARTIFACT_BYTES,
+    UNIT_LEGACY_SERVING_VERSION,
+    UNIT_SERVING_VERSION,
     UnitServingModel,
     export_unit_serving_model,
     read_unit_serving_model,
 )
+from squadopt.prediction.football_unit_strength import UNIT_LEGACY_PHYSICAL_FIT_VERSION
 
 
 def canonical(value):
@@ -38,7 +41,9 @@ def fitted():
 
 @pytest.fixture(scope="module")
 def payload(fitted):
-    return export_unit_serving_model(fitted, original_fit_sha256="a" * 64)
+    return export_unit_serving_model(
+        fitted, original_fit_sha256="a" * 64, target_season="2026-27", target_gameweek=1
+    )
 
 
 def test_exact_full_model_parity_and_distinct_small_result(fitted, payload):
@@ -234,7 +239,7 @@ def test_current_source_family_must_equal_fit_even_with_consistent_artifact_hash
 def test_current_prediction_rejects_same_or_future_training_scope(payload, scope):
     body = json.loads(payload)
     body["training_scopes"] = scope
-    with pytest.raises(ValueError, match="same or a future"):
+    with pytest.raises(ValueError, match="target week"):
         read(canonical(body)).predict(current_projection())
 
 
@@ -259,9 +264,13 @@ def test_unseen_player_identity_has_no_fitted_residual_and_exact_full_parity(fit
 
 def test_model_exports_only_actual_v4_and_fixed_parameters(fitted):
     with pytest.raises(ValueError, match="only the actual fitted"):
-        export_unit_serving_model(physical_fit(), original_fit_sha256="a" * 64)
+        export_unit_serving_model(
+            physical_fit(), original_fit_sha256="a" * 64, target_season="2026-27", target_gameweek=1
+        )
     with pytest.raises(ValueError):
-        export_unit_serving_model(fitted, original_fit_sha256="not-sha")
+        export_unit_serving_model(
+            fitted, original_fit_sha256="not-sha", target_season="2026-27", target_gameweek=1
+        )
 
 
 def test_compact_sparse_numerics_independently_reproduce_log_ratio(payload):
@@ -294,3 +303,77 @@ def test_compact_sparse_numerics_independently_reproduce_log_ratio(payload):
         np.exp(log_ratio) * p.causal_baseline_own_goal_rate, abs=1e-14
     )
     assert asdict(result.serving_receipt)["model_version"] == metadata.model_version
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"target_season": None},
+        {"target_gameweek": None},
+        {"target_gameweek": True},
+        {"target_gameweek": 0},
+        {"target_season": "2025-26", "target_gameweek": 1},
+        {"target_season": "2024-25", "target_gameweek": 38},
+    ],
+)
+def test_v2_requires_explicit_causal_target(payload, changes):
+    values = json.loads(payload)
+    values.update(changes)
+    with pytest.raises(ValueError):
+        read(canonical(values))
+
+
+def test_v2_target_identity_is_explicit_and_supports_later_horizons(payload):
+    serving = read(payload)
+    assert serving.metadata.contract_version == UNIT_SERVING_VERSION
+    assert (serving.metadata.target_season, serving.metadata.target_gameweek) == ("2026-27", 1)
+    p = current_projection()
+    later = replace(p, gameweek=3, catalog=replace(p.catalog, gameweek=3))
+    assert serving.predict(later).own_goal_rate == serving.predict(p).own_goal_rate
+    other = replace(p, season="2027-28", catalog=replace(p.catalog, season="2027-28"))
+    with pytest.raises(ValueError, match="target season"):
+        serving.predict(other)
+    values = json.loads(payload)
+    values["target_gameweek"] = 2
+    with pytest.raises(ValueError, match="target season"):
+        read(canonical(values)).predict(p)
+
+
+def test_legacy_v1_bytes_remain_canonical_and_keep_missing_target_fields(payload):
+    values = json.loads(payload)
+    values["contract_version"] = UNIT_LEGACY_SERVING_VERSION
+    values["fit_contract_version"] = UNIT_LEGACY_PHYSICAL_FIT_VERSION
+    values.pop("target_season")
+    values.pop("target_gameweek")
+    legacy_bytes = canonical(values)
+    legacy = read(legacy_bytes)
+    assert legacy.artifact_sha256 == hashlib.sha256(legacy_bytes).hexdigest()
+    assert legacy.metadata.target_season is legacy.metadata.target_gameweek is None
+    assert (
+        legacy.predict(current_projection()).own_goal_rate
+        == read(payload).predict(current_projection()).own_goal_rate
+    )
+    for field in ("target_season", "target_gameweek"):
+        with pytest.raises(ValueError, match="Legacy unit bytes"):
+            read(canonical({**values, field: None}))
+    wrong = replace(legacy.metadata, target_season="2026-27", target_gameweek=1)
+    with pytest.raises(ValueError, match="cannot claim"):
+        UnitServingModel(wrong, legacy.artifact_sha256)
+
+
+def test_v2_release_flag_matches_rows_but_v1_preserves_original_option_meaning(payload):
+    values = json.loads(payload)
+    values["training_scopes"] = [["2024-25", 38]]
+    assert values["allow_released_2025_26"] is True
+    with pytest.raises(ValueError, match="actual training scopes"):
+        read(canonical(values))
+    legacy = {
+        **values,
+        "contract_version": UNIT_LEGACY_SERVING_VERSION,
+        "fit_contract_version": UNIT_LEGACY_PHYSICAL_FIT_VERSION,
+    }
+    legacy.pop("target_season")
+    legacy.pop("target_gameweek")
+    assert read(canonical(legacy)).metadata.allow_released_2025_26 is True
+    values["allow_released_2025_26"] = False
+    assert read(canonical(values)).metadata.allow_released_2025_26 is False

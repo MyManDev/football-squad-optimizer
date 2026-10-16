@@ -65,6 +65,8 @@ def replay_catalog():
         GENERATED,
         "fm",
         "https://example.test/published-fm-version",
+        native_fit_sha256="f" * 64,
+        native_training_cutoff=D - timedelta(hours=1),
     )
 
     def source(identity, kind, digest, published, captured, effective, version="test-v1"):
@@ -77,7 +79,7 @@ def replay_catalog():
             published,
             captured,
             effective,
-            FIT + timedelta(days=5),
+            FIT + timedelta(days=5) if identity == "fm" else D,
             "test-only-explicit-receipt",
             True,
         )
@@ -170,6 +172,17 @@ def current_projection():
         decision_cutoff=decision,
         projection_source_id="reference",
         replay=None,
+        sources=tuple(
+            replace(
+                source,
+                published_at=decision,
+                captured_at=decision,
+                effective_at=decision,
+                valid_until=decision + timedelta(days=5),
+                version="current-v1",
+            )
+            for source in replay_catalog().sources
+        ),
     )
     return replace(
         target,
@@ -404,7 +417,7 @@ def test_legacy_metadata_bytes_and_release_only_policy_are_distinct():
     explicit = FootballUnitStrengthModel(rows, cutoff=cutoff, allow_released_2025_26=True).predict(
         projection()
     )
-    assert explicit.metadata["fit_contract"] == "football_unit_explicit_release_fit_v1"
+    assert dict(explicit.metadata) == dict(legacy.metadata)
     assert "training_exposure_clock" not in explicit.metadata
     assert _result_receipt(explicit)
     for result in (legacy, explicit):

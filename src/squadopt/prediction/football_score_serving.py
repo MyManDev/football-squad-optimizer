@@ -15,7 +15,7 @@ from typing import Any
 
 import numpy as np
 
-from squadopt.features.football_score_replay import REPLAY_FIT_VERSION
+from squadopt.features.football_score_replay import LEGACY_REPLAY_FIT_VERSION, REPLAY_FIT_VERSION
 from squadopt.features.football_score_state_inputs import ScoreFixture, validate_score_fixture
 from squadopt.prediction.football_score_state import (
     COEFFICIENT_BOUND,
@@ -103,7 +103,8 @@ def _validate(metadata: ScoreServingMetadata) -> None:
         or metadata.feature_version != FEATURE_VERSION
         or type(metadata.feature_names) is not tuple
         or metadata.feature_names != FEATURE_NAMES
-        or metadata.fit_contract not in ("football_score_state_fit_v1", REPLAY_FIT_VERSION)
+        or metadata.fit_contract
+        not in ("football_score_state_fit_v1", LEGACY_REPLAY_FIT_VERSION, REPLAY_FIT_VERSION)
         or metadata.native_offset
         != "original_whole_fixture_goals_divided_by_forecast_physical_duration"
         or metadata.playing_interval_policy
@@ -113,7 +114,8 @@ def _validate(metadata: ScoreServingMetadata) -> None:
     ):
         raise ValueError("Unsupported score serving version or numerical policy.")
     if type(metadata.allow_released_2025_26) is not bool or (
-        metadata.allow_released_2025_26 and metadata.fit_contract != REPLAY_FIT_VERSION
+        metadata.allow_released_2025_26
+        and metadata.fit_contract not in (LEGACY_REPLAY_FIT_VERSION, REPLAY_FIT_VERSION)
     ):
         raise ValueError("Score serving released-season declaration disagrees with fit contract.")
     _sha(metadata.original_metadata_sha256)

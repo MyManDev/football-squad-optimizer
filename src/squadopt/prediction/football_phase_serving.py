@@ -135,7 +135,12 @@ def _validate(metadata: PhaseServingMetadata) -> None:
         or metadata.feature_version != FEATURE_VERSION
         or metadata.phase_definition_version != PHASE_DEFINITION_VERSION
         or metadata.fit_contract_version
-        not in ("football_phase_duty_fit_v1", "football_phase_duty_replay_fit_v1")
+        not in (
+            "football_phase_duty_fit_v1",
+            "football_phase_duty_replay_fit_v1",
+            "football_phase_duty_fit_v2",
+            "football_phase_duty_replay_fit_v2",
+        )
         or metadata.penalty_miss_treatment != PENALTY_MISS_POLICY
         or metadata.output_scope != "separate_expected_scoring_marginals"
         or metadata.physical_check != "per_state_player_goals_plus_assists_not_above_physical_goals"
@@ -166,15 +171,27 @@ def _validate(metadata: PhaseServingMetadata) -> None:
         or len(set(metadata.allowed_seasons)) != len(metadata.allowed_seasons)
     ):
         raise ValueError("Phase serving requires unique immutable allowed seasons.")
+    legacy_fit = metadata.fit_contract_version.endswith("_v1")
+    if (
+        not legacy_fit
+        and not metadata.released_2025_26
+        and metadata.allowed_seasons == ("2025-26",)
+    ):
+        raise ValueError("Phase serving needs an observed season within its declared allowlist.")
     for season in metadata.allowed_seasons:
         validate_phase_season(season)
         if season > metadata.target_season or (
-            season == "2025-26" and not metadata.released_2025_26
+            legacy_fit and season == "2025-26" and not metadata.released_2025_26
         ):
             raise ValueError("Phase serving season release/window declarations disagree.")
-    if (
-        metadata.released_2025_26
-        and metadata.fit_contract_version != "football_phase_duty_replay_fit_v1"
+    if metadata.released_2025_26 and (
+        metadata.fit_contract_version
+        != (
+            "football_phase_duty_replay_fit_v1"
+            if legacy_fit
+            else "football_phase_duty_replay_fit_v2"
+        )
+        or (not legacy_fit and "2025-26" not in metadata.allowed_seasons)
     ):
         raise ValueError("Released phase fitting requires its explicit fit contract.")
     if type(metadata.recipient_heads) is not tuple or len(metadata.recipient_heads) > 10:

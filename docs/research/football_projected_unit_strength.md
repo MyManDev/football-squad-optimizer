@@ -31,17 +31,31 @@ the exact source hash, cutoff and declared FM trait-column mapping, requires a
 persistent UID, preserves blank missing values and refuses ranges or ambiguous
 duplicate ratings. It returns source-keyed attributes, not a name-derived FPL
 crosswalk. The FM23 aliases, including `Nat.1` for Natural Fitness, are explicitly
-declared by the caller. Research downloads have not been passed into a fitted model.
+declared by the caller. Dataset admission is recorded separately from this byte adapter.
 The owner's 2026-10-09 decision retains this adapter and the local datasets for
 private training preparation. No dataset rows or downloaded archives enter Git.
-The adapter remains separately invoked. A real export must be filtered to the
-explicit temporal mapped catalog scope before construction; that filtering,
-reviewed FPL crosswalk and admitted source receipts belong to step 2. The owner's
-choice does not establish unknown upstream rights or historical availability.
+`read_scoped_fm_attributes` now validates the whole export and selects the active
+temporal mappings and their rows (`src/squadopt/features/football_fm_attributes.py:296`).
+Its receipt validates its source, cutoff, mappings, rows and contract when built
+directly (`src/squadopt/features/football_fm_attributes.py:176`). Use
+`ScopedFMAttributes.add_to_catalog` as the scoped handoff: it requires the receipt
+cutoff to equal the catalog's independently supplied decision cutoff before adding
+the source, mappings and rows (`src/squadopt/features/football_fm_attributes.py:213`).
+The generic catalog still supports independently supplied inputs; manually splitting
+the receipt into its fields discards the scope clock and is not this checked
+handoff (`src/squadopt/features/football_unit_inputs.py:517`). Reviewed crosswalks,
+source rights and historical availability remain separately supplied evidence,
+which the adapter cannot establish (`src/squadopt/features/football_fm_attributes.py:1`).
 
 Historical observations contain both actual eleven-player club units, exposure
 minutes, integer credited goal counts, a separate settled outcome receipt, and
-paired reference units and baseline rates available at the historical deadline.
+paired reference units and supplied baseline rates. Ordinary catalogs require
+availability at the decision; historical replay keeps the original reference clock
+and later baseline reconstruction separate. Replay v2 binds the exact native fit
+and a training cutoff no later than its historical feature cutoff
+(`src/squadopt/features/football_unit_inputs.py:229`,
+`src/squadopt/features/football_unit_inputs.py:303`,
+`src/squadopt/features/football_unit_inputs.py:550`).
 Goals refer to the same exposure interval. Overlapping intervals and duplicate
 opposing copies are refused. A segment spanning a substitution must be split at
 the substitution; player presence cannot be reconstructed from total match minutes.
@@ -169,8 +183,13 @@ Historical projected lineups may be used only if their predeadline availability
 is proved. Later-published FM editions cannot be backfilled into earlier decisions
 by calling them that earlier year's FM version.
 
-Before any real comparison, the owner must resolve the existing #1004/#1009/#1016
-population and reading decisions, including protected 2025-26 disposition. Record
+The owner released 2025-26 for experimental training while accepting loss of its
+independent test status, as recorded in `docs/operations/football_unit_replay.md:56`.
+The experimental training release is explicitly separate from measurement: the
+constructor requires the owner's released-season opt-in, and v2 metadata records
+whether 2025-26 rows actually entered this fit
+(`src/squadopt/prediction/football_unit_strength.py:430`,
+`src/squadopt/prediction/football_unit_strength.py:485`). Record
 which predecision source snapshots and seasons are admitted, then freeze chronological
 development/validation/later untouched test blocks, primary rate and fantasy-point
 metrics, missing-data policy, comparison and thresholds. Proposed comparisons are

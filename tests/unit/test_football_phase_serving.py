@@ -145,9 +145,53 @@ def test_released_replay_metadata_is_exported_without_inventing_training_receipt
     model = _restore(export_phase_serving_model(fitted))
     assert model.metadata.released_2025_26 is True
     assert model.metadata.allowed_seasons == ("2025-26",)
-    assert model.metadata.fit_contract_version == "football_phase_duty_replay_fit_v1"
+    assert model.metadata.fit_contract_version == "football_phase_duty_replay_fit_v2"
     assert model.metadata.original_metadata_sha256 == _sha(_bytes(asdict(fitted.metadata)))
     assert not hasattr(model.metadata, "training_receipts")
+
+
+@pytest.mark.parametrize(
+    "contract,released",
+    [
+        ("football_phase_duty_fit_v1", False),
+        ("football_phase_duty_replay_fit_v1", False),
+        ("football_phase_duty_replay_fit_v1", True),
+    ],
+)
+def test_legacy_fit_contracts_keep_original_option_bit_semantics(fitted, contract, released):
+    document = json.loads(export_phase_serving_model(fitted))
+    document.update(fit_contract_version=contract, released_2025_26=released)
+    model = _restore(_bytes(document))
+    assert model.metadata.fit_contract_version == contract
+    assert model.metadata.released_2025_26 is released
+    document["allowed_seasons"] = ["2024-25", "2025-26"]
+    if not released:
+        with pytest.raises(ValueError, match="release/window"):
+            _restore(_bytes(document))
+    else:
+        assert _restore(_bytes(document)).metadata.released_2025_26
+
+
+def test_flag_only_v2_export_does_not_claim_replay_or_released_rows():
+    from tests.unit.test_football_phase_replay_training import _fit_rows
+
+    fitted = _fit_rows((read_observation(),))
+    model = _restore(export_phase_serving_model(fitted))
+    assert model.metadata.fit_contract_version == "football_phase_duty_fit_v2"
+    assert model.metadata.released_2025_26 is False
+    assert model.metadata.allowed_seasons == ("2024-25", "2025-26")
+
+
+def test_v2_release_use_requires_replay_contract_and_selected_season(fitted):
+    document = json.loads(export_phase_serving_model(fitted))
+    document.update(fit_contract_version="football_phase_duty_replay_fit_v2", released_2025_26=True)
+    with pytest.raises(ValueError, match="explicit fit contract"):
+        _restore(_bytes(document))
+    document["allowed_seasons"] = ["2025-26"]
+    assert _restore(_bytes(document)).metadata.released_2025_26
+    document["fit_contract_version"] = "football_phase_duty_fit_v2"
+    with pytest.raises(ValueError, match="explicit fit contract"):
+        _restore(_bytes(document))
 
 
 @pytest.mark.parametrize(

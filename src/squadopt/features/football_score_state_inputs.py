@@ -626,6 +626,8 @@ def read_score_snapshot(
         _fail("Native basis cannot be captured after its containing source snapshot.")
     keys = {f.name for f in fields(ScoreFixture)} - {"source_sha256"}
     projection = dict(_object(doc["projection"], keys, "projection"))
+    if projection["native_model_version"] == COMPOSITE_OFFSET_VERSION:
+        _fail("Raw score inputs cannot mint a derived composite unit offset.")
     for field, expected in (
         ("season", season),
         ("gameweek", gameweek),

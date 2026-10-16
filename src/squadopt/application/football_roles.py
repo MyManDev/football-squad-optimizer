@@ -40,7 +40,11 @@ def fixture_role_estimates(
     revised_rows: pd.DataFrame | None = None,
     applied_fixtures: Set[tuple[int, int]] = frozenset(),
 ) -> list[dict[str, Any]]:
-    """Keep source eligibility separate from model roles; never infer a role from minutes."""
+    """Quote source eligibility separately from its use in the model's role law.
+
+    ``captured_eligibility_multiplier`` remains the captured FPL input. It is not
+    a factor to apply again: flag and composite laws already include eligibility.
+    """
     if basis is None or not football_capabilities(basis.companion["model_version"]).role_components:
         return []
     rows = basis.fixture_rows if revised_rows is None else revised_rows

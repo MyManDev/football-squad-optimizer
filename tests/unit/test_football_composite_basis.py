@@ -142,6 +142,72 @@ def test_protocol_compatible_tactical_fake_is_refused(real_assets, monkeypatch):
         module._models(real_assets)
 
 
+@pytest.mark.parametrize("field", ["snapshot_id", "source_fingerprint", "captured_at"])
+def test_each_side_duty_capture_must_match_composite_inventory(field):
+    from tests.unit.test_football_composite_core import case
+
+    inventory, _ = population()
+    x = case()
+    values = dict(
+        snapshot_id=inventory.source_snapshot_id,
+        source_fingerprint=inventory.source_fingerprint,
+        captured_at=inventory.captured_at,
+    )
+    phases = tuple(replace(p, duties=replace(p.duties, **values)) for p in x.phase)
+    module._bind_duties((replace(x, phase=phases),), inventory)
+    for side in range(2):
+        bad = {
+            "snapshot_id": "another-real-capture",
+            "source_fingerprint": "e" * 64,
+            "captured_at": "2026-10-15T01:00:00Z",
+        }[field]
+        changed = list(phases)
+        changed[side] = replace(phases[side], duties=replace(phases[side].duties, **{field: bad}))
+        with pytest.raises(ValueError, match="exact retained capture"):
+            module._bind_duties((replace(x, phase=tuple(changed)),), inventory)
+
+
+def test_empty_restored_gameweeks_refuse_before_model_target_indexing(real_assets):
+    inventory, _ = population()
+    empty = replace(inventory, gameweeks=())
+    restored = module._unpack_source(module._pack_source(empty), type(empty))
+    models, _ = module._models(real_assets)
+    with pytest.raises(ValueError, match="nonempty target gameweek"):
+        module._bind_model_targets(models, restored)
+
+
+@pytest.mark.parametrize("family", ["unit", "score", "tactical", "phase"])
+@pytest.mark.parametrize("mismatch", ["season", "week"])
+def test_compact_family_target_is_bound_to_first_week(real_assets, family, mismatch):
+    inventory, _ = population()
+
+    def assets_with_target(changed_family=None):
+        assets = []
+        for asset in real_assets:
+            if asset.role not in ("unit", "score", "tactical", "phase"):
+                assets.append(asset)
+                continue
+            value = module.json.loads(asset.payload_json)
+            value["target_season"] = inventory.season
+            field = "target_gameweeks" if asset.role == "score" else "target_gameweek"
+            week = inventory.gameweeks[0]
+            if asset.role == changed_family:
+                if mismatch == "season":
+                    value["target_season"] = "2027-28"
+                else:
+                    week -= 1
+            value[field] = [week] if asset.role == "score" else week
+            raw = canonical(value)
+            assets.append(replace(asset, payload_json=raw, sha256=digest(value)))
+        return tuple(assets)
+
+    models, _ = module._models(assets_with_target())
+    module._bind_model_targets(models, inventory)
+    models, _ = module._models(assets_with_target(family))
+    with pytest.raises(ValueError, match="first captured gameweek"):
+        module._bind_model_targets(models, inventory)
+
+
 def envelope_case():
     inventory, _ = population()
     native = {

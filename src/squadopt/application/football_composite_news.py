@@ -14,6 +14,7 @@ import pandas as pd
 from squadopt.application.football_context import FULL_MATCH_UNAVAILABLE
 from squadopt.application.football_roles import fixture_role_estimates
 from squadopt.application.manager_words import ManagerWord
+from squadopt.data.errors import DataError
 from squadopt.live import RecommendationInputs
 from squadopt.live.football_artifact import FootballForecast
 from squadopt.live.minute_evidence import FixtureComponentBasis
@@ -63,7 +64,7 @@ def recompose_composite_news(
     try:
         basis.validate_evidence(accepted)
         result = basis.recompose(accepted)
-    except ValueError:
+    except (ValueError, DataError):
         restricted_players = {item.player_code for item in accepted if item.kind == "no_full_match"}
         if not restricted_players:
             raise

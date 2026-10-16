@@ -53,6 +53,7 @@ def test_point_matches_independent_full_enumeration_and_is_order_invariant():
 
 def test_ties_use_persistent_identity_and_keep_original_probabilities():
     supplied = inputs()
+    supplied["roster"] = tuple(reversed(supplied["roster"]))
     supplied["starter_probabilities"] = tuple(UnitStarterProbability(i, 0.5) for i in range(1, 15))
     result = project_unit_point(**supplied)
     assert tuple(player.player_id for player in result.unit.players) == (1, *range(3, 13))

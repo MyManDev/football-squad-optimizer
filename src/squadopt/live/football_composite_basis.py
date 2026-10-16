@@ -64,7 +64,7 @@ from squadopt.prediction.football_observed_tactical_serving import (
 )
 from squadopt.prediction.football_phase_serving import read_phase_serving_model
 from squadopt.prediction.football_score_serving import read_score_serving_model
-from squadopt.prediction.football_unit_serving import read_unit_serving_model
+from squadopt.prediction.football_unit_serving import UNIT_SERVING_VERSION, read_unit_serving_model
 
 COMPONENT_CONTRACT = "football_composite_components_v1"
 RECIPE_VERSION = "football_composite_retained_recipe_v1"
@@ -277,6 +277,37 @@ def _native_envelope(
         _sha(digest)
 
 
+def _bind_duties(
+    fixtures: tuple[CompositeFixtureInput, ...], inventory: CompositeWeekInventory
+) -> None:
+    for context in fixtures:
+        for phase in context.phase:
+            if (
+                phase.duties.snapshot_id != inventory.source_snapshot_id
+                or phase.duties.source_fingerprint != inventory.source_fingerprint
+                or _clock(phase.duties.captured_at) != _clock(inventory.captured_at)
+            ):
+                raise ValueError("Composite duties differ from the exact retained capture.")
+
+
+def _bind_model_targets(models: CompositeModels, inventory: CompositeWeekInventory) -> None:
+    if type(models.tactical) is not ObservedTacticalServingModel:
+        raise ValueError("Composite requires the concrete compact tactical model.")
+    if not inventory.gameweeks:
+        raise ValueError("Composite requires a nonempty target gameweek inventory.")
+    target = inventory.season, inventory.gameweeks[0]
+    if models.unit.metadata.contract_version != UNIT_SERVING_VERSION:
+        raise ValueError("Composite requires an explicit target-bound unit serving artifact.")
+    targets = (
+        (models.unit.metadata.target_season, models.unit.metadata.target_gameweek),
+        (models.score.metadata.target_season, min(models.score.metadata.target_gameweeks)),
+        (models.tactical.metadata.target_season, models.tactical.metadata.target_gameweek),
+        (models.phase.metadata.target_season, models.phase.metadata.target_gameweek),
+    )
+    if any(value != target for value in targets):
+        raise ValueError("Composite family fit targets must equal its first captured gameweek.")
+
+
 def _bind_sources(
     native: dict[str, Any],
     components: dict[str, Any],
@@ -450,6 +481,7 @@ def _bind_sources(
     expected_fixtures = tuple((f.gameweek, f.fixture_id) for f in inventory.calendar)
     if tuple((f.score.gameweek, f.score.fixture_id) for f in fixtures) != expected_fixtures:
         raise ValueError("Composite contexts require every captured fixture in calendar order.")
+    _bind_duties(fixtures, inventory)
     for context in fixtures:
         selected = [r for r in components["rows"] if r["fixture"] == context.score.fixture_id]
         if (
@@ -646,6 +678,7 @@ def _restore_recipe(
     )
     models, load = _models(assets)
     inventory = _unpack_source(recipe["inventory"], CompositeWeekInventory)
+    _bind_model_targets(models, inventory)
     if (
         type(recipe["weeks"]) is not list
         or not 0 < len(recipe["weeks"]) <= 10000

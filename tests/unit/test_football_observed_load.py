@@ -88,7 +88,7 @@ def week(
         )
         for i in range(count)
     )
-    source_recorded = stamp(decision - timedelta(hours=1)) if target else "2026-09-01T00:00:00Z"
+    source_recorded = stamp(decision - timedelta(hours=1))
     retrieved = stamp(decision - timedelta(minutes=45)) if target else "2026-09-02T00:00:00Z"
     generated = stamp(decision - timedelta(minutes=30)) if target else "2026-09-03T00:00:00Z"
     feature = stamp(decision - timedelta(minutes=15)) if target else stamp(decision)
@@ -194,7 +194,7 @@ def test_exact_feature_inventory_keeps_unknown_and_zero_distinct() -> None:
     assert len(FEATURE_NAMES) == 24
     assert missing[:8] == (1, 0, 1, None, 0, 1, None, None)
     assert zero[:8] == (1, 1, 0, 0, 1, 0, 0, None)
-    assert observed_load_features(week())[:8] == (1, 1, 0, 80, 1, 0, 1, 72)
+    assert observed_load_features(week())[:8] == (1, 1, 0, 80, 1, 0, 1, 74 - 1 / 3600)
     empty = observed_load_features(replace(week(), records=()))
     assert empty[:8] == (0, 0, 0, None, 0, 0, None, None)
 
@@ -228,7 +228,8 @@ def test_windows_aggregate_only_named_records_without_imputing_missing() -> None
 def test_replay_provenance_does_not_claim_original_capture() -> None:
     source = week()
     validate_observed_load_week(source)
-    assert source.provenance.source_recorded_at > source.decision_at
+    assert source.provenance.source_recorded_at < source.provenance.feature_cutoff
+    assert source.provenance.retrieved_at > source.decision_at
     assert source.native.recorded_at < source.decision_at
     with pytest.raises((ValueError, DataError), match="Prospective"):
         validate_observed_load_week(
@@ -610,7 +611,11 @@ def test_season_boundary_is_july_first_inclusive_next_july_exclusive(
         decision_at=decision,
         deadline_at=stamp(clock + timedelta(hours=2)),
         records=(),
-        provenance=replace(source.provenance, feature_cutoff=decision),
+        provenance=replace(
+            source.provenance,
+            feature_cutoff=decision,
+            source_recorded_at=stamp(clock - timedelta(hours=1)),
+        ),
         native=replace(
             source.native,
             recorded_at=stamp(clock - timedelta(days=1)),
@@ -757,6 +762,7 @@ def test_compact_serving_preserves_fitted_predictions_without_fitting(
     "field,value",
     [
         ("version", "unexpected_v1"),
+        ("feature_version", "observed_non_pl_reported_records_v1"),
         ("model_sha256", "a" * 63),
         ("target_gameweeks", [True]),
         ("allow_released_2025_26", 1),
@@ -824,3 +830,99 @@ def test_serving_retains_prediction_target_scope_and_support_guards() -> None:
     ):
         with pytest.raises(ValueError, match=message):
             serving.predict(source)
+
+
+@pytest.mark.parametrize(
+    "field,value,message",
+    [
+        ("retrieved_at", "2026-10-03T08:40:00Z", "source/feature chronology"),
+        ("feature_cutoff", "2026-10-03T09:01:00Z", "source/feature chronology"),
+        ("generated_at", "2026-10-03T08:46:00Z", "before feature use"),
+    ],
+)
+def test_each_prospective_source_clock_guard_is_independent(
+    field: str, value: str, message: str
+) -> None:
+    source = week(target=True)
+    validate_observed_load_week(source)
+    with pytest.raises(ValueError, match=message):
+        validate_observed_load_week(
+            replace(source, provenance=replace(source.provenance, **{field: value}))
+        )
+
+
+def test_replay_revision_after_feature_use_refuses_later_corrections() -> None:
+    source = week()
+    with pytest.raises(ValueError, match="revision was recorded after feature use"):
+        validate_observed_load_week(
+            replace(
+                source,
+                provenance=replace(source.provenance, source_recorded_at="2026-09-01T00:00:00Z"),
+            )
+        )
+
+
+@pytest.mark.parametrize("competition", ["english-premier-league", "cup", "unknown", "prem"])
+def test_only_named_non_pl_competitions_are_admitted(competition: str) -> None:
+    source = week()
+    with pytest.raises(ValueError, match="named supported competition"):
+        validate_observed_load_week(
+            replace(
+                source,
+                competitions=(competition,),
+                records=(replace(source.records[0], competition=competition),),
+            )
+        )
+
+
+def test_deadline_windows_and_fitted_prediction_do_not_move_with_operator_decision() -> None:
+    source = week(target=True)
+    boundary = replace(
+        source.records[0],
+        fixture="boundary",
+        kickoff="2026-09-26T10:00:00Z",
+        completed_by="2026-09-27T10:00:00Z",
+    )
+    source = replace(source, records=(source.records[0], boundary))
+    later = replace(source, decision_at="2026-10-03T10:30:00Z")
+    for item in (source, later):
+        validate_observed_load_week(item)
+    early_features = observed_load_features(source)
+    assert early_features == observed_load_features(later)
+    assert early_features[0] == 1  # The boundary record is older than seven days at the deadline.
+    assert early_features[8] == 2
+    rows = tuple(
+        outcome(
+            replace(
+                week(i + 1, minutes=20 + 10 * i),
+                records=(
+                    replace(
+                        week(i + 1, minutes=20 + 10 * i).records[0],
+                        kickoff=stamp(datetime(2024, 11, 1, 9, tzinfo=UTC) - timedelta(days=2 + i)),
+                        completed_by="2024-10-31T09:00:00Z",
+                    ),
+                ),
+            ),
+            (1 + i % 6,),
+        )
+        for i in range(6)
+    )
+    model = fit(rows)
+    raw = export_observed_load_serving_result(model).encode()
+    compact = read_observed_load_serving_result(raw, sha256=hashlib.sha256(raw).hexdigest())
+    first, second = compact.predict(source), compact.predict(later)
+    assert first.probabilities == second.probabilities
+    assert first.weekly_appearance == second.weekly_appearance
+    assert first.fixture_probabilities == second.fixture_probabilities
+    assert first.input_sha256 != second.input_sha256
+
+
+def test_serving_fit_cutoff_after_decision_refuses_with_other_clocks_valid() -> None:
+    source = week(target=True)
+    validate_observed_load_week(source)
+    document = json.loads(export_observed_load_serving_result(fit()))
+    document["cutoff"] = "2026-10-03T09:01:00Z"
+    raw = json.dumps(document, sort_keys=True, separators=(",", ":")).encode()
+    compact = read_observed_load_serving_result(raw, sha256=hashlib.sha256(raw).hexdigest())
+    with pytest.raises(ValueError, match="outside its fitted target"):
+        compact.predict(source)

@@ -16,6 +16,7 @@ from tests.unit.test_football_minute_integration import world
 from squadopt.application import football_composite_news as module
 from squadopt.application.football_context import FULL_MATCH_UNAVAILABLE
 from squadopt.application.manager_words import ManagerWord
+from squadopt.data.errors import DataError
 from squadopt.live.football_artifact import FootballForecast
 from squadopt.prediction.football_capabilities import COMPOSITE_MODEL_VERSION
 from squadopt.prediction.football_joint_week_law import VerifiedWeekEvidence
@@ -31,6 +32,7 @@ class FrozenBasisStub:
     original_weekly: pd.DataFrame
     original_fixtures: pd.DataFrame
     unsupported_minutes: bool = False
+    support_error: type[Exception] = ValueError
     absence_failure: bool = False
     population_fault: str | None = None
     future_tamper: bool = False
@@ -42,7 +44,7 @@ class FrozenBasisStub:
 
     def validate_evidence(self, evidence: tuple[VerifiedWeekEvidence, ...]) -> None:
         if self.unsupported_minutes and any(e.kind == "no_full_match" for e in evidence):
-            raise ValueError("Synthetic unsupported within-role minute support.")
+            raise self.support_error("Synthetic unsupported within-role minute support.")
         if self.absence_failure and any(e.kind == "absence" for e in evidence):
             raise ValueError("Synthetic unavailable absence recomposition.")
 
@@ -153,10 +155,14 @@ def run(
     return module.recompose_composite_news(football, inputs, news, words, stub)
 
 
+@pytest.mark.parametrize("error", [ValueError, DataError])
 def test_failed_optional_minute_keeps_unrelated_verified_absence(
     monkeypatch: pytest.MonkeyPatch,
+    error: type[Exception],
 ) -> None:
-    football, inputs, word, stub, _ = case(monkeypatch, unsupported_minutes=True)
+    football, inputs, word, stub, _ = case(
+        monkeypatch, unsupported_minutes=True, support_error=error
+    )
     adjusted, decisions, withheld, metadata = run(
         football,
         inputs,

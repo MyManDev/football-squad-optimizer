@@ -1,58 +1,68 @@
 # Composite weekly population
 
-`compose_composite_weeks` accepts frozen player-week inputs, a compact observed-LOAD
-serving model, an explicit captured inventory, the first gameweek and caller-verified
-evidence. Its result retains each complete joint law and separate input, model and
-intervention receipts. The function performs no fitting, file access or clock generation
+`compose_composite_weeks` accepts frozen player-week inputs, a compact observed
+LOAD model, a captured inventory, the first gameweek and caller-verified evidence.
+It returns complete joint laws and separate input, model and intervention receipts
+without fitting, file access or clock generation
 (`src/squadopt/prediction/football_composite_weeks.py:81`,
 `src/squadopt/prediction/football_composite_weeks.py:90`,
-`src/squadopt/prediction/football_composite_weeks.py:103`,
-`src/squadopt/prediction/football_composite_weeks.py:359`).
+`src/squadopt/prediction/football_composite_weeks.py:366`).
 
-Supply the full selected captured roster, contiguous target weeks, PL fixture calendar
-and ordered deadlines. Every declared player requires one input in every declared week,
-including a blank week. Fixture identity, club, opponent, home status, order and kickoff
-must agree with the inventory. The source adapter owns verification that this declared
-inventory actually equals the retained capture; the pure function cannot authenticate
-external bytes or detect a player omitted from both the declaration and its inputs
+Supply the complete declared roster, contiguous weeks, Premier League fixture
+calendar and ordered deadlines. Each player requires one row per week, including
+blanks. Fixture identity, club, opponent, home status, kickoff and order must
+match the inventory. The caller must verify that the declaration matches the
+retained capture; the pure function cannot authenticate external bytes or detect
+a player omitted from both declaration and input
 (`src/squadopt/prediction/football_composite_weeks.py:61`,
-`src/squadopt/prediction/football_composite_weeks.py:145`,
-`src/squadopt/prediction/football_composite_weeks.py:240`,
-`src/squadopt/prediction/football_composite_weeks.py:359`).
+`src/squadopt/prediction/football_composite_weeks.py:146`,
+`src/squadopt/prediction/football_composite_weeks.py:241`,
+`src/squadopt/prediction/football_composite_weeks.py:366`).
 
-Build each original native law with the exact source labels returned by
-`composite_native_sources`. The native components and retained flag result hashes identify
-canonical complete JSON documents, including their fingerprint fields; a source adapter
-must distinguish these identities from fingerprint calculations that omit that field.
-The native basis, role metadata, calendar, capture and captured eligibility each retain
-their own identities. The first-week flag law must bind the same original native law and
-name its retained result under `retained_flag_result`. Later weeks refuse a flag law
-(`src/squadopt/prediction/football_composite_weeks.py:61`,
-`src/squadopt/prediction/football_composite_weeks.py:135`,
-`src/squadopt/prediction/football_composite_weeks.py:240`,
-`src/squadopt/live/football_artifact.py:66`).
+Original native laws use the exact labels from `composite_native_sources`.
+Calendar, snapshot, native components, native basis, role metadata and captured
+eligibility retain separate identities. The first-week flag law must derive from
+the same native law and bind the retained flag result. Later weeks refuse a flag
+law. Every row's captured eligibility must equal the declared roster value
+(`src/squadopt/prediction/football_composite_weeks.py:136`,
+`src/squadopt/prediction/football_composite_weeks.py:241`,
+`tests/unit/test_football_composite_weeks.py:558`).
 
-All population, source, declared chronology and evidence checks run before the first
-LOAD prediction. LOAD receives the unchanged original native week. The learned first-week
-flag law supplies that week's offset; later weeks receive one shared captured-eligibility
-mixture. The fitted LOAD multiplier is transported using mass proportional to `q*l/p`,
-then resolved news is applied to the resulting law. Transport refuses an offset cell
-outside native support. No-full-match evidence preserves appearance through supported
-within-role redistribution; absence uses an explicitly recorded deterministic
-intervention. These are inference composition policies, with no new calibration claim
-(`src/squadopt/prediction/football_composite_weeks.py:359`,
-`src/squadopt/prediction/football_joint_week_law.py:342`,
+All population, source and evidence checks precede prediction. LOAD runs only in
+the first week, receiving its unchanged original native law. Its fitted multiplier
+is transported onto that week's learned flag offset with mass proportional to
+`q*l/p`. Resolved first-week news follows this transport. Later weeks receive one
+shared captured-eligibility mixture of their native law, with no LOAD prediction
+or LOAD lineage until a model is trained for those forecast horizons
+(`src/squadopt/prediction/football_composite_weeks.py:366`,
 `src/squadopt/prediction/football_joint_week_law.py:370`,
-`src/squadopt/prediction/football_joint_week_law.py:464`).
+`tests/unit/test_football_composite_weeks.py:227`,
+`tests/unit/test_football_composite_weeks.py:433`).
 
-The result separates the compact LOAD result hash from the full training-metadata hash.
-Each weekly receipt identifies original native, LOAD result, selected offset, pre-evidence
-and final laws. The input-population hash covers the ordered weekly input hashes; the
-inventory and evidence have separate hashes. Single-fixture, dependent double-fixture
-and blank-week arithmetic, source mismatches, double eligibility, late malformed rows
-and pre-prediction evidence rejection have focused tests
+Transport refuses extrapolation outside native support. No-full-match evidence
+preserves appearance through supported within-role redistribution; absence uses
+an explicit deterministic intervention. A later player-week with eligibility
+below one and zero native absent mass refuses the whole declared population
+before prediction. One such unsupported row withholds the forecast for everyone
+instead of being skipped
+(`src/squadopt/prediction/football_composite_weeks.py:348`,
+`src/squadopt/prediction/football_joint_week_law.py:370`,
+`src/squadopt/prediction/football_joint_week_law.py:464`,
+`tests/unit/test_football_composite_weeks.py:570`).
+
+Each receipt records whether LOAD was applied. In later weeks `load_applied` is
+false, the LOAD result hash equals the original native hash and the pre-evidence
+law equals the eligibility offset. Receipts separately identify input, native,
+offset and final laws, while the population, inventory and evidence have their
+own hashes. The compact LOAD result hash remains distinct from the full fitted
+metadata hash. These are inference composition policies with no accuracy claim
 (`src/squadopt/prediction/football_composite_weeks.py:90`,
-`src/squadopt/prediction/football_composite_weeks.py:103`,
-`src/squadopt/prediction/football_composite_weeks.py:359`,
-`tests/unit/test_football_composite_weeks.py:225`,
-`tests/unit/test_football_composite_weeks.py:296`).
+`src/squadopt/prediction/football_composite_weeks.py:366`).
+
+The point-XI boundary requires each start probability to be at most one, even
+though the composite accepts total atom mass within 1e-12 of one. A tolerated
+rounding excess in start mass can therefore refuse fixture composition and
+withhold the complete forecast; no player or fixture is silently dropped
+(`src/squadopt/features/football_unit_point.py:32`,
+`src/squadopt/prediction/football_composite_core.py:266`,
+`src/squadopt/prediction/football_composite_core.py:674`).

@@ -58,7 +58,9 @@ def digest(value: Any) -> str:
     ).hexdigest()
 
 
-def serving(*, zero: bool = False) -> ObservedLoadServingModel:
+def serving(
+    *, zero: bool = False, cutoff: str = "2026-10-14T00:00:00Z"
+) -> ObservedLoadServingModel:
     coefficients = tuple(
         0.0 if zero or index else score
         for score in HEAD_SCORE
@@ -72,9 +74,9 @@ def serving(*, zero: bool = False) -> ObservedLoadServingModel:
         MINUTE_DEFINITION,
         FEATURE_NAMES,
         DESIGN_NAMES,
-        "2026-10-14T00:00:00Z",
+        cutoff,
         "2026-27",
-        (7, 8, 9),
+        (7,),
         False,
         ObservedLoadTransform((0.0,) * 24, (1.0,) * 24, (1,) * 24),
         coefficients,
@@ -242,7 +244,14 @@ def test_exact_sgw_dgw_bgw_likelihood_and_first_week_no_double_eligibility() -> 
             )
             for s, p in zip(row.native.states, offset, strict=True)
         )
-        expected = tuple(p / math.fsum(values) for p in values)
+        expected = (
+            tuple(p / math.fsum(values) for p in values) if row.native.gameweek == 7 else offset
+        )
+        assert receipt.load_applied is (row.native.gameweek == 7)
+        if not receipt.load_applied:
+            assert receipt.load_result_sha256 == receipt.native_sha256
+            assert receipt.before_evidence_sha256 == receipt.offset_sha256
+            assert all("load" not in entry.policy for entry in final.lineage)
         assert final.probabilities == pytest.approx(expected, abs=3e-16)
         assert receipt.final_sha256 == joint_week_law_digest(final)
         assert receipt.input_sha256 == digest(asdict(row))
@@ -287,7 +296,7 @@ def test_zero_coefficients_and_news_last_preserve_appearance() -> None:
         evidence=(replace(evidence[0], kind="absence"),),
     )
     assert absent.laws[0].probabilities == (1.0, 0, 0, 0, 0, 0, 0)
-    assert absent.laws[2:] != baseline.laws[2:]
+    assert absent.laws[2:] == baseline.laws[2:]
 
 
 @pytest.mark.parametrize(
@@ -432,7 +441,7 @@ def test_native_law_is_passed_unchanged_to_load(monkeypatch: pytest.MonkeyPatch)
 
     monkeypatch.setattr(ObservedLoadServingModel, "predict", inspect)
     compose_composite_weeks(rows, serving(), inventory=inventory, first_gameweek=7)
-    assert tuple(seen) == tuple(row.load_week for row in rows)
+    assert tuple(seen) == tuple(row.load_week for row in rows if row.native.gameweek == 7)
     assert tuple(asdict(row) for row in rows) == tuple(asdict(row) for row in population()[1])
 
 
@@ -529,3 +538,81 @@ def test_sparse_native_support_and_mismatched_flag_native_are_not_repaired() -> 
             inventory=inventory,
             first_gameweek=7,
         )
+
+
+def test_load_fit_cutoff_after_features_refuses_before_prediction(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    inventory, rows = population()
+    # 11:30 is after feature use at 11:00, but before the decision at 12:00.
+    model = serving(cutoff="2026-10-16T11:30:00Z")
+    monkeypatch.setattr(
+        ObservedLoadServingModel,
+        "predict",
+        lambda *_: pytest.fail("prediction before fit-cutoff validation"),
+    )
+    with pytest.raises(ValueError, match="fit chronology"):
+        compose_composite_weeks(rows, model, inventory=inventory, first_gameweek=7)
+
+
+def test_later_eligibility_must_equal_roster_probability(monkeypatch: pytest.MonkeyPatch) -> None:
+    inventory, rows = population()
+    changed = (*rows[:2], replace(rows[2], captured_eligibility=0.7), *rows[3:])
+    monkeypatch.setattr(
+        ObservedLoadServingModel,
+        "predict",
+        lambda *_: pytest.fail("prediction before eligibility binding"),
+    )
+    with pytest.raises(ValueError, match="eligibility"):
+        compose_composite_weeks(changed, serving(), inventory=inventory, first_gameweek=7)
+
+
+def test_later_eligibility_without_native_absent_mass_refuses_whole_population(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    inventory, rows = population()
+    row = rows[2]
+    probabilities = (0.0,) + (1 / 48,) * 48
+    fixtures = tuple(
+        replace(
+            fixture,
+            probabilities=tuple(
+                math.fsum(
+                    p
+                    for state, p in zip(row.native.states, probabilities, strict=True)
+                    if state[index] == k
+                )
+                for k in range(7)
+            ),
+        )
+        for index, fixture in enumerate(row.native.fixtures)
+    )
+    basis = replace(
+        row.load_week.native,
+        fixtures=fixtures,
+        probabilities=probabilities,
+        law_sha256=native_joint_law_digest(fixtures, row.native.states, probabilities),
+    )
+    law = make_joint_week_law(
+        season=row.native.season,
+        gameweek=8,
+        player_code=42,
+        position="MID",
+        fixtures=fixtures,
+        states=row.native.states,
+        probabilities=probabilities,
+        role_metadata_sha256=inventory.role_metadata_sha256,
+        sources=composite_native_sources(inventory),
+    )
+    changed = (
+        *rows[:2],
+        replace(row, native=law, load_week=replace(row.load_week, native=basis)),
+        *rows[3:],
+    )
+    monkeypatch.setattr(
+        ObservedLoadServingModel,
+        "predict",
+        lambda *_: pytest.fail("prediction before unsupported eligibility refusal"),
+    )
+    with pytest.raises(ValueError, match="native absent support"):
+        compose_composite_weeks(changed, serving(), inventory=inventory, first_gameweek=7)

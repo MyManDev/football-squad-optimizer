@@ -9,7 +9,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 
 from squadopt.features.football_score_state_inputs import (
     CLOCK_VERSION,
@@ -29,8 +29,9 @@ from squadopt.features.football_score_state_inputs import (
     _validate_score_outcome,
 )
 
-REPLAY_VERSION = "football_score_public_revision_replay_v1"
-REPLAY_FIT_VERSION = "football_score_public_replay_fit_v1"
+REPLAY_VERSION = "football_score_public_revision_replay_v2"
+REPLAY_FIT_VERSION = "football_score_public_replay_fit_v2"
+LEGACY_REPLAY_FIT_VERSION = "football_score_public_replay_fit_v1"
 REQUIRED_SOURCE_HASHES = frozenset(
     {
         "players_raw.csv",
@@ -62,7 +63,7 @@ class ScoreReplayProvenance:
     native_fit_information_cutoff: str
     latest_native_history_settled_at: str
     duration_history_latest_settled_at: str
-    duration_history_fixtures: tuple[tuple[str, int, int], ...]
+    duration_history_fixtures: tuple[tuple[str, int, int, str, str], ...]
     source_hashes: tuple[tuple[str, str], ...]
     native_implementation_sha256: str
     duration_implementation_sha256: str
@@ -218,11 +219,19 @@ def validate_score_replay_basis(
     if not inventory:
         raise ValueError("Forecast duration requires a nonempty prior fixture inventory.")
     for item in inventory:
-        if type(item) is not tuple or len(item) != 3:
-            raise ValueError("Duration history requires season, gameweek and fixture identities.")
+        if type(item) is not tuple or len(item) != 5:
+            raise ValueError("Duration history requires identities, kickoff and completion bound.")
         historical_season = _replay_season(item[0])
         historical_week = _integer(item[1], "duration history gameweek", maximum=38)
         historical_fixture = _integer(item[2], "duration history fixture")
+        historical_kickoff = _clock(item[3], "duration history kickoff")
+        completed_by = _clock(item[4], "duration history completion bound")
+        if not historical_kickoff < completed_by <= duration_settled or not (
+            f"{historical_season[:4]}-07-01"
+            <= historical_kickoff.date().isoformat()
+            < f"{int(historical_season[:4]) + 1}-07-01"
+        ):
+            raise ValueError("Duration history chronology contradicts its completion bound.")
         key = (historical_season, historical_fixture)
         if (
             key in duration_keys
@@ -298,10 +307,67 @@ def validate_score_replay_observation(
     )
 
 
+def canonical_score_replay_basis(
+    basis: ScoreReplayBasis, *, allow_released_2025_26: bool = False
+) -> ScoreReplayBasis:
+    """Normalize validated v2 clocks and named inventories without changing facts."""
+    validate_score_replay_basis(basis, allow_released_2025_26=allow_released_2025_26)
+
+    def utc(value: str) -> str:
+        return _clock(value, "replay clock").isoformat().replace("+00:00", "Z")
+
+    provenance = basis.provenance
+    canonical = replace(
+        provenance,
+        recorded_at=utc(provenance.recorded_at),
+        retrieved_at=utc(provenance.retrieved_at),
+        generated_at=utc(provenance.generated_at),
+        feature_cutoff=utc(provenance.feature_cutoff),
+        native_fit_information_cutoff=utc(provenance.native_fit_information_cutoff),
+        latest_native_history_settled_at=utc(provenance.latest_native_history_settled_at),
+        duration_history_latest_settled_at=utc(provenance.duration_history_latest_settled_at),
+        source_hashes=tuple(sorted(provenance.source_hashes)),
+        duration_history_fixtures=tuple(
+            sorted(
+                (season, week, fixture, utc(kickoff), utc(completed))
+                for season, week, fixture, kickoff, completed in (
+                    provenance.duration_history_fixtures
+                )
+            )
+        ),
+    )
+    return replace(
+        basis,
+        provenance=canonical,
+        decision_at=utc(basis.decision_at),
+        gameweek_first_kickoff=utc(basis.gameweek_first_kickoff),
+        kickoff=utc(basis.kickoff),
+    )
+
+
+def canonical_score_replay_observation(
+    row: ScoreReplayObservation, *, allow_released_2025_26: bool = False
+) -> ScoreReplayObservation:
+    """Canonical receipt form after the caller validates every training header and label."""
+    return replace(
+        row,
+        basis=canonical_score_replay_basis(
+            row.basis, allow_released_2025_26=allow_released_2025_26
+        ),
+        settled_at=_clock(row.settled_at, "settlement").isoformat().replace("+00:00", "Z"),
+        outcome_retrieved_at=_clock(row.outcome_retrieved_at, "outcome retrieval")
+        .isoformat()
+        .replace("+00:00", "Z"),
+        outcome_generated_at=_clock(row.outcome_generated_at, "outcome generation")
+        .isoformat()
+        .replace("+00:00", "Z"),
+    )
+
+
 def score_replay_basis_digest(
     basis: ScoreReplayBasis, *, allow_released_2025_26: bool = False
 ) -> str:
-    validate_score_replay_basis(basis, allow_released_2025_26=allow_released_2025_26)
+    basis = canonical_score_replay_basis(basis, allow_released_2025_26=allow_released_2025_26)
     return hashlib.sha256(
         json.dumps(asdict(basis), sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
     ).hexdigest()

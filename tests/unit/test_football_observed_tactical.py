@@ -31,6 +31,7 @@ from squadopt.features.football_observed_tactical_inputs import (
     recipient_features,
     style_values,
     team_features,
+    validate_header,
     validate_projection,
 )
 from squadopt.features.football_observed_tactical_readers import (
@@ -1016,3 +1017,135 @@ def test_complete_role_inventory_requires_hash_and_old_schema_is_refused() -> No
     raw = encoded({"version": "football_observed_tactical_inputs_v1", "projection": asdict(p)})
     with pytest.raises(ValueError, match="version"):
         read_observed_projection(raw, expected_sha256=sha(raw))
+
+
+@pytest.mark.parametrize(
+    "field,value,match",
+    [
+        ("version", "unknown", "provenance"),
+        ("revision", "main", "provenance"),
+        ("feature_cutoff", "2025-10-09T11:59:59Z", "replay clocks"),
+        ("generated_at", "2026-09-02T00:00:01Z", "replay clocks"),
+        ("latest_native_history_kickoff", "2025-10-09T11:00:00Z", "replay clocks"),
+        ("recorded_at", "2025-10-09T12:00:01Z", "replay clocks"),
+        ("retrieved_at", "2025-10-09T12:00:00Z", "replay clocks"),
+        ("retrieved_at", "2026-09-02T00:00:01Z", "replay clocks"),
+    ],
+)
+def test_replay_provenance_clock_clauses_are_independently_pinned(field, value, match) -> None:
+    p = replayed().projection
+    validate_projection(p, allow_released_2025_26=True)
+    with pytest.raises(ValueError, match=match):
+        validate_projection(
+            replace(p, replay=replace(p.replay, **{field: value})), allow_released_2025_26=True
+        )
+
+
+def test_replay_inventory_and_individual_source_bindings_refuse_independently() -> None:
+    p = replayed().projection
+    r = p.replay
+    assert r is not None
+    hashes = r.source_hashes
+    for changed, match in (
+        (replace(r, source_hashes=(*hashes, hashes[0])), "unique"),
+        (
+            replace(r, source_hashes=tuple(x for x in hashes if x[0] != "teams.csv")),
+            "requires original history",
+        ),
+        (
+            replace(
+                r,
+                source_hashes=tuple(
+                    (n, "c" * 64 if n == "native_baseline.json" else h) for n, h in hashes
+                ),
+            ),
+            "hash binding",
+        ),
+        (
+            replace(
+                r,
+                source_hashes=tuple(
+                    (n, "c" * 64 if n == "players_raw.csv" else h) for n, h in hashes
+                ),
+            ),
+            "hash binding",
+        ),
+    ):
+        with pytest.raises(ValueError, match=match):
+            validate_projection(replace(p, replay=changed), allow_released_2025_26=True)
+    with pytest.raises(ValueError, match="original revision clock"):
+        validate_projection(
+            replace(p, roster_source=replace(p.roster_source, published_at="2025-10-09T10:59:59Z")),
+            allow_released_2025_26=True,
+        )
+
+
+def test_replay_target_week_and_generation_cutoff_refuse_before_any_outcome_labels() -> None:
+    o = replace(replayed(), physical_goals=object())
+    with pytest.raises(ValueError, match="Whole target"):
+        validate_header(
+            o,
+            cutoff=CUTOFF,
+            target_season="2025-26",
+            target_gameweek=5,
+            allowed_seasons=("2025-26",),
+            allow_released_2025_26=True,
+        )
+    p = o.projection
+    p = replace(p, generated_at=CUTOFF, replay=replace(p.replay, generated_at=CUTOFF))
+    validate_projection(p, allow_released_2025_26=True)
+    with pytest.raises(ValueError, match="generated inputs follow"):
+        validate_header(
+            replace(o, projection=p),
+            cutoff=CUTOFF,
+            target_season="2026-27",
+            target_gameweek=5,
+            allowed_seasons=("2025-26",),
+            allow_released_2025_26=True,
+        )
+
+
+def test_current_source_publication_cannot_follow_its_retrieval() -> None:
+    p = projection(current=True)
+    with pytest.raises(ValueError, match="source clocks"):
+        validate_projection(
+            replace(p, native_source=replace(p.native_source, published_at=p.decision_at))
+        )
+
+
+def test_fm_publication_cutoff_is_independent_of_source_acquisition_order() -> None:
+    p = projection(current=True)
+    p = replace(p, feature_cutoff=p.generated_at, generated_at="2026-10-09T11:30:00Z")
+    validate_projection(p)
+    first = p.home.players[0]
+    assert first.profile.trait_source is not None
+    later = replace(
+        first.profile.trait_source,
+        published_at="2026-10-09T11:15:00Z",
+        retrieved_at="2026-10-09T11:15:00Z",
+    )
+    changed = replace(first, profile=replace(first.profile, trait_source=later))
+    with pytest.raises(ValueError, match="FM attributes were published"):
+        validate_projection(
+            replace(p, home=replace(p.home, players=(changed, *p.home.players[1:])))
+        )
+
+
+@pytest.mark.parametrize("clause", ["kickoff", "cutoff", "retrieval"])
+def test_each_role_finish_clause_refuses_independently(clause: str) -> None:
+    p = projection(current=True)
+    first = p.home.players[0]
+    role = first.profile.role_history[0]
+    if clause == "kickoff":
+        role = replace(role, finished_at=role.kickoff)
+    elif clause == "cutoff":
+        role = replace(role, finished_at=p.feature_cutoff)
+    else:
+        role = replace(
+            role, source=replace(role.source, published_at=role.kickoff, retrieved_at=role.kickoff)
+        )
+    changed = replace(first, profile=replace(first.profile, role_history=(role,)))
+    with pytest.raises(ValueError, match=r"role.*finished|role.*unavailable"):
+        validate_projection(
+            replace(p, home=replace(p.home, players=(changed, *p.home.players[1:])))
+        )

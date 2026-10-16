@@ -26,6 +26,7 @@ from squadopt.features.football_unit_inputs import (
     UNIT_INPUT_VERSION,
     UNIT_PHYSICAL_CLOCK_VERSION,
     UNIT_PREFIX_CLOCK_VERSION,
+    UNIT_REPLAY_VERSION,
     NumericAttributeSpec,
     SourceRecord,
     UnitExposureClock,
@@ -40,6 +41,9 @@ from squadopt.prediction.football import FOOTBALL_MODEL_VERSION
 from squadopt.prediction.football_unit_strength import (
     UNIT_ALL_UNOBSERVED_SEMANTICS,
     UNIT_FEATURE_VERSION,
+    UNIT_FM_EFFECTIVE_SEMANTICS,
+    UNIT_LEGACY_PHYSICAL_FIT_VERSION,
+    UNIT_LEGACY_REPLAY_FIT_VERSION,
     UNIT_MODEL_VERSION,
     UNIT_PHYSICAL_EXPOSURE_POLICY,
     UNIT_PHYSICAL_FIT_VERSION,
@@ -54,6 +58,9 @@ from squadopt.prediction.football_unit_strength import (
     UNIT_POOLED_OBJECTIVE,
     UNIT_POOLED_PRIOR,
     UNIT_POOLED_SCALING,
+    UNIT_PREFIX_PROJECTION,
+    UNIT_PREFIX_SELECTION,
+    UNIT_PREFIX_SEMANTICS,
     UNIT_REPLAY_FIT_VERSION,
     UNIT_RESIDUAL_MISSINGNESS_SEMANTICS,
     UNIT_SOURCE_MISSINGNESS_FEATURE_VERSION,
@@ -97,7 +104,7 @@ def _replay_fit_receipts(
     target_gameweek: int,
 ) -> None:
     contract = metadata.get("fit_contract")
-    physical = contract == UNIT_PHYSICAL_FIT_VERSION
+    physical = contract in (UNIT_LEGACY_PHYSICAL_FIT_VERSION, UNIT_PHYSICAL_FIT_VERSION)
     replay_keys = {
         "training_exposure_clock",
         "training_selection",
@@ -115,18 +122,41 @@ def _replay_fit_receipts(
     released = metadata.get("allow_released_2025_26")
     if type(released) is not bool:
         raise ValueError("Unit result requires its explicit released-season policy.")
-    if contract == "football_unit_explicit_release_fit_v1":
+    if contract in (
+        "football_unit_explicit_release_fit_v1",
+        "football_unit_explicit_release_fit_v2",
+    ):
         if released is not True or (replay_keys | {"exposure_policy"}) & metadata.keys():
             raise ValueError("Explicit release contract has inconsistent replay evidence.")
+        if contract == "football_unit_explicit_release_fit_v2":
+            scopes = metadata.get("training_scopes")
+            if not isinstance(scopes, tuple) or not scopes:
+                raise ValueError("Explicit release requires its actual training scopes.")
+            for item in scopes:
+                if not isinstance(item, tuple) or len(item) != 2:
+                    raise ValueError("Release training scopes must be immutable pairs.")
+                scope(*item, fixture_id=1)
+                if item >= (target_season, target_gameweek):
+                    raise ValueError("Release training must precede the target week.")
+            if not any(item[0] == "2025-26" for item in scopes):
+                raise ValueError("Release contract requires actual released-season rows.")
         return
     if (
-        contract not in (UNIT_REPLAY_FIT_VERSION, UNIT_PHYSICAL_FIT_VERSION)
+        contract
+        not in (
+            UNIT_LEGACY_REPLAY_FIT_VERSION,
+            UNIT_REPLAY_FIT_VERSION,
+            UNIT_LEGACY_PHYSICAL_FIT_VERSION,
+            UNIT_PHYSICAL_FIT_VERSION,
+        )
         or metadata.get("training_exposure_clock")
         != (UNIT_PHYSICAL_CLOCK_VERSION if physical else UNIT_PREFIX_CLOCK_VERSION)
         or metadata.get("fm_game_vintage") != "unknown"
         or not replay_keys <= metadata.keys()
     ):
         raise ValueError("Unit result requires its declared replay and observed clock contract.")
+    if metadata.get("fm_effective_semantics") != UNIT_FM_EFFECTIVE_SEMANTICS:
+        raise ValueError("Unit result must retain the exact FM eligibility statement.")
     if physical:
         if any(
             metadata.get(key) != value
@@ -143,6 +173,17 @@ def _replay_fit_receipts(
             )
     elif "exposure_policy" in metadata:
         raise ValueError("Reported-prefix results cannot claim a physical exposure policy.")
+    elif any(
+        metadata.get(key) != value
+        for key, value in {
+            "training_selection": UNIT_PREFIX_SELECTION,
+            "exposure_semantics": UNIT_PREFIX_SEMANTICS,
+            "projection_extrapolation": UNIT_PREFIX_PROJECTION,
+        }.items()
+    ):
+        raise ValueError(
+            "Unit prefix result must retain its exact exposure and extrapolation statements."
+        )
     replays, exposures = (
         metadata.get("training_replay_receipts"),
         metadata.get("training_exposure_receipts"),
@@ -181,6 +222,7 @@ def _replay_fit_receipts(
     fixture_bases: dict[tuple[str, int], tuple[object, ...]] = {}
     physical_spans: dict[tuple[str, int], list[tuple[int, int]]] = {}
     physical_totals: dict[tuple[str, int], int] = {}
+    released_used = False
     try:
         for replay_text, exposure_text, group in zip(replays, exposures, sources, strict=True):
             envelope, exposure = document(replay_text), document(exposure_text)
@@ -206,8 +248,16 @@ def _replay_fit_receipts(
                         )
                     },
                     "source_hashes": tuple(tuple(item) for item in raw["source_hashes"]),
+                    "native_training_cutoff": instant(raw["native_training_cutoff"])
+                    if raw.get("native_training_cutoff") is not None
+                    else None,
                 }
             )
+            if (
+                contract in (UNIT_REPLAY_FIT_VERSION, UNIT_PHYSICAL_FIT_VERSION)
+                and replay.version != UNIT_REPLAY_VERSION
+            ):
+                raise ValueError("Unit v2 fitting requires its native baseline replay receipt.")
             records = {
                 row[0]: SourceRecord(
                     row[0],
@@ -297,6 +347,7 @@ def _replay_fit_receipts(
             start, minutes = _finite(exposure["start_minute"]), _finite(exposure["minutes"])
             scope(exposure["season"], exposure["gameweek"], exposure["fixture_id"])
             season, gameweek = exposure["season"], exposure["gameweek"]
+            released_used |= season == "2025-26"
             identity = clock.source_sha256, clock.interval_id
             bad_span = (
                 start != clock.start_seconds / 60
@@ -347,6 +398,11 @@ def _replay_fit_receipts(
             spans[fixture_key].append((start, end))
         for key, segments in physical_spans.items():
             validate_physical_partition(segments, physical_totals[key])
+        if (
+            contract in (UNIT_REPLAY_FIT_VERSION, UNIT_PHYSICAL_FIT_VERSION)
+            and released != released_used
+        ):
+            raise ValueError("Unit v2 release declaration must match actual training exposure.")
     except (KeyError, TypeError, AttributeError, OverflowError) as error:
         raise ValueError("Malformed unit replay or exposure receipt.") from error
 
@@ -477,7 +533,8 @@ def _identity_feature_receipt(result: UnitStrengthResult) -> None:
 def _result_receipt(result: UnitStrengthResult) -> str:
     metadata = result.metadata
     if (result.model_version in (UNIT_PHYSICAL_MODEL_VERSION, UNIT_POOLED_MODEL_VERSION)) != (
-        metadata.get("fit_contract") == UNIT_PHYSICAL_FIT_VERSION
+        metadata.get("fit_contract")
+        in (UNIT_LEGACY_PHYSICAL_FIT_VERSION, UNIT_PHYSICAL_FIT_VERSION)
     ):
         raise ValueError("Physical fitting and model versions must agree.")
     if (

@@ -201,6 +201,13 @@ def test_invalid_population_and_predecision_clocks_refuse(changes: dict[str, Any
     ],
 )
 def test_malformed_or_target_history_refuses(changes: dict[str, Any]) -> None:
+    if "season" in changes:
+        year = changes["season"][:4]
+        changes = {
+            "kickoff": f"{year}-08-15T19:00:00Z",
+            "completed_by": f"{year}-08-16T01:00:00Z",
+            **changes,
+        }
     with pytest.raises(ValueError):
         forecast_physical_duration(
             replace(forecast(), history=(replace(history()[0], **changes),)), decision_at=DECISION

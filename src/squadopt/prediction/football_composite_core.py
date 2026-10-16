@@ -48,6 +48,7 @@ from squadopt.features.football_unit_inputs import (
     UnitProjection,
 )
 from squadopt.features.football_unit_point import UnitStarterProbability, project_unit_point
+from squadopt.prediction.football_capabilities import COMPOSITE_MODEL_VERSION
 from squadopt.prediction.football_components import role_component_record
 from squadopt.prediction.football_observed_tactical import ObservedTacticalRecipientSide
 from squadopt.prediction.football_phase_serving import PhaseServingModel
@@ -55,7 +56,7 @@ from squadopt.prediction.football_score_serving import ScoreServingModel
 from squadopt.prediction.football_unit_serving import UnitServingModel
 
 CORE_VERSION = "football_composite_fixture_core_v1"
-OUTPUT_MODEL_VERSION = "football_composite_v1"
+OUTPUT_MODEL_VERSION = COMPOSITE_MODEL_VERSION
 MAX_NATIVE_BYTES = 2 * 1024 * 1024
 _BINS = (0, 1, 2, 3, 1, 2, 3)
 
@@ -376,6 +377,10 @@ def _validate(
             or _clock(phase.kickoff) != unit.kickoff
             or _clock(phase.source.captured_at) > generated
             or _clock(phase.duties.captured_at) > generated
+            or phase.duties.snapshot_id.startswith("git:")
+            or phase.duties.snapshot_id != x.phase[0].duties.snapshot_id
+            or phase.duties.source_fingerprint != x.phase[0].duties.source_fingerprint
+            or phase.duties.captured_at != x.phase[0].duties.captured_at
         ):
             raise ValueError("Composite phase source scope or chronology differs.")
     if type(x.final_minutes) is not tuple or any(

@@ -636,7 +636,7 @@ def load_switch_inputs(
             minute_basis=minute_input.basis,
             minute_basis_reason=minute_input.reason,
         )
-    except (OSError, ValueError, KeyError, TypeError) as error:
+    except (DataError, OSError, ValueError, KeyError, TypeError) as error:
         notes.append(f"football: {error}")
         football = None
         components_sha256 = None

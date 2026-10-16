@@ -15,7 +15,8 @@ from types import MappingProxyType
 from typing import Literal, cast
 
 UNIT_INPUT_VERSION = "football_unit_inputs_v1"
-UNIT_REPLAY_VERSION = "football_unit_public_revision_replay_v1"
+UNIT_LEGACY_REPLAY_VERSION = "football_unit_public_revision_replay_v1"
+UNIT_REPLAY_VERSION = "football_unit_public_revision_replay_v2"
 UNIT_PREFIX_CLOCK_VERSION = "reported_first_half_minute_bins_0_to_40_v1"
 UNIT_PHYSICAL_CLOCK_VERSION = "pannadata_paired_periods_nonzero_event_seconds_fullmatch_v1"
 UNIT_DURATION_POLICY = "past_verified_nonzero_period_end_seconds_arithmetic_mean_v1"
@@ -215,10 +216,28 @@ class UnitHistoricalReplay:
     fm_version_reference: str
     fm_game_vintage: str = "unknown"
     version: str = UNIT_REPLAY_VERSION
+    native_fit_sha256: str | None = None
+    native_training_cutoff: datetime | None = None
 
     def __post_init__(self) -> None:
-        if self.version != UNIT_REPLAY_VERSION or self.fm_game_vintage != "unknown":
+        if (
+            self.version not in (UNIT_LEGACY_REPLAY_VERSION, UNIT_REPLAY_VERSION)
+            or self.fm_game_vintage != "unknown"
+        ):
             raise ValueError("Unit replay requires its declared version and unknown FM vintage.")
+        utc_time(self.feature_cutoff, "feature_cutoff")
+        if self.version == UNIT_REPLAY_VERSION:
+            if not isinstance(self.native_fit_sha256, str) or not re.fullmatch(
+                r"[a-f0-9]{64}", self.native_fit_sha256
+            ):
+                raise ValueError("Unit replay requires the exact native baseline fit SHA256.")
+            if not isinstance(self.native_training_cutoff, datetime):
+                raise ValueError("Unit replay requires the native baseline training cutoff.")
+            utc_time(self.native_training_cutoff, "native training cutoff")
+            if self.native_training_cutoff > self.feature_cutoff:
+                raise ValueError("Native baseline training must precede its feature cutoff.")
+        elif self.native_fit_sha256 is not None or self.native_training_cutoff is not None:
+            raise ValueError("Legacy unit replay cannot claim the v2 native fit receipt.")
         if not isinstance(self.revision, str) or not re.fullmatch(r"[a-f0-9]{40}", self.revision):
             raise ValueError("Unit replay requires an immutable public Git revision.")
         if not all(
@@ -258,10 +277,28 @@ class UnitHistoricalReplay:
         object.__setattr__(self, "source_hashes", tuple(sorted(self.source_hashes)))
         if not (
             self.latest_history_kickoff < self.recorded_at <= self.feature_cutoff
-            and self.latest_history_kickoff + timedelta(hours=3) < self.feature_cutoff
+            and self.latest_history_kickoff + timedelta(hours=3) < self.recorded_at
             and self.feature_cutoff < self.retrieved_at <= self.generated_at
         ):
             raise ValueError("Unit replay needs settled predecision history and actual retrieval.")
+
+    def validate_fm_source(self, source: SourceRecord, *, decision: datetime) -> None:
+        """Admit the later FM acquisition while preserving historical feature eligibility."""
+        utc_time(decision, "FM replay decision")
+        if not self.feature_cutoff <= decision < self.retrieved_at:
+            raise ValueError("Unit replay feature cutoff must precede the historical decision.")
+        if (
+            source.source_id != self.fm_source_id
+            or source.kind != "fm"
+            or source.sha256 != dict(self.source_hashes)["fm.csv"]
+        ):
+            raise ValueError("Unit replay FM identity and source hash disagree.")
+        if not decision < source.captured_at <= self.generated_at:
+            raise ValueError("FM replay must retain its own actual later acquisition clock.")
+        if max(source.published_at, source.effective_at) > self.feature_cutoff:
+            raise ValueError("Replayed source version was unavailable at the feature cutoff.")
+        if source.valid_until < decision:
+            raise ValueError("Replay source validity does not cover the historical decision.")
 
     def validate_sources(
         self,
@@ -271,6 +308,7 @@ class UnitHistoricalReplay:
         baseline_source_id: str,
         reference_source_id: str,
     ) -> None:
+        utc_time(decision, "unit replay decision")
         identities = {self.fm_source_id, baseline_source_id, reference_source_id}
         if len(identities) != 3 or not identities <= sources.keys():
             raise ValueError(
@@ -300,8 +338,7 @@ class UnitHistoricalReplay:
             raise ValueError(
                 "Unit replay source identities, hashes or acquisition clocks disagree."
             )
-        if not decision < fm.captured_at <= self.generated_at:
-            raise ValueError("FM replay must retain its own actual later acquisition clock.")
+        self.validate_fm_source(fm, decision=decision)
         for source in (fm, reference):
             if max(source.published_at, source.effective_at) > self.feature_cutoff:
                 raise ValueError("Replayed source version was unavailable at the feature cutoff.")
@@ -311,6 +348,8 @@ class UnitHistoricalReplay:
             )
         if any(source.valid_until < decision for source in (fm, reference, baseline)):
             raise ValueError("Replay source validity does not cover the historical decision.")
+        if any(source.valid_until >= self.retrieved_at for source in (reference, baseline)):
+            raise ValueError("Replayed reference and baseline must expire before retrieval.")
         for source_id, source in sources.items():
             if source_id not in identities:
                 source.available_at(decision)

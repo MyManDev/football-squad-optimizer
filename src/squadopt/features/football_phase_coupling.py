@@ -12,10 +12,16 @@ from dataclasses import dataclass
 from fractions import Fraction
 from itertools import pairwise
 
-from squadopt.features.football_phase_inputs import POSITIONS, PhasePlayer, PhaseState
+from squadopt.features.football_phase_inputs import (
+    MAX_PHASE_STATES,
+    POSITIONS,
+    PhasePlayer,
+    PhaseState,
+)
 
 COUPLING_VERSION = "persistent_id_circular_positive_role_intervals_v1"
 MASS_POLICY = "fixed_full_club_mass_independent_of_participation_v1"
+MAX_COUPLING_PLAYERS = (MAX_PHASE_STATES - 1) // 6
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,6 +38,12 @@ class PhaseMinuteMarginal:
 
 @dataclass(frozen=True, slots=True)
 class PhaseCouplingReceipt:
+    """Retained imposed dependence in identity order, with participation states.
+
+    Each state holds the floor or ceiling of the coupled expected participant
+    count. These are not legal starting XIs and impose no position constraints.
+    """
+
     marginals: tuple[PhaseMinuteMarginal, ...]
     native_basis_sha256: str
     states: tuple[PhaseState, ...]
@@ -104,7 +116,7 @@ def couple_phase_minutes(
     against the supplied atom within 1e-12. Exact binary-float fractions prevent
     tiny intervals from disappearing during endpoint comparisons.
     """
-    if type(marginals) is not tuple or not marginals or len(marginals) > 170:
+    if type(marginals) is not tuple or not marginals or len(marginals) > MAX_COUPLING_PLAYERS:
         raise ValueError("Phase coupling needs a bounded immutable full-club population.")
     if type(roster) is not tuple or not roster:
         raise ValueError("Phase coupling needs an explicit immutable complete roster.")

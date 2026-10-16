@@ -5,11 +5,14 @@ from dataclasses import FrozenInstanceError, replace
 
 import pytest
 
+from squadopt.features import football_phase_coupling as coupling_module
 from squadopt.features.football_phase_coupling import (
     COUPLING_VERSION,
+    MAX_COUPLING_PLAYERS,
     PhaseMinuteMarginal,
     couple_phase_minutes,
 )
+from squadopt.features.football_phase_inputs import MAX_PHASE_STATES
 
 MINUTES = (0.0, 40.0, 70.0, 90.0, 15.0, 65.0, 100.0)
 
@@ -71,12 +74,17 @@ def test_structural_absence_is_retained_when_club_mass_is_zero():
     assert result.states[0].weight == 1
 
 
-def test_subnormal_positive_atom_is_not_silently_discarded():
-    tiny = math.nextafter(0.0, 1.0)
-    original = player(probabilities=(1, tiny, 0, 0, 0, 0, 0))
-    result = coupled((original,), goal_mass=0, assist_mass=0, physical_goal_mass=0)
-    assert result.states[0].weight == tiny
-    assert result.role_indices[0] == (1,)
+@pytest.mark.parametrize("tiny", [math.nextafter(0.0, 1.0), 1e-17])
+def test_tiny_positive_atom_after_nonzero_cursor_is_not_silently_discarded(tiny):
+    first = player(1, (0.7, 0.1, 0.2, 0, 0, 0, 0))
+    second = player(2, (1.0, 0, 0, 0, 0, tiny, 0))
+    result = coupled((first, second), goal_mass=0, assist_mass=0, physical_goal_mass=0)
+    weights = [
+        state.weight
+        for state, roles in zip(result.states, result.role_indices, strict=True)
+        if roles[1] == 5
+    ]
+    assert weights == [tiny]
 
 
 @pytest.mark.parametrize(
@@ -116,6 +124,7 @@ def test_invalid_native_atoms_refuse(mutation):
         {"goal_mass": True},
         {"assist_mass": float("nan")},
         {"goal_mass": 2},
+        {"assist_mass": 2},
     ],
 )
 def test_ambiguous_roster_hash_or_mass_refuses(kwargs):
@@ -162,3 +171,60 @@ def test_population_shape_refuses_before_construction():
                 assist_mass=0,
                 physical_goal_mass=0,
             )
+
+
+@pytest.mark.parametrize("index,bad_minute", [(1, 60), (2, 59), (3, 89), (4, 60), (5, 59), (6, 89)])
+def test_every_start_and_cameo_atom_has_its_own_minute_bin(index, bad_minute):
+    minutes = list(MINUTES)
+    minutes[index] = bad_minute
+    marginal = replace(player(), minutes=tuple(minutes))
+    with pytest.raises(ValueError, match="outside its minute bin"):
+        coupled((marginal,), goal_mass=0, assist_mass=0, physical_goal_mass=0)
+
+
+@pytest.mark.parametrize("head", ["goals", "assists"])
+def test_each_credited_mass_requires_its_own_active_recipient(head):
+    always = player(probabilities=(0, 1, 0, 0, 0, 0, 0))
+    marginal = replace(always, **{("goal_weight90" if head == "goals" else "assist_weight90"): 0})
+    with pytest.raises(ValueError, match="active allocation recipient"):
+        coupled((marginal,), goal_mass=int(head == "goals"), assist_mass=int(head == "assists"))
+
+
+def test_population_cap_is_derived_from_shared_state_limit_and_enforced():
+    assert MAX_COUPLING_PLAYERS == (MAX_PHASE_STATES - 1) // 6 == 170
+    absent = tuple(player(code, (1, 0, 0, 0, 0, 0, 0)) for code in range(1, 172))
+    assert len(coupled(absent[:170], goal_mass=0, assist_mass=0, physical_goal_mass=0).states) == 1
+    with pytest.raises(ValueError, match="bounded immutable full-club population"):
+        coupled(absent, goal_mass=0, assist_mass=0, physical_goal_mass=0)
+
+
+def test_native_normalization_tolerance_is_not_loosened_to_one_part_per_million():
+    marginal = player(probabilities=(0.500000005, 0.5, 0, 0, 0, 0, 0))
+    with pytest.raises(ValueError, match="normalized native role law"):
+        coupled((marginal,), goal_mass=0, assist_mass=0, physical_goal_mass=0)
+
+
+def test_constructed_marginal_self_check_refuses_small_state_weight_drift(monkeypatch):
+    state_type = coupling_module.PhaseState
+
+    def drifted_state(identifier, weight, *arguments):
+        return state_type(identifier, weight + 5e-9, *arguments)
+
+    monkeypatch.setattr(coupling_module, "PhaseState", drifted_state)
+    marginal = player(probabilities=(0, 1, 0, 0, 0, 0, 0))
+    with pytest.raises(ValueError, match="changed a native role marginal"):
+        coupled((marginal,))
+
+
+def test_exact_positive_mass_can_refuse_a_float_normalized_native_law():
+    probabilities = (0, 0.1, 0.2, 0.3, 0.4, 0, 0)
+    assert math.fsum(probabilities) == 1.0
+    with pytest.raises(ValueError, match="Positive phase atoms exceed one"):
+        coupled((player(probabilities=probabilities),))
+
+
+def test_receipt_preserves_supplied_digest_and_literal_mass_policy():
+    result = coupled((player(probabilities=(0, 1, 0, 0, 0, 0, 0)),), native_basis_sha256="ab" * 32)
+    assert result.native_basis_sha256 == "ab" * 32
+    assert result.mass_policy == "fixed_full_club_mass_independent_of_participation_v1"
+    assert result.version == "persistent_id_circular_positive_role_intervals_v1"

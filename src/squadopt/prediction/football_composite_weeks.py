@@ -97,6 +97,7 @@ class CompositeWeekReceipt:
     load_result_sha256: str
     before_evidence_sha256: str
     final_sha256: str
+    load_applied: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -345,6 +346,12 @@ def _input(
     elif flag is not None:
         raise ValueError("Composite later weeks cannot carry a first-week flag law.")
     if (
+        week.gameweek != first_gameweek
+        and row.captured_eligibility < 1
+        and row.native.probabilities[0] == 0
+    ):
+        raise ValueError("Composite later eligibility requires native absent support.")
+    if week.gameweek == first_gameweek and (
         week.season != model.parameters.target_season
         or week.gameweek not in model.parameters.target_gameweeks
         or parse_observed_load_clock(model.parameters.cutoff, "LOAD fit cutoff")
@@ -411,15 +418,19 @@ def compose_composite_weeks(
     )
     laws, receipts = [], []
     for row in inputs:
-        result = model.predict(row.load_week)
         input_hash = _digest(asdict(row))
-        loaded = model_week_law(
-            row.native,
-            result.states,
-            result.probabilities,
-            kind="load",
-            sources=(*model_sources, ("load_input", observed_load_digest(row.load_week))),
-        )
+        load_input_hash = observed_load_digest(row.load_week)
+        load_applied = row.native.gameweek == first_gameweek
+        loaded = row.native
+        if load_applied:
+            result = model.predict(row.load_week)
+            loaded = model_week_law(
+                row.native,
+                result.states,
+                result.probabilities,
+                kind="load",
+                sources=(*model_sources, ("load_input", load_input_hash)),
+            )
         offset = row.first_week_flag
         if offset is None:
             offset = apply_shared_eligibility(
@@ -427,11 +438,15 @@ def compose_composite_weeks(
                 row.captured_eligibility,
                 sources=(("captured_eligibility", inventory.captured_eligibility_sha256),),
             )
-        before = transport_load(
-            row.native,
-            loaded,
-            offset,
-            sources=(*model_sources, ("composition_inventory", inventory_hash)),
+        before = (
+            transport_load(
+                row.native,
+                loaded,
+                offset,
+                sources=(*model_sources, ("composition_inventory", inventory_hash)),
+            )
+            if load_applied
+            else offset
         )
         final = apply_verified_week_evidence(
             before,
@@ -444,12 +459,13 @@ def compose_composite_weeks(
                 final.gameweek,
                 final.player_code,
                 input_hash,
-                result.input_sha256,
+                load_input_hash,
                 joint_week_law_digest(row.native),
                 joint_week_law_digest(offset),
                 joint_week_law_digest(loaded),
                 joint_week_law_digest(before),
                 joint_week_law_digest(final),
+                load_applied,
             )
         )
     return CompositeWeeksResult(

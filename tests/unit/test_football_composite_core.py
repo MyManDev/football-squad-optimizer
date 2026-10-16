@@ -116,7 +116,9 @@ class RecipientOracle:
 def models():
     return CompositeModels(
         restore(
-            export_unit_serving_model(unit_fit(), original_fit_sha256="1" * 64),
+            export_unit_serving_model(
+                unit_fit(), original_fit_sha256="1" * 64, target_season="2026-27", target_gameweek=6
+            ),
             read_unit_serving_model,
         ),
         restore(export_score_serving_model(score_fit()), read_score_serving_model),
@@ -413,6 +415,7 @@ def test_absence_rebuilds_point_unit_and_full_club_allocation(models):
         "missing_player",
         "late_generation",
         "fraction",
+        "assist_fraction",
         "native_identity",
         "law_hash",
         "nan",
@@ -434,9 +437,16 @@ def test_bad_scope_support_or_original_source_refuses(models, damage):
         x = replace(x, final_minutes=x.final_minutes[:-1])
     elif damage == "late_generation":
         x = replace(x, generated_at=x.score.kickoff)
-    elif damage == "fraction":
+    elif damage in ("fraction", "assist_fraction"):
         x = replace(
-            x, tactical=replace(x.tactical, home=replace(x.tactical.home, scored_fraction=0.8))
+            x,
+            tactical=replace(
+                x.tactical,
+                home=replace(
+                    x.tactical.home,
+                    **{"scored_fraction" if damage == "fraction" else "assist_fraction": 0.8},
+                ),
+            ),
         )
     else:
         rows = json.loads(x.native_rows_json)
@@ -520,6 +530,104 @@ def test_default_compact_receipts_preserve_all_stage_hashes_and_results(models):
     )
     assert all(s.payload_json is None for s in compact.receipt.stages)
     assert len(composite_bytes(compact.receipt)) < 8000
+
+
+@pytest.mark.parametrize("damage", ["replay", "snapshot", "fingerprint", "capture_time"])
+def test_phase_sources_cannot_replay_or_mix_captures(models, damage):
+    x = case()
+    changes = {
+        "replay": {"snapshot_id": "git:" + "a" * 40},
+        "snapshot": {"snapshot_id": "another-current-capture"},
+        "fingerprint": {"source_fingerprint": "9" * 64},
+        "capture_time": {"captured_at": stamp(x.unit.decision_cutoff - timedelta(hours=2))},
+    }[damage]
+    phases = list(x.phase)
+    indexes = (0, 1) if damage == "replay" else (1,)
+    for i in indexes:
+        phases[i] = replace(phases[i], duties=replace(phases[i].duties, **changes))
+    with pytest.raises(ValueError, match="phase source"):
+        compose_fixture(replace(x, phase=tuple(phases)), models)
+
+
+def test_point_xi_uses_start_atoms_when_appearance_ranks_differ(models):
+    x = case()
+    laws = {
+        11: (0.1, 0.1, 0.1, 0.1, 0.6, 0.0, 0.0),
+        12: (0.2, 0.1, 0.2, 0.5, 0.0, 0.0, 0.0),
+    }
+    x = replace(
+        x,
+        final_minutes=tuple(
+            replace(p, probabilities=laws[p.player_code]) if p.player_code in laws else p
+            for p in x.final_minutes
+        ),
+    )
+    result = compose_fixture(x, models)
+    selected = {
+        p["player_id"]
+        for p in stage(result, "final_law_point_units")["result"][0]["unit"]["players"]
+    }
+    assert 12 in selected and 11 not in selected
+
+
+def test_core_itself_refuses_unit_replay_before_calling_a_serving_model():
+    from tests.unit.test_football_unit_replay import replay_catalog
+
+    from squadopt.prediction.football_composite_core import _validate
+
+    x = case()
+    _validate(x)
+    catalog = replay_catalog()
+    assert catalog.replay is not None
+    x = replace(x, unit=replace(x.unit, catalog=catalog))
+    with pytest.raises(ValueError, match="without replay"):
+        _validate(x)
+
+
+def test_phase_offsets_are_the_nonidentity_tactical_recipient_shares(models):
+    class WeightedRecipients(RecipientOracle):
+        def predict_recipients(self, p, *, control=False):
+            original = super().predict_recipients(p, control=control)
+            sides = []
+            for side in (original.home, original.away):
+                goals = [r.goal_share * (1 + r.player_code % 3) for r in side.players]
+                assists = [r.assist_share * (1 + r.player_code % 5) for r in side.players]
+                sides.append(
+                    replace(
+                        side,
+                        players=tuple(
+                            replace(
+                                r,
+                                goal_share=g / math.fsum(goals),
+                                assist_share=a / math.fsum(assists),
+                            )
+                            for r, g, a in zip(side.players, goals, assists, strict=True)
+                        ),
+                    )
+                )
+            return replace(original, home=sides[0], away=sides[1])
+
+    x = case()
+    result = compose_fixture(x, replace(models, tactical=WeightedRecipients()))
+    recipients = stage(result, "tactical_recipient_heads_only")["result"]
+    for orientation, club in (("home", 1), ("away", 2)):
+        expected = {p["player_code"]: p for p in recipients[orientation]["players"]}
+        native = getattr(x.tactical, orientation)
+        assert any(
+            expected[p.profile.player_code]["goal_share"] != p.native_goal_share
+            for p in native.players
+        )
+        states = stage(result, f"phase_coupling_{club}")["input"]["projection"]["states"]
+        for state in states:
+            for p in state["players"]:
+                marginal = next(m for m in x.final_minutes if m.player_code == p["player_code"])
+                minutes = math.fsum(
+                    q * m for q, m in zip(marginal.probabilities, marginal.minutes, strict=True)
+                )
+                for head in ("goal", "assist"):
+                    assert p[head + "_weight90"] == pytest.approx(
+                        90 * expected[p["player_code"]][head + "_share"] / minutes
+                    )
 
 
 def test_native_artifact_envelope_model_version_does_not_require_row_injection(models):
@@ -628,7 +736,19 @@ def test_source_available_before_decision_but_after_assembly_refuses(models, tar
     later = stamp(generated + timedelta(minutes=5))
     x = replace(
         x,
-        unit=replace(x.unit, captured_at=generated),
+        unit=replace(
+            x.unit,
+            captured_at=generated,
+            catalog=replace(
+                x.unit.catalog,
+                sources=tuple(
+                    replace(
+                        s, published_at=generated, captured_at=generated, effective_at=generated
+                    )
+                    for s in x.unit.catalog.sources
+                ),
+            ),
+        ),
         generated_at=stamp(generated),
         tactical=replace(x.tactical, generated_at=stamp(generated)),
         duration=replace(x.duration, generated_at=stamp(generated)),

@@ -4,8 +4,8 @@ The separate `football_observed_tactical_marginal_context_v2` model accepts four
 event channels and nullable FM traits. Its metadata declares this partial scope, the input v2 schema, the lagged-role policy
 and the
 `native_full_roster_marginal_context_v1` policy; the original tactical model retains its
-separate contract (`src/squadopt/prediction/football_observed_tactical.py:44`,
-`src/squadopt/prediction/football_observed_tactical.py:180`,
+separate contract (`src/squadopt/prediction/football_observed_tactical.py:45`,
+`src/squadopt/prediction/football_observed_tactical.py:181`,
 `src/squadopt/features/football_tactical_inputs.py:1`).
 
 ## Source scope
@@ -17,15 +17,15 @@ These identifiers follow the pinned [Panna Opta reference](https://github.com/pe
 The implementation retains the complete selected fixture row population and unique event
 identities; pressure and high-pass evidence remain unsupported
 (`src/squadopt/features/football_observed_tactical_readers.py:155`,
-`src/squadopt/features/football_observed_tactical_inputs.py:356`).
+`src/squadopt/features/football_observed_tactical_inputs.py:357`).
 
 Style is the arithmetic count per enumerated observed fixture in the preceding 28 days.
 Each admitted fixture must finish before the feature cutoff and belong to an earlier
 gameweek. This is an observed provider population, with its count exposed as a feature;
 an empty population yields unknown rates, while observed zero counts remain zero
-(`src/squadopt/features/football_observed_tactical_inputs.py:133`,
-`src/squadopt/features/football_observed_tactical_inputs.py:344`,
-`src/squadopt/features/football_observed_tactical_inputs.py:558`).
+(`src/squadopt/features/football_observed_tactical_inputs.py:134`,
+`src/squadopt/features/football_observed_tactical_inputs.py:345`,
+`src/squadopt/features/football_observed_tactical_inputs.py:559`).
 
 FM inputs preserve exact row, name, birth-date and source-column mappings; blank traits
 remain unknown. The typed profile retains the original identity and mapping reference.
@@ -42,7 +42,7 @@ and never substitutes for a provider role
 (`src/squadopt/features/football_observed_tactical_readers.py:276`,
 `src/squadopt/features/football_observed_tactical_readers.py:30`,
 `src/squadopt/features/football_observed_tactical_readers.py:406`,
-`src/squadopt/features/football_observed_tactical_inputs.py:213`).
+`src/squadopt/features/football_observed_tactical_inputs.py:214`).
 
 ## Context and model
 
@@ -52,9 +52,9 @@ include native exposure. Goal and assist trait means use their respective shares
 defensive and goalkeeper context uses expected minutes and supported provider roles.
 Unknown traits and roles retain observed-weight fractions and known-player counts.
 The contract imposes no realized XI, total-minute bound or learned dependence law
-(`src/squadopt/features/football_observed_tactical_inputs.py:304`,
-`src/squadopt/features/football_observed_tactical_inputs.py:572`,
-`src/squadopt/prediction/football_observed_tactical.py:180`).
+(`src/squadopt/features/football_observed_tactical_inputs.py:305`,
+`src/squadopt/features/football_observed_tactical_inputs.py:573`,
+`src/squadopt/prediction/football_observed_tactical.py:181`).
 
 The model fits a paired Poisson rate adjustment and separate conditional recipient
 multinomials at this declared marginal context. Native rates and shares are offsets.
@@ -64,17 +64,17 @@ are learned solely from training inputs, using one-half weight per club for team
 and one-half native share for recipient context. Missing values occupy a neutral centered
 numeric coordinate with a separate observed mask. A column with no observed training
 support stays disabled at prediction, even if later evidence appears
-(`src/squadopt/prediction/football_observed_tactical.py:91`,
-`src/squadopt/prediction/football_observed_tactical.py:669`,
-`src/squadopt/prediction/football_observed_tactical.py:533`).
+(`src/squadopt/prediction/football_observed_tactical.py:92`,
+`src/squadopt/prediction/football_observed_tactical.py:670`,
+`src/squadopt/prediction/football_observed_tactical.py:534`).
 
 Allocation returns paired physical goal rates and player goal/assist expectations only.
 Clean-sheet calculations belong to a separately composed score and minute-law path.
 Control preserves native rates and shares. Learned allocation refuses an unsupported
 positive recipient head, broken full-club mass conservation or a player's G+A exceeding
 physical goal intensity; it does not clip those cases
-(`src/squadopt/prediction/football_observed_tactical.py:212`,
-`src/squadopt/prediction/football_observed_tactical.py:777`).
+(`src/squadopt/prediction/football_observed_tactical.py:213`,
+`src/squadopt/prediction/football_observed_tactical.py:778`).
 
 `predict_recipients` is the separately versioned
 `native_offset_observed_tactical_recipient_only_v1` inference path. It evaluates only
@@ -86,10 +86,10 @@ The path preserves exact native zero support, validates finite nonnegative norma
 shares, requires historical support for a positive credited head, and checks the player's
 combined physical goal fraction. Native control returns the supplied shares unchanged.
 These checks leave final team rates and score composition to the caller
-(`src/squadopt/prediction/football_observed_tactical.py:47`,
-`src/squadopt/prediction/football_observed_tactical.py:240`,
-`src/squadopt/prediction/football_observed_tactical.py:388`,
-`src/squadopt/prediction/football_observed_tactical.py:750`).
+(`src/squadopt/prediction/football_observed_tactical.py:48`,
+`src/squadopt/prediction/football_observed_tactical.py:241`,
+`src/squadopt/prediction/football_observed_tactical.py:389`,
+`src/squadopt/prediction/football_observed_tactical.py:751`).
 
 ## Clocks, integrity and integration boundary
 
@@ -97,11 +97,11 @@ All training headers pass before any outcome labels are accessed. The whole targ
 later gameweeks are excluded, and use of 2025-26 requires a strict explicit Boolean
 opt-in. A retrospective record separates historical feature/decision clocks from actual
 later retrieval and input-generation clocks. Current prediction refuses a replay record
-(`src/squadopt/features/football_observed_tactical_inputs.py:192`,
-`src/squadopt/features/football_observed_tactical_inputs.py:385`,
-`src/squadopt/features/football_observed_tactical_inputs.py:480`,
-`src/squadopt/prediction/football_observed_tactical.py:498`,
-`src/squadopt/prediction/football_observed_tactical.py:777`).
+(`src/squadopt/features/football_observed_tactical_inputs.py:193`,
+`src/squadopt/features/football_observed_tactical_inputs.py:386`,
+`src/squadopt/features/football_observed_tactical_inputs.py:481`,
+`src/squadopt/prediction/football_observed_tactical.py:499`,
+`src/squadopt/prediction/football_observed_tactical.py:778`).
 
 The pure readers accept supplied bytes and compare their SHA256 with the caller's
 expected value. Canonical envelope readers validate declared schemas, clocks, identities
@@ -111,8 +111,8 @@ bridge and complete-inventory hashes are retained declarations. Source hashes pr
 byte integrity, not source authenticity or proof of permission
 (`src/squadopt/features/football_observed_tactical_readers.py:45`,
 `src/squadopt/features/football_observed_tactical_readers.py:82`,
-`src/squadopt/features/football_observed_tactical_inputs.py:180`,
-`src/squadopt/features/football_observed_tactical_inputs.py:432`).
+`src/squadopt/features/football_observed_tactical_inputs.py:181`,
+`src/squadopt/features/football_observed_tactical_inputs.py:433`).
 
 Before a real fit or runtime integration, the producer must independently compare the
 native values and complete paired roster with their retained original bytes, verify
@@ -121,9 +121,9 @@ represented by each completeness declaration, and retain actual acquisition rece
 The runtime composition must bind this context to its loaded native artifact and keep
 the declared partial family scope. This page specifies that integration requirement;
 the pure contracts and allocation are the implementation boundary here
-(`src/squadopt/features/football_observed_tactical_inputs.py:133`,
-`src/squadopt/features/football_observed_tactical_inputs.py:453`,
-`src/squadopt/prediction/football_observed_tactical.py:228`).
+(`src/squadopt/features/football_observed_tactical_inputs.py:134`,
+`src/squadopt/features/football_observed_tactical_inputs.py:454`,
+`src/squadopt/prediction/football_observed_tactical.py:229`).
 
 The focused tests use invented fixtures to check independent feature arithmetic,
 chronology, unknown evidence, strict readers, native control and allocation guards.

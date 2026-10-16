@@ -55,7 +55,7 @@ weighted minute eligibility. A nonlinear learned score process still operates on
 declared point intervals; this does not estimate an empirical interval mixture's
 survival. The tests compare zero-process survival through the actual score chain
 (`tests/unit/test_football_score_projection.py:1`,
-`src/squadopt/prediction/football_score_state.py:803`).
+`src/squadopt/prediction/football_score_state.py:816`).
 
 ## Receipt and caller responsibilities
 
@@ -67,7 +67,7 @@ the full native roster and source bytes, assemble the paired `ScoreFixture`, and
 its existing validator before prediction
 (`src/squadopt/features/football_score_projection.py:66`,
 `src/squadopt/features/football_score_projection.py:174`,
-`src/squadopt/features/football_score_state_inputs.py:273`).
+`src/squadopt/features/football_score_state_inputs.py:274`).
 
 This pure producer performs no acquisition or activation. Mathematical consistency
 and source chronology do not establish predictive improvement

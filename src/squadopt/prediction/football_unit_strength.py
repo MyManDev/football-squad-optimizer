@@ -27,6 +27,7 @@ from squadopt.features.football_unit_inputs import (
     UNIT_INPUT_VERSION,
     UNIT_PHYSICAL_CLOCK_VERSION,
     UNIT_PREFIX_CLOCK_VERSION,
+    UNIT_REPLAY_VERSION,
     ClubUnit,
     NumericAttributeSpec,
     ProjectedUnitState,
@@ -40,7 +41,14 @@ from squadopt.features.football_unit_inputs import (
 
 UNIT_MODEL_VERSION = "football_projected_unit_strength_v1"
 UNIT_FEATURE_VERSION = "reference_relative_unit_identity_attributes_v1"
-UNIT_REPLAY_FIT_VERSION = "football_unit_public_replay_quantized_prefix_fit_v1"
+UNIT_LEGACY_REPLAY_FIT_VERSION = "football_unit_public_replay_quantized_prefix_fit_v1"
+UNIT_REPLAY_FIT_VERSION = "football_unit_public_replay_quantized_prefix_fit_v2"
+UNIT_PREFIX_SELECTION = "source-validated first-half reported minute bins 0..40"
+UNIT_PREFIX_SEMANTICS = "quantized observed intervals, not exact physical seconds"
+UNIT_PREFIX_PROJECTION = (
+    "whole-match rates extrapolate associations fitted on selected first-half prefixes"
+)
+UNIT_FM_EFFECTIVE_SEMANTICS = "published frozen feature eligibility, not game/save date"
 UNIT_LEGACY_MISSINGNESS_POLICY = "per_attribute_v1"
 UNIT_SOURCE_MISSINGNESS_POLICY = "source_all_unobserved_residual_v2"
 UNIT_SOURCE_MISSINGNESS_MODEL_VERSION = "football_projected_unit_source_missingness_v2"
@@ -48,7 +56,8 @@ UNIT_SOURCE_MISSINGNESS_FEATURE_VERSION = "reference_relative_unit_source_missin
 UNIT_LEGACY_EXPOSURE_POLICY = "reported_minutes_over_90_v1"
 UNIT_PHYSICAL_EXPOSURE_POLICY = "physical_seconds_over_forecast_duration_v1"
 UNIT_PHYSICAL_MODEL_VERSION = "football_projected_unit_physical_source_missingness_v3"
-UNIT_PHYSICAL_FIT_VERSION = "football_unit_public_replay_physical_duration_fit_v1"
+UNIT_LEGACY_PHYSICAL_FIT_VERSION = "football_unit_public_replay_physical_duration_fit_v1"
+UNIT_PHYSICAL_FIT_VERSION = "football_unit_public_replay_physical_duration_fit_v2"
 UNIT_LEGACY_IDENTITY_POLICY = "exposure_standardized_v1"
 UNIT_POOLED_IDENTITY_POLICY = "raw_identity_pooled_no_home_v1"
 UNIT_POOLED_MODEL_VERSION = "football_projected_unit_pooled_identity_v4"
@@ -412,6 +421,11 @@ class FootballUnitStrengthModel:
         physical_spans: dict[tuple[str, int], list[tuple[int, int]]] = {}
         physical_totals: dict[tuple[str, int], int] = {}
         for observation in observations:
+            if (
+                observation.catalog.replay is not None
+                and observation.catalog.replay.version != UNIT_REPLAY_VERSION
+            ):
+                raise ValueError("New unit fits require the v2 native baseline replay receipt.")
             if observation.season == "2025-26" and not allow_released_2025_26:
                 raise ValueError("Locked 2025-26 outcomes are excluded from unit-strength fitting.")
             if (
@@ -468,20 +482,25 @@ class FootballUnitStrengthModel:
         self._observations = observations
         self._attribute_contract = contract
         self._replay_metadata: dict[str, object] = {}
-        if allow_released_2025_26 or any(replayed):
+        released_used = any(row.season == "2025-26" for row in observations)
+        if released_used or any(replayed):
             self._replay_metadata = {
                 "fit_contract": (
                     UNIT_REPLAY_FIT_VERSION
                     if any(replayed)
-                    else "football_unit_explicit_release_fit_v1"
+                    else "football_unit_explicit_release_fit_v2"
                 ),
-                "allow_released_2025_26": allow_released_2025_26,
+                "allow_released_2025_26": released_used,
             }
+            if not any(replayed):
+                self._replay_metadata["training_scopes"] = tuple(
+                    sorted({(row.season, row.gameweek) for row in observations})
+                )
         if any(replayed):
             self._replay_metadata.update(
                 {
                     "training_exposure_clock": UNIT_PREFIX_CLOCK_VERSION,
-                    "training_selection": "source-validated first-half reported minute bins 0..40",
+                    "training_selection": UNIT_PREFIX_SELECTION,
                     "training_replay_receipts": tuple(
                         _canonical(
                             {
@@ -511,17 +530,10 @@ class FootballUnitStrengthModel:
                         for x in observations
                         if x.exposure_clock is not None
                     ),
-                    "exposure_semantics": (
-                        "quantized observed intervals, not exact physical seconds"
-                    ),
-                    "projection_extrapolation": (
-                        "whole-match rates extrapolate associations fitted on "
-                        "selected first-half prefixes"
-                    ),
+                    "exposure_semantics": UNIT_PREFIX_SEMANTICS,
+                    "projection_extrapolation": UNIT_PREFIX_PROJECTION,
                     "fm_game_vintage": "unknown",
-                    "fm_effective_semantics": (
-                        "published frozen feature eligibility, not game/save date"
-                    ),
+                    "fm_effective_semantics": UNIT_FM_EFFECTIVE_SEMANTICS,
                 }
             )
         if physical:

@@ -61,7 +61,7 @@ def test_replay_metadata_survives_experiment_receipt_and_fixed_fifteen_read(
     receipt = json.loads(candidate.receipt_json)
     assert receipt["process_model_metadata_json"] == replay_model.metadata_json
     metadata = json.loads(receipt["process_model_metadata_json"])
-    assert metadata["fit_contract"] == "football_score_public_replay_fit_v1"
+    assert metadata["fit_contract"] == "football_score_public_replay_fit_v2"
     assert len(metadata["replay_receipts"]) == 3
     assert ("solver_receipt" in metadata) is fallback
     decision = plan(candidate, max_evaluations=1, locked_first=True)

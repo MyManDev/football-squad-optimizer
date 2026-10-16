@@ -28,13 +28,13 @@ retained joint law and recomposes whole affected fixtures. It discards the scala
 participation updater's numeric result. Current statements with ambiguous fixture
 scope are withheld. Independent agreeing absence sources are bound together into
 one intervention; a full-match restriction does not supply a new appearance or
-start estimate (`src/squadopt/application/football_composite_news.py:125`).
+start estimate (`src/squadopt/application/football_composite_news.py:126`).
 
 An unsupported minute restriction is withheld while verified absences still enter
 recomposition. If the absence-only fixture cannot be composed, the forecast is
 unavailable. Complete player-week identity and unchanged later weeks are checked
 before binding results. The existing captured eligibility is not applied again
-(`src/squadopt/application/football_composite_news.py:34`,
+(`src/squadopt/application/football_composite_news.py:35`,
 `src/squadopt/application/football_participation.py:442`,
 `src/squadopt/application/football_participation.py:557`).
 

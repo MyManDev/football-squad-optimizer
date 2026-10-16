@@ -28,6 +28,7 @@ from squadopt.features.football_phase_inputs import (
     PhaseProjection,
     PhaseReplay,
     PhaseSource,
+    canonical_phase_replay,
     observation_digest,
     projection_digest,
     validate_observation,
@@ -368,6 +369,8 @@ class PhaseDutyModel:
             if identity in identities:
                 raise ValueError("Duplicate phase training club-fixture.")
             identities.add(identity)
+        if len({row.rules_version for row in observations}) != 1:
+            raise ValueError("Phase fitting requires one coherent FPL rules version.")
         for observation in observations:
             validate_observation(
                 observation,
@@ -428,11 +431,12 @@ class PhaseDutyModel:
             total = int(phase_counts.sum())
             phase_shares[head] = phase_counts / total if total else phase_counts
             event_totals[head] = total
+        released_2025_26 = any(row.season == "2025-26" for row in ordered)
         metadata = PhaseModelMetadata(
             contract_version=(
-                "football_phase_duty_replay_fit_v1"
-                if any(row.replay is not None for row in ordered) or allow_released_2025_26
-                else "football_phase_duty_fit_v1"
+                "football_phase_duty_replay_fit_v2"
+                if any(row.replay is not None for row in ordered) or released_2025_26
+                else "football_phase_duty_fit_v2"
             ),
             cutoff=cutoff,
             target_season=target_season,
@@ -459,7 +463,7 @@ class PhaseDutyModel:
                     phase_definition_version=row.phase_definition_version,
                     rules_version=row.rules_version,
                     complete_coverage=row.complete_coverage,
-                    replay=row.replay,
+                    replay=None if row.replay is None else canonical_phase_replay(row.replay),
                 )
                 for row in ordered
             ),
@@ -470,7 +474,7 @@ class PhaseDutyModel:
             alpha=alpha,
             max_iter=max_iter,
             recipient_heads=tuple(fitted_heads),
-            released_2025_26=allow_released_2025_26,
+            released_2025_26=released_2025_26,
         )
         self._fitted = _FittedState(
             metadata=metadata,

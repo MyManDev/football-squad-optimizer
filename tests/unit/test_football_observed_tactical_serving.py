@@ -242,6 +242,18 @@ def test_current_window_control_type_and_replay_refusals(fitted: ObservedTactica
         compact.predict_recipients(replayed().projection)
 
 
+def test_valid_current_projection_before_fit_cutoff_refuses(fitted: ObservedTacticalModel) -> None:
+    p = projection(current=True)
+    body = asdict(restore(export_observed_tactical_serving_model(fitted)).metadata)
+    body["cutoff"] = "2026-10-09T13:00:00Z"
+    compact = restore(encoded(body))
+    from squadopt.features.football_observed_tactical_inputs import validate_projection
+
+    validate_projection(p)
+    with pytest.raises(ValueError, match="target window"):
+        compact.predict_recipients(p)
+
+
 @pytest.mark.parametrize("field", ["scope", "role_policy", "native_share_policy"])
 def test_export_never_relabels_another_original_model_scope(
     fitted: ObservedTacticalModel, field: str

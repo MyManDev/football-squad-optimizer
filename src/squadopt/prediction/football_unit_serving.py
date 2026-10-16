@@ -25,6 +25,7 @@ from squadopt.features.football_unit_inputs import (
 )
 from squadopt.prediction.football_unit_strength import (
     UNIT_ALL_UNOBSERVED_SEMANTICS,
+    UNIT_LEGACY_PHYSICAL_FIT_VERSION,
     UNIT_PHYSICAL_EXPOSURE_POLICY,
     UNIT_PHYSICAL_FIT_VERSION,
     UNIT_PHYSICAL_PROJECTION,
@@ -46,7 +47,8 @@ from squadopt.prediction.football_unit_strength import (
     pooled_relative_features,
 )
 
-UNIT_SERVING_VERSION: Final = "football_unit_pooled_serving_v1"
+UNIT_LEGACY_SERVING_VERSION: Final = "football_unit_pooled_serving_v1"
+UNIT_SERVING_VERSION: Final = "football_unit_pooled_serving_v2"
 UNIT_SERVING_RECEIPT_VERSION: Final = "football_unit_pooled_serving_result_v1"
 MAX_ARTIFACT_BYTES: Final = 4 * 1024 * 1024
 MAX_VOCABULARY: Final = 10_000
@@ -103,6 +105,8 @@ class UnitServingMetadata:
     output_scope: str
     provenance_scope: str
     fm_game_vintage: str
+    target_season: str | None = None
+    target_gameweek: int | None = None
 
 
 @dataclass(frozen=True)
@@ -173,10 +177,8 @@ def _validate(metadata: UnitServingMetadata) -> None:
     if type(metadata) is not UnitServingMetadata:
         raise ValueError("Unit serving requires its typed immutable metadata.")
     expected = {
-        "contract_version": UNIT_SERVING_VERSION,
         "model_version": UNIT_POOLED_MODEL_VERSION,
         "feature_version": UNIT_POOLED_FEATURE_VERSION,
-        "fit_contract_version": UNIT_PHYSICAL_FIT_VERSION,
         "identity_policy": UNIT_POOLED_IDENTITY_POLICY,
         "missingness_policy": UNIT_SOURCE_MISSINGNESS_POLICY,
         "exposure_policy": UNIT_PHYSICAL_EXPOSURE_POLICY,
@@ -195,6 +197,14 @@ def _validate(metadata: UnitServingMetadata) -> None:
         for key, value in expected.items()
     ):
         raise ValueError("Unsupported unit serving version or semantics.")
+    if metadata.contract_version not in (
+        UNIT_LEGACY_SERVING_VERSION,
+        UNIT_SERVING_VERSION,
+    ) or metadata.fit_contract_version not in (
+        UNIT_LEGACY_PHYSICAL_FIT_VERSION,
+        UNIT_PHYSICAL_FIT_VERSION,
+    ):
+        raise ValueError("Unsupported unit serving version or fit contract.")
     _sha(metadata.original_fit_sha256)
     _timestamp(metadata.cutoff)
     if type(metadata.allow_released_2025_26) is not bool:
@@ -212,6 +222,21 @@ def _validate(metadata: UnitServingMetadata) -> None:
             raise ValueError("Released training scope needs its explicit opt-in.")
     if metadata.training_scopes != tuple(sorted(set(metadata.training_scopes))):
         raise ValueError("Unit serving scopes must be sorted and unique.")
+    if metadata.contract_version == UNIT_SERVING_VERSION:
+        if not isinstance(metadata.target_season, str) or type(metadata.target_gameweek) is not int:
+            raise ValueError("Unit v2 serving requires its explicit intended target.")
+        scope(metadata.target_season, metadata.target_gameweek, fixture_id=1)
+        if any(
+            item >= (metadata.target_season, metadata.target_gameweek)
+            for item in metadata.training_scopes
+        ):
+            raise ValueError("Unit fitting scopes must precede the explicit target week.")
+        if metadata.allow_released_2025_26 != any(
+            item[0] == "2025-26" for item in metadata.training_scopes
+        ):
+            raise ValueError("Unit v2 release declaration must match actual training scopes.")
+    elif metadata.target_season is not None or metadata.target_gameweek is not None:
+        raise ValueError("Legacy unit serving cannot claim a v2 intended target.")
     vocabulary = metadata.player_vocabulary
     if type(vocabulary) is not tuple or not 1 <= len(vocabulary) <= MAX_VOCABULARY:
         raise ValueError("Unit serving requires a bounded immutable player vocabulary.")
@@ -281,7 +306,7 @@ class UnitServingModel:
 
     def __post_init__(self) -> None:
         _validate(self.metadata)
-        payload = _canonical(asdict(self.metadata))
+        payload = _canonical(_metadata_document(self.metadata))
         if len(payload) > MAX_ARTIFACT_BYTES or hashlib.sha256(payload).hexdigest() != _sha(
             self.artifact_sha256
         ):
@@ -291,6 +316,12 @@ class UnitServingModel:
         if type(projection) is not UnitProjection or projection.catalog.replay is not None:
             raise ValueError("Unit serving requires a current typed projection without replay.")
         metadata = self.metadata
+        if metadata.contract_version == UNIT_SERVING_VERSION and (
+            projection.season != metadata.target_season
+            or metadata.target_gameweek is None
+            or projection.gameweek < metadata.target_gameweek
+        ):
+            raise ValueError("Unit projection precedes or differs from the fitted target season.")
         if _timestamp(metadata.cutoff) > projection.decision_cutoff:
             raise ValueError("Fitted unit model was unavailable at the projection cutoff.")
         if any(
@@ -392,7 +423,11 @@ class UnitServingModel:
 
 
 def export_unit_serving_model(
-    model: FootballUnitStrengthModel, *, original_fit_sha256: str
+    model: FootballUnitStrengthModel,
+    *,
+    original_fit_sha256: str,
+    target_season: str,
+    target_gameweek: int,
 ) -> bytes:
     """Export actual v4 parameters; the caller verifies original fit provenance."""
     if not isinstance(model, FootballUnitStrengthModel) or (
@@ -401,7 +436,8 @@ def export_unit_serving_model(
         or getattr(model, "identity_policy", None) != UNIT_POOLED_IDENTITY_POLICY
         or getattr(model, "missingness_policy", None) != UNIT_SOURCE_MISSINGNESS_POLICY
         or getattr(model, "exposure_policy", None) != UNIT_PHYSICAL_EXPOSURE_POLICY
-        or model._replay_metadata.get("fit_contract") != UNIT_PHYSICAL_FIT_VERSION
+        or model._replay_metadata.get("fit_contract")
+        not in (UNIT_LEGACY_PHYSICAL_FIT_VERSION, UNIT_PHYSICAL_FIT_VERSION)
         or model.regularization != 0.1
         or model._head.alpha != 0.1
         or model._head.fit_intercept is not False
@@ -418,11 +454,11 @@ def export_unit_serving_model(
         UNIT_SERVING_VERSION,
         model.model_version,
         model.feature_version,
-        UNIT_PHYSICAL_FIT_VERSION,
+        str(model._replay_metadata["fit_contract"]),
         _sha(original_fit_sha256),
         model.cutoff.isoformat(),
         tuple(sorted({(row.season, row.gameweek) for row in model._observations})),
-        released,
+        any(row.season == "2025-26" for row in model._observations),
         attributes,
         model.player_vocabulary,
         model.feature_contract,
@@ -444,9 +480,11 @@ def export_unit_serving_model(
         OUTPUT_SCOPE,
         PROVENANCE_SCOPE,
         "unknown",
+        target_season,
+        target_gameweek,
     )
     _validate(metadata)
-    payload = _canonical(asdict(metadata))
+    payload = _canonical(_metadata_document(metadata))
     if len(payload) > MAX_ARTIFACT_BYTES:
         raise ValueError("Unit serving artifact exceeds its transport bound.")
     return payload
@@ -467,6 +505,14 @@ def _record(value: object, kind: type[Any]) -> dict[str, Any]:
     return value
 
 
+def _metadata_document(metadata: UnitServingMetadata) -> dict[str, Any]:
+    values = asdict(metadata)
+    if metadata.contract_version == UNIT_LEGACY_SERVING_VERSION:
+        values.pop("target_season")
+        values.pop("target_gameweek")
+    return values
+
+
 def read_unit_serving_model(payload: bytes, *, expected_sha256: str) -> UnitServingModel:
     """Read bounded canonical parameters without source IO or a training model."""
     if type(payload) is not bytes or not 0 < len(payload) <= MAX_ARTIFACT_BYTES:
@@ -474,7 +520,15 @@ def read_unit_serving_model(payload: bytes, *, expected_sha256: str) -> UnitServ
     if hashlib.sha256(payload).hexdigest() != _sha(expected_sha256):
         raise ValueError("Unit serving bytes differ from the expected SHA256.")
     try:
-        values = _record(json.loads(payload, object_pairs_hook=_object), UnitServingMetadata)
+        parsed = json.loads(payload, object_pairs_hook=_object)
+        if (
+            isinstance(parsed, dict)
+            and parsed.get("contract_version") == UNIT_LEGACY_SERVING_VERSION
+        ):
+            if "target_season" in parsed or "target_gameweek" in parsed:
+                raise ValueError("Legacy unit bytes cannot include v2 target fields.")
+            parsed = {**parsed, "target_season": None, "target_gameweek": None}
+        values = _record(parsed, UnitServingMetadata)
         for name in (
             "attributes",
             "training_scopes",
@@ -496,7 +550,7 @@ def read_unit_serving_model(payload: bytes, *, expected_sha256: str) -> UnitServ
         values["training_scopes"] = tuple(tuple(item) for item in values["training_scopes"])
         metadata = UnitServingMetadata(**values)
         _validate(metadata)
-        if _canonical(asdict(metadata)) != payload:
+        if _canonical(_metadata_document(metadata)) != payload:
             raise ValueError("Unit serving JSON must use canonical serialization.")
         return UnitServingModel(metadata, expected_sha256)
     except (TypeError, KeyError, OverflowError, RecursionError, UnicodeError) as error:

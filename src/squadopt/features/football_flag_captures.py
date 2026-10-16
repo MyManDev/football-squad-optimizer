@@ -11,6 +11,7 @@ import hashlib
 import json
 import re
 from collections.abc import Mapping
+from datetime import timedelta
 from typing import Any
 
 from squadopt.data.errors import DataError
@@ -110,6 +111,8 @@ def captured_flag_weeks(
 
     Later horizon weeks need a separately declared policy. This function refuses
     to relabel a captured next-event flag as another gameweek's source fact.
+    Ages use deadline minus one second in both reconstructed and prospective
+    inputs; the operator's decision remains a separate admission/provenance clock.
     """
     _season(season)
     _id(gameweek, "gameweek", maximum=38)
@@ -128,6 +131,9 @@ def captured_flag_weeks(
     deadline = _clock(events[0]["deadline_time"])
     if as_instant(decision) >= as_instant(deadline):
         raise DataError("Reference decision must precede the captured deadline.")
+    age_reference = as_instant(deadline) - timedelta(seconds=1)
+    if as_instant(captured) >= age_reference:
+        raise DataError("The source capture must precede deadline minus one second.")
     players = _players(boot)
     if set(players) != set(native_fixtures):
         raise DataError("Native minute supports must cover the exact captured roster.")
@@ -164,7 +170,7 @@ def captured_flag_weeks(
             raise DataError("Captured news must be explicit text.")
         age = None
         if added is not None:
-            age = (as_instant(decision) - as_instant(_clock(added))).total_seconds() / 3600
+            age = (age_reference - as_instant(_clock(added))).total_seconds() / 3600
             if as_instant(_clock(added)) > as_instant(captured):
                 raise DataError("News was added after the source capture.")
         news_state = "flagged" if news.strip() else "cleared" if added is not None else "unknown"
@@ -179,7 +185,7 @@ def captured_flag_weeks(
             label=label,
             news_state=news_state,
             news_age_hours=age,
-            capture_age_hours=(as_instant(decision) - as_instant(captured)).total_seconds() / 3600,
+            capture_age_hours=(age_reference - as_instant(captured)).total_seconds() / 3600,
             history_covered=False,
             label_changed=None,
             fixtures=supports,
