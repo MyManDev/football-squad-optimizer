@@ -53,6 +53,8 @@ def role_forecast_schema() -> dict[str, Any]:
                 "enum": [
                     "football_joint_role_minutes_v1",
                     "football_joint_role_retained_history_v1",
+                    "football_joint_role_retained_flags_v2",
+                    "football_composite_v1",
                 ]
             },
             "calibration": {"const": "not_independently_verified"},

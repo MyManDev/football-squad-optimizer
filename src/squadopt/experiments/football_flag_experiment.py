@@ -15,15 +15,19 @@ from dataclasses import dataclass
 from numbers import Integral, Real
 from typing import cast
 
-import numpy as np
 import pandas as pd
-from scipy.stats import nbinom
 
 from squadopt.features.football_flag_inputs import PlayerWeekInput, validate_week_input
 from squadopt.live.minute_evidence import _validate_components
 from squadopt.prediction.availability import apply_availability
 from squadopt.prediction.football import FOOTBALL_MODEL_VERSION, JOINT_ROLE_MODEL_VERSIONS
 from squadopt.prediction.football_components import component_rows
+from squadopt.prediction.football_flag_components import (
+    allocate_flag_components as _allocate_and_score,
+)
+from squadopt.prediction.football_flag_components import (
+    flag_fixture_components,
+)
 from squadopt.prediction.football_flag_minutes import FlagMinutesModel, WeekMinutePrediction
 from squadopt.scenarios.expected_lineup import ExpectedLineupSearchResult, improve_expected_lineup
 
@@ -385,131 +389,9 @@ def _marginal_updates(
     fixture_index: int,
     season: str,
 ) -> dict[str, object]:
-    fixture = prediction.week.fixtures[fixture_index]
-    p = np.asarray(prediction.fixture_probabilities[fixture_index], dtype=float)
-    m = np.asarray(fixture.minutes, dtype=float)
-    q = float(p[1:].sum())
-    expected = float(p @ m)
-    bins = np.array([0, 1, 2, 3, 1, 2, 3])
-    p60 = float(p[bins >= 2].sum())
-    cs = float(
-        np.sum(
-            p[bins >= 2]
-            * np.exp(-_finite(row["opponent_goal_rate"], "opposing intensity") * m[bins >= 2] / 90)
-        )
+    return flag_fixture_components(
+        row, prediction, fixture_index, season, model_version=EXPERIMENT_VERSION
     )
-    position = str(row["position"])
-    threshold = 10 if position == "DEF" else 12
-    rate = _finite(row["defcon_rate90"], "defensive count rate")
-    dispersion = _finite(row["defcon_dispersion"], "defensive dispersion")
-    means = rate * m[1:] / 90
-    dc = (
-        0.0
-        if position == "GK"
-        else float(
-            np.sum(p[1:] * nbinom.sf(threshold - 1, dispersion, dispersion / (dispersion + means)))
-        )
-    )
-    if not all(math.isfinite(v) for v in (q, expected, p60, cs, dc)):
-        raise ValueError("Learned minute scoring exceeded finite support.")
-    result: dict[str, object] = dict(row)
-    result.update(
-        expected_minutes=expected,
-        appearance_probability=q,
-        p60=p60,
-        clean_sheet_probability=cs,
-        defcon_probability=dc,
-        zero_probability=float(p[0]),
-        start_probability=float(p[1:4].sum()),
-        cameo_probability=float(p[4:].sum()),
-        unknown_role_probability=0.0,
-        expected_minutes_if_appearance=expected / q if q else 0.0,
-        model_version=EXPERIMENT_VERSION,
-        availability_multiplier=1.0,
-    )
-    for role, offset in (("start", 0), ("cameo", 3)):
-        for b in (1, 2, 3):
-            result[f"{role}_minute_probability_{b}"] = float(p[offset + b])
-            result[f"{role}_minute_value_{b}"] = float(m[offset + b])
-    for b in range(4):
-        mask = bins == b
-        mass = float(p[mask].sum())
-        representative = float(np.sum(p[mask] * m[mask]) / mass) if mass else (0, 30, 75, 90)[b]
-        lower, upper = (
-            (0, 0),
-            (np.nextafter(0.0, 1.0), np.nextafter(60.0, 0.0)),
-            (60, np.nextafter(90.0, 0.0)),
-            (90, 120),
-        )[b]
-        result[f"minute_probability_{b}"] = mass
-        result[f"minute_value_{b}"] = float(np.clip(representative, lower, upper))
-    result["flag_minute_model_sha256"] = prediction.model_sha256
-    result["flag_input_sha256"] = prediction.input_sha256
-    result["flag_weekly_appearance"] = prediction.weekly_appearance
-    result["flag_eligibility_application"] = "replaced_by_learned_whole_week_law"
-    # Points are recomputed after complete-club allocation below.
-    result["flag_defcon_active"] = int(season[:4]) >= 2025
-    result["flag_goal_coefficient"] = (
-        10 if position == "GK" and season >= "2024-25" else GOAL_POINTS[position]
-    )
-    return result
-
-
-def _allocate_and_score(native: pd.DataFrame, updated: pd.DataFrame) -> pd.DataFrame:
-    output = updated.copy(deep=True)
-    originals = native.set_index(["fixture", "player_code"])
-    for (fixture, _), group in output.groupby(["fixture", "club"], sort=True):
-        indices = group.index
-        old = originals.loc[[(fixture, int(p)) for p in group.player_code]]
-        old_minutes = old.expected_minutes.to_numpy(float)
-        new_minutes = group.expected_minutes.to_numpy(float)
-        if ((old_minutes == 0) & (new_minutes > 0)).any():
-            raise ValueError("Native zero minute support cannot allocate a new positive recipient.")
-        ratio = np.divide(
-            new_minutes, old_minutes, out=np.zeros_like(new_minutes), where=old_minutes > 0
-        )
-        for count, share in (("goals", "goals_share"), ("assists", "assists_share")):
-            total = math.fsum(old[count].to_numpy(float))
-            old_share = old[share].to_numpy(float)
-            if total > 0 and not math.isclose(
-                math.fsum(old_share), 1.0, rel_tol=1e-12, abs_tol=1e-12
-            ):
-                raise ValueError("Native positive attacking mass lacks a full-club share basis.")
-            if not np.allclose(
-                old[count].to_numpy(float), total * old_share, rtol=1e-12, atol=1e-12
-            ):
-                raise ValueError("Native attacking counts disagree with their club share basis.")
-            weights = old_share * ratio
-            mass = math.fsum(weights)
-            if total > 0 and mass <= 0:
-                raise ValueError("A positive native club total has no learned minute support.")
-            shares = weights / mass if mass > 0 else np.zeros_like(weights)
-            output.loc[indices, share] = shares
-            output.loc[indices, count] = total * shares
-    if (
-        output.goals.to_numpy(float) + output.assists.to_numpy(float)
-        > output.team_goal_rate.to_numpy(float) + 1e-12
-    ).any():
-        raise ValueError(
-            "A player cannot receive scorer and assist credit on the same physical goal."
-        )
-    q = output.appearance_probability.to_numpy(float)
-    p60 = output.p60.to_numpy(float)
-    raw = (
-        q
-        + p60
-        + output.flag_goal_coefficient.to_numpy(float) * output.goals.to_numpy(float)
-        + 3 * output.assists.to_numpy(float)
-        + output.position.map(CS_POINTS).to_numpy(float)
-        * output.clean_sheet_probability.to_numpy(float)
-        + 2 * output.flag_defcon_active.to_numpy(float) * output.defcon_probability.to_numpy(float)
-        + q * output.residual_if_appearance.to_numpy(float)
-    )
-    if not np.isfinite(raw).all():
-        raise ValueError("Learned fixture points exceeded finite support.")
-    output["raw_expected_points"] = raw
-    output["expected_points"] = np.maximum(raw, 0)
-    return output
 
 
 def compose_flag_experiment(

@@ -101,29 +101,38 @@ export function useMemberAdviceView(
     deviceDependencies,
     onDevice?.rivals ?? [],
   );
-  const requestKey = [
+  // What the member asked for, chip and Top 100 weight included.
+  const selectionKey = [
     adviceRequestKey(request),
-    selection.status,
-    selection.path,
     selection.top100.weight,
     selection.chip.chip ?? "",
   ].join(":");
+  // The same with what the publish says of it, which a late index read changes.
+  const requestKey = [selectionKey, selection.status, selection.path].join(":");
 
   // A new selection starts clean: an earlier request's answer, wait or failure must not
   // read as this member's, strategy's, window's or rival's.
   // A wait this tab began for the same selection before a reload is picked up again.
   const { reset, resume, readCached } = job;
+  const { reset: resetDevice, run: runOnDevice } = deviceJob;
   const readOnOpen = computeService === "ready" && computeAvailable && advice == null;
   const resumable = useRef(request);
+  const endDeviceRun = useRef(resetDevice);
   useEffect(() => {
     resumable.current = request;
+    endDeviceRun.current = resetDevice;
   });
-  const { reset: resetDevice, run: runOnDevice } = deviceJob;
   useEffect(() => {
     reset();
-    resetDevice();
     if (computeAvailable) resume?.(resumable.current);
-  }, [requestKey, computeAvailable, reset, resetDevice, resume]);
+  }, [requestKey, computeAvailable, reset, resume]);
+  // A run on the device, solving or finished, ends with a new selection here and when the
+  // member asks the service (below); a late index or advice read, or a baseline the service
+  // may now offer, leaves it as it is. The reset is read through a ref, so a caller's timers
+  // passed inline do not end it either.
+  useEffect(() => {
+    endDeviceRun.current();
+  }, [selectionKey]);
   useEffect(() => {
     if (readOnOpen) readCached?.(resumable.current);
   }, [requestKey, readOnOpen, readCached]);

@@ -1,7 +1,8 @@
 /**
  * The device solve on the page: offered for the one selection the publisher wrote inputs
  * for, run through a worker, shown as the advice document the page reads, held to the
- * capture on screen, and dropped by a new selection or a service computation.
+ * capture on screen, started once while a run loads or solves, dropped by a new
+ * selection or a service computation, and marked on the page's timeline.
  */
 
 import { existsSync, readFileSync } from "node:fs";
@@ -34,6 +35,8 @@ import {
   useDevicePlan,
   type DeviceSolver,
   type DevicePlanPhase,
+  type DeviceTimeline,
+  type PageVisibility,
 } from "./useDevicePlan";
 
 afterEach(cleanup);
@@ -143,6 +146,56 @@ class SilentSolver implements DeviceSolver {
   }
 }
 
+/** A worker that loads and answers only when the test says, keeping each request posted to it. */
+class HeldSolver implements DeviceSolver {
+  onmessage: ((event: MessageEvent<DevicePlanReply>) => void) | null = null;
+  onerror: ((event: unknown) => void) | null = null;
+  readonly posted: DevicePlanRequest[] = [];
+  postMessage(request: DevicePlanRequest): void {
+    this.posted.push(request);
+    queueMicrotask(() =>
+      this.onmessage?.({
+        data: { id: request.id, kind: "ready" },
+      } as MessageEvent<DevicePlanReply>),
+    );
+  }
+  /** Answer a request posted earlier with the real solver's plan. */
+  answer(request: DevicePlanRequest): void {
+    this.onmessage?.({
+      data: {
+        id: request.id,
+        kind: "answer",
+        answer: solvePlan(highs, request.document, request.entry, () => 0),
+      },
+    } as MessageEvent<DevicePlanReply>);
+  }
+  terminate(): void {}
+}
+
+/** A timeline kept in order; a measure needs both its marks, as User Timing's does. */
+class KeptTimeline implements DeviceTimeline {
+  readonly marks: string[] = [];
+  readonly measures: { name: string; start: string; end: string }[] = [];
+  /** Every measure asked for, kept or not. */
+  readonly asked: string[] = [];
+  mark(name: string): void {
+    this.marks.push(name);
+  }
+  measure(name: string, start: string, end: string): void {
+    this.asked.push(name);
+    if (!this.marks.includes(start) || !this.marks.includes(end)) {
+      throw new Error(`no mark ${start} or ${end}`);
+    }
+    this.measures.push({ name, start, end });
+  }
+}
+
+/** The names the marks of the run whose press is `press` take: `device:<n>:<point>`. */
+function marksOf(press: string): (point: string) => string {
+  const run = /^device:(\d+):press$/.exec(press)?.[1];
+  return (point) => `device:${run}:${point}`;
+}
+
 /** A worker that never loads: it answers nothing, not even that it is ready. */
 class MuteSolver implements DeviceSolver {
   onmessage: ((event: MessageEvent<DevicePlanReply>) => void) | null = null;
@@ -152,6 +205,32 @@ class MuteSolver implements DeviceSolver {
   terminate(): void {
     this.terminated = true;
   }
+}
+
+/** A page the test hides and shows, keeping each listener it is given until it is removed. */
+class HandVisibility implements PageVisibility {
+  private state: DocumentVisibilityState = "visible";
+  readonly listeners = new Set<() => void>();
+  readonly hidden = (): boolean => this.state === "hidden";
+  readonly listen = (changed: () => void): (() => void) => {
+    // One entry for each listener added, even one added twice.
+    const listener = () => changed();
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  };
+  /** Hide or show the page and tell each listener, as the browser's visibilitychange does. */
+  turn(state: DocumentVisibilityState): void {
+    this.state = state;
+    for (const listener of [...this.listeners]) listener();
+  }
+}
+
+/** A clock in milliseconds that moves only when the test moves it. */
+class HandClock {
+  milliseconds = 0;
+  readonly read = (): number => this.milliseconds;
 }
 
 function Harness({
@@ -164,6 +243,9 @@ function Harness({
   createSolver,
   timers,
   inlineTimers = false,
+  timeline,
+  visibility,
+  clock,
 }: {
   squad: EntrySquad;
   request: AdviceRequest;
@@ -176,6 +258,11 @@ function Harness({
   timers?: HandTimers;
   /** Pass the timers as new functions on every render, as a caller writing them inline does. */
   inlineTimers?: boolean;
+  /** Absent, the page's own User Timing. */
+  timeline?: DeviceTimeline;
+  /** Absent, the page's own visibility and clock. */
+  visibility?: PageVisibility;
+  clock?: () => number;
 }) {
   const timerDependencies = !timers
     ? {}
@@ -194,6 +281,9 @@ function Harness({
       createSolver: createSolver ?? (() => solver),
       now: () => new Date("2026-10-03T01:02:03Z"),
       ...timerDependencies,
+      timeline,
+      visibility,
+      clock,
     },
     rivals,
   );
@@ -822,5 +912,685 @@ describe("a solve that runs too long, or is no longer wanted", () => {
     expect(timers.waiting.size).toBe(0);
     await act(async () => screen.getByText("reset").click());
     expect(solver.terminated).toBe(false);
+  });
+});
+
+describe("a watchdog on a page the member hides", () => {
+  const LOAD = (DEVICE_LOAD_ALLOWANCE_SECONDS + DEVICE_REPLY_GRACE_SECONDS) * 1000;
+  const SOLVE = (DEVICE_SOLVE_CEILING_SECONDS + DEVICE_REPLY_GRACE_SECONDS) * 1000;
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  /** The delays of the timers still set. */
+  const delays = (timers: HandTimers) =>
+    [...timers.waiting.values()].map((timer) => timer.milliseconds);
+
+  /** A page with its own timers, visibility and clock, whose workers are kept in `created`. */
+  function hiddenPage<Solver extends DeviceSolver>(make: () => Solver) {
+    const timers = new HandTimers();
+    const visibility = new HandVisibility();
+    const clock = new HandClock();
+    const timeline = new KeptTimeline();
+    const created: Solver[] = [];
+    const page = (request: AdviceRequest = REQUEST) =>
+      withLeague(
+        <Harness
+          squad={squadWith(entry)}
+          request={request}
+          loadDocument={async () => envelope(document)}
+          solver={make()}
+          createSolver={() => {
+            const made = make();
+            created.push(made);
+            return made;
+          }}
+          timers={timers}
+          visibility={visibility}
+          clock={clock.read}
+          timeline={timeline}
+          onState={() => {}}
+        />,
+      );
+    return { timers, visibility, clock, timeline, created, page };
+  }
+
+  it("pauses the solve's watchdog while the page is hidden and sets it again for what was left", async () => {
+    const { timers, visibility, clock, created, page } = hiddenPage(() => new SilentSolver());
+    render(page());
+    await act(async () => screen.getByText("run").click());
+    await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("solving"));
+    expect(delays(timers)).toEqual([SOLVE]);
+    clock.milliseconds += 40_000;
+    act(() => visibility.turn("hidden"));
+    expect(timers.waiting.size).toBe(0);
+    // However long the page stays hidden, none of it is counted.
+    clock.milliseconds += 600_000;
+    act(() => visibility.turn("visible"));
+    expect(delays(timers)).toEqual([SOLVE - 40_000]);
+    clock.milliseconds += 25_000;
+    act(() => visibility.turn("hidden"));
+    clock.milliseconds += 5_000;
+    act(() => visibility.turn("visible"));
+    expect(delays(timers)).toEqual([SOLVE - 65_000]);
+    await act(async () => timers.fireAll());
+    await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("failed"));
+    expect(created).toHaveLength(1);
+    expect(created[0]!.terminated).toBe(true);
+    expect(visibility.listeners.size).toBe(0);
+  });
+
+  it("pauses the load's allowance the same way while the worker is still loading", async () => {
+    const { timers, visibility, clock, created, page } = hiddenPage(() => new MuteSolver());
+    render(page());
+    await act(async () => screen.getByText("run").click());
+    await waitFor(() => expect(timers.waiting.size).toBe(1));
+    expect(screen.getByTestId("phase")).toHaveTextContent("loading");
+    expect(delays(timers)).toEqual([LOAD]);
+    clock.milliseconds += 20_000;
+    act(() => visibility.turn("hidden"));
+    expect(timers.waiting.size).toBe(0);
+    clock.milliseconds += 300_000;
+    act(() => visibility.turn("visible"));
+    expect(delays(timers)).toEqual([LOAD - 20_000]);
+    await act(async () => timers.fireAll());
+    await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("failed"));
+    expect(created).toHaveLength(1);
+    expect(created[0]!.terminated).toBe(true);
+    expect(visibility.listeners.size).toBe(0);
+  });
+
+  it.each([
+    { worker: "still loading", make: (): DeviceSolver => new MuteSolver(), point: "posted" },
+    { worker: "ready", make: (): DeviceSolver => new SilentSolver(), point: "ready" },
+  ])(
+    "sets nothing for a run started on a hidden page until it is shown, then the whole span for a worker $worker",
+    async ({ make, point }) => {
+      const { timers, visibility, clock, timeline, page } = hiddenPage(make);
+      visibility.turn("hidden");
+      render(page());
+      await act(async () => screen.getByText("run").click());
+      await waitFor(() => expect(timeline.marks.at(-1)).toMatch(new RegExp(`:${point}$`)));
+      expect(timers.waiting.size).toBe(0);
+      expect(visibility.listeners.size).toBe(1);
+      clock.milliseconds += 90_000;
+      act(() => visibility.turn("visible"));
+      expect(delays(timers)).toEqual([point === "posted" ? LOAD : SOLVE]);
+      await act(async () => timers.fireAll());
+      await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("failed"));
+      expect(visibility.listeners.size).toBe(0);
+    },
+  );
+
+  it.each(
+    (["an answer", "a reset", "a new selection", "an unmount"] as const).flatMap((ending) =>
+      (["visible", "hidden"] as const).map((state) => ({ ending, state })),
+    ),
+  )("leaves no listener and no timer after $ending on a $state page", async ({ ending, state }) => {
+    const { timers, visibility, created, page } = hiddenPage(() => new HeldSolver());
+    const view = render(page());
+    await act(async () => screen.getByText("run").click());
+    await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("solving"));
+    expect(visibility.listeners.size).toBe(1);
+    act(() => visibility.turn(state));
+    expect(timers.waiting.size).toBe(state === "visible" ? 1 : 0);
+    if (ending === "an answer") {
+      await act(async () => created[0]!.answer(created[0]!.posted[0]!));
+      await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("done"));
+    } else if (ending === "a reset") {
+      await act(async () => screen.getByText("reset").click());
+    } else if (ending === "a new selection") {
+      view.rerender(page({ ...REQUEST, window: 3 }));
+    } else {
+      view.unmount();
+    }
+    expect(visibility.listeners.size).toBe(0);
+    expect(timers.waiting.size).toBe(0);
+    // A page shown again sets nothing for a run that has ended.
+    act(() => visibility.turn("visible"));
+    expect(timers.waiting.size).toBe(0);
+  });
+
+  it("hears the page's own visibility when given none", async () => {
+    const timers = new HandTimers();
+    render(
+      withLeague(
+        <Harness
+          squad={squadWith(entry)}
+          request={REQUEST}
+          loadDocument={async () => envelope(document)}
+          solver={new SilentSolver()}
+          timers={timers}
+          onState={() => {}}
+        />,
+      ),
+    );
+    await act(async () => screen.getByText("run").click());
+    await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("solving"));
+    const page = globalThis.document;
+    const shown = vi.spyOn(page, "visibilityState", "get").mockReturnValue("hidden");
+    act(() => {
+      page.dispatchEvent(new Event("visibilitychange"));
+    });
+    expect(timers.waiting.size).toBe(0);
+    shown.mockReturnValue("visible");
+    act(() => {
+      page.dispatchEvent(new Event("visibilitychange"));
+    });
+    expect(timers.waiting.size).toBe(1);
+    expect(delays(timers)[0]).toBeLessThanOrEqual(SOLVE);
+    // A reset takes its listener off the page: the page shown again sets nothing.
+    await act(async () => screen.getByText("reset").click());
+    act(() => {
+      page.dispatchEvent(new Event("visibilitychange"));
+    });
+    expect(timers.waiting.size).toBe(0);
+  });
+});
+
+describe("a run asked for again while one is in flight", () => {
+  /** A gate the inputs' read waits on, and how many reads were made. */
+  function heldReads() {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const reads = { count: 0 };
+    const loadDocument = async () => {
+      reads.count += 1;
+      await gate;
+      return envelope(document);
+    };
+    return { reads, loadDocument, release };
+  }
+
+  /** Reads of the inputs that each wait on a gate of their own, released one at a time. */
+  function gatedReads() {
+    const gates: (() => void)[] = [];
+    const loadDocument = () =>
+      new Promise<LeagueViewEnvelope<DevicePlanDocument>>((resolve) => {
+        gates.push(() => resolve(envelope(document)));
+      });
+    return { gates, loadDocument };
+  }
+
+  async function pressTwice() {
+    await act(async () => {
+      screen.getByText("run").click();
+      screen.getByText("run").click();
+    });
+  }
+
+  it("posts nothing more to a worker that is solving, and the first run still finishes", async () => {
+    const timers = new HandTimers();
+    const created: HeldSolver[] = [];
+    let reads = 0;
+    render(
+      withLeague(
+        <Harness
+          squad={squadWith(entry)}
+          request={REQUEST}
+          loadDocument={async () => {
+            reads += 1;
+            return envelope(document);
+          }}
+          solver={new HeldSolver()}
+          createSolver={() => {
+            const made = new HeldSolver();
+            created.push(made);
+            return made;
+          }}
+          timers={timers}
+          onState={() => {}}
+        />,
+      ),
+    );
+    await act(async () => screen.getByText("run").click());
+    await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("solving"));
+    await act(async () => screen.getByText("run").click());
+    expect(screen.getByTestId("phase")).toHaveTextContent("solving");
+    expect(created).toHaveLength(1);
+    expect(created[0]!.posted).toHaveLength(1);
+    expect(reads).toBe(1);
+    await act(async () => created[0]!.answer(created[0]!.posted[0]!));
+    await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("done"));
+    expect(timers.waiting.size).toBe(0);
+  });
+
+  it("reads the inputs once when asked again while they are still being read", async () => {
+    const { reads, loadDocument, release } = heldReads();
+    render(
+      withLeague(
+        <Harness
+          squad={squadWith(entry)}
+          request={REQUEST}
+          loadDocument={loadDocument}
+          solver={new InProcessSolver()}
+          onState={() => {}}
+        />,
+      ),
+    );
+    await act(async () => screen.getByText("run").click());
+    await act(async () => screen.getByText("run").click());
+    expect(screen.getByTestId("phase")).toHaveTextContent("loading");
+    expect(reads.count).toBe(1);
+    await act(async () => release());
+    await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("done"));
+    expect(reads.count).toBe(1);
+  });
+
+  it.each(["a reset", "a new selection"])("starts one new run at once after %s", async (cause) => {
+    const { reads, loadDocument, release } = heldReads();
+    const page = (request: AdviceRequest) =>
+      withLeague(
+        <Harness
+          squad={squadWith(entry)}
+          request={request}
+          loadDocument={loadDocument}
+          solver={new InProcessSolver()}
+          onState={() => {}}
+        />,
+      );
+    const { rerender } = render(page(REQUEST));
+    await act(async () => screen.getByText("run").click());
+    // The first run is still reading its inputs when it is interrupted.
+    if (cause === "a reset") await act(async () => screen.getByText("reset").click());
+    else rerender(page({ ...REQUEST, gameweek: 9 }));
+    expect(screen.getByTestId("phase")).toHaveTextContent("idle");
+    await pressTwice();
+    expect(screen.getByTestId("phase")).toHaveTextContent("loading");
+    expect(reads.count).toBe(2);
+    await act(async () => release());
+    await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("done"));
+    expect(reads.count).toBe(2);
+  });
+
+  it.each(["a reset", "a new selection"])(
+    "still starts nothing beside the run after %s when the run it ended settles late",
+    async (cause) => {
+      const { gates, loadDocument } = gatedReads();
+      const page = (request: AdviceRequest) =>
+        withLeague(
+          <Harness
+            squad={squadWith(entry)}
+            request={request}
+            loadDocument={loadDocument}
+            solver={new InProcessSolver()}
+            onState={() => {}}
+          />,
+        );
+      const { rerender } = render(page(REQUEST));
+      await act(async () => screen.getByText("run").click());
+      if (cause === "a reset") await act(async () => screen.getByText("reset").click());
+      else rerender(page({ ...REQUEST, gameweek: 9 }));
+      await act(async () => screen.getByText("run").click());
+      expect(gates).toHaveLength(2);
+      // The ended run's read lands and that run settles while the next is still reading.
+      await act(async () => gates[0]!());
+      expect(screen.getByTestId("phase")).toHaveTextContent("loading");
+      await act(async () => screen.getByText("run").click());
+      expect(gates).toHaveLength(2);
+      await act(async () => gates[1]!());
+      await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("done"));
+      expect(gates).toHaveLength(2);
+    },
+  );
+
+  it.each([
+    { ending: "done", answer: undefined },
+    {
+      ending: "failed",
+      answer: (request: DevicePlanRequest): DevicePlanReply => ({ id: request.id, kind: "failed" }),
+    },
+    {
+      ending: "refused",
+      answer: (request: DevicePlanRequest): DevicePlanReply => ({
+        id: request.id,
+        kind: "refused",
+        status: "Infeasible",
+        stage: "plan",
+      }),
+    },
+  ])("starts one new run at once after a run that ended $ending", async ({ ending, answer }) => {
+    let reads = 0;
+    render(
+      withLeague(
+        <Harness
+          squad={squadWith(entry)}
+          request={REQUEST}
+          loadDocument={async () => {
+            reads += 1;
+            return envelope(document);
+          }}
+          solver={new InProcessSolver(answer)}
+          onState={() => {}}
+        />,
+      ),
+    );
+    await act(async () => screen.getByText("run").click());
+    await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent(ending));
+    expect(reads).toBe(1);
+    await pressTwice();
+    await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent(ending));
+    expect(reads).toBe(2);
+  });
+});
+
+describe("the marks a run leaves", () => {
+  const FINISHED = ["press", "inputs", "posted", "ready", "answer"];
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("marks each stage of a finished run in order and measures the three between them", async () => {
+    const timeline = new KeptTimeline();
+    render(
+      withLeague(
+        <Harness
+          squad={squadWith(entry)}
+          request={REQUEST}
+          loadDocument={async () => envelope(document)}
+          solver={new InProcessSolver()}
+          timeline={timeline}
+          onState={() => {}}
+        />,
+      ),
+    );
+    await act(async () => screen.getByText("run").click());
+    await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("done"));
+    const at = marksOf(timeline.marks[0]!);
+    expect(timeline.marks).toEqual(FINISHED.map(at));
+    expect(timeline.measures).toEqual([
+      { name: "device:inputs", start: at("press"), end: at("inputs") },
+      { name: "device:load", start: at("posted"), end: at("ready") },
+      { name: "device:solve", start: at("ready"), end: at("answer") },
+    ]);
+  });
+
+  it("leaves no solve measured when the load's watchdog ends the run", async () => {
+    const timers = new HandTimers();
+    const timeline = new KeptTimeline();
+    render(
+      withLeague(
+        <Harness
+          squad={squadWith(entry)}
+          request={REQUEST}
+          loadDocument={async () => envelope(document)}
+          solver={new MuteSolver()}
+          timers={timers}
+          timeline={timeline}
+          onState={() => {}}
+        />,
+      ),
+    );
+    await act(async () => screen.getByText("run").click());
+    await waitFor(() => expect(timers.waiting.size).toBe(1));
+    await act(async () => timers.fireAll());
+    await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("failed"));
+    const at = marksOf(timeline.marks[0]!);
+    expect(timeline.marks).toEqual(["press", "inputs", "posted", "failed"].map(at));
+    expect(timeline.measures.map((measure) => measure.name)).toEqual(["device:inputs"]);
+    // Not asked for at all, rather than asked for and lost for want of its start.
+    expect(timeline.asked).toEqual(["device:inputs"]);
+  });
+
+  it("measures the solve to the failure when the solve's watchdog ends the run", async () => {
+    const timers = new HandTimers();
+    const timeline = new KeptTimeline();
+    render(
+      withLeague(
+        <Harness
+          squad={squadWith(entry)}
+          request={REQUEST}
+          loadDocument={async () => envelope(document)}
+          solver={new SilentSolver()}
+          timers={timers}
+          timeline={timeline}
+          onState={() => {}}
+        />,
+      ),
+    );
+    await act(async () => screen.getByText("run").click());
+    await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("solving"));
+    await act(async () => timers.fireAll());
+    await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("failed"));
+    const at = marksOf(timeline.marks[0]!);
+    expect(timeline.marks).toEqual(["press", "inputs", "posted", "ready", "failed"].map(at));
+    expect(timeline.measures.at(-1)).toEqual({
+      name: "device:solve",
+      start: at("ready"),
+      end: at("failed"),
+    });
+  });
+
+  it.each(["a reset", "a new selection"])(
+    "leaves no reply mark and no solve measured for a run %s ends while it solves",
+    async (cause) => {
+      const timers = new HandTimers();
+      const timeline = new KeptTimeline();
+      const page = (request: AdviceRequest) =>
+        withLeague(
+          <Harness
+            squad={squadWith(entry)}
+            request={request}
+            loadDocument={async () => envelope(document)}
+            solver={new SilentSolver()}
+            timers={timers}
+            timeline={timeline}
+            onState={() => {}}
+          />,
+        );
+      const { rerender } = render(page(REQUEST));
+      await act(async () => screen.getByText("run").click());
+      await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("solving"));
+      if (cause === "a reset") await act(async () => screen.getByText("reset").click());
+      else rerender(page({ ...REQUEST, window: 3 }));
+      // The ended run's wait settles empty, and the run goes no further.
+      await act(async () => {});
+      expect(screen.getByTestId("phase")).toHaveTextContent("idle");
+      const at = marksOf(timeline.marks[0]!);
+      expect(timeline.marks).toEqual(["press", "inputs", "posted", "ready"].map(at));
+      expect(timeline.asked).toEqual(["device:inputs", "device:load"]);
+    },
+  );
+
+  it("marks a refusal as the reply that ended the solve", async () => {
+    const timeline = new KeptTimeline();
+    const refusing = new InProcessSolver((request) => ({
+      id: request.id,
+      kind: "refused",
+      status: "Infeasible",
+      stage: "plan",
+    }));
+    render(
+      withLeague(
+        <Harness
+          squad={squadWith(entry)}
+          request={REQUEST}
+          loadDocument={async () => envelope(document)}
+          solver={refusing}
+          timeline={timeline}
+          onState={() => {}}
+        />,
+      ),
+    );
+    await act(async () => screen.getByText("run").click());
+    await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("refused"));
+    const at = marksOf(timeline.marks[0]!);
+    expect(timeline.marks).toEqual(["press", "inputs", "posted", "ready", "refused"].map(at));
+    expect(timeline.measures.at(-1)).toEqual({
+      name: "device:solve",
+      start: at("ready"),
+      end: at("refused"),
+    });
+  });
+
+  it("keeps two runs apart: one a reset ended leaves only its press, the next its own marks", async () => {
+    const gates: (() => void)[] = [];
+    const loadDocument = () =>
+      new Promise<LeagueViewEnvelope<DevicePlanDocument>>((resolve) => {
+        gates.push(() => resolve(envelope(document)));
+      });
+    const timeline = new KeptTimeline();
+    render(
+      withLeague(
+        <Harness
+          squad={squadWith(entry)}
+          request={REQUEST}
+          loadDocument={loadDocument}
+          solver={new InProcessSolver()}
+          timeline={timeline}
+          onState={() => {}}
+        />,
+      ),
+    );
+    await act(async () => screen.getByText("run").click());
+    await act(async () => screen.getByText("reset").click());
+    await act(async () => screen.getByText("run").click());
+    // The ended run's inputs land while the next run is still reading its own.
+    await act(async () => gates[0]!());
+    await act(async () => gates[1]!());
+    await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("done"));
+    const first = marksOf(timeline.marks[0]!);
+    const next = marksOf(timeline.marks[1]!);
+    expect(next("press")).not.toBe(first("press"));
+    expect(timeline.marks).toEqual([first("press"), ...FINISHED.map(next)]);
+    expect(timeline.measures.map(({ start, end }) => [start, end])).toEqual([
+      [next("press"), next("inputs")],
+      [next("posted"), next("ready")],
+      [next("ready"), next("answer")],
+    ]);
+  });
+
+  it("marks nothing for a press the run in flight ignores", async () => {
+    const timeline = new KeptTimeline();
+    render(
+      withLeague(
+        <Harness
+          squad={squadWith(entry)}
+          request={REQUEST}
+          loadDocument={async () => envelope(document)}
+          solver={new InProcessSolver()}
+          timeline={timeline}
+          onState={() => {}}
+        />,
+      ),
+    );
+    await act(async () => {
+      screen.getByText("run").click();
+      screen.getByText("run").click();
+    });
+    await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("done"));
+    expect(timeline.marks).toEqual(FINISHED.map(marksOf(timeline.marks[0]!)));
+  });
+
+  it("names a run's marks apart from those of a run on the page before it was mounted again", async () => {
+    const timeline = new KeptTimeline();
+    for (let mounted = 0; mounted < 2; mounted += 1) {
+      render(
+        withLeague(
+          <Harness
+            squad={squadWith(entry)}
+            request={REQUEST}
+            loadDocument={async () => envelope(document)}
+            solver={new InProcessSolver()}
+            timeline={timeline}
+            onState={() => {}}
+          />,
+        ),
+      );
+      await act(async () => screen.getByText("run").click());
+      await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("done"));
+      cleanup();
+    }
+    const first = marksOf(timeline.marks[0]!);
+    const next = marksOf(timeline.marks[FINISHED.length]!);
+    expect(next("press")).not.toBe(first("press"));
+    expect(timeline.marks).toEqual([...FINISHED.map(first), ...FINISHED.map(next)]);
+  });
+
+  it("finishes a run whose timeline throws on every call as it finishes one whose does not", async () => {
+    const answer = solvePlan(highs, document, entry, () => 0);
+    const calls = { count: 0 };
+    const throwing: DeviceTimeline = {
+      mark: () => {
+        calls.count += 1;
+        throw new Error("no marks here");
+      },
+      measure: () => {
+        calls.count += 1;
+        throw new Error("no measures here");
+      },
+    };
+    async function finished(timeline: DeviceTimeline): Promise<DevicePlanPhase> {
+      const seen = { latest: { phase: "idle" } as DevicePlanPhase };
+      render(
+        withLeague(
+          <Harness
+            squad={squadWith(entry)}
+            request={REQUEST}
+            loadDocument={async () => envelope(document)}
+            solver={new InProcessSolver((request) => ({ id: request.id, kind: "answer", answer }))}
+            timeline={timeline}
+            onState={(state) => {
+              seen.latest = state;
+            }}
+          />,
+        ),
+      );
+      await act(async () => screen.getByText("run").click());
+      await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("done"));
+      cleanup();
+      return seen.latest;
+    }
+    const kept = await finished(new KeptTimeline());
+    expect(await finished(throwing)).toEqual(kept);
+    // Five marks and three measures were asked for, and every one of them threw.
+    expect(calls.count).toBe(8);
+  });
+
+  it("leaves its marks and measures on the page's own User Timing when given no timeline", async () => {
+    performance.clearMarks();
+    performance.clearMeasures();
+    render(
+      withLeague(
+        <Harness
+          squad={squadWith(entry)}
+          request={REQUEST}
+          loadDocument={async () => envelope(document)}
+          solver={new InProcessSolver()}
+          onState={() => {}}
+        />,
+      ),
+    );
+    await act(async () => screen.getByText("run").click());
+    await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("done"));
+    const named = (type: string) =>
+      performance
+        .getEntriesByType(type)
+        .map(({ name }) => name)
+        .filter((name) => name.startsWith("device:"));
+    expect(named("measure")).toEqual(["device:inputs", "device:load", "device:solve"]);
+    const marks = named("mark");
+    expect(marks).toEqual(FINISHED.map(marksOf(marks[0]!)));
+  });
+
+  it("finishes a run on a page whose browser has no User Timing", async () => {
+    vi.stubGlobal("performance", { now: performance.now.bind(performance) });
+    render(
+      withLeague(
+        <Harness
+          squad={squadWith(entry)}
+          request={REQUEST}
+          loadDocument={async () => envelope(document)}
+          solver={new InProcessSolver()}
+          onState={() => {}}
+        />,
+      ),
+    );
+    await act(async () => screen.getByText("run").click());
+    await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("done"));
   });
 });

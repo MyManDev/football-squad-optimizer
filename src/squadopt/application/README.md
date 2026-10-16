@@ -12,7 +12,7 @@ domain records import no process, thread, event-loop or command-line module" in
 `source_revision()` in `squadopt.data.source_revision`, which runs `git`; ARCHITECTURE.md lists
 it as a known violation.
 
-Its 62 Python files, 57 at the top level, four in the `strategies/` subpackage and the package
+Its 63 Python files, 58 at the top level, four in the `strategies/` subpackage and the package
 file of `ports/`, are placed by this page: every one of them is in exactly one family. Review:
 the owner ([ownership](../../../docs/architecture/ownership.md)).
 
@@ -128,6 +128,7 @@ may end in `_experiment` (`tests/architecture/test_run_boundary.py`).
 | --- | --- |
 | `football_live.py` | Produces the optional live football forecast from an immutable capture and archive. |
 | `football_context.py` | Binds captured feed availability and source-resolved manager claims to the football input. |
+| `football_composite_news.py` | Selects verified first-week joint-law interventions and reprojects the complete composite fixture basis (`src/squadopt/application/football_composite_news.py:39`, `src/squadopt/application/football_composite_news.py:127`). |
 | `football_participation.py` | Binds captured participation evidence to the experimental football window. |
 | `football_roles.py` | Internal fixture-role estimates and their restricted public explanation. |
 | `football_information.py` | The public conditional plan explanation, with base points apart from choice utility. |

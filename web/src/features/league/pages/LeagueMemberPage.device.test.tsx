@@ -1,7 +1,9 @@
 /**
  * The device solve on the member page: offered where the publisher wrote the member's
  * inputs, the plan it proves shown as a computation result, one answer at a time with
- * the service, and nothing offered where the inputs are absent.
+ * the service, a solve still running or a plan it finished ended by a new selection and by
+ * no read that lands, and nothing offered where the inputs are absent or the manager's word
+ * is on.
  */
 
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
@@ -27,8 +29,9 @@ import type {
 import type { DevicePlanReply, DevicePlanRequest } from "../device/deviceSolver.worker";
 import type { DevicePlanDocument, DevicePlanEntry } from "../device/types";
 import type { DeviceSolver } from "../device/useDevicePlan";
-import type { EntrySquad, LeagueViewEnvelope } from "../types";
+import type { EntryAdviceIndex, EntrySquad, LeagueViewEnvelope } from "../types";
 import { LeagueMemberView } from "./LeagueMemberPage";
+import type { LeagueMemberViewProps } from "./memberPageTypes";
 import { exampleTree, withLeague } from "../../../testSupport/league";
 import type { RequestOptions } from "../../../data/request";
 import { StaticOnlyAdviceClient } from "../advice/adviceClient";
@@ -38,6 +41,19 @@ afterEach(cleanup);
 const ENTRY = 35249001;
 const MEMBERS = mockLeagueMembersEnvelope.payload.members;
 const INDEX = mockEntryAdviceIndex(ENTRY).payload;
+/** The same publish with the manager's word solved for the member. */
+const WORD_INDEX: EntryAdviceIndex = {
+  ...INDEX,
+  evidence: {
+    available: true,
+    path: `advice/${ENTRY}/saf-puan/1/hoca-sozu.json`,
+    applied_count: 1,
+    source_kind: "synthetic_fixture",
+    source_label: "club_news_v1.fixture.json",
+    clubs_covered: ["Arsenal"],
+    rule_version: "managers_word_rule_v1",
+  },
+};
 const copy = MESSAGES.tr.leagueMembers;
 const PLAN_SHOWN = copy.squadAfterTitle;
 const document = fixture.document as unknown as DevicePlanDocument;
@@ -97,6 +113,22 @@ class CannedSolver implements DeviceSolver {
   }
 }
 
+/** A worker that loads and never answers: its solve is still running while the page changes. */
+class StillSolving implements DeviceSolver {
+  onmessage: ((event: MessageEvent<DevicePlanReply>) => void) | null = null;
+  terminated = false;
+  postMessage(request: DevicePlanRequest): void {
+    queueMicrotask(() =>
+      this.onmessage?.({
+        data: { id: request.id, kind: "ready" },
+      } as MessageEvent<DevicePlanReply>),
+    );
+  }
+  terminate(): void {
+    this.terminated = true;
+  }
+}
+
 /** Moves the selection to a three-week window and back, through the URL as the page does. */
 function SwitchWindow() {
   const [params, setParams] = useSearchParams();
@@ -114,6 +146,21 @@ function SwitchWindow() {
         to-1
       </button>
     </>
+  );
+}
+
+/** Switches the manager's word on, through the URL as the page does. */
+function SwitchWord() {
+  const [params, setParams] = useSearchParams();
+  const on = () => {
+    const next = new URLSearchParams(params);
+    next.set("llm", "on");
+    setParams(next);
+  };
+  return (
+    <button type="button" onClick={on}>
+      word-on
+    </button>
   );
 }
 
@@ -137,30 +184,37 @@ class ServiceClient implements AdviceClient {
   }
 }
 
+/** The shared device document, as the tree serves it. */
+async function deviceDocument(): Promise<LeagueViewEnvelope<DevicePlanDocument>> {
+  return {
+    contract_version: "provisional_league_ui_v1",
+    generated_at_utc: "2026-10-03T00:00:00Z",
+    source_kind: "live",
+    payload: document,
+  };
+}
+
 function renderView(
   squad: LeagueViewEnvelope<EntrySquad>,
   search = "mode=saf-puan&window=1",
   hold = false,
+  index: EntryAdviceIndex = INDEX,
 ) {
   return render(
     <LanguageProvider initialLanguage="tr">
       <MemoryRouter initialEntries={[`/league/352490/members/${ENTRY}?${search}`]}>
         <SwitchWindow />
+        <SwitchWord />
         {withLeague(
           <LeagueMemberView
             squad={squad}
             advice={null}
             adviceIssue="not-listed"
             members={MEMBERS}
-            index={INDEX}
+            index={index}
             client={new ServiceClient()}
             deviceDependencies={{
-              loadDocument: async () => ({
-                contract_version: "provisional_league_ui_v1",
-                generated_at_utc: "2026-10-03T00:00:00Z",
-                source_kind: "live",
-                payload: document,
-              }),
+              loadDocument: deviceDocument,
               createSolver: () => new CannedSolver(hold),
               now: () => new Date("2026-10-03T01:02:03Z"),
             }}
@@ -182,6 +236,30 @@ describe("the device solve on the member page", () => {
     expect(deviceButton()).toBeNull();
     cleanup();
     renderView(squadWith(entryBlock), "mode=saf-puan&window=3");
+    expect(deviceButton()).toBeNull();
+  });
+
+  it("is not offered while the manager's word is on, which only the service solves", () => {
+    renderView(squadWith(entryBlock), "mode=saf-puan&window=1", false, WORD_INDEX);
+    expect(deviceButton()).not.toBeNull();
+    cleanup();
+    renderView(squadWith(entryBlock), "mode=saf-puan&window=1&llm=on", false, WORD_INDEX);
+    expect(deviceButton()).toBeNull();
+  });
+
+  it("does not keep a plan it proved once the manager's word is switched on", async () => {
+    const { container } = renderView(
+      squadWith(entryBlock),
+      "mode=saf-puan&window=1",
+      false,
+      WORD_INDEX,
+    );
+    await act(async () => deviceButton()!.click());
+    await waitFor(() => expect(container).toHaveTextContent(copy.deviceDone("0,4")));
+    await act(async () => screen.getByText("word-on").click());
+    expect(container).not.toHaveTextContent(copy.deviceDone("0,4"));
+    expect(container).not.toHaveTextContent(copy.computeEcho(copy.computeEchoStates.device));
+    expect(screen.queryByText(PLAN_SHOWN)).toBeNull();
     expect(deviceButton()).toBeNull();
   });
 
@@ -237,5 +315,128 @@ describe("the device solve on the member page", () => {
     const decision = screen.getByRole("region", { name: copy.decisionTitle });
     expect(decision).toHaveTextContent(copy.noMove);
     expect(decision).not.toHaveTextContent(/yayımlanan plan|yayınlanan plan/i);
+  });
+});
+
+/** What the page has read of the index and the published advice. */
+type Reads = Pick<LeagueMemberViewProps, "advice" | "adviceIssue" | "adviceLoading" | "index">;
+const READING_INDEX: Reads = {
+  advice: null,
+  adviceIssue: "index-missing",
+  adviceLoading: true,
+  index: null,
+};
+const READING_ADVICE: Reads = {
+  advice: null,
+  adviceIssue: undefined,
+  adviceLoading: true,
+  index: INDEX,
+};
+const ALL_READ: Reads = {
+  advice: null,
+  adviceIssue: "published-missing",
+  adviceLoading: false,
+  index: INDEX,
+};
+
+/** The published plan for the selection, held to the capture the device's inputs are from. */
+const PUBLISHED_ADVICE = (() => {
+  const published = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1);
+  return {
+    ...published,
+    payload: { ...published.payload, source_snapshot_id: document.source_snapshot_id },
+  };
+})();
+const PUBLISHED_READ: Reads = { ...ALL_READ, advice: PUBLISHED_ADVICE, adviceIssue: undefined };
+
+/** The member page as its reads land, its device solving in the workers it creates. */
+function memberPage(createSolver: () => DeviceSolver) {
+  const squad = squadWith(entryBlock);
+  const client = new ServiceClient();
+  return (reads: Reads) => (
+    <LanguageProvider initialLanguage="tr">
+      <MemoryRouter initialEntries={[`/league/352490/members/${ENTRY}?mode=saf-puan&window=1`]}>
+        <SwitchWindow />
+        {withLeague(
+          <LeagueMemberView
+            squad={squad}
+            members={MEMBERS}
+            client={client}
+            deviceDependencies={{
+              loadDocument: deviceDocument,
+              // Written inline, as a caller may: each rerender of the page gives the device
+              // new timers.
+              setTimer: (callback: () => void, milliseconds: number) =>
+                setTimeout(callback, milliseconds),
+              clearTimer: (handle: unknown) =>
+                clearTimeout(handle as ReturnType<typeof setTimeout>),
+              createSolver,
+            }}
+            {...reads}
+          />,
+        )}
+      </MemoryRouter>
+    </LanguageProvider>
+  );
+}
+
+describe("a device solve on the member page as the page's reads land", () => {
+  /** The page from its first reads, its device solving in a worker that does not answer. */
+  async function solvingFrom(first: Reads) {
+    const workers: StillSolving[] = [];
+    const page = memberPage(() => {
+      const made = new StillSolving();
+      workers.push(made);
+      return made;
+    });
+    const { container, rerender } = render(page(first));
+    await act(async () => deviceButton()!.click());
+    await waitFor(() =>
+      expect(container.querySelector("[data-device-state='solving']")).not.toBeNull(),
+    );
+    return { container, workers, land: (reads: Reads) => rerender(page(reads)) };
+  }
+
+  /**
+   * A new selection still ends the solve. The device's own cleanup ends it before the page's
+   * reset runs; the page's reset is what "is dropped by a new selection" above shows.
+   */
+  async function endsWithTheSelection(container: HTMLElement, worker: StillSolving) {
+    await act(async () => screen.getByText("to-3").click());
+    expect(worker.terminated).toBe(true);
+    await act(async () => screen.getByText("to-1").click());
+    expect(container.querySelector("[data-device-state]")).toBeNull();
+    expect(deviceButton()).toBeEnabled();
+  }
+
+  it("goes on solving when the index read lands after it began", async () => {
+    const { container, workers, land } = await solvingFrom(READING_INDEX);
+    land(READING_ADVICE);
+    await act(async () => {});
+    expect(container.querySelector("[data-device-state='solving']")).not.toBeNull();
+    expect(workers).toHaveLength(1);
+    expect(workers[0]!.terminated).toBe(false);
+    await endsWithTheSelection(container, workers[0]!);
+  });
+
+  it("goes on solving when the advice read lands and the service may now be asked", async () => {
+    const { container, workers, land } = await solvingFrom(READING_ADVICE);
+    land(ALL_READ);
+    await act(async () => {});
+    expect(container.querySelector("[data-device-state='solving']")).not.toBeNull();
+    expect(workers).toHaveLength(1);
+    expect(workers[0]!.terminated).toBe(false);
+    await endsWithTheSelection(container, workers[0]!);
+  });
+
+  it("keeps the plan it finished when the published plan lands after it", async () => {
+    const page = memberPage(() => new CannedSolver());
+    const { container, rerender } = render(page(READING_INDEX));
+    await act(async () => deviceButton()!.click());
+    await waitFor(() => expect(container).toHaveTextContent(copy.deviceDone("0,4")));
+    rerender(page(PUBLISHED_READ));
+    await act(async () => {});
+    expect(container).toHaveTextContent(copy.deviceDone("0,4"));
+    expect(container).toHaveTextContent(copy.computeEcho(copy.computeEchoStates.device));
   });
 });

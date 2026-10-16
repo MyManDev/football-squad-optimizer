@@ -9,7 +9,7 @@ some of them directly. Nothing here calls a live endpoint: the capture is taken 
 `squadopt.platform.fpl_capture`, and every module reads bytes that were written down, which is
 what lets a past decision be replayed exactly.
 
-Its 21 Python files sit in one folder. This page places every one of them in exactly one
+Its 23 Python files sit in one folder. This page places every one of them in exactly one
 family.
 
 Review: the owner ([ownership](../../../docs/architecture/ownership.md)). `ledger.py`, `tick.py`
@@ -80,6 +80,8 @@ whole.
 | Module | What it does |
 | --- | --- |
 | `football_artifact.py` | Reads a versioned, capture-bound football forecast; reading never fits or fetches a model. |
+| `football_composite_basis.py` | Builds and verifies a required retained composite recipe, then reprojects news from its original weekly laws (`src/squadopt/live/football_composite_basis.py:731`, `src/squadopt/live/football_composite_basis.py:882`). |
+| `football_composite_codec.py` | Reads canonical bounded source DTOs selected by code, rejecting duplicate fields and undeclared types (`src/squadopt/live/football_composite_codec.py:125`). |
 | `football_horizon.py` | Opt-in football forecasts for a complete roster over a captured fixture calendar. |
 | `football_observations.py` | Capture-bound availability information for the experimental window consumer, from explicit source percentages only; `transfers.py` uses it. |
 | `minute_evidence.py` | Applies a source-verified exclusion of a full match to the football fixture components (`explicit_full_match_exclusion_v1`), keeping the probability of an appearance; it fits, fetches and publishes nothing. |

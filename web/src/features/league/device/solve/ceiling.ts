@@ -11,10 +11,11 @@ import type { LpSolver } from "../lp/problem";
 /**
  * The longest one request may spend solving, all its solves together: the primary, the
  * tie-break tiers, the hold and, with a chip or a rival strategy, their own. Far above
- * the work measured on the shipped tree: the slowest of 75 one-week requests (15 members,
- * the plain plan and four chips, on the GW6 tree) took 9.9 s on a desktop processor. Twelve
- * times that binds only on a device far slower than any measured one, or on a solve that
- * has stopped making progress.
+ * the work measured on the shipped tree: the slowest kind, a rival strategy, took 8.18 s at
+ * worst on the owner's PC (#1085; the plain plan 2.04 s, a chip 4.54 s, a Top 100 weight
+ * 5.78 s). The machine of the first measurements is about 2.2 times slower (its slowest
+ * chip request took 9.9 s), so about 18 s there. About 6.7 times that binds only on a device
+ * far slower than any measured one, or on a solve that has stopped making progress.
  */
 export const DEVICE_SOLVE_CEILING_SECONDS = 120;
 
