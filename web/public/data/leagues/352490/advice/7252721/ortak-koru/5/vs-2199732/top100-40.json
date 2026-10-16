@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-10-15T14:15:28Z",
+  "generated_at_utc": "2026-10-16T07:13:49Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,16 +9,16 @@
     "league_id": 352490,
     "mode": "ortak-koru",
     "window": 5,
-    "source_snapshot_id": "fpl-live-20261015T130038Z-7a7a388a3a43",
+    "source_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd",
     "moves": [
       {
         "move_id": "gw07-1",
         "player_out": {
-          "player_id": 219924,
-          "name": "Issa Diop",
-          "short_name": "Diop",
+          "player_id": 244723,
+          "name": "Tyrick Mitchell",
+          "short_name": "Mitchell",
           "position": "DEF",
-          "team": "Ipswich Town"
+          "team": "Crystal Palace"
         },
         "player_in": {
           "player_id": 466075,
@@ -33,7 +33,7 @@
     ],
     "transfer_hit_points": 0.0,
     "expected_gain_vs_hold": 0.7091674691565828,
-    "expected_points_cost": 6.4869332003701174,
+    "expected_points_cost": 3.6633524792616754,
     "rival_label": "entry-2199732",
     "solver_status": "FEASIBLE",
     "optimality_gap": null,
@@ -155,20 +155,20 @@
         "expected_points": 0.10027015579447286
       },
       {
-        "player_id": 244723,
-        "name": "Tyrick Mitchell",
-        "short_name": "Mitchell",
-        "position": "DEF",
-        "team": "Crystal Palace",
-        "expected_points": 2.742248299250839
-      },
-      {
         "player_id": 146426,
         "name": "Semi Ajayi",
         "short_name": "Ajayi",
         "position": "DEF",
         "team": "Hull City",
         "expected_points": 2.25764101727074
+      },
+      {
+        "player_id": 219924,
+        "name": "Issa Diop",
+        "short_name": "Diop",
+        "position": "DEF",
+        "team": "Ipswich Town",
+        "expected_points": 2.1748575911872456
       },
       {
         "player_id": 661313,
@@ -194,11 +194,11 @@
         ],
         "transfers_out": [
           {
-            "player_id": 219924,
-            "name": "Issa Diop",
-            "short_name": "Diop",
+            "player_id": 244723,
+            "name": "Tyrick Mitchell",
+            "short_name": "Mitchell",
             "position": "DEF",
-            "team": "Ipswich Town"
+            "team": "Crystal Palace"
           }
         ],
         "transfer_hit_points": 0.0,
@@ -211,11 +211,11 @@
         "gameweek": 8,
         "transfers_in": [
           {
-            "player_id": 215413,
-            "name": "Kiernan Dewsbury-Hall",
-            "short_name": "Dewsbury-Hall",
+            "player_id": 244851,
+            "name": "Cole Palmer",
+            "short_name": "Palmer",
             "position": "MID",
-            "team": "Everton"
+            "team": "Chelsea"
           }
         ],
         "transfers_out": [
@@ -231,17 +231,17 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 56.90807357556355
+        "expected_points": 57.92587515791399
       },
       {
         "gameweek": 9,
         "transfers_in": [
           {
-            "player_id": 17761,
-            "name": "James Tarkowski",
-            "short_name": "Tarkowski",
+            "player_id": 487838,
+            "name": "Lewis Hall",
+            "short_name": "Hall",
             "position": "DEF",
-            "team": "Everton"
+            "team": "Newcastle"
           }
         ],
         "transfers_out": [
@@ -257,17 +257,17 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 57.66082389297409
+        "expected_points": 57.83224817980239
       },
       {
         "gameweek": 10,
         "transfers_in": [
           {
-            "player_id": 244851,
-            "name": "Cole Palmer",
-            "short_name": "Palmer",
+            "player_id": 466052,
+            "name": "Rayan Cherki",
+            "short_name": "Cherki",
             "position": "MID",
-            "team": "Chelsea"
+            "team": "Man City"
           }
         ],
         "transfers_out": [
@@ -283,7 +283,7 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 58.240758348403006
+        "expected_points": 58.08476324859315
       },
       {
         "gameweek": 11,
@@ -309,7 +309,7 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 58.240758348403006
+        "expected_points": 58.08476324859315
       }
     ],
     "stated_limits": [
@@ -327,7 +327,7 @@
     "missing_fields": [],
     "squad_basis": "captured",
     "control_solver_status": "FEASIBLE",
-    "control_optimality_gap": 1.795000000000016,
+    "control_optimality_gap": 5.572999999999979,
     "rival_entry_id": 2199732,
     "overlap_count": 6,
     "transfer_cap": 1,
@@ -341,9 +341,9 @@
       "weight": 40,
       "changed": true,
       "price_basis": "base_model_pure_points_v1",
-      "cohort_snapshot_id": "fpl-top100-20261015T125956Z-62eac7653b23",
-      "picks_snapshot_id": "fpl-elite-picks-20261015T130016Z-f74142d5b421",
-      "table_sha256": "0a890f659631183ae43ffe18feb2530d6b0c3b18a22958933876121eb5c9028d",
+      "cohort_snapshot_id": "fpl-top100-20261016T060118Z-ae3db8c93137",
+      "picks_snapshot_id": "fpl-elite-picks-20261016T060136Z-8b4c3667de56",
+      "table_sha256": "2818a2e18bb44ede2d2baa84576d374ea81f0c3b4f9ba8a9ece1068a577408e5",
       "picks_gameweek": 6
     }
   }

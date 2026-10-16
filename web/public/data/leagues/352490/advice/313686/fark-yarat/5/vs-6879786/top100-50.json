@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-10-15T14:15:28Z",
+  "generated_at_utc": "2026-10-16T07:13:49Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "fark-yarat",
     "window": 5,
-    "source_snapshot_id": "fpl-live-20261015T130038Z-7a7a388a3a43",
+    "source_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd",
     "moves": [
       {
         "move_id": "gw07-1",
@@ -33,9 +33,9 @@
     ],
     "transfer_hit_points": 0.0,
     "expected_gain_vs_hold": 1.8281528551472945,
-    "expected_points_cost": 8.54572082747194,
+    "expected_points_cost": 7.739171978750903,
     "rival_label": "entry-6879786",
-    "solver_status": "FEASIBLE",
+    "solver_status": "OPTIMAL",
     "optimality_gap": null,
     "wall_clock_stopped_the_search": false,
     "expected_own_points": 58.20318064017789,
@@ -246,70 +246,70 @@
         ],
         "transfers_out": [
           {
-            "player_id": 586309,
-            "name": "Thierno Barry",
-            "short_name": "Barry",
+            "player_id": 631786,
+            "name": "Jonah Kusi-Asare",
+            "short_name": "Kusi-Asare",
             "position": "FWD",
-            "team": "Everton"
+            "team": "Fulham"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 57.01421939217725
+        "expected_points": 57.25345403944522
       },
       {
         "gameweek": 10,
         "transfers_in": [
           {
-            "player_id": 154561,
-            "name": "David Raya Mart\u00edn",
-            "short_name": "Mart\u00edn",
-            "position": "GK",
-            "team": "Arsenal"
+            "player_id": 201666,
+            "name": "Harvey Barnes",
+            "short_name": "Barnes",
+            "position": "MID",
+            "team": "Newcastle"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 489639,
-            "name": "Bart Verbruggen",
-            "short_name": "Verbruggen",
-            "position": "GK",
-            "team": "Brighton"
+            "player_id": 577725,
+            "name": "Josh King",
+            "short_name": "King",
+            "position": "MID",
+            "team": "Fulham"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 57.334780515392154
+        "expected_points": 57.71218688180244
       },
       {
         "gameweek": 11,
         "transfers_in": [
           {
-            "player_id": 154043,
-            "name": "Ainsley Maitland-Niles",
-            "short_name": "Maitland-Niles",
-            "position": "DEF",
-            "team": "Everton"
+            "player_id": 437730,
+            "name": "Antoine Semenyo",
+            "short_name": "Semenyo",
+            "position": "MID",
+            "team": "Man City"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 199798,
-            "name": "Ezri Konsa Ngoyo",
-            "short_name": "Ngoyo",
-            "position": "DEF",
-            "team": "Arsenal"
+            "player_id": 222531,
+            "name": "Morgan Gibbs-White",
+            "short_name": "Gibbs-White",
+            "position": "MID",
+            "team": "Nott'm Forest"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 57.93246670616253
+        "expected_points": 58.1223745412053
       }
     ],
     "stated_limits": [
@@ -326,8 +326,9 @@
     "data_quality": "complete",
     "missing_fields": [],
     "squad_basis": "captured",
-    "control_solver_status": "FEASIBLE",
-    "control_optimality_gap": 1.1169999999999618,
+    "expected_points_cost_ceiling": 7.739171978750903,
+    "control_solver_status": "OPTIMAL",
+    "control_optimality_gap": 0.0,
     "rival_entry_id": 6879786,
     "overlap_count": 4,
     "transfer_cap": 1,
@@ -341,9 +342,9 @@
       "weight": 50,
       "changed": true,
       "price_basis": "base_model_pure_points_v1",
-      "cohort_snapshot_id": "fpl-top100-20261015T125956Z-62eac7653b23",
-      "picks_snapshot_id": "fpl-elite-picks-20261015T130016Z-f74142d5b421",
-      "table_sha256": "0a890f659631183ae43ffe18feb2530d6b0c3b18a22958933876121eb5c9028d",
+      "cohort_snapshot_id": "fpl-top100-20261016T060118Z-ae3db8c93137",
+      "picks_snapshot_id": "fpl-elite-picks-20261016T060136Z-8b4c3667de56",
+      "table_sha256": "2818a2e18bb44ede2d2baa84576d374ea81f0c3b4f9ba8a9ece1068a577408e5",
       "picks_gameweek": 6
     }
   }
