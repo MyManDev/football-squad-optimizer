@@ -70,7 +70,7 @@ names (`tests/architecture/test_storage_imports.py`).
 | Module | What it does |
 | --- | --- |
 | `snapshots.py` | The immutable on-disk store for pre-deadline captures of a live season. |
-| `atomic.py` | Creates a file exactly once, atomically: it reports whether it wrote the bytes or found the same bytes there, and refuses different ones. |
+| `atomic.py` | Creates a file exactly once, atomically: it reports whether it wrote the bytes or found the same bytes there, and refuses different ones. It also holds `replace_retrying`, the one retrying rename that records are published through, and `document_bytes`, the canonical JSON bytes. |
 | `loaders.py` | Local file loaders for raw player-gameweek data; they read and do not transform. |
 | `adapters.py` | The explicit mapping from a raw source's layout (column names, position codes, price unit) onto canonical names. |
 | `pipeline.py` | One function for the whole raw-to-canonical path, so the stage order has one owner. |
@@ -133,25 +133,45 @@ adapters are `FixtureClubNewsProvider` in the same module, which serves the comm
 and the model providers in `squadopt.platform`: `AnthropicClubNewsProvider`
 (`club_news_model.py`), `OpenAIClubNewsProvider` (`club_news_openai.py`) and
 `GeminiClubNewsProvider` (`club_news_gemini.py`).
+[ADR 0011](../../../docs/architecture/decisions/0011-storage-ports-and-platform-split.md) moves
+the protocol unchanged to `squadopt.data.payloads.club_news`.
 
 ## Known violations here
 
 ARCHITECTURE.md measures and schedules these; this list says where they are.
 
 - **One package in two rings, at the bottom of the layer order.** `__init__.py` imports the
-  storage modules `adapters`, `loaders`, `pipeline` and `snapshots`, so importing any module of
-  this package loads those four at run time; `sources/__init__.py` likewise loads `fpl_live`
-  and `vaastav` with any `sources` module. The contract "The decision core imports no storage or
-  source module" and `tests/architecture/test_storage_imports.py` keep the import statements of
-  the clean packages off the storage half; neither stops the run-time load. Splitting the
-  package is an open question in
-  [ADR 0010](../../../docs/architecture/decisions/0010-clean-architecture-rings-and-repository-layout.md).
+  storage modules `adapters`, `loaders`, `pipeline` and `snapshots`, and through them
+  `snapshots` loads `atomic` and `checksums` and `atomic` loads `_long_paths`, so importing any
+  module of this package loads seven storage modules at run time; `sources/__init__.py`
+  likewise loads `fpl_live` and `vaastav` with any `sources` module. The contract "The decision
+  core imports no storage or source module" and `tests/architecture/test_storage_imports.py`
+  keep the import statements of the clean packages off the storage half; neither stops the
+  run-time load.
+  [ADR 0011](../../../docs/architecture/decisions/0011-storage-ports-and-platform-split.md)
+  (decision 2) keeps `data` one package and gives its vocabulary half named modules,
+  `data.capture`, `data.canonical` and `data.payloads`; it leaves the run-time load of
+  `__init__.py` to the data owner.
 - **Three vocabulary modules import the storage half.** `claim_identity.py` imports
   `RosterPlayer` from `sources/club_news.py`, `cleaning.py` imports `PriceUnit` from
-  `adapters.py`, and `cohorts.py` imports `LeagueStandingsPage` from `sources/fpl_live.py`. The
-  remedy is to move the three types into the vocabulary half with a one-release re-export, with
-  the split of the package; the data owner decides.
+  `adapters.py`, and `cohorts.py` imports `LeagueStandingsPage` from `sources/fpl_live.py`. ADR
+  0011 decision 2 is the remedy: the FPL and club news parsers move into `data.payloads`,
+  `PriceUnit` moves into `cleaning`, and `cleaning`, `claim_identity` and `cohorts` then become
+  sources of the storage contract. The data owner reviews each move; if he declines, the
+  fallback is to name the IO modules in the forbidden lists and leave the files in place.
 
 `source_revision.py` runs `git` by design, as an adapter. That `application/advice_record.py`
-reaches it from the use-case ring is a known violation of `squadopt.application`, listed in its
-[guide](../application/README.md#known-violations-here).
+reaches it from the use-case ring is a known violation of `squadopt.application`: its
+[guide](../application/README.md) names it in its opening paragraph, and ARCHITECTURE.md lists
+it.
+
+## Names frozen until the planner chain's final reading
+
+ADR 0011 keeps these names at their paths until the planner policy chain's runner and scorer
+retire after GW38, because `scripts/score_planner_policy_chain.py` imports them; the dependency
+rules record the exception to rule 2:
+
+- `snapshots.CapturedSnapshot`;
+- `atomic.document_bytes`;
+- in `sources/fpl_live.py`: `BOOTSTRAP_PAYLOAD`, `FPL_LIVE_SOURCE`, `gameweek_deadlines`,
+  `live_event_outcomes`, `live_payload`, `player_snapshot` and `scored_gameweeks`.
