@@ -45,6 +45,7 @@ from scripts._experiment_cli import (
     REPOSITORY_ROOT,
     artifact_metadata,
     measurement_optimization_config,
+    repository_provenance,
     write_json,
     write_text,
 )
@@ -259,6 +260,8 @@ def chain_summary(record: Mapping[str, object]) -> dict[str, object]:
         "transfer_count": record["transfer_count"],
         "paid_transfer_count": record["paid_transfer_count"],
         "reversals": reversal_count(weeks),
+        "carried_blank_rows": record["carried_blank_rows"],
+        "carried_unexplained_rows": record["carried_unexplained_rows"],
         "proven_share": record["proven_share"],
         "proven_decisions": sum(1 for w in weeks if w["solver_status"] == "OPTIMAL"),
         "mean_relative_gap": record["mean_relative_gap"],
@@ -451,8 +454,9 @@ def markdown_twin(document: Mapping[str, object]) -> str:
         "## Season totals per arm (net of charged hits)",
         "",
         "| Season | Arm | Decisions | Realized | Hits | Net | Transfers | Paid | Reversals "
-        "| Proven | Mean gap | Seconds per decision |",
-        "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+        "| Carried blank | Carried holes | Proven | Mean gap | Seconds per decision |",
+        "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: "
+        "| ---: | ---: |",
     ]
     for season in seasons:
         for label in labels:
@@ -467,6 +471,7 @@ def markdown_twin(document: Mapping[str, object]) -> str:
                 f"| {season} | `{label}` | {row['decisions']} | {realized:.0f} "
                 f"| {hits:.0f} | {net:.0f} "
                 f"| {row['transfer_count']} | {row['paid_transfer_count']} | {row['reversals']} "
+                f"| {row['carried_blank_rows']} | {row['carried_unexplained_rows']} "
                 f"| {float(str(row['proven_share'])):.2f} "
                 f"| {'none' if gap is None else f'{float(str(gap)):.3f}'} "
                 f"| {float(str(row['seconds_per_decision'] or 0.0)):.1f} |"
@@ -509,17 +514,33 @@ def markdown_twin(document: Mapping[str, object]) -> str:
         "is not certified.",
         f"- Reversals: a purchased player sold within {REVERSAL_WINDOW_GAMEWEEKS} gameweeks of "
         "purchase.",
+        "- Carried rows: squad members the chain carried at a zero projection because their "
+        "club was blank that week (blank) or the archive had no row for them (holes). Under "
+        "the mean-reversion rule such a member projects the position mean times one minus "
+        "rho to the offset in a later week, where the naive rule keeps them at zero; the "
+        "counts above size that side effect per chain.",
         "",
         "## Provenance",
         "",
         f"- Repository commit `{document['repository_commit']}`, working tree dirty: "
         f"{document['working_tree_dirty']}; archive commit `{document['archive_commit']}`.",
+        f"- The chains ran at `{document['repository_commit']}`; this record was merged at "
+        f"`{document['merge_repository_commit']}` (working tree dirty at the merge: "
+        f"{document['merge_working_tree_dirty']}) from the per-season artifacts below, "
+        "whose sha256 digests name the chain output the merge read. Where the two commits "
+        "differ, the code that changed between them changed what the merge keeps of each "
+        "chain and nothing in the chain, so the numbers stand (protocol step 4).",
         f"- Per-week expansion `{document['expansion']['path']}` (gitignored), sha256 "  # type: ignore[index]
         f"`{document['expansion']['sha256']}`.",  # type: ignore[index]
         f"- Machine: {document['environment']['platform']}, "  # type: ignore[index]
         f"{document['environment']['logical_cpu_count']} logical cores, Python "  # type: ignore[index]
         f"{document['environment']['python']}; one process per season in parallel.",  # type: ignore[index]
-        f"- Merged from: {', '.join(str(p) for p in document['merged_from'])}.",  # type: ignore[union-attr]
+        "- Merged from: "
+        + "; ".join(
+            f"`{item['path']}` sha256 `{item['sha256']}`"  # type: ignore[index]
+            for item in document["merged_from"]  # type: ignore[union-attr]
+        )
+        + ".",
         "",
     ]
     return "\n".join(lines)
@@ -636,6 +657,7 @@ def _merge(arguments: argparse.Namespace) -> int:
         "proven_decisions": sum(int(str(s["proven_decisions"])) for s in summaries),
     }
     first = documents[0]
+    merge_provenance = repository_provenance()
     document = {
         "contract_version": CONTRACT_VERSION,
         "chain_contract_version": SEASON_CHAIN_CONTRACT_VERSION,
@@ -646,7 +668,9 @@ def _merge(arguments: argparse.Namespace) -> int:
         "started_at_utc": min(str(doc["started_at_utc"]) for doc in documents),
         "finished_at_utc": max(str(doc["finished_at_utc"]) for doc in documents),
         "merged_at_utc": datetime.now(UTC).isoformat(timespec="seconds"),
-        "merged_from": [str(path) for path in sources],
+        "merge_repository_commit": merge_provenance["repository_commit"],
+        "merge_working_tree_dirty": merge_provenance["working_tree_dirty"],
+        "merged_from": [{"path": str(path), "sha256": _sha256(path)} for path in sources],
         "provenance": first["provenance"],
         "environment": first["environment"],
         "development_scope": "v2" if "v2" in scopes else "v1",

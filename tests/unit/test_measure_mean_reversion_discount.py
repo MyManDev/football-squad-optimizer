@@ -230,6 +230,17 @@ def test_the_merge_writes_the_record_its_twin_and_the_expansion(tmp_path: Path) 
     assert document["bootstrap"]["seed"] == 0
     assert document["expansion"]["sha256"] == cli._sha256(expansion)
     assert len(document["chains"]) == 10
+    assert all(
+        chain["carried_blank_rows"] == 0 and chain["carried_unexplained_rows"] == 0
+        for chain in document["chains"]
+    )
+    assert len(document["merge_repository_commit"]) == 40
+    assert isinstance(document["merge_working_tree_dirty"], bool)
+    assert [item["path"] for item in document["merged_from"]] == [str(p) for p in sources]
+    assert all(
+        item["sha256"] == cli._sha256(path)
+        for item, path in zip(document["merged_from"], sources, strict=True)
+    )
     assert all("weeks" not in chain and len(chain["weekly"]) == 4 for chain in document["chains"])
     keys = {(c["variant"], c["baseline"]) for c in document["comparisons"]}
     assert keys == {
@@ -261,6 +272,7 @@ def test_the_merge_writes_the_record_its_twin_and_the_expansion(tmp_path: Path) 
     twin = markdown_output.read_text(encoding="utf-8")
     assert twin.startswith("# A mean-reversion discount")
     assert "## Verdict" in twin and "`L3_mr_0.75` minus `L3_naive` (primary)" in twin
+    assert "| Carried blank | Carried holes |" in twin and "protocol step 4" in twin
     assert chr(0x2014) not in twin and chr(0x2013) not in twin
 
 
