@@ -159,6 +159,7 @@ do not move.
 | `measure_prior_minutes_level.py` | measurement runner | `docs/prior_minutes_level.json`, `docs/prior_minutes_level.md`; protocol `docs/prior_minutes_level_prereg.md` | 2026-09-26 |
 | `measure_projection_level_audit.py` | measurement runner | `docs/projection_level_audit.json`, `docs/projection_level_audit.md`; protocol `docs/projection_level_audit_prereg.md` | 2026-09-19 |
 | `measure_rank_tail_selector_inertness.py` | measurement runner | `docs/rank_tail_selector_inertness.json`, `docs/rank_tail_selector_inertness.md`, a precondition reading for `docs/rank_tail_selector_prereg.md` | 2026-09-19 |
+| `measure_rank_conditional_shrinkage.py` | measurement runner | `docs/research/rank_conditional_shrinkage.json`, `docs/research/rank_conditional_shrinkage.md`, once (it refuses to overwrite them); per-fold table in `artifacts/rank_conditional_shrinkage/`; protocol `docs/research/rank_conditional_shrinkage_prereg.md`; `--folds` runs a pilot that writes nowhere under `docs/` | 2026-10-17 |
 | `measure_rival_calibration.py` | measurement runner | `docs/rival_calibration.json` | 2026-09-19 |
 | `measure_rotation_ceiling.py` | measurement runner | `docs/rotation_oracle_ceiling.json` | 2026-09-26 |
 | `measure_scenario_path_dependence.py` | measurement runner | `docs/scenario_path_dependence.json` | 2026-08-19 |
