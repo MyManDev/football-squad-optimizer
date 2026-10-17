@@ -80,8 +80,7 @@ before any switch is proposed. This document is that re-measure's protocol.
   `feat/highs-window-remeasure` at the run, with `working_tree_dirty: false`. The source
   measured is that of the runner commit on that branch; the commit's hash is written into
   this section before the run and after the runner commit, and the head at the run differs
-  from it in documents only. Runner commit: not yet written, because the runner has not been
-  committed; this line is completed before the run.
+  from it in documents only. Runner commit: `f97544034475624aaf079f6d54e5918397b01588`.
 - **Sell-on fee:** as #994, the runner sets the game's 0.5. The three inputs do not publish
   it, and at the captured prices a lot bought inside the window sells for what was paid.
 - **Rebuild gate:** before any timing, the runner rebuilds each member's one-week problem
