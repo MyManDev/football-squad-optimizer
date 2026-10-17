@@ -33,6 +33,19 @@ Point estimates decide, as the binding protocol says. 0.1606 is above 0.16 by 0.
 one fold of 137; the band is inclusive and the tolerance is 1e-9, so the gate fails. It is
 reported as it fell and is not re-run.
 
+### Both PIT tails (descriptive)
+
+The brief asked for the upper-tail rate beside the lower. Counted from the per-fold PIT of each
+arm over the same 137 folds:
+
+| PIT tail | Frozen binding record | Control arm | Candidate |
+| --- | --- | --- | --- |
+| at or above 0.95 (realized score at or above the scenario 95th percentile) | 14 (0.1022) | 16 (0.1168) | 11 (0.0803) |
+| at or below 0.05 | 19 (0.1387) | 19 (0.1387) | 16 (0.1168) |
+
+Both tails are heavier than the nominal 0.05 under every arm, and the block thins both: the
+candidate's distribution is wider on both sides, not shifted.
+
 ### Per season (descriptive)
 
 | Season | Folds | Candidate mean PIT | Candidate below q10 | Control mean PIT | Control below q10 |
@@ -66,9 +79,10 @@ table digest with the same roster and the same row structure (details in the pre
 Both arms were therefore read on the regenerated table. Against the frozen record, the control
 arm reproduces the realized score of 127 of 137 frozen decisions exactly; ten full-pool decisions
 differ, as the solver's incumbent moves with the regenerated predictions (44 of 147 solves ended
-FEASIBLE, 103 OPTIMAL). The per-fold PIT agrees exactly on 8 folds and differs by 0.0050 on
-average (largest 0.40), since the residual pools differ in their values; the tail flag differs on
-5 folds, which is the 28 against 25. The frozen verdict (S1 pass, S2 fail) is reproduced in kind,
+FEASIBLE, 103 OPTIMAL). The per-fold PIT agrees exactly on 8 folds; the signed mean difference,
+control minus frozen, is +0.0050 (0.5197 against 0.5147), the mean absolute per-fold difference
+is 0.0156 and the largest is 0.40, since the residual pools differ in their values; the tail
+flag differs on 5 folds, which is the 28 against 25. The frozen verdict (S1 pass, S2 fail) is reproduced in kind,
 not in count. The candidate's reading is a reading on the regenerated table, beside its own
 control; it is not a reading on the binding table, and this record says so.
 
@@ -89,7 +103,10 @@ control; it is not a reading on the binding table, and this record says so.
 
 The block does what it was built to do: same-club squad members' scenario points now co-move
 (0.18 against 0.00), the squad distribution widens by 8.75% on average and its tenth percentile
-drops by 0.93 points. That buys three folds of lower tail. The remaining gap to the band (one
+drops by 0.93 points. One design note on that 0.18: rows within a position group are drawn with
+replacement, so two same-club same-position squad members can take the identical source row in
+a scenario, and part of the within-club correlation is row identity rather than inherited
+co-movement. That buys three folds of lower tail. The remaining gap to the band (one
 fold here, and 2023-24 at 0.2973 under either sampler) is not within-club co-movement.
 
 ## What this record is and is not
