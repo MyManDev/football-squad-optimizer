@@ -67,7 +67,7 @@ module that imports it.
 | The screening design, the frozen holdout and shared reporting | `config`, `design`, `models`, `runner`, `reporting`, `statistics` |
 | Season chains and planning studies | `season_chain`, `season_chain_runs`, `multi_gw_rehearsal`, `terminal_value`, `policy_objective`, `planning_shortlist`, `chip_threshold`, `calendar_chip` |
 | Model, residual and rating studies | `control_residuals`, `residual_signal_scan`, `opening_prior_exposure`, `opponent_projection`, `team_rating`, `team_rating_cs`, `positional_defence`, `preseason_difficulty`, `published_difficulty_live`, `continuation_diagnostic` |
-| Phase C to E readings and the shadow report | `phase_c_ablation`, `phase_c_reporting`, `component_squad_calibration`, `phase_e_shadow`, `shadow_report` |
+| Phase C to E readings and the shadow report | `phase_c_ablation`, `phase_c_reporting`, `component_squad_calibration`, `component_distribution_scoring`, `phase_e_shadow`, `shadow_report` |
 | Benchmark V2 | `benchmark_v2`, `benchmark_v2_live` |
 | Football studies | `football_components`, `football_defcon`, `football_minutes`, `football_share_sizing`, `football_windows` |
 | Private football model experiments | `football_flag_experiment`, `football_load_experiment`, `football_phase_experiment`, `football_score_state_experiment`, `football_tactical_experiment`, `football_unit_experiment` |
