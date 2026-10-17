@@ -58,7 +58,7 @@ import uuid
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, field, replace
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 from time import perf_counter
@@ -66,6 +66,16 @@ from typing import Any, Final, cast
 
 import pandas as pd
 from ortools.sat.python import cp_model
+from scripts import _highs_native_driver as native_driver
+from scripts._highs_native_driver import (
+    DRIVER_SHA256,
+    HIGHS_THREADS,
+    MIP_ABS_GAP,
+    MIP_REL_GAP,
+    ProtocolRefusal,
+    highs_options,
+    refuse_blocked_date,
+)
 from scripts._provenance import REPOSITORY_ROOT, _git_revision, write_json, write_text
 
 from squadopt.application.advice import (
@@ -89,6 +99,13 @@ from squadopt.planning import (
     optimize_transfer_plan,
 )
 from squadopt.planning.optimizer import PLAN_WALL_CEILING_SECONDS
+
+# The native HiGHS side lives in ``scripts/_highs_native_driver.py`` since #1090, because a
+# process holding OR-Tools cannot load ``highspy`` on Linux; these names keep their old home.
+BLOCKED_DAYS: Final = native_driver.BLOCKED_DAYS
+HIGHS_PRIMAL_FEASIBLE: Final = native_driver.HIGHS_PRIMAL_FEASIBLE
+floor_value = native_driver.floor_value
+native_run = native_driver.native_run
 
 CONTRACT_VERSION: Final = "window_solver_highs_v1"
 PROTOCOL: Final = "docs/window_solver_highs_prereg.md"
@@ -125,10 +142,6 @@ ROW_TOLERANCE: Final = 1e-6
 #: Two primary values agree when they differ by at most this many integer units.
 AGREEMENT_UNITS: Final = 1000
 DEVICE_PROOF_SECONDS: Final = 15.0
-MIP_REL_GAP: Final = 0.0
-MIP_ABS_GAP: Final = 0.5
-#: (month, day) in UTC on which no solve runs.
-BLOCKED_DAYS: Final = ((10, 9), (10, 10))
 #: Check 2 fixes every variable, so CP-SAT only propagates; this is a stop, not a budget.
 FIXED_CHECK_SECONDS: Final = 120.0
 #: The hold probe's wall stop: ``planning/optimizer.py`` configures it with
@@ -139,9 +152,6 @@ HOLD_PROBE_WALL_SECONDS: Final = 30.0
 SOLVE_MARGIN_SECONDS: Final = 900.0
 #: A driver's stop on the toy model it must prove before any timed run.
 PREFLIGHT_TIMEOUT_SECONDS: Final = 900.0
-#: The native build is set to this many threads. The wasm build is single-threaded and
-#: refuses a thread option, so its job leaves it out.
-HIGHS_THREADS: Final = 1
 
 LEAGUE_DIR: Final = REPOSITORY_ROOT / "web" / "public" / "data" / "league"
 FIXTURES_PATH: Final = REPOSITORY_ROOT / "web" / "public" / "data" / "fixtures.json"
@@ -178,7 +188,6 @@ HIGHS_MODEL_STATUS: Final = {
     18: "Memory limit reached",
 }
 HIGHS_OPTIMAL: Final = 7
-HIGHS_PRIMAL_FEASIBLE: Final = 2
 
 #: The narrow readings this runner takes where the protocol leaves a choice, recorded with
 #: the result so a reader can see them beside the numbers.
@@ -232,10 +241,6 @@ SETUP_FAILURES: Final = (
     "FileNotFoundError",
     "ENOENT",
 )
-
-
-class ProtocolRefusal(RuntimeError):
-    """An input, a guard or a check is not what the protocol declares; nothing goes on."""
 
 
 class ExportRefused(ValueError):
@@ -1849,40 +1854,25 @@ def published_plan_value(call: PlannerCall, published: Mapping[str, Any]) -> dic
 # Guards.
 
 
-def refuse_blocked_date(now: datetime, seconds: float = 0.0) -> None:
-    """No solve runs on 9 or 10 October (UTC): none starts on either day, and none starts
-    whose ``seconds`` of wall stops could carry it into either."""
-
-    start = now.astimezone(UTC)
-    end = start + timedelta(seconds=max(float(seconds), 0.0))
-    day = start.date()
-    while day <= end.date():
-        if (day.month, day.day) in BLOCKED_DAYS:
-            if day == start.date():
-                raise ProtocolRefusal(
-                    f"It is {day.isoformat()} UTC; the protocol runs no solve on 9 or 10 October."
-                )
-            raise ProtocolRefusal(
-                f"A solve started at {start.isoformat(timespec='seconds')} may run until "
-                f"{end.isoformat(timespec='seconds')}, into {day.isoformat()} UTC; the "
-                "protocol runs no solve on 9 or 10 October."
-            )
-        day += timedelta(days=1)
-
-
 def native_core_version() -> str:
-    """The HiGHS core version the native build reports."""
+    """The HiGHS core version the native build reports, read in a child process.
 
-    highspy = importlib.import_module("highspy")
-    return _native_version(highspy)
+    OR-Tools and ``highspy`` each ship a ``libhighs.so.1``, so on Linux one process cannot
+    load both; this process holds OR-Tools, and the child holds ``highspy``.
+    """
 
-
-def _native_version(highspy: Any) -> str:
-    highs = highspy.Highs()
-    try:
-        return str(highs.version())
-    except AttributeError:
-        return f"{highs.versionMajor()}.{highs.versionMinor()}.{highs.versionPatch()}"
+    completed = subprocess.run(
+        [sys.executable, "-m", "scripts._highs_native_driver", "--version"],
+        cwd=REPOSITORY_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if completed.returncode != 0:
+        raise ProtocolRefusal(
+            f"highspy could not be loaded in a child process: {completed.stderr.strip()[-500:]}"
+        )
+    return completed.stdout.strip()
 
 
 def wasm_report(node: str, web_dir: Path = WEB_DIR) -> dict[str, Any]:
@@ -1936,134 +1926,8 @@ def measure_guards(
 
 
 # --------------------------------------------------------------------------------------
-# HiGHS runs: native in a child Python process, wasm in Node. Neither takes CP-SAT's value.
-
-
-def highs_options(time_limit: float) -> dict[str, float | bool | int]:
-    return {
-        "output_flag": False,
-        "threads": HIGHS_THREADS,
-        "mip_rel_gap": MIP_REL_GAP,
-        "mip_abs_gap": MIP_ABS_GAP,
-        "time_limit": max(float(time_limit), 0.0),
-    }
-
-
-def _option_value(highs: Any, name: str) -> Any:
-    """An option as the native build reports it (older bindings return a status first)."""
-
-    value = highs.getOptionValue(name)
-    return value[-1] if isinstance(value, tuple) else value
-
-
-def _finite(value: float) -> float | None:
-    """A bound HiGHS has not computed is infinite; the record holds None, as the wasm
-    build's JSON does."""
-
-    return value if math.isfinite(value) else None
-
-
-def _native_solve(
-    highspy: Any,
-    path: str,
-    budget: float,
-    floor: tuple[int, Mapping[int, int | float]] | None,
-    start: Sequence[int] | None = None,
-) -> dict[str, Any]:
-    numpy = importlib.import_module("numpy")
-    highs = highspy.Highs()
-    # Set before anything runs: the native build starts its scheduler on the first run.
-    highs.setOptionValue("threads", HIGHS_THREADS)
-    started = perf_counter()
-    read_status = int(highs.readModel(path))
-    read_seconds = perf_counter() - started
-    if read_status < 0:
-        raise RuntimeError(f"HiGHS could not read {path}.")
-    for name, value in highs_options(budget).items():
-        highs.setOptionValue(name, value)
-    floor_seconds = 0.0
-    if floor is not None:
-        value, costs = floor
-        started = perf_counter()
-        indices = numpy.array(sorted(costs), dtype=numpy.int32)
-        values = numpy.array([float(costs[j]) for j in sorted(costs)], dtype=numpy.float64)
-        added = int(highs.addRow(float(value), highspy.kHighsInf, len(indices), indices, values))
-        floor_seconds = perf_counter() - started
-        if added < 0:
-            raise RuntimeError("HiGHS refused the hold floor row.")
-    start_seconds = 0.0
-    start_status: int | None = None
-    if start is not None:
-        started = perf_counter()
-        columns = numpy.arange(len(start), dtype=numpy.int32)
-        values = numpy.array([float(value) for value in start], dtype=numpy.float64)
-        start_status = int(highs.setSolution(len(start), columns, values))
-        start_seconds = perf_counter() - started
-        if start_status < 0:
-            raise RuntimeError("HiGHS refused the hold solution as a start.")
-    started = perf_counter()
-    highs.run()
-    seconds = perf_counter() - started
-    status = int(highs.getModelStatus())
-    info = highs.getInfo()
-    primal = int(info.primal_solution_status)
-    result: dict[str, Any] = {
-        "model_status": status,
-        "read_seconds": read_seconds,
-        "floor_seconds": floor_seconds,
-        "start_seconds": start_seconds,
-        "start_status": start_status,
-        "seconds": seconds,
-        "primal_solution_status": primal,
-        "bound": _finite(float(info.mip_dual_bound)),
-        "threads": int(_option_value(highs, "threads")),
-    }
-    if primal == HIGHS_PRIMAL_FEASIBLE:
-        result["objective"] = float(info.objective_function_value)
-        result["solution"] = [float(value) for value in highs.getSolution().col_value]
-    return result
-
-
-def floor_value(solution: Sequence[float], costs: Mapping[int, int | float]) -> int:
-    """The primary objective at a rounded hold solution: the floor a HiGHS primary gets."""
-
-    return int(sum(cost * round(solution[j]) for j, cost in costs.items()))
-
-
-def native_run(job: Mapping[str, Any]) -> dict[str, Any]:
-    """One native HiGHS run of one instance: the hold model, then the floored primary."""
-
-    budget = float(job["budget_seconds"])
-    refuse_blocked_date(datetime.now(UTC), budget)
-    started = perf_counter()
-    highspy = importlib.import_module("highspy")
-    load_seconds = perf_counter() - started
-    costs = {int(j): cost for j, cost in job["objective"].items()}
-    hold = _native_solve(highspy, str(job["hold_mps"]), budget, None)
-    result: dict[str, Any] = {
-        "build": "native",
-        "nonce": job.get("nonce"),
-        "runner_sha256": RUNNER_SHA256,
-        "core_version": _native_version(highspy),
-        "load_seconds": load_seconds,
-        "hold": {key: value for key, value in hold.items() if key != "solution"},
-        "hold_solution": hold.get("solution"),
-        "floor": None,
-        "primary": None,
-        "primary_solution": None,
-    }
-    start: list[int] | None = None
-    if hold.get("solution") is not None:
-        result["floor"] = floor_value(hold["solution"], costs)
-        start = [round(value) for value in hold["solution"]]
-    remaining = budget - float(hold["seconds"])
-    if remaining <= 0:
-        return result
-    floor = None if result["floor"] is None else (int(result["floor"]), costs)
-    primary = _native_solve(highspy, str(job["primary_mps"]), remaining, floor, start)
-    result["primary"] = {key: value for key, value in primary.items() if key != "solution"}
-    result["primary_solution"] = primary.get("solution")
-    return result
+# HiGHS runs: native in a child Python process (``scripts/_highs_native_driver.py``, which
+# never loads OR-Tools), wasm in Node. Neither takes CP-SAT's value.
 
 
 #: The wasm driver. It loads the package from ``web/node_modules`` as the device's parity
@@ -2239,11 +2103,11 @@ def _run_native_child(
     job_path = out_dir / "native_job.json"
     out_path = out_dir / "native_result.json"
     job_path.write_text(json.dumps(job), encoding="utf-8")
+    # The child never loads OR-Tools: see ``scripts/_highs_native_driver.py``.
     command = [
         sys.executable,
         "-m",
-        "scripts.measure_window_solver_highs",
-        "native-run",
+        "scripts._highs_native_driver",
         "--job",
         str(job_path),
         "--out",
@@ -2254,6 +2118,11 @@ def _run_native_child(
         raise ProtocolRefusal(
             "The native child ran another runner file than this run started with; the "
             "runner changed on disk during the run. No verdict."
+        )
+    if result.get("driver_sha256") not in (None, DRIVER_SHA256):
+        raise ProtocolRefusal(
+            "The native child ran another driver file than this run started with; the "
+            "driver changed on disk during the run. No verdict."
         )
     return result
 
@@ -2823,6 +2692,7 @@ def _measure_locked(
         "started_at_utc": _stamp(started),
         "finished_at_utc": _stamp(datetime.now(UTC)),
         "runner_sha256": RUNNER_SHA256,
+        "driver_sha256": DRIVER_SHA256,
         "machine": machine_record(),
         "versions": {
             "ortools": importlib.import_module("ortools").__version__,
@@ -3038,9 +2908,6 @@ def _parse(argv: Sequence[str] | None) -> argparse.Namespace:
     )
     measure.add_argument("--i-have-the-slot", dest="have_slot", action="store_true")
     measure.add_argument("--node", default=os.environ.get("SQUADOPT_NODE", "node"))
-    native = commands.add_parser("native-run", help=argparse.SUPPRESS)
-    native.add_argument("--job", type=Path, required=True)
-    native.add_argument("--out", type=Path, required=True)
     return parser.parse_args(argv)
 
 
@@ -3062,10 +2929,6 @@ def target_from(arguments: argparse.Namespace) -> Target:
 
 def main(argv: Sequence[str] | None = None) -> int:
     arguments = _parse(argv)
-    if arguments.command == "native-run":
-        job = json.loads(arguments.job.read_text(encoding="utf-8"))
-        write_json(arguments.out, native_run(job))
-        return 0
     target: Target | None = None
     try:
         target = target_from(arguments)
