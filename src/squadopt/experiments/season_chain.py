@@ -45,11 +45,13 @@ from squadopt.evaluation.promotion import (
     ExperimentExecutionError,
 )
 from squadopt.experiments.multi_gw_rehearsal import (
+    MEAN_REVERSION_PROJECTION_RULE,
     NAIVE_PROJECTION_RULE,
     PROJECTION_RULES,
     DecisionSeason,
     _relative_gap,
     realize_week,
+    validate_mean_reversion_factor,
 )
 from squadopt.features import CrossSeasonConfig
 from squadopt.optimization import OptimizationConfig, optimize_squad
@@ -222,7 +224,13 @@ class SeasonChainConfig:
     projection_rule: str = NAIVE_PROJECTION_RULE
     """``naive_calendar_scaling_v1`` scales the decision-time control projection by the
     known fixture count (a double counts twice); ``control_calendar_blind_v1`` is the
-    control as evaluated, with no scaling — a double projects like a single."""
+    control as evaluated, with no scaling — a double projects like a single;
+    ``mean_reversion_discount_v1`` is the naive rule with each later week's deviation
+    from the position mean discounted by ``mean_reversion_factor`` per week of offset
+    (`multi_gw_rehearsal.MEAN_REVERSION_PROJECTION_RULE`)."""
+    mean_reversion_factor: float | None = None
+    """The per-week factor of ``mean_reversion_discount_v1``, in (0, 1]; required under
+    that rule and refused under the other two."""
     hit_points_charged: float = 4.0
     """What the game charges per paid transfer on the realized sheet. The planner's
     own ``transfer_config.transfer_hit_cost_points`` is a decision control — a higher
@@ -281,6 +289,11 @@ class SeasonChainConfig:
             raise ExperimentConfigurationError(
                 f"projection_rule must be one of {PROJECTION_RULES!r}."
             )
+        object.__setattr__(
+            self,
+            "mean_reversion_factor",
+            validate_mean_reversion_factor(self.projection_rule, self.mean_reversion_factor),
+        )
         if self.chip_policy not in CHIP_POLICIES:
             raise ExperimentConfigurationError(f"chip_policy must be one of {CHIP_POLICIES!r}.")
         if self.chip_threshold not in CHIP_THRESHOLDS:
@@ -381,6 +394,11 @@ class SeasonChainWeek:
     bench_projected_points: float | None = None
     """What the decision expected of its bench: what a bench boost would have been
     expected to add this week."""
+    position_means: Mapping[str, float] | None = None
+    """Under ``mean_reversion_discount_v1``, the shrink target of this decision: the mean
+    expected points per position over the decision gameweek's full projection table.
+    ``None`` under the other rules, and then absent from the record, so a chain run as
+    every committed one was keeps the record it always wrote."""
 
     def __post_init__(self) -> None:
         for name in ("realized_points", "transfer_hit_points", "projected_points"):
@@ -390,6 +408,14 @@ class SeasonChainWeek:
             raise ExperimentExecutionError(f"Unknown chip {self.chip!r} on a chain week.")
         object.__setattr__(self, "planned_chips", MappingProxyType(dict(self.planned_chips)))
         object.__setattr__(self, "squad_player_ids", tuple(self.squad_player_ids))
+        if self.position_means is not None:
+            object.__setattr__(
+                self,
+                "position_means",
+                MappingProxyType(
+                    {str(key): float(value) for key, value in self.position_means.items()}
+                ),
+            )
 
     @property
     def net_points(self) -> float:
@@ -422,6 +448,11 @@ class SeasonChainWeek:
             "chip_counterfactual_net_points": self.chip_counterfactual_net_points,
             "captain_projected_points": self.captain_projected_points,
             "bench_projected_points": self.bench_projected_points,
+            **(
+                {"position_means": dict(sorted(self.position_means.items()))}
+                if self.position_means is not None
+                else {}
+            ),
         }
 
 
@@ -539,6 +570,7 @@ class SeasonChain(DecisionSeason):
             cheap_pool_per_position=settings.cheap_pool_per_position,
             cross_season_config=settings.cross_season_config,
             projection_rule=settings.projection_rule,
+            mean_reversion_factor=settings.mean_reversion_factor,
         )
         self._settings = settings
         # Last projection row seen for each squad member, so a member without a row
@@ -615,6 +647,13 @@ class SeasonChain(DecisionSeason):
             opening_squad_ids=squad_ids,
             diagnostics={
                 "projection_rule": settings.projection_rule,
+                # Recorded only under the rule that reads it, so a chain run as every
+                # committed one was keeps the record it always wrote.
+                **(
+                    {"mean_reversion_factor": settings.mean_reversion_factor}
+                    if settings.projection_rule == MEAN_REVERSION_PROJECTION_RULE
+                    else {}
+                ),
                 "form_window": settings.form_window,
                 "candidate_pool_per_position": settings.candidate_pool_per_position,
                 "cheap_pool_per_position": settings.cheap_pool_per_position,
@@ -963,5 +1002,10 @@ class SeasonChain(DecisionSeason):
             chip_counterfactual_net_points=counterfactual_net,
             captain_projected_points=_captain_projection(week),
             bench_projected_points=float(week.projected_bench_points),
+            position_means=(
+                self._position_means(gameweek)
+                if settings.projection_rule == MEAN_REVERSION_PROJECTION_RULE
+                else None
+            ),
         )
         return record, new_state
