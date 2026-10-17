@@ -44,6 +44,15 @@ before any switch is proposed. This document is that re-measure's protocol.
   capture substituted and nothing solved: it reads 15 members at gameweek 7, the published
   rules and coefficients are the ones the code would solve with, and every club has one
   fixture in each of GW7 to GW11. That run saw no solver output and is not a pilot.
+- The first start of `measure`, at 12:56Z on 17 October on head 4b0d3cc8, stopped at the
+  version guard before any solve: OR-Tools and `highspy` each ship a `libhighs.so.1`, so on
+  Linux one process cannot load both, in either order (#1083 ran on Windows, where this
+  cannot happen). The native HiGHS side of the runner (the solve functions, the blocked-day
+  rule and the version reader, unchanged in their bodies) moved to
+  `scripts/_highs_native_driver.py`, which imports `highspy` and the standard library only,
+  and the runner runs it as the native child and for the version guard; the runner re-exports
+  the moved names. No instance was solved by HiGHS before this change, no threshold changed,
+  and the runner commit named below is the one after it.
 - The import contract "The CP-SAT solver stays in the decision core" in `pyproject.toml`,
   enforced by `lint-imports` and `tests/architecture/test_layer_contracts.py`: it forbids
   `ortools` outside `optimization`, `planning`, `scenarios`, `evaluation` and `backtest`. A
@@ -80,7 +89,8 @@ before any switch is proposed. This document is that re-measure's protocol.
   `feat/highs-window-remeasure` at the run, with `working_tree_dirty: false`. The source
   measured is that of the runner commit on that branch; the commit's hash is written into
   this section before the run and after the runner commit, and the head at the run differs
-  from it in documents only. Runner commit: `f97544034475624aaf079f6d54e5918397b01588`.
+  from it in documents only. Runner commit: `3cf9c60347c1370aea2a4853e4e876df90681e9a` (the one after the
+  native driver change disclosed above; the first named was f9754403).
 - **Sell-on fee:** as #994, the runner sets the game's 0.5. The three inputs do not publish
   it, and at the captured prices a lot bought inside the window sells for what was paid.
 - **Rebuild gate:** before any timing, the runner rebuilds each member's one-week problem
