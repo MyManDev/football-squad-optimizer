@@ -91,3 +91,29 @@ def test_runner_timestamp_allows_an_identical_create_once_replay(tmp_path: Path)
 
     assert write_document_once(first, path) == "written"
     assert write_document_once(replay, path) == "replay"
+
+
+def test_a_development_contract_evaluation_refuses_the_frozen_output_path(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    """A development-contract reading is not the frozen Phase C record, so it must name its
+    own output file; the default path is refused before anything is read."""
+
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "evaluate_phase_c_components",
+            "--table",
+            str(tmp_path / "t.csv"),
+            "--manifest",
+            str(tmp_path / "m.json"),
+            "--roster",
+            str(tmp_path / "r.csv"),
+            "--producer-environment",
+            str(tmp_path / "e.json"),
+            "--development-contract",
+            "phase_c_component_oof_development_v2",
+        ],
+    )
+    assert runner.main() == 1
+    assert "separate --json-output" in capsys.readouterr().out
