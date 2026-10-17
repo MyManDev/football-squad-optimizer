@@ -35,6 +35,8 @@ export function LeagueMemberPage() {
     adviceEnabled,
     advice,
     rival,
+    duel,
+    duelId,
     deviceRivals,
     windowControl,
     client,
@@ -96,6 +98,16 @@ export function LeagueMemberPage() {
       squad={squad.data}
       advice={adviceEnabled && !advice.isError ? (advice.data ?? null) : null}
       rivalSquad={rival.data ?? null}
+      duelSquad={duelId !== null && !duel.isError ? (duel.data ?? null) : null}
+      duelIssue={
+        duelId === null
+          ? undefined
+          : duel.isError
+            ? "unreadable"
+            : duel.isPending
+              ? "loading"
+              : undefined
+      }
       deviceRivals={deviceRivals}
       windowControl={windowControl.isError ? null : (windowControl.data ?? null)}
       adviceIssue={adviceIssue}
