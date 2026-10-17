@@ -1,6 +1,6 @@
 # Rank-conditional shrinkage of expected points before the squad decision
 
-Record of the measurement pre-registered in [the protocol](rank_conditional_shrinkage_prereg.md). JSON twin: `rank_conditional_shrinkage.json`. Run at commit `edf99561` on a clean tree, 2026-10-17T12:27:27Z to 2026-10-17T12:49:09Z, on the Phase C v2 gradient-boosting out-of-fold table (`phase_c_control_components_gbm_v1`, table digest `eae3e9148509…`, roster `01d111138220…`, equal to the digests the protocol names). 2025-26 was read as development data under the v2 scope; it is not an unseen test. Measurement only, nothing promoted.
+Record of the measurement pre-registered in [the protocol](rank_conditional_shrinkage_prereg.md). JSON twin: `rank_conditional_shrinkage.json`. Run at commit `8210672d` on a clean tree, 2026-10-17T12:27:27Z to 2026-10-17T12:49:09Z, on the Phase C v2 gradient-boosting out-of-fold table (`phase_c_control_components_gbm_v1`, table digest `eae3e9148509…`, roster `01d111138220…`, equal to the digests the protocol names). 2025-26 was read as development data under the v2 scope; it is not an unseen test. Measurement only, nothing promoted. The branch's commits were re-authored on 2026-10-17 under the repository's author identity after the run; each kept its tree, message and dates, so the commit named here is the code that ran under a new id (its tree is `28c69b3cbe0872761bcb81eaa73d80cec5494103`).
 
 **Measured, not certified** under the pre-registered gate. Arm A (rank-conditional additive debias) minus the unshrunk control, paired on 176 folds: mean -0.847 points a gameweek, median +0.0, 90% season-aware moving-block interval [-1.591, -0.022], wins / ties / losses 51 / 63 / 62. The noise floor is 1.5 points a gameweek; certification needs the mean at or above it, the interval above zero and at most one negative season.
 
@@ -78,8 +78,8 @@ owner asked for. On the scheduling of this run: the three arms were solved in th
 the claim that the numbers do not depend on the scheduling holds only while the 600 second
 wall-clock cap never binds; every one of the 528 solves ended OPTIMAL inside the deterministic
 budget of 5.0, so the cap did not bind here. The per-fold artifact carries solver statuses, not
-wall times, so no largest wall time is quoted. The commits after the run (c6cc973d and the one
+wall times, so no largest wall time is quoted. The commits after the run (48d260eb and the one
 that adds this paragraph) changed documents and the runner's harness note only; the record's
-`repository_commit` stays `edf99561` and no number moved.
+`repository_commit` stays `8210672d` and no number moved.
 
 Per-fold table: `artifacts/rank_conditional_shrinkage/rank_conditional_shrinkage_folds.csv` (sha256 `5703db92252ba5242c68e6287496a9c8efcd7e924db3b4edbb66f04aeb4a2edf`).
