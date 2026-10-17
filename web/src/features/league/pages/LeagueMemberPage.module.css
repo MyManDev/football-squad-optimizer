@@ -668,7 +668,7 @@ section.notice p {
 
 .toolIcon {
   flex: none;
-  transition: transform 150ms ease;
+  transition: transform var(--motion-ui-fast) var(--motion-ease);
 }
 
 .tool[open] .toolIcon {
