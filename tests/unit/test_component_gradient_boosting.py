@@ -204,3 +204,22 @@ def test_the_v2_export_writes_the_candidate_the_reader_and_the_comparison_accept
     # The default arm still expects the weighted candidate and refuses the boosted table.
     refused = ["--artifact-dir", str(artifact_dir), "--candidate", table_path.name[:-4]]
     assert compare_main(refused) == 1
+
+
+def test_the_served_pair_is_the_boosted_one_and_the_elite_layer_keeps_the_linear_base() -> None:
+    from squadopt.application import projection_handoff as producer
+    from squadopt.live.recommendation import IN_SEASON_CONTROL_MODEL_VERSIONS
+    from squadopt.prediction.component_models import (
+        COMPONENT_CONTROL_MODEL_VERSIONS,
+        SERVED_COMPONENT_CONFIG,
+        SERVED_COMPONENT_MODEL_VERSION,
+    )
+
+    assert SERVED_COMPONENT_MODEL_VERSION == GRADIENT_BOOSTING_MODEL_VERSION
+    assert SERVED_COMPONENT_CONFIG.estimator == GRADIENT_BOOSTING_ESTIMATOR
+    config, version = producer.served_component(with_evidence=False)
+    assert (config, version) == (SERVED_COMPONENT_CONFIG, SERVED_COMPONENT_MODEL_VERSION)
+    config, version = producer.served_component(with_evidence=True)
+    assert config == ComponentModelConfig()
+    assert version == COMPONENT_MODEL_VERSION
+    assert set(COMPONENT_CONTROL_MODEL_VERSIONS) <= set(IN_SEASON_CONTROL_MODEL_VERSIONS)

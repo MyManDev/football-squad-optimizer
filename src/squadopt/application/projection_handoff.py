@@ -82,6 +82,9 @@ from squadopt.prediction.component_dataset import (
 )
 from squadopt.prediction.component_models import (
     COMPONENT_MODEL_VERSION,
+    SERVED_COMPONENT_CONFIG,
+    SERVED_COMPONENT_MODEL_VERSION,
+    ComponentModelConfig,
     fit_component_models,
     predict_components,
 )
@@ -172,6 +175,20 @@ def _carried(components: pd.DataFrame) -> list[str]:
     ]
 
 
+def served_component(*, with_evidence: bool) -> tuple[ComponentModelConfig, str]:
+    """Which component estimator pair the producer fits for this handoff.
+
+    Without evidence the served pair is the pinned ``SERVED_COMPONENT_MODEL_VERSION``. The
+    elite-evidence layer is declared on the linear control
+    (``phase_c_control_components_v1``), so a handoff with evidence fits that control: the
+    layer's version then names the base it was measured on, and nothing is relabelled.
+    """
+
+    if with_evidence:
+        return ComponentModelConfig(), COMPONENT_MODEL_VERSION
+    return SERVED_COMPONENT_CONFIG, SERVED_COMPONENT_MODEL_VERSION
+
+
 def _component_table(
     archive_root: Path,
     *,
@@ -186,7 +203,9 @@ def _component_table(
     fallback: pd.DataFrame,
     include_components: bool = False,
     training_seasons: Sequence[str] | None = None,
+    with_evidence: bool = False,
 ) -> tuple[pd.DataFrame, dict[str, object]]:
+    component_config, component_version = served_component(with_evidence=with_evidence)
     archives = (
         COMPONENT_TRAINING_SEASONS
         if training_seasons is None
@@ -194,7 +213,7 @@ def _component_table(
     )
     if archives != COMPONENT_TRAINING_SEASONS:
         raise DataSourceError(
-            f"{COMPONENT_MODEL_VERSION} requires the full Phase C training population "
+            f"{component_version} requires the full Phase C training population "
             f"{COMPONENT_TRAINING_SEASONS!r}; a subset needs a separately versioned model."
         )
     training_panel = build_panel(archive_root, seasons=archives)
@@ -213,10 +232,17 @@ def _component_table(
         seasons=archives,
         config=COMPONENT_FEATURE_CONFIG,
     )
-    models = fit_component_models(training, feature_columns=component_feature_columns())
+    models = fit_component_models(
+        training, feature_columns=component_feature_columns(), config=component_config
+    )
     if models is None:
         raise SystemExit(
             "The declared Phase C training population is too thin to fit its component models."
+        )
+    if models.model_version != component_version:
+        raise DataSourceError(
+            f"The component fit reports {models.model_version!r}; the producer declared "
+            f"{component_version!r}."
         )
 
     current_panel, incomplete_players = build_live_player_history(
@@ -265,7 +291,7 @@ def _component_table(
     last = training.sort_values(["season", "gameweek", "player_id"], kind="stable").iloc[-1]
     provenance = PredictionProvenance(
         model_name=CONTROL_MODEL_NAME,
-        model_version=COMPONENT_MODEL_VERSION,
+        model_version=component_version,
         feature_contract_version=COMPONENT_FEATURE_CONTRACT_VERSION,
         training_cutoff=f"{last['season']}:GW{int(last['gameweek']):02d}",
         training_data_fingerprint=_frame_fingerprint(training),
@@ -512,6 +538,7 @@ def build(
                     deadline_utc=target_deadline.deadline_utc,
                     fallback=blend.table,
                     training_seasons=training_seasons,
+                    with_evidence=evidence_table_path is not None,
                 )
             except IncompleteLiveHistoryError as error:
                 diagnostics.update(
@@ -522,7 +549,7 @@ def build(
                     }
                 )
             else:
-                model_version = COMPONENT_MODEL_VERSION
+                _, model_version = served_component(with_evidence=evidence_table_path is not None)
                 feature_contract_version = COMPONENT_FEATURE_CONTRACT_VERSION
                 diagnostics.update(component_diagnostics)
                 diagnostics["projection_selection"] = "phase_c_component_default"

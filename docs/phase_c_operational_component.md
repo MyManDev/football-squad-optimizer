@@ -9,10 +9,16 @@ read both, in that order, before relying on either.
 
 ## Decision
 
-For every in-season deadline, the projection producer first attempts model version
-`phase_c_control_components_v1` with feature contract
-`phase_c_component_form_window_v1`. The model is exactly the component base measured on 147
-chronological development folds:
+For every in-season deadline, the projection producer first attempts the served component
+version (`SERVED_COMPONENT_MODEL_VERSION`, since the recorded gradient-boosting comparison
+`phase_c_control_components_gbm_v1`; `phase_c_control_components_v1` before it and still
+whenever elite evidence is supplied, because the elite layer is declared on the linear
+base) with feature contract `phase_c_component_form_window_v1`. The linear model is exactly
+the component base measured on 147 chronological development folds, and the gradient-boosting
+pair is the same base with its three estimators replaced under
+[research/phase_c_gradient_boosting_method.md](research/phase_c_gradient_boosting_method.md)
+and preferred in
+[research/phase_c_gradient_boosting_comparison.md](research/phase_c_gradient_boosting_comparison.md):
 
 ```text
 expected_points_i = P(appearance_i) * E(points_i | appearance_i)
@@ -131,9 +137,10 @@ number from the code.
    points must be present, finite and non-negative, and so must the adjusted points. Any one
    of these raises rather than degrading to a silent fallback. Supplying one of the two
    evidence paths without the other is an error, not a run without evidence.
-7. **It layers on a base that is itself promoted.** Both bases the producer can build —
-   `phase_c_control_components_v1` and the legacy `in-season-carry-over-v1` — are pinned in
-   `IN_SEASON_CONTROL_MODEL_VERSIONS`, so this holds today. **It holds by construction, not by
+7. **It layers on a base that is itself promoted.** The bases the producer can build —
+   `phase_c_control_components_v1`, `phase_c_control_components_gbm_v1` and the legacy
+   `in-season-carry-over-v1` — are pinned in `IN_SEASON_CONTROL_MODEL_VERSIONS`, so this
+   holds today; with evidence the producer fits the linear base the layer is declared on. **It holds by construction, not by
    a check:** nothing in `build_projection_handoff` or `apply_elite_evidence` tests the base's
    promotion before multiplying, and `version_is_promoted` in the producer's report is a
    membership test on the *composed* version, not on the base. This condition is therefore a

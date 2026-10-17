@@ -95,7 +95,10 @@ from squadopt.planning import (
 )
 from squadopt.planning.guarded import GUARDED_FALLBACK_LIMIT, GUARDED_PLAN_LIMIT
 from squadopt.planning.observed import OBSERVED_FALLBACK_LIMIT, OBSERVED_WINDOW_LIMIT
-from squadopt.prediction.component_models import COMPONENT_MODEL_VERSION
+from squadopt.prediction.component_models import (
+    COMPONENT_MODEL_VERSION,
+    GRADIENT_BOOSTING_MODEL_VERSION,
+)
 from squadopt.prediction.elite_evidence import COMPONENT_ELITE_MODEL_VERSION
 
 #: The multi-week solve's budget, as the system's own horizon path spends it: twenty
@@ -587,7 +590,7 @@ NO_DEFCON_LIMIT: str = (
 )
 
 _TRAINED_WITHOUT_DEFCON: frozenset[str] = frozenset(
-    {COMPONENT_MODEL_VERSION, COMPONENT_ELITE_MODEL_VERSION}
+    {COMPONENT_MODEL_VERSION, GRADIENT_BOOSTING_MODEL_VERSION, COMPONENT_ELITE_MODEL_VERSION}
 )
 
 

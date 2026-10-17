@@ -47,7 +47,11 @@ from squadopt.prediction.availability import (
 from squadopt.prediction.component_dataset import (
     FEATURE_CONTRACT_VERSION as COMPONENT_FEATURE_CONTRACT_VERSION,
 )
-from squadopt.prediction.component_models import COMPONENT_MODEL_VERSION
+from squadopt.prediction.component_models import (
+    COMPONENT_CONTROL_MODEL_VERSIONS,
+    COMPONENT_MODEL_VERSION,
+    GRADIENT_BOOSTING_MODEL_VERSION,
+)
 from squadopt.prediction.config import BaselineProjectionConfig
 from squadopt.prediction.elite_evidence import (
     COMPONENT_ELITE_FEATURE_CONTRACT_VERSION,
@@ -75,6 +79,7 @@ PROJECTION_HANDOFF_CONTRACT_VERSION: Final = "projection_handoff_v1"
 # verification rather than made from an unpromoted model.
 IN_SEASON_CONTROL_MODEL_VERSIONS: Final[tuple[str, ...]] = (
     COMPONENT_MODEL_VERSION,
+    GRADIENT_BOOSTING_MODEL_VERSION,
     IN_SEASON_MODEL_VERSION,
     ELITE_EVIDENCE_MODEL_VERSION,
     COMPONENT_ELITE_MODEL_VERSION,
@@ -185,7 +190,7 @@ class InSeasonProjection:
             raise DataSourceError(
                 "The legacy in-season control cannot claim an elite evidence fingerprint."
             )
-        if self.model_version == COMPONENT_MODEL_VERSION and (
+        if self.model_version in COMPONENT_CONTROL_MODEL_VERSIONS and (
             self.evidence_fingerprint is not None
             or self.feature_contract_version != COMPONENT_FEATURE_CONTRACT_VERSION
         ):

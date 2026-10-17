@@ -161,6 +161,17 @@ class ComponentModelConfig:
             )
 
 
+# The estimator pair the live in-season path fits and serves. Pinning it here is the
+# promotion decision for the estimator: the gradient-boosting candidate after the recorded
+# v2 comparison (docs/research/phase_c_gradient_boosting_comparison.md). The linear control
+# stays declared and fitted wherever a layer is defined on it (the elite-evidence layer).
+SERVED_COMPONENT_MODEL_VERSION: Final = GRADIENT_BOOSTING_MODEL_VERSION
+SERVED_COMPONENT_CONFIG: Final = ComponentModelConfig(estimator=GRADIENT_BOOSTING_ESTIMATOR)
+# Every version that is "the Phase C component base": no external evidence, the exact
+# form-window feature contract, trained on seasons without defensive-contribution points.
+COMPONENT_CONTROL_MODEL_VERSIONS: Final = (COMPONENT_MODEL_VERSION, GRADIENT_BOOSTING_MODEL_VERSION)
+
+
 @dataclass(frozen=True, slots=True)
 class FittedComponentModels:
     """The three fitted estimators, with the rows each was fitted on.
