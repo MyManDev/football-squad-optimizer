@@ -41,6 +41,7 @@ runners live in `scripts/`, and its records are committed under `docs/`.
 | Residual exports | [Residual contract](../residual_export_contract.md) |
 | How records and larger expansions are stored | [Measurement artifacts](../architecture/decisions/0003-measurement-artifacts.md) |
 | October 2026 member web practice review | [Existing capabilities, interface sources and ranked experience choices](web_experience_review_2026_10.md) |
+| Switching the server's window solves to HiGHS (#1090, draft) | [Design note](highs_window_switch_design.md) |
 
 ## Pre-registrations
 
