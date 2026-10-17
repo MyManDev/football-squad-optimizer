@@ -694,7 +694,9 @@ def run(arguments: argparse.Namespace, *, json_name: str) -> dict[str, object]:
             "scoring_policy": ScoringPolicy.OFFICIAL_AUTOSUB_CAPTAIN_V2.value,
             "arms_solved_concurrently": (
                 "the three arms ran in three threads; every solve is bound by its own "
-                "deterministic budget, so the numbers do not depend on the scheduling"
+                "deterministic budget, so the numbers do not depend on the scheduling while "
+                "the wall-clock cap never binds. A solve the cap stops ends FEASIBLE rather "
+                "than OPTIMAL, so solver_by_arm shows whether it bound in this run."
             ),
             "solver": solver_record(*results.values()),
             "solver_by_arm": {arm: solver_record(results[arm]) for arm in ARMS},
