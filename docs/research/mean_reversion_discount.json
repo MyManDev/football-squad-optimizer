@@ -16,6 +16,8 @@
   "chain_contract_version": "season_chain_v1",
   "chains": [
     {
+      "carried_blank_rows": 36,
+      "carried_unexplained_rows": 0,
       "decisions": 37,
       "diagnostics": {
         "banked_transfer_value_points": 0.0,
@@ -373,6 +375,8 @@
       ]
     },
     {
+      "carried_blank_rows": 44,
+      "carried_unexplained_rows": 0,
       "decisions": 37,
       "diagnostics": {
         "banked_transfer_value_points": 0.0,
@@ -730,6 +734,8 @@
       ]
     },
     {
+      "carried_blank_rows": 42,
+      "carried_unexplained_rows": 0,
       "decisions": 37,
       "diagnostics": {
         "banked_transfer_value_points": 0.0,
@@ -1088,6 +1094,8 @@
       ]
     },
     {
+      "carried_blank_rows": 42,
+      "carried_unexplained_rows": 0,
       "decisions": 37,
       "diagnostics": {
         "banked_transfer_value_points": 0.0,
@@ -1446,6 +1454,8 @@
       ]
     },
     {
+      "carried_blank_rows": 41,
+      "carried_unexplained_rows": 0,
       "decisions": 37,
       "diagnostics": {
         "banked_transfer_value_points": 0.0,
@@ -1804,6 +1814,8 @@
       ]
     },
     {
+      "carried_blank_rows": 30,
+      "carried_unexplained_rows": 0,
       "decisions": 36,
       "diagnostics": {
         "banked_transfer_value_points": 0.0,
@@ -2153,6 +2165,8 @@
       ]
     },
     {
+      "carried_blank_rows": 26,
+      "carried_unexplained_rows": 0,
       "decisions": 36,
       "diagnostics": {
         "banked_transfer_value_points": 0.0,
@@ -2502,6 +2516,8 @@
       ]
     },
     {
+      "carried_blank_rows": 26,
+      "carried_unexplained_rows": 0,
       "decisions": 36,
       "diagnostics": {
         "banked_transfer_value_points": 0.0,
@@ -2852,6 +2868,8 @@
       ]
     },
     {
+      "carried_blank_rows": 26,
+      "carried_unexplained_rows": 0,
       "decisions": 36,
       "diagnostics": {
         "banked_transfer_value_points": 0.0,
@@ -3202,6 +3220,8 @@
       ]
     },
     {
+      "carried_blank_rows": 25,
+      "carried_unexplained_rows": 0,
       "decisions": 36,
       "diagnostics": {
         "banked_transfer_value_points": 0.0,
@@ -3552,6 +3572,8 @@
       ]
     },
     {
+      "carried_blank_rows": 20,
+      "carried_unexplained_rows": 0,
       "decisions": 37,
       "diagnostics": {
         "banked_transfer_value_points": 0.0,
@@ -3909,6 +3931,8 @@
       ]
     },
     {
+      "carried_blank_rows": 18,
+      "carried_unexplained_rows": 0,
       "decisions": 37,
       "diagnostics": {
         "banked_transfer_value_points": 0.0,
@@ -4266,6 +4290,8 @@
       ]
     },
     {
+      "carried_blank_rows": 18,
+      "carried_unexplained_rows": 0,
       "decisions": 37,
       "diagnostics": {
         "banked_transfer_value_points": 0.0,
@@ -4624,6 +4650,8 @@
       ]
     },
     {
+      "carried_blank_rows": 19,
+      "carried_unexplained_rows": 0,
       "decisions": 37,
       "diagnostics": {
         "banked_transfer_value_points": 0.0,
@@ -4982,6 +5010,8 @@
       ]
     },
     {
+      "carried_blank_rows": 18,
+      "carried_unexplained_rows": 0,
       "decisions": 37,
       "diagnostics": {
         "banked_transfer_value_points": 0.0,
@@ -5340,6 +5370,8 @@
       ]
     },
     {
+      "carried_blank_rows": 17,
+      "carried_unexplained_rows": 0,
       "decisions": 37,
       "diagnostics": {
         "banked_transfer_value_points": 0.0,
@@ -5697,6 +5729,8 @@
       ]
     },
     {
+      "carried_blank_rows": 12,
+      "carried_unexplained_rows": 0,
       "decisions": 37,
       "diagnostics": {
         "banked_transfer_value_points": 0.0,
@@ -6054,6 +6088,8 @@
       ]
     },
     {
+      "carried_blank_rows": 9,
+      "carried_unexplained_rows": 0,
       "decisions": 37,
       "diagnostics": {
         "banked_transfer_value_points": 0.0,
@@ -6412,6 +6448,8 @@
       ]
     },
     {
+      "carried_blank_rows": 10,
+      "carried_unexplained_rows": 0,
       "decisions": 37,
       "diagnostics": {
         "banked_transfer_value_points": 0.0,
@@ -6770,6 +6808,8 @@
       ]
     },
     {
+      "carried_blank_rows": 9,
+      "carried_unexplained_rows": 0,
       "decisions": 37,
       "diagnostics": {
         "banked_transfer_value_points": 0.0,
@@ -7128,6 +7168,8 @@
       ]
     },
     {
+      "carried_blank_rows": 13,
+      "carried_unexplained_rows": 0,
       "decisions": 37,
       "diagnostics": {
         "banked_transfer_value_points": 0.0,
@@ -7485,6 +7527,8 @@
       ]
     },
     {
+      "carried_blank_rows": 10,
+      "carried_unexplained_rows": 0,
       "decisions": 37,
       "diagnostics": {
         "banked_transfer_value_points": 0.0,
@@ -7842,6 +7886,8 @@
       ]
     },
     {
+      "carried_blank_rows": 10,
+      "carried_unexplained_rows": 0,
       "decisions": 37,
       "diagnostics": {
         "banked_transfer_value_points": 0.0,
@@ -8200,6 +8246,8 @@
       ]
     },
     {
+      "carried_blank_rows": 10,
+      "carried_unexplained_rows": 0,
       "decisions": 37,
       "diagnostics": {
         "banked_transfer_value_points": 0.0,
@@ -8558,6 +8606,8 @@
       ]
     },
     {
+      "carried_blank_rows": 10,
+      "carried_unexplained_rows": 0,
       "decisions": 37,
       "diagnostics": {
         "banked_transfer_value_points": 0.0,
@@ -9280,13 +9330,30 @@
   "finished_at_utc": "2026-10-17T12:34:46+00:00",
   "locked_holdout_accessed": true,
   "measurement_only": true,
-  "merged_at_utc": "2026-10-17T12:34:52+00:00",
+  "merge_repository_commit": "537520b72e989be2965da8f938a4b9a91501064b",
+  "merge_working_tree_dirty": false,
+  "merged_at_utc": "2026-10-17T13:25:43+00:00",
   "merged_from": [
-    "artifacts/mean_reversion_discount/2021-22.json",
-    "artifacts/mean_reversion_discount/2022-23.json",
-    "artifacts/mean_reversion_discount/2023-24.json",
-    "artifacts/mean_reversion_discount/2024-25.json",
-    "artifacts/mean_reversion_discount/2025-26.json"
+    {
+      "path": "artifacts/mean_reversion_discount/2021-22.json",
+      "sha256": "c57c8440b1ef266ae72dd9092b19cf9bb5e35fc76bfab7d1db921f353d75b51b"
+    },
+    {
+      "path": "artifacts/mean_reversion_discount/2022-23.json",
+      "sha256": "d54661da3551486ca2691ad6a7c46afbbc41654924f41a35e1bbeac53a4ed357"
+    },
+    {
+      "path": "artifacts/mean_reversion_discount/2023-24.json",
+      "sha256": "a158f7cf070758a005cad94d46382462f3c3d734ce53e5258055a14558016e07"
+    },
+    {
+      "path": "artifacts/mean_reversion_discount/2024-25.json",
+      "sha256": "d948f3b1959c09bd6f49ebfdf2e5ee2521f8ee1080ab89638697c181ae4da8e7"
+    },
+    {
+      "path": "artifacts/mean_reversion_discount/2025-26.json",
+      "sha256": "b447f3c8956cdcbdaa936390dc7125bf3b52f7f08e88019cd789edbe10e5039f"
+    }
   ],
   "noise_floor_points_per_gameweek": 1.5,
   "policy": {
