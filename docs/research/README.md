@@ -63,6 +63,7 @@ reaches, and a backticked name is not a link.
 | [Planner policy chain](planner_policy_chain_prereg.md) | Read after GW20 (interim) and GW38 (final); no record yet |
 | [Published fixture difficulty, live](published_difficulty_live_prereg.md) | Runner described in [the live runner](published_difficulty_live_runner.md); no record yet |
 | [Available attacking shares](football_available_shares_prereg.md) | No record names it yet |
+| [HiGHS on the current window model](window_solver_highs_current_prereg.md) | The #994 protocol applied to the GW7 tree for #1090; no record yet |
 
 ## Reproducing a record
 
