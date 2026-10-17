@@ -65,6 +65,7 @@ reaches, and a backticked name is not a link.
 | [Available attacking shares](football_available_shares_prereg.md) | No record names it yet |
 | [Mean-reversion discount for later plan weeks](mean_reversion_discount_prereg.md) | Recorded in [mean-reversion discount](mean_reversion_discount.md): measured, not certified |
 | [Team-match block resampler for component scenarios](team_match_block_sampler_prereg.md) | Recorded in [the calibration reading](team_match_block_sampler.md) and [the fidelity diagnostic](team_match_block_sampler_fidelity.md) |
+| [Joint team-match sampler, zero atom and club block in one draw](moe_sampler_prereg.md) | No record names it yet |
 
 ## Reproducing a record
 
