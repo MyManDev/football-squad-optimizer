@@ -6134,7 +6134,7 @@
     "phase_c_producer_repository_commit": "1079ba64c11ead48fdcd574cb8c8143e81b5d6ae",
     "pinned_by_arguments": true,
     "prereg_document": "docs/phase_d_component_fidelity_prereg.md",
-    "repository_commit": "3d52acd1d3eaba8f110f920c56ee0583401a64b9",
+    "repository_commit": "6d07dec4660425126e3a07ed422541bdada44203",
     "roster": "phase_c_component_oof_v1.roster.csv",
     "roster_sha256": "3ef0c5717fa63c3c4772512f019cd750d3fae6cd9a7567d20dd4bfa24003678e",
     "target_contract_version": "phase_c_component_targets_v1",

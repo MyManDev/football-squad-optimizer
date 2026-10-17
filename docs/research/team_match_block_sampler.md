@@ -12,12 +12,12 @@ empty, no probability is published, no product default changes.
 Protocol: [team_match_block_sampler_prereg.md](team_match_block_sampler_prereg.md), frozen before
 the code. Record: [team_match_block_sampler.json](team_match_block_sampler.json), contract
 `phase_d_component_squad_calibration_candidate_v1`, `binding: false`. Written by
-`python -m scripts.run_component_squad_calibration --team-match-block` at commit `9d4aee49` on a
-clean tree (the sampler and runners are commit `3d52acd1`; `9d4aee49` adds only the fidelity
+`python -m scripts.run_component_squad_calibration --team-match-block` at commit `265e38c3` on a
+clean tree (the sampler and runners are commit `6d07dec4`; `265e38c3` adds only the fidelity
 record), 2026-10-17 11:53Z to 12:43Z, 3,015 seconds on a four-core Linux container, OR-Tools
 9.15.6755, numpy 2.5.2, archive commit `8c97b2ad`. Fidelity precondition:
 [the candidate fidelity record](team_match_block_sampler_fidelity.md), verified structurally
-before the read (digest `09688767...`). 2025-26 not read.
+before the read (digest `09688767...`). 2025-26 not read. The branch's commits were re-authored on 2026-10-17 under the repository's author identity after the run; each kept its tree, message and dates, so the commit named here is the code that ran under a new id (its tree is `f251dde3ce52b4652fa3226df65eded8fc0f1845`).
 
 ## The gates
 

@@ -8,12 +8,12 @@ calibration run. Record: [team_match_block_sampler_fidelity.json](team_match_blo
 contract `phase_d_component_fidelity_candidate_v1`, `binding: false`.
 
 Written by `python -m scripts.measure_component_fidelity --team-match-block` at commit
-`3d52acd1` on a clean tree, pinned to the regenerated Phase C v1 table (table
+`6d07dec4` on a clean tree, pinned to the regenerated Phase C v1 table (table
 `6dd22797...`, roster `3ef0c571...`, manifest `66096a7c...`, produced at commit `1079ba64`;
 see the pre-registration for why the table digest differs from the binding record's).
 `ScenarioConfig()` defaults: 1,000 scenarios, seed 0, `min_history_folds` 8. Population: 147
 folds, 9 burn-in folds excluded, 138 measured, 95,323 fold-player observations, 2021-22 to
-2024-25. 2025-26 not read. No warnings.
+2024-25. 2025-26 not read. No warnings. The branch's commits were re-authored on 2026-10-17 under the repository's author identity after the run; each kept its tree, message and dates, so the commit named here is the code that ran under a new id (its tree is `5ade99600012bbf3a82da4f44b740449382667ab`).
 
 ## The five differences, sampled minus predicted, pooled over fold-player observations
 
