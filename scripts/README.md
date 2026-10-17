@@ -146,6 +146,7 @@ do not move.
 | `measure_listed_minutes.py` | measurement runner | the `--output` record, committed as `docs/in_season_listed_minutes.json` beside its reading `docs/in_season_listed_minutes.md` | 2026-10-04 |
 | `measure_live_price_honesty.py` | measurement runner | `docs/live_price_honesty.json`, `docs/live_price_honesty.md`, regenerated after a settled gameweek; protocol `docs/live_price_honesty_prereg.md` | 2026-09-26 |
 | `measure_live_projection_audit.py` | measurement runner | `docs/live_projection_audit.json`, `docs/live_projection_audit.md`, regenerated after each settled gameweek; protocol `docs/live_projection_audit_prereg.md` | 2026-09-19 |
+| `measure_mean_reversion_discount.py` | measurement runner | `docs/research/mean_reversion_discount.json`, `docs/research/mean_reversion_discount.md` through `--merge` of per-season artifacts under `artifacts/mean_reversion_discount/`; a pilot writes only there; protocol `docs/research/mean_reversion_discount_prereg.md` | 2026-10-17 |
 | `measure_member_plan_determinism.py` | measurement runner | `docs/member_plan_determinism.json`, `docs/member_plan_determinism.md` | 2026-09-20 |
 | `measure_member_window_proofs.py` | measurement runner | `docs/member_window_proofs.json`, `docs/member_window_proofs.md` | 2026-09-19 |
 | `measure_mode_plan_selection.py` | measurement runner | `docs/mode_plan_selection.json` | 2026-09-19 |

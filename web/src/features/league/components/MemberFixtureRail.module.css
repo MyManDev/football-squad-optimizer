@@ -296,8 +296,8 @@
   transform: translateX(100%);
   visibility: hidden;
   transition:
-    transform 200ms ease,
-    visibility 0s linear 200ms;
+    transform var(--motion-ui) var(--motion-ease),
+    visibility 0s linear var(--motion-ui);
 }
 
 .rail[data-placement="sheet"][data-open] {
@@ -305,7 +305,7 @@
   visibility: visible;
   box-shadow: var(--shadow-drawer);
   transition:
-    transform 200ms ease,
+    transform var(--motion-ui) var(--motion-ease),
     visibility 0s;
 }
 
