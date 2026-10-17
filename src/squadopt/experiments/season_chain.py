@@ -224,7 +224,7 @@ class SeasonChainConfig:
     projection_rule: str = NAIVE_PROJECTION_RULE
     """``naive_calendar_scaling_v1`` scales the decision-time control projection by the
     known fixture count (a double counts twice); ``control_calendar_blind_v1`` is the
-    control as evaluated, with no scaling — a double projects like a single;
+    control as evaluated, with no scaling, so a double projects like a single;
     ``mean_reversion_discount_v1`` is the naive rule with each later week's deviation
     from the position mean discounted by ``mean_reversion_factor`` per week of offset
     (`multi_gw_rehearsal.MEAN_REVERSION_PROJECTION_RULE`)."""

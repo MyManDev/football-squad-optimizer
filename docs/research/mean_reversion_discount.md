@@ -72,6 +72,7 @@ Selection is realized points before hits; hits are the charged hit points. Weekl
 ## Provenance
 
 - Repository commit `e112fede8371232022b2df8035203e5fabd83605`, working tree dirty: False; archive commit `8c97b2adb123863c3dd581e730f1360e89815ac2`.
+- A later commit on the branch changed one docstring sentence of `src/squadopt/experiments/season_chain.py` (a dash replaced by a comma) and nothing else; no code that ran changed, so the numbers stand and the commit above is the one to reproduce from.
 - Per-week expansion `artifacts/mean_reversion_discount/weeks.json` (gitignored), sha256 `2e5cd417254029fc804cafc3d07d121e545a83294559070f443b5777fee0d63c`.
 - Machine: Linux-6.18.44-fc-v139-x86_64-with-glibc2.39, 4 logical cores, Python 3.13.16; one process per season in parallel.
 - Merged from: artifacts/mean_reversion_discount/2021-22.json, artifacts/mean_reversion_discount/2022-23.json, artifacts/mean_reversion_discount/2023-24.json, artifacts/mean_reversion_discount/2024-25.json, artifacts/mean_reversion_discount/2025-26.json.
