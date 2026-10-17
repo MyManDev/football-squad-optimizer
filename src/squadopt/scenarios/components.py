@@ -697,43 +697,44 @@ def team_match_joint_pool(
             f"Residual history must precede {target.fold_id}; found {later[:5]!r}."
         )
 
-    route = frame["composition_route"].astype("string") == COMPONENT_MODEL_ROUTE
-    appearance = pd.to_numeric(frame["appearance_target"], errors="coerce")
-    probability = pd.to_numeric(frame["appearance_probability"], errors="coerce")
-    fixtures = pd.to_numeric(frame["fixture_count"], errors="coerce")
-    minutes_mean = pd.to_numeric(frame["expected_minutes_if_appearance"], errors="coerce")
-    points_mean = pd.to_numeric(frame["raw_expected_points_if_appearance"], errors="coerce")
-    minutes_target = pd.to_numeric(frame["minutes_target"], errors="coerce")
-    points_target = pd.to_numeric(frame["points_target"], errors="coerce")
-    appeared = appearance == 1
+    # Read as plain float arrays with NaN for a missing value, whatever nullable dtype the
+    # caller's frame carries: every comparison below then treats a missing value as refused.
+    def numbers(name: str) -> np.ndarray:
+        return pd.to_numeric(frame[name], errors="coerce").to_numpy(
+            dtype="float64", na_value=np.nan
+        )
+
+    route = (frame["composition_route"].astype("string") == COMPONENT_MODEL_ROUTE).to_numpy(
+        dtype=bool, na_value=False
+    )
+    appearance = numbers("appearance_target")
+    probability = numbers("appearance_probability")
+    fixtures = numbers("fixture_count")
+    minutes_mean = numbers("expected_minutes_if_appearance")
+    points_mean = numbers("raw_expected_points_if_appearance")
+    minutes_target = numbers("minutes_target")
+    points_target = numbers("points_target")
+    appeared = appearance == 1.0
+    block_fields = (
+        frame.loc[:, list(TEAM_MATCH_BLOCK_SOURCE_COLUMNS)]
+        .isna()
+        .any(axis=1)
+        .to_numpy(dtype=bool, na_value=True)
+    )
     # Each reason is read on the rows the earlier reasons admitted, so a row is counted once.
     reasons: tuple[tuple[str, np.ndarray], ...] = (
-        ("direct_control_rows", (~route).to_numpy(dtype=bool)),
-        ("appearance_target_not_binary", (~appearance.isin([0, 1])).to_numpy(dtype=bool)),
+        ("direct_control_rows", ~route),
+        ("appearance_target_not_binary", ~np.isin(appearance, (0.0, 1.0))),
         (
             "appearance_probability_outside_unit_interval",
-            (~probability.between(0.0, 1.0)).to_numpy(dtype=bool),
+            ~((probability >= 0.0) & (probability <= 1.0)),
         ),
-        (
-            "block_field_missing",
-            frame.loc[:, list(TEAM_MATCH_BLOCK_SOURCE_COLUMNS)].isna().any(axis=1).to_numpy()
-            | ~np.isfinite(fixtures.to_numpy(dtype="float64")),
-        ),
-        ("no_fixture", ~(fixtures >= 1).to_numpy(dtype=bool)),
-        (
-            "conditional_mean_missing",
-            ~(
-                np.isfinite(minutes_mean.to_numpy(dtype="float64"))
-                & np.isfinite(points_mean.to_numpy(dtype="float64"))
-            ),
-        ),
+        ("block_field_missing", block_fields | ~np.isfinite(fixtures)),
+        ("no_fixture", ~(fixtures >= 1.0)),
+        ("conditional_mean_missing", ~(np.isfinite(minutes_mean) & np.isfinite(points_mean))),
         (
             "appeared_target_missing",
-            appeared.to_numpy(dtype=bool)
-            & ~(
-                np.isfinite(minutes_target.to_numpy(dtype="float64"))
-                & np.isfinite(points_target.to_numpy(dtype="float64"))
-            ),
+            appeared & ~(np.isfinite(minutes_target) & np.isfinite(points_target)),
         ),
     )
     admitted = np.ones(len(frame), dtype=bool)
