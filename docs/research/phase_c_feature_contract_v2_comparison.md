@@ -22,3 +22,36 @@ Lower is better. The v2 contract is better on every component in every season: p
 - One paired measurement; the rows, routes, folds, estimator and constants are identical, the windows are the only difference.
 - A development reading on the points metric. The gradient-boosting estimator's own decision-level reading (`phase_c_gradient_boosting_comparison.md`) did not confirm its player-level gain, so this candidate owes the same decision-level reading before any feature-contract pin is proposed; none is proposed here.
 - Serving v2 would also need captures with ten settled weeks of live history, as the declaration states.
+
+## Decision-level reading (added after the first record, reported beside the rule)
+
+Both boosted arms were exported at this branch's commit for the frozen decision seasons
+2021-22 to 2024-25 and run through the repository's decision comparison
+(`scripts.evaluate_phase_c_components --development-contract phase_c_component_oof_development_v2`):
+147 folds, squads solved from each arm's expected points, official autosub and captain
+scoring, the frozen ridge control on the same folds. The linear components' row is the
+reading recorded beside the gradient-boosting comparison.
+
+| arm | mean realized squad points | against the ridge control | wins / ties / losses | zero-minute starters | autosub points |
+| --- | --- | --- | --- | --- | --- |
+| linear components, v1 features | 63.4150 | +4.8912 | 83 / 8 / 56 | 83 | 230 |
+| gradient boosting, v1 features | 62.6667 | +4.1429 | 88 / 4 / 55 | 108 | 397 |
+| gradient boosting, v2 features | 62.4626 | +3.9388 | 80 / 3 / 64 | 85 | 289 |
+
+Paired on the same folds, v2 features minus v1 features (both gradient boosting): mean
+-0.2041 points a gameweek, median +0.0, 90% season-aware moving-block
+interval [-1.796, +1.061], wins / ties / losses
+69 / 10 / 68; by season
+2021-22 +2.189, 2022-23 +0.278, 2023-24 -1.784, 2024-25 -1.486. Against the linear components:
+-0.9524 [-3.238, +1.014], 67 / 8 / 72.
+
+What this says: a second time, a candidate that is better on every player-level metric is
+not better at the decision level. The v2 windows cut the boosted arm's zero-minute starters
+back to the linear arm's level (85 against 108 and 83) and still score fewer realized points
+than the linear components' squads. The pattern points at the decision objective, which
+multiplies an appearance probability by a conditional points estimate and hands the maximum
+to the solver: sharper components move the maximum to different players without moving
+realized points. The points-MAE rule stands as recorded; no feature-contract pin is proposed,
+and the next declared candidate is the composition itself (how the components enter the
+expected points the solver reads), measured at the decision level first.
+
