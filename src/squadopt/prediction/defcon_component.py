@@ -21,6 +21,7 @@ DEFCON_SEASON = "2026-27"
 DEFCON_CANDIDATE_VERSIONS = MappingProxyType(
     {
         "phase_c_control_components_v1": "phase_c_control_components_defcon_2026_v1",
+        "phase_c_control_components_gbm_v1": "phase_c_control_components_gbm_defcon_2026_v1",
         "phase-c-component-elite-top100-v1": "phase-c-component-elite-top100-defcon-2026-v1",
     }
 )

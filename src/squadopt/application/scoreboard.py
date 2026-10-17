@@ -97,7 +97,7 @@ from squadopt.live import (
     season_from_bootstrap,
 )
 from squadopt.live.settlement import empty_diagnostics
-from squadopt.prediction.component_models import COMPONENT_MODEL_VERSION
+from squadopt.prediction.component_models import COMPONENT_CONTROL_MODEL_VERSIONS
 
 SCOREBOARD_FILE: Final = "scoreboard.json"
 TOP100_SIZE: Final = 100
@@ -479,7 +479,7 @@ def scoreboard_payload(
                 raise DataError(
                     "Paired base decision must use the system's same season and capture."
                 )
-            if control.decision.get("model_version") != COMPONENT_MODEL_VERSION:
+            if control.decision.get("model_version") not in COMPONENT_CONTROL_MODEL_VERSIONS:
                 raise DataError("The bare component row needs a frozen component-only decision.")
             base_row = _ours(control)
             comparisons[1].update(

@@ -37,7 +37,9 @@ from squadopt.prediction.component_dataset import (
 from squadopt.prediction.component_dataset import (
     FEATURE_CONTRACT_VERSION as COMPONENT_FEATURE_CONTRACT_VERSION,
 )
-from squadopt.prediction.component_models import COMPONENT_MODEL_VERSION
+from squadopt.prediction.component_models import (
+    SERVED_COMPONENT_MODEL_VERSION,
+)
 from squadopt.prediction.elite_evidence import (
     COMPONENT_ELITE_FEATURE_CONTRACT_VERSION,
     COMPONENT_ELITE_MODEL_VERSION,
@@ -561,7 +563,7 @@ def test_component_model_is_the_default_when_the_capture_has_settled_history(
 
     projection, _, report = _build(world, snapshot_id=snapshot.snapshot_id, dry_run=True)
 
-    assert projection.model_version == COMPONENT_MODEL_VERSION
+    assert projection.model_version == SERVED_COMPONENT_MODEL_VERSION
     assert projection.feature_contract_version == COMPONENT_FEATURE_CONTRACT_VERSION
     assert report["projection_selection"] == "phase_c_component_default"
     assert report["version_is_promoted"] is True
@@ -688,7 +690,7 @@ def test_evidence_on_the_component_base_is_its_own_promoted_identity(
 
     monkeypatch.setattr(producer, "_component_table", fake_component)
     component, _, _ = _build(world, snapshot_id=snapshot.snapshot_id, dry_run=True)
-    assert component.model_version == COMPONENT_MODEL_VERSION
+    assert component.model_version == SERVED_COMPONENT_MODEL_VERSION
     table_path, manifest_path, ordered_players = _evidence_for(component, tmp_path, monkeypatch)
 
     projection, written, report = _build(
