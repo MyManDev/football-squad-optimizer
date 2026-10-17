@@ -44,7 +44,7 @@ before any switch is proposed. This document is that re-measure's protocol.
   capture substituted and nothing solved: it reads 15 members at gameweek 7, the published
   rules and coefficients are the ones the code would solve with, and every club has one
   fixture in each of GW7 to GW11. That run saw no solver output and is not a pilot.
-- The first start of `measure`, at 12:56Z on 17 October on head 4b0d3cc8, stopped at the
+- The first start of `measure`, at 12:56Z on 17 October on head 311e3c79, stopped at the
   version guard before any solve: OR-Tools and `highspy` each ship a `libhighs.so.1`, so on
   Linux one process cannot load both, in either order (#1083 ran on Windows, where this
   cannot happen). The native HiGHS side of the runner (the solve functions, the blocked-day
@@ -89,8 +89,8 @@ before any switch is proposed. This document is that re-measure's protocol.
   `feat/highs-window-remeasure` at the run, with `working_tree_dirty: false`. The source
   measured is that of the runner commit on that branch; the commit's hash is written into
   this section before the run and after the runner commit, and the head at the run differs
-  from it in documents only. Runner commit: `3cf9c60347c1370aea2a4853e4e876df90681e9a` (the one after the
-  native driver change disclosed above; the first named was f9754403).
+  from it in documents only. Runner commit: `a2ba723025650c8cae4eff46237f9767498c20e0` (the one after the
+  native driver change disclosed above; the first named was a85cc75b). On 2026-10-17, after the run, the branch's commits were re-authored under the repository's author identity; the ids in this document are the re-authored ones, each commit kept its tree, message and dates, and nothing else in this document moved.
 - **Sell-on fee:** as #994, the runner sets the game's 0.5. The three inputs do not publish
   it, and at the captured prices a lot bought inside the window sells for what was paid.
 - **Rebuild gate:** before any timing, the runner rebuilds each member's one-week problem

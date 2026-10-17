@@ -1,8 +1,8 @@
 # HiGHS on the member window model at GW7
 
-Protocol `docs/research/window_solver_highs_current_prereg.md`, issue #1090, capture `fpl-live-20261016T060154Z-b1702d00c8cd`, commit `ad7b5c46cbf1002a3ec0d4ae0437ab31c2ca2492`. One week of one season with a flat calendar; nothing here claims more.
+Protocol `docs/research/window_solver_highs_current_prereg.md`, issue #1090, capture `fpl-live-20261016T060154Z-b1702d00c8cd`, commit `6163d4e83db60d2152808f354e251f899b402055`. One week of one season with a flat calendar; nothing here claims more.
 
-Run from 2026-10-17T13:17:40+00:00 to 2026-10-17T15:06:41+00:00; head at the end `ad7b5c46cbf1002a3ec0d4ae0437ab31c2ca2492`, runner sha256 `1491abc2c0ab348b1653836189dc25c7af949be01104b2a876fccb95c3e9da5a`.
+Run from 2026-10-17T13:17:40+00:00 to 2026-10-17T15:06:41+00:00; head at the end `6163d4e83db60d2152808f354e251f899b402055`, runner sha256 `1491abc2c0ab348b1653836189dc25c7af949be01104b2a876fccb95c3e9da5a`. The branch's commits were re-authored on 2026-10-17 under the repository's author identity after the run; each kept its tree, message and dates, so the commit named here is the code that ran under a new id (its tree is `f446538545f936f9a50372b34056dccb9e3ecc48`).
 
 ## Verdicts
 
@@ -70,4 +70,4 @@ Linux-6.18.44-fc-v139-x86_64-with-glibc2.39, Intel(R) Xeon(R) Processor @ 2.10GH
 
 ## Decision
 
-Switch the server's three- and five-week window solves to native HiGHS, as a proposal on #632 and not in this pull request. On the current window model (commit ad7b5c46) the three conditions hold: wall-matched, native proves every instance CP-SAT proves at CP-SAT's value; at 1,800 s it proves at least half of the 7 five-week instances CP-SAT leaves FEASIBLE; and on no instance does it end below CP-SAT's value. The switch is a separate pull request: it pins `highspy==1.15.1` in `constraints.txt` and `pyproject.toml`, it changes the import contract "The CP-SAT solver stays in the decision core" in `pyproject.toml` so that the one module in `planning/` that drives HiGHS is where `highspy` is imported and `ortools` stays forbidden outside the decision core, it keeps CP-SAT for the one-week solves and as the fallback when HiGHS returns no solution, and it is merged only in a window the live-path plan allows for `planning/`, after a full weekly rehearsal before the next publish (#1090).
+Switch the server's three- and five-week window solves to native HiGHS, as a proposal on #632 and not in this pull request. On the current window model (commit 6163d4e8) the three conditions hold: wall-matched, native proves every instance CP-SAT proves at CP-SAT's value; at 1,800 s it proves at least half of the 7 five-week instances CP-SAT leaves FEASIBLE; and on no instance does it end below CP-SAT's value. The switch is a separate pull request: it pins `highspy==1.15.1` in `constraints.txt` and `pyproject.toml`, it changes the import contract "The CP-SAT solver stays in the decision core" in `pyproject.toml` so that the one module in `planning/` that drives HiGHS is where `highspy` is imported and `ortools` stays forbidden outside the decision core, it keeps CP-SAT for the one-week solves and as the fallback when HiGHS returns no solution, and it is merged only in a window the live-path plan allows for `planning/`, after a full weekly rehearsal before the next publish (#1090).

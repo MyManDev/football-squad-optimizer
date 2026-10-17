@@ -73,7 +73,7 @@
   "driver_sha256": "2e781598b52ae330babf910686bf5332ea6326a79bb103d7f4d9ff199bc1d0f1",
   "finished_at_utc": "2026-10-17T15:06:41+00:00",
   "gameweek": 7,
-  "head_at_end": "ad7b5c46cbf1002a3ec0d4ae0437ab31c2ca2492",
+  "head_at_end": "6163d4e83db60d2152808f354e251f899b402055",
   "instances": [
     {
       "cp_sat": {
@@ -7725,7 +7725,7 @@
       }
     ]
   },
-  "repository_commit": "ad7b5c46cbf1002a3ec0d4ae0437ab31c2ca2492",
+  "repository_commit": "6163d4e83db60d2152808f354e251f899b402055",
   "runner_sha256": "1491abc2c0ab348b1653836189dc25c7af949be01104b2a876fccb95c3e9da5a",
   "started_at_utc": "2026-10-17T13:17:40+00:00",
   "verdicts": {
