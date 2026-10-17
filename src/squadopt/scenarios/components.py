@@ -58,6 +58,7 @@ from squadopt.scenarios.models import (
 COMPONENT_SCENARIO_CONTRACT_VERSION: Final = "component_scenario_foundation_v1"
 CONDITIONAL_RESIDUAL_CONTRACT_VERSION: Final = "component_scenario_conditional_residual_v1"
 TEAM_MATCH_BLOCK_CONTRACT_VERSION: Final = "team_match_block_v1"
+TEAM_MATCH_JOINT_CONTRACT_VERSION: Final = "team_match_joint_v1"
 # ScenarioConfig fields the component sampler does not read; recorded on every draw so a
 # reader of the config block cannot take them for applied settings.
 UNUSED_SCENARIO_CONFIG_FIELDS: Final = (
@@ -108,6 +109,13 @@ RESIDUAL_SOURCE_COLUMNS: Final = (
 # ``team_id`` and ``position`` from the decision roster, so the caller supplies that join and
 # the foundation pool keeps accepting a frame without them.
 TEAM_MATCH_BLOCK_SOURCE_COLUMNS: Final = ("team_id", "position", "fixture_count")
+# The joint pool reads the appearance probability of every history row as well: a row's
+# observed appearance and the probability it was given are what the joint draw inherits.
+TEAM_MATCH_JOINT_SOURCE_COLUMNS: Final = (
+    *RESIDUAL_SOURCE_COLUMNS,
+    *TEAM_MATCH_BLOCK_SOURCE_COLUMNS,
+    "appearance_probability",
+)
 
 # The routes and evidence statuses are the Phase C contract's own
 # (``squadopt.prediction.components``), imported rather than re-declared here: a second copy of
@@ -620,6 +628,197 @@ class TeamMatchBlockConfig:
             )
 
 
+@dataclass(frozen=True, slots=True)
+class TeamMatchJointConfig:
+    """Opt-in: the appearance and the paired residual drawn from one club-week block.
+
+    ``TeamMatchBlockConfig`` keeps the foundation's per-player appearance Bernoulli and draws
+    only the residual from a club-week block, so a source week in which a club rested six
+    starters lifts no co-movement into the target squad's appearances. Under this config a
+    player's appearance is inherited from the source row's own observed appearance through
+    its latent uniform (``u = v * p_s`` when the row appeared, ``p_s + v * (1 - p_s)`` when it
+    did not; the target appears iff ``u < p_t``), so the zero atom and the club co-movement
+    come from one draw, and the conditional residual is drawn within the same block.
+
+    There is no tunable number. The pool must be a ``TeamMatchJointPool``, which keeps the
+    non-appearance rows the paired residual pool drops; nothing else may draw from one.
+    """
+
+    contract_version: str = TEAM_MATCH_JOINT_CONTRACT_VERSION
+
+    def __post_init__(self) -> None:
+        if self.contract_version != TEAM_MATCH_JOINT_CONTRACT_VERSION:
+            raise ScenarioValidationError(
+                "contract_version does not match the team-match joint implementation."
+            )
+
+
+@dataclass(frozen=True, slots=True)
+class TeamMatchJointPool(PairedResidualPool):
+    """History rows for the joint draw: appeared rows with their paired residuals and the
+    non-appeared rows beside them, each carrying its observed appearance and the probability
+    it was given. A non-appeared row's residuals are missing, never zero, and the draw never
+    reads them as residuals. ``excluded_rows`` counts what the builder refused, by reason."""
+
+    excluded_rows: tuple[tuple[str, int], ...] = ()
+
+
+def team_match_joint_pool(
+    out_of_fold: pd.DataFrame,
+    *,
+    target: ScenarioTarget,
+    min_history_folds: int = 1,
+) -> TeamMatchJointPool:
+    """Build the joint pool from Phase C rows strictly before ``target``.
+
+    Pure, like ``paired_conditional_residuals``, with the same chronology rule and the same
+    canonical order, and the same refusals to invent: a ``direct_control`` row produces
+    nothing; an appearance target outside {0, 1} or a probability outside [0, 1] excludes its
+    row; a missing club, position or fixture count excludes its row; a row with no fixture has
+    nowhere to appear and is excluded; an appeared row with a missing conditional target is
+    excluded rather than filled. Every exclusion is counted on the pool. A history fold with no
+    appeared row is dropped, so the history folds are those of the paired residual pool.
+    """
+
+    if not isinstance(out_of_fold, pd.DataFrame):
+        raise ScenarioValidationError("out_of_fold must be a pandas DataFrame.")
+    missing = [name for name in TEAM_MATCH_JOINT_SOURCE_COLUMNS if name not in out_of_fold.columns]
+    if missing:
+        raise ScenarioValidationError(f"Phase C rows are missing {missing!r}.")
+    frame = out_of_fold.loc[:, list(TEAM_MATCH_JOINT_SOURCE_COLUMNS)].copy(deep=True)
+    fold_ids = frame["fold_id"].astype("string")
+    if bool((fold_ids == target.fold_id).any()):
+        raise ScenarioValidationError(
+            f"The target fold {target.fold_id} appears in its own residual history."
+        )
+    later = sorted({str(value) for value in fold_ids if str(value) >= target.fold_id})
+    if later:
+        raise ScenarioValidationError(
+            f"Residual history must precede {target.fold_id}; found {later[:5]!r}."
+        )
+
+    route = frame["composition_route"].astype("string") == COMPONENT_MODEL_ROUTE
+    appearance = pd.to_numeric(frame["appearance_target"], errors="coerce")
+    probability = pd.to_numeric(frame["appearance_probability"], errors="coerce")
+    fixtures = pd.to_numeric(frame["fixture_count"], errors="coerce")
+    minutes_mean = pd.to_numeric(frame["expected_minutes_if_appearance"], errors="coerce")
+    points_mean = pd.to_numeric(frame["raw_expected_points_if_appearance"], errors="coerce")
+    minutes_target = pd.to_numeric(frame["minutes_target"], errors="coerce")
+    points_target = pd.to_numeric(frame["points_target"], errors="coerce")
+    appeared = appearance == 1
+    # Each reason is read on the rows the earlier reasons admitted, so a row is counted once.
+    reasons: tuple[tuple[str, np.ndarray], ...] = (
+        ("direct_control_rows", (~route).to_numpy(dtype=bool)),
+        ("appearance_target_not_binary", (~appearance.isin([0, 1])).to_numpy(dtype=bool)),
+        (
+            "appearance_probability_outside_unit_interval",
+            (~probability.between(0.0, 1.0)).to_numpy(dtype=bool),
+        ),
+        (
+            "block_field_missing",
+            frame.loc[:, list(TEAM_MATCH_BLOCK_SOURCE_COLUMNS)].isna().any(axis=1).to_numpy()
+            | ~np.isfinite(fixtures.to_numpy(dtype="float64")),
+        ),
+        ("no_fixture", ~(fixtures >= 1).to_numpy(dtype=bool)),
+        (
+            "conditional_mean_missing",
+            ~(
+                np.isfinite(minutes_mean.to_numpy(dtype="float64"))
+                & np.isfinite(points_mean.to_numpy(dtype="float64"))
+            ),
+        ),
+        (
+            "appeared_target_missing",
+            appeared.to_numpy(dtype=bool)
+            & ~(
+                np.isfinite(minutes_target.to_numpy(dtype="float64"))
+                & np.isfinite(points_target.to_numpy(dtype="float64"))
+            ),
+        ),
+    )
+    admitted = np.ones(len(frame), dtype=bool)
+    excluded: list[tuple[str, int]] = []
+    for reason, refused in reasons:
+        hit = admitted & refused
+        excluded.append((reason, int(hit.sum())))
+        admitted &= ~hit
+    kept = frame.loc[admitted].copy()
+    if kept.empty:
+        raise ScenarioValidationError(
+            f"No component row precedes {target.fold_id}, so no joint draw exists. This is "
+            "refused rather than filled with zeros."
+        )
+    kept_appeared = (pd.to_numeric(kept["appearance_target"]) == 1).to_numpy(dtype=bool)
+    kept["minutes_residual"] = np.where(
+        kept_appeared,
+        pd.to_numeric(kept["minutes_target"]).to_numpy(dtype="float64")
+        - pd.to_numeric(kept["expected_minutes_if_appearance"]).to_numpy(dtype="float64"),
+        np.nan,
+    )
+    kept["points_residual"] = np.where(
+        kept_appeared,
+        pd.to_numeric(kept["points_target"]).to_numpy(dtype="float64")
+        - pd.to_numeric(kept["raw_expected_points_if_appearance"]).to_numpy(dtype="float64"),
+        np.nan,
+    )
+    kept["appearance_target"] = pd.to_numeric(kept["appearance_target"]).astype("int64")
+    kept["fixture_count"] = pd.to_numeric(kept["fixture_count"]).astype("int64")
+    residuals = (
+        kept.loc[
+            :,
+            [
+                "fold_id",
+                "player_id",
+                "minutes_residual",
+                "points_residual",
+                "raw_expected_points_if_appearance",
+                *TEAM_MATCH_BLOCK_SOURCE_COLUMNS,
+                "appearance_target",
+                "appearance_probability",
+            ],
+        ]
+        .astype(
+            {
+                "fold_id": "string",
+                "player_id": "int64",
+                "raw_expected_points_if_appearance": "float64",
+                "team_id": "string",
+                "position": "string",
+                "appearance_probability": "float64",
+            }
+        )
+        .sort_values(["fold_id", "player_id"], kind="stable")
+        .reset_index(drop=True)
+    )
+    # A fold with rows but no appearance has no residual to draw for anyone who appears, so it
+    # leaves the history; the folds that remain are the paired residual pool's own.
+    appeared_folds = {
+        str(value)
+        for value in residuals.loc[residuals["appearance_target"] == 1, "fold_id"].unique()
+    }
+    in_history = residuals["fold_id"].isin(appeared_folds).to_numpy(dtype=bool)
+    excluded.append(("rows_of_folds_without_appearance", int((~in_history).sum())))
+    residuals = residuals.loc[in_history].reset_index(drop=True)
+    if residuals.empty:
+        raise ScenarioValidationError(
+            f"No appearance-observed component row precedes {target.fold_id}, so no "
+            "conditional residual exists. This is refused rather than filled with zeros."
+        )
+    required = _integer(min_history_folds, "min_history_folds", 1)
+    history = tuple(sorted(appeared_folds))
+    if len(history) < required:
+        raise ScenarioValidationError(
+            f"{len(history)} history fold(s) precede {target.fold_id}; at least "
+            f"{required} are required. Refused rather than sampled from too little."
+        )
+    return TeamMatchJointPool(
+        target_fold_id=target.fold_id,
+        residuals=residuals,
+        history_fold_ids=history,
+        excluded_rows=tuple(excluded),
+    )
+
+
 def paired_conditional_residuals(
     out_of_fold: pd.DataFrame,
     *,
@@ -750,6 +949,7 @@ def sample_component_scenarios(
     *,
     conditional_residuals: ConditionalResidualConfig | None = None,
     team_match_block: TeamMatchBlockConfig | None = None,
+    team_match_joint: TeamMatchJointConfig | None = None,
 ) -> ComponentScenarioDraw:
     """Draw appearance, then a paired conditional residual, into a V1-shaped ``ScenarioSet``.
 
@@ -785,6 +985,23 @@ def sample_component_scenarios(
         raise ScenarioValidationError(
             "conditional_residuals and team_match_block are two candidate samplers; a draw "
             "declares one or neither, never both."
+        )
+    if team_match_joint is not None and not isinstance(team_match_joint, TeamMatchJointConfig):
+        raise ScenarioValidationError("team_match_joint must be a TeamMatchJointConfig or None.")
+    if team_match_joint is not None and (
+        conditional_residuals is not None or team_match_block is not None
+    ):
+        raise ScenarioValidationError(
+            "team_match_joint is a candidate sampler of its own; a draw declares one candidate "
+            "or none, never two."
+        )
+    # The joint pool carries non-appearance rows whose residuals are missing, so no other
+    # sampler may draw from one, and the joint sampler draws from nothing else.
+    if (team_match_joint is not None) != isinstance(residuals, TeamMatchJointPool):
+        raise ScenarioValidationError(
+            "team_match_joint draws on a TeamMatchJointPool and no other sampler does; build "
+            "the pool with team_match_joint_pool for the joint sampler and with "
+            "paired_conditional_residuals otherwise."
         )
     if not isinstance(projections, PredictionSnapshot):
         raise ScenarioValidationError("projections must be a PredictionSnapshot.")
@@ -874,36 +1091,43 @@ def sample_component_scenarios(
     mean_points = inputs.table["raw_expected_points_if_appearance"].to_numpy(dtype="float64")
     ceiling = inputs.table["fixture_count"].to_numpy(dtype="float64") * MINUTES_PER_FIXTURE
 
-    appeared = generator.random((count, players)) < probability[None, :]
-    # A blank gameweek has nowhere to play, whatever the probability says.
-    appeared &= ceiling[None, :] > 0.0
-
-    # One source fold per scenario, then one row *within that fold* per player. Drawing each
-    # cell from the whole pool while the set names a single source fold would make
-    # ``source_fold_ids`` true only by accident; here the block is the constraint, so the
-    # field is a fact. The chosen fold is a block-bootstrap boundary and nothing more: no
-    # common or team shock is layered on top of it, and no team or position fallback
-    # hierarchy is introduced.
     history = residuals.history_fold_ids
-    blocks = residuals.fold_blocks()
-    starts = np.array([start for start, _ in blocks], dtype="int64")
-    sizes = np.array([size for _, size in blocks], dtype="int64")
-    chosen = generator.integers(0, len(history), size=count)
-    if conditional_residuals is not None:
-        drawn, selection_diagnostics = _conditional_rows(
-            generator, residuals, blocks, chosen, mean_points, conditional_residuals
-        )
-    elif team_match_block is not None:
-        drawn, selection_diagnostics = _team_match_block_rows(
-            generator, residuals, blocks, chosen, inputs.table, team_match_block
+    if team_match_joint is not None and isinstance(residuals, TeamMatchJointPool):
+        # The appearance is part of the joint draw, so the cell helper returns it beside the
+        # source fold and the residual row; the stream order is documented there.
+        appeared, chosen, drawn, selection_diagnostics = _team_match_joint_cells(
+            generator, residuals, inputs.table, probability, ceiling, count, team_match_joint
         )
     else:
-        offsets = generator.integers(0, sizes[chosen][:, None], size=(count, players))
-        drawn = starts[chosen][:, None] + offsets
-        selection_diagnostics = {
-            "component_sampler_contract_version": COMPONENT_SCENARIO_CONTRACT_VERSION,
-            "residual_selection": "fold_uniform",
-        }
+        appeared = generator.random((count, players)) < probability[None, :]
+        # A blank gameweek has nowhere to play, whatever the probability says.
+        appeared &= ceiling[None, :] > 0.0
+
+        # One source fold per scenario, then one row *within that fold* per player. Drawing
+        # each cell from the whole pool while the set names a single source fold would make
+        # ``source_fold_ids`` true only by accident; here the block is the constraint, so the
+        # field is a fact. The chosen fold is a block-bootstrap boundary and nothing more: no
+        # common or team shock is layered on top of it, and no team or position fallback
+        # hierarchy is introduced.
+        blocks = residuals.fold_blocks()
+        starts = np.array([start for start, _ in blocks], dtype="int64")
+        sizes = np.array([size for _, size in blocks], dtype="int64")
+        chosen = generator.integers(0, len(history), size=count)
+        if conditional_residuals is not None:
+            drawn, selection_diagnostics = _conditional_rows(
+                generator, residuals, blocks, chosen, mean_points, conditional_residuals
+            )
+        elif team_match_block is not None:
+            drawn, selection_diagnostics = _team_match_block_rows(
+                generator, residuals, blocks, chosen, inputs.table, team_match_block
+            )
+        else:
+            offsets = generator.integers(0, sizes[chosen][:, None], size=(count, players))
+            drawn = starts[chosen][:, None] + offsets
+            selection_diagnostics = {
+                "component_sampler_contract_version": COMPONENT_SCENARIO_CONTRACT_VERSION,
+                "residual_selection": "fold_uniform",
+            }
 
     minutes_pool = residuals.residuals["minutes_residual"].to_numpy(dtype="float64")
     points_pool = residuals.residuals["points_residual"].to_numpy(dtype="float64")
@@ -1198,6 +1422,272 @@ def _team_match_block_rows(
         "team_match_block_mixed_fixture_blocks": mixed_blocks,
         "team_match_block_mixed_fixture_target_clubs": mixed_target_clubs,
     }
+
+
+def _contiguous_groups(keys: np.ndarray) -> list[tuple[object, int, int]]:
+    """``(key, start, size)`` of every run of equal keys in an already sorted array."""
+
+    if keys.size == 0:
+        return []
+    boundaries = np.flatnonzero(np.r_[True, keys[1:] != keys[:-1]])
+    ends = np.r_[boundaries[1:], keys.size]
+    return [
+        (keys[start], int(start), int(end) - int(start))
+        for start, end in zip(boundaries.tolist(), ends.tolist(), strict=True)
+    ]
+
+
+# Per block: start and size over every row, start and size over the appeared rows, the
+# fixture index, and the position groups of each ordering.
+_JointBlock = tuple[int, int, int, int, int, dict[int, tuple[int, int]], dict[int, tuple[int, int]]]
+
+
+def _team_match_joint_cells(
+    generator: np.random.Generator,
+    pool: TeamMatchJointPool,
+    roster: pd.DataFrame,
+    probability: np.ndarray,
+    ceiling: np.ndarray,
+    count: int,
+    config: TeamMatchJointConfig,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, dict[str, object]]:
+    """Appearance, source fold and residual row per cell, from one club-week block.
+
+    The generator is consumed in this order: one uniform per cell (the foundation's first
+    call, in its shape), one source fold per scenario (its second call, so the source folds
+    are the foundation's seed for seed), one block per scenario and target club, one source
+    row per cell, and one uniform per cell for the residual re-draw. Each is one call over an
+    array of option counts.
+
+    A player's source row is drawn among the block's rows of the same position, appeared or
+    not (any row of the block when the position is absent, counted). The row's observed
+    appearance ``a_s`` and probability ``p_s`` give its latent uniform, ``v * p_s`` when it
+    appeared and ``p_s + v * (1 - p_s)`` when it did not; the player appears iff that uniform
+    is below the player's own probability and the ceiling is positive. An appearing player
+    whose source row appeared takes its paired residual; one whose source row did not appear
+    re-draws among the block's appeared rows of the same position, else the block's appeared
+    rows, else the fold's appeared rows, each level counted. The draw checks that no appearing
+    cell reads a missing residual, rather than trusting the construction.
+    """
+
+    frame = pool.residuals
+    teams = frame["team_id"].astype("string").to_numpy(dtype=object)
+    positions = frame["position"].astype("string").to_numpy(dtype=object)
+    fixtures = frame["fixture_count"].to_numpy(dtype="int64")
+    source_appeared = frame["appearance_target"].to_numpy(dtype="int64") == 1
+    source_probability = frame["appearance_probability"].to_numpy(dtype="float64")
+    finite_residual = np.isfinite(frame["minutes_residual"].to_numpy(dtype="float64")) & (
+        np.isfinite(frame["points_residual"].to_numpy(dtype="float64"))
+    )
+
+    target_teams = [str(value) for value in roster["team_id"]]
+    target_positions = [str(value) for value in roster["position"]]
+    target_fixtures = roster["fixture_count"].to_numpy(dtype="int64")
+    clubs = list(dict.fromkeys(target_teams))
+    club_of_player = np.array([clubs.index(team) for team in target_teams], dtype="int64")
+    club_fixtures = np.zeros(len(clubs), dtype="int64")
+    mixed_target_clubs = 0
+    for index in range(len(clubs)):
+        values = target_fixtures[club_of_player == index]
+        club_fixtures[index] = values.max()
+        mixed_target_clubs += int(len(set(values.tolist())) > 1)
+    position_names = sorted(set(positions.tolist()) | set(target_positions))
+    position_index = {name: index for index, name in enumerate(position_names)}
+    player_position = np.array([position_index[name] for name in target_positions], dtype="int64")
+    fixture_values = sorted(set(fixtures.tolist()) | set(club_fixtures.tolist()))
+    fixture_index = {value: index for index, value in enumerate(fixture_values)}
+    club_fixture = np.array([fixture_index[int(value)] for value in club_fixtures], dtype="int64")
+
+    # Two orderings of the pool, both by fold, club and position: one over every row, for the
+    # source row, and one over the appeared rows, for the residual re-draw. The blocks are the
+    # clubs of the first; a club with no appeared row has an empty range in the second.
+    blocks = pool.fold_blocks()
+    folds = len(blocks)
+    ordered_all_parts: list[np.ndarray] = []
+    ordered_app_parts: list[np.ndarray] = []
+    block_counts = np.zeros(folds, dtype="int64")
+    fold_app_start = np.zeros(folds, dtype="int64")
+    fold_app_size = np.zeros(folds, dtype="int64")
+    described: list[list[_JointBlock]] = []
+    mixed_blocks = 0
+    appeared_rows_total = 0
+    offset_all = 0
+    offset_app = 0
+    for fold, (start, size) in enumerate(blocks):
+        rows = np.arange(start, start + size)
+        rows_all = rows[np.lexsort((positions[rows], teams[rows]))]
+        app = rows[source_appeared[rows]]
+        rows_app = app[np.lexsort((positions[app], teams[app]))]
+        ordered_all_parts.append(rows_all)
+        ordered_app_parts.append(rows_app)
+        fold_app_start[fold] = offset_app
+        fold_app_size[fold] = rows_app.size
+        appeared_rows_total += int(rows_app.size)
+        app_blocks = {
+            key: (block_start, block_size)
+            for key, block_start, block_size in _contiguous_groups(teams[rows_app])
+        }
+        fold_blocks: list[_JointBlock] = []
+        for team, block_start, block_size in _contiguous_groups(teams[rows_all]):
+            block_rows = rows_all[block_start : block_start + block_size]
+            counted = Counter(fixtures[block_rows].tolist())
+            mixed_blocks += int(len(counted) > 1)
+            fixture = max(counted, key=lambda value: (counted[value], value))
+            groups_all = {
+                position_index[str(name)]: (offset_all + block_start + group_start, group_size)
+                for name, group_start, group_size in _contiguous_groups(positions[block_rows])
+            }
+            app_start, app_size = app_blocks.get(team, (0, 0))
+            app_rows = rows_app[app_start : app_start + app_size]
+            groups_app = {
+                position_index[str(name)]: (offset_app + app_start + group_start, group_size)
+                for name, group_start, group_size in _contiguous_groups(positions[app_rows])
+            }
+            fold_blocks.append(
+                (
+                    offset_all + block_start,
+                    block_size,
+                    offset_app + app_start,
+                    app_size,
+                    fixture_index[fixture],
+                    groups_all,
+                    groups_app,
+                )
+            )
+        described.append(fold_blocks)
+        block_counts[fold] = len(fold_blocks)
+        offset_all += size
+        offset_app += int(rows_app.size)
+    ordered_all = np.concatenate(ordered_all_parts)
+    ordered_app = np.concatenate(ordered_app_parts)
+    widest = int(block_counts.max())
+    shape = (folds, widest)
+    block_start_all = np.zeros(shape, dtype="int64")
+    block_size_all = np.zeros(shape, dtype="int64")
+    block_start_app = np.zeros(shape, dtype="int64")
+    block_size_app = np.zeros(shape, dtype="int64")
+    group_shape = (folds, widest, len(position_names))
+    group_start_all = np.zeros(group_shape, dtype="int64")
+    group_size_all = np.zeros(group_shape, dtype="int64")
+    group_start_app = np.zeros(group_shape, dtype="int64")
+    group_size_app = np.zeros(group_shape, dtype="int64")
+    preferred = np.zeros((folds, len(fixture_values), widest), dtype="int64")
+    preferred_count = np.zeros((folds, len(fixture_values)), dtype="int64")
+    for fold, fold_blocks in enumerate(described):
+        for block, (
+            start_all,
+            size_all,
+            start_app,
+            size_app,
+            fixture,
+            groups_all,
+            groups_app,
+        ) in enumerate(fold_blocks):
+            block_start_all[fold, block] = start_all
+            block_size_all[fold, block] = size_all
+            block_start_app[fold, block] = start_app
+            block_size_app[fold, block] = size_app
+            for position, (group_start, group_size) in groups_all.items():
+                group_start_all[fold, block, position] = group_start
+                group_size_all[fold, block, position] = group_size
+            for position, (group_start, group_size) in groups_app.items():
+                group_start_app[fold, block, position] = group_start
+                group_size_app[fold, block, position] = group_size
+            preferred[fold, fixture, preferred_count[fold, fixture]] = block
+            preferred_count[fold, fixture] += 1
+
+    players = len(target_teams)
+    latent = generator.random((count, players))
+    chosen = generator.integers(0, folds, size=count)
+    fold_column = chosen[:, None]
+
+    # One block per scenario and target club, among the matching blocks when any exist.
+    matching = preferred_count[chosen][:, club_fixture]
+    block_high = np.where(matching > 0, matching, block_counts[chosen][:, None])
+    option = generator.integers(0, block_high, size=(count, len(clubs)))
+    club_block = np.where(
+        matching > 0, preferred[chosen[:, None], club_fixture[None, :], option], option
+    )
+    blank = club_fixtures <= 0
+    fixture_fallback = int(np.count_nonzero((matching == 0) & ~blank[None, :]))
+    blank_cells = int(count * np.count_nonzero(blank))
+
+    # One source row per scenario and player, among the block's rows of the player's position.
+    player_block = club_block[:, club_of_player]
+    sizes = group_size_all[fold_column, player_block, player_position[None, :]]
+    starts = group_start_all[fold_column, player_block, player_position[None, :]]
+    row_high = np.where(sizes > 0, sizes, block_size_all[fold_column, player_block])
+    row_start = np.where(sizes > 0, starts, block_start_all[fold_column, player_block])
+    offsets = generator.integers(0, row_high, size=row_high.shape)
+    source = ordered_all[row_start + offsets]
+    position_fallback = int(np.count_nonzero(sizes == 0))
+
+    # The appearance, inherited through the source row's latent uniform.
+    row_appeared = source_appeared[source]
+    row_probability = source_probability[source]
+    uniform = np.where(
+        row_appeared,
+        latent * row_probability,
+        row_probability + latent * (1.0 - row_probability),
+    )
+    appeared = uniform < probability[None, :]
+    appeared &= ceiling[None, :] > 0.0
+
+    # The residual row: the source row itself when it appeared, else a re-draw among appeared
+    # rows of the same block and position, falling back to the block, then to the fold.
+    redraw = appeared & ~row_appeared
+    app_sizes = group_size_app[fold_column, player_block, player_position[None, :]]
+    app_starts = group_start_app[fold_column, player_block, player_position[None, :]]
+    block_sizes = block_size_app[fold_column, player_block]
+    block_starts = block_start_app[fold_column, player_block]
+    fold_sizes = np.broadcast_to(fold_app_size[chosen][:, None], app_sizes.shape)
+    fold_starts = np.broadcast_to(fold_app_start[chosen][:, None], app_sizes.shape)
+    level_position = app_sizes > 0
+    level_block = ~level_position & (block_sizes > 0)
+    level_fold = ~level_position & ~level_block
+    high = np.where(level_position, app_sizes, np.where(level_block, block_sizes, fold_sizes))
+    first = np.where(level_position, app_starts, np.where(level_block, block_starts, fold_starts))
+    scaled = generator.random((count, players))
+    redraw_offset = np.minimum((scaled * high).astype("int64"), np.maximum(high - 1, 0))
+    redrawn = ordered_app[first + redraw_offset]
+    drawn = np.where(redraw, redrawn, source)
+    if not bool(finite_residual[drawn[appeared]].all()):
+        raise ScenarioValidationError(
+            "An appearing cell would read a missing residual; the joint draw refuses rather "
+            "than publishing a non-appearance's residual as an outcome."
+        )
+
+    appeared_cells = int(np.count_nonzero(appeared))
+    redraw_cells = int(np.count_nonzero(redraw))
+    matched_cells = count * len(clubs) - blank_cells
+    diagnostics: dict[str, object] = {
+        "component_sampler_contract_version": config.contract_version,
+        "residual_selection": "team_match_joint",
+        "team_match_joint_history_folds": folds,
+        "team_match_joint_blocks_per_fold_mean": float(block_counts.mean()),
+        "team_match_joint_block_rows_mean": float(len(frame) / block_counts.sum()),
+        "team_match_joint_block_appeared_rows_mean": float(
+            appeared_rows_total / block_counts.sum()
+        ),
+        "team_match_joint_target_clubs": len(clubs),
+        "team_match_joint_fixture_fallback_cells": fixture_fallback,
+        "team_match_joint_fixture_fallback_rate": (
+            fixture_fallback / matched_cells if matched_cells else 0.0
+        ),
+        "team_match_joint_blank_club_cells": blank_cells,
+        "team_match_joint_position_fallback_cells": position_fallback,
+        "team_match_joint_position_fallback_rate": position_fallback / drawn.size,
+        "team_match_joint_mixed_fixture_blocks": mixed_blocks,
+        "team_match_joint_mixed_fixture_target_clubs": mixed_target_clubs,
+        "team_match_joint_source_row_appearance_rate": float(row_appeared.mean()),
+        "team_match_joint_sampled_appearance_rate": float(appeared.mean()),
+        "team_match_joint_redraw_cells": redraw_cells,
+        "team_match_joint_redraw_rate": (redraw_cells / appeared_cells if appeared_cells else 0.0),
+        "team_match_joint_redraw_block_fallback_cells": int(np.count_nonzero(redraw & level_block)),
+        "team_match_joint_redraw_fold_fallback_cells": int(np.count_nonzero(redraw & level_fold)),
+        "team_match_joint_pool_excluded_rows": dict(pool.excluded_rows),
+    }
+    return appeared, chosen, drawn, diagnostics
 
 
 def _draw_seed(

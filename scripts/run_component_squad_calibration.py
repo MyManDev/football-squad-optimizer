@@ -100,18 +100,25 @@ from squadopt.scenarios import (
 )
 from squadopt.scenarios.components import (
     COMPONENT_SCENARIO_CONTRACT_VERSION,
+    TEAM_MATCH_BLOCK_CONTRACT_VERSION,
+    TEAM_MATCH_JOINT_CONTRACT_VERSION,
     ComponentScenarioDraw,
     ComponentScenarioInputs,
     ComponentScenarioProvenance,
     ConditionalResidualConfig,
     TeamMatchBlockConfig,
+    TeamMatchJointConfig,
     paired_conditional_residuals,
     sample_component_scenarios,
+    team_match_joint_pool,
 )
 from squadopt.scenarios.decision_scoring import ComponentDecisionDistributionReadout
 
-# The two opt-in candidate samplers the run can draw on instead of the foundation.
-CandidateSampler = ConditionalResidualConfig | TeamMatchBlockConfig
+# The three opt-in candidate samplers the run can draw on instead of the foundation.
+CandidateSampler = ConditionalResidualConfig | TeamMatchBlockConfig | TeamMatchJointConfig
+# The two candidates that are pinned to the v1 table by its digests and read beside the
+# foundation control arm.
+PinnedCandidate = TeamMatchBlockConfig | TeamMatchJointConfig
 
 REPORT_VERSION: Final = "phase_d_component_squad_calibration_binding_v1"
 FIDELITY_VERSION: Final = "phase_d_component_fidelity_v1"
@@ -148,6 +155,7 @@ PHASE_C_CONTRACTS: Final = ("v1", "development_v2")
 DEVELOPMENT_HISTORY_SEASONS: Final = (*HISTORY_SEASONS, LOCKED_HOLDOUT_SEASON)
 _DIGEST: Final = r"[0-9a-f]{64}"
 TEAM_MATCH_BLOCK_PREREG: Final = "docs/research/team_match_block_sampler_prereg.md"
+TEAM_MATCH_JOINT_PREREG: Final = "docs/research/moe_sampler_prereg.md"
 # The repository's noise floor, stated on every team-match block record: it applies to a
 # points claim, and the record makes none, since its gates are the S1 and S2 bands.
 NOISE_FLOOR_POINTS_PER_GAMEWEEK: Final = 1.5
@@ -157,6 +165,15 @@ PAIRED_DIFFERENCE_POLICY: Final = PromotionPolicy(
     min_mean_improvement=0.0,
     confidence_level=0.90,
     bootstrap_resamples=2_000,
+    moving_block_length=4,
+    deterministic_seed=0,
+)
+# The joint protocol's descriptive interval: the same blocks and seed, 5,000 resamples, as
+# the mixture-of-experts brief asks. It decides nothing either.
+JOINT_PAIRED_DIFFERENCE_POLICY: Final = PromotionPolicy(
+    min_mean_improvement=0.0,
+    confidence_level=0.90,
+    bootstrap_resamples=5_000,
     moving_block_length=4,
     deterministic_seed=0,
 )
@@ -204,10 +221,25 @@ def _parse_arguments() -> argparse.Namespace:
         help="candidate sampler: a club-week block inside the source fold (team_match_block_v1);"
         " on the v1 contract the run is pinned to the three expected digests",
     )
+    parser.add_argument(
+        "--team-match-joint",
+        action="store_true",
+        help="candidate sampler: the appearance and the residual from one club-week block "
+        "(team_match_joint_v1); pinned like --team-match-block, and drawn beside the foundation "
+        "and the block sampler as its two control arms",
+    )
     arguments = parser.parse_args()
     if arguments.phase_c_contract == "v1" and arguments.fidelity is None:
         parser.error("--fidelity is required under the v1 binding contract.")
     return arguments
+
+
+def _pinned_candidate_requested(arguments: argparse.Namespace) -> bool:
+    """Whether the arguments name a candidate pinned to the v1 table by its digests."""
+
+    return bool(getattr(arguments, "team_match_block", False)) or bool(
+        getattr(arguments, "team_match_joint", False)
+    )
 
 
 def _candidate_from_arguments(arguments: argparse.Namespace) -> CandidateSampler | None:
@@ -215,6 +247,21 @@ def _candidate_from_arguments(arguments: argparse.Namespace) -> CandidateSampler
 
     fraction = arguments.conditional_residual_fraction
     minimum_rows = arguments.conditional_residual_minimum_rows
+    if bool(getattr(arguments, "team_match_joint", False)):
+        if (
+            fraction is not None
+            or minimum_rows is not None
+            or bool(getattr(arguments, "team_match_block", False))
+        ):
+            raise BindingCalibrationError(
+                "--team-match-joint and any other candidate flag name two candidate samplers; "
+                "a run draws on one."
+            )
+        if Path(arguments.json_output).resolve() == DEFAULT_OUTPUT.resolve():
+            raise BindingCalibrationError(
+                "A candidate run cannot write the binding artifact path; give --json-output."
+            )
+        return TeamMatchJointConfig()
     if bool(getattr(arguments, "team_match_block", False)):
         if fraction is not None or minimum_rows is not None:
             raise BindingCalibrationError(
@@ -266,8 +313,8 @@ def _reference_from_arguments(arguments: argparse.Namespace) -> ReferenceInputs 
     candidate, keeps pinning the frozen digests itself and takes no digest argument.
     """
 
-    if str(getattr(arguments, "phase_c_contract", "v1")) != "v1" or not bool(
-        getattr(arguments, "team_match_block", False)
+    if str(getattr(arguments, "phase_c_contract", "v1")) != "v1" or not _pinned_candidate_requested(
+        arguments
     ):
         return None
     digests: dict[str, str] = {}
@@ -276,7 +323,7 @@ def _reference_from_arguments(arguments: argparse.Namespace) -> ReferenceInputs 
         if not isinstance(value, str) or re.fullmatch(_DIGEST, value) is None:
             raise BindingCalibrationError(
                 f"--{name.replace('_', '-')} must pin the v1 table with a 64-hex SHA-256 "
-                "under --team-match-block."
+                "under --team-match-block or --team-match-joint."
             )
         digests[name] = value
     return ReferenceInputs(
@@ -311,13 +358,13 @@ def _development_from_arguments(arguments: argparse.Namespace) -> DevelopmentInp
     if contract == "v1":
         if getattr(arguments, "fidelity", None) is None:
             raise BindingCalibrationError("--fidelity is required under the v1 binding contract.")
-        # The digests belong to `_reference_from_arguments` when --team-match-block is set.
-        pinned = bool(getattr(arguments, "team_match_block", False))
+        # The digests belong to `_reference_from_arguments` when a pinned candidate is set.
+        pinned = _pinned_candidate_requested(arguments)
         for name in ("expected_table_sha256", "expected_roster_sha256", "expected_manifest_sha256"):
             if not pinned and getattr(arguments, name, None) is not None:
                 raise BindingCalibrationError(
                     f"--{name.replace('_', '-')} applies to --phase-c-contract development_v2 "
-                    "only, or to a --team-match-block run."
+                    "only, or to a --team-match-block or --team-match-joint run."
                 )
         if getattr(arguments, "folds", None) is not None:
             raise BindingCalibrationError(
@@ -388,7 +435,7 @@ def _read_handoff(
 def _sampler_record(candidate_sampler: CandidateSampler | None) -> dict[str, object]:
     """The sampler identity a fidelity record has to match, from this run's own setting."""
 
-    if candidate_sampler is None or isinstance(candidate_sampler, TeamMatchBlockConfig):
+    if candidate_sampler is None or isinstance(candidate_sampler, PinnedCandidate):
         return {
             "contract_version": (
                 COMPONENT_SCENARIO_CONTRACT_VERSION
@@ -997,6 +1044,15 @@ def _candidate_record(
 
     if candidate_sampler is None:
         return None
+    if isinstance(candidate_sampler, TeamMatchJointConfig):
+        return {
+            "sampler_contract_version": candidate_sampler.contract_version,
+            "residual_selection": "team_match_joint",
+            "prereg_document": TEAM_MATCH_JOINT_PREREG,
+            "reference_contract_version": reference,
+            "development_data_only": True,
+            "binding": False,
+        }
     if isinstance(candidate_sampler, TeamMatchBlockConfig):
         return {
             "sampler_contract_version": candidate_sampler.contract_version,
@@ -1019,6 +1075,8 @@ def _candidate_record(
 def _sampler_keywords(candidate_sampler: CandidateSampler | None) -> dict[str, object]:
     """The keyword the draw takes for this sampler; the foundation takes none."""
 
+    if isinstance(candidate_sampler, TeamMatchJointConfig):
+        return {"team_match_joint": candidate_sampler}
     if isinstance(candidate_sampler, TeamMatchBlockConfig):
         return {"team_match_block": candidate_sampler}
     if isinstance(candidate_sampler, ConditionalResidualConfig):
@@ -1034,7 +1092,7 @@ def _history_rows(
     ``position`` and ``fixture_count`` but keeps team identity in the roster)."""
 
     rows = handoff.rows
-    if not isinstance(candidate_sampler, TeamMatchBlockConfig) or "team_id" in rows.columns:
+    if not isinstance(candidate_sampler, PinnedCandidate) or "team_id" in rows.columns:
         return rows
     return rows.merge(
         handoff.roster.loc[:, [*HANDOFF_KEY, "team_id"]],
@@ -1065,6 +1123,23 @@ def _within_club_points_correlation(draw: ComponentScenarioDraw) -> tuple[int, f
                 continue
             correlations.append(float(np.corrcoef(points[:, left], points[:, right])[0, 1]))
     return pairs, (float(np.mean(correlations)) if correlations else None)
+
+
+def _within_club_appearance_correlation(draw: ComponentScenarioDraw) -> float | None:
+    """Mean Pearson correlation of ``sampled_appearances`` over same-club pairs of the squad,
+    read as the points correlation is; None when no pair has two varying columns."""
+
+    appeared = draw.sampled_appearances.to_numpy(dtype="float64")
+    teams = [str(value) for value in draw.inputs.table["team_id"]]
+    correlations: list[float] = []
+    for left in range(len(teams)):
+        for right in range(left + 1, len(teams)):
+            if teams[left] != teams[right]:
+                continue
+            if appeared[:, left].std() == 0.0 or appeared[:, right].std() == 0.0:
+                continue
+            correlations.append(float(np.corrcoef(appeared[:, left], appeared[:, right])[0, 1]))
+    return float(np.mean(correlations)) if correlations else None
 
 
 def _readout_record(readout: ComponentDecisionDistributionReadout) -> dict[str, object]:
@@ -1139,22 +1214,29 @@ def _arm_summary(records: Sequence[Mapping[str, object]]) -> dict[str, object]:
     }
 
 
-def _paired_differences(fold_records: Sequence[Mapping[str, object]]) -> dict[str, object]:
-    """Candidate minus control, fold by fold, for the tail indicator and the PIT: a mean and
-    the protocol's descriptive 90% season-aware moving-block bootstrap interval."""
+def _paired_differences(
+    fold_records: Sequence[Mapping[str, object]],
+    *,
+    arm: str = "control_arm",
+    candidate_id: str = "team_match_block_v1",
+    policy: PromotionPolicy = PAIRED_DIFFERENCE_POLICY,
+) -> dict[str, object]:
+    """Candidate minus the named control arm, fold by fold, for the tail indicator and the
+    PIT: a mean and the protocol's descriptive 90% season-aware moving-block bootstrap
+    interval. The defaults are the team-match block protocol's."""
 
     def paired(name: str) -> dict[str, object]:
         differences = [
             (
                 _season_of(str(item["fold_id"])),
-                float(item[name]) - float(_mapping(item["control_arm"], "control_arm")[name]),  # type: ignore[arg-type]
+                float(item[name]) - float(_mapping(item[arm], arm)[name]),  # type: ignore[arg-type]
             )
             for item in fold_records
         ]
         if not differences:
             return {"fold_count": 0, "mean": None, "interval_90": None}
         lower, upper = season_aware_moving_block_interval(
-            differences, policy=PAIRED_DIFFERENCE_POLICY, candidate_id="team_match_block_v1"
+            differences, policy=policy, candidate_id=candidate_id
         )
         return {
             "fold_count": len(differences),
@@ -1167,12 +1249,13 @@ def _paired_differences(fold_records: Sequence[Mapping[str, object]]) -> dict[st
             "Descriptive: the gates are read on point estimates; this interval decides nothing."
         ),
         "bootstrap": {
-            "confidence_level": PAIRED_DIFFERENCE_POLICY.confidence_level,
-            "resamples": PAIRED_DIFFERENCE_POLICY.bootstrap_resamples,
-            "moving_block_length": PAIRED_DIFFERENCE_POLICY.moving_block_length,
-            "deterministic_seed": PAIRED_DIFFERENCE_POLICY.deterministic_seed,
+            "confidence_level": policy.confidence_level,
+            "resamples": policy.bootstrap_resamples,
+            "moving_block_length": policy.moving_block_length,
+            "deterministic_seed": policy.deterministic_seed,
             "season_aware": True,
         },
+        "against": arm,
         "realized_below_q10": paired("realized_below_q10"),
         "probability_integral_transform": paired("probability_integral_transform"),
     }
@@ -1212,6 +1295,156 @@ def _pooled_diagnostics(fold_records: Sequence[Mapping[str, object]]) -> dict[st
     }
 
 
+def _pit_tails(records: Sequence[Mapping[str, object]]) -> dict[str, object]:
+    """Both PIT tails of one arm: at or above 0.95 and at or below 0.05, counts and rates."""
+
+    pits = [float(str(item["probability_integral_transform"])) for item in records]
+    upper = sum(value >= 0.95 - BOUND_TOLERANCE for value in pits)
+    lower = sum(value <= 0.05 + BOUND_TOLERANCE for value in pits)
+    return {
+        "fold_count": len(pits),
+        "pit_at_or_above_0_95_count": upper,
+        "pit_at_or_above_0_95_rate": upper / len(pits) if pits else None,
+        "pit_at_or_below_0_05_count": lower,
+        "pit_at_or_below_0_05_rate": lower / len(pits) if pits else None,
+    }
+
+
+def _not_worse(candidate: Mapping[str, object], control: Mapping[str, object]) -> dict[str, object]:
+    """The joint protocol's G3 and G4 clause: the candidate's distance of the mean PIT from
+    0.5 is not greater than the control's, and its lower-tail count is not greater."""
+
+    candidate_pit = float(str(candidate["mean_probability_integral_transform"]))
+    control_pit = float(str(control["mean_probability_integral_transform"]))
+    candidate_count = int(str(candidate["realized_below_lower_quantile_count"]))
+    control_count = int(str(control["realized_below_lower_quantile_count"]))
+    pit_holds = abs(candidate_pit - 0.5) <= abs(control_pit - 0.5) + BOUND_TOLERANCE
+    tail_holds = candidate_count <= control_count
+    return {
+        "candidate_mean_pit_distance_from_centre": abs(candidate_pit - 0.5),
+        "control_mean_pit_distance_from_centre": abs(control_pit - 0.5),
+        "mean_pit_not_farther_from_centre": pit_holds,
+        "candidate_lower_tail_count": candidate_count,
+        "control_lower_tail_count": control_count,
+        "lower_tail_count_not_greater": tail_holds,
+        "holds": pit_holds and tail_holds,
+    }
+
+
+def _joint_readings(fold_records: Sequence[Mapping[str, object]]) -> dict[str, object]:
+    """The joint protocol's readings beyond the block protocol's: the block control arm, the
+    paired differences against it, both PIT tails of every arm, the folds whose tail flag
+    differs from each control with wins, ties and losses, the within-club appearance
+    correlation, and the gate clauses G1 to G4 with their values. The verdict stays the
+    evaluator's; G3 and G4 are the pin condition's "not worse than the control"."""
+
+    control_records = [
+        {"fold_id": item["fold_id"], **_mapping(item["control_arm"], "control_arm")}
+        for item in fold_records
+    ]
+    block_records = [
+        {"fold_id": item["fold_id"], **_mapping(item["block_arm"], "block_arm")}
+        for item in fold_records
+    ]
+    candidate = _arm_summary(fold_records)
+    control = _arm_summary(control_records)
+    block = _arm_summary(block_records)
+
+    def flag_changes(arm: str) -> dict[str, object]:
+        left: list[str] = []
+        entered: list[str] = []
+        closer = farther = same = 0
+        for item in fold_records:
+            other = _mapping(item[arm], arm)
+            mine = bool(item["realized_below_q10"])
+            theirs = bool(other["realized_below_q10"])
+            if mine != theirs:
+                (entered if mine else left).append(str(item["fold_id"]))
+            my_distance = abs(float(str(item["probability_integral_transform"])) - 0.5)
+            their_distance = abs(float(str(other["probability_integral_transform"])) - 0.5)
+            if abs(my_distance - their_distance) <= BOUND_TOLERANCE:
+                same += 1
+            elif my_distance < their_distance:
+                closer += 1
+            else:
+                farther += 1
+        return {
+            "tail_flag": {
+                "wins_left_the_tail": left,
+                "losses_entered_the_tail": entered,
+                "ties": len(fold_records) - len(left) - len(entered),
+            },
+            "pit_distance_from_centre": {"wins": closer, "ties": same, "losses": farther},
+        }
+
+    appearance = [
+        _mapping(item["within_club_appearance_correlation"], "appearance") for item in fold_records
+    ]
+
+    def mean_of(name: str) -> float | None:
+        values = [float(str(item[name])) for item in appearance if item.get(name) is not None]
+        return float(np.mean(values)) if values else None
+
+    block_points = [
+        float(str(_mapping(item["within_club_points_correlation"], "points")["block"]))
+        for item in fold_records
+        if _mapping(item["within_club_points_correlation"], "points").get("block") is not None
+    ]
+    return {
+        "candidate_prereg_document": TEAM_MATCH_JOINT_PREREG,
+        "block_arm": {
+            "sampler_contract_version": TEAM_MATCH_BLOCK_CONTRACT_VERSION,
+            "note": (
+                "The team-match block sampler of PR #1145 on the same table, decisions, "
+                "scenario count and seed, scored by the same scorer: the second control arm."
+            ),
+            **block,
+        },
+        "paired_differences_against_block": _paired_differences(
+            fold_records,
+            arm="block_arm",
+            candidate_id=TEAM_MATCH_JOINT_CONTRACT_VERSION,
+            policy=JOINT_PAIRED_DIFFERENCE_POLICY,
+        ),
+        "pit_tails": {
+            "candidate": _pit_tails(fold_records),
+            "control_arm": _pit_tails(control_records),
+            "block_arm": _pit_tails(block_records),
+        },
+        "tail_flag_changes": {
+            "against_control_arm": flag_changes("control_arm"),
+            "against_block_arm": flag_changes("block_arm"),
+        },
+        "within_club_appearance_correlation": {
+            "candidate_mean": mean_of("candidate"),
+            "control_mean": mean_of("control"),
+            "block_mean": mean_of("block"),
+        },
+        "within_club_points_correlation_block_mean": (
+            float(np.mean(block_points)) if block_points else None
+        ),
+        "gate": {
+            "g1_s1_mean_pit_within_bounds": {
+                "value": candidate["mean_probability_integral_transform"],
+                "bounds": list(S1_PIT_BOUNDS),
+                "holds": candidate["mean_pit_within_s1_bounds"],
+            },
+            "g2_s2_lower_tail_rate_within_bounds": {
+                "value": candidate["realized_below_lower_quantile_rate"],
+                "count": candidate["realized_below_lower_quantile_count"],
+                "bounds": list(S2_LOWER_TAIL_BOUNDS),
+                "holds": candidate["tail_rate_within_s2_bounds"],
+            },
+            "g3_not_worse_than_the_foundation": _not_worse(candidate, control),
+            "g4_not_worse_than_the_block_sampler_descriptive": _not_worse(candidate, block),
+        },
+        "decision_level_reading": (
+            "Not applicable: the sampler does not feed expected points, so the 147-fold "
+            "decision reading of the pin condition is not read."
+        ),
+    }
+
+
 def _measure_fold(
     handoff: PhaseCComponentHandoff,
     prepared: EvaluationFold,
@@ -1244,18 +1477,30 @@ def _measure_fold(
     target = _target(fold_id)
     rows = _history_rows(handoff, candidate_sampler)
     history = rows.loc[rows["fold_id"].astype("string") < fold_id]
+    joint = isinstance(candidate_sampler, TeamMatchJointConfig)
     residuals = paired_conditional_residuals(
         history,
         target=target,
         min_history_folds=settings.min_history_folds,
         team_match_block=(
-            candidate_sampler if isinstance(candidate_sampler, TeamMatchBlockConfig) else None
+            candidate_sampler
+            if isinstance(candidate_sampler, TeamMatchBlockConfig)
+            else TeamMatchBlockConfig()
+            if joint
+            else None
         ),
+    )
+    # The joint candidate draws on its own pool, which keeps the non-appearance rows; its two
+    # control arms read the paired pool built beside it from the same history rows.
+    candidate_pool = (
+        team_match_joint_pool(history, target=target, min_history_folds=settings.min_history_folds)
+        if joint
+        else residuals
     )
     draw = sample_component_scenarios(
         inputs,
         snapshot,
-        residuals,
+        candidate_pool,
         target,
         settings,
         **_sampler_keywords(candidate_sampler),  # type: ignore[arg-type]
@@ -1289,11 +1534,45 @@ def _measure_fold(
             "candidate": candidate_correlation,
             "control": control_correlation,
         }
+        prefix = "team_match_joint_" if joint else "team_match_block_"
         record["block_diagnostics"] = {
             name: value
             for name, value in draw.scenarios.diagnostics.items()
-            if name.startswith("team_match_block_")
+            if name.startswith(prefix) and not isinstance(value, Mapping)
         }
+        if joint:
+            # The second control arm: the block sampler on the paired pool, same seed.
+            block = sample_component_scenarios(
+                inputs,
+                snapshot,
+                residuals,
+                target,
+                settings,
+                team_match_block=TeamMatchBlockConfig(),
+            )
+            block_readout = summarize_component_decision_distribution(
+                score_component_scenario_decision(result, block), realized_score=realized_score
+            )
+            _, block_correlation = _within_club_points_correlation(block)
+            record["block_arm"] = {
+                "sampler_contract_version": str(
+                    block.scenarios.diagnostics["component_sampler_contract_version"]
+                ),
+                **_readout_record(block_readout),
+            }
+            record["within_club_points_correlation"] = {
+                **_mapping(record["within_club_points_correlation"], "points"),
+                "block": block_correlation,
+            }
+            record["within_club_appearance_correlation"] = {
+                "pairs": pairs,
+                "candidate": _within_club_appearance_correlation(draw),
+                "control": _within_club_appearance_correlation(control),
+                "block": _within_club_appearance_correlation(block),
+            }
+            record["pool_excluded_rows"] = dict(
+                _mapping(draw.scenarios.diagnostics["team_match_joint_pool_excluded_rows"], "pool")
+            )
     if development:
         record["decision_identity"] = _decision_identity(result)
         record["residual_history_folds"] = len(residuals.history_fold_ids)
@@ -1640,6 +1919,7 @@ def _measure_binding(
     )
     pinned: dict[str, object] = {}
     if reference is not None:
+        joint = isinstance(candidate_sampler, TeamMatchJointConfig)
         control_records = [
             {"fold_id": item["fold_id"], **_mapping(item["control_arm"], "control_arm")}
             for item in fold_records
@@ -1670,8 +1950,17 @@ def _measure_binding(
                 ),
                 **_arm_summary(control_records),
             },
-            "paired_differences": _paired_differences(fold_records),
+            "paired_differences": (
+                _paired_differences(
+                    fold_records,
+                    candidate_id=TEAM_MATCH_JOINT_CONTRACT_VERSION,
+                    policy=JOINT_PAIRED_DIFFERENCE_POLICY,
+                )
+                if joint
+                else _paired_differences(fold_records)
+            ),
             **_pooled_diagnostics(fold_records),
+            **(_joint_readings(fold_records) if joint else {}),
             "noise_floor_points_per_gameweek": NOISE_FLOOR_POINTS_PER_GAMEWEEK,
             "noise_floor_note": (
                 "An effect smaller than 1.5 points per gameweek is not certified. This record "
