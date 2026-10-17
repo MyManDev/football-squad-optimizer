@@ -74,6 +74,8 @@ from squadopt.prediction.component_models import (
     EQUAL_WEIGHTING,
     GRADIENT_BOOSTING_ESTIMATOR,
     GRADIENT_BOOSTING_MODEL_VERSION,
+    GRADIENT_BOOSTING_POINTS_ESTIMATOR,
+    GRADIENT_BOOSTING_POINTS_MODEL_VERSION,
     LINEAR_ESTIMATOR,
     SEASON_HALF_LIFE_WEIGHTING,
     SEASON_WEIGHT_BASE,
@@ -103,8 +105,12 @@ WEIGHTING_LABELS = {"equal": EQUAL_WEIGHTING, "season_half_life": SEASON_HALF_LI
 # weighting, with the three linear estimators replaced by the gradient-boosted ensembles
 # of `ComponentModelConfig` (constants, never searched). Its table name carries the arm so
 # the two candidates cannot overwrite each other or the control.
-ESTIMATOR_ARMS = (LINEAR_ESTIMATOR, GRADIENT_BOOSTING_ESTIMATOR)
-ESTIMATOR_TABLE_SUFFIX = {LINEAR_ESTIMATOR: "", GRADIENT_BOOSTING_ESTIMATOR: "_gradient_boosting"}
+ESTIMATOR_ARMS = (LINEAR_ESTIMATOR, GRADIENT_BOOSTING_ESTIMATOR, GRADIENT_BOOSTING_POINTS_ESTIMATOR)
+ESTIMATOR_TABLE_SUFFIX = {
+    LINEAR_ESTIMATOR: "",
+    GRADIENT_BOOSTING_ESTIMATOR: "_gradient_boosting",
+    GRADIENT_BOOSTING_POINTS_ESTIMATOR: "_gradient_boosting_points",
+}
 ESTIMATOR_RULES = {
     LINEAR_ESTIMATOR: (
         "standardized logistic regression (appearance) and ridge regression (minutes and "
@@ -113,6 +119,10 @@ ESTIMATOR_RULES = {
     GRADIENT_BOOSTING_ESTIMATOR: (
         "histogram gradient-boosted trees for all three estimators: fixed rounds, no early "
         "stopping, constants from ComponentModelConfig; equal weighting only"
+    ),
+    GRADIENT_BOOSTING_POINTS_ESTIMATOR: (
+        "the linear appearance and minutes estimators with a histogram gradient-boosted "
+        "conditional points estimator (same constants); equal weighting only"
     ),
 }
 WEIGHTING_RULES = {
@@ -406,16 +416,18 @@ def build_oof_table(
         )
     if estimator not in ESTIMATOR_ARMS:
         raise DataError(f"Unknown estimator {estimator!r}.")
-    boosted = estimator == GRADIENT_BOOSTING_ESTIMATOR
+    boosted = estimator != LINEAR_ESTIMATOR
     if boosted and (not development or weighting != "equal"):
         raise DataError(
-            "The gradient-boosting candidate is a Phase C v2 development arm under equal "
+            "The gradient-boosting candidates are Phase C v2 development arms under equal "
             "weighting; the v1 contract and the weighted arm fit only the linear estimators."
         )
     config = replace(ComponentModelConfig() if config is None else config, estimator=estimator)
     arm_model_version = (
         GRADIENT_BOOSTING_MODEL_VERSION
-        if boosted
+        if estimator == GRADIENT_BOOSTING_ESTIMATOR
+        else GRADIENT_BOOSTING_POINTS_MODEL_VERSION
+        if estimator == GRADIENT_BOOSTING_POINTS_ESTIMATOR
         else COMPONENT_MODEL_VERSION
         if weighting == "equal"
         else SEASON_WEIGHTED_MODEL_VERSION
@@ -832,7 +844,7 @@ def main() -> int:
                             "l2_regularization": config.boosting_l2_regularization,
                             "early_stopping": False,
                         }
-                        if estimator == GRADIENT_BOOSTING_ESTIMATOR
+                        if estimator != LINEAR_ESTIMATOR
                         else {
                             "appearance_regularization": config.appearance_regularization,
                             "minutes_alpha": config.minutes_alpha,

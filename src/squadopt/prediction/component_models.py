@@ -81,9 +81,19 @@ SEASON_WEIGHTED_MODEL_VERSION: Final = "phase_c_components_season_half_life_v1"
 # a fit under this estimator carries its own model version so a consumer cannot mistake it
 # for the linear control.
 GRADIENT_BOOSTING_MODEL_VERSION: Final = "phase_c_control_components_gbm_v1"
+# The third declared candidate, after the decision-level reading of the first: the linear
+# appearance and minutes estimators kept, only the conditional points estimator boosted. The
+# decision-level probes found the loss of the full boosted pair in its appearance probability
+# and the gain in its conditional points; this arm keeps the one and takes the other.
+GRADIENT_BOOSTING_POINTS_MODEL_VERSION: Final = "phase_c_control_components_gbm_points_v1"
 LINEAR_ESTIMATOR: Final = "linear"
 GRADIENT_BOOSTING_ESTIMATOR: Final = "gradient_boosting"
-ESTIMATORS: Final = (LINEAR_ESTIMATOR, GRADIENT_BOOSTING_ESTIMATOR)
+GRADIENT_BOOSTING_POINTS_ESTIMATOR: Final = "gradient_boosting_points"
+ESTIMATORS: Final = (
+    LINEAR_ESTIMATOR,
+    GRADIENT_BOOSTING_ESTIMATOR,
+    GRADIENT_BOOSTING_POINTS_ESTIMATOR,
+)
 EQUAL_WEIGHTING: Final = "equal_weights_v1"
 SEASON_HALF_LIFE_WEIGHTING: Final = "season_half_life_0.5_v1"
 SEASON_WEIGHT_BASE: Final = 0.5
@@ -311,9 +321,10 @@ def fit_component_models(
         raise PredictionConfigurationError("At least one feature column is required.")
 
     boosted = settings.estimator == GRADIENT_BOOSTING_ESTIMATOR
-    if boosted and weighting is not None:
+    boosted_points = settings.estimator == GRADIENT_BOOSTING_POINTS_ESTIMATOR
+    if (boosted or boosted_points) and weighting is not None:
         raise PredictionConfigurationError(
-            "The gradient-boosting candidate is declared under equal weighting only."
+            "The gradient-boosting candidates are declared under equal weighting only."
         )
 
     usable = training.loc[complete_feature_rows(training, columns)]
@@ -383,8 +394,12 @@ def fit_component_models(
         minutes_model = make_pipeline(
             StandardScaler(), Ridge(alpha=settings.minutes_alpha, solver="cholesky")
         )
-        points_model = make_pipeline(
-            StandardScaler(), Ridge(alpha=settings.points_alpha, solver="cholesky")
+        points_model = (
+            make_pipeline(_boosted_regressor(settings))
+            if boosted_points
+            else make_pipeline(
+                StandardScaler(), Ridge(alpha=settings.points_alpha, solver="cholesky")
+            )
         )
     appearance_model.fit(
         _design(usable, columns), appearance_target.astype("int64"), **appearance_fit
@@ -410,6 +425,8 @@ def fit_component_models(
         model_version=(
             GRADIENT_BOOSTING_MODEL_VERSION
             if boosted
+            else GRADIENT_BOOSTING_POINTS_MODEL_VERSION
+            if boosted_points
             else COMPONENT_MODEL_VERSION
             if weighting is None
             else weighting.model_version
