@@ -77,6 +77,10 @@ from squadopt.prediction.component_models import (
     GRADIENT_BOOSTING_POINTS_ESTIMATOR,
     GRADIENT_BOOSTING_POINTS_MODEL_VERSION,
     LINEAR_ESTIMATOR,
+    REGIME_ESTIMATOR,
+    REGIME_GATE_TERMS,
+    REGIME_LABELS,
+    REGIME_MODEL_VERSION,
     SEASON_HALF_LIFE_WEIGHTING,
     SEASON_WEIGHT_BASE,
     SEASON_WEIGHTED_MODEL_VERSION,
@@ -105,11 +109,17 @@ WEIGHTING_LABELS = {"equal": EQUAL_WEIGHTING, "season_half_life": SEASON_HALF_LI
 # weighting, with the three linear estimators replaced by the gradient-boosted ensembles
 # of `ComponentModelConfig` (constants, never searched). Its table name carries the arm so
 # the two candidates cannot overwrite each other or the control.
-ESTIMATOR_ARMS = (LINEAR_ESTIMATOR, GRADIENT_BOOSTING_ESTIMATOR, GRADIENT_BOOSTING_POINTS_ESTIMATOR)
+ESTIMATOR_ARMS = (
+    LINEAR_ESTIMATOR,
+    GRADIENT_BOOSTING_ESTIMATOR,
+    GRADIENT_BOOSTING_POINTS_ESTIMATOR,
+    REGIME_ESTIMATOR,
+)
 ESTIMATOR_TABLE_SUFFIX = {
     LINEAR_ESTIMATOR: "",
     GRADIENT_BOOSTING_ESTIMATOR: "_gradient_boosting",
     GRADIENT_BOOSTING_POINTS_ESTIMATOR: "_gradient_boosting_points",
+    REGIME_ESTIMATOR: "_regime",
 }
 ESTIMATOR_RULES = {
     LINEAR_ESTIMATOR: (
@@ -123,6 +133,14 @@ ESTIMATOR_RULES = {
     GRADIENT_BOOSTING_POINTS_ESTIMATOR: (
         "the linear appearance and minutes estimators with a histogram gradient-boosted "
         "conditional points estimator (same constants); equal weighting only"
+    ),
+    REGIME_ESTIMATOR: (
+        "one linear expert set (the control's estimators and constants) per regime label, "
+        "fixture regime (single, double) by rule era (pre_defcon, defcon), fitted on that "
+        "regime's rows; mixed by a standardized multinomial logistic gate on the v1 "
+        "features plus the regime terms (double indicator, defcon indicator, season age); "
+        "an expert below the minimum rows is absent and the gate mass is renormalized; "
+        "equal weighting only"
     ),
 }
 WEIGHTING_RULES = {
@@ -419,7 +437,7 @@ def build_oof_table(
     boosted = estimator != LINEAR_ESTIMATOR
     if boosted and (not development or weighting != "equal"):
         raise DataError(
-            "The gradient-boosting candidates are Phase C v2 development arms under equal "
+            "The candidate estimators are Phase C v2 development arms under equal "
             "weighting; the v1 contract and the weighted arm fit only the linear estimators."
         )
     config = replace(ComponentModelConfig() if config is None else config, estimator=estimator)
@@ -428,6 +446,8 @@ def build_oof_table(
         if estimator == GRADIENT_BOOSTING_ESTIMATOR
         else GRADIENT_BOOSTING_POINTS_MODEL_VERSION
         if estimator == GRADIENT_BOOSTING_POINTS_ESTIMATOR
+        else REGIME_MODEL_VERSION
+        if estimator == REGIME_ESTIMATOR
         else COMPONENT_MODEL_VERSION
         if weighting == "equal"
         else SEASON_WEIGHTED_MODEL_VERSION
@@ -480,7 +500,11 @@ def build_oof_table(
         )
         season_weights = declared_season_weights(training_seasons, rule=rule)
         models = fit_component_models(
-            training, feature_columns=columns, config=config, weighting=rule
+            training,
+            feature_columns=columns,
+            config=config,
+            weighting=rule,
+            target_season=decision.season,
         )
         if models is None:
             refused.append(decision.fold_id)
@@ -629,7 +653,7 @@ def main() -> int:
             return 1
         if estimator != LINEAR_ESTIMATOR:
             print(
-                "The gradient-boosting estimator is a Phase C v2 development candidate. Run "
+                f"The {estimator} estimator is a Phase C v2 development candidate. Run "
                 "it with --development-scope v2; the v1 contract fits only the linear control."
             )
             return 1
@@ -649,7 +673,7 @@ def main() -> int:
             return 1
         if estimator != LINEAR_ESTIMATOR and weighting != "equal":
             print(
-                "The gradient-boosting candidate is declared under equal weighting only; "
+                f"The {estimator} candidate is declared under equal weighting only; "
                 "the weighted arm fits the linear estimators."
             )
             return 1
@@ -837,6 +861,19 @@ def main() -> int:
                     "rule": ESTIMATOR_RULES[estimator],
                     "constants": (
                         {
+                            "regime_labels": list(REGIME_LABELS),
+                            "fixture_regime": "double when fixture_count >= 2, else single",
+                            "rule_era": "defcon for season start year 2025 or later",
+                            "gate_terms": list(REGIME_GATE_TERMS),
+                            "gate": "StandardScaler + LogisticRegression (lbfgs, C "
+                            f"{config.appearance_regularization}) over the regime labels",
+                            "expert_appearance_regularization": config.appearance_regularization,
+                            "expert_minutes_alpha": config.minutes_alpha,
+                            "expert_points_alpha": config.points_alpha,
+                            "minimum_training_rows_per_expert": config.minimum_training_rows,
+                        }
+                        if estimator == REGIME_ESTIMATOR
+                        else {
                             "learning_rate": config.boosting_learning_rate,
                             "iterations": config.boosting_iterations,
                             "max_leaf_nodes": config.boosting_max_leaf_nodes,
