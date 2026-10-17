@@ -161,6 +161,13 @@ Transfer decisions and multi-week plans; the historical ridge control as an arm;
 member's squad; Top100 evidence; 2025-26 as a test; any bucket edge, shrinkage form, floor or
 seed other than the ones written here.
 
+Scope statement added on 2026-10-17 at the owner's request on the pull request, after the
+measurement and without changing any gate, grid, population, seed or budget above: the
+planning hit-cost arms (planning hit cost 4, with and without the transfer cap, on the season
+chain with transfers) and buckets by the four position groups are deferred to a named
+follow-up pre-registration, `docs/research/rank_conditional_shrinkage_chain_prereg.md`, which
+is not written here.
+
 ## Record
 
 `docs/research/rank_conditional_shrinkage.json` and its Markdown twin, written once by the

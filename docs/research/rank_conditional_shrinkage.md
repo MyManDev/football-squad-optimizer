@@ -68,15 +68,18 @@ changes score less, in four of five seasons. Arm B, the shape control, leaves th
 order unchanged, moves the decision rarely and reads as a tie with the control. The planning hit
 cost of 8 on the live member path is not addressed by this result either way: it was not measured.
 
-Two readings the owner's review of 2026-10-17 asked for are deferred to named follow-ups rather
-than added here, because the protocol was frozen before the run and is not widened after it.
-The season chain with transfers, with the planning hit cost at 4, with and without the transfer
-cap, is the follow-up `rank_conditional_shrinkage_season_chain`; buckets by position group
-rather than six pooled across positions is the follow-up
-`rank_conditional_shrinkage_position_buckets`. Each needs its own pre-registration before its
-runner runs. On the scheduling of this run: the three arms were solved in three threads, and the
-claim that the numbers do not depend on the scheduling holds only while the 600 second wall-clock
-cap never binds; every one of the 528 solves ended OPTIMAL under the deterministic budget, so the
-cap did not bind here.
+Two readings the owner's review of 2026-10-17 asked for are deferred rather than added here,
+because the protocol was frozen before the run and is not widened after it: the season chain
+with transfers under the planning hit cost at 4, with and without the transfer cap, and buckets
+by the four position groups rather than six pooled across positions. Both go to the named
+follow-up pre-registration `docs/research/rank_conditional_shrinkage_chain_prereg.md`, not
+written yet, and the protocol's "What is not measured" section says so in a scope statement the
+owner asked for. On the scheduling of this run: the three arms were solved in three threads, and
+the claim that the numbers do not depend on the scheduling holds only while the 600 second
+wall-clock cap never binds; every one of the 528 solves ended OPTIMAL inside the deterministic
+budget of 5.0, so the cap did not bind here. The per-fold artifact carries solver statuses, not
+wall times, so no largest wall time is quoted. The commits after the run (c6cc973d and the one
+that adds this paragraph) changed documents and the runner's harness note only; the record's
+`repository_commit` stays `edf99561` and no number moved.
 
 Per-fold table: `artifacts/rank_conditional_shrinkage/rank_conditional_shrinkage_folds.csv` (sha256 `5703db92252ba5242c68e6287496a9c8efcd7e924db3b4edbb66f04aeb4a2edf`).
