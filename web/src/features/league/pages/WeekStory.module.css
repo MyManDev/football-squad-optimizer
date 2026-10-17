@@ -1,0 +1,79 @@
+/* The week's story (#1134): up to three short cards above the decision. On a phone they sit
+   in one row that scrolls sideways inside itself, never the page; on wider screens they share
+   the row. A chip card that opens lifts by a few pixels with a transform, so no other card
+   moves, in the motion tokens' card time. */
+
+.story {
+  margin-block: var(--space-3) var(--space-4);
+}
+
+.cards {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(9.5rem, 1fr);
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0 0 var(--space-1);
+  overflow-x: auto;
+  list-style: none;
+}
+
+.card {
+  align-self: start;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-surface);
+  transition:
+    transform var(--motion-ui) var(--motion-ease),
+    box-shadow var(--motion-ui) var(--motion-ease);
+}
+
+.card[data-open] {
+  transform: translateY(-3px);
+  box-shadow: 0 4px 12px rgba(16, 38, 26, 0.16);
+}
+
+.link {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  min-height: 44px;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  background: none;
+  color: var(--color-text);
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.label {
+  color: var(--color-text-muted);
+  font-size: var(--step--2);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.value {
+  font-family: var(--font-display);
+  font-size: var(--step-1);
+  font-weight: 700;
+}
+
+.detail {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--step--1);
+}
+
+.opened {
+  display: grid;
+  gap: var(--space-1);
+  padding: 0 var(--space-3) var(--space-2);
+}
+
+.more {
+  font-size: var(--step--1);
+}

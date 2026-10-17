@@ -636,3 +636,19 @@ describe("a chip strategy the service planned", () => {
     },
   );
 });
+
+describe("the week's story (#1134)", () => {
+  it.each(["tr", "en"] as const)("sits above the decision and links into it (%s)", (language) => {
+    show(language);
+    const copy = MESSAGES[language].leagueMembers;
+    const story = screen.getByRole("navigation", { name: copy.storyTitle });
+    expect(
+      story.compareDocumentPosition(decision(language)) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    const targets = within(story)
+      .getAllByRole("link")
+      .map((link) => link.getAttribute("href")!.slice(1));
+    for (const target of targets) expect(document.getElementById(target)).not.toBeNull();
+    expect(boards(language)).toHaveLength(2);
+  });
+});
