@@ -21,9 +21,12 @@ With -ClubNewsSettings (or the SQUADOPT_CLUB_NEWS_SETTINGS environment variable)
 first acquires the week's club news (scripts.capture_club_news, which fetches the registered
 club pages and codes them with the model named in that private file) from the newest capture's
 roster, and passes the new capture to the weekly command as --rotation-capture, so the
-manager's word rides on real news instead of the committed fixture. A capture that produces
-no id is a refusal: the run does not fall back to the fixture silently, because a published
-week without the word is exactly what the option exists to prevent.
+manager's word rides on real news instead of the committed fixture. -ClubNews does the same
+with no file, from the shell's own SQUADOPT_LLM_PROVIDER, SQUADOPT_LLM_API_KEY and optional
+SQUADOPT_LLM_MODEL (set them in the window that runs this script; the script never prints
+them). A capture that produces no id is a refusal: the run does not fall back to the fixture
+silently, because a published week without the word is exactly what the option exists to
+prevent.
 
 The exit code is the weekly command's (0 when the run completed and the site pull request
 is open), 2 for a refusal before anything ran. A Tuesday run is the next gameweek's run
@@ -38,6 +41,7 @@ param(
     [int]$Workers = 15,
     [int]$Gameweek = 0,
     [string]$ClubNewsSettings = '',
+    [switch]$ClubNews,
     [switch]$DryRun
 )
 Set-StrictMode -Version 2.0
@@ -160,13 +164,18 @@ New-Item -ItemType Directory -Force -Path $logDirectory | Out-Null
 $log = Join-Path $logDirectory ($runId + '.log')
 if (-not $ClubNewsSettings -and $env:SQUADOPT_CLUB_NEWS_SETTINGS) { $ClubNewsSettings = $env:SQUADOPT_CLUB_NEWS_SETTINGS }
 $rotationCapture = ''
-if ($ClubNewsSettings) {
-    if (-not (Test-Path -LiteralPath $ClubNewsSettings)) { Write-Output "Refused: club-news settings file not found at $ClubNewsSettings."; exit 2 }
+if ($ClubNewsSettings -or $ClubNews) {
+    if ($ClubNewsSettings -and -not (Test-Path -LiteralPath $ClubNewsSettings)) { Write-Output "Refused: club-news settings file not found at $ClubNewsSettings."; exit 2 }
+    if (-not $ClubNewsSettings -and -not ($env:SQUADOPT_LLM_PROVIDER -and $env:SQUADOPT_LLM_API_KEY)) {
+        Write-Output 'Refused: -ClubNews needs SQUADOPT_LLM_PROVIDER and SQUADOPT_LLM_API_KEY in this window (never printed, never committed).'; exit 2
+    }
     if (-not $DryRun) {
         $roster = Latest-Capture $RepoRoot
         Write-Output ("club news: acquiring from the roster of {0}" -f $roster)
         $env:PYTHONPATH = (Join-Path $RepoRoot 'src') + ';' + $RepoRoot
-        $newsLines = @(& $python -m scripts.capture_club_news --settings-file $ClubNewsSettings --roster-snapshot $roster 2>&1 | ForEach-Object { [string]$_ })
+        $newsArguments = @('-m', 'scripts.capture_club_news', '--roster-snapshot', $roster)
+        if ($ClubNewsSettings) { $newsArguments += @('--settings-file', $ClubNewsSettings) }
+        $newsLines = @(& $python @newsArguments 2>&1 | ForEach-Object { [string]$_ })
         $newsLines | Add-Content -LiteralPath $log
         $rotationCapture = Captured-NewsId $newsLines
         if (-not $rotationCapture) { Write-Output 'Refused: the club-news acquisition produced no capture id; read the log, fix the cause, and run again.'; Write-Output ("log: {0}" -f $log); exit 2 }
