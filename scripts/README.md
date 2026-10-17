@@ -170,7 +170,7 @@ do not move.
 | `measure_template_rival.py` | measurement runner | `docs/template_rival_strength.json` (+ per-season variants) | 2026-09-19 |
 | `measure_temporal_refinement.py` | measurement runner | a fresh output directory; `docs/research/temporal_refinement_measurement.json` and `docs/research/triple_refinement_measurement.json` each record this file's hash | 2026-09-30 |
 | `measure_top100_effect.py` | measurement runner | `docs/top100_effect_gw12` or `docs/top100_effect_gw20` as `.json` and `.md`, each once (none committed yet); protocol `docs/top100_effect_prereg.md`, usage `docs/top100_effect_reader.md` | 2026-09-21 |
-| `measure_window_solver_highs.py` | measurement runner | `docs/research/window_solver_highs.json`, `docs/research/window_solver_highs.md`; `check` writes only `artifacts/window_solver_highs/`; protocol `docs/window_solver_highs_prereg.md` | 2026-10-07 |
+| `measure_window_solver_highs.py` | measurement runner | `docs/research/window_solver_highs.json`, `docs/research/window_solver_highs.md` by default (protocol `docs/window_solver_highs_prereg.md`); with `--record-stem window_solver_highs_current`, `docs/research/window_solver_highs_current.json` and `.md` (protocol `docs/research/window_solver_highs_current_prereg.md`); `check` writes only `artifacts/<stem>/` | 2026-10-17 |
 | `read_benchmark_v2_live.py` | measurement runner | `docs/benchmark-v2-live-2026-27.json` and its Markdown twin, with the claim `docs/benchmark-v2-live-2026-27.reading` | 2026-10-11 |
 | `record_preseason_difficulty.py` | measurement runner | `docs/preseason_fixture_difficulty.json`; also `docs/gw1_run_sheet.md` | 2026-09-19 |
 | `replay_football_planning.py` | measurement runner | a fresh `--output` directory; `docs/research/football_planning_replay.json` records this file's hash | 2026-09-28 |
@@ -226,6 +226,7 @@ allowing the web formatter's layout.
 
 | Script | Class | Record it writes, or what names it | Last commit |
 | --- | --- | --- | --- |
+| `_highs_native_driver.py` | helper | imported by `measure_window_solver_highs` and run by it as the native HiGHS child (`python -m scripts._highs_native_driver --job --out`, and `--version` for the guard): `highspy` and the standard library only, never OR-Tools, whose `libhighs.so.1` shares the SONAME | 2026-10-17 |
 | `_experiment_cli.py` | helper | imported by every runner that `git grep -l "from scripts._experiment_cli import" -- 'scripts/*.py' \| wc -l` counts: provenance metadata, `write_json`, `write_text` | 2026-10-12 |
 | `_phase_e_checkpoints.py` | helper | imported by `probe_phase_e_runtime` | 2026-09-07 |
 | `_phase_e_development.py` | helper | imported by `probe_phase_e_runtime`, `_phase_e_evaluation` | 2026-09-07 |
