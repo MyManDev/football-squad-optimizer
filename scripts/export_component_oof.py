@@ -71,18 +71,26 @@ from squadopt.prediction.component_dataset import (
 )
 from squadopt.prediction.component_models import (
     COMPONENT_MODEL_VERSION,
+    DISTRIBUTION_COLUMNS,
     EQUAL_WEIGHTING,
     GRADIENT_BOOSTING_ESTIMATOR,
     GRADIENT_BOOSTING_MODEL_VERSION,
     GRADIENT_BOOSTING_POINTS_ESTIMATOR,
     GRADIENT_BOOSTING_POINTS_MODEL_VERSION,
     LINEAR_ESTIMATOR,
+    MINUTES_FULL_THRESHOLD_PER_FIXTURE,
+    MINUTES_SCALE_FLOOR,
+    MIXTURE_ESTIMATOR,
+    MIXTURE_MODEL_VERSION,
+    POINTS_RETURN_THRESHOLD,
+    POINTS_SCALE_FLOOR,
     SEASON_HALF_LIFE_WEIGHTING,
     SEASON_WEIGHT_BASE,
     SEASON_WEIGHTED_MODEL_VERSION,
     ComponentModelConfig,
     SeasonAgeWeighting,
     fit_component_models,
+    predict_component_distribution,
     predict_components,
 )
 from squadopt.preflight import compute_table_sha256
@@ -105,12 +113,37 @@ WEIGHTING_LABELS = {"equal": EQUAL_WEIGHTING, "season_half_life": SEASON_HALF_LI
 # weighting, with the three linear estimators replaced by the gradient-boosted ensembles
 # of `ComponentModelConfig` (constants, never searched). Its table name carries the arm so
 # the two candidates cannot overwrite each other or the control.
-ESTIMATOR_ARMS = (LINEAR_ESTIMATOR, GRADIENT_BOOSTING_ESTIMATOR, GRADIENT_BOOSTING_POINTS_ESTIMATOR)
+# The fourth: the gated mixture of `docs/research/moe_mixture_prereg.md`, which also writes
+# the distribution sidecar every v2 export declares beside its table.
+ESTIMATOR_ARMS = (
+    LINEAR_ESTIMATOR,
+    GRADIENT_BOOSTING_ESTIMATOR,
+    GRADIENT_BOOSTING_POINTS_ESTIMATOR,
+    MIXTURE_ESTIMATOR,
+)
 ESTIMATOR_TABLE_SUFFIX = {
     LINEAR_ESTIMATOR: "",
     GRADIENT_BOOSTING_ESTIMATOR: "_gradient_boosting",
     GRADIENT_BOOSTING_POINTS_ESTIMATOR: "_gradient_boosting_points",
+    MIXTURE_ESTIMATOR: "_mixture",
 }
+ESTIMATOR_MODEL_VERSIONS = {
+    GRADIENT_BOOSTING_ESTIMATOR: GRADIENT_BOOSTING_MODEL_VERSION,
+    GRADIENT_BOOSTING_POINTS_ESTIMATOR: GRADIENT_BOOSTING_POINTS_MODEL_VERSION,
+    MIXTURE_ESTIMATOR: MIXTURE_MODEL_VERSION,
+}
+# The sidecar a v2 export writes beside its table when the arm declares a predictive
+# distribution: the linear arm's single Gaussian residual and the mixture's two experts with
+# their gate. Keyed like the table; one row per component-model row of a fitted fold.
+DISTRIBUTION_KEY_COLUMNS = ("season", "target_gameweek", "fold_id", "player_id")
+DISTRIBUTION_SIDECAR_SUFFIX = ".distribution.csv"
+DISTRIBUTION_RULE = (
+    "one row per component_model row of a fitted, non-blank fold; the gate is the weight of "
+    "the high expert (minutes: full, points: return); the means are the experts' outputs "
+    "before the public bounds; a scale is the expert's residual standard deviation (ddof=1) "
+    "on its own training rows, floored; the linear arm writes gaussian_1 with gate 0 and the "
+    "high slots missing"
+)
 ESTIMATOR_RULES = {
     LINEAR_ESTIMATOR: (
         "standardized logistic regression (appearance) and ridge regression (minutes and "
@@ -123,6 +156,12 @@ ESTIMATOR_RULES = {
     GRADIENT_BOOSTING_POINTS_ESTIMATOR: (
         "the linear appearance and minutes estimators with a histogram gradient-boosted "
         "conditional points estimator (same constants); equal weighting only"
+    ),
+    MIXTURE_ESTIMATOR: (
+        "the linear appearance estimator kept; conditional minutes and points each a gated "
+        "mixture of two standardized ridge experts (full/short minutes, return/no-return "
+        "points) with a standardized logistic-regression gate on the same features; the "
+        "expected value is the gate-weighted mean; equal weighting only"
     ),
 }
 WEIGHTING_RULES = {
@@ -373,6 +412,8 @@ class WalkSummary:
     training_rows_seen: int
     scored_folds: int
     folds: tuple[FoldRecord, ...]
+    # The distribution sidecar rows, or ``None`` when the arm declares no distribution.
+    distribution: pd.DataFrame | None = None
 
 
 def declared_season_weights(
@@ -416,18 +457,16 @@ def build_oof_table(
         )
     if estimator not in ESTIMATOR_ARMS:
         raise DataError(f"Unknown estimator {estimator!r}.")
-    boosted = estimator != LINEAR_ESTIMATOR
-    if boosted and (not development or weighting != "equal"):
+    candidate_estimator = estimator != LINEAR_ESTIMATOR
+    if candidate_estimator and (not development or weighting != "equal"):
         raise DataError(
-            "The gradient-boosting candidates are Phase C v2 development arms under equal "
+            "The candidate estimators are Phase C v2 development arms under equal "
             "weighting; the v1 contract and the weighted arm fit only the linear estimators."
         )
     config = replace(ComponentModelConfig() if config is None else config, estimator=estimator)
     arm_model_version = (
-        GRADIENT_BOOSTING_MODEL_VERSION
-        if estimator == GRADIENT_BOOSTING_ESTIMATOR
-        else GRADIENT_BOOSTING_POINTS_MODEL_VERSION
-        if estimator == GRADIENT_BOOSTING_POINTS_ESTIMATOR
+        ESTIMATOR_MODEL_VERSIONS[estimator]
+        if candidate_estimator
         else COMPONENT_MODEL_VERSION
         if weighting == "equal"
         else SEASON_WEIGHTED_MODEL_VERSION
@@ -435,6 +474,7 @@ def build_oof_table(
     columns = component_feature_columns()
     ranks = {season: rank for rank, season in enumerate(season_order)}
     pieces: list[pd.DataFrame] = []
+    distribution_pieces: list[pd.DataFrame] = []
     refused: list[str] = []
     records: list[FoldRecord] = []
     training_rows = 0
@@ -539,6 +579,15 @@ def build_oof_table(
         )
         piece["fold_id"] = decision.fold_id
         pieces.append(piece)
+        if development:
+            distribution = predict_component_distribution(models, scoring, feature_columns=columns)
+            if not distribution.empty:
+                keyed = scoring.loc[distribution.index, ["season", "gameweek", "player_id"]]
+                keyed = keyed.rename(columns={"gameweek": "target_gameweek"})
+                keyed["fold_id"] = decision.fold_id
+                distribution_pieces.append(
+                    pd.concat([keyed, distribution], axis=1).reset_index(drop=True)
+                )
 
     if not pieces:
         raise DataError("No decision produced a scoring population.")
@@ -560,11 +609,24 @@ def build_oof_table(
         .sort_values(["season", "target_gameweek", "player_id"], kind="stable")
         .reset_index(drop=True)
     )
+    distribution_table: pd.DataFrame | None = None
+    if distribution_pieces:
+        distribution_table = (
+            pd.concat(distribution_pieces, ignore_index=True)
+            .loc[:, [*DISTRIBUTION_KEY_COLUMNS, *DISTRIBUTION_COLUMNS]]
+            .sort_values(["season", "target_gameweek", "player_id"], kind="stable")
+            .reset_index(drop=True)
+        )
+        for column in DISTRIBUTION_COLUMNS[1:]:
+            distribution_table[column] = (
+                distribution_table[column].astype("Float64").round(PREDICTED_POINTS_DECIMALS)
+            )
     return table, WalkSummary(
         refused_folds=tuple(refused),
         training_rows_seen=training_rows,
         scored_folds=len(pieces),
         folds=tuple(records),
+        distribution=distribution_table,
     )
 
 
@@ -629,7 +691,7 @@ def main() -> int:
             return 1
         if estimator != LINEAR_ESTIMATOR:
             print(
-                "The gradient-boosting estimator is a Phase C v2 development candidate. Run "
+                f"The {estimator} estimator is a Phase C v2 development candidate. Run "
                 "it with --development-scope v2; the v1 contract fits only the linear control."
             )
             return 1
@@ -649,7 +711,7 @@ def main() -> int:
             return 1
         if estimator != LINEAR_ESTIMATOR and weighting != "equal":
             print(
-                "The gradient-boosting candidate is declared under equal weighting only; "
+                f"The {estimator} candidate is declared under equal weighting only; "
                 "the weighted arm fits the linear estimators."
             )
             return 1
@@ -710,6 +772,18 @@ def main() -> int:
     write_export_table(roster, roster_path)
     digest = compute_table_sha256(table_path)
     roster_digest = compute_table_sha256(roster_path)
+    distribution_sidecar: dict[str, object] | None = None
+    if development and walk.distribution is not None:
+        distribution_path = output_dir / f"{table_name}{DISTRIBUTION_SIDECAR_SUFFIX}"
+        write_export_table(walk.distribution, distribution_path)
+        distribution_sidecar = {
+            "path": distribution_path.name,
+            "sha256": compute_table_sha256(distribution_path),
+            "row_count": len(walk.distribution),
+            "columns": [*DISTRIBUTION_KEY_COLUMNS, *DISTRIBUTION_COLUMNS],
+            "family": str(walk.distribution["distribution_family"].iloc[0]),
+            "rule": DISTRIBUTION_RULE,
+        }
 
     modelled = int((table["composition_route"] == "component_model").sum())
     model_version = str(table["model_version"].iloc[0])
@@ -844,13 +918,33 @@ def main() -> int:
                             "l2_regularization": config.boosting_l2_regularization,
                             "early_stopping": False,
                         }
-                        if estimator != LINEAR_ESTIMATOR
+                        if estimator
+                        in (
+                            GRADIENT_BOOSTING_ESTIMATOR,
+                            GRADIENT_BOOSTING_POINTS_ESTIMATOR,
+                        )
                         else {
                             "appearance_regularization": config.appearance_regularization,
                             "minutes_alpha": config.minutes_alpha,
                             "points_alpha": config.points_alpha,
+                            "minutes_full_threshold_per_fixture": (
+                                MINUTES_FULL_THRESHOLD_PER_FIXTURE
+                            ),
+                            "points_return_threshold": POINTS_RETURN_THRESHOLD,
+                            "minutes_scale_floor": MINUTES_SCALE_FLOOR,
+                            "points_scale_floor": POINTS_SCALE_FLOOR,
+                            "minimum_regime_rows": max(2, config.minimum_training_rows // 4),
+                        }
+                        if estimator == MIXTURE_ESTIMATOR
+                        else {
+                            "appearance_regularization": config.appearance_regularization,
+                            "minutes_alpha": config.minutes_alpha,
+                            "points_alpha": config.points_alpha,
+                            "minutes_scale_floor": MINUTES_SCALE_FLOOR,
+                            "points_scale_floor": POINTS_SCALE_FLOOR,
                         }
                     ),
+                    "distribution_sidecar": distribution_sidecar,
                     "declared_before_measurement": True,
                 },
                 "rule_era": {
