@@ -803,6 +803,13 @@ const en = {
     linkLabel: "Open league members →",
     // Direction D's member page: the top bar, the decision board, the plan in the sidebar.
     decisionTitle: "This week's move",
+    // The week as short cards above the decision (#1134): transfers, captain and chip, each
+    // opening into its detail below. Rendered from the advice document only.
+    storyTitle: "This week's decisions",
+    storyTransfers: "Transfers",
+    storyMoves: (count: number) => (count === 1 ? "1 change" : `${count} changes`),
+    storyChipPlay: "Played this week",
+    storyDetail: "Details",
     top100Weight: (weight: number) => `Top 100 weight ${weight}`,
     weekLabel: (gameweek: number) => `Gameweek ${gameweek}`,
     deadlineLabel: "Deadline",
@@ -1802,6 +1809,11 @@ const tr: MessageSchema<typeof en> = {
       "Her üye satırı o üyenin son tarih sonrası public kadrosunu ve o kadrodan önerilen hamleleri açar.",
     linkLabel: "Lig üyelerini aç →",
     decisionTitle: "Bu haftanın hamlesi",
+    storyTitle: "Bu haftanın kararları",
+    storyTransfers: "Transferler",
+    storyMoves: (count) => `${count} değişiklik`,
+    storyChipPlay: "Bu hafta oynanıyor",
+    storyDetail: "Ayrıntı",
     top100Weight: (weight) => `Top 100 ağırlığı ${weight}`,
     weekLabel: (gameweek) => `${gameweek}. hafta`,
     deadlineLabel: "Son karar",

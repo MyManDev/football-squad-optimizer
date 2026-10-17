@@ -40,6 +40,7 @@ import { hasLineup, squadOnPitch } from "./squadOnPitch";
 import { MemberTopBar, MemberWho } from "./MemberTopBar";
 import type { LeagueMemberViewProps } from "./memberPageTypes";
 import { useMemberAdviceView } from "./useMemberAdviceView";
+import { WeekStory } from "./WeekStory";
 import styles from "./LeagueMemberPage.module.css";
 
 export function LeagueMemberView(props: LeagueMemberViewProps) {
@@ -406,6 +407,8 @@ function LeagueMemberContent({
             {copy.membersAuxiliaryUnavailable}
           </p>
         ) : null}
+
+        {plan ? <WeekStory view={plan} /> : null}
 
         <section aria-labelledby="entry-advice-title" className={styles.adviceSection}>
           <div className={styles.decision} data-mark="decision">
