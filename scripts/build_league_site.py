@@ -16,7 +16,8 @@ fact rather than as intention.
 
 It does record what it published. The site's advice paths carry no gameweek and are
 overwritten every week, so ``build_league_views`` also writes an immutable advice record
-under ``--advice-record-root``, one per member, gameweek and capture; without it, a week
+under ``--advice-record-root``, one per league, member, gameweek and capture (league 352490
+at the store's root, every other league under ``leagues/<id>/``); without it, a week
 that has been published can never afterwards be reviewed. A week is published more than
 once — mid-week, then again with fresh availability before the deadline — and each of those
 captures records its own, so the advice that stood at the deadline is on disk too.
@@ -41,7 +42,6 @@ from squadopt.application.league_publication import (
     leagues_beside,
     prepare_league_publication,
     publish_prepared_league,
-    records_advice_for,
 )
 from squadopt.application.league_publication import (
     last_scored_gameweek as last_scored_gameweek,
@@ -145,10 +145,11 @@ def main() -> int:
         "--advice-record-root",
         type=Path,
         default=ADVICE_RECORD_ROOT,
-        help="where the immutable per-member, per-gameweek, per-capture advice record is "
-        "written; the published tree has no gameweek in its paths and is overwritten every "
-        "week, so without this nothing survives to say what a member was told for a given "
-        "week",
+        help="the store the immutable per-member, per-gameweek, per-capture advice record is "
+        "written to, each league under its own root (league 352490 at the store's root, "
+        "every other league under leagues/<id>/); the published tree has no gameweek in its "
+        "paths and is overwritten every week, so without this nothing survives to say what "
+        "a member was told for a given week",
     )
     parser.add_argument(
         "--no-advice-record",
@@ -182,13 +183,8 @@ def main() -> int:
     if arguments.workers < 1:
         parser.error("--workers must be at least 1")
 
-    # The advice record names one league; another league is published without one.
-    recorded = not arguments.no_advice_record and records_advice_for(arguments.league)
-    if not arguments.no_advice_record and not recorded:
-        print(
-            f"League {arguments.league} is published without an advice record: the record "
-            "names one league until it carries the league."
-        )
+    # Every league records, each under its own root in the store.
+    recorded = not arguments.no_advice_record
     try:
         snapshot_root = Path(arguments.snapshot_root)
         snapshot_id = resolve_live_snapshot_id(snapshot_root, arguments.snapshot_id)

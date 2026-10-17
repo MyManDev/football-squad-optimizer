@@ -16,6 +16,7 @@ from typing import Any
 import pandas as pd
 from scripts._experiment_cli import REPOSITORY_ROOT
 
+from squadopt.application.advice_record import STORE_ROOT_LEAGUE_ID, league_record_root
 from squadopt.application.weekly_suggestion_eval import score_recorded_advice, select_record
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import CapturedSnapshot, list_snapshot_ids, read_snapshot
@@ -290,13 +291,16 @@ def collect(root: Path, evidence_root: Path, season: str, through: int) -> dict[
             continue
         if week == 5:
             continue
-        directory = root / "advice_records" / season / f"gw{week:02d}"
+        # The league whose records this instrument has always read, at its own root.
+        records = league_record_root(root / "advice_records", STORE_ROOT_LEAGUE_ID)
+        directory = records / season / f"gw{week:02d}"
         for member in sorted(directory.glob("entry-*")):
             if not member.is_dir() or not member.name.removeprefix("entry-").isdigit():
                 continue
             try:
                 record = select_record(
-                    root / "advice_records",
+                    records,
+                    league_id=STORE_ROOT_LEAGUE_ID,
                     season=season,
                     gameweek=week,
                     entry_id=int(member.name.removeprefix("entry-")),

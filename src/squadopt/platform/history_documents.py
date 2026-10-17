@@ -7,7 +7,7 @@ from typing import Any
 from squadopt.application.advice_capabilities import TOP100_WEIGHTS
 from squadopt.application.mode_selection import MODE_SLUGS
 from squadopt.application.strategies import STRATEGY_CATALOG
-from squadopt.application.weekly_suggestion_eval import CONTRACT_VERSION, SUPPORTED_LEAGUE_ID
+from squadopt.application.weekly_suggestion_eval import CONTRACT_VERSION
 from squadopt.live.rules import CHIP_NAMES
 
 
@@ -115,7 +115,9 @@ def history_schema() -> dict[str, Any]:
         },
     }
     payload = {
-        "league_id": {"const": SUPPORTED_LEAGUE_ID},
+        # Every league in a publication renders its members' histories from its own records,
+        # so the league is any league; the reader holds it to the tree it was read from.
+        "league_id": identifier,
         "entry_id": identifier,
         "season": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}$"},
         "as_of_snapshot_id": text,

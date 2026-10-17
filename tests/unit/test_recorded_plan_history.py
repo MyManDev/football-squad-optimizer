@@ -172,6 +172,18 @@ def test_reproducible_history_schema_accepts_both_shapes_and_refuses_a_null_pric
     assert list(jsonschema.Draft202012Validator(schema).iter_errors(legacy))
 
 
+@pytest.mark.parametrize(("league_id", "valid"), [(352490, True), (7, True), (0, False)])
+def test_history_schema_accepts_every_league_and_no_league_that_is_not_one(
+    league_id: int, valid: bool
+) -> None:
+    history = json.loads(
+        (ROOT / "web/src/fixtures/weeklySuggestionHistory.json").read_text(encoding="utf-8")
+    )
+    history["payload"]["league_id"] = league_id
+    errors = list(jsonschema.Draft202012Validator(history_schema()).iter_errors(history))
+    assert not errors if valid else errors
+
+
 @pytest.mark.parametrize("mode", ["garantici", "agresif", "asiri-agresif"])
 def test_history_schema_accepts_legacy_mode_rows_the_publisher_can_emit(mode: str) -> None:
     history = json.loads(
