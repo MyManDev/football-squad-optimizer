@@ -37,9 +37,17 @@ from squadopt.evaluation import (
 from squadopt.evaluation.promotion import PromotionPolicy
 from squadopt.evaluation.statistics import season_aware_moving_block_interval
 from squadopt.experiments.phase_c_reporting import phase_c_component_evaluation_to_dict
+from squadopt.prediction.component_dataset import (
+    FEATURE_CONTRACT_VERSION,
+    FEATURE_CONTRACT_VERSION_V2,
+)
 from squadopt.prediction.component_models import (
     COMPONENT_MODEL_VERSION,
     EQUAL_WEIGHTING,
+    GRADIENT_BOOSTING_MODEL_VERSION,
+    GRADIENT_BOOSTING_POINTS_MODEL_VERSION,
+    MIXTURE_MODEL_VERSION,
+    REGIME_MODEL_VERSION,
     SEASON_HALF_LIFE_WEIGHTING,
     SEASON_WEIGHTED_MODEL_VERSION,
 )
@@ -51,6 +59,61 @@ PRIMARY_SEASON = "2025-26"
 CONTROL_ERA_SEASON = "2024-25"
 DEVELOPMENT_SEASONS = (PRIMARY_SEASON,)
 CANDIDATE_ID = "phase_c_v2_season_half_life_vs_equal"
+# The two declared candidates, each against the equal-weight linear control. The expected
+# weighting label and model version of a candidate are fixed here, so an arm cannot be
+# relabelled after its numbers are seen.
+CANDIDATE_ARMS = {
+    "season_half_life": {
+        "weighting": SEASON_HALF_LIFE_WEIGHTING,
+        "model_version": SEASON_WEIGHTED_MODEL_VERSION,
+        "candidate_id": CANDIDATE_ID,
+        "table": f"{DEVELOPMENT_OOF_CONTRACT_VERSION}_season_half_life",
+        "reference": "season_half_life candidate",
+    },
+    "gradient_boosting": {
+        "weighting": EQUAL_WEIGHTING,
+        "model_version": GRADIENT_BOOSTING_MODEL_VERSION,
+        "candidate_id": "phase_c_v2_gradient_boosting_vs_linear",
+        "table": f"{DEVELOPMENT_OOF_CONTRACT_VERSION}_equal_gradient_boosting",
+        "reference": "gradient_boosting candidate",
+    },
+    "gradient_boosting_points": {
+        "weighting": EQUAL_WEIGHTING,
+        "model_version": GRADIENT_BOOSTING_POINTS_MODEL_VERSION,
+        "candidate_id": "phase_c_v2_gradient_boosting_points_vs_linear",
+        "table": f"{DEVELOPMENT_OOF_CONTRACT_VERSION}_equal_gradient_boosting_points",
+        "reference": "gradient_boosting_points candidate",
+    },
+    "mixture": {
+        "weighting": EQUAL_WEIGHTING,
+        "model_version": MIXTURE_MODEL_VERSION,
+        "candidate_id": "phase_c_v2_mixture_vs_linear",
+        "table": f"{DEVELOPMENT_OOF_CONTRACT_VERSION}_equal_mixture",
+        "reference": "mixture candidate",
+    },
+    "regime": {
+        "weighting": EQUAL_WEIGHTING,
+        "model_version": REGIME_MODEL_VERSION,
+        "candidate_id": "phase_c_v2_regime_vs_linear",
+        "table": f"{DEVELOPMENT_OOF_CONTRACT_VERSION}_equal_regime",
+        "reference": "regime candidate",
+    },
+    # The feature-contract candidate is read against the gradient-boosting arm on the v1
+    # features, so the comparison isolates the windows; the model version is the same and
+    # only the declared feature contract differs between the two arms. Both contracts are
+    # named, so neither side can be swapped for a table on another contract.
+    "gradient_boosting_windows": {
+        "weighting": EQUAL_WEIGHTING,
+        "model_version": GRADIENT_BOOSTING_MODEL_VERSION,
+        "candidate_id": "phase_c_v2_gradient_boosting_windows_vs_v1_features",
+        "table": f"{DEVELOPMENT_OOF_CONTRACT_VERSION}_equal_gradient_boosting_features_v2",
+        "reference": "gradient_boosting candidate on the v2 feature contract",
+        "control_model_version": GRADIENT_BOOSTING_MODEL_VERSION,
+        "control_table": f"{DEVELOPMENT_OOF_CONTRACT_VERSION}_equal_gradient_boosting",
+        "control_feature_contract_version": FEATURE_CONTRACT_VERSION,
+        "candidate_feature_contract_version": FEATURE_CONTRACT_VERSION_V2,
+    },
+}
 # The existing paired-inference policy at its declared defaults. `min_mean_improvement` is
 # a squad-points gate and has no meaning for a per-player MAE, so it is not consulted and
 # no substitute threshold is invented.
@@ -110,9 +173,10 @@ class SeasonComparison:
 def _parse_arguments(argv: Sequence[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--artifact-dir", type=Path, required=True)
-    parser.add_argument("--control", default=f"{DEVELOPMENT_OOF_CONTRACT_VERSION}_equal")
+    parser.add_argument("--control", default=None)
+    parser.add_argument("--candidate", default=None)
     parser.add_argument(
-        "--candidate", default=f"{DEVELOPMENT_OOF_CONTRACT_VERSION}_season_half_life"
+        "--candidate-arm", choices=tuple(CANDIDATE_ARMS), default="season_half_life"
     )
     parser.add_argument("--output-dir", type=Path, default=None)
     return parser.parse_args(argv)
@@ -129,32 +193,49 @@ def load_arm(directory: Path, name: str) -> PhaseCComponentHandoff:
     )
 
 
-def check_paired(control: PhaseCComponentHandoff, candidate: PhaseCComponentHandoff) -> None:
+def check_paired(
+    control: PhaseCComponentHandoff,
+    candidate: PhaseCComponentHandoff,
+    *,
+    candidate_arm: str = "season_half_life",
+) -> None:
     """Refuse two arms that are not one measurement with two sets of predictions."""
 
-    if control.weighting != EQUAL_WEIGHTING or candidate.weighting != SEASON_HALF_LIFE_WEIGHTING:
+    arm = CANDIDATE_ARMS[candidate_arm]
+    expected_weighting = str(arm["weighting"])
+    expected_version = str(arm["model_version"])
+    control_version = str(arm.get("control_model_version", COMPONENT_MODEL_VERSION))
+    control_features = arm.get("control_feature_contract_version")
+    candidate_features = arm.get("candidate_feature_contract_version")
+    if control.weighting != EQUAL_WEIGHTING or candidate.weighting != expected_weighting:
         raise EvaluationValidationError(
-            "The declared comparison is the equal-weight control against the season-half-life "
-            f"candidate; got control {control.weighting!r} and candidate "
-            f"{candidate.weighting!r}."
+            f"The declared comparison is the equal-weight control against the {candidate_arm} "
+            f"candidate ({expected_weighting!r}); got control {control.weighting!r} and "
+            f"candidate {candidate.weighting!r}."
         )
     # A label alone is a claim; the model version is what the fit actually recorded.
-    if (
-        control.model_version != COMPONENT_MODEL_VERSION
-        or candidate.model_version != SEASON_WEIGHTED_MODEL_VERSION
-    ):
+    if control.model_version != control_version or candidate.model_version != expected_version:
         raise EvaluationValidationError(
             "Arm labels and model versions disagree: the control must carry "
-            f"{COMPONENT_MODEL_VERSION!r} and the candidate {SEASON_WEIGHTED_MODEL_VERSION!r}, "
+            f"{control_version!r} and the candidate {expected_version!r}, "
             f"got {control.model_version!r} and {candidate.model_version!r}."
+        )
+    if candidate_features is not None and candidate.feature_contract_version != candidate_features:
+        raise EvaluationValidationError(
+            f"The {candidate_arm} candidate must carry the feature contract "
+            f"{candidate_features!r}, got {candidate.feature_contract_version!r}."
+        )
+    if control_features is not None and control.feature_contract_version != control_features:
+        raise EvaluationValidationError(
+            f"The {candidate_arm} control must carry the feature contract "
+            f"{control_features!r}, got {control.feature_contract_version!r}."
         )
     if control.repository_commit != candidate.repository_commit:
         raise EvaluationValidationError("Both arms must come from the same commit.")
-    for field in (
-        "feature_contract_version",
-        "target_contract_version",
-        "dataset_contract_version",
-    ):
+    agreed = ("target_contract_version", "dataset_contract_version") + (
+        () if candidate_features is not None else ("feature_contract_version",)
+    )
+    for field in agreed:
         if getattr(control, field) != getattr(candidate, field):
             raise EvaluationValidationError(f"The two arms disagree on {field}.")
     left = control.rows.sort_values(KEY, kind="stable").reset_index(drop=True)
@@ -240,6 +321,7 @@ def compare_season(
     season: str,
     control_metrics: PhaseCComponentEvaluation,
     candidate_metrics: PhaseCComponentEvaluation,
+    candidate_id: str = CANDIDATE_ID,
 ) -> SeasonComparison:
     """The fixed paired reading for one season."""
 
@@ -247,7 +329,7 @@ def compare_season(
     if not differences:
         raise EvaluationValidationError(f"No scored fold in {season}.")
     low, high = season_aware_moving_block_interval(
-        [(season, value) for _, value in differences], policy=POLICY, candidate_id=CANDIDATE_ID
+        [(season, value) for _, value in differences], policy=POLICY, candidate_id=candidate_id
     )
     return SeasonComparison(
         season=season,
@@ -261,7 +343,12 @@ def compare_season(
     )
 
 
-def decide(primary: SeasonComparison, control_era: SeasonComparison) -> dict[str, object]:
+def decide(
+    primary: SeasonComparison,
+    control_era: SeasonComparison,
+    *,
+    candidate_reference: str = "season_half_life candidate",
+) -> dict[str, object]:
     """Apply the acceptance rule exactly as written before the measurement."""
 
     lower_primary_mae = primary.candidate_points_mae < primary.control_points_mae
@@ -277,7 +364,7 @@ def decide(primary: SeasonComparison, control_era: SeasonComparison) -> dict[str
         "control_era_interval_excludes_zero_against_candidate": control_era_interval_below_zero,
         "verdict": "candidate_preferred" if preferred else "no_selection",
         "phase_d_reference": (
-            "season_half_life candidate" if preferred else "equal-weight control (no selection)"
+            candidate_reference if preferred else "equal-weight control (no selection)"
         ),
     }
 
@@ -287,6 +374,7 @@ def _arm_record(handoff: PhaseCComponentHandoff, name: str) -> dict[str, object]
         "name": name,
         "weighting": handoff.weighting,
         "model_version": handoff.model_version,
+        "feature_contract_version": handoff.feature_contract_version,
         "development_contract": handoff.development_contract,
         "repository_commit": handoff.repository_commit,
         "table_sha256": handoff.table_sha256,
@@ -346,10 +434,21 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     primary_season = PRIMARY_SEASON
     control_era_season = CONTROL_ERA_SEASON
+    candidate_arm = str(arguments.candidate_arm)
+    arm = CANDIDATE_ARMS[candidate_arm]
+    candidate_name = str(arm["table"]) if arguments.candidate is None else str(arguments.candidate)
+    control_name = (
+        str(arm.get("control_table", f"{DEVELOPMENT_OOF_CONTRACT_VERSION}_equal"))
+        if arguments.control is None
+        else str(arguments.control)
+    )
+    candidate_id = str(arm["candidate_id"])
+    if arguments.output_dir is None and candidate_arm != "season_half_life":
+        output_dir = artifact_dir / f"comparison_{candidate_arm}"
     try:
-        control = load_arm(artifact_dir, str(arguments.control))
-        candidate = load_arm(artifact_dir, str(arguments.candidate))
-        check_paired(control, candidate)
+        control = load_arm(artifact_dir, control_name)
+        candidate = load_arm(artifact_dir, candidate_name)
+        check_paired(control, candidate, candidate_arm=candidate_arm)
         control_metrics = evaluate_component_oof(
             control.rows, development_seasons=DEVELOPMENT_SEASONS
         )
@@ -362,6 +461,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             season=primary_season,
             control_metrics=control_metrics,
             candidate_metrics=candidate_metrics,
+            candidate_id=candidate_id,
         )
         control_era = compare_season(
             control.rows,
@@ -369,6 +469,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             season=control_era_season,
             control_metrics=control_metrics,
             candidate_metrics=candidate_metrics,
+            candidate_id=candidate_id,
         )
     except EvaluationValidationError as error:
         print(f"Phase C v2 comparison refused: {error}")
@@ -382,9 +483,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         for season in sorted(control_metrics.by_season)
         if season not in (primary_season, control_era_season)
     }
-    verdict = decide(primary, control_era)
+    verdict = decide(primary, control_era, candidate_reference=str(arm["reference"]))
     report: dict[str, object] = {
         "contract_version": COMPARISON_CONTRACT_VERSION,
+        "candidate_arm": candidate_arm,
         "generated_at_utc": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "development_only": True,
         "promotes_anything": False,
@@ -394,11 +496,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             "bootstrap_resamples": POLICY.bootstrap_resamples,
             "moving_block_length": POLICY.moving_block_length,
             "deterministic_seed": POLICY.deterministic_seed,
-            "candidate_id": CANDIDATE_ID,
+            "candidate_id": candidate_id,
         },
         "arms": {
-            "control": _arm_record(control, str(arguments.control)),
-            "candidate": _arm_record(candidate, str(arguments.candidate)),
+            "control": _arm_record(control, control_name),
+            "candidate": _arm_record(candidate, candidate_name),
         },
         "primary_season": primary.as_record(),
         "control_era_season": control_era.as_record(),

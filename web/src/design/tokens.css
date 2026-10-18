@@ -23,7 +23,14 @@
    5.6:1 on --color-out-panel and 5.3:1 on --color-in-panel; lime and --color-board-muted
    are 13.5:1 and 11.9:1 on the board; ink is 9.8:1 on --color-seg2 and 13.5:1 on lime.
    No small text sits directly on the grass (white 3.98:1, ink 4.02:1): it goes on the
-   white plates (--color-chip, ink2 on them 7.6:1). */
+   white plates (--color-chip, ink2 on them 7.6:1).
+
+   Motion (#1136): every transition and animation takes its duration and easing from the
+   tokens below, never a literal of its own, and src/design/motion.ts mirrors them for the
+   few places that time a change in script. Buttons, cards and icons move in --motion-ui-fast
+   or --motion-ui (150 to 250 ms); the pitch and data move in --motion-data (300 to 500 ms).
+   Nothing moves without an event behind it, and under prefers-reduced-motion every duration
+   is zero, so each change is instant. */
 
 :root {
   color-scheme: light;
@@ -85,6 +92,11 @@
 
   --color-scrim: rgba(16, 38, 26, 0.45);
   --shadow-drawer: 0 12px 32px rgba(16, 38, 26, 0.28);
+
+  --motion-ui-fast: 150ms;
+  --motion-ui: 200ms;
+  --motion-data: 400ms;
+  --motion-ease: cubic-bezier(0.2, 0, 0, 1);
 
   font-variant-numeric: tabular-nums;
 }
@@ -196,6 +208,12 @@ a.visually-hidden:focus-visible {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-ui-fast: 0ms;
+    --motion-ui: 0ms;
+    --motion-data: 0ms;
+  }
+
   *,
   *::before,
   *::after {

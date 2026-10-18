@@ -5,14 +5,9 @@
  * secondary tools as closed sections. The fixture rail is a column of its own from 1180 px.
  */
 
-.page,
-.systemPage {
+.page {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
-}
-
-.page {
   gap: var(--space-5);
   min-width: 0;
 }
@@ -287,65 +282,6 @@
   .scoreCell dd {
     font-size: 16px;
     line-height: 18px;
-  }
-}
-
-/* ---- WHO block, in the sidebar (surface-2: labels are ink2, never ink3) ---- */
-
-.who {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 0 0 2px;
-}
-
-.whoLeague {
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: var(--step--2);
-  line-height: 16px;
-  overflow-wrap: anywhere;
-}
-
-.whoLink {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-  min-height: 36px;
-  margin: 0 calc(-1 * var(--space-2));
-  padding: 0 var(--space-2);
-  border-radius: var(--radius-s);
-  color: var(--color-text);
-  text-decoration: none;
-}
-
-.whoLink:hover {
-  background: var(--color-bg);
-}
-
-.whoText {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.whoTeam {
-  font-weight: 600;
-  line-height: 20px;
-  overflow-wrap: anywhere;
-}
-
-.whoManager {
-  color: var(--color-text-muted);
-  font-size: var(--step--2);
-  line-height: 16px;
-  overflow-wrap: anywhere;
-}
-
-@media (max-width: 1179.98px) {
-  .whoLink {
-    min-height: 48px;
   }
 }
 
@@ -668,7 +604,7 @@ section.notice p {
 
 .toolIcon {
   flex: none;
-  transition: transform 150ms ease;
+  transition: transform var(--motion-ui-fast) var(--motion-ease);
 }
 
 .tool[open] .toolIcon {
@@ -779,13 +715,6 @@ section.notice p {
   padding-left: 1.2rem;
   color: var(--color-text-muted);
   overflow-wrap: anywhere;
-}
-
-.back {
-  display: inline-block;
-  margin-bottom: var(--space-2);
-  font-size: var(--step--1);
-  font-weight: 600;
 }
 
 .muted {
@@ -969,25 +898,5 @@ section.notice p {
   .windowTable .pointsCell {
     grid-area: points;
     font-weight: 600;
-  }
-}
-
-.viewerClear {
-  border: none;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  text-decoration: underline;
-  cursor: pointer;
-  padding: 0;
-}
-
-/* The viewer's change and clear controls are touch targets under 1180 px. */
-@media (max-width: 1179.98px) {
-  .viewerAction,
-  .viewerClear {
-    display: inline-flex;
-    align-items: center;
-    min-height: 44px;
   }
 }

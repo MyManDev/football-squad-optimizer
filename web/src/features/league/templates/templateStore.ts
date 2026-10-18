@@ -5,7 +5,7 @@
  * vocabulary the site already computes — one per mode, at the one-week window —
  * and each carries the evidence label its mode already carries elsewhere; nothing
  * here invents a claim. A member's own templates are combinations they named
- * themselves, stored where the viewer claim is stored: in their browser.
+ * themselves, kept in their browser (localStorage).
  *
  * `TemplateStore` is the seam. Today's implementation is `localStorage`; the
  * authenticated future stores server-side behind the same interface, and the pages

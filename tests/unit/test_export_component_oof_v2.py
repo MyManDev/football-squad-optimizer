@@ -101,6 +101,8 @@ V2_MANIFEST_KEYS = (
     "development_note",
     "development_only",
     "development_scope",
+    "estimator",
+    "feature_contract",
     "rule_era",
     "weighting",
 )

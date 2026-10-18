@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 import { mockLeagueMembersEnvelope } from "../src/fixtures/league";
 import { MESSAGES } from "../src/i18n/messages";
+import { exampleMember, pickMember } from "./identity";
 import { installLeagueMocks } from "./leagueMocks";
 import { NO_LEAGUE, REMEMBERED_LEAGUE_KEY } from "./leagueState";
 
@@ -10,8 +11,9 @@ const LEAGUE = mockLeagueMembersEnvelope.payload.league_id;
 // The number connects only through a live publication; the fixture is served as one.
 const published = { ...mockLeagueMembersEnvelope, source_kind: "live" };
 
+/** The published league, and a visitor who has not yet said who they are. */
 async function servePublished(page: Page) {
-  await installLeagueMocks(page);
+  await installLeagueMocks(page, { claim: null });
   await page.route("**/data/league/members.json", (route) =>
     route.fulfill({ contentType: "application/json", body: JSON.stringify(published) }),
   );
@@ -23,6 +25,7 @@ test.describe("a first visit", () => {
 
   for (const language of ["tr", "en"] as const) {
     const entry = MESSAGES[language].leagueEntry;
+    const picker = MESSAGES[language].memberPicker;
 
     test(`a direct link from before the league number asks for the number first in ${language}`, async ({
       page,
@@ -43,9 +46,13 @@ test.describe("a first visit", () => {
       await page.getByLabel(entry.label).fill(String(LEAGUE));
       await page.getByRole("button", { name: entry.submit }).click();
 
-      // The member page opens where the visitor stood, now under the league's number, and
-      // the number is kept for next time.
+      // The address is rewritten under the league's number, and the visitor is asked who
+      // they are there; the number is kept for next time.
       const numbered = `/league/${LEAGUE}/members/${member.entry_id}`;
+      await expect(page.getByRole("heading", { level: 1, name: picker.title })).toBeVisible();
+      await expect(page).toHaveURL(numbered);
+      await pickMember(page, exampleMember(member.entry_id!), language);
+      // The member page opens where the visitor stood.
       await expect(page.getByRole("heading", { level: 1, name: member.team_name! })).toBeVisible();
       await expect(page).toHaveURL(numbered);
       expect(await page.evaluate((key) => localStorage.getItem(key), REMEMBERED_LEAGUE_KEY)).toBe(
@@ -58,7 +65,9 @@ test.describe("a first visit", () => {
       await expect(page.getByRole("heading", { name: entry.title })).toHaveCount(0);
     });
 
-    test(`a numbered member link opens without asking in ${language}`, async ({ page }) => {
+    test(`a numbered member link asks who you are, not for the number, in ${language}`, async ({
+      page,
+    }) => {
       await page.addInitScript(
         (value) => localStorage.setItem("squadopt.language", value),
         language,
@@ -66,9 +75,10 @@ test.describe("a first visit", () => {
       await servePublished(page);
       const address = `/league/${LEAGUE}/members/${member.entry_id}`;
       await page.goto(address);
-      await expect(page.getByRole("heading", { level: 1, name: member.team_name! })).toBeVisible();
+      await expect(page.getByRole("heading", { level: 1, name: picker.title })).toBeVisible();
       await expect(page).toHaveURL(address);
       await expect(page.getByRole("heading", { name: entry.title })).toHaveCount(0);
+      await expect(page.getByRole("heading", { level: 1, name: member.team_name! })).toHaveCount(0);
       // The league in the address is the one the visitor is in from here on.
       expect(await page.evaluate((key) => localStorage.getItem(key), REMEMBERED_LEAGUE_KEY)).toBe(
         String(LEAGUE),
@@ -112,6 +122,7 @@ test.describe("a return visit", () => {
   // The default browser state: the published league was opened by its number before.
   for (const language of ["tr", "en"] as const) {
     const entry = MESSAGES[language].leagueEntry;
+    const picker = MESSAGES[language].memberPicker;
 
     test(`an address from before the league number is rewritten to the remembered league's in ${language}`, async ({
       page,
@@ -122,15 +133,21 @@ test.describe("a return visit", () => {
       );
       await servePublished(page);
       await page.goto(`/league/members/${member.entry_id}?mode=saf-puan&window=3`);
-      await expect(page.getByRole("heading", { level: 1, name: member.team_name! })).toBeVisible();
-      await expect(page).toHaveURL(
-        `/league/${LEAGUE}/members/${member.entry_id}?mode=saf-puan&window=3`,
-      );
+      const numbered = `/league/${LEAGUE}/members/${member.entry_id}?mode=saf-puan&window=3`;
+      await expect(page.getByRole("heading", { level: 1, name: picker.title })).toBeVisible();
+      await expect(page).toHaveURL(numbered);
       await expect(page.getByRole("heading", { name: entry.title })).toHaveCount(0);
+      // Onayla keeps the address, its plan included.
+      await pickMember(page, exampleMember(member.entry_id!), language);
+      await expect(page.getByRole("heading", { level: 1, name: member.team_name! })).toBeVisible();
+      await expect(page).toHaveURL(numbered);
 
       await page.goto("/league/members");
       await expect(page).toHaveURL(`/league/${LEAGUE}/members`);
-      await expect(page.getByText(member.manager_name!)).toBeVisible();
+      // The members list, not the sidebar, which names the member too once claimed.
+      await expect(
+        page.getByRole("main").getByText(member.manager_name!, { exact: true }),
+      ).toBeVisible();
     });
   }
 });
