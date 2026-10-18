@@ -1,7 +1,6 @@
 import { Card } from "../../design/components/Card";
 import { EmptyState } from "../../design/components/EmptyState";
 import { useLanguage } from "../../i18n/context";
-import { local } from "../../lib/format";
 import { upcomingFixtureWeeks, useFixtures } from "./data";
 import { FIXTURES_COPY } from "./fixturesCopy";
 import { GameweekFixtures } from "./GameweekFixtures";
@@ -29,7 +28,6 @@ export function FixturesPage() {
           ? `${label} · ${messages.common.gameweek(entry.gameweek)}`
           : messages.common.gameweek(entry.gameweek)
       }
-      aside={copy.deadline(local(entry.deadline_utc, locale))}
     >
       <GameweekFixtures week={entry} locale={locale} copy={copy} />
     </Card>
@@ -54,10 +52,9 @@ export function FixturesPage() {
       ) : (
         <div className={styles.weeks}>{past.map((entry) => week(entry))}</div>
       )}
-      <p className={styles.lede}>
-        {copy.capturedAt(local(data.captured_at_utc, locale))}
-        {data.unscheduled_count > 0 ? ` ${copy.unscheduledCount(data.unscheduled_count)}` : null}
-      </p>
+      {data.unscheduled_count > 0 ? (
+        <p className={styles.lede}>{copy.unscheduledCount(data.unscheduled_count)}</p>
+      ) : null}
     </div>
   );
 }

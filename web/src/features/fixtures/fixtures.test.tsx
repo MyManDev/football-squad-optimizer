@@ -267,6 +267,47 @@ describe("the fixtures page", () => {
   });
 });
 
+describe("what the fixtures page leaves out", () => {
+  it.each(["tr", "en"] as const)(
+    "prints no capture time and no deadline on any week in %s",
+    async (language) => {
+      serve(published(payload()));
+      render(surface(<FixturesPage />, language, "/fixtures"));
+      await gameweekRegion(
+        `${FIXTURES_COPY[language].thisWeek} · ${MESSAGES[language].common.gameweek(3)}`,
+      );
+      const text = screen.getByTestId("surface").textContent ?? "";
+      expect(text).not.toMatch(/tarihli kayda göre|As recorded on|Son tarih|Deadline/);
+      // No week heading carries an aside of its own.
+      for (const heading of screen.getAllByRole("heading", { level: 2 }))
+        if (heading.closest("section")) expect(heading.parentElement!.children).toHaveLength(1);
+      expect(FIXTURES_COPY[language]).not.toHaveProperty("capturedAt");
+      expect(FIXTURES_COPY[language]).not.toHaveProperty("deadline");
+    },
+  );
+
+  it.each(["tr", "en"] as const)(
+    "states the postponed fixtures in a paragraph of their own in %s, and nothing when none",
+    async (language) => {
+      serve(published(payload()));
+      const first = render(surface(<FixturesPage />, language, "/fixtures"));
+      const note = await screen.findByText(FIXTURES_COPY[language].unscheduledCount(1));
+      expect(note.tagName).toBe("P");
+      expect(note.textContent).toBe(FIXTURES_COPY[language].unscheduledCount(1));
+      first.unmount();
+
+      serve(published({ ...payload(), unscheduled_count: 0 }));
+      render(surface(<FixturesPage />, language, "/fixtures"));
+      await gameweekRegion(
+        `${FIXTURES_COPY[language].thisWeek} · ${MESSAGES[language].common.gameweek(3)}`,
+      );
+      expect(screen.getByTestId("surface")).not.toHaveTextContent(
+        FIXTURES_COPY[language].unscheduledCount(1),
+      );
+    },
+  );
+});
+
 describe("the two club colours in a fixture list", () => {
   const week = shipped.payload.gameweeks[0]!;
 

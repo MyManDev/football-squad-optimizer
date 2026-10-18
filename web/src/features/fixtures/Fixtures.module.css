@@ -92,15 +92,3 @@
   align-items: start;
   gap: var(--space-5) var(--space-6);
 }
-
-/* Every week states its deadline the same way, under its heading, whatever its title's
-   length: side by side in one card and stacked in the next would read as two styles. */
-.weeks header {
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-}
-
-.weeks header > div {
-  text-align: left;
-}
