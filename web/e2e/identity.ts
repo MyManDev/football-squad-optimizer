@@ -93,13 +93,51 @@ export async function claimMember(page: Page, claim: SeededClaim): Promise<void>
   );
 }
 
-/** Says who you are through the picker: the member's radio, then Onayla. */
+/** A member as the picker names them: the manager, then the team. */
+export interface PickedMember {
+  managerName: string | null;
+  teamName: string | null;
+}
+
+/** The mocked example league's member with this entry number, as the picker names them. */
+export function exampleMember(entryId: number): PickedMember {
+  const member = mockLeagueMembersEnvelope.payload.members.find(
+    (candidate) => candidate.entry_id === entryId,
+  );
+  if (member === undefined) throw new Error(`The example league has no member ${entryId}.`);
+  return { managerName: member.manager_name, teamName: member.team_name };
+}
+
+/** A published member list's member with this entry number, as the picker names them. */
+export function publishedMember(membersPath: string, entryId: number): PickedMember {
+  const members = JSON.parse(readFileSync(membersPath, "utf-8")) as {
+    payload: {
+      members: { entry_id: number | null; manager_name: string | null; team_name: string | null }[];
+    };
+  };
+  const member = members.payload.members.find((candidate) => candidate.entry_id === entryId);
+  if (member === undefined) throw new Error(`${membersPath} lists no member ${entryId}.`);
+  return { managerName: member.manager_name, teamName: member.team_name };
+}
+
+const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/**
+ * Says who you are through the picker: the member's radio, found by the name a screen
+ * reader hears (the entry number is not in the markup), then Onayla.
+ */
 export async function pickMember(
   page: Page,
-  entryId: number,
+  member: PickedMember,
   language: Language = "tr",
 ): Promise<void> {
-  await page.locator(`input[type="radio"][name="member"][value="${entryId}"]`).check();
+  const list = MESSAGES[language].leagueMembers;
+  const manager = escapeRegExp(member.managerName ?? list.unknownMember);
+  const team = escapeRegExp(member.teamName ?? list.unknownTeam);
+  await page
+    .locator("[data-member-picker]")
+    .getByRole("radio", { name: new RegExp(`^${manager}\\s*,\\s*${team}$`) })
+    .check();
   await page
     .getByRole("button", { name: MESSAGES[language].memberPicker.confirm, exact: true })
     .click();

@@ -77,7 +77,15 @@ test("published league and member journey works without submitting a solve", asy
   const membersResponse = await page.request.get(`/data/${tree}/members.json`);
   expect(membersResponse.status()).toBe(200);
   const members = (await membersResponse.json()) as {
-    payload: { league_id: number; members: { member_kind: string; entry_id: number }[] };
+    payload: {
+      league_id: number;
+      members: {
+        member_kind: string;
+        entry_id: number;
+        manager_name: string | null;
+        team_name: string | null;
+      }[];
+    };
   };
   const member = members.payload.members.find((entry) => entry.member_kind === "human");
   expect(member, "a published human member is required").toBeDefined();
@@ -98,7 +106,7 @@ test("published league and member journey works without submitting a solve", asy
   // Every league page stands behind "Sen kimsin?": the visitor says they are this member
   // first. The navigation below loads the site again, so every document is read again.
   await page.goto(`/league/${league}/members`);
-  await pickMember(page, entryId, "en");
+  await pickMember(page, { managerName: member!.manager_name, teamName: member!.team_name }, "en");
   await expect(page.locator("[data-member-picker]")).toHaveCount(0);
   // Register before navigation; a fast table must not hide late document failures.
   const documentReads = [...pendingDocuments].map(async (path) => {

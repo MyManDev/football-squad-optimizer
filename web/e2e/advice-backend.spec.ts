@@ -6,7 +6,7 @@ import AxeBuilder from "@axe-core/playwright";
 import type { EntryAdvice, LeagueViewEnvelope } from "../src/features/league/types";
 import { COMPUTE_COPY } from "../src/features/league/advice/computeCopy";
 import { MESSAGES } from "../src/i18n/messages";
-import { pickMember } from "./identity";
+import { pickMember, publishedMember } from "./identity";
 
 const context = JSON.parse(process.env.SQUADOPT_BROWSER_CONTEXT ?? "null");
 
@@ -99,7 +99,7 @@ test("member selections compute, reload uses cache, and a stopped backend leaves
     (response) =>
       response.url() === `${context.apiOrigin}/api/v1/leagues/${context.leagueId}/capabilities`,
   );
-  await pickMember(page, context.entryId);
+  await pickMember(page, publishedMember(`${built}/league/members.json`, context.entryId));
   expect(await (await capabilities).json()).toMatchObject({
     contract_version: "league_capabilities_v1",
     capture_snapshot_id: context.snapshotId,

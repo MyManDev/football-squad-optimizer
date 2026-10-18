@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 import { mockLeagueMembersEnvelope } from "../src/fixtures/league";
 import { MESSAGES } from "../src/i18n/messages";
-import { EXAMPLE_CLAIM, pickMember } from "./identity";
+import { EXAMPLE_CLAIM, exampleMember, pickMember } from "./identity";
 import { installLeagueMocks } from "./leagueMocks";
 import { NO_LEAGUE, rememberedLeague } from "./leagueState";
 
@@ -140,6 +140,18 @@ test.describe("before the visitor says who they are", () => {
           ),
         ),
       );
+      // No member's entry number reaches the picker's markup either, in any attribute.
+      const attributes = await page
+        .locator("[data-member-picker]")
+        .evaluate((root) =>
+          [root, ...root.querySelectorAll("*")].flatMap((element) =>
+            [...element.attributes].map((attribute) => `${attribute.name}=${attribute.value}`),
+          ),
+        );
+      const numbers = humans.map((member) => String(member.entry_id));
+      expect(
+        attributes.filter((attribute) => numbers.some((number) => attribute.includes(number))),
+      ).toEqual([]);
     }
     const allowed = new Set([
       "/data/leagues.json",
@@ -235,7 +247,7 @@ test.describe("from the league number to the visitor's own page", () => {
         if (document.querySelector("main #league-member-list")) seen.table = true;
       }).observe(document.body, { childList: true, subtree: true });
     });
-    await pickMember(page, 35249002);
+    await pickMember(page, exampleMember(35249002));
     await expect(page).toHaveURL(own(35249002));
     const team = humans.find((member) => member.entry_id === 35249002)!.team_name!;
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(team);
@@ -262,7 +274,7 @@ test.describe("a deep link behind the step", () => {
     await expect(pickerHeading(page)).toBeVisible();
     // The shell's own wait for #kadro runs out while the picker is up.
     await page.waitForTimeout(6_000);
-    await pickMember(page, EXAMPLE_CLAIM.entryId);
+    await pickMember(page, EXAMPLE_CLAIM);
     await expect(page).toHaveURL(address);
     const team = humans.find((member) => member.entry_id === 35249003)!.team_name!;
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(team);
@@ -288,7 +300,7 @@ test.describe("how long the step holds", () => {
   test("a reload in the same tab keeps it, in this tab's storage only", async ({ page }) => {
     await installLeagueMocks(page, { claim: null });
     await page.goto(MEMBERS);
-    await pickMember(page, 35249002);
+    await pickMember(page, exampleMember(35249002));
     await expect(page.locator("#league-member-list")).toBeVisible();
     await page.reload();
     await expect(page.locator("#league-member-list")).toBeVisible();
@@ -305,7 +317,7 @@ test.describe("how long the step holds", () => {
   test("a new tab and a new visit ask again", async ({ page, browser, baseURL }) => {
     await installLeagueMocks(page, { claim: null });
     await page.goto(MEMBERS);
-    await pickMember(page, 35249002);
+    await pickMember(page, exampleMember(35249002));
     await expect(page.locator("#league-member-list")).toBeVisible();
 
     const tab = await page.context().newPage();
@@ -339,7 +351,7 @@ test.describe("Değiştir", () => {
     await expect(
       page.locator("#sidebar").getByRole("link", { name: TR.shell.findLeague, exact: true }),
     ).toBeVisible();
-    await pickMember(page, 35249004);
+    await pickMember(page, exampleMember(35249004));
     await expect(page).toHaveURL(own(35249004));
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(
       humans.find((member) => member.entry_id === 35249004)!.team_name!,
@@ -479,7 +491,7 @@ test.describe("the system's own pages behind the same two steps", () => {
       await page.getByRole("button", { name: TR.leagueEntry.submit, exact: true }).click();
       await expect(page).toHaveURL("/moves");
       await expect(pickerHeading(page)).toBeFocused();
-      await pickMember(page, 35249002);
+      await pickMember(page, exampleMember(35249002));
       await expect(page).toHaveURL("/moves");
       await expect(page.getByRole("heading", { level: 1 })).toHaveText(TR.moves.title);
     });

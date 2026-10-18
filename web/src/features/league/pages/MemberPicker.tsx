@@ -13,7 +13,8 @@ import styles from "./MemberPicker.module.css";
 /**
  * "Sen kimsin?": the league's members by name, one to pick, and Onayla under them. The
  * names are sorted by name, never in the file's order, which is the standings. Nothing
- * else of a member is shown here: no points, rank or value.
+ * else of a member is shown here: no points, rank or value. The entry number stays out
+ * of the markup too: the radios are controlled by state and carry no value attribute.
  *
  * A view only: the member gate decides when it shows and what Onayla does.
  */
@@ -87,7 +88,6 @@ export function MemberPicker({
                   type="radio"
                   className={styles.radio}
                   name="member"
-                  value={row.entryId}
                   checked={selected === row.entryId}
                   onChange={() => setSelected(row.entryId)}
                 />

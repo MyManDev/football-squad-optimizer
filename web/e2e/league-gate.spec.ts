@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 import { mockLeagueMembersEnvelope } from "../src/fixtures/league";
 import { MESSAGES } from "../src/i18n/messages";
-import { pickMember } from "./identity";
+import { exampleMember, pickMember } from "./identity";
 import { installLeagueMocks } from "./leagueMocks";
 import { NO_LEAGUE, REMEMBERED_LEAGUE_KEY } from "./leagueState";
 
@@ -51,7 +51,7 @@ test.describe("a first visit", () => {
       const numbered = `/league/${LEAGUE}/members/${member.entry_id}`;
       await expect(page.getByRole("heading", { level: 1, name: picker.title })).toBeVisible();
       await expect(page).toHaveURL(numbered);
-      await pickMember(page, member.entry_id!, language);
+      await pickMember(page, exampleMember(member.entry_id!), language);
       // The member page opens where the visitor stood.
       await expect(page.getByRole("heading", { level: 1, name: member.team_name! })).toBeVisible();
       await expect(page).toHaveURL(numbered);
@@ -138,7 +138,7 @@ test.describe("a return visit", () => {
       await expect(page).toHaveURL(numbered);
       await expect(page.getByRole("heading", { name: entry.title })).toHaveCount(0);
       // Onayla keeps the address, its plan included.
-      await pickMember(page, member.entry_id!, language);
+      await pickMember(page, exampleMember(member.entry_id!), language);
       await expect(page.getByRole("heading", { level: 1, name: member.team_name! })).toBeVisible();
       await expect(page).toHaveURL(numbered);
 

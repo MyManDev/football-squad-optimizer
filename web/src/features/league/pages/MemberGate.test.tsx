@@ -243,6 +243,9 @@ describe("what the picker shows of a member", () => {
         expect(tokens).not.toContain(String(value));
       }
     }
+    // Nor in the markup: no attribute (a radio's value among them) carries an entry number.
+    const markup = group.closest("[data-member-picker]")!.outerHTML;
+    for (const row of rows) expect(markup).not.toContain(String(row.entry_id));
   });
 
   it("starts a new league's list with nothing picked", async () => {
