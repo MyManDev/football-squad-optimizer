@@ -1,6 +1,7 @@
 import { expect, test, type Response } from "@playwright/test";
 import type { EntryAdvice, LeagueViewEnvelope } from "../src/features/league/types";
 import { MESSAGES } from "../src/i18n/messages";
+import { pickMember } from "./identity";
 import { figure } from "../src/lib/format";
 
 // Documents whose 404 is absence: the league directory on a site from before it, and the
@@ -94,6 +95,11 @@ test("published league and member journey works without submitting a solve", asy
       .filter((entry) => entry.member_kind === "human")
       .map((entry) => `/data/${tree}/history/${entry.entry_id}.json`),
   ]);
+  // Every league page stands behind "Sen kimsin?": the visitor says they are this member
+  // first. The navigation below loads the site again, so every document is read again.
+  await page.goto(`/league/${league}/members`);
+  await pickMember(page, entryId, "en");
+  await expect(page.locator("[data-member-picker]")).toHaveCount(0);
   // Register before navigation; a fast table must not hide late document failures.
   const documentReads = [...pendingDocuments].map(async (path) => {
     const response = await page.waitForResponse((item) => item.url() === `${origin}${path}`, {
@@ -124,12 +130,7 @@ test("published league and member journey works without submitting a solve", asy
   }
   await expect(page.locator("main h1")).toBeVisible();
   await expect(page.locator("main table").first()).toBeVisible();
-  await page.goto(`/league/${league}/members`);
-  await page
-    .getByRole("row")
-    .filter({ has: page.locator(`a[href="/league/${league}/members/${entryId}"]`) })
-    .getByRole("button", { name: MESSAGES.en.leagueMembers.viewerSelect })
-    .click();
+  await page.goto(`/league/${league}/members/${entryId}`);
   await expect(page).toHaveURL(new RegExp(`/league/${league}/members/${entryId}$`));
   const plan = page.locator('[aria-labelledby="entry-advice-title"]');
   await expect(plan).toBeVisible();

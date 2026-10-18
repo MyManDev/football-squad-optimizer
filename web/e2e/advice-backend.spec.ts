@@ -6,6 +6,7 @@ import AxeBuilder from "@axe-core/playwright";
 import type { EntryAdvice, LeagueViewEnvelope } from "../src/features/league/types";
 import { COMPUTE_COPY } from "../src/features/league/advice/computeCopy";
 import { MESSAGES } from "../src/i18n/messages";
+import { pickMember } from "./identity";
 
 const context = JSON.parse(process.env.SQUADOPT_BROWSER_CONTEXT ?? "null");
 
@@ -91,16 +92,14 @@ test("member selections compute, reload uses cache, and a stopped backend leaves
   await leagueField.fill(String(context.leagueId));
   await findLeague.click();
   await expect(page).toHaveURL("/league/352490/members");
-  // The member page asks the service what it computes, once, and says about how long.
+  // After the number, "Sen kimsin?"; the member page then asks the service what it
+  // computes, once, and says about how long.
+  await expect(page.getByRole("heading", { level: 1, name: "Sen kimsin?" })).toBeVisible();
   const capabilities = page.waitForResponse(
     (response) =>
       response.url() === `${context.apiOrigin}/api/v1/leagues/${context.leagueId}/capabilities`,
   );
-  await page
-    .getByRole("row")
-    .filter({ has: page.locator(`a[href="/league/352490/members/${context.entryId}"]`) })
-    .getByRole("button", { name: "Bu benim" })
-    .click();
+  await pickMember(page, context.entryId);
   expect(await (await capabilities).json()).toMatchObject({
     contract_version: "league_capabilities_v1",
     capture_snapshot_id: context.snapshotId,
@@ -120,8 +119,7 @@ test("member selections compute, reload uses cache, and a stopped backend leaves
     page.getByText("Bir haftalık planın hesabı birkaç saniye ile yarım dakika arasında sürer"),
   ).toBeVisible();
   await expect(page).toHaveURL(`/league/352490/members/${context.entryId}`);
-  expect(await page.evaluate(() => localStorage.getItem("squadopt.viewer"))).toBeNull();
-  await expect(page.getByRole("button", { name: "Seçimi Kaldır" })).toBeVisible();
+  await expect(page.locator("#sidebar").getByRole("button", { name: "Değiştir" })).toBeVisible();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Browser smoke team");
   await expect(page.getByRole("list", { name: "Pozisyona göre ilk on bir" })).toBeVisible();
   await expect(page.getByText("Listelenen öneri dosyası bulunamadı.")).toBeVisible();

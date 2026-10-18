@@ -13,7 +13,6 @@ const ROUTES = [
   "/league/352490",
   "/league/352490/members",
   "/league/352490/members/35249001?mode=saf-puan&window=3",
-  "/league/352490/members/squadopt",
   "/admin",
   "/status",
 ] as const;
@@ -116,7 +115,8 @@ function fixturesCalendar() {
 }
 
 // The site has one palette (direction D is light only), so every route is checked in it,
-// in both languages.
+// in both languages. The mocked visitor has said who they are, so the league and system
+// pages are drawn; the picker in front of them is checked on its own.
 for (const language of ["tr", "en"] as const) {
   test(`axe has no critical or serious violations in ${language}`, async ({ page }) => {
     test.setTimeout(60_000);
@@ -138,6 +138,22 @@ for (const language of ["tr", "en"] as const) {
       }
       expect(await blockingSummary(page), `${language} ${route}`).toEqual([]);
     }
+  });
+
+  test(`axe has no critical or serious violations on the member picker in ${language}`, async ({
+    page,
+  }) => {
+    await installLeagueMocks(page, { claim: null });
+    await page.addInitScript((selectedLanguage) => {
+      localStorage.setItem("squadopt.language", selectedLanguage);
+    }, language);
+    await page.goto("/league/352490/members");
+    await expect(
+      page.getByRole("group", { name: MESSAGES[language].memberPicker.legend }),
+    ).toBeVisible();
+    expect(await blockingSummary(page), `${language} picker`).toEqual([]);
+    await page.locator('input[name="member"]').first().check();
+    expect(await blockingSummary(page), `${language} picker with a name picked`).toEqual([]);
   });
 
   test(`axe has no critical or serious violations on /fixtures in ${language}`, async ({
@@ -216,12 +232,43 @@ test("skip link and the sidebar's controls take keyboard focus in order", async 
   await expect(skip).toHaveCSS("outline-style", "solid");
 
   // Then the sidebar, in the order it stands: its collapse button, the navigation and
-  // the language switch.
+  // the language switch. Before the visitor says who they are, the navigation is 'Ligini
+  // bul' and the open pages.
   const sidebar = page.locator("#sidebar");
   const navigation = page.getByRole("navigation");
   const order = [
     sidebar.getByRole("button", { name: "Kenar çubuğunu kapat" }),
+    navigation.getByRole("link", { name: "Ligini bul", exact: true }),
+    navigation.getByRole("link", { name: "Fikstür", exact: true }),
+    ...(process.env.VITE_ADVICE_API_ORIGIN
+      ? [navigation.getByRole("link", { name: "Katkıda bulun", exact: true })]
+      : []),
+    sidebar.getByRole("button", { name: /^TR/ }),
+    sidebar.getByRole("button", { name: /^EN/ }),
+  ];
+  for (const control of order) {
+    await page.keyboard.press("Tab");
+    await expect(control).toBeFocused();
+    await expect(control).toHaveCSS("outline-style", "solid");
+  }
+});
+
+test("once the visitor has said who they are, Değiştir comes before the league's links", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await installLeagueMocks(page);
+  await page.goto("/fixtures");
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("link", { name: "İçeriğe geç" })).toBeFocused();
+  const sidebar = page.locator("#sidebar");
+  const navigation = page.getByRole("navigation");
+  const order = [
+    sidebar.getByRole("button", { name: "Kenar çubuğunu kapat" }),
+    sidebar.getByRole("button", { name: "Değiştir" }),
     navigation.getByRole("link", { name: "Bu hafta", exact: true }),
+    navigation.getByRole("link", { name: "Kadro", exact: true }),
     navigation.getByRole("link", { name: "Lig", exact: true }),
     navigation.getByRole("link", { name: "Fikstür", exact: true }),
     ...(process.env.VITE_ADVICE_API_ORIGIN
@@ -235,10 +282,6 @@ test("skip link and the sidebar's controls take keyboard focus in order", async 
     await expect(control).toBeFocused();
     await expect(control).toHaveCSS("outline-style", "solid");
   }
-  await expect(navigation.getByRole("link", { name: "Bu hafta", exact: true })).toHaveAttribute(
-    "aria-current",
-    "page",
-  );
 });
 
 test("the phone menu is a modal drawer that keeps focus and gives it back", async ({ page }) => {
@@ -286,7 +329,7 @@ test("the tablet rail names every icon and opens the sidebar over the page", asy
   await page.setViewportSize({ width: 820, height: 1180 });
   await page.goto("/");
   const navigation = page.getByRole("navigation");
-  const names = ["Bu hafta", "Lig", "Fikstür"];
+  const names = ["Ligini bul", "Fikstür"];
   if (process.env.VITE_ADVICE_API_ORIGIN) {
     names.push("Katkıda bulun");
   } else {
@@ -337,7 +380,7 @@ test("the desktop sidebar collapses to the rail and stays so after a reload", as
   expect((await page.getByRole("main").boundingBox())!.x).toBeGreaterThanOrEqual(72);
   // The rail keeps every destination by name.
   await expect(
-    page.getByRole("navigation").getByRole("link", { name: "Lig", exact: true }),
+    page.getByRole("navigation").getByRole("link", { name: "Ligini bul", exact: true }),
   ).toBeVisible();
   expect(await page.evaluate(() => localStorage.getItem("squadopt.sidebar"))).toBe("collapsed");
   expect(await blockingViolations(page)).toEqual([]);
