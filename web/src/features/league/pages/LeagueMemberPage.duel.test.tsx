@@ -1,8 +1,9 @@
 /**
  * The duel on the member page (#1133): a closed tool until an address names a rival with
  * `?duel=`, which opens it; the page reads that rival's entry document of the same capture
- * and nothing else, an id outside the league's human members reads nothing, and a tap on
- * another rival changes the address in place.
+ * and nothing else, an id outside the league's human members reads nothing, a rival not in
+ * the publication is told apart from a failed read, and a tap on another rival changes the
+ * address in place.
  */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
@@ -83,10 +84,12 @@ describe("the duel tool on the member page", () => {
 });
 
 describe("the duel's read", () => {
-  function page(search: string) {
+  function page(search: string, broken: ReadonlyMap<number, Error> = new Map()) {
     const entrySquad = vi
       .fn<leagueData.LeagueTree["entrySquad"]>()
       .mockImplementation(async (id) => {
+        const failure = broken.get(id);
+        if (failure) throw failure;
         const squad = mockEntrySquadEnvelopes[id];
         if (!squad) throw new leagueData.LeagueDataMissing(`entries/${id}.json`);
         return squad;
@@ -115,6 +118,21 @@ describe("the duel's read", () => {
       expect(container.querySelector("[data-duel]")).toHaveAttribute("data-duel", "35249003"),
     );
     expect(entrySquad).toHaveBeenCalledWith(35249003);
+  });
+
+  it("says a rival whose document is not in the week's publication is not there", async () => {
+    page(
+      "?duel=35249003",
+      new Map([[35249003, new leagueData.LeagueDataMissing("entries/35249003.json")]]),
+    );
+    expect(await screen.findByText(COPY.duelMissing)).toBeInTheDocument();
+    expect(screen.queryByText(COPY.duelUnreadable)).toBeNull();
+  });
+
+  it("says a rival whose document could not be read could not be read", async () => {
+    page("?duel=35249003", new Map([[35249003, new Error("broken")]]));
+    expect(await screen.findByText(COPY.duelUnreadable)).toBeInTheDocument();
+    expect(screen.queryByText(COPY.duelMissing)).toBeNull();
   });
 
   it("reads no document for an id outside the league's human members", async () => {

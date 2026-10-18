@@ -125,13 +125,16 @@ describe("the duel of two elevens", () => {
     expect(onSelect).toHaveBeenCalledWith(35249003);
   });
 
-  it("says when the rival is being read, cannot be read, or is from another capture", () => {
+  it("says when the rival is being read, cannot be read, is not published or is from another capture", () => {
     const copy = MESSAGES.tr.leagueMembers;
     show({ rival: null, issue: "loading" });
     expect(screen.getByText(copy.duelLoading)).toBeInTheDocument();
     cleanup();
     show({ rival: null, issue: "unreadable" });
     expect(screen.getByText(copy.duelUnreadable)).toBeInTheDocument();
+    cleanup();
+    show({ rival: null, issue: "missing" });
+    expect(screen.getByText(copy.duelMissing)).toBeInTheDocument();
     cleanup();
     const { container } = show({
       rival: {

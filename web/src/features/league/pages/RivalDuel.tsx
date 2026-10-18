@@ -86,7 +86,7 @@ export function RivalDuel({
   candidates: EntryView[];
   selected: number | null;
   rival: LeagueViewEnvelope<EntrySquad> | null;
-  issue?: "loading" | "unreadable";
+  issue?: "loading" | "missing" | "unreadable";
   onSelect: (entryId: number) => void;
 }) {
   const { locale, messages } = useLanguage();
@@ -117,6 +117,8 @@ export function RivalDuel({
       </div>
       {selected === null ? null : issue === "loading" ? (
         <p className={styles.state}>{copy.duelLoading}</p>
+      ) : issue === "missing" ? (
+        <p className={styles.state}>{copy.duelMissing}</p>
       ) : issue === "unreadable" ? (
         <p className={styles.state}>{copy.duelUnreadable}</p>
       ) : !rival ? null : !duel ? (

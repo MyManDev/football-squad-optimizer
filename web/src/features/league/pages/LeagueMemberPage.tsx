@@ -103,7 +103,9 @@ export function LeagueMemberPage() {
         duelId === null
           ? undefined
           : duel.isError
-            ? "unreadable"
+            ? duel.error instanceof LeagueDataMissing
+              ? "missing"
+              : "unreadable"
             : duel.isPending
               ? "loading"
               : undefined
