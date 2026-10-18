@@ -144,7 +144,10 @@ test.describe("a return visit", () => {
 
       await page.goto("/league/members");
       await expect(page).toHaveURL(`/league/${LEAGUE}/members`);
-      await expect(page.getByText(member.manager_name!)).toBeVisible();
+      // The members list, not the sidebar, which names the member too once claimed.
+      await expect(
+        page.getByRole("main").getByText(member.manager_name!, { exact: true }),
+      ).toBeVisible();
     });
   }
 });
