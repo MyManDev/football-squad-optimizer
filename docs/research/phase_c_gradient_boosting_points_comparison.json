@@ -5055,5 +5055,6 @@
       },
       "solver_reading": "The candidate's 147 component solves all ended OPTIMAL under the 5.0 deterministic limit; the linear arm's ended 41 FEASIBLE and 106 OPTIMAL. Split by the linear arm's status, the paired difference is larger where the linear solve was proven optimal, so the asymmetry does not favour the candidate."
     }
-  }
+  },
+  "locked_holdout_accessed": true
 }
