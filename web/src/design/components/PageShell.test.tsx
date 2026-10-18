@@ -701,4 +701,77 @@ describe("the app shell on a tablet", () => {
     // A tablet never stores the desktop's collapse choice.
     expect(window.localStorage.getItem(SIDEBAR_STORAGE_KEY)).toBeNull();
   });
+
+  it("keeps the member and Değiştir in the rail, opening the sidebar on Değiştir", async () => {
+    stubLayout("tablet");
+    const onChangeMember = vi.fn();
+    const { user } = renderShell({ identity: CLAIMED, onChangeMember });
+    expect(sidebar()).toHaveAttribute("data-mode", "rail");
+    const icon = within(sidebar()).getByRole("button", { name: TR.changeMember });
+    expect(icon).toHaveAccessibleDescription(
+      "SquadOpt Classic League: Deniz Aral, North Stand Notes",
+    );
+    expect(icon).toHaveAttribute("aria-haspopup", "dialog");
+    expect(icon).toHaveAttribute("aria-expanded", "false");
+    // The icon stands over the navigation, as the block does.
+    expect(
+      icon.compareDocumentPosition(screen.getByRole("navigation")) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+
+    await user.click(icon);
+    const dialog = screen.getByRole("dialog", { name: TR.menu });
+    const change = within(dialog).getByRole("button", { name: TR.changeMember });
+    expect(change).toHaveFocus();
+    expect(within(dialog).getByText("Deniz Aral")).toBeInTheDocument();
+    expect(onChangeMember).not.toHaveBeenCalled();
+
+    // Closed without changing, focus comes back to the rail's icon.
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(within(sidebar()).getByRole("button", { name: TR.changeMember })).toHaveFocus();
+
+    await user.click(within(sidebar()).getByRole("button", { name: TR.changeMember }));
+    await user.click(
+      within(screen.getByRole("dialog", { name: TR.menu })).getByRole("button", {
+        name: TR.changeMember,
+      }),
+    );
+    expect(onChangeMember).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("has no identity icon in the rail before the member is claimed", () => {
+    stubLayout("tablet");
+    for (const identity of [NO_IDENTITY, CHOSEN]) {
+      const view = renderShell({ identity });
+      expect(within(sidebar()).queryByRole("button", { name: TR.changeMember })).toBeNull();
+      expect(document.getElementById("sidebar-member")).toBeNull();
+      view.unmount();
+    }
+  });
+});
+
+describe("the collapsed desktop rail with a member claimed", () => {
+  it("opens the sidebar from the identity icon with focus on Değiştir", async () => {
+    window.localStorage.setItem(SIDEBAR_STORAGE_KEY, "collapsed");
+    const { user } = renderShell({ identity: CLAIMED });
+    expect(sidebar()).toHaveAttribute("data-mode", "rail");
+    const icon = within(sidebar()).getByRole("button", { name: TR.changeMember });
+    expect(icon).toHaveAccessibleDescription(
+      "SquadOpt Classic League: Deniz Aral, North Stand Notes",
+    );
+    // On a desktop the sidebar folds in place; the icon opens no dialog.
+    expect(icon).not.toHaveAttribute("aria-haspopup");
+
+    await user.click(icon);
+    expect(sidebar()).toHaveAttribute("data-mode", "open");
+    expect(window.localStorage.getItem(SIDEBAR_STORAGE_KEY)).toBe("open");
+    const change = within(sidebar()).getByRole("button", { name: TR.changeMember });
+    expect(change).toHaveFocus();
+    expect(change).toHaveAccessibleDescription(
+      "SquadOpt Classic League: Deniz Aral, North Stand Notes",
+    );
+    expect(document.querySelectorAll("#sidebar-member")).toHaveLength(1);
+  });
 });

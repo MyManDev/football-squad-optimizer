@@ -365,6 +365,55 @@ test("the tablet rail names every icon and opens the sidebar over the page", asy
   await expect(drawer).toHaveCount(0);
 });
 
+test("the tablet rail keeps who you are and Değiştir, opening the sidebar on it", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 820, height: 1180 });
+  await installLeagueMocks(page);
+  await page.goto("/fixtures");
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  const sidebar = page.locator("#sidebar");
+  await expect(sidebar).toHaveAttribute("data-mode", "rail");
+  const icon = sidebar.getByRole("button", { name: "Değiştir", exact: true });
+  await expect(icon).toBeVisible();
+  await expect(icon).toHaveAccessibleDescription(/Deniz Aral/);
+  const box = (await icon.boundingBox())!;
+  expect(box.width).toBeGreaterThanOrEqual(44);
+  expect(box.height).toBeGreaterThanOrEqual(44);
+  expect(await blockingViolations(page)).toEqual([]);
+
+  await icon.focus();
+  await page.keyboard.press("Enter");
+  const drawer = page.getByRole("dialog", { name: "Menü" });
+  await expect(drawer).toBeVisible();
+  await expect(drawer.getByText("Deniz Aral")).toBeVisible();
+  await expect(drawer.getByRole("button", { name: "Değiştir", exact: true })).toBeFocused();
+  expect(await blockingViolations(page)).toEqual([]);
+  await page.keyboard.press("Escape");
+  await expect(drawer).toHaveCount(0);
+  await expect(sidebar.getByRole("button", { name: "Değiştir", exact: true })).toBeFocused();
+});
+
+test("the collapsed desktop rail opens the sidebar on Değiştir", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.addInitScript(() => localStorage.setItem("squadopt.sidebar", "collapsed"));
+  await installLeagueMocks(page);
+  await page.goto("/fixtures");
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  const sidebar = page.locator("#sidebar");
+  await expect(sidebar).toHaveAttribute("data-mode", "rail");
+  const icon = sidebar.getByRole("button", { name: "Değiştir", exact: true });
+  await expect(icon).toBeVisible();
+  await expect(icon).toHaveAccessibleDescription(/Deniz Aral/);
+  expect(await blockingViolations(page)).toEqual([]);
+
+  await icon.click();
+  await expect(sidebar).toHaveAttribute("data-mode", "open");
+  expect((await sidebar.boundingBox())!.width).toBe(264);
+  await expect(sidebar.getByText("Deniz Aral")).toBeVisible();
+  await expect(sidebar.getByRole("button", { name: "Değiştir", exact: true })).toBeFocused();
+});
+
 test("the desktop sidebar collapses to the rail and stays so after a reload", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/");

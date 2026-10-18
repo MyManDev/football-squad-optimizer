@@ -19,6 +19,7 @@ import {
   CloseIcon,
   MenuIcon,
   NavIcon,
+  PersonIcon,
   PlanIcon,
 } from "../shell/icons";
 import { useShellLayout } from "../shell/layout";
@@ -101,7 +102,9 @@ function useScrollToHash(hash: string, key: string) {
  * `identity` is the league the visitor entered and the member they said they are in it,
  * handed in by the app (design/ reads nothing of the league feature). It decides the
  * navigation, and with a member it draws the identity block: the league, the member and
- * Değiştir, which calls `onChangeMember`, the one way to say you are someone else.
+ * Değiştir, which calls `onChangeMember`, the one way to say you are someone else. The
+ * rail, too narrow for the block, shows it as one icon (as it shows the plan) that opens
+ * the sidebar with focus on Değiştir.
  */
 export function PageShell({
   children,
@@ -185,21 +188,29 @@ export function PageShell({
     };
   }, [overlay, closeOverlays]);
 
-  // Opening moves focus to the drawer's close button; closing returns it to the opener,
-  // unless a step taken in the drawer (Değiştir) has already put focus on the page.
+  // Opening moves focus to the drawer's close button, or to Değiştir when the rail's
+  // identity icon opened it; closing returns it to the opener, unless a step taken in the
+  // drawer (Değiştir) has already put focus on the page.
   const mainRef = useRef<HTMLElement>(null);
   const toggleRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLButtonElement>(null);
+  const whoChangeRef = useRef<HTMLButtonElement>(null);
+  const whoRailRef = useRef<HTMLButtonElement>(null);
   const returnFocus = useRef<HTMLElement | null>(null);
   const wasOverlay = useRef(false);
+  // The rail's identity icon opened the drawer. The icon itself is gone while the drawer
+  // is open, so focus returns to the one drawn again when it closes.
+  const openedFromWho = useRef(false);
   useEffect(() => {
     if (overlay && !wasOverlay.current) {
       returnFocus.current =
         document.activeElement instanceof HTMLElement ? document.activeElement : null;
-      if (drawerOpen) toggleRef.current?.focus();
+      if (drawerOpen)
+        ((openedFromWho.current ? whoChangeRef.current : null) ?? toggleRef.current)?.focus();
     } else if (!overlay && wasOverlay.current) {
-      const opener = returnFocus.current;
+      const opener = openedFromWho.current ? whoRailRef.current : returnFocus.current;
       returnFocus.current = null;
+      openedFromWho.current = false;
       const active = document.activeElement;
       const onPage = active instanceof Node && (mainRef.current?.contains(active) ?? false);
       if (onPage) {
@@ -210,14 +221,18 @@ export function PageShell({
     wasOverlay.current = overlay;
   }, [overlay, drawerOpen, layout]);
 
-  // The rail's plan button opens the sidebar and, on a desktop, puts focus in the plan.
-  const focusPlan = useRef(false);
+  // A rail button opens the sidebar on a desktop and puts focus in what it stands for:
+  // the plan's chosen setting, or Değiştir.
+  const focusAfterExpand = useRef<"plan" | "who" | null>(null);
   useEffect(() => {
-    if (!focusPlan.current || collapsed) return;
-    focusPlan.current = false;
+    const goal = focusAfterExpand.current;
+    if (goal === null || collapsed) return;
+    focusAfterExpand.current = null;
     const target =
-      planSlot?.querySelector<HTMLElement>("input:checked:not([disabled])") ??
-      planSlot?.querySelector<HTMLElement>(FOCUSABLE);
+      goal === "who"
+        ? whoChangeRef.current
+        : (planSlot?.querySelector<HTMLElement>("input:checked:not([disabled])") ??
+          planSlot?.querySelector<HTMLElement>(FOCUSABLE));
     (target ?? toggleRef.current)?.focus();
   }, [collapsed, planSlot]);
 
@@ -231,9 +246,18 @@ export function PageShell({
   };
   const openPlan = () => {
     if (layout === "desktop") {
-      focusPlan.current = true;
+      focusAfterExpand.current = "plan";
       setDesktopCollapsed(false);
     } else setDrawerOpen(true);
+  };
+  const openWho = () => {
+    if (layout === "desktop") {
+      focusAfterExpand.current = "who";
+      setDesktopCollapsed(false);
+    } else {
+      openedFromWho.current = true;
+      setDrawerOpen(true);
+    }
   };
   const closeDrawer = () => setDrawerOpen(false);
 
@@ -323,6 +347,22 @@ export function PageShell({
     ) : (
       <ChevronIcon direction={mode === "open" ? "left" : "right"} />
     );
+  // One line to a screen reader: "league: name, team". The spaces stand between the
+  // lines, where the block's column does not draw them.
+  const memberLine =
+    own === null ? null : (
+      <>
+        <span className={styles.whoLeague}>{own.league}</span>
+        <span className="visually-hidden">:</span>{" "}
+        <span className={styles.whoName}>{own.name}</span>
+        {own.team !== null ? (
+          <>
+            <span className="visually-hidden">,</span>{" "}
+            <span className={styles.whoTeam}>{own.team}</span>
+          </>
+        ) : null}
+      </>
+    );
   const fixturesFace = (
     <span className={styles.phoneFixturesFace}>
       <CalendarIcon />
@@ -410,22 +450,13 @@ export function PageShell({
               </button>
             </div>
             <div className={styles.body}>
-              {own !== null ? (
+              {own !== null && !rail ? (
                 <div className={styles.who}>
-                  {/* One line to a screen reader: "league: name, team". The spaces stand
-                      between the lines, where the column does not draw them. */}
                   <p className={styles.whoText} id="sidebar-member">
-                    <span className={styles.whoLeague}>{own.league}</span>
-                    <span className="visually-hidden">:</span>{" "}
-                    <span className={styles.whoName}>{own.name}</span>
-                    {own.team !== null ? (
-                      <>
-                        <span className="visually-hidden">,</span>{" "}
-                        <span className={styles.whoTeam}>{own.team}</span>
-                      </>
-                    ) : null}
+                    {memberLine}
                   </p>
                   <button
+                    ref={whoChangeRef}
                     type="button"
                     className={styles.whoChange}
                     aria-describedby="sidebar-member"
@@ -433,6 +464,27 @@ export function PageShell({
                   >
                     {copy.changeMember}
                   </button>
+                </div>
+              ) : null}
+              {own !== null && rail ? (
+                <div className={styles.whoRail}>
+                  <button
+                    ref={whoRailRef}
+                    type="button"
+                    className={styles.railButton}
+                    aria-label={copy.changeMember}
+                    aria-describedby="sidebar-member"
+                    aria-controls="sidebar"
+                    aria-expanded={false}
+                    aria-haspopup={layout === "desktop" ? undefined : "dialog"}
+                    onClick={openWho}
+                  >
+                    <PersonIcon />
+                  </button>
+                  {/* The same line the block shows, read with the icon and in reading order. */}
+                  <p className="visually-hidden" id="sidebar-member">
+                    {memberLine}
+                  </p>
                 </div>
               ) : null}
               <nav aria-label={copy.primary} className={styles.nav}>

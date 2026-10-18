@@ -416,9 +416,18 @@
   padding: 0;
 }
 
-.sidebar[data-mode="rail"] .who,
+/* The plan slot stays mounted for the page that fills it; the rail shows its icon instead.
+   The identity block is drawn as its own icon there (.whoRail), so it is not hidden here. */
 .sidebar[data-mode="rail"] .plan {
   display: none;
+}
+
+/* The identity block's face in the rail: one 44 px icon over the navigation, ruled off
+   from it as the block is. */
+.whoRail {
+  flex: none;
+  padding-bottom: var(--space-1);
+  border-bottom: 1px solid var(--color-line);
 }
 
 .sidebar[data-mode="rail"] .nav {

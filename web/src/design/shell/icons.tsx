@@ -121,6 +121,23 @@ export function CloseIcon() {
   );
 }
 
+/** A head and shoulders: who the visitor said they are. */
+export function PersonIcon() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 18 18"
+      aria-hidden="true"
+      focusable="false"
+      {...STROKE}
+    >
+      <circle cx="9" cy="6" r="3" />
+      <path d="M3 15.5c.8-3 3.2-4.5 6-4.5s5.2 1.5 6 4.5" />
+    </svg>
+  );
+}
+
 /** Two sliders: the plan's settings. */
 export function PlanIcon() {
   return (
