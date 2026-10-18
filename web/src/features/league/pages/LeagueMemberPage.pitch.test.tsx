@@ -437,6 +437,21 @@ describe("the fixture rail", () => {
       expect(
         within(rows[0]!).getAllByRole("cell")[1]!.querySelector("[data-venue]"),
       ).toHaveAttribute("data-venue", "away");
+      // Every opponent in a week cell carries its two colours before its code; a blank week
+      // has no club to colour.
+      const played = [
+        ...aside.querySelectorAll<HTMLElement>('[data-venue="home"], [data-venue="away"]'),
+      ];
+      expect(played.length).toBeGreaterThan(0);
+      for (const fixture of played) {
+        const [mark, code] = [...fixture.children] as HTMLElement[];
+        const colours = CLUB_COLOURS[code!.textContent!]!;
+        expect(mark).toHaveAttribute("aria-hidden", "true");
+        expect(mark!.textContent).toBe("");
+        expect(mark!.style.getPropertyValue("--club-primary")).toBe(colours.primary);
+        expect(mark!.style.getPropertyValue("--club-secondary")).toBe(colours.secondary);
+      }
+      expect(aside.querySelectorAll('[data-venue="none"] [aria-hidden="true"]')).toHaveLength(0);
       // Block C: players of the eleven who face each other that week, home side first.
       const meet = within(aside).getByRole("region", { name: copy.railMeet(GW) });
       expect(
