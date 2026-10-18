@@ -17,33 +17,24 @@ Record of the measurement declared in [phase_c_gradient_boosting_points_method.m
 
 Lower is better in every column. The appearance and minutes estimators are the control's, so those columns agree to rounding; only the conditional points estimator differs. Pooled points MAE 1.07155 to 1.07141.
 
-## Decision-level reading (declared with the rule)
+## Decision-level reading (declared with the rule; it re-computes the pre-declaration probe)
 
-The candidate was exported at the same commit for the frozen decision seasons 2021-22 to 2024-25 and run through the repository's decision comparison (`scripts.evaluate_phase_c_components --development-contract phase_c_component_oof_development_v2`): 147 folds, squads solved from the arm's expected points and scored under the official autosub and captain rules, against the frozen ridge control on the same folds. The linear components' row is the reading recorded beside the gradient-boosting comparison.
+The candidate was exported at the same commit, `7118ebd9`, for the frozen decision seasons 2021-22 to 2024-25 and run through the repository's decision comparison (`scripts.evaluate_phase_c_components --development-contract phase_c_component_oof_development_v2`, at commit `b344b9ca`): 147 folds, squads solved from the arm's expected points and scored under the official autosub and captain rules, against the frozen ridge control on the same folds. The linear components' row is the reading recorded beside the gradient-boosting comparison, exported at commit `69f18b0c` and scored at the same evaluation commit.
 
-| arm | mean realized squad points | against the ridge control | wins / ties / losses | zero-minute starters | autosub points |
-| --- | --- | --- | --- | --- | --- |
-| linear components | 63.4150 | +4.8912 | 83 / 8 / 56 | 83 | 230 |
-| linear appearance and minutes, boosted points | 63.8844 | +5.3605 | 85 / 2 / 60 | 108 | 401 |
+| arm | mean realized squad points | against the ridge control | wins / ties / losses | zero-minute starters | autosub points | solves proven optimal |
+| --- | --- | --- | --- | --- | --- | --- |
+| linear components | 63.4150 | +4.8912 | 83 / 8 / 56 | 83 | 230 | 106 of 147 |
+| linear appearance and minutes, boosted points | 63.8844 | +5.3605 | 85 / 2 / 60 | 108 | 401 | 147 of 147 |
 
 Paired on the same folds, candidate minus linear: mean +0.4694 points a gameweek, median +0.0, 90% season-aware moving-block interval [-1.190, +2.218], wins / ties / losses 73 / 6 / 68; by season 2021-22 -0.757, 2022-23 +1.667, 2023-24 +2.892, 2024-25 -1.892.
 
+**Added after the result, descriptive, 2026-10-18, computed at commit `193e6895` from the same decision artifacts and the probe's; it changes no number above.** This reading is a re-computation, not an independent confirmation. The fitted arm reproduces the recomposition probe the declaration quotes exactly: its expected points equal the probe table's on all 101,447 rows (largest absolute difference 0.0 in every expectation column), so the solver read the same inputs, and its realized squad points equal the probe's on 147 of 147 folds. Its outcome was known before the declaration was written. The interval differs from the declaration's [-1.18, +2.23] only through the bootstrap seed, which is derived from the candidate id: under the probe's id the same fold values give [-1.177, +2.231].
+
+Also added after the result, on the same terms: the two decision tables were exported at different commits (`69f18b0c` and `7118ebd9`); their appearance and minutes columns are equal on every row (largest absolute difference 0.0). The solves are not: 41 of the linear arm's 147 component solves stopped at the 5.0 deterministic limit without a proof of optimality (FEASIBLE), against none of the candidate's. Split by the linear arm's status, candidate minus linear is +0.783 on the 106 folds where the linear solve was proven optimal (54 / 5 / 47) and -0.341 on the 41 where it was not (19 / 1 / 21), so the asymmetry does not favour the candidate.
+
 ## What this says
 
-The rule does not prefer the candidate: with the control's appearance and minutes kept, the
-boosted conditional points estimator raises the 2025-26 points MAE slightly (1.00578 to
-1.00787, interval below zero) and leaves 2024-25 across zero. Read with the earlier records,
-this places the boosted pair's points-MAE gain in its appearance estimator, not in its points
-estimator: a sharper appearance probability shrinks uncertain players toward the zero that
-most realized points are, which the error metric rewards and the solver does not. The
-decision-level reading goes the other way, as the recomposition probe said it would: this
-arm's squads score the most realized points of any component arm measured (+5.36 a gameweek
-against the ridge control, +0.47 against the linear components), with the interval across
-zero, 73 wins to 68 losses, two seasons up and two down. The two readings disagree, neither
-is separated from zero, and the declaration's pin condition (rule preferred and a non-negative
-decision mean) is not met. The linear control stays in place; the record stands as the
-finding that the points-MAE rule and realized squad points can move in opposite directions
-on the same arm.
+The rule does not prefer the candidate: with the control's appearance and minutes kept, the boosted conditional points estimator raises the 2025-26 points MAE slightly (1.00578 to 1.00787, interval below zero, so that reading is separated from zero against the candidate) and leaves 2024-25 across zero. Read with the earlier records, this suggests that the boosted pair's points-MAE gain came from its appearance estimator rather than its points estimator. One possible mechanism, not measured here, is that a sharper appearance probability pulls uncertain players toward the zero that most realized points are, which the error metric rewards. The decision-level reading goes the other way: this arm's squads score the most realized points of any component arm measured (+5.36 a gameweek against the ridge control, +0.47 against the linear components), with the interval across zero, 73 wins to 68 losses, two seasons up and two down. That reading re-computes the recomposition probe the declaration quotes, so it repeats that probe rather than confirming it. The two readings disagree: the points-MAE reading is separated from zero against the candidate on 2025-26 and crosses zero on 2024-25, and the decision-level reading is not separated from zero. The declaration's pin condition (rule preferred and a non-negative decision mean) is not met. The linear control stays in place; the record stands as the finding that the points-MAE rule and realized squad points can move in opposite directions on the same arm.
 
-- One paired measurement at each level: the same rows, features, targets, routes, folds and cutoffs; only the conditional points estimator differs.
+- One paired measurement at the player level: the same rows, features, targets, routes, folds and cutoffs; only the conditional points estimator differs. At the decision level the appearance and minutes columns are equal too and only the conditional points differ, but the linear arm's solves were proven optimal on 106 of 147 folds and the candidate's on all 147.
 - The availability rule, the elite-evidence path and the experimental football arm are untouched by this measurement.

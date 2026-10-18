@@ -4586,7 +4586,7 @@
     }
   },
   "decision_level_reading": {
-    "scope": "decision-level reading declared with the rule; the candidate exported at the same commit for the frozen decision seasons 2021-22 to 2024-25 and scored by scripts.evaluate_phase_c_components with --development-contract (147 folds, the ridge control of the frozen evaluation on the same folds); the linear components' reading is the one recorded beside the gradient-boosting comparison",
+    "scope": "decision-level reading declared with the rule; the candidate exported at commit 7118ebd9, the commit of the five-season arms, for the frozen decision seasons 2021-22 to 2024-25 and scored by scripts.evaluate_phase_c_components at commit b344b9ca with --development-contract (147 folds, the ridge control of the frozen evaluation on the same folds); the linear components' reading is the one recorded beside the gradient-boosting comparison, exported at commit 69f18b0c and scored at the same evaluation commit",
     "paired_folds": 147,
     "candidate_minus_linear_mean": 0.46938775510204084,
     "candidate_minus_linear_median": 0.0,
@@ -4609,7 +4609,19 @@
       "linear": {
         "source_table_sha256": "d88270536fe7b762e7627d482955885656f10b08a631ea7c05b0a95564a2fe09",
         "model_version": "phase_c_control_components_v1",
-        "repository_commit": null,
+        "repository_commit": "69f18b0c8da8167174a3d5379753c2e9cc203cad",
+        "manifest_sha256": "57c2b9ab82cf84eadc5cfc7f437a8aff2dcb73a6fa68dc784bee78c771c1e7ef",
+        "roster_sha256": "3ef0c5717fa63c3c4772512f019cd750d3fae6cd9a7567d20dd4bfa24003678e",
+        "evaluation_repository_commit": "b344b9ca7ee160409c20cd143f6bd1d85d23c40d",
+        "evaluation_working_tree_dirty": false,
+        "component_solver_status_counts": {
+          "FEASIBLE": 41,
+          "OPTIMAL": 106
+        },
+        "ridge_control_solver_status_counts": {
+          "FEASIBLE": 30,
+          "OPTIMAL": 117
+        },
         "ridge_control_mean": 58.523809523809526,
         "component_mean": 63.414965986394556,
         "diagnostics": {
@@ -4786,7 +4798,18 @@
       "gradient_boosting_points": {
         "source_table_sha256": "5b496e6145867b199bce715401278685c90eee7146714a6aac1b06c842cdd269",
         "model_version": "phase_c_control_components_gbm_points_v1",
-        "repository_commit": null,
+        "repository_commit": "7118ebd94c352aed6a61282ca930063130bbc529",
+        "manifest_sha256": "5cbc11640e1cc96d615a934ac49af27746d3c2cf5ce21f38e4fede60fe10f17b",
+        "roster_sha256": "3ef0c5717fa63c3c4772512f019cd750d3fae6cd9a7567d20dd4bfa24003678e",
+        "evaluation_repository_commit": "b344b9ca7ee160409c20cd143f6bd1d85d23c40d",
+        "evaluation_working_tree_dirty": false,
+        "component_solver_status_counts": {
+          "OPTIMAL": 147
+        },
+        "ridge_control_solver_status_counts": {
+          "FEASIBLE": 30,
+          "OPTIMAL": 117
+        },
         "ridge_control_mean": 58.523809523809526,
         "component_mean": 63.8843537414966,
         "diagnostics": {
@@ -4967,6 +4990,70 @@
       "decision_interval_above_zero": false,
       "pin_proposed": false
     },
-    "note": "The points-MAE rule did not prefer the candidate (2025-26 interval below zero) while its squads scored the most realized points of any component arm measured, with an interval across zero. The pin condition of the declaration is not met; no pin is proposed. The boosted pair's points-MAE gain sits in its appearance estimator, the realized-points gain in the boosted points estimator; neither is separated."
+    "note": "The points-MAE rule did not prefer the candidate: its 2025-26 interval lies below zero, separated from zero against the candidate, and its 2024-25 interval crosses zero. Its squads scored the most realized points of any component arm measured, with a paired interval across zero that is not separated from zero. That decision-level reading re-computes the pre-declaration recomposition probe exactly (the same expected points on every row, the same realized score on every fold), so it is not an independent confirmation. The pin condition of the declaration is not met; no pin is proposed.",
+    "added_after_the_result": {
+      "label": "added after the result, descriptive, 2026-10-18, computed at commit 193e6895cddd3cba83223e430d27c74d0cc492d3 from the same decision artifacts and the pre-declaration probe's artifacts; promotes nothing and changes no number of the measurement",
+      "probe_reproduction": {
+        "probe": "the recomposition probe quoted in the declaration: the linear decision table with its conditional points taken from the boosted pair's table, scored by scripts.evaluate_phase_c_components before the declaration was written",
+        "probe_source_table_sha256": "ac28edbe1a066bd20637bc8fc6ebd28fa5406deac48be5a62989ffc7a36282aa",
+        "probe_source_model_version": "phase_c_control_components_v1",
+        "probe_generated_at_utc": "2026-10-17T12:11:22+00:00",
+        "rows_compared": 101447,
+        "largest_absolute_difference_fitted_minus_probe": {
+          "appearance_probability": 0.0,
+          "expected_minutes_if_appearance": 0.0,
+          "raw_expected_points_if_appearance": 0.0,
+          "expected_points_if_appearance": 0.0,
+          "control_expected_points": 0.0
+        },
+        "folds_with_the_same_realized_score": 147,
+        "folds_compared": 147,
+        "same_decision_diagnostics": true,
+        "interval_90_under_the_probe_candidate_id": [
+          -1.1768707482993197,
+          2.2312925170068025
+        ],
+        "probe_candidate_id": "linear appearance, boosted points",
+        "interval_90_under_the_record_candidate_id": [
+          -1.1904761904761905,
+          2.2180272108843546
+        ],
+        "record_candidate_id": "phase_c_gbm_points_vs_linear_decisions",
+        "declared_probe_interval_as_quoted": [
+          -1.18,
+          2.23
+        ],
+        "reading": "The fitted arm reproduces the probe exactly: the same expected points on every row, so the solver read the same inputs, and the same realized squad points on every fold. The decision-level number is a re-computation of a result known before the declaration, not an independent confirmation of it. Its interval differs from the declaration's only through the bootstrap seed, which is derived from the candidate id."
+      },
+      "decision_tables_pairing": {
+        "rows_compared": 101447,
+        "largest_absolute_difference_candidate_minus_linear": {
+          "appearance_probability": 0.0,
+          "expected_minutes_if_appearance": 0.0
+        },
+        "reading": "The candidate's and the linear arm's decision tables were exported at different commits; their appearance and minutes columns are equal on every row, so the two tables differ in the conditional points alone."
+      },
+      "by_linear_solver_status": {
+        "FEASIBLE": {
+          "folds": 41,
+          "candidate_minus_linear_mean": -0.34146341463414637,
+          "wins_ties_losses": [
+            19,
+            1,
+            21
+          ]
+        },
+        "OPTIMAL": {
+          "folds": 106,
+          "candidate_minus_linear_mean": 0.7830188679245284,
+          "wins_ties_losses": [
+            54,
+            5,
+            47
+          ]
+        }
+      },
+      "solver_reading": "The candidate's 147 component solves all ended OPTIMAL under the 5.0 deterministic limit; the linear arm's ended 41 FEASIBLE and 106 OPTIMAL. Split by the linear arm's status, the paired difference is larger where the linear solve was proven optimal, so the asymmetry does not favour the candidate."
+    }
   }
 }
