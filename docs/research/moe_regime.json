@@ -2,6 +2,7 @@
   "line": "moe_regime",
   "repository_commit": "1ec7ae2059ca0bc521bedb2233ff3cc2034c01fc",
   "declaration": "docs/research/moe_regime_prereg.md",
+  "gate_inputs_note": "Added 2026-10-18, after the result, at commit 1367d4bc1. The declaration describes the gate's inputs as the eight v1 feature columns plus the three regime terms. The v1 feature contract has nine columns (arm_manifests feature_columns), and the gate read all nine plus the three regime terms, twelve inputs. The declaration is left as written.",
   "development_only": true,
   "locked_holdout_read_as_development_data": true,
   "locked_holdout_note": "Both arms read 2025-26 under the Phase C v2 development scope as declared; it is development evidence, not an unseen final test, and the locked holdout was not spent.",
@@ -21,7 +22,8 @@
     "python -m scripts.export_component_oof --development-scope v2 --season-weighting equal --estimator regime --output-dir <dir>",
     "python -m scripts.compare_component_oof_development --artifact-dir <dir> --candidate-arm regime",
     "python -m scripts.export_component_oof --development-scope v2 --season-weighting equal --estimator regime --seasons 2021-22,2022-23,2023-24,2024-25 --output-dir <decision dir>",
-    "python -m scripts.evaluate_phase_c_components --table <decision dir>/<table>.csv --manifest ... --roster ... --producer-environment ... --development-contract phase_c_component_oof_development_v2 --json-output <decision dir>/decision.json"
+    "at commit b344b9ca7 (squashed into develop as #1137): python -m scripts.evaluate_phase_c_components --table <decision dir>/<table>.csv --manifest ... --roster ... --producer-environment ... --development-contract phase_c_component_oof_development_v2 --json-output <decision dir>/decision.json",
+    "the decision interval: squadopt.evaluation.statistics.season_aware_moving_block_interval over decision_level_reading.interval_inputs with decision_level_reading.interval_candidate_id"
   ],
   "gate_clauses": {
     "R1": {
@@ -4653,6 +4655,7 @@
   },
   "decision_level_reading": {
     "scope": "decision-level reading declared with the rule; the candidate exported at the same commit for the frozen decision seasons 2021-22 to 2024-25 and scored by scripts.evaluate_phase_c_components with --development-contract (147 folds, the ridge control of the frozen evaluation on the same folds); the linear components' reading is the one recorded beside the gradient-boosting comparison",
+    "decision_scorer_note": "scripts.evaluate_phase_c_components with --development-contract is the admission of a development handoff to the frozen decision comparison, commit b344b9ca7 on branch feat/component-decision-development-arm, which was not merged and not on this branch when the arm ran (the flag does not exist at 1ec7ae20 or at the record commit); the scorer ran from that commit's checkout on this branch's exported table, as the earlier gradient-boosting records did, and both arms' decision files carry repository_commit b344b9ca7. It has since been squashed into develop as #1137 (1079ba64c).",
     "paired_folds": 147,
     "candidate_minus_linear_mean": 0.54421768707483,
     "candidate_minus_linear_median": 0.0,
@@ -4660,6 +4663,9 @@
       -0.6261904761904766,
       1.6666666666666667
     ],
+    "interval_candidate_id": "decision_regime_gated_vs_linear",
+    "interval_inputs": "the 147 paired differences arms.regime.folds minus arms.linear.folds in ascending fold_id order, each paired with its season (the fold_id's first seven characters), under PromotionPolicy(confidence_level=0.90, bootstrap_resamples=5000, moving_block_length=4, deterministic_seed=0); the bootstrap seed is deterministic_seed plus the first eight hex digits of sha256(interval_candidate_id)",
+    "interval_reproduction_note": "Added 2026-10-18, after the result, at commit 1367d4bc1. The first record did not carry the candidate_id that seeds this interval's bootstrap. decision_regime_gated_vs_linear reproduces the recorded interval exactly from interval_inputs, and so does phase_c_regime_gated_experts_vs_linear, so which id the first computation used cannot be told apart; the recorded interval is unchanged. Under the comparison's own candidate_id phase_c_v2_regime_vs_linear the same inputs give [-0.673469387755102, 1.687414965986396]. Both intervals cross zero, and D1 reads the mean only.",
     "wins_ties_losses": [
       39,
       86,
@@ -5031,11 +5037,104 @@
     }
   },
   "expert_availability": {
-    "note": "first fold at which each regime had at least 200 complete rows and 200 appeared rows strictly before it, read from the exported control table; a diagnostic, not a gate",
+    "added_after_the_result": "2026-10-18, after the result, at commit 1367d4bc1",
+    "note": "first walk-forward fold whose regime fit held each expert: every one of the 184 folds refitted from the archive with fit_component_models (estimator regime) and read with regime_expert_summary; every fold's training key digest equals the exported manifest's and the refused folds agree (2021-22-gw02 only). Descriptive, not a gate.",
     "first_fold_with_expert": {
-      "single_pre_defcon": "2021-22-gw04",
-      "double_pre_defcon": "2021-22-gw27",
-      "single_defcon": "2025-26-gw03"
+      "single_pre_defcon": {
+        "fold": "2021-22-gw03",
+        "appearance_rows": 554,
+        "conditional_rows": 274
+      },
+      "double_pre_defcon": {
+        "fold": "2021-22-gw27",
+        "appearance_rows": 632,
+        "conditional_rows": 289
+      },
+      "single_defcon": {
+        "fold": "2025-26-gw03",
+        "appearance_rows": 690,
+        "conditional_rows": 306
+      }
+    },
+    "never_fitted": [
+      "double_defcon"
+    ],
+    "never_fitted_note": "double_defcon never reached the minimum rows: before the last fold 2025-26 had 408 feature-complete double-gameweek rows (gameweeks 26, 33 and 36, counted from the exported table), of which 171 appeared, below the 200 conditional rows an expert needs. The 2025-26 double-gameweek rows were therefore scored by the present experts with the gate's mass on double_defcon renormalized over them",
+    "lowest_own_expert_gate_weight": {
+      "value": 0.9993871085285286,
+      "fold": "2021-22-gw31",
+      "folds_with_a_gate": 163,
+      "note": "the smallest gate weight on a scored row's own regime expert, over the feature-complete non-blank scored rows of every fold whose fit had a gate, where the row's regime had an expert"
+    },
+    "first_record_proxy": {
+      "note": "the first record read availability from the exported control table (first fold with at least 200 complete rows and 200 appeared rows of the regime strictly before it). That proxy cannot see the refused fold's rows: 2021-22-gw02 exported all its rows on the direct_control route, although 554 of them were the feature-complete training rows of the 2021-22-gw03 fit, so it put single_pre_defcon one fold late",
+      "first_fold_with_expert": {
+        "single_pre_defcon": "2021-22-gw04",
+        "double_pre_defcon": "2021-22-gw27",
+        "single_defcon": "2025-26-gw03"
+      }
+    }
+  },
+  "points_mae_by_season_and_fixture_group": {
+    "added_after_the_result": "2026-10-18, after the result, at commit 1367d4bc1",
+    "note": "points MAE by fixture group and season over exactly the rows the comparison's points metric scores (scripts.compare_component_oof_development._scored_points), read from the two exported tables; the pooled values equal the recorded by_fixture_group metrics. Descriptive, not a gate.",
+    "control_table_sha256": "13330e61737698cd2a20a19418f891b6a96618d47064b2cc386c3ea614b8f882",
+    "candidate_table_sha256": "0a4bdd53239db7bd755eaf187e40821dbee55df5ea970610478d56611fcc8181",
+    "groups": {
+      "double_plus": {
+        "2021-22": {
+          "rows": 2198,
+          "control_points_mae": 1.9419332465618742,
+          "candidate_points_mae": 1.8441461842766151
+        },
+        "2022-23": {
+          "rows": 1532,
+          "control_points_mae": 1.8011144664960836,
+          "candidate_points_mae": 1.7160288534079633
+        },
+        "2023-24": {
+          "rows": 973,
+          "control_points_mae": 1.6841357665765673,
+          "candidate_points_mae": 1.5735271642641315
+        },
+        "2024-25": {
+          "rows": 362,
+          "control_points_mae": 2.0183713074005523,
+          "candidate_points_mae": 1.9171745175994475
+        },
+        "2025-26": {
+          "rows": 408,
+          "control_points_mae": 1.6520326156862744,
+          "candidate_points_mae": 1.5200340215196078
+        }
+      },
+      "single": {
+        "2021-22": {
+          "rows": 19741,
+          "control_points_mae": 1.1795825907514816,
+          "candidate_points_mae": 1.1806748888215897
+        },
+        "2022-23": {
+          "rows": 22647,
+          "control_points_mae": 1.071052767683181,
+          "candidate_points_mae": 1.0750934967637655
+        },
+        "2023-24": {
+          "rows": 26904,
+          "control_points_mae": 0.972568258064154,
+          "candidate_points_mae": 0.9770575521820176
+        },
+        "2024-25": {
+          "rows": 25773,
+          "control_points_mae": 1.011282831936445,
+          "candidate_points_mae": 1.0143138477181548
+        },
+        "2025-26": {
+          "rows": 28089,
+          "control_points_mae": 0.9963964291472106,
+          "candidate_points_mae": 1.0106344228504398
+        }
+      }
     }
   }
 }
