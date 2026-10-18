@@ -15,6 +15,18 @@ publishes, tags, deploys or restarts anything.
   powershell -ExecutionPolicy Bypass -File scripts\weekly_run.ps1 -Kind friday
   powershell -ExecutionPolicy Bypass -File scripts\weekly_run.ps1 -Kind tuesday -DryRun
   powershell -ExecutionPolicy Bypass -File scripts\weekly_run.ps1 -Kind friday -Gameweek 8
+  powershell -ExecutionPolicy Bypass -File scripts\weekly_run.ps1 -Kind friday -ClubNewsSettings C:\private\club-news.settings.toml
+
+With -ClubNewsSettings (or the SQUADOPT_CLUB_NEWS_SETTINGS environment variable) the script
+first acquires the week's club news (scripts.capture_club_news, which fetches the registered
+club pages and codes them with the model named in that private file) from the newest capture's
+roster, and passes the new capture to the weekly command as --rotation-capture, so the
+manager's word rides on real news instead of the committed fixture. -ClubNews does the same
+with no file, from the shell's own SQUADOPT_LLM_PROVIDER, SQUADOPT_LLM_API_KEY and optional
+SQUADOPT_LLM_MODEL (set them in the window that runs this script; the script never prints
+them). A capture that produces no id is a refusal: the run does not fall back to the fixture
+silently, because a published week without the word is exactly what the option exists to
+prevent.
 
 The exit code is the weekly command's (0 when the run completed and the site pull request
 is open), 2 for a refusal before anything ran. A Tuesday run is the next gameweek's run
@@ -28,6 +40,8 @@ param(
     [string]$RepoRoot = '',
     [int]$Workers = 15,
     [int]$Gameweek = 0,
+    [string]$ClubNewsSettings = '',
+    [switch]$ClubNews,
     [switch]$DryRun
 )
 Set-StrictMode -Version 2.0
@@ -59,21 +73,41 @@ function Weekly-Suffix([string]$kind, [datetime]$now) {
     return ('{0}-{1}' -f $kind, $now.ToUniversalTime().ToString('yyyyMMdd'))
 }
 
-function Build-WeeklyArguments([string]$season, [int]$gameweek, [int]$workers, [string]$runId, [string]$suffix) {
-    # The cadence's arguments, as the 10 and 14 October publishes ran them.
-    return @(
+function Build-WeeklyArguments([string]$season, [int]$gameweek, [int]$workers, [string]$runId, [string]$suffix, [string]$rotationCapture = '') {
+    # The cadence's arguments, as the 10 and 14 October publishes ran them; a club-news
+    # capture, when one was acquired, is what the rotation stage reads instead of the fixture.
+    $arguments = @(
         '-m', 'squadopt.platform.weekly_operations',
         '--season', $season,
         '--gameweek', [string]$gameweek,
         '--league-list', 'config/leagues.json',
         '--workers', [string]$workers,
         '--projection', 'component-only',
-        '--rotation',
+        '--rotation'
+    )
+    if ($rotationCapture) { $arguments += @('--rotation-capture', $rotationCapture) }
+    $arguments += @(
         '--record-advice',
         '--publish',
         '--publish-suffix', $suffix,
         '--run-id', $runId
     )
+    return $arguments
+}
+
+function Latest-Capture([string]$repo) {
+    # The newest fpl-live capture on disk supplies the roster the club-news acquisition reads.
+    $captures = @(Get-ChildItem -LiteralPath (Join-Path $repo 'data\snapshots') -Directory -Filter 'fpl-live-*' | Sort-Object Name)
+    if ($captures.Count -eq 0) { throw "No fpl-live capture under data\snapshots to read a roster from." }
+    return $captures[-1].Name
+}
+
+function Captured-NewsId([string[]]$lines) {
+    # scripts.capture_club_news prints "Capture       club-news-<stamp>-<hash>" once it has written the week.
+    foreach ($line in $lines) {
+        if ($line -match '^Capture\s+(club-news-\S+)') { return $Matches[1] }
+    }
+    return ''
 }
 
 function Suggested-Tag([string]$kind, [string]$season, [int]$gameweek, [string[]]$existingTags) {
@@ -124,11 +158,33 @@ try {
 }
 $runId = Weekly-RunId $Kind $season $Gameweek $now
 $suffix = Weekly-Suffix $Kind $now
-$arguments = Build-WeeklyArguments $season $Gameweek $Workers $runId $suffix
 $python = Join-Path $RepoRoot '.venv\Scripts\python.exe'
 $logDirectory = Join-Path $RepoRoot 'data\logs\weekly'
 New-Item -ItemType Directory -Force -Path $logDirectory | Out-Null
 $log = Join-Path $logDirectory ($runId + '.log')
+if (-not $ClubNewsSettings -and $env:SQUADOPT_CLUB_NEWS_SETTINGS) { $ClubNewsSettings = $env:SQUADOPT_CLUB_NEWS_SETTINGS }
+$rotationCapture = ''
+if ($ClubNewsSettings -or $ClubNews) {
+    if ($ClubNewsSettings -and -not (Test-Path -LiteralPath $ClubNewsSettings)) { Write-Output "Refused: club-news settings file not found at $ClubNewsSettings."; exit 2 }
+    if (-not $ClubNewsSettings -and -not ($env:SQUADOPT_LLM_PROVIDER -and $env:SQUADOPT_LLM_API_KEY)) {
+        Write-Output 'Refused: -ClubNews needs SQUADOPT_LLM_PROVIDER and SQUADOPT_LLM_API_KEY in this window (never printed, never committed).'; exit 2
+    }
+    if (-not $DryRun) {
+        $roster = Latest-Capture $RepoRoot
+        Write-Output ("club news: acquiring from the roster of {0}" -f $roster)
+        $env:PYTHONPATH = (Join-Path $RepoRoot 'src') + ';' + $RepoRoot
+        $newsArguments = @('-m', 'scripts.capture_club_news', '--roster-snapshot', $roster)
+        if ($ClubNewsSettings) { $newsArguments += @('--settings-file', $ClubNewsSettings) }
+        $newsLines = @(& $python @newsArguments 2>&1 | ForEach-Object { [string]$_ })
+        $newsLines | Add-Content -LiteralPath $log
+        $rotationCapture = Captured-NewsId $newsLines
+        if (-not $rotationCapture) { Write-Output 'Refused: the club-news acquisition produced no capture id; read the log, fix the cause, and run again.'; Write-Output ("log: {0}" -f $log); exit 2 }
+        Write-Output ("club news: capture {0}" -f $rotationCapture)
+    } else {
+        $rotationCapture = '<club-news capture>'
+    }
+}
+$arguments = Build-WeeklyArguments $season $Gameweek $Workers $runId $suffix $rotationCapture
 $tags = @(& git -C $RepoRoot ls-remote --tags origin ('site-{0}-gw*' -f $season) | ForEach-Object { ($_ -split '\s+')[1] -replace '^refs/tags/', '' } | Where-Object { $_ -notmatch '\^\{\}$' })
 $tag = Suggested-Tag $Kind $season $Gameweek $tags
 
@@ -160,5 +216,9 @@ Write-Output ''
 Write-Output 'Next, a person: once the site pull request is merged through the queue, read the accepted'
 Write-Output 'stamp (data/leagues.json generated_at_utc in the preview) and release from Git Bash:'
 Write-Output ("  sh scripts/release/ship.sh {0} {1} release/{2} <accepted generated-at ISO> '<summary>'{3}" -f $number, $tag, ($tag -replace '^site-[0-9]{4}-[0-9]{2}-', ''), $settledArgument)
-Write-Output 'Then move the VM to the release: bash scripts/vm_push.sh ' + $tag
+Write-Output ('Then move the VM to the release: bash scripts/vm_push.sh ' + $tag)
+if ($rotationCapture) {
+    Write-Output ("The manager's word rode on club-news capture {0}; the football bundle must be sealed with it:" -f $rotationCapture)
+    Write-Output ('  python -m scripts.prepare_football_bundle ... --news-capture-id ' + $rotationCapture + ' --rotation-table artifacts\rotation\<the rotation_evidence_v4 table this run wrote>')
+}
 exit 0

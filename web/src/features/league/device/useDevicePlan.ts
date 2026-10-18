@@ -9,8 +9,9 @@
  * document the page already reads. A new selection starts clean, and a reset or a new
  * selection stops a solve still running: its worker is ended, not left computing an
  * answer nobody will read. A worker that does not answer within the solve's ceiling, and
- * a grace beyond it, is ended too and the run fails. Each run leaves User Timing marks and
- * measures of its stages (`DeviceTimeline`); the device spec prints the measures.
+ * a grace beyond it, is ended too and the run fails. That watchdog counts only the time the
+ * page is visible, not the time a hidden tab spends suspended. Each run leaves User Timing
+ * marks and measures of its stages (`DeviceTimeline`); the device spec prints the measures.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -84,6 +85,17 @@ export interface DevicePlanDependencies {
   clearTimer?: (handle: unknown) => void;
   /** Where a run leaves its marks and measures, for tests; the page's own otherwise. */
   timeline?: DeviceTimeline;
+  /** Whether the page is hidden, for tests; the page's own otherwise. */
+  visibility?: PageVisibility;
+  /** The watchdog's clock in milliseconds, for tests; the page's own otherwise. */
+  clock?: () => number;
+}
+
+/** Whether the page is hidden, and a way to hear each time it is hidden or shown. */
+export interface PageVisibility {
+  hidden(): boolean;
+  /** Calls `changed` on each change, until the function it returns is called. */
+  listen(changed: () => void): () => void;
 }
 
 /**
@@ -107,6 +119,21 @@ function startTimer(callback: () => void, milliseconds: number): unknown {
 
 function stopTimer(handle: unknown): void {
   clearTimeout(handle as ReturnType<typeof setTimeout>);
+}
+
+// The page's own visibility; where there is no document, a page is never hidden.
+const pageVisibility: PageVisibility = {
+  hidden: () => globalThis.document?.visibilityState === "hidden",
+  listen(changed) {
+    const page = globalThis.document;
+    if (!page) return () => {};
+    page.addEventListener("visibilitychange", changed);
+    return () => page.removeEventListener("visibilitychange", changed);
+  },
+};
+
+function pageClock(): number {
+  return performance.now();
 }
 
 // The page's own User Timing; a browser without it keeps no marks.
@@ -141,6 +168,54 @@ function runTimeline(timeline: DeviceTimeline) {
   };
 }
 
+/** A watchdog set for a span of the page's visible time, until it is stopped. */
+interface Watchdog {
+  /** Sets the span to `milliseconds`, in place of what was left of the last one. */
+  set(milliseconds: number): void;
+  /** Clears the timer and stops listening to the page. */
+  stop(): void;
+}
+
+/**
+ * A watchdog that counts only the time the page is visible. Hidden, its timer is cleared
+ * and what is left of the span is kept; shown again, the timer is set for what was left.
+ * It listens to the page from its first set until it is stopped.
+ */
+function visibleWatchdog(
+  expire: () => void,
+  page: Required<Pick<DevicePlanDependencies, "setTimer" | "clearTimer" | "visibility" | "clock">>,
+): Watchdog {
+  let left = 0;
+  let since = 0;
+  let timer: { handle: unknown } | null = null;
+  let stopListening: (() => void) | null = null;
+  const pause = () => {
+    if (timer === null) return;
+    page.clearTimer(timer.handle);
+    timer = null;
+    left -= page.clock() - since;
+  };
+  const resume = () => {
+    if (timer !== null || page.visibility.hidden()) return;
+    since = page.clock();
+    timer = { handle: page.setTimer(expire, left) };
+  };
+  const changed = () => (page.visibility.hidden() ? pause() : resume());
+  return {
+    set(milliseconds) {
+      pause();
+      left = milliseconds;
+      stopListening ??= page.visibility.listen(changed);
+      resume();
+    },
+    stop() {
+      pause();
+      stopListening?.();
+      stopListening = null;
+    },
+  };
+}
+
 function createWorker(): DeviceSolver {
   // The worker's file name is part of what the browser caches; renaming it changes its URL.
   return new Worker(new URL("./deviceSolver.worker.ts", import.meta.url), {
@@ -172,6 +247,8 @@ export function useDevicePlan(
     setTimer = startTimer,
     clearTimer = stopTimer,
     timeline = pageTimeline,
+    visibility = pageVisibility,
+    clock = pageClock,
   } = dependencies;
   const entry: DevicePlanEntry | null = isDevicePlanEntry(squad.device_plan)
     ? squad.device_plan
@@ -189,7 +266,7 @@ export function useDevicePlan(
   // The run a worker is solving now: how to end its wait, and its watchdog.
   const pending = useRef<{
     settle: (reply: DevicePlanReply | null) => void;
-    timer: unknown;
+    watchdog: Watchdog;
   } | null>(null);
   // The run still loading or solving, by its generation. A run asked for meanwhile starts
   // nothing: it reads no inputs and posts no message. A reset or a new selection moves the
@@ -221,11 +298,11 @@ export function useDevicePlan(
     const running = pending.current;
     if (running === null) return;
     pending.current = null;
-    clearTimer(running.timer);
+    running.watchdog.stop();
     solver.current?.terminate();
     solver.current = null;
     running.settle(null);
-  }, [clearTimer]);
+  }, []);
 
   const reset = useCallback(() => {
     generation.current += 1;
@@ -333,32 +410,31 @@ export function useDevicePlan(
       let ready = false;
       const reply = await new Promise<DevicePlanReply | null>((resolve) => {
         // A worker that never answers is ended: the load gets its allowance, and the
-        // solves their ceiling, each with a grace beyond it.
+        // solves their ceiling, each with a grace beyond it, counted while the page is visible.
+        const watchdog = visibleWatchdog(
+          () => {
+            if (pending.current?.settle === settle) stopSolving();
+          },
+          { setTimer, clearTimer, visibility, clock },
+        );
         const watch = (seconds: number) =>
-          setTimer(
-            () => {
-              if (pending.current?.settle === settle) stopSolving();
-            },
-            (seconds + DEVICE_REPLY_GRACE_SECONDS) * 1000,
-          );
+          watchdog.set((seconds + DEVICE_REPLY_GRACE_SECONDS) * 1000);
         const settle = (value: DevicePlanReply | null) => {
           if (pending.current?.settle === settle) {
-            clearTimer(pending.current.timer);
+            pending.current.watchdog.stop();
             pending.current = null;
           }
           resolve(value);
         };
-        pending.current = { settle, timer: watch(DEVICE_LOAD_ALLOWANCE_SECONDS) };
+        pending.current = { settle, watchdog };
+        watch(DEVICE_LOAD_ALLOWANCE_SECONDS);
         worker.onmessage = (event) => {
           if (event.data.id !== run) return;
           if (event.data.kind === "ready") {
             ready = true;
             timing.mark("ready");
             timing.measure("load", "posted", "ready");
-            if (pending.current?.settle === settle) {
-              clearTimer(pending.current.timer);
-              pending.current.timer = watch(DEVICE_SOLVE_CEILING_SECONDS);
-            }
+            if (pending.current?.settle === settle) watch(DEVICE_SOLVE_CEILING_SECONDS);
             if (alive()) setState({ phase: "solving" });
             return;
           }
@@ -420,6 +496,8 @@ export function useDevicePlan(
     setTimer,
     clearTimer,
     timeline,
+    visibility,
+    clock,
     stopSolving,
     tree.league.leagueId,
   ]);

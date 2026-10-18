@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-10-15T14:15:28Z",
+  "generated_at_utc": "2026-10-16T07:13:49Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,36 +9,36 @@
     "league_id": 352490,
     "mode": "fark-yarat",
     "window": 5,
-    "source_snapshot_id": "fpl-live-20261015T130038Z-7a7a388a3a43",
+    "source_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd",
     "moves": [
       {
         "move_id": "gw07-1",
         "player_out": {
-          "player_id": 466075,
-          "name": "Riccardo Calafiori",
-          "short_name": "Calafiori",
-          "position": "DEF",
-          "team": "Arsenal"
+          "player_id": 424876,
+          "name": "Dominik Szoboszlai",
+          "short_name": "Szoboszlai",
+          "position": "MID",
+          "team": "Liverpool"
         },
         "player_in": {
-          "player_id": 17761,
-          "name": "James Tarkowski",
-          "short_name": "Tarkowski",
-          "position": "DEF",
-          "team": "Everton"
+          "player_id": 243413,
+          "name": "Regan Slater",
+          "short_name": "Slater",
+          "position": "MID",
+          "team": "Hull City"
         },
-        "expected_points_delta": 0.8723272031930804,
+        "expected_points_delta": 0.0,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 0.8723272031930804,
+    "expected_gain_vs_hold": 0.0,
     "expected_points_cost": 0.0,
     "rival_label": "entry-7252721",
-    "solver_status": "FEASIBLE",
-    "optimality_gap": 1.8629999999999995,
+    "solver_status": "OPTIMAL",
+    "optimality_gap": 0.0,
     "wall_clock_stopped_the_search": false,
-    "expected_own_points": 56.31875704396049,
+    "expected_own_points": 55.44642984076741,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
@@ -65,14 +65,6 @@
         "expected_points": 3.568590651677484
       },
       {
-        "player_id": 17761,
-        "name": "James Tarkowski",
-        "short_name": "Tarkowski",
-        "position": "DEF",
-        "team": "Everton",
-        "expected_points": 4.323742971600514
-      },
-      {
         "player_id": 209036,
         "name": "Marc Gu\u00e9hi",
         "short_name": "Gu\u00e9hi",
@@ -87,6 +79,14 @@
         "position": "DEF",
         "team": "Brighton",
         "expected_points": 3.7099911306959767
+      },
+      {
+        "player_id": 466075,
+        "name": "Riccardo Calafiori",
+        "short_name": "Calafiori",
+        "position": "DEF",
+        "team": "Arsenal",
+        "expected_points": 3.45141576840743
       },
       {
         "player_id": 244851,
@@ -163,26 +163,78 @@
         "expected_points": 2.4955901164532333
       },
       {
+        "player_id": 243413,
+        "name": "Regan Slater",
+        "short_name": "Slater",
+        "position": "MID",
+        "team": "Hull City",
+        "expected_points": 2.2246718293712173
+      },
+      {
         "player_id": 219924,
         "name": "Issa Diop",
         "short_name": "Diop",
         "position": "DEF",
         "team": "Ipswich Town",
         "expected_points": 2.1748575911872456
-      },
-      {
-        "player_id": 424876,
-        "name": "Dominik Szoboszlai",
-        "short_name": "Szoboszlai",
-        "position": "MID",
-        "team": "Liverpool",
-        "expected_points": 1.9203981798052088
       }
     ],
     "chip": null,
     "plan_weeks": [
       {
         "gameweek": 7,
+        "transfers_in": [
+          {
+            "player_id": 243413,
+            "name": "Regan Slater",
+            "short_name": "Slater",
+            "position": "MID",
+            "team": "Hull City"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 424876,
+            "name": "Dominik Szoboszlai",
+            "short_name": "Szoboszlai",
+            "position": "MID",
+            "team": "Liverpool"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 3,
+        "free_transfers_after": 3,
+        "expected_points": 55.44642984076741
+      },
+      {
+        "gameweek": 8,
+        "transfers_in": [
+          {
+            "player_id": 437730,
+            "name": "Antoine Semenyo",
+            "short_name": "Semenyo",
+            "position": "MID",
+            "team": "Man City"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 440993,
+            "name": "Iliman Ndiaye",
+            "short_name": "Ndiaye",
+            "position": "MID",
+            "team": "Man City"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 3,
+        "free_transfers_after": 3,
+        "expected_points": 57.65303944141169
+      },
+      {
+        "gameweek": 9,
         "transfers_in": [
           {
             "player_id": 17761,
@@ -205,59 +257,7 @@
         "chip": null,
         "free_transfers_before": 3,
         "free_transfers_after": 3,
-        "expected_points": 56.31875704396049
-      },
-      {
-        "gameweek": 8,
-        "transfers_in": [
-          {
-            "player_id": 154043,
-            "name": "Ainsley Maitland-Niles",
-            "short_name": "Maitland-Niles",
-            "position": "DEF",
-            "team": "Everton"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 209036,
-            "name": "Marc Gu\u00e9hi",
-            "short_name": "Gu\u00e9hi",
-            "position": "DEF",
-            "team": "Man City"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 3,
-        "free_transfers_after": 3,
-        "expected_points": 56.27619266790754
-      },
-      {
-        "gameweek": 9,
-        "transfers_in": [
-          {
-            "player_id": 437730,
-            "name": "Antoine Semenyo",
-            "short_name": "Semenyo",
-            "position": "MID",
-            "team": "Man City"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 424876,
-            "name": "Dominik Szoboszlai",
-            "short_name": "Szoboszlai",
-            "position": "MID",
-            "team": "Liverpool"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 3,
-        "free_transfers_after": 3,
-        "expected_points": 58.482802268551836
+        "expected_points": 58.52536664460479
       },
       {
         "gameweek": 10,
@@ -283,33 +283,33 @@
         "chip": null,
         "free_transfers_before": 3,
         "free_transfers_after": 3,
-        "expected_points": 58.849052787744554
+        "expected_points": 58.891617163797505
       },
       {
         "gameweek": 11,
         "transfers_in": [
           {
-            "player_id": 481283,
-            "name": "James Wright",
-            "short_name": "Wright",
-            "position": "GK",
-            "team": "Aston Villa"
+            "player_id": 154043,
+            "name": "Ainsley Maitland-Niles",
+            "short_name": "Maitland-Niles",
+            "position": "DEF",
+            "team": "Everton"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 112520,
-            "name": "Alex Palmer",
-            "short_name": "Palmer",
-            "position": "GK",
-            "team": "Ipswich Town"
+            "player_id": 199798,
+            "name": "Ezri Konsa Ngoyo",
+            "short_name": "Ngoyo",
+            "position": "DEF",
+            "team": "Arsenal"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 3,
         "free_transfers_after": 3,
-        "expected_points": 58.849052787744554
+        "expected_points": 59.023866202951154
       }
     ],
     "stated_limits": [
@@ -324,8 +324,9 @@
     "data_quality": "complete",
     "missing_fields": [],
     "squad_basis": "captured",
-    "control_solver_status": "FEASIBLE",
-    "control_optimality_gap": 1.8629999999999995,
+    "expected_points_cost_ceiling": 0.0,
+    "control_solver_status": "OPTIMAL",
+    "control_optimality_gap": 0.0,
     "rival_entry_id": 7252721,
     "overlap_count": 5,
     "transfer_cap": 1,
@@ -333,7 +334,7 @@
     "overlap_applied": 5,
     "plan_kind": "within_free_transfers",
     "alternative_plan": null,
-    "expected_gap_vs_rival": -0.5746794049588715,
+    "expected_gap_vs_rival": -1.447006608151952,
     "captain_agreement": true
   }
 }

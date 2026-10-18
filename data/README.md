@@ -19,13 +19,13 @@ backup of this folder.
 | Folder | Holds | Written by |
 | --- | --- | --- |
 | `raw/` | The historical archive (`raw/vaastav-fpl`), downloaded as `sources/` describes | The operator |
-| `snapshots/` | Immutable, checksummed captures of the live game | The capture |
+| `snapshots/` | Immutable, checksummed captures of the live game, and by default the club news captures, each holding the fetched documents and the model answers | The capture and the club news acquisition |
 | `ledger/` | The season ledger of our own decisions and their outcomes | The decide and settle steps |
 | `handoffs/` | Projection handoffs, retained by capture and content | The handoff stage |
 | `entries/` | The private entry registry of each league's members | `scripts/seed_entry_registry.py` |
 | `advice_records/` | The immutable record of what each member was told | The publish stage |
 | `benchmark_v2_captures/` | Private prospective benchmark captures and binding claims | The benchmark stages |
-| `runtime/`, `logs/` | Run manifests, the weekly run journals and previews, and structured logs | The installed CLI and the weekly run |
+| `runtime/`, `logs/` | Run manifests, the weekly run journals and previews, and structured logs; on the PC route, the backend's whole store under `runtime/backend` | The installed CLI, the weekly run, and the backend when `scripts/run_backend_local.ps1` starts it from this checkout |
 | `external/`, `interim/`, `processed/` | Ignored by Git; no code under `src/`, `scripts/` or `tests/` names them | |
 
 The committed record of the season is the generated summary under `docs/`, not these files.
@@ -35,8 +35,13 @@ The committed record of the season is the generated summary under `docs/`, not t
 `scripts/backup_data.ps1` copies `snapshots/`, `ledger/`, `handoffs/`, `advice_records/` and
 `entries/`, and `benchmark_v2_captures/` when it exists, to a backup directory outside every
 repository worktree; with `-Verify` it checks both sides against the latest manifest. The
-procedure, and the `SquadOptDataBackup` scheduled task that runs it daily, are in the
-[deployment runbook](../docs/deployment_runbook.md#back-up-irreplaceable-data). Never delete a
+procedure is in the
+[deployment runbook](../docs/deployment_runbook.md#back-up-irreplaceable-data), with the
+`SquadOptDataBackup` scheduled task that would run it daily: registering that task is the
+owner's step, and the first real backup and restore have not been exercised. The script never
+reads `runtime/`; the installed tool `python -m squadopt.platform.backup_recovery`
+([backup and recovery](../docs/architecture/backup_recovery.md)) can take the backend store as
+well. Never delete a
 directory another worktree is using: on Windows a recursive delete follows directory junctions
 and takes the target's contents with it.
 

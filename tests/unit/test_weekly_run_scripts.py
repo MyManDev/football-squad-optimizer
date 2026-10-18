@@ -103,6 +103,19 @@ def test_a_season_with_no_deadline_ahead_refuses(tmp_path: Path) -> None:
     assert "refused: No gameweek deadline lies ahead" in completed.stdout
 
 
+def test_a_club_news_capture_rides_on_the_rotation_stage() -> None:
+    news = "club-news-20261023T050000Z-abc"
+    out = _powershell(
+        f"(Build-WeeklyArguments '2026-27' 8 15 'rid' 'friday-20261023' '{news}') -join ' '",
+        f"Captured-NewsId @('Read          41 documents', 'Capture       {news}')",
+        "\"[{0}]\" -f (Captured-NewsId @('Refused: no key'))",
+    )
+    arguments, captured, none = out.splitlines()
+    assert f"--rotation --rotation-capture {news} --record-advice" in arguments
+    assert captured == news
+    assert none == "[]"
+
+
 def test_run_id_suffix_and_argument_line_follow_the_cadence() -> None:
     out = _powershell(
         "$now = [datetime]::Parse('2026-10-16T06:00:00Z').ToUniversalTime()",
@@ -205,3 +218,4 @@ def test_the_wrappers_pass_their_kind_to_the_script() -> None:
         assert f"Kind = '{kind}'" in text
         assert "weekly_run.ps1" in text
         assert "exit $LASTEXITCODE" in text
+        assert "ClubNewsSettings = $ClubNewsSettings" in text

@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-10-15T14:15:28Z",
+  "generated_at_utc": "2026-10-16T07:13:49Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,16 +9,16 @@
     "league_id": 352490,
     "mode": "fark-yarat",
     "window": 5,
-    "source_snapshot_id": "fpl-live-20261015T130038Z-7a7a388a3a43",
+    "source_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd",
     "moves": [
       {
         "move_id": "gw07-1",
         "player_out": {
-          "player_id": 244723,
-          "name": "Tyrick Mitchell",
-          "short_name": "Mitchell",
+          "player_id": 219924,
+          "name": "Issa Diop",
+          "short_name": "Diop",
           "position": "DEF",
-          "team": "Crystal Palace"
+          "team": "Ipswich Town"
         },
         "player_in": {
           "player_id": 17761,
@@ -33,7 +33,7 @@
     ],
     "transfer_hit_points": 0.0,
     "expected_gain_vs_hold": 1.5814946723496774,
-    "expected_points_cost": 2.618996197210663,
+    "expected_points_cost": 0.7922280314438126,
     "rival_label": "entry-2199732",
     "solver_status": "FEASIBLE",
     "optimality_gap": null,
@@ -155,20 +155,20 @@
         "expected_points": 0.10027015579447286
       },
       {
+        "player_id": 244723,
+        "name": "Tyrick Mitchell",
+        "short_name": "Mitchell",
+        "position": "DEF",
+        "team": "Crystal Palace",
+        "expected_points": 2.742248299250839
+      },
+      {
         "player_id": 146426,
         "name": "Semi Ajayi",
         "short_name": "Ajayi",
         "position": "DEF",
         "team": "Hull City",
         "expected_points": 2.25764101727074
-      },
-      {
-        "player_id": 219924,
-        "name": "Issa Diop",
-        "short_name": "Diop",
-        "position": "DEF",
-        "team": "Ipswich Town",
-        "expected_points": 2.1748575911872456
       },
       {
         "player_id": 661313,
@@ -194,11 +194,11 @@
         ],
         "transfers_out": [
           {
-            "player_id": 244723,
-            "name": "Tyrick Mitchell",
-            "short_name": "Mitchell",
+            "player_id": 219924,
+            "name": "Issa Diop",
+            "short_name": "Diop",
             "position": "DEF",
-            "team": "Crystal Palace"
+            "team": "Ipswich Town"
           }
         ],
         "transfer_hit_points": 0.0,
@@ -209,32 +209,6 @@
       },
       {
         "gameweek": 8,
-        "transfers_in": [
-          {
-            "player_id": 485055,
-            "name": "Anton\u00edn Kinsk\u00fd",
-            "short_name": "Kinsk\u00fd",
-            "position": "GK",
-            "team": "Spurs"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 67089,
-            "name": "Martin Dubravka",
-            "short_name": "Dubravka",
-            "position": "GK",
-            "team": "Spurs"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 58.47493112126902
-      },
-      {
-        "gameweek": 9,
         "transfers_in": [
           {
             "player_id": 466075,
@@ -251,6 +225,32 @@
             "short_name": "Gvardiol",
             "position": "DEF",
             "team": "Man City"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 1,
+        "free_transfers_after": 1,
+        "expected_points": 58.35535423548649
+      },
+      {
+        "gameweek": 9,
+        "transfers_in": [
+          {
+            "player_id": 80201,
+            "name": "Bernd Leno",
+            "short_name": "Leno",
+            "position": "GK",
+            "team": "Fulham"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 67089,
+            "name": "Martin Dubravka",
+            "short_name": "Dubravka",
+            "position": "GK",
+            "team": "Spurs"
           }
         ],
         "transfer_hit_points": 0.0,
@@ -298,11 +298,11 @@
         ],
         "transfers_out": [
           {
-            "player_id": 219924,
-            "name": "Issa Diop",
-            "short_name": "Diop",
+            "player_id": 244723,
+            "name": "Tyrick Mitchell",
+            "short_name": "Mitchell",
             "position": "DEF",
-            "team": "Ipswich Town"
+            "team": "Crystal Palace"
           }
         ],
         "transfer_hit_points": 0.0,
@@ -327,7 +327,7 @@
     "missing_fields": [],
     "squad_basis": "captured",
     "control_solver_status": "FEASIBLE",
-    "control_optimality_gap": 1.795000000000016,
+    "control_optimality_gap": 5.572999999999979,
     "rival_entry_id": 2199732,
     "overlap_count": 5,
     "transfer_cap": 1,
@@ -341,9 +341,9 @@
       "weight": 30,
       "changed": true,
       "price_basis": "base_model_pure_points_v1",
-      "cohort_snapshot_id": "fpl-top100-20261015T125956Z-62eac7653b23",
-      "picks_snapshot_id": "fpl-elite-picks-20261015T130016Z-f74142d5b421",
-      "table_sha256": "0a890f659631183ae43ffe18feb2530d6b0c3b18a22958933876121eb5c9028d",
+      "cohort_snapshot_id": "fpl-top100-20261016T060118Z-ae3db8c93137",
+      "picks_snapshot_id": "fpl-elite-picks-20261016T060136Z-8b4c3667de56",
+      "table_sha256": "2818a2e18bb44ede2d2baa84576d374ea81f0c3b4f9ba8a9ece1068a577408e5",
       "picks_gameweek": 6
     }
   }

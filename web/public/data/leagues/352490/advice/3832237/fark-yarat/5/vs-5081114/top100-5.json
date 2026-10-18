@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-10-15T14:15:28Z",
+  "generated_at_utc": "2026-10-16T07:13:49Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "fark-yarat",
     "window": 5,
-    "source_snapshot_id": "fpl-live-20261015T130038Z-7a7a388a3a43",
+    "source_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd",
     "moves": [
       {
         "move_id": "gw07-1",
@@ -28,12 +28,12 @@
           "team": "Brighton"
         },
         "expected_points_delta": 2.737923768529946,
-        "reason_code": "mode_tradeoff"
+        "reason_code": "top100_preference"
       }
     ],
     "transfer_hit_points": 0.0,
     "expected_gain_vs_hold": 2.737923768529946,
-    "expected_points_cost": 1.2414619895955354,
+    "expected_points_cost": 0.0,
     "rival_label": "entry-5081114",
     "solver_status": "FEASIBLE",
     "optimality_gap": null,
@@ -211,6 +211,84 @@
         "gameweek": 8,
         "transfers_in": [
           {
+            "player_id": 154043,
+            "name": "Ainsley Maitland-Niles",
+            "short_name": "Maitland-Niles",
+            "position": "DEF",
+            "team": "Everton"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 472769,
+            "name": "Nico O'Reilly",
+            "short_name": "O'Reilly",
+            "position": "DEF",
+            "team": "Man City"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 5,
+        "free_transfers_after": 5,
+        "expected_points": 47.671765270820366
+      },
+      {
+        "gameweek": 9,
+        "transfers_in": [
+          {
+            "player_id": 444102,
+            "name": "Francisco Evanilson de Lima Barbosa",
+            "short_name": "Barbosa",
+            "position": "FWD",
+            "team": "Bournemouth"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 178301,
+            "name": "Ollie Watkins",
+            "short_name": "Watkins",
+            "position": "FWD",
+            "team": "Aston Villa"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 5,
+        "free_transfers_after": 5,
+        "expected_points": 48.59959412784709
+      },
+      {
+        "gameweek": 10,
+        "transfers_in": [
+          {
+            "player_id": 141746,
+            "name": "Bruno Borges Fernandes",
+            "short_name": "Fernandes",
+            "position": "MID",
+            "team": "Man Utd"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 446008,
+            "name": "Bryan Mbeumo",
+            "short_name": "Mbeumo",
+            "position": "MID",
+            "team": "Man Utd"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 5,
+        "free_transfers_after": 5,
+        "expected_points": 51.19605393441711
+      },
+      {
+        "gameweek": 11,
+        "transfers_in": [
+          {
             "player_id": 17761,
             "name": "James Tarkowski",
             "short_name": "Tarkowski",
@@ -231,85 +309,7 @@
         "chip": null,
         "free_transfers_before": 5,
         "free_transfers_after": 5,
-        "expected_points": 48.27169553187337
-      },
-      {
-        "gameweek": 9,
-        "transfers_in": [
-          {
-            "player_id": 475168,
-            "name": "Jo\u00e3o Pedro Junqueira de Jesus",
-            "short_name": "Jesus",
-            "position": "FWD",
-            "team": "Chelsea"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 178301,
-            "name": "Ollie Watkins",
-            "short_name": "Watkins",
-            "position": "FWD",
-            "team": "Aston Villa"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 5,
-        "free_transfers_after": 5,
-        "expected_points": 49.388402208353845
-      },
-      {
-        "gameweek": 10,
-        "transfers_in": [
-          {
-            "player_id": 465730,
-            "name": "Maxim De Cuyper",
-            "short_name": "Cuyper",
-            "position": "DEF",
-            "team": "Brighton"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 106611,
-            "name": "Michael Keane",
-            "short_name": "Keane",
-            "position": "DEF",
-            "team": "Everton"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 5,
-        "free_transfers_after": 5,
-        "expected_points": 50.313124538708784
-      },
-      {
-        "gameweek": 11,
-        "transfers_in": [
-          {
-            "player_id": 209036,
-            "name": "Marc Gu\u00e9hi",
-            "short_name": "Gu\u00e9hi",
-            "position": "DEF",
-            "team": "Man City"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 472769,
-            "name": "Nico O'Reilly",
-            "short_name": "O'Reilly",
-            "position": "DEF",
-            "team": "Man City"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 5,
-        "free_transfers_after": 5,
-        "expected_points": 51.129132057025096
+        "expected_points": 52.73452810567659
       }
     ],
     "stated_limits": [
@@ -327,7 +327,7 @@
     "missing_fields": [],
     "squad_basis": "captured",
     "control_solver_status": "FEASIBLE",
-    "control_optimality_gap": 10.267999999999972,
+    "control_optimality_gap": 33.761000000000024,
     "rival_entry_id": 5081114,
     "overlap_count": 2,
     "transfer_cap": 1,
@@ -341,9 +341,9 @@
       "weight": 5,
       "changed": true,
       "price_basis": "base_model_pure_points_v1",
-      "cohort_snapshot_id": "fpl-top100-20261015T125956Z-62eac7653b23",
-      "picks_snapshot_id": "fpl-elite-picks-20261015T130016Z-f74142d5b421",
-      "table_sha256": "0a890f659631183ae43ffe18feb2530d6b0c3b18a22958933876121eb5c9028d",
+      "cohort_snapshot_id": "fpl-top100-20261016T060118Z-ae3db8c93137",
+      "picks_snapshot_id": "fpl-elite-picks-20261016T060136Z-8b4c3667de56",
+      "table_sha256": "2818a2e18bb44ede2d2baa84576d374ea81f0c3b4f9ba8a9ece1068a577408e5",
       "picks_gameweek": 6
     }
   }

@@ -365,7 +365,7 @@ function memberPage(createSolver: () => DeviceSolver) {
             deviceDependencies={{
               loadDocument: deviceDocument,
               // Written inline, as a caller may: each rerender of the page gives the device
-              // new timers, and so a new reset.
+              // new timers.
               setTimer: (callback: () => void, milliseconds: number) =>
                 setTimeout(callback, milliseconds),
               clearTimer: (handle: unknown) =>

@@ -30,7 +30,7 @@ import argparse
 import hashlib
 import sys
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -72,6 +72,9 @@ from squadopt.prediction.component_dataset import (
 from squadopt.prediction.component_models import (
     COMPONENT_MODEL_VERSION,
     EQUAL_WEIGHTING,
+    GRADIENT_BOOSTING_ESTIMATOR,
+    GRADIENT_BOOSTING_MODEL_VERSION,
+    LINEAR_ESTIMATOR,
     SEASON_HALF_LIFE_WEIGHTING,
     SEASON_WEIGHT_BASE,
     SEASON_WEIGHTED_MODEL_VERSION,
@@ -96,6 +99,22 @@ DEVELOPMENT_SCOPES = ("v1", "v2")
 DEVELOPMENT_SEASONS_V2 = COMPONENT_DEVELOPMENT_SEASONS_V2
 SEASON_WEIGHTINGS = ("equal", "season_half_life")
 WEIGHTING_LABELS = {"equal": EQUAL_WEIGHTING, "season_half_life": SEASON_HALF_LIFE_WEIGHTING}
+# The second declared v2 candidate: the same rows, features and targets under equal
+# weighting, with the three linear estimators replaced by the gradient-boosted ensembles
+# of `ComponentModelConfig` (constants, never searched). Its table name carries the arm so
+# the two candidates cannot overwrite each other or the control.
+ESTIMATOR_ARMS = (LINEAR_ESTIMATOR, GRADIENT_BOOSTING_ESTIMATOR)
+ESTIMATOR_TABLE_SUFFIX = {LINEAR_ESTIMATOR: "", GRADIENT_BOOSTING_ESTIMATOR: "_gradient_boosting"}
+ESTIMATOR_RULES = {
+    LINEAR_ESTIMATOR: (
+        "standardized logistic regression (appearance) and ridge regression (minutes and "
+        "points given an appearance), the control"
+    ),
+    GRADIENT_BOOSTING_ESTIMATOR: (
+        "histogram gradient-boosted trees for all three estimators: fixed rounds, no early "
+        "stopping, constants from ComponentModelConfig; equal weighting only"
+    ),
+}
 WEIGHTING_RULES = {
     "equal": "every training row weighs 1",
     "season_half_life": (
@@ -191,6 +210,7 @@ def _parse_arguments() -> argparse.Namespace:
     parser.add_argument("--seasons", default=None)
     parser.add_argument("--development-scope", choices=DEVELOPMENT_SCOPES, default="v1")
     parser.add_argument("--season-weighting", choices=SEASON_WEIGHTINGS, default="equal")
+    parser.add_argument("--estimator", choices=ESTIMATOR_ARMS, default=LINEAR_ESTIMATOR)
     parser.add_argument(
         "--output-dir", type=Path, default=REPOSITORY_ROOT / "artifacts" / "phase_c"
     )
@@ -308,6 +328,7 @@ class FoldRecord:
     # record carries neither field, so the v1 manifest schema is exactly what it was.
     weighting: str | None = None
     training_weight_by_season: dict[str, float] | None = None
+    estimator: str | None = None
 
     def as_record(self) -> dict[str, object]:
         record: dict[str, object] = {
@@ -329,6 +350,8 @@ class FoldRecord:
         if self.weighting is not None:
             record["weighting"] = self.weighting
             record["training_weight_by_season"] = dict(self.training_weight_by_season or {})
+        if self.estimator is not None:
+            record["estimator"] = self.estimator
         return record
 
 
@@ -358,6 +381,7 @@ def build_oof_table(
     config: ComponentModelConfig | None = None,
     weighting: str = "equal",
     contract_version: str = OOF_CONTRACT_VERSION,
+    estimator: str = LINEAR_ESTIMATOR,
 ) -> tuple[pd.DataFrame, WalkSummary]:
     """Walk the decisions, fitting before each and predicting at it.
 
@@ -380,8 +404,21 @@ def build_oof_table(
             "Season-age weighting is a Phase C v2 development candidate; the v1 contract "
             "fits only the equal-weight control."
         )
+    if estimator not in ESTIMATOR_ARMS:
+        raise DataError(f"Unknown estimator {estimator!r}.")
+    boosted = estimator == GRADIENT_BOOSTING_ESTIMATOR
+    if boosted and (not development or weighting != "equal"):
+        raise DataError(
+            "The gradient-boosting candidate is a Phase C v2 development arm under equal "
+            "weighting; the v1 contract and the weighted arm fit only the linear estimators."
+        )
+    config = replace(ComponentModelConfig() if config is None else config, estimator=estimator)
     arm_model_version = (
-        COMPONENT_MODEL_VERSION if weighting == "equal" else SEASON_WEIGHTED_MODEL_VERSION
+        GRADIENT_BOOSTING_MODEL_VERSION
+        if boosted
+        else COMPONENT_MODEL_VERSION
+        if weighting == "equal"
+        else SEASON_WEIGHTED_MODEL_VERSION
     )
     columns = component_feature_columns()
     ranks = {season: rank for rank, season in enumerate(season_order)}
@@ -465,6 +502,7 @@ def build_oof_table(
                 target_contract_version=TARGET_CONTRACT_VERSION,
                 weighting=WEIGHTING_LABELS[weighting] if development else None,
                 training_weight_by_season=season_weights if development else None,
+                estimator=estimator if development else None,
             )
         )
         predicted = predict_components(models, scoring, feature_columns=columns)
@@ -558,6 +596,7 @@ def main() -> int:
     arguments = _parse_arguments()
     scope = str(arguments.development_scope)
     weighting = str(arguments.season_weighting)
+    estimator = str(arguments.estimator)
     development = scope == "v2"
     contract_version = DEVELOPMENT_OOF_CONTRACT_VERSION if development else OOF_CONTRACT_VERSION
     default_seasons = DEVELOPMENT_SEASONS_V2 if development else DEFAULT_SEASONS
@@ -576,6 +615,12 @@ def main() -> int:
                 "--development-scope v2; the v1 contract fits only the equal-weight control."
             )
             return 1
+        if estimator != LINEAR_ESTIMATOR:
+            print(
+                "The gradient-boosting estimator is a Phase C v2 development candidate. Run "
+                "it with --development-scope v2; the v1 contract fits only the linear control."
+            )
+            return 1
         if LOCKED_HOLDOUT_SEASON in seasons:
             print(
                 f"{LOCKED_HOLDOUT_SEASON} is the locked holdout. It is not read, listed or "
@@ -588,6 +633,12 @@ def main() -> int:
             print(
                 f"The v2 development scope covers {', '.join(DEVELOPMENT_SEASONS_V2)}; "
                 f"{outside!r} lies outside it."
+            )
+            return 1
+        if estimator != LINEAR_ESTIMATOR and weighting != "equal":
+            print(
+                "The gradient-boosting candidate is declared under equal weighting only; "
+                "the weighted arm fits the linear estimators."
             )
             return 1
     revision, dirty = _git_revision()
@@ -626,6 +677,7 @@ def main() -> int:
             config=config,
             weighting=weighting,
             contract_version=contract_version,
+            estimator=estimator,
         )
         roster = build_decision_roster(panel, table)
     except DataError as error:
@@ -635,7 +687,7 @@ def main() -> int:
     if arguments.table_name is not None:
         table_name = str(arguments.table_name)
     elif development:
-        table_name = f"{contract_version}_{weighting}"
+        table_name = f"{contract_version}_{weighting}{ESTIMATOR_TABLE_SUFFIX[estimator]}"
     else:
         table_name = contract_version
     output_dir: Path = arguments.output_dir
@@ -649,8 +701,10 @@ def main() -> int:
 
     modelled = int((table["composition_route"] == "component_model").sum())
     model_version = str(table["model_version"].iloc[0])
-    command = "python -m scripts.export_component_oof" + (
-        f" --development-scope v2 --season-weighting {weighting}" if development else ""
+    command = (
+        "python -m scripts.export_component_oof"
+        + (f" --development-scope v2 --season-weighting {weighting}" if development else "")
+        + (f" --estimator {estimator}" if development and estimator != LINEAR_ESTIMATOR else "")
     )
     manifest = {
         "contract_version": contract_version,
@@ -765,6 +819,28 @@ def main() -> int:
                     "normalization": WEIGHT_NORMALIZATION,
                     "declared_before_measurement": True,
                 },
+                "estimator": {
+                    "name": estimator,
+                    "model_version": model_version,
+                    "rule": ESTIMATOR_RULES[estimator],
+                    "constants": (
+                        {
+                            "learning_rate": config.boosting_learning_rate,
+                            "iterations": config.boosting_iterations,
+                            "max_leaf_nodes": config.boosting_max_leaf_nodes,
+                            "min_samples_leaf": config.boosting_min_samples_leaf,
+                            "l2_regularization": config.boosting_l2_regularization,
+                            "early_stopping": False,
+                        }
+                        if estimator == GRADIENT_BOOSTING_ESTIMATOR
+                        else {
+                            "appearance_regularization": config.appearance_regularization,
+                            "minutes_alpha": config.minutes_alpha,
+                            "points_alpha": config.points_alpha,
+                        }
+                    ),
+                    "declared_before_measurement": True,
+                },
                 "rule_era": {
                     "defensive_contribution_seasons": [
                         season for season in seasons if season >= LOCKED_HOLDOUT_SEASON
@@ -793,7 +869,7 @@ def main() -> int:
     print(f"  table sha256      {digest}")
     print(f"  roster sha256     {roster_digest}")
     if development:
-        print(f"  scope             v2 development (weighting {weighting})")
+        print(f"  scope             v2 development (weighting {weighting}, estimator {estimator})")
         read = "read as development data" if manifest["locked_holdout_read"] else "not read"
         print(f"  locked holdout    {read} ({LOCKED_HOLDOUT_SEASON})")
     else:
