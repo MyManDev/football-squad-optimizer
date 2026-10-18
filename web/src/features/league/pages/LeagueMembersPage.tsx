@@ -126,7 +126,9 @@ export function LeagueMembersView({
   const cells = viewerRow ? scoreBugCells(viewerRow, rows.length, squad, locale, copy) : [];
   const count = (value: number) => points(value, 0, locale);
   const race =
-    scoreboard?.status === "ready" ? leagueRace(scoreboard.envelope.payload, view.members) : null;
+    scoreboard?.status === "ready"
+      ? leagueRace(scoreboard.envelope.payload, view.members, view.scored_gameweek)
+      : null;
 
   return (
     <div className={styles.page}>

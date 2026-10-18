@@ -806,8 +806,6 @@ const en = {
     top100Weight: (weight: number) => `Top 100 weight ${weight}`,
     // The league race (#1135): each member's place after every settled gameweek.
     raceTitle: "League race",
-    raceBasis:
-      "The place after each settled gameweek, by the total points the scoreboard publishes for it; equal totals share a place.",
     raceMember: "Member",
     raceWeek: (gameweek: number) => `Gameweek ${gameweek}`,
     racePrevious: "Previous gameweek",
@@ -1820,8 +1818,6 @@ const tr: MessageSchema<typeof en> = {
     decisionTitle: "Bu haftanın hamlesi",
     top100Weight: (weight) => `Top 100 ağırlığı ${weight}`,
     raceTitle: "Lig yarışı",
-    raceBasis:
-      "Her biten haftanın sonundaki sıra, skor tablosunun o hafta için yayımladığı toplam puana göre; eşit toplam aynı sırayı paylaşır.",
     raceMember: "Üye",
     raceWeek: (gameweek) => `${gameweek}. hafta`,
     racePrevious: "Önceki hafta",

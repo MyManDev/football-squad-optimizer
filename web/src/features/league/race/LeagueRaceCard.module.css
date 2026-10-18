@@ -4,8 +4,11 @@
    weeks marked; the selected gameweek's band moves in the data time of the motion tokens,
    and a line's change of state in the card time; reduced motion makes both instant. */
 
+/* One column no wider than the card: the member list's longest name would otherwise set
+   the width of an implicit auto column and push the card past a phone's gutter. */
 .race {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-3);
   min-width: 0;
 }
@@ -14,7 +17,6 @@
   margin: 0;
 }
 
-.basis,
 .quiet {
   margin: 0;
   color: var(--color-text-muted);
@@ -28,15 +30,17 @@
   gap: var(--space-3);
 }
 
-.member {
+.memberPick {
   display: grid;
   gap: var(--space-1);
+  min-width: 0;
+  max-width: 100%;
   font-weight: 600;
 }
 
-.member select {
+.memberPick select {
+  width: 100%;
   min-height: 44px;
-  max-width: 100%;
   font: inherit;
 }
 

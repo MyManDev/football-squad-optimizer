@@ -68,7 +68,6 @@ describe("one timeline with a rank change", () => {
       expect(chart()).toHaveAccessibleName(copy.raceChart("M22"));
       // Second in week 1, first from week 2.
       expect(marks(container)).toEqual([null, "gained", null]);
-      expect(screen.getByText(copy.raceBasis)).toBeInTheDocument();
       expect(container.textContent).not.toMatch(AS_A_CHANCE);
       expect(container.textContent).not.toMatch(AS_A_CAVEAT);
     },
@@ -184,7 +183,7 @@ describe("the card's stylesheet", () => {
   it("scrolls the chart inside itself, never the page, with thumb-sized controls", () => {
     expect(rule(".chart")).toMatch(/overflow-x: auto/);
     expect(rule(".step")).toMatch(/height: 44px/);
-    expect(rule(".member select")).toMatch(/min-height: 44px/);
+    expect(rule(".memberPick select")).toMatch(/min-height: 44px/);
   });
 });
 

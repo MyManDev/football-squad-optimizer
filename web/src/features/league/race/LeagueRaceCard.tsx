@@ -92,10 +92,9 @@ export function LeagueRaceCard({
       <h2 className={styles.title} id={titleId}>
         {copy.raceTitle}
       </h2>
-      <p className={styles.basis}>{copy.raceBasis}</p>
 
       <div className={styles.controls}>
-        <label className={styles.member} htmlFor={memberId}>
+        <label className={styles.memberPick} htmlFor={memberId}>
           <span>{copy.raceMember}</span>
           <select
             id={memberId}

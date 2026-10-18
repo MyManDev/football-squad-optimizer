@@ -59,6 +59,48 @@ describe("the league race", () => {
     expect(byId.get(33)).toEqual([3, 2]);
   });
 
+  it("takes the table's places where it publishes them, so a tie reads as the table breaks it", () => {
+    // Week 2: 11 and 22 are level on 120; the table, from the standings, puts 11 first.
+    // Week 1: 22 and 33 are level on 60; the table's movement puts 33 second and 22 third.
+    const table = [
+      { ...raceMember(11), rank: 1, movement: "same" as const, movement_places: 0 },
+      { ...raceMember(22), rank: 2, movement: "up" as const, movement_places: 1 },
+      { ...raceMember(33), rank: 3, movement: "down" as const, movement_places: 1 },
+      RACE_SYSTEM,
+    ];
+    const board = raceScoreboard([
+      raceWeek(1, { 11: 70, 22: 60, 33: 60 }),
+      raceWeek(2, { 11: 120, 22: 120, 33: 90 }),
+    ]);
+    const race = leagueRace(board, table, 2)!;
+    const byId = new Map(race.lines.map((line) => [line.entryId, line.ranks]));
+    expect(byId.get(11)).toEqual([1, 1]);
+    expect(byId.get(22)).toEqual([3, 2]);
+    expect(byId.get(33)).toEqual([2, 3]);
+    // Without the table's scored week the totals alone decide, and the ties share.
+    const alone = new Map(
+      leagueRace(board, table)!.lines.map((line) => [line.entryId, line.ranks]),
+    );
+    expect(alone.get(22)).toEqual([2, 1]);
+    expect(alone.get(33)).toEqual([2, 3]);
+  });
+
+  it("keeps the shared place for a week the table's movement cannot reach", () => {
+    const table = [
+      { ...raceMember(11), rank: 1, movement: "unknown" as const, movement_places: null },
+      { ...raceMember(22), rank: 2, movement: "new" as const, movement_places: null },
+      RACE_SYSTEM,
+    ];
+    const race = leagueRace(
+      raceScoreboard([raceWeek(1, { 11: 60, 22: 60 }), raceWeek(2, { 11: 120, 22: 120 })]),
+      table,
+      2,
+    )!;
+    const byId = new Map(race.lines.map((line) => [line.entryId, line.ranks]));
+    expect(byId.get(11)).toEqual([1, 1]);
+    expect(byId.get(22)).toEqual([1, 2]);
+  });
+
   it("leaves a member out of a week the scoreboard has no row for", () => {
     const race = leagueRace(
       raceScoreboard([raceWeek(1, { 11: 70, 22: 60 }), raceWeek(2, { 11: 90, 22: 95, 33: 10 })]),
@@ -97,7 +139,7 @@ describe("the shipped trees", () => {
           readFileSync(join(root, "members.json"), "utf-8"),
         ) as LeagueViewEnvelope<LeagueMembers>
       ).payload;
-      const race = leagueRace(board, table.members);
+      const race = leagueRace(board, table.members, table.scored_gameweek);
       if (race === null || race.gameweeks[race.gameweeks.length - 1] !== table.scored_gameweek)
         return;
       for (const row of table.members.filter((item) => item.member_kind === "human")) {
