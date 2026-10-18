@@ -10,7 +10,45 @@
     "python -m scripts.compare_component_oof_development --artifact-dir <dir> --candidate-arm gradient_boosting_windows"
   ],
   "decision_level_reading": {
-    "scope": "development-only decision-level reading on the 147 frozen decision folds (2021-22 to 2024-25), both boosted arms exported at the feature-branch commit and scored by scripts.evaluate_phase_c_components with --development-contract; the linear components' reading comes from the gradient-boosting record",
+    "scope": "development-only decision-level reading on the 147 frozen decision folds (2021-22 to 2024-25), added after the points-MAE result and not part of the rule; both boosted arms exported at commit 8fb3eeb77 from a clean tree (its code is the declaration commit 2a3ed544b's; the two differ only by the first record) and scored at commit b344b9ca7 (feat/component-decision-development-arm, squashed to develop as 1079ba64c in #1137 with the same four files) by scripts.evaluate_phase_c_components with --development-contract phase_c_component_oof_development_v2; the linear components' reading is the one recorded beside the gradient-boosting comparison, exported at commit 69f18b0c8 and scored at b344b9ca7",
+    "added_after_result": true,
+    "added_on": "2026-10-17",
+    "descriptive_only": true,
+    "provenance": {
+      "export_repository_commit": "8fb3eeb776e6097ef0f5874a800a73a90ffe73f5",
+      "export_working_tree_dirty": false,
+      "declaration_commit": "2a3ed544b8f2604006ddff2f7836d5ebb324f56c",
+      "scoring_repository_commit": "b344b9ca7ee160409c20cd143f6bd1d85d23c40d",
+      "scoring_working_tree_dirty": false,
+      "scoring_commit_on_develop": "1079ba64c11ead48fdcd574cb8c8143e81b5d6ae",
+      "decision_seasons": [
+        "2021-22",
+        "2022-23",
+        "2023-24",
+        "2024-25"
+      ],
+      "linear_arm_export_repository_commit": "69f18b0c8da8167174a3d5379753c2e9cc203cad"
+    },
+    "policy": {
+      "confidence_level": 0.9,
+      "bootstrap_resamples": 5000,
+      "moving_block_length": 4,
+      "deterministic_seed": 0,
+      "candidate_ids": {
+        "v2_minus_v1_features": "phase_c_features_v2_vs_v1_decisions",
+        "v2_features_minus_linear": "phase_c_features_v2_vs_linear_decisions"
+      }
+    },
+    "pairing": "per fold shared by both arms, the compared arm's component_realized_score minus the reference arm's (v2 features minus v1 features; v2 features minus the linear components), the season taken from the fold id, and the 90% interval from squadopt.evaluation.statistics.season_aware_moving_block_interval under the policy above with the named candidate id, which seeds the bootstrap",
+    "reproduce": [
+      "python -m scripts.fetch_historical_data",
+      "at commit 8fb3eeb77: python -m scripts.export_component_oof --development-scope v2 --season-weighting equal --estimator gradient_boosting --seasons 2021-22,2022-23,2023-24,2024-25 --output-dir <dir>",
+      "at commit 8fb3eeb77: python -m scripts.export_component_oof --development-scope v2 --season-weighting equal --estimator gradient_boosting --seasons 2021-22,2022-23,2023-24,2024-25 --feature-contract v2 --output-dir <dir>",
+      "write <dir>/<table>.environment.json beside each table, naming its table_sha256, the export repository_commit and the export interpreter's python, numpy, pandas, scipy and scikit_learn versions",
+      "at commit b344b9ca7 (or develop from 1079ba64c): python -m scripts.evaluate_phase_c_components --table <dir>/phase_c_component_oof_development_v2_equal_gradient_boosting.csv --manifest <dir>/phase_c_component_oof_development_v2_equal_gradient_boosting.manifest.json --roster <dir>/phase_c_component_oof_development_v2_equal_gradient_boosting.roster.csv --producer-environment <dir>/phase_c_component_oof_development_v2_equal_gradient_boosting.environment.json --development-contract phase_c_component_oof_development_v2 --json-output <dir>/decision_v1.json",
+      "at commit b344b9ca7 (or develop from 1079ba64c): python -m scripts.evaluate_phase_c_components --table <dir>/phase_c_component_oof_development_v2_equal_gradient_boosting_features_v2.csv --manifest <dir>/phase_c_component_oof_development_v2_equal_gradient_boosting_features_v2.manifest.json --roster <dir>/phase_c_component_oof_development_v2_equal_gradient_boosting_features_v2.roster.csv --producer-environment <dir>/phase_c_component_oof_development_v2_equal_gradient_boosting_features_v2.environment.json --development-contract phase_c_component_oof_development_v2 --json-output <dir>/decision_v2.json",
+      "pair decision_v1.json, decision_v2.json and the linear components' evaluation as 'pairing' states"
+    ],
     "v2_minus_v1_features": {
       "paired_folds": 147,
       "mean": -0.20408163265306123,
@@ -56,6 +94,10 @@
         "source_table_sha256": "96ac55769c894047d2e4f77131f6cd873dc1481bb89cf6334c33b94125831666",
         "model_version": "phase_c_control_components_gbm_v1",
         "feature_contract_version": "phase_c_component_form_window_v1",
+        "producer_repository_commit": "8fb3eeb776e6097ef0f5874a800a73a90ffe73f5",
+        "scoring_repository_commit": "b344b9ca7ee160409c20cd143f6bd1d85d23c40d",
+        "scoring_working_tree_dirty": false,
+        "scoring_generated_at_utc": "2026-10-17T11:32:53+00:00",
         "ridge_control_mean": 58.523809523809526,
         "component_mean": 62.666666666666664,
         "diagnostics": {
@@ -233,6 +275,10 @@
         "source_table_sha256": "c15d39d237e909f752cb6d42727ae3729df77320ed8dcfad8528810b0000d0c5",
         "model_version": "phase_c_control_components_gbm_v1",
         "feature_contract_version": "phase_c_component_form_window_v2",
+        "producer_repository_commit": "8fb3eeb776e6097ef0f5874a800a73a90ffe73f5",
+        "scoring_repository_commit": "b344b9ca7ee160409c20cd143f6bd1d85d23c40d",
+        "scoring_working_tree_dirty": false,
+        "scoring_generated_at_utc": "2026-10-17T11:32:59+00:00",
         "ridge_control_mean": 58.523809523809526,
         "component_mean": 62.46258503401361,
         "diagnostics": {
@@ -410,6 +456,10 @@
         "source_table_sha256": "d88270536fe7b762e7627d482955885656f10b08a631ea7c05b0a95564a2fe09",
         "model_version": "phase_c_control_components_v1",
         "feature_contract_version": "phase_c_component_form_window_v1",
+        "producer_repository_commit": "69f18b0c8da8167174a3d5379753c2e9cc203cad",
+        "scoring_repository_commit": "b344b9ca7ee160409c20cd143f6bd1d85d23c40d",
+        "scoring_working_tree_dirty": false,
+        "scoring_generated_at_utc": "2026-10-17T10:18:43+00:00",
         "ridge_control_mean": 58.523809523809526,
         "component_mean": 63.414965986394556,
         "diagnostics": {
@@ -584,7 +634,7 @@
         }
       }
     },
-    "note": "The points-MAE rule preferred v2; at the decision level v2 is below v1 features and below the linear components, with intervals across zero. No pin is proposed."
+    "note": "The points-MAE rule preferred v2; at the decision level v2 is below v1 features and below the linear components on the mean, with both intervals across zero. No pin is proposed."
   },
   "arm_manifests": {
     "phase_c_component_oof_development_v2_equal_gradient_boosting": {

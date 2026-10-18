@@ -23,14 +23,20 @@ Lower is better. The v2 contract is better on every component in every season: p
 - A development reading on the points metric. The gradient-boosting estimator's own decision-level reading (`phase_c_gradient_boosting_comparison.md`) did not confirm its player-level gain, so this candidate owes the same decision-level reading before any feature-contract pin is proposed; none is proposed here.
 - Serving v2 would also need captures with ten settled weeks of live history, as the declaration states.
 
-## Decision-level reading (added after the first record, reported beside the rule)
+## Decision-level reading (added after the result, descriptive, not part of the rule)
 
-Both boosted arms were exported at this branch's commit for the frozen decision seasons
-2021-22 to 2024-25 and run through the repository's decision comparison
+Added on 2026-10-17, after the points-MAE result above. Both boosted arms were
+exported for the frozen decision seasons 2021-22 to 2024-25 at commit `8fb3eeb7`
+(clean tree; its code is the declaration commit `2a3ed544`'s, the two differing
+only by the first record) and scored at commit `b344b9ca`
+(`feat/component-decision-development-arm`, squashed to develop as `1079ba64` in
+#1137) by the repository's decision comparison
 (`scripts.evaluate_phase_c_components --development-contract phase_c_component_oof_development_v2`):
 147 folds, squads solved from each arm's expected points, official autosub and captain
 scoring, the frozen ridge control on the same folds. The linear components' row is the
-reading recorded beside the gradient-boosting comparison.
+reading recorded beside the gradient-boosting comparison (exported at `69f18b0c`, scored at
+`b344b9ca`). The commands, the policy and the bootstrap candidate ids are in the
+JSON twin under `decision_level_reading`.
 
 | arm | mean realized squad points | against the ridge control | wins / ties / losses | zero-minute starters | autosub points |
 | --- | --- | --- | --- | --- | --- |
@@ -45,13 +51,17 @@ interval [-1.796, +1.061], wins / ties / losses
 2021-22 +2.189, 2022-23 +0.278, 2023-24 -1.784, 2024-25 -1.486. Against the linear components:
 -0.9524 [-3.238, +1.014], 67 / 8 / 72.
 
-What this says: a second time, a candidate that is better on every player-level metric is
-not better at the decision level. The v2 windows cut the boosted arm's zero-minute starters
-back to the linear arm's level (85 against 108 and 83) and still score fewer realized points
-than the linear components' squads. The pattern points at the decision objective, which
-multiplies an appearance probability by a conditional points estimate and hands the maximum
-to the solver: sharper components move the maximum to different players without moving
-realized points. The points-MAE rule stands as recorded; no feature-contract pin is proposed,
-and the next declared candidate is the composition itself (how the components enter the
-expected points the solver reads), measured at the decision level first.
+What this says: a second time, a candidate that is better on every component in every season
+is not measurably better at the decision level. Against the v1 features the mean is
+-0.20 points a gameweek and the interval [-1.80, +1.06] crosses zero, so this
+reading neither shows a gain nor rules out one of about a point. The v2 windows cut the
+boosted arm's zero-minute starters back to the linear arm's level (85 against
+108 and 83); on the mean the v2 arm's squads still score fewer realized points
+than the linear components' squads (-0.95, interval [-3.24, +1.01], across zero).
+The points-MAE rule stands as recorded, and no feature-contract pin is proposed.
 
+A hypothesis for the next candidate, not a finding of this record: the decision objective
+multiplies an appearance probability by a conditional points estimate and hands the maximum
+to the solver, so sharper components may move the maximum to different players without
+moving realized points. The composition itself (how the components enter the expected points
+the solver reads) is the candidate to declare next, measured at the decision level first.
