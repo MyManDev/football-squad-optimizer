@@ -237,7 +237,7 @@
 
 .notesIcon {
   flex: none;
-  transition: transform 150ms ease;
+  transition: transform var(--motion-ui-fast) var(--motion-ease);
 }
 
 .notes[open] .notesIcon {

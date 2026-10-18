@@ -60,7 +60,66 @@ CALENDAR_BLIND_PROJECTION_RULE: Final = "control_calendar_blind_v1"
 """The operational control as it is evaluated: no fixture-count scaling, so a double
 gameweek projects like a single. A blank still projects zero — a team that does not
 play cannot score, and that is known before the deadline, not modelled."""
-PROJECTION_RULES: Final = (NAIVE_PROJECTION_RULE, CALENDAR_BLIND_PROJECTION_RULE)
+MEAN_REVERSION_PROJECTION_RULE: Final = "mean_reversion_discount_v1"
+"""Naive calendar scaling with the later weeks' deviation from the position mean
+discounted. For a horizon week at offset ``k`` from the decision week (``k = 0`` is the
+decision week and is untouched), with ``m_pos`` the mean of the decision-time projection's
+expected points over every projected player of that position (the full projection table,
+not the pool) and ``rho`` the mean-reversion factor in (0, 1]::
+
+    base_k            = m_pos + rho**k * (expected - m_pos)
+    expected_points_k = max(0, base_k) * fixture_count(gameweek, team)
+
+So a far week's ranking regresses toward the position mean while its level stays, and
+a blank week stays zero through the fixture count, as under the naive rule. At
+``rho = 1`` the rule is the naive rule exactly. Measurement only: the candidate of
+``docs/research/mean_reversion_discount_prereg.md``."""
+PROJECTION_RULES: Final = (
+    NAIVE_PROJECTION_RULE,
+    CALENDAR_BLIND_PROJECTION_RULE,
+    MEAN_REVERSION_PROJECTION_RULE,
+)
+
+
+def validate_mean_reversion_factor(projection_rule: str, factor: float | None) -> float | None:
+    """The mean-reversion factor a projection rule may carry, checked and normalised.
+
+    The mean-reversion rule needs a factor in (0, 1]; the two calendar rules refuse one,
+    so a factor can never be set on a rule that would silently ignore it.
+    """
+
+    if projection_rule != MEAN_REVERSION_PROJECTION_RULE:
+        if factor is not None:
+            raise ExperimentConfigurationError(
+                f"mean_reversion_factor is read only under {MEAN_REVERSION_PROJECTION_RULE!r}; "
+                f"{projection_rule!r} refuses one."
+            )
+        return None
+    if (
+        factor is None
+        or isinstance(factor, bool)
+        or not isinstance(factor, int | float)
+        or not math.isfinite(float(factor))
+        or not 0.0 < float(factor) <= 1.0
+    ):
+        raise ExperimentConfigurationError(
+            f"{MEAN_REVERSION_PROJECTION_RULE!r} needs a mean_reversion_factor in (0, 1]."
+        )
+    return float(factor)
+
+
+def position_means(projections: pd.DataFrame) -> dict[str, float]:
+    """The mean expected points per position over a whole projection table.
+
+    The shrink target of the mean-reversion rule: every projected player of the position
+    counts, not only the candidate pool, so the target is the roster's level and not the
+    pool's.
+    """
+
+    return {
+        str(position): float(group["expected_points"].mean())
+        for position, group in projections.groupby("position", sort=True)
+    }
 
 
 @dataclass(frozen=True, slots=True)
@@ -303,6 +362,7 @@ class DecisionSeason:
         cheap_pool_per_position: int,
         cross_season_config: CrossSeasonConfig | None,
         projection_rule: str = NAIVE_PROJECTION_RULE,
+        mean_reversion_factor: float | None = None,
     ) -> None:
         """``fixture_counts``: one row per (gameweek, team_id) with the known number
         of fixtures, using the panel's own team labels."""
@@ -312,6 +372,10 @@ class DecisionSeason:
                 f"projection_rule must be one of {PROJECTION_RULES!r}, got {projection_rule!r}."
             )
         self._projection_rule = projection_rule
+        self._mean_reversion_factor = validate_mean_reversion_factor(
+            projection_rule, mean_reversion_factor
+        )
+        self._position_means_at: dict[int, dict[str, float]] = {}
         if not isinstance(panel, pd.DataFrame):
             raise ExperimentExecutionError("panel must be a pandas DataFrame.")
         if not isinstance(fixture_counts, pd.DataFrame):
@@ -397,6 +461,17 @@ class DecisionSeason:
             if self._fixture_counts.get((gameweek, team_id), 0) == 0
         )
 
+    def _position_means(self, gameweek: int) -> dict[str, float]:
+        """The shrink target of the mean-reversion rule at one decision gameweek.
+
+        Read from the full projection table of that gameweek and kept, so a decision's
+        target is computed once and the week record can carry it.
+        """
+
+        if gameweek not in self._position_means_at:
+            self._position_means_at[gameweek] = position_means(self._projection_at(gameweek))
+        return self._position_means_at[gameweek]
+
     def _naive_horizon(
         self,
         pool: pd.DataFrame,
@@ -404,12 +479,28 @@ class DecisionSeason:
     ) -> ProjectionHorizon:
         rows: list[dict[str, object]] = []
         columns = ("player_id", "name", "team_id", "position", "price_tenths", "expected_points")
-        for gameweek in gameweeks:
+        rho = self._mean_reversion_factor
+        means = (
+            self._position_means(gameweeks[0])
+            if self._projection_rule == MEAN_REVERSION_PROJECTION_RULE
+            else None
+        )
+        for offset, gameweek in enumerate(gameweeks):
             for player_id, name, team_id, position, price, expected in zip(
                 *(pool[column].tolist() for column in columns), strict=True
             ):
                 count = self._fixture_counts.get((gameweek, team_id), 0)
-                scale = count if self._projection_rule == NAIVE_PROJECTION_RULE else min(count, 1)
+                if self._projection_rule == CALENDAR_BLIND_PROJECTION_RULE:
+                    projected = float(expected) * min(count, 1)
+                elif means is None or offset == 0:
+                    # The naive rule, and the mean-reversion rule's decision week, which
+                    # it leaves untouched.
+                    projected = float(expected) * count
+                else:
+                    assert rho is not None
+                    mean = means.get(str(position), 0.0)
+                    base = mean + rho**offset * (float(expected) - mean)
+                    projected = max(0.0, base) * count
                 rows.append(
                     {
                         "gameweek": gameweek,
@@ -418,7 +509,7 @@ class DecisionSeason:
                         "team_id": team_id,
                         "position": position,
                         "price_tenths": int(price),
-                        "expected_points": float(expected) * scale,
+                        "expected_points": projected,
                         "fixture_count": count,
                         "home_fixture_count": 0,
                     }

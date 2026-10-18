@@ -81,10 +81,11 @@ SEASON_WEIGHTED_MODEL_VERSION: Final = "phase_c_components_season_half_life_v1"
 # a fit under this estimator carries its own model version so a consumer cannot mistake it
 # for the linear control.
 GRADIENT_BOOSTING_MODEL_VERSION: Final = "phase_c_control_components_gbm_v1"
-# The third declared candidate, after the decision-level reading of the first: the linear
-# appearance and minutes estimators kept, only the conditional points estimator boosted. The
-# decision-level probes found the loss of the full boosted pair in its appearance probability
-# and the gain in its conditional points; this arm keeps the one and takes the other.
+# The fourth declared Phase C v2 development candidate, after the decision-level reading of
+# the boosted pair above: the linear appearance and minutes estimators kept, only the
+# conditional points estimator boosted. The decision-level probes found the loss of the full
+# boosted pair in its appearance probability and the gain in its conditional points; this
+# arm keeps the one and takes the other.
 GRADIENT_BOOSTING_POINTS_MODEL_VERSION: Final = "phase_c_control_components_gbm_points_v1"
 # The regime-gated candidate (mixture-of-experts line 3, `docs/research/moe_regime_prereg.md`):
 # one served-pair expert set per declared regime (fixture regime by rule era), mixed by a
