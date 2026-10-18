@@ -5,14 +5,9 @@
  * secondary tools as closed sections. The fixture rail is a column of its own from 1180 px.
  */
 
-.page,
-.systemPage {
+.page {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
-}
-
-.page {
   gap: var(--space-5);
   min-width: 0;
 }
@@ -781,13 +776,6 @@ section.notice p {
   overflow-wrap: anywhere;
 }
 
-.back {
-  display: inline-block;
-  margin-bottom: var(--space-2);
-  font-size: var(--step--1);
-  font-weight: 600;
-}
-
 .muted {
   color: var(--color-text-muted);
   font-size: var(--step--1);
@@ -969,25 +957,5 @@ section.notice p {
   .windowTable .pointsCell {
     grid-area: points;
     font-weight: 600;
-  }
-}
-
-.viewerClear {
-  border: none;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  text-decoration: underline;
-  cursor: pointer;
-  padding: 0;
-}
-
-/* The viewer's change and clear controls are touch targets under 1180 px. */
-@media (max-width: 1179.98px) {
-  .viewerAction,
-  .viewerClear {
-    display: inline-flex;
-    align-items: center;
-    min-height: 44px;
   }
 }

@@ -557,24 +557,7 @@ const en = {
     adviceBaselineWhileComputing:
       "This is the published pure-points, one-week plan; the requested combination is still computing.",
     adviceRequestHint: "You can ask for it with Compute in the plan.",
-    viewerTitle: "Which one is you?",
-    viewerBody:
-      "Pick your own row to get advice from your squad. Select again whenever you reopen or refresh the site.",
-    viewerSelect: "This is me",
-    /** The button's accessible name: its visible words first, then whose row it is. */
-    viewerSelectFor: (manager: string, team: string) => `This is me: ${manager}, ${team}`,
     viewerYouBadge: "you",
-    viewerPrompt: "Pick your row with “This is me”; the choice lasts for this visit only.",
-    viewerSelected: (name: string) =>
-      `Viewing as ${name}. Advice pages will start from this squad.`,
-    viewerClear: "Clear selection",
-    viewerChange: "Change member",
-    viewerMissing:
-      "Your saved selection is not in the published member list. Choose another member or clear it.",
-    viewerOpenMine: "Open my squad →",
-    notYourPageTitle: "Not your page",
-    notYourPageBody: "You picked another row as yourself; this page advises this member.",
-    notYourPageLink: "Go to my page →",
     strategyIntro:
       "Every option was solved from your own squad; a rival strategy names the member you play against.",
     strategyLegend: "Strategy",
@@ -723,12 +706,7 @@ const en = {
     entryNotAvailableBody: "Return to the member list or try again after the next publication.",
     invalidEntry: "This entry ID is not valid.",
     exampleData: "example data",
-    systemTeamBadge: "SquadOpt · system team",
-    systemTeamTitle: "SquadOpt is playing too",
     leagueNumber: (leagueId: number) => `league ${leagueId}`,
-    title: "League table",
-    memberCount: (count: number) => `${count} members`,
-    afterGameweek: (gameweek: number) => `after gameweek ${gameweek}`,
     caption: (leagueName: string) => `${leagueName} member standings`,
     rank: "Rank",
     team: "Team",
@@ -896,21 +874,7 @@ const en = {
     railNoCalendar: "The fixture calendar is not available, so no match is shown here.",
     railLoading: "Reading the fixture calendar.",
     railNoWeeks: "The calendar lists none of these gameweeks.",
-    // Direction D's league table page: the system's record, the viewer's chips and chaser.
-    karneTitle: "The system's record",
-    karneLede:
-      "How many points SquadOpt's own paper squad scored each week, beside the league mean.",
-    // The record's short week name beside its bars; the full name stays in each week's label.
-    karneWeek: (gameweek: number) => `GW${gameweek}`,
-    karneOurs: "SquadOpt squad",
-    karneLeague: "League mean",
-    karneGame: "FPL average",
-    karneNone: "no record",
-    karneReplay: "replay",
-    karneNamedEleven:
-      "Its score counts the eleven it named, with no autosubs or vice-captain step.",
-    karneReplayNote: "A week marked replay was recorded after its deadline.",
-    karneFull: "The full scoreboard",
+    // Direction D's league table page: the viewer's chips and chaser.
     chipsHalfNote: "Second-half chips are not open yet.",
     chipLine: {
       available: "ready",
@@ -1572,23 +1536,7 @@ const tr: MessageSchema<typeof en> = {
     adviceBaselineWhileComputing:
       "Bu, yayınlanmış saf puan / 1 hafta planı; istenen kombinasyon hâlâ hesaplanıyor.",
     adviceRequestHint: "Plandaki Hesapla ile isteyebilirsin.",
-    viewerTitle: "Hangisi sensin?",
-    viewerBody:
-      "Kendi satırını seç ki tavsiye kendi kadrondan hesaplansın. Siteyi yeniden açtığında veya yenilediğinde tekrar seçim yapmalısın.",
-    viewerSelect: "Bu benim",
-    viewerSelectFor: (manager: string, team: string) => `Bu benim: ${manager}, ${team}`,
     viewerYouBadge: "sen",
-    viewerPrompt: "Satırındaki “Bu benim” ile kendini seç; seçim yalnız bu ziyarette tutulur.",
-    viewerSelected: (name: string) =>
-      `${name} olarak bakıyorsun. Tavsiye sayfaları bu kadrodan başlayacak.`,
-    viewerClear: "Seçimi kaldır",
-    viewerChange: "Üyeyi değiştir",
-    viewerMissing:
-      "Kayıtlı seçimin yayımlanan üye listesinde yok. Başka bir üye seç veya seçimi kaldır.",
-    viewerOpenMine: "Kadromu aç →",
-    notYourPageTitle: "Bu senin sayfan değil",
-    notYourPageBody: "Kendin olarak başka bir satırı seçtin; bu sayfa bu üyeye öneri verir.",
-    notYourPageLink: "Kendi sayfama git →",
     strategyIntro:
       "Her seçenek senin kadrondan çözüldü; rakip stratejisi karşısında oynadığın üyeyi adlandırır.",
     strategyLegend: "Strateji",
@@ -1727,12 +1675,7 @@ const tr: MessageSchema<typeof en> = {
     entryNotAvailableBody: "Üye listesine dönebilir veya sonraki yayında yeniden deneyebilirsin.",
     invalidEntry: "Bu üye numarası geçerli değil.",
     exampleData: "örnek veri",
-    systemTeamBadge: "SquadOpt · sistem takımı",
-    systemTeamTitle: "SquadOpt da oynuyor",
     leagueNumber: (leagueId) => `lig ${leagueId}`,
-    title: "Lig tablosu",
-    memberCount: (count) => `${count} üye`,
-    afterGameweek: (gameweek) => `${gameweek}. hafta sonunda`,
     caption: (leagueName) => `${leagueName} üye sıralaması`,
     rank: "Sıra",
     team: "Takım",
@@ -1885,19 +1828,6 @@ const tr: MessageSchema<typeof en> = {
     railNoCalendar: "Fikstür takvimi okunamadı; bu yüzden burada maç gösterilmiyor.",
     railLoading: "Fikstür takvimi okunuyor.",
     railNoWeeks: "Takvim bu haftaların hiçbirini listelemiyor.",
-    karneTitle: "Sistemin karnesi",
-    karneLede:
-      "SquadOpt'un kendi kâğıt kadrosu her hafta kaç puan aldı, lig ortalamasıyla yan yana.",
-    karneWeek: (gameweek) => `${gameweek}. hafta`,
-    karneOurs: "SquadOpt kadrosu",
-    karneLeague: "Lig ortalaması",
-    karneGame: "FPL ortalaması",
-    karneNone: "kayıt yok",
-    karneReplay: "sonradan kayıt",
-    karneNamedEleven:
-      "Puanı belirlediği ilk on birin puanıdır; otomatik yedek ve yedek kaptan devreye girmez.",
-    karneReplayNote: "“Sonradan kayıt” yazan hafta son karardan sonra kaydedildi.",
-    karneFull: "Tüm skor tablosu",
     chipsHalfNote: "İkinci yarı çipleri henüz açılmadı.",
     chipLine: {
       available: "hazır",

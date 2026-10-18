@@ -1,11 +1,10 @@
-import { memberAddress, memberHistoryAddress, membersAddress } from "../../../lib/leagueAddresses";
+import { memberHistoryAddress } from "../../../lib/leagueAddresses";
 import { useLeagueId } from "../useLeague";
 import { NewInformationNotice } from "../advice/OfficialInformationCard";
 import { useMemo, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { Link, useNavigate, useSearchParams } from "react-router";
+import { Link, useSearchParams } from "react-router";
 
-import { Card } from "../../../design/components/Card";
 import { EmptyState } from "../../../design/components/EmptyState";
 import { useShellLayout } from "../../../design/shell/layout";
 import { useShell } from "../../../design/shell/ShellContext";
@@ -21,7 +20,6 @@ import { ModelComparison } from "../advice/ModelComparison";
 import { DecisionWorkbench } from "../advice/DecisionWorkbench";
 import { EVIDENCE_COPY } from "../advice/evidenceCopy";
 import type { AdviceJob } from "../advice/useAdviceJob";
-import { useViewerEntry } from "../identity/useViewerEntry";
 import { TemplatePicker } from "../templates/TemplatePicker";
 import { MemberResourceCards } from "../components/MemberResourceCards";
 import { MemberFixtureRail, type RailPlacement } from "../components/MemberFixtureRail";
@@ -128,8 +126,6 @@ function LeagueMemberContent({
   const shell = useShell();
   const view = squad.payload;
   const [searchParams] = useSearchParams();
-  const { viewer, clear } = useViewerEntry(leagueId);
-  const navigate = useNavigate();
   const {
     entryId,
     resolve,
@@ -482,40 +478,6 @@ function LeagueMemberContent({
         </section>
 
         {planSettings}
-
-        {viewer ? (
-          <Card tone="muted" title={copy.viewerTitle}>
-            <p className={styles.notice}>{copy.viewerBody}</p>
-            <p className={styles.notice}>
-              <strong>
-                {copy.viewerSelected(
-                  viewer.entryId === entryId
-                    ? (view.entry.manager_name ?? `#${viewer.entryId}`)
-                    : `#${viewer.entryId}`,
-                )}
-              </strong>{" "}
-              <Link className={styles.viewerAction} to={membersAddress(leagueId)}>
-                {copy.viewerChange}
-              </Link>{" "}
-              <button
-                type="button"
-                className={styles.viewerClear}
-                onClick={() => {
-                  clear();
-                  navigate(membersAddress(leagueId), { replace: true });
-                }}
-              >
-                {copy.viewerClear}
-              </button>
-            </p>
-            {viewer.entryId !== entryId ? (
-              <p className={styles.notice}>
-                <strong>{copy.notYourPageTitle}</strong> {copy.notYourPageBody}{" "}
-                <Link to={memberAddress(leagueId, viewer.entryId)}>{copy.notYourPageLink}</Link>
-              </p>
-            ) : null}
-          </Card>
-        ) : null}
 
         <div className={styles.tools}>
           {onPitch.source === "plan" && view.starting_xi.length > 0 ? (
