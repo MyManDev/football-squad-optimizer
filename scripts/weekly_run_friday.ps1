@@ -15,13 +15,16 @@ param(
     [string]$RepoRoot = '',
     [int]$Workers = 15,
     [int]$Gameweek = 0,
+    [string]$ClubNewsSettings = '',
+    [switch]$ClubNews,
     [switch]$DryRun
 )
 Set-StrictMode -Version 2.0
 $ErrorActionPreference = 'Stop'
 $script = Join-Path $PSScriptRoot 'weekly_run.ps1'
-$arguments = @{ Kind = 'friday'; Workers = $Workers; Gameweek = $Gameweek }
+$arguments = @{ Kind = 'friday'; Workers = $Workers; Gameweek = $Gameweek; ClubNewsSettings = $ClubNewsSettings }
 if ($RepoRoot) { $arguments.RepoRoot = $RepoRoot }
 if ($DryRun) { $arguments.DryRun = $true }
+if ($ClubNews) { $arguments.ClubNews = $true }
 & $script @arguments
 exit $LASTEXITCODE
