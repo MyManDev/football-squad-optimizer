@@ -310,6 +310,16 @@ describe("what the fixtures page leaves out", () => {
       );
     },
   );
+
+  it("draws no rule between the days of a fixture list", () => {
+    const css = stylesheet();
+    const day = css.match(/(^|\n)\.day\s*\{([^}]*)\}/)?.[2];
+    expect(day).toBeDefined();
+    expect(day).not.toMatch(/border/);
+    // Nothing else in the page's stylesheet draws a rule either; space keeps the days apart.
+    expect(css).not.toMatch(/border/);
+    expect(css.match(/\.days\s*\{([^}]*)\}/)?.[1]).toMatch(/gap:\s*var\(--space-4\)/);
+  });
 });
 
 describe("the upcoming pair", () => {
