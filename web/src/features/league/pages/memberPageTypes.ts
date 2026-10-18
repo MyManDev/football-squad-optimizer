@@ -60,6 +60,13 @@ export interface LeagueMemberViewProps {
    */
   deadlinePassed?: string | null;
   rivalSquad?: LeagueViewEnvelope<EntrySquad> | null;
+  /** The entry document of the rival `?duel=` names (#1133); null while none is named or read. */
+  duelSquad?: LeagueViewEnvelope<EntrySquad> | null;
+  /**
+   * Why a named duel rival has no document yet: still being read, not in the week's
+   * publication, or a read that failed.
+   */
+  duelIssue?: "loading" | "missing" | "unreadable";
   /**
    * The published fixture calendar the page already reads for the deadline: the open
    * deadline in the top bar and the clubs' next three gameweeks on the boards come from it.

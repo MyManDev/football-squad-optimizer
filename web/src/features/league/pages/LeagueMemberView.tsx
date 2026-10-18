@@ -37,6 +37,9 @@ import { hasLineup, squadOnPitch } from "./squadOnPitch";
 import { MemberTopBar } from "./MemberTopBar";
 import type { LeagueMemberViewProps } from "./memberPageTypes";
 import { useMemberAdviceView } from "./useMemberAdviceView";
+import { rivalCandidates } from "../advice/adviceSelection";
+import { canDuel, duelRivalId } from "./duelSides";
+import { RivalDuel } from "./RivalDuel";
 import { WeekStory } from "./WeekStory";
 import styles from "./LeagueMemberPage.module.css";
 
@@ -83,9 +86,18 @@ function computeEcho(copy: MemberCopy, state: AdviceJob["state"]): string | null
 }
 
 /** A closed section of the page's secondary tools, read one click away. */
-function Tool({ title, children }: { title: string; children: ReactNode }) {
+function Tool({
+  title,
+  open,
+  children,
+}: {
+  title: string;
+  /** Opened by the address, as the duel is by a link that names a rival. */
+  open?: boolean;
+  children: ReactNode;
+}) {
   return (
-    <details className={styles.tool}>
+    <details className={styles.tool} open={open || undefined}>
       <summary className={styles.toolSummary}>
         <DisclosureIcon className={styles.toolIcon} />
         <span>{title}</span>
@@ -113,6 +125,8 @@ function LeagueMemberContent({
   deviceDependencies,
   deviceRivals,
   rivalSquad = null,
+  duelSquad = null,
+  duelIssue,
   windowControl = null,
   deadlinePassed = null,
   fixtures = null,
@@ -124,7 +138,7 @@ function LeagueMemberContent({
   const layout = useShellLayout();
   const shell = useShell();
   const view = squad.payload;
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const {
     entryId,
     resolve,
@@ -164,6 +178,9 @@ function LeagueMemberContent({
     selection.status === "not-listed" &&
     ((computeAvailable && selection.computable !== undefined) ||
       (device.available && deadlinePassed === null && !deviceEndedWithoutPlan(device.state)));
+  // The duel (#1133): the other human members, and the one `?duel=` names among them.
+  const duelCandidates = rivalCandidates(members, view.entry.entry_id);
+  const duelId = duelRivalId(searchParams, members, view.entry.entry_id);
   const selectedRival = members.find(
     (member) => member.entry_id === selection.request.rivalEntryId,
   );
@@ -506,6 +523,27 @@ function LeagueMemberContent({
               />
             ) : null}
           </Tool>
+          {canDuel(squad) && duelCandidates.length > 0 ? (
+            <Tool title={copy.duelTitle} open={duelId !== null}>
+              <RivalDuel
+                squad={squad}
+                candidates={duelCandidates}
+                selected={duelId}
+                rival={duelSquad?.payload.entry.entry_id === duelId ? duelSquad : null}
+                issue={duelIssue}
+                onSelect={(rivalId) =>
+                  setSearchParams(
+                    (current) => {
+                      const next = new URLSearchParams(current);
+                      next.set("duel", String(rivalId));
+                      return next;
+                    },
+                    { replace: true },
+                  )
+                }
+              />
+            </Tool>
+          ) : null}
           <Tool title={copy.chipsAndTransfers}>
             <MemberResourceCards squad={view} />
           </Tool>
