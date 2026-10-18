@@ -15,6 +15,7 @@ runners live in `scripts/`, and its records are committed under `docs/`.
 | Phase C gradient-boosting candidate (declaration and comparison method) | [Gradient-boosting method](phase_c_gradient_boosting_method.md) |
 | Phase C feature contract v2 (declaration and comparison method) | [Feature contract v2 method](phase_c_feature_contract_v2_method.md) |
 | Phase C points-only gradient-boosting candidate (declaration, comparison method and decision-level reading) | [Points-only gradient-boosting method](phase_c_gradient_boosting_points_method.md) |
+| Regime-gated experts for the Phase C components (mixture-of-experts line 3: declaration, rule and decision-level reading) | [Regime pre-registration](moe_regime_prereg.md) |
 | Prospective benchmark of the live decisions (the Phase A exit) | [Benchmark V2 pre-registration](../benchmark_v2_prereg.md) |
 | Experimental football model: development, results and the served model | [Implementation and evidence contract](football_candidate_development.md), [results and rejected ablations](football_candidate_results.md), [experimental football model in member advice](../live-football-model.md) |
 | Football prospective reading | [Football prospective pre-registration](../football_prospective_prereg.md) |
