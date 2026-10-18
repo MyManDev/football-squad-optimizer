@@ -1,7 +1,6 @@
 import { Card } from "../../design/components/Card";
 import { EmptyState } from "../../design/components/EmptyState";
 import { useLanguage } from "../../i18n/context";
-import { local } from "../../lib/format";
 import { upcomingFixtureWeeks, useFixtures } from "./data";
 import { FIXTURES_COPY } from "./fixturesCopy";
 import { GameweekFixtures } from "./GameweekFixtures";
@@ -9,7 +8,7 @@ import type { FixtureGameweek } from "./types";
 import styles from "./Fixtures.module.css";
 
 /**
- * This week and next at the top, then every played gameweek, newest first. The weeks stand
+ * This week and next at the top, sharing the row, then every played gameweek, newest first,
  * side by side where the column has room for more than one, so a wide screen reads the
  * schedule like a fixture board instead of one narrow list down the page.
  */
@@ -29,7 +28,6 @@ export function FixturesPage() {
           ? `${label} · ${messages.common.gameweek(entry.gameweek)}`
           : messages.common.gameweek(entry.gameweek)
       }
-      aside={copy.deadline(local(entry.deadline_utc, locale))}
     >
       <GameweekFixtures week={entry} locale={locale} copy={copy} />
     </Card>
@@ -43,7 +41,7 @@ export function FixturesPage() {
         <p className={styles.lede}>{copy.pageLede}</p>
       </header>
       {current || next ? (
-        <div className={styles.weeks}>
+        <div className={styles.upcoming} data-mark="upcoming-weeks">
           {current ? week(current, copy.thisWeek) : null}
           {next ? week(next, copy.nextWeek) : null}
         </div>
@@ -54,10 +52,9 @@ export function FixturesPage() {
       ) : (
         <div className={styles.weeks}>{past.map((entry) => week(entry))}</div>
       )}
-      <p className={styles.lede}>
-        {copy.capturedAt(local(data.captured_at_utc, locale))}
-        {data.unscheduled_count > 0 ? ` ${copy.unscheduledCount(data.unscheduled_count)}` : null}
-      </p>
+      {data.unscheduled_count > 0 ? (
+        <p className={styles.lede}>{copy.unscheduledCount(data.unscheduled_count)}</p>
+      ) : null}
     </div>
   );
 }

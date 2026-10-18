@@ -1,3 +1,4 @@
+import { ClubSwatch } from "../../design/components/ClubSwatch";
 import type { FixturesCopy } from "./fixturesCopy";
 import type { Fixture, FixtureGameweek } from "./types";
 import styles from "./Fixtures.module.css";
@@ -51,6 +52,11 @@ function Middle({
   );
 }
 
+/**
+ * One gameweek's fixtures grouped by local day. Each club is printed by its code with its
+ * two colours beside it, on the side facing the middle, so a row reads the same from both
+ * ends.
+ */
 export function GameweekFixtures({
   week,
   locale,
@@ -71,9 +77,11 @@ export function GameweekFixtures({
               <li key={fixture.fixture_id} className={styles.row}>
                 <span className={styles.home} title={fixture.home.name}>
                   {fixture.home.short_name}
+                  <ClubSwatch code={fixture.home.short_name} split />
                 </span>
                 <Middle fixture={fixture} locale={locale} copy={copy} />
                 <span className={styles.away} title={fixture.away.name}>
+                  <ClubSwatch code={fixture.away.short_name} split />
                   {fixture.away.short_name}
                 </span>
               </li>
