@@ -19,6 +19,7 @@ import {
   useEntrySquads,
   useLeagueMembers,
 } from "../queries";
+import { duelRivalId } from "./duelSides";
 import { deviceRequestFor, memberSelection } from "./memberSelection";
 
 /** The other human members' entry ids: the rivals a rival strategy may name. */
@@ -203,6 +204,11 @@ export function useLeagueMemberData(entryParam: string | undefined, searchParams
       deviceSolve?.kind === "rival",
   );
 
+  // The duel reads one more entry document of the same capture, and only when a link
+  // names a rival; the device's reads above share it where they already hold it.
+  const duelId = ownSquad ? duelRivalId(searchParams, members, ownSquad.entry.entry_id) : null;
+  const duel = useEntrySquad(duelId, duelId !== null);
+
   return {
     validEntryId,
     squad,
@@ -214,6 +220,8 @@ export function useLeagueMemberData(entryParam: string | undefined, searchParams
     adviceEnabled,
     advice,
     rival,
+    duel,
+    duelId,
     deviceRivals,
     windowControl,
     client,
