@@ -46,6 +46,7 @@ from squadopt.prediction.component_models import (
     EQUAL_WEIGHTING,
     GRADIENT_BOOSTING_MODEL_VERSION,
     GRADIENT_BOOSTING_POINTS_MODEL_VERSION,
+    MIXTURE_MODEL_VERSION,
     REGIME_MODEL_VERSION,
     SEASON_HALF_LIFE_WEIGHTING,
     SEASON_WEIGHTED_MODEL_VERSION,
@@ -82,6 +83,13 @@ CANDIDATE_ARMS = {
         "candidate_id": "phase_c_v2_gradient_boosting_points_vs_linear",
         "table": f"{DEVELOPMENT_OOF_CONTRACT_VERSION}_equal_gradient_boosting_points",
         "reference": "gradient_boosting_points candidate",
+    },
+    "mixture": {
+        "weighting": EQUAL_WEIGHTING,
+        "model_version": MIXTURE_MODEL_VERSION,
+        "candidate_id": "phase_c_v2_mixture_vs_linear",
+        "table": f"{DEVELOPMENT_OOF_CONTRACT_VERSION}_equal_mixture",
+        "reference": "mixture candidate",
     },
     "regime": {
         "weighting": EQUAL_WEIGHTING,

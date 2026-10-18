@@ -87,6 +87,13 @@ GRADIENT_BOOSTING_MODEL_VERSION: Final = "phase_c_control_components_gbm_v1"
 # boosted pair in its appearance probability and the gain in its conditional points; this
 # arm keeps the one and takes the other.
 GRADIENT_BOOSTING_POINTS_MODEL_VERSION: Final = "phase_c_control_components_gbm_points_v1"
+# The fourth declared candidate (`docs/research/moe_mixture_prereg.md`): the appearance
+# estimator kept, each conditional ridge replaced by a gated mixture of two ridge experts.
+# The gate is the served appearance estimator's logistic regression fitted on a supervised
+# regime label of the training rows; the expected value is the gate-weighted mean and the
+# predictive distribution the gated mixture of the experts' Gaussian residuals. The regime
+# rules and the scale floors below are constants of the declaration, never searched.
+MIXTURE_MODEL_VERSION: Final = "phase_c_control_components_mixture_v1"
 # The regime-gated candidate (mixture-of-experts line 3, `docs/research/moe_regime_prereg.md`):
 # one served-pair expert set per declared regime (fixture regime by rule era), mixed by a
 # multinomial logistic gate on the v1 features plus the regime terms. Equal weighting only;
@@ -95,12 +102,39 @@ REGIME_MODEL_VERSION: Final = "phase_c_control_components_regime_v1"
 LINEAR_ESTIMATOR: Final = "linear"
 GRADIENT_BOOSTING_ESTIMATOR: Final = "gradient_boosting"
 GRADIENT_BOOSTING_POINTS_ESTIMATOR: Final = "gradient_boosting_points"
+MIXTURE_ESTIMATOR: Final = "mixture"
 REGIME_ESTIMATOR: Final = "regime"
 ESTIMATORS: Final = (
     LINEAR_ESTIMATOR,
     GRADIENT_BOOSTING_ESTIMATOR,
     GRADIENT_BOOSTING_POINTS_ESTIMATOR,
+    MIXTURE_ESTIMATOR,
     REGIME_ESTIMATOR,
+)
+# A training row is in the `full` minutes regime when it played at least the 60-minute
+# appearance threshold of the scoring rules in every fixture of its gameweek, and in the
+# `return` points regime when it scored the two points of a full appearance plus at least two
+# more (a clean sheet, a goal, an assist or bonus).
+MINUTES_FULL_THRESHOLD_PER_FIXTURE: Final = 60.0
+POINTS_RETURN_THRESHOLD: Final = 4.0
+# Residual scales are floored so a near-constant expert cannot claim a point mass.
+MINUTES_SCALE_FLOOR: Final = 1.0
+POINTS_SCALE_FLOOR: Final = 0.5
+# The predictive family each estimator writes to the distribution sidecar.
+SINGLE_GAUSSIAN_FAMILY: Final = "gaussian_1"
+MIXTURE_FAMILY: Final = "gaussian_mixture_2"
+DISTRIBUTION_COLUMNS: Final = (
+    "distribution_family",
+    "minutes_gate",
+    "minutes_mean_low",
+    "minutes_mean_high",
+    "minutes_scale_low",
+    "minutes_scale_high",
+    "points_gate",
+    "points_mean_low",
+    "points_mean_high",
+    "points_scale_low",
+    "points_scale_high",
 )
 
 # The regimes of the gated candidate. A row's label is the cross of its fixture regime
@@ -202,17 +236,64 @@ class ComponentModelConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class GatedMixtureRegressor:
+    """A gated mixture of two ridge experts over one conditional target.
+
+    ``gate`` is a logistic regression for the high regime (``full`` minutes, a points
+    ``return``), ``low`` and ``high`` the ridge experts fitted on each regime's rows alone,
+    and the scales the experts' residual standard deviations on their own rows. ``predict``
+    returns the gate-weighted mean, so the fitted model reads like the ridge it replaces;
+    ``parameters`` returns what the mean hides, the two means and the gate weight, for the
+    distribution sidecar.
+    """
+
+    gate: Pipeline
+    low: Pipeline
+    high: Pipeline
+    low_scale: float
+    high_scale: float
+    low_rows: int
+    high_rows: int
+
+    def high_weight(self, design: pd.DataFrame) -> npt.NDArray[np.float64]:
+        weight: npt.NDArray[np.float64] = np.clip(
+            self.gate.predict_proba(design)[:, 1], 0.0, 1.0
+        ).astype("float64")
+        return weight
+
+    def parameters(
+        self, design: pd.DataFrame
+    ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64], npt.NDArray[np.float64]]:
+        """The gate weight of the high expert and the two expert means, in the input order."""
+
+        weight = self.high_weight(design)
+        low = np.asarray(self.low.predict(design), dtype="float64")
+        high = np.asarray(self.high.predict(design), dtype="float64")
+        return weight, low, high
+
+    def predict(self, design: pd.DataFrame) -> npt.NDArray[np.float64]:
+        weight, low, high = self.parameters(design)
+        mean: npt.NDArray[np.float64] = weight * high + (1.0 - weight) * low
+        return mean
+
+
+@dataclass(frozen=True, slots=True)
 class FittedComponentModels:
     """The three fitted estimators, with the rows each was fitted on.
 
     ``season_weights`` records the declared, un-normalized weight of every training season
     that reached the fit, so a manifest can show which rows counted for how much without
     re-deriving the rule. Under equal weighting every season weighs 1.
+
+    ``minutes_scale`` and ``points_scale`` are the residual standard deviations of the two
+    linear conditional estimators on their training rows (floored), the single Gaussian the
+    mixture candidate's predictive distribution is scored against. They are missing for the
+    boosted arms, which declare no distribution.
     """
 
     appearance: "Pipeline | RegimeMixture"
-    minutes: "Pipeline | RegimeMixture"
-    points: "Pipeline | RegimeMixture"
+    minutes: "Pipeline | GatedMixtureRegressor | RegimeMixture"
+    points: "Pipeline | GatedMixtureRegressor | RegimeMixture"
     feature_columns: tuple[str, ...]
     appearance_rows: int
     conditional_rows: int
@@ -220,6 +301,8 @@ class FittedComponentModels:
     weighting: str = EQUAL_WEIGHTING
     season_weights: tuple[tuple[str, float], ...] = ()
     estimator: str = LINEAR_ESTIMATOR
+    minutes_scale: float | None = None
+    points_scale: float | None = None
     # The season the fit predicts; only the regime candidate needs it, for the season-age
     # term of its gate. ``None`` for every other estimator.
     target_season: str | None = None
@@ -509,6 +592,7 @@ def fit_component_models(
 
     boosted = settings.estimator == GRADIENT_BOOSTING_ESTIMATOR
     boosted_points = settings.estimator == GRADIENT_BOOSTING_POINTS_ESTIMATOR
+    mixture = settings.estimator == MIXTURE_ESTIMATOR
     regime = settings.estimator == REGIME_ESTIMATOR
     if (boosted or boosted_points or regime) and weighting is not None:
         raise PredictionConfigurationError(
@@ -517,6 +601,10 @@ def fit_component_models(
     if regime and target_season is None:
         raise PredictionConfigurationError(
             "The regime candidate needs the target season for its season-age term."
+        )
+    if mixture and weighting is not None:
+        raise PredictionConfigurationError(
+            "The mixture candidate is declared under equal weighting only."
         )
 
     usable = training.loc[complete_feature_rows(training, columns)]
@@ -595,15 +683,71 @@ def fit_component_models(
     appearance_model.fit(
         _design(usable, columns), appearance_target.astype("int64"), **appearance_fit
     )
-    minutes_model.fit(
-        _design(conditional, columns),
-        pd.to_numeric(conditional["minutes_target"], errors="raise").astype("float64"),
-        **minutes_fit,
+    conditional_design = _design(conditional, columns)
+    minutes_target = pd.to_numeric(conditional["minutes_target"], errors="raise").astype("float64")
+    points_target = pd.to_numeric(conditional["points_target"], errors="raise").astype("float64")
+
+    if mixture:
+        if FIXTURE_COUNT_COLUMN not in conditional.columns:
+            raise PredictionConfigurationError(
+                f"The mixture candidate needs {FIXTURE_COUNT_COLUMN!r} on the training rows "
+                "for its minutes regime label."
+            )
+        fixtures = pd.to_numeric(conditional[FIXTURE_COUNT_COLUMN], errors="raise").astype(
+            "float64"
+        )
+        minutes_regime = (
+            minutes_target.to_numpy() >= MINUTES_FULL_THRESHOLD_PER_FIXTURE * fixtures.to_numpy()
+        )
+        points_regime = points_target.to_numpy() >= POINTS_RETURN_THRESHOLD
+        minimum_regime_rows = max(2, settings.minimum_training_rows // 4)
+        minutes_mixture = _fit_gated_mixture(
+            conditional_design,
+            minutes_target,
+            minutes_regime,
+            settings=settings,
+            alpha=settings.minutes_alpha,
+            scale_floor=MINUTES_SCALE_FLOOR,
+            minimum_regime_rows=minimum_regime_rows,
+        )
+        points_mixture = _fit_gated_mixture(
+            conditional_design,
+            points_target,
+            points_regime,
+            settings=settings,
+            alpha=settings.points_alpha,
+            scale_floor=POINTS_SCALE_FLOOR,
+            minimum_regime_rows=minimum_regime_rows,
+        )
+        # A regime too thin to fit is refused like thin history, not filled with the ridge.
+        if minutes_mixture is None or points_mixture is None:
+            return None
+        return FittedComponentModels(
+            appearance=appearance_model,
+            minutes=minutes_mixture,
+            points=points_mixture,
+            feature_columns=columns,
+            appearance_rows=len(usable),
+            conditional_rows=len(conditional),
+            model_version=MIXTURE_MODEL_VERSION,
+            weighting=EQUAL_WEIGHTING,
+            season_weights=season_weights,
+            estimator=settings.estimator,
+        )
+
+    minutes_model.fit(conditional_design, minutes_target, **minutes_fit)
+    points_model.fit(conditional_design, points_target, **points_fit)
+    # The linear conditional estimators declare a single Gaussian residual; the boosted arms
+    # declare no distribution and carry no scale.
+    minutes_scale = (
+        None
+        if boosted
+        else _residual_scale(minutes_model, conditional_design, minutes_target, MINUTES_SCALE_FLOOR)
     )
-    points_model.fit(
-        _design(conditional, columns),
-        pd.to_numeric(conditional["points_target"], errors="raise").astype("float64"),
-        **points_fit,
+    points_scale = (
+        None
+        if boosted or boosted_points
+        else _residual_scale(points_model, conditional_design, points_target, POINTS_SCALE_FLOOR)
     )
 
     return FittedComponentModels(
@@ -625,6 +769,71 @@ def fit_component_models(
         weighting=EQUAL_WEIGHTING if weighting is None else weighting.label,
         season_weights=season_weights,
         estimator=settings.estimator,
+        minutes_scale=minutes_scale,
+        points_scale=points_scale,
+    )
+
+
+def _residual_scale(
+    model: Pipeline, design: pd.DataFrame, target: pd.Series, floor: float
+) -> float:
+    """The floored standard deviation (``ddof=1``) of a fitted estimator's training residuals."""
+
+    residuals = target.to_numpy(dtype="float64") - np.asarray(
+        model.predict(design), dtype="float64"
+    )
+    scale = float(np.std(residuals, ddof=1)) if len(residuals) > 1 else 0.0
+    return max(scale, floor)
+
+
+def _fit_gated_mixture(
+    design: pd.DataFrame,
+    target: pd.Series,
+    high_regime: npt.NDArray[np.bool_],
+    *,
+    settings: ComponentModelConfig,
+    alpha: float,
+    scale_floor: float,
+    minimum_regime_rows: int,
+) -> GatedMixtureRegressor | None:
+    """Fit one gated mixture, or return ``None`` when a regime is too thin to fit.
+
+    The gate is the served appearance estimator (standardized logistic regression, the same
+    constants) on the regime label; the experts are the served ridge (the same alpha) on each
+    regime's rows alone, every row weighing 1. Nothing here is searched.
+    """
+
+    high_rows = int(high_regime.sum())
+    low_rows = int(len(high_regime) - high_rows)
+    if min(high_rows, low_rows) < minimum_regime_rows:
+        return None
+    gate = make_pipeline(
+        StandardScaler(),
+        LogisticRegression(
+            C=settings.appearance_regularization,
+            max_iter=settings.appearance_max_iterations,
+            solver="lbfgs",
+            random_state=RANDOM_STATE,
+        ),
+    )
+    gate.fit(design, high_regime.astype("int64"))
+    experts: list[Pipeline] = []
+    scales: list[float] = []
+    for mask in (~high_regime, high_regime):
+        expert = make_pipeline(StandardScaler(), Ridge(alpha=alpha, solver="cholesky"))
+        expert_design = design.loc[mask]
+        expert_target = target.loc[mask]
+        expert.fit(expert_design, expert_target)
+        experts.append(expert)
+        scales.append(_residual_scale(expert, expert_design, expert_target, scale_floor))
+    return GatedMixtureRegressor(
+        gate=gate,
+        low=experts[0],
+        high=experts[1],
+        low_scale=scales[0],
+        high_scale=scales[1],
+        low_rows=low_rows,
+        high_rows=high_rows,
     )
 
 
@@ -893,3 +1102,81 @@ def predict_components(
         },
         index=index,
     ).loc[:, list(COMPONENT_PREDICTION_COLUMNS)]
+
+
+def predict_component_distribution(
+    models: FittedComponentModels | None,
+    scoring: pd.DataFrame,
+    *,
+    feature_columns: Sequence[str],
+) -> pd.DataFrame:
+    """The predictive distribution parameters behind the conditional means, per modelled row.
+
+    Returns :data:`DISTRIBUTION_COLUMNS` for exactly the rows :func:`predict_components`
+    puts on the ``component_model`` route with a fitted model and a non-blank gameweek, in
+    the input's order and under the input's index. The linear arm writes a single Gaussian
+    (family ``gaussian_1``: gate 0, the low slots filled, the high slots missing); the
+    mixture arm writes both experts and the gate weight of the high one (family
+    ``gaussian_mixture_2``). The means are the experts' own outputs, before the public
+    bounds. An arm that declares no distribution (the boosted arms) returns no rows, as does
+    a fold with no fitted model.
+    """
+
+    if not isinstance(scoring, pd.DataFrame):
+        raise PredictionConfigurationError("predict_component_distribution expects a DataFrame.")
+    columns = tuple(str(column) for column in feature_columns)
+    empty = pd.DataFrame({column: pd.Series(dtype="object") for column in DISTRIBUTION_COLUMNS})
+    if models is None:
+        return empty
+    if models.feature_columns != columns:
+        raise PredictionConfigurationError(
+            "feature_columns must match the columns the models were fitted on."
+        )
+    if FIXTURE_COUNT_COLUMN not in scoring.columns:
+        raise PredictionConfigurationError(
+            f"Scoring frame must carry {FIXTURE_COUNT_COLUMN!r} to skip blank gameweeks."
+        )
+    fixtures = pd.to_numeric(scoring[FIXTURE_COUNT_COLUMN], errors="raise").astype("int64")
+    modelled = complete_feature_rows(scoring, columns) & (fixtures > 0)
+    if not bool(modelled.any()):
+        return empty
+    design = _design(scoring.loc[modelled], columns)
+    index = design.index
+    missing = pd.Series(np.nan, index=index, dtype="float64")
+
+    def single(model: Pipeline | GatedMixtureRegressor, scale: float | None) -> dict[str, object]:
+        if isinstance(model, GatedMixtureRegressor):
+            weight, low, high = model.parameters(design)
+            return {
+                "gate": pd.Series(weight, index=index, dtype="float64"),
+                "mean_low": pd.Series(low, index=index, dtype="float64"),
+                "mean_high": pd.Series(high, index=index, dtype="float64"),
+                "scale_low": pd.Series(model.low_scale, index=index, dtype="float64"),
+                "scale_high": pd.Series(model.high_scale, index=index, dtype="float64"),
+            }
+        if scale is None:
+            return {}
+        return {
+            "gate": pd.Series(0.0, index=index, dtype="float64"),
+            "mean_low": pd.Series(
+                np.asarray(model.predict(design), dtype="float64"), index=index, dtype="float64"
+            ),
+            "mean_high": missing,
+            "scale_low": pd.Series(scale, index=index, dtype="float64"),
+            "scale_high": missing,
+        }
+
+    minutes = single(models.minutes, models.minutes_scale)
+    points = single(models.points, models.points_scale)
+    if not minutes or not points:
+        return empty
+    family = MIXTURE_FAMILY if models.estimator == MIXTURE_ESTIMATOR else SINGLE_GAUSSIAN_FAMILY
+    frame = pd.DataFrame(
+        {
+            "distribution_family": pd.Series(family, index=index, dtype="string"),
+            **{f"minutes_{name}": series for name, series in minutes.items()},
+            **{f"points_{name}": series for name, series in points.items()},
+        },
+        index=index,
+    )
+    return frame.loc[:, list(DISTRIBUTION_COLUMNS)]
