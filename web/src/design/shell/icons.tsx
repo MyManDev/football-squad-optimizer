@@ -17,6 +17,12 @@ const STROKE = {
 } as const;
 
 const NAV_PATHS: Record<NavKey, ReactNode> = {
+  findLeague: (
+    <>
+      <circle cx="7.5" cy="7.5" r="5" />
+      <path d="M11.2 11.2l4.3 4.3" />
+    </>
+  ),
   thisWeek: <path d="M5.5 2.5v12M2.5 11.5l3 3 3-3M12.5 15.5v-12M9.5 6.5l3-3 3 3" />,
   squad: (
     <path d="M6.5 2.5L2.5 4.5 4 8l2-.8v8.3h6V7.2l2 .8 1.5-3.5-4-2c-.4 1.2-1.4 2-2.5 2s-2.1-.8-2.5-2z" />
@@ -111,6 +117,23 @@ export function CloseIcon() {
       {...STROKE}
     >
       <path strokeWidth={1.8} d="M5 5l10 10M15 5L5 15" />
+    </svg>
+  );
+}
+
+/** A head and shoulders: who the visitor said they are. */
+export function PersonIcon() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 18 18"
+      aria-hidden="true"
+      focusable="false"
+      {...STROKE}
+    >
+      <circle cx="9" cy="6" r="3" />
+      <path d="M3 15.5c.8-3 3.2-4.5 6-4.5s5.2 1.5 6 4.5" />
     </svg>
   );
 }

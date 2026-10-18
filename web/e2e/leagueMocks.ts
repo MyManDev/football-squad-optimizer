@@ -12,6 +12,7 @@ import {
 import type { AdviceStrategy } from "../src/features/league/types";
 import type { WindowSize } from "../src/lib/decisionVocabulary";
 import { shippedTrees } from "../src/testSupport/shippedTrees";
+import { claimMember, EXAMPLE_CLAIM, type SeededClaim } from "./identity";
 
 const STRATEGIES: readonly AdviceStrategy[] = [
   "saf-puan",
@@ -67,8 +68,16 @@ export function openCalendar() {
  * every `/api/v1/` request is aborted as a refused connection, which the page reads as a
  * backend that is down. The abort is registered first, and Playwright tries the most
  * recently registered route first, so a spec that needs the API routes it after this call.
+ *
+ * The visitor has also said who they are: the example league's first member, seeded in the
+ * tab (storageState cannot carry sessionStorage). A spec that serves its own member list
+ * passes a member it serves, and a spec about the picker passes `claim: null`.
  */
-export async function installLeagueMocks(page: Page) {
+export async function installLeagueMocks(
+  page: Page,
+  { claim = EXAMPLE_CLAIM }: { claim?: SeededClaim | null } = {},
+) {
+  if (claim !== null) await claimMember(page, claim);
   // Registered first, so every route below wins over it: a document the example league
   // does not carry (the scoreboard, the histories, the series, the device inputs) is the
   // shipped tree's, read from wherever the site publishes it. Before the directory these

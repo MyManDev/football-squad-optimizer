@@ -2,7 +2,14 @@ import { expect, test } from "@playwright/test";
 
 import fixtures from "../public/data/fixtures.json" with { type: "json" };
 import indexFixture from "../public/data/index.json" with { type: "json" };
+import { claimMember, shippedClaim } from "./identity";
 import { CLUB_COLOURS } from "../src/lib/clubs";
+
+// The gameweek page stands behind the league number and "Sen kimsin?"; this visitor has
+// taken both, as the published league's first member.
+test.beforeEach(async ({ page }) => {
+  await claimMember(page, shippedClaim());
+});
 
 // The fixtures page reads whatever week the shipped fixture list names, which moves with every
 // publish.

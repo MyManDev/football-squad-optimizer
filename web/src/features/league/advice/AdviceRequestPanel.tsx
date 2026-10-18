@@ -1,9 +1,9 @@
 /**
  * Hesapla: the member's button, and every state it can land in.
  *
- * The request comes from the page's shared selection and squad context;
- * the viewer's claim says whose squad the computation starts from. Every state is a
- * sentence the member can act on — queued, running with the published answer
+ * The request comes from the page's shared selection and squad context; the member
+ * the visitor said they are says whose squad the computation starts from. Every state is
+ * a sentence the member can act on: queued, running with the published answer
  * showing, done with the capture identity beside it, honestly unavailable when only
  * the static site is there.
  *
@@ -30,7 +30,7 @@
 import { Badge } from "../../../design/components/Badge";
 import { useLanguage } from "../../../i18n/context";
 import { local } from "../../../lib/format";
-import { useViewerEntry } from "../identity/useViewerEntry";
+import { useLeagueIdentity } from "../identity/useLeagueIdentity";
 import type { AdviceRequest } from "./adviceClient";
 import { canComputeAdvice } from "./adviceSelection";
 import { COMPUTE_COPY, failureSentence } from "./computeCopy";
@@ -123,9 +123,9 @@ export function AdviceRequestPanel({
   const { language, locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
   const computeCopy = COMPUTE_COPY[language];
-  const { viewer } = useViewerEntry(request.leagueId);
+  const { member } = useLeagueIdentity(request.leagueId);
   const { state, compute } = job;
-  const isSelf = viewer !== null && viewer.entryId === request.entryId;
+  const isSelf = member?.entryId === request.entryId;
   const supported =
     !deadlinePassed &&
     (service === "ready"

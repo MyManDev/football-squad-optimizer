@@ -212,6 +212,30 @@ describe.each(["tr", "en"] as const)("honest publication states in %s", (languag
     },
   );
 
+  it("draws no squad at the system team's old address, only the invalid-entry state", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+    clients.push(client);
+    render(
+      <QueryClientProvider client={client}>
+        <LanguageProvider initialLanguage={language}>
+          <MemoryRouter initialEntries={[`${membersAddress(LEAGUE)}/squadopt`]}>
+            {withLeague(
+              <Routes>
+                <Route path="/league/:leagueId/members/:entryId" element={<LeagueMemberPage />} />
+              </Routes>,
+            )}
+          </MemoryRouter>
+        </LanguageProvider>
+      </QueryClientProvider>,
+    );
+    expect(await screen.findByText(copy.invalidEntry)).toBeInTheDocument();
+    expect(document.body).not.toHaveTextContent(/SquadOpt da oynuyor|SquadOpt is playing too/);
+    expect(
+      screen.queryByRole("list", { name: MESSAGES[language].squad.pitchLabel }),
+    ).not.toBeInTheDocument();
+    expect(reads.entrySquad).not.toHaveBeenCalled();
+  });
+
   it.each(["missing", "unreadable"] as const)("distinguishes a %s member list", async (kind) => {
     reads.members.mockRejectedValue(
       kind === "missing"
