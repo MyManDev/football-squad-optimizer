@@ -47,14 +47,14 @@ Scored on 52517 rows that appeared and sit on the component route in both arms: 
 
 ## (c) The 147 decision folds
 
-The candidate was exported at the same commit for the frozen decision seasons 2021-22 to 2024-25 and run through the repository's decision comparison (`scripts.evaluate_phase_c_components --development-contract phase_c_component_oof_development_v2`): 147 folds, squads solved from the arm's expected points and scored under the official autosub and captain rules, against the frozen ridge control on the same folds. The linear components' row is the reading recorded beside the gradient-boosting comparison. The development-contract admission of the decision scorer is commit `b344b9ca7` on `feat/component-decision-development-arm`, not on this branch; the scorer ran from that checkout on this branch's exported table, as the earlier gradient-boosting records did.
+The candidate was exported at the same commit for the frozen decision seasons 2021-22 to 2024-25 and run through the repository's decision comparison (`scripts.evaluate_phase_c_components --development-contract phase_c_component_oof_development_v2`): 147 folds, squads solved from the arm's expected points and scored under the official autosub and captain rules, against the frozen ridge control on the same folds. The linear components' row is the reading recorded beside the gradient-boosting comparison. The decision tables were exported at `69f18b0c8` (linear) and `d186104eb` (gated mixture). The development-contract admission of the decision scorer was first committed as `b344b9ca7` on `feat/component-decision-development-arm` and merged to `develop` as #1137 (`1079ba64c`, with identical evaluation code) before this record was written; the scorer ran from the `b344b9ca7` checkout on the exported tables, as the earlier gradient-boosting records did.
 
 | arm | mean realized squad points | against the ridge control | wins / ties / losses | zero-minute starters | autosub points |
 | --- | --- | --- | --- | --- | --- |
 | linear components | 63.4150 | +4.8912 | 83 / 8 / 56 | 83 | 230 |
 | gated mixture | 63.0544 | +4.5306 | 82 / 7 / 58 | 83 | 208 |
 
-Paired on the same folds, candidate minus linear: mean -0.3605 points a gameweek, median +0.0, 90% season-aware moving-block interval [-1.068, +0.735], wins / ties / losses 33 / 78 / 36; by season 2021-22 +0.108, 2022-23 -0.583, 2023-24 +0.486, 2024-25 -1.459.
+Paired on the same folds, candidate minus linear: mean -0.3605 points a gameweek, median +0.0, 90% season-aware moving-block interval [-1.068, +0.735] (bootstrap id `phase_c_mixture_vs_linear_decisions`), wins / ties / losses 33 / 78 / 36; by season 2021-22 +0.108, 2022-23 -0.583, 2023-24 +0.486, 2024-25 -1.459.
 
 ## Verdict against the pin condition
 
@@ -62,3 +62,7 @@ The gate does not pass; the linear control stays in place and the distribution s
 
 - One paired measurement at each level: the same rows, features, targets, routes, folds and cutoffs; only the conditional estimators differ.
 - The availability rule, the elite-evidence path, the samplers and the experimental football arm are untouched by this measurement; S1 and S2 were not run because no scenario distribution changed.
+
+## Record correction
+
+Regenerated on 2026-10-18 at `9c3f072e0` from the same artifacts with a corrected writer; no measured number changed. The JSON twin's decision arms now carry the commit each decision table was exported at (the first writer read a key the decision JSON does not have and wrote null) and the scorer's commit, the paired decision interval carries the bootstrap id and policy it was drawn with, and the scorer note above says the admission had merged to `develop` as #1137 before the record was written (the first version said it was not merged).

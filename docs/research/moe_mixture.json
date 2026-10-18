@@ -1,6 +1,18 @@
 {
   "repository_commit": "d186104eb0dfdce5c7b7cf40189814e6f305b399",
   "record_written_at_commit": "d186104eb0dfdce5c7b7cf40189814e6f305b399",
+  "record_regenerated": {
+    "date": "2026-10-18",
+    "at_commit": "9c3f072e080fa527533b1cb4c2fb7d627ac9ca7b",
+    "from": "the same artifacts (the comparison, the distribution scoring, the two arm manifests and the two decision JSONs)",
+    "writer_corrections": [
+      "decision_level_reading.arms.*.repository_commit read from source.producer_repository_commit; the first writer read source.repository_commit, which the decision JSON does not carry, and wrote null",
+      "decision_level_reading.arms.*.scorer_repository_commit added from provenance.repository_commit",
+      "decision_level_reading.pairing and decision_level_reading.interval_method added (the bootstrap candidate_id and policy the recorded interval was drawn with), and the pairing step added to reproduce",
+      "decision_level_reading.decision_scorer_note corrected: the development-contract admission merged to develop as #1137 before the record was written"
+    ],
+    "measured_numbers_changed": false
+  },
   "declaration": "docs/research/moe_mixture_prereg.md",
   "development_only": true,
   "locked_holdout_read_as_development_data": true,
@@ -19,7 +31,8 @@
     "python -m scripts.compare_component_oof_development --artifact-dir <dir> --candidate-arm mixture",
     "python -m scripts.score_component_distribution --artifact-dir <dir> --candidate-arm mixture",
     "python -m scripts.export_component_oof --development-scope v2 --season-weighting equal --estimator mixture --seasons 2021-22,2022-23,2023-24,2024-25 --output-dir <decision dir>",
-    "python -m scripts.evaluate_phase_c_components --table <decision dir>/<table>.csv --manifest ... --roster ... --producer-environment ... --development-contract phase_c_component_oof_development_v2 --json-output <decision dir>/decision.json"
+    "python -m scripts.evaluate_phase_c_components --table <decision dir>/<table>.csv --manifest ... --roster ... --producer-environment ... --development-contract phase_c_component_oof_development_v2 --json-output <decision dir>/decision.json",
+    "pair the mixture decision JSON with the linear one recorded beside the gradient-boosting comparison as decision_level_reading.pairing says, then season_aware_moving_block_interval(differences, policy=PromotionPolicy(confidence_level=0.90, bootstrap_resamples=5000, moving_block_length=4, deterministic_seed=0), candidate_id=\"phase_c_mixture_vs_linear_decisions\")"
   ],
   "gate": {
     "1_primary_points_mae_lower": {
@@ -4954,8 +4967,17 @@
   },
   "decision_level_reading": {
     "scope": "decision-level reading declared in the pre-registration; the candidate exported at the same commit for the frozen decision seasons 2021-22 to 2024-25 and scored by scripts.evaluate_phase_c_components with --development-contract (147 folds, the ridge control of the frozen evaluation on the same folds); the linear components' reading is the one recorded beside the gradient-boosting comparison",
-    "decision_scorer_note": "scripts.evaluate_phase_c_components with --development-contract is the admission of a development handoff to the frozen decision comparison, commit b344b9ca7 on branch feat/component-decision-development-arm (not merged, not on this branch); the scorer ran from that commit's checkout on this branch's exported table, as the earlier gradient-boosting records did",
+    "decision_scorer_note": "scripts.evaluate_phase_c_components with --development-contract is the admission of a development handoff to the frozen decision comparison, first committed as b344b9ca7 on feat/component-decision-development-arm and merged to develop as #1137 (1079ba64c, 2026-10-17T10:33:58Z, before this record was written; its scripts/evaluate_phase_c_components.py and src/squadopt/evaluation/ are identical to b344b9ca7). The scorer ran from the b344b9ca7 checkout (each arm's scorer_repository_commit) on the exported tables, as the earlier gradient-boosting records did",
     "paired_folds": 147,
+    "pairing": "fold ids present in both arms, in the linear arm's decision_comparison.folds order; season label fold_id[:7]; difference = mixture component_realized_score minus linear component_realized_score",
+    "interval_method": {
+      "function": "squadopt.evaluation.statistics.season_aware_moving_block_interval",
+      "candidate_id": "phase_c_mixture_vs_linear_decisions",
+      "confidence_level": 0.9,
+      "bootstrap_resamples": 5000,
+      "moving_block_length": 4,
+      "deterministic_seed": 0
+    },
     "candidate_minus_linear_mean": -0.36054421768707484,
     "candidate_minus_linear_median": 0.0,
     "candidate_minus_linear_interval_90": [
@@ -4977,7 +4999,8 @@
       "linear": {
         "source_table_sha256": "d88270536fe7b762e7627d482955885656f10b08a631ea7c05b0a95564a2fe09",
         "model_version": "phase_c_control_components_v1",
-        "repository_commit": null,
+        "repository_commit": "69f18b0c8da8167174a3d5379753c2e9cc203cad",
+        "scorer_repository_commit": "b344b9ca7ee160409c20cd143f6bd1d85d23c40d",
         "ridge_control_mean": 58.523809523809526,
         "component_mean": 63.414965986394556,
         "diagnostics": {
@@ -5154,7 +5177,8 @@
       "mixture": {
         "source_table_sha256": "120718ee4da9e5e5e946bafcc90a413b2a18eaf32b725733b99b24b7a45e4e81",
         "model_version": "phase_c_control_components_mixture_v1",
-        "repository_commit": null,
+        "repository_commit": "d186104eb0dfdce5c7b7cf40189814e6f305b399",
+        "scorer_repository_commit": "b344b9ca7ee160409c20cd143f6bd1d85d23c40d",
         "ridge_control_mean": 58.523809523809526,
         "component_mean": 63.054421768707485,
         "diagnostics": {
