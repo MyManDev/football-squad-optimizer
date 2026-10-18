@@ -1,7 +1,7 @@
 """HiGHS against CP-SAT on the member window model, as the #984 protocol declares.
 
 The protocol is written before any solve and this runner does what it declares and nothing
-more (#984). It rebuilds the fifteen GW6 members' one-week problems and their three- and
+more (#984). It rebuilds the fifteen members' one-week problems and their three- and
 five-week windows from the committed publication inputs of one capture, runs the planner's
 own code (``optimize_transfer_plan`` on the plain path the member-menu windows take) and
 records the CP-SAT models it solves: the hold probe and the primary. A generic exporter
@@ -23,6 +23,23 @@ into either day.
 
     python -m scripts.measure_window_solver_highs check [--member ENTRY_ID]
     python -m scripts.measure_window_solver_highs measure --i-have-the-slot --node <node22>
+
+The defaults are the #1083 record's: the GW6 capture, the old ``web/public/data/league/``
+tree, both HiGHS builds and the stem ``window_solver_highs``, so that record stays
+reproducible from its commit. A later tree is measured by naming it (#1090): ``--league-dir``
+and ``--fixtures`` point at the committed inputs, ``--capture`` is the capture every input
+must carry, ``--record-stem`` names the record and the evidence directory, and
+``--builds native`` runs native HiGHS and CP-SAT only, skipping the wasm guard and preflight;
+the record's device verdict then reads as carried from the #1083 record. The protocol path
+and the issue follow the stem (``STEM_PROTOCOLS``) unless ``--protocol`` and ``--issue`` name
+them.
+
+    python -m scripts.measure_window_solver_highs check \
+        --league-dir web/public/data/leagues/352490 \
+        --capture fpl-live-20261016T060154Z-b1702d00c8cd \
+        --record-stem window_solver_highs_current
+    python -m scripts.measure_window_solver_highs measure --i-have-the-slot --builds native \
+        --league-dir ... --capture ... --record-stem window_solver_highs_current
 """
 
 from __future__ import annotations
@@ -41,7 +58,7 @@ import uuid
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, field, replace
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 from time import perf_counter
@@ -49,6 +66,16 @@ from typing import Any, Final, cast
 
 import pandas as pd
 from ortools.sat.python import cp_model
+from scripts import _highs_native_driver as native_driver
+from scripts._highs_native_driver import (
+    DRIVER_SHA256,
+    HIGHS_THREADS,
+    MIP_ABS_GAP,
+    MIP_REL_GAP,
+    ProtocolRefusal,
+    highs_options,
+    refuse_blocked_date,
+)
 from scripts._provenance import REPOSITORY_ROOT, _git_revision, write_json, write_text
 
 from squadopt.application.advice import (
@@ -73,12 +100,29 @@ from squadopt.planning import (
 )
 from squadopt.planning.optimizer import PLAN_WALL_CEILING_SECONDS
 
+# The native HiGHS side lives in ``scripts/_highs_native_driver.py`` since #1090, because a
+# process holding OR-Tools cannot load ``highspy`` on Linux; these names keep their old home.
+BLOCKED_DAYS: Final = native_driver.BLOCKED_DAYS
+HIGHS_PRIMAL_FEASIBLE: Final = native_driver.HIGHS_PRIMAL_FEASIBLE
+floor_value = native_driver.floor_value
+native_run = native_driver.native_run
+
 CONTRACT_VERSION: Final = "window_solver_highs_v1"
 PROTOCOL: Final = "docs/window_solver_highs_prereg.md"
 ISSUE: Final = 984
 #: The one capture every input must carry (the protocol's "Instances").
 CAPTURE: Final = "fpl-live-20261002T104314Z-8b70515b9b31"
 WINDOWS: Final = (3, 5)
+#: The two HiGHS builds the #994 protocol measures; ``--builds native`` runs the first only.
+BUILDS: Final = ("native", "wasm")
+DEFAULT_RECORD_STEM: Final = "window_solver_highs"
+#: The protocol and the issue each record stem answers to. Another stem names its own.
+STEM_PROTOCOLS: Final[Mapping[str, tuple[str, int]]] = {
+    DEFAULT_RECORD_STEM: (PROTOCOL, ISSUE),
+    "window_solver_highs_current": ("docs/research/window_solver_highs_current_prereg.md", 1090),
+}
+#: The device verdict of a run without the wasm build: settled by #1083, not reopened.
+DEVICE_VERDICT_CARRIED: Final = "not measured, carried from docs/research/window_solver_highs.md"
 #: The HiGHS core both builds carry: ``highspy`` 1.15.1, and the npm package below.
 HIGHS_CORE_VERSION: Final = "1.15.1"
 #: The npm package's own version, as ``web/package.json`` pins it; it wraps core 1.15.1.
@@ -98,10 +142,6 @@ ROW_TOLERANCE: Final = 1e-6
 #: Two primary values agree when they differ by at most this many integer units.
 AGREEMENT_UNITS: Final = 1000
 DEVICE_PROOF_SECONDS: Final = 15.0
-MIP_REL_GAP: Final = 0.0
-MIP_ABS_GAP: Final = 0.5
-#: (month, day) in UTC on which no solve runs.
-BLOCKED_DAYS: Final = ((10, 9), (10, 10))
 #: Check 2 fixes every variable, so CP-SAT only propagates; this is a stop, not a budget.
 FIXED_CHECK_SECONDS: Final = 120.0
 #: The hold probe's wall stop: ``planning/optimizer.py`` configures it with
@@ -112,9 +152,6 @@ HOLD_PROBE_WALL_SECONDS: Final = 30.0
 SOLVE_MARGIN_SECONDS: Final = 900.0
 #: A driver's stop on the toy model it must prove before any timed run.
 PREFLIGHT_TIMEOUT_SECONDS: Final = 900.0
-#: The native build is set to this many threads. The wasm build is single-threaded and
-#: refuses a thread option, so its job leaves it out.
-HIGHS_THREADS: Final = 1
 
 LEAGUE_DIR: Final = REPOSITORY_ROOT / "web" / "public" / "data" / "league"
 FIXTURES_PATH: Final = REPOSITORY_ROOT / "web" / "public" / "data" / "fixtures.json"
@@ -151,7 +188,6 @@ HIGHS_MODEL_STATUS: Final = {
     18: "Memory limit reached",
 }
 HIGHS_OPTIMAL: Final = 7
-HIGHS_PRIMAL_FEASIBLE: Final = 2
 
 #: The narrow readings this runner takes where the protocol leaves a choice, recorded with
 #: the result so a reader can see them beside the numbers.
@@ -207,10 +243,6 @@ SETUP_FAILURES: Final = (
 )
 
 
-class ProtocolRefusal(RuntimeError):
-    """An input, a guard or a check is not what the protocol declares; nothing goes on."""
-
-
 class ExportRefused(ValueError):
     """The exporter met something it does not translate; it names it rather than guess."""
 
@@ -227,13 +259,13 @@ def _payload(path: Path) -> dict[str, Any]:
     return payload
 
 
-def require_capture(path: Path, payload: Mapping[str, Any]) -> None:
+def require_capture(path: Path, payload: Mapping[str, Any], capture: str = CAPTURE) -> None:
     """Refuse an input from any capture but the protocol's."""
 
     found = payload.get("source_snapshot_id")
-    if found != CAPTURE:
+    if found != capture:
         raise ProtocolRefusal(
-            f"{path} is capture {found!r}; the protocol measures {CAPTURE!r} and no other."
+            f"{path} is capture {found!r}; the protocol measures {capture!r} and no other."
         )
 
 
@@ -245,6 +277,7 @@ class PublishedInputs:
     members: Mapping[int, Mapping[str, Any]]
     fixture_counts: Mapping[int, Mapping[str, int]]
     league_dir: Path
+    capture: str = CAPTURE
 
     @property
     def gameweek(self) -> int:
@@ -266,22 +299,23 @@ def fixture_counts(fixtures: Mapping[str, Any]) -> dict[int, dict[str, int]]:
 
 
 def load_inputs(
-    league_dir: Path = LEAGUE_DIR, fixtures_path: Path = FIXTURES_PATH
+    league_dir: Path = LEAGUE_DIR, fixtures_path: Path = FIXTURES_PATH, capture: str = CAPTURE
 ) -> PublishedInputs:
-    """Read the three committed inputs, refusing any from another capture."""
+    """Read the three committed inputs, refusing any from another capture than ``capture``."""
 
     plan_path = league_dir / "device-plan.json"
     if not plan_path.is_file():
         raise ProtocolRefusal(
-            f"{plan_path} is missing: the committed tree has moved past {CAPTURE}. Measure "
-            "from the runner's merge commit, whose tree holds it."
+            f"{plan_path} is missing: the committed tree has moved past {capture}. Measure "
+            "from the runner's merge commit, whose tree holds it, or name the tree with "
+            "--league-dir and --capture."
         )
     table = _payload(plan_path)
-    require_capture(plan_path, table)
+    require_capture(plan_path, table, capture)
     members: dict[int, Mapping[str, Any]] = {}
     for path in sorted((league_dir / "entries").glob("*.json")):
         payload = _payload(path)
-        require_capture(path, payload)
+        require_capture(path, payload, capture)
         if int(payload.get("gameweek", -1)) != int(table["gameweek"]):
             raise ProtocolRefusal(f"{path} is for another gameweek than the device table.")
         block = payload.get("device_plan")
@@ -289,8 +323,8 @@ def load_inputs(
             raise ProtocolRefusal(f"{path} publishes no device_plan block.")
         members[int(path.stem)] = block
     fixtures = _payload(fixtures_path)
-    require_capture(fixtures_path, fixtures)
-    return PublishedInputs(table, members, fixture_counts(fixtures), league_dir)
+    require_capture(fixtures_path, fixtures, capture)
+    return PublishedInputs(table, members, fixture_counts(fixtures), league_dir, capture)
 
 
 def published_advice(inputs: PublishedInputs, entry_id: int, window: int) -> dict[str, Any]:
@@ -298,8 +332,82 @@ def published_advice(inputs: PublishedInputs, entry_id: int, window: int) -> dic
 
     path = inputs.league_dir / "advice" / str(entry_id) / "saf-puan" / f"{window}.json"
     payload = _payload(path)
-    require_capture(path, payload)
+    require_capture(path, payload, inputs.capture)
     return payload
+
+
+def calendar_record(inputs: PublishedInputs) -> dict[str, Any]:
+    """Each window week's fixtures per club, read from the calendar rather than assumed."""
+
+    weeks: dict[str, Any] = {}
+    for week in range(inputs.gameweek, inputs.gameweek + max(WINDOWS)):
+        counts = inputs.fixture_counts.get(week)
+        weeks[str(week)] = (
+            None
+            if counts is None
+            else {"clubs": len(counts), "fixtures_per_club": sorted(set(counts.values()))}
+        )
+    return {
+        "first_gameweek": inputs.gameweek,
+        "last_gameweek": inputs.gameweek + max(WINDOWS) - 1,
+        "weeks": weeks,
+        "flat": all(row is not None and row["fixtures_per_club"] == [1] for row in weeks.values()),
+    }
+
+
+@dataclass(frozen=True)
+class Target:
+    """What one run reads and writes: the tree, its capture, the builds and the record stem.
+
+    The defaults are the #1083 record's. For the default stem the record and evidence paths
+    are the module's, so the committed record is written where it always was.
+    """
+
+    league_dir: Path = LEAGUE_DIR
+    fixtures_path: Path = FIXTURES_PATH
+    capture: str = CAPTURE
+    record_stem: str = DEFAULT_RECORD_STEM
+    builds: tuple[str, ...] = BUILDS
+    #: The protocol and the issue follow the stem (``STEM_PROTOCOLS``) unless both are named.
+    protocol: str | None = None
+    issue: int | None = None
+
+    def __post_init__(self) -> None:
+        known = STEM_PROTOCOLS.get(self.record_stem)
+        if self.protocol is None and known is not None:
+            object.__setattr__(self, "protocol", known[0])
+        if self.issue is None and known is not None:
+            object.__setattr__(self, "issue", known[1])
+        if self.protocol is None or self.issue is None:
+            raise ProtocolRefusal(
+                f"Record stem {self.record_stem!r} names no protocol; pass --protocol and "
+                f"--issue, or use one of {sorted(STEM_PROTOCOLS)}."
+            )
+
+    @property
+    def artifact_dir(self) -> Path:
+        if self.record_stem == DEFAULT_RECORD_STEM:
+            return ARTIFACT_DIR
+        return REPOSITORY_ROOT / "artifacts" / self.record_stem
+
+    @property
+    def record_json(self) -> Path:
+        if self.record_stem == DEFAULT_RECORD_STEM:
+            return RECORD_JSON
+        return REPOSITORY_ROOT / "docs" / "research" / f"{self.record_stem}.json"
+
+    @property
+    def record_markdown(self) -> Path:
+        if self.record_stem == DEFAULT_RECORD_STEM:
+            return RECORD_MARKDOWN
+        return REPOSITORY_ROOT / "docs" / "research" / f"{self.record_stem}.md"
+
+    @property
+    def measures_wasm(self) -> bool:
+        return "wasm" in self.builds
+
+    def load(self) -> PublishedInputs:
+        return load_inputs(self.league_dir, self.fixtures_path, self.capture)
 
 
 # --------------------------------------------------------------------------------------
@@ -1746,40 +1854,25 @@ def published_plan_value(call: PlannerCall, published: Mapping[str, Any]) -> dic
 # Guards.
 
 
-def refuse_blocked_date(now: datetime, seconds: float = 0.0) -> None:
-    """No solve runs on 9 or 10 October (UTC): none starts on either day, and none starts
-    whose ``seconds`` of wall stops could carry it into either."""
-
-    start = now.astimezone(UTC)
-    end = start + timedelta(seconds=max(float(seconds), 0.0))
-    day = start.date()
-    while day <= end.date():
-        if (day.month, day.day) in BLOCKED_DAYS:
-            if day == start.date():
-                raise ProtocolRefusal(
-                    f"It is {day.isoformat()} UTC; the protocol runs no solve on 9 or 10 October."
-                )
-            raise ProtocolRefusal(
-                f"A solve started at {start.isoformat(timespec='seconds')} may run until "
-                f"{end.isoformat(timespec='seconds')}, into {day.isoformat()} UTC; the "
-                "protocol runs no solve on 9 or 10 October."
-            )
-        day += timedelta(days=1)
-
-
 def native_core_version() -> str:
-    """The HiGHS core version the native build reports."""
+    """The HiGHS core version the native build reports, read in a child process.
 
-    highspy = importlib.import_module("highspy")
-    return _native_version(highspy)
+    OR-Tools and ``highspy`` each ship a ``libhighs.so.1``, so on Linux one process cannot
+    load both; this process holds OR-Tools, and the child holds ``highspy``.
+    """
 
-
-def _native_version(highspy: Any) -> str:
-    highs = highspy.Highs()
-    try:
-        return str(highs.version())
-    except AttributeError:
-        return f"{highs.versionMajor()}.{highs.versionMinor()}.{highs.versionPatch()}"
+    completed = subprocess.run(
+        [sys.executable, "-m", "scripts._highs_native_driver", "--version"],
+        cwd=REPOSITORY_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if completed.returncode != 0:
+        raise ProtocolRefusal(
+            f"highspy could not be loaded in a child process: {completed.stderr.strip()[-500:]}"
+        )
+    return completed.stdout.strip()
 
 
 def wasm_report(node: str, web_dir: Path = WEB_DIR) -> dict[str, Any]:
@@ -1794,8 +1887,12 @@ def measure_guards(
     now: datetime,
     native_version: Callable[[], str],
     wasm_version: Callable[[], Mapping[str, Any]],
+    builds: Sequence[str] = BUILDS,
 ) -> dict[str, Any]:
-    """Refuse to measure unless every condition the protocol sets holds; else the versions."""
+    """Refuse to measure unless every condition the protocol sets holds; else the versions.
+
+    Without the wasm build among ``builds`` its report is never read: no Node, no package.
+    """
 
     if not have_slot:
         raise ProtocolRefusal(
@@ -1807,6 +1904,8 @@ def measure_guards(
         raise ProtocolRefusal(
             f"highspy reports HiGHS {native}; the protocol pins {HIGHS_CORE_VERSION}."
         )
+    if "wasm" not in builds:
+        return {"native_core": native, "wasm": None}
     wasm = dict(wasm_version())
     if wasm.get("core_version") != HIGHS_CORE_VERSION:
         raise ProtocolRefusal(
@@ -1827,134 +1926,8 @@ def measure_guards(
 
 
 # --------------------------------------------------------------------------------------
-# HiGHS runs: native in a child Python process, wasm in Node. Neither takes CP-SAT's value.
-
-
-def highs_options(time_limit: float) -> dict[str, float | bool | int]:
-    return {
-        "output_flag": False,
-        "threads": HIGHS_THREADS,
-        "mip_rel_gap": MIP_REL_GAP,
-        "mip_abs_gap": MIP_ABS_GAP,
-        "time_limit": max(float(time_limit), 0.0),
-    }
-
-
-def _option_value(highs: Any, name: str) -> Any:
-    """An option as the native build reports it (older bindings return a status first)."""
-
-    value = highs.getOptionValue(name)
-    return value[-1] if isinstance(value, tuple) else value
-
-
-def _finite(value: float) -> float | None:
-    """A bound HiGHS has not computed is infinite; the record holds None, as the wasm
-    build's JSON does."""
-
-    return value if math.isfinite(value) else None
-
-
-def _native_solve(
-    highspy: Any,
-    path: str,
-    budget: float,
-    floor: tuple[int, Mapping[int, int | float]] | None,
-    start: Sequence[int] | None = None,
-) -> dict[str, Any]:
-    numpy = importlib.import_module("numpy")
-    highs = highspy.Highs()
-    # Set before anything runs: the native build starts its scheduler on the first run.
-    highs.setOptionValue("threads", HIGHS_THREADS)
-    started = perf_counter()
-    read_status = int(highs.readModel(path))
-    read_seconds = perf_counter() - started
-    if read_status < 0:
-        raise RuntimeError(f"HiGHS could not read {path}.")
-    for name, value in highs_options(budget).items():
-        highs.setOptionValue(name, value)
-    floor_seconds = 0.0
-    if floor is not None:
-        value, costs = floor
-        started = perf_counter()
-        indices = numpy.array(sorted(costs), dtype=numpy.int32)
-        values = numpy.array([float(costs[j]) for j in sorted(costs)], dtype=numpy.float64)
-        added = int(highs.addRow(float(value), highspy.kHighsInf, len(indices), indices, values))
-        floor_seconds = perf_counter() - started
-        if added < 0:
-            raise RuntimeError("HiGHS refused the hold floor row.")
-    start_seconds = 0.0
-    start_status: int | None = None
-    if start is not None:
-        started = perf_counter()
-        columns = numpy.arange(len(start), dtype=numpy.int32)
-        values = numpy.array([float(value) for value in start], dtype=numpy.float64)
-        start_status = int(highs.setSolution(len(start), columns, values))
-        start_seconds = perf_counter() - started
-        if start_status < 0:
-            raise RuntimeError("HiGHS refused the hold solution as a start.")
-    started = perf_counter()
-    highs.run()
-    seconds = perf_counter() - started
-    status = int(highs.getModelStatus())
-    info = highs.getInfo()
-    primal = int(info.primal_solution_status)
-    result: dict[str, Any] = {
-        "model_status": status,
-        "read_seconds": read_seconds,
-        "floor_seconds": floor_seconds,
-        "start_seconds": start_seconds,
-        "start_status": start_status,
-        "seconds": seconds,
-        "primal_solution_status": primal,
-        "bound": _finite(float(info.mip_dual_bound)),
-        "threads": int(_option_value(highs, "threads")),
-    }
-    if primal == HIGHS_PRIMAL_FEASIBLE:
-        result["objective"] = float(info.objective_function_value)
-        result["solution"] = [float(value) for value in highs.getSolution().col_value]
-    return result
-
-
-def floor_value(solution: Sequence[float], costs: Mapping[int, int | float]) -> int:
-    """The primary objective at a rounded hold solution: the floor a HiGHS primary gets."""
-
-    return int(sum(cost * round(solution[j]) for j, cost in costs.items()))
-
-
-def native_run(job: Mapping[str, Any]) -> dict[str, Any]:
-    """One native HiGHS run of one instance: the hold model, then the floored primary."""
-
-    budget = float(job["budget_seconds"])
-    refuse_blocked_date(datetime.now(UTC), budget)
-    started = perf_counter()
-    highspy = importlib.import_module("highspy")
-    load_seconds = perf_counter() - started
-    costs = {int(j): cost for j, cost in job["objective"].items()}
-    hold = _native_solve(highspy, str(job["hold_mps"]), budget, None)
-    result: dict[str, Any] = {
-        "build": "native",
-        "nonce": job.get("nonce"),
-        "runner_sha256": RUNNER_SHA256,
-        "core_version": _native_version(highspy),
-        "load_seconds": load_seconds,
-        "hold": {key: value for key, value in hold.items() if key != "solution"},
-        "hold_solution": hold.get("solution"),
-        "floor": None,
-        "primary": None,
-        "primary_solution": None,
-    }
-    start: list[int] | None = None
-    if hold.get("solution") is not None:
-        result["floor"] = floor_value(hold["solution"], costs)
-        start = [round(value) for value in hold["solution"]]
-    remaining = budget - float(hold["seconds"])
-    if remaining <= 0:
-        return result
-    floor = None if result["floor"] is None else (int(result["floor"]), costs)
-    primary = _native_solve(highspy, str(job["primary_mps"]), remaining, floor, start)
-    result["primary"] = {key: value for key, value in primary.items() if key != "solution"}
-    result["primary_solution"] = primary.get("solution")
-    return result
+# HiGHS runs: native in a child Python process (``scripts/_highs_native_driver.py``, which
+# never loads OR-Tools), wasm in Node. Neither takes CP-SAT's value.
 
 
 #: The wasm driver. It loads the package from ``web/node_modules`` as the device's parity
@@ -2109,28 +2082,32 @@ def _child(
 
 
 def _run_wasm_driver(
-    node: str, job: Mapping[str, Any], web_dir: Path, *, timeout: float
+    node: str, job: Mapping[str, Any], web_dir: Path, *, timeout: float, out_dir: Path | None = None
 ) -> dict[str, Any]:
-    ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
-    driver = ARTIFACT_DIR / "wasm_driver.mjs"
+    out_dir = ARTIFACT_DIR if out_dir is None else out_dir
+    out_dir.mkdir(parents=True, exist_ok=True)
+    driver = out_dir / "wasm_driver.mjs"
     driver.write_text(WASM_DRIVER, encoding="utf-8")
-    job_path = ARTIFACT_DIR / "wasm_job.json"
-    out_path = ARTIFACT_DIR / "wasm_result.json"
+    job_path = out_dir / "wasm_job.json"
+    out_path = out_dir / "wasm_result.json"
     job_path.write_text(json.dumps(job), encoding="utf-8")
     command = [node, str(driver), str(web_dir), str(job_path), str(out_path)]
     return _child(command, out_path, timeout=timeout, nonce=job.get("nonce"))
 
 
-def _run_native_child(job: Mapping[str, Any], *, timeout: float) -> dict[str, Any]:
-    ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
-    job_path = ARTIFACT_DIR / "native_job.json"
-    out_path = ARTIFACT_DIR / "native_result.json"
+def _run_native_child(
+    job: Mapping[str, Any], *, timeout: float, out_dir: Path | None = None
+) -> dict[str, Any]:
+    out_dir = ARTIFACT_DIR if out_dir is None else out_dir
+    out_dir.mkdir(parents=True, exist_ok=True)
+    job_path = out_dir / "native_job.json"
+    out_path = out_dir / "native_result.json"
     job_path.write_text(json.dumps(job), encoding="utf-8")
+    # The child never loads OR-Tools: see ``scripts/_highs_native_driver.py``.
     command = [
         sys.executable,
         "-m",
-        "scripts.measure_window_solver_highs",
-        "native-run",
+        "scripts._highs_native_driver",
         "--job",
         str(job_path),
         "--out",
@@ -2141,6 +2118,11 @@ def _run_native_child(job: Mapping[str, Any], *, timeout: float) -> dict[str, An
         raise ProtocolRefusal(
             "The native child ran another runner file than this run started with; the "
             "runner changed on disk during the run. No verdict."
+        )
+    if result.get("driver_sha256") not in (None, DRIVER_SHA256):
+        raise ProtocolRefusal(
+            "The native child ran another driver file than this run started with; the "
+            "driver changed on disk during the run. No verdict."
         )
     return result
 
@@ -2289,15 +2271,20 @@ def _toy_model(hold: bool) -> cp_model.CpModel:
     return model
 
 
-def preflight_driver(build: Callable[[Mapping[str, Any]], Mapping[str, Any]], name: str) -> None:
+def preflight_driver(
+    build: Callable[[Mapping[str, Any]], Mapping[str, Any]],
+    name: str,
+    out_dir: Path | None = None,
+) -> None:
     """A driver must solve a toy model to CP-SAT's optimum before any timed run counts."""
 
-    ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
+    out_dir = ARTIFACT_DIR if out_dir is None else out_dir
+    out_dir.mkdir(parents=True, exist_ok=True)
     milps: dict[str, Milp] = {}
     paths: dict[str, Path] = {}
     for part, hold in (("hold", True), ("primary", False)):
         milps[part] = export_milp(_toy_model(hold).proto, f"preflight-{part}")
-        paths[part] = ARTIFACT_DIR / f"preflight-{part}.mps"
+        paths[part] = out_dir / f"preflight-{part}.mps"
         paths[part].write_bytes(write_mps(milps[part]).encode("utf-8"))
     primary = _toy_model(False)
     solver = cp_model.CpSolver()
@@ -2323,13 +2310,18 @@ def _proved(run: Mapping[str, Any]) -> bool:
     return run.get("status") == "proved_optimal"
 
 
-def verdicts(instances: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
-    """The protocol's device and server verdicts, or "the models disagree"."""
+def verdicts(
+    instances: Sequence[Mapping[str, Any]], builds: Sequence[str] = BUILDS
+) -> dict[str, Any]:
+    """The protocol's device and server verdicts, or "the models disagree".
+
+    Without the wasm build the device verdict is #1083's, carried and not re-measured.
+    """
 
     disagreements = [
         {"entry_id": i["entry_id"], "window": i["window"], "build": build}
         for i in instances
-        for build in ("native", "wasm")
+        for build in builds
         if i["cp_sat"]["proved"]
         and _proved(i["highs"][build]["ceiling"])
         and i["highs"][build]["ceiling"]["agrees_with_cp_sat"] is not True
@@ -2354,7 +2346,11 @@ def verdicts(instances: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     three = [i for i in instances if i["window"] == 3]
     five = [i for i in instances if i["window"] == 5]
     device_ok = (
-        len(three) == 15 and len(five) == 15 and device_proofs(3) == 15 and device_proofs(5) >= 14
+        "wasm" in builds
+        and len(three) == 15
+        and len(five) == 15
+        and device_proofs(3) == 15
+        and device_proofs(5) >= 14
     )
     native = [(i, i["highs"]["native"]) for i in instances]
     first = all(
@@ -2374,17 +2370,23 @@ def verdicts(instances: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         and runs["ceiling"]["value"] >= i["cp_sat"]["value"] - AGREEMENT_UNITS
         for i, runs in native
     )
-    return {
-        "verdict": None,
-        "device": (
+    if "wasm" not in builds:
+        device: str = DEVICE_VERDICT_CARRIED
+        device_counts: dict[str, int] | None = None
+    else:
+        device = (
             "Device can carry windows on a flat calendar"
             if device_ok
             else "windows stay on the server"
-        ),
-        "device_counts": {
+        )
+        device_counts = {
             "three_week_proved_within_15s": device_proofs(3),
             "five_week_proved_within_15s": device_proofs(5),
-        },
+        }
+    return {
+        "verdict": None,
+        "device": device,
+        "device_counts": device_counts,
         "server": "A switch is supported"
         if first and second and third
         else "the server stays on CP-SAT",
@@ -2396,6 +2398,31 @@ def verdicts(instances: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         },
         "disagreements": [],
     }
+
+
+def instance_counts(
+    instances: Sequence[Mapping[str, Any]], builds: Sequence[str] = BUILDS
+) -> dict[str, Any]:
+    """Every count the record states: members, instances, proofs by window, run and build."""
+
+    counts: dict[str, Any] = {
+        "members": len({int(i["entry_id"]) for i in instances}),
+        "instances": len(instances),
+    }
+    for window in WINDOWS:
+        rows = [i for i in instances if i["window"] == window]
+        by_window: dict[str, int] = {
+            "instances": len(rows),
+            "cp_sat_proved": sum(1 for i in rows if i["cp_sat"]["proved"]),
+            "cp_sat_feasible": sum(1 for i in rows if i["cp_sat"]["plan_status"] == "FEASIBLE"),
+        }
+        for build in builds:
+            for run in ("wall_matched", "ceiling"):
+                by_window[f"{build}_{run}_proved"] = sum(
+                    1 for i in rows if _proved(i["highs"][build][run])
+                )
+        counts[f"week_{window}"] = by_window
+    return counts
 
 
 # --------------------------------------------------------------------------------------
@@ -2410,16 +2437,19 @@ def _members(inputs: PublishedInputs, member: int | None) -> list[int]:
     return [member]
 
 
-def run_check(member: int | None, out_dir: Path) -> dict[str, Any]:
+def run_check(member: int | None, out_dir: Path, target: Target | None = None) -> dict[str, Any]:
     """Build the instances, run the rebuild gate, export, run check 1. No timing claims."""
 
-    inputs = load_inputs()
+    target = Target() if target is None else target
+    inputs = target.load()
     members = _members(inputs, member)
     rebuild = [rebuild_check(inputs, entry) for entry in members]
     record: dict[str, Any] = {
         "contract_version": CONTRACT_VERSION,
         "command": "check",
-        "capture": CAPTURE,
+        "capture": target.capture,
+        "gameweek": inputs.gameweek,
+        "calendar": calendar_record(inputs),
         "members": members,
         "rebuild": {"passed": all(row["passed"] for row in rebuild), "rows": rebuild},
         "instances": [],
@@ -2458,10 +2488,25 @@ def run_check(member: int | None, out_dir: Path) -> dict[str, Any]:
     return record
 
 
+def _cpu_model() -> str:
+    """The CPU model: Windows names it in the environment, Linux in ``/proc/cpuinfo``, and
+    ``platform.processor`` is the fallback (empty on many Linux builds)."""
+
+    named = os.environ.get("PROCESSOR_IDENTIFIER")
+    if named:
+        return named
+    cpuinfo = Path("/proc/cpuinfo")
+    if cpuinfo.is_file():
+        for line in cpuinfo.read_text(encoding="utf-8", errors="replace").splitlines():
+            if line.lower().startswith("model name"):
+                return line.split(":", 1)[1].strip()
+    return platform.processor()
+
+
 def machine_record() -> dict[str, Any]:
     return {
         "operating_system": platform.platform(),
-        "processor": os.environ.get("PROCESSOR_IDENTIFIER") or platform.processor(),
+        "processor": _cpu_model(),
         "machine": platform.machine(),
         "logical_cores": os.cpu_count(),
         "python": platform.python_version(),
@@ -2469,7 +2514,7 @@ def machine_record() -> dict[str, Any]:
 
 
 def _highs_run(
-    build: str, instance: Instance, budget: float, node: str
+    build: str, instance: Instance, budget: float, node: str, out_dir: Path | None = None
 ) -> tuple[Mapping[str, Any] | None, str | None]:
     assert instance.hold_mps is not None and instance.primary_mps is not None
     assert instance.primary_milp is not None
@@ -2479,8 +2524,8 @@ def _highs_run(
     timeout = child_timeout(budget)
     try:
         if build == "native":
-            return _run_native_child(job, timeout=timeout), None
-        return _run_wasm_driver(node, job, WEB_DIR, timeout=timeout), None
+            return _run_native_child(job, timeout=timeout, out_dir=out_dir), None
+        return _run_wasm_driver(node, job, WEB_DIR, timeout=timeout, out_dir=out_dir), None
     except DriverFailed as error:
         if any(marker in str(error) for marker in SETUP_FAILURES):
             raise ProtocolRefusal(
@@ -2502,12 +2547,15 @@ def require_code_from_this_tree() -> None:
         )
 
 
-def run_measure(node: str, versions: Mapping[str, Any], out_dir: Path) -> dict[str, Any]:
+def run_measure(
+    node: str, versions: Mapping[str, Any], out_dir: Path, target: Target | None = None
+) -> dict[str, Any]:
     """The declared runs, in order, one solve at a time; the record is returned, not written.
 
     One measure at a time: a lock file in the artifact directory refuses a second.
     """
 
+    target = Target() if target is None else target
     out_dir.mkdir(parents=True, exist_ok=True)
     lock = out_dir / "measure.lock"
     try:
@@ -2518,7 +2566,7 @@ def run_measure(node: str, versions: Mapping[str, Any], out_dir: Path) -> dict[s
             "removing it. Remove it only when no measure is running."
         ) from error
     try:
-        return _measure_locked(node, versions, out_dir)
+        return _measure_locked(node, versions, out_dir, target)
     finally:
         lock.unlink(missing_ok=True)
 
@@ -2527,7 +2575,9 @@ def _stamp(moment: datetime) -> str:
     return moment.isoformat(timespec="seconds")
 
 
-def _measure_locked(node: str, versions: Mapping[str, Any], out_dir: Path) -> dict[str, Any]:
+def _measure_locked(
+    node: str, versions: Mapping[str, Any], out_dir: Path, target: Target
+) -> dict[str, Any]:
     started = datetime.now(UTC)
     require_code_from_this_tree()
     revision, dirty = _git_revision()
@@ -2543,18 +2593,24 @@ def _measure_locked(node: str, versions: Mapping[str, Any], out_dir: Path) -> di
             "The working tree has uncommitted changes; measure runs only from a clean "
             f"commit. Write logs outside the tree. git status: {changed[:500]}"
         )
-    inputs = load_inputs()
+    inputs = target.load()
     members = sorted(inputs.members)
     preflight_horizon = PREFLIGHT_TIMEOUT_SECONDS + SOLVE_MARGIN_SECONDS
     refuse_blocked_date(datetime.now(UTC), preflight_horizon)
     preflight_driver(
-        lambda job: _run_native_child(job, timeout=PREFLIGHT_TIMEOUT_SECONDS), "native"
+        lambda job: _run_native_child(job, timeout=PREFLIGHT_TIMEOUT_SECONDS, out_dir=out_dir),
+        "native",
+        out_dir,
     )
-    refuse_blocked_date(datetime.now(UTC), preflight_horizon)
-    preflight_driver(
-        lambda job: _run_wasm_driver(node, job, WEB_DIR, timeout=PREFLIGHT_TIMEOUT_SECONDS),
-        "wasm",
-    )
+    if target.measures_wasm:
+        refuse_blocked_date(datetime.now(UTC), preflight_horizon)
+        preflight_driver(
+            lambda job: _run_wasm_driver(
+                node, job, WEB_DIR, timeout=PREFLIGHT_TIMEOUT_SECONDS, out_dir=out_dir
+            ),
+            "wasm",
+            out_dir,
+        )
     # ``rebuild_check`` and ``solve_instance`` each refuse a CP-SAT run that could reach a
     # blocked day; the HiGHS runs are guarded here, up to their child's stop.
     rebuild = [rebuild_check(inputs, entry) for entry in members]
@@ -2580,14 +2636,14 @@ def _measure_locked(node: str, versions: Mapping[str, Any], out_dir: Path) -> di
                 raise ProtocolRefusal(f"Check 1 failed on {entry} w{window}; no verdict.")
             matched = wall_matched_budget(first)
             runs: dict[str, dict[str, Any]] = {}
-            for build in ("native", "wasm"):
+            for build in target.builds:
                 runs[build] = {}
                 for name, budget in (
                     ("wall_matched", matched),
                     ("ceiling", float(WINDOW_WALL_CEILING_SECONDS)),
                 ):
                     refuse_blocked_date(datetime.now(UTC), child_timeout(budget))
-                    raw, error = _highs_run(build, reference, budget, node)
+                    raw, error = _highs_run(build, reference, budget, node, out_dir)
                     if raw is not None:
                         require_run_version(build, raw, versions)
                     run = interpret_run(reference, raw, error)
@@ -2618,9 +2674,17 @@ def _measure_locked(node: str, versions: Mapping[str, Any], out_dir: Path) -> di
     head_at_end, dirty_at_end = _git_revision()
     return {
         "contract_version": CONTRACT_VERSION,
-        "protocol": PROTOCOL,
-        "issue": ISSUE,
-        "capture": CAPTURE,
+        "protocol": target.protocol,
+        "issue": target.issue,
+        "capture": target.capture,
+        "league_dir": target.league_dir.relative_to(REPOSITORY_ROOT).as_posix()
+        if target.league_dir.is_relative_to(REPOSITORY_ROOT)
+        else str(target.league_dir),
+        "gameweek": inputs.gameweek,
+        "members": members,
+        "calendar": calendar_record(inputs),
+        "builds": list(target.builds),
+        "device_verdict_source": None if target.measures_wasm else DEVICE_VERDICT_CARRIED,
         "repository_commit": revision,
         "working_tree_dirty": dirty,
         "head_at_end": head_at_end,
@@ -2628,6 +2692,7 @@ def _measure_locked(node: str, versions: Mapping[str, Any], out_dir: Path) -> di
         "started_at_utc": _stamp(started),
         "finished_at_utc": _stamp(datetime.now(UTC)),
         "runner_sha256": RUNNER_SHA256,
+        "driver_sha256": DRIVER_SHA256,
         "machine": machine_record(),
         "versions": {
             "ortools": importlib.import_module("ortools").__version__,
@@ -2646,20 +2711,88 @@ def _measure_locked(node: str, versions: Mapping[str, Any], out_dir: Path) -> di
         "readings": list(READINGS),
         "rebuild": {"passed": True, "rows": rebuild},
         "instances": instances,
-        "verdicts": verdicts(instances),
+        "counts": instance_counts(instances, target.builds),
+        "verdicts": verdicts(instances, target.builds),
     }
+
+
+def decision(record: Mapping[str, Any]) -> str:
+    """The one-paragraph decision #1090 asks for, following the verdict and naming the pin
+    and the import contract a switch would change."""
+
+    result = record["verdicts"]
+    core = record["versions"]["highs_native_core"]
+    pin = f"`highspy=={core}`"
+    contract = '"The CP-SAT solver stays in the decision core" in `pyproject.toml`'
+    commit = str(record["repository_commit"])[:8]
+    if result["verdict"] is not None:
+        where = ", ".join(
+            f"{d['entry_id']} w{d['window']} ({d['build']})" for d in result["disagreements"]
+        )
+        return (
+            f"Keep CP-SAT. On the current window model (commit {commit}) the models disagree "
+            f"on {len(result['disagreements'])} instance(s): {where}. A disagreement between "
+            "a proved HiGHS optimum and a proved CP-SAT optimum means the exported model or "
+            "one solver is wrong, and no switch is proposed until the cause is found. The "
+            f"{pin} pin and the import contract {contract} stay as they are."
+        )
+    conditions = result["server_conditions"]
+    if result["server"] == "A switch is supported":
+        return (
+            "Switch the server's three- and five-week window solves to native HiGHS, as a "
+            f"proposal on #632 and not in this pull request. On the current window model "
+            f"(commit {commit}) the three conditions hold: wall-matched, native proves every "
+            "instance CP-SAT proves at CP-SAT's value; at 1,800 s it proves at least half of "
+            f"the {conditions['five_week_left_feasible_by_cp_sat']} five-week instances CP-SAT "
+            "leaves FEASIBLE; and on no instance does it end below CP-SAT's value. The switch "
+            f"is a separate pull request: it pins {pin} in `constraints.txt` and "
+            f"`pyproject.toml`, it changes the import contract {contract} so that the one "
+            "module in `planning/` that drives HiGHS is where `highspy` is imported and "
+            "`ortools` stays forbidden outside the decision core, it keeps CP-SAT for the "
+            "one-week solves and as the fallback when HiGHS returns no solution, and it is "
+            "merged only in a window the live-path plan allows for `planning/`, after a full "
+            "weekly rehearsal before the next publish (#1090)."
+        )
+    failed = [
+        name
+        for name, held in (
+            (
+                "wall-matched proves every CP-SAT proof at CP-SAT's value",
+                conditions["wall_matched_proves_every_cp_sat_proof"],
+            ),
+            (
+                "1,800 s proves half of the five-week instances CP-SAT leaves FEASIBLE",
+                conditions["ceiling_proves_half_of_feasible_five_week"],
+            ),
+            ("1,800 s never ends below CP-SAT's value", conditions["ceiling_never_below_cp_sat"]),
+        )
+        if not held
+    ]
+    return (
+        f"Keep CP-SAT for the server's window solves. On the current window model (commit "
+        f"{commit}) native HiGHS fails the protocol's condition(s): {'; '.join(failed)}. The "
+        f"{pin} pin stays out of `constraints.txt` and `pyproject.toml`, and the import "
+        f"contract {contract} stays as it is."
+    )
 
 
 def markdown(record: Mapping[str, Any]) -> str:
     """The record's twin for reading."""
 
     result = record["verdicts"]
+    builds = tuple(record.get("builds", BUILDS))
+    calendar = record.get("calendar")
+    flat = calendar is None or bool(calendar.get("flat"))
+    gameweek = record.get("gameweek")
+    week = "" if gameweek is None else f" at GW{gameweek}"
     lines = [
-        "# HiGHS on the member window model",
+        f"# HiGHS on the member window model{week}",
         "",
         f"Protocol `{record['protocol']}`, issue #{record['issue']}, capture "
         f"`{record['capture']}`, commit `{record['repository_commit']}`. One week of one "
-        "season with a flat calendar; nothing here claims more.",
+        "season with "
+        + ("a flat calendar" if flat else "a calendar that is not flat")
+        + "; nothing here claims more.",
         "",
         f"Run from {record.get('started_at_utc')} to {record.get('finished_at_utc')}; head at "
         f"the end `{record.get('head_at_end')}`, runner sha256 `{record.get('runner_sha256')}`.",
@@ -2670,14 +2803,19 @@ def markdown(record: Mapping[str, Any]) -> str:
     if result["verdict"] is not None:
         lines.append(f"**{result['verdict']}**: {len(result['disagreements'])} disagreement(s).")
     else:
-        lines += [f"- Device: **{result['device']}**", f"- Server: **{result['server']}**"]
+        lines += [f"- Server: **{result['server']}**", f"- Device: **{result['device']}**"]
+    heads = {
+        "native": "Native matched | Native 1,800 s",
+        "wasm": "Wasm matched | Wasm 1,800 s",
+    }
     lines += [
         "",
         "## Instances",
         "",
-        "| Entry | Window | CP-SAT | CP-SAT s | Native matched | Native 1,800 s | "
-        "Wasm matched | Wasm 1,800 s |",
-        "| ---: | ---: | --- | ---: | --- | --- | --- | --- |",
+        "| Entry | Window | CP-SAT | CP-SAT s | "
+        + " | ".join(heads[build] for build in builds)
+        + " |",
+        "| ---: | ---: | --- | ---: | " + " | ".join("--- | ---" for _ in builds) + " |",
     ]
 
     def cell(run: Mapping[str, Any]) -> str:
@@ -2690,24 +2828,56 @@ def markdown(record: Mapping[str, Any]) -> str:
     for row in record["instances"]:
         cp = row["cp_sat"]
         highs = row["highs"]
+        cells = " | ".join(
+            f"{cell(highs[build]['wall_matched'])} | {cell(highs[build]['ceiling'])}"
+            for build in builds
+        )
         lines.append(
             f"| {row['entry_id']} | {row['window']} | {cp['primary_status']} | "
-            f"{cp['seconds']:.1f} | {cell(highs['native']['wall_matched'])} | "
-            f"{cell(highs['native']['ceiling'])} | {cell(highs['wasm']['wall_matched'])} | "
-            f"{cell(highs['wasm']['ceiling'])} |"
+            f"{cp['seconds']:.1f} | {cells} |"
         )
+    counts = record.get("counts")
+    if counts is not None:
+        lines += ["", "## Counts", ""]
+        lines.append(f"- Members {counts['members']}, instances {counts['instances']}.")
+        for window in WINDOWS:
+            by_window = counts[f"week_{window}"]
+            proved = ", ".join(
+                f"{build} {run.replace('_', ' ')} {by_window[f'{build}_{run}_proved']}"
+                for build in builds
+                for run in ("wall_matched", "ceiling")
+            )
+            lines.append(
+                f"- {window}-week: {by_window['instances']} instances; CP-SAT proves "
+                f"{by_window['cp_sat_proved']} and leaves {by_window['cp_sat_feasible']} "
+                f"FEASIBLE; proved by {proved}."
+            )
     lines += ["", "## Readings", ""]
     lines += [f"- {reading}" for reading in record["readings"]]
+    if "wasm" not in builds:
+        lines.append(
+            "- The wasm build was not run: the device verdict was settled by #1083 and is "
+            "carried from docs/research/window_solver_highs.md, not re-measured."
+        )
     machine = record["machine"]
+    wasm = record["versions"].get("highs_wasm")
+    wasm_text = (
+        "no wasm run"
+        if not wasm
+        else f"wasm {wasm.get('core_version')} under Node {wasm.get('node_version')}"
+    )
     lines += [
         "",
         "## Machine and versions",
         "",
         f"{machine['operating_system']}, {machine['processor']}, "
-        f"{machine['logical_cores']} logical cores. OR-Tools {record['versions']['ortools']}, "
-        f"HiGHS native {record['versions']['highs_native_core']}, wasm "
-        f"{record['versions']['highs_wasm'].get('core_version')} under Node "
-        f"{record['versions']['highs_wasm'].get('node_version')}.",
+        f"{machine['logical_cores']} logical cores, Python {machine.get('python')}. OR-Tools "
+        f"{record['versions']['ortools']}, HiGHS native {record['versions']['highs_native_core']}, "
+        f"{wasm_text}.",
+        "",
+        "## Decision",
+        "",
+        decision(record),
     ]
     return "\n".join(lines) + "\n"
 
@@ -2715,24 +2885,57 @@ def markdown(record: Mapping[str, Any]) -> str:
 def _parse(argv: Sequence[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
     commands = parser.add_subparsers(dest="command", required=True)
-    check = commands.add_parser("check", help="build, gate, export and run check 1; no timing")
+    shared = argparse.ArgumentParser(add_help=False)
+    shared.add_argument("--league-dir", type=Path, default=LEAGUE_DIR, help="the league tree")
+    shared.add_argument("--fixtures", type=Path, default=FIXTURES_PATH, help="the calendar")
+    shared.add_argument("--capture", default=CAPTURE, help="the capture every input must carry")
+    shared.add_argument("--record-stem", default=DEFAULT_RECORD_STEM, help="the record's stem")
+    shared.add_argument(
+        "--builds",
+        choices=("both", "native"),
+        default="both",
+        help="native runs native HiGHS and CP-SAT only and skips the wasm guard and preflight",
+    )
+    shared.add_argument("--protocol", default=None, help="the protocol path the record names")
+    shared.add_argument("--issue", type=int, default=None, help="the issue the record names")
+    check = commands.add_parser(
+        "check", parents=[shared], help="build, gate, export and run check 1; no timing"
+    )
     check.add_argument("--member", type=int, default=None, help="one entry id instead of all")
-    check.add_argument("--artifacts", type=Path, default=ARTIFACT_DIR)
-    measure = commands.add_parser("measure", help="the declared runs; needs the slot")
+    check.add_argument("--artifacts", type=Path, default=None)
+    measure = commands.add_parser(
+        "measure", parents=[shared], help="the declared runs; needs the slot"
+    )
     measure.add_argument("--i-have-the-slot", dest="have_slot", action="store_true")
     measure.add_argument("--node", default=os.environ.get("SQUADOPT_NODE", "node"))
-    native = commands.add_parser("native-run", help=argparse.SUPPRESS)
-    native.add_argument("--job", type=Path, required=True)
-    native.add_argument("--out", type=Path, required=True)
     return parser.parse_args(argv)
+
+
+def target_from(arguments: argparse.Namespace) -> Target:
+    """The run's target from the command line; a stem without a known protocol must name one."""
+
+    league_dir = Path(arguments.league_dir)
+    fixtures = Path(arguments.fixtures)
+    return Target(
+        league_dir=league_dir if league_dir.is_absolute() else REPOSITORY_ROOT / league_dir,
+        fixtures_path=fixtures if fixtures.is_absolute() else REPOSITORY_ROOT / fixtures,
+        capture=str(arguments.capture),
+        record_stem=str(arguments.record_stem),
+        builds=BUILDS if arguments.builds == "both" else ("native",),
+        protocol=arguments.protocol,
+        issue=arguments.issue,
+    )
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     arguments = _parse(argv)
+    target: Target | None = None
     try:
+        target = target_from(arguments)
         if arguments.command == "check":
-            record = run_check(arguments.member, arguments.artifacts)
-            write_json(arguments.artifacts / "check.json", record)
+            artifacts = arguments.artifacts or target.artifact_dir
+            record = run_check(arguments.member, artifacts, target)
+            write_json(artifacts / "check.json", record)
             summary = {
                 "passed": record.get("passed", False),
                 "rebuild_passed": record["rebuild"]["passed"],
@@ -2749,19 +2952,16 @@ def main(argv: Sequence[str] | None = None) -> int:
             }
             print(json.dumps(summary, indent=2))
             return 0 if record.get("passed") else 1
-        if arguments.command == "native-run":
-            job = json.loads(arguments.job.read_text(encoding="utf-8"))
-            write_json(arguments.out, native_run(job))
-            return 0
         versions = measure_guards(
             have_slot=arguments.have_slot,
             now=datetime.now(UTC),
             native_version=native_core_version,
             wasm_version=lambda: wasm_report(arguments.node),
+            builds=target.builds,
         )
-        record = run_measure(arguments.node, versions, ARTIFACT_DIR)
-        write_json(RECORD_JSON, record)
-        write_text(RECORD_MARKDOWN, markdown(record))
+        record = run_measure(arguments.node, versions, target.artifact_dir, target)
+        write_json(target.record_json, record)
+        write_text(target.record_markdown, markdown(record))
         return 0
     except (ProtocolRefusal, DriverFailed, ExportRefused) as refusal:
         # A driver that fails its version report or its toy model, or a model the exporter
@@ -2769,7 +2969,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         if arguments.command == "measure" and arguments.have_slot:
             # A run that stopped leaves its reason beside its evidence, never in docs/.
             write_json(
-                ARTIFACT_DIR / "stopped.json",
+                (ARTIFACT_DIR if target is None else target.artifact_dir) / "stopped.json",
                 {
                     "kind": type(refusal).__name__,
                     "reason": str(refusal),

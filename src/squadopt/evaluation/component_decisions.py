@@ -284,8 +284,15 @@ def evaluate_phase_c_component_decisions(
     handoff: PhaseCComponentHandoff,
     control_folds: Iterable[EvaluationFold],
     config: EvaluationConfig,
+    *,
+    development_contract: str | None = None,
 ) -> PhaseCDecisionComparison:
-    """Compare component-base and historical control decisions without promoting either."""
+    """Compare component-base and historical control decisions without promoting either.
+
+    ``development_contract`` admits a handoff read under the Phase C v2 development
+    contract, and only that one; the frozen v1 path leaves it ``None`` and a development
+    artifact is then refused, as :func:`prepare_phase_c_component_folds` states.
+    """
 
     if not isinstance(config, EvaluationConfig):
         raise EvaluationValidationError("config must be an EvaluationConfig.")
@@ -294,7 +301,9 @@ def evaluate_phase_c_component_decisions(
             "Phase C decision comparison requires official_autosub_captain_v2."
         )
     controls = _folds(control_folds)
-    candidates = prepare_phase_c_component_folds(handoff, controls)
+    candidates = prepare_phase_c_component_folds(
+        handoff, controls, development_contract=development_contract
+    )
     normalized_controls = tuple(
         EvaluationFold(
             fold_id=control.fold_id,
