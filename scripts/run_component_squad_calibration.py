@@ -34,6 +34,7 @@ from importlib.metadata import version
 from pathlib import Path
 from typing import Final, cast
 
+import numpy as np
 import pandas as pd
 from scripts._experiment_cli import (
     DEFAULT_ARCHIVE_ROOT,
@@ -42,6 +43,7 @@ from scripts._experiment_cli import (
     measurement_optimization_config,
     solver_record,
 )
+from scripts.measure_component_fidelity import CANDIDATE_FIDELITY_CONTRACT_VERSION
 from scripts.measure_component_fidelity import METRIC_NAMES as FIDELITY_METRIC_NAMES
 from scripts.measure_component_fidelity import OBSERVATION_UNIT as FIDELITY_OBSERVATION_UNIT
 
@@ -54,6 +56,7 @@ from squadopt.data import DataError
 from squadopt.data.sources.vaastav import build_panel
 from squadopt.evaluation import (
     DEVELOPMENT_OOF_CONTRACT_VERSION,
+    OOF_CONTRACT_VERSION,
     EvaluationConfig,
     EvaluationError,
     EvaluationFold,
@@ -63,7 +66,9 @@ from squadopt.evaluation import (
     prepare_phase_c_component_folds,
     read_phase_c_component_handoff,
 )
-from squadopt.evaluation.component_handoff import PhaseCComponentHandoff
+from squadopt.evaluation.component_handoff import HANDOFF_KEY, PhaseCComponentHandoff
+from squadopt.evaluation.promotion import PromotionPolicy
+from squadopt.evaluation.statistics import season_aware_moving_block_interval
 from squadopt.experiments import (
     COMPONENT_SQUAD_CALIBRATION_CONTRACT_VERSION,
     ComponentCalibrationFold,
@@ -95,12 +100,18 @@ from squadopt.scenarios import (
 )
 from squadopt.scenarios.components import (
     COMPONENT_SCENARIO_CONTRACT_VERSION,
+    ComponentScenarioDraw,
     ComponentScenarioInputs,
     ComponentScenarioProvenance,
     ConditionalResidualConfig,
+    TeamMatchBlockConfig,
     paired_conditional_residuals,
     sample_component_scenarios,
 )
+from squadopt.scenarios.decision_scoring import ComponentDecisionDistributionReadout
+
+# The two opt-in candidate samplers the run can draw on instead of the foundation.
+CandidateSampler = ConditionalResidualConfig | TeamMatchBlockConfig
 
 REPORT_VERSION: Final = "phase_d_component_squad_calibration_binding_v1"
 FIDELITY_VERSION: Final = "phase_d_component_fidelity_v1"
@@ -136,6 +147,19 @@ DEVELOPMENT_REPORT_VERSION: Final = "phase_d_component_squad_calibration_develop
 PHASE_C_CONTRACTS: Final = ("v1", "development_v2")
 DEVELOPMENT_HISTORY_SEASONS: Final = (*HISTORY_SEASONS, LOCKED_HOLDOUT_SEASON)
 _DIGEST: Final = r"[0-9a-f]{64}"
+TEAM_MATCH_BLOCK_PREREG: Final = "docs/research/team_match_block_sampler_prereg.md"
+# The repository's noise floor, stated on every team-match block record: it applies to a
+# points claim, and the record makes none, since its gates are the S1 and S2 bands.
+NOISE_FLOOR_POINTS_PER_GAMEWEEK: Final = 1.5
+# The descriptive paired-difference interval of the team-match block protocol: 90%,
+# season-aware moving blocks of four folds, 2,000 resamples, seed 0. It decides nothing.
+PAIRED_DIFFERENCE_POLICY: Final = PromotionPolicy(
+    min_mean_improvement=0.0,
+    confidence_level=0.90,
+    bootstrap_resamples=2_000,
+    moving_block_length=4,
+    deterministic_seed=0,
+)
 
 
 class BindingCalibrationError(ValueError):
@@ -174,17 +198,34 @@ def _parse_arguments() -> argparse.Namespace:
         default=None,
         help="candidate sampler: the smallest such window, whole fold when the fold is smaller",
     )
+    parser.add_argument(
+        "--team-match-block",
+        action="store_true",
+        help="candidate sampler: a club-week block inside the source fold (team_match_block_v1);"
+        " on the v1 contract the run is pinned to the three expected digests",
+    )
     arguments = parser.parse_args()
     if arguments.phase_c_contract == "v1" and arguments.fidelity is None:
         parser.error("--fidelity is required under the v1 binding contract.")
     return arguments
 
 
-def _candidate_from_arguments(arguments: argparse.Namespace) -> ConditionalResidualConfig | None:
+def _candidate_from_arguments(arguments: argparse.Namespace) -> CandidateSampler | None:
     """The candidate sampler the arguments ask for, or None for the frozen binding sampler."""
 
     fraction = arguments.conditional_residual_fraction
     minimum_rows = arguments.conditional_residual_minimum_rows
+    if bool(getattr(arguments, "team_match_block", False)):
+        if fraction is not None or minimum_rows is not None:
+            raise BindingCalibrationError(
+                "--team-match-block and the conditional-residual flags name two candidate "
+                "samplers; a run draws on one."
+            )
+        if Path(arguments.json_output).resolve() == DEFAULT_OUTPUT.resolve():
+            raise BindingCalibrationError(
+                "A candidate run cannot write the binding artifact path; give --json-output."
+            )
+        return TeamMatchBlockConfig()
     if fraction is None and minimum_rows is None:
         return None
     if fraction is None or minimum_rows is None:
@@ -200,11 +241,49 @@ def _candidate_from_arguments(arguments: argparse.Namespace) -> ConditionalResid
 
 
 def _report_contract_version(
-    candidate: ConditionalResidualConfig | None, development: DevelopmentInputs | None = None
+    candidate: CandidateSampler | None, development: DevelopmentInputs | None = None
 ) -> str:
     if development is not None:
         return DEVELOPMENT_REPORT_VERSION
     return REPORT_VERSION if candidate is None else CANDIDATE_REPORT_VERSION
+
+
+@dataclass(frozen=True, slots=True)
+class ReferenceInputs:
+    """The Phase C v1 table a team-match block run is pinned to, by its three digests."""
+
+    table_sha256: str
+    roster_sha256: str
+    manifest_sha256: str
+
+
+def _reference_from_arguments(arguments: argparse.Namespace) -> ReferenceInputs | None:
+    """The pinned v1 table a ``--team-match-block`` run reads, or None.
+
+    On the v1 contract the candidate is read on whatever v1 export the three digests name,
+    never on the frozen binding fidelity record: the table the candidate's own fidelity
+    record was measured on is the table its calibration reads. The binding path, with no
+    candidate, keeps pinning the frozen digests itself and takes no digest argument.
+    """
+
+    if str(getattr(arguments, "phase_c_contract", "v1")) != "v1" or not bool(
+        getattr(arguments, "team_match_block", False)
+    ):
+        return None
+    digests: dict[str, str] = {}
+    for name in ("expected_table_sha256", "expected_roster_sha256", "expected_manifest_sha256"):
+        value = getattr(arguments, name, None)
+        if not isinstance(value, str) or re.fullmatch(_DIGEST, value) is None:
+            raise BindingCalibrationError(
+                f"--{name.replace('_', '-')} must pin the v1 table with a 64-hex SHA-256 "
+                "under --team-match-block."
+            )
+        digests[name] = value
+    return ReferenceInputs(
+        table_sha256=digests["expected_table_sha256"],
+        roster_sha256=digests["expected_roster_sha256"],
+        manifest_sha256=digests["expected_manifest_sha256"],
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -232,10 +311,13 @@ def _development_from_arguments(arguments: argparse.Namespace) -> DevelopmentInp
     if contract == "v1":
         if getattr(arguments, "fidelity", None) is None:
             raise BindingCalibrationError("--fidelity is required under the v1 binding contract.")
+        # The digests belong to `_reference_from_arguments` when --team-match-block is set.
+        pinned = bool(getattr(arguments, "team_match_block", False))
         for name in ("expected_table_sha256", "expected_roster_sha256", "expected_manifest_sha256"):
-            if getattr(arguments, name, None) is not None:
+            if not pinned and getattr(arguments, name, None) is not None:
                 raise BindingCalibrationError(
-                    f"--{name.replace('_', '-')} applies to --phase-c-contract development_v2 only."
+                    f"--{name.replace('_', '-')} applies to --phase-c-contract development_v2 "
+                    "only, or to a --team-match-block run."
                 )
         if getattr(arguments, "folds", None) is not None:
             raise BindingCalibrationError(
@@ -303,12 +385,16 @@ def _read_handoff(
     return handoff
 
 
-def _sampler_record(candidate_sampler: ConditionalResidualConfig | None) -> dict[str, object]:
+def _sampler_record(candidate_sampler: CandidateSampler | None) -> dict[str, object]:
     """The sampler identity a fidelity record has to match, from this run's own setting."""
 
-    if candidate_sampler is None:
+    if candidate_sampler is None or isinstance(candidate_sampler, TeamMatchBlockConfig):
         return {
-            "contract_version": COMPONENT_SCENARIO_CONTRACT_VERSION,
+            "contract_version": (
+                COMPONENT_SCENARIO_CONTRACT_VERSION
+                if candidate_sampler is None
+                else candidate_sampler.contract_version
+            ),
             "conditional_residual_fraction": None,
             "conditional_residual_minimum_rows": None,
         }
@@ -324,7 +410,7 @@ def _load_verified_development_fidelity(
     handoff: PhaseCComponentHandoff,
     *,
     settings: ScenarioConfig,
-    candidate_sampler: ConditionalResidualConfig | None,
+    candidate_sampler: CandidateSampler | None,
 ) -> tuple[str, tuple[str, ...], tuple[str, ...]]:
     """Verify the development fidelity record and return its digest and its two fold lists.
 
@@ -667,6 +753,14 @@ def _load_verified_fidelity(path: Path, handoff: PhaseCComponentHandoff) -> str:
         or provenance.get("feature_contract_version") != handoff.feature_contract_version
     ):
         raise BindingCalibrationError("Fidelity artifact does not describe this Phase C handoff.")
+    _verify_frozen_fidelity_population(fidelity, handoff)
+    return fidelity_digest
+
+
+def _verify_frozen_fidelity_population(
+    fidelity: Mapping[str, object], handoff: PhaseCComponentHandoff
+) -> None:
+    """The v1 population a fidelity record has to cover: 147 folds, 9 burn-in, 138 measured."""
 
     population = _mapping(fidelity.get("population"), "fidelity.population")
     measured_ids = _string_list(population.get("measured_fold_ids"), "measured_fold_ids")
@@ -697,6 +791,75 @@ def _load_verified_fidelity(path: Path, handoff: PhaseCComponentHandoff) -> str:
         not isinstance(item, str) for item in warnings_value
     ):
         raise BindingCalibrationError("Fidelity warnings must be a list of strings.")
+
+
+def _load_verified_candidate_fidelity(
+    path: Path,
+    handoff: PhaseCComponentHandoff,
+    candidate_sampler: CandidateSampler,
+    reference: ReferenceInputs,
+) -> str:
+    """Verify a candidate fidelity record on the pinned v1 table, structurally, as on the
+    binding path: no numeric threshold is read. What is checked is that it was produced on
+    *this* table (the three digests), by *this* sampler, under the frozen configuration, over
+    the frozen population. Its digest is recorded, not pinned."""
+
+    if (
+        handoff.table_sha256 != reference.table_sha256
+        or handoff.roster_sha256 != reference.roster_sha256
+        or handoff.manifest_sha256 != reference.manifest_sha256
+    ):
+        raise BindingCalibrationError(
+            "Phase C handoff digests differ from the pinned reference "
+            f"(table {handoff.table_sha256[:12]}..., roster {handoff.roster_sha256[:12]}..., "
+            f"manifest {handoff.manifest_sha256[:12]}...)."
+        )
+    fidelity_digest = _sha256(path)
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise BindingCalibrationError(f"Cannot read fidelity artifact {path}: {error}") from error
+    fidelity = _mapping(document, "fidelity artifact")
+    _finite_numbers(fidelity)
+    if fidelity.get("contract_version") != CANDIDATE_FIDELITY_CONTRACT_VERSION:
+        raise BindingCalibrationError(
+            f"A candidate run needs a {CANDIDATE_FIDELITY_CONTRACT_VERSION!r} fidelity record; "
+            "the frozen v1 artifact and any other contract are refused."
+        )
+    if (
+        fidelity.get("diagnostic_only") is not True
+        or fidelity.get("promotes_anything") is not False
+        or fidelity.get("registers_any_threshold") is not False
+        or fidelity.get("binding") is not False
+        or fidelity.get("development_only") is not False
+        or fidelity.get("phase_c_contract") != OOF_CONTRACT_VERSION
+    ):
+        raise BindingCalibrationError("Fidelity artifact changes its diagnostic-only meaning.")
+    config = _mapping(fidelity.get("config"), "fidelity.config")
+    if dict(config) != {"scenario_count": 1_000, "deterministic_seed": 0, "min_history_folds": 8}:
+        raise BindingCalibrationError("Fidelity artifact does not use the frozen scenario config.")
+    sampler = dict(_mapping(fidelity.get("sampler"), "fidelity.sampler"))
+    expected_sampler = _sampler_record(candidate_sampler)
+    if {name: sampler.get(name) for name in expected_sampler} != expected_sampler:
+        raise BindingCalibrationError(
+            "Fidelity artifact was measured on a different sampler than this run uses."
+        )
+    provenance = _mapping(fidelity.get("provenance"), "fidelity.provenance")
+    if (
+        provenance.get("working_tree_dirty") is not False
+        or provenance.get("manifest_locked_holdout_read") is not False
+        or provenance.get("phase_c_contract") != OOF_CONTRACT_VERSION
+        or provenance.get("manifest_table_sha256") != handoff.table_sha256
+        or provenance.get("oof_table_sha256") != handoff.table_sha256
+        or provenance.get("manifest_roster_sha256") != handoff.roster_sha256
+        or provenance.get("roster_sha256") != handoff.roster_sha256
+        or provenance.get("manifest_sha256") != handoff.manifest_sha256
+        or provenance.get("model_version") != handoff.model_version
+        or provenance.get("feature_contract_version") != handoff.feature_contract_version
+        or provenance.get("phase_c_producer_repository_commit") != handoff.repository_commit
+    ):
+        raise BindingCalibrationError("Fidelity artifact does not describe this Phase C handoff.")
+    _verify_frozen_fidelity_population(fidelity, handoff)
     return fidelity_digest
 
 
@@ -822,7 +985,7 @@ def _binding_population(
 
 
 def _candidate_record(
-    candidate_sampler: ConditionalResidualConfig | None,
+    candidate_sampler: CandidateSampler | None,
     *,
     reference: str = REPORT_VERSION,
 ) -> dict[str, object] | None:
@@ -834,6 +997,15 @@ def _candidate_record(
 
     if candidate_sampler is None:
         return None
+    if isinstance(candidate_sampler, TeamMatchBlockConfig):
+        return {
+            "sampler_contract_version": candidate_sampler.contract_version,
+            "residual_selection": "team_match_block",
+            "prereg_document": TEAM_MATCH_BLOCK_PREREG,
+            "reference_contract_version": reference,
+            "development_data_only": True,
+            "binding": False,
+        }
     return {
         "sampler_contract_version": candidate_sampler.contract_version,
         "conditional_residual_fraction": candidate_sampler.fraction,
@@ -844,48 +1016,61 @@ def _candidate_record(
     }
 
 
-def _measure_fold(
-    handoff: PhaseCComponentHandoff,
-    prepared: EvaluationFold,
-    result: OptimizationResult,
-    realized_score: float,
-    selected_ids: Sequence[int],
-    settings: ScenarioConfig,
-    candidate_sampler: ConditionalResidualConfig | None,
-    *,
-    development: bool = False,
-) -> tuple[ComponentCalibrationFold, dict[str, object]]:
-    """Simulate one frozen squad decision on the binding sampler, or on the candidate if given.
+def _sampler_keywords(candidate_sampler: CandidateSampler | None) -> dict[str, object]:
+    """The keyword the draw takes for this sampler; the foundation takes none."""
 
-    The sampler setting travels under its own name from the arguments to the draw, and the fold
-    record reports the contract version the draw itself declares, so the report can never name
-    a sampler the draw did not use. A development record additionally carries the complete
-    decision identity and its own wall time; the binding record is unchanged.
+    if isinstance(candidate_sampler, TeamMatchBlockConfig):
+        return {"team_match_block": candidate_sampler}
+    if isinstance(candidate_sampler, ConditionalResidualConfig):
+        return {"conditional_residuals": candidate_sampler}
+    return {}
+
+
+def _history_rows(
+    handoff: PhaseCComponentHandoff, candidate_sampler: CandidateSampler | None
+) -> pd.DataFrame:
+    """The rows a residual pool is built from: the handoff's own, plus each row's club
+    from the decision roster when the team-match block needs it (the OOF table carries
+    ``position`` and ``fixture_count`` but keeps team identity in the roster)."""
+
+    rows = handoff.rows
+    if not isinstance(candidate_sampler, TeamMatchBlockConfig) or "team_id" in rows.columns:
+        return rows
+    return rows.merge(
+        handoff.roster.loc[:, [*HANDOFF_KEY, "team_id"]],
+        on=list(HANDOFF_KEY),
+        how="left",
+        validate="one_to_one",
+    )
+
+
+def _within_club_points_correlation(draw: ComponentScenarioDraw) -> tuple[int, float | None]:
+    """Mean Pearson correlation of ``scenario_points`` over same-club pairs of the squad.
+
+    Non-appearances enter as zero, which is what the squad score sees. A pair whose column
+    is constant has no correlation and is left out; a squad with no same-club pair gives
+    None and a pair count of zero.
     """
 
-    started = datetime.now(UTC)
-    fold_id = prepared.fold_id
-    inputs, snapshot = _selected_component_inputs(handoff, prepared, selected_ids)
-    if not bool(inputs.table["composition_route"].eq(COMPONENT_MODEL_ROUTE).all()):
-        raise BindingCalibrationError(f"{fold_id} contains a selected non-component row.")
-    target = _target(fold_id)
-    history = handoff.rows.loc[handoff.rows["fold_id"].astype("string") < fold_id]
-    residuals = paired_conditional_residuals(
-        history,
-        target=target,
-        min_history_folds=settings.min_history_folds,
-    )
-    draw = sample_component_scenarios(
-        inputs, snapshot, residuals, target, settings, conditional_residuals=candidate_sampler
-    )
-    scored = score_component_scenario_decision(result, draw)
-    readout = summarize_component_decision_distribution(scored, realized_score=realized_score)
-    record: dict[str, object] = {
-        "fold_id": fold_id,
-        "sampler_contract_version": str(
-            draw.scenarios.diagnostics["component_sampler_contract_version"]
-        ),
-        "solver_status": result.solver_status.value,
+    points = draw.scenarios.scenario_points.to_numpy(dtype="float64")
+    teams = [str(value) for value in draw.inputs.table["team_id"]]
+    pairs = 0
+    correlations: list[float] = []
+    for left in range(len(teams)):
+        for right in range(left + 1, len(teams)):
+            if teams[left] != teams[right]:
+                continue
+            pairs += 1
+            if points[:, left].std() == 0.0 or points[:, right].std() == 0.0:
+                continue
+            correlations.append(float(np.corrcoef(points[:, left], points[:, right])[0, 1]))
+    return pairs, (float(np.mean(correlations)) if correlations else None)
+
+
+def _readout_record(readout: ComponentDecisionDistributionReadout) -> dict[str, object]:
+    """The per-fold numbers one arm's readout contributes to the record."""
+
+    return {
         "realized_score": readout.realized_score,
         "scenario_mean_score": readout.mean_score,
         "scenario_standard_deviation": readout.score_standard_deviation,
@@ -895,6 +1080,220 @@ def _measure_fold(
         "scenario_fingerprint": readout.scenario_fingerprint,
         "component_fingerprint": readout.component_fingerprint,
     }
+
+
+def _season_of(fold_id: str) -> str:
+    return fold_id.rpartition("-gw")[0]
+
+
+def _arm_summary(records: Sequence[Mapping[str, object]]) -> dict[str, object]:
+    """S1 and S2 point readings of one arm over the given fold records, with per-season
+    readings beside them. Descriptive for the control arm; the candidate's verdict is the
+    evaluator's."""
+
+    def summary(items: Sequence[Mapping[str, object]]) -> dict[str, object]:
+        pits = [float(str(item["probability_integral_transform"])) for item in items]
+        below = [bool(item["realized_below_q10"]) for item in items]
+        mean_pit = sum(pits) / len(pits) if pits else None
+        rate = sum(below) / len(below) if below else None
+        return {
+            "fold_count": len(items),
+            "mean_probability_integral_transform": mean_pit,
+            "realized_below_lower_quantile_count": sum(below),
+            "realized_below_lower_quantile_rate": rate,
+            "mean_pit_within_s1_bounds": (
+                None
+                if mean_pit is None
+                else S1_PIT_BOUNDS[0] - BOUND_TOLERANCE
+                <= mean_pit
+                <= S1_PIT_BOUNDS[1] + BOUND_TOLERANCE
+            ),
+            "tail_rate_within_s2_bounds": (
+                None
+                if rate is None
+                else S2_LOWER_TAIL_BOUNDS[0] - BOUND_TOLERANCE
+                <= rate
+                <= S2_LOWER_TAIL_BOUNDS[1] + BOUND_TOLERANCE
+            ),
+            "mean_q10_score": (
+                float(np.mean([float(str(item["q10_score"])) for item in items])) if items else None
+            ),
+            "mean_scenario_standard_deviation": (
+                float(np.mean([float(str(item["scenario_standard_deviation"])) for item in items]))
+                if items
+                else None
+            ),
+        }
+
+    seasons = sorted({_season_of(str(item["fold_id"])) for item in records})
+    return {
+        **summary(records),
+        "s1_bounds": list(S1_PIT_BOUNDS),
+        "s2_bounds": list(S2_LOWER_TAIL_BOUNDS),
+        "seasons": {
+            season: summary(
+                [item for item in records if _season_of(str(item["fold_id"])) == season]
+            )
+            for season in seasons
+        },
+    }
+
+
+def _paired_differences(fold_records: Sequence[Mapping[str, object]]) -> dict[str, object]:
+    """Candidate minus control, fold by fold, for the tail indicator and the PIT: a mean and
+    the protocol's descriptive 90% season-aware moving-block bootstrap interval."""
+
+    def paired(name: str) -> dict[str, object]:
+        differences = [
+            (
+                _season_of(str(item["fold_id"])),
+                float(item[name]) - float(_mapping(item["control_arm"], "control_arm")[name]),  # type: ignore[arg-type]
+            )
+            for item in fold_records
+        ]
+        if not differences:
+            return {"fold_count": 0, "mean": None, "interval_90": None}
+        lower, upper = season_aware_moving_block_interval(
+            differences, policy=PAIRED_DIFFERENCE_POLICY, candidate_id="team_match_block_v1"
+        )
+        return {
+            "fold_count": len(differences),
+            "mean": float(np.mean([value for _, value in differences])),
+            "interval_90": [lower, upper],
+        }
+
+    return {
+        "note": (
+            "Descriptive: the gates are read on point estimates; this interval decides nothing."
+        ),
+        "bootstrap": {
+            "confidence_level": PAIRED_DIFFERENCE_POLICY.confidence_level,
+            "resamples": PAIRED_DIFFERENCE_POLICY.bootstrap_resamples,
+            "moving_block_length": PAIRED_DIFFERENCE_POLICY.moving_block_length,
+            "deterministic_seed": PAIRED_DIFFERENCE_POLICY.deterministic_seed,
+            "season_aware": True,
+        },
+        "realized_below_q10": paired("realized_below_q10"),
+        "probability_integral_transform": paired("probability_integral_transform"),
+    }
+
+
+def _pooled_diagnostics(fold_records: Sequence[Mapping[str, object]]) -> dict[str, object]:
+    """The block diagnostics and the within-club correlation, pooled over folds as means."""
+
+    diagnostics = [
+        _mapping(item["block_diagnostics"], "block_diagnostics") for item in fold_records
+    ]
+    pooled: dict[str, object] = {}
+    for name in sorted({key for item in diagnostics for key in item}):
+        values = [float(str(item[name])) for item in diagnostics if name in item]
+        pooled[f"{name}_mean"] = float(np.mean(values)) if values else None
+    correlations = [
+        _mapping(item["within_club_points_correlation"], "within_club") for item in fold_records
+    ]
+    with_pairs = [item for item in correlations if int(str(item["pairs"])) > 0]
+    candidate = [
+        float(str(item["candidate"])) for item in with_pairs if item["candidate"] is not None
+    ]
+    control = [float(str(item["control"])) for item in with_pairs if item["control"] is not None]
+    return {
+        "block_diagnostics": pooled,
+        "within_club_points_correlation": {
+            "fold_count": len(fold_records),
+            "fold_count_with_pairs": len(with_pairs),
+            "pairs_mean": (
+                float(np.mean([int(str(item["pairs"])) for item in correlations]))
+                if correlations
+                else None
+            ),
+            "candidate_mean": float(np.mean(candidate)) if candidate else None,
+            "control_mean": float(np.mean(control)) if control else None,
+        },
+    }
+
+
+def _measure_fold(
+    handoff: PhaseCComponentHandoff,
+    prepared: EvaluationFold,
+    result: OptimizationResult,
+    realized_score: float,
+    selected_ids: Sequence[int],
+    settings: ScenarioConfig,
+    candidate_sampler: CandidateSampler | None,
+    *,
+    development: bool = False,
+    control_arm: bool = False,
+) -> tuple[ComponentCalibrationFold, dict[str, object]]:
+    """Simulate one frozen squad decision on the binding sampler, or on the candidate if given.
+
+    The sampler setting travels under its own name from the arguments to the draw, and the fold
+    record reports the contract version the draw itself declares, so the report can never name
+    a sampler the draw did not use. A development record additionally carries the complete
+    decision identity and its own wall time; the binding record is unchanged.
+
+    ``control_arm`` additionally draws and scores the foundation sampler on the same pool,
+    decisions and seed, and records it under ``control_arm`` beside the within-club points
+    correlation of both draws. The reading returned is always the requested sampler's.
+    """
+
+    started = datetime.now(UTC)
+    fold_id = prepared.fold_id
+    inputs, snapshot = _selected_component_inputs(handoff, prepared, selected_ids)
+    if not bool(inputs.table["composition_route"].eq(COMPONENT_MODEL_ROUTE).all()):
+        raise BindingCalibrationError(f"{fold_id} contains a selected non-component row.")
+    target = _target(fold_id)
+    rows = _history_rows(handoff, candidate_sampler)
+    history = rows.loc[rows["fold_id"].astype("string") < fold_id]
+    residuals = paired_conditional_residuals(
+        history,
+        target=target,
+        min_history_folds=settings.min_history_folds,
+        team_match_block=(
+            candidate_sampler if isinstance(candidate_sampler, TeamMatchBlockConfig) else None
+        ),
+    )
+    draw = sample_component_scenarios(
+        inputs,
+        snapshot,
+        residuals,
+        target,
+        settings,
+        **_sampler_keywords(candidate_sampler),  # type: ignore[arg-type]
+    )
+    scored = score_component_scenario_decision(result, draw)
+    readout = summarize_component_decision_distribution(scored, realized_score=realized_score)
+    record: dict[str, object] = {
+        "fold_id": fold_id,
+        "sampler_contract_version": str(
+            draw.scenarios.diagnostics["component_sampler_contract_version"]
+        ),
+        "solver_status": result.solver_status.value,
+        **_readout_record(readout),
+    }
+    if control_arm:
+        # The same pool serves both arms: the foundation reads the block fields as nothing.
+        control = sample_component_scenarios(inputs, snapshot, residuals, target, settings)
+        control_readout = summarize_component_decision_distribution(
+            score_component_scenario_decision(result, control), realized_score=realized_score
+        )
+        pairs, candidate_correlation = _within_club_points_correlation(draw)
+        _, control_correlation = _within_club_points_correlation(control)
+        record["control_arm"] = {
+            "sampler_contract_version": str(
+                control.scenarios.diagnostics["component_sampler_contract_version"]
+            ),
+            **_readout_record(control_readout),
+        }
+        record["within_club_points_correlation"] = {
+            "pairs": pairs,
+            "candidate": candidate_correlation,
+            "control": control_correlation,
+        }
+        record["block_diagnostics"] = {
+            name: value
+            for name, value in draw.scenarios.diagnostics.items()
+            if name.startswith("team_match_block_")
+        }
     if development:
         record["decision_identity"] = _decision_identity(result)
         record["residual_history_folds"] = len(residuals.history_fold_ids)
@@ -906,16 +1305,17 @@ def _measure_fold(
 def _measure(arguments: argparse.Namespace) -> tuple[dict[str, object], int]:
     candidate_sampler = _candidate_from_arguments(arguments)
     development = _development_from_arguments(arguments)
+    reference = _reference_from_arguments(arguments)
     handoff = _read_handoff(arguments, development)
     if development is None:
-        return _measure_binding(arguments, handoff, candidate_sampler)
+        return _measure_binding(arguments, handoff, candidate_sampler, reference)
     return _measure_development(arguments, handoff, candidate_sampler, development)
 
 
 def _measure_development(
     arguments: argparse.Namespace,
     handoff: PhaseCComponentHandoff,
-    candidate_sampler: ConditionalResidualConfig | None,
+    candidate_sampler: CandidateSampler | None,
     development: DevelopmentInputs,
 ) -> tuple[dict[str, object], int]:
     """The development_v2 reading: computed population, pinned inputs, its own contract.
@@ -1160,9 +1560,20 @@ def _measure_development(
 def _measure_binding(
     arguments: argparse.Namespace,
     handoff: PhaseCComponentHandoff,
-    candidate_sampler: ConditionalResidualConfig | None,
+    candidate_sampler: CandidateSampler | None,
+    reference: ReferenceInputs | None = None,
 ) -> tuple[dict[str, object], int]:
-    fidelity_sha256 = _load_verified_fidelity(arguments.fidelity, handoff)
+    """The v1 walk: the binding record, or, with ``reference``, a candidate read on the
+    pinned table beside the foundation control arm on the same folds."""
+
+    if reference is None:
+        fidelity_sha256 = _load_verified_fidelity(arguments.fidelity, handoff)
+    elif candidate_sampler is None:
+        raise BindingCalibrationError("A pinned v1 run names a candidate sampler.")
+    else:
+        fidelity_sha256 = _load_verified_candidate_fidelity(
+            arguments.fidelity, handoff, candidate_sampler, reference
+        )
     panel = _load_development_panel(arguments.archive_root)
     controls = build_walk_forward_folds(
         panel,
@@ -1217,6 +1628,7 @@ def _measure_binding(
             selected_by_id[fold_id],
             settings,
             candidate_sampler,
+            control_arm=reference is not None,
         )
         readings.append(reading)
         fold_records.append(record)
@@ -1226,6 +1638,46 @@ def _measure_binding(
         expected_fold_ids=expected_ids,
         sampler_fidelity_verified=True,
     )
+    pinned: dict[str, object] = {}
+    if reference is not None:
+        control_records = [
+            {"fold_id": item["fold_id"], **_mapping(item["control_arm"], "control_arm")}
+            for item in fold_records
+        ]
+        pinned = {
+            "reference": {
+                "table_sha256": reference.table_sha256,
+                "roster_sha256": reference.roster_sha256,
+                "manifest_sha256": reference.manifest_sha256,
+                "frozen_binding_table": reference.table_sha256 == PHASE_C_TABLE_SHA256
+                and reference.roster_sha256 == PHASE_C_ROSTER_SHA256
+                and reference.manifest_sha256 == PHASE_C_MANIFEST_SHA256,
+                "fidelity_contract_version": CANDIDATE_FIDELITY_CONTRACT_VERSION,
+                "pinned_by_arguments": True,
+            },
+            "protocol_verdict": {
+                "calibrated_internal": "candidate_within_gates",
+                "failed": "candidate_outside_gates",
+                "abstained": "abstained",
+            }[verdict.status],
+            "candidate_arm": _arm_summary(fold_records),
+            "control_arm": {
+                "sampler_contract_version": COMPONENT_SCENARIO_CONTRACT_VERSION,
+                "note": (
+                    "The foundation sampler on the same table, decisions, scenario count and "
+                    "seed, scored by the same scorer. The comparison arm; the frozen binding "
+                    "record is quoted in the Markdown twin, not here."
+                ),
+                **_arm_summary(control_records),
+            },
+            "paired_differences": _paired_differences(fold_records),
+            **_pooled_diagnostics(fold_records),
+            "noise_floor_points_per_gameweek": NOISE_FLOOR_POINTS_PER_GAMEWEEK,
+            "noise_floor_note": (
+                "An effect smaller than 1.5 points per gameweek is not certified. This record "
+                "makes no points claim: its gates are the S1 and S2 bands."
+            ),
+        }
     return (
         {
             "source": {
@@ -1251,6 +1703,7 @@ def _measure_binding(
             },
             "folds": fold_records,
             "verdict": asdict(verdict),
+            **pinned,
         },
         len(panel),
     )
@@ -1270,6 +1723,7 @@ def main() -> int:
     try:
         development = _development_from_arguments(arguments)
         candidate_sampler = _candidate_from_arguments(arguments)
+        _reference_from_arguments(arguments)
     except BindingCalibrationError as error:
         print(f"Refused: {error}")
         return 1
@@ -1334,7 +1788,11 @@ def main() -> int:
         # True only when the development run actually loaded 2025-26, as development data
         # under the v2 contract; never an unseen test.
         "locked_holdout_accessed": development_mode and LOCKED_HOLDOUT_SEASON in history_seasons,
-        "prereg_document": "docs/phase_d_component_squad_calibration_prereg.md",
+        "prereg_document": (
+            TEAM_MATCH_BLOCK_PREREG
+            if isinstance(candidate_sampler, TeamMatchBlockConfig)
+            else "docs/phase_d_component_squad_calibration_prereg.md"
+        ),
         **(
             {"development_method": "docs/phase_d_v2_development_method.md"}
             if development_mode
