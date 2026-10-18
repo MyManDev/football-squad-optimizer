@@ -68,14 +68,20 @@ def raw_week_document(
     native_basis_fit_cutoff: str = FIT_CUTOFF,
     covered_gameweeks: tuple[int, ...] | None = None,
     previous_label: int | None = None,
+    capture_age_hours: float = 3,
+    news_age_hours: float = 6,
 ) -> dict[str, object]:
     """Original source fields, not generated participation probabilities."""
     decision = pd.Timestamp(decision_at)
     news = None if label is None else "" if label == 100 else "Synthetic dated fitness report"
-    news_added = None if label in (None, 100) else (decision - pd.Timedelta(hours=6)).isoformat()
+    news_added = (
+        None
+        if label in (None, 100)
+        else (decision - pd.Timedelta(hours=news_age_hours)).isoformat()
+    )
     captures = []
-    for offset in (4, 3):
-        current_label = previous_label if offset == 4 and previous_label is not None else label
+    for index, offset in enumerate((capture_age_hours + 1, capture_age_hours)):
+        current_label = previous_label if index == 0 and previous_label is not None else label
         captures.append(
             {
                 "captured_at": (decision - pd.Timedelta(hours=offset)).isoformat(),
@@ -210,7 +216,7 @@ def case_inputs(
     )
 
 
-def training_weeks() -> tuple[TrainingWeek, ...]:
+def training_weeks(*, varied_ages: bool = False) -> tuple[TrainingWeek, ...]:
     """Raw synthetic settled weeks; categorical ordering is deliberately not imposed."""
     output = []
     appearances = {0: 2, 25: 14, 50: 7, 75: 10, 100: 19, None: 12}
@@ -247,6 +253,8 @@ def training_weeks() -> tuple[TrainingWeek, ...]:
                     ).hexdigest(),
                     native_basis_kind="out_of_fold",
                     native_basis_fit_cutoff="2024-09-01T12:00:00+00:00",
+                    capture_age_hours=2 + 46 * repetition / 19 if varied_ages else 3,
+                    news_age_hours=4 + 46 * repetition / 19 if varied_ages else 6,
                 )
                 week = parse_week_document(
                     document, fixtures, decision_at=decision, deadline_at=deadline

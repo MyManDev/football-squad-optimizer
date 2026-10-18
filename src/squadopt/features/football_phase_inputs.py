@@ -6,7 +6,7 @@ import hashlib
 import json
 import math
 import re
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from datetime import UTC, datetime, timedelta
 from typing import Literal, TypedDict, cast
 
@@ -251,6 +251,8 @@ def _duties(
     if not isinstance(capture, PhaseDutyCapture) or capture.season != season:
         raise ValueError("A duty capture has the wrong season identity.")
     _text(capture.snapshot_id, "snapshot_id")
+    if recorded_at is None and capture.snapshot_id.startswith("git:"):
+        raise ValueError("A public-revision duty capture requires explicit replay provenance.")
     if not isinstance(capture.source_fingerprint, str) or not re.fullmatch(
         r"[0-9a-f]{64}", capture.source_fingerprint
     ):
@@ -371,6 +373,19 @@ def validate_observation_header(
         raise ValueError("Unknown phase coverage cannot become a zero-event fixture.")
 
 
+def canonical_phase_replay(replay: PhaseReplay) -> PhaseReplay:
+    """Give an admitted replay one source order and one UTC clock spelling."""
+    return replace(
+        replay,
+        source_hashes=tuple(sorted(replay.source_hashes)),
+        recorded_at=_time(replay.recorded_at, "recorded_at"),
+        retrieved_at=_time(replay.retrieved_at, "retrieved_at"),
+        feature_cutoff=_time(replay.feature_cutoff, "feature_cutoff"),
+        latest_history_kickoff=_time(replay.latest_history_kickoff, "latest_history_kickoff"),
+        generated_at=_time(replay.generated_at, "generated_at"),
+    )
+
+
 def _replayed_basis(
     duties: PhaseDutyCapture,
     baseline: PhaseSource,
@@ -379,7 +394,7 @@ def _replayed_basis(
     season: str,
     decision_at: str,
     training_cutoff: str,
-) -> None:
+) -> PhaseReplay:
     if (
         not isinstance(replay, PhaseReplay)
         or replay.version != "football_phase_public_revision_replay_v1"
@@ -426,6 +441,12 @@ def _replayed_basis(
             "Replay clocks do not establish settled predecision features and actual acquisition."
         )
     _duties(duties, season=season, decision_at=decision_at, recorded_at=replay.recorded_at)
+    if (
+        not decision
+        <= as_instant(_time(duties.valid_until, "duty valid_until"))
+        < clocks["retrieved_at"]
+    ):
+        raise ValueError("Replay duty validity must cover its decision and end before retrieval.")
     source_receipt(baseline, cutoff=training_cutoff, kind="baseline")
     if (
         duties.snapshot_id != "git:" + replay.revision
@@ -436,6 +457,7 @@ def _replayed_basis(
         != clocks["generated_at"]
     ):
         raise ValueError("Replay does not bind the actual duty and generated baseline receipts.")
+    return canonical_phase_replay(replay)
 
 
 def validate_observation(
@@ -553,8 +575,11 @@ def validate_projection(projection: PhaseProjection, *, model_cutoff: str) -> No
 
 def _digest(value: PhaseObservation | PhaseProjection) -> str:
     document = asdict(value)
-    if isinstance(value, PhaseObservation) and value.replay is None:
-        document.pop("replay")
+    if isinstance(value, PhaseObservation):
+        if value.replay is None:
+            document.pop("replay")
+        else:
+            document["replay"] = asdict(canonical_phase_replay(value.replay))
     content = json.dumps(document, sort_keys=True, separators=(",", ":"), allow_nan=False)
     return hashlib.sha256(content.encode("utf-8")).hexdigest()
 
@@ -793,7 +818,7 @@ def read_phase_observation(
         source_receipt(baseline_source, cutoff=decision_at, kind="baseline")
         _duties(duties, season=season, decision_at=decision_at)
     else:
-        _replayed_basis(
+        replay = _replayed_basis(
             duties,
             baseline_source,
             replay,

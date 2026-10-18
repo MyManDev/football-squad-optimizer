@@ -1,7 +1,7 @@
 """Temporal full-export FM scoping and its actual UnitInputCatalog handoff."""
 
 from dataclasses import FrozenInstanceError, replace
-from datetime import timedelta
+from datetime import timedelta, timezone
 
 import pytest
 from tests.unit.test_football_fm_attributes import CSV, CUTOFF, _source, _specs
@@ -13,6 +13,7 @@ from squadopt.features.football_fm_attributes import (
 )
 from squadopt.features.football_unit_inputs import (
     ClubUnit,
+    PlayerAttributes,
     PlayerMapping,
     UnitInputCatalog,
     UnitPlayer,
@@ -108,6 +109,29 @@ def test_source_unavailable_at_cutoff_refuses_before_csv_decoding():
         scoped(payload=b"not csv", source=_source(CSV, captured_at=CUTOFF + timedelta(seconds=1)))
 
 
+@pytest.mark.parametrize(
+    "options,reason",
+    [
+        ({"source": _source(CSV, kind="provider")}, "explicit FM source"),
+        ({"cutoff": CUTOFF.replace(tzinfo=None)}, "explicit timezone"),
+        ({"source": _source(CSV, valid_until=CUTOFF - timedelta(seconds=1))}, "stale"),
+    ],
+)
+def test_scoped_source_and_clock_refusals_precede_csv_decoding(options, reason):
+    with pytest.raises(ValueError, match=reason):
+        scoped(payload=b"not csv", **options)
+
+
+def test_scoped_reader_passes_explicit_unnamed_index_policy_to_the_full_reader():
+    payload = b",UID,Heading,Positioning\n0,1001,12,14\n"
+    with pytest.raises(ValueError, match="named header"):
+        scoped(payload=payload)
+    with pytest.raises(ValueError, match="explicit boolean"):
+        scoped(payload=payload, allow_unnamed_index=1)
+    result = scoped(payload=payload, allow_unnamed_index=True)
+    assert dict(result.player_attributes[0].values) == {"heading": 12.0, "positioning": 14.0}
+
+
 def test_a_mapped_uid_missing_from_the_actual_bytes_refuses():
     with pytest.raises(ValueError, match="absent from the verified export"):
         scoped((mapping("9999"),))
@@ -122,8 +146,7 @@ def test_filtering_does_not_skip_hash_or_unselected_row_validation():
         scoped(payload=CSV + b"1004,Extra,5,5,20\n")
 
 
-def test_scoped_rows_enter_the_catalog_while_the_wide_unmapped_export_refuses():
-    result = scoped((mapping(), mapping("1002", 12, 20)))
+def base_catalog():
     base = replace(_source(CSV), source_id="native", kind="provider", provider="fictional-native")
     baseline_mappings = tuple(
         PlayerMapping(
@@ -136,25 +159,34 @@ def test_scoped_rows_enter_the_catalog_while_the_wide_unmapped_export_refuses():
         )
         for p in range(1, 23)
     )
-    arguments = dict(
+    return UnitInputCatalog(
         season="2024-25",
         gameweek=1,
         fixture_id=1,
         decision_cutoff=CUTOFF,
-        sources=(base, result.source),
-        attributes=_specs(),
-        mappings=baseline_mappings + result.mappings,
+        sources=(base,),
+        attributes=(),
+        mappings=baseline_mappings,
+        player_attributes=(),
         baseline_source_id="native",
         reference_source_id="native",
         projection_source_id="native",
     )
-    catalog = UnitInputCatalog(**arguments, player_attributes=result.player_attributes)
+
+
+def test_scoped_rows_enter_the_catalog_while_the_wide_unmapped_export_refuses():
+    result = scoped((mapping(), mapping("1002", 12, 20)))
+    original = base_catalog()
+    catalog = result.add_to_catalog(original, attributes=_specs())
     catalog.validate_unit(
         ClubUnit(10, tuple(UnitPlayer(p, "GK" if p == 1 else "DEF") for p in range(1, 12)))
     )
     assert catalog.value(1, _specs()[0]) == 12
     assert catalog.value(12, _specs()[0]) is None
+    assert catalog.value(12, _specs()[1]) == 20
     assert catalog.value(11, _specs()[0]) is None
+    assert original.sources == catalog.sources[:1]
+    assert original.player_attributes == ()
     full = read_fm_attributes(
         CSV,
         source=_source(CSV),
@@ -164,4 +196,104 @@ def test_scoped_rows_enter_the_catalog_while_the_wide_unmapped_export_refuses():
         uid_column="UID",
     )
     with pytest.raises(ValueError, match="one active persistent player mapping"):
-        UnitInputCatalog(**arguments, player_attributes=full)
+        replace(catalog, player_attributes=full)
+
+
+def test_later_scoped_receipt_cannot_drop_a_mapping_at_an_earlier_catalog_cutoff():
+    mappings = (mapping(), mapping("1002", 12, 20, valid_until=CUTOFF + timedelta(hours=6)))
+    earlier = scoped(mappings)
+    later = scoped(mappings, cutoff=CUTOFF + timedelta(hours=12))
+    original = base_catalog()
+    assert [row.source_player_id for row in later.player_attributes] == ["1001"]
+    assert earlier.add_to_catalog(original, attributes=_specs()).value(12, _specs()[1]) == 20
+    with pytest.raises(ValueError, match="cutoff must equal"):
+        later.add_to_catalog(original, attributes=_specs())
+
+
+def test_earlier_scoped_receipt_cannot_be_reused_for_a_later_catalog_cutoff():
+    original = replace(base_catalog(), decision_cutoff=CUTOFF + timedelta(hours=12))
+    with pytest.raises(ValueError, match="cutoff must equal"):
+        scoped().add_to_catalog(original, attributes=_specs())
+
+
+def test_equivalent_timezone_representation_is_the_same_catalog_cutoff():
+    result = scoped(cutoff=CUTOFF.astimezone(timezone(timedelta(hours=3))))
+    assert result.add_to_catalog(base_catalog(), attributes=_specs()).value(1, _specs()[0]) == 12
+
+
+@pytest.mark.parametrize(
+    "attributes", [(), list(_specs()), (replace(_specs()[0], source_id="other"),)]
+)
+def test_scoped_handoff_requires_exact_source_definitions(attributes):
+    with pytest.raises(ValueError, match="definitions for its exact source"):
+        scoped().add_to_catalog(base_catalog(), attributes=attributes)
+
+
+def test_scoped_handoff_keeps_catalog_duplicate_and_scale_guards():
+    receipt = scoped()
+    catalog = receipt.add_to_catalog(base_catalog(), attributes=_specs())
+    with pytest.raises(ValueError, match="Attribute definitions must be unique"):
+        receipt.add_to_catalog(catalog, attributes=_specs())
+    with pytest.raises(ValueError, match="supported 1 to 20 scale"):
+        receipt.add_to_catalog(base_catalog(), attributes=(replace(_specs()[0], maximum=21),))
+
+
+@pytest.mark.parametrize(
+    "changes,reason",
+    [
+        ({"contract_version": "unknown"}, "Unsupported"),
+        ({"source": _source(CSV, kind="provider")}, "explicit FM source"),
+        ({"cutoff": CUTOFF.replace(tzinfo=None)}, "explicit timezone"),
+        ({"source": _source(CSV, valid_until=CUTOFF - timedelta(seconds=1))}, "stale"),
+        (
+            {"mappings": (mapping(), mapping("1002", 2, valid_from=CUTOFF + timedelta(hours=1)))},
+            "all be active",
+        ),
+        ({"mappings": [mapping()]}, "immutable explicit player mappings"),
+        ({"player_attributes": []}, "immutable typed attribute rows"),
+        ({"player_attributes": (None,)}, "immutable typed attribute rows"),
+        ({"player_attributes": ()}, "exact source and mappings"),
+        (
+            {"player_attributes": (PlayerAttributes("other", "1001", (("heading", 12),)),)},
+            "exact source and mappings",
+        ),
+        (
+            {
+                "player_attributes": (
+                    PlayerAttributes("synthetic-fm-export", "1002", (("heading", 12),)),
+                )
+            },
+            "exact source and mappings",
+        ),
+        ({"source_player_count": True}, "count must cover"),
+        ({"source_player_count": 0}, "count must cover"),
+        ({"source_player_count": 1.5}, "count must cover"),
+    ],
+)
+def test_direct_scoped_receipt_construction_validates_its_contract(changes, reason):
+    with pytest.raises(ValueError, match=reason):
+        replace(scoped(), **changes)
+
+
+@pytest.mark.parametrize(
+    "values", [(), (("", 12),), (("heading", 0),), (("heading", 21),), (("heading", 1.5),)]
+)
+def test_direct_scoped_receipt_rejects_non_fm_attribute_rows(values):
+    with pytest.raises(ValueError, match=r"attribute names|integer 1 to 20"):
+        replace(
+            scoped(), player_attributes=(PlayerAttributes("synthetic-fm-export", "1001", values),)
+        )
+
+
+def test_direct_scoped_receipt_rejects_duplicate_rows_and_inconsistent_fields():
+    receipt = scoped((mapping(), mapping("1002", 2)))
+    with pytest.raises(ValueError, match="exact source and mappings"):
+        replace(receipt, player_attributes=(receipt.player_attributes[0],) * 2)
+    with pytest.raises(ValueError, match="same integer 1 to 20 fields"):
+        replace(
+            receipt,
+            player_attributes=(
+                receipt.player_attributes[0],
+                replace(receipt.player_attributes[1], values=(("heading", None),)),
+            ),
+        )

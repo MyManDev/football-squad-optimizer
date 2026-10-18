@@ -726,7 +726,7 @@ def produce_flagged_football_components(
         "head_version": FLAG_HEAD_VERSION,
         "feature_version": FLAG_FEATURE_VERSION,
         "model_sha256": model.model_sha256,
-        "fit_cutoff": document["captured_at_utc"],
+        "fit_cutoff": model.metadata.cutoff,
         "decision_at": weeks[0].decision_at,
         "deadline_at": weeks[0].deadline_at,
         "native_forecast_fingerprint": document["fingerprint"],
@@ -765,7 +765,11 @@ def produce_flagged_football_components(
     companion["model_version"] = JOINT_ROLE_FLAG_MODEL_VERSION
     companion["flag_metadata"] = json.loads(json.dumps(metadata))
     companion["forecast_fingerprint"] = document["fingerprint"]
-    companion["limitations"] = [*document["limitations"], *COMPONENT_LIMITATIONS]
+    companion["limitations"] = [
+        *document["limitations"],
+        *COMPONENT_LIMITATIONS,
+        SHARES_BEFORE_AVAILABILITY_LIMIT,
+    ]
     companion["rows"] = component_rows(
         combined, model_version=JOINT_ROLE_FLAG_MODEL_VERSION, players=players
     )

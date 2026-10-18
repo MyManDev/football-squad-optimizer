@@ -32,7 +32,7 @@ from squadopt.features.football_flag_inputs import (
 )
 
 MODEL_VERSION: Final = "football_flag_minutes_v1"
-FEATURE_VERSION: Final = "causal_categorical_flag_minutes_features_v1"
+FEATURE_VERSION: Final = "causal_categorical_flag_minutes_features_v2"
 Array = npt.NDArray[np.float64]
 _POSITIONS: Final = ("GK", "DEF", "MID", "FWD")
 _STATUSES: Final = (None, "a", "d", "i", "s", "u", "n")
@@ -513,6 +513,11 @@ class FlagMinutesModel:
             raise ValueError("zero_coefficients must be Boolean.")
         validate_week_input(week)
         fitted = self._fitted
+        if (
+            fitted.metadata.model_version != MODEL_VERSION
+            or fitted.metadata.feature_version != FEATURE_VERSION
+        ):
+            raise ValueError("Flag-minute prediction requires the current fitted feature version.")
         if (
             week.season != fitted.metadata.target_season
             or week.gameweek not in fitted.metadata.target_gameweeks

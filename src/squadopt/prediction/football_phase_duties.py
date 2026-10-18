@@ -28,6 +28,7 @@ from squadopt.features.football_phase_inputs import (
     PhaseProjection,
     PhaseReplay,
     PhaseSource,
+    canonical_phase_replay,
     observation_digest,
     projection_digest,
     validate_observation,
@@ -368,6 +369,8 @@ class PhaseDutyModel:
             if identity in identities:
                 raise ValueError("Duplicate phase training club-fixture.")
             identities.add(identity)
+        if len({row.rules_version for row in observations}) != 1:
+            raise ValueError("Phase fitting requires one coherent FPL rules version.")
         for observation in observations:
             validate_observation(
                 observation,
@@ -428,11 +431,12 @@ class PhaseDutyModel:
             total = int(phase_counts.sum())
             phase_shares[head] = phase_counts / total if total else phase_counts
             event_totals[head] = total
+        released_2025_26 = any(row.season == "2025-26" for row in ordered)
         metadata = PhaseModelMetadata(
             contract_version=(
-                "football_phase_duty_replay_fit_v1"
-                if any(row.replay is not None for row in ordered) or allow_released_2025_26
-                else "football_phase_duty_fit_v1"
+                "football_phase_duty_replay_fit_v2"
+                if any(row.replay is not None for row in ordered) or released_2025_26
+                else "football_phase_duty_fit_v2"
             ),
             cutoff=cutoff,
             target_season=target_season,
@@ -459,7 +463,7 @@ class PhaseDutyModel:
                     phase_definition_version=row.phase_definition_version,
                     rules_version=row.rules_version,
                     complete_coverage=row.complete_coverage,
-                    replay=row.replay,
+                    replay=None if row.replay is None else canonical_phase_replay(row.replay),
                 )
                 for row in ordered
             ),
@@ -470,7 +474,7 @@ class PhaseDutyModel:
             alpha=alpha,
             max_iter=max_iter,
             recipient_heads=tuple(fitted_heads),
-            released_2025_26=allow_released_2025_26,
+            released_2025_26=released_2025_26,
         )
         self._fitted = _FittedState(
             metadata=metadata,
@@ -487,89 +491,125 @@ class PhaseDutyModel:
         fitted = self._fitted
         if fitted is None:
             raise ValueError("Phase duty model must be fitted before prediction.")
-        metadata = fitted.metadata
-        validate_projection(projection, model_cutoff=metadata.cutoff)
-        if (
-            projection.season != metadata.target_season
-            or projection.gameweek < metadata.target_gameweek
-        ):
-            raise ValueError("Phase prediction must belong to the fitted target season/window.")
-        codes = tuple(sorted(player.player_code for player in projection.states[0].players))
-        total = {head: np.zeros(len(codes), float) for head in ("goals", "assists")}
-        zero_mass_shares = {head: np.zeros(len(codes), float) for head in total}
-        masses = {head: 0.0 for head in total}
-        physical = 0.0
-        state_results = []
-        for state in projection.states:
-            players = tuple(sorted(state.players, key=lambda player: player.player_code))
-            allocated = {}
-            shares = {}
-            for head, mass in (("goals", state.goal_mass), ("assists", state.assist_mass)):
-                composition = fitted.phase_shares[head]
-                if mass > 0 and not composition.any():
-                    raise ValueError(
-                        f"Phase {head} unavailable without historical credited events."
-                    )
-                recipient = np.zeros(len(codes), float)
-                exposure = _exposure(players, head)
-                for phase, phase_share in zip(PHASES, composition, strict=True):
-                    if phase_share == 0:
-                        continue
-                    features, _ = _features(players, projection.duties, head=head, phase=phase)
-                    probabilities = _probabilities(
-                        features, exposure, fitted.coefficients[head, phase]
-                    )
-                    if mass > 0 and not probabilities.any():
-                        raise ValueError("Positive phase mass has no projected recipient exposure.")
-                    recipient += phase_share * probabilities
-                allocated[head] = mass * recipient
-                shares[head] = recipient
-                total[head] += state.weight * allocated[head]
-                zero_mass_shares[head] += state.weight * recipient
-                masses[head] += state.weight * mass
-                if not _close(float(allocated[head].sum()), mass):
-                    raise ValueError("Phase allocation did not conserve full-club attacking mass.")
-            if any(
-                value > state.physical_goal_mass
-                and not _close(float(value), state.physical_goal_mass)
-                for value in allocated["goals"] + allocated["assists"]
-            ):
-                raise ValueError(
-                    "Player goal plus assist mass exceeds physical scoring-event mass."
-                )
-            physical += state.weight * state.physical_goal_mass
-            state_results.append(
-                PhaseStateAllocation(
-                    state.state_id,
-                    state.weight,
-                    _records(
-                        codes,
-                        allocated["goals"],
-                        allocated["assists"],
-                        shares["goals"],
-                        shares["assists"],
-                    ),
-                    state.goal_mass,
-                    state.assist_mass,
-                    state.physical_goal_mass,
-                )
-            )
-        gs = total["goals"] / masses["goals"] if masses["goals"] else zero_mass_shares["goals"]
-        aps = (
-            total["assists"] / masses["assists"]
-            if masses["assists"]
-            else zero_mass_shares["assists"]
+        moments = _phase_moments(
+            projection,
+            cutoff=fitted.metadata.cutoff,
+            target_season=fitted.metadata.target_season,
+            target_gameweek=fitted.metadata.target_gameweek,
+            phase_shares=fitted.phase_shares,
+            coefficients=fitted.coefficients,
         )
         return PhaseAllocation(
-            players=_records(codes, total["goals"], total["assists"], gs, aps),
-            states=tuple(state_results),
-            goal_phase_shares=tuple(float(value) for value in fitted.phase_shares["goals"]),
-            assist_phase_shares=tuple(float(value) for value in fitted.phase_shares["assists"]),
-            total_goals=masses["goals"],
-            total_assists=masses["assists"],
-            physical_goal_mass=physical,
-            projection_sha256=projection_digest(projection),
+            players=moments.players,
+            states=moments.states,
+            goal_phase_shares=moments.goal_phase_shares,
+            assist_phase_shares=moments.assist_phase_shares,
+            total_goals=moments.total_goals,
+            total_assists=moments.total_assists,
+            physical_goal_mass=moments.physical_goal_mass,
+            projection_sha256=moments.projection_sha256,
             model_version=self.model_version,
             feature_version=self.feature_version,
-            metadata=metadata,
+            metadata=fitted.metadata,
         )
+
+
+@dataclass(frozen=True)
+class _PhaseMoments:
+    players: tuple[PhaseAllocatedPlayer, ...]
+    states: tuple[PhaseStateAllocation, ...]
+    goal_phase_shares: tuple[float, ...]
+    assist_phase_shares: tuple[float, ...]
+    total_goals: float
+    total_assists: float
+    physical_goal_mass: float
+    projection_sha256: str
+
+
+def _phase_moments(
+    projection: PhaseProjection,
+    *,
+    cutoff: str,
+    target_season: str,
+    target_gameweek: int,
+    phase_shares: Mapping[str, Array],
+    coefficients: Mapping[tuple[str, str], Array],
+) -> _PhaseMoments:
+    """Shared allocation arithmetic; fitted and serving wrappers retain distinct receipts."""
+    validate_projection(projection, model_cutoff=cutoff)
+    if projection.season != target_season or projection.gameweek < target_gameweek:
+        raise ValueError("Phase prediction must belong to the fitted target season/window.")
+    codes = tuple(sorted(player.player_code for player in projection.states[0].players))
+    total = {head: np.zeros(len(codes), float) for head in ("goals", "assists")}
+    zero_mass_shares = {head: np.zeros(len(codes), float) for head in total}
+    masses = {head: 0.0 for head in total}
+    physical = 0.0
+    state_results = []
+    # Validation fixes the ordered roster, positions and captured duties across states.
+    # Rank features vary only with the active roster; exposure still uses actual minutes.
+    feature_cache: dict[tuple[str | None, tuple[bool, ...]], Array] = {}
+    for state in projection.states:
+        players = tuple(sorted(state.players, key=lambda player: player.player_code))
+        active_players = tuple(player.minutes > 0 for player in players)
+        allocated = {}
+        shares = {}
+        for head, mass in (("goals", state.goal_mass), ("assists", state.assist_mass)):
+            composition = phase_shares[head]
+            if mass > 0 and not composition.any():
+                raise ValueError(f"Phase {head} unavailable without historical credited events.")
+            recipient = np.zeros(len(codes), float)
+            exposure = _exposure(players, head)
+            for phase, phase_share in zip(PHASES, composition, strict=True):
+                if phase_share == 0:
+                    continue
+                field = _rank_field(head, phase)
+                feature_key = (field, active_players if field is not None else ())
+                features = feature_cache.get(feature_key)
+                if features is None:
+                    features, _ = _features(players, projection.duties, head=head, phase=phase)
+                    feature_cache[feature_key] = features
+                probabilities = _probabilities(features, exposure, coefficients[head, phase])
+                if mass > 0 and not probabilities.any():
+                    raise ValueError("Positive phase mass has no projected recipient exposure.")
+                recipient += phase_share * probabilities
+            allocated[head] = mass * recipient
+            shares[head] = recipient
+            total[head] += state.weight * allocated[head]
+            zero_mass_shares[head] += state.weight * recipient
+            masses[head] += state.weight * mass
+            if not _close(float(allocated[head].sum()), mass):
+                raise ValueError("Phase allocation did not conserve full-club attacking mass.")
+        if any(
+            value > state.physical_goal_mass and not _close(float(value), state.physical_goal_mass)
+            for value in allocated["goals"] + allocated["assists"]
+        ):
+            raise ValueError("Player goal plus assist mass exceeds physical scoring-event mass.")
+        physical += state.weight * state.physical_goal_mass
+        state_results.append(
+            PhaseStateAllocation(
+                state.state_id,
+                state.weight,
+                _records(
+                    codes,
+                    allocated["goals"],
+                    allocated["assists"],
+                    shares["goals"],
+                    shares["assists"],
+                ),
+                state.goal_mass,
+                state.assist_mass,
+                state.physical_goal_mass,
+            )
+        )
+    gs = total["goals"] / masses["goals"] if masses["goals"] else zero_mass_shares["goals"]
+    aps = total["assists"] / masses["assists"] if masses["assists"] else zero_mass_shares["assists"]
+    return _PhaseMoments(
+        players=_records(codes, total["goals"], total["assists"], gs, aps),
+        states=tuple(state_results),
+        goal_phase_shares=tuple(float(value) for value in phase_shares["goals"]),
+        assist_phase_shares=tuple(float(value) for value in phase_shares["assists"]),
+        total_goals=masses["goals"],
+        total_assists=masses["assists"],
+        physical_goal_mass=physical,
+        projection_sha256=projection_digest(projection),
+    )

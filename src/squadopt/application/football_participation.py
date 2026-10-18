@@ -10,6 +10,7 @@ from dataclasses import replace
 
 import pandas as pd
 
+from squadopt.application.football_composite_news import recompose_composite_news
 from squadopt.application.football_context import (
     FULL_MATCH_UNAVAILABLE,
     manager_word_attestation_reason,
@@ -29,6 +30,7 @@ from squadopt.live.minute_evidence import (
     apply_explicit_minute_evidence,
 )
 from squadopt.prediction.football import JOINT_ROLE_FLAG_MODEL_VERSION
+from squadopt.prediction.football_capabilities import football_capabilities
 from squadopt.prediction.participation_updates import (
     PARTICIPATION_UPDATE_CONTRACT,
     ParticipationEvidence,
@@ -77,6 +79,19 @@ def participation_summary(diagnostics: Mapping[str, object]) -> dict[str, object
         else ["source_eligibility_only", "no_start_or_minutes_reestimate"]
     )
     assumptions.append("no_external_calibration")
+    if audit.get("joint_recomposition"):
+        applied = any(
+            isinstance(row, dict) and row.get("status") == "applied" for row in statements
+        )
+        assumptions = (
+            [
+                "source_verified_joint_law_intervention",
+                "fixture_families_recomputed",
+                "declared_intervention_not_calibration",
+            ]
+            if applied
+            else ["retained_joint_baseline_unchanged", "no_verified_intervention_applied"]
+        ) + ["no_external_calibration"]
     if audit.get("minute_statements_unapplied"):
         assumptions.append("minute_evidence_not_applied")
     if audit.get("inherited_future_zero"):
@@ -374,7 +389,10 @@ def bind_football_participation(
     first = int(inputs.deadline.gameweek)
     as_of = pd.Timestamp(inputs.captured_at_utc)
     deadline = pd.Timestamp(inputs.deadline.deadline_utc)
+    composite = football_capabilities(football.horizon.model_version).requires_reprojection
     if "appearance_probability" not in football.horizon.table:
+        if composite:
+            raise ValueError("Composite football requires the complete weekly appearance law.")
         # Older handoffs without a joint E/q basis remain usable, but cannot safely
         # be adjusted by this adapter. Missing q is not a certainty of appearance.
         return replace(
@@ -421,7 +439,7 @@ def bind_football_participation(
     stated = inputs.availability.set_index("player_id").chance_of_playing
     percentages = pd.to_numeric(stated, errors="coerce")
     base["availability_multiplier"] = base.player_id.map(percentages).div(100.0)
-    learned_flags = football.horizon.model_version == JOINT_ROLE_FLAG_MODEL_VERSION
+    learned_flags = composite or football.horizon.model_version == JOINT_ROLE_FLAG_MODEL_VERSION
     if learned_flags:
         # These labels have already entered the learned categorical head. They
         # are not another eligibility probability to audit or apply numerically.
@@ -536,31 +554,37 @@ def bind_football_participation(
                     disposition=word.disposition,
                 )
             )
-    base, news, minute_audit, minute_withheld, minute_metadata = _minute_updates(
-        base,
-        news,
-        source_words,
-        inputs=inputs,
-        football=football,
-        basis=minute_basis,
-        basis_reason=minute_basis_reason,
-    )
+    if composite:
+        adjusted, statements, minute_withheld, minute_metadata = recompose_composite_news(
+            football, inputs, news, source_words, minute_basis
+        )
+        minute_audit = statements
+    else:
+        base, news, minute_audit, minute_withheld, minute_metadata = _minute_updates(
+            base,
+            news,
+            source_words,
+            inputs=inputs,
+            football=football,
+            basis=minute_basis,
+            basis_reason=minute_basis_reason,
+        )
+        result = apply_participation_updates(
+            base,
+            news,
+            season=inputs.season,
+            as_of=as_of,
+            deadlines={first: deadline},
+            base_revision=football.fingerprint,
+        )
+        adjusted = football.horizon.table.copy(deep=True)
+        for column in ("expected_points", "appearance_probability"):
+            adjusted.loc[adjusted.gameweek.eq(first), column] = result.table[column].to_numpy()
+        statements = [
+            row for row in result.diagnostics if row.get("reason") != "no_evidence"
+        ] + minute_audit
     withheld.extend(minute_withheld)
-    result = apply_participation_updates(
-        base,
-        news,
-        season=inputs.season,
-        as_of=as_of,
-        deadlines={first: deadline},
-        base_revision=football.fingerprint,
-    )
-    adjusted = football.horizon.table.copy(deep=True)
     first_mask = adjusted.gameweek.eq(first)
-    for column in ("expected_points", "appearance_probability"):
-        adjusted.loc[first_mask, column] = result.table[column].to_numpy()
-    statements = [
-        row for row in result.diagnostics if row.get("reason") != "no_evidence"
-    ] + minute_audit
     audit = {
         "version": FOOTBALL_PARTICIPATION_VERSION,
         "contract": PARTICIPATION_UPDATE_CONTRACT,
@@ -578,14 +602,16 @@ def bind_football_participation(
         "unapplied_statements": withheld,
         "external_calibration_supplied": False,
         "minutes_reestimated": any(row.get("status") == "applied" for row in minute_audit),
-        "starts_reestimated": False,
+        "starts_reestimated": composite
+        and any(row.get("starts_reestimated") for row in statements),
         "minute_statements_unapplied": any(
             row.get("disposition") == FULL_MATCH_UNAVAILABLE for row in withheld
         )
         or any(row.get("status") != "applied" for row in minute_audit),
         "minute_basis": minute_metadata,
         "future_rows_recovered": False,
-        "inherited_future_zero": bool(
+        "inherited_future_zero": not composite
+        and bool(
             (
                 adjusted.gameweek.ne(first)
                 & adjusted.fixture_count.gt(0)
@@ -593,6 +619,8 @@ def bind_football_participation(
             ).any()
         ),
     }
+    if composite:
+        audit["joint_recomposition"] = True
     role_estimates = minute_metadata.get("role_estimates", [])
     assert isinstance(role_estimates, list)
     projection = replace(
@@ -607,7 +635,12 @@ def bind_football_participation(
         diagnostics={
             **football.projection.diagnostics,
             "participation_evidence": audit,
-            "fixture_role_estimates": bind_role_absences(role_estimates, result.table),
+            "fixture_role_estimates": bind_role_absences(role_estimates, adjusted.loc[first_mask]),
+            **(
+                {"composite_reprojection_fingerprint": minute_metadata["intervention_fingerprint"]}
+                if composite
+                else {}
+            ),
         },
     )
     return replace(

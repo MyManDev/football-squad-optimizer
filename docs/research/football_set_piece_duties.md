@@ -24,10 +24,18 @@ fields/versions, nonfinite values, coerced identities and unsettled credits refu
 A declared permission receipt records caller evidence; it does not authenticate
 upstream rights.
 
-The declared source season/GW, protected-season exclusion and source availability
-are checked before outcome decoding. Settled event and totals source clocks must
-be strictly before the training cutoff. Baseline bytes and historical duty captures
-must be known by their own recorded decision, which cannot follow kickoff. Final
+The declared source season/GW, default protected-season exclusion and source availability
+are checked before outcome decoding. The explicit experimental-training release can admit
+2025-26 original-capture or replayed observations; the recorded decision and its scope are
+in `docs/operations/phase_training_replay.md:11`
+(`src/squadopt/features/football_phase_inputs.py:308`,
+`src/squadopt/features/football_phase_inputs.py:757`). Settled event and totals source clocks must
+be strictly before the training cutoff. Original baseline bytes and historical duty captures
+must be known by their own recorded decision. A replay separately records a predecision
+revision and later retrieval/generation; its duty validity ends before retrieval and cannot
+be reused as an original capture or projection duty
+(`src/squadopt/features/football_phase_inputs.py:389`,
+`src/squadopt/features/football_phase_replay.py:118`). The decision cannot follow kickoff. Final
 outcomes must become available after kickoff and strictly before training; their
 source capture cannot precede the claimed availability. All observation headers
 are checked before the model reads any event labels. The target GW, later GWs and
@@ -221,8 +229,17 @@ original source model rights. Family 2 does not infer a duty from FM ability or
 consume those actual attributes in this step.
 
 Unanswered owner population, chronological-fold, metric and threshold decisions
-in #1004, #1009 and #1016 remain unresolved. Protected 2025-26 outcomes remain
-excluded. A later untouched reading requires its accepted protocol. Actual native
+in #1004, #1009 and #1016 remain unresolved. The default path excludes 2025-26 outcomes;
+the explicit experimental-training release includes phase labels and removes independent-test
+status for the outcomes used (`docs/operations/phase_training_replay.md:11`,
+`src/squadopt/features/football_phase_inputs.py:319`). Each phase fit now requires a single
+FPL rules version, including when original and replayed rows are combined
+(`src/squadopt/prediction/football_phase_duties.py:372`). Unique-assignment admission can
+select concentrated assist patterns, so fitted delivery-rank coefficients need a later
+selection analysis before any accuracy interpretation; no such experiment is performed here
+(`src/squadopt/features/football_phase_credits.py:106`,
+`src/squadopt/features/football_phase_credits.py:166`). A later untouched reading requires its
+accepted protocol. Actual native
 combination waits for predecessor merges, including #1058 projected-unit intensity
 and #1056 exact fixed-fifteen roles, then a separate named invocation PR with
 Ibo/designated review and cumulative checks. No predecessor code is copied into

@@ -31,7 +31,7 @@ from squadopt.prediction.football_flag_minutes import (
 
 GOAL_POINTS = {"GK": 6, "DEF": 6, "MID": 5, "FWD": 4}
 CS_POINTS = {"GK": 4, "DEF": 4, "MID": 1, "FWD": 0}
-LIVE_FLAG_CONTRACT = "football_first_week_flags_v1"
+LIVE_FLAG_CONTRACT = "football_first_week_flags_v2"
 FLAG_SCOPE_LIMITATION = (
     "Learned categorical flags replace eligibility only in the first week; "
     "later weeks retain the captured rule. Independent calibration is unverified."
@@ -364,15 +364,21 @@ def _flag_weekly_chances(
             or re.fullmatch(r"[0-9a-f]{64}", metadata[field]) is None
         ):
             raise ValueError("Learned flag metadata lacks a valid fitted/native fingerprint.")
-    cutoff = pd.Timestamp(document["captured_at_utc"])
+    raw_cutoff = metadata.get("fit_cutoff")
+    if not isinstance(raw_cutoff, str):
+        raise ValueError("Learned flag information and decision clocks differ.")
+    fitted_cutoff = pd.Timestamp(raw_cutoff)
+    captured = pd.Timestamp(document["captured_at_utc"])
     decision, deadline = (
         pd.Timestamp(metadata["decision_at"]),
         pd.Timestamp(metadata["deadline_at"]),
     )
     if (
-        any(pd.isna(clock) or clock.tzinfo is None for clock in (cutoff, decision, deadline))
-        or not cutoff < decision < deadline
-        or metadata.get("fit_cutoff") != document["captured_at_utc"]
+        any(
+            pd.isna(clock) or clock.tzinfo is None
+            for clock in (fitted_cutoff, captured, decision, deadline)
+        )
+        or not fitted_cutoff <= captured < decision < deadline
     ):
         raise ValueError("Learned flag information and decision clocks differ.")
     if (
