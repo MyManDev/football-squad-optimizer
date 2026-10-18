@@ -13,7 +13,6 @@ import type { Language } from "../../i18n/messages";
 export interface FixturesCopy {
   thisWeek: string;
   nextWeek: string;
-  deadline: (when: string) => string;
   versus: string;
   unscheduled: string;
   noFixtures: string;
@@ -23,13 +22,11 @@ export interface FixturesCopy {
   noPast: string;
   notPublished: string;
   unscheduledCount: (count: number) => string;
-  capturedAt: (when: string) => string;
 }
 
 const en: FixturesCopy = {
   thisWeek: "Upcoming gameweek",
   nextWeek: "Following gameweek",
-  deadline: (when) => `Deadline ${when}`,
   versus: "v",
   unscheduled: "TBC",
   noFixtures: "No fixtures in this gameweek.",
@@ -42,13 +39,11 @@ const en: FixturesCopy = {
     count === 1
       ? "1 postponed fixture has no new gameweek yet and is not listed."
       : `${count} postponed fixtures have no new gameweek yet and are not listed.`,
-  capturedAt: (when) => `As recorded on ${when}.`,
 };
 
 const tr: FixturesCopy = {
   thisWeek: "Oynanacak hafta",
   nextWeek: "Gelecek hafta",
-  deadline: (when) => `Son tarih ${when}`,
   versus: "-",
   unscheduled: "Belli değil",
   noFixtures: "Bu oyun haftasında maç yok.",
@@ -59,7 +54,6 @@ const tr: FixturesCopy = {
   notPublished: "Henüz yayımlanmış bir fikstür yok.",
   unscheduledCount: (count) =>
     `Ertelenen ${count} maçın yeni oyun haftası henüz belli değil; listede yer almıyor.`,
-  capturedAt: (when) => `${when} tarihli kayda göre.`,
 };
 
 export const FIXTURES_COPY: Record<Language, FixturesCopy> = { en, tr };

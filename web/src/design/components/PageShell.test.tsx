@@ -1,5 +1,5 @@
 import userEvent from "@testing-library/user-event";
-import { act, cleanup, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { useEffect, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { MemoryRouter, useLocation } from "react-router";
@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LanguageProvider } from "../../i18n/LanguageProvider";
 import { MESSAGES, type Language } from "../../i18n/messages";
 import { DESKTOP_QUERY, PHONE_QUERY, type ShellLayout } from "../shell/layout";
+import { NO_IDENTITY, type ShellIdentity } from "../shell/nav";
 import { FIXTURE_SHEET_ID, useShell, useShellSlot } from "../shell/ShellContext";
 import { ShellPortal } from "../shell/ShellPortal";
 import { SIDEBAR_STORAGE_KEY } from "../shell/sidebarPreference";
@@ -16,6 +17,20 @@ import { PageShell } from "./PageShell";
 const TR = MESSAGES.tr.shell;
 const LEAGUE = 352490;
 const MEMBERS = `/league/${LEAGUE}/members`;
+const OWN = `${MEMBERS}/35249001`;
+
+/** A league entered and nobody claimed in it. */
+const CHOSEN: ShellIdentity = { leagueId: LEAGUE, member: null };
+/** The visitor entered the league and said they are Deniz Aral. */
+const CLAIMED: ShellIdentity = {
+  leagueId: LEAGUE,
+  member: {
+    entryId: 35249001,
+    league: "SquadOpt Classic League",
+    name: "Deniz Aral",
+    team: "North Stand Notes",
+  },
+};
 
 beforeEach(() => vi.stubEnv("VITE_ADVICE_API_ORIGIN", "https://squadopt-api.example"));
 afterEach(() => vi.unstubAllEnvs());
@@ -30,21 +45,21 @@ function LocationProbe() {
 function renderShell({
   path = "/",
   language = "tr",
-  viewer = null,
-  chosenLeagueId = null,
+  identity = NO_IDENTITY,
+  onChangeMember,
   page = <p>page</p>,
 }: {
   path?: string;
   language?: Language;
-  viewer?: { leagueId: number; entryId: number } | null;
-  chosenLeagueId?: number | null;
+  identity?: ShellIdentity;
+  onChangeMember?: () => void;
   page?: ReactNode;
 } = {}) {
   const user = userEvent.setup();
   const view = render(
     <LanguageProvider initialLanguage={language}>
       <MemoryRouter initialEntries={[path]}>
-        <PageShell viewer={viewer} chosenLeagueId={chosenLeagueId}>
+        <PageShell identity={identity} onChangeMember={onChangeMember}>
           {page}
         </PageShell>
         <LocationProbe />
@@ -97,6 +112,7 @@ afterEach(() => {
   document.documentElement.style.overflow = "";
   delete (HTMLElement.prototype as { scrollIntoView?: unknown }).scrollIntoView;
   window.localStorage.clear();
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 
@@ -109,6 +125,8 @@ describe("the app shell on a desktop", () => {
     expect(skip).toHaveAttribute("href", "#main");
     expect(screen.getAllByRole("main")).toHaveLength(1);
     expect(screen.getByRole("main")).toHaveAttribute("id", "main");
+    // Main can take focus from the page's steps, but is never a stop for Tab.
+    expect(screen.getByRole("main")).toHaveAttribute("tabindex", "-1");
     expect(screen.getAllByRole("navigation")).toHaveLength(1);
     expect(sidebar()).toHaveAttribute("id", "sidebar");
     expect(within(sidebar()).getByRole("navigation")).toBeInTheDocument();
@@ -118,7 +136,7 @@ describe("the app shell on a desktop", () => {
   });
 
   it.each(["tr", "en"] as const)(
-    "names the navigation from the catalogue and keeps the system pages unlinked in %s",
+    "offers only 'Ligini bul', the fixtures and Contribute before a league in %s",
     (language) => {
       const copy = MESSAGES[language].shell;
       renderShell({ language });
@@ -126,22 +144,19 @@ describe("the app shell on a desktop", () => {
       expect(screen.getByRole("navigation", { name: copy.primary })).toBeInTheDocument();
       expect(screen.getByRole("complementary", { name: copy.sidebar })).toBeInTheDocument();
 
-      // On the home page with no league chosen, 'Lig' is the home page itself: the form.
       expect(navLinks().map((link) => [link.textContent, link.getAttribute("href")])).toEqual([
-        [copy.thisWeek, "/"],
-        [copy.league, "/"],
+        [copy.findLeague, "/"],
         [copy.fixtures, "/fixtures"],
         [copy.contribute, "/contribute"],
       ]);
-      expect(screen.getByRole("link", { name: copy.thisWeek })).toHaveAttribute(
+      expect(screen.getByRole("link", { name: copy.findLeague })).toHaveAttribute(
         "aria-current",
         "page",
       );
-      const aside = screen.getByRole("complementary", { name: copy.sidebar });
-      const hrefs = within(aside)
-        .getAllByRole("link")
-        .map((link) => link.getAttribute("href"));
-      expect(hrefs).toEqual(["/", "/", "/fixtures", "/contribute"]);
+      for (const name of [copy.league, copy.squad, copy.thisWeek]) {
+        expect(screen.queryByRole("link", { name })).toBeNull();
+      }
+      expect(screen.queryByRole("button", { name: copy.changeMember })).toBeNull();
       // The operations, analysis and admin surfaces are reachable by address only.
       expect(
         document.querySelector(
@@ -151,16 +166,22 @@ describe("the app shell on a desktop", () => {
     },
   );
 
-  it("links 'Lig' to the chosen league's member list from the home page", () => {
-    renderShell({ chosenLeagueId: LEAGUE });
-    expect(screen.getByRole("link", { name: TR.league })).toHaveAttribute("href", MEMBERS);
-    expect(screen.getByRole("link", { name: TR.league })).not.toHaveAttribute("aria-current");
-    expect(screen.getByRole("link", { name: TR.thisWeek })).toHaveAttribute("href", "/");
+  it("sends 'Ligini bul' to the league's step with a league and nobody claimed, and nothing more", async () => {
+    const { user } = renderShell({ identity: CHOSEN });
+    const find = screen.getByRole("link", { name: TR.findLeague });
+    expect(find).toHaveAttribute("href", MEMBERS);
+    expect(find).not.toHaveAttribute("aria-current");
+    for (const name of [TR.league, TR.squad, TR.thisWeek]) {
+      expect(screen.queryByRole("link", { name })).toBeNull();
+    }
+    expect(screen.queryByRole("button", { name: TR.changeMember })).toBeNull();
+    await user.click(find);
+    expect(location()).toBe(MEMBERS);
   });
 
-  it("opens the member in the address as 'Bu hafta', with its plan, and its squad as 'Kadro'", async () => {
-    const path = `${MEMBERS}/35249001?mode=fark-yarat&window=3`;
-    const { user } = renderShell({ path });
+  it("opens the claimed member as 'Bu hafta' and 'Kadro', and the league as 'Lig'", async () => {
+    const path = `${OWN}?mode=fark-yarat&window=3`;
+    const { user } = renderShell({ path, identity: CLAIMED });
 
     const thisWeek = screen.getByRole("link", { name: TR.thisWeek });
     const squad = screen.getByRole("link", { name: TR.squad });
@@ -168,6 +189,8 @@ describe("the app shell on a desktop", () => {
     expect(thisWeek).toHaveAttribute("aria-current", "page");
     expect(squad).toHaveAttribute("href", `${path}#kadro`);
     expect(squad).not.toHaveAttribute("aria-current");
+    expect(screen.getByRole("link", { name: TR.league })).toHaveAttribute("href", MEMBERS);
+    expect(screen.queryByRole("link", { name: TR.findLeague })).toBeNull();
 
     await user.click(squad);
     expect(location()).toBe(`${path}#kadro`);
@@ -175,9 +198,9 @@ describe("the app shell on a desktop", () => {
     expect(screen.getByRole("link", { name: TR.thisWeek })).not.toHaveAttribute("aria-current");
   });
 
-  it("keeps the member page in reach for the rest of the visit, in memory only", async () => {
-    const path = `${MEMBERS}/35249001?mode=ortak-koru`;
-    const { user } = renderShell({ path });
+  it("keeps the plan of the own page in reach for the rest of the visit, in memory only", async () => {
+    const path = `${OWN}?mode=ortak-koru`;
+    const { user } = renderShell({ path, identity: CLAIMED });
 
     await user.click(screen.getByRole("link", { name: TR.fixtures }));
     expect(location()).toBe("/fixtures");
@@ -188,34 +211,12 @@ describe("the app shell on a desktop", () => {
     expect(Object.keys(window.localStorage)).not.toContain("squadopt.member");
   });
 
-  it("opens the member the visitor claimed, in the claim's league, when the address names none", () => {
-    renderShell({
-      path: "/fixtures",
-      viewer: { leagueId: LEAGUE, entryId: 42 },
-      chosenLeagueId: LEAGUE,
-    });
-    expect(screen.getByRole("link", { name: TR.thisWeek })).toHaveAttribute(
-      "href",
-      `${MEMBERS}/42`,
-    );
-    expect(screen.getByRole("link", { name: TR.squad })).toHaveAttribute(
-      "href",
-      `${MEMBERS}/42#kadro`,
-    );
-    expect(screen.getByRole("link", { name: TR.league })).toHaveAttribute("href", MEMBERS);
-  });
-
-  it("opens the claimed member's page in the claim's league whatever league is chosen", () => {
-    renderShell({
-      path: "/fixtures",
-      viewer: { leagueId: 7, entryId: 42 },
-      chosenLeagueId: LEAGUE,
-    });
-    expect(screen.getByRole("link", { name: TR.thisWeek })).toHaveAttribute(
-      "href",
-      "/league/7/members/42",
-    );
-    expect(screen.getByRole("link", { name: TR.league })).toHaveAttribute("href", MEMBERS);
+  it("points 'Bu hafta' at the visitor's own page, not current, on a rival's page", () => {
+    renderShell({ path: `${MEMBERS}/35249002?mode=agresif`, identity: CLAIMED });
+    const thisWeek = screen.getByRole("link", { name: TR.thisWeek });
+    expect(thisWeek).toHaveAttribute("href", OWN);
+    expect(thisWeek).not.toHaveAttribute("aria-current");
+    expect(screen.getByRole("link", { name: TR.squad })).toHaveAttribute("href", `${OWN}#kadro`);
   });
 
   it("collapses to the icon rail and remembers that in this browser", async () => {
@@ -236,15 +237,21 @@ describe("the app shell on a desktop", () => {
     // The rail shows icons; each link keeps its words as its name.
     for (const link of navLinks()) expect(link.querySelector(".visually-hidden")).not.toBeNull();
     expect(navLinks().map((link) => link.textContent)).toEqual([
-      TR.thisWeek,
-      TR.league,
+      TR.findLeague,
       TR.fixtures,
       TR.contribute,
     ]);
     expect(screen.getByRole("group", { name: "Dil" })).toHaveClass("vertical");
     first.unmount();
 
-    const second = renderShell();
+    const second = renderShell({ identity: CLAIMED });
+    expect(navLinks().map((link) => link.textContent)).toEqual([
+      TR.thisWeek,
+      TR.squad,
+      TR.league,
+      TR.fixtures,
+      TR.contribute,
+    ]);
     await second.user.click(screen.getByRole("button", { name: TR.expandSidebar }));
     expect(sidebar()).toHaveAttribute("data-mode", "open");
     expect(window.localStorage.getItem(SIDEBAR_STORAGE_KEY)).toBe("open");
@@ -274,6 +281,20 @@ describe("the app shell on a desktop", () => {
     }
   });
 
+  it("puts Değiştir before the navigation in the keyboard order once the member is claimed", async () => {
+    const { user } = renderShell({ identity: CLAIMED });
+    const expected = [
+      screen.getByRole("link", { name: TR.skip }),
+      screen.getByRole("button", { name: TR.collapseSidebar }),
+      screen.getByRole("button", { name: TR.changeMember }),
+      ...navLinks(),
+    ];
+    for (const element of expected) {
+      await user.tab();
+      expect(element).toHaveFocus();
+    }
+  });
+
   it("scrolls to the squad once the page has drawn it", async () => {
     const scrolled: string[] = [];
     Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
@@ -286,19 +307,135 @@ describe("the app shell on a desktop", () => {
       const { hash } = useLocation();
       return hash ? <section id="kadro">squad</section> : null;
     }
-    const { user } = renderShell({ path: `${MEMBERS}/7`, page: <Late /> });
+    const { user } = renderShell({ path: OWN, identity: CLAIMED, page: <Late /> });
     await user.click(screen.getByRole("link", { name: TR.squad }));
     expect(scrolled).toContain("kadro");
   });
 });
 
+describe("the identity block", () => {
+  it.each(["tr", "en"] as const)(
+    "shows the league, the member and their team over Değiştir in %s",
+    async (language) => {
+      const copy = MESSAGES[language].shell;
+      const onChangeMember = vi.fn();
+      const { user } = renderShell({ language, identity: CLAIMED, onChangeMember });
+      const aside = screen.getByRole("complementary", { name: copy.sidebar });
+      const block = within(aside);
+      expect(block.getByText("SquadOpt Classic League")).toBeInTheDocument();
+      expect(block.getByText("Deniz Aral")).toBeInTheDocument();
+      expect(block.getByText("North Stand Notes")).toBeInTheDocument();
+      const change = block.getByRole("button", { name: copy.changeMember });
+      expect(change).toHaveAccessibleDescription(
+        "SquadOpt Classic League: Deniz Aral, North Stand Notes",
+      );
+      // The block stands between the brand and the navigation.
+      const order = [...aside.querySelectorAll("p, nav")].map((node) => node.tagName);
+      expect(order).toEqual(["P", "NAV"]);
+      await user.click(change);
+      expect(onChangeMember).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it("names a member with no team on one line", () => {
+    renderShell({
+      identity: { leagueId: LEAGUE, member: { ...CLAIMED.member!, team: null } },
+    });
+    expect(screen.getByRole("button", { name: TR.changeMember })).toHaveAccessibleDescription(
+      "SquadOpt Classic League: Deniz Aral",
+    );
+  });
+
+  it("is not there without a member", () => {
+    for (const identity of [NO_IDENTITY, CHOSEN]) {
+      const view = renderShell({ identity });
+      expect(screen.queryByRole("button", { name: TR.changeMember })).toBeNull();
+      expect(document.getElementById("sidebar-member")).toBeNull();
+      view.unmount();
+    }
+  });
+
+  it("keeps no empty WHO place for a page to fill", () => {
+    renderShell();
+    expect(sidebar().querySelector(".who")).toBeNull();
+  });
+});
+
+describe("focusing the page after a step in front of it", () => {
+  function Step({ heading }: { heading: boolean }) {
+    const shell = useShell();
+    return (
+      <>
+        <button type="button" onClick={() => shell?.focusPage()}>
+          step done
+        </button>
+        {heading ? <h1>Page heading</h1> : null}
+      </>
+    );
+  }
+
+  function tree(heading: boolean) {
+    return (
+      <LanguageProvider initialLanguage="tr">
+        <MemoryRouter initialEntries={["/"]}>
+          <PageShell>
+            <Step heading={heading} />
+          </PageShell>
+        </MemoryRouter>
+      </LanguageProvider>
+    );
+  }
+
+  async function settle() {
+    await act(async () => {
+      await Promise.resolve();
+    });
+  }
+
+  it("focuses main at once, then the heading as soon as it is drawn", async () => {
+    const { rerender } = render(tree(false));
+    fireEvent.click(screen.getByRole("button", { name: "step done" }));
+    expect(screen.getByRole("main")).toHaveFocus();
+    rerender(tree(true));
+    await settle();
+    const heading = screen.getByRole("heading", { level: 1, name: "Page heading" });
+    expect(heading).toHaveFocus();
+    expect(heading).toHaveAttribute("tabindex", "-1");
+  });
+
+  it("focuses a heading that is already drawn at once", () => {
+    render(tree(true));
+    fireEvent.click(screen.getByRole("button", { name: "step done" }));
+    expect(screen.getByRole("heading", { level: 1, name: "Page heading" })).toHaveFocus();
+  });
+
+  it("leaves focus where the visitor moved it before the heading came", async () => {
+    const { rerender } = render(tree(false));
+    fireEvent.click(screen.getByRole("button", { name: "step done" }));
+    expect(screen.getByRole("main")).toHaveFocus();
+    screen.getByRole("link", { name: TR.fixtures }).focus();
+    rerender(tree(true));
+    await settle();
+    expect(screen.getByRole("link", { name: TR.fixtures })).toHaveFocus();
+  });
+
+  it("stops waiting for a heading after five seconds", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const { rerender } = render(tree(false));
+    fireEvent.click(screen.getByRole("button", { name: "step done" }));
+    await act(async () => {
+      vi.advanceTimersByTime(6000);
+    });
+    rerender(tree(true));
+    await settle();
+    expect(screen.getByRole("main")).toHaveFocus();
+  });
+});
+
 function Slots({ planFirst = true }: { planFirst?: boolean }) {
-  const who = useShellSlot("who");
+  const plan = useShellSlot("plan");
   return (
     <>
-      <ShellPortal slot="who">
-        <p>who block</p>
-      </ShellPortal>
       <ShellPortal slot="plan">
         <fieldset>
           <legend>Strateji</legend>
@@ -311,35 +448,31 @@ function Slots({ planFirst = true }: { planFirst?: boolean }) {
         </fieldset>
       </ShellPortal>
       <p>main content</p>
-      <output data-testid="who-slot">{who ? who.tagName : "none"}</output>
+      <output data-testid="plan-slot">{plan ? plan.tagName : "none"}</output>
     </>
   );
 }
 
-describe("the shell's slots", () => {
-  it("renders a page's WHO and PLAN parts once, inside the sidebar", () => {
-    const { container } = renderShell({ path: `${MEMBERS}/7`, page: <Slots /> });
+describe("the shell's plan slot", () => {
+  it("renders a page's PLAN part once, inside the sidebar after the navigation", () => {
+    const { container } = renderShell({ path: OWN, identity: CLAIMED, page: <Slots /> });
 
-    expect(within(sidebar()).getByText("who block")).toBeInTheDocument();
     expect(within(sidebar()).getByRole("group", { name: "Strateji" })).toBeInTheDocument();
-    expect(within(screen.getByRole("main")).queryByText("who block")).toBeNull();
     expect(within(screen.getByRole("main")).getByText("main content")).toBeInTheDocument();
     expect(container.querySelectorAll('input[name="strategy"]')).toHaveLength(2);
-    expect(screen.getByTestId("who-slot")).toHaveTextContent("DIV");
-    // The slot sits between the brand and the navigation, the plan after the navigation.
-    const order = [...sidebar().querySelectorAll("p, nav, fieldset")].map((node) => node.tagName);
-    expect(order).toEqual(["P", "NAV", "FIELDSET"]);
+    expect(screen.getByTestId("plan-slot")).toHaveTextContent("DIV");
+    const order = [...sidebar().querySelectorAll("nav, fieldset")].map((node) => node.tagName);
+    expect(order).toEqual(["NAV", "FIELDSET"]);
   });
 
-  it("renders them inline where the page stands when there is no shell", () => {
+  it("renders it inline where the page stands when there is no shell", () => {
     const { container } = render(
       <MemoryRouter>
         <Slots />
       </MemoryRouter>,
     );
-    expect(screen.getByText("who block")).toBeInTheDocument();
     expect(container.querySelectorAll('input[name="strategy"]')).toHaveLength(2);
-    expect(screen.getByTestId("who-slot")).toHaveTextContent("none");
+    expect(screen.getByTestId("plan-slot")).toHaveTextContent("none");
     expect(screen.queryByRole("complementary")).toBeNull();
   });
 
@@ -349,7 +482,7 @@ describe("the shell's slots", () => {
     expect(screen.queryByRole("button", { name: TR.changePlan })).toBeNull();
     empty.unmount();
 
-    const { user } = renderShell({ path: `${MEMBERS}/7`, page: <Slots /> });
+    const { user } = renderShell({ path: OWN, identity: CLAIMED, page: <Slots /> });
     const plan = await screen.findByRole("button", { name: TR.changePlan });
     expect(plan).toHaveAttribute("aria-controls", "sidebar");
     expect(plan).toHaveAttribute("aria-expanded", "false");
@@ -419,7 +552,7 @@ describe("the app shell on a phone", () => {
 
   it("closes the drawer from the scrim, the close button and a navigation", async () => {
     stubLayout("phone");
-    const { user, container } = renderShell({ chosenLeagueId: LEAGUE });
+    const { user, container } = renderShell({ identity: CLAIMED });
     const menu = screen.getByRole("button", { name: TR.openMenu });
 
     await user.click(menu);
@@ -502,6 +635,29 @@ describe("the app shell on a phone", () => {
     expect(bar().getByRole("link", { name: TR.fixtures })).toHaveAttribute("href", "/fixtures");
   });
 
+  it("closes the drawer from Değiştir and leaves focus on a heading the step put it on", async () => {
+    stubLayout("phone");
+    const onChangeMember = vi.fn(() => {
+      // What the member gate does: the picker's heading takes focus as it arrives.
+      document.querySelector<HTMLElement>("#page-heading")?.focus();
+    });
+    const { user } = renderShell({
+      identity: CLAIMED,
+      onChangeMember,
+      page: (
+        <h1 id="page-heading" tabIndex={-1}>
+          Sen kimsin?
+        </h1>
+      ),
+    });
+    await user.click(screen.getByRole("button", { name: TR.openMenu }));
+    const dialog = screen.getByRole("dialog", { name: TR.menu });
+    await user.click(within(dialog).getByRole("button", { name: TR.changeMember }));
+    expect(onChangeMember).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByRole("heading", { level: 1, name: "Sen kimsin?" })).toHaveFocus();
+  });
+
   it("closes the drawer when the window grows to a desktop", async () => {
     const viewport = stubLayout("phone");
     const { user, container } = renderShell();
@@ -527,7 +683,7 @@ describe("the app shell on a tablet", () => {
     expect(expand).toHaveAttribute("aria-controls", "sidebar");
     expect(expand).toHaveAttribute("aria-expanded", "false");
     expect(expand).toHaveAttribute("aria-haspopup", "dialog");
-    expect(navLinks()).toHaveLength(4);
+    expect(navLinks()).toHaveLength(3);
 
     await user.click(expand);
     const dialog = screen.getByRole("dialog", { name: TR.menu });
@@ -544,5 +700,78 @@ describe("the app shell on a tablet", () => {
     expect(screen.getByRole("button", { name: TR.expandSidebar })).toHaveFocus();
     // A tablet never stores the desktop's collapse choice.
     expect(window.localStorage.getItem(SIDEBAR_STORAGE_KEY)).toBeNull();
+  });
+
+  it("keeps the member and Değiştir in the rail, opening the sidebar on Değiştir", async () => {
+    stubLayout("tablet");
+    const onChangeMember = vi.fn();
+    const { user } = renderShell({ identity: CLAIMED, onChangeMember });
+    expect(sidebar()).toHaveAttribute("data-mode", "rail");
+    const icon = within(sidebar()).getByRole("button", { name: TR.changeMember });
+    expect(icon).toHaveAccessibleDescription(
+      "SquadOpt Classic League: Deniz Aral, North Stand Notes",
+    );
+    expect(icon).toHaveAttribute("aria-haspopup", "dialog");
+    expect(icon).toHaveAttribute("aria-expanded", "false");
+    // The icon stands over the navigation, as the block does.
+    expect(
+      icon.compareDocumentPosition(screen.getByRole("navigation")) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+
+    await user.click(icon);
+    const dialog = screen.getByRole("dialog", { name: TR.menu });
+    const change = within(dialog).getByRole("button", { name: TR.changeMember });
+    expect(change).toHaveFocus();
+    expect(within(dialog).getByText("Deniz Aral")).toBeInTheDocument();
+    expect(onChangeMember).not.toHaveBeenCalled();
+
+    // Closed without changing, focus comes back to the rail's icon.
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(within(sidebar()).getByRole("button", { name: TR.changeMember })).toHaveFocus();
+
+    await user.click(within(sidebar()).getByRole("button", { name: TR.changeMember }));
+    await user.click(
+      within(screen.getByRole("dialog", { name: TR.menu })).getByRole("button", {
+        name: TR.changeMember,
+      }),
+    );
+    expect(onChangeMember).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("has no identity icon in the rail before the member is claimed", () => {
+    stubLayout("tablet");
+    for (const identity of [NO_IDENTITY, CHOSEN]) {
+      const view = renderShell({ identity });
+      expect(within(sidebar()).queryByRole("button", { name: TR.changeMember })).toBeNull();
+      expect(document.getElementById("sidebar-member")).toBeNull();
+      view.unmount();
+    }
+  });
+});
+
+describe("the collapsed desktop rail with a member claimed", () => {
+  it("opens the sidebar from the identity icon with focus on Değiştir", async () => {
+    window.localStorage.setItem(SIDEBAR_STORAGE_KEY, "collapsed");
+    const { user } = renderShell({ identity: CLAIMED });
+    expect(sidebar()).toHaveAttribute("data-mode", "rail");
+    const icon = within(sidebar()).getByRole("button", { name: TR.changeMember });
+    expect(icon).toHaveAccessibleDescription(
+      "SquadOpt Classic League: Deniz Aral, North Stand Notes",
+    );
+    // On a desktop the sidebar folds in place; the icon opens no dialog.
+    expect(icon).not.toHaveAttribute("aria-haspopup");
+
+    await user.click(icon);
+    expect(sidebar()).toHaveAttribute("data-mode", "open");
+    expect(window.localStorage.getItem(SIDEBAR_STORAGE_KEY)).toBe("open");
+    const change = within(sidebar()).getByRole("button", { name: TR.changeMember });
+    expect(change).toHaveFocus();
+    expect(change).toHaveAccessibleDescription(
+      "SquadOpt Classic League: Deniz Aral, North Stand Notes",
+    );
+    expect(document.querySelectorAll("#sidebar-member")).toHaveLength(1);
   });
 });

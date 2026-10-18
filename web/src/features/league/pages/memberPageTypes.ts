@@ -75,6 +75,4 @@ export interface LeagueMemberViewProps {
   fixtures?: FixturesPayload | null;
   /** Whether the calendar is still being read, so its absence is not yet a failure. */
   fixturesPending?: boolean;
-  /** The league's published name for the sidebar; absent while the member list is not read. */
-  leagueName?: string;
 }

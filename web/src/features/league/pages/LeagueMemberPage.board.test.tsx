@@ -1,6 +1,6 @@
 /**
  * Direction D's member page: the top bar with the team as the one heading and the score
- * bug, the WHO block, the decision as substitution boards with the gain strip, the captain
+ * bug, the decision as substitution boards with the gain strip, the captain
  * line and the proof stamp, the two honesty lines with their disclosure, and the tools
  * that wait closed. Every figure is a published one; what is absent is left out.
  */
@@ -21,7 +21,6 @@ import { deadlineLong } from "../../../lib/format";
 import { AS_A_CHANCE } from "../../../testSupport/honesty";
 import type { FixturesPayload } from "../../fixtures/types";
 import { HttpAdviceClient } from "../advice/adviceClient";
-import { writeViewerEntry } from "../identity/useViewerEntry";
 import type {
   AdviceMove,
   AdvicePlayer,
@@ -32,10 +31,10 @@ import type {
 import { LeagueMemberView } from "./LeagueMemberPage";
 import { AdviceCard } from "./MemberAdviceCard";
 import type { LeagueMemberViewProps } from "./memberPageTypes";
-import { withLeague } from "../../../testSupport/league";
+import { forgetIdentity, withLeague } from "../../../testSupport/league";
 
 afterEach(cleanup);
-beforeEach(() => writeViewerEntry(null));
+beforeEach(() => forgetIdentity());
 
 const ENTRY = 35249001;
 const MEMBERS = mockLeagueMembersEnvelope.payload.members;
@@ -172,7 +171,6 @@ function show(
             members={MEMBERS}
             index={mockEntryAdviceIndex(ENTRY).payload}
             fixtures={CALENDAR}
-            leagueName={mockLeagueMembersEnvelope.payload.league_name}
             {...props}
           />,
         )}
@@ -264,14 +262,16 @@ describe("the top bar", () => {
   });
 });
 
-describe("the WHO block", () => {
-  it("names the league and links the member back to the list to change member", () => {
-    show("tr");
-    const who = screen.getByRole("link", { name: /Üye değiştir/ });
-    expect(who).toHaveAttribute("href", "/league/352490/members");
-    expect(who).toHaveTextContent(SQUAD.payload.entry.team_name!);
-    expect(who).toHaveTextContent(`${SQUAD.payload.entry.manager_name} · #${ENTRY}`);
-    expect(screen.getByText(mockLeagueMembersEnvelope.payload.league_name)).toBeInTheDocument();
+describe("who the visitor is", () => {
+  it.each(["tr", "en"] as const)("renders no change control on the page in %s", (language) => {
+    show(language);
+    const change = MESSAGES[language].shell.changeMember;
+    expect(screen.queryByRole("link", { name: change })).toBeNull();
+    expect(screen.queryByRole("button", { name: change })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Bu benim|This is me/ })).toBeNull();
+    expect(document.body).not.toHaveTextContent(
+      /Bu benim|This is me|Hangisi sensin|Which one is you/,
+    );
   });
 });
 

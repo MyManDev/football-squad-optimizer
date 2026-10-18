@@ -8,15 +8,17 @@
 }
 
 /* The row scrolls sideways, which makes it a scroll container that clips at its padding
-   box in both directions; the padding is room for the open card's 3 px lift above it and
-   its shadow below it, so neither is cut. */
+   box in both directions. Its padding is the room the open card needs: 8 px above for the
+   3 px lift and the shadow's 2 px above the card, 4 px on each side for the shadow's 4 px
+   blur, and 16 px below for its 6 px. The negative margin gives the room back, so the cards
+   keep the page's own edges and the row its place. */
 .cards {
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: minmax(9.5rem, 1fr);
   gap: var(--space-2);
-  margin: 0;
-  padding: var(--space-1) 0 var(--space-4);
+  margin: calc(-1 * var(--space-2)) calc(-1 * var(--space-1)) 0;
+  padding: var(--space-2) var(--space-1) var(--space-4);
   overflow-x: auto;
   list-style: none;
 }
@@ -33,7 +35,7 @@
 
 .card[data-open] {
   transform: translateY(-3px);
-  box-shadow: 0 4px 12px rgba(16, 38, 26, 0.16);
+  box-shadow: 0 2px 4px rgba(16, 38, 26, 0.18);
 }
 
 .link {
@@ -77,6 +79,13 @@
   padding: 0 var(--space-3) var(--space-2);
 }
 
+/* The link's text is small and its target is not: 44 px for a thumb, with the negative
+   margin keeping the card the height its text needs. */
 .more {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  min-height: 44px;
+  margin-block: -12px;
   font-size: var(--step--1);
 }
