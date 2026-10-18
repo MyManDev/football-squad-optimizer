@@ -5063,8 +5063,9 @@
     "lowest_own_expert_gate_weight": {
       "value": 0.9993871085285286,
       "fold": "2021-22-gw31",
-      "folds_with_a_gate": 163,
-      "note": "the smallest gate weight on a scored row's own regime expert, over the feature-complete non-blank scored rows of every fold whose fit had a gate, where the row's regime had an expert"
+      "folds_with_a_gate": 164,
+      "folds_contributing_rows": 163,
+      "note": "the smallest gate weight on a scored row's own regime expert, over the feature-complete non-blank scored rows of every fold whose fit had a gate, where the row's regime had an expert. The fits have a gate from 2021-22-gw22 on (164 folds; the five folds 2021-22-gw22 to gw26 held only the single_pre_defcon expert). 163 of them contributed rows to the minimum: 2025-26-gw02 had a gate, but its scored rows were all single_defcon, whose expert did not exist yet"
     },
     "first_record_proxy": {
       "note": "the first record read availability from the exported control table (first fold with at least 200 complete rows and 200 appeared rows of the regime strictly before it). That proxy cannot see the refused fold's rows: 2021-22-gw02 exported all its rows on the direct_control route, although 554 of them were the feature-complete training rows of the 2021-22-gw03 fit, so it put single_pre_defcon one fold late",
