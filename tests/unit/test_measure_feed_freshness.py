@@ -5,6 +5,7 @@ the lead-time runner's tests; nothing reaches a network and no real captured byt
 """
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -91,6 +92,14 @@ def test_a_note_stamped_exactly_at_the_previous_deadline_is_not_since_it(tmp_pat
     assert entry["notes_since_previous_deadline"] == 1
 
 
+def test_a_note_stamped_at_the_capture_instant_is_one_note_of_age_zero(tmp_path: Path) -> None:
+    entry = _single(tmp_path, [_note(1, "Knee injury", CAPTURED)])
+    assert entry["notes"] == 1
+    assert entry["age"] == {"q1_days": 0.0, "median_days": 0.0, "q3_days": 0.0}
+    assert entry["stamps_after_capture"] == 0
+    assert entry["notes_since_previous_deadline"] == 1
+
+
 def test_a_capture_before_the_first_deadline_has_no_since_count_not_zero(
     tmp_path: Path,
 ) -> None:
@@ -132,6 +141,9 @@ def test_the_record_declares_its_contract_and_reads_no_holdout(tmp_path: Path) -
     assert record["note_rule"] == "nonempty_news_with_news_added_v1"
     assert record["measurement_only"] is True and record["gate_evidence"] is False
     assert record["locked_holdout_accessed"] is False
+    # The record names the code that produced it, as the records gate requires.
+    assert re.fullmatch(r"[0-9a-f]{7,40}", str(record["repository_commit"]))
+    assert isinstance(record["working_tree_dirty"], bool)
     # The notes' words are never written.
     assert "Knee" not in json.dumps(record) and "Knee" not in summary(record)
 

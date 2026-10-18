@@ -40,7 +40,7 @@ from pathlib import Path
 from typing import Final
 
 import numpy as np
-from scripts._experiment_cli import write_json, write_text
+from scripts._experiment_cli import repository_provenance, write_json, write_text
 from scripts.measure_capture_lead_time import _captures
 
 from squadopt.data.errors import DataSourceError
@@ -172,6 +172,8 @@ def measure(snapshot_root: Path) -> dict[str, object]:
         "gate_evidence": False,
         "measurement_only": True,
         "locked_holdout_accessed": False,
+        # Which code produced the record; it reads no archive, so the commit is all of it.
+        **repository_provenance(),
     }
 
 
