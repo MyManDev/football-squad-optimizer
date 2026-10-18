@@ -77,6 +77,11 @@ def _parse_arguments() -> argparse.Namespace:
     parser.add_argument("--producer-environment", type=Path, required=True)
     parser.add_argument("--archive-root", type=Path, default=DEFAULT_ARCHIVE_ROOT)
     parser.add_argument("--json-output", type=Path, default=DEFAULT_OUTPUT)
+    # Development-only: read a Phase C v2 development artifact (the declared estimator or
+    # weighting candidates) through the development reader and score its decisions on the
+    # same development seasons. The output then names the contract it was read under and
+    # is not the frozen v1 evaluation; a default output path is refused for it.
+    parser.add_argument("--development-contract", default=None)
     return parser.parse_args()
 
 
@@ -123,7 +128,15 @@ def _load_development_panel(archive_root: Path) -> pd.DataFrame:
 
 
 def _measure(arguments: argparse.Namespace) -> dict[str, object]:
-    handoff = read_phase_c_component_handoff(arguments.table, arguments.roster, arguments.manifest)
+    development_contract = (
+        None if arguments.development_contract is None else str(arguments.development_contract)
+    )
+    handoff = read_phase_c_component_handoff(
+        arguments.table,
+        arguments.roster,
+        arguments.manifest,
+        development_contract=development_contract,
+    )
     producer = _producer_environment(
         arguments.producer_environment,
         table_sha256=handoff.table_sha256,
@@ -143,8 +156,12 @@ def _measure(arguments: argparse.Namespace) -> dict[str, object]:
         run_metadata={"study": REPORT_VERSION},
     )
     player_metrics = evaluate_component_oof(handoff.rows)
-    decisions = evaluate_phase_c_component_decisions(handoff, controls, config)
+    decisions = evaluate_phase_c_component_decisions(
+        handoff, controls, config, development_contract=development_contract
+    )
     return {
+        "development_contract": development_contract,
+        "development_only": development_contract is not None,
         "source": {
             "table_sha256": handoff.table_sha256,
             "roster_sha256": handoff.roster_sha256,
@@ -167,6 +184,12 @@ def _measure(arguments: argparse.Namespace) -> dict[str, object]:
 
 def main() -> int:
     arguments = _parse_arguments()
+    if arguments.development_contract is not None and arguments.json_output == DEFAULT_OUTPUT:
+        print(
+            "A development-contract evaluation is not the frozen Phase C record; name a "
+            "separate --json-output."
+        )
+        return 1
     started = datetime.now(UTC)
     metadata = artifact_metadata(
         panel_rows=0,

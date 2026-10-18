@@ -128,7 +128,7 @@ do not move.
 | `measure_capture_lead_time.py` | measurement runner | `docs/capture_lead_time.json`; also `docs/weekly_runbook.md` | 2026-09-08 |
 | `measure_chip_forecast_rule.py` | measurement runner | `docs/chip_forecast_rule.json`, `docs/chip_forecast_rule.md`; protocol `docs/chip_forecast_prereg.md` | 2026-09-19 |
 | `measure_chip_threshold_induction.py` | measurement runner | `docs/chip_threshold_induction.json`, `docs/chip_threshold_induction.md`, in two stages; reads `docs/chip_forecast_rule.json`; protocol `docs/chip_threshold_induction_prereg.md` | 2026-09-20 |
-| `measure_component_fidelity.py` | measurement runner | `docs/phase_d_component_fidelity.json` | 2026-09-07 |
+| `measure_component_fidelity.py` | measurement runner | `docs/phase_d_component_fidelity.json`; with `--team-match-block`, a candidate record such as `docs/research/team_match_block_sampler_fidelity.json` | 2026-10-17 |
 | `measure_continuation_diagnostic.py` | measurement runner | a fresh `--output` directory; `docs/research/continuation_diagnostic.json` records this file's hash; protocol `docs/research/continuation_diagnostic_protocol.md` | 2026-09-29 |
 | `measure_defcon_component.py` | measurement runner | outcome-free identity check; one owner-authorized `docs/research/defcon_component_reading.{json,md}` record under #1000 | 2026-10-11 |
 | `measure_double_reduction.py` | measurement runner | `docs/double_reduction.json`, `docs/double_reduction.md` | 2026-09-26 |
@@ -146,6 +146,7 @@ do not move.
 | `measure_listed_minutes.py` | measurement runner | the `--output` record, committed as `docs/in_season_listed_minutes.json` beside its reading `docs/in_season_listed_minutes.md` | 2026-10-04 |
 | `measure_live_price_honesty.py` | measurement runner | `docs/live_price_honesty.json`, `docs/live_price_honesty.md`, regenerated after a settled gameweek; protocol `docs/live_price_honesty_prereg.md` | 2026-09-26 |
 | `measure_live_projection_audit.py` | measurement runner | `docs/live_projection_audit.json`, `docs/live_projection_audit.md`, regenerated after each settled gameweek; protocol `docs/live_projection_audit_prereg.md` | 2026-09-19 |
+| `measure_mean_reversion_discount.py` | measurement runner | `docs/research/mean_reversion_discount.json`, `docs/research/mean_reversion_discount.md` through `--merge` of per-season artifacts under `artifacts/mean_reversion_discount/`; a pilot writes only there; protocol `docs/research/mean_reversion_discount_prereg.md` | 2026-10-17 |
 | `measure_member_plan_determinism.py` | measurement runner | `docs/member_plan_determinism.json`, `docs/member_plan_determinism.md` | 2026-09-20 |
 | `measure_member_window_proofs.py` | measurement runner | `docs/member_window_proofs.json`, `docs/member_window_proofs.md` | 2026-09-19 |
 | `measure_mode_plan_selection.py` | measurement runner | `docs/mode_plan_selection.json` | 2026-09-19 |
@@ -170,12 +171,12 @@ do not move.
 | `measure_template_rival.py` | measurement runner | `docs/template_rival_strength.json` (+ per-season variants) | 2026-09-19 |
 | `measure_temporal_refinement.py` | measurement runner | a fresh output directory; `docs/research/temporal_refinement_measurement.json` and `docs/research/triple_refinement_measurement.json` each record this file's hash | 2026-09-30 |
 | `measure_top100_effect.py` | measurement runner | `docs/top100_effect_gw12` or `docs/top100_effect_gw20` as `.json` and `.md`, each once (none committed yet); protocol `docs/top100_effect_prereg.md`, usage `docs/top100_effect_reader.md` | 2026-09-21 |
-| `measure_window_solver_highs.py` | measurement runner | `docs/research/window_solver_highs.json`, `docs/research/window_solver_highs.md`; `check` writes only `artifacts/window_solver_highs/`; protocol `docs/window_solver_highs_prereg.md` | 2026-10-07 |
+| `measure_window_solver_highs.py` | measurement runner | `docs/research/window_solver_highs.json`, `docs/research/window_solver_highs.md` by default (protocol `docs/window_solver_highs_prereg.md`); with `--record-stem window_solver_highs_current`, `docs/research/window_solver_highs_current.json` and `.md` (protocol `docs/research/window_solver_highs_current_prereg.md`); `check` writes only `artifacts/<stem>/` | 2026-10-17 |
 | `read_benchmark_v2_live.py` | measurement runner | `docs/benchmark-v2-live-2026-27.json` and its Markdown twin, with the claim `docs/benchmark-v2-live-2026-27.reading` | 2026-10-11 |
 | `record_preseason_difficulty.py` | measurement runner | `docs/preseason_fixture_difficulty.json`; also `docs/gw1_run_sheet.md` | 2026-09-19 |
 | `replay_football_planning.py` | measurement runner | a fresh `--output` directory; `docs/research/football_planning_replay.json` records this file's hash | 2026-09-28 |
 | `run_candidate_gate.py` | measurement runner | `docs/issue43_candidate_declaration.json` (reads and judges); `docs/candidate_gate_spec.md` | 2026-10-12 |
-| `run_component_squad_calibration.py` | measurement runner | `docs/phase_d_component_squad_calibration.json` | 2026-09-21 |
+| `run_component_squad_calibration.py` | measurement runner | `docs/phase_d_component_squad_calibration.json`; with `--team-match-block`, a candidate record such as `docs/research/team_match_block_sampler.json` | 2026-10-17 |
 | `run_opening_backtest.py` | measurement runner | `docs/opening_backtest.json` | 2026-09-19 |
 | `run_opponent_projection_study.py` | measurement runner | `docs/opponent_projection_study.json` | 2026-08-19 |
 | `run_planner_horizon_seasons.py` | measurement runner | `docs/planner_horizon_seasons.json` | 2026-09-26 |
@@ -226,6 +227,7 @@ allowing the web formatter's layout.
 
 | Script | Class | Record it writes, or what names it | Last commit |
 | --- | --- | --- | --- |
+| `_highs_native_driver.py` | helper | imported by `measure_window_solver_highs` and run by it as the native HiGHS child (`python -m scripts._highs_native_driver --job --out`, and `--version` for the guard): `highspy` and the standard library only, never OR-Tools, whose `libhighs.so.1` shares the SONAME | 2026-10-17 |
 | `_experiment_cli.py` | helper | imported by every runner that `git grep -l "from scripts._experiment_cli import" -- 'scripts/*.py' \| wc -l` counts: provenance metadata, `write_json`, `write_text` | 2026-10-12 |
 | `_phase_e_checkpoints.py` | helper | imported by `probe_phase_e_runtime` | 2026-09-07 |
 | `_phase_e_development.py` | helper | imported by `probe_phase_e_runtime`, `_phase_e_evaluation` | 2026-09-07 |

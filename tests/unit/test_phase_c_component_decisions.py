@@ -194,3 +194,33 @@ def test_decision_comparison_requires_official_scoring_v2() -> None:
             [_control()],
             EvaluationConfig(optimization_config=OptimizationConfig()),
         )
+
+
+def test_a_development_handoff_is_admitted_only_under_its_named_contract() -> None:
+    """The decision comparison reads a v2 development artifact only when the caller names
+    the development contract; the frozen path, which never does, refuses it, and a caller
+    naming the contract is refused a v1 artifact in its place."""
+
+    import dataclasses
+
+    from squadopt.evaluation import DEVELOPMENT_OOF_CONTRACT_VERSION
+
+    development = dataclasses.replace(
+        _handoff(), development_contract=DEVELOPMENT_OOF_CONTRACT_VERSION
+    )
+    with pytest.raises(EvaluationValidationError, match="development-only"):
+        evaluate_phase_c_component_decisions(development, [_control()], _config())
+    with pytest.raises(EvaluationValidationError, match="development-only"):
+        evaluate_phase_c_component_decisions(
+            _handoff(),
+            [_control()],
+            _config(),
+            development_contract=DEVELOPMENT_OOF_CONTRACT_VERSION,
+        )
+    comparison = evaluate_phase_c_component_decisions(
+        development,
+        [_control()],
+        _config(),
+        development_contract=DEVELOPMENT_OOF_CONTRACT_VERSION,
+    )
+    assert phase_c_decision_comparison_to_dict(comparison)["component_base"]
