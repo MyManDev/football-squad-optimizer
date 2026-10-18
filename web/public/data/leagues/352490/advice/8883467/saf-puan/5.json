@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-10-15T14:15:28Z",
+  "generated_at_utc": "2026-10-16T07:13:49Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "saf-puan",
     "window": 5,
-    "source_snapshot_id": "fpl-live-20261015T130038Z-7a7a388a3a43",
+    "source_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd",
     "moves": [
       {
         "move_id": "gw07-1",
@@ -263,19 +263,45 @@
         "gameweek": 10,
         "transfers_in": [
           {
-            "player_id": 444102,
-            "name": "Francisco Evanilson de Lima Barbosa",
-            "short_name": "Barbosa",
-            "position": "FWD",
-            "team": "Bournemouth"
+            "player_id": 201666,
+            "name": "Harvey Barnes",
+            "short_name": "Barnes",
+            "position": "MID",
+            "team": "Newcastle"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 169432,
-            "name": "Oli McBurnie",
-            "short_name": "McBurnie",
-            "position": "FWD",
+            "player_id": 122806,
+            "name": "John McGinn",
+            "short_name": "McGinn",
+            "position": "MID",
+            "team": "Aston Villa"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 2,
+        "free_transfers_after": 2,
+        "expected_points": 58.08554969675704
+      },
+      {
+        "gameweek": 11,
+        "transfers_in": [
+          {
+            "player_id": 489639,
+            "name": "Bart Verbruggen",
+            "short_name": "Verbruggen",
+            "position": "GK",
+            "team": "Brighton"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 473284,
+            "name": "Konstantinos Tzolakis",
+            "short_name": "Tzolakis",
+            "position": "GK",
             "team": "Hull City"
           }
         ],
@@ -283,33 +309,7 @@
         "chip": null,
         "free_transfers_before": 2,
         "free_transfers_after": 2,
-        "expected_points": 57.864818074845175
-      },
-      {
-        "gameweek": 11,
-        "transfers_in": [
-          {
-            "player_id": 502500,
-            "name": "Igor Thiago Nascimento Rodrigues",
-            "short_name": "Rodrigues",
-            "position": "FWD",
-            "team": "Brentford"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 475168,
-            "name": "Jo\u00e3o Pedro Junqueira de Jesus",
-            "short_name": "Jesus",
-            "position": "FWD",
-            "team": "Chelsea"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 2,
-        "free_transfers_after": 2,
-        "expected_points": 58.23106859403789
+        "expected_points": 58.08554969675704
       }
     ],
     "stated_limits": [

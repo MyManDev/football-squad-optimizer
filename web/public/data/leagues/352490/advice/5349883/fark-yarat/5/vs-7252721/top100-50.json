@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-10-15T14:15:28Z",
+  "generated_at_utc": "2026-10-16T07:13:49Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "fark-yarat",
     "window": 5,
-    "source_snapshot_id": "fpl-live-20261015T130038Z-7a7a388a3a43",
+    "source_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd",
     "moves": [
       {
         "move_id": "gw07-1",
@@ -33,9 +33,9 @@
     ],
     "transfer_hit_points": 0.0,
     "expected_gain_vs_hold": 3.063411096158376,
-    "expected_points_cost": 2.9103209614311254,
+    "expected_points_cost": 1.878967590455602,
     "rival_label": "entry-7252721",
-    "solver_status": "FEASIBLE",
+    "solver_status": "OPTIMAL",
     "optimality_gap": null,
     "wall_clock_stopped_the_search": false,
     "expected_own_points": 53.39405308049132,
@@ -237,32 +237,6 @@
         "gameweek": 9,
         "transfers_in": [
           {
-            "player_id": 154043,
-            "name": "Ainsley Maitland-Niles",
-            "short_name": "Maitland-Niles",
-            "position": "DEF",
-            "team": "Everton"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 191866,
-            "name": "Kristoffer Ajer",
-            "short_name": "Ajer",
-            "position": "DEF",
-            "team": "Brentford"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 3,
-        "free_transfers_after": 3,
-        "expected_points": 55.27371000166934
-      },
-      {
-        "gameweek": 10,
-        "transfers_in": [
-          {
             "player_id": 502500,
             "name": "Igor Thiago Nascimento Rodrigues",
             "short_name": "Rodrigues",
@@ -283,10 +257,10 @@
         "chip": null,
         "free_transfers_before": 3,
         "free_transfers_after": 3,
-        "expected_points": 56.125991082977976
+        "expected_points": 55.708388017258756
       },
       {
-        "gameweek": 11,
+        "gameweek": 10,
         "transfers_in": [
           {
             "player_id": 244850,
@@ -303,6 +277,32 @@
             "short_name": "\u00d8degaard",
             "position": "MID",
             "team": "Arsenal"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 3,
+        "free_transfers_after": 3,
+        "expected_points": 56.7226664383641
+      },
+      {
+        "gameweek": 11,
+        "transfers_in": [
+          {
+            "player_id": 154043,
+            "name": "Ainsley Maitland-Niles",
+            "short_name": "Maitland-Niles",
+            "position": "DEF",
+            "team": "Everton"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 191866,
+            "name": "Kristoffer Ajer",
+            "short_name": "Ajer",
+            "position": "DEF",
+            "team": "Brentford"
           }
         ],
         "transfer_hit_points": 0.0,
@@ -326,7 +326,7 @@
     "data_quality": "complete",
     "missing_fields": [],
     "squad_basis": "captured",
-    "expected_points_cost_ceiling": 2.9103209614311254,
+    "expected_points_cost_ceiling": 1.878967590455602,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0,
     "rival_entry_id": 7252721,
@@ -342,9 +342,9 @@
       "weight": 50,
       "changed": true,
       "price_basis": "base_model_pure_points_v1",
-      "cohort_snapshot_id": "fpl-top100-20261015T125956Z-62eac7653b23",
-      "picks_snapshot_id": "fpl-elite-picks-20261015T130016Z-f74142d5b421",
-      "table_sha256": "0a890f659631183ae43ffe18feb2530d6b0c3b18a22958933876121eb5c9028d",
+      "cohort_snapshot_id": "fpl-top100-20261016T060118Z-ae3db8c93137",
+      "picks_snapshot_id": "fpl-elite-picks-20261016T060136Z-8b4c3667de56",
+      "table_sha256": "2818a2e18bb44ede2d2baa84576d374ea81f0c3b4f9ba8a9ece1068a577408e5",
       "picks_gameweek": 6
     }
   }

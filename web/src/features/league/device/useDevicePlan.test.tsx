@@ -36,6 +36,7 @@ import {
   type DeviceSolver,
   type DevicePlanPhase,
   type DeviceTimeline,
+  type PageVisibility,
 } from "./useDevicePlan";
 
 afterEach(cleanup);
@@ -206,6 +207,32 @@ class MuteSolver implements DeviceSolver {
   }
 }
 
+/** A page the test hides and shows, keeping each listener it is given until it is removed. */
+class HandVisibility implements PageVisibility {
+  private state: DocumentVisibilityState = "visible";
+  readonly listeners = new Set<() => void>();
+  readonly hidden = (): boolean => this.state === "hidden";
+  readonly listen = (changed: () => void): (() => void) => {
+    // One entry for each listener added, even one added twice.
+    const listener = () => changed();
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  };
+  /** Hide or show the page and tell each listener, as the browser's visibilitychange does. */
+  turn(state: DocumentVisibilityState): void {
+    this.state = state;
+    for (const listener of [...this.listeners]) listener();
+  }
+}
+
+/** A clock in milliseconds that moves only when the test moves it. */
+class HandClock {
+  milliseconds = 0;
+  readonly read = (): number => this.milliseconds;
+}
+
 function Harness({
   squad,
   request,
@@ -217,6 +244,8 @@ function Harness({
   timers,
   inlineTimers = false,
   timeline,
+  visibility,
+  clock,
 }: {
   squad: EntrySquad;
   request: AdviceRequest;
@@ -231,6 +260,9 @@ function Harness({
   inlineTimers?: boolean;
   /** Absent, the page's own User Timing. */
   timeline?: DeviceTimeline;
+  /** Absent, the page's own visibility and clock. */
+  visibility?: PageVisibility;
+  clock?: () => number;
 }) {
   const timerDependencies = !timers
     ? {}
@@ -250,6 +282,8 @@ function Harness({
       now: () => new Date("2026-10-03T01:02:03Z"),
       ...timerDependencies,
       timeline,
+      visibility,
+      clock,
     },
     rivals,
   );
@@ -878,6 +912,180 @@ describe("a solve that runs too long, or is no longer wanted", () => {
     expect(timers.waiting.size).toBe(0);
     await act(async () => screen.getByText("reset").click());
     expect(solver.terminated).toBe(false);
+  });
+});
+
+describe("a watchdog on a page the member hides", () => {
+  const LOAD = (DEVICE_LOAD_ALLOWANCE_SECONDS + DEVICE_REPLY_GRACE_SECONDS) * 1000;
+  const SOLVE = (DEVICE_SOLVE_CEILING_SECONDS + DEVICE_REPLY_GRACE_SECONDS) * 1000;
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  /** The delays of the timers still set. */
+  const delays = (timers: HandTimers) =>
+    [...timers.waiting.values()].map((timer) => timer.milliseconds);
+
+  /** A page with its own timers, visibility and clock, whose workers are kept in `created`. */
+  function hiddenPage<Solver extends DeviceSolver>(make: () => Solver) {
+    const timers = new HandTimers();
+    const visibility = new HandVisibility();
+    const clock = new HandClock();
+    const timeline = new KeptTimeline();
+    const created: Solver[] = [];
+    const page = (request: AdviceRequest = REQUEST) =>
+      withLeague(
+        <Harness
+          squad={squadWith(entry)}
+          request={request}
+          loadDocument={async () => envelope(document)}
+          solver={make()}
+          createSolver={() => {
+            const made = make();
+            created.push(made);
+            return made;
+          }}
+          timers={timers}
+          visibility={visibility}
+          clock={clock.read}
+          timeline={timeline}
+          onState={() => {}}
+        />,
+      );
+    return { timers, visibility, clock, timeline, created, page };
+  }
+
+  it("pauses the solve's watchdog while the page is hidden and sets it again for what was left", async () => {
+    const { timers, visibility, clock, created, page } = hiddenPage(() => new SilentSolver());
+    render(page());
+    await act(async () => screen.getByText("run").click());
+    await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("solving"));
+    expect(delays(timers)).toEqual([SOLVE]);
+    clock.milliseconds += 40_000;
+    act(() => visibility.turn("hidden"));
+    expect(timers.waiting.size).toBe(0);
+    // However long the page stays hidden, none of it is counted.
+    clock.milliseconds += 600_000;
+    act(() => visibility.turn("visible"));
+    expect(delays(timers)).toEqual([SOLVE - 40_000]);
+    clock.milliseconds += 25_000;
+    act(() => visibility.turn("hidden"));
+    clock.milliseconds += 5_000;
+    act(() => visibility.turn("visible"));
+    expect(delays(timers)).toEqual([SOLVE - 65_000]);
+    await act(async () => timers.fireAll());
+    await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("failed"));
+    expect(created).toHaveLength(1);
+    expect(created[0]!.terminated).toBe(true);
+    expect(visibility.listeners.size).toBe(0);
+  });
+
+  it("pauses the load's allowance the same way while the worker is still loading", async () => {
+    const { timers, visibility, clock, created, page } = hiddenPage(() => new MuteSolver());
+    render(page());
+    await act(async () => screen.getByText("run").click());
+    await waitFor(() => expect(timers.waiting.size).toBe(1));
+    expect(screen.getByTestId("phase")).toHaveTextContent("loading");
+    expect(delays(timers)).toEqual([LOAD]);
+    clock.milliseconds += 20_000;
+    act(() => visibility.turn("hidden"));
+    expect(timers.waiting.size).toBe(0);
+    clock.milliseconds += 300_000;
+    act(() => visibility.turn("visible"));
+    expect(delays(timers)).toEqual([LOAD - 20_000]);
+    await act(async () => timers.fireAll());
+    await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("failed"));
+    expect(created).toHaveLength(1);
+    expect(created[0]!.terminated).toBe(true);
+    expect(visibility.listeners.size).toBe(0);
+  });
+
+  it.each([
+    { worker: "still loading", make: (): DeviceSolver => new MuteSolver(), point: "posted" },
+    { worker: "ready", make: (): DeviceSolver => new SilentSolver(), point: "ready" },
+  ])(
+    "sets nothing for a run started on a hidden page until it is shown, then the whole span for a worker $worker",
+    async ({ make, point }) => {
+      const { timers, visibility, clock, timeline, page } = hiddenPage(make);
+      visibility.turn("hidden");
+      render(page());
+      await act(async () => screen.getByText("run").click());
+      await waitFor(() => expect(timeline.marks.at(-1)).toMatch(new RegExp(`:${point}$`)));
+      expect(timers.waiting.size).toBe(0);
+      expect(visibility.listeners.size).toBe(1);
+      clock.milliseconds += 90_000;
+      act(() => visibility.turn("visible"));
+      expect(delays(timers)).toEqual([point === "posted" ? LOAD : SOLVE]);
+      await act(async () => timers.fireAll());
+      await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("failed"));
+      expect(visibility.listeners.size).toBe(0);
+    },
+  );
+
+  it.each(
+    (["an answer", "a reset", "a new selection", "an unmount"] as const).flatMap((ending) =>
+      (["visible", "hidden"] as const).map((state) => ({ ending, state })),
+    ),
+  )("leaves no listener and no timer after $ending on a $state page", async ({ ending, state }) => {
+    const { timers, visibility, created, page } = hiddenPage(() => new HeldSolver());
+    const view = render(page());
+    await act(async () => screen.getByText("run").click());
+    await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("solving"));
+    expect(visibility.listeners.size).toBe(1);
+    act(() => visibility.turn(state));
+    expect(timers.waiting.size).toBe(state === "visible" ? 1 : 0);
+    if (ending === "an answer") {
+      await act(async () => created[0]!.answer(created[0]!.posted[0]!));
+      await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("done"));
+    } else if (ending === "a reset") {
+      await act(async () => screen.getByText("reset").click());
+    } else if (ending === "a new selection") {
+      view.rerender(page({ ...REQUEST, window: 3 }));
+    } else {
+      view.unmount();
+    }
+    expect(visibility.listeners.size).toBe(0);
+    expect(timers.waiting.size).toBe(0);
+    // A page shown again sets nothing for a run that has ended.
+    act(() => visibility.turn("visible"));
+    expect(timers.waiting.size).toBe(0);
+  });
+
+  it("hears the page's own visibility when given none", async () => {
+    const timers = new HandTimers();
+    render(
+      withLeague(
+        <Harness
+          squad={squadWith(entry)}
+          request={REQUEST}
+          loadDocument={async () => envelope(document)}
+          solver={new SilentSolver()}
+          timers={timers}
+          onState={() => {}}
+        />,
+      ),
+    );
+    await act(async () => screen.getByText("run").click());
+    await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("solving"));
+    const page = globalThis.document;
+    const shown = vi.spyOn(page, "visibilityState", "get").mockReturnValue("hidden");
+    act(() => {
+      page.dispatchEvent(new Event("visibilitychange"));
+    });
+    expect(timers.waiting.size).toBe(0);
+    shown.mockReturnValue("visible");
+    act(() => {
+      page.dispatchEvent(new Event("visibilitychange"));
+    });
+    expect(timers.waiting.size).toBe(1);
+    expect(delays(timers)[0]).toBeLessThanOrEqual(SOLVE);
+    // A reset takes its listener off the page: the page shown again sets nothing.
+    await act(async () => screen.getByText("reset").click());
+    act(() => {
+      page.dispatchEvent(new Event("visibilitychange"));
+    });
+    expect(timers.waiting.size).toBe(0);
   });
 });
 

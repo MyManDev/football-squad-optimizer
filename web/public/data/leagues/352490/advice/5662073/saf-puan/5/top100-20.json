@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-10-15T14:15:28Z",
+  "generated_at_utc": "2026-10-16T07:13:49Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "saf-puan",
     "window": 5,
-    "source_snapshot_id": "fpl-live-20261015T130038Z-7a7a388a3a43",
+    "source_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd",
     "moves": [
       {
         "move_id": "gw07-1",
@@ -21,11 +21,11 @@
           "team": "Man City"
         },
         "player_in": {
-          "player_id": 508395,
-          "name": "Yehor Yarmoliuk",
-          "short_name": "Yarmoliuk",
+          "player_id": 101282,
+          "name": "Matt Crooks",
+          "short_name": "Crooks",
           "position": "MID",
-          "team": "Brentford"
+          "team": "Hull City"
         },
         "expected_points_delta": -1.3212533132744326,
         "reason_code": "top100_preference"
@@ -33,9 +33,9 @@
     ],
     "transfer_hit_points": 0.0,
     "expected_gain_vs_hold": -1.3212533132744326,
-    "expected_points_cost": 0.177866656723495,
+    "expected_points_cost": 0.0,
     "rival_label": null,
-    "solver_status": "FEASIBLE",
+    "solver_status": "OPTIMAL",
     "optimality_gap": null,
     "wall_clock_stopped_the_search": false,
     "expected_own_points": 47.23207115513985,
@@ -155,14 +155,6 @@
         "expected_points": 3.2480295284625815
       },
       {
-        "player_id": 508395,
-        "name": "Yehor Yarmoliuk",
-        "short_name": "Yarmoliuk",
-        "position": "MID",
-        "team": "Brentford",
-        "expected_points": 2.552809170960097
-      },
-      {
         "player_id": 199798,
         "name": "Ezri Konsa Ngoyo",
         "short_name": "Ngoyo",
@@ -177,6 +169,14 @@
         "position": "DEF",
         "team": "Everton",
         "expected_points": 1.7100561668961303
+      },
+      {
+        "player_id": 101282,
+        "name": "Matt Crooks",
+        "short_name": "Crooks",
+        "position": "MID",
+        "team": "Hull City",
+        "expected_points": 1.535957395897475
       }
     ],
     "chip": null,
@@ -185,11 +185,11 @@
         "gameweek": 7,
         "transfers_in": [
           {
-            "player_id": 508395,
-            "name": "Yehor Yarmoliuk",
-            "short_name": "Yarmoliuk",
+            "player_id": 101282,
+            "name": "Matt Crooks",
+            "short_name": "Crooks",
             "position": "MID",
-            "team": "Brentford"
+            "team": "Hull City"
           }
         ],
         "transfers_out": [
@@ -237,19 +237,19 @@
         "gameweek": 9,
         "transfers_in": [
           {
-            "player_id": 108813,
-            "name": "Christian Walton",
-            "short_name": "Walton",
-            "position": "GK",
-            "team": "Ipswich Town"
+            "player_id": 177815,
+            "name": "Dominic Calvert-Lewin",
+            "short_name": "Calvert-Lewin",
+            "position": "FWD",
+            "team": "Leeds"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 489639,
-            "name": "Bart Verbruggen",
-            "short_name": "Verbruggen",
-            "position": "GK",
+            "player_id": 647850,
+            "name": "Charalampos Kostoulas",
+            "short_name": "Kostoulas",
+            "position": "FWD",
             "team": "Brighton"
           }
         ],
@@ -257,7 +257,7 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 55.19045531273288
+        "expected_points": 55.271062434987144
       },
       {
         "gameweek": 10,
@@ -283,7 +283,7 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 56.46689568576967
+        "expected_points": 56.547502808023935
       },
       {
         "gameweek": 11,
@@ -309,7 +309,7 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 57.21964600318023
+        "expected_points": 57.300253125434494
       }
     ],
     "stated_limits": [
@@ -325,16 +325,15 @@
     "data_quality": "complete",
     "missing_fields": [],
     "squad_basis": "captured",
-    "expected_points_cost_ceiling": 0.177866656723495,
-    "control_solver_status": "OPTIMAL",
-    "control_optimality_gap": 0.0,
+    "control_solver_status": "FEASIBLE",
+    "control_optimality_gap": 3.7759999999999536,
     "top100": {
       "weight": 20,
       "changed": true,
       "price_basis": "base_model_pure_points_v1",
-      "cohort_snapshot_id": "fpl-top100-20261015T125956Z-62eac7653b23",
-      "picks_snapshot_id": "fpl-elite-picks-20261015T130016Z-f74142d5b421",
-      "table_sha256": "0a890f659631183ae43ffe18feb2530d6b0c3b18a22958933876121eb5c9028d",
+      "cohort_snapshot_id": "fpl-top100-20261016T060118Z-ae3db8c93137",
+      "picks_snapshot_id": "fpl-elite-picks-20261016T060136Z-8b4c3667de56",
+      "table_sha256": "2818a2e18bb44ede2d2baa84576d374ea81f0c3b4f9ba8a9ece1068a577408e5",
       "picks_gameweek": 6
     }
   }
