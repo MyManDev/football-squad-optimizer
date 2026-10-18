@@ -71,6 +71,7 @@ reaches, and a backticked name is not a link.
 | [HiGHS on the current window model](window_solver_highs_current_prereg.md) | Recorded in [HiGHS on the current window model at GW7](window_solver_highs_current.md): a switch is supported on the server, device verdict carried from #1083 |
 | [Team-match block resampler for component scenarios](team_match_block_sampler_prereg.md) | Recorded in [the calibration reading](team_match_block_sampler.md) and [the fidelity diagnostic](team_match_block_sampler_fidelity.md) |
 | [Rank-conditional shrinkage of expected points](rank_conditional_shrinkage_prereg.md) | Recorded in [rank-conditional shrinkage](rank_conditional_shrinkage.md): measured, not certified |
+| [Joint team-match sampler, zero atom and club block in one draw](moe_sampler_prereg.md) | Recorded in [the calibration reading](moe_sampler.md) and [the fidelity diagnostic](moe_sampler_fidelity.md): `candidate_within_gates` at the frozen seed 0, measured, not certified; not robust across seeds (added after the result, 2026-10-18, at `d3b9dab1`) and not a basis for a pin |
 
 ## Reproducing a record
 

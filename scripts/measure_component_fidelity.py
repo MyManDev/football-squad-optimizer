@@ -70,8 +70,10 @@ from squadopt.scenarios.components import (
     ComponentScenarioProvenance,
     ConditionalResidualConfig,
     TeamMatchBlockConfig,
+    TeamMatchJointConfig,
     paired_conditional_residuals,
     sample_component_scenarios,
+    team_match_joint_pool,
 )
 
 LOGGER = logging.getLogger(__name__)
@@ -86,6 +88,7 @@ DEVELOPMENT_FIDELITY_CONTRACT_VERSION: Final = "phase_d_component_fidelity_devel
 # it draws on, and nothing that requires the frozen v1 record can read it as one.
 CANDIDATE_FIDELITY_CONTRACT_VERSION: Final = "phase_d_component_fidelity_candidate_v1"
 TEAM_MATCH_BLOCK_PREREG: Final = "docs/research/team_match_block_sampler_prereg.md"
+TEAM_MATCH_JOINT_PREREG: Final = "docs/research/moe_sampler_prereg.md"
 PHASE_C_CONTRACTS: Final = ("v1", "development_v2")
 LOCKED_HOLDOUT_SEASON: Final = "2025-26"
 DEVELOPMENT_SEASONS: Final = ("2021-22", "2022-23", "2023-24", "2024-25")
@@ -128,6 +131,12 @@ def _parse_arguments() -> argparse.Namespace:
         action="store_true",
         help="candidate sampler: a club-week block inside the source fold (team_match_block_v1)",
     )
+    parser.add_argument(
+        "--team-match-joint",
+        action="store_true",
+        help="candidate sampler: the appearance and the residual from one club-week block "
+        "(team_match_joint_v1); pinned like --team-match-block",
+    )
     return parser.parse_args()
 
 
@@ -144,7 +153,7 @@ class DevelopmentInputs:
     manifest_sha256: str
     # ``None`` is the foundation sampler, which the calibration run also admits; the two
     # sides declare it the same way so a foundation run can be fidelity-verified too.
-    sampler: ConditionalResidualConfig | TeamMatchBlockConfig | None
+    sampler: ConditionalResidualConfig | TeamMatchBlockConfig | TeamMatchJointConfig | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -154,7 +163,7 @@ class CandidateInputs:
     table_sha256: str
     roster_sha256: str
     manifest_sha256: str
-    sampler: TeamMatchBlockConfig
+    sampler: TeamMatchBlockConfig | TeamMatchJointConfig
 
 
 def _pinned_digests(arguments: argparse.Namespace, contract: str) -> dict[str, str]:
@@ -171,26 +180,27 @@ def _pinned_digests(arguments: argparse.Namespace, contract: str) -> dict[str, s
 
 
 def _candidate_from_arguments(arguments: argparse.Namespace) -> CandidateInputs | None:
-    """The v1 candidate run ``--team-match-block`` asks for, or None.
+    """The v1 candidate run ``--team-match-block`` or ``--team-match-joint`` asks for, or None.
 
     A candidate run on the v1 contract is pinned to the three digests of the table it reads,
-    cannot write the frozen v1 artifact path, and names one sampler: the conditional-residual
-    flags are refused beside it rather than silently outranked.
+    cannot write the frozen v1 artifact path, and names one sampler: any second candidate flag
+    is refused beside it rather than silently outranked.
     """
 
-    if str(getattr(arguments, "phase_c_contract", "v1")) != "v1" or not bool(
-        getattr(arguments, "team_match_block", False)
-    ):
+    block = bool(getattr(arguments, "team_match_block", False))
+    joint = bool(getattr(arguments, "team_match_joint", False))
+    if str(getattr(arguments, "phase_c_contract", "v1")) != "v1" or not (block or joint):
         return None
     if (
-        getattr(arguments, "conditional_residual_fraction", None) is not None
+        (block and joint)
+        or getattr(arguments, "conditional_residual_fraction", None) is not None
         or getattr(arguments, "conditional_residual_minimum_rows", None) is not None
     ):
         raise FidelityBindingError(
-            "--team-match-block and the conditional-residual flags name two candidate "
-            "samplers; a run draws on one."
+            "--team-match-block, --team-match-joint and the conditional-residual flags name "
+            "two candidate samplers; a run draws on one."
         )
-    digests = _pinned_digests(arguments, "--team-match-block")
+    digests = _pinned_digests(arguments, "--team-match-joint" if joint else "--team-match-block")
     if Path(arguments.json_output).resolve() == DEFAULT_OUTPUT.resolve():
         raise FidelityBindingError(
             "A candidate run cannot write the frozen v1 artifact path; give --json-output."
@@ -199,7 +209,7 @@ def _candidate_from_arguments(arguments: argparse.Namespace) -> CandidateInputs 
         table_sha256=digests["expected_table_sha256"],
         roster_sha256=digests["expected_roster_sha256"],
         manifest_sha256=digests["expected_manifest_sha256"],
-        sampler=TeamMatchBlockConfig(),
+        sampler=TeamMatchJointConfig() if joint else TeamMatchBlockConfig(),
     )
 
 
@@ -217,10 +227,12 @@ def _development_from_arguments(arguments: argparse.Namespace) -> DevelopmentInp
     fraction = getattr(arguments, "conditional_residual_fraction", None)
     minimum_rows = getattr(arguments, "conditional_residual_minimum_rows", None)
     team_match_block = bool(getattr(arguments, "team_match_block", False))
+    team_match_joint = bool(getattr(arguments, "team_match_joint", False))
+    pinned_candidate = team_match_block or team_match_joint
     digest_names = ("expected_table_sha256", "expected_roster_sha256", "expected_manifest_sha256")
     if contract == "v1":
-        # The digests belong to `_candidate_from_arguments` when --team-match-block is set.
-        for name in (*(() if team_match_block else digest_names), "conditional_residual_fraction"):
+        # The digests belong to `_candidate_from_arguments` when a pinned candidate is set.
+        for name in (*(() if pinned_candidate else digest_names), "conditional_residual_fraction"):
             if getattr(arguments, name, None) is not None:
                 raise FidelityBindingError(
                     f"--{name.replace('_', '-')} applies to --phase-c-contract development_v2 only."
@@ -240,10 +252,10 @@ def _development_from_arguments(arguments: argparse.Namespace) -> DevelopmentInp
             "--conditional-residual-minimum-rows or neither: the record has to name the same "
             "sampler the calibration run will use, and a half-declared sampler names nothing."
         )
-    if team_match_block and fraction is not None:
+    if (pinned_candidate and fraction is not None) or (team_match_block and team_match_joint):
         raise FidelityBindingError(
-            "--team-match-block and the conditional-residual flags name two candidate "
-            "samplers; a run draws on one."
+            "--team-match-block, --team-match-joint and the conditional-residual flags name "
+            "two candidate samplers; a run draws on one."
         )
     if Path(arguments.json_output).resolve() == DEFAULT_OUTPUT.resolve():
         raise FidelityBindingError(
@@ -254,7 +266,9 @@ def _development_from_arguments(arguments: argparse.Namespace) -> DevelopmentInp
         roster_sha256=digests["expected_roster_sha256"],
         manifest_sha256=digests["expected_manifest_sha256"],
         sampler=(
-            TeamMatchBlockConfig()
+            TeamMatchJointConfig()
+            if team_match_joint
+            else TeamMatchBlockConfig()
             if team_match_block
             else None
             if fraction is None
@@ -457,6 +471,7 @@ def measure_fidelity(
     development_contract: str | None = None,
     conditional_residuals: ConditionalResidualConfig | None = None,
     team_match_block: TeamMatchBlockConfig | None = None,
+    team_match_joint: TeamMatchJointConfig | None = None,
 ) -> dict[str, object]:
     """Measure the five differences over every eligible fold and return one document.
 
@@ -466,19 +481,23 @@ def measure_fidelity(
     than a second copy of that rule living here.
 
     ``development_contract`` is the one way to measure a table that carries the locked season,
-    and it names the Phase C contract those rows came from. ``conditional_residuals`` and
-    ``team_match_block`` select a declared candidate sampler, one or neither; on the v1
-    contract a candidate run writes the candidate contract and names its sampler. Everything
-    defaults to the frozen v1 behaviour, which is unchanged down to the document's keys.
+    and it names the Phase C contract those rows came from. ``conditional_residuals``,
+    ``team_match_block`` and ``team_match_joint`` select a declared candidate sampler, one or
+    none; on the v1 contract a candidate run writes the candidate contract and names its
+    sampler. Everything defaults to the frozen v1 behaviour, which is unchanged down to the
+    document's keys.
     """
 
     settings = ScenarioConfig() if config is None else config
     development = development_contract is not None
-    if conditional_residuals is not None and team_match_block is not None:
+    samplers = [
+        item
+        for item in (conditional_residuals, team_match_block, team_match_joint)
+        if item is not None
+    ]
+    if len(samplers) > 1:
         raise FidelityBindingError("A fidelity run draws on one candidate sampler, not two.")
-    candidate = not development and (
-        conditional_residuals is not None or team_match_block is not None
-    )
+    candidate = not development and bool(samplers)
     if development and development_contract != DEVELOPMENT_OOF_CONTRACT_VERSION:
         raise FidelityBindingError(
             f"Unsupported Phase C development contract {development_contract!r}."
@@ -509,7 +528,7 @@ def measure_fidelity(
             )
 
     table = oof.copy(deep=True)
-    if team_match_block is not None:
+    if team_match_block is not None or team_match_joint is not None:
         # The club-week block needs each history row's own club. The v1 export keeps team
         # identity in the decision roster, so it is joined here per fold and player, for the
         # fields the table does not already carry (the v2 handoff joins position itself).
@@ -558,11 +577,17 @@ def measure_fidelity(
         # of "enough history" rather than predicting it here and risking a different answer.
         history = table.loc[table["fold_id"] < fold_id]
         try:
-            pool = paired_conditional_residuals(
-                history,
-                target=target,
-                min_history_folds=settings.min_history_folds,
-                team_match_block=team_match_block,
+            pool = (
+                team_match_joint_pool(
+                    history, target=target, min_history_folds=settings.min_history_folds
+                )
+                if team_match_joint is not None
+                else paired_conditional_residuals(
+                    history,
+                    target=target,
+                    min_history_folds=settings.min_history_folds,
+                    team_match_block=team_match_block,
+                )
             )
         except ScenarioValidationError as error:
             excluded.append(
@@ -586,6 +611,7 @@ def measure_fidelity(
             settings,
             conditional_residuals=conditional_residuals,
             team_match_block=team_match_block,
+            team_match_joint=team_match_joint,
         )
         # The draw declares the sampler it used; the record reports that rather than the
         # setting this run asked for, so the document cannot name a sampler it did not draw on.
@@ -712,6 +738,8 @@ def measure_fidelity(
                 **(
                     {"candidate_prereg_document": TEAM_MATCH_BLOCK_PREREG}
                     if team_match_block is not None
+                    else {"candidate_prereg_document": TEAM_MATCH_JOINT_PREREG}
+                    if team_match_joint is not None
                     else {}
                 ),
             }
@@ -926,6 +954,7 @@ def main() -> int:
                 sampler if isinstance(sampler, ConditionalResidualConfig) else None
             ),
             team_match_block=sampler if isinstance(sampler, TeamMatchBlockConfig) else None,
+            team_match_joint=sampler if isinstance(sampler, TeamMatchJointConfig) else None,
         )
     except (FidelityBindingError, ScenarioValidationError) as error:
         LOGGER.error("Refused: %s", error)
