@@ -55,12 +55,15 @@ The appearance is no longer drawn against the prediction alone: it is inherited 
 row's observed appearance through its latent uniform, so the sampled level equals the predicted
 one only where the source rows' appearance model is calibrated. On this table's component rows
 (read from the table, not from the record) the realized appearance rate sits below the
-predicted probability in the bottom decile (predicted 0.076 against realized 0.041 on 39,347
-rows) and above it in the middle deciles, and the pooled
-pass-through is -0.0039, every fold in the same direction: 0.94% fewer appeared cells than the
-foundation draws (38,750,016 against 39,117,876). That is what the
-pre-registration said this construction would do, and the calibration read measures whether it
-matters at squad level; nothing here is a gate.
+predicted probability among rows predicted at or below 0.1 (predicted 0.076 against realized
+0.041 on 39,347 of the 100,130 component rows; a probability bin of width 0.1, not a decile)
+and above it in the bins from 0.1 to 0.7. That bin reading comes from a script saved two
+minutes before the protocol was frozen, which
+[the calibration record](moe_sampler.md#development-evidence-on-reused-folds) discloses. The
+pooled pass-through is -0.0039, every fold in the same direction: 0.94% fewer appeared cells
+than the foundation draws (38,750,016 against 39,117,876). That is what the pre-registration
+said this construction would do, and the calibration read measures whether it matters at squad
+level; nothing here is a gate.
 
 The conditional minutes gap narrows from -1.41 to -0.96 and the floor engages less often (2.9%
 against 3.4% of appeared cells), for the reason the block candidate gave: a same-position row of

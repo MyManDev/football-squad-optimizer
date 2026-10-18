@@ -11098,6 +11098,2444 @@
     "roster_sha256": "3ef0c5717fa63c3c4772512f019cd750d3fae6cd9a7567d20dd4bfa24003678e",
     "table_sha256": "b05f10c3fd3ab5058fe1ff720cc6ef0a4b1362a70a19dd979ad0eb0f47d12c01"
   },
+  "seed_sensitivity_added_after_the_result": {
+    "added_on": "2026-10-18",
+    "arms": {
+      "block_arm": {
+        "counts_by_seed": {
+          "0": 23,
+          "1": 24,
+          "2": 24,
+          "3": 24,
+          "4": 23,
+          "5": 26,
+          "6": 26,
+          "7": 23,
+          "8": 23,
+          "9": 24
+        },
+        "fixed_count_outside_the_redrawn_folds": 19,
+        "max_count": 26,
+        "mean_count": 24.0,
+        "min_count": 23,
+        "seeds_within_s2_band": 0,
+        "seeds_within_s2_band_ids": []
+      },
+      "candidate": {
+        "counts_by_seed": {
+          "0": 21,
+          "1": 22,
+          "2": 23,
+          "3": 25,
+          "4": 25,
+          "5": 23,
+          "6": 25,
+          "7": 24,
+          "8": 23,
+          "9": 23
+        },
+        "fixed_count_outside_the_redrawn_folds": 19,
+        "max_count": 25,
+        "mean_count": 23.4,
+        "min_count": 21,
+        "seeds_within_s2_band": 1,
+        "seeds_within_s2_band_ids": [
+          "0"
+        ]
+      }
+    },
+    "boundary_fold_ids": [
+      "2021-22-gw19",
+      "2021-22-gw20",
+      "2022-23-gw18",
+      "2022-23-gw30",
+      "2022-23-gw37",
+      "2023-24-gw05",
+      "2023-24-gw19",
+      "2023-24-gw30",
+      "2023-24-gw38",
+      "2024-25-gw06",
+      "2024-25-gw27",
+      "2024-25-gw37"
+    ],
+    "boundary_pit_interval": [
+      0.06,
+      0.14
+    ],
+    "execution": {
+      "completed_at_utc": "2026-10-18T14:34:05+00:00",
+      "decisions_ready_at_utc": "2026-10-18T13:52:43+00:00",
+      "elapsed_seconds": 3409.543178,
+      "numpy": "2.5.2",
+      "ortools": "9.15.6755",
+      "pandas": "3.0.5",
+      "python": "3.13.5",
+      "started_at_utc": "2026-10-18T13:37:15+00:00"
+    },
+    "folds": {
+      "2021-22-gw19": {
+        "flags_by_seed": {
+          "block_arm": [
+            1,
+            1,
+            1,
+            1,
+            0,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "candidate": [
+            0,
+            0,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            0
+          ]
+        },
+        "realized_score": 39.0,
+        "seeds": {
+          "0": {
+            "block_arm": {
+              "probability_integral_transform": 0.099,
+              "q10_score": 39.0367040268,
+              "realized_below_q10": true,
+              "scenario_mean_score": 53.37550010197,
+              "scenario_standard_deviation": 11.702793990037973
+            },
+            "candidate": {
+              "probability_integral_transform": 0.101,
+              "q10_score": 38.9697208271,
+              "realized_below_q10": false,
+              "scenario_mean_score": 53.22480611322899,
+              "scenario_standard_deviation": 12.104099242905052
+            }
+          },
+          "1": {
+            "block_arm": {
+              "probability_integral_transform": 0.086,
+              "q10_score": 39.7937841592,
+              "realized_below_q10": true,
+              "scenario_mean_score": 54.219178465054995,
+              "scenario_standard_deviation": 12.099530635818311
+            },
+            "candidate": {
+              "probability_integral_transform": 0.102,
+              "q10_score": 38.82826214799999,
+              "realized_below_q10": false,
+              "scenario_mean_score": 53.707876053625995,
+              "scenario_standard_deviation": 12.0022233009452
+            }
+          },
+          "2": {
+            "block_arm": {
+              "probability_integral_transform": 0.078,
+              "q10_score": 40.0301246038,
+              "realized_below_q10": true,
+              "scenario_mean_score": 53.830292225058,
+              "scenario_standard_deviation": 11.745660954198367
+            },
+            "candidate": {
+              "probability_integral_transform": 0.096,
+              "q10_score": 39.2214551378,
+              "realized_below_q10": true,
+              "scenario_mean_score": 53.49824815059701,
+              "scenario_standard_deviation": 11.88827746422689
+            }
+          },
+          "3": {
+            "block_arm": {
+              "probability_integral_transform": 0.099,
+              "q10_score": 39.049663526399996,
+              "realized_below_q10": true,
+              "scenario_mean_score": 54.021230422459,
+              "scenario_standard_deviation": 12.297739813574953
+            },
+            "candidate": {
+              "probability_integral_transform": 0.095,
+              "q10_score": 39.044322609599995,
+              "realized_below_q10": true,
+              "scenario_mean_score": 53.895837182895995,
+              "scenario_standard_deviation": 12.06900431428107
+            }
+          },
+          "4": {
+            "block_arm": {
+              "probability_integral_transform": 0.101,
+              "q10_score": 38.833709195599994,
+              "realized_below_q10": false,
+              "scenario_mean_score": 54.139163667514005,
+              "scenario_standard_deviation": 12.58611472192851
+            },
+            "candidate": {
+              "probability_integral_transform": 0.096,
+              "q10_score": 39.2506916321,
+              "realized_below_q10": true,
+              "scenario_mean_score": 54.384268365504,
+              "scenario_standard_deviation": 12.449302172617797
+            }
+          },
+          "5": {
+            "block_arm": {
+              "probability_integral_transform": 0.085,
+              "q10_score": 39.7441607186,
+              "realized_below_q10": true,
+              "scenario_mean_score": 54.18053987198499,
+              "scenario_standard_deviation": 12.340162900149206
+            },
+            "candidate": {
+              "probability_integral_transform": 0.087,
+              "q10_score": 39.59334082149999,
+              "realized_below_q10": true,
+              "scenario_mean_score": 53.796623531858,
+              "scenario_standard_deviation": 11.727340092639889
+            }
+          },
+          "6": {
+            "block_arm": {
+              "probability_integral_transform": 0.089,
+              "q10_score": 39.689127133999996,
+              "realized_below_q10": true,
+              "scenario_mean_score": 54.342924348124,
+              "scenario_standard_deviation": 12.58391139627191
+            },
+            "candidate": {
+              "probability_integral_transform": 0.084,
+              "q10_score": 39.7015852783,
+              "realized_below_q10": true,
+              "scenario_mean_score": 54.306548644615994,
+              "scenario_standard_deviation": 12.71219920333994
+            }
+          },
+          "7": {
+            "block_arm": {
+              "probability_integral_transform": 0.083,
+              "q10_score": 40.0479392822,
+              "realized_below_q10": true,
+              "scenario_mean_score": 54.555066796445,
+              "scenario_standard_deviation": 12.549350967952215
+            },
+            "candidate": {
+              "probability_integral_transform": 0.092,
+              "q10_score": 39.371173255,
+              "realized_below_q10": true,
+              "scenario_mean_score": 53.704251846058995,
+              "scenario_standard_deviation": 12.199510837724999
+            }
+          },
+          "8": {
+            "block_arm": {
+              "probability_integral_transform": 0.085,
+              "q10_score": 40.0012275346,
+              "realized_below_q10": true,
+              "scenario_mean_score": 54.51337318152,
+              "scenario_standard_deviation": 12.137465985465361
+            },
+            "candidate": {
+              "probability_integral_transform": 0.091,
+              "q10_score": 39.3525237847,
+              "realized_below_q10": true,
+              "scenario_mean_score": 53.984136773394994,
+              "scenario_standard_deviation": 12.237183609394489
+            }
+          },
+          "9": {
+            "block_arm": {
+              "probability_integral_transform": 0.091,
+              "q10_score": 39.509622901,
+              "realized_below_q10": true,
+              "scenario_mean_score": 53.808305084143,
+              "scenario_standard_deviation": 12.044854652084773
+            },
+            "candidate": {
+              "probability_integral_transform": 0.107,
+              "q10_score": 38.712173309099995,
+              "realized_below_q10": false,
+              "scenario_mean_score": 53.878469949966,
+              "scenario_standard_deviation": 12.36482770242673
+            }
+          }
+        }
+      },
+      "2021-22-gw20": {
+        "flags_by_seed": {
+          "block_arm": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "candidate": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        "realized_score": 39.0,
+        "seeds": {
+          "0": {
+            "block_arm": {
+              "probability_integral_transform": 0.052,
+              "q10_score": 41.9245854981,
+              "realized_below_q10": true,
+              "scenario_mean_score": 56.608089902276,
+              "scenario_standard_deviation": 12.616223833942044
+            },
+            "candidate": {
+              "probability_integral_transform": 0.063,
+              "q10_score": 41.2318457577,
+              "realized_below_q10": true,
+              "scenario_mean_score": 55.76354239631101,
+              "scenario_standard_deviation": 12.07773609879709
+            }
+          },
+          "1": {
+            "block_arm": {
+              "probability_integral_transform": 0.049,
+              "q10_score": 42.264365898499996,
+              "realized_below_q10": true,
+              "scenario_mean_score": 56.00787901629,
+              "scenario_standard_deviation": 11.72801682864934
+            },
+            "candidate": {
+              "probability_integral_transform": 0.051,
+              "q10_score": 42.0942123912,
+              "realized_below_q10": true,
+              "scenario_mean_score": 55.96116503138,
+              "scenario_standard_deviation": 11.98275333444006
+            }
+          },
+          "2": {
+            "block_arm": {
+              "probability_integral_transform": 0.051,
+              "q10_score": 42.1518377696,
+              "realized_below_q10": true,
+              "scenario_mean_score": 56.383689524471,
+              "scenario_standard_deviation": 12.616716434368774
+            },
+            "candidate": {
+              "probability_integral_transform": 0.052,
+              "q10_score": 41.9076940465,
+              "realized_below_q10": true,
+              "scenario_mean_score": 56.323256265446005,
+              "scenario_standard_deviation": 11.860949698778468
+            }
+          },
+          "3": {
+            "block_arm": {
+              "probability_integral_transform": 0.05,
+              "q10_score": 41.9892902381,
+              "realized_below_q10": true,
+              "scenario_mean_score": 56.348392640338005,
+              "scenario_standard_deviation": 11.958560304636352
+            },
+            "candidate": {
+              "probability_integral_transform": 0.035,
+              "q10_score": 42.643833336600004,
+              "realized_below_q10": true,
+              "scenario_mean_score": 55.977991054296,
+              "scenario_standard_deviation": 11.288970650602984
+            }
+          },
+          "4": {
+            "block_arm": {
+              "probability_integral_transform": 0.058,
+              "q10_score": 41.7861632278,
+              "realized_below_q10": true,
+              "scenario_mean_score": 56.276528659649,
+              "scenario_standard_deviation": 12.4175480004531
+            },
+            "candidate": {
+              "probability_integral_transform": 0.049,
+              "q10_score": 41.9733548198,
+              "realized_below_q10": true,
+              "scenario_mean_score": 56.229822244527,
+              "scenario_standard_deviation": 11.94060714364485
+            }
+          },
+          "5": {
+            "block_arm": {
+              "probability_integral_transform": 0.051,
+              "q10_score": 42.2441640824,
+              "realized_below_q10": true,
+              "scenario_mean_score": 56.649705987509996,
+              "scenario_standard_deviation": 11.822569595055779
+            },
+            "candidate": {
+              "probability_integral_transform": 0.046,
+              "q10_score": 42.4726720728,
+              "realized_below_q10": true,
+              "scenario_mean_score": 56.646075328912,
+              "scenario_standard_deviation": 11.962897123810961
+            }
+          },
+          "6": {
+            "block_arm": {
+              "probability_integral_transform": 0.054,
+              "q10_score": 42.193802982600005,
+              "realized_below_q10": true,
+              "scenario_mean_score": 55.984748641397005,
+              "scenario_standard_deviation": 11.74595905904256
+            },
+            "candidate": {
+              "probability_integral_transform": 0.056,
+              "q10_score": 42.1303681076,
+              "realized_below_q10": true,
+              "scenario_mean_score": 56.212319603336,
+              "scenario_standard_deviation": 11.783328402802766
+            }
+          },
+          "7": {
+            "block_arm": {
+              "probability_integral_transform": 0.043,
+              "q10_score": 41.842779665500004,
+              "realized_below_q10": true,
+              "scenario_mean_score": 55.993264002216,
+              "scenario_standard_deviation": 11.59436702203497
+            },
+            "candidate": {
+              "probability_integral_transform": 0.057,
+              "q10_score": 41.5487329787,
+              "realized_below_q10": true,
+              "scenario_mean_score": 55.601212315525004,
+              "scenario_standard_deviation": 11.877443777495186
+            }
+          },
+          "8": {
+            "block_arm": {
+              "probability_integral_transform": 0.044,
+              "q10_score": 42.5142830696,
+              "realized_below_q10": true,
+              "scenario_mean_score": 56.254232711922,
+              "scenario_standard_deviation": 12.256916780787172
+            },
+            "candidate": {
+              "probability_integral_transform": 0.06,
+              "q10_score": 41.2332454244,
+              "realized_below_q10": true,
+              "scenario_mean_score": 56.030921230828,
+              "scenario_standard_deviation": 12.077645628412974
+            }
+          },
+          "9": {
+            "block_arm": {
+              "probability_integral_transform": 0.046,
+              "q10_score": 42.4928479233,
+              "realized_below_q10": true,
+              "scenario_mean_score": 56.591170162580006,
+              "scenario_standard_deviation": 12.47419091963638
+            },
+            "candidate": {
+              "probability_integral_transform": 0.056,
+              "q10_score": 41.3662756597,
+              "realized_below_q10": true,
+              "scenario_mean_score": 55.70126191825399,
+              "scenario_standard_deviation": 11.778465410835366
+            }
+          }
+        }
+      },
+      "2022-23-gw18": {
+        "flags_by_seed": {
+          "block_arm": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "candidate": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "realized_score": 44.0,
+        "seeds": {
+          "0": {
+            "block_arm": {
+              "probability_integral_transform": 0.121,
+              "q10_score": 43.0516326752,
+              "realized_below_q10": false,
+              "scenario_mean_score": 57.526013445033,
+              "scenario_standard_deviation": 12.31583168754993
+            },
+            "candidate": {
+              "probability_integral_transform": 0.117,
+              "q10_score": 43.0608369941,
+              "realized_below_q10": false,
+              "scenario_mean_score": 57.020504334388,
+              "scenario_standard_deviation": 11.636818201660352
+            }
+          },
+          "1": {
+            "block_arm": {
+              "probability_integral_transform": 0.135,
+              "q10_score": 42.8835488248,
+              "realized_below_q10": false,
+              "scenario_mean_score": 57.780321994879,
+              "scenario_standard_deviation": 12.124796557858799
+            },
+            "candidate": {
+              "probability_integral_transform": 0.128,
+              "q10_score": 43.0092197907,
+              "realized_below_q10": false,
+              "scenario_mean_score": 57.382610388416,
+              "scenario_standard_deviation": 11.989671189713567
+            }
+          },
+          "2": {
+            "block_arm": {
+              "probability_integral_transform": 0.127,
+              "q10_score": 42.7146682034,
+              "realized_below_q10": false,
+              "scenario_mean_score": 57.531928149608,
+              "scenario_standard_deviation": 12.372085108276085
+            },
+            "candidate": {
+              "probability_integral_transform": 0.133,
+              "q10_score": 42.54227838930001,
+              "realized_below_q10": false,
+              "scenario_mean_score": 56.899764905612,
+              "scenario_standard_deviation": 12.227618759187363
+            }
+          },
+          "3": {
+            "block_arm": {
+              "probability_integral_transform": 0.138,
+              "q10_score": 42.310704991,
+              "realized_below_q10": false,
+              "scenario_mean_score": 56.852291151398994,
+              "scenario_standard_deviation": 11.81411131607985
+            },
+            "candidate": {
+              "probability_integral_transform": 0.15,
+              "q10_score": 42.0289112698,
+              "realized_below_q10": false,
+              "scenario_mean_score": 56.515855802133,
+              "scenario_standard_deviation": 11.992396365064929
+            }
+          },
+          "4": {
+            "block_arm": {
+              "probability_integral_transform": 0.132,
+              "q10_score": 42.583835447999995,
+              "realized_below_q10": false,
+              "scenario_mean_score": 57.491985367506,
+              "scenario_standard_deviation": 12.181704827780113
+            },
+            "candidate": {
+              "probability_integral_transform": 0.126,
+              "q10_score": 42.952365221,
+              "realized_below_q10": false,
+              "scenario_mean_score": 57.51117821157499,
+              "scenario_standard_deviation": 12.37468493772052
+            }
+          },
+          "5": {
+            "block_arm": {
+              "probability_integral_transform": 0.125,
+              "q10_score": 42.5172560728,
+              "realized_below_q10": false,
+              "scenario_mean_score": 57.294294026769,
+              "scenario_standard_deviation": 12.273696324117857
+            },
+            "candidate": {
+              "probability_integral_transform": 0.126,
+              "q10_score": 42.9162818686,
+              "realized_below_q10": false,
+              "scenario_mean_score": 56.875836537912996,
+              "scenario_standard_deviation": 11.505756491811361
+            }
+          },
+          "6": {
+            "block_arm": {
+              "probability_integral_transform": 0.113,
+              "q10_score": 43.1068819014,
+              "realized_below_q10": false,
+              "scenario_mean_score": 57.443704563505,
+              "scenario_standard_deviation": 11.91342906576499
+            },
+            "candidate": {
+              "probability_integral_transform": 0.128,
+              "q10_score": 42.7802878214,
+              "realized_below_q10": false,
+              "scenario_mean_score": 56.855064303612004,
+              "scenario_standard_deviation": 11.61896939111869
+            }
+          },
+          "7": {
+            "block_arm": {
+              "probability_integral_transform": 0.126,
+              "q10_score": 42.7581079915,
+              "realized_below_q10": false,
+              "scenario_mean_score": 56.877898411087,
+              "scenario_standard_deviation": 11.942535608162556
+            },
+            "candidate": {
+              "probability_integral_transform": 0.122,
+              "q10_score": 42.787567581400005,
+              "realized_below_q10": false,
+              "scenario_mean_score": 57.20352679146,
+              "scenario_standard_deviation": 12.207145920384026
+            }
+          },
+          "8": {
+            "block_arm": {
+              "probability_integral_transform": 0.114,
+              "q10_score": 43.4593640842,
+              "realized_below_q10": false,
+              "scenario_mean_score": 57.474533544113,
+              "scenario_standard_deviation": 12.034355118552318
+            },
+            "candidate": {
+              "probability_integral_transform": 0.12,
+              "q10_score": 43.158086135199994,
+              "realized_below_q10": false,
+              "scenario_mean_score": 57.155007619568,
+              "scenario_standard_deviation": 11.660962720814872
+            }
+          },
+          "9": {
+            "block_arm": {
+              "probability_integral_transform": 0.133,
+              "q10_score": 42.862864764,
+              "realized_below_q10": false,
+              "scenario_mean_score": 57.43698384861399,
+              "scenario_standard_deviation": 12.229508068085
+            },
+            "candidate": {
+              "probability_integral_transform": 0.132,
+              "q10_score": 42.6182969722,
+              "realized_below_q10": false,
+              "scenario_mean_score": 56.92825509238901,
+              "scenario_standard_deviation": 12.074274023725438
+            }
+          }
+        }
+      },
+      "2022-23-gw30": {
+        "flags_by_seed": {
+          "block_arm": [
+            0,
+            0,
+            1,
+            0,
+            0,
+            1,
+            1,
+            0,
+            0,
+            1
+          ],
+          "candidate": [
+            0,
+            0,
+            0,
+            1,
+            0,
+            1,
+            1,
+            0,
+            0,
+            1
+          ]
+        },
+        "realized_score": 50.0,
+        "seeds": {
+          "0": {
+            "block_arm": {
+              "probability_integral_transform": 0.108,
+              "q10_score": 49.5475418475,
+              "realized_below_q10": false,
+              "scenario_mean_score": 64.088146721852,
+              "scenario_standard_deviation": 12.072985533618814
+            },
+            "candidate": {
+              "probability_integral_transform": 0.103,
+              "q10_score": 49.6697779207,
+              "realized_below_q10": false,
+              "scenario_mean_score": 64.255043132227,
+              "scenario_standard_deviation": 12.193657796541599
+            }
+          },
+          "1": {
+            "block_arm": {
+              "probability_integral_transform": 0.107,
+              "q10_score": 49.8027352545,
+              "realized_below_q10": false,
+              "scenario_mean_score": 63.907571556113,
+              "scenario_standard_deviation": 11.606826535855689
+            },
+            "candidate": {
+              "probability_integral_transform": 0.104,
+              "q10_score": 49.8303452307,
+              "realized_below_q10": false,
+              "scenario_mean_score": 64.32658336223899,
+              "scenario_standard_deviation": 11.969343971440976
+            }
+          },
+          "2": {
+            "block_arm": {
+              "probability_integral_transform": 0.099,
+              "q10_score": 50.0989753934,
+              "realized_below_q10": true,
+              "scenario_mean_score": 63.912996910413,
+              "scenario_standard_deviation": 11.684774810700347
+            },
+            "candidate": {
+              "probability_integral_transform": 0.11,
+              "q10_score": 49.69602195,
+              "realized_below_q10": false,
+              "scenario_mean_score": 64.03951093663001,
+              "scenario_standard_deviation": 12.36022161948526
+            }
+          },
+          "3": {
+            "block_arm": {
+              "probability_integral_transform": 0.11,
+              "q10_score": 49.6137500089,
+              "realized_below_q10": false,
+              "scenario_mean_score": 64.671876855675,
+              "scenario_standard_deviation": 12.758414960819517
+            },
+            "candidate": {
+              "probability_integral_transform": 0.093,
+              "q10_score": 50.6324426096,
+              "realized_below_q10": true,
+              "scenario_mean_score": 65.04883671233999,
+              "scenario_standard_deviation": 12.467089312982406
+            }
+          },
+          "4": {
+            "block_arm": {
+              "probability_integral_transform": 0.102,
+              "q10_score": 49.76077190749999,
+              "realized_below_q10": false,
+              "scenario_mean_score": 64.190799612586,
+              "scenario_standard_deviation": 11.663981868333101
+            },
+            "candidate": {
+              "probability_integral_transform": 0.106,
+              "q10_score": 49.5960826896,
+              "realized_below_q10": false,
+              "scenario_mean_score": 64.61945467659599,
+              "scenario_standard_deviation": 12.309810887957541
+            }
+          },
+          "5": {
+            "block_arm": {
+              "probability_integral_transform": 0.089,
+              "q10_score": 50.718790063,
+              "realized_below_q10": true,
+              "scenario_mean_score": 65.194169585458,
+              "scenario_standard_deviation": 12.64354784408269
+            },
+            "candidate": {
+              "probability_integral_transform": 0.091,
+              "q10_score": 50.412417856299996,
+              "realized_below_q10": true,
+              "scenario_mean_score": 64.58904308888,
+              "scenario_standard_deviation": 12.353347629269155
+            }
+          },
+          "6": {
+            "block_arm": {
+              "probability_integral_transform": 0.097,
+              "q10_score": 50.1434240524,
+              "realized_below_q10": true,
+              "scenario_mean_score": 64.851466262976,
+              "scenario_standard_deviation": 12.158969330372635
+            },
+            "candidate": {
+              "probability_integral_transform": 0.1,
+              "q10_score": 50.004426201,
+              "realized_below_q10": true,
+              "scenario_mean_score": 64.635602521442,
+              "scenario_standard_deviation": 12.101649289525502
+            }
+          },
+          "7": {
+            "block_arm": {
+              "probability_integral_transform": 0.114,
+              "q10_score": 49.6089661464,
+              "realized_below_q10": false,
+              "scenario_mean_score": 64.620718707913,
+              "scenario_standard_deviation": 12.226680470563867
+            },
+            "candidate": {
+              "probability_integral_transform": 0.104,
+              "q10_score": 49.8046059527,
+              "realized_below_q10": false,
+              "scenario_mean_score": 64.219528748361,
+              "scenario_standard_deviation": 12.290563787696662
+            }
+          },
+          "8": {
+            "block_arm": {
+              "probability_integral_transform": 0.103,
+              "q10_score": 49.8745469924,
+              "realized_below_q10": false,
+              "scenario_mean_score": 63.852319312488994,
+              "scenario_standard_deviation": 11.689397876218003
+            },
+            "candidate": {
+              "probability_integral_transform": 0.11,
+              "q10_score": 49.5830481732,
+              "realized_below_q10": false,
+              "scenario_mean_score": 63.923627201267,
+              "scenario_standard_deviation": 12.255553428507774
+            }
+          },
+          "9": {
+            "block_arm": {
+              "probability_integral_transform": 0.093,
+              "q10_score": 50.3605360593,
+              "realized_below_q10": true,
+              "scenario_mean_score": 64.61738816396,
+              "scenario_standard_deviation": 12.008695492646794
+            },
+            "candidate": {
+              "probability_integral_transform": 0.1,
+              "q10_score": 50.0114976642,
+              "realized_below_q10": true,
+              "scenario_mean_score": 64.025295805903,
+              "scenario_standard_deviation": 12.033162611646567
+            }
+          }
+        }
+      },
+      "2022-23-gw37": {
+        "flags_by_seed": {
+          "block_arm": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "candidate": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "realized_score": 66.0,
+        "seeds": {
+          "0": {
+            "block_arm": {
+              "probability_integral_transform": 0.111,
+              "q10_score": 65.4508832153,
+              "realized_below_q10": false,
+              "scenario_mean_score": 83.93704566630299,
+              "scenario_standard_deviation": 16.034084232760392
+            },
+            "candidate": {
+              "probability_integral_transform": 0.123,
+              "q10_score": 64.8672637587,
+              "realized_below_q10": false,
+              "scenario_mean_score": 83.467049238559,
+              "scenario_standard_deviation": 16.16768678501436
+            }
+          },
+          "1": {
+            "block_arm": {
+              "probability_integral_transform": 0.123,
+              "q10_score": 64.49857162549999,
+              "realized_below_q10": false,
+              "scenario_mean_score": 83.43676084232101,
+              "scenario_standard_deviation": 15.943384325397181
+            },
+            "candidate": {
+              "probability_integral_transform": 0.102,
+              "q10_score": 65.7683061598,
+              "realized_below_q10": false,
+              "scenario_mean_score": 84.462319689355,
+              "scenario_standard_deviation": 16.208413187031006
+            }
+          },
+          "2": {
+            "block_arm": {
+              "probability_integral_transform": 0.101,
+              "q10_score": 65.888683194,
+              "realized_below_q10": false,
+              "scenario_mean_score": 83.792997811867,
+              "scenario_standard_deviation": 15.833560237148737
+            },
+            "candidate": {
+              "probability_integral_transform": 0.104,
+              "q10_score": 65.9542057884,
+              "realized_below_q10": false,
+              "scenario_mean_score": 84.16742784087701,
+              "scenario_standard_deviation": 15.691029882861272
+            }
+          },
+          "3": {
+            "block_arm": {
+              "probability_integral_transform": 0.119,
+              "q10_score": 64.6767752912,
+              "realized_below_q10": false,
+              "scenario_mean_score": 83.10323887934501,
+              "scenario_standard_deviation": 15.258768681134567
+            },
+            "candidate": {
+              "probability_integral_transform": 0.123,
+              "q10_score": 64.6462274067,
+              "realized_below_q10": false,
+              "scenario_mean_score": 83.32238724759,
+              "scenario_standard_deviation": 16.10931460013963
+            }
+          },
+          "4": {
+            "block_arm": {
+              "probability_integral_transform": 0.121,
+              "q10_score": 64.6275159468,
+              "realized_below_q10": false,
+              "scenario_mean_score": 82.800097416281,
+              "scenario_standard_deviation": 16.062114271083633
+            },
+            "candidate": {
+              "probability_integral_transform": 0.114,
+              "q10_score": 65.3265386406,
+              "realized_below_q10": false,
+              "scenario_mean_score": 83.23287517886399,
+              "scenario_standard_deviation": 15.678693238292393
+            }
+          },
+          "5": {
+            "block_arm": {
+              "probability_integral_transform": 0.115,
+              "q10_score": 65.1059868081,
+              "realized_below_q10": false,
+              "scenario_mean_score": 82.83271226762999,
+              "scenario_standard_deviation": 16.030212408613036
+            },
+            "candidate": {
+              "probability_integral_transform": 0.108,
+              "q10_score": 65.6336657727,
+              "realized_below_q10": false,
+              "scenario_mean_score": 83.608299978992,
+              "scenario_standard_deviation": 16.212628538613554
+            }
+          },
+          "6": {
+            "block_arm": {
+              "probability_integral_transform": 0.133,
+              "q10_score": 63.89290230500001,
+              "realized_below_q10": false,
+              "scenario_mean_score": 83.20288405219102,
+              "scenario_standard_deviation": 16.378762576542808
+            },
+            "candidate": {
+              "probability_integral_transform": 0.118,
+              "q10_score": 64.8735965481,
+              "realized_below_q10": false,
+              "scenario_mean_score": 83.380040239818,
+              "scenario_standard_deviation": 16.088388802408595
+            }
+          },
+          "7": {
+            "block_arm": {
+              "probability_integral_transform": 0.11,
+              "q10_score": 65.39702682000001,
+              "realized_below_q10": false,
+              "scenario_mean_score": 83.194414307258,
+              "scenario_standard_deviation": 15.786151792137991
+            },
+            "candidate": {
+              "probability_integral_transform": 0.102,
+              "q10_score": 65.8341511669,
+              "realized_below_q10": false,
+              "scenario_mean_score": 83.758997315756,
+              "scenario_standard_deviation": 15.89075622154019
+            }
+          },
+          "8": {
+            "block_arm": {
+              "probability_integral_transform": 0.105,
+              "q10_score": 65.5578201868,
+              "realized_below_q10": false,
+              "scenario_mean_score": 84.51190437434501,
+              "scenario_standard_deviation": 16.209583512479995
+            },
+            "candidate": {
+              "probability_integral_transform": 0.109,
+              "q10_score": 64.8553567705,
+              "realized_below_q10": false,
+              "scenario_mean_score": 83.997879512681,
+              "scenario_standard_deviation": 16.110674718371538
+            }
+          },
+          "9": {
+            "block_arm": {
+              "probability_integral_transform": 0.119,
+              "q10_score": 64.465665419,
+              "realized_below_q10": false,
+              "scenario_mean_score": 83.69417520576701,
+              "scenario_standard_deviation": 16.069204984385756
+            },
+            "candidate": {
+              "probability_integral_transform": 0.132,
+              "q10_score": 64.055905648,
+              "realized_below_q10": false,
+              "scenario_mean_score": 83.782401893016,
+              "scenario_standard_deviation": 16.96946440214662
+            }
+          }
+        }
+      },
+      "2023-24-gw05": {
+        "flags_by_seed": {
+          "block_arm": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "candidate": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "realized_score": 44.0,
+        "seeds": {
+          "0": {
+            "block_arm": {
+              "probability_integral_transform": 0.125,
+              "q10_score": 42.7622385271,
+              "realized_below_q10": false,
+              "scenario_mean_score": 57.74660207943,
+              "scenario_standard_deviation": 12.37899540976689
+            },
+            "candidate": {
+              "probability_integral_transform": 0.129,
+              "q10_score": 43.1678491686,
+              "realized_below_q10": false,
+              "scenario_mean_score": 57.65585961565199,
+              "scenario_standard_deviation": 12.171209821494125
+            }
+          },
+          "1": {
+            "block_arm": {
+              "probability_integral_transform": 0.141,
+              "q10_score": 42.3606714041,
+              "realized_below_q10": false,
+              "scenario_mean_score": 57.013498706763,
+              "scenario_standard_deviation": 12.28070755900256
+            },
+            "candidate": {
+              "probability_integral_transform": 0.138,
+              "q10_score": 42.5895332343,
+              "realized_below_q10": false,
+              "scenario_mean_score": 57.069112101823,
+              "scenario_standard_deviation": 12.18116357517202
+            }
+          },
+          "2": {
+            "block_arm": {
+              "probability_integral_transform": 0.134,
+              "q10_score": 42.979368297,
+              "realized_below_q10": false,
+              "scenario_mean_score": 56.971619176109996,
+              "scenario_standard_deviation": 12.270120208359135
+            },
+            "candidate": {
+              "probability_integral_transform": 0.124,
+              "q10_score": 43.206077744,
+              "realized_below_q10": false,
+              "scenario_mean_score": 56.867383059949006,
+              "scenario_standard_deviation": 12.030998475055767
+            }
+          },
+          "3": {
+            "block_arm": {
+              "probability_integral_transform": 0.138,
+              "q10_score": 42.649799986699996,
+              "realized_below_q10": false,
+              "scenario_mean_score": 57.278929973976005,
+              "scenario_standard_deviation": 12.491160225464828
+            },
+            "candidate": {
+              "probability_integral_transform": 0.157,
+              "q10_score": 41.8210543675,
+              "realized_below_q10": false,
+              "scenario_mean_score": 56.680641848745,
+              "scenario_standard_deviation": 12.396091923805004
+            }
+          },
+          "4": {
+            "block_arm": {
+              "probability_integral_transform": 0.137,
+              "q10_score": 42.5171514872,
+              "realized_below_q10": false,
+              "scenario_mean_score": 56.779075686143,
+              "scenario_standard_deviation": 12.60114057770351
+            },
+            "candidate": {
+              "probability_integral_transform": 0.143,
+              "q10_score": 42.3720538202,
+              "realized_below_q10": false,
+              "scenario_mean_score": 56.64983981457401,
+              "scenario_standard_deviation": 12.298353631510853
+            }
+          },
+          "5": {
+            "block_arm": {
+              "probability_integral_transform": 0.15,
+              "q10_score": 41.750283928900004,
+              "realized_below_q10": false,
+              "scenario_mean_score": 56.766077855725996,
+              "scenario_standard_deviation": 11.934923055710884
+            },
+            "candidate": {
+              "probability_integral_transform": 0.135,
+              "q10_score": 42.4070279657,
+              "realized_below_q10": false,
+              "scenario_mean_score": 56.728332108728,
+              "scenario_standard_deviation": 12.08756423447284
+            }
+          },
+          "6": {
+            "block_arm": {
+              "probability_integral_transform": 0.127,
+              "q10_score": 42.8980001506,
+              "realized_below_q10": false,
+              "scenario_mean_score": 56.656883879287,
+              "scenario_standard_deviation": 11.651793846408282
+            },
+            "candidate": {
+              "probability_integral_transform": 0.153,
+              "q10_score": 41.7601028148,
+              "realized_below_q10": false,
+              "scenario_mean_score": 56.510916178787,
+              "scenario_standard_deviation": 12.326186810180673
+            }
+          },
+          "7": {
+            "block_arm": {
+              "probability_integral_transform": 0.123,
+              "q10_score": 42.9048500136,
+              "realized_below_q10": false,
+              "scenario_mean_score": 57.562045108006004,
+              "scenario_standard_deviation": 12.623713439001872
+            },
+            "candidate": {
+              "probability_integral_transform": 0.131,
+              "q10_score": 42.6575065484,
+              "realized_below_q10": false,
+              "scenario_mean_score": 57.422288003804,
+              "scenario_standard_deviation": 12.71852527705467
+            }
+          },
+          "8": {
+            "block_arm": {
+              "probability_integral_transform": 0.117,
+              "q10_score": 43.3000130728,
+              "realized_below_q10": false,
+              "scenario_mean_score": 57.098160883496995,
+              "scenario_standard_deviation": 11.851002570209355
+            },
+            "candidate": {
+              "probability_integral_transform": 0.109,
+              "q10_score": 43.4106534254,
+              "realized_below_q10": false,
+              "scenario_mean_score": 57.546225377946996,
+              "scenario_standard_deviation": 12.333233611512846
+            }
+          },
+          "9": {
+            "block_arm": {
+              "probability_integral_transform": 0.125,
+              "q10_score": 42.4818662574,
+              "realized_below_q10": false,
+              "scenario_mean_score": 56.906377734656,
+              "scenario_standard_deviation": 11.958204279469818
+            },
+            "candidate": {
+              "probability_integral_transform": 0.13,
+              "q10_score": 42.641731262600004,
+              "realized_below_q10": false,
+              "scenario_mean_score": 57.176180529343,
+              "scenario_standard_deviation": 12.210659184849352
+            }
+          }
+        }
+      },
+      "2023-24-gw19": {
+        "flags_by_seed": {
+          "block_arm": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "candidate": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        "realized_score": 41.0,
+        "seeds": {
+          "0": {
+            "block_arm": {
+              "probability_integral_transform": 0.071,
+              "q10_score": 42.332412273500005,
+              "realized_below_q10": true,
+              "scenario_mean_score": 55.936230851328,
+              "scenario_standard_deviation": 11.459548529011496
+            },
+            "candidate": {
+              "probability_integral_transform": 0.083,
+              "q10_score": 41.8669393986,
+              "realized_below_q10": true,
+              "scenario_mean_score": 56.05117657956699,
+              "scenario_standard_deviation": 11.966144669388857
+            }
+          },
+          "1": {
+            "block_arm": {
+              "probability_integral_transform": 0.065,
+              "q10_score": 43.002717864,
+              "realized_below_q10": true,
+              "scenario_mean_score": 55.971203666945996,
+              "scenario_standard_deviation": 11.756713380547744
+            },
+            "candidate": {
+              "probability_integral_transform": 0.08,
+              "q10_score": 42.041067780599995,
+              "realized_below_q10": true,
+              "scenario_mean_score": 55.530319998545,
+              "scenario_standard_deviation": 11.9557993406944
+            }
+          },
+          "2": {
+            "block_arm": {
+              "probability_integral_transform": 0.073,
+              "q10_score": 42.4269776215,
+              "realized_below_q10": true,
+              "scenario_mean_score": 56.735990586004,
+              "scenario_standard_deviation": 12.382401378869814
+            },
+            "candidate": {
+              "probability_integral_transform": 0.088,
+              "q10_score": 41.9700305057,
+              "realized_below_q10": true,
+              "scenario_mean_score": 56.221300137346,
+              "scenario_standard_deviation": 11.866358777518297
+            }
+          },
+          "3": {
+            "block_arm": {
+              "probability_integral_transform": 0.061,
+              "q10_score": 42.859691614300004,
+              "realized_below_q10": true,
+              "scenario_mean_score": 56.09962676708199,
+              "scenario_standard_deviation": 11.294982923629126
+            },
+            "candidate": {
+              "probability_integral_transform": 0.067,
+              "q10_score": 43.5084445786,
+              "realized_below_q10": true,
+              "scenario_mean_score": 56.20239159084999,
+              "scenario_standard_deviation": 11.547044626282508
+            }
+          },
+          "4": {
+            "block_arm": {
+              "probability_integral_transform": 0.074,
+              "q10_score": 42.3962377493,
+              "realized_below_q10": true,
+              "scenario_mean_score": 56.642378667957,
+              "scenario_standard_deviation": 11.72326074035595
+            },
+            "candidate": {
+              "probability_integral_transform": 0.08,
+              "q10_score": 41.989992317500004,
+              "realized_below_q10": true,
+              "scenario_mean_score": 56.53485778828801,
+              "scenario_standard_deviation": 11.822523463258616
+            }
+          },
+          "5": {
+            "block_arm": {
+              "probability_integral_transform": 0.072,
+              "q10_score": 42.533502823000006,
+              "realized_below_q10": true,
+              "scenario_mean_score": 56.423816885009,
+              "scenario_standard_deviation": 11.516814585784331
+            },
+            "candidate": {
+              "probability_integral_transform": 0.079,
+              "q10_score": 42.0565455924,
+              "realized_below_q10": true,
+              "scenario_mean_score": 56.376496626497996,
+              "scenario_standard_deviation": 12.00829892868555
+            }
+          },
+          "6": {
+            "block_arm": {
+              "probability_integral_transform": 0.081,
+              "q10_score": 42.04351258,
+              "realized_below_q10": true,
+              "scenario_mean_score": 55.397308301253,
+              "scenario_standard_deviation": 11.226847355462507
+            },
+            "candidate": {
+              "probability_integral_transform": 0.085,
+              "q10_score": 41.6223560673,
+              "realized_below_q10": true,
+              "scenario_mean_score": 55.50894956119701,
+              "scenario_standard_deviation": 11.756950268783784
+            }
+          },
+          "7": {
+            "block_arm": {
+              "probability_integral_transform": 0.07,
+              "q10_score": 42.7320230845,
+              "realized_below_q10": true,
+              "scenario_mean_score": 56.389328391811006,
+              "scenario_standard_deviation": 11.853530104743387
+            },
+            "candidate": {
+              "probability_integral_transform": 0.08,
+              "q10_score": 41.742365082300005,
+              "realized_below_q10": true,
+              "scenario_mean_score": 55.767277397883,
+              "scenario_standard_deviation": 11.828878317610345
+            }
+          },
+          "8": {
+            "block_arm": {
+              "probability_integral_transform": 0.089,
+              "q10_score": 41.553190575500004,
+              "realized_below_q10": true,
+              "scenario_mean_score": 55.317005472493,
+              "scenario_standard_deviation": 11.375582253227877
+            },
+            "candidate": {
+              "probability_integral_transform": 0.076,
+              "q10_score": 42.1736143231,
+              "realized_below_q10": true,
+              "scenario_mean_score": 56.23800241203399,
+              "scenario_standard_deviation": 11.942429312729617
+            }
+          },
+          "9": {
+            "block_arm": {
+              "probability_integral_transform": 0.079,
+              "q10_score": 42.3746216901,
+              "realized_below_q10": true,
+              "scenario_mean_score": 56.160275882457,
+              "scenario_standard_deviation": 11.924168478422695
+            },
+            "candidate": {
+              "probability_integral_transform": 0.083,
+              "q10_score": 41.690395411599994,
+              "realized_below_q10": true,
+              "scenario_mean_score": 55.636490665996995,
+              "scenario_standard_deviation": 11.43517659542717
+            }
+          }
+        }
+      },
+      "2023-24-gw30": {
+        "flags_by_seed": {
+          "block_arm": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            0,
+            0,
+            1
+          ],
+          "candidate": [
+            0,
+            0,
+            1,
+            1,
+            1,
+            0,
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        "realized_score": 46.0,
+        "seeds": {
+          "0": {
+            "block_arm": {
+              "probability_integral_transform": 0.086,
+              "q10_score": 46.5750540518,
+              "realized_below_q10": true,
+              "scenario_mean_score": 61.77315770982,
+              "scenario_standard_deviation": 13.105095719754178
+            },
+            "candidate": {
+              "probability_integral_transform": 0.101,
+              "q10_score": 45.9474336453,
+              "realized_below_q10": false,
+              "scenario_mean_score": 61.627761634576004,
+              "scenario_standard_deviation": 13.066869310833885
+            }
+          },
+          "1": {
+            "block_arm": {
+              "probability_integral_transform": 0.096,
+              "q10_score": 46.1012843805,
+              "realized_below_q10": true,
+              "scenario_mean_score": 61.393003182456994,
+              "scenario_standard_deviation": 13.230696293456914
+            },
+            "candidate": {
+              "probability_integral_transform": 0.109,
+              "q10_score": 45.3305387695,
+              "realized_below_q10": false,
+              "scenario_mean_score": 60.985488465466,
+              "scenario_standard_deviation": 12.878415205456964
+            }
+          },
+          "2": {
+            "block_arm": {
+              "probability_integral_transform": 0.087,
+              "q10_score": 46.8028435537,
+              "realized_below_q10": true,
+              "scenario_mean_score": 61.380167044189996,
+              "scenario_standard_deviation": 12.578162262400756
+            },
+            "candidate": {
+              "probability_integral_transform": 0.092,
+              "q10_score": 46.4340256274,
+              "realized_below_q10": true,
+              "scenario_mean_score": 61.20136834655,
+              "scenario_standard_deviation": 12.737632479177856
+            }
+          },
+          "3": {
+            "block_arm": {
+              "probability_integral_transform": 0.084,
+              "q10_score": 46.954611298299994,
+              "realized_below_q10": true,
+              "scenario_mean_score": 60.584918393946005,
+              "scenario_standard_deviation": 12.213964475557999
+            },
+            "candidate": {
+              "probability_integral_transform": 0.099,
+              "q10_score": 46.034702403800004,
+              "realized_below_q10": true,
+              "scenario_mean_score": 60.959355450775,
+              "scenario_standard_deviation": 12.497751151298942
+            }
+          },
+          "4": {
+            "block_arm": {
+              "probability_integral_transform": 0.09,
+              "q10_score": 46.7414362749,
+              "realized_below_q10": true,
+              "scenario_mean_score": 61.727422522522,
+              "scenario_standard_deviation": 12.54303271608762
+            },
+            "candidate": {
+              "probability_integral_transform": 0.09,
+              "q10_score": 46.6169652103,
+              "realized_below_q10": true,
+              "scenario_mean_score": 61.312250641349,
+              "scenario_standard_deviation": 12.626974055476884
+            }
+          },
+          "5": {
+            "block_arm": {
+              "probability_integral_transform": 0.099,
+              "q10_score": 46.0229640737,
+              "realized_below_q10": true,
+              "scenario_mean_score": 61.26844813465699,
+              "scenario_standard_deviation": 12.736959630637424
+            },
+            "candidate": {
+              "probability_integral_transform": 0.123,
+              "q10_score": 45.070377083800004,
+              "realized_below_q10": false,
+              "scenario_mean_score": 60.585491942942,
+              "scenario_standard_deviation": 12.795642540223264
+            }
+          },
+          "6": {
+            "block_arm": {
+              "probability_integral_transform": 0.094,
+              "q10_score": 46.3712403033,
+              "realized_below_q10": true,
+              "scenario_mean_score": 61.164093702999004,
+              "scenario_standard_deviation": 12.460389815042987
+            },
+            "candidate": {
+              "probability_integral_transform": 0.099,
+              "q10_score": 46.026021224000004,
+              "realized_below_q10": true,
+              "scenario_mean_score": 61.38581960720201,
+              "scenario_standard_deviation": 12.463422768763497
+            }
+          },
+          "7": {
+            "block_arm": {
+              "probability_integral_transform": 0.105,
+              "q10_score": 45.7472512434,
+              "realized_below_q10": false,
+              "scenario_mean_score": 60.844708705034,
+              "scenario_standard_deviation": 12.41031495093179
+            },
+            "candidate": {
+              "probability_integral_transform": 0.1,
+              "q10_score": 46.005619685999996,
+              "realized_below_q10": true,
+              "scenario_mean_score": 60.742359018693996,
+              "scenario_standard_deviation": 12.298590253324909
+            }
+          },
+          "8": {
+            "block_arm": {
+              "probability_integral_transform": 0.103,
+              "q10_score": 45.809731465700004,
+              "realized_below_q10": false,
+              "scenario_mean_score": 60.484830394413,
+              "scenario_standard_deviation": 12.243132140183512
+            },
+            "candidate": {
+              "probability_integral_transform": 0.093,
+              "q10_score": 46.5004272384,
+              "realized_below_q10": true,
+              "scenario_mean_score": 61.199793575948,
+              "scenario_standard_deviation": 12.50629747152074
+            }
+          },
+          "9": {
+            "block_arm": {
+              "probability_integral_transform": 0.096,
+              "q10_score": 46.380485398000005,
+              "realized_below_q10": true,
+              "scenario_mean_score": 60.950260933746996,
+              "scenario_standard_deviation": 12.747417670245959
+            },
+            "candidate": {
+              "probability_integral_transform": 0.084,
+              "q10_score": 46.802664779500006,
+              "realized_below_q10": true,
+              "scenario_mean_score": 60.575002784836,
+              "scenario_standard_deviation": 12.09605609343058
+            }
+          }
+        }
+      },
+      "2023-24-gw38": {
+        "flags_by_seed": {
+          "block_arm": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            0
+          ],
+          "candidate": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "realized_score": 54.0,
+        "seeds": {
+          "0": {
+            "block_arm": {
+              "probability_integral_transform": 0.133,
+              "q10_score": 52.7346054565,
+              "realized_below_q10": false,
+              "scenario_mean_score": 67.941894155714,
+              "scenario_standard_deviation": 12.590490739490674
+            },
+            "candidate": {
+              "probability_integral_transform": 0.122,
+              "q10_score": 52.9272713989,
+              "realized_below_q10": false,
+              "scenario_mean_score": 68.260483146969,
+              "scenario_standard_deviation": 12.945399432531962
+            }
+          },
+          "1": {
+            "block_arm": {
+              "probability_integral_transform": 0.113,
+              "q10_score": 53.320704155,
+              "realized_below_q10": false,
+              "scenario_mean_score": 67.96945343397499,
+              "scenario_standard_deviation": 12.674519577127116
+            },
+            "candidate": {
+              "probability_integral_transform": 0.131,
+              "q10_score": 52.595334143799995,
+              "realized_below_q10": false,
+              "scenario_mean_score": 67.288097148612,
+              "scenario_standard_deviation": 12.385579268006381
+            }
+          },
+          "2": {
+            "block_arm": {
+              "probability_integral_transform": 0.112,
+              "q10_score": 53.4724933856,
+              "realized_below_q10": false,
+              "scenario_mean_score": 68.55424134770999,
+              "scenario_standard_deviation": 12.888551621010315
+            },
+            "candidate": {
+              "probability_integral_transform": 0.115,
+              "q10_score": 53.2355523962,
+              "realized_below_q10": false,
+              "scenario_mean_score": 68.18149379898,
+              "scenario_standard_deviation": 12.681920918058639
+            }
+          },
+          "3": {
+            "block_arm": {
+              "probability_integral_transform": 0.111,
+              "q10_score": 53.4836783257,
+              "realized_below_q10": false,
+              "scenario_mean_score": 68.266310021937,
+              "scenario_standard_deviation": 12.604702131355005
+            },
+            "candidate": {
+              "probability_integral_transform": 0.113,
+              "q10_score": 53.4062216481,
+              "realized_below_q10": false,
+              "scenario_mean_score": 68.475899374471,
+              "scenario_standard_deviation": 12.57289317957426
+            }
+          },
+          "4": {
+            "block_arm": {
+              "probability_integral_transform": 0.112,
+              "q10_score": 52.8513350399,
+              "realized_below_q10": false,
+              "scenario_mean_score": 67.8768546587,
+              "scenario_standard_deviation": 12.244821121229366
+            },
+            "candidate": {
+              "probability_integral_transform": 0.111,
+              "q10_score": 53.4102492191,
+              "realized_below_q10": false,
+              "scenario_mean_score": 67.80961834371399,
+              "scenario_standard_deviation": 12.54178991435545
+            }
+          },
+          "5": {
+            "block_arm": {
+              "probability_integral_transform": 0.099,
+              "q10_score": 54.0146355395,
+              "realized_below_q10": true,
+              "scenario_mean_score": 68.10803995885401,
+              "scenario_standard_deviation": 12.32015837040638
+            },
+            "candidate": {
+              "probability_integral_transform": 0.123,
+              "q10_score": 52.8631182212,
+              "realized_below_q10": false,
+              "scenario_mean_score": 68.082585128854,
+              "scenario_standard_deviation": 11.951223805029448
+            }
+          },
+          "6": {
+            "block_arm": {
+              "probability_integral_transform": 0.114,
+              "q10_score": 53.476390787,
+              "realized_below_q10": false,
+              "scenario_mean_score": 68.032474841759,
+              "scenario_standard_deviation": 12.431508412822325
+            },
+            "candidate": {
+              "probability_integral_transform": 0.123,
+              "q10_score": 53.0252918492,
+              "realized_below_q10": false,
+              "scenario_mean_score": 67.812563386556,
+              "scenario_standard_deviation": 12.315213669549504
+            }
+          },
+          "7": {
+            "block_arm": {
+              "probability_integral_transform": 0.117,
+              "q10_score": 53.082779286000005,
+              "realized_below_q10": false,
+              "scenario_mean_score": 67.291240551217,
+              "scenario_standard_deviation": 11.720737822778554
+            },
+            "candidate": {
+              "probability_integral_transform": 0.122,
+              "q10_score": 53.2402073612,
+              "realized_below_q10": false,
+              "scenario_mean_score": 67.59325516295101,
+              "scenario_standard_deviation": 12.191333302520384
+            }
+          },
+          "8": {
+            "block_arm": {
+              "probability_integral_transform": 0.111,
+              "q10_score": 53.561820508,
+              "realized_below_q10": false,
+              "scenario_mean_score": 68.689913869912,
+              "scenario_standard_deviation": 12.853838560279987
+            },
+            "candidate": {
+              "probability_integral_transform": 0.124,
+              "q10_score": 53.1936119838,
+              "realized_below_q10": false,
+              "scenario_mean_score": 68.51273563487501,
+              "scenario_standard_deviation": 12.812285265026066
+            }
+          },
+          "9": {
+            "block_arm": {
+              "probability_integral_transform": 0.103,
+              "q10_score": 53.871981078699996,
+              "realized_below_q10": false,
+              "scenario_mean_score": 68.48257265348799,
+              "scenario_standard_deviation": 12.47646709075656
+            },
+            "candidate": {
+              "probability_integral_transform": 0.113,
+              "q10_score": 53.6400279168,
+              "realized_below_q10": false,
+              "scenario_mean_score": 68.48455506462601,
+              "scenario_standard_deviation": 12.75392869953901
+            }
+          }
+        }
+      },
+      "2024-25-gw06": {
+        "flags_by_seed": {
+          "block_arm": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "candidate": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "realized_score": 49.0,
+        "seeds": {
+          "0": {
+            "block_arm": {
+              "probability_integral_transform": 0.138,
+              "q10_score": 47.192293230400004,
+              "realized_below_q10": false,
+              "scenario_mean_score": 62.078955119674994,
+              "scenario_standard_deviation": 12.378207324997861
+            },
+            "candidate": {
+              "probability_integral_transform": 0.151,
+              "q10_score": 46.6743070156,
+              "realized_below_q10": false,
+              "scenario_mean_score": 61.768539232525,
+              "scenario_standard_deviation": 12.511689583445433
+            }
+          },
+          "1": {
+            "block_arm": {
+              "probability_integral_transform": 0.155,
+              "q10_score": 46.2485294859,
+              "realized_below_q10": false,
+              "scenario_mean_score": 61.286645526941,
+              "scenario_standard_deviation": 12.468574272134472
+            },
+            "candidate": {
+              "probability_integral_transform": 0.161,
+              "q10_score": 46.4237312963,
+              "realized_below_q10": false,
+              "scenario_mean_score": 61.047347902053005,
+              "scenario_standard_deviation": 12.393808157989733
+            }
+          },
+          "2": {
+            "block_arm": {
+              "probability_integral_transform": 0.156,
+              "q10_score": 46.824156329800005,
+              "realized_below_q10": false,
+              "scenario_mean_score": 61.470636614408,
+              "scenario_standard_deviation": 12.465797821317743
+            },
+            "candidate": {
+              "probability_integral_transform": 0.149,
+              "q10_score": 47.1375390019,
+              "realized_below_q10": false,
+              "scenario_mean_score": 61.627319390002,
+              "scenario_standard_deviation": 12.369106524826575
+            }
+          },
+          "3": {
+            "block_arm": {
+              "probability_integral_transform": 0.162,
+              "q10_score": 45.9317392733,
+              "realized_below_q10": false,
+              "scenario_mean_score": 61.40820050945,
+              "scenario_standard_deviation": 12.442182694295726
+            },
+            "candidate": {
+              "probability_integral_transform": 0.148,
+              "q10_score": 46.876034412500005,
+              "realized_below_q10": false,
+              "scenario_mean_score": 62.108258129736,
+              "scenario_standard_deviation": 12.81440137679535
+            }
+          },
+          "4": {
+            "block_arm": {
+              "probability_integral_transform": 0.151,
+              "q10_score": 46.4661766127,
+              "realized_below_q10": false,
+              "scenario_mean_score": 61.731027505363,
+              "scenario_standard_deviation": 12.356872554646195
+            },
+            "candidate": {
+              "probability_integral_transform": 0.143,
+              "q10_score": 46.897951824100005,
+              "realized_below_q10": false,
+              "scenario_mean_score": 61.431816488123005,
+              "scenario_standard_deviation": 12.288688733298489
+            }
+          },
+          "5": {
+            "block_arm": {
+              "probability_integral_transform": 0.157,
+              "q10_score": 47.1184846116,
+              "realized_below_q10": false,
+              "scenario_mean_score": 61.881981894946,
+              "scenario_standard_deviation": 12.584992538578929
+            },
+            "candidate": {
+              "probability_integral_transform": 0.164,
+              "q10_score": 46.5228818722,
+              "realized_below_q10": false,
+              "scenario_mean_score": 61.329565539524005,
+              "scenario_standard_deviation": 12.36733534751192
+            }
+          },
+          "6": {
+            "block_arm": {
+              "probability_integral_transform": 0.134,
+              "q10_score": 47.2857388466,
+              "realized_below_q10": false,
+              "scenario_mean_score": 61.958213470087,
+              "scenario_standard_deviation": 12.119930550427247
+            },
+            "candidate": {
+              "probability_integral_transform": 0.151,
+              "q10_score": 47.3289537683,
+              "realized_below_q10": false,
+              "scenario_mean_score": 61.621193351299,
+              "scenario_standard_deviation": 12.07534598401015
+            }
+          },
+          "7": {
+            "block_arm": {
+              "probability_integral_transform": 0.158,
+              "q10_score": 46.468984291400005,
+              "realized_below_q10": false,
+              "scenario_mean_score": 60.836587996867,
+              "scenario_standard_deviation": 12.355398179113319
+            },
+            "candidate": {
+              "probability_integral_transform": 0.168,
+              "q10_score": 46.575547558800004,
+              "realized_below_q10": false,
+              "scenario_mean_score": 60.881607338675,
+              "scenario_standard_deviation": 12.31578932238786
+            }
+          },
+          "8": {
+            "block_arm": {
+              "probability_integral_transform": 0.137,
+              "q10_score": 47.616951368900004,
+              "realized_below_q10": false,
+              "scenario_mean_score": 61.86646681397001,
+              "scenario_standard_deviation": 12.021373258084825
+            },
+            "candidate": {
+              "probability_integral_transform": 0.125,
+              "q10_score": 47.9274182806,
+              "realized_below_q10": false,
+              "scenario_mean_score": 62.279453532457005,
+              "scenario_standard_deviation": 12.216438377456639
+            }
+          },
+          "9": {
+            "block_arm": {
+              "probability_integral_transform": 0.144,
+              "q10_score": 47.2840034768,
+              "realized_below_q10": false,
+              "scenario_mean_score": 61.885175202165996,
+              "scenario_standard_deviation": 12.40968356622008
+            },
+            "candidate": {
+              "probability_integral_transform": 0.147,
+              "q10_score": 46.820935577700006,
+              "realized_below_q10": false,
+              "scenario_mean_score": 62.136549583589,
+              "scenario_standard_deviation": 12.885342920709498
+            }
+          }
+        }
+      },
+      "2024-25-gw27": {
+        "flags_by_seed": {
+          "block_arm": [
+            0,
+            1,
+            0,
+            1,
+            1,
+            1,
+            1,
+            0,
+            0,
+            0
+          ],
+          "candidate": [
+            0,
+            1,
+            0,
+            1,
+            1,
+            0,
+            0,
+            1,
+            0,
+            0
+          ]
+        },
+        "realized_score": 52.0,
+        "seeds": {
+          "0": {
+            "block_arm": {
+              "probability_integral_transform": 0.12,
+              "q10_score": 51.0153761308,
+              "realized_below_q10": false,
+              "scenario_mean_score": 65.105087921863,
+              "scenario_standard_deviation": 11.259884287520496
+            },
+            "candidate": {
+              "probability_integral_transform": 0.115,
+              "q10_score": 51.4509737697,
+              "realized_below_q10": false,
+              "scenario_mean_score": 65.389792583272,
+              "scenario_standard_deviation": 11.966575189054343
+            }
+          },
+          "1": {
+            "block_arm": {
+              "probability_integral_transform": 0.087,
+              "q10_score": 52.560550809700004,
+              "realized_below_q10": true,
+              "scenario_mean_score": 66.139303274436,
+              "scenario_standard_deviation": 11.980741015643877
+            },
+            "candidate": {
+              "probability_integral_transform": 0.098,
+              "q10_score": 52.088642159799996,
+              "realized_below_q10": true,
+              "scenario_mean_score": 66.202540814128,
+              "scenario_standard_deviation": 12.201765564899242
+            }
+          },
+          "2": {
+            "block_arm": {
+              "probability_integral_transform": 0.101,
+              "q10_score": 51.9807635576,
+              "realized_below_q10": false,
+              "scenario_mean_score": 66.360633328733,
+              "scenario_standard_deviation": 12.247417698596879
+            },
+            "candidate": {
+              "probability_integral_transform": 0.101,
+              "q10_score": 51.9677421085,
+              "realized_below_q10": false,
+              "scenario_mean_score": 65.722675360859,
+              "scenario_standard_deviation": 11.611329985252846
+            }
+          },
+          "3": {
+            "block_arm": {
+              "probability_integral_transform": 0.099,
+              "q10_score": 52.1762450917,
+              "realized_below_q10": true,
+              "scenario_mean_score": 65.472370414758,
+              "scenario_standard_deviation": 11.20815575633851
+            },
+            "candidate": {
+              "probability_integral_transform": 0.099,
+              "q10_score": 52.036126525099995,
+              "realized_below_q10": true,
+              "scenario_mean_score": 65.810947371006,
+              "scenario_standard_deviation": 11.745170008395755
+            }
+          },
+          "4": {
+            "block_arm": {
+              "probability_integral_transform": 0.098,
+              "q10_score": 52.0851138325,
+              "realized_below_q10": true,
+              "scenario_mean_score": 66.364619984945,
+              "scenario_standard_deviation": 12.17326967360088
+            },
+            "candidate": {
+              "probability_integral_transform": 0.099,
+              "q10_score": 52.0106480173,
+              "realized_below_q10": true,
+              "scenario_mean_score": 65.64553168053699,
+              "scenario_standard_deviation": 11.630895184833818
+            }
+          },
+          "5": {
+            "block_arm": {
+              "probability_integral_transform": 0.094,
+              "q10_score": 52.3322912986,
+              "realized_below_q10": true,
+              "scenario_mean_score": 66.54550552966,
+              "scenario_standard_deviation": 11.946998803992297
+            },
+            "candidate": {
+              "probability_integral_transform": 0.103,
+              "q10_score": 51.8455359833,
+              "realized_below_q10": false,
+              "scenario_mean_score": 66.3291475474,
+              "scenario_standard_deviation": 11.94741587436988
+            }
+          },
+          "6": {
+            "block_arm": {
+              "probability_integral_transform": 0.097,
+              "q10_score": 52.028394752800004,
+              "realized_below_q10": true,
+              "scenario_mean_score": 66.118312442504,
+              "scenario_standard_deviation": 11.64265062214741
+            },
+            "candidate": {
+              "probability_integral_transform": 0.111,
+              "q10_score": 51.5318542644,
+              "realized_below_q10": false,
+              "scenario_mean_score": 65.865414520277,
+              "scenario_standard_deviation": 11.966774340848671
+            }
+          },
+          "7": {
+            "block_arm": {
+              "probability_integral_transform": 0.103,
+              "q10_score": 51.766981530500004,
+              "realized_below_q10": false,
+              "scenario_mean_score": 65.603062214277,
+              "scenario_standard_deviation": 11.741298911792502
+            },
+            "candidate": {
+              "probability_integral_transform": 0.098,
+              "q10_score": 52.066785562599996,
+              "realized_below_q10": true,
+              "scenario_mean_score": 65.17885368046699,
+              "scenario_standard_deviation": 11.468060409273656
+            }
+          },
+          "8": {
+            "block_arm": {
+              "probability_integral_transform": 0.11,
+              "q10_score": 51.5212547948,
+              "realized_below_q10": false,
+              "scenario_mean_score": 65.778609481709,
+              "scenario_standard_deviation": 11.942709190844607
+            },
+            "candidate": {
+              "probability_integral_transform": 0.12,
+              "q10_score": 51.1287109501,
+              "realized_below_q10": false,
+              "scenario_mean_score": 65.710300751227,
+              "scenario_standard_deviation": 12.118257090547516
+            }
+          },
+          "9": {
+            "block_arm": {
+              "probability_integral_transform": 0.106,
+              "q10_score": 51.695165125299994,
+              "realized_below_q10": false,
+              "scenario_mean_score": 66.48522998594001,
+              "scenario_standard_deviation": 12.138158530313369
+            },
+            "candidate": {
+              "probability_integral_transform": 0.105,
+              "q10_score": 51.6891200907,
+              "realized_below_q10": false,
+              "scenario_mean_score": 66.209979979427,
+              "scenario_standard_deviation": 11.797340277854326
+            }
+          }
+        }
+      },
+      "2024-25-gw37": {
+        "flags_by_seed": {
+          "block_arm": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            1,
+            1,
+            0
+          ],
+          "candidate": [
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            1,
+            0,
+            0,
+            0
+          ]
+        },
+        "realized_score": 48.0,
+        "seeds": {
+          "0": {
+            "block_arm": {
+              "probability_integral_transform": 0.106,
+              "q10_score": 47.7477022275,
+              "realized_below_q10": false,
+              "scenario_mean_score": 61.36377200225599,
+              "scenario_standard_deviation": 12.004158717300326
+            },
+            "candidate": {
+              "probability_integral_transform": 0.102,
+              "q10_score": 47.9054297345,
+              "realized_below_q10": false,
+              "scenario_mean_score": 61.612895411576,
+              "scenario_standard_deviation": 11.376114419799874
+            }
+          },
+          "1": {
+            "block_arm": {
+              "probability_integral_transform": 0.118,
+              "q10_score": 47.2910079527,
+              "realized_below_q10": false,
+              "scenario_mean_score": 61.196762460938,
+              "scenario_standard_deviation": 11.701778439205517
+            },
+            "candidate": {
+              "probability_integral_transform": 0.101,
+              "q10_score": 47.9663387761,
+              "realized_below_q10": false,
+              "scenario_mean_score": 61.339094541480996,
+              "scenario_standard_deviation": 11.643499378723828
+            }
+          },
+          "2": {
+            "block_arm": {
+              "probability_integral_transform": 0.101,
+              "q10_score": 47.923112755199995,
+              "realized_below_q10": false,
+              "scenario_mean_score": 61.575849552198,
+              "scenario_standard_deviation": 11.52920128106593
+            },
+            "candidate": {
+              "probability_integral_transform": 0.107,
+              "q10_score": 47.6601242074,
+              "realized_below_q10": false,
+              "scenario_mean_score": 60.78575874492,
+              "scenario_standard_deviation": 11.045637409598061
+            }
+          },
+          "3": {
+            "block_arm": {
+              "probability_integral_transform": 0.116,
+              "q10_score": 47.247770936600006,
+              "realized_below_q10": false,
+              "scenario_mean_score": 61.105797064413,
+              "scenario_standard_deviation": 11.689096863651637
+            },
+            "candidate": {
+              "probability_integral_transform": 0.108,
+              "q10_score": 47.6323826803,
+              "realized_below_q10": false,
+              "scenario_mean_score": 60.958861846204,
+              "scenario_standard_deviation": 11.90883767174665
+            }
+          },
+          "4": {
+            "block_arm": {
+              "probability_integral_transform": 0.116,
+              "q10_score": 47.4106808771,
+              "realized_below_q10": false,
+              "scenario_mean_score": 61.286834740125,
+              "scenario_standard_deviation": 11.719256332375283
+            },
+            "candidate": {
+              "probability_integral_transform": 0.089,
+              "q10_score": 48.5693673891,
+              "realized_below_q10": true,
+              "scenario_mean_score": 61.624356020803,
+              "scenario_standard_deviation": 11.44736258205253
+            }
+          },
+          "5": {
+            "block_arm": {
+              "probability_integral_transform": 0.126,
+              "q10_score": 46.7481238202,
+              "realized_below_q10": false,
+              "scenario_mean_score": 61.16190089959701,
+              "scenario_standard_deviation": 11.889474402357262
+            },
+            "candidate": {
+              "probability_integral_transform": 0.122,
+              "q10_score": 47.1298395596,
+              "realized_below_q10": false,
+              "scenario_mean_score": 60.728450181955004,
+              "scenario_standard_deviation": 11.642240603549432
+            }
+          },
+          "6": {
+            "block_arm": {
+              "probability_integral_transform": 0.095,
+              "q10_score": 48.2205112982,
+              "realized_below_q10": true,
+              "scenario_mean_score": 61.17578884698,
+              "scenario_standard_deviation": 11.20948854325476
+            },
+            "candidate": {
+              "probability_integral_transform": 0.093,
+              "q10_score": 48.3833840229,
+              "realized_below_q10": true,
+              "scenario_mean_score": 60.979745039659,
+              "scenario_standard_deviation": 11.316644828895404
+            }
+          },
+          "7": {
+            "block_arm": {
+              "probability_integral_transform": 0.1,
+              "q10_score": 48.004012046300005,
+              "realized_below_q10": true,
+              "scenario_mean_score": 61.031530035903,
+              "scenario_standard_deviation": 11.121959674446371
+            },
+            "candidate": {
+              "probability_integral_transform": 0.105,
+              "q10_score": 47.6819248343,
+              "realized_below_q10": false,
+              "scenario_mean_score": 60.88517750128099,
+              "scenario_standard_deviation": 11.241298545992441
+            }
+          },
+          "8": {
+            "block_arm": {
+              "probability_integral_transform": 0.093,
+              "q10_score": 48.5777709564,
+              "realized_below_q10": true,
+              "scenario_mean_score": 62.801189172174006,
+              "scenario_standard_deviation": 12.026207516064108
+            },
+            "candidate": {
+              "probability_integral_transform": 0.106,
+              "q10_score": 47.6971885219,
+              "realized_below_q10": false,
+              "scenario_mean_score": 62.219188149191005,
+              "scenario_standard_deviation": 12.122868805521472
+            }
+          },
+          "9": {
+            "block_arm": {
+              "probability_integral_transform": 0.121,
+              "q10_score": 47.4341822737,
+              "realized_below_q10": false,
+              "scenario_mean_score": 60.814053671409,
+              "scenario_standard_deviation": 11.100583000125107
+            },
+            "candidate": {
+              "probability_integral_transform": 0.112,
+              "q10_score": 47.6030114983,
+              "realized_below_q10": false,
+              "scenario_mean_score": 60.852301105473,
+              "scenario_standard_deviation": 11.8365447336917
+            }
+          }
+        }
+      }
+    },
+    "folds_outside_the_boundary": {
+      "count": 125,
+      "monte_carlo_standard_error_at_0_10": 0.009486832980505138,
+      "nearest_pit_distance_from_0_10": {
+        "block_arm": 0.04100000000000001,
+        "candidate": 0.042
+      }
+    },
+    "input_sha256": {
+      "manifest": "1a06b69abb3d7fe98afde6983885a9a7723463d351a2432dc9e0a11082f5eba8",
+      "roster": "3ef0c5717fa63c3c4772512f019cd750d3fae6cd9a7567d20dd4bfa24003678e",
+      "table": "b05f10c3fd3ab5058fe1ff720cc6ef0a4b1362a70a19dd979ad0eb0f47d12c01"
+    },
+    "location_against_block_arm": {
+      "block_count_with_q10_moved_by_the_mean_difference": 22,
+      "block_folds_entering_the_tail_when_moved": [],
+      "block_folds_leaving_the_tail_when_moved": [
+        "2021-22-gw19"
+      ],
+      "centred_q10_difference_mean": 0.04545873716507281,
+      "fold_count": 137,
+      "folds_with_candidate_centred_q10_lower": 62,
+      "folds_with_candidate_mean_lower": 92,
+      "mean_score_difference_mean": -0.1556443174723721,
+      "q10_difference_mean": -0.11018558030729929,
+      "standard_deviation_difference_mean": -0.05528874956360839
+    },
+    "plug_in_lower_tail_count": {
+      "block_arm": {
+        "at_most_100": {
+          "expected_count": 23.229940198728325,
+          "probability_count_within_band_ceiling": 0.01033723259825603
+        },
+        "at_most_99": {
+          "expected_count": 23.075580020251177,
+          "probability_count_within_band_ceiling": 0.015921609280960307
+        },
+        "band_ceiling_count": 21
+      },
+      "candidate": {
+        "at_most_100": {
+          "expected_count": 22.94613903186001,
+          "probability_count_within_band_ceiling": 0.08186012537774502
+        },
+        "at_most_99": {
+          "expected_count": 22.743672870725426,
+          "probability_count_within_band_ceiling": 0.11393542696963534
+        },
+        "band_ceiling_count": 21
+      }
+    },
+    "repository_commit": "d3b9dab1a79612a9a67c203c16005bbdce8a65cd",
+    "runner": "scripts/redraw_component_calibration_seeds.py",
+    "seed_0_reproduces_the_record": true,
+    "seeds": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9
+    ],
+    "solver_profile": "measurement_optimization_config, as the calibration run",
+    "status": "descriptive, added after the result; the verdict stays the seed-0 protocol's and this reading decides nothing",
+    "working_tree_dirty": false
+  },
   "solver": {
     "binding_limit": "deterministic_time",
     "solver_deterministic_time_limit": 5.0,
