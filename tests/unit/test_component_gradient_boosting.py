@@ -253,6 +253,15 @@ def test_the_points_only_candidate_boosts_the_points_estimator_alone(
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     assert manifest["model_version"] == GRADIENT_BOOSTING_POINTS_MODEL_VERSION
     assert manifest["estimator"]["name"] == GRADIENT_BOOSTING_POINTS_ESTIMATOR
+    # The arm fits the linear appearance and minutes estimators beside the boosted points
+    # estimator, so its manifest records the constants of all three and no ridge points alpha.
+    constants = manifest["estimator"]["constants"]
+    defaults = ComponentModelConfig()
+    assert constants["appearance_regularization"] == defaults.appearance_regularization
+    assert constants["minutes_alpha"] == defaults.minutes_alpha
+    assert constants["learning_rate"] == defaults.boosting_learning_rate
+    assert constants["early_stopping"] is False
+    assert "points_alpha" not in constants
     artifact_dir = tmp_path / "pair"
     artifact_dir.mkdir()
     for paths in (control, candidate):

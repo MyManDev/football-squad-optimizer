@@ -13,6 +13,7 @@ runners live in `scripts/`, and its records are committed under `docs/`.
 | Product and research phases A to H, and where each stands | [Roadmap](../product/roadmap.md) |
 | Prediction research programme | [Research agenda](../prediction_research_agenda.md) |
 | Phase C gradient-boosting candidate (declaration and comparison method) | [Gradient-boosting method](phase_c_gradient_boosting_method.md) |
+| Phase C feature contract v2 (declaration and comparison method) | [Feature contract v2 method](phase_c_feature_contract_v2_method.md) |
 | Phase C points-only gradient-boosting candidate (declaration, comparison method and decision-level reading) | [Points-only gradient-boosting method](phase_c_gradient_boosting_points_method.md) |
 | Mixture-of-experts line 1: gated mixture for the conditional components (pre-registration and record) | [Mixture pre-registration](moe_mixture_prereg.md), [record](moe_mixture.md) |
 | Prospective benchmark of the live decisions (the Phase A exit) | [Benchmark V2 pre-registration](../benchmark_v2_prereg.md) |
@@ -66,6 +67,10 @@ reaches, and a backticked name is not a link.
 | [Planner policy chain](planner_policy_chain_prereg.md) | Read after GW20 (interim) and GW38 (final); no record yet |
 | [Published fixture difficulty, live](published_difficulty_live_prereg.md) | Runner described in [the live runner](published_difficulty_live_runner.md); no record yet |
 | [Available attacking shares](football_available_shares_prereg.md) | No record names it yet |
+| [Mean-reversion discount for later plan weeks](mean_reversion_discount_prereg.md) | Recorded in [mean-reversion discount](mean_reversion_discount.md): measured, not certified |
+| [HiGHS on the current window model](window_solver_highs_current_prereg.md) | Recorded in [HiGHS on the current window model at GW7](window_solver_highs_current.md): a switch is supported on the server, device verdict carried from #1083 |
+| [Team-match block resampler for component scenarios](team_match_block_sampler_prereg.md) | Recorded in [the calibration reading](team_match_block_sampler.md) and [the fidelity diagnostic](team_match_block_sampler_fidelity.md) |
+| [Rank-conditional shrinkage of expected points](rank_conditional_shrinkage_prereg.md) | Recorded in [rank-conditional shrinkage](rank_conditional_shrinkage.md): measured, not certified |
 
 ## Reproducing a record
 

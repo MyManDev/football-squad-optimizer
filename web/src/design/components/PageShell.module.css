@@ -153,8 +153,8 @@
   transform: translateX(-100%);
   visibility: hidden;
   transition:
-    transform 200ms ease,
-    visibility 0s linear 200ms;
+    transform var(--motion-ui) var(--motion-ease),
+    visibility 0s linear var(--motion-ui);
 }
 
 .shell[data-layout="phone"][data-drawer] .sidebar {
@@ -162,7 +162,7 @@
   visibility: visible;
   box-shadow: var(--shadow-drawer);
   transition:
-    transform 200ms ease,
+    transform var(--motion-ui) var(--motion-ease),
     visibility 0s;
 }
 
@@ -175,7 +175,7 @@
   width: 316px;
   border-right: 0;
   box-shadow: var(--shadow-drawer);
-  animation: drawer-in 200ms ease;
+  animation: drawer-in var(--motion-ui) var(--motion-ease);
 }
 
 @keyframes drawer-in {

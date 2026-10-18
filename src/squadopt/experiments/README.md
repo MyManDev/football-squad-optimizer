@@ -71,7 +71,7 @@ module that imports it.
 | Benchmark V2 | `benchmark_v2`, `benchmark_v2_live` |
 | Football studies | `football_components`, `football_defcon`, `football_minutes`, `football_share_sizing`, `football_windows` |
 | Private football model experiments | `football_flag_experiment`, `football_load_experiment`, `football_phase_experiment`, `football_score_state_experiment`, `football_tactical_experiment`, `football_unit_experiment` |
-| Single gate readings | `defcon_component_reading`, `rank_tail_selector` |
+| Single gate readings | `defcon_component_reading`, `rank_tail_selector`, `rank_conditional_shrinkage` |
 | The package root, an interface (see above) | `__init__` |
 
 Each study module's docstring states its study; the runner that calls it is in the
