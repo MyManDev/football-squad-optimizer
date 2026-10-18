@@ -15,6 +15,7 @@ import {
 } from "../../../lib/leagueAddresses";
 import { claimIn, forgetIdentity } from "../../../testSupport/league";
 import { readMemberClaim } from "../identity/memberClaim";
+import { readChosenLeague } from "../identity/useChosenLeague";
 import { LeagueEntryPage } from "./LeagueEntryPage";
 
 const published = { ...mockLeagueMembersEnvelope, source_kind: "live" };
@@ -200,7 +201,7 @@ describe("the form in place", () => {
     );
   }
 
-  it("rewrites an address from before the number with no step asked of it", async () => {
+  it("rewrites an address from before the number, asking the member step there", async () => {
     legacySite();
     openInPlace("/league/members/35249002", false);
     const user = userEvent.setup();
@@ -209,7 +210,11 @@ describe("the form in place", () => {
     expect(await screen.findByRole("heading", { name: "Member page" })).toBeInTheDocument();
     const location = screen.getByTestId("location");
     expect(location).toHaveTextContent(memberAddress(LEAGUE, 35249002));
-    expect(location.dataset.state).toBe("null");
+    // The step state is what puts focus on the picker's question when it stands there.
+    await waitFor(() => expect(location.dataset.state).toBe(JSON.stringify(PICK_HERE)));
+    // The gate at the new address chooses the league; a choice made here first would let
+    // the gate rewrite the old address itself, dropping the step state.
+    expect(readChosenLeague()).toBeNull();
   });
 
   it("keeps a system page's address with `stay`, asking the member step there", async () => {

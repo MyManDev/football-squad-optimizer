@@ -97,8 +97,10 @@ describe.each(["tr", "en"] as const)("league gate in %s", (language) => {
     await user.type(screen.getByLabelText(copy.label), String(LEAGUE));
     await user.click(screen.getByRole("button", { name: copy.submit }));
 
-    // The address asked for is rewritten under the league, and the picker stands there.
-    expect(await screen.findByRole("heading", { name: picker.title })).toBeInTheDocument();
+    // The address asked for is rewritten under the league, and the picker stands there
+    // with focus on its question.
+    const heading = await screen.findByRole("heading", { name: picker.title });
+    await waitFor(() => expect(heading).toHaveFocus());
     expect(location()).toBe(memberAddress(LEAGUE, ENTRY));
     expect(screen.queryByRole("heading", { name: "Member page" })).toBeNull();
     expect(readChosenLeague()).toBe(LEAGUE);

@@ -495,6 +495,27 @@ test.describe("the system's own pages behind the same two steps", () => {
       await expect(page).toHaveURL("/moves");
       await expect(page.getByRole("heading", { level: 1 })).toHaveText(TR.moves.title);
     });
+
+    for (const [address, numbered] of [
+      ["/league", `/league/${LEAGUE}`],
+      ["/league/members", MEMBERS],
+      ["/league/members/35249002", own(35249002)],
+    ] as const) {
+      test(`an address from before the number (${address}) puts focus on who you are`, async ({
+        page,
+      }) => {
+        await installLeagueMocks(page, { claim: null });
+        await page.route("**/data/league/members.json", (route) =>
+          route.fulfill({ json: { ...mockLeagueMembersEnvelope, source_kind: "live" } }),
+        );
+        await page.goto(address);
+        await expect(page.getByRole("heading", { level: 1 })).toHaveText(TR.leagueEntry.title);
+        await page.getByLabel(TR.leagueEntry.label).fill(String(LEAGUE));
+        await page.getByLabel(TR.leagueEntry.label).press("Enter");
+        await expect(page).toHaveURL(numbered);
+        await expect(pickerHeading(page)).toBeFocused();
+      });
+    }
   });
 
   test("the rivals page and the gameweek page ask who you are before reading anything", async ({
