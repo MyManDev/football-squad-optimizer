@@ -1,0 +1,144 @@
+/* The what-if mode (#1132): the account as a small scoreboard, the rules the fifteen
+   breaks in words, the fifteen by position with a remove button on each row, a select to
+   add a player, and the way back to the advice. A changed row carries the page's one
+   bright accent; its state changes in the card time of the motion tokens. */
+
+.whatIf {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.action {
+  justify-self: start;
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-text);
+  border-radius: var(--radius-s);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.action:disabled {
+  border-color: var(--color-line);
+  color: var(--color-text-muted);
+  cursor: default;
+}
+
+.state {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.account {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2) var(--space-3);
+  margin: 0;
+  padding: var(--space-3);
+  border-radius: var(--radius-m);
+  background: var(--color-board);
+  color: var(--color-board-muted);
+}
+
+.account dt {
+  font-size: var(--step--1);
+  font-weight: 600;
+}
+
+.account dd {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--step-1);
+  font-weight: 700;
+}
+
+.headline dd {
+  color: var(--color-lime);
+}
+
+.breaks {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-left: 3px solid var(--color-bad);
+  list-style: none;
+}
+
+.group {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.player {
+  display: grid;
+  grid-template-columns: 2.5rem minmax(0, 1fr) auto auto;
+  grid-template-areas:
+    "position name points remove"
+    "position meta points remove";
+  align-items: center;
+  column-gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-s);
+  background: var(--color-surface);
+  transition: background-color var(--motion-ui) var(--motion-ease);
+}
+
+.player[data-changed] {
+  background: var(--color-lime);
+}
+
+.position {
+  grid-area: position;
+  font-size: var(--step--1);
+}
+
+.name {
+  grid-area: name;
+  min-width: 0;
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meta {
+  grid-area: meta;
+  color: var(--color-text-muted);
+  font-size: var(--step--1);
+}
+
+.points {
+  grid-area: points;
+  font-family: var(--font-display);
+}
+
+.remove {
+  grid-area: remove;
+  min-height: 44px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--color-text);
+  border-radius: var(--radius-s);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.add {
+  display: grid;
+  gap: var(--space-1);
+  font-weight: 600;
+}
+
+.add select {
+  min-height: 44px;
+  max-width: 100%;
+  font: inherit;
+}

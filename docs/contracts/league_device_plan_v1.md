@@ -37,6 +37,11 @@ served from the site's own assets) in a Web Worker:
 | `deviceAdvice.ts` | The answer as the advice document the page already reads. |
 | `useDevicePlan.ts` | Reads the documents when the member asks, holds them to the capture on screen, runs the worker. |
 | `deviceSolver.worker.ts` | The solve off the page's thread: a ready signal once loaded, then one request in; an answer, a refusal or a failure out. |
+| `lp/highs.ts` | The solver a worker loads once, with its binary from the site's own assets. |
+| `whatIf.ts` | The what-if mode's reading of a fifteen the member puts together: the one-week problem's squad rows evaluated at it (size, quotas, club limit, bank, paid transfers) and its value from `solve/week.ts`. |
+| `useWhatIf.ts` | Reads the table when the member starts the mode, holds it to the capture on screen, and asks the what-if worker for each fifteen tried. |
+| `whatIf.worker.ts` | The what-if values off the page's thread: the table and the fifteens in; each fifteen's points, or a failure, out. |
+| `WhatIfPanel.tsx` | The what-if mode on the member page. |
 
 ## The shared document
 
