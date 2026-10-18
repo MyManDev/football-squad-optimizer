@@ -159,8 +159,28 @@ describe("the chip card's lift", () => {
     expect(declared.sort()).toEqual(["box-shadow", "transform"]);
   });
 
-  it("has room in its row for the lift above and the shadow below, which the row would clip", () => {
-    expect(rule(".cards")).toMatch(/padding: var\(--space-1\) 0 var\(--space-4\)/);
+  it("has room in its row for the whole lift and shadow, which the scroll row would clip", () => {
+    const tokens = readFileSync(join(__dirname, "../../../design/tokens.css"), "utf-8");
+    const px = (value: string) => {
+      const token = value.match(/var\((--space-\d)\)/)?.[1];
+      const raw = token ? tokens.match(new RegExp(`${token}:\\s*(\\d+)px`))![1]! : value;
+      return Number.parseFloat(raw);
+    };
+    const padding = rule(".cards")
+      .match(/padding:\s*([^;]+);/)![1]!
+      .trim()
+      .split(/\s+(?![^(]*\))/);
+    const [top, inline, bottom] = padding.map(px);
+    const open = rule(".card[data-open]");
+    const lift = -Number(open.match(/translateY\((-?[\d.]+)px\)/)![1]);
+    const [, y, blur] = open.match(/box-shadow:\s*0 ([\d.]+)px ([\d.]+)px/)!.map(Number);
+    expect(lift + blur! - y!).toBeLessThanOrEqual(top!);
+    expect(blur).toBeLessThanOrEqual(inline!);
+    expect(y! + blur! - lift).toBeLessThanOrEqual(bottom!);
+  });
+
+  it("gives the chip card's link a thumb-sized target", () => {
+    expect(rule(".more")).toMatch(/min-height: 44px/);
   });
 
   it("takes the card time of the motion tokens", () => {
