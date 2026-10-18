@@ -74,6 +74,21 @@ FEATURE_CONTRACT_VERSION: Final = "phase_c_component_form_window_v1"
 # and a minutes average cannot separate the two. Both halves come from the same shifted
 # primitive as everything else.
 COMPONENT_FEATURE_CONFIG: Final = FeatureConfig(appearance_windows=(3, 5))
+
+# The declared second feature contract, measured under the v2 development path before any
+# serving change: the same primitives (shifted rolling means over the player's own season),
+# with the one-gameweek and ten-gameweek windows added for minutes and appearance. The
+# points windows stay (3, 5); no new source column and no ratio enters. A capture serving
+# this contract needs ten settled weeks of live history instead of five, because
+# ``COMPONENT_HISTORY_WINDOW`` is derived from the served configuration.
+FEATURE_CONTRACT_VERSION_V2: Final = "phase_c_component_form_window_v2"
+COMPONENT_FEATURE_CONFIG_V2: Final = FeatureConfig(
+    minutes_windows=(1, 3, 5, 10), points_windows=(3, 5), appearance_windows=(1, 3, 5, 10)
+)
+FEATURE_CONTRACTS: Final = {
+    "v1": (FEATURE_CONTRACT_VERSION, COMPONENT_FEATURE_CONFIG),
+    "v2": (FEATURE_CONTRACT_VERSION_V2, COMPONENT_FEATURE_CONFIG_V2),
+}
 COMPONENT_HISTORY_WINDOW: Final = max(
     *COMPONENT_FEATURE_CONFIG.minutes_windows,
     *COMPONENT_FEATURE_CONFIG.points_windows,

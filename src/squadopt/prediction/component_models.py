@@ -81,9 +81,49 @@ SEASON_WEIGHTED_MODEL_VERSION: Final = "phase_c_components_season_half_life_v1"
 # a fit under this estimator carries its own model version so a consumer cannot mistake it
 # for the linear control.
 GRADIENT_BOOSTING_MODEL_VERSION: Final = "phase_c_control_components_gbm_v1"
+# The fourth declared Phase C v2 development candidate, after the decision-level reading of
+# the boosted pair above: the linear appearance and minutes estimators kept, only the
+# conditional points estimator boosted. The decision-level probes found the loss of the full
+# boosted pair in its appearance probability and the gain in its conditional points; this
+# arm keeps the one and takes the other.
+GRADIENT_BOOSTING_POINTS_MODEL_VERSION: Final = "phase_c_control_components_gbm_points_v1"
+# The regime-gated candidate (mixture-of-experts line 3, `docs/research/moe_regime_prereg.md`):
+# one served-pair expert set per declared regime (fixture regime by rule era), mixed by a
+# multinomial logistic gate on the v1 features plus the regime terms. Equal weighting only;
+# the constants are the control's own and the regime boundaries are declared below.
+REGIME_MODEL_VERSION: Final = "phase_c_control_components_regime_v1"
 LINEAR_ESTIMATOR: Final = "linear"
 GRADIENT_BOOSTING_ESTIMATOR: Final = "gradient_boosting"
-ESTIMATORS: Final = (LINEAR_ESTIMATOR, GRADIENT_BOOSTING_ESTIMATOR)
+GRADIENT_BOOSTING_POINTS_ESTIMATOR: Final = "gradient_boosting_points"
+REGIME_ESTIMATOR: Final = "regime"
+ESTIMATORS: Final = (
+    LINEAR_ESTIMATOR,
+    GRADIENT_BOOSTING_ESTIMATOR,
+    GRADIENT_BOOSTING_POINTS_ESTIMATOR,
+    REGIME_ESTIMATOR,
+)
+
+# The regimes of the gated candidate. A row's label is the cross of its fixture regime
+# (single or double gameweek; a blank gameweek is the contract's zero and reaches no fit)
+# and its rule era (seasons from 2025-26 carry the defensive-contribution and keeper
+# rules). The season-age term is the third regime term: an input of the gate, never a
+# label and never a sample weight.
+SEASON_COLUMN: Final = "season"
+DEFCON_ERA_FIRST_START_YEAR: Final = 2025
+SINGLE_PRE_DEFCON_REGIME: Final = "single_pre_defcon"
+DOUBLE_PRE_DEFCON_REGIME: Final = "double_pre_defcon"
+SINGLE_DEFCON_REGIME: Final = "single_defcon"
+DOUBLE_DEFCON_REGIME: Final = "double_defcon"
+REGIME_LABELS: Final = (
+    SINGLE_PRE_DEFCON_REGIME,
+    DOUBLE_PRE_DEFCON_REGIME,
+    SINGLE_DEFCON_REGIME,
+    DOUBLE_DEFCON_REGIME,
+)
+REGIME_DOUBLE_TERM: Final = "regime_double_fixture"
+REGIME_DEFCON_TERM: Final = "regime_defcon_era"
+REGIME_SEASON_AGE_TERM: Final = "regime_season_age"
+REGIME_GATE_TERMS: Final = (REGIME_DOUBLE_TERM, REGIME_DEFCON_TERM, REGIME_SEASON_AGE_TERM)
 EQUAL_WEIGHTING: Final = "equal_weights_v1"
 SEASON_HALF_LIFE_WEIGHTING: Final = "season_half_life_0.5_v1"
 SEASON_WEIGHT_BASE: Final = 0.5
@@ -170,9 +210,9 @@ class FittedComponentModels:
     re-deriving the rule. Under equal weighting every season weighs 1.
     """
 
-    appearance: Pipeline
-    minutes: Pipeline
-    points: Pipeline
+    appearance: "Pipeline | RegimeMixture"
+    minutes: "Pipeline | RegimeMixture"
+    points: "Pipeline | RegimeMixture"
     feature_columns: tuple[str, ...]
     appearance_rows: int
     conditional_rows: int
@@ -180,6 +220,9 @@ class FittedComponentModels:
     weighting: str = EQUAL_WEIGHTING
     season_weights: tuple[tuple[str, float], ...] = ()
     estimator: str = LINEAR_ESTIMATOR
+    # The season the fit predicts; only the regime candidate needs it, for the season-age
+    # term of its gate. ``None`` for every other estimator.
+    target_season: str | None = None
 
 
 _SEASON_LABEL: Final = re.compile(r"(?P<start>\d{4})-(?P<end>\d{2})")
@@ -261,6 +304,156 @@ def normalize_weights(weights: pd.Series) -> pd.Series:
     return values / float(values.mean())
 
 
+def _season_start_years(seasons: pd.Series) -> pd.Series:
+    """The start year of every row's season label, refusing a missing or malformed one."""
+
+    if bool(seasons.isna().any()):
+        raise PredictionConfigurationError("Every row must carry a season label.")
+    labels = seasons.astype("string")
+    by_season = {str(season): season_start_year(str(season)) for season in labels.unique()}
+    return pd.Series(labels.map(by_season).to_numpy(dtype="int64"), index=seasons.index)
+
+
+def regime_labels(frame: pd.DataFrame) -> pd.Series:
+    """The declared regime label of every row: fixture regime by rule era.
+
+    ``fixture_count >= 2`` is ``double``, ``1`` is ``single``; a blank gameweek is the
+    contract's zero and must not reach a fit, so it is refused here rather than labelled.
+    """
+
+    for column in (SEASON_COLUMN, FIXTURE_COUNT_COLUMN):
+        if column not in frame.columns:
+            raise PredictionConfigurationError(
+                f"The regime candidate needs the {column!r} column on every row."
+            )
+    fixtures = pd.to_numeric(frame[FIXTURE_COUNT_COLUMN], errors="raise").astype("int64")
+    if bool((fixtures < 1).any()):
+        raise PredictionConfigurationError(
+            "A blank gameweek is the contract's zero, not a regime; it must not reach a fit."
+        )
+    double = fixtures.to_numpy() >= 2
+    defcon = _season_start_years(frame[SEASON_COLUMN]).to_numpy() >= DEFCON_ERA_FIRST_START_YEAR
+    labels = np.where(
+        defcon,
+        np.where(double, DOUBLE_DEFCON_REGIME, SINGLE_DEFCON_REGIME),
+        np.where(double, DOUBLE_PRE_DEFCON_REGIME, SINGLE_PRE_DEFCON_REGIME),
+    )
+    return pd.Series(labels, index=frame.index, dtype="string")
+
+
+def regime_design(
+    frame: pd.DataFrame, feature_columns: Sequence[str], *, target_season: str
+) -> pd.DataFrame:
+    """The gate's design: the v1 features plus the three declared regime terms.
+
+    The season-age term is ``target season start year - row season start year``; it is
+    zero for every scoring row and positive for the earlier seasons' training rows. A
+    training row from a season after the target season is refused as a leak.
+    """
+
+    design = _design(frame, feature_columns)
+    labels = regime_labels(frame)
+    ages = season_start_year(target_season) - _season_start_years(frame[SEASON_COLUMN])
+    if bool((ages < 0).any()):
+        raise PredictionConfigurationError(
+            f"A row lies after the prediction season {target_season!r}; that is a leak."
+        )
+    design[REGIME_DOUBLE_TERM] = (
+        labels.isin((DOUBLE_PRE_DEFCON_REGIME, DOUBLE_DEFCON_REGIME)).to_numpy().astype("float64")
+    )
+    design[REGIME_DEFCON_TERM] = (
+        labels.isin((SINGLE_DEFCON_REGIME, DOUBLE_DEFCON_REGIME)).to_numpy().astype("float64")
+    )
+    design[REGIME_SEASON_AGE_TERM] = ages.to_numpy(dtype="float64")
+    return design
+
+
+@dataclass(frozen=True, slots=True)
+class RegimeExpert:
+    """One regime's served pair, fitted on that regime's rows only."""
+
+    label: str
+    appearance: Pipeline
+    minutes: Pipeline
+    points: Pipeline
+    appearance_rows: int
+    conditional_rows: int
+
+
+@dataclass(frozen=True, slots=True)
+class RegimeMixture:
+    """One component of the regime-gated candidate: the gate-weighted mean of the experts.
+
+    The gate is shared by the three components and is ``None`` when the fold's usable rows
+    carried a single regime label, in which case the one expert takes all the mass. Gate
+    mass on a regime whose expert is absent is dropped and the rest renormalized, so a row
+    of a thin regime is scored by the experts that exist, in the gate's proportions.
+    """
+
+    component: str
+    feature_columns: tuple[str, ...]
+    experts: tuple[RegimeExpert, ...]
+    gate: Pipeline | None
+    gate_classes: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        if self.component not in ("appearance", "minutes", "points"):
+            raise PredictionConfigurationError(f"Unknown component {self.component!r}.")
+        if not self.experts:
+            raise PredictionConfigurationError("A regime mixture needs at least one expert.")
+
+    def gate_weights(self, design: pd.DataFrame) -> npt.NDArray[np.float64]:
+        """One row of weights per design row, over the present experts, summing to one."""
+
+        rows = len(design)
+        if self.gate is None or len(self.experts) == 1:
+            weights = np.zeros((rows, len(self.experts)), dtype="float64")
+            weights[:, 0] = 1.0
+            return weights
+        columns = [*self.feature_columns, *REGIME_GATE_TERMS]
+        probabilities = np.asarray(self.gate.predict_proba(design.loc[:, columns]), dtype="float64")
+        position = {label: index for index, label in enumerate(self.gate_classes)}
+        weights = np.column_stack(
+            [
+                probabilities[:, position[expert.label]]
+                if expert.label in position
+                else np.zeros(rows, dtype="float64")
+                for expert in self.experts
+            ]
+        )
+        totals = weights.sum(axis=1, keepdims=True)
+        # A logistic gate never puts exactly zero on a present class; the fallback keeps
+        # the arithmetic defined if it ever did.
+        weights = np.where(totals > 0.0, weights / np.where(totals > 0.0, totals, 1.0), 1.0)
+        return np.asarray(weights / weights.sum(axis=1, keepdims=True), dtype="float64")
+
+    def _expert_outputs(self, design: pd.DataFrame) -> npt.NDArray[np.float64]:
+        features = design.loc[:, list(self.feature_columns)]
+        outputs = []
+        for expert in self.experts:
+            if self.component == "appearance":
+                outputs.append(np.asarray(expert.appearance.predict_proba(features))[:, 1])
+            elif self.component == "minutes":
+                outputs.append(np.asarray(expert.minutes.predict(features)))
+            else:
+                outputs.append(np.asarray(expert.points.predict(features)))
+        return np.column_stack(outputs).astype("float64")
+
+    def predict(self, design: pd.DataFrame) -> npt.NDArray[np.float64]:
+        """The gate-weighted mean of the experts' outputs, one value per row."""
+
+        weights = self.gate_weights(design)
+        return np.asarray((weights * self._expert_outputs(design)).sum(axis=1), dtype="float64")
+
+    def predict_proba(self, design: pd.DataFrame) -> npt.NDArray[np.float64]:
+        """The appearance mixture in scikit-learn's two-column shape."""
+
+        if self.component != "appearance":
+            raise PredictionConfigurationError("Only the appearance mixture is a probability.")
+        positive = np.clip(self.predict(design), 0.0, 1.0)
+        return np.column_stack([1.0 - positive, positive])
+
+
 def _design(frame: pd.DataFrame, feature_columns: Sequence[str]) -> pd.DataFrame:
     missing = [column for column in feature_columns if column not in frame.columns]
     if missing:
@@ -291,6 +484,7 @@ def fit_component_models(
     feature_columns: Sequence[str],
     config: ComponentModelConfig | None = None,
     weighting: SeasonAgeWeighting | None = None,
+    target_season: str | None = None,
 ) -> FittedComponentModels | None:
     """Fit the three control estimators, or return ``None`` when history is too thin.
 
@@ -299,6 +493,9 @@ def fit_component_models(
 
     With ``weighting`` the same estimators are fitted on the same rows under the declared
     season-age weights; without it the fit is the equal-weight control, unchanged.
+
+    ``target_season`` is read by the regime candidate alone, for the season-age term of
+    its gate; the other estimators ignore it.
     """
 
     settings = ComponentModelConfig() if config is None else config
@@ -311,9 +508,15 @@ def fit_component_models(
         raise PredictionConfigurationError("At least one feature column is required.")
 
     boosted = settings.estimator == GRADIENT_BOOSTING_ESTIMATOR
-    if boosted and weighting is not None:
+    boosted_points = settings.estimator == GRADIENT_BOOSTING_POINTS_ESTIMATOR
+    regime = settings.estimator == REGIME_ESTIMATOR
+    if (boosted or boosted_points or regime) and weighting is not None:
         raise PredictionConfigurationError(
-            "The gradient-boosting candidate is declared under equal weighting only."
+            "The candidate estimators are declared under equal weighting only."
+        )
+    if regime and target_season is None:
+        raise PredictionConfigurationError(
+            "The regime candidate needs the target season for its season-age term."
         )
 
     usable = training.loc[complete_feature_rows(training, columns)]
@@ -366,25 +569,28 @@ def fit_component_models(
             for season in sorted(usable["season"].astype("string").unique())
         )
 
+    if regime:
+        assert target_season is not None
+        return _fit_regime_models(
+            usable,
+            conditional,
+            feature_columns=columns,
+            settings=settings,
+            target_season=target_season,
+            season_weights=season_weights,
+        )
+
     if boosted:
         appearance_model = make_pipeline(_boosted_classifier(settings))
         minutes_model = make_pipeline(_boosted_regressor(settings))
         points_model = make_pipeline(_boosted_regressor(settings))
     else:
-        appearance_model = make_pipeline(
-            StandardScaler(),
-            LogisticRegression(
-                C=settings.appearance_regularization,
-                max_iter=settings.appearance_max_iterations,
-                solver="lbfgs",
-                random_state=RANDOM_STATE,
-            ),
-        )
-        minutes_model = make_pipeline(
-            StandardScaler(), Ridge(alpha=settings.minutes_alpha, solver="cholesky")
-        )
-        points_model = make_pipeline(
-            StandardScaler(), Ridge(alpha=settings.points_alpha, solver="cholesky")
+        appearance_model = _linear_appearance(settings)
+        minutes_model = _linear_ridge(settings.minutes_alpha)
+        points_model = (
+            make_pipeline(_boosted_regressor(settings))
+            if boosted_points
+            else _linear_ridge(settings.points_alpha)
         )
     appearance_model.fit(
         _design(usable, columns), appearance_target.astype("int64"), **appearance_fit
@@ -410,6 +616,8 @@ def fit_component_models(
         model_version=(
             GRADIENT_BOOSTING_MODEL_VERSION
             if boosted
+            else GRADIENT_BOOSTING_POINTS_MODEL_VERSION
+            if boosted_points
             else COMPONENT_MODEL_VERSION
             if weighting is None
             else weighting.model_version
@@ -418,6 +626,140 @@ def fit_component_models(
         season_weights=season_weights,
         estimator=settings.estimator,
     )
+
+
+def _linear_appearance(settings: ComponentModelConfig) -> Pipeline:
+    """The served appearance estimator: standardized logistic regression."""
+
+    return make_pipeline(
+        StandardScaler(),
+        LogisticRegression(
+            C=settings.appearance_regularization,
+            max_iter=settings.appearance_max_iterations,
+            solver="lbfgs",
+            random_state=RANDOM_STATE,
+        ),
+    )
+
+
+def _linear_ridge(alpha: float) -> Pipeline:
+    """The served conditional estimator: standardized ridge regression."""
+
+    return make_pipeline(StandardScaler(), Ridge(alpha=alpha, solver="cholesky"))
+
+
+def _fit_regime_models(
+    usable: pd.DataFrame,
+    conditional: pd.DataFrame,
+    *,
+    feature_columns: tuple[str, ...],
+    settings: ComponentModelConfig,
+    target_season: str,
+    season_weights: tuple[tuple[str, float], ...],
+) -> FittedComponentModels | None:
+    """Fit the regime experts and the shared gate on rows the control's guards admitted.
+
+    Each regime with enough rows gets the served pair fitted on its own rows; the gate is
+    a multinomial logistic regression over every usable row's regime label, on the v1
+    features plus the regime terms. A fold with no fittable regime is refused like a thin
+    fold, and the refusal is the caller's to record.
+    """
+
+    # A blank gameweek is the contract's zero: it enters no expert fit and no gate fit.
+    usable = usable.loc[
+        pd.to_numeric(usable[FIXTURE_COUNT_COLUMN], errors="raise").astype("int64") >= 1
+    ]
+    conditional = conditional.loc[
+        pd.to_numeric(conditional[FIXTURE_COUNT_COLUMN], errors="raise").astype("int64") >= 1
+    ]
+    if usable.empty or conditional.empty:
+        return None
+    usable_labels = regime_labels(usable)
+    conditional_labels = regime_labels(conditional)
+    appearance_target = pd.to_numeric(usable["appearance_target"], errors="raise").astype("int64")
+    experts: list[RegimeExpert] = []
+    for label in REGIME_LABELS:
+        regime_usable = usable.loc[(usable_labels == label).to_numpy()]
+        regime_conditional = conditional.loc[(conditional_labels == label).to_numpy()]
+        regime_appearance = appearance_target.loc[regime_usable.index]
+        if (
+            len(regime_usable) < settings.minimum_training_rows
+            or regime_appearance.nunique() < 2
+            or len(regime_conditional) < settings.minimum_training_rows
+        ):
+            continue
+        appearance_model = _linear_appearance(settings)
+        minutes_model = _linear_ridge(settings.minutes_alpha)
+        points_model = _linear_ridge(settings.points_alpha)
+        appearance_model.fit(_design(regime_usable, feature_columns), regime_appearance)
+        regime_design_conditional = _design(regime_conditional, feature_columns)
+        minutes_model.fit(
+            regime_design_conditional,
+            pd.to_numeric(regime_conditional["minutes_target"], errors="raise").astype("float64"),
+        )
+        points_model.fit(
+            regime_design_conditional,
+            pd.to_numeric(regime_conditional["points_target"], errors="raise").astype("float64"),
+        )
+        experts.append(
+            RegimeExpert(
+                label=label,
+                appearance=appearance_model,
+                minutes=minutes_model,
+                points=points_model,
+                appearance_rows=len(regime_usable),
+                conditional_rows=len(regime_conditional),
+            )
+        )
+    if not experts:
+        return None
+
+    gate_classes = tuple(label for label in REGIME_LABELS if bool((usable_labels == label).any()))
+    gate: Pipeline | None = None
+    if len(gate_classes) >= 2:
+        gate = _linear_appearance(settings)
+        gate.fit(
+            regime_design(usable, feature_columns, target_season=target_season),
+            usable_labels.astype("object"),
+        )
+        gate_classes = tuple(str(label) for label in gate[-1].classes_)
+
+    def mixture(component: str) -> RegimeMixture:
+        return RegimeMixture(
+            component=component,
+            feature_columns=feature_columns,
+            experts=tuple(experts),
+            gate=gate,
+            gate_classes=gate_classes,
+        )
+
+    return FittedComponentModels(
+        appearance=mixture("appearance"),
+        minutes=mixture("minutes"),
+        points=mixture("points"),
+        feature_columns=feature_columns,
+        appearance_rows=len(usable),
+        conditional_rows=len(conditional),
+        model_version=REGIME_MODEL_VERSION,
+        weighting=EQUAL_WEIGHTING,
+        season_weights=season_weights,
+        estimator=REGIME_ESTIMATOR,
+        target_season=target_season,
+    )
+
+
+def regime_expert_summary(models: FittedComponentModels) -> dict[str, dict[str, int]]:
+    """Which regime experts a regime fit holds and how many rows each was fitted on."""
+
+    if models.estimator != REGIME_ESTIMATOR or not isinstance(models.appearance, RegimeMixture):
+        raise PredictionConfigurationError("regime_expert_summary expects a regime fit.")
+    return {
+        expert.label: {
+            "appearance_rows": expert.appearance_rows,
+            "conditional_rows": expert.conditional_rows,
+        }
+        for expert in models.appearance.experts
+    }
 
 
 def _boosted_classifier(settings: ComponentModelConfig) -> HistGradientBoostingClassifier:
@@ -498,7 +840,19 @@ def predict_components(
         else pd.Series(False, index=index)
     )
     if models is not None and bool(modelled.any()):
-        design = _design(scoring.loc[modelled], columns)
+        scored = scoring.loc[modelled]
+        if models.estimator == REGIME_ESTIMATOR:
+            if models.target_season is None:
+                raise PredictionConfigurationError("A regime fit must carry its target season.")
+            # The gate reads the row's own regime terms beside the features. A blank row
+            # is the contract's zero and is overwritten below whatever the estimators say,
+            # so it is labelled single here only to keep the design matrix complete.
+            blank_safe = scored.assign(
+                **{FIXTURE_COUNT_COLUMN: fixtures.loc[modelled].clip(lower=1)}
+            )
+            design = regime_design(blank_safe, columns, target_season=models.target_season)
+        else:
+            design = _design(scored, columns)
         probability = np.clip(models.appearance.predict_proba(design)[:, 1], 0.0, 1.0)
         ceiling = fixtures.loc[modelled].to_numpy(dtype="float64") * MINUTES_PER_FIXTURE
         conditional_minutes = np.clip(models.minutes.predict(design), 0.0, ceiling)

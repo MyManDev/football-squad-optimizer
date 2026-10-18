@@ -26,6 +26,8 @@ from squadopt.prediction.component_models import (
     EQUAL_WEIGHTING,
     GRADIENT_BOOSTING_ESTIMATOR,
     GRADIENT_BOOSTING_MODEL_VERSION,
+    GRADIENT_BOOSTING_POINTS_ESTIMATOR,
+    GRADIENT_BOOSTING_POINTS_MODEL_VERSION,
     LINEAR_ESTIMATOR,
     ComponentModelConfig,
     SeasonAgeWeighting,
@@ -204,3 +206,69 @@ def test_the_v2_export_writes_the_candidate_the_reader_and_the_comparison_accept
     # The default arm still expects the weighted candidate and refuses the boosted table.
     refused = ["--artifact-dir", str(artifact_dir), "--candidate", table_path.name[:-4]]
     assert compare_main(refused) == 1
+
+
+def test_the_points_only_candidate_boosts_the_points_estimator_alone(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from sklearn.ensemble import HistGradientBoostingRegressor
+    from sklearn.linear_model import LogisticRegression, Ridge
+
+    config = ComponentModelConfig(
+        minimum_training_rows=10,
+        estimator=GRADIENT_BOOSTING_POINTS_ESTIMATOR,
+        boosting_iterations=20,
+    )
+    fitted = fit_component_models(_training(), feature_columns=FEATURES, config=config)
+    assert fitted is not None
+    assert fitted.model_version == GRADIENT_BOOSTING_POINTS_MODEL_VERSION
+    assert fitted.estimator == GRADIENT_BOOSTING_POINTS_ESTIMATOR
+    assert isinstance(fitted.appearance[-1], LogisticRegression)
+    assert isinstance(fitted.minutes[-1], Ridge)
+    assert isinstance(fitted.points[-1], HistGradientBoostingRegressor)
+    with pytest.raises(PredictionConfigurationError):
+        fit_component_models(
+            _training(),
+            feature_columns=FEATURES,
+            config=config,
+            weighting=SeasonAgeWeighting(target_season="2024-25"),
+        )
+
+    seasons = ",".join(THREE)
+    control = _run_export(
+        tmp_path / "control", monkeypatch, "--development-scope", "v2", "--seasons", seasons
+    )
+    candidate = _run_export(
+        tmp_path / "candidate",
+        monkeypatch,
+        "--development-scope",
+        "v2",
+        "--estimator",
+        GRADIENT_BOOSTING_POINTS_ESTIMATOR,
+        "--seasons",
+        seasons,
+    )
+    table_path, _, manifest_path = candidate
+    assert table_path.name.endswith("_equal_gradient_boosting_points.csv")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert manifest["model_version"] == GRADIENT_BOOSTING_POINTS_MODEL_VERSION
+    assert manifest["estimator"]["name"] == GRADIENT_BOOSTING_POINTS_ESTIMATOR
+    # The arm fits the linear appearance and minutes estimators beside the boosted points
+    # estimator, so its manifest records the constants of all three and no ridge points alpha.
+    constants = manifest["estimator"]["constants"]
+    defaults = ComponentModelConfig()
+    assert constants["appearance_regularization"] == defaults.appearance_regularization
+    assert constants["minutes_alpha"] == defaults.minutes_alpha
+    assert constants["learning_rate"] == defaults.boosting_learning_rate
+    assert constants["early_stopping"] is False
+    assert "points_alpha" not in constants
+    artifact_dir = tmp_path / "pair"
+    artifact_dir.mkdir()
+    for paths in (control, candidate):
+        for path in paths:
+            (artifact_dir / path.name).write_bytes(path.read_bytes())
+    arguments = ["--artifact-dir", str(artifact_dir), "--candidate-arm", "gradient_boosting_points"]
+    assert compare_main(arguments) == 0
+    report_path = artifact_dir / "comparison_gradient_boosting_points" / "comparison.json"
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    assert report["arms"]["candidate"]["model_version"] == GRADIENT_BOOSTING_POINTS_MODEL_VERSION
