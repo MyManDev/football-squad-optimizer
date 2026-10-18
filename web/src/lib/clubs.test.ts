@@ -100,17 +100,43 @@ describe("club codes", () => {
     expect(clubColours("MCI")).toEqual({ primary: "#6CABDD", secondary: "#FFFFFF" });
     expect(clubColours("HUL")).toEqual({ primary: "#F5A12D", secondary: "#000000" });
     expect(clubColours("CRY")).toEqual({ primary: "#1B458F", secondary: "#C4122E" });
-    // The clubs that play in white shirts lead with white; their old swatch is the second.
-    expect(clubColours("TOT")).toEqual({ primary: "#FFFFFF", secondary: "#132257" });
-    expect(clubColours("FUL")).toEqual({ primary: "#FFFFFF", secondary: "#000000" });
-    expect(clubColours("LEE")).toEqual({ primary: "#FFFFFF", secondary: "#FFCD00" });
+    // The clubs that play in white keep their swatch colour first and take white second.
+    expect(clubColours("TOT")).toEqual({ primary: "#132257", secondary: "#FFFFFF" });
+    expect(clubColours("FUL")).toEqual({ primary: "#000000", secondary: "#FFFFFF" });
+    expect(clubColours("LEE")).toEqual({ primary: "#FFCD00", secondary: "#FFFFFF" });
   });
 
-  it("keeps the direction D swatches", () => {
-    expect(clubSwatch("CHE")).toBe("#034694");
-    expect(clubSwatch("mun")).toBe("#DA291C");
-    expect(clubSwatch("COV")).toBe("#6CBFE8");
-    expect(clubSwatch("HUL")).toBe("#F5A12D");
-    expect(clubSwatch("NEW")).toBe("#241F20");
+  it("keeps the direction D swatches for every club, so the boards look as they did", () => {
+    // The one-colour swatch the boards, plates, bench and squad lists draw. A change to the
+    // two-colour pairs must never move one of these.
+    const DIRECTION_D: Readonly<Record<string, string>> = {
+      ARS: "#EF0107",
+      AVL: "#670E36",
+      BHA: "#0057B8",
+      BOU: "#B50E12",
+      BRE: "#E30613",
+      CHE: "#034694",
+      COV: "#6CBFE8",
+      CRY: "#1B458F",
+      EVE: "#003399",
+      FUL: "#000000",
+      HUL: "#F5A12D",
+      IPS: "#3A64A3",
+      LEE: "#FFCD00",
+      LIV: "#C8102E",
+      MCI: "#6CABDD",
+      MUN: "#DA291C",
+      NEW: "#241F20",
+      NFO: "#DD0000",
+      SUN: "#EB172B",
+      TOT: "#132257",
+    };
+    expect(CLUB_SWATCHES).toEqual(DIRECTION_D);
+    for (const [code, colour] of Object.entries(DIRECTION_D)) {
+      expect(clubSwatch(code), code).toBe(colour);
+      expect(clubSwatch(code.toLowerCase()), code).toBe(colour);
+    }
+    // None is plain white, which would vanish on a white pitch plate.
+    expect(Object.values(CLUB_SWATCHES)).not.toContain("#FFFFFF");
   });
 });

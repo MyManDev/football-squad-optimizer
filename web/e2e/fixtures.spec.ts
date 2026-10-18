@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 
 import fixtures from "../public/data/fixtures.json" with { type: "json" };
 import indexFixture from "../public/data/index.json" with { type: "json" };
+import { CLUB_COLOURS } from "../src/lib/clubs";
 
 // The fixtures page reads whatever week the shipped fixture list names, which moves with every
 // publish.
@@ -28,21 +29,34 @@ const upcomingEdges = () => {
   };
 };
 
-/** Every day heading's bottom rule and every fixture side's two-colour mark. */
+/** A colour from CLUB_COLOURS as the browser computes it. */
+const rgb = (hex: string) => {
+  const [r, g, b] = [1, 3, 5].map((start) => parseInt(hex.slice(start, start + 2), 16));
+  return `rgb(${r}, ${g}, ${b})`;
+};
+
+/**
+ * Every day heading's bottom rule and every fixture side's two-colour mark: the code printed
+ * beside it and the colours the browser actually paints.
+ */
 const dayRulesAndMarks = () => {
   const rows = [...document.querySelectorAll("main li")];
   return {
     rules: [...document.querySelectorAll('main [class*="_day_"]')].map(
       (day) => getComputedStyle(day).borderBottomStyle,
     ),
-    marks: rows.map(
-      (row) =>
-        [...row.querySelectorAll<HTMLElement>("[aria-hidden='true']")].filter(
+    marks: rows.map((row) =>
+      [...row.querySelectorAll<HTMLElement>("[aria-hidden='true']")]
+        .filter(
           (mark) =>
             mark.style.getPropertyValue("--club-primary") !== "" &&
             mark.style.getPropertyValue("--club-secondary") !== "" &&
             mark.getBoundingClientRect().width === 10,
-        ).length,
+        )
+        .map((mark) => ({
+          code: mark.parentElement!.textContent!.trim(),
+          painted: getComputedStyle(mark).backgroundImage.match(/rgba?\([^)]*\)/g) ?? [],
+        })),
     ),
   };
 };
@@ -100,7 +114,14 @@ for (const width of [1280, 1600])
     expect(drawn.rules.length).toBeGreaterThan(0);
     expect(new Set(drawn.rules)).toEqual(new Set(["none"]));
     expect(drawn.marks.length).toBeGreaterThan(0);
-    expect(new Set(drawn.marks)).toEqual(new Set([2]));
+    expect(new Set(drawn.marks.map((row) => row.length))).toEqual(new Set([2]));
+    // Each mark paints the club's two colours, the primary first, and never one colour twice.
+    for (const { code, painted } of drawn.marks.flat()) {
+      const colours = CLUB_COLOURS[code];
+      expect(colours, code).toBeDefined();
+      expect(painted, code).toEqual([rgb(colours!.primary), rgb(colours!.secondary)]);
+      expect(painted[0], code).not.toBe(painted[1]);
+    }
     await expect(page.getByRole("main")).not.toContainText(/Son tarih|tarihli kayda göre/);
     await expect(
       page.getByRole("navigation").getByRole("link", { name: "Fikstür", exact: true }),

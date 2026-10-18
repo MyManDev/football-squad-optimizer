@@ -68,10 +68,11 @@ export interface ClubColours {
 }
 
 /**
- * Two colours per club code. The primary is the swatch beside a code on the boards, plates
- * and squad lists; a fixture list draws both, split on the diagonal. Either is decoration:
- * the code or the name is always printed beside it, and the ink outline keeps a white half
- * visible on a light page.
+ * Two colours per club code. The primary is the one-colour swatch beside a code on the
+ * boards, plates and squad lists, and it keeps the value those pages have always drawn; a
+ * fixture list draws both, split on the diagonal with the primary top left. Either is
+ * decoration: the code or the name is always printed beside it, and the ink outline keeps
+ * a white half visible on a light page.
  */
 export const CLUB_COLOURS: Readonly<Record<string, ClubColours>> = {
   ARS: { primary: "#EF0107", secondary: "#FFFFFF" },
@@ -83,17 +84,17 @@ export const CLUB_COLOURS: Readonly<Record<string, ClubColours>> = {
   COV: { primary: "#6CBFE8", secondary: "#FFFFFF" },
   CRY: { primary: "#1B458F", secondary: "#C4122E" },
   EVE: { primary: "#003399", secondary: "#FFFFFF" },
-  FUL: { primary: "#FFFFFF", secondary: "#000000" },
+  FUL: { primary: "#000000", secondary: "#FFFFFF" },
   HUL: { primary: "#F5A12D", secondary: "#000000" },
   IPS: { primary: "#3A64A3", secondary: "#FFFFFF" },
-  LEE: { primary: "#FFFFFF", secondary: "#FFCD00" },
+  LEE: { primary: "#FFCD00", secondary: "#FFFFFF" },
   LIV: { primary: "#C8102E", secondary: "#FFFFFF" },
   MCI: { primary: "#6CABDD", secondary: "#FFFFFF" },
   MUN: { primary: "#DA291C", secondary: "#FFFFFF" },
   NEW: { primary: "#241F20", secondary: "#FFFFFF" },
   NFO: { primary: "#DD0000", secondary: "#FFFFFF" },
   SUN: { primary: "#EB172B", secondary: "#FFFFFF" },
-  TOT: { primary: "#FFFFFF", secondary: "#132257" },
+  TOT: { primary: "#132257", secondary: "#FFFFFF" },
 };
 
 /** One swatch per club code: its primary colour, read from CLUB_COLOURS. */
