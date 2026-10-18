@@ -113,6 +113,11 @@ describe("bringing a line forward", () => {
     const table = screen.getByRole("table", { name: "M11" });
     expect(
       within(table)
+        .getAllByRole("rowheader")
+        .map((cell) => cell.textContent),
+    ).toEqual([COPY.raceGameweek, COPY.racePlaces, COPY.racePoints]);
+    expect(
+      within(table)
         .getAllByRole("cell")
         .map((cell) => cell.textContent),
     ).toEqual(["1", "2", "2", "70", "120", "180"]);

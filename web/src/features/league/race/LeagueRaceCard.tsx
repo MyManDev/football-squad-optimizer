@@ -221,7 +221,7 @@ export function LeagueRaceCard({
           <caption>{name(highlighted.entryId)}</caption>
           <thead>
             <tr>
-              <th scope="row" />
+              <th scope="row">{copy.raceGameweek}</th>
               {race.gameweeks.map((gameweek) => (
                 <th key={gameweek} scope="col" className="num">
                   {gameweek}

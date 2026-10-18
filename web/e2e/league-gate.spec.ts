@@ -130,7 +130,8 @@ test.describe("a return visit", () => {
 
       await page.goto("/league/members");
       await expect(page).toHaveURL(`/league/${LEAGUE}/members`);
-      await expect(page.getByText(member.manager_name!)).toBeVisible();
+      // The name is the table row's link; the league race names members too.
+      await expect(page.getByRole("link", { name: member.manager_name! })).toBeVisible();
     });
   }
 });
