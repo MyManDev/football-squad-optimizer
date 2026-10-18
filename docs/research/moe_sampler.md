@@ -150,29 +150,32 @@ appearance rate 0.926), and a near-certain starter inherits little from a source
 rested row is below `p_t` most of the time (the re-draw rate of 0.53 says so). The two folds
 that leave the tail against Control B at seed 0 are `2021-22-gw19` (the realized 39 falls below
 Control B's q10 of 39.04 and not below the candidate's 38.97) and `2023-24-gw30` (46 below
-Control B's 46.58, not below the candidate's 45.95). Both sit within 0.06 points of the
-candidate's q10 at a PIT of 0.101, inside one Monte Carlo standard error of 0.10, and the seed
-reading below flags each of them under the candidate on 7 seeds of 10 (Control B: 9 and 8).
-Whether the inherited appearance changes the tail on a regular's rested week is a hypothesis
-this record does not test.
+Control B's 46.58, not below the candidate's 45.95). Added after the result on 2026-10-18
+(descriptive): both sit within 0.06 points of the candidate's q10 at a PIT of 0.101, inside one
+Monte Carlo standard error of 0.10, and the seed reading below (run at `d3b9dab1`) flags each of
+them under the candidate on 7 seeds of 10 (Control B: 9 and 8). Whether the inherited
+appearance changes the tail on a regular's rested week is a hypothesis this record does not
+test.
 
 Second, the rest of the candidate is the block sampler: the same blocks, the same position rule,
 and a residual that is either the source row's own or a uniform re-draw among the block's
 appeared rows of the position, which is Control B's draw. The within-club points correlation
-(0.18 against 0.18) and the standard deviation (0.996 of Control B's) say the same. What
-differs is location. Fold by fold, the candidate's scenario mean sits 0.156 points below
-Control B's on average (lower on 92 of 137 folds), its q10 0.110 lower and its standard
-deviation 0.055 smaller. Measured from each arm's own mean, the candidate's q10 is 0.045 higher
-than Control B's, so its lower tail is thinner relative to its centre, and it is deeper than
-Control B's on only 62 folds. Moving Control B's q10 by the candidate's per-fold mean difference
-and nothing else takes Control B from 23 to 22 below q10 (`2021-22-gw19` leaves). The mean PIT
-difference of +0.0021 [0.0005, 0.0037] is the same downward shift, and it is why G4 fails on
-the PIT clause. The shift is consistent with the uniform appearance shortfall the fidelity
-record shows (-0.0039 sampled minus predicted, below zero in every fold); that link is not
-tested here. So the seed-0 edge over Control B comes mostly from a location shift that also
-moves S1 farther from the centre, not from the shape of the lower tail. These figures are
-computed from the record's fold entries and recorded under
-`seed_sensitivity_added_after_the_result.location_against_block_arm`.
+(0.18 against 0.18) and the standard deviation (0.996 of Control B's) say the same.
+
+Added after the result on 2026-10-18 (descriptive, decides nothing), computed from the record's
+fold entries by `scripts.redraw_component_calibration_seeds` at commit `d3b9dab1` and recorded
+under `seed_sensitivity_added_after_the_result.location_against_block_arm`: what differs is
+location. Fold by fold, the candidate's scenario mean sits 0.156 points below Control B's on
+average (lower on 92 of 137 folds), its q10 0.110 lower and its standard deviation 0.055
+smaller. Measured from each arm's own mean, the candidate's q10 is 0.045 higher than Control
+B's, so its lower tail is thinner relative to its centre, and it is deeper than Control B's on
+only 62 folds. Moving Control B's q10 by the candidate's per-fold mean difference and nothing
+else takes Control B from 23 to 22 below q10 (`2021-22-gw19` leaves). The mean PIT difference
+of +0.0021 [0.0005, 0.0037], recorded at the result, is the same downward shift, and it is why
+G4 fails on the PIT clause. The shift is consistent with the uniform appearance shortfall the
+fidelity record shows (-0.0039 sampled minus predicted, below zero in every fold); that link is
+not tested here. So the seed-0 edge over Control B comes mostly from a location shift that also
+moves S1 farther from the centre, not from the shape of the lower tail.
 
 ## Seed sensitivity (added after the result)
 
@@ -245,9 +248,10 @@ below and is withdrawn.
 - Declared gate, at seed 0: G1 and G2 hold, `candidate_within_gates`; G3 (not worse than the
   foundation) holds; G4 against Control B, descriptive, fails on the mean PIT clause. The
   decision-level clause is not applicable: the sampler does not feed expected points.
-- "The pin condition" of the protocol and of the record's `decision_level_reading` is that
-  protocol's own wording for its G3; no document in the repository defines a pin condition for a
-  candidate sampler.
+- "The pin condition" in the protocol and in the record is that protocol's name for a condition
+  made of its G3 clause ("not worse than the control") and a 147-fold decision reading; the
+  record's `decision_level_reading` uses the term for the decision clause and marks it not
+  applicable. No document in the repository defines it.
 - The repository's pin rule is in
   [the Phase E pre-registration](../phase_e_candidate_selection_prereg.md#calibration-pin):
   `PHASE_E_CALIBRATED_VERSIONS` stays empty until the binding Phase D artifact records
