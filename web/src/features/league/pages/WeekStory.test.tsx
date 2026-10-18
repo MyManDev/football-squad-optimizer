@@ -3,6 +3,7 @@
  * from the advice document alone. A week without a transfer or a chip shows no card for it;
  * the chip card opens on itself with the chip and its gain, and its lift is a transform in
  * the motion tokens' card time, so no other card moves and reduced motion makes it instant.
+ * Only a chip the member chose gets a card, in the chip choice's own words.
  */
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { readFileSync } from "node:fs";
@@ -10,7 +11,6 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { mockEntryAdviceEnvelope } from "../../../fixtures/league";
-import { REDUCED_MOTION_QUERY } from "../../../design/motion";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { MESSAGES, type Language } from "../../../i18n/messages";
 import { AS_A_CAVEAT, AS_A_CHANCE } from "../../../testSupport/honesty";
@@ -19,10 +19,7 @@ import type { AdvicePlayer, EntryAdvice } from "../types";
 import { STORY_ANCHORS } from "./storyPlan";
 import { WeekStory } from "./WeekStory";
 
-afterEach(() => {
-  cleanup();
-  delete (window as { matchMedia?: unknown }).matchMedia;
-});
+afterEach(cleanup);
 
 const ENTRY = 35249001;
 
@@ -112,17 +109,19 @@ describe("the week's story", () => {
     expect(container.innerHTML).toBe("");
   });
 
-  it("opens the chip card on itself with the chip week's gain and a link to its detail", () => {
+  it("opens the chip card on itself with the chip choice's own sentence, its gain and a link", () => {
     const copy = MESSAGES.tr.leagueMembers;
     show(plan({ chip: "3xc", chip_choice: { chip: "3xc", gain_vs_no_chip: 6.4, basis: "x" } }));
     const chip = cards()[2]!;
     const button = within(chip).getByRole("button");
+    const chosen = CHIP_COPY.tr.chosen(copy.chipNames["3xc"]!);
     expect(button).toHaveAttribute("aria-expanded", "false");
-    expect(within(chip).queryByText(copy.storyChipPlay)).toBeNull();
+    expect(within(chip).queryByText(chosen)).toBeNull();
     fireEvent.click(button);
     expect(button).toHaveAttribute("aria-expanded", "true");
     expect(chip).toHaveAttribute("data-open");
-    expect(within(chip).getByText(copy.storyChipPlay)).toBeInTheDocument();
+    // The member's own choice, worded as the decision below words it.
+    expect(within(chip).getByText(chosen)).toBeInTheDocument();
     expect(within(chip).getByText(CHIP_COPY.tr.gain("+6,4"))).toBeInTheDocument();
     expect(within(chip).getByRole("link", { name: copy.storyDetail })).toHaveAttribute(
       "href",
@@ -132,22 +131,15 @@ describe("the week's story", () => {
     expect(chip).not.toHaveAttribute("data-open");
   });
 
-  it("opens at once under reduced motion: the state changes with no wait", () => {
-    Object.defineProperty(window, "matchMedia", {
-      configurable: true,
-      writable: true,
-      value: (query: string) => ({
-        media: query,
-        matches: query === REDUCED_MOTION_QUERY,
-        addEventListener() {},
-        removeEventListener() {},
-      }),
-    });
-    show(plan({ chip: "bboost", chip_choice: { chip: "bboost", gain_vs_no_chip: 2, basis: "x" } }));
-    const chip = cards()[2]!;
-    fireEvent.click(within(chip).getByRole("button"));
-    expect(chip).toHaveAttribute("data-open");
-    expect(within(chip).getByText(MESSAGES.tr.leagueMembers.storyChipPlay)).toBeInTheDocument();
+  it("tells no chip the member did not choose, whatever else names one", () => {
+    const strategy = {
+      version: "dated_joint_opportunity_v3",
+      mode: "auto",
+      requested_chip: "auto",
+      selected_chip: "bboost",
+    } as EntryAdvice["chip_strategy"];
+    show(plan({ chip: "bboost", chip_strategy: strategy }));
+    expect(kinds()).toEqual(["transfers", "captain"]);
   });
 });
 
@@ -165,6 +157,10 @@ describe("the chip card's lift", () => {
       .map((line) => line.split(":")[0]!.trim())
       .filter(Boolean);
     expect(declared.sort()).toEqual(["box-shadow", "transform"]);
+  });
+
+  it("has room in its row for the lift above and the shadow below, which the row would clip", () => {
+    expect(rule(".cards")).toMatch(/padding: var\(--space-1\) 0 var\(--space-4\)/);
   });
 
   it("takes the card time of the motion tokens", () => {

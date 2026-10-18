@@ -81,3 +81,9 @@ applies the rule below.
 A v2 artifact is not binding evidence for Phase D, does not pin a production model, and
 does not start a Phase D or E run. Measurement numbers stay with the local run and are not
 published in the repository.
+
+## A second declared candidate
+
+The gradient-boosting estimator pair is the second development candidate under this same
+scope, contract and comparison rule; its declaration is
+[research/phase_c_gradient_boosting_method.md](research/phase_c_gradient_boosting_method.md).

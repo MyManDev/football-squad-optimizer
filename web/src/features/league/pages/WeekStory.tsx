@@ -4,15 +4,16 @@ import { useLanguage } from "../../../i18n/context";
 import { signedPoints } from "../../../lib/format";
 import { CHIP_COPY } from "../advice/chipCopy";
 import type { EntryAdvice } from "../types";
-import { hasPublishedPlan, namedChip, STORY_ANCHORS } from "./storyPlan";
+import { chosenChip, hasPublishedPlan, STORY_ANCHORS } from "./storyPlan";
 import styles from "./WeekStory.module.css";
 
 /**
  * The week's decisions as short cards at the top of the member page (#1134): transfers,
  * captain and chip, each from the advice document alone. A week without a transfer or a chip
  * shows no card for it, and a week with none of the three shows nothing. The transfer and
- * captain cards are links into their detail below; the chip card opens on itself, lifting
- * slightly, with the chip and what the chip week adds against the member's own plan.
+ * captain cards are links into their detail below; the chip card, there only for a chip the
+ * member chose, opens on itself, lifting slightly, with the chip choice's own sentence and
+ * what the chip week adds against the member's own plan.
  */
 export function WeekStory({ view }: { view: EntryAdvice }) {
   const { language, locale, messages } = useLanguage();
@@ -22,7 +23,7 @@ export function WeekStory({ view }: { view: EntryAdvice }) {
   const planned = hasPublishedPlan(view);
   const moves = planned ? view.moves : [];
   const captain = planned ? (view.captain ?? null) : null;
-  const chip = namedChip(view);
+  const chip = chosenChip(view);
   if (moves.length === 0 && !captain && !chip) return null;
 
   const swaps = moves
@@ -72,17 +73,15 @@ export function WeekStory({ view }: { view: EntryAdvice }) {
             </button>
             {chipOpen ? (
               <div className={styles.opened}>
-                <p className={styles.detail}>{copy.storyChipPlay}</p>
+                <p className={styles.detail}>{CHIP_COPY[language].chosen(chipName)}</p>
                 {typeof gain === "number" && Number.isFinite(gain) ? (
                   <p className={`${styles.detail} num`}>
                     {CHIP_COPY[language].gain(signedPoints(gain, 1, locale))}
                   </p>
                 ) : null}
-                {view.chip_choice ? (
-                  <a className={styles.more} href={`#${STORY_ANCHORS.chip}`}>
-                    {copy.storyDetail}
-                  </a>
-                ) : null}
+                <a className={styles.more} href={`#${STORY_ANCHORS.chip}`}>
+                  {copy.storyDetail}
+                </a>
               </div>
             ) : null}
           </li>

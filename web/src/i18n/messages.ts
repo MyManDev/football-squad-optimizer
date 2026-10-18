@@ -808,7 +808,6 @@ const en = {
     storyTitle: "This week's decisions",
     storyTransfers: "Transfers",
     storyMoves: (count: number) => (count === 1 ? "1 change" : `${count} changes`),
-    storyChipPlay: "Played this week",
     storyDetail: "Details",
     // The duel (#1133): the member's eleven beside one rival's, from the same capture.
     duelTitle: "Head to head",
@@ -1823,7 +1822,6 @@ const tr: MessageSchema<typeof en> = {
     storyTitle: "Bu haftanın kararları",
     storyTransfers: "Transferler",
     storyMoves: (count) => `${count} değişiklik`,
-    storyChipPlay: "Bu hafta oynanıyor",
     storyDetail: "Ayrıntı",
     duelTitle: "Rakiple yan yana",
     duelPick: "Rakip",

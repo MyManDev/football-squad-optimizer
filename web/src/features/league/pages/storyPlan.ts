@@ -21,7 +21,12 @@ export function hasPublishedPlan(view: EntryAdvice): boolean {
   );
 }
 
-/** The chip the advice document names for this week, or null where it names none. */
-export function namedChip(view: EntryAdvice): AdviceChip | null {
-  return view.chip ?? view.chip_choice?.chip ?? view.chip_strategy?.selected_chip ?? null;
+/**
+ * The chip the member chose for this week, as the document's chip choice names it, or null
+ * without one. Only the member's own choice is told at the top of the page: a chip the
+ * producer's chip strategy names is left to the decision below, because the page never
+ * says on its own that this is the week to play a chip.
+ */
+export function chosenChip(view: EntryAdvice): AdviceChip | null {
+  return view.chip_choice?.chip ?? null;
 }
