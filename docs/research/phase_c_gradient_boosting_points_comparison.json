@@ -4990,7 +4990,7 @@
       "decision_interval_above_zero": false,
       "pin_proposed": false
     },
-    "note": "The points-MAE rule did not prefer the candidate: its 2025-26 interval lies below zero, separated from zero against the candidate, and its 2024-25 interval crosses zero. Its squads scored the most realized points of any component arm measured, with a paired interval across zero that is not separated from zero. That decision-level reading re-computes the pre-declaration recomposition probe exactly (the same expected points on every row, the same realized score on every fold), so it is not an independent confirmation. The pin condition of the declaration is not met; no pin is proposed.",
+    "note": "The points-MAE rule did not prefer the candidate: its 2025-26 interval lies below zero, separated from zero against the candidate, and its 2024-25 interval crosses zero. Its squads scored the most realized points of any component arm measured, with a paired interval across zero that is not separated from zero. Added after the result (descriptive, 2026-10-18, at commit 193e6895; see added_after_the_result): that decision-level reading re-computes the pre-declaration recomposition probe exactly (the same expected points on every row, the same realized score on every fold), so it is not an independent confirmation. The pin condition of the declaration is not met; no pin is proposed.",
     "added_after_the_result": {
       "label": "added after the result, descriptive, 2026-10-18, computed at commit 193e6895cddd3cba83223e430d27c74d0cc492d3 from the same decision artifacts and the pre-declaration probe's artifacts; promotes nothing and changes no number of the measurement",
       "probe_reproduction": {
