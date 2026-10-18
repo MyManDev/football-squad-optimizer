@@ -75,6 +75,8 @@ from squadopt.prediction.component_models import (
     EQUAL_WEIGHTING,
     GRADIENT_BOOSTING_ESTIMATOR,
     GRADIENT_BOOSTING_MODEL_VERSION,
+    GRADIENT_BOOSTING_POINTS_ESTIMATOR,
+    GRADIENT_BOOSTING_POINTS_MODEL_VERSION,
     LINEAR_ESTIMATOR,
     SEASON_HALF_LIFE_WEIGHTING,
     SEASON_WEIGHT_BASE,
@@ -104,13 +106,17 @@ WEIGHTING_LABELS = {"equal": EQUAL_WEIGHTING, "season_half_life": SEASON_HALF_LI
 # weighting, with the three linear estimators replaced by the gradient-boosted ensembles
 # of `ComponentModelConfig` (constants, never searched). Its table name carries the arm so
 # the two candidates cannot overwrite each other or the control.
-ESTIMATOR_ARMS = (LINEAR_ESTIMATOR, GRADIENT_BOOSTING_ESTIMATOR)
+ESTIMATOR_ARMS = (LINEAR_ESTIMATOR, GRADIENT_BOOSTING_ESTIMATOR, GRADIENT_BOOSTING_POINTS_ESTIMATOR)
 # The declared feature contracts. v2 adds the one-gameweek and ten-gameweek windows for
 # minutes and appearance and is a v2 development arm only; the v1 contract fits the frozen
 # feature set.
 FEATURE_CONTRACT_ARMS = tuple(FEATURE_CONTRACTS)
 FEATURE_CONTRACT_TABLE_SUFFIX = {"v1": "", "v2": "_features_v2"}
-ESTIMATOR_TABLE_SUFFIX = {LINEAR_ESTIMATOR: "", GRADIENT_BOOSTING_ESTIMATOR: "_gradient_boosting"}
+ESTIMATOR_TABLE_SUFFIX = {
+    LINEAR_ESTIMATOR: "",
+    GRADIENT_BOOSTING_ESTIMATOR: "_gradient_boosting",
+    GRADIENT_BOOSTING_POINTS_ESTIMATOR: "_gradient_boosting_points",
+}
 ESTIMATOR_RULES = {
     LINEAR_ESTIMATOR: (
         "standardized logistic regression (appearance) and ridge regression (minutes and "
@@ -119,6 +125,10 @@ ESTIMATOR_RULES = {
     GRADIENT_BOOSTING_ESTIMATOR: (
         "histogram gradient-boosted trees for all three estimators: fixed rounds, no early "
         "stopping, constants from ComponentModelConfig; equal weighting only"
+    ),
+    GRADIENT_BOOSTING_POINTS_ESTIMATOR: (
+        "the linear appearance and minutes estimators with a histogram gradient-boosted "
+        "conditional points estimator (same constants); equal weighting only"
     ),
 }
 WEIGHTING_RULES = {
@@ -416,10 +426,10 @@ def build_oof_table(
         )
     if estimator not in ESTIMATOR_ARMS:
         raise DataError(f"Unknown estimator {estimator!r}.")
-    boosted = estimator == GRADIENT_BOOSTING_ESTIMATOR
+    boosted = estimator != LINEAR_ESTIMATOR
     if boosted and (not development or weighting != "equal"):
         raise DataError(
-            "The gradient-boosting candidate is a Phase C v2 development arm under equal "
+            "The gradient-boosting candidates are Phase C v2 development arms under equal "
             "weighting; the v1 contract and the weighted arm fit only the linear estimators."
         )
     config = replace(ComponentModelConfig() if config is None else config, estimator=estimator)
@@ -433,7 +443,9 @@ def build_oof_table(
     feature_contract_version, feature_config = FEATURE_CONTRACTS[feature_contract]
     arm_model_version = (
         GRADIENT_BOOSTING_MODEL_VERSION
-        if boosted
+        if estimator == GRADIENT_BOOSTING_ESTIMATOR
+        else GRADIENT_BOOSTING_POINTS_MODEL_VERSION
+        if estimator == GRADIENT_BOOSTING_POINTS_ESTIMATOR
         else COMPONENT_MODEL_VERSION
         if weighting == "equal"
         else SEASON_WEIGHTED_MODEL_VERSION
@@ -608,6 +620,36 @@ def build_decision_roster(panel: pd.DataFrame, table: pd.DataFrame) -> pd.DataFr
     return (
         roster.loc[:, list(ROSTER_COLUMNS)].sort_values(keys, kind="stable").reset_index(drop=True)
     )
+
+
+def estimator_constants(estimator: str, config: ComponentModelConfig) -> dict[str, object]:
+    """The declared constants of every estimator an arm fits, for its manifest.
+
+    The points-only arm fits the linear appearance and minutes estimators beside the boosted
+    points estimator, so it records the constants of all three.
+    """
+    linear: dict[str, object] = {
+        "appearance_regularization": config.appearance_regularization,
+        "minutes_alpha": config.minutes_alpha,
+        "points_alpha": config.points_alpha,
+    }
+    boosted: dict[str, object] = {
+        "learning_rate": config.boosting_learning_rate,
+        "iterations": config.boosting_iterations,
+        "max_leaf_nodes": config.boosting_max_leaf_nodes,
+        "min_samples_leaf": config.boosting_min_samples_leaf,
+        "l2_regularization": config.boosting_l2_regularization,
+        "early_stopping": False,
+    }
+    if estimator == LINEAR_ESTIMATOR:
+        return linear
+    if estimator == GRADIENT_BOOSTING_POINTS_ESTIMATOR:
+        return {
+            "appearance_regularization": linear["appearance_regularization"],
+            "minutes_alpha": linear["minutes_alpha"],
+            **boosted,
+        }
+    return boosted
 
 
 def main() -> int:
@@ -871,22 +913,7 @@ def main() -> int:
                     "name": estimator,
                     "model_version": model_version,
                     "rule": ESTIMATOR_RULES[estimator],
-                    "constants": (
-                        {
-                            "learning_rate": config.boosting_learning_rate,
-                            "iterations": config.boosting_iterations,
-                            "max_leaf_nodes": config.boosting_max_leaf_nodes,
-                            "min_samples_leaf": config.boosting_min_samples_leaf,
-                            "l2_regularization": config.boosting_l2_regularization,
-                            "early_stopping": False,
-                        }
-                        if estimator == GRADIENT_BOOSTING_ESTIMATOR
-                        else {
-                            "appearance_regularization": config.appearance_regularization,
-                            "minutes_alpha": config.minutes_alpha,
-                            "points_alpha": config.points_alpha,
-                        }
-                    ),
+                    "constants": estimator_constants(estimator, config),
                     "declared_before_measurement": True,
                 },
                 "rule_era": {
