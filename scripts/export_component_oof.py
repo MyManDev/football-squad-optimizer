@@ -604,6 +604,36 @@ def build_decision_roster(panel: pd.DataFrame, table: pd.DataFrame) -> pd.DataFr
     )
 
 
+def estimator_constants(estimator: str, config: ComponentModelConfig) -> dict[str, object]:
+    """The declared constants of every estimator an arm fits, for its manifest.
+
+    The points-only arm fits the linear appearance and minutes estimators beside the boosted
+    points estimator, so it records the constants of all three.
+    """
+    linear: dict[str, object] = {
+        "appearance_regularization": config.appearance_regularization,
+        "minutes_alpha": config.minutes_alpha,
+        "points_alpha": config.points_alpha,
+    }
+    boosted: dict[str, object] = {
+        "learning_rate": config.boosting_learning_rate,
+        "iterations": config.boosting_iterations,
+        "max_leaf_nodes": config.boosting_max_leaf_nodes,
+        "min_samples_leaf": config.boosting_min_samples_leaf,
+        "l2_regularization": config.boosting_l2_regularization,
+        "early_stopping": False,
+    }
+    if estimator == LINEAR_ESTIMATOR:
+        return linear
+    if estimator == GRADIENT_BOOSTING_POINTS_ESTIMATOR:
+        return {
+            "appearance_regularization": linear["appearance_regularization"],
+            "minutes_alpha": linear["minutes_alpha"],
+            **boosted,
+        }
+    return boosted
+
+
 def main() -> int:
     arguments = _parse_arguments()
     scope = str(arguments.development_scope)
@@ -835,22 +865,7 @@ def main() -> int:
                     "name": estimator,
                     "model_version": model_version,
                     "rule": ESTIMATOR_RULES[estimator],
-                    "constants": (
-                        {
-                            "learning_rate": config.boosting_learning_rate,
-                            "iterations": config.boosting_iterations,
-                            "max_leaf_nodes": config.boosting_max_leaf_nodes,
-                            "min_samples_leaf": config.boosting_min_samples_leaf,
-                            "l2_regularization": config.boosting_l2_regularization,
-                            "early_stopping": False,
-                        }
-                        if estimator != LINEAR_ESTIMATOR
-                        else {
-                            "appearance_regularization": config.appearance_regularization,
-                            "minutes_alpha": config.minutes_alpha,
-                            "points_alpha": config.points_alpha,
-                        }
-                    ),
+                    "constants": estimator_constants(estimator, config),
                     "declared_before_measurement": True,
                 },
                 "rule_era": {
