@@ -37,7 +37,10 @@ from squadopt.evaluation import (
 from squadopt.evaluation.promotion import PromotionPolicy
 from squadopt.evaluation.statistics import season_aware_moving_block_interval
 from squadopt.experiments.phase_c_reporting import phase_c_component_evaluation_to_dict
-from squadopt.prediction.component_dataset import FEATURE_CONTRACT_VERSION_V2
+from squadopt.prediction.component_dataset import (
+    FEATURE_CONTRACT_VERSION,
+    FEATURE_CONTRACT_VERSION_V2,
+)
 from squadopt.prediction.component_models import (
     COMPONENT_MODEL_VERSION,
     EQUAL_WEIGHTING,
@@ -73,7 +76,8 @@ CANDIDATE_ARMS = {
     },
     # The feature-contract candidate is read against the gradient-boosting arm on the v1
     # features, so the comparison isolates the windows; the model version is the same and
-    # only the declared feature contract differs between the two arms.
+    # only the declared feature contract differs between the two arms. Both contracts are
+    # named, so neither side can be swapped for a table on another contract.
     "gradient_boosting_windows": {
         "weighting": EQUAL_WEIGHTING,
         "model_version": GRADIENT_BOOSTING_MODEL_VERSION,
@@ -82,6 +86,7 @@ CANDIDATE_ARMS = {
         "reference": "gradient_boosting candidate on the v2 feature contract",
         "control_model_version": GRADIENT_BOOSTING_MODEL_VERSION,
         "control_table": f"{DEVELOPMENT_OOF_CONTRACT_VERSION}_equal_gradient_boosting",
+        "control_feature_contract_version": FEATURE_CONTRACT_VERSION,
         "candidate_feature_contract_version": FEATURE_CONTRACT_VERSION_V2,
     },
 }
@@ -176,6 +181,7 @@ def check_paired(
     expected_weighting = str(arm["weighting"])
     expected_version = str(arm["model_version"])
     control_version = str(arm.get("control_model_version", COMPONENT_MODEL_VERSION))
+    control_features = arm.get("control_feature_contract_version")
     candidate_features = arm.get("candidate_feature_contract_version")
     if control.weighting != EQUAL_WEIGHTING or candidate.weighting != expected_weighting:
         raise EvaluationValidationError(
@@ -194,6 +200,11 @@ def check_paired(
         raise EvaluationValidationError(
             f"The {candidate_arm} candidate must carry the feature contract "
             f"{candidate_features!r}, got {candidate.feature_contract_version!r}."
+        )
+    if control_features is not None and control.feature_contract_version != control_features:
+        raise EvaluationValidationError(
+            f"The {candidate_arm} control must carry the feature contract "
+            f"{control_features!r}, got {control.feature_contract_version!r}."
         )
     if control.repository_commit != candidate.repository_commit:
         raise EvaluationValidationError("Both arms must come from the same commit.")
@@ -339,6 +350,7 @@ def _arm_record(handoff: PhaseCComponentHandoff, name: str) -> dict[str, object]
         "name": name,
         "weighting": handoff.weighting,
         "model_version": handoff.model_version,
+        "feature_contract_version": handoff.feature_contract_version,
         "development_contract": handoff.development_contract,
         "repository_commit": handoff.repository_commit,
         "table_sha256": handoff.table_sha256,
