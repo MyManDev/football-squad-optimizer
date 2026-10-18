@@ -55,7 +55,7 @@ carry-over, and the Top-100 variant of each.
 | --- | --- |
 | `opening.py` | Projections for a season that has not started, from a roster and earlier seasons. |
 | `in_season.py` | The control extended into a season that has started (`in-season-carry-over-v1`), blending the completed season with the current one. |
-| `component_dataset.py` | The leakage-safe modelling frame the Phase C control components are fitted on: which columns may be features and which rows may be training data (`phase_c_component_dataset_v1`). |
+| `component_dataset.py` | The leakage-safe modelling frame the Phase C control components are fitted on: which columns may be features and which rows may be training data (`phase_c_component_dataset_v1`); the served feature contract and the declared v2 contract with the one-week and ten-week windows (`docs/research/phase_c_feature_contract_v2_method.md`). |
 | `component_models.py` | The Phase C control components (`phase_c_control_components_v1`): appearance, conditional minutes and conditional points, declared rather than searched. Also the declared gradient-boosting candidate (`phase_c_control_components_gbm_v1`, `ComponentModelConfig(estimator="gradient_boosting")`), measured under the v2 development path; see `docs/research/phase_c_gradient_boosting_method.md`. The points-only candidate (`phase_c_control_components_gbm_points_v1`, `estimator="gradient_boosting_points"`) keeps the linear appearance and minutes estimators and boosts only the conditional points; see `docs/research/phase_c_gradient_boosting_points_method.md`. |
 | `elite_evidence.py` | The conservative Top-100 evidence adjustment of the operational point handoff (`phase_c_operational_elite_policy_v1`), and the two Top-100 model versions. |
 
