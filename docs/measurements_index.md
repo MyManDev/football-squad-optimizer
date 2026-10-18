@@ -6,7 +6,7 @@ where it came from. Every artifact here is measurement-only in the sense that ma
 has since been acted on, and that qualification is spelled out below rather than left to
 the row.
 
-**Four non-football** artifacts measured on the locked 2025-26 holdout under
+**Nine non-football** artifacts measured on the locked 2025-26 holdout under
 different rules, so all are named here rather than left to their rows. `fw10_holdout`
 **spent** the holdout as an unseen final test, once, under the pre-registered protocol in
 `fw10_holdout_plan.md`, with three owner approvals recorded first; it did not promote its
@@ -19,8 +19,16 @@ was read, not that the holdout was spent as a final test. `mean_reversion_discou
 development data under `--development-scope v2`, as one of its five season chains, and its
 record carries the same flag for the same reason. `rank_conditional_shrinkage` (2026-10-17,
 under `docs/research/`) walked 2025-26 the same way, under the same v2 scope and its own
-pre-registration, and records the same flag for the same reason. A header a reader trusts
-must not contradict its own table, so the count is stated and all four readings are named.
+pre-registration, and records the same flag for the same reason. The five Phase C component
+candidate records under `docs/research/` (2026-10-17 and 2026-10-18:
+`phase_c_gradient_boosting_comparison`, `phase_c_feature_contract_v2_comparison`,
+`phase_c_gradient_boosting_points_comparison`, `moe_regime` and `moe_mixture`) walked 2025-26
+the same way for their points-MAE rule, as declared development data under
+`--development-scope v2`; their decision-level readings use the frozen 2021-22 to 2024-25
+folds only. They stated the read under `locked_holdout_read_as_development_data` and carry
+the same flag since 2026-10-18, added as provenance without changing any measured value. A
+header a reader trusts must not contradict its own table, so the count is stated and all
+nine readings are named.
 
 Nothing in this index promoted a model, and nothing here changed the **operational
 control** — the promoted live point model, as `phase_c_component_model_prereg.md` and
