@@ -84,8 +84,23 @@
   font-weight: 700;
 }
 
-/* Weeks side by side where the column holds two or three of them, one under the other on a
-   phone. Each list keeps a readable width, so a result never stretches across the page. */
+/* This week and the following week share the row: two equal halves wherever the column
+   holds two lists of 20rem, so the following week ends at the column's right edge, and one
+   under the other on a phone. A track is never narrower than half the row, so a lone week
+   keeps half the row too. The 1px keeps rounding from dropping the second track. */
+.upcoming {
+  display: grid;
+  grid-template-columns: repeat(
+    auto-fill,
+    minmax(max(min(100%, 20rem), calc((100% - var(--space-6)) / 2 - 1px)), 1fr)
+  );
+  align-items: start;
+  gap: var(--space-5) var(--space-6);
+}
+
+/* Played weeks side by side where the column holds two or three of them, one under the
+   other on a phone. Each list keeps a readable width, so a result never stretches across
+   the page. */
 .weeks {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr));

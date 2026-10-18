@@ -45,6 +45,10 @@ const SEASON_CODES = [
   "TOT",
 ];
 
+/** The page's stylesheet without its comments. */
+const stylesheet = () =>
+  readFileSync(join(__dirname, "Fixtures.module.css"), "utf-8").replace(/\/\*[\s\S]*?\*\//g, "");
+
 const team = (team_id: number, name: string, short_name: string) => ({ team_id, name, short_name });
 const ARS = team(1, "Arsenal", "ARS");
 const AVL = team(2, "Aston Villa", "AVL");
@@ -306,6 +310,41 @@ describe("what the fixtures page leaves out", () => {
       );
     },
   );
+});
+
+describe("the upcoming pair", () => {
+  it("sets this week and next in a row of their own, apart from the played weeks", async () => {
+    serve(published(payload()));
+    render(surface(<FixturesPage />, "en", "/fixtures"));
+    const current = await gameweekRegion("Upcoming gameweek · Gameweek 3");
+    const next = await gameweekRegion("Following gameweek · Gameweek 4");
+    const pair = current.parentElement!;
+    expect(next.parentElement).toBe(pair);
+    expect(pair).toHaveClass("upcoming");
+    expect(pair).not.toHaveClass("weeks");
+    expect(pair).toHaveAttribute("data-mark", "upcoming-weeks");
+    expect(pair.children).toHaveLength(2);
+
+    const played = (await gameweekRegion("Gameweek 2")).parentElement!;
+    expect(played).toHaveClass("weeks");
+    expect(played).not.toHaveClass("upcoming");
+  });
+
+  it("keeps a lone upcoming week in the same row", async () => {
+    serve(published(payload(4)));
+    render(surface(<FixturesPage />, "en", "/fixtures"));
+    const current = await gameweekRegion("Upcoming gameweek · Gameweek 4");
+    expect(current.parentElement).toHaveClass("upcoming");
+    expect(current.parentElement!.children).toHaveLength(1);
+  });
+
+  it("gives every track half the row at least, so two weeks fill it", () => {
+    const rule = (stylesheet().match(/\.upcoming\s*\{([^}]*)\}/)?.[1] ?? "").replace(/\s+/g, " ");
+    expect(rule).toMatch(/display: grid/);
+    expect(rule).toContain(
+      "minmax(max(min(100%, 20rem), calc((100% - var(--space-6)) / 2 - 1px)), 1fr)",
+    );
+  });
 });
 
 describe("the two club colours in a fixture list", () => {

@@ -8,7 +8,7 @@ import type { FixtureGameweek } from "./types";
 import styles from "./Fixtures.module.css";
 
 /**
- * This week and next at the top, then every played gameweek, newest first. The weeks stand
+ * This week and next at the top, sharing the row, then every played gameweek, newest first,
  * side by side where the column has room for more than one, so a wide screen reads the
  * schedule like a fixture board instead of one narrow list down the page.
  */
@@ -41,7 +41,7 @@ export function FixturesPage() {
         <p className={styles.lede}>{copy.pageLede}</p>
       </header>
       {current || next ? (
-        <div className={styles.weeks}>
+        <div className={styles.upcoming} data-mark="upcoming-weeks">
           {current ? week(current, copy.thisWeek) : null}
           {next ? week(next, copy.nextWeek) : null}
         </div>
