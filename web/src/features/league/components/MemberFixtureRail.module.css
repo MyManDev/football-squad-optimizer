@@ -242,8 +242,12 @@
   padding: 4px 0;
 }
 
+/* Each side's two colours face the dash, as on the fixtures page. */
 .match {
   flex: none;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
   min-width: 76px;
   font-family: var(--font-mono);
   font-weight: 600;

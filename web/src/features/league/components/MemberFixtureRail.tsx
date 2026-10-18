@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef } from "react";
 
+import { ClubSwatch } from "../../../design/components/ClubSwatch";
 import { CloseIcon } from "../../../design/shell/icons";
 import { FIXTURE_SHEET_ID, useShell } from "../../../design/shell/ShellContext";
 import { useLanguage } from "../../../i18n/context";
@@ -283,7 +284,11 @@ export function MemberFixtureRail({
                     {pairs.map((pair) => (
                       <li key={`${pair.home}-${pair.away}`}>
                         <span className={styles.match}>
-                          {pair.home} - {pair.away}
+                          {pair.home}
+                          <ClubSwatch code={pair.home} split />
+                          {" - "}
+                          <ClubSwatch code={pair.away} split />
+                          {pair.away}
                         </span>
                         <span className={styles.who}>
                           {names(pair.homePlayers)} / {names(pair.awayPlayers)}

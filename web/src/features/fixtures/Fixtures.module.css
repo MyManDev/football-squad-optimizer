@@ -39,13 +39,18 @@
   font-size: var(--step--1);
 }
 
+/* Each club's code with its two colours on the side facing the middle. */
 .home,
 .away {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  min-width: 0;
   font-weight: 600;
 }
 
 .home {
-  text-align: right;
+  justify-content: flex-end;
 }
 
 .when {

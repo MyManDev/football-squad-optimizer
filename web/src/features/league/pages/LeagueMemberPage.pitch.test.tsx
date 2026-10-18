@@ -22,6 +22,7 @@ import {
 } from "../../../fixtures/league";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { MESSAGES, type Language } from "../../../i18n/messages";
+import { CLUB_COLOURS } from "../../../lib/clubs";
 import type { FixturesPayload } from "../../fixtures/types";
 import type { AdvicePlayer, EntryAdvice, LeagueViewEnvelope } from "../types";
 import { LeagueMemberView } from "./LeagueMemberPage";
@@ -447,6 +448,19 @@ describe("the fixture rail", () => {
         "SUN - BHABrobbey / Cuyper, Groß",
         "LIV - MCISzoboszlai / Guéhi, Haaland",
       ]);
+      // Each side of a meeting carries its club's two colours, beside the code.
+      for (const item of within(meet).getAllByRole("listitem")) {
+        const [home, away] = item.firstElementChild!.textContent!.split(" - ");
+        const marks = [...item.querySelectorAll<HTMLElement>("[aria-hidden='true']")];
+        expect(marks.map((mark) => mark.style.getPropertyValue("--club-primary"))).toEqual([
+          CLUB_COLOURS[home!]!.primary,
+          CLUB_COLOURS[away!]!.primary,
+        ]);
+        expect(marks.map((mark) => mark.style.getPropertyValue("--club-secondary"))).toEqual([
+          CLUB_COLOURS[home!]!.secondary,
+          CLUB_COLOURS[away!]!.secondary,
+        ]);
+      }
       // No legend under the tables.
       expect(aside).not.toHaveTextContent(/E: ev|H: home|zorluk derecesi|Fixture difficulty/);
     },

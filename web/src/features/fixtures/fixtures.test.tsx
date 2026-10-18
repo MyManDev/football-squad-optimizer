@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
@@ -7,10 +10,40 @@ import { PageShell } from "../../design/components/PageShell";
 import { AS_A_CHANCE } from "../../testSupport/honesty";
 import { LanguageProvider } from "../../i18n/LanguageProvider";
 import { MESSAGES, type Language } from "../../i18n/messages";
+import { CLUB_COLOURS } from "../../lib/clubs";
 import { fixtureWeeks, upcomingFixtureWeeks, loadFixtures } from "./data";
 import { FIXTURES_COPY } from "./fixturesCopy";
 import { FixturesPage } from "./FixturesPage";
+import { GameweekFixtures } from "./GameweekFixtures";
 import type { Fixture, FixturesPayload } from "./types";
+
+/** The shipped calendar: its first gameweek names all twenty clubs of the season. */
+const shipped = JSON.parse(
+  readFileSync(join(__dirname, "../../../public/data/fixtures.json"), "utf-8"),
+) as { payload: FixturesPayload };
+
+const SEASON_CODES = [
+  "ARS",
+  "AVL",
+  "BHA",
+  "BOU",
+  "BRE",
+  "CHE",
+  "COV",
+  "CRY",
+  "EVE",
+  "FUL",
+  "HUL",
+  "IPS",
+  "LEE",
+  "LIV",
+  "MCI",
+  "MUN",
+  "NEW",
+  "NFO",
+  "SUN",
+  "TOT",
+];
 
 const team = (team_id: number, name: string, short_name: string) => ({ team_id, name, short_name });
 const ARS = team(1, "Arsenal", "ARS");
@@ -231,6 +264,77 @@ describe("the fixtures page", () => {
     render(surface(<FixturesPage />, "tr", "/fixtures"));
     await gameweekRegion(`${FIXTURES_COPY.tr.thisWeek} · Oyun haftası 3`);
     expect(screen.getByTestId("surface").textContent).not.toMatch(AS_A_CHANCE);
+  });
+});
+
+describe("the two club colours in a fixture list", () => {
+  const week = shipped.payload.gameweeks[0]!;
+
+  it("covers all twenty clubs of the season in the shipped first gameweek", () => {
+    const codes = week.fixtures.flatMap((fixture) => [
+      fixture.home.short_name,
+      fixture.away.short_name,
+    ]);
+    expect([...codes].sort()).toEqual(SEASON_CODES);
+  });
+
+  it.each(["tr", "en"] as const)(
+    "draws both colours beside every club, facing the middle, with the code printed (%s)",
+    (language) => {
+      render(
+        <GameweekFixtures
+          week={week}
+          locale={language === "tr" ? "tr-TR" : "en-GB"}
+          copy={FIXTURES_COPY[language]}
+        />,
+      );
+      const rows = screen.getAllByRole("listitem");
+      expect(rows).toHaveLength(week.fixtures.length);
+      const seen: string[] = [];
+      rows.forEach((row, index) => {
+        const fixture = week.fixtures[index]!;
+        const [home, , away] = [...row.children] as HTMLElement[];
+        const sides = [
+          { side: home!, team: fixture.home, mark: home!.lastElementChild, code: home!.firstChild },
+          { side: away!, team: fixture.away, mark: away!.firstElementChild, code: away!.lastChild },
+        ];
+        for (const { side, team, mark, code } of sides) {
+          // The code is printed beside the mark, and the full name stays on the side.
+          expect(side.textContent).toBe(team.short_name);
+          expect(code!.textContent).toBe(team.short_name);
+          expect(side).toHaveAttribute("title", team.name);
+          expect(side.querySelectorAll("[aria-hidden='true']")).toHaveLength(1);
+          const swatch = mark as HTMLElement;
+          expect(swatch).toHaveAttribute("aria-hidden", "true");
+          expect(swatch.textContent).toBe("");
+          expect(swatch.style.getPropertyValue("--club-primary")).toBe(
+            CLUB_COLOURS[team.short_name]!.primary,
+          );
+          expect(swatch.style.getPropertyValue("--club-secondary")).toBe(
+            CLUB_COLOURS[team.short_name]!.secondary,
+          );
+          seen.push(team.short_name);
+        }
+      });
+      expect(seen.sort()).toEqual(SEASON_CODES);
+    },
+  );
+
+  it("prints a club it has no colours for by its code alone", () => {
+    render(
+      <GameweekFixtures
+        week={{
+          gameweek: 1,
+          deadline_utc: "2026-08-21T17:30:00Z",
+          fixtures: [upcoming(1, team(90, "Northport", "NPT"), ARS, "2026-08-22T14:00:00Z")],
+        }}
+        locale="en-GB"
+        copy={FIXTURES_COPY.en}
+      />,
+    );
+    const row = screen.getByRole("listitem");
+    expect(row).toHaveTextContent(/^NPT\d{2}:\d{2}ARS$/);
+    expect(row.querySelectorAll("[aria-hidden='true']")).toHaveLength(1);
   });
 });
 
