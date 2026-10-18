@@ -200,7 +200,7 @@ def _candidate_from_arguments(arguments: argparse.Namespace) -> CandidateInputs 
             "--team-match-block, --team-match-joint and the conditional-residual flags name "
             "two candidate samplers; a run draws on one."
         )
-    digests = _pinned_digests(arguments, "--team-match-block")
+    digests = _pinned_digests(arguments, "--team-match-joint" if joint else "--team-match-block")
     if Path(arguments.json_output).resolve() == DEFAULT_OUTPUT.resolve():
         raise FidelityBindingError(
             "A candidate run cannot write the frozen v1 artifact path; give --json-output."

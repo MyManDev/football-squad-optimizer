@@ -57,8 +57,15 @@ def test_a_v1_joint_run_is_pinned_and_names_one_sampler() -> None:
         _candidate_from_arguments(_joint_arguments(team_match_block=True))  # type: ignore[arg-type]
     with pytest.raises(FidelityBindingError, match="one"):
         _candidate_from_arguments(_joint_arguments(conditional_residual_fraction=0.15))  # type: ignore[arg-type]
-    with pytest.raises(FidelityBindingError, match="64-hex"):
+    # A missing digest is refused under the flag the run was given.
+    with pytest.raises(FidelityBindingError, match="64-hex SHA-256 under --team-match-joint"):
         _candidate_from_arguments(_joint_arguments(expected_roster_sha256=None))  # type: ignore[arg-type]
+    with pytest.raises(FidelityBindingError, match="64-hex SHA-256 under --team-match-block"):
+        _candidate_from_arguments(
+            _joint_arguments(
+                team_match_block=True, team_match_joint=False, expected_roster_sha256=None
+            )
+        )  # type: ignore[arg-type]
     with pytest.raises(FidelityBindingError, match="frozen v1 artifact path"):
         _candidate_from_arguments(_joint_arguments(json_output=DEFAULT_OUTPUT))  # type: ignore[arg-type]
     # The block run is what it was, and a plain v1 run names no candidate.

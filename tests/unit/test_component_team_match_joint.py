@@ -184,6 +184,11 @@ def test_the_pool_keeps_non_appearances_without_a_residual_and_counts_its_refusa
         team_match_joint_pool(_pool_frame().drop(columns=["appearance_probability"]), target=TARGET)
     with pytest.raises(ScenarioValidationError, match="own residual history"):
         team_match_joint_pool(_pool_frame().assign(fold_id=TARGET.fold_id), target=TARGET)
+    # A fold after the target is refused too, by the zero-padded fold order (gw10 after gw09).
+    later = _pool_frame()
+    later.loc[later["fold_id"] == "2026-27-gw08", "fold_id"] = "2026-27-gw10"
+    with pytest.raises(ScenarioValidationError, match="must precede"):
+        team_match_joint_pool(later, target=TARGET)
 
 
 def test_a_fold_with_no_appearance_leaves_the_history() -> None:

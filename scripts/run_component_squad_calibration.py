@@ -169,7 +169,7 @@ PAIRED_DIFFERENCE_POLICY: Final = PromotionPolicy(
     deterministic_seed=0,
 )
 # The joint protocol's descriptive interval: the same blocks and seed, 5,000 resamples, as
-# the mixture-of-experts brief asks. It decides nothing either.
+# docs/research/moe_sampler_prereg.md declares. It decides nothing either.
 JOINT_PAIRED_DIFFERENCE_POLICY: Final = PromotionPolicy(
     min_mean_improvement=0.0,
     confidence_level=0.90,
@@ -1336,7 +1336,8 @@ def _joint_readings(fold_records: Sequence[Mapping[str, object]]) -> dict[str, o
     paired differences against it, both PIT tails of every arm, the folds whose tail flag
     differs from each control with wins, ties and losses, the within-club appearance
     correlation, and the gate clauses G1 to G4 with their values. The verdict stays the
-    evaluator's; G3 and G4 are the pin condition's "not worse than the control"."""
+    evaluator's; G3 and G4 are that protocol's "not worse than the control" clauses, which
+    are not the repository's pin rule (docs/phase_e_candidate_selection_prereg.md)."""
 
     control_records = [
         {"fold_id": item["fold_id"], **_mapping(item["control_arm"], "control_arm")}
