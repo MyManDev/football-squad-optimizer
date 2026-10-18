@@ -6,7 +6,7 @@ where it came from. Every artifact here is measurement-only in the sense that ma
 has since been acted on, and that qualification is spelled out below rather than left to
 the row.
 
-**Three non-football** artifacts measured on the locked 2025-26 holdout under
+**Four non-football** artifacts measured on the locked 2025-26 holdout under
 different rules, so all are named here rather than left to their rows. `fw10_holdout`
 **spent** the holdout as an unseen final test, once, under the pre-registered protocol in
 `fw10_holdout_plan.md`, with three owner approvals recorded first; it did not promote its
@@ -17,8 +17,10 @@ under the Phase C v2 development scope (`--development-scope v2`, declared in
 was read, not that the holdout was spent as a final test. `mean_reversion_discount`
 (2026-10-17, under `docs/research/`) **walked** 2025-26 the same way, as declared
 development data under `--development-scope v2`, as one of its five season chains, and its
-record carries the same flag for the same reason. A header a reader trusts must not
-contradict its own table, so the count is stated and all three readings are named.
+record carries the same flag for the same reason. `rank_conditional_shrinkage` (2026-10-17,
+under `docs/research/`) walked 2025-26 the same way, under the same v2 scope and its own
+pre-registration, and records the same flag for the same reason. A header a reader trusts
+must not contradict its own table, so the count is stated and all four readings are named.
 
 Nothing in this index promoted a model, and nothing here changed the **operational
 control** — the promoted live point model, as `phase_c_component_model_prereg.md` and
@@ -310,6 +312,7 @@ was written.
 | --- | --- | --- |
 | `research/football_share_sizing` | Forecast-only retained-history capture `fpl-live-20261002T104314Z-8b70515b9b31`, GW6: 14.678791716983769 attacking expected points uncredited across 20 clubs; four available players gain at least 0.2, maximum 0.21821737796427154. Frozen sizing rule returns go. No outcome read and no served model changed. | Issue #1009 |
 | `research/phase_c_gradient_boosting_comparison` ([record](research/phase_c_gradient_boosting_comparison.json), [readout](research/phase_c_gradient_boosting_comparison.md); declaration [research/phase_c_gradient_boosting_method.md](research/phase_c_gradient_boosting_method.md)) | **The gradient-boosting estimator pair of the Phase C components is preferred under the pre-declared v2 rule**: same rows, features, targets, routes and folds as the linear control (184 walk-forward folds, 2021-22 to 2025-26 under the v2 development scope, 130,095 rows), the estimator the only difference. 2025-26 points MAE 1.00578 to 0.98718, paired 90% interval [+0.01428, +0.02125]; 2024-25 1.02523 to 1.01304, interval [+0.00675, +0.01686]; better in every season on every component (pooled appearance log loss 0.34623 to 0.33082, minutes MAE 16.16 to 15.41). Development reading, 2025-26 read as declared development data. **Decision level (added after the first record, beside the rule):** on the 147 frozen decision folds the boosted arm scores +4.14 a gameweek against the ridge control and the linear arm +4.89; paired boosted minus linear -0.75 [-2.66, +1.05], 75/5/67, so the player-level gain did not turn into a measurable decision gain and the promotion pin waits. | #1129 |
+| `research/rank_conditional_shrinkage` ([record](research/rank_conditional_shrinkage.json), [readout](research/rank_conditional_shrinkage.md); protocol [research/rank_conditional_shrinkage_prereg.md](research/rank_conditional_shrinkage_prereg.md)) | **Measured, not certified: a rank-conditional additive debias of expected points, fitted walk-forward on the gradient-boosting v2 table's own residuals and applied before `optimize_squad`, scores below the unshrunk control.** 176 paired single-gameweek decisions (2021-22-gw10 to 2025-26-gw38, eight burn-in folds, none excluded, all 528 solves proved), Arm A minus control -0.847 points a gameweek, median 0.0, 90% season-aware moving-block interval [-1.591, -0.022] (repository helper, blocks of four, 2,000 resamples, seed 0), wins / ties / losses 51 / 63 / 62, negative in four of five seasons; the noise floor is 1.5 points a gameweek. The position shrinkage control arm, reported not gated, reads +0.068 [-0.284, +0.562]. On this table the control's own selection gap is +0.505 a starter (the old control measured +2.95), so there is little curse left to correct and the bucket shifts move the decision only at bucket boundaries. 2025-26 read as declared development data (`development_scope: v2`, `locked_holdout_accessed: true`). Measurement only, nothing promoted; the verdict licenses nothing but the record. | #1143 |
 
 ## Process references
 
