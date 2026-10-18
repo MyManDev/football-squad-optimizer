@@ -8,7 +8,6 @@ import { Link, useSearchParams } from "react-router";
 import { EmptyState } from "../../../design/components/EmptyState";
 import { useShellLayout } from "../../../design/shell/layout";
 import { useShell } from "../../../design/shell/ShellContext";
-import { ShellPortal } from "../../../design/shell/ShellPortal";
 import { useLanguage } from "../../../i18n/context";
 import { clubCodesFromFixtures } from "../../../lib/clubs";
 import { AdviceRequestPanel } from "../advice/AdviceRequestPanel";
@@ -35,7 +34,7 @@ import {
 } from "./MemberAdviceCard";
 import { HeldSquad, MemberSquad } from "./MemberSquad";
 import { hasLineup, squadOnPitch } from "./squadOnPitch";
-import { MemberTopBar, MemberWho } from "./MemberTopBar";
+import { MemberTopBar } from "./MemberTopBar";
 import type { LeagueMemberViewProps } from "./memberPageTypes";
 import { useMemberAdviceView } from "./useMemberAdviceView";
 import styles from "./LeagueMemberPage.module.css";
@@ -117,7 +116,6 @@ function LeagueMemberContent({
   deadlinePassed = null,
   fixtures = null,
   fixturesPending = false,
-  leagueName,
 }: LeagueMemberViewProps) {
   const { language, locale, messages } = useLanguage();
   const leagueId = useLeagueId();
@@ -375,9 +373,6 @@ function LeagueMemberContent({
           fixtures={fixtures}
           deadlinePassed={deadlinePassed}
         />
-        <ShellPortal slot="who">
-          <MemberWho squad={squad} leagueName={leagueName} />
-        </ShellPortal>
 
         {deadlinePassed !== null ? (
           <section className={styles.notice} aria-labelledby="deadline-passed-title">

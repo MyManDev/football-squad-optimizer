@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -9,6 +9,8 @@ import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { MESSAGES, type Language } from "../../../i18n/messages";
 import { jsonResponse, notFound, stubFetchByUrl } from "../../../testSupport/fetchByUrl";
 import { memberAddress, membersAddress } from "../../../lib/leagueAddresses";
+import { claimIn, forgetIdentity } from "../../../testSupport/league";
+import { readMemberClaim } from "../identity/memberClaim";
 import { readChosenLeague, writeChosenLeague } from "../identity/useChosenLeague";
 import { LeagueGate } from "./LeagueGate";
 
@@ -23,7 +25,7 @@ afterEach(() => {
 });
 beforeEach(() => {
   localStorage.clear();
-  writeChosenLeague(null);
+  forgetIdentity();
 });
 
 /** A site from before the directory: no `leagues.json`, the one league under `data/league/`. */
@@ -34,7 +36,11 @@ function legacySite() {
   ]);
 }
 
-/** Which addresses were asked for: the directory is read, a league's documents are not. */
+/**
+ * Which addresses were asked for: the directory is read, a league's documents are not. The
+ * member step reads the member list too, which the loaders serve from the example under
+ * test, so it asks the network for nothing here.
+ */
 const asked = (fetcher: ReturnType<typeof legacySite>) =>
   fetcher.mock.calls.map(([url]) => url.replace(/^.*\/data\//, "data/"));
 const DIRECTORY_READS = ["data/leagues.json", "data/league/members.json"];
@@ -44,6 +50,13 @@ function LocationProbe() {
   return <span data-testid="location">{`${location.pathname}${location.search}`}</span>;
 }
 const location = () => screen.getByTestId("location").textContent;
+
+/** Counts the stored league choice's writes from here on. */
+function countLeagueChoices() {
+  const heard = vi.fn();
+  window.addEventListener("squadopt:league-changed", heard);
+  return { heard, stop: () => window.removeEventListener("squadopt:league-changed", heard) };
+}
 
 function open(language: Language, address = `/league/members/${ENTRY}`) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -70,8 +83,9 @@ function open(language: Language, address = `/league/members/${ENTRY}`) {
 
 describe.each(["tr", "en"] as const)("league gate in %s", (language) => {
   const copy = MESSAGES[language].leagueEntry;
+  const picker = MESSAGES[language].memberPicker;
 
-  it("shows the entry form at an address from before the league number until the number is given", async () => {
+  it("asks for the number, then who you are, at an address from before the number", async () => {
     const fetcher = legacySite();
     open(language);
     expect(screen.getByRole("heading", { name: copy.title })).toBeInTheDocument();
@@ -83,26 +97,43 @@ describe.each(["tr", "en"] as const)("league gate in %s", (language) => {
     await user.type(screen.getByLabelText(copy.label), String(LEAGUE));
     await user.click(screen.getByRole("button", { name: copy.submit }));
 
-    // The page the visitor asked for opens in place, under the league; no detour through
-    // the members list.
+    // The address asked for is rewritten under the league, and the picker stands there.
+    expect(await screen.findByRole("heading", { name: picker.title })).toBeInTheDocument();
+    expect(location()).toBe(memberAddress(LEAGUE, ENTRY));
+    expect(screen.queryByRole("heading", { name: "Member page" })).toBeNull();
+    expect(readChosenLeague()).toBe(LEAGUE);
+    expect(localStorage.getItem("squadopt.league")).toBe(String(LEAGUE));
+
+    // Once the visitor says who they are, the page opens where it was asked for.
+    const group = await screen.findByRole("group", { name: picker.legend });
+    await user.click(within(group).getByRole("radio", { name: /Deniz Aral/ }));
+    await user.click(screen.getByRole("button", { name: picker.confirm }));
     expect(await screen.findByRole("heading", { name: "Member page" })).toBeInTheDocument();
     expect(location()).toBe(memberAddress(LEAGUE, ENTRY));
     expect(screen.queryByRole("heading", { name: "Members list" })).toBeNull();
-    expect(readChosenLeague()).toBe(LEAGUE);
-    expect(localStorage.getItem("squadopt.league")).toBe(String(LEAGUE));
   });
 
-  it("rewrites an address from before the league number to the remembered league's", async () => {
+  it("rewrites an address from before the league number to the claimed member's league", async () => {
     legacySite();
-    writeChosenLeague(LEAGUE);
+    claimIn();
     open(language, `/league/members/${ENTRY}?mode=ortak-koru`);
     expect(await screen.findByRole("heading", { name: "Member page" })).toBeInTheDocument();
     expect(location()).toBe(memberAddress(LEAGUE, ENTRY, "?mode=ortak-koru"));
     expect(screen.queryByRole("heading", { name: copy.title })).toBeNull();
   });
 
-  it("opens the page at its league address, reading only the directory", async () => {
+  it("rewrites the old address to the claim's league, not to a league chosen since", async () => {
+    legacySite();
+    claimIn();
+    writeChosenLeague(OTHER);
+    open(language, `/league/members/35249002`);
+    expect(await screen.findByRole("heading", { name: "Member page" })).toBeInTheDocument();
+    expect(location()).toBe(memberAddress(LEAGUE, 35249002));
+  });
+
+  it("opens the page at its league address for a claimed visitor, reading only the directory", async () => {
     const fetcher = legacySite();
+    claimIn();
     open(language, memberAddress(LEAGUE, ENTRY));
     expect(await screen.findByRole("heading", { name: "Member page" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: copy.title })).toBeNull();
@@ -111,12 +142,50 @@ describe.each(["tr", "en"] as const)("league gate in %s", (language) => {
     expect(readChosenLeague()).toBe(LEAGUE);
   });
 
-  it("opens the page at its league address when another league is remembered", async () => {
+  it("asks who you are at a published league address, keeping the address", async () => {
+    legacySite();
+    writeChosenLeague(LEAGUE);
+    open(language, memberAddress(LEAGUE, 35249003));
+    expect(await screen.findByRole("heading", { name: picker.title })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Member page" })).toBeNull();
+    expect(location()).toBe(memberAddress(LEAGUE, 35249003));
+  });
+
+  it("asks again, and drops the claim, when the address names another league than the claim's", async () => {
+    legacySite();
+    claimIn(ENTRY, OTHER);
+    open(language, memberAddress(LEAGUE, ENTRY));
+    expect(await screen.findByRole("heading", { name: picker.title })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Member page" })).toBeNull();
+    expect(readMemberClaim()).toBeNull();
+    expect(readChosenLeague()).toBe(LEAGUE);
+  });
+
+  it("chooses the league in the address once when another league is remembered", async () => {
     legacySite();
     writeChosenLeague(OTHER);
+    const choices = countLeagueChoices();
+    open(language, memberAddress(LEAGUE, ENTRY));
+    expect(await screen.findByRole("heading", { name: picker.title })).toBeInTheDocument();
+    expect(readChosenLeague()).toBe(LEAGUE);
+    expect(choices.heard).toHaveBeenCalledTimes(1);
+    choices.stop();
+  });
+
+  it("does not choose again when another tab chooses another league", async () => {
+    legacySite();
+    claimIn();
     open(language, memberAddress(LEAGUE, ENTRY));
     expect(await screen.findByRole("heading", { name: "Member page" })).toBeInTheDocument();
-    expect(readChosenLeague()).toBe(LEAGUE);
+    const choices = countLeagueChoices();
+    act(() => {
+      localStorage.setItem("squadopt.league", String(OTHER));
+      window.dispatchEvent(new StorageEvent("storage", { key: "squadopt.league" }));
+    });
+    expect(choices.heard).not.toHaveBeenCalled();
+    expect(localStorage.getItem("squadopt.league")).toBe(String(OTHER));
+    expect(screen.getByRole("heading", { name: "Member page" })).toBeInTheDocument();
+    choices.stop();
   });
 
   it("asks again, in place, when the address names a league the site does not publish", async () => {
@@ -150,6 +219,7 @@ describe.each(["tr", "en"] as const)("league gate in %s", (language) => {
 
   it("says when the directory could not be read, and reads it again on request", async () => {
     let failures = 1;
+    claimIn();
     const fetcher = stubFetchByUrl([
       ["/data/leagues.json", notFound],
       [

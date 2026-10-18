@@ -12,7 +12,7 @@ import { ExampleDataBadge } from "../components/ExampleDataBadge";
 import { DisclosureIcon } from "../components/memberIcons";
 import { ViewerChips } from "../components/ViewerChips";
 import { LeagueDataMissing } from "../data";
-import { useViewerEntry } from "../identity/useViewerEntry";
+import { useLeagueIdentity } from "../identity/useLeagueIdentity";
 import { useEntrySquad, useLeagueMembers } from "../queries";
 import { follower, gapToLeader, leaderTotal, netWeekPoints } from "../standing";
 import type {
@@ -30,7 +30,7 @@ import styles from "./LeagueMembersPage.module.css";
 export function LeagueMembersPage() {
   const { messages } = useLanguage();
   const copy = messages.leagueMembers;
-  const { viewer } = useViewerEntry(useLeagueId());
+  const viewer = useLeagueIdentity(useLeagueId()).member;
   const query = useLeagueMembers();
   // The viewer's own squad document, only once the visitor has said who they are: it holds
   // the bank, the free transfers and the chips. The member page shares the read.
@@ -90,7 +90,7 @@ export function LeagueMembersView({
   const { locale, messages } = useLanguage();
   const leagueId = useLeagueId();
   const copy = messages.leagueMembers;
-  const { viewer } = useViewerEntry(leagueId);
+  const viewer = useLeagueIdentity(leagueId).member;
   const view = envelope.payload;
   // A published example can include our virtual team; the visitor list is for members.
   const rows = view.members.filter(

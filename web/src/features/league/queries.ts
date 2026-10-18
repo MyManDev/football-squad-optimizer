@@ -12,6 +12,8 @@ import { useLeague } from "./useLeague";
  * says at once. A failed read is not retried: the page offers a read-again control, shows a
  * notice, or goes on without it, and the read runs again when a page that holds it is next
  * opened, or on reload. A read that succeeded in the last minute is served from the cache.
+ * The member gate reads members.json in front of every league page, through
+ * `useLeagueMembers`, so the pages that read it too share that one read.
  * Capabilities also refresh on focus once stale, to expose changed decision information.
  * This is a read, never a compute request, and introduces no polling interval.
  *

@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -23,10 +24,10 @@ import {
 import { useShellLayout } from "../shell/layout";
 import {
   memberAt,
-  memberInContext,
   navItems,
+  NO_IDENTITY,
   type MemberContext,
-  type ViewerClaim,
+  type ShellIdentity,
 } from "../shell/nav";
 import { FIXTURE_SHEET_ID, ShellContext, type ShellContextValue } from "../shell/ShellContext";
 import { readSidebarCollapsed, writeSidebarCollapsed } from "../shell/sidebarPreference";
@@ -93,22 +94,23 @@ function useScrollToHash(hash: string, key: string) {
  * open at 264 px or collapsed to the rail (the choice is kept in this browser). The phone
  * bar exists only in the phone layout; everything else is rendered once in every layout.
  *
- * The sidebar holds the brand, the WHO slot, the navigation, the PLAN slot and a footer
- * with the language switch. A page fills the two slots through
- * `ShellPortal`; the shell reads no document of its own.
+ * The sidebar holds the brand, the identity block, the navigation, the PLAN slot and a
+ * footer with the language switch. A page fills the PLAN slot through `ShellPortal`; the
+ * shell reads no document of its own.
  *
- * `viewer` is the member the visitor said they are, in the league they said it in, held
- * in memory only; with no member in the address, 'Bu hafta' opens that member's page.
+ * `identity` is the league the visitor entered and the member they said they are in it,
+ * handed in by the app (design/ reads nothing of the league feature). It decides the
+ * navigation, and with a member it draws the identity block: the league, the member and
+ * Değiştir, which calls `onChangeMember`, the one way to say you are someone else.
  */
 export function PageShell({
   children,
-  viewer = null,
-  chosenLeagueId = null,
+  identity = NO_IDENTITY,
+  onChangeMember,
 }: {
   children: ReactNode;
-  viewer?: ViewerClaim | null;
-  /** The league the visitor opened by its number, for the member links outside a league page. */
-  chosenLeagueId?: number | null;
+  identity?: ShellIdentity;
+  onChangeMember?: () => void;
 }) {
   const { messages } = useLanguage();
   const copy = messages.shell;
@@ -119,7 +121,6 @@ export function PageShell({
   const [sheetState, setSheetOpen] = useState(false);
   const [sheets, setSheets] = useState(0);
   const [collapsed, setCollapsed] = useState(readSidebarCollapsed);
-  const [whoSlot, setWhoSlot] = useState<HTMLElement | null>(null);
   const [planSlot, setPlanSlot] = useState<HTMLElement | null>(null);
   const [lastSeen, setLastSeen] = useState<MemberContext | null>(null);
   const [shown, setShown] = useState({ layout, pathname: location.pathname });
@@ -146,14 +147,22 @@ export function PageShell({
         : "rail";
   const rail = mode === "rail";
 
-  // The member page last opened stays in reach for the rest of the visit, in memory only.
+  // The plan last opened on the visitor's own page stays in 'Bu hafta' for the rest of the
+  // visit, in memory only. A rival's page is never recorded here.
   const here = memberAt(location);
-  if (here) {
-    const search = here.search ?? (lastSeen?.entryId === here.entryId ? lastSeen.search : "");
-    if (lastSeen?.entryId !== here.entryId || lastSeen.search !== search)
+  const own = identity.member;
+  if (
+    here &&
+    own !== null &&
+    here.leagueId === identity.leagueId &&
+    here.entryId === String(own.entryId)
+  ) {
+    const same = lastSeen?.leagueId === here.leagueId && lastSeen.entryId === here.entryId;
+    const search = here.search ?? (same ? lastSeen.search : "");
+    if (!same || lastSeen.search !== search)
       setLastSeen({ leagueId: here.leagueId, entryId: here.entryId, search });
   }
-  const items = navItems(location, memberInContext(location, viewer, lastSeen), chosenLeagueId);
+  const items = navItems(location, identity, lastSeen);
 
   const closeOverlays = useCallback(() => {
     setDrawerOpen(false);
@@ -176,7 +185,9 @@ export function PageShell({
     };
   }, [overlay, closeOverlays]);
 
-  // Opening moves focus to the drawer's close button; closing returns it to the opener.
+  // Opening moves focus to the drawer's close button; closing returns it to the opener,
+  // unless a step taken in the drawer (Değiştir) has already put focus on the page.
+  const mainRef = useRef<HTMLElement>(null);
   const toggleRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLButtonElement>(null);
   const returnFocus = useRef<HTMLElement | null>(null);
@@ -189,7 +200,11 @@ export function PageShell({
     } else if (!overlay && wasOverlay.current) {
       const opener = returnFocus.current;
       returnFocus.current = null;
-      if (opener?.isConnected) opener.focus();
+      const active = document.activeElement;
+      const onPage = active instanceof Node && (mainRef.current?.contains(active) ?? false);
+      if (onPage) {
+        // Focus is already on the page; it stays there.
+      } else if (opener?.isConnected) opener.focus();
       else (layout === "phone" ? menuRef.current : toggleRef.current)?.focus();
     }
     wasOverlay.current = overlay;
@@ -233,6 +248,51 @@ export function PageShell({
     };
   }, []);
 
+  // Focus the page once a step in front of it is done: main at once, so focus never stays
+  // on a node that is gone, then the page's heading when it is drawn, if the visitor has
+  // not moved focus by then. With an id in the address the scroll to it keeps its place.
+  const hash = useRef(location.hash);
+  // Before any page's effect asks for focus in the same commit.
+  useLayoutEffect(() => {
+    hash.current = location.hash;
+  }, [location.hash]);
+  const stopWatching = useRef<(() => void) | null>(null);
+  const focusPage = useCallback(() => {
+    stopWatching.current?.();
+    const main = mainRef.current;
+    if (!main) return;
+    const options = { preventScroll: hash.current !== "" };
+    main.focus(options);
+    const toHeading = () => {
+      const heading = main.querySelector<HTMLElement>("h1");
+      if (!heading) return false;
+      if (document.activeElement === main) {
+        if (!heading.hasAttribute("tabindex")) heading.setAttribute("tabindex", "-1");
+        heading.focus(options);
+      }
+      return true;
+    };
+    if (toHeading()) return;
+    let timer = 0;
+    const observer = new MutationObserver(() => {
+      if (toHeading()) stop();
+    });
+    const stop = () => {
+      observer.disconnect();
+      window.clearTimeout(timer);
+      if (stopWatching.current === stop) stopWatching.current = null;
+    };
+    timer = window.setTimeout(stop, 5000);
+    observer.observe(main, { childList: true, subtree: true });
+    stopWatching.current = stop;
+  }, []);
+  useEffect(() => () => stopWatching.current?.(), []);
+
+  const changeMember = () => {
+    closeOverlays();
+    onChangeMember?.();
+  };
+
   const shell = useMemo<ShellContextValue>(
     () => ({
       drawerOpen,
@@ -241,10 +301,10 @@ export function PageShell({
       setSheetOpen,
       sheetAvailable: sheets > 0,
       registerSheet,
-      whoSlot,
       planSlot,
+      focusPage,
     }),
-    [drawerOpen, sheetOpen, sheets, registerSheet, whoSlot, planSlot],
+    [drawerOpen, sheetOpen, sheets, registerSheet, planSlot, focusPage],
   );
 
   useScrollToHash(location.hash, location.key);
@@ -299,7 +359,7 @@ export function PageShell({
               <BrandMark small className={styles.mark} />
               <span className={styles.phoneWordmark}>SquadOpt</span>
             </span>
-            {shell.sheetAvailable ? (
+            {sheets > 0 ? (
               <button
                 type="button"
                 className={styles.phoneFixtures}
@@ -350,12 +410,37 @@ export function PageShell({
               </button>
             </div>
             <div className={styles.body}>
-              <div ref={setWhoSlot} className={styles.who} />
+              {own !== null ? (
+                <div className={styles.who}>
+                  {/* One line to a screen reader: "league: name, team". The spaces stand
+                      between the lines, where the column does not draw them. */}
+                  <p className={styles.whoText} id="sidebar-member">
+                    <span className={styles.whoLeague}>{own.league}</span>
+                    <span className="visually-hidden">:</span>{" "}
+                    <span className={styles.whoName}>{own.name}</span>
+                    {own.team !== null ? (
+                      <>
+                        <span className="visually-hidden">,</span>{" "}
+                        <span className={styles.whoTeam}>{own.team}</span>
+                      </>
+                    ) : null}
+                  </p>
+                  <button
+                    type="button"
+                    className={styles.whoChange}
+                    aria-describedby="sidebar-member"
+                    onClick={changeMember}
+                  >
+                    {copy.changeMember}
+                  </button>
+                </div>
+              ) : null}
               <nav aria-label={copy.primary} className={styles.nav}>
                 {items.map((item) => (
                   <Link
                     key={item.key}
                     to={item.to}
+                    state={item.state}
                     className={styles.navItem}
                     aria-current={item.active ? "page" : undefined}
                     onClick={closeDrawer}
@@ -389,7 +474,7 @@ export function PageShell({
         </aside>
         {/* A page's fixture sheet is rendered outside main, so main can be inert while
             the sheet is open as well as while the drawer is. */}
-        <main id="main" className={styles.main} inert={overlay}>
+        <main id="main" ref={mainRef} tabIndex={-1} className={styles.main} inert={overlay}>
           {children}
         </main>
         {overlay ? (

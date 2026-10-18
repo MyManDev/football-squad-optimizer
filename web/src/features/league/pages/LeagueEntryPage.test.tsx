@@ -7,9 +7,9 @@ import { mockLeagueMembersEnvelope } from "../../../fixtures/league";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { MESSAGES, type Language } from "../../../i18n/messages";
 import { jsonResponse, notFound, stubFetchByUrl } from "../../../testSupport/fetchByUrl";
-import { membersAddress } from "../../../lib/leagueAddresses";
-import { writeChosenLeague } from "../identity/useChosenLeague";
-import { readViewerEntry, writeViewerEntry } from "../identity/useViewerEntry";
+import { FIND_YOURSELF, membersAddress } from "../../../lib/leagueAddresses";
+import { claimIn, forgetIdentity } from "../../../testSupport/league";
+import { readMemberClaim } from "../identity/memberClaim";
 import { LeagueEntryPage } from "./LeagueEntryPage";
 
 const published = { ...mockLeagueMembersEnvelope, source_kind: "live" };
@@ -25,7 +25,11 @@ function legacySite() {
 
 function LocationProbe() {
   const location = useLocation();
-  return <span data-testid="location">{location.pathname}</span>;
+  return (
+    <span data-testid="location" data-state={JSON.stringify(location.state)}>
+      {location.pathname}
+    </span>
+  );
 }
 
 afterEach(() => {
@@ -34,9 +38,8 @@ afterEach(() => {
 });
 beforeEach(() => {
   localStorage.clear();
-  writeViewerEntry(null);
-  // Each case is a first visit: no league remembered from the one before.
-  writeChosenLeague(null);
+  // Each case is a first visit: no league remembered from the one before, nobody claimed.
+  forgetIdentity();
 });
 
 function open(language: Language) {
@@ -55,9 +58,7 @@ function open(language: Language) {
 
 describe.each(["tr", "en"] as const)("league entry in %s", (language) => {
   const copy = MESSAGES[language].leagueEntry;
-  it("connects through published data without changing the existing viewer selection", async () => {
-    const viewer = 35249001;
-    writeViewerEntry({ leagueId: 352490, entryId: viewer });
+  it("connects through published data and asks who you are on the members list", async () => {
     const fetcher = legacySite();
     open(language);
     expect(fetcher).not.toHaveBeenCalled();
@@ -66,8 +67,34 @@ describe.each(["tr", "en"] as const)("league entry in %s", (language) => {
     await user.type(screen.getByLabelText(copy.label), String(LEAGUE));
     await user.click(screen.getByRole("button", { name: copy.submit }));
     expect(await screen.findByRole("heading", { name: "Member destination" })).toBeInTheDocument();
-    expect(screen.getByTestId("location")).toHaveTextContent(membersAddress(LEAGUE));
-    expect(readViewerEntry()?.entryId).toBe(viewer);
+    const location = screen.getByTestId("location");
+    expect(location).toHaveTextContent(membersAddress(LEAGUE));
+    // After the step, the visitor's own page opens.
+    expect(location.dataset.state).toBe(JSON.stringify(FIND_YOURSELF));
+  });
+
+  it("keeps the claim when the claimed league is entered again", async () => {
+    claimIn(35249001, LEAGUE);
+    legacySite();
+    open(language);
+    // The form offers the league the visitor is in.
+    expect(screen.getByLabelText(copy.label)).toHaveValue(String(LEAGUE));
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: copy.submit }));
+    expect(await screen.findByRole("heading", { name: "Member destination" })).toBeInTheDocument();
+    expect(readMemberClaim()?.entryId).toBe(35249001);
+  });
+
+  it("drops a claim made in another league when this one is entered", async () => {
+    claimIn(35249001, 7);
+    legacySite();
+    open(language);
+    const user = userEvent.setup();
+    await user.clear(screen.getByLabelText(copy.label));
+    await user.type(screen.getByLabelText(copy.label), String(LEAGUE));
+    await user.click(screen.getByRole("button", { name: copy.submit }));
+    expect(await screen.findByRole("heading", { name: "Member destination" })).toBeInTheDocument();
+    expect(readMemberClaim()).toBeNull();
   });
 
   it("says what the site does before the field, and keeps the ID help folded", () => {

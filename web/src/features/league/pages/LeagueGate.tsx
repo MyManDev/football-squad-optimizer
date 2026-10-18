@@ -7,23 +7,33 @@ import { useLanguage } from "../../../i18n/context";
 import { leagueIdInAddress, legacyLeagueAddress } from "../../../lib/leagueAddresses";
 import { LeagueDataMissing } from "../data";
 import { findLeague, loadLeagueDirectory } from "../directory";
-import { useChosenLeague } from "../identity/useChosenLeague";
+import { useLeagueIdentity } from "../identity/useLeagueIdentity";
 import { LeagueProvider } from "../LeagueProvider";
 import { LEAGUE_READ, leagueKeys } from "../queries";
 import { LeagueEntryPage } from "./LeagueEntryPage";
+import { MemberGate } from "./MemberGate";
 
 /**
- * Every league page sits behind the league number in its address. The gate reads the
- * number, finds the league in the published directory, and provides its tree to the page;
- * an address naming no league, or one the site does not publish, shows the entry form
- * where it stands. An address from before the number (`/league/members/...`) goes to the
- * same page under the league the visitor chose, or to the form when none was.
+ * Every league page sits behind two steps: the league number in its address, then who
+ * the visitor is in that league. The gate reads the number, finds the league in the
+ * published directory and provides its tree; the member gate inside it then asks "Sen
+ * kimsin?" in place until the visitor has said, and only then draws the page. An address
+ * naming no league, or one the site does not publish, shows the entry form where it
+ * stands. An address from before the number (`/league/members/...`) goes to the same page
+ * under the visitor's current league, or to the form when there is none.
+ *
+ * A league reached by its address is the one the visitor is in: the gate chooses it once
+ * per league it reaches. It never chooses again because the stored choice changed (another
+ * tab may change it), so two tabs cannot keep choosing against each other. Every gated
+ * route passes through here exactly once, so the picker never shows before the number and
+ * never twice.
  */
 export function LeagueGate({ children }: { children: ReactNode }) {
   const { messages } = useLanguage();
   const { leagueId: parameter } = useParams();
   const location = useLocation();
-  const { leagueId: chosen, choose } = useChosenLeague();
+  // The claim's league, else the chosen one: where an address without a number goes.
+  const { leagueId: current, chooseLeague } = useLeagueIdentity();
   // The number as the sidebar and the links read it: digits, or no league at all.
   const named = parameter === undefined ? null : leagueIdInAddress(location.pathname);
   const directory = useQuery({
@@ -35,14 +45,13 @@ export function LeagueGate({ children }: { children: ReactNode }) {
   });
 
   const league = named !== null && directory.data ? findLeague(directory.data, named) : null;
-  // A league reached by its address is the one the visitor is in: the form prefills it
-  // and the old addresses rewrite to it from here on.
+  const addressLeague = league?.leagueId ?? null;
   useEffect(() => {
-    if (league !== null && chosen !== league.leagueId) choose(league.leagueId);
-  }, [league, chosen, choose]);
+    if (addressLeague !== null) chooseLeague(addressLeague);
+  }, [addressLeague, chooseLeague]);
   if (parameter === undefined) {
-    // The old shape of the address: the chosen league's version of it, or the form.
-    const legacy = chosen === null ? null : legacyLeagueAddress(location.pathname, chosen);
+    // The old shape of the address: the current league's version of it, or the form.
+    const legacy = current === null ? null : legacyLeagueAddress(location.pathname, current);
     if (legacy !== null)
       return <Navigate to={`${legacy}${location.search}${location.hash}`} replace />;
     return <LeagueEntryPage inPlace />;
@@ -65,5 +74,9 @@ export function LeagueGate({ children }: { children: ReactNode }) {
     );
   }
   if (league === null) return <LeagueEntryPage inPlace />;
-  return <LeagueProvider league={league}>{children}</LeagueProvider>;
+  return (
+    <LeagueProvider league={league}>
+      <MemberGate>{children}</MemberGate>
+    </LeagueProvider>
+  );
 }

@@ -194,7 +194,6 @@ function view(props: Partial<LeagueMemberViewProps> = {}): LeagueMemberViewProps
     members: MEMBERS,
     index: mockEntryAdviceIndex(ENTRY).payload,
     fixtures: CALENDAR,
-    leagueName: mockLeagueMembersEnvelope.payload.league_name,
     ...props,
   };
 }

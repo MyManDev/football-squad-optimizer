@@ -14,6 +14,6 @@ import { ShellContext, type ShellSlot } from "./ShellContext";
 export function ShellPortal({ slot, children }: { slot: ShellSlot; children: ReactNode }) {
   const shell = useContext(ShellContext);
   if (!shell) return <>{children}</>;
-  const target = slot === "who" ? shell.whoSlot : shell.planSlot;
+  const target = slot === "plan" ? shell.planSlot : null;
   return target ? createPortal(children, target) : null;
 }
