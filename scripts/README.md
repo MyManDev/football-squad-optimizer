@@ -193,6 +193,7 @@ do not move.
 | `build_football_shadow.py` | artifact-only runner | `artifacts/shadow/football_team_share_v1/{football,receipts}/<capture>.json`; `docs/football_prospective_shadow_note.md`, #999 | 2026-10-11 |
 | `compare_component_oof_development.py` | artifact-only runner | `--output-dir` (`comparison.json`, `comparison.md`) | 2026-09-26 |
 | `export_component_oof.py` | artifact-only runner | `artifacts/phase_c/` | 2026-10-12 |
+| `score_component_distribution.py` | artifact-only runner | `--output-dir` (`distribution_scoring.json`, `distribution_scoring.md`); the proper-scoring reading of `docs/research/moe_mixture_prereg.md` | 2026-10-17 |
 | `export_decided_appearance.py` | artifact-only runner | `artifacts/double_reduction/`; the `--fitted` input of `measure_double_reduction.py` | 2026-09-26 |
 | `measure_availability_transitions.py` | artifact-only runner | a fresh `--output` directory the operator names (`record.json`, `summary.md`); refuses the snapshot root and the repository's `data/` and `docs/`; protocol `docs/availability_transitions_prereg.md` | 2026-10-02 |
 | `measure_football_lead_reliability.py` | artifact-only runner | a fresh `--output` directory the operator names (`record.json`, `summary.md`, `forecasts.csv`); refuses the archive and the repository's `data/` and `docs/`; protocol `docs/football_lead_reliability_prereg.md` | 2026-10-07 |
