@@ -3,7 +3,14 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { CLUB_SWATCHES, clubCode, clubCodesFromFixtures, clubSwatch } from "./clubs";
+import {
+  CLUB_COLOURS,
+  CLUB_SWATCHES,
+  clubCode,
+  clubCodesFromFixtures,
+  clubColours,
+  clubSwatch,
+} from "./clubs";
 import type { ClubFixtureList } from "./clubs";
 
 const published = JSON.parse(
@@ -65,6 +72,38 @@ describe("club codes", () => {
       expect(clubSwatch(code), code).toMatch(/^#[0-9A-F]{6}$/);
     }
     expect(Object.keys(CLUB_SWATCHES).sort()).toEqual([...pairs.values()].sort());
+  });
+
+  it("gives every club the calendar names two distinct colours, the primary its swatch", () => {
+    const codes = new Set<string>();
+    for (const week of published.payload.gameweeks)
+      for (const match of week.fixtures)
+        for (const side of [match.home, match.away]) codes.add(side.short_name);
+
+    expect(Object.keys(CLUB_COLOURS).sort()).toEqual([...codes].sort());
+    for (const code of codes) {
+      const colours = clubColours(code)!;
+      expect(colours.primary, code).toMatch(/^#[0-9A-F]{6}$/);
+      expect(colours.secondary, code).toMatch(/^#[0-9A-F]{6}$/);
+      expect(colours.secondary, code).not.toBe(colours.primary);
+      expect(clubSwatch(code), code).toBe(colours.primary);
+      expect(CLUB_SWATCHES[code], code).toBe(colours.primary);
+    }
+    expect(clubColours("ars")).toEqual({ primary: "#EF0107", secondary: "#FFFFFF" });
+    expect(clubColours(null)).toBeNull();
+    expect(clubColours("XYZ")).toBeNull();
+  });
+
+  it("pairs each club with its recognised home colours", () => {
+    expect(clubColours("AVL")).toEqual({ primary: "#670E36", secondary: "#95BFE5" });
+    expect(clubColours("NEW")).toEqual({ primary: "#241F20", secondary: "#FFFFFF" });
+    expect(clubColours("MCI")).toEqual({ primary: "#6CABDD", secondary: "#FFFFFF" });
+    expect(clubColours("HUL")).toEqual({ primary: "#F5A12D", secondary: "#000000" });
+    expect(clubColours("CRY")).toEqual({ primary: "#1B458F", secondary: "#C4122E" });
+    // The clubs that play in white shirts lead with white; their old swatch is the second.
+    expect(clubColours("TOT")).toEqual({ primary: "#FFFFFF", secondary: "#132257" });
+    expect(clubColours("FUL")).toEqual({ primary: "#FFFFFF", secondary: "#000000" });
+    expect(clubColours("LEE")).toEqual({ primary: "#FFFFFF", secondary: "#FFCD00" });
   });
 
   it("keeps the direction D swatches", () => {
