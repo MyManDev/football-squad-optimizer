@@ -23,3 +23,34 @@ Lower is better in every column. The candidate is better on every component in e
 - A development reading, consistent with the private research that motivated the declaration (16% better appearance log loss and minutes MAE on player-gameweek rows against a walk-forward refit of the same control, without the availability rule); the repository's own protocol finds a smaller but one-directional gain on the points metric the rule reads.
 - Not a promotion. The verdict makes the candidate the Phase D reference for the development path; pinning `phase_c_control_components_gbm_v1` on the live in-season path is its own reviewed change, which this record supports.
 - The availability rule, the elite-evidence path and the experimental football arm are untouched by this measurement.
+
+## Decision-level reading (added after the first record, reported beside the rule)
+
+Both arms were also run through the repository's decision comparison
+(`scripts.evaluate_phase_c_components --development-contract phase_c_component_oof_development_v2`,
+PR #1137) on the v2 tables exported for the frozen decision seasons 2021-22 to 2024-25: 147
+folds, squads solved from each arm's expected points and scored under the official autosub
+and captain rules, against the frozen ridge control on the same folds.
+
+| arm | mean realized squad points | against the ridge control | wins / ties / losses | zero-minute starters | autosub points |
+| --- | --- | --- | --- | --- | --- |
+| linear components | 63.4150 | +4.8912 | 83 / 8 / 56 | 83 | 230 |
+| gradient-boosting components | 62.6667 | +4.1429 | 88 / 4 / 55 | 108 | 397 |
+
+Paired on the same folds, gradient boosting minus linear: mean -0.7483 points a
+gameweek, median +1.0, 90% season-aware moving-block interval
+[-2.660, +1.048], wins / ties / losses 75 / 5 / 67; by season
+2021-22 -3.405, 2022-23 +0.333, 2023-24 +2.757, 2024-25 -2.649.
+
+What this says: the player-level gains (appearance log loss, minutes, points MAE) did not
+turn into a measurable decision gain on these folds. The interval crosses zero with a
+negative mean, carried by 2021-22 (the thinnest training history) and 2024-25, against a
+positive 2023-24. The boosted arm's squads also start more players who then record no
+minutes (108 against 83) and recover more through automatic substitutions (397 against 230),
+which points at how its appearance probabilities enter the expected points rather than at
+their accuracy. The declared rule (points MAE) stands as recorded above; this reading does
+not refute the candidate, and it does not support promoting it on its own. The promotion
+pin waits for a decision-level reading that is not negative, and the next candidate to
+declare is the composition of the boosted appearance with the points component, measured
+at the decision level before anything is pinned.
+
