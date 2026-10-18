@@ -85,6 +85,10 @@ from squadopt.prediction.component_models import (
     MIXTURE_MODEL_VERSION,
     POINTS_RETURN_THRESHOLD,
     POINTS_SCALE_FLOOR,
+    REGIME_ESTIMATOR,
+    REGIME_GATE_TERMS,
+    REGIME_LABELS,
+    REGIME_MODEL_VERSION,
     SEASON_HALF_LIFE_WEIGHTING,
     SEASON_WEIGHT_BASE,
     SEASON_WEIGHTED_MODEL_VERSION,
@@ -116,11 +120,14 @@ WEIGHTING_LABELS = {"equal": EQUAL_WEIGHTING, "season_half_life": SEASON_HALF_LI
 # the two candidates cannot overwrite each other or the control.
 # The fourth: the gated mixture of `docs/research/moe_mixture_prereg.md`, which also writes
 # the distribution sidecar every v2 export declares beside its table.
+# The fifth: the regime-gated experts of `docs/research/moe_regime_prereg.md`, which
+# declare no predictive distribution and so write no sidecar.
 ESTIMATOR_ARMS = (
     LINEAR_ESTIMATOR,
     GRADIENT_BOOSTING_ESTIMATOR,
     GRADIENT_BOOSTING_POINTS_ESTIMATOR,
     MIXTURE_ESTIMATOR,
+    REGIME_ESTIMATOR,
 )
 # The declared feature contracts. v2 adds the one-gameweek and ten-gameweek windows for
 # minutes and appearance and is a v2 development arm only; the v1 contract fits the frozen
@@ -132,11 +139,13 @@ ESTIMATOR_TABLE_SUFFIX = {
     GRADIENT_BOOSTING_ESTIMATOR: "_gradient_boosting",
     GRADIENT_BOOSTING_POINTS_ESTIMATOR: "_gradient_boosting_points",
     MIXTURE_ESTIMATOR: "_mixture",
+    REGIME_ESTIMATOR: "_regime",
 }
 ESTIMATOR_MODEL_VERSIONS = {
     GRADIENT_BOOSTING_ESTIMATOR: GRADIENT_BOOSTING_MODEL_VERSION,
     GRADIENT_BOOSTING_POINTS_ESTIMATOR: GRADIENT_BOOSTING_POINTS_MODEL_VERSION,
     MIXTURE_ESTIMATOR: MIXTURE_MODEL_VERSION,
+    REGIME_ESTIMATOR: REGIME_MODEL_VERSION,
 }
 # The sidecar a v2 export writes beside its table when the arm declares a predictive
 # distribution: the linear arm's single Gaussian residual and the mixture's two experts with
@@ -168,6 +177,14 @@ ESTIMATOR_RULES = {
         "mixture of two standardized ridge experts (full/short minutes, return/no-return "
         "points) with a standardized logistic-regression gate on the same features; the "
         "expected value is the gate-weighted mean; equal weighting only"
+    ),
+    REGIME_ESTIMATOR: (
+        "one linear expert set (the control's estimators and constants) per regime label, "
+        "fixture regime (single, double) by rule era (pre_defcon, defcon), fitted on that "
+        "regime's rows; mixed by a standardized multinomial logistic gate on the v1 "
+        "features plus the regime terms (double indicator, defcon indicator, season age); "
+        "an expert below the minimum rows is absent and the gate mass is renormalized; "
+        "equal weighting only"
     ),
 }
 WEIGHTING_RULES = {
@@ -538,7 +555,11 @@ def build_oof_table(
         )
         season_weights = declared_season_weights(training_seasons, rule=rule)
         models = fit_component_models(
-            training, feature_columns=columns, config=config, weighting=rule
+            training,
+            feature_columns=columns,
+            config=config,
+            weighting=rule,
+            target_season=decision.season,
         )
         if models is None:
             refused.append(decision.fold_id)
@@ -723,6 +744,19 @@ def estimator_constants(estimator: str, config: ComponentModelConfig) -> dict[st
             "minutes_scale_floor": MINUTES_SCALE_FLOOR,
             "points_scale_floor": POINTS_SCALE_FLOOR,
             "minimum_regime_rows": max(2, config.minimum_training_rows // 4),
+        }
+    if estimator == REGIME_ESTIMATOR:
+        return {
+            "regime_labels": list(REGIME_LABELS),
+            "fixture_regime": "double when fixture_count >= 2, else single",
+            "rule_era": "defcon for season start year 2025 or later",
+            "gate_terms": list(REGIME_GATE_TERMS),
+            "gate": "StandardScaler + LogisticRegression (lbfgs, C "
+            f"{config.appearance_regularization}) over the regime labels",
+            "expert_appearance_regularization": config.appearance_regularization,
+            "expert_minutes_alpha": config.minutes_alpha,
+            "expert_points_alpha": config.points_alpha,
+            "minimum_training_rows_per_expert": config.minimum_training_rows,
         }
     return boosted
 
