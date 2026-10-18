@@ -51,10 +51,10 @@ Paired on the same folds, candidate minus linear: mean +0.5442 points a gameweek
 The rule does not prefer the candidate; the linear control stays in place and the decision-level reading is recorded beside it as a finding.
 
 The gate is close to hard: wherever a row's regime had an expert, the gate put at least
-0.99939 of the row's mass on it (read after the result), so the candidate is in effect separate
+0.99938 of the row's mass on it (read after the result, 2026-10-18, at `1367d4bc1`), so the candidate is in effect separate
 linear fits by fixture regime and rule era. That helps where the pooled fit is weakest, on
 double gameweeks: the points MAE there falls from 1.84013 to 1.74084, and it falls in every
-season (`points_mae_by_season_and_fixture_group` in the json, added after the result).
+season (`points_mae_by_season_and_fixture_group` in the json, added after the result, 2026-10-18, at `1367d4bc1`).
 Separately, the minutes MAE of 2025-26 falls from 14.3393 to 13.9176. It costs a little
 everywhere else: single-gameweek rows (123,154 of the 128,627 scored) are worse by 0.00578
 pooled, and by 0.0011 to 0.0045 in each of the four seasons before 2025-26, where no rule-era
