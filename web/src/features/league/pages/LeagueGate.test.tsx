@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, cleanup, render, screen, within } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -312,10 +312,13 @@ describe.each(["tr", "en"] as const)("the system pages behind the two steps in %
     await user.type(screen.getByLabelText(copy.label), String(LEAGUE));
     await user.click(screen.getByRole("button", { name: copy.submit }));
     const heading = await screen.findByRole("heading", { name: picker.title });
-    const probe = screen.getByTestId("visitor-location");
-    expect(probe).toHaveTextContent("/moves?mode=garantici");
-    expect(probe.dataset.state).toBe(JSON.stringify(PICK_HERE));
-    expect(heading).toHaveFocus();
+    // The navigation that carries the step state runs as a transition, so the picker can be
+    // drawn once before it lands; wait for the state and for the focus it moves.
+    await waitFor(() =>
+      expect(screen.getByTestId("visitor-location").dataset.state).toBe(JSON.stringify(PICK_HERE)),
+    );
+    await waitFor(() => expect(heading).toHaveFocus());
+    expect(screen.getByTestId("visitor-location")).toHaveTextContent("/moves?mode=garantici");
     expect(readChosenLeague()).toBe(LEAGUE);
 
     const group = await screen.findByRole("group", { name: picker.legend });
