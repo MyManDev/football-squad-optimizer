@@ -1,7 +1,7 @@
 # Joint team-match sampler on the S1 and S2 calibration gates
 
 **Protocol verdict at the frozen seed 0: `candidate_within_gates`.** Measured, not certified,
-and not robust. The candidate sampler `team_match_joint_v1` passes S1 (mean PIT 0.5207 in
+and not robust by a seed reading added after the result (2026-10-18, at `d3b9dab1`). The candidate sampler `team_match_joint_v1` passes S1 (mean PIT 0.5207 in
 [0.43, 0.57]) and, at seed 0, passes S2: the realized squad score fell below its own scenario
 tenth percentile in 21 of 137 folds, a rate of 0.1533 against the band [0.04, 0.16]. The margin
 is one fold: 22 would be 0.1606 and outside. The foundation sampler, read as Control A on the
