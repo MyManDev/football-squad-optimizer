@@ -49,6 +49,10 @@ from typing import Final
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
+from sklearn.ensemble import (  # type: ignore[import-untyped]
+    HistGradientBoostingClassifier,
+    HistGradientBoostingRegressor,
+)
 from sklearn.linear_model import LogisticRegression, Ridge  # type: ignore[import-untyped]
 from sklearn.pipeline import Pipeline, make_pipeline  # type: ignore[import-untyped]
 from sklearn.preprocessing import StandardScaler  # type: ignore[import-untyped]
@@ -70,6 +74,16 @@ COMPONENT_MODEL_VERSION: Final = "phase_c_control_components_v1"
 # that uses it carries its own model version so a consumer cannot mistake it for the
 # equal-weight control.
 SEASON_WEIGHTED_MODEL_VERSION: Final = "phase_c_components_season_half_life_v1"
+
+# The declared gradient-boosting candidate: the same features, targets, rows and routes as
+# the control, with each of the three estimators replaced by a histogram gradient-boosted
+# tree ensemble whose parameters are fixed below and never searched. Equal weighting only;
+# a fit under this estimator carries its own model version so a consumer cannot mistake it
+# for the linear control.
+GRADIENT_BOOSTING_MODEL_VERSION: Final = "phase_c_control_components_gbm_v1"
+LINEAR_ESTIMATOR: Final = "linear"
+GRADIENT_BOOSTING_ESTIMATOR: Final = "gradient_boosting"
+ESTIMATORS: Final = (LINEAR_ESTIMATOR, GRADIENT_BOOSTING_ESTIMATOR)
 EQUAL_WEIGHTING: Final = "equal_weights_v1"
 SEASON_HALF_LIFE_WEIGHTING: Final = "season_half_life_0.5_v1"
 SEASON_WEIGHT_BASE: Final = 0.5
@@ -109,16 +123,42 @@ class ComponentModelConfig:
     minutes_alpha: float = 1.0
     points_alpha: float = 1.0
     minimum_training_rows: int = 200
+    # ``estimator`` selects the linear control or the declared gradient-boosting candidate.
+    # The boosting parameters below are constants of the declaration: a tree ensemble with
+    # a fixed number of rounds, no early stopping (so the same rows give the same model) and
+    # a leaf size large enough that a fold of a few hundred players cannot be memorized.
+    estimator: str = LINEAR_ESTIMATOR
+    boosting_learning_rate: float = 0.05
+    boosting_iterations: int = 300
+    boosting_max_leaf_nodes: int = 31
+    boosting_min_samples_leaf: int = 100
+    boosting_l2_regularization: float = 1.0
 
     def __post_init__(self) -> None:
-        for name in ("appearance_regularization", "minutes_alpha", "points_alpha"):
+        for name in (
+            "appearance_regularization",
+            "minutes_alpha",
+            "points_alpha",
+            "boosting_learning_rate",
+            "boosting_l2_regularization",
+        ):
             value = getattr(self, name)
             if not isinstance(value, float | int) or isinstance(value, bool) or value <= 0:
                 raise PredictionConfigurationError(f"{name} must be a positive number.")
-        for name in ("appearance_max_iterations", "minimum_training_rows"):
+        for name in (
+            "appearance_max_iterations",
+            "minimum_training_rows",
+            "boosting_iterations",
+            "boosting_max_leaf_nodes",
+            "boosting_min_samples_leaf",
+        ):
             value = getattr(self, name)
             if isinstance(value, bool) or not isinstance(value, int) or value < 1:
                 raise PredictionConfigurationError(f"{name} must be a positive integer.")
+        if self.estimator not in ESTIMATORS:
+            raise PredictionConfigurationError(
+                f"estimator must be one of {ESTIMATORS}, got {self.estimator!r}."
+            )
 
 
 @dataclass(frozen=True, slots=True)
@@ -139,6 +179,7 @@ class FittedComponentModels:
     model_version: str = COMPONENT_MODEL_VERSION
     weighting: str = EQUAL_WEIGHTING
     season_weights: tuple[tuple[str, float], ...] = ()
+    estimator: str = LINEAR_ESTIMATOR
 
 
 _SEASON_LABEL: Final = re.compile(r"(?P<start>\d{4})-(?P<end>\d{2})")
@@ -269,6 +310,12 @@ def fit_component_models(
     if not columns:
         raise PredictionConfigurationError("At least one feature column is required.")
 
+    boosted = settings.estimator == GRADIENT_BOOSTING_ESTIMATOR
+    if boosted and weighting is not None:
+        raise PredictionConfigurationError(
+            "The gradient-boosting candidate is declared under equal weighting only."
+        )
+
     usable = training.loc[complete_feature_rows(training, columns)]
     appearance_target = pd.to_numeric(usable["appearance_target"], errors="raise")
     if len(usable) < settings.minimum_training_rows:
@@ -319,30 +366,33 @@ def fit_component_models(
             for season in sorted(usable["season"].astype("string").unique())
         )
 
-    appearance_model = make_pipeline(
-        StandardScaler(),
-        LogisticRegression(
-            C=settings.appearance_regularization,
-            max_iter=settings.appearance_max_iterations,
-            solver="lbfgs",
-            random_state=RANDOM_STATE,
-        ),
-    )
+    if boosted:
+        appearance_model = make_pipeline(_boosted_classifier(settings))
+        minutes_model = make_pipeline(_boosted_regressor(settings))
+        points_model = make_pipeline(_boosted_regressor(settings))
+    else:
+        appearance_model = make_pipeline(
+            StandardScaler(),
+            LogisticRegression(
+                C=settings.appearance_regularization,
+                max_iter=settings.appearance_max_iterations,
+                solver="lbfgs",
+                random_state=RANDOM_STATE,
+            ),
+        )
+        minutes_model = make_pipeline(
+            StandardScaler(), Ridge(alpha=settings.minutes_alpha, solver="cholesky")
+        )
+        points_model = make_pipeline(
+            StandardScaler(), Ridge(alpha=settings.points_alpha, solver="cholesky")
+        )
     appearance_model.fit(
         _design(usable, columns), appearance_target.astype("int64"), **appearance_fit
-    )
-
-    minutes_model = make_pipeline(
-        StandardScaler(), Ridge(alpha=settings.minutes_alpha, solver="cholesky")
     )
     minutes_model.fit(
         _design(conditional, columns),
         pd.to_numeric(conditional["minutes_target"], errors="raise").astype("float64"),
         **minutes_fit,
-    )
-
-    points_model = make_pipeline(
-        StandardScaler(), Ridge(alpha=settings.points_alpha, solver="cholesky")
     )
     points_model.fit(
         _design(conditional, columns),
@@ -357,9 +407,45 @@ def fit_component_models(
         feature_columns=columns,
         appearance_rows=len(usable),
         conditional_rows=len(conditional),
-        model_version=COMPONENT_MODEL_VERSION if weighting is None else weighting.model_version,
+        model_version=(
+            GRADIENT_BOOSTING_MODEL_VERSION
+            if boosted
+            else COMPONENT_MODEL_VERSION
+            if weighting is None
+            else weighting.model_version
+        ),
         weighting=EQUAL_WEIGHTING if weighting is None else weighting.label,
         season_weights=season_weights,
+        estimator=settings.estimator,
+    )
+
+
+def _boosted_classifier(settings: ComponentModelConfig) -> HistGradientBoostingClassifier:
+    """The declared appearance ensemble; no early stopping, so the fit is a pure function."""
+
+    return HistGradientBoostingClassifier(
+        learning_rate=settings.boosting_learning_rate,
+        max_iter=settings.boosting_iterations,
+        max_leaf_nodes=settings.boosting_max_leaf_nodes,
+        min_samples_leaf=settings.boosting_min_samples_leaf,
+        l2_regularization=settings.boosting_l2_regularization,
+        early_stopping=False,
+        random_state=RANDOM_STATE,
+    )
+
+
+def _boosted_regressor(settings: ComponentModelConfig) -> HistGradientBoostingRegressor:
+    """The declared conditional ensemble (squared error, the same constants)."""
+
+    return HistGradientBoostingRegressor(
+        loss="squared_error",
+        learning_rate=settings.boosting_learning_rate,
+        max_iter=settings.boosting_iterations,
+        max_leaf_nodes=settings.boosting_max_leaf_nodes,
+        min_samples_leaf=settings.boosting_min_samples_leaf,
+        l2_regularization=settings.boosting_l2_regularization,
+        early_stopping=False,
+        random_state=RANDOM_STATE,
     )
 
 
