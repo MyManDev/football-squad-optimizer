@@ -1,4 +1,4 @@
-import { useId } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import { useLanguage } from "../../../i18n/context";
 import { figure, money, signedPoints } from "../../../lib/format";
@@ -33,6 +33,20 @@ export function WhatIfPanel({
   const addId = useId();
   const whatIf = useWhatIf(squad, advised, dependencies);
   const { phase, document, account, advisedAccount, points } = whatIf;
+  // The player chosen in the list; only the add button adds, so moving through the list
+  // with the keyboard changes nothing.
+  const [pick, setPick] = useState("");
+  // Where focus goes after a removal unmounts the row that held it: the next row's remove
+  // button, the row before it, or the add list when the group is empty.
+  const removeButtons = useRef(new Map<number, HTMLButtonElement>());
+  const addList = useRef<HTMLSelectElement>(null);
+  const focusNext = useRef<number | "add" | null>(null);
+  useEffect(() => {
+    const target = focusNext.current;
+    if (target === null) return;
+    focusNext.current = null;
+    (target === "add" ? addList.current : removeButtons.current.get(target))?.focus();
+  });
 
   if (phase !== "ready" || document === null || account === null || advisedAccount === null) {
     const said = {
@@ -40,14 +54,15 @@ export function WhatIfPanel({
       loading: copy.whatIfLoading,
       unpublished: copy.whatIfUnpublished,
       failed: copy.whatIfFailed,
+      "solver-failed": copy.whatIfSolverFailed,
       "other-capture": copy.whatIfOtherCapture,
       ready: null,
     }[phase];
     return (
       <div className={styles.whatIf}>
-        {phase === "idle" ? (
+        {phase !== "loading" && phase !== "ready" ? (
           <button type="button" className={styles.action} onClick={whatIf.start}>
-            {copy.whatIfStart}
+            {phase === "idle" ? copy.whatIfStart : copy.whatIfRetry}
           </button>
         ) : null}
         {said ? <p className={styles.state}>{said}</p> : null}
@@ -102,8 +117,23 @@ export function WhatIfPanel({
       .sort((a, b) => b.expected_points - a.expected_points || a.id - b.id),
   }));
 
+  const removeFrom = (player: DevicePlanPlayer, group: DevicePlanPlayer[]) => {
+    const at = group.indexOf(player);
+    const neighbour = group[at + 1] ?? group[at - 1];
+    focusNext.current = neighbour ? neighbour.id : "add";
+    whatIf.remove(player.id);
+  };
+  const summary = copy.whatIfSummary(
+    money(account.bankTenths, locale),
+    tried === null ? "-" : figure(tried, locale),
+    difference === null ? "-" : signedPoints(difference, 1, locale),
+  );
+
   return (
     <div className={styles.whatIf}>
+      <p className="visually-hidden" aria-live="polite">
+        {whatIf.reading ? "" : summary}
+      </p>
       <dl
         className={styles.account}
         aria-busy={whatIf.reading}
@@ -177,7 +207,11 @@ export function WhatIfPanel({
                   type="button"
                   className={styles.remove}
                   aria-label={copy.whatIfRemoveLabel(name(player))}
-                  onClick={() => whatIf.remove(player.id)}
+                  ref={(element) => {
+                    if (element) removeButtons.current.set(player.id, element);
+                    else removeButtons.current.delete(player.id);
+                  }}
+                  onClick={() => removeFrom(player, rows)}
                 >
                   {copy.whatIfRemove}
                 </button>
@@ -187,28 +221,40 @@ export function WhatIfPanel({
         );
       })}
 
-      <label className={styles.add} htmlFor={addId}>
-        <span>{copy.whatIfAdd}</span>
-        <select
-          id={addId}
-          value=""
-          onChange={(event) => {
-            const id = Number(event.target.value);
-            if (Number.isSafeInteger(id) && id > 0) whatIf.add(id);
-          }}
-        >
-          <option value="">{copy.whatIfAdd}</option>
-          {offered.map(({ code, players }) => (
-            <optgroup key={code} label={messages.positions[code]}>
-              {players.map((player) => (
-                <option key={player.id} value={player.id}>
-                  {`${name(player)} · ${player.team} · ${money(price(player), locale)} · ${figure(player.expected_points, locale)}`}
-                </option>
-              ))}
-            </optgroup>
-          ))}
-        </select>
-      </label>
+      <div className={styles.add}>
+        <label htmlFor={addId}>{copy.whatIfAdd}</label>
+        <div className={styles.addRow}>
+          <select
+            id={addId}
+            ref={addList}
+            value={chosen.has(Number(pick)) ? "" : pick}
+            onChange={(event) => setPick(event.target.value)}
+          >
+            <option value="">{copy.whatIfChoose}</option>
+            {offered.map(({ code, players }) => (
+              <optgroup key={code} label={messages.positions[code]}>
+                {players.map((player) => (
+                  <option key={player.id} value={player.id}>
+                    {`${name(player)} · ${player.team} · ${money(price(player), locale)} · ${figure(player.expected_points, locale)}`}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+          <button
+            type="button"
+            className={styles.action}
+            disabled={pick === "" || chosen.has(Number(pick))}
+            onClick={() => {
+              const id = Number(pick);
+              if (Number.isSafeInteger(id) && id > 0) whatIf.add(id);
+              setPick("");
+            }}
+          >
+            {copy.whatIfAddButton}
+          </button>
+        </div>
+      </div>
 
       <button type="button" className={styles.action} disabled={!changed} onClick={whatIf.reset}>
         {copy.whatIfReset}

@@ -1,14 +1,15 @@
 /**
  * The what-if mode reads the shipped tree's plans as the tree publishes them (#1132). For
  * every human member of every published league tree whose entry document carries the
- * device block, the published one-week pure-points plan (`saf-puan/1.json`) is the
- * fifteen the mode starts from; read on the mode's terms it must have the plan's own
- * points, its hit and as many transfers as the plan has moves, and break no rule. A
- * member the mode cannot start for is listed with the reason, never passed over.
+ * device block, every advice document the mode is offered for (a solved one-week plan on
+ * base points: the pure-points plan and each rival plan) is read on the mode's terms: it
+ * must have the plan's own points, its hit and as many transfers as the plan has moves,
+ * and break no rule. The documents it is not offered for are counted, never read on a
+ * basis that is not theirs.
  */
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 
 import { beforeAll, describe, expect, it } from "vitest";
 
@@ -27,10 +28,26 @@ beforeAll(async () => {
   })) as unknown as LpSolver;
 }, 60_000);
 
+/** Every advice document under a member's folder, by its path in the tree. */
+function adviceDocuments(root: string, entryId: number): string[] {
+  const base = join(root, "advice", String(entryId));
+  if (!existsSync(base)) return [];
+  const found: string[] = [];
+  const walk = (folder: string) => {
+    for (const item of readdirSync(folder, { withFileTypes: true })) {
+      const full = join(folder, item.name);
+      if (item.isDirectory()) walk(full);
+      else if (item.name.endsWith(".json") && item.name !== "index.json")
+        found.push(relative(root, full));
+    }
+  };
+  walk(base);
+  return found.sort();
+}
+
 for (const { path, root } of shippedTrees()) {
   describe(path, () => {
-    const read = <T>(relative: string): T =>
-      JSON.parse(readFileSync(join(root, relative), "utf-8")) as T;
+    const read = <T>(file: string): T => JSON.parse(readFileSync(join(root, file), "utf-8")) as T;
     if (!existsSync(join(root, "device-plan.json"))) {
       it.skip("publishes no device-plan.json", () => {});
       return;
@@ -39,39 +56,36 @@ for (const { path, root } of shippedTrees()) {
       read<LeagueViewEnvelope<DevicePlanDocument>>("device-plan.json").payload,
     );
     const members = read<LeagueViewEnvelope<LeagueMembers>>("members.json").payload.members;
-    const cases: { entryId: number; squad: EntrySquad; plan: EntryAdvice; advised: number[] }[] =
-      [];
-    const passed: string[] = [];
+    const cases: { file: string; squad: EntrySquad; plan: EntryAdvice; advised: number[] }[] = [];
+    let declined = 0;
     for (const member of members) {
       if (member.member_kind !== "human") continue;
       const squad = read<LeagueViewEnvelope<EntrySquad>>(`entries/${member.entry_id}.json`).payload;
-      const relative = `advice/${member.entry_id}/saf-puan/1.json`;
-      if (!isDevicePlanEntry(squad.device_plan)) {
-        passed.push(`${member.entry_id}: no device block`);
-        continue;
+      if (!isDevicePlanEntry(squad.device_plan)) continue;
+      for (const file of adviceDocuments(root, member.entry_id)) {
+        const plan = read<LeagueViewEnvelope<EntryAdvice>>(file).payload;
+        const advised = advisedFifteen(plan);
+        if (advised === null) declined += 1;
+        else cases.push({ file, squad, plan, advised });
       }
-      if (!existsSync(join(root, relative))) {
-        passed.push(`${member.entry_id}: no published one-week plan`);
-        continue;
-      }
-      const plan = read<LeagueViewEnvelope<EntryAdvice>>(relative).payload;
-      const advised = advisedFifteen(plan);
-      if (advised === null) {
-        passed.push(`${member.entry_id}: the plan is not a solved week without a chip`);
-        continue;
-      }
-      cases.push({ entryId: member.entry_id, squad, plan, advised });
     }
 
-    it("starts from at least one member's plan, and names every member it does not", () => {
+    it("offers the mode on the one-week base plans and declines every other document", () => {
       expect(cases.length).toBeGreaterThan(0);
-      expect(cases.length + passed.length).toBe(
-        members.filter((member) => member.member_kind === "human").length,
-      );
+      expect(declined).toBeGreaterThan(0);
+      for (const { plan } of cases) {
+        expect([plan.window, plan.top100, plan.evidence, plan.chip ?? null]).toEqual([
+          1,
+          undefined,
+          undefined,
+          null,
+        ]);
+      }
     });
 
-    for (const { entryId, squad, plan, advised } of cases) {
-      it(`reads ${entryId}'s plan with the plan's points, hit and transfers`, () => {
+    it.each(cases.map((item) => [item.file, item] as const))(
+      "reads %s with the plan's own points, hit and transfers",
+      (_, { squad, plan, advised }) => {
         expect(squad.source_snapshot_id).toBe(document.source_snapshot_id);
         const [points] = whatIfValues(solver, document, [advised]);
         expect(points).toBeCloseTo(plan.expected_own_points!, 6);
@@ -80,7 +94,7 @@ for (const { path, root } of shippedTrees()) {
         expect(account.hitPoints).toBe(plan.transfer_hit_points);
         expect(account.transfers).toBe(plan.moves.length);
         expect(account.bankTenths).toBeGreaterThanOrEqual(0);
-      });
-    }
+      },
+    );
   });
 }

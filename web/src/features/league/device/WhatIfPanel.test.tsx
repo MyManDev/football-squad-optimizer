@@ -5,7 +5,7 @@
  * words, the reset returns to the advice, and after the table is read once every change
  * is answered with no further read.
  */
-import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join } from "node:path";
@@ -28,6 +28,9 @@ import type { WhatIfReply, WhatIfRequest } from "./whatIf.worker";
 import { WhatIfPanel } from "./WhatIfPanel";
 
 afterEach(cleanup);
+
+/** The page's document; `document` here is the capture's table. */
+const document_ = globalThis.document;
 
 const require = createRequire(import.meta.url);
 let highs: LpSolver;
@@ -100,14 +103,17 @@ async function started() {
   await act(async () => {
     fireEvent.click(screen.getByRole("button", { name: COPY.whatIfStart }));
   });
-  await screen.findByText("74,39", { exact: false });
+  await waitFor(() => expect(figure(COPY.whatIfPoints)).toContain("74,39"));
   return shown;
 }
 
 const remove = (name: string) =>
   fireEvent.click(screen.getByRole("button", { name: COPY.whatIfRemoveLabel(name) }));
-const add = (id: number) =>
+/** Choose a player in the list, then press the add button: choosing alone adds nothing. */
+const add = (id: number) => {
   fireEvent.change(screen.getByLabelText(COPY.whatIfAdd), { target: { value: String(id) } });
+  fireEvent.click(screen.getByRole("button", { name: COPY.whatIfAddButton }));
+};
 
 async function settled() {
   await act(async () => {
@@ -223,7 +229,7 @@ describe("on the device", () => {
       fireEvent.click(screen.getByRole("button", { name: COPY.whatIfStart }));
     });
     await act(async () => held.shift()!());
-    await screen.findByText("74,39", { exact: false });
+    await waitFor(() => expect(figure(COPY.whatIfPoints)).toContain("74,39"));
     remove("160");
     const account = screen.getByText(COPY.whatIfPoints, { selector: "dt" }).closest("dl")!;
     expect(account).toHaveAttribute("aria-busy", "true");
@@ -261,8 +267,118 @@ describe("what the mode says before it can start", () => {
   });
 });
 
+describe("again after a failure", () => {
+  it("offers the start again after a failed read, and reads again when pressed", async () => {
+    const loadDocument = vi
+      .fn<NonNullable<WhatIfDependencies["loadDocument"]>>()
+      .mockRejectedValueOnce(new Error("broken"))
+      .mockResolvedValue(envelope(document));
+    show({ loadDocument });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: COPY.whatIfStart }));
+    });
+    expect(await screen.findByText(COPY.whatIfFailed)).toBeInTheDocument();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: COPY.whatIfRetry }));
+    });
+    await waitFor(() => expect(figure(COPY.whatIfPoints)).toContain("74,39"));
+    expect(loadDocument).toHaveBeenCalledTimes(2);
+  });
+
+  it("says a solver that could not read a fifteen apart from a list that could not be read", async () => {
+    const failing: WhatIfSolver = {
+      onmessage: null,
+      onerror: null,
+      postMessage(request) {
+        queueMicrotask(() =>
+          failing.onmessage?.({
+            data: { id: request.id, kind: "failed" },
+          } as MessageEvent<WhatIfReply>),
+        );
+      },
+      terminate() {},
+    };
+    show({ createSolver: () => failing });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: COPY.whatIfStart }));
+    });
+    expect(await screen.findByText(COPY.whatIfSolverFailed)).toBeInTheDocument();
+    expect(screen.queryByText(COPY.whatIfFailed)).toBeNull();
+    expect(screen.getByRole("button", { name: COPY.whatIfRetry })).toBeInTheDocument();
+  });
+
+  it("creates no worker once the panel has left before the table arrived", async () => {
+    let release: (value: LeagueViewEnvelope<DevicePlanDocument>) => void = () => {};
+    let signal: AbortSignal | null = null;
+    const createSolver = vi.fn(() => new InProcessSolver());
+    const { unmount } = show({
+      loadDocument: (abort) => {
+        signal = abort;
+        return new Promise((resolve) => {
+          release = resolve;
+        });
+      },
+      createSolver,
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: COPY.whatIfStart }));
+    });
+    unmount();
+    expect(signal!.aborted).toBe(true);
+    await act(async () => release(envelope(document)));
+    expect(createSolver).not.toHaveBeenCalled();
+  });
+});
+
+describe("with the keyboard and a screen reader", () => {
+  it("adds nothing while the member moves through the list; only the add button adds", async () => {
+    await started();
+    const list = screen.getByLabelText(COPY.whatIfAdd);
+    fireEvent.change(list, { target: { value: "152" } });
+    fireEvent.change(list, { target: { value: "159" } });
+    await settled();
+    expect(figure(COPY.whatIfTransfers)).toBe("1");
+    expect(screen.getAllByRole("button", { name: /^Kadrodan çıkar/ })).toHaveLength(15);
+    fireEvent.click(screen.getByRole("button", { name: COPY.whatIfAddButton }));
+    await settled();
+    expect(screen.getAllByRole("button", { name: /^Kadrodan çıkar/ })).toHaveLength(16);
+  });
+
+  it("moves focus to the next row's remove button, and to the list when the group empties", async () => {
+    await started();
+    const forwards = screen
+      .getAllByRole("list")
+      .find((list) => list.getAttribute("aria-label") === MESSAGES.tr.positions.FWD)!;
+    const [first, second, third] = within(forwards).getAllByRole("button");
+    fireEvent.click(first!);
+    await settled();
+    expect(document_.activeElement).toBe(second);
+    fireEvent.click(second!);
+    await settled();
+    expect(document_.activeElement).toBe(third);
+    fireEvent.click(third!);
+    await settled();
+    expect(document_.activeElement).toBe(screen.getByLabelText(COPY.whatIfAdd));
+  });
+
+  it("says the new bank, points and difference in a polite live region once they are read", async () => {
+    await started();
+    const live = () => document_.querySelector('[aria-live="polite"]')!;
+    expect(live().textContent).toBe(COPY.whatIfSummary("0,7m", "74,39", "0,0"));
+    remove("160");
+    add(152);
+    await settled();
+    expect(live().textContent).toBe(COPY.whatIfSummary("0,0m", "66,38", "−8,0"));
+  });
+});
+
 describe("the panel's stylesheet", () => {
   const css = readFileSync(join(__dirname, "WhatIfPanel.module.css"), "utf-8");
+  it("keeps one column no wider than its card, whatever the list's longest option", () => {
+    expect(css).toMatch(/\.whatIf \{[^}]*grid-template-columns: minmax\(0, 1fr\)/);
+    expect(css).toMatch(/\.add select \{[^}]*width: 100%;[^}]*min-width: 0/);
+  });
+
   it("changes a row's state in the card time and gives each button a thumb-sized target", () => {
     expect(css).toMatch(
       /\.player \{[^}]*transition: background-color var\(--motion-ui\) var\(--motion-ease\)/,

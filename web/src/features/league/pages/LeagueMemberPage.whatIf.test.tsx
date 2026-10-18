@@ -96,6 +96,21 @@ describe("the what-if tool", () => {
     expect(tool()).toBeNull();
   });
 
+  it.each([
+    ["a plan over several weeks", { window: 3 as const }],
+    [
+      "a plan chosen with a Top 100 weight",
+      { top100: { weight: 30 } as unknown as EntryAdvice["top100"] },
+    ],
+    [
+      "a plan chosen with the manager's word",
+      { evidence: {} as unknown as EntryAdvice["evidence"] },
+    ],
+  ])("is not offered for %s, whose points are on another basis", (_, patch) => {
+    show(WITH_BLOCK, { ...ADVICE, payload: { ...ADVICE.payload, ...patch } });
+    expect(tool()).toBeNull();
+  });
+
   it("is not offered for a plan the solver did not prove", () => {
     show(WITH_BLOCK, {
       ...ADVICE,

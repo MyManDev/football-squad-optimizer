@@ -114,16 +114,22 @@ export function whatIfValues(
 }
 
 /**
- * The fifteen the mode starts from: a solved plan's eleven and bench, played without a
- * chip, so its points are on the basis the mode reads every fifteen on. Null otherwise.
+ * The fifteen the mode starts from: a solved one-week plan's eleven and bench, with no
+ * chip, no Top 100 weight and the manager's word off, so the plan's own points are on the
+ * base basis every fifteen is read on here. A plan chosen on other points (a weight, the
+ * word, a chip week) or over several weeks has another basis, and the mode is not offered
+ * for it. Null otherwise.
  */
 export function advisedFifteen(plan: EntryAdvice | null | undefined): number[] | null {
   if (
     !plan ||
     (plan.solver_status !== "OPTIMAL" && plan.solver_status !== "FEASIBLE") ||
+    plan.window !== 1 ||
+    plan.top100 !== undefined ||
+    plan.evidence !== undefined ||
+    (plan.chip ?? null) !== null ||
     plan.starting_xi?.length !== 11 ||
-    plan.bench?.length !== 4 ||
-    (plan.chip ?? null) !== null
+    plan.bench?.length !== 4
   )
     return null;
   const ids = [...plan.starting_xi, ...plan.bench].map((player) => player.player_id);

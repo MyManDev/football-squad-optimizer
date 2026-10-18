@@ -25,11 +25,18 @@ export interface WhatIfSolver {
 }
 
 export interface WhatIfDependencies {
-  loadDocument?: () => Promise<LeagueViewEnvelope<DevicePlanDocument>>;
+  /** Reads the capture's table; the signal ends the read when the page leaves. */
+  loadDocument?: (signal: AbortSignal) => Promise<LeagueViewEnvelope<DevicePlanDocument>>;
   createSolver?: () => WhatIfSolver;
 }
 
-export type WhatIfPhase = "idle" | "loading" | "ready" | "other-capture" | "unpublished" | "failed";
+/**
+ * Where the mode stands: `failed` is a table that could not be read, `solver-failed` a
+ * solver that could not read a fifteen. From any phase but `loading` and `ready` the member
+ * can start again.
+ */
+export type WhatIfPhase =
+  "idle" | "loading" | "ready" | "other-capture" | "unpublished" | "failed" | "solver-failed";
 
 export interface WhatIf {
   phase: WhatIfPhase;
@@ -67,7 +74,7 @@ export function useWhatIf(
 ): WhatIf {
   const { tree } = useLeague();
   const {
-    loadDocument = () => tree.devicePlan(squad.source_snapshot_id),
+    loadDocument = (signal: AbortSignal) => tree.devicePlan(squad.source_snapshot_id, { signal }),
     createSolver = createWorker,
   } = dependencies;
   const entry: DevicePlanEntry | null = isDevicePlanEntry(squad.device_plan)
@@ -92,12 +99,26 @@ export function useWhatIf(
   } | null>(null);
   const solver = useRef<WhatIfSolver | null>(null);
   const asked = useRef(0);
+  // The read in flight, ended when the page leaves so nothing is created after it.
+  const reading = useRef<AbortController | null>(null);
+
+  /** The worker is ended on a solver failure, so the next start creates a fresh one. */
+  const solverFailed = useCallback(() => {
+    solver.current?.terminate();
+    solver.current = null;
+    setDocument(null);
+    setPhase("solver-failed");
+  }, []);
 
   const start = useCallback(() => {
     if (entry === null || phase === "loading" || phase === "ready") return;
     setPhase("loading");
-    loadDocument().then(
+    reading.current?.abort();
+    const read = new AbortController();
+    reading.current = read;
+    loadDocument(read.signal).then(
       (envelope) => {
+        if (read.signal.aborted) return;
         const table = whatIfDocument(envelope.payload);
         const known = new Set(table.players.map((player) => player.id));
         // The table is held to the capture on screen, and must carry the advised fifteen.
@@ -112,16 +133,27 @@ export function useWhatIf(
         try {
           solver.current ??= createSolver();
         } catch {
-          setPhase("failed");
+          solverFailed();
           return;
         }
-        solver.current.onerror = () => setPhase("failed");
+        solver.current.onerror = solverFailed;
         setDocument(table);
         setPhase("ready");
       },
-      (error: unknown) => setPhase(error instanceof LeagueDataMissing ? "unpublished" : "failed"),
+      (error: unknown) => {
+        if (read.signal.aborted) return;
+        setPhase(error instanceof LeagueDataMissing ? "unpublished" : "failed");
+      },
     );
-  }, [entry, phase, loadDocument, createSolver, squad.source_snapshot_id, advisedIds]);
+  }, [
+    entry,
+    phase,
+    loadDocument,
+    createSolver,
+    solverFailed,
+    squad.source_snapshot_id,
+    advisedIds,
+  ]);
 
   // Each fifteen tried asks the worker for its points beside the advised one's; only the
   // last question's answer is kept.
@@ -133,7 +165,7 @@ export function useWhatIf(
       const reply = event.data;
       if (reply.id !== asked.current) return;
       if (reply.kind === "failed") {
-        setPhase("failed");
+        solverFailed();
         return;
       }
       setAnswer({
@@ -143,11 +175,12 @@ export function useWhatIf(
       });
     };
     worker.postMessage({ id, document, squads: [[...advisedIds], [...current]] });
-  }, [document, advisedIds, current]);
+  }, [document, advisedIds, current, solverFailed]);
 
   // An unmounted page keeps no worker.
   useEffect(
     () => () => {
+      reading.current?.abort();
       solver.current?.terminate();
       solver.current = null;
     },

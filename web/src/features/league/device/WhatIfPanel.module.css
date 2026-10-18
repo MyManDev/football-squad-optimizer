@@ -3,8 +3,11 @@
    add a player, and the way back to the advice. A changed row carries the page's one
    bright accent; its state changes in the card time of the motion tokens. */
 
+/* One column that never grows past its card: the add list's longest option would
+   otherwise set the width of an implicit auto column. */
 .whatIf {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-3);
 }
 
@@ -134,11 +137,20 @@
 .add {
   display: grid;
   gap: var(--space-1);
+  min-width: 0;
   font-weight: 600;
 }
 
+.addRow {
+  display: flex;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
 .add select {
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
   min-height: 44px;
-  max-width: 100%;
   font: inherit;
 }
