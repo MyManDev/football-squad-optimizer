@@ -1,6 +1,6 @@
 import { memberAddress } from "../../../lib/leagueAddresses";
 import { useLeagueId } from "../useLeague";
-import { Link, useNavigate } from "react-router";
+import { Link } from "react-router";
 
 import { EmptyState } from "../../../design/components/EmptyState";
 import { useLanguage } from "../../../i18n/context";
@@ -9,14 +9,12 @@ import { useFixtures } from "../../fixtures/data";
 import type { FixturesPayload } from "../../fixtures/types";
 import { gameweekDeadline, useDeadlinePassed } from "../advice/deadline";
 import { ExampleDataBadge } from "../components/ExampleDataBadge";
-import type { ScoreboardState } from "../components/karne";
 import { DisclosureIcon } from "../components/memberIcons";
-import { SystemKarne, SystemScoreboardDetails } from "../components/SystemKarne";
 import { ViewerChips } from "../components/ViewerChips";
 import { leagueRace } from "../race/leagueRace";
 import { LeagueRaceCard } from "../race/LeagueRaceCard";
 import { LeagueDataMissing } from "../data";
-import { useViewerEntry } from "../identity/useViewerEntry";
+import { useLeagueIdentity } from "../identity/useLeagueIdentity";
 import { useEntrySquad, useLeagueMembers, useLeagueScoreboard } from "../queries";
 import { follower, gapToLeader, leaderTotal, netWeekPoints } from "../standing";
 import type {
@@ -25,6 +23,7 @@ import type {
   LeagueMembers,
   LeagueViewEnvelope,
   RankMovement,
+  Scoreboard,
 } from "../types";
 import { ScoreBug, TopWeek } from "./MemberTopBar";
 import { scoreBugCells } from "./scoreBug";
@@ -34,15 +33,14 @@ import styles from "./LeagueMembersPage.module.css";
 export function LeagueMembersPage() {
   const { messages } = useLanguage();
   const copy = messages.leagueMembers;
-  const { viewer } = useViewerEntry(useLeagueId());
+  const viewer = useLeagueIdentity(useLeagueId()).member;
   const query = useLeagueMembers();
-  // The system's record beside the table; the same document /league reads, without the
-  // member histories that page also fetches.
-  const scoreboard = useLeagueScoreboard();
   // The viewer's own squad document, only once the visitor has said who they are: it holds
   // the bank, the free transfers and the chips. The member page shares the read.
   const viewerSquad = useEntrySquad(viewer?.entryId, viewer !== null);
   const fixtures = useFixtures();
+  // The scoreboard the league race is drawn from; a missing or failed read draws no race.
+  const scoreboard = useLeagueScoreboard();
   // Re-read once a minute, so an open page notices its deadline passing.
   const deadlinePassed = useDeadlinePassed(
     query.data?.payload.season,
@@ -62,42 +60,36 @@ export function LeagueMembersPage() {
       </EmptyState>
     );
   }
-  const scoreboardState: ScoreboardState = scoreboard.isPending
-    ? { status: "pending" }
-    : scoreboard.isError
-      ? { status: scoreboard.error instanceof LeagueDataMissing ? "missing" : "error" }
-      : { status: "ready", envelope: scoreboard.data };
   return (
     <LeagueMembersView
       envelope={query.data}
-      scoreboard={scoreboardState}
       viewerSquad={viewer !== null ? (viewerSquad.data ?? null) : null}
       fixtures={fixtures.data ?? null}
       deadlinePassed={deadlinePassed !== null}
+      scoreboard={scoreboard.isError ? null : (scoreboard.data?.payload ?? null)}
     />
   );
 }
 
 /**
  * The league table, as D-Lig draws it: the gameweek and its deadline in the top bar (with
- * the viewer's score bug once the visitor has said who they are), the table as the page's
- * one focal point, and beside it the system's own record, the viewer's chips and the
- * member right behind the viewer.
+ * the viewer's score bug), the league's name over the table as the page's one focal point,
+ * and beside it the viewer's chips and the member right behind the viewer.
  *
  * Every figure is a published one or arithmetic on published ones: the week net of that
  * week's hit, and the gap to the leader's total. An unknown number is a dash, never 0.
- * The system's paper squad is never a row here, and nothing here links to its pages.
+ * The system's paper squad is never a row here, and nothing here links to it.
  */
 export function LeagueMembersView({
   envelope,
-  scoreboard,
   viewerSquad = null,
   fixtures = null,
   deadlinePassed = false,
+  scoreboard = null,
 }: {
   envelope: LeagueViewEnvelope<LeagueMembers>;
-  /** The system's scoreboard; without it (a page rendered on its own) there is no record. */
-  scoreboard?: ScoreboardState;
+  /** The published scoreboard the league race is drawn from; none, no race. */
+  scoreboard?: Scoreboard | null;
   /** The viewer's own squad document, for the bank, the free transfers and the chips. */
   viewerSquad?: LeagueViewEnvelope<EntrySquad> | null;
   fixtures?: FixturesPayload | null;
@@ -107,8 +99,7 @@ export function LeagueMembersView({
   const { locale, messages } = useLanguage();
   const leagueId = useLeagueId();
   const copy = messages.leagueMembers;
-  const { viewer, select, clear } = useViewerEntry(leagueId);
-  const navigate = useNavigate();
+  const viewer = useLeagueIdentity(leagueId).member;
   const view = envelope.payload;
   // A published example can include our virtual team; the visitor list is for members.
   const rows = view.members.filter(
@@ -126,9 +117,7 @@ export function LeagueMembersView({
   const cells = viewerRow ? scoreBugCells(viewerRow, rows.length, squad, locale, copy) : [];
   const count = (value: number) => points(value, 0, locale);
   const race =
-    scoreboard?.status === "ready"
-      ? leagueRace(scoreboard.envelope.payload, view.members, view.scored_gameweek)
-      : null;
+    scoreboard !== null ? leagueRace(scoreboard, view.members, view.scored_gameweek) : null;
 
   return (
     <div className={styles.page}>
@@ -140,61 +129,11 @@ export function LeagueMembersView({
 
       <div className={styles.columns}>
         <section className={styles.tableColumn} aria-labelledby="league-table-title">
-          <div className={styles.heading}>
-            <h1 className={styles.title} id="league-table-title">
-              {copy.title}
-            </h1>
-            <p className={styles.context}>
-              <span>{view.league_name}</span>
-              <span>{copy.memberCount(rows.length)}</span>
-              {view.scored_gameweek !== null ? (
-                <span>{copy.afterGameweek(view.scored_gameweek)}</span>
-              ) : null}
-            </p>
-          </div>
+          <h1 className={styles.title} id="league-table-title">
+            {view.league_name}
+          </h1>
 
-          <div className={styles.viewer}>
-            {viewer === null ? (
-              <p className={styles.viewerLine}>
-                <strong>{copy.viewerTitle}</strong> {copy.viewerPrompt}
-              </p>
-            ) : (
-              <p className={styles.viewerLine}>
-                {/* The claim on its own line, then its actions together on the next. */}
-                <span className={styles.viewerState}>
-                  {viewerRow ? (
-                    <strong>
-                      {copy.viewerSelected(viewerRow.manager_name ?? `#${viewerRow.entry_id}`)}
-                    </strong>
-                  ) : (
-                    copy.viewerMissing
-                  )}
-                </span>{" "}
-                {viewerRow ? (
-                  <>
-                    <Link
-                      className={styles.viewerAction}
-                      to={memberAddress(leagueId, viewerRow.entry_id!)}
-                    >
-                      {copy.viewerOpenMine}
-                    </Link>{" "}
-                  </>
-                ) : null}
-                <a className={styles.viewerAction} href="#league-member-list">
-                  {copy.viewerChange}
-                </a>{" "}
-                <button type="button" className={styles.viewerClear} onClick={clear}>
-                  {copy.viewerClear}
-                </button>
-              </p>
-            )}
-          </div>
-
-          <table
-            id="league-member-list"
-            className={styles.table}
-            data-viewer={viewerRow ? "" : undefined}
-          >
+          <table id="league-member-list" className={styles.table}>
             <caption className="visually-hidden">{copy.caption(view.league_name)}</caption>
             <thead>
               <tr>
@@ -254,24 +193,6 @@ export function LeagueMembersView({
                           </Link>
                           {isViewer ? <span> · {copy.viewerYouBadge}</span> : null}
                         </span>
-                        {isViewer ? null : (
-                          <button
-                            type="button"
-                            className={styles.viewerSelect}
-                            // Fifteen rows carry this button: its name says whose row it is,
-                            // starting with the words it shows.
-                            aria-label={copy.viewerSelectFor(
-                              member.manager_name ?? copy.unknownMember,
-                              member.team_name ?? copy.unknownTeam,
-                            )}
-                            onClick={() => {
-                              select(member.entry_id);
-                              navigate(memberAddress(leagueId, member.entry_id!));
-                            }}
-                          >
-                            {copy.viewerSelect}
-                          </button>
-                        )}
                       </div>
                     </td>
                     <td className={`${styles.week} num`}>{net === null ? "—" : count(net)}</td>
@@ -306,7 +227,6 @@ export function LeagueMembersView({
             <div className={styles.aboutBody}>
               <h2 className={styles.aboutTitle}>{copy.publicDataTitle}</h2>
               <p>{copy.publicDataBody}</p>
-              <p>{copy.viewerBody}</p>
               <p>{copy.movementNote}</p>
               {/* The column is netted for every row, so the basis belongs to the column, and
                   it differs from what the FPL site shows a manager. */}
@@ -315,9 +235,8 @@ export function LeagueMembersView({
           </details>
         </section>
 
-        {scoreboard || squad || chaser ? (
+        {squad || chaser ? (
           <div className={styles.side}>
-            {scoreboard ? <SystemKarne state={scoreboard} leagueId={view.league_id} /> : null}
             {squad ? <ViewerChips squad={squad} /> : null}
             {chaser ? (
               <p className={styles.chaser}>
@@ -343,24 +262,15 @@ export function LeagueMembersView({
           </div>
         ) : null}
 
-        {/* The race reads the same scoreboard: across both columns, under the table. */}
+        {/* The league race, from the scoreboard the page reads for it, across both columns. */}
         {race ? (
-          <div className={styles.fullScoreboard}>
+          <div className={styles.race}>
             <LeagueRaceCard
               race={race}
               members={view.members}
               initialEntry={viewerRow?.entry_id ?? null}
             />
           </div>
-        ) : null}
-
-        {/* The whole scoreboard is a wide table: closed, and across both columns. */}
-        {scoreboard ? (
-          <SystemScoreboardDetails
-            state={scoreboard}
-            leagueId={view.league_id}
-            className={styles.fullScoreboard}
-          />
         ) : null}
       </div>
     </div>

@@ -8,28 +8,28 @@ import { cleanup, fireEvent, render, screen, within } from "@testing-library/rea
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { MemoryRouter } from "react-router";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { mockLeagueMembersEnvelope } from "../../../fixtures/league";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { MESSAGES, type Language } from "../../../i18n/messages";
 import { AS_A_CAVEAT, AS_A_CHANCE } from "../../../testSupport/honesty";
-import { withLeague } from "../../../testSupport/league";
+import { forgetIdentity, stubTree, withLeague } from "../../../testSupport/league";
 import {
   RACE_SYSTEM,
   raceMember,
   raceScoreboard,
   raceWeek,
 } from "../../../testSupport/raceScoreboard";
-import type { ScoreboardState } from "../components/karne";
-import { writeViewerEntry } from "../identity/useViewerEntry";
-import { LeagueMembersView } from "../pages/LeagueMembersPage";
-import type { EntryView } from "../types";
+import { LeagueMembersPage, LeagueMembersView } from "../pages/LeagueMembersPage";
+import { LeagueDataMissing } from "../dataErrors";
+import type { EntryView, LeagueViewEnvelope, Scoreboard } from "../types";
 import { leagueRace } from "./leagueRace";
 import { LeagueRaceCard, RACE_COLUMN, RACE_ROW } from "./LeagueRaceCard";
 
 afterEach(cleanup);
-beforeEach(() => writeViewerEntry(null));
+beforeEach(() => forgetIdentity());
 
 const COPY = MESSAGES.tr.leagueMembers;
 const MEMBERS = [raceMember(11), raceMember(22), raceMember(33), RACE_SYSTEM];
@@ -193,15 +193,9 @@ describe("on the league table page", () => {
   );
   const totals = (base: number) =>
     Object.fromEntries(humans.map((member, index) => [member.entry_id!, base - index * 3]));
-  const ready: ScoreboardState = {
-    status: "ready",
-    envelope: {
-      ...mockLeagueMembersEnvelope,
-      payload: raceScoreboard([raceWeek(1, totals(60)), raceWeek(2, totals(120))]),
-    },
-  };
+  const board = raceScoreboard([raceWeek(1, totals(60)), raceWeek(2, totals(120))]);
 
-  function page(scoreboard: ScoreboardState) {
+  function view(scoreboard: Scoreboard | null) {
     return render(
       <LanguageProvider initialLanguage="tr">
         <MemoryRouter initialEntries={["/league/352490/members"]}>
@@ -213,14 +207,39 @@ describe("on the league table page", () => {
     );
   }
 
-  it("draws the race under the table from the scoreboard the page reads", () => {
-    page(ready);
+  it("draws the race under the table from the scoreboard it is given", () => {
+    view(board);
     const race = screen.getByRole("region", { name: COPY.raceTitle });
     expect(within(race).getByRole("img")).toBeInTheDocument();
   });
 
-  it("draws nothing while the scoreboard is missing", () => {
-    page({ status: "missing" });
+  it("draws nothing without a scoreboard", () => {
+    view(null);
+    expect(screen.queryByRole("region", { name: COPY.raceTitle })).toBeNull();
+  });
+
+  function page(scoreboard: () => Promise<LeagueViewEnvelope<Scoreboard>>) {
+    stubTree({ scoreboard: vi.fn(scoreboard) });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    return render(
+      <QueryClientProvider client={client}>
+        <LanguageProvider initialLanguage="tr">
+          <MemoryRouter initialEntries={["/league/352490/members"]}>
+            {withLeague(<LeagueMembersPage />)}
+          </MemoryRouter>
+        </LanguageProvider>
+      </QueryClientProvider>,
+    );
+  }
+
+  it("reads the scoreboard for the race on the page itself", async () => {
+    page(async () => ({ ...mockLeagueMembersEnvelope, payload: board }));
+    expect(await screen.findByRole("region", { name: COPY.raceTitle })).toBeInTheDocument();
+  });
+
+  it("draws no race when the scoreboard is not published", async () => {
+    page(() => Promise.reject(new LeagueDataMissing("scoreboard.json")));
+    await screen.findAllByRole("table");
     expect(screen.queryByRole("region", { name: COPY.raceTitle })).toBeNull();
   });
 });

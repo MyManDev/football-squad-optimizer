@@ -5,6 +5,7 @@ import { expect, test } from "@playwright/test";
 
 import { MESSAGES } from "../src/i18n/messages";
 import { shippedTrees } from "../src/testSupport/shippedTrees";
+import { shippedClaim } from "./identity";
 import { installLeagueMocks } from "./leagueMocks";
 
 // The league race (#1135) on the narrowest phones of the matrix, with a manager name of 40
@@ -18,7 +19,8 @@ for (const width of [320, 360]) {
     page,
   }) => {
     await page.setViewportSize({ width, height: 800 });
-    await installLeagueMocks(page);
+    // The viewer is the shipped league's first member, the table served below being its own.
+    await installLeagueMocks(page, { claim: shippedClaim() });
     // The shipped tree's table, the one the shipped scoreboard the mocks serve belongs to.
     const root = shippedTrees()[0]!.root;
     const table = JSON.parse(readFileSync(join(root, "members.json"), "utf-8"));

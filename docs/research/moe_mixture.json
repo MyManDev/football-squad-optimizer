@@ -5359,5 +5359,6 @@
       "decision_interval_above_zero": false,
       "pin_proposed": false
     }
-  }
+  },
+  "locked_holdout_accessed": true
 }

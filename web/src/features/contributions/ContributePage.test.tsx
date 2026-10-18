@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { App } from "../../app/App";
 import { LanguageProvider } from "../../i18n/LanguageProvider";
+import type { Language } from "../../i18n/messages";
 import { ContributePage } from "./ContributePage";
 
 afterEach(() => {
@@ -42,9 +43,9 @@ it("keeps the contribution route and navigation with a configured origin", async
     "https://squadopt-api.example/api/v1/contributions/players",
   );
 });
-function mount() {
+function mount(language: Language = "tr") {
   render(
-    <LanguageProvider initialLanguage="tr">
+    <LanguageProvider initialLanguage={language}>
       <QueryClientProvider
         client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
       >
@@ -86,6 +87,23 @@ function serve(status = 202) {
   vi.stubGlobal("fetch", mock);
   return mock;
 }
+it.each([
+  ["tr", "Takım", "Yorumlar yönetici onayından sonra herkese açılır.", "Tüm FPL oyuncuları"],
+  ["en", "Team", "Comments become public after moderation.", "Complete FPL roster"],
+] as const)(
+  "prints no moderation note and no roster header in %s",
+  async (language, team, note, roster) => {
+    serve();
+    mount(language);
+    await screen.findByLabelText(team);
+    const text = document.body.textContent ?? "";
+    expect(text).not.toContain(note);
+    expect(text).not.toContain(roster);
+    // Neither the roster's season, its size nor its capture time is printed anywhere.
+    expect(text).not.toMatch(/2026|\b4 (oyuncu|players)\b/);
+    expect(document.querySelector("small")).toBeNull();
+  },
+);
 it("requires consent, preserves untrusted text as text and reports pending rather than public", async () => {
   const mock = serve();
   const user = userEvent.setup();

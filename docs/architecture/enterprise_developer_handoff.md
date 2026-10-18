@@ -59,6 +59,9 @@ adım cache cevabının yeni hesap gerektirmediğini doğrular. Sonuç görünü
 kontrolü de uygulanır. Bu koşunun dil kapsamı TR'dir; EN ve rakip değiştirme kapsamı
 kapanış matrisinde ayrıca belirtilmelidir.
 
+Üye seçimi artık lig numarasından sonraki “Sen kimsin?” adımıdır ve sekme oturumu boyunca
+(sessionStorage) tutulur; senaryodaki “Bu benim” düğmesi ve `squadopt.viewer` kaydı yoktur.
+
 İlk genişletilmiş koşu, seçili üyenin “Üyeyi değiştir” bağlantısında **4,33:1** kontrast
 oranını yakaladı. `LeagueMemberPage.module.css` içindeki `.notice a` rengi mevcut
 `--color-text` token'ına alındı. Bu değişiklikten sonraki yerel koşu **1 passed in 22.54s**

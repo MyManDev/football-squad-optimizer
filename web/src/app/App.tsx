@@ -3,11 +3,9 @@ import { lazy, Suspense } from "react";
 import { BrowserRouter, Route, Routes } from "react-router";
 
 import { EmptyState } from "../design/components/EmptyState";
-import { PageShell } from "../design/components/PageShell";
-import { useChosenLeague } from "../features/league/identity/useChosenLeague";
-import { useViewerEntry } from "../features/league/identity/useViewerEntry";
 import { useLanguage } from "../i18n/context";
 import { LanguageProvider } from "../i18n/LanguageProvider";
+import { IdentifiedShell } from "./IdentifiedShell";
 import { RouteErrorBoundary } from "./RouteErrorBoundary";
 
 const SquadPage = lazy(() =>
@@ -71,24 +69,50 @@ export function App() {
 
 function LocalizedApp({ basename }: { basename: string }) {
   const { messages } = useLanguage();
-  // The member the visitor said they are, in memory only: 'Bu hafta' opens their page.
-  const { viewer } = useViewerEntry();
-  const { leagueId } = useChosenLeague();
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter basename={basename}>
-        <PageShell viewer={viewer} chosenLeagueId={leagueId}>
+        {/* The shell reads the visitor's league and member through the identity module. */}
+        <IdentifiedShell>
           <RouteErrorBoundary>
             <Suspense fallback={<EmptyState title={messages.common.loading} />}>
               <Routes>
                 <Route path="/" element={<LeagueEntryPage />} />
-                <Route path="/gw/:season/:gameweek" element={<SquadPage />} />
-                <Route path="/moves" element={<MovesPage />} />
-                <Route path="/moves/:season/:gameweek" element={<MovesPage />} />
-                <Route path="/rivals" element={<RivalsPage />} />
-                <Route path="/rivals/:season/:gameweek" element={<RivalsPage />} />
+                {/* The system's own pages name no league; they stand behind the same two
+                    steps as the league pages, for the visitor's current league. */}
+                <Route
+                  path="/gw/:season/:gameweek"
+                  element={
+                    <LeagueGate source="visitor">
+                      <SquadPage />
+                    </LeagueGate>
+                  }
+                />
+                {["/moves", "/moves/:season/:gameweek"].map((path) => (
+                  <Route
+                    key={path}
+                    path={path}
+                    element={
+                      <LeagueGate source="visitor">
+                        <MovesPage />
+                      </LeagueGate>
+                    }
+                  />
+                ))}
+                {["/rivals", "/rivals/:season/:gameweek"].map((path) => (
+                  <Route
+                    key={path}
+                    path={path}
+                    element={
+                      <LeagueGate source="visitor">
+                        <RivalsPage />
+                      </LeagueGate>
+                    }
+                  />
+                ))}
                 {/* Every league address names its league; the old shape without the
-                    number goes through the gate, which rewrites it to the chosen league. */}
+                    number goes through the gate, which rewrites it to the current league.
+                    The gate then asks who the visitor is before the page is drawn. */}
                 {["/league", "/league/:leagueId"].map((root) => (
                   <Route
                     key={root}
@@ -146,7 +170,7 @@ function LocalizedApp({ basename }: { basename: string }) {
               </Routes>
             </Suspense>
           </RouteErrorBoundary>
-        </PageShell>
+        </IdentifiedShell>
       </BrowserRouter>
     </QueryClientProvider>
   );

@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { expect, test } from "@playwright/test";
 
 import { shippedTrees } from "../src/testSupport/shippedTrees";
+import { claimMember, shippedClaim } from "./identity";
 
 /**
  * The decision's captain line on a phone, over the published tree rather than the example
@@ -69,6 +70,8 @@ for (const language of ["tr", "en"] as const) {
     }) => {
       await page.addInitScript((lang) => localStorage.setItem("squadopt.language", lang), language);
       await page.route("**/api/v1/**", (route) => route.abort("connectionrefused"));
+      // The visitor has entered the league and said who they are.
+      await claimMember(page, shippedClaim());
       for (const { strategy, window, armband } of pages) {
         if (!armband) continue;
         await page.setViewportSize({ width: WIDTHS[0], height: 800 });

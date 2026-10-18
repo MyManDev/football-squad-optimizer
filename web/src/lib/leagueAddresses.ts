@@ -41,3 +41,29 @@ export function legacyLeagueAddress(pathname: string, leagueId: number): string 
   const rest = /^\/league\/(members(?:\/.*)?)$/.exec(pathname);
   return rest ? `${leagueAddress(leagueId)}/${rest[1]}` : null;
 }
+
+/**
+ * What a navigation asks of the "Sen kimsin?" step, carried in the router's state (which
+ * a reload keeps). `FIND_YOURSELF`: once the visitor has said who they are, open their own
+ * page. `PICK_HERE`: open the address they are on.
+ */
+export const FIND_YOURSELF = { identity: "find" } as const;
+export const PICK_HERE = { identity: "here" } as const;
+export type IdentityStep = typeof FIND_YOURSELF | typeof PICK_HERE;
+
+function identityStep(state: unknown): unknown {
+  return typeof state === "object" && state !== null
+    ? (state as { identity?: unknown }).identity
+    : undefined;
+}
+
+/** The navigation asked for the visitor's own page once they say who they are. */
+export function asksForOwnPage(state: unknown): boolean {
+  return identityStep(state) === FIND_YOURSELF.identity;
+}
+
+/** The navigation came to the step on purpose, so the step takes focus. */
+export function arrivedToPick(state: unknown): boolean {
+  const step = identityStep(state);
+  return step === FIND_YOURSELF.identity || step === PICK_HERE.identity;
+}

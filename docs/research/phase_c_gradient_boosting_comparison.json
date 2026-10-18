@@ -4958,5 +4958,6 @@
       }
     },
     "note": "The points-MAE rule of the declared comparison preferred the candidate; this decision-level reading is reported beside it, not as part of the rule. Its interval crosses zero with a negative mean, so it does not support the promotion on its own and it does not refute the candidate either."
-  }
+  },
+  "locked_holdout_accessed": true
 }
