@@ -8,7 +8,7 @@ import { mockLeagueMembersEnvelope } from "../../../fixtures/league";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { MESSAGES, type Language } from "../../../i18n/messages";
 import { jsonResponse, notFound, stubFetchByUrl } from "../../../testSupport/fetchByUrl";
-import { memberAddress, membersAddress } from "../../../lib/leagueAddresses";
+import { memberAddress, membersAddress, PICK_HERE } from "../../../lib/leagueAddresses";
 import { claimIn, forgetIdentity } from "../../../testSupport/league";
 import { readMemberClaim } from "../identity/memberClaim";
 import { readChosenLeague, writeChosenLeague } from "../identity/useChosenLeague";
@@ -259,5 +259,93 @@ describe.each(["tr", "en"] as const)("league gate in %s", (language) => {
     // was asked for.
     expect(asked(fetcher).every((url) => DIRECTORY_READS.includes(url))).toBe(true);
     expect(asked(fetcher)).toContain("data/league/members.json");
+  });
+});
+
+/** A system page behind the two steps: its address names no league. */
+function openVisitor(language: Language, address = "/moves?mode=garantici") {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  function StateProbe() {
+    const location = useLocation();
+    return (
+      <span data-testid="visitor-location" data-state={JSON.stringify(location.state)}>
+        {`${location.pathname}${location.search}`}
+      </span>
+    );
+  }
+  return render(
+    <QueryClientProvider client={client}>
+      <LanguageProvider initialLanguage={language}>
+        <MemoryRouter initialEntries={[address]}>
+          <Routes>
+            <Route
+              path="/moves"
+              element={
+                <LeagueGate source="visitor">
+                  <h1>Moves page</h1>
+                </LeagueGate>
+              }
+            />
+          </Routes>
+          <StateProbe />
+        </MemoryRouter>
+      </LanguageProvider>
+    </QueryClientProvider>,
+  );
+}
+
+describe.each(["tr", "en"] as const)("the system pages behind the two steps in %s", (language) => {
+  const copy = MESSAGES[language].leagueEntry;
+  const picker = MESSAGES[language].memberPicker;
+
+  it("asks for the number with no league entered", () => {
+    legacySite();
+    openVisitor(language);
+    expect(screen.getByRole("heading", { name: copy.title })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Moves page" })).toBeNull();
+  });
+
+  it("keeps the address once the number connects, and asks who you are there", async () => {
+    legacySite();
+    openVisitor(language);
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText(copy.label), String(LEAGUE));
+    await user.click(screen.getByRole("button", { name: copy.submit }));
+    const heading = await screen.findByRole("heading", { name: picker.title });
+    const probe = screen.getByTestId("visitor-location");
+    expect(probe).toHaveTextContent("/moves?mode=garantici");
+    expect(probe.dataset.state).toBe(JSON.stringify(PICK_HERE));
+    expect(heading).toHaveFocus();
+    expect(readChosenLeague()).toBe(LEAGUE);
+
+    const group = await screen.findByRole("group", { name: picker.legend });
+    await user.click(within(group).getByRole("radio", { name: /Deniz Aral/ }));
+    await user.click(screen.getByRole("button", { name: picker.confirm }));
+    expect(await screen.findByRole("heading", { name: "Moves page" })).toBeInTheDocument();
+    expect(screen.getByTestId("visitor-location")).toHaveTextContent("/moves?mode=garantici");
+  });
+
+  it("asks who you are in place with a league entered and nobody claimed", async () => {
+    legacySite();
+    writeChosenLeague(LEAGUE);
+    openVisitor(language);
+    expect(await screen.findByRole("heading", { name: picker.title })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Moves page" })).toBeNull();
+    expect(screen.getByTestId("visitor-location")).toHaveTextContent("/moves?mode=garantici");
+  });
+
+  it("draws the page once the visitor has said who they are", async () => {
+    legacySite();
+    claimIn();
+    openVisitor(language);
+    expect(await screen.findByRole("heading", { name: "Moves page" })).toBeInTheDocument();
+  });
+
+  it("asks for the number again when the league entered is not published", async () => {
+    legacySite();
+    writeChosenLeague(OTHER);
+    openVisitor(language);
+    expect(await screen.findByRole("heading", { name: copy.title })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Moves page" })).toBeNull();
   });
 });

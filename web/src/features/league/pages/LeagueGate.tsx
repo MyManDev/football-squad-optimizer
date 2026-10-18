@@ -27,15 +27,32 @@ import { MemberGate } from "./MemberGate";
  * tab may change it), so two tabs cannot keep choosing against each other. Every gated
  * route passes through here exactly once, so the picker never shows before the number and
  * never twice.
+ *
+ * `source="visitor"` puts a page whose address names no league (the system's own pages:
+ * a gameweek's squad, the moves, the rivals) behind the same two steps. The league is the
+ * visitor's current one; the form asks for it in place, and once it connects the address
+ * is kept and the member step follows there.
  */
-export function LeagueGate({ children }: { children: ReactNode }) {
+export function LeagueGate({
+  children,
+  source = "address",
+}: {
+  children: ReactNode;
+  source?: "address" | "visitor";
+}) {
   const { messages } = useLanguage();
   const { leagueId: parameter } = useParams();
   const location = useLocation();
   // The claim's league, else the chosen one: where an address without a number goes.
   const { leagueId: current, chooseLeague } = useLeagueIdentity();
-  // The number as the sidebar and the links read it: digits, or no league at all.
-  const named = parameter === undefined ? null : leagueIdInAddress(location.pathname);
+  // The number as the sidebar and the links read it: digits, or no league at all. A
+  // visitor-mode page names none, so the visitor's current league stands for it.
+  const named =
+    source === "visitor"
+      ? current
+      : parameter === undefined
+        ? null
+        : leagueIdInAddress(location.pathname);
   const directory = useQuery({
     queryKey: leagueKeys.directory(),
     queryFn: () => loadLeagueDirectory(),
@@ -45,18 +62,18 @@ export function LeagueGate({ children }: { children: ReactNode }) {
   });
 
   const league = named !== null && directory.data ? findLeague(directory.data, named) : null;
-  const addressLeague = league?.leagueId ?? null;
+  const addressLeague = source === "address" ? (league?.leagueId ?? null) : null;
   useEffect(() => {
     if (addressLeague !== null) chooseLeague(addressLeague);
   }, [addressLeague, chooseLeague]);
-  if (parameter === undefined) {
+  if (source === "address" && parameter === undefined) {
     // The old shape of the address: the current league's version of it, or the form.
     const legacy = current === null ? null : legacyLeagueAddress(location.pathname, current);
     if (legacy !== null)
       return <Navigate to={`${legacy}${location.search}${location.hash}`} replace />;
     return <LeagueEntryPage inPlace />;
   }
-  if (named === null) return <LeagueEntryPage inPlace />;
+  if (named === null) return <LeagueEntryPage inPlace stay={source === "visitor"} />;
   if (directory.isPending) return <EmptyState title={messages.common.loading} />;
   if (directory.isError) {
     // A directory that could not be read says so: the league may well be published.
@@ -73,7 +90,7 @@ export function LeagueGate({ children }: { children: ReactNode }) {
       </EmptyState>
     );
   }
-  if (league === null) return <LeagueEntryPage inPlace />;
+  if (league === null) return <LeagueEntryPage inPlace stay={source === "visitor"} />;
   return (
     <LeagueProvider league={league}>
       <MemberGate>{children}</MemberGate>

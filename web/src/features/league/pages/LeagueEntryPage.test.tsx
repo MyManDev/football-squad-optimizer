@@ -1,4 +1,4 @@
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -7,7 +7,12 @@ import { mockLeagueMembersEnvelope } from "../../../fixtures/league";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { MESSAGES, type Language } from "../../../i18n/messages";
 import { jsonResponse, notFound, stubFetchByUrl } from "../../../testSupport/fetchByUrl";
-import { FIND_YOURSELF, membersAddress } from "../../../lib/leagueAddresses";
+import {
+  FIND_YOURSELF,
+  memberAddress,
+  membersAddress,
+  PICK_HERE,
+} from "../../../lib/leagueAddresses";
 import { claimIn, forgetIdentity } from "../../../testSupport/league";
 import { readMemberClaim } from "../identity/memberClaim";
 import { LeagueEntryPage } from "./LeagueEntryPage";
@@ -177,5 +182,44 @@ describe.each(["tr", "en"] as const)("league entry in %s", (language) => {
     expect(screen.getByRole("status")).toHaveTextContent(copy.loading);
     await act(async () => finish(notFound()));
     expect(await screen.findByRole("heading", { name: "Member destination" })).toBeInTheDocument();
+  });
+});
+
+describe("the form in place", () => {
+  function openInPlace(address: string, stay: boolean) {
+    return render(
+      <LanguageProvider initialLanguage="tr">
+        <MemoryRouter initialEntries={[address]}>
+          <Routes>
+            <Route path="*" element={<LeagueEntryPage inPlace stay={stay} />} />
+            <Route path="/league/:leagueId/members/:entryId" element={<h1>Member page</h1>} />
+          </Routes>
+          <LocationProbe />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+  }
+
+  it("rewrites an address from before the number with no step asked of it", async () => {
+    legacySite();
+    openInPlace("/league/members/35249002", false);
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText(MESSAGES.tr.leagueEntry.label), String(LEAGUE));
+    await user.click(screen.getByRole("button", { name: MESSAGES.tr.leagueEntry.submit }));
+    expect(await screen.findByRole("heading", { name: "Member page" })).toBeInTheDocument();
+    const location = screen.getByTestId("location");
+    expect(location).toHaveTextContent(memberAddress(LEAGUE, 35249002));
+    expect(location.dataset.state).toBe("null");
+  });
+
+  it("keeps a system page's address with `stay`, asking the member step there", async () => {
+    legacySite();
+    openInPlace("/moves", true);
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText(MESSAGES.tr.leagueEntry.label), String(LEAGUE));
+    await user.click(screen.getByRole("button", { name: MESSAGES.tr.leagueEntry.submit }));
+    const location = screen.getByTestId("location");
+    await waitFor(() => expect(location.dataset.state).toBe(JSON.stringify(PICK_HERE)));
+    expect(location).toHaveTextContent("/moves");
   });
 });

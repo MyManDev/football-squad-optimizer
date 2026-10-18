@@ -78,11 +78,38 @@ function LocalizedApp({ basename }: { basename: string }) {
             <Suspense fallback={<EmptyState title={messages.common.loading} />}>
               <Routes>
                 <Route path="/" element={<LeagueEntryPage />} />
-                <Route path="/gw/:season/:gameweek" element={<SquadPage />} />
-                <Route path="/moves" element={<MovesPage />} />
-                <Route path="/moves/:season/:gameweek" element={<MovesPage />} />
-                <Route path="/rivals" element={<RivalsPage />} />
-                <Route path="/rivals/:season/:gameweek" element={<RivalsPage />} />
+                {/* The system's own pages name no league; they stand behind the same two
+                    steps as the league pages, for the visitor's current league. */}
+                <Route
+                  path="/gw/:season/:gameweek"
+                  element={
+                    <LeagueGate source="visitor">
+                      <SquadPage />
+                    </LeagueGate>
+                  }
+                />
+                {["/moves", "/moves/:season/:gameweek"].map((path) => (
+                  <Route
+                    key={path}
+                    path={path}
+                    element={
+                      <LeagueGate source="visitor">
+                        <MovesPage />
+                      </LeagueGate>
+                    }
+                  />
+                ))}
+                {["/rivals", "/rivals/:season/:gameweek"].map((path) => (
+                  <Route
+                    key={path}
+                    path={path}
+                    element={
+                      <LeagueGate source="visitor">
+                        <RivalsPage />
+                      </LeagueGate>
+                    }
+                  />
+                ))}
                 {/* Every league address names its league; the old shape without the
                     number goes through the gate, which rewrites it to the current league.
                     The gate then asks who the visitor is before the page is drawn. */}

@@ -3,7 +3,12 @@ import { useLocation, useNavigate } from "react-router";
 
 import { Card } from "../../../design/components/Card";
 import { useLanguage } from "../../../i18n/context";
-import { FIND_YOURSELF, legacyLeagueAddress, membersAddress } from "../../../lib/leagueAddresses";
+import {
+  FIND_YOURSELF,
+  legacyLeagueAddress,
+  membersAddress,
+  PICK_HERE,
+} from "../../../lib/leagueAddresses";
 import { LeagueDataMissing, lookupPublishedLeague } from "../data";
 import { useLeagueIdentity } from "../identity/useLeagueIdentity";
 import styles from "./LeagueEntryPage.module.css";
@@ -18,8 +23,17 @@ type State = "idle" | "invalid" | "loading" | "unsupported" | "missing" | "faile
  * `inPlace`: the gate rendered this form at a league address. A connected league then
  * opens the page the address named under that league (an address from before the number
  * is rewritten with it), or the members list where the address named another league.
+ *
+ * `stay` (with `inPlace`): the gate rendered this form in front of a page whose address
+ * names no league. A connected league keeps the address, and the member step follows there.
  */
-export function LeagueEntryPage({ inPlace = false }: { inPlace?: boolean }) {
+export function LeagueEntryPage({
+  inPlace = false,
+  stay = false,
+}: {
+  inPlace?: boolean;
+  stay?: boolean;
+}) {
   const { messages } = useLanguage();
   const copy = messages.leagueEntry;
   const navigate = useNavigate();
@@ -53,6 +67,13 @@ export function LeagueEntryPage({ inPlace = false }: { inPlace?: boolean }) {
       if (!active.current) return;
       if (result.status === "connected") {
         chooseLeague(leagueId);
+        if (inPlace && stay) {
+          navigate(
+            { pathname: location.pathname, search: location.search, hash: location.hash },
+            { replace: true, state: PICK_HERE },
+          );
+          return;
+        }
         const here = inPlace ? legacyLeagueAddress(location.pathname, leagueId) : null;
         if (here === null)
           navigate(membersAddress(leagueId), { replace: inPlace, state: FIND_YOURSELF });
