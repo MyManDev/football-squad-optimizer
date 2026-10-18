@@ -5,8 +5,9 @@ expert set per declared regime (fixture regime by rule era) and mixes them with 
 multinomial logistic gate on the v1 features plus the regime terms. These tests pin the
 contract: its own model version, equal weighting only, the target season it needs,
 determinism, the control's bounds and routes, a one-regime fit equal to the linear control,
-an absent expert's mass renormalized away, and the v2 export writing a separately named
-table the development reader and the comparison accept while the v1 export refuses it.
+an absent expert's mass renormalized away, a gate that routes each row to its own regime's
+expert, and the v2 export writing a separately named table the development reader and the
+comparison accept while the v1 export refuses it.
 """
 
 from __future__ import annotations
@@ -219,6 +220,37 @@ def test_an_absent_expert_hands_its_mass_to_the_present_ones() -> None:
     assert np.allclose(weights.sum(axis=1), 1.0)
     predicted = predict_components(regime, scoring, feature_columns=FEATURES)
     assert (predicted["composition_route"] == "component_model").all()
+
+
+def test_the_gate_routes_each_row_to_its_own_regime_expert() -> None:
+    # Separable regimes: double-gameweek rows score eight points more. The gate reads the
+    # double indicator, so it must put almost all of a row's mass on that row's expert, and
+    # the mixture must follow that expert rather than the plain mean of the experts.
+    seasons = ("2023-24", "2024-25")
+    training = _training(rows=800, seasons=seasons, double_share=0.4)
+    double_rows = training["fixture_count"] >= 2
+    training.loc[double_rows, "points_target"] += 8.0
+    regime = fit_component_models(
+        training, feature_columns=FEATURES, config=SMALL, target_season="2024-25"
+    )
+    assert regime is not None
+    assert isinstance(regime.points, RegimeMixture)
+    labels = [expert.label for expert in regime.points.experts]
+    assert labels == [SINGLE_PRE_DEFCON_REGIME, DOUBLE_PRE_DEFCON_REGIME]
+    for share, own in ((0.0, 0), (1.0, 1)):
+        scoring = _training(rows=60, seed=11, seasons=("2024-25", "2024-25"), double_share=share)
+        design = regime_design(scoring, FEATURES, target_season="2024-25")
+        weights = regime.points.gate_weights(design)
+        assert weights[:, own].min() > 0.9
+        experts = np.column_stack(
+            [
+                np.asarray(expert.points.predict(design.loc[:, list(FEATURES)]))
+                for expert in regime.points.experts
+            ]
+        )
+        mixed = regime.points.predict(design)
+        np.testing.assert_allclose(mixed, experts[:, own], atol=0.1)
+        assert np.abs(mixed - experts.mean(axis=1)).min() > 1.0
 
 
 def test_the_v1_contract_refuses_the_regime_candidate(
