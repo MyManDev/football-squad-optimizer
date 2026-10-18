@@ -5,7 +5,7 @@
  *
  * Every production module under `src` (anything that is not a test, `test/` or
  * `testSupport/`) is parsed with the TypeScript compiler, its relative imports are resolved
- * to files, and three rules are held at zero:
+ * to files, and four rules are held at zero:
  *
  * 1. The lower zones (`design/`, `lib/`, `i18n/`, `data/`) import nothing from `features/`
  *    or `app/`, not even a type.
@@ -15,6 +15,11 @@
  *    held for is the list below, not every module that checks a document.
  * 3. No two production modules import each other's values, directly or around a longer
  *    loop.
+ * 4. No production module outside `features/league/identity/` imports the member claim's
+ *    store (`memberClaim.ts`) or the stored league choice (`useChosenLeague.ts`), not even
+ *    a type: pages, gates and the shell read identity through `useLeagueIdentity`, so a
+ *    later sign-in replaces the identity module alone. The claim's storage key is spelled
+ *    in its store only.
  *
  * An edge is a type edge when the build erases it: `import type`, `export type`,
  * `import("x").T`, and an `export { type A } from` whose every name is a type. An
@@ -131,6 +136,10 @@ const isValidator = (path: string): boolean =>
 const isLoader = (path: string): boolean =>
   /^features\/[^/]+\/data\.ts$/.test(path) || path === "data/client.ts";
 
+/** The identity module's private files, pinned so a rename cannot drop one from rule 4. */
+const IDENTITY = "features/league/identity/";
+const IDENTITY_PRIVATE = [`${IDENTITY}memberClaim.ts`, `${IDENTITY}useChosenLeague.ts`];
+
 /** Strongly connected components of more than one module (or a module importing itself). */
 function valueCycles(edges: readonly Edge[]): string[][] {
   const next = new Map<string, string[]>();
@@ -213,5 +222,17 @@ describe("web architecture", () => {
 
   it("has no value import cycle between production modules", () => {
     expect(valueCycles(EDGES)).toEqual([]);
+  });
+
+  it("keeps the claim store and the stored league choice inside the identity module", () => {
+    for (const path of IDENTITY_PRIVATE) expect(KNOWN.has(path)).toBe(true);
+    const reached = EDGES.filter(
+      ({ from, to }) => IDENTITY_PRIVATE.includes(to) && !from.startsWith(IDENTITY),
+    );
+    expect(reached.map(show)).toEqual([]);
+    const spelled = PRODUCTION.filter((path) =>
+      readFileSync(`${SRC}${path}`, "utf8").includes("squadopt.member"),
+    );
+    expect(spelled).toEqual([`${IDENTITY}memberClaim.ts`]);
   });
 });

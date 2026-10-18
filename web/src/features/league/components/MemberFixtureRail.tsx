@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef } from "react";
 
+import { ClubSwatch } from "../../../design/components/ClubSwatch";
 import { CloseIcon } from "../../../design/shell/icons";
 import { FIXTURE_SHEET_ID, useShell } from "../../../design/shell/ShellContext";
 import { useLanguage } from "../../../i18n/context";
@@ -35,7 +36,10 @@ function ShortName({ name, shortName }: { name: string; shortName: string }) {
   );
 }
 
-/** One club's gameweek: every opponent of a double week, or 'no match' in a blank one. */
+/**
+ * One club's gameweek: every opponent of a double week, each with its two colours before
+ * its code, or 'no match' in a blank one.
+ */
 function WeekCell({ week }: { week: ClubWeek | null }) {
   const copy = useLanguage().messages.leagueMembers;
   if (!week) return <td className={styles.cell} />;
@@ -52,6 +56,7 @@ function WeekCell({ week }: { week: ClubWeek | null }) {
             className={styles.fixture}
             data-venue={match.home ? "home" : "away"}
           >
+            <ClubSwatch code={match.opponent} split />
             <span className={styles.opponent}>{match.opponent}</span>{" "}
             <span className={styles.venue}>{match.home ? copy.fixtureHome : copy.fixtureAway}</span>
           </span>
@@ -92,7 +97,8 @@ function WeekHead({ weeks }: { weeks: readonly number[] }) {
  *
  * Everything is read from the published fixture calendar and joined to the players by
  * club. A home match is a filled cell and an away match an outlined one, and that is the
- * only encoding: no difficulty is rated or coloured. A week the calendar does not list is
+ * only encoding: no difficulty is rated or coloured. Each club's two colours beside its
+ * code are decoration, as in every fixture list. A week the calendar does not list is
  * left out; a blank week says so; with no calendar the rail says that and nothing else,
  * and while the calendar is still being read it says only that.
  *
@@ -283,7 +289,11 @@ export function MemberFixtureRail({
                     {pairs.map((pair) => (
                       <li key={`${pair.home}-${pair.away}`}>
                         <span className={styles.match}>
-                          {pair.home} - {pair.away}
+                          {pair.home}
+                          <ClubSwatch code={pair.home} split />
+                          {" - "}
+                          <ClubSwatch code={pair.away} split />
+                          {pair.away}
                         </span>
                         <span className={styles.who}>
                           {names(pair.homePlayers)} / {names(pair.awayPlayers)}

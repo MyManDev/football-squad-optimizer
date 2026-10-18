@@ -1,0 +1,4963 @@
+{
+  "repository_commit": "3c825721d93cb7448430f2abd11c597e73858602",
+  "declaration": "docs/research/phase_c_gradient_boosting_method.md",
+  "development_only": true,
+  "locked_holdout_read_as_development_data": true,
+  "locked_holdout_note": "Both arms read 2025-26 under the Phase C v2 development scope as declared; it is development evidence, not an unseen final test, and the locked holdout was not spent.",
+  "reproduce": [
+    "python -m scripts.export_component_oof --development-scope v2 --season-weighting equal --output-dir <dir>",
+    "python -m scripts.export_component_oof --development-scope v2 --season-weighting equal --estimator gradient_boosting --output-dir <dir>",
+    "python -m scripts.compare_component_oof_development --artifact-dir <dir> --candidate-arm gradient_boosting"
+  ],
+  "arm_manifests": {
+    "phase_c_component_oof_development_v2_equal": {
+      "archive_commit": "8c97b2adb123863c3dd581e730f1360e89815ac2",
+      "chronology_check": "training_cutoff_utc < decision_timestamp_utc is unrunnable on archive folds: neither timestamp is published and neither may be forged. The substitute is stronger because it reads the set rather than a boundary -- for every fold, fold_id is absent from training_fold_ids and every training fold ranks before it under development_seasons order. The export enforces both and refuses rather than recording a violation. training_cutoff_fold_id is the ordinal analogue of training_cutoff_utc, and training_key_digest covers the training row set rather than only its fold labels.",
+      "component_model_rows": 128627,
+      "contract_version": "phase_c_component_oof_development_v2",
+      "dataset_contract_version": "phase_c_component_dataset_v1",
+      "decision_timestamp_policy": "The archive publishes no deadline and one cannot be recovered from a kickoff time, so decision_timestamp_utc is missing on every row. What guarantees these rows is structural: every feature is a shift(1) rolling aggregate or a declared pre-match column, each fold trains strictly before its own gameweek, and no outcome column is in the feature set.",
+      "deterministic_seed": 0,
+      "development_note": "Phase C v2 development path. 2025-26 is read here as development data under this separate contract; the repository has used that season before, so nothing measured on it is an unseen final test. The v1 contract, its artifacts and its refusals are unchanged, and this artifact is not binding evidence for any later phase.",
+      "development_only": true,
+      "development_scope": "v2",
+      "development_seasons": [
+        "2021-22",
+        "2022-23",
+        "2023-24",
+        "2024-25",
+        "2025-26"
+      ],
+      "direct_control_rows": 1468,
+      "estimator": {
+        "constants": {
+          "appearance_regularization": 1.0,
+          "minutes_alpha": 1.0,
+          "points_alpha": 1.0
+        },
+        "declared_before_measurement": true,
+        "model_version": "phase_c_control_components_v1",
+        "name": "linear",
+        "rule": "standardized logistic regression (appearance) and ridge regression (minutes and points given an appearance), the control"
+      },
+      "excluded_ratio_features": [
+        "points_per_90_last_5",
+        "minutes_per_appearance_last_3",
+        "minutes_per_appearance_last_5"
+      ],
+      "feature_columns": [
+        "minutes_last_3",
+        "minutes_last_5",
+        "points_last_3",
+        "points_last_5",
+        "appearance_rate_last_3",
+        "appearance_rate_last_5",
+        "price_tenths",
+        "fixture_count",
+        "home_fixture_count"
+      ],
+      "feature_contract_version": "phase_c_component_form_window_v1",
+      "fold_count": 184,
+      "fold_ids": [
+        "2021-22-gw02",
+        "2021-22-gw03",
+        "2021-22-gw04",
+        "2021-22-gw05",
+        "2021-22-gw06",
+        "2021-22-gw07",
+        "2021-22-gw08",
+        "2021-22-gw09",
+        "2021-22-gw10",
+        "2021-22-gw11",
+        "2021-22-gw12",
+        "2021-22-gw13",
+        "2021-22-gw14",
+        "2021-22-gw15",
+        "2021-22-gw16",
+        "2021-22-gw17",
+        "2021-22-gw18",
+        "2021-22-gw19",
+        "2021-22-gw20",
+        "2021-22-gw21",
+        "2021-22-gw22",
+        "2021-22-gw23",
+        "2021-22-gw24",
+        "2021-22-gw25",
+        "2021-22-gw26",
+        "2021-22-gw27",
+        "2021-22-gw28",
+        "2021-22-gw29",
+        "2021-22-gw30",
+        "2021-22-gw31",
+        "2021-22-gw32",
+        "2021-22-gw33",
+        "2021-22-gw34",
+        "2021-22-gw35",
+        "2021-22-gw36",
+        "2021-22-gw37",
+        "2021-22-gw38",
+        "2022-23-gw02",
+        "2022-23-gw03",
+        "2022-23-gw04",
+        "2022-23-gw05",
+        "2022-23-gw06",
+        "2022-23-gw08",
+        "2022-23-gw09",
+        "2022-23-gw10",
+        "2022-23-gw11",
+        "2022-23-gw12",
+        "2022-23-gw13",
+        "2022-23-gw14",
+        "2022-23-gw15",
+        "2022-23-gw16",
+        "2022-23-gw17",
+        "2022-23-gw18",
+        "2022-23-gw19",
+        "2022-23-gw20",
+        "2022-23-gw21",
+        "2022-23-gw22",
+        "2022-23-gw23",
+        "2022-23-gw24",
+        "2022-23-gw25",
+        "2022-23-gw26",
+        "2022-23-gw27",
+        "2022-23-gw28",
+        "2022-23-gw29",
+        "2022-23-gw30",
+        "2022-23-gw31",
+        "2022-23-gw32",
+        "2022-23-gw33",
+        "2022-23-gw34",
+        "2022-23-gw35",
+        "2022-23-gw36",
+        "2022-23-gw37",
+        "2022-23-gw38",
+        "2023-24-gw02",
+        "2023-24-gw03",
+        "2023-24-gw04",
+        "2023-24-gw05",
+        "2023-24-gw06",
+        "2023-24-gw07",
+        "2023-24-gw08",
+        "2023-24-gw09",
+        "2023-24-gw10",
+        "2023-24-gw11",
+        "2023-24-gw12",
+        "2023-24-gw13",
+        "2023-24-gw14",
+        "2023-24-gw15",
+        "2023-24-gw16",
+        "2023-24-gw17",
+        "2023-24-gw18",
+        "2023-24-gw19",
+        "2023-24-gw20",
+        "2023-24-gw21",
+        "2023-24-gw22",
+        "2023-24-gw23",
+        "2023-24-gw24",
+        "2023-24-gw25",
+        "2023-24-gw26",
+        "2023-24-gw27",
+        "2023-24-gw28",
+        "2023-24-gw29",
+        "2023-24-gw30",
+        "2023-24-gw31",
+        "2023-24-gw32",
+        "2023-24-gw33",
+        "2023-24-gw34",
+        "2023-24-gw35",
+        "2023-24-gw36",
+        "2023-24-gw37",
+        "2023-24-gw38",
+        "2024-25-gw02",
+        "2024-25-gw03",
+        "2024-25-gw04",
+        "2024-25-gw05",
+        "2024-25-gw06",
+        "2024-25-gw07",
+        "2024-25-gw08",
+        "2024-25-gw09",
+        "2024-25-gw10",
+        "2024-25-gw11",
+        "2024-25-gw12",
+        "2024-25-gw13",
+        "2024-25-gw14",
+        "2024-25-gw15",
+        "2024-25-gw16",
+        "2024-25-gw17",
+        "2024-25-gw18",
+        "2024-25-gw19",
+        "2024-25-gw20",
+        "2024-25-gw21",
+        "2024-25-gw22",
+        "2024-25-gw23",
+        "2024-25-gw24",
+        "2024-25-gw25",
+        "2024-25-gw26",
+        "2024-25-gw27",
+        "2024-25-gw28",
+        "2024-25-gw29",
+        "2024-25-gw30",
+        "2024-25-gw31",
+        "2024-25-gw32",
+        "2024-25-gw33",
+        "2024-25-gw34",
+        "2024-25-gw35",
+        "2024-25-gw36",
+        "2024-25-gw37",
+        "2024-25-gw38",
+        "2025-26-gw02",
+        "2025-26-gw03",
+        "2025-26-gw04",
+        "2025-26-gw05",
+        "2025-26-gw06",
+        "2025-26-gw07",
+        "2025-26-gw08",
+        "2025-26-gw09",
+        "2025-26-gw10",
+        "2025-26-gw11",
+        "2025-26-gw12",
+        "2025-26-gw13",
+        "2025-26-gw14",
+        "2025-26-gw15",
+        "2025-26-gw16",
+        "2025-26-gw17",
+        "2025-26-gw18",
+        "2025-26-gw19",
+        "2025-26-gw20",
+        "2025-26-gw21",
+        "2025-26-gw22",
+        "2025-26-gw23",
+        "2025-26-gw24",
+        "2025-26-gw25",
+        "2025-26-gw26",
+        "2025-26-gw27",
+        "2025-26-gw28",
+        "2025-26-gw29",
+        "2025-26-gw30",
+        "2025-26-gw31",
+        "2025-26-gw32",
+        "2025-26-gw33",
+        "2025-26-gw34",
+        "2025-26-gw35",
+        "2025-26-gw36",
+        "2025-26-gw37",
+        "2025-26-gw38"
+      ],
+      "folds_refused_for_thin_history": [
+        "2021-22-gw02"
+      ],
+      "generated_at_utc": "2026-10-17T08:28:52Z",
+      "locked_holdout_read": true,
+      "locked_holdout_season": "2025-26",
+      "missing_data_policy": "A missing value is missing. Conditional targets are absent where the player did not appear; a row without complete features takes the direct_control route and carries no component prediction; the start component is unavailable, not zero. Nothing is imputed.",
+      "model_version": "phase_c_control_components_v1",
+      "negative_raw_conditional_points": 0,
+      "promotes_anything": false,
+      "public_points_bound": "control_expected_points = max(0, appearance_probability * raw_expected_points_if_appearance), both factors read at the exported precision",
+      "public_points_bound_note": "Equivalent to clipping the conditional first, because a probability is non-negative. The two derived columns are composed from the *rounded* independent columns, so a reader recomputing them from the file gets the value the file carries; deriving them from unrounded inputs left a discrepancy of 4.4e-09 with only 201 of 100,130 rows exact.",
+      "repository_commit": "3c825721d93cb7448430f2abd11c597e73858602",
+      "reproduce": "This artifact reads only the pinned public archive, so it can be rebuilt rather than transferred: python -m scripts.fetch_historical_data (verifies against the committed checksum manifest), then python -m scripts.export_component_oof --development-scope v2 --season-weighting equal, at the repository_commit below. Byte-identical output is the check -- compare table_sha256 and roster_sha256. Only generated_at_utc differs between runs.",
+      "roster_column_dtypes": {
+        "contract_version": "str",
+        "fold_id": "str",
+        "name": "string",
+        "player_id": "int64",
+        "position": "string",
+        "price_tenths": "int64",
+        "season": "string",
+        "target_gameweek": "int64",
+        "team_id": "string"
+      },
+      "roster_columns": [
+        "contract_version",
+        "season",
+        "target_gameweek",
+        "fold_id",
+        "player_id",
+        "name",
+        "team_id",
+        "position",
+        "price_tenths"
+      ],
+      "roster_contract_version": "phase_c_decision_roster_v1",
+      "roster_file": "phase_c_component_oof_development_v2_equal.roster.csv",
+      "roster_ownership_policy": "Omitted. selected_by_percent is the only ownership column the panel carries and data/schema.py classifies it in AMBIGUOUS_TIMING_COLUMNS, so its snapshot timing cannot be proven -- it fails the 'only if timing is verified' condition rather than passing it quietly.",
+      "roster_row_count": 130095,
+      "roster_sha256": "01d1111382206a5b2943099aaac2f70063073491b1987ed9a58e3950d8d54044",
+      "row_count": 130095,
+      "rule_era": {
+        "defensive_contribution_seasons": [
+          "2025-26"
+        ],
+        "note": "2025-26 total_points already include the defensive-contribution points introduced that season, so points_target embeds the new scoring era for 2025-26 rows while 2021-22..2024-25 were scored without it. No defensive-action column enters the panel, the features or the targets; nothing is added, re-thresholded or imputed, and an absent action count in an earlier season is absent, not a measured zero."
+      },
+      "scored_fold_count": 184,
+      "start_target_status": "available",
+      "start_target_supported_seasons": [
+        "2023-24",
+        "2024-25"
+      ],
+      "table_column_dtypes": {
+        "appearance_probability": "Float64",
+        "appearance_target": "Int64",
+        "composition_route": "string",
+        "contract_version": "str",
+        "control_expected_points": "Float64",
+        "dataset_contract_version": "str",
+        "decision_timestamp_utc": "string",
+        "evidence_status": "string",
+        "expected_minutes_if_appearance": "Float64",
+        "expected_points_if_appearance": "Float64",
+        "feature_contract_version": "str",
+        "fixture_count": "int64",
+        "fold_id": "str",
+        "minutes_target": "Int64",
+        "model_version": "str",
+        "player_id": "int64",
+        "points_target": "Int64",
+        "q_start_given_appearance": "Float64",
+        "raw_expected_points_if_appearance": "Float64",
+        "season": "string",
+        "start_probability": "Float64",
+        "start_target": "Int64",
+        "target_contract_version": "str",
+        "target_gameweek": "int64"
+      },
+      "table_columns": [
+        "contract_version",
+        "model_version",
+        "feature_contract_version",
+        "target_contract_version",
+        "dataset_contract_version",
+        "season",
+        "target_gameweek",
+        "decision_timestamp_utc",
+        "fold_id",
+        "player_id",
+        "fixture_count",
+        "appearance_target",
+        "start_target",
+        "minutes_target",
+        "points_target",
+        "appearance_probability",
+        "q_start_given_appearance",
+        "start_probability",
+        "expected_minutes_if_appearance",
+        "raw_expected_points_if_appearance",
+        "expected_points_if_appearance",
+        "control_expected_points",
+        "composition_route",
+        "evidence_status"
+      ],
+      "table_file": "phase_c_component_oof_development_v2_equal.csv",
+      "table_sha256": "13330e61737698cd2a20a19418f891b6a96618d47064b2cc386c3ea614b8f882",
+      "target_contract_version": "phase_c_component_targets_v1",
+      "training_rows_seen": 11252092,
+      "weighting": {
+        "base": null,
+        "declared_before_measurement": true,
+        "label": "equal_weights_v1",
+        "model_version": "phase_c_control_components_v1",
+        "normalization": "mean 1 within each fitted subset -- complete-feature rows for the appearance model, appeared rows with both conditional targets for the minutes and points models -- and the same weights are passed to the StandardScaler and to the estimator of each pipeline",
+        "rule": "every training row weighs 1"
+      },
+      "working_tree_dirty": false,
+      "folds": "omitted here; carried by the exported manifest"
+    },
+    "phase_c_component_oof_development_v2_equal_gradient_boosting": {
+      "archive_commit": "8c97b2adb123863c3dd581e730f1360e89815ac2",
+      "chronology_check": "training_cutoff_utc < decision_timestamp_utc is unrunnable on archive folds: neither timestamp is published and neither may be forged. The substitute is stronger because it reads the set rather than a boundary -- for every fold, fold_id is absent from training_fold_ids and every training fold ranks before it under development_seasons order. The export enforces both and refuses rather than recording a violation. training_cutoff_fold_id is the ordinal analogue of training_cutoff_utc, and training_key_digest covers the training row set rather than only its fold labels.",
+      "component_model_rows": 128627,
+      "contract_version": "phase_c_component_oof_development_v2",
+      "dataset_contract_version": "phase_c_component_dataset_v1",
+      "decision_timestamp_policy": "The archive publishes no deadline and one cannot be recovered from a kickoff time, so decision_timestamp_utc is missing on every row. What guarantees these rows is structural: every feature is a shift(1) rolling aggregate or a declared pre-match column, each fold trains strictly before its own gameweek, and no outcome column is in the feature set.",
+      "deterministic_seed": 0,
+      "development_note": "Phase C v2 development path. 2025-26 is read here as development data under this separate contract; the repository has used that season before, so nothing measured on it is an unseen final test. The v1 contract, its artifacts and its refusals are unchanged, and this artifact is not binding evidence for any later phase.",
+      "development_only": true,
+      "development_scope": "v2",
+      "development_seasons": [
+        "2021-22",
+        "2022-23",
+        "2023-24",
+        "2024-25",
+        "2025-26"
+      ],
+      "direct_control_rows": 1468,
+      "estimator": {
+        "constants": {
+          "early_stopping": false,
+          "iterations": 300,
+          "l2_regularization": 1.0,
+          "learning_rate": 0.05,
+          "max_leaf_nodes": 31,
+          "min_samples_leaf": 100
+        },
+        "declared_before_measurement": true,
+        "model_version": "phase_c_control_components_gbm_v1",
+        "name": "gradient_boosting",
+        "rule": "histogram gradient-boosted trees for all three estimators: fixed rounds, no early stopping, constants from ComponentModelConfig; equal weighting only"
+      },
+      "excluded_ratio_features": [
+        "points_per_90_last_5",
+        "minutes_per_appearance_last_3",
+        "minutes_per_appearance_last_5"
+      ],
+      "feature_columns": [
+        "minutes_last_3",
+        "minutes_last_5",
+        "points_last_3",
+        "points_last_5",
+        "appearance_rate_last_3",
+        "appearance_rate_last_5",
+        "price_tenths",
+        "fixture_count",
+        "home_fixture_count"
+      ],
+      "feature_contract_version": "phase_c_component_form_window_v1",
+      "fold_count": 184,
+      "fold_ids": [
+        "2021-22-gw02",
+        "2021-22-gw03",
+        "2021-22-gw04",
+        "2021-22-gw05",
+        "2021-22-gw06",
+        "2021-22-gw07",
+        "2021-22-gw08",
+        "2021-22-gw09",
+        "2021-22-gw10",
+        "2021-22-gw11",
+        "2021-22-gw12",
+        "2021-22-gw13",
+        "2021-22-gw14",
+        "2021-22-gw15",
+        "2021-22-gw16",
+        "2021-22-gw17",
+        "2021-22-gw18",
+        "2021-22-gw19",
+        "2021-22-gw20",
+        "2021-22-gw21",
+        "2021-22-gw22",
+        "2021-22-gw23",
+        "2021-22-gw24",
+        "2021-22-gw25",
+        "2021-22-gw26",
+        "2021-22-gw27",
+        "2021-22-gw28",
+        "2021-22-gw29",
+        "2021-22-gw30",
+        "2021-22-gw31",
+        "2021-22-gw32",
+        "2021-22-gw33",
+        "2021-22-gw34",
+        "2021-22-gw35",
+        "2021-22-gw36",
+        "2021-22-gw37",
+        "2021-22-gw38",
+        "2022-23-gw02",
+        "2022-23-gw03",
+        "2022-23-gw04",
+        "2022-23-gw05",
+        "2022-23-gw06",
+        "2022-23-gw08",
+        "2022-23-gw09",
+        "2022-23-gw10",
+        "2022-23-gw11",
+        "2022-23-gw12",
+        "2022-23-gw13",
+        "2022-23-gw14",
+        "2022-23-gw15",
+        "2022-23-gw16",
+        "2022-23-gw17",
+        "2022-23-gw18",
+        "2022-23-gw19",
+        "2022-23-gw20",
+        "2022-23-gw21",
+        "2022-23-gw22",
+        "2022-23-gw23",
+        "2022-23-gw24",
+        "2022-23-gw25",
+        "2022-23-gw26",
+        "2022-23-gw27",
+        "2022-23-gw28",
+        "2022-23-gw29",
+        "2022-23-gw30",
+        "2022-23-gw31",
+        "2022-23-gw32",
+        "2022-23-gw33",
+        "2022-23-gw34",
+        "2022-23-gw35",
+        "2022-23-gw36",
+        "2022-23-gw37",
+        "2022-23-gw38",
+        "2023-24-gw02",
+        "2023-24-gw03",
+        "2023-24-gw04",
+        "2023-24-gw05",
+        "2023-24-gw06",
+        "2023-24-gw07",
+        "2023-24-gw08",
+        "2023-24-gw09",
+        "2023-24-gw10",
+        "2023-24-gw11",
+        "2023-24-gw12",
+        "2023-24-gw13",
+        "2023-24-gw14",
+        "2023-24-gw15",
+        "2023-24-gw16",
+        "2023-24-gw17",
+        "2023-24-gw18",
+        "2023-24-gw19",
+        "2023-24-gw20",
+        "2023-24-gw21",
+        "2023-24-gw22",
+        "2023-24-gw23",
+        "2023-24-gw24",
+        "2023-24-gw25",
+        "2023-24-gw26",
+        "2023-24-gw27",
+        "2023-24-gw28",
+        "2023-24-gw29",
+        "2023-24-gw30",
+        "2023-24-gw31",
+        "2023-24-gw32",
+        "2023-24-gw33",
+        "2023-24-gw34",
+        "2023-24-gw35",
+        "2023-24-gw36",
+        "2023-24-gw37",
+        "2023-24-gw38",
+        "2024-25-gw02",
+        "2024-25-gw03",
+        "2024-25-gw04",
+        "2024-25-gw05",
+        "2024-25-gw06",
+        "2024-25-gw07",
+        "2024-25-gw08",
+        "2024-25-gw09",
+        "2024-25-gw10",
+        "2024-25-gw11",
+        "2024-25-gw12",
+        "2024-25-gw13",
+        "2024-25-gw14",
+        "2024-25-gw15",
+        "2024-25-gw16",
+        "2024-25-gw17",
+        "2024-25-gw18",
+        "2024-25-gw19",
+        "2024-25-gw20",
+        "2024-25-gw21",
+        "2024-25-gw22",
+        "2024-25-gw23",
+        "2024-25-gw24",
+        "2024-25-gw25",
+        "2024-25-gw26",
+        "2024-25-gw27",
+        "2024-25-gw28",
+        "2024-25-gw29",
+        "2024-25-gw30",
+        "2024-25-gw31",
+        "2024-25-gw32",
+        "2024-25-gw33",
+        "2024-25-gw34",
+        "2024-25-gw35",
+        "2024-25-gw36",
+        "2024-25-gw37",
+        "2024-25-gw38",
+        "2025-26-gw02",
+        "2025-26-gw03",
+        "2025-26-gw04",
+        "2025-26-gw05",
+        "2025-26-gw06",
+        "2025-26-gw07",
+        "2025-26-gw08",
+        "2025-26-gw09",
+        "2025-26-gw10",
+        "2025-26-gw11",
+        "2025-26-gw12",
+        "2025-26-gw13",
+        "2025-26-gw14",
+        "2025-26-gw15",
+        "2025-26-gw16",
+        "2025-26-gw17",
+        "2025-26-gw18",
+        "2025-26-gw19",
+        "2025-26-gw20",
+        "2025-26-gw21",
+        "2025-26-gw22",
+        "2025-26-gw23",
+        "2025-26-gw24",
+        "2025-26-gw25",
+        "2025-26-gw26",
+        "2025-26-gw27",
+        "2025-26-gw28",
+        "2025-26-gw29",
+        "2025-26-gw30",
+        "2025-26-gw31",
+        "2025-26-gw32",
+        "2025-26-gw33",
+        "2025-26-gw34",
+        "2025-26-gw35",
+        "2025-26-gw36",
+        "2025-26-gw37",
+        "2025-26-gw38"
+      ],
+      "folds_refused_for_thin_history": [
+        "2021-22-gw02"
+      ],
+      "generated_at_utc": "2026-10-17T09:03:32Z",
+      "locked_holdout_read": true,
+      "locked_holdout_season": "2025-26",
+      "missing_data_policy": "A missing value is missing. Conditional targets are absent where the player did not appear; a row without complete features takes the direct_control route and carries no component prediction; the start component is unavailable, not zero. Nothing is imputed.",
+      "model_version": "phase_c_control_components_gbm_v1",
+      "negative_raw_conditional_points": 0,
+      "promotes_anything": false,
+      "public_points_bound": "control_expected_points = max(0, appearance_probability * raw_expected_points_if_appearance), both factors read at the exported precision",
+      "public_points_bound_note": "Equivalent to clipping the conditional first, because a probability is non-negative. The two derived columns are composed from the *rounded* independent columns, so a reader recomputing them from the file gets the value the file carries; deriving them from unrounded inputs left a discrepancy of 4.4e-09 with only 201 of 100,130 rows exact.",
+      "repository_commit": "3c825721d93cb7448430f2abd11c597e73858602",
+      "reproduce": "This artifact reads only the pinned public archive, so it can be rebuilt rather than transferred: python -m scripts.fetch_historical_data (verifies against the committed checksum manifest), then python -m scripts.export_component_oof --development-scope v2 --season-weighting equal --estimator gradient_boosting, at the repository_commit below. Byte-identical output is the check -- compare table_sha256 and roster_sha256. Only generated_at_utc differs between runs.",
+      "roster_column_dtypes": {
+        "contract_version": "str",
+        "fold_id": "str",
+        "name": "string",
+        "player_id": "int64",
+        "position": "string",
+        "price_tenths": "int64",
+        "season": "string",
+        "target_gameweek": "int64",
+        "team_id": "string"
+      },
+      "roster_columns": [
+        "contract_version",
+        "season",
+        "target_gameweek",
+        "fold_id",
+        "player_id",
+        "name",
+        "team_id",
+        "position",
+        "price_tenths"
+      ],
+      "roster_contract_version": "phase_c_decision_roster_v1",
+      "roster_file": "phase_c_component_oof_development_v2_equal_gradient_boosting.roster.csv",
+      "roster_ownership_policy": "Omitted. selected_by_percent is the only ownership column the panel carries and data/schema.py classifies it in AMBIGUOUS_TIMING_COLUMNS, so its snapshot timing cannot be proven -- it fails the 'only if timing is verified' condition rather than passing it quietly.",
+      "roster_row_count": 130095,
+      "roster_sha256": "01d1111382206a5b2943099aaac2f70063073491b1987ed9a58e3950d8d54044",
+      "row_count": 130095,
+      "rule_era": {
+        "defensive_contribution_seasons": [
+          "2025-26"
+        ],
+        "note": "2025-26 total_points already include the defensive-contribution points introduced that season, so points_target embeds the new scoring era for 2025-26 rows while 2021-22..2024-25 were scored without it. No defensive-action column enters the panel, the features or the targets; nothing is added, re-thresholded or imputed, and an absent action count in an earlier season is absent, not a measured zero."
+      },
+      "scored_fold_count": 184,
+      "start_target_status": "available",
+      "start_target_supported_seasons": [
+        "2023-24",
+        "2024-25"
+      ],
+      "table_column_dtypes": {
+        "appearance_probability": "Float64",
+        "appearance_target": "Int64",
+        "composition_route": "string",
+        "contract_version": "str",
+        "control_expected_points": "Float64",
+        "dataset_contract_version": "str",
+        "decision_timestamp_utc": "string",
+        "evidence_status": "string",
+        "expected_minutes_if_appearance": "Float64",
+        "expected_points_if_appearance": "Float64",
+        "feature_contract_version": "str",
+        "fixture_count": "int64",
+        "fold_id": "str",
+        "minutes_target": "Int64",
+        "model_version": "str",
+        "player_id": "int64",
+        "points_target": "Int64",
+        "q_start_given_appearance": "Float64",
+        "raw_expected_points_if_appearance": "Float64",
+        "season": "string",
+        "start_probability": "Float64",
+        "start_target": "Int64",
+        "target_contract_version": "str",
+        "target_gameweek": "int64"
+      },
+      "table_columns": [
+        "contract_version",
+        "model_version",
+        "feature_contract_version",
+        "target_contract_version",
+        "dataset_contract_version",
+        "season",
+        "target_gameweek",
+        "decision_timestamp_utc",
+        "fold_id",
+        "player_id",
+        "fixture_count",
+        "appearance_target",
+        "start_target",
+        "minutes_target",
+        "points_target",
+        "appearance_probability",
+        "q_start_given_appearance",
+        "start_probability",
+        "expected_minutes_if_appearance",
+        "raw_expected_points_if_appearance",
+        "expected_points_if_appearance",
+        "control_expected_points",
+        "composition_route",
+        "evidence_status"
+      ],
+      "table_file": "phase_c_component_oof_development_v2_equal_gradient_boosting.csv",
+      "table_sha256": "eae3e91485098edf01275b24310d2e7449d2d96b53a67cba5173d227b5c80feb",
+      "target_contract_version": "phase_c_component_targets_v1",
+      "training_rows_seen": 11252092,
+      "weighting": {
+        "base": null,
+        "declared_before_measurement": true,
+        "label": "equal_weights_v1",
+        "model_version": "phase_c_control_components_gbm_v1",
+        "normalization": "mean 1 within each fitted subset -- complete-feature rows for the appearance model, appeared rows with both conditional targets for the minutes and points models -- and the same weights are passed to the StandardScaler and to the estimator of each pipeline",
+        "rule": "every training row weighs 1"
+      },
+      "working_tree_dirty": false,
+      "folds": "omitted here; carried by the exported manifest"
+    }
+  },
+  "comparison": {
+    "acceptance_rule": "The candidate is preferred only if (i) its primary-season points MAE is lower than the control's, (ii) the 90% season-aware moving-block interval of the per-fold paired differences (control MAE minus candidate MAE) on the primary season lies entirely above zero, and (iii) the same interval on the previous-era season does not lie entirely below zero. Otherwise there is no selection and the control remains the reference. No minimum effect size is imposed and none is added afterwards.",
+    "arms": {
+      "candidate": {
+        "component_model_rows": 128627,
+        "development_contract": "phase_c_component_oof_development_v2",
+        "manifest_sha256": "ff27bb46aa565540bbc48408994c6beb1b242c0a25df67f51de07eef53b92d8f",
+        "model_version": "phase_c_control_components_gbm_v1",
+        "name": "phase_c_component_oof_development_v2_equal_gradient_boosting",
+        "repository_commit": "3c825721d93cb7448430f2abd11c597e73858602",
+        "roster_sha256": "01d1111382206a5b2943099aaac2f70063073491b1987ed9a58e3950d8d54044",
+        "rows": 130095,
+        "table_sha256": "eae3e91485098edf01275b24310d2e7449d2d96b53a67cba5173d227b5c80feb",
+        "weighting": "equal_weights_v1"
+      },
+      "control": {
+        "component_model_rows": 128627,
+        "development_contract": "phase_c_component_oof_development_v2",
+        "manifest_sha256": "5cf8c8a51f164236a325f0832329289287f4c4c10b27880bc846ee0cc038c585",
+        "model_version": "phase_c_control_components_v1",
+        "name": "phase_c_component_oof_development_v2_equal",
+        "repository_commit": "3c825721d93cb7448430f2abd11c597e73858602",
+        "roster_sha256": "01d1111382206a5b2943099aaac2f70063073491b1987ed9a58e3950d8d54044",
+        "rows": 130095,
+        "table_sha256": "13330e61737698cd2a20a19418f891b6a96618d47064b2cc386c3ea614b8f882",
+        "weighting": "equal_weights_v1"
+      }
+    },
+    "candidate_arm": "gradient_boosting",
+    "contract_version": "phase_c_v2_development_comparison_v1",
+    "control_era_season": {
+      "candidate_points_mae": 1.0130363635727186,
+      "control_points_mae": 1.025232172977884,
+      "fold_differences": [
+        {
+          "difference": 0.009106491215908896,
+          "fold_id": "2024-25-gw02"
+        },
+        {
+          "difference": -0.002294692518341357,
+          "fold_id": "2024-25-gw03"
+        },
+        {
+          "difference": 0.01021673183024685,
+          "fold_id": "2024-25-gw04"
+        },
+        {
+          "difference": 0.002812326147192845,
+          "fold_id": "2024-25-gw05"
+        },
+        {
+          "difference": -0.015148544937972686,
+          "fold_id": "2024-25-gw06"
+        },
+        {
+          "difference": 0.010454863762048294,
+          "fold_id": "2024-25-gw07"
+        },
+        {
+          "difference": -0.0036568200555555652,
+          "fold_id": "2024-25-gw08"
+        },
+        {
+          "difference": 0.019037361347826298,
+          "fold_id": "2024-25-gw09"
+        },
+        {
+          "difference": 0.02725317085522383,
+          "fold_id": "2024-25-gw10"
+        },
+        {
+          "difference": 0.018278581232937574,
+          "fold_id": "2024-25-gw11"
+        },
+        {
+          "difference": 0.014407893281711104,
+          "fold_id": "2024-25-gw12"
+        },
+        {
+          "difference": 0.0066798662573102074,
+          "fold_id": "2024-25-gw13"
+        },
+        {
+          "difference": 0.0026138938608695206,
+          "fold_id": "2024-25-gw14"
+        },
+        {
+          "difference": -0.021879207698412673,
+          "fold_id": "2024-25-gw15"
+        },
+        {
+          "difference": 0.0022215848701299112,
+          "fold_id": "2024-25-gw16"
+        },
+        {
+          "difference": 0.012792575021397967,
+          "fold_id": "2024-25-gw17"
+        },
+        {
+          "difference": 0.017839529295292422,
+          "fold_id": "2024-25-gw18"
+        },
+        {
+          "difference": 0.021914374136170256,
+          "fold_id": "2024-25-gw19"
+        },
+        {
+          "difference": -0.01123830085613542,
+          "fold_id": "2024-25-gw20"
+        },
+        {
+          "difference": 0.01146347990436003,
+          "fold_id": "2024-25-gw21"
+        },
+        {
+          "difference": 0.010862869377071593,
+          "fold_id": "2024-25-gw22"
+        },
+        {
+          "difference": -0.0028714737832647996,
+          "fold_id": "2024-25-gw23"
+        },
+        {
+          "difference": -0.005690746561141102,
+          "fold_id": "2024-25-gw24"
+        },
+        {
+          "difference": 0.026698208640161925,
+          "fold_id": "2024-25-gw25"
+        },
+        {
+          "difference": 0.015088670500658763,
+          "fold_id": "2024-25-gw26"
+        },
+        {
+          "difference": 0.014348944921363072,
+          "fold_id": "2024-25-gw27"
+        },
+        {
+          "difference": 0.015984100683246183,
+          "fold_id": "2024-25-gw28"
+        },
+        {
+          "difference": 0.020252968075441413,
+          "fold_id": "2024-25-gw29"
+        },
+        {
+          "difference": 0.015437860373212042,
+          "fold_id": "2024-25-gw30"
+        },
+        {
+          "difference": 0.01920581368871599,
+          "fold_id": "2024-25-gw31"
+        },
+        {
+          "difference": 0.02507491356347158,
+          "fold_id": "2024-25-gw32"
+        },
+        {
+          "difference": 0.05104181116580975,
+          "fold_id": "2024-25-gw33"
+        },
+        {
+          "difference": 0.019929684864649633,
+          "fold_id": "2024-25-gw34"
+        },
+        {
+          "difference": 0.024232249575641074,
+          "fold_id": "2024-25-gw35"
+        },
+        {
+          "difference": 0.016616876591549312,
+          "fold_id": "2024-25-gw36"
+        },
+        {
+          "difference": 0.02547098988476315,
+          "fold_id": "2024-25-gw37"
+        },
+        {
+          "difference": 0.011090352796414793,
+          "fold_id": "2024-25-gw38"
+        }
+      ],
+      "interval_high": 0.016855998889474477,
+      "interval_low": 0.006754718541711688,
+      "mean_paired_difference": 0.011774304089458721,
+      "paired_difference_sign": "control MAE minus candidate MAE; positive favours the candidate",
+      "scored_folds": 37,
+      "season": "2024-25"
+    },
+    "descriptive_seasons": {
+      "2021-22": {
+        "candidate_points_mae": 1.2433505885094582,
+        "control_points_mae": 1.2559601258019053
+      },
+      "2022-23": {
+        "candidate_points_mae": 1.100155450109889,
+        "control_points_mae": 1.1173100373213531
+      },
+      "2023-24": {
+        "candidate_points_mae": 0.9764419405231911,
+        "control_points_mae": 0.9974043303022923
+      }
+    },
+    "development_only": true,
+    "generated_at_utc": "2026-10-17T09:04:04Z",
+    "metrics": {
+      "candidate": {
+        "by_fixture_group": {
+          "double_plus": {
+            "appearance": {
+              "brier_score": 0.0948455685994712,
+              "event_rate": 0.4467385346245204,
+              "log_loss": 0.3183050538255635,
+              "mean_calibration_bias": -0.0059897929122967875,
+              "mean_prediction": 0.4407487417122236,
+              "observations": 5473,
+              "reliability_bins": [
+                {
+                  "event_rate": 0.044667274384685506,
+                  "index": 0,
+                  "lower_bound": 0.0,
+                  "mean_probability": 0.04807856234685506,
+                  "observations": 2194,
+                  "upper_bound": 0.1
+                },
+                {
+                  "event_rate": 0.12759643916913946,
+                  "index": 1,
+                  "lower_bound": 0.1,
+                  "mean_probability": 0.12832423760830858,
+                  "observations": 337,
+                  "upper_bound": 0.2
+                },
+                {
+                  "event_rate": 0.2550335570469799,
+                  "index": 2,
+                  "lower_bound": 0.2,
+                  "mean_probability": 0.24751797576510062,
+                  "observations": 149,
+                  "upper_bound": 0.3
+                },
+                {
+                  "event_rate": 0.4236111111111111,
+                  "index": 3,
+                  "lower_bound": 0.3,
+                  "mean_probability": 0.34693408946527776,
+                  "observations": 144,
+                  "upper_bound": 0.4
+                },
+                {
+                  "event_rate": 0.558282208588957,
+                  "index": 4,
+                  "lower_bound": 0.4,
+                  "mean_probability": 0.45275431396319016,
+                  "observations": 163,
+                  "upper_bound": 0.5
+                },
+                {
+                  "event_rate": 0.5736842105263158,
+                  "index": 5,
+                  "lower_bound": 0.5,
+                  "mean_probability": 0.551558286663158,
+                  "observations": 190,
+                  "upper_bound": 0.6
+                },
+                {
+                  "event_rate": 0.696078431372549,
+                  "index": 6,
+                  "lower_bound": 0.6,
+                  "mean_probability": 0.6528845253186274,
+                  "observations": 204,
+                  "upper_bound": 0.7
+                },
+                {
+                  "event_rate": 0.7681159420289855,
+                  "index": 7,
+                  "lower_bound": 0.7,
+                  "mean_probability": 0.7527538686666666,
+                  "observations": 345,
+                  "upper_bound": 0.8
+                },
+                {
+                  "event_rate": 0.8535714285714285,
+                  "index": 8,
+                  "lower_bound": 0.8,
+                  "mean_probability": 0.8568445085642858,
+                  "observations": 560,
+                  "upper_bound": 0.9
+                },
+                {
+                  "event_rate": 0.9435551811288964,
+                  "index": 9,
+                  "lower_bound": 0.9,
+                  "mean_probability": 0.9480480724203875,
+                  "observations": 1187,
+                  "upper_bound": 1.0
+                }
+              ]
+            },
+            "blank_rows": 0,
+            "minutes": {
+              "mean_absolute_error": 28.753738390734974,
+              "mean_error": -1.476471761389961,
+              "observations": 5473,
+              "root_mean_squared_error": 44.49227970156926
+            },
+            "minutes_if_appearance": {
+              "mean_absolute_error": 42.62671894964949,
+              "mean_error": -1.8924132676617587,
+              "observations": 2445,
+              "root_mean_squared_error": 51.716168456135925
+            },
+            "missing_appearance_prediction_rows": 48,
+            "missing_appearance_target_rows": 0,
+            "missing_minutes_prediction_rows": 48,
+            "missing_minutes_target_rows": 0,
+            "missing_points_prediction_rows": 48,
+            "missing_points_target_rows": 0,
+            "missing_start_label_rows": 4174,
+            "missing_start_prediction_rows": 1347,
+            "points": {
+              "mean_absolute_error": 1.7207112649406178,
+              "mean_error": -0.15557356092380778,
+              "observations": 5473,
+              "root_mean_squared_error": 3.1288096012026845
+            },
+            "points_if_appearance": {
+              "mean_absolute_error": 3.1846072701501025,
+              "mean_error": -0.29193620147116567,
+              "observations": 2445,
+              "root_mean_squared_error": 4.3431053357904705
+            },
+            "population_rows": 5521,
+            "start": {
+              "brier_score": null,
+              "event_rate": null,
+              "log_loss": null,
+              "mean_calibration_bias": null,
+              "mean_prediction": null,
+              "observations": 0,
+              "reliability_bins": []
+            },
+            "start_given_appearance": {
+              "brier_score": null,
+              "event_rate": null,
+              "log_loss": null,
+              "mean_calibration_bias": null,
+              "mean_prediction": null,
+              "observations": 0,
+              "reliability_bins": []
+            }
+          },
+          "single": {
+            "appearance": {
+              "brier_score": 0.1009224950205468,
+              "event_rate": 0.40658037903762767,
+              "log_loss": 0.33137736071872165,
+              "mean_calibration_bias": -0.003091819062929324,
+              "mean_prediction": 0.40348855997469835,
+              "observations": 123154,
+              "reliability_bins": [
+                {
+                  "event_rate": 0.0367310673371394,
+                  "index": 0,
+                  "lower_bound": 0.0,
+                  "mean_probability": 0.04377646158480472,
+                  "observations": 52898,
+                  "upper_bound": 0.1
+                },
+                {
+                  "event_rate": 0.1475378787878788,
+                  "index": 1,
+                  "lower_bound": 0.1,
+                  "mean_probability": 0.1459660998310606,
+                  "observations": 5280,
+                  "upper_bound": 0.2
+                },
+                {
+                  "event_rate": 0.2559771879798201,
+                  "index": 2,
+                  "lower_bound": 0.2,
+                  "mean_probability": 0.24533375657030052,
+                  "observations": 4559,
+                  "upper_bound": 0.3
+                },
+                {
+                  "event_rate": 0.3916732962079024,
+                  "index": 3,
+                  "lower_bound": 0.3,
+                  "mean_probability": 0.3545933241317953,
+                  "observations": 3771,
+                  "upper_bound": 0.4
+                },
+                {
+                  "event_rate": 0.47727735887507644,
+                  "index": 4,
+                  "lower_bound": 0.4,
+                  "mean_probability": 0.4494906862537191,
+                  "observations": 4907,
+                  "upper_bound": 0.5
+                },
+                {
+                  "event_rate": 0.5754846289406697,
+                  "index": 5,
+                  "lower_bound": 0.5,
+                  "mean_probability": 0.5522478504873702,
+                  "observations": 5107,
+                  "upper_bound": 0.6
+                },
+                {
+                  "event_rate": 0.6729039744705541,
+                  "index": 6,
+                  "lower_bound": 0.6,
+                  "mean_probability": 0.6495785478846824,
+                  "observations": 6894,
+                  "upper_bound": 0.7
+                },
+                {
+                  "event_rate": 0.7705939868002933,
+                  "index": 7,
+                  "lower_bound": 0.7,
+                  "mean_probability": 0.7533676206629185,
+                  "observations": 8182,
+                  "upper_bound": 0.8
+                },
+                {
+                  "event_rate": 0.8625782045686018,
+                  "index": 8,
+                  "lower_bound": 0.8,
+                  "mean_probability": 0.8548837641278918,
+                  "observations": 13746,
+                  "upper_bound": 0.9
+                },
+                {
+                  "event_rate": 0.9334081976417743,
+                  "index": 9,
+                  "lower_bound": 0.9,
+                  "mean_probability": 0.9393448988562042,
+                  "observations": 17810,
+                  "upper_bound": 1.0
+                }
+              ]
+            },
+            "blank_rows": 0,
+            "minutes": {
+              "mean_absolute_error": 14.81244043500727,
+              "mean_error": 0.08572247837187455,
+              "observations": 123154,
+              "root_mean_squared_error": 23.884947943830948
+            },
+            "minutes_if_appearance": {
+              "mean_absolute_error": 18.311450575544576,
+              "mean_error": 0.8596576137373382,
+              "observations": 50072,
+              "root_mean_squared_error": 24.76917008278813
+            },
+            "missing_appearance_prediction_rows": 1420,
+            "missing_appearance_target_rows": 0,
+            "missing_minutes_prediction_rows": 1420,
+            "missing_minutes_target_rows": 0,
+            "missing_points_prediction_rows": 1420,
+            "missing_points_target_rows": 0,
+            "missing_start_label_rows": 71534,
+            "missing_start_prediction_rows": 53040,
+            "points": {
+              "mean_absolute_error": 1.0254532871642739,
+              "mean_error": -0.018091581414968253,
+              "observations": 123154,
+              "root_mean_squared_error": 1.9868170591591916
+            },
+            "points_if_appearance": {
+              "mean_absolute_error": 2.0601011909733984,
+              "mean_error": -0.01882590737689727,
+              "observations": 50072,
+              "root_mean_squared_error": 2.8787512145125476
+            },
+            "population_rows": 124574,
+            "start": {
+              "brier_score": null,
+              "event_rate": null,
+              "log_loss": null,
+              "mean_calibration_bias": null,
+              "mean_prediction": null,
+              "observations": 0,
+              "reliability_bins": []
+            },
+            "start_given_appearance": {
+              "brier_score": null,
+              "event_rate": null,
+              "log_loss": null,
+              "mean_calibration_bias": null,
+              "mean_prediction": null,
+              "observations": 0,
+              "reliability_bins": []
+            }
+          }
+        },
+        "by_position": {
+          "DEF": {
+            "appearance": {
+              "brier_score": 0.11376769096748658,
+              "event_rate": 0.4124441132637854,
+              "log_loss": 0.3670282992315899,
+              "mean_calibration_bias": -0.011376555420827106,
+              "mean_prediction": 0.4010675578429583,
+              "observations": 42944,
+              "reliability_bins": [
+                {
+                  "event_rate": 0.049941014549744395,
+                  "index": 0,
+                  "lower_bound": 0.0,
+                  "mean_probability": 0.034942713868378175,
+                  "observations": 17801,
+                  "upper_bound": 0.1
+                },
+                {
+                  "event_rate": 0.18991853360488797,
+                  "index": 1,
+                  "lower_bound": 0.1,
+                  "mean_probability": 0.1523371122398167,
+                  "observations": 1964,
+                  "upper_bound": 0.2
+                },
+                {
+                  "event_rate": 0.2764008620689655,
+                  "index": 2,
+                  "lower_bound": 0.2,
+                  "mean_probability": 0.2473510948125,
+                  "observations": 1856,
+                  "upper_bound": 0.3
+                },
+                {
+                  "event_rate": 0.4180622009569378,
+                  "index": 3,
+                  "lower_bound": 0.3,
+                  "mean_probability": 0.35272292295394736,
+                  "observations": 1672,
+                  "upper_bound": 0.4
+                },
+                {
+                  "event_rate": 0.4831064044377206,
+                  "index": 4,
+                  "lower_bound": 0.4,
+                  "mean_probability": 0.4498791802188603,
+                  "observations": 1983,
+                  "upper_bound": 0.5
+                },
+                {
+                  "event_rate": 0.5750611246943765,
+                  "index": 5,
+                  "lower_bound": 0.5,
+                  "mean_probability": 0.5506106393828851,
+                  "observations": 2045,
+                  "upper_bound": 0.6
+                },
+                {
+                  "event_rate": 0.6671171171171171,
+                  "index": 6,
+                  "lower_bound": 0.6,
+                  "mean_probability": 0.6498354969175675,
+                  "observations": 2220,
+                  "upper_bound": 0.7
+                },
+                {
+                  "event_rate": 0.7515552099533437,
+                  "index": 7,
+                  "lower_bound": 0.7,
+                  "mean_probability": 0.7512378981450233,
+                  "observations": 2572,
+                  "upper_bound": 0.8
+                },
+                {
+                  "event_rate": 0.8405948343334203,
+                  "index": 8,
+                  "lower_bound": 0.8,
+                  "mean_probability": 0.8572933295588312,
+                  "observations": 3833,
+                  "upper_bound": 0.9
+                },
+                {
+                  "event_rate": 0.9242640754501286,
+                  "index": 9,
+                  "lower_bound": 0.9,
+                  "mean_probability": 0.9394784689268364,
+                  "observations": 6998,
+                  "upper_bound": 1.0
+                }
+              ]
+            },
+            "blank_rows": 0,
+            "minutes": {
+              "mean_absolute_error": 17.473712192266174,
+              "mean_error": -1.1364209380991,
+              "observations": 42944,
+              "root_mean_squared_error": 28.202110224995568
+            },
+            "minutes_if_appearance": {
+              "mean_absolute_error": 18.475377757146905,
+              "mean_error": -1.388010287343496,
+              "observations": 17712,
+              "root_mean_squared_error": 26.791846865543427
+            },
+            "missing_appearance_prediction_rows": 468,
+            "missing_appearance_target_rows": 0,
+            "missing_minutes_prediction_rows": 468,
+            "missing_minutes_target_rows": 0,
+            "missing_points_prediction_rows": 468,
+            "missing_points_target_rows": 0,
+            "missing_start_label_rows": 25511,
+            "missing_start_prediction_rows": 17901,
+            "points": {
+              "mean_absolute_error": 1.1333076543673621,
+              "mean_error": -0.048986725021702676,
+              "observations": 42944,
+              "root_mean_squared_error": 2.0954873688642737
+            },
+            "points_if_appearance": {
+              "mean_absolute_error": 2.263756228466407,
+              "mean_error": -0.07252277656137082,
+              "observations": 17712,
+              "root_mean_squared_error": 3.010336374289475
+            },
+            "population_rows": 43412,
+            "start": {
+              "brier_score": null,
+              "event_rate": null,
+              "log_loss": null,
+              "mean_calibration_bias": null,
+              "mean_prediction": null,
+              "observations": 0,
+              "reliability_bins": []
+            },
+            "start_given_appearance": {
+              "brier_score": null,
+              "event_rate": null,
+              "log_loss": null,
+              "mean_calibration_bias": null,
+              "mean_prediction": null,
+              "observations": 0,
+              "reliability_bins": []
+            }
+          },
+          "FWD": {
+            "appearance": {
+              "brier_score": 0.10019408387139538,
+              "event_rate": 0.4241106206180213,
+              "log_loss": 0.33211005212221095,
+              "mean_calibration_bias": 0.0011317113061542483,
+              "mean_prediction": 0.42524233192417554,
+              "observations": 15404,
+              "reliability_bins": [
+                {
+                  "event_rate": 0.03128103277060576,
+                  "index": 0,
+                  "lower_bound": 0.0,
+                  "mean_probability": 0.056333431679741815,
+                  "observations": 6042,
+                  "upper_bound": 0.1
+                },
+                {
+                  "event_rate": 0.10495283018867925,
+                  "index": 1,
+                  "lower_bound": 0.1,
+                  "mean_probability": 0.13830981840801887,
+                  "observations": 848,
+                  "upper_bound": 0.2
+                },
+                {
+                  "event_rate": 0.22473867595818817,
+                  "index": 2,
+                  "lower_bound": 0.2,
+                  "mean_probability": 0.2446711418432056,
+                  "observations": 574,
+                  "upper_bound": 0.3
+                },
+                {
+                  "event_rate": 0.3732394366197183,
+                  "index": 3,
+                  "lower_bound": 0.3,
+                  "mean_probability": 0.35488600336854464,
+                  "observations": 426,
+                  "upper_bound": 0.4
+                },
+                {
+                  "event_rate": 0.4715447154471545,
+                  "index": 4,
+                  "lower_bound": 0.4,
+                  "mean_probability": 0.4483356234065041,
+                  "observations": 615,
+                  "upper_bound": 0.5
+                },
+                {
+                  "event_rate": 0.5930408472012103,
+                  "index": 5,
+                  "lower_bound": 0.5,
+                  "mean_probability": 0.553314028881997,
+                  "observations": 661,
+                  "upper_bound": 0.6
+                },
+                {
+                  "event_rate": 0.6832993890020367,
+                  "index": 6,
+                  "lower_bound": 0.6,
+                  "mean_probability": 0.6510376235753564,
+                  "observations": 982,
+                  "upper_bound": 0.7
+                },
+                {
+                  "event_rate": 0.799512987012987,
+                  "index": 7,
+                  "lower_bound": 0.7,
+                  "mean_probability": 0.7540284717662338,
+                  "observations": 1232,
+                  "upper_bound": 0.8
+                },
+                {
+                  "event_rate": 0.8702776513427402,
+                  "index": 8,
+                  "lower_bound": 0.8,
+                  "mean_probability": 0.8535845727296314,
+                  "observations": 2197,
+                  "upper_bound": 0.9
+                },
+                {
+                  "event_rate": 0.939792008757526,
+                  "index": 9,
+                  "lower_bound": 0.9,
+                  "mean_probability": 0.93928986127422,
+                  "observations": 1827,
+                  "upper_bound": 1.0
+                }
+              ]
+            },
+            "blank_rows": 0,
+            "minutes": {
+              "mean_absolute_error": 14.745223857308545,
+              "mean_error": 1.7142055466884196,
+              "observations": 15404,
+              "root_mean_squared_error": 23.080823050668695
+            },
+            "minutes_if_appearance": {
+              "mean_absolute_error": 21.815984970516,
+              "mean_error": 4.399763360657432,
+              "observations": 6533,
+              "root_mean_squared_error": 28.00221366152872
+            },
+            "missing_appearance_prediction_rows": 195,
+            "missing_appearance_target_rows": 0,
+            "missing_minutes_prediction_rows": 195,
+            "missing_minutes_target_rows": 0,
+            "missing_points_prediction_rows": 195,
+            "missing_points_target_rows": 0,
+            "missing_start_label_rows": 9047,
+            "missing_start_prediction_rows": 6552,
+            "points": {
+              "mean_absolute_error": 1.1893811964441054,
+              "mean_error": 0.019640615099519605,
+              "observations": 15404,
+              "root_mean_squared_error": 2.25467226105352
+            },
+            "points_if_appearance": {
+              "mean_absolute_error": 2.3516275585689574,
+              "mean_error": 0.06996177013669064,
+              "observations": 6533,
+              "root_mean_squared_error": 3.222561640714124
+            },
+            "population_rows": 15599,
+            "start": {
+              "brier_score": null,
+              "event_rate": null,
+              "log_loss": null,
+              "mean_calibration_bias": null,
+              "mean_prediction": null,
+              "observations": 0,
+              "reliability_bins": []
+            },
+            "start_given_appearance": {
+              "brier_score": null,
+              "event_rate": null,
+              "log_loss": null,
+              "mean_calibration_bias": null,
+              "mean_prediction": null,
+              "observations": 0,
+              "reliability_bins": []
+            }
+          },
+          "GK": {
+            "appearance": {
+              "brier_score": 0.04274499818130144,
+              "event_rate": 0.25078787029904054,
+              "log_loss": 0.16333490115303323,
+              "mean_calibration_bias": 0.015383644116954975,
+              "mean_prediction": 0.2661715144159955,
+              "observations": 14279,
+              "reliability_bins": [
+                {
+                  "event_rate": 0.017278617710583154,
+                  "index": 0,
+                  "lower_bound": 0.0,
+                  "mean_probability": 0.028972394154581915,
+                  "observations": 9723,
+                  "upper_bound": 0.1
+                },
+                {
+                  "event_rate": 0.09064327485380116,
+                  "index": 1,
+                  "lower_bound": 0.1,
+                  "mean_probability": 0.14475575790643275,
+                  "observations": 342,
+                  "upper_bound": 0.2
+                },
+                {
+                  "event_rate": 0.15920398009950248,
+                  "index": 2,
+                  "lower_bound": 0.2,
+                  "mean_probability": 0.2447743063930348,
+                  "observations": 201,
+                  "upper_bound": 0.3
+                },
+                {
+                  "event_rate": 0.23668639053254437,
+                  "index": 3,
+                  "lower_bound": 0.3,
+                  "mean_probability": 0.35237128575739646,
+                  "observations": 169,
+                  "upper_bound": 0.4
+                },
+                {
+                  "event_rate": 0.39572192513368987,
+                  "index": 4,
+                  "lower_bound": 0.4,
+                  "mean_probability": 0.45022565421925126,
+                  "observations": 187,
+                  "upper_bound": 0.5
+                },
+                {
+                  "event_rate": 0.47297297297297297,
+                  "index": 5,
+                  "lower_bound": 0.5,
+                  "mean_probability": 0.5480045626891892,
+                  "observations": 148,
+                  "upper_bound": 0.6
+                },
+                {
+                  "event_rate": 0.5035460992907801,
+                  "index": 6,
+                  "lower_bound": 0.6,
+                  "mean_probability": 0.6503883522695035,
+                  "observations": 141,
+                  "upper_bound": 0.7
+                },
+                {
+                  "event_rate": 0.6733870967741935,
+                  "index": 7,
+                  "lower_bound": 0.7,
+                  "mean_probability": 0.7490445429153225,
+                  "observations": 248,
+                  "upper_bound": 0.8
+                },
+                {
+                  "event_rate": 0.8762626262626263,
+                  "index": 8,
+                  "lower_bound": 0.8,
+                  "mean_probability": 0.8635862750404041,
+                  "observations": 396,
+                  "upper_bound": 0.9
+                },
+                {
+                  "event_rate": 0.947503671071953,
+                  "index": 9,
+                  "lower_bound": 0.9,
+                  "mean_probability": 0.945654468448238,
+                  "observations": 2724,
+                  "upper_bound": 1.0
+                }
+              ]
+            },
+            "blank_rows": 0,
+            "minutes": {
+              "mean_absolute_error": 8.39091474506259,
+              "mean_error": -0.756608895053037,
+              "observations": 14279,
+              "root_mean_squared_error": 19.14530429823114
+            },
+            "minutes_if_appearance": {
+              "mean_absolute_error": 8.322662986044122,
+              "mean_error": -6.6964611079994425,
+              "observations": 3581,
+              "root_mean_squared_error": 15.393885088856806
+            },
+            "missing_appearance_prediction_rows": 168,
+            "missing_appearance_target_rows": 0,
+            "missing_minutes_prediction_rows": 168,
+            "missing_minutes_target_rows": 0,
+            "missing_points_prediction_rows": 168,
+            "missing_points_target_rows": 0,
+            "missing_start_label_rows": 8464,
+            "missing_start_prediction_rows": 5983,
+            "points": {
+              "mean_absolute_error": 0.6841306903558372,
+              "mean_error": -0.08360136215568317,
+              "observations": 14279,
+              "root_mean_squared_error": 1.603881701506809
+            },
+            "points_if_appearance": {
+              "mean_absolute_error": 2.1651763255263896,
+              "mean_error": -0.4499208481703435,
+              "observations": 3581,
+              "root_mean_squared_error": 2.934751756237841
+            },
+            "population_rows": 14447,
+            "start": {
+              "brier_score": null,
+              "event_rate": null,
+              "log_loss": null,
+              "mean_calibration_bias": null,
+              "mean_prediction": null,
+              "observations": 0,
+              "reliability_bins": []
+            },
+            "start_given_appearance": {
+              "brier_score": null,
+              "event_rate": null,
+              "log_loss": null,
+              "mean_calibration_bias": null,
+              "mean_prediction": null,
+              "observations": 0,
+              "reliability_bins": []
+            }
+          },
+          "MID": {
+            "appearance": {
+              "brier_score": 0.10551274162163934,
+              "event_rate": 0.44091071428571427,
+              "log_loss": 0.3454068832657974,
+              "mean_calibration_bias": -0.002894520728553507,
+              "mean_prediction": 0.43801619355716076,
+              "observations": 56000,
+              "reliability_bins": [
+                {
+                  "event_rate": 0.03693208213323423,
+                  "index": 0,
+                  "lower_bound": 0.0,
+                  "mean_probability": 0.05468230040681037,
+                  "observations": 21526,
+                  "upper_bound": 0.1
+                },
+                {
+                  "event_rate": 0.13357693869265125,
+                  "index": 1,
+                  "lower_bound": 0.1,
+                  "mean_probability": 0.14127608263459196,
+                  "observations": 2463,
+                  "upper_bound": 0.2
+                },
+                {
+                  "event_rate": 0.25565719788155994,
+                  "index": 2,
+                  "lower_bound": 0.2,
+                  "mean_probability": 0.2439250224448724,
+                  "observations": 2077,
+                  "upper_bound": 0.3
+                },
+                {
+                  "event_rate": 0.3883495145631068,
+                  "index": 3,
+                  "lower_bound": 0.3,
+                  "mean_probability": 0.3559739212845873,
+                  "observations": 1648,
+                  "upper_bound": 0.4
+                },
+                {
+                  "event_rate": 0.4862144420131291,
+                  "index": 4,
+                  "lower_bound": 0.4,
+                  "mean_probability": 0.44963708118818374,
+                  "observations": 2285,
+                  "upper_bound": 0.5
+                },
+                {
+                  "event_rate": 0.5771592304543594,
+                  "index": 5,
+                  "lower_bound": 0.5,
+                  "mean_probability": 0.553533295537454,
+                  "observations": 2443,
+                  "upper_bound": 0.6
+                },
+                {
+                  "event_rate": 0.6812250332889481,
+                  "index": 6,
+                  "lower_bound": 0.6,
+                  "mean_probability": 0.6491942596814914,
+                  "observations": 3755,
+                  "upper_bound": 0.7
+                },
+                {
+                  "event_rate": 0.7787709497206704,
+                  "index": 7,
+                  "lower_bound": 0.7,
+                  "mean_probability": 0.7546020020259218,
+                  "observations": 4475,
+                  "upper_bound": 0.8
+                },
+                {
+                  "event_rate": 0.8697969543147208,
+                  "index": 8,
+                  "lower_bound": 0.8,
+                  "mean_probability": 0.8537759318649746,
+                  "observations": 7880,
+                  "upper_bound": 0.9
+                },
+                {
+                  "event_rate": 0.9368958109559613,
+                  "index": 9,
+                  "lower_bound": 0.9,
+                  "mean_probability": 0.9383123034963748,
+                  "observations": 7448,
+                  "upper_bound": 1.0
+                }
+              ]
+            },
+            "blank_rows": 0,
+            "minutes": {
+              "mean_absolute_error": 15.790001843178034,
+              "mean_error": 0.6370855908629326,
+              "observations": 56000,
+              "root_mean_squared_error": 24.45714809140322
+            },
+            "minutes_if_appearance": {
+              "mean_absolute_error": 21.123085506887936,
+              "mean_error": 2.3586989995391843,
+              "observations": 24691,
+              "root_mean_squared_error": 27.427365607139105
+            },
+            "missing_appearance_prediction_rows": 637,
+            "missing_appearance_target_rows": 0,
+            "missing_minutes_prediction_rows": 637,
+            "missing_minutes_target_rows": 0,
+            "missing_points_prediction_rows": 637,
+            "missing_points_target_rows": 0,
+            "missing_start_label_rows": 32686,
+            "missing_start_prediction_rows": 23951,
+            "points": {
+              "mean_absolute_error": 1.0526327302443037,
+              "mean_error": -0.0015110532491964283,
+              "observations": 56000,
+              "root_mean_squared_error": 2.0533603071333904
+            },
+            "points_if_appearance": {
+              "mean_absolute_error": 1.9329886205297075,
+              "mean_error": 0.031679352180025114,
+              "observations": 24691,
+              "root_mean_squared_error": 2.859421576276933
+            },
+            "population_rows": 56637,
+            "start": {
+              "brier_score": null,
+              "event_rate": null,
+              "log_loss": null,
+              "mean_calibration_bias": null,
+              "mean_prediction": null,
+              "observations": 0,
+              "reliability_bins": []
+            },
+            "start_given_appearance": {
+              "brier_score": null,
+              "event_rate": null,
+              "log_loss": null,
+              "mean_calibration_bias": null,
+              "mean_prediction": null,
+              "observations": 0,
+              "reliability_bins": []
+            }
+          }
+        },
+        "by_season": {
+          "2021-22": {
+            "appearance": {
+              "brier_score": 0.11879305562401027,
+              "event_rate": 0.41957245088654904,
+              "log_loss": 0.38283736397798696,
+              "mean_calibration_bias": 0.011679394098135731,
+              "mean_prediction": 0.4312518449846848,
+              "observations": 21939,
+              "reliability_bins": [
+                {
+                  "event_rate": 0.040239614533142336,
+                  "index": 0,
+                  "lower_bound": 0.0,
+                  "mean_probability": 0.05301046282927465,
+                  "observations": 7679,
+                  "upper_bound": 0.1
+                },
+                {
+                  "event_rate": 0.13933077345035655,
+                  "index": 1,
+                  "lower_bound": 0.1,
+                  "mean_probability": 0.1412243527575425,
+                  "observations": 1823,
+                  "upper_bound": 0.2
+                },
+                {
+                  "event_rate": 0.2611585944919278,
+                  "index": 2,
+                  "lower_bound": 0.2,
+                  "mean_probability": 0.24755117112440644,
+                  "observations": 1053,
+                  "upper_bound": 0.3
+                },
+                {
+                  "event_rate": 0.3714622641509434,
+                  "index": 3,
+                  "lower_bound": 0.3,
+                  "mean_probability": 0.350095219018868,
+                  "observations": 848,
+                  "upper_bound": 0.4
+                },
+                {
+                  "event_rate": 0.4865979381443299,
+                  "index": 4,
+                  "lower_bound": 0.4,
+                  "mean_probability": 0.4503331271164948,
+                  "observations": 970,
+                  "upper_bound": 0.5
+                },
+                {
+                  "event_rate": 0.5633528265107213,
+                  "index": 5,
+                  "lower_bound": 0.5,
+                  "mean_probability": 0.5527933505545809,
+                  "observations": 1026,
+                  "upper_bound": 0.6
+                },
+                {
+                  "event_rate": 0.6646706586826348,
+                  "index": 6,
+                  "lower_bound": 0.6,
+                  "mean_probability": 0.64992396686142,
+                  "observations": 1169,
+                  "upper_bound": 0.7
+                },
+                {
+                  "event_rate": 0.7398648648648649,
+                  "index": 7,
+                  "lower_bound": 0.7,
+                  "mean_probability": 0.7529361240844594,
+                  "observations": 1480,
+                  "upper_bound": 0.8
+                },
+                {
+                  "event_rate": 0.8158241758241759,
+                  "index": 8,
+                  "lower_bound": 0.8,
+                  "mean_probability": 0.8557544809687913,
+                  "observations": 2275,
+                  "upper_bound": 0.9
+                },
+                {
+                  "event_rate": 0.9054203539823009,
+                  "index": 9,
+                  "lower_bound": 0.9,
+                  "mean_probability": 0.944199563875,
+                  "observations": 3616,
+                  "upper_bound": 1.0
+                }
+              ]
+            },
+            "blank_rows": 0,
+            "minutes": {
+              "mean_absolute_error": 19.247405653988746,
+              "mean_error": 0.5502895179165322,
+              "observations": 21939,
+              "root_mean_squared_error": 30.098977455124807
+            },
+            "minutes_if_appearance": {
+              "mean_absolute_error": 20.620954090514395,
+              "mean_error": -0.22700202596925592,
+              "observations": 9205,
+              "root_mean_squared_error": 29.72133962311975
+            },
+            "missing_appearance_prediction_rows": 737,
+            "missing_appearance_target_rows": 0,
+            "missing_minutes_prediction_rows": 737,
+            "missing_minutes_target_rows": 0,
+            "missing_points_prediction_rows": 737,
+            "missing_points_target_rows": 0,
+            "missing_start_label_rows": 22676,
+            "missing_start_prediction_rows": 0,
+            "points": {
+              "mean_absolute_error": 1.2433505885094582,
+              "mean_error": -0.003420643961484118,
+              "observations": 21939,
+              "root_mean_squared_error": 2.288645399874015
+            },
+            "points_if_appearance": {
+              "mean_absolute_error": 2.316419626297882,
+              "mean_error": -0.06503538063639326,
+              "observations": 9205,
+              "root_mean_squared_error": 3.223011049355767
+            },
+            "population_rows": 22676,
+            "start": {
+              "brier_score": null,
+              "event_rate": null,
+              "log_loss": null,
+              "mean_calibration_bias": null,
+              "mean_prediction": null,
+              "observations": 0,
+              "reliability_bins": []
+            },
+            "start_given_appearance": {
+              "brier_score": null,
+              "event_rate": null,
+              "log_loss": null,
+              "mean_calibration_bias": null,
+              "mean_prediction": null,
+              "observations": 0,
+              "reliability_bins": []
+            }
+          },
+          "2022-23": {
+            "appearance": {
+              "brier_score": 0.10264531548885883,
+              "event_rate": 0.432441374746681,
+              "log_loss": 0.336681709136317,
+              "mean_calibration_bias": -0.011274946798751018,
+              "mean_prediction": 0.42116642794792997,
+              "observations": 24179,
+              "reliability_bins": [
+                {
+                  "event_rate": 0.03842568617296738,
+                  "index": 0,
+                  "lower_bound": 0.0,
+                  "mean_probability": 0.04510387127063697,
+                  "observations": 9655,
+                  "upper_bound": 0.1
+                },
+                {
+                  "event_rate": 0.15743183817062445,
+                  "index": 1,
+                  "lower_bound": 0.1,
+                  "mean_probability": 0.1433630937897977,
+                  "observations": 1137,
+                  "upper_bound": 0.2
+                },
+                {
+                  "event_rate": 0.2755417956656347,
+                  "index": 2,
+                  "lower_bound": 0.2,
+                  "mean_probability": 0.24879901166666665,
+                  "observations": 969,
+                  "upper_bound": 0.3
+                },
+                {
+                  "event_rate": 0.3946406820950061,
+                  "index": 3,
+                  "lower_bound": 0.3,
+                  "mean_probability": 0.3527168896954933,
+                  "observations": 821,
+                  "upper_bound": 0.4
+                },
+                {
+                  "event_rate": 0.48021978021978023,
+                  "index": 4,
+                  "lower_bound": 0.4,
+                  "mean_probability": 0.44971693480219777,
+                  "observations": 910,
+                  "upper_bound": 0.5
+                },
+                {
+                  "event_rate": 0.5918367346938775,
+                  "index": 5,
+                  "lower_bound": 0.5,
+                  "mean_probability": 0.5536368731428571,
+                  "observations": 1078,
+                  "upper_bound": 0.6
+                },
+                {
+                  "event_rate": 0.6880058866813834,
+                  "index": 6,
+                  "lower_bound": 0.6,
+                  "mean_probability": 0.6514695301376012,
+                  "observations": 1359,
+                  "upper_bound": 0.7
+                },
+                {
+                  "event_rate": 0.7786516853932585,
+                  "index": 7,
+                  "lower_bound": 0.7,
+                  "mean_probability": 0.7526664251140448,
+                  "observations": 1780,
+                  "upper_bound": 0.8
+                },
+                {
+                  "event_rate": 0.8882093102276588,
+                  "index": 8,
+                  "lower_bound": 0.8,
+                  "mean_probability": 0.8526274271715937,
+                  "observations": 2943,
+                  "upper_bound": 0.9
+                },
+                {
+                  "event_rate": 0.937056988942444,
+                  "index": 9,
+                  "lower_bound": 0.9,
+                  "mean_probability": 0.9395508170136092,
+                  "observations": 3527,
+                  "upper_bound": 1.0
+                }
+              ]
+            },
+            "blank_rows": 0,
+            "minutes": {
+              "mean_absolute_error": 16.099832105514167,
+              "mean_error": 0.051200961056614064,
+              "observations": 24179,
+              "root_mean_squared_error": 25.567180585502623
+            },
+            "minutes_if_appearance": {
+              "mean_absolute_error": 19.749378059368016,
+              "mean_error": 1.9869821711241393,
+              "observations": 10456,
+              "root_mean_squared_error": 27.172863960956132
+            },
+            "missing_appearance_prediction_rows": 205,
+            "missing_appearance_target_rows": 0,
+            "missing_minutes_prediction_rows": 205,
+            "missing_minutes_target_rows": 0,
+            "missing_points_prediction_rows": 205,
+            "missing_points_target_rows": 0,
+            "missing_start_label_rows": 24384,
+            "missing_start_prediction_rows": 0,
+            "points": {
+              "mean_absolute_error": 1.100155450109889,
+              "mean_error": -0.023308899077836134,
+              "observations": 24179,
+              "root_mean_squared_error": 2.0774556014469456
+            },
+            "points_if_appearance": {
+              "mean_absolute_error": 2.117288697403405,
+              "mean_error": 0.019901941142310624,
+              "observations": 10456,
+              "root_mean_squared_error": 2.9268532969384524
+            },
+            "population_rows": 24384,
+            "start": {
+              "brier_score": null,
+              "event_rate": null,
+              "log_loss": null,
+              "mean_calibration_bias": null,
+              "mean_prediction": null,
+              "observations": 0,
+              "reliability_bins": []
+            },
+            "start_given_appearance": {
+              "brier_score": null,
+              "event_rate": null,
+              "log_loss": null,
+              "mean_calibration_bias": null,
+              "mean_prediction": null,
+              "observations": 0,
+              "reliability_bins": []
+            }
+          },
+          "2023-24": {
+            "appearance": {
+              "brier_score": 0.0967274648220628,
+              "event_rate": 0.38547906876636656,
+              "log_loss": 0.319069100664173,
+              "mean_calibration_bias": -0.00641676547146397,
+              "mean_prediction": 0.3790623032949026,
+              "observations": 27877,
+              "reliability_bins": [
+                {
+                  "event_rate": 0.037077257213775985,
+                  "index": 0,
+                  "lower_bound": 0.0,
+                  "mean_probability": 0.04182970349798325,
+                  "observations": 12892,
+                  "upper_bound": 0.1
+                },
+                {
+                  "event_rate": 0.12912087912087913,
+                  "index": 1,
+                  "lower_bound": 0.1,
+                  "mean_probability": 0.14102257452930403,
+                  "observations": 1092,
+                  "upper_bound": 0.2
+                },
+                {
+                  "event_rate": 0.2657200811359026,
+                  "index": 2,
+                  "lower_bound": 0.2,
+                  "mean_probability": 0.2467741228559838,
+                  "observations": 986,
+                  "upper_bound": 0.3
+                },
+                {
+                  "event_rate": 0.40816326530612246,
+                  "index": 3,
+                  "lower_bound": 0.3,
+                  "mean_probability": 0.35454752441043086,
+                  "observations": 882,
+                  "upper_bound": 0.4
+                },
+                {
+                  "event_rate": 0.4833782569631626,
+                  "index": 4,
+                  "lower_bound": 0.4,
+                  "mean_probability": 0.4476468085965858,
+                  "observations": 1113,
+                  "upper_bound": 0.5
+                },
+                {
+                  "event_rate": 0.5824561403508772,
+                  "index": 5,
+                  "lower_bound": 0.5,
+                  "mean_probability": 0.5522297286359649,
+                  "observations": 1140,
+                  "upper_bound": 0.6
+                },
+                {
+                  "event_rate": 0.6727019498607242,
+                  "index": 6,
+                  "lower_bound": 0.6,
+                  "mean_probability": 0.6490511711392758,
+                  "observations": 1436,
+                  "upper_bound": 0.7
+                },
+                {
+                  "event_rate": 0.7794031597425395,
+                  "index": 7,
+                  "lower_bound": 0.7,
+                  "mean_probability": 0.7533954355693386,
+                  "observations": 1709,
+                  "upper_bound": 0.8
+                },
+                {
+                  "event_rate": 0.8593314763231198,
+                  "index": 8,
+                  "lower_bound": 0.8,
+                  "mean_probability": 0.8527997870832174,
+                  "observations": 2872,
+                  "upper_bound": 0.9
+                },
+                {
+                  "event_rate": 0.9419440745672437,
+                  "index": 9,
+                  "lower_bound": 0.9,
+                  "mean_probability": 0.9377417789997337,
+                  "observations": 3755,
+                  "upper_bound": 1.0
+                }
+              ]
+            },
+            "blank_rows": 0,
+            "minutes": {
+              "mean_absolute_error": 14.242247708094878,
+              "mean_error": -0.14695227714539266,
+              "observations": 27877,
+              "root_mean_squared_error": 23.77532838011386
+            },
+            "minutes_if_appearance": {
+              "mean_absolute_error": 19.285463562494414,
+              "mean_error": 0.8534613431584778,
+              "observations": 10746,
+              "root_mean_squared_error": 26.12926612202446
+            },
+            "missing_appearance_prediction_rows": 207,
+            "missing_appearance_target_rows": 0,
+            "missing_minutes_prediction_rows": 207,
+            "missing_minutes_target_rows": 0,
+            "missing_points_prediction_rows": 207,
+            "missing_points_target_rows": 0,
+            "missing_start_label_rows": 0,
+            "missing_start_prediction_rows": 28084,
+            "points": {
+              "mean_absolute_error": 0.9764419405231911,
+              "mean_error": -0.022345383860781283,
+              "observations": 27877,
+              "root_mean_squared_error": 1.9861004683074872
+            },
+            "points_if_appearance": {
+              "mean_absolute_error": 2.0837050147607483,
+              "mean_error": -0.014911067623766986,
+              "observations": 10746,
+              "root_mean_squared_error": 2.9656317601824562
+            },
+            "population_rows": 28084,
+            "start": {
+              "brier_score": null,
+              "event_rate": null,
+              "log_loss": null,
+              "mean_calibration_bias": null,
+              "mean_prediction": null,
+              "observations": 0,
+              "reliability_bins": []
+            },
+            "start_given_appearance": {
+              "brier_score": null,
+              "event_rate": null,
+              "log_loss": null,
+              "mean_calibration_bias": null,
+              "mean_prediction": null,
+              "observations": 0,
+              "reliability_bins": []
+            }
+          },
+          "2024-25": {
+            "appearance": {
+              "brier_score": 0.09996389275900952,
+              "event_rate": 0.42429691983929596,
+              "log_loss": 0.3296644794874137,
+              "mean_calibration_bias": -0.009485812611019717,
+              "mean_prediction": 0.41481110722827624,
+              "observations": 26135,
+              "reliability_bins": [
+                {
+                  "event_rate": 0.0404076524226712,
+                  "index": 0,
+                  "lower_bound": 0.0,
+                  "mean_probability": 0.041875479369479704,
+                  "observations": 11186,
+                  "upper_bound": 0.1
+                },
+                {
+                  "event_rate": 0.16149068322981366,
+                  "index": 1,
+                  "lower_bound": 0.1,
+                  "mean_probability": 0.1529909524037267,
+                  "observations": 805,
+                  "upper_bound": 0.2
+                },
+                {
+                  "event_rate": 0.24882629107981222,
+                  "index": 2,
+                  "lower_bound": 0.2,
+                  "mean_probability": 0.24397863300234743,
+                  "observations": 852,
+                  "upper_bound": 0.3
+                },
+                {
+                  "event_rate": 0.3746630727762803,
+                  "index": 3,
+                  "lower_bound": 0.3,
+                  "mean_probability": 0.356317283467655,
+                  "observations": 742,
+                  "upper_bound": 0.4
+                },
+                {
+                  "event_rate": 0.4858757062146893,
+                  "index": 4,
+                  "lower_bound": 0.4,
+                  "mean_probability": 0.4497437784143126,
+                  "observations": 1062,
+                  "upper_bound": 0.5
+                },
+                {
+                  "event_rate": 0.5705069124423963,
+                  "index": 5,
+                  "lower_bound": 0.5,
+                  "mean_probability": 0.5512340738046083,
+                  "observations": 1085,
+                  "upper_bound": 0.6
+                },
+                {
+                  "event_rate": 0.6818181818181818,
+                  "index": 6,
+                  "lower_bound": 0.6,
+                  "mean_probability": 0.6493157588713189,
+                  "observations": 1562,
+                  "upper_bound": 0.7
+                },
+                {
+                  "event_rate": 0.7875131164742917,
+                  "index": 7,
+                  "lower_bound": 0.7,
+                  "mean_probability": 0.7527889662896118,
+                  "observations": 1906,
+                  "upper_bound": 0.8
+                },
+                {
+                  "event_rate": 0.8706840390879479,
+                  "index": 8,
+                  "lower_bound": 0.8,
+                  "mean_probability": 0.8559578167586318,
+                  "observations": 3070,
+                  "upper_bound": 0.9
+                },
+                {
+                  "event_rate": 0.9425614489003881,
+                  "index": 9,
+                  "lower_bound": 0.9,
+                  "mean_probability": 0.9378266218732212,
+                  "observations": 3865,
+                  "upper_bound": 1.0
+                }
+              ]
+            },
+            "blank_rows": 0,
+            "minutes": {
+              "mean_absolute_error": 14.804857519063473,
+              "mean_error": -0.3544991306804393,
+              "observations": 26135,
+              "root_mean_squared_error": 23.844427190133835
+            },
+            "minutes_if_appearance": {
+              "mean_absolute_error": 18.778869862524754,
+              "mean_error": 0.6089767027052936,
+              "observations": 11089,
+              "root_mean_squared_error": 25.02473795596158
+            },
+            "missing_appearance_prediction_rows": 168,
+            "missing_appearance_target_rows": 0,
+            "missing_minutes_prediction_rows": 168,
+            "missing_minutes_target_rows": 0,
+            "missing_points_prediction_rows": 168,
+            "missing_points_target_rows": 0,
+            "missing_start_label_rows": 0,
+            "missing_start_prediction_rows": 26303,
+            "points": {
+              "mean_absolute_error": 1.0130363635727186,
+              "mean_error": -0.011433711708475227,
+              "observations": 26135,
+              "root_mean_squared_error": 1.9670931816643207
+            },
+            "points_if_appearance": {
+              "mean_absolute_error": 1.9952678466106053,
+              "mean_error": 0.031402667423302374,
+              "observations": 11089,
+              "root_mean_squared_error": 2.815559152148718
+            },
+            "population_rows": 26303,
+            "start": {
+              "brier_score": null,
+              "event_rate": null,
+              "log_loss": null,
+              "mean_calibration_bias": null,
+              "mean_prediction": null,
+              "observations": 0,
+              "reliability_bins": []
+            },
+            "start_given_appearance": {
+              "brier_score": null,
+              "event_rate": null,
+              "log_loss": null,
+              "mean_calibration_bias": null,
+              "mean_prediction": null,
+              "observations": 0,
+              "reliability_bins": []
+            }
+          },
+          "2025-26": {
+            "appearance": {
+              "brier_score": 0.08951850875754248,
+              "event_rate": 0.38674246411903007,
+              "log_loss": 0.2983599879777513,
+              "mean_calibration_bias": 0.0010394979710144914,
+              "mean_prediction": 0.38778196209004456,
+              "observations": 28497,
+              "reliability_bins": [
+                {
+                  "event_rate": 0.03150584795321638,
+                  "index": 0,
+                  "lower_bound": 0.0,
+                  "mean_probability": 0.041735289458698824,
+                  "observations": 13680,
+                  "upper_bound": 0.1
+                },
+                {
+                  "event_rate": 0.15526315789473685,
+                  "index": 1,
+                  "lower_bound": 0.1,
+                  "mean_probability": 0.15307378209868422,
+                  "observations": 760,
+                  "upper_bound": 0.2
+                },
+                {
+                  "event_rate": 0.22287735849056603,
+                  "index": 2,
+                  "lower_bound": 0.2,
+                  "mean_probability": 0.23869111867924528,
+                  "observations": 848,
+                  "upper_bound": 0.3
+                },
+                {
+                  "event_rate": 0.41961414790996787,
+                  "index": 3,
+                  "lower_bound": 0.3,
+                  "mean_probability": 0.3594377510498392,
+                  "observations": 622,
+                  "upper_bound": 0.4
+                },
+                {
+                  "event_rate": 0.4630541871921182,
+                  "index": 4,
+                  "lower_bound": 0.4,
+                  "mean_probability": 0.45076395665615765,
+                  "observations": 1015,
+                  "upper_bound": 0.5
+                },
+                {
+                  "event_rate": 0.5671487603305785,
+                  "index": 5,
+                  "lower_bound": 0.5,
+                  "mean_probability": 0.5511451025464875,
+                  "observations": 968,
+                  "upper_bound": 0.6
+                },
+                {
+                  "event_rate": 0.6603053435114504,
+                  "index": 6,
+                  "lower_bound": 0.6,
+                  "mean_probability": 0.6488588081749364,
+                  "observations": 1572,
+                  "upper_bound": 0.7
+                },
+                {
+                  "event_rate": 0.7602905569007264,
+                  "index": 7,
+                  "lower_bound": 0.7,
+                  "mean_probability": 0.7550203919309927,
+                  "observations": 1652,
+                  "upper_bound": 0.8
+                },
+                {
+                  "event_rate": 0.8658614113159567,
+                  "index": 8,
+                  "lower_bound": 0.8,
+                  "mean_probability": 0.8575682448111888,
+                  "observations": 3146,
+                  "upper_bound": 0.9
+                },
+                {
+                  "event_rate": 0.9411903637222485,
+                  "index": 9,
+                  "lower_bound": 0.9,
+                  "mean_probability": 0.9402749367805857,
+                  "observations": 4234,
+                  "upper_bound": 1.0
+                }
+              ]
+            },
+            "blank_rows": 0,
+            "minutes": {
+              "mean_absolute_error": 13.548013327859325,
+              "mean_error": 0.0886749408948066,
+              "observations": 28497,
+              "root_mean_squared_error": 22.78489515062016
+            },
+            "minutes_if_appearance": {
+              "mean_absolute_error": 18.992597977544865,
+              "mean_error": 0.3454546242188549,
+              "observations": 11021,
+              "root_mean_squared_error": 25.42865436411055
+            },
+            "missing_appearance_prediction_rows": 151,
+            "missing_appearance_target_rows": 0,
+            "missing_minutes_prediction_rows": 151,
+            "missing_minutes_target_rows": 0,
+            "missing_points_prediction_rows": 151,
+            "missing_points_target_rows": 0,
+            "missing_start_label_rows": 28648,
+            "missing_start_prediction_rows": 0,
+            "points": {
+              "mean_absolute_error": 0.9871783820400393,
+              "mean_error": -0.05330845409878233,
+              "observations": 28497,
+              "root_mean_squared_error": 1.959003088146289
+            },
+            "points_if_appearance": {
+              "mean_absolute_error": 2.083451509856728,
+              "mean_error": -0.13191803928599946,
+              "observations": 11021,
+              "root_mean_squared_error": 2.9121977624738182
+            },
+            "population_rows": 28648,
+            "start": {
+              "brier_score": null,
+              "event_rate": null,
+              "log_loss": null,
+              "mean_calibration_bias": null,
+              "mean_prediction": null,
+              "observations": 0,
+              "reliability_bins": []
+            },
+            "start_given_appearance": {
+              "brier_score": null,
+              "event_rate": null,
+              "log_loss": null,
+              "mean_calibration_bias": null,
+              "mean_prediction": null,
+              "observations": 0,
+              "reliability_bins": []
+            }
+          }
+        },
+        "contract_version": "phase_c_component_metrics_v1",
+        "overall": {
+          "appearance": {
+            "brier_score": 0.10066392552656382,
+            "event_rate": 0.40828908394038577,
+            "log_loss": 0.33082114207390945,
+            "mean_calibration_bias": -0.003215126073724761,
+            "mean_prediction": 0.405073957866661,
+            "observations": 128627,
+            "reliability_bins": [
+              {
+                "event_rate": 0.03704712117911856,
+                "index": 0,
+                "lower_bound": 0.0,
+                "mean_probability": 0.043947789709976044,
+                "observations": 55092,
+                "upper_bound": 0.1
+              },
+              {
+                "event_rate": 0.14634146341463414,
+                "index": 1,
+                "lower_bound": 0.1,
+                "mean_probability": 0.14490765091365496,
+                "observations": 5617,
+                "upper_bound": 0.2
+              },
+              {
+                "event_rate": 0.25594732370433304,
+                "index": 2,
+                "lower_bound": 0.2,
+                "mean_probability": 0.24540288330352591,
+                "observations": 4708,
+                "upper_bound": 0.3
+              },
+              {
+                "event_rate": 0.39284802043422734,
+                "index": 3,
+                "lower_bound": 0.3,
+                "mean_probability": 0.3543116051555556,
+                "observations": 3915,
+                "upper_bound": 0.4
+              },
+              {
+                "event_rate": 0.4798816568047337,
+                "index": 4,
+                "lower_bound": 0.4,
+                "mean_probability": 0.4495956115627219,
+                "observations": 5070,
+                "upper_bound": 0.5
+              },
+              {
+                "event_rate": 0.5754200490843874,
+                "index": 5,
+                "lower_bound": 0.5,
+                "mean_probability": 0.5522231162743062,
+                "observations": 5297,
+                "upper_bound": 0.6
+              },
+              {
+                "event_rate": 0.6735700197238659,
+                "index": 6,
+                "lower_bound": 0.6,
+                "mean_probability": 0.649673563296985,
+                "observations": 7098,
+                "upper_bound": 0.7
+              },
+              {
+                "event_rate": 0.7704937258121262,
+                "index": 7,
+                "lower_bound": 0.7,
+                "mean_probability": 0.7533427884313358,
+                "observations": 8527,
+                "upper_bound": 0.8
+              },
+              {
+                "event_rate": 0.8622256395917797,
+                "index": 8,
+                "lower_bound": 0.8,
+                "mean_probability": 0.8549605163216832,
+                "observations": 14306,
+                "upper_bound": 0.9
+              },
+              {
+                "event_rate": 0.9340422171921883,
+                "index": 9,
+                "lower_bound": 0.9,
+                "mean_probability": 0.9398887040370585,
+                "observations": 18997,
+                "upper_bound": 1.0
+              }
+            ]
+          },
+          "blank_rows": 0,
+          "minutes": {
+            "mean_absolute_error": 15.405634116829109,
+            "mean_error": 0.019252071115104782,
+            "observations": 128627,
+            "root_mean_squared_error": 25.108681710483225
+          },
+          "minutes_if_appearance": {
+            "mean_absolute_error": 19.44348079765716,
+            "mean_error": 0.7315312298041206,
+            "observations": 52517,
+            "root_mean_squared_error": 26.635817463775
+          },
+          "missing_appearance_prediction_rows": 1468,
+          "missing_appearance_target_rows": 0,
+          "missing_minutes_prediction_rows": 1468,
+          "missing_minutes_target_rows": 0,
+          "missing_points_prediction_rows": 1468,
+          "missing_points_target_rows": 0,
+          "missing_start_label_rows": 75708,
+          "missing_start_prediction_rows": 54387,
+          "points": {
+            "mean_absolute_error": 1.0550360879166039,
+            "mean_error": -0.023941355364853412,
+            "observations": 128627,
+            "root_mean_squared_error": 2.048417892962934
+          },
+          "points_if_appearance": {
+            "mean_absolute_error": 2.1124540931495894,
+            "mean_error": -0.0315409266860826,
+            "observations": 52517,
+            "root_mean_squared_error": 2.963031983661246
+          },
+          "population_rows": 130095,
+          "start": {
+            "brier_score": null,
+            "event_rate": null,
+            "log_loss": null,
+            "mean_calibration_bias": null,
+            "mean_prediction": null,
+            "observations": 0,
+            "reliability_bins": []
+          },
+          "start_given_appearance": {
+            "brier_score": null,
+            "event_rate": null,
+            "log_loss": null,
+            "mean_calibration_bias": null,
+            "mean_prediction": null,
+            "observations": 0,
+            "reliability_bins": []
+          }
+        }
+      },
+      "control": {
+        "by_fixture_group": {
+          "double_plus": {
+            "appearance": {
+              "brier_score": 0.0996950725259996,
+              "event_rate": 0.4467385346245204,
+              "log_loss": 0.33658444739324644,
+              "mean_calibration_bias": 0.002527110063402116,
+              "mean_prediction": 0.4492656446879225,
+              "observations": 5473,
+              "reliability_bins": [
+                {
+                  "event_rate": 0.03731343283582089,
+                  "index": 0,
+                  "lower_bound": 0.0,
+                  "mean_probability": 0.0966022354552239,
+                  "observations": 134,
+                  "upper_bound": 0.1
+                },
+                {
+                  "event_rate": 0.06741124850418827,
+                  "index": 1,
+                  "lower_bound": 0.1,
+                  "mean_probability": 0.12431503914998004,
+                  "observations": 2507,
+                  "upper_bound": 0.2
+                },
+                {
+                  "event_rate": 0.3942307692307692,
+                  "index": 2,
+                  "lower_bound": 0.2,
+                  "mean_probability": 0.2539899876346154,
+                  "observations": 208,
+                  "upper_bound": 0.3
+                },
+                {
+                  "event_rate": 0.5401785714285714,
+                  "index": 3,
+                  "lower_bound": 0.3,
+                  "mean_probability": 0.34574220154464286,
+                  "observations": 224,
+                  "upper_bound": 0.4
+                },
+                {
+                  "event_rate": 0.5838509316770186,
+                  "index": 4,
+                  "lower_bound": 0.4,
+                  "mean_probability": 0.44841544788819876,
+                  "observations": 161,
+                  "upper_bound": 0.5
+                },
+                {
+                  "event_rate": 0.717741935483871,
+                  "index": 5,
+                  "lower_bound": 0.5,
+                  "mean_probability": 0.5521356219435484,
+                  "observations": 124,
+                  "upper_bound": 0.6
+                },
+                {
+                  "event_rate": 0.7055214723926381,
+                  "index": 6,
+                  "lower_bound": 0.6,
+                  "mean_probability": 0.652701553588957,
+                  "observations": 163,
+                  "upper_bound": 0.7
+                },
+                {
+                  "event_rate": 0.7873134328358209,
+                  "index": 7,
+                  "lower_bound": 0.7,
+                  "mean_probability": 0.7547752488656716,
+                  "observations": 268,
+                  "upper_bound": 0.8
+                },
+                {
+                  "event_rate": 0.8394366197183099,
+                  "index": 8,
+                  "lower_bound": 0.8,
+                  "mean_probability": 0.857356751971831,
+                  "observations": 355,
+                  "upper_bound": 0.9
+                },
+                {
+                  "event_rate": 0.9488337095560572,
+                  "index": 9,
+                  "lower_bound": 0.9,
+                  "mean_probability": 0.9407529939736644,
+                  "observations": 1329,
+                  "upper_bound": 1.0
+                }
+              ]
+            },
+            "blank_rows": 0,
+            "minutes": {
+              "mean_absolute_error": 32.96842310321504,
+              "mean_error": 0.4357409841519548,
+              "observations": 5473,
+              "root_mean_squared_error": 45.04559516880234
+            },
+            "minutes_if_appearance": {
+              "mean_absolute_error": 46.47301589513866,
+              "mean_error": 0.7298258835869118,
+              "observations": 2445,
+              "root_mean_squared_error": 53.39155844413704
+            },
+            "missing_appearance_prediction_rows": 48,
+            "missing_appearance_target_rows": 0,
+            "missing_minutes_prediction_rows": 48,
+            "missing_minutes_target_rows": 0,
+            "missing_points_prediction_rows": 48,
+            "missing_points_target_rows": 0,
+            "missing_start_label_rows": 4174,
+            "missing_start_prediction_rows": 1347,
+            "points": {
+              "mean_absolute_error": 1.840127984646994,
+              "mean_error": -0.04810933431883792,
+              "observations": 5473,
+              "root_mean_squared_error": 3.1088363957233986
+            },
+            "points_if_appearance": {
+              "mean_absolute_error": 3.259836234164417,
+              "mean_error": -0.11287540477218813,
+              "observations": 2445,
+              "root_mean_squared_error": 4.29805588900489
+            },
+            "population_rows": 5521,
+            "start": {
+              "brier_score": null,
+              "event_rate": null,
+              "log_loss": null,
+              "mean_calibration_bias": null,
+              "mean_prediction": null,
+              "observations": 0,
+              "reliability_bins": []
+            },
+            "start_given_appearance": {
+              "brier_score": null,
+              "event_rate": null,
+              "log_loss": null,
+              "mean_calibration_bias": null,
+              "mean_prediction": null,
+              "observations": 0,
+              "reliability_bins": []
+            }
+          },
+          "single": {
+            "appearance": {
+              "brier_score": 0.10481467649152834,
+              "event_rate": 0.40658037903762767,
+              "log_loss": 0.3466573277081684,
+              "mean_calibration_bias": -0.0007902142215924779,
+              "mean_prediction": 0.4057901648160352,
+              "observations": 123154,
+              "reliability_bins": [
+                {
+                  "event_rate": 0.03990053125353227,
+                  "index": 0,
+                  "lower_bound": 0.0,
+                  "mean_probability": 0.07406168424633586,
+                  "observations": 53082,
+                  "upper_bound": 0.1
+                },
+                {
+                  "event_rate": 0.17780954475478336,
+                  "index": 1,
+                  "lower_bound": 0.1,
+                  "mean_probability": 0.1356118930138553,
+                  "observations": 9094,
+                  "upper_bound": 0.2
+                },
+                {
+                  "event_rate": 0.4245442585980079,
+                  "index": 2,
+                  "lower_bound": 0.2,
+                  "mean_probability": 0.24668889850084572,
+                  "observations": 5321,
+                  "upper_bound": 0.3
+                },
+                {
+                  "event_rate": 0.44986449864498645,
+                  "index": 3,
+                  "lower_bound": 0.3,
+                  "mean_probability": 0.3461812788829268,
+                  "observations": 3690,
+                  "upper_bound": 0.4
+                },
+                {
+                  "event_rate": 0.5539380365808138,
+                  "index": 4,
+                  "lower_bound": 0.4,
+                  "mean_probability": 0.4522262182825681,
+                  "observations": 2679,
+                  "upper_bound": 0.5
+                },
+                {
+                  "event_rate": 0.6172349986782977,
+                  "index": 5,
+                  "lower_bound": 0.5,
+                  "mean_probability": 0.5529709254755486,
+                  "observations": 3783,
+                  "upper_bound": 0.6
+                },
+                {
+                  "event_rate": 0.6687354538401862,
+                  "index": 6,
+                  "lower_bound": 0.6,
+                  "mean_probability": 0.6519084142222653,
+                  "observations": 5156,
+                  "upper_bound": 0.7
+                },
+                {
+                  "event_rate": 0.7175672719317436,
+                  "index": 7,
+                  "lower_bound": 0.7,
+                  "mean_probability": 0.7500120425939619,
+                  "observations": 4571,
+                  "upper_bound": 0.8
+                },
+                {
+                  "event_rate": 0.8522747029846421,
+                  "index": 8,
+                  "lower_bound": 0.8,
+                  "mean_probability": 0.8683748685391481,
+                  "observations": 17255,
+                  "upper_bound": 0.9
+                },
+                {
+                  "event_rate": 0.9266857420504238,
+                  "index": 9,
+                  "lower_bound": 0.9,
+                  "mean_probability": 0.9255135936186364,
+                  "observations": 18523,
+                  "upper_bound": 1.0
+                }
+              ]
+            },
+            "blank_rows": 0,
+            "minutes": {
+              "mean_absolute_error": 15.413535662379434,
+              "mean_error": 0.11063503763520266,
+              "observations": 123154,
+              "root_mean_squared_error": 24.26903935274232
+            },
+            "minutes_if_appearance": {
+              "mean_absolute_error": 19.224087440094646,
+              "mean_error": 0.5379418144080323,
+              "observations": 50072,
+              "root_mean_squared_error": 25.10659863814215
+            },
+            "missing_appearance_prediction_rows": 1420,
+            "missing_appearance_target_rows": 0,
+            "missing_minutes_prediction_rows": 1420,
+            "missing_minutes_target_rows": 0,
+            "missing_points_prediction_rows": 1420,
+            "missing_points_target_rows": 0,
+            "missing_start_label_rows": 71534,
+            "missing_start_prediction_rows": 53040,
+            "points": {
+              "mean_absolute_error": 1.0373988672273577,
+              "mean_error": -0.013603571504133037,
+              "observations": 123154,
+              "root_mean_squared_error": 1.9789110840514177
+            },
+            "points_if_appearance": {
+              "mean_absolute_error": 2.0463242230336918,
+              "mean_error": -0.021610608208359968,
+              "observations": 50072,
+              "root_mean_squared_error": 2.8502479537023704
+            },
+            "population_rows": 124574,
+            "start": {
+              "brier_score": null,
+              "event_rate": null,
+              "log_loss": null,
+              "mean_calibration_bias": null,
+              "mean_prediction": null,
+              "observations": 0,
+              "reliability_bins": []
+            },
+            "start_given_appearance": {
+              "brier_score": null,
+              "event_rate": null,
+              "log_loss": null,
+              "mean_calibration_bias": null,
+              "mean_prediction": null,
+              "observations": 0,
+              "reliability_bins": []
+            }
+          }
+        },
+        "by_position": {
+          "DEF": {
+            "appearance": {
+              "brier_score": 0.11756694913280837,
+              "event_rate": 0.4124441132637854,
+              "log_loss": 0.38028038122100644,
+              "mean_calibration_bias": -0.009301423888529337,
+              "mean_prediction": 0.40314268937525605,
+              "observations": 42944,
+              "reliability_bins": [
+                {
+                  "event_rate": 0.05504535466786861,
+                  "index": 0,
+                  "lower_bound": 0.0,
+                  "mean_probability": 0.07193498677187447,
+                  "observations": 17749,
+                  "upper_bound": 0.1
+                },
+                {
+                  "event_rate": 0.195177304964539,
+                  "index": 1,
+                  "lower_bound": 0.1,
+                  "mean_probability": 0.1369049953441135,
+                  "observations": 3525,
+                  "upper_bound": 0.2
+                },
+                {
+                  "event_rate": 0.43072702331961593,
+                  "index": 2,
+                  "lower_bound": 0.2,
+                  "mean_probability": 0.24857416587700043,
+                  "observations": 2187,
+                  "upper_bound": 0.3
+                },
+                {
+                  "event_rate": 0.4458161865569273,
+                  "index": 3,
+                  "lower_bound": 0.3,
+                  "mean_probability": 0.3456232032366255,
+                  "observations": 1458,
+                  "upper_bound": 0.4
+                },
+                {
+                  "event_rate": 0.5417989417989418,
+                  "index": 4,
+                  "lower_bound": 0.4,
+                  "mean_probability": 0.4560862492920635,
+                  "observations": 945,
+                  "upper_bound": 0.5
+                },
+                {
+                  "event_rate": 0.5998583569405099,
+                  "index": 5,
+                  "lower_bound": 0.5,
+                  "mean_probability": 0.5527608019497167,
+                  "observations": 1412,
+                  "upper_bound": 0.6
+                },
+                {
+                  "event_rate": 0.6518199233716475,
+                  "index": 6,
+                  "lower_bound": 0.6,
+                  "mean_probability": 0.6524161130771073,
+                  "observations": 2088,
+                  "upper_bound": 0.7
+                },
+                {
+                  "event_rate": 0.7023223082336383,
+                  "index": 7,
+                  "lower_bound": 0.7,
+                  "mean_probability": 0.7478188729634061,
+                  "observations": 1421,
+                  "upper_bound": 0.8
+                },
+                {
+                  "event_rate": 0.8515543656105905,
+                  "index": 8,
+                  "lower_bound": 0.8,
+                  "mean_probability": 0.8721309110990629,
+                  "observations": 6723,
+                  "upper_bound": 0.9
+                },
+                {
+                  "event_rate": 0.9220014716703459,
+                  "index": 9,
+                  "lower_bound": 0.9,
+                  "mean_probability": 0.9208818610739515,
+                  "observations": 5436,
+                  "upper_bound": 1.0
+                }
+              ]
+            },
+            "blank_rows": 0,
+            "minutes": {
+              "mean_absolute_error": 18.294078483366686,
+              "mean_error": -2.0057041426631814,
+              "observations": 42944,
+              "root_mean_squared_error": 28.69543294210233
+            },
+            "minutes_if_appearance": {
+              "mean_absolute_error": 19.771050396228887,
+              "mean_error": -3.635991996012534,
+              "observations": 17712,
+              "root_mean_squared_error": 26.89771100877842
+            },
+            "missing_appearance_prediction_rows": 468,
+            "missing_appearance_target_rows": 0,
+            "missing_minutes_prediction_rows": 468,
+            "missing_minutes_target_rows": 0,
+            "missing_points_prediction_rows": 468,
+            "missing_points_target_rows": 0,
+            "missing_start_label_rows": 25511,
+            "missing_start_prediction_rows": 17901,
+            "points": {
+              "mean_absolute_error": 1.1468736499647447,
+              "mean_error": -0.051751535710646425,
+              "observations": 42944,
+              "root_mean_squared_error": 2.0935250299794332
+            },
+            "points_if_appearance": {
+              "mean_absolute_error": 2.2522209846077237,
+              "mean_error": -0.07604739836201446,
+              "observations": 17712,
+              "root_mean_squared_error": 2.990434880118464
+            },
+            "population_rows": 43412,
+            "start": {
+              "brier_score": null,
+              "event_rate": null,
+              "log_loss": null,
+              "mean_calibration_bias": null,
+              "mean_prediction": null,
+              "observations": 0,
+              "reliability_bins": []
+            },
+            "start_given_appearance": {
+              "brier_score": null,
+              "event_rate": null,
+              "log_loss": null,
+              "mean_calibration_bias": null,
+              "mean_prediction": null,
+              "observations": 0,
+              "reliability_bins": []
+            }
+          },
+          "FWD": {
+            "appearance": {
+              "brier_score": 0.10449908735685197,
+              "event_rate": 0.4241106206180213,
+              "log_loss": 0.347346610242766,
+              "mean_calibration_bias": 0.00861933321448971,
+              "mean_prediction": 0.432729953832511,
+              "observations": 15404,
+              "reliability_bins": [
+                {
+                  "event_rate": 0.029657089898053754,
+                  "index": 0,
+                  "lower_bound": 0.0,
+                  "mean_probability": 0.07775897947136237,
+                  "observations": 5395,
+                  "upper_bound": 0.1
+                },
+                {
+                  "event_rate": 0.11904761904761904,
+                  "index": 1,
+                  "lower_bound": 0.1,
+                  "mean_probability": 0.13168024794461697,
+                  "observations": 1932,
+                  "upper_bound": 0.2
+                },
+                {
+                  "event_rate": 0.3856115107913669,
+                  "index": 2,
+                  "lower_bound": 0.2,
+                  "mean_probability": 0.2462334739942446,
+                  "observations": 695,
+                  "upper_bound": 0.3
+                },
+                {
+                  "event_rate": 0.46881720430107526,
+                  "index": 3,
+                  "lower_bound": 0.3,
+                  "mean_probability": 0.34683203855268807,
+                  "observations": 465,
+                  "upper_bound": 0.4
+                },
+                {
+                  "event_rate": 0.5415676959619953,
+                  "index": 4,
+                  "lower_bound": 0.4,
+                  "mean_probability": 0.44902421903800477,
+                  "observations": 421,
+                  "upper_bound": 0.5
+                },
+                {
+                  "event_rate": 0.6443514644351465,
+                  "index": 5,
+                  "lower_bound": 0.5,
+                  "mean_probability": 0.5523501001213389,
+                  "observations": 478,
+                  "upper_bound": 0.6
+                },
+                {
+                  "event_rate": 0.6760828625235404,
+                  "index": 6,
+                  "lower_bound": 0.6,
+                  "mean_probability": 0.6502095553389831,
+                  "observations": 531,
+                  "upper_bound": 0.7
+                },
+                {
+                  "event_rate": 0.7327249022164276,
+                  "index": 7,
+                  "lower_bound": 0.7,
+                  "mean_probability": 0.7554898010325944,
+                  "observations": 767,
+                  "upper_bound": 0.8
+                },
+                {
+                  "event_rate": 0.8370660694288914,
+                  "index": 8,
+                  "lower_bound": 0.8,
+                  "mean_probability": 0.8598012133768198,
+                  "observations": 1786,
+                  "upper_bound": 0.9
+                },
+                {
+                  "event_rate": 0.921949556918882,
+                  "index": 9,
+                  "lower_bound": 0.9,
+                  "mean_probability": 0.935943302919223,
+                  "observations": 2934,
+                  "upper_bound": 1.0
+                }
+              ]
+            },
+            "blank_rows": 0,
+            "minutes": {
+              "mean_absolute_error": 15.30231809467362,
+              "mean_error": 3.045098199578785,
+              "observations": 15404,
+              "root_mean_squared_error": 23.3453341237355
+            },
+            "minutes_if_appearance": {
+              "mean_absolute_error": 22.818835906402573,
+              "mean_error": 5.946929079040869,
+              "observations": 6533,
+              "root_mean_squared_error": 28.786270886617007
+            },
+            "missing_appearance_prediction_rows": 195,
+            "missing_appearance_target_rows": 0,
+            "missing_minutes_prediction_rows": 195,
+            "missing_minutes_target_rows": 0,
+            "missing_points_prediction_rows": 195,
+            "missing_points_target_rows": 0,
+            "missing_start_label_rows": 9047,
+            "missing_start_prediction_rows": 6552,
+            "points": {
+              "mean_absolute_error": 1.2225888435708256,
+              "mean_error": 0.057326848663528954,
+              "observations": 15404,
+              "root_mean_squared_error": 2.2488295054440237
+            },
+            "points_if_appearance": {
+              "mean_absolute_error": 2.360518653955151,
+              "mean_error": 0.07345119556758,
+              "observations": 6533,
+              "root_mean_squared_error": 3.1905985337493483
+            },
+            "population_rows": 15599,
+            "start": {
+              "brier_score": null,
+              "event_rate": null,
+              "log_loss": null,
+              "mean_calibration_bias": null,
+              "mean_prediction": null,
+              "observations": 0,
+              "reliability_bins": []
+            },
+            "start_given_appearance": {
+              "brier_score": null,
+              "event_rate": null,
+              "log_loss": null,
+              "mean_calibration_bias": null,
+              "mean_prediction": null,
+              "observations": 0,
+              "reliability_bins": []
+            }
+          },
+          "GK": {
+            "appearance": {
+              "brier_score": 0.045446200810583696,
+              "event_rate": 0.25078787029904054,
+              "log_loss": 0.1877956075217935,
+              "mean_calibration_bias": 0.03104789443070244,
+              "mean_prediction": 0.281835764729743,
+              "observations": 14279,
+              "reliability_bins": [
+                {
+                  "event_rate": 0.01838982144766385,
+                  "index": 0,
+                  "lower_bound": 0.0,
+                  "mean_probability": 0.07017630252838662,
+                  "observations": 9353,
+                  "upper_bound": 0.1
+                },
+                {
+                  "event_rate": 0.052571428571428575,
+                  "index": 1,
+                  "lower_bound": 0.1,
+                  "mean_probability": 0.11844915904914287,
+                  "observations": 875,
+                  "upper_bound": 0.2
+                },
+                {
+                  "event_rate": 0.39285714285714285,
+                  "index": 2,
+                  "lower_bound": 0.2,
+                  "mean_probability": 0.2442050183821428,
+                  "observations": 280,
+                  "upper_bound": 0.3
+                },
+                {
+                  "event_rate": 0.2914285714285714,
+                  "index": 3,
+                  "lower_bound": 0.3,
+                  "mean_probability": 0.3458268926914286,
+                  "observations": 175,
+                  "upper_bound": 0.4
+                },
+                {
+                  "event_rate": 0.55,
+                  "index": 4,
+                  "lower_bound": 0.4,
+                  "mean_probability": 0.4504077101,
+                  "observations": 40,
+                  "upper_bound": 0.5
+                },
+                {
+                  "event_rate": 0.6601941747572816,
+                  "index": 5,
+                  "lower_bound": 0.5,
+                  "mean_probability": 0.5551449851747573,
+                  "observations": 103,
+                  "upper_bound": 0.6
+                },
+                {
+                  "event_rate": 0.45918367346938777,
+                  "index": 6,
+                  "lower_bound": 0.6,
+                  "mean_probability": 0.6537845051173469,
+                  "observations": 196,
+                  "upper_bound": 0.7
+                },
+                {
+                  "event_rate": 0.6733333333333333,
+                  "index": 7,
+                  "lower_bound": 0.7,
+                  "mean_probability": 0.7397088796066665,
+                  "observations": 150,
+                  "upper_bound": 0.8
+                },
+                {
+                  "event_rate": 0.9087378640776699,
+                  "index": 8,
+                  "lower_bound": 0.8,
+                  "mean_probability": 0.884263606231068,
+                  "observations": 1030,
+                  "upper_bound": 0.9
+                },
+                {
+                  "event_rate": 0.9557053442465094,
+                  "index": 9,
+                  "lower_bound": 0.9,
+                  "mean_probability": 0.9197630959330765,
+                  "observations": 2077,
+                  "upper_bound": 1.0
+                }
+              ]
+            },
+            "blank_rows": 0,
+            "minutes": {
+              "mean_absolute_error": 10.316084568474704,
+              "mean_error": -1.0882016130601144,
+              "observations": 14279,
+              "root_mean_squared_error": 19.97338629910426
+            },
+            "minutes_if_appearance": {
+              "mean_absolute_error": 10.817739621936052,
+              "mean_error": -9.383011436875453,
+              "observations": 3581,
+              "root_mean_squared_error": 17.655611028324188
+            },
+            "missing_appearance_prediction_rows": 168,
+            "missing_appearance_target_rows": 0,
+            "missing_minutes_prediction_rows": 168,
+            "missing_minutes_target_rows": 0,
+            "missing_points_prediction_rows": 168,
+            "missing_points_target_rows": 0,
+            "missing_start_label_rows": 8464,
+            "missing_start_prediction_rows": 5983,
+            "points": {
+              "mean_absolute_error": 0.7185146151189858,
+              "mean_error": -0.06822814325555011,
+              "observations": 14279,
+              "root_mean_squared_error": 1.60130786128634
+            },
+            "points_if_appearance": {
+              "mean_absolute_error": 2.145641083088802,
+              "mean_error": -0.4479847053317509,
+              "observations": 3581,
+              "root_mean_squared_error": 2.899743452870372
+            },
+            "population_rows": 14447,
+            "start": {
+              "brier_score": null,
+              "event_rate": null,
+              "log_loss": null,
+              "mean_calibration_bias": null,
+              "mean_prediction": null,
+              "observations": 0,
+              "reliability_bins": []
+            },
+            "start_given_appearance": {
+              "brier_score": null,
+              "event_rate": null,
+              "log_loss": null,
+              "mean_calibration_bias": null,
+              "mean_prediction": null,
+              "observations": 0,
+              "reliability_bins": []
+            }
+          },
+          "MID": {
+            "appearance": {
+              "brier_score": 0.10975986596417647,
+              "event_rate": 0.44091071428571427,
+              "log_loss": 0.3602061046788723,
+              "mean_calibration_bias": -0.004645569907357094,
+              "mean_prediction": 0.4362651443783572,
+              "observations": 56000,
+              "reliability_bins": [
+                {
+                  "event_rate": 0.03928761040590762,
+                  "index": 0,
+                  "lower_bound": 0.0,
+                  "mean_probability": 0.07682051695086635,
+                  "observations": 20719,
+                  "upper_bound": 0.1
+                },
+                {
+                  "event_rate": 0.15600683241601823,
+                  "index": 1,
+                  "lower_bound": 0.1,
+                  "mean_probability": 0.1336635028339343,
+                  "observations": 5269,
+                  "upper_bound": 0.2
+                },
+                {
+                  "event_rate": 0.4313476975073933,
+                  "index": 2,
+                  "lower_bound": 0.2,
+                  "mean_probability": 0.24601612843472745,
+                  "observations": 2367,
+                  "upper_bound": 0.3
+                },
+                {
+                  "event_rate": 0.4746696035242291,
+                  "index": 3,
+                  "lower_bound": 0.3,
+                  "mean_probability": 0.3464426970027533,
+                  "observations": 1816,
+                  "upper_bound": 0.4
+                },
+                {
+                  "event_rate": 0.5690376569037657,
+                  "index": 4,
+                  "lower_bound": 0.4,
+                  "mean_probability": 0.450245408430265,
+                  "observations": 1434,
+                  "upper_bound": 0.5
+                },
+                {
+                  "event_rate": 0.6274817136886103,
+                  "index": 5,
+                  "lower_bound": 0.5,
+                  "mean_probability": 0.5531098717403343,
+                  "observations": 1914,
+                  "upper_bound": 0.6
+                },
+                {
+                  "event_rate": 0.7000798722044729,
+                  "index": 6,
+                  "lower_bound": 0.6,
+                  "mean_probability": 0.6517501022252397,
+                  "observations": 2504,
+                  "upper_bound": 0.7
+                },
+                {
+                  "event_rate": 0.7317073170731707,
+                  "index": 7,
+                  "lower_bound": 0.7,
+                  "mean_probability": 0.750706591594962,
+                  "observations": 2501,
+                  "upper_bound": 0.8
+                },
+                {
+                  "event_rate": 0.8484698302564738,
+                  "index": 8,
+                  "lower_bound": 0.8,
+                  "mean_probability": 0.8646310750545162,
+                  "observations": 8071,
+                  "upper_bound": 0.9
+                },
+                {
+                  "event_rate": 0.927591706539075,
+                  "index": 9,
+                  "lower_bound": 0.9,
+                  "mean_probability": 0.928360406780755,
+                  "observations": 9405,
+                  "upper_bound": 1.0
+                }
+              ]
+            },
+            "blank_rows": 0,
+            "minutes": {
+              "mean_absolute_error": 16.250599370272703,
+              "mean_error": 1.2638331196480503,
+              "observations": 56000,
+              "root_mean_squared_error": 24.708429452667946
+            },
+            "minutes_if_appearance": {
+              "mean_absolute_error": 21.798080473992385,
+              "mean_error": 3.5587952424713456,
+              "observations": 24691,
+              "root_mean_squared_error": 27.877019095842034
+            },
+            "missing_appearance_prediction_rows": 637,
+            "missing_appearance_target_rows": 0,
+            "missing_minutes_prediction_rows": 637,
+            "missing_minutes_target_rows": 0,
+            "missing_points_prediction_rows": 637,
+            "missing_points_target_rows": 0,
+            "missing_start_label_rows": 32686,
+            "missing_start_prediction_rows": 23951,
+            "points": {
+              "mean_absolute_error": 1.0622691034777856,
+              "mean_error": 0.00669550354542857,
+              "observations": 56000,
+              "root_mean_squared_error": 2.0373529342698675
+            },
+            "points_if_appearance": {
+              "mean_absolute_error": 1.9212546646175936,
+              "mean_error": 0.04508773844967802,
+              "observations": 24691,
+              "root_mean_squared_error": 2.8242024305407245
+            },
+            "population_rows": 56637,
+            "start": {
+              "brier_score": null,
+              "event_rate": null,
+              "log_loss": null,
+              "mean_calibration_bias": null,
+              "mean_prediction": null,
+              "observations": 0,
+              "reliability_bins": []
+            },
+            "start_given_appearance": {
+              "brier_score": null,
+              "event_rate": null,
+              "log_loss": null,
+              "mean_calibration_bias": null,
+              "mean_prediction": null,
+              "observations": 0,
+              "reliability_bins": []
+            }
+          }
+        },
+        "by_season": {
+          "2021-22": {
+            "appearance": {
+              "brier_score": 0.11871594095977411,
+              "event_rate": 0.41957245088654904,
+              "log_loss": 0.38734891481112044,
+              "mean_calibration_bias": 0.009790692997447559,
+              "mean_prediction": 0.4293631438839966,
+              "observations": 21939,
+              "reliability_bins": [
+                {
+                  "event_rate": 0.036055923473142015,
+                  "index": 0,
+                  "lower_bound": 0.0,
+                  "mean_probability": 0.08728423903348051,
+                  "observations": 5436,
+                  "upper_bound": 0.1
+                },
+                {
+                  "event_rate": 0.09809381023773828,
+                  "index": 1,
+                  "lower_bound": 0.1,
+                  "mean_probability": 0.127203806767402,
+                  "observations": 4669,
+                  "upper_bound": 0.2
+                },
+                {
+                  "event_rate": 0.3639240506329114,
+                  "index": 2,
+                  "lower_bound": 0.2,
+                  "mean_probability": 0.24696942117009496,
+                  "observations": 1264,
+                  "upper_bound": 0.3
+                },
+                {
+                  "event_rate": 0.4682017543859649,
+                  "index": 3,
+                  "lower_bound": 0.3,
+                  "mean_probability": 0.34721083899671057,
+                  "observations": 912,
+                  "upper_bound": 0.4
+                },
+                {
+                  "event_rate": 0.5343511450381679,
+                  "index": 4,
+                  "lower_bound": 0.4,
+                  "mean_probability": 0.451653344129771,
+                  "observations": 655,
+                  "upper_bound": 0.5
+                },
+                {
+                  "event_rate": 0.5773333333333334,
+                  "index": 5,
+                  "lower_bound": 0.5,
+                  "mean_probability": 0.5513049164093333,
+                  "observations": 750,
+                  "upper_bound": 0.6
+                },
+                {
+                  "event_rate": 0.6797385620915033,
+                  "index": 6,
+                  "lower_bound": 0.6,
+                  "mean_probability": 0.6544394002464986,
+                  "observations": 1071,
+                  "upper_bound": 0.7
+                },
+                {
+                  "event_rate": 0.7344961240310077,
+                  "index": 7,
+                  "lower_bound": 0.7,
+                  "mean_probability": 0.7504925265358527,
+                  "observations": 1032,
+                  "upper_bound": 0.8
+                },
+                {
+                  "event_rate": 0.8481781376518218,
+                  "index": 8,
+                  "lower_bound": 0.8,
+                  "mean_probability": 0.8678785890050607,
+                  "observations": 2964,
+                  "upper_bound": 0.9
+                },
+                {
+                  "event_rate": 0.9042686754551161,
+                  "index": 9,
+                  "lower_bound": 0.9,
+                  "mean_probability": 0.9307796711839298,
+                  "observations": 3186,
+                  "upper_bound": 1.0
+                }
+              ]
+            },
+            "blank_rows": 0,
+            "minutes": {
+              "mean_absolute_error": 19.827648113891602,
+              "mean_error": 0.8376026640688887,
+              "observations": 21939,
+              "root_mean_squared_error": 29.941140993935573
+            },
+            "minutes_if_appearance": {
+              "mean_absolute_error": 21.036049289244325,
+              "mean_error": 0.543037729178707,
+              "observations": 9205,
+              "root_mean_squared_error": 29.486302171250436
+            },
+            "missing_appearance_prediction_rows": 737,
+            "missing_appearance_target_rows": 0,
+            "missing_minutes_prediction_rows": 737,
+            "missing_minutes_target_rows": 0,
+            "missing_points_prediction_rows": 737,
+            "missing_points_target_rows": 0,
+            "missing_start_label_rows": 22676,
+            "missing_start_prediction_rows": 0,
+            "points": {
+              "mean_absolute_error": 1.2559601258019053,
+              "mean_error": 0.03042495211194676,
+              "observations": 21939,
+              "root_mean_squared_error": 2.2536760627359467
+            },
+            "points_if_appearance": {
+              "mean_absolute_error": 2.2944039376664858,
+              "mean_error": 0.00854598001303639,
+              "observations": 9205,
+              "root_mean_squared_error": 3.144623157516604
+            },
+            "population_rows": 22676,
+            "start": {
+              "brier_score": null,
+              "event_rate": null,
+              "log_loss": null,
+              "mean_calibration_bias": null,
+              "mean_prediction": null,
+              "observations": 0,
+              "reliability_bins": []
+            },
+            "start_given_appearance": {
+              "brier_score": null,
+              "event_rate": null,
+              "log_loss": null,
+              "mean_calibration_bias": null,
+              "mean_prediction": null,
+              "observations": 0,
+              "reliability_bins": []
+            }
+          },
+          "2022-23": {
+            "appearance": {
+              "brier_score": 0.1059232071313945,
+              "event_rate": 0.432441374746681,
+              "log_loss": 0.35004624641877286,
+              "mean_calibration_bias": -0.006865365656685496,
+              "mean_prediction": 0.4255760090899955,
+              "observations": 24179,
+              "reliability_bins": [
+                {
+                  "event_rate": 0.04097069019855027,
+                  "index": 0,
+                  "lower_bound": 0.0,
+                  "mean_probability": 0.0764821167142557,
+                  "observations": 9519,
+                  "upper_bound": 0.1
+                },
+                {
+                  "event_rate": 0.1890184645286686,
+                  "index": 1,
+                  "lower_bound": 0.1,
+                  "mean_probability": 0.13540960874441205,
+                  "observations": 2058,
+                  "upper_bound": 0.2
+                },
+                {
+                  "event_rate": 0.3889409559512652,
+                  "index": 2,
+                  "lower_bound": 0.2,
+                  "mean_probability": 0.24457193095407687,
+                  "observations": 1067,
+                  "upper_bound": 0.3
+                },
+                {
+                  "event_rate": 0.45103092783505155,
+                  "index": 3,
+                  "lower_bound": 0.3,
+                  "mean_probability": 0.3460744123878866,
+                  "observations": 776,
+                  "upper_bound": 0.4
+                },
+                {
+                  "event_rate": 0.5648994515539305,
+                  "index": 4,
+                  "lower_bound": 0.4,
+                  "mean_probability": 0.4542274330877514,
+                  "observations": 547,
+                  "upper_bound": 0.5
+                },
+                {
+                  "event_rate": 0.6472972972972973,
+                  "index": 5,
+                  "lower_bound": 0.5,
+                  "mean_probability": 0.5536857192297296,
+                  "observations": 740,
+                  "upper_bound": 0.6
+                },
+                {
+                  "event_rate": 0.6591639871382636,
+                  "index": 6,
+                  "lower_bound": 0.6,
+                  "mean_probability": 0.6513213620310825,
+                  "observations": 933,
+                  "upper_bound": 0.7
+                },
+                {
+                  "event_rate": 0.7242647058823529,
+                  "index": 7,
+                  "lower_bound": 0.7,
+                  "mean_probability": 0.752883525046875,
+                  "observations": 1088,
+                  "upper_bound": 0.8
+                },
+                {
+                  "event_rate": 0.8737286033242372,
+                  "index": 8,
+                  "lower_bound": 0.8,
+                  "mean_probability": 0.8684663947888862,
+                  "observations": 4031,
+                  "upper_bound": 0.9
+                },
+                {
+                  "event_rate": 0.9353801169590643,
+                  "index": 9,
+                  "lower_bound": 0.9,
+                  "mean_probability": 0.9263117263444445,
+                  "observations": 3420,
+                  "upper_bound": 1.0
+                }
+              ]
+            },
+            "blank_rows": 0,
+            "minutes": {
+              "mean_absolute_error": 16.87030566568575,
+              "mean_error": 0.34897788280605896,
+              "observations": 24179,
+              "root_mean_squared_error": 26.083276519760535
+            },
+            "minutes_if_appearance": {
+              "mean_absolute_error": 20.788583353378062,
+              "mean_error": 2.0095808884327657,
+              "observations": 10456,
+              "root_mean_squared_error": 27.77987655754261
+            },
+            "missing_appearance_prediction_rows": 205,
+            "missing_appearance_target_rows": 0,
+            "missing_minutes_prediction_rows": 205,
+            "missing_minutes_target_rows": 0,
+            "missing_points_prediction_rows": 205,
+            "missing_points_target_rows": 0,
+            "missing_start_label_rows": 24384,
+            "missing_start_prediction_rows": 0,
+            "points": {
+              "mean_absolute_error": 1.1173100373213531,
+              "mean_error": -0.00860030804123413,
+              "observations": 24179,
+              "root_mean_squared_error": 2.064949648733404
+            },
+            "points_if_appearance": {
+              "mean_absolute_error": 2.1118390249352523,
+              "mean_error": 0.03129089500889442,
+              "observations": 10456,
+              "root_mean_squared_error": 2.894147712394156
+            },
+            "population_rows": 24384,
+            "start": {
+              "brier_score": null,
+              "event_rate": null,
+              "log_loss": null,
+              "mean_calibration_bias": null,
+              "mean_prediction": null,
+              "observations": 0,
+              "reliability_bins": []
+            },
+            "start_given_appearance": {
+              "brier_score": null,
+              "event_rate": null,
+              "log_loss": null,
+              "mean_calibration_bias": null,
+              "mean_prediction": null,
+              "observations": 0,
+              "reliability_bins": []
+            }
+          },
+          "2023-24": {
+            "appearance": {
+              "brier_score": 0.10213376998653799,
+              "event_rate": 0.38547906876636656,
+              "log_loss": 0.3388050295257944,
+              "mean_calibration_bias": -0.0010277353051619809,
+              "mean_prediction": 0.3844513334612046,
+              "observations": 27877,
+              "reliability_bins": [
+                {
+                  "event_rate": 0.04072676880437293,
+                  "index": 0,
+                  "lower_bound": 0.0,
+                  "mean_probability": 0.07342247078073756,
+                  "observations": 12989,
+                  "upper_bound": 0.1
+                },
+                {
+                  "event_rate": 0.18397469688982604,
+                  "index": 1,
+                  "lower_bound": 0.1,
+                  "mean_probability": 0.13567512359462308,
+                  "observations": 1897,
+                  "upper_bound": 0.2
+                },
+                {
+                  "event_rate": 0.4489973844812554,
+                  "index": 2,
+                  "lower_bound": 0.2,
+                  "mean_probability": 0.248059991157803,
+                  "observations": 1147,
+                  "upper_bound": 0.3
+                },
+                {
+                  "event_rate": 0.44529262086513993,
+                  "index": 3,
+                  "lower_bound": 0.3,
+                  "mean_probability": 0.34503137124300254,
+                  "observations": 786,
+                  "upper_bound": 0.4
+                },
+                {
+                  "event_rate": 0.5555555555555556,
+                  "index": 4,
+                  "lower_bound": 0.4,
+                  "mean_probability": 0.45227916131597223,
+                  "observations": 576,
+                  "upper_bound": 0.5
+                },
+                {
+                  "event_rate": 0.6145833333333334,
+                  "index": 5,
+                  "lower_bound": 0.5,
+                  "mean_probability": 0.5522819438969907,
+                  "observations": 864,
+                  "upper_bound": 0.6
+                },
+                {
+                  "event_rate": 0.6552346570397112,
+                  "index": 6,
+                  "lower_bound": 0.6,
+                  "mean_probability": 0.6507067338122744,
+                  "observations": 1108,
+                  "upper_bound": 0.7
+                },
+                {
+                  "event_rate": 0.7266112266112266,
+                  "index": 7,
+                  "lower_bound": 0.7,
+                  "mean_probability": 0.7529217415945946,
+                  "observations": 962,
+                  "upper_bound": 0.8
+                },
+                {
+                  "event_rate": 0.8524332810047096,
+                  "index": 8,
+                  "lower_bound": 0.8,
+                  "mean_probability": 0.8698426574152276,
+                  "observations": 3822,
+                  "upper_bound": 0.9
+                },
+                {
+                  "event_rate": 0.9310252281266774,
+                  "index": 9,
+                  "lower_bound": 0.9,
+                  "mean_probability": 0.9240615575010734,
+                  "observations": 3726,
+                  "upper_bound": 1.0
+                }
+              ]
+            },
+            "blank_rows": 0,
+            "minutes": {
+              "mean_absolute_error": 15.153080468014993,
+              "mean_error": -0.09658690615819347,
+              "observations": 27877,
+              "root_mean_squared_error": 24.35780493664562
+            },
+            "minutes_if_appearance": {
+              "mean_absolute_error": 20.60184065117337,
+              "mean_error": 0.11296866425786352,
+              "observations": 10746,
+              "root_mean_squared_error": 26.76391645252847
+            },
+            "missing_appearance_prediction_rows": 207,
+            "missing_appearance_target_rows": 0,
+            "missing_minutes_prediction_rows": 207,
+            "missing_minutes_target_rows": 0,
+            "missing_points_prediction_rows": 207,
+            "missing_points_target_rows": 0,
+            "missing_start_label_rows": 0,
+            "missing_start_prediction_rows": 28084,
+            "points": {
+              "mean_absolute_error": 0.9974043303022923,
+              "mean_error": -0.01781742227703842,
+              "observations": 27877,
+              "root_mean_squared_error": 1.9848071612249485
+            },
+            "points_if_appearance": {
+              "mean_absolute_error": 2.076146362990508,
+              "mean_error": -0.032138922542899684,
+              "observations": 10746,
+              "root_mean_squared_error": 2.9505724397078077
+            },
+            "population_rows": 28084,
+            "start": {
+              "brier_score": null,
+              "event_rate": null,
+              "log_loss": null,
+              "mean_calibration_bias": null,
+              "mean_prediction": null,
+              "observations": 0,
+              "reliability_bins": []
+            },
+            "start_given_appearance": {
+              "brier_score": null,
+              "event_rate": null,
+              "log_loss": null,
+              "mean_calibration_bias": null,
+              "mean_prediction": null,
+              "observations": 0,
+              "reliability_bins": []
+            }
+          },
+          "2024-25": {
+            "appearance": {
+              "brier_score": 0.10465685991934023,
+              "event_rate": 0.42429691983929596,
+              "log_loss": 0.34594293530188314,
+              "mean_calibration_bias": -0.007353640107595205,
+              "mean_prediction": 0.41694327973170076,
+              "observations": 26135,
+              "reliability_bins": [
+                {
+                  "event_rate": 0.045163553450846265,
+                  "index": 0,
+                  "lower_bound": 0.0,
+                  "mean_probability": 0.07192175920582303,
+                  "observations": 11403,
+                  "upper_bound": 0.1
+                },
+                {
+                  "event_rate": 0.20253164556962025,
+                  "index": 1,
+                  "lower_bound": 0.1,
+                  "mean_probability": 0.14067643536175883,
+                  "observations": 1501,
+                  "upper_bound": 0.2
+                },
+                {
+                  "event_rate": 0.44957587181903863,
+                  "index": 2,
+                  "lower_bound": 0.2,
+                  "mean_probability": 0.24738049639396795,
+                  "observations": 1061,
+                  "upper_bound": 0.3
+                },
+                {
+                  "event_rate": 0.46573426573426574,
+                  "index": 3,
+                  "lower_bound": 0.3,
+                  "mean_probability": 0.3460890194055944,
+                  "observations": 715,
+                  "upper_bound": 0.4
+                },
+                {
+                  "event_rate": 0.5584905660377358,
+                  "index": 4,
+                  "lower_bound": 0.4,
+                  "mean_probability": 0.4515627805188679,
+                  "observations": 530,
+                  "upper_bound": 0.5
+                },
+                {
+                  "event_rate": 0.6279357231149567,
+                  "index": 5,
+                  "lower_bound": 0.5,
+                  "mean_probability": 0.5542119150370829,
+                  "observations": 809,
+                  "upper_bound": 0.6
+                },
+                {
+                  "event_rate": 0.6780701754385965,
+                  "index": 6,
+                  "lower_bound": 0.6,
+                  "mean_probability": 0.6512661465149124,
+                  "observations": 1140,
+                  "upper_bound": 0.7
+                },
+                {
+                  "event_rate": 0.7363128491620111,
+                  "index": 7,
+                  "lower_bound": 0.7,
+                  "mean_probability": 0.7472885059687151,
+                  "observations": 895,
+                  "upper_bound": 0.8
+                },
+                {
+                  "event_rate": 0.8428005284015853,
+                  "index": 8,
+                  "lower_bound": 0.8,
+                  "mean_probability": 0.8675499109815059,
+                  "observations": 3785,
+                  "upper_bound": 0.9
+                },
+                {
+                  "event_rate": 0.9390130353817505,
+                  "index": 9,
+                  "lower_bound": 0.9,
+                  "mean_probability": 0.9248092096515362,
+                  "observations": 4296,
+                  "upper_bound": 1.0
+                }
+              ]
+            },
+            "blank_rows": 0,
+            "minutes": {
+              "mean_absolute_error": 15.485712648653081,
+              "mean_error": -0.38015113574683734,
+              "observations": 26135,
+              "root_mean_squared_error": 24.290817824314747
+            },
+            "minutes_if_appearance": {
+              "mean_absolute_error": 19.991331884697356,
+              "mean_error": 0.19541032586969068,
+              "observations": 11089,
+              "root_mean_squared_error": 25.632863118051144
+            },
+            "missing_appearance_prediction_rows": 168,
+            "missing_appearance_target_rows": 0,
+            "missing_minutes_prediction_rows": 168,
+            "missing_minutes_target_rows": 0,
+            "missing_points_prediction_rows": 168,
+            "missing_points_target_rows": 0,
+            "missing_start_label_rows": 0,
+            "missing_start_prediction_rows": 26303,
+            "points": {
+              "mean_absolute_error": 1.025232172977884,
+              "mean_error": -0.010615554817792234,
+              "observations": 26135,
+              "root_mean_squared_error": 1.9619265994385107
+            },
+            "points_if_appearance": {
+              "mean_absolute_error": 1.9894613720245287,
+              "mean_error": 0.024386796488231586,
+              "observations": 11089,
+              "root_mean_squared_error": 2.799846374351688
+            },
+            "population_rows": 26303,
+            "start": {
+              "brier_score": null,
+              "event_rate": null,
+              "log_loss": null,
+              "mean_calibration_bias": null,
+              "mean_prediction": null,
+              "observations": 0,
+              "reliability_bins": []
+            },
+            "start_given_appearance": {
+              "brier_score": null,
+              "event_rate": null,
+              "log_loss": null,
+              "mean_calibration_bias": null,
+              "mean_prediction": null,
+              "observations": 0,
+              "reliability_bins": []
+            }
+          },
+          "2025-26": {
+            "appearance": {
+              "brier_score": 0.09495600964028947,
+              "event_rate": 0.38674246411903007,
+              "log_loss": 0.31885674845594414,
+              "mean_calibration_bias": 0.003107346562339852,
+              "mean_prediction": 0.3898498106813699,
+              "observations": 28497,
+              "reliability_bins": [
+                {
+                  "event_rate": 0.03554690316533276,
+                  "index": 0,
+                  "lower_bound": 0.0,
+                  "mean_probability": 0.06979366480142764,
+                  "observations": 13869,
+                  "upper_bound": 0.1
+                },
+                {
+                  "event_rate": 0.1937669376693767,
+                  "index": 1,
+                  "lower_bound": 0.1,
+                  "mean_probability": 0.13807166035704607,
+                  "observations": 1476,
+                  "upper_bound": 0.2
+                },
+                {
+                  "event_rate": 0.47878787878787876,
+                  "index": 2,
+                  "lower_bound": 0.2,
+                  "mean_probability": 0.24781659710303028,
+                  "observations": 990,
+                  "upper_bound": 0.3
+                },
+                {
+                  "event_rate": 0.44275862068965516,
+                  "index": 3,
+                  "lower_bound": 0.3,
+                  "mean_probability": 0.3462025329296552,
+                  "observations": 725,
+                  "upper_bound": 0.4
+                },
+                {
+                  "event_rate": 0.5695488721804511,
+                  "index": 4,
+                  "lower_bound": 0.4,
+                  "mean_probability": 0.4503242650225564,
+                  "observations": 532,
+                  "upper_bound": 0.5
+                },
+                {
+                  "event_rate": 0.635752688172043,
+                  "index": 5,
+                  "lower_bound": 0.5,
+                  "mean_probability": 0.5532509003575269,
+                  "observations": 744,
+                  "upper_bound": 0.6
+                },
+                {
+                  "event_rate": 0.6757263355201499,
+                  "index": 6,
+                  "lower_bound": 0.6,
+                  "mean_probability": 0.651936495253046,
+                  "observations": 1067,
+                  "upper_bound": 0.7
+                },
+                {
+                  "event_rate": 0.6809744779582366,
+                  "index": 7,
+                  "lower_bound": 0.7,
+                  "mean_probability": 0.746873924015081,
+                  "observations": 862,
+                  "upper_bound": 0.8
+                },
+                {
+                  "event_rate": 0.8377659574468085,
+                  "index": 8,
+                  "lower_bound": 0.8,
+                  "mean_probability": 0.8666139556788564,
+                  "observations": 3008,
+                  "upper_bound": 0.9
+                },
+                {
+                  "event_rate": 0.9270673813169985,
+                  "index": 9,
+                  "lower_bound": 0.9,
+                  "mean_probability": 0.9272712785580015,
+                  "observations": 5224,
+                  "upper_bound": 1.0
+                }
+              ]
+            },
+            "blank_rows": 0,
+            "minutes": {
+              "mean_absolute_error": 14.339310582443314,
+              "mean_error": 0.06399480196265912,
+              "observations": 28497,
+              "root_mean_squared_error": 23.36970718245721
+            },
+            "minutes_if_appearance": {
+              "mean_absolute_error": 20.156202704536792,
+              "mean_error": -0.06092547135631974,
+              "observations": 11021,
+              "root_mean_squared_error": 26.045998168248286
+            },
+            "missing_appearance_prediction_rows": 151,
+            "missing_appearance_target_rows": 0,
+            "missing_minutes_prediction_rows": 151,
+            "missing_minutes_target_rows": 0,
+            "missing_points_prediction_rows": 151,
+            "missing_points_target_rows": 0,
+            "missing_start_label_rows": 28648,
+            "missing_start_prediction_rows": 0,
+            "points": {
+              "mean_absolute_error": 1.0057833668637401,
+              "mean_error": -0.0569901744752781,
+              "observations": 28497,
+              "root_mean_squared_error": 1.9667620689382146
+            },
+            "points_if_appearance": {
+              "mean_absolute_error": 2.074318394542782,
+              "mean_error": -0.15325019578277832,
+              "observations": 11021,
+              "root_mean_squared_error": 2.9027224400011256
+            },
+            "population_rows": 28648,
+            "start": {
+              "brier_score": null,
+              "event_rate": null,
+              "log_loss": null,
+              "mean_calibration_bias": null,
+              "mean_prediction": null,
+              "observations": 0,
+              "reliability_bins": []
+            },
+            "start_given_appearance": {
+              "brier_score": null,
+              "event_rate": null,
+              "log_loss": null,
+              "mean_calibration_bias": null,
+              "mean_prediction": null,
+              "observations": 0,
+              "reliability_bins": []
+            }
+          }
+        },
+        "contract_version": "phase_c_component_metrics_v1",
+        "overall": {
+          "appearance": {
+            "brier_score": 0.10459684048117796,
+            "event_rate": 0.40828908394038577,
+            "log_loss": 0.3462287328255732,
+            "mean_calibration_bias": -0.000649064106828301,
+            "mean_prediction": 0.40764001983355747,
+            "observations": 128627,
+            "reliability_bins": [
+              {
+                "event_rate": 0.03989401683704149,
+                "index": 0,
+                "lower_bound": 0.0,
+                "mean_probability": 0.07411844224885374,
+                "observations": 53216,
+                "upper_bound": 0.1
+              },
+              {
+                "event_rate": 0.15395224549607792,
+                "index": 1,
+                "lower_bound": 0.1,
+                "mean_probability": 0.13317061962046375,
+                "observations": 11601,
+                "upper_bound": 0.2
+              },
+              {
+                "event_rate": 0.42340387050099476,
+                "index": 2,
+                "lower_bound": 0.2,
+                "mean_probability": 0.2469635641799602,
+                "observations": 5529,
+                "upper_bound": 0.3
+              },
+              {
+                "event_rate": 0.45503321410321923,
+                "index": 3,
+                "lower_bound": 0.3,
+                "mean_probability": 0.3461561502871742,
+                "observations": 3914,
+                "upper_bound": 0.4
+              },
+              {
+                "event_rate": 0.5556338028169014,
+                "index": 4,
+                "lower_bound": 0.4,
+                "mean_probability": 0.4520101851721831,
+                "observations": 2840,
+                "upper_bound": 0.5
+              },
+              {
+                "event_rate": 0.6204248784233427,
+                "index": 5,
+                "lower_bound": 0.5,
+                "mean_probability": 0.5529444146902994,
+                "observations": 3907,
+                "upper_bound": 0.6
+              },
+              {
+                "event_rate": 0.6698627561571724,
+                "index": 6,
+                "lower_bound": 0.6,
+                "mean_probability": 0.6519327198655762,
+                "observations": 5319,
+                "upper_bound": 0.7
+              },
+              {
+                "event_rate": 0.7214300475304815,
+                "index": 7,
+                "lower_bound": 0.7,
+                "mean_probability": 0.7502758448838602,
+                "observations": 4839,
+                "upper_bound": 0.8
+              },
+              {
+                "event_rate": 0.852015900056786,
+                "index": 8,
+                "lower_bound": 0.8,
+                "mean_probability": 0.8681527543210108,
+                "observations": 17610,
+                "upper_bound": 0.9
+              },
+              {
+                "event_rate": 0.9281684465041306,
+                "index": 9,
+                "lower_bound": 0.9,
+                "mean_probability": 0.9265338013091378,
+                "observations": 19852,
+                "upper_bound": 1.0
+              }
+            ]
+          },
+          "blank_rows": 0,
+          "minutes": {
+            "mean_absolute_error": 16.160485361615933,
+            "mean_error": 0.1244680963653774,
+            "observations": 128627,
+            "root_mean_squared_error": 25.500244461862543
+          },
+          "minutes_if_appearance": {
+            "mean_absolute_error": 20.492698177048062,
+            "mean_error": 0.5468752369025076,
+            "observations": 52517,
+            "root_mean_squared_error": 27.0871033473068
+          },
+          "missing_appearance_prediction_rows": 1468,
+          "missing_appearance_target_rows": 0,
+          "missing_minutes_prediction_rows": 1468,
+          "missing_minutes_target_rows": 0,
+          "missing_points_prediction_rows": 1468,
+          "missing_points_target_rows": 0,
+          "missing_start_label_rows": 75708,
+          "missing_start_prediction_rows": 54387,
+          "points": {
+            "mean_absolute_error": 1.071554499090323,
+            "mean_error": -0.015071770559423756,
+            "observations": 128627,
+            "root_mean_squared_error": 2.0397783987863805
+          },
+          "points_if_appearance": {
+            "mean_absolute_error": 2.102820916813127,
+            "mean_error": -0.025859564310166238,
+            "observations": 52517,
+            "root_mean_squared_error": 2.9335545623589927
+          },
+          "population_rows": 130095,
+          "start": {
+            "brier_score": null,
+            "event_rate": null,
+            "log_loss": null,
+            "mean_calibration_bias": null,
+            "mean_prediction": null,
+            "observations": 0,
+            "reliability_bins": []
+          },
+          "start_given_appearance": {
+            "brier_score": null,
+            "event_rate": null,
+            "log_loss": null,
+            "mean_calibration_bias": null,
+            "mean_prediction": null,
+            "observations": 0,
+            "reliability_bins": []
+          }
+        }
+      }
+    },
+    "policy": {
+      "bootstrap_resamples": 5000,
+      "candidate_id": "phase_c_v2_gradient_boosting_vs_linear",
+      "confidence_level": 0.9,
+      "deterministic_seed": 0,
+      "moving_block_length": 4
+    },
+    "primary_season": {
+      "candidate_points_mae": 0.9871783820400393,
+      "control_points_mae": 1.0057833668637401,
+      "fold_differences": [
+        {
+          "difference": 0.03739101202898554,
+          "fold_id": "2025-26-gw02"
+        },
+        {
+          "difference": 0.03181392718581555,
+          "fold_id": "2025-26-gw03"
+        },
+        {
+          "difference": 0.023601830066011242,
+          "fold_id": "2025-26-gw04"
+        },
+        {
+          "difference": 0.027305016412162098,
+          "fold_id": "2025-26-gw05"
+        },
+        {
+          "difference": 0.006723020279352121,
+          "fold_id": "2025-26-gw06"
+        },
+        {
+          "difference": 0.015451078285714459,
+          "fold_id": "2025-26-gw07"
+        },
+        {
+          "difference": 0.018489975726783348,
+          "fold_id": "2025-26-gw08"
+        },
+        {
+          "difference": 0.01993199765100684,
+          "fold_id": "2025-26-gw09"
+        },
+        {
+          "difference": 0.007395732855227988,
+          "fold_id": "2025-26-gw10"
+        },
+        {
+          "difference": 0.010030842459169742,
+          "fold_id": "2025-26-gw11"
+        },
+        {
+          "difference": 0.014534000640957334,
+          "fold_id": "2025-26-gw12"
+        },
+        {
+          "difference": 0.011292934052980153,
+          "fold_id": "2025-26-gw13"
+        },
+        {
+          "difference": 0.01488283813377489,
+          "fold_id": "2025-26-gw14"
+        },
+        {
+          "difference": 0.019597919701846878,
+          "fold_id": "2025-26-gw15"
+        },
+        {
+          "difference": 0.001700866553359548,
+          "fold_id": "2025-26-gw16"
+        },
+        {
+          "difference": 0.007984797318420833,
+          "fold_id": "2025-26-gw17"
+        },
+        {
+          "difference": 0.016768974892207744,
+          "fold_id": "2025-26-gw18"
+        },
+        {
+          "difference": -0.00022767914838706105,
+          "fold_id": "2025-26-gw19"
+        },
+        {
+          "difference": 0.012064814814102487,
+          "fold_id": "2025-26-gw20"
+        },
+        {
+          "difference": 0.019314797821519014,
+          "fold_id": "2025-26-gw21"
+        },
+        {
+          "difference": 0.028274507161006435,
+          "fold_id": "2025-26-gw22"
+        },
+        {
+          "difference": 0.021579241514392944,
+          "fold_id": "2025-26-gw23"
+        },
+        {
+          "difference": 0.009786856869240301,
+          "fold_id": "2025-26-gw24"
+        },
+        {
+          "difference": 0.01236975053884104,
+          "fold_id": "2025-26-gw25"
+        },
+        {
+          "difference": 0.00915168035618108,
+          "fold_id": "2025-26-gw26"
+        },
+        {
+          "difference": 0.016547243151774804,
+          "fold_id": "2025-26-gw27"
+        },
+        {
+          "difference": 0.029744548474327726,
+          "fold_id": "2025-26-gw28"
+        },
+        {
+          "difference": 0.012220649194139122,
+          "fold_id": "2025-26-gw29"
+        },
+        {
+          "difference": 0.021187561004878064,
+          "fold_id": "2025-26-gw30"
+        },
+        {
+          "difference": 0.010065201839636995,
+          "fold_id": "2025-26-gw31"
+        },
+        {
+          "difference": 0.020382209475151458,
+          "fold_id": "2025-26-gw32"
+        },
+        {
+          "difference": 0.047054663509685346,
+          "fold_id": "2025-26-gw33"
+        },
+        {
+          "difference": 0.014626547135972334,
+          "fold_id": "2025-26-gw34"
+        },
+        {
+          "difference": 0.04591213406987937,
+          "fold_id": "2025-26-gw35"
+        },
+        {
+          "difference": 0.021755783311298238,
+          "fold_id": "2025-26-gw36"
+        },
+        {
+          "difference": 0.022058536675417573,
+          "fold_id": "2025-26-gw37"
+        },
+        {
+          "difference": 0.02469599987976201,
+          "fold_id": "2025-26-gw38"
+        }
+      ],
+      "interval_high": 0.021246689357659394,
+      "interval_low": 0.014284967292086576,
+      "mean_paired_difference": 0.018471940861962043,
+      "paired_difference_sign": "control MAE minus candidate MAE; positive favours the candidate",
+      "scored_folds": 37,
+      "season": "2025-26"
+    },
+    "promotes_anything": false,
+    "verdict": {
+      "candidate_has_lower_primary_mae": true,
+      "control_era_interval_excludes_zero_against_candidate": false,
+      "phase_d_reference": "gradient_boosting candidate",
+      "primary_interval_excludes_zero_in_candidate_favour": true,
+      "rule": "The candidate is preferred only if (i) its primary-season points MAE is lower than the control's, (ii) the 90% season-aware moving-block interval of the per-fold paired differences (control MAE minus candidate MAE) on the primary season lies entirely above zero, and (iii) the same interval on the previous-era season does not lie entirely below zero. Otherwise there is no selection and the control remains the reference. No minimum effect size is imposed and none is added afterwards.",
+      "verdict": "candidate_preferred"
+    }
+  },
+  "decision_level_reading": {
+    "scope": "development-only decision-level reading; both arms scored by scripts.evaluate_phase_c_components with --development-contract on the v2 tables exported for 2021-22 to 2024-25 (the frozen v1 decision seasons), 147 folds, the ridge control of the frozen evaluation on the same folds",
+    "paired_folds": 147,
+    "gbm_minus_linear_mean": -0.7482993197278912,
+    "gbm_minus_linear_median": 1.0,
+    "gbm_minus_linear_interval_90": [
+      -2.6598639455782314,
+      1.0476190476190477
+    ],
+    "wins_ties_losses": [
+      75,
+      5,
+      67
+    ],
+    "by_season_mean": {
+      "2021-22": -3.4054054054054053,
+      "2022-23": 0.3333333333333333,
+      "2023-24": 2.7567567567567566,
+      "2024-25": -2.6486486486486487
+    },
+    "arms": {
+      "linear": {
+        "source_table_sha256": "d88270536fe7b762e7627d482955885656f10b08a631ea7c05b0a95564a2fe09",
+        "model_version": "phase_c_control_components_v1",
+        "ridge_control_mean": 58.523809523809526,
+        "component_mean": 63.414965986394556,
+        "diagnostics": {
+          "attempted_folds": 147,
+          "candidate_autosub_points": 230.0,
+          "candidate_losses": 56,
+          "candidate_vice_captain_recoveries": 5,
+          "candidate_wins": 83,
+          "candidate_zero_minute_starters": 83,
+          "comparable_folds": 147,
+          "control_autosub_points": 187.0,
+          "control_vice_captain_recoveries": 8,
+          "control_zero_minute_starters": 74,
+          "mean_difference": 4.891156462585034,
+          "median_difference": 2.0,
+          "season_mean_differences": {
+            "2021-22": 4.351351351351352,
+            "2022-23": 7.277777777777778,
+            "2023-24": 2.4864864864864864,
+            "2024-25": 5.513513513513513
+          },
+          "ties": 8
+        },
+        "folds": {
+          "2021-22-gw02": 66.0,
+          "2021-22-gw03": 72.0,
+          "2021-22-gw04": 53.0,
+          "2021-22-gw05": 75.0,
+          "2021-22-gw06": 40.0,
+          "2021-22-gw07": 48.0,
+          "2021-22-gw08": 62.0,
+          "2021-22-gw09": 81.0,
+          "2021-22-gw10": 36.0,
+          "2021-22-gw11": 32.0,
+          "2021-22-gw12": 50.0,
+          "2021-22-gw13": 35.0,
+          "2021-22-gw14": 61.0,
+          "2021-22-gw15": 59.0,
+          "2021-22-gw16": 87.0,
+          "2021-22-gw17": 49.0,
+          "2021-22-gw18": 58.0,
+          "2021-22-gw19": 39.0,
+          "2021-22-gw20": 39.0,
+          "2021-22-gw21": 59.0,
+          "2021-22-gw22": 52.0,
+          "2021-22-gw23": 35.0,
+          "2021-22-gw24": 67.0,
+          "2021-22-gw25": 70.0,
+          "2021-22-gw26": 119.0,
+          "2021-22-gw27": 46.0,
+          "2021-22-gw28": 85.0,
+          "2021-22-gw29": 107.0,
+          "2021-22-gw30": 71.0,
+          "2021-22-gw31": 72.0,
+          "2021-22-gw32": 59.0,
+          "2021-22-gw33": 93.0,
+          "2021-22-gw34": 82.0,
+          "2021-22-gw35": 74.0,
+          "2021-22-gw36": 103.0,
+          "2021-22-gw37": 72.0,
+          "2021-22-gw38": 53.0,
+          "2022-23-gw02": 41.0,
+          "2022-23-gw03": 60.0,
+          "2022-23-gw04": 70.0,
+          "2022-23-gw05": 66.0,
+          "2022-23-gw06": 77.0,
+          "2022-23-gw08": 61.0,
+          "2022-23-gw09": 76.0,
+          "2022-23-gw10": 68.0,
+          "2022-23-gw11": 49.0,
+          "2022-23-gw12": 55.0,
+          "2022-23-gw13": 61.0,
+          "2022-23-gw14": 67.0,
+          "2022-23-gw15": 56.0,
+          "2022-23-gw16": 51.0,
+          "2022-23-gw17": 61.0,
+          "2022-23-gw18": 44.0,
+          "2022-23-gw19": 74.0,
+          "2022-23-gw20": 75.0,
+          "2022-23-gw21": 77.0,
+          "2022-23-gw22": 77.0,
+          "2022-23-gw23": 76.0,
+          "2022-23-gw24": 59.0,
+          "2022-23-gw25": 91.0,
+          "2022-23-gw26": 71.0,
+          "2022-23-gw27": 82.0,
+          "2022-23-gw28": 56.0,
+          "2022-23-gw29": 78.0,
+          "2022-23-gw30": 50.0,
+          "2022-23-gw31": 82.0,
+          "2022-23-gw32": 52.0,
+          "2022-23-gw33": 64.0,
+          "2022-23-gw34": 98.0,
+          "2022-23-gw35": 56.0,
+          "2022-23-gw36": 117.0,
+          "2022-23-gw37": 66.0,
+          "2022-23-gw38": 74.0,
+          "2023-24-gw02": 26.0,
+          "2023-24-gw03": 31.0,
+          "2023-24-gw04": 80.0,
+          "2023-24-gw05": 44.0,
+          "2023-24-gw06": 54.0,
+          "2023-24-gw07": 45.0,
+          "2023-24-gw08": 50.0,
+          "2023-24-gw09": 81.0,
+          "2023-24-gw10": 57.0,
+          "2023-24-gw11": 29.0,
+          "2023-24-gw12": 69.0,
+          "2023-24-gw13": 35.0,
+          "2023-24-gw14": 61.0,
+          "2023-24-gw15": 35.0,
+          "2023-24-gw16": 50.0,
+          "2023-24-gw17": 37.0,
+          "2023-24-gw18": 53.0,
+          "2023-24-gw19": 41.0,
+          "2023-24-gw20": 69.0,
+          "2023-24-gw21": 38.0,
+          "2023-24-gw22": 58.0,
+          "2023-24-gw23": 69.0,
+          "2023-24-gw24": 47.0,
+          "2023-24-gw25": 71.0,
+          "2023-24-gw26": 63.0,
+          "2023-24-gw27": 64.0,
+          "2023-24-gw28": 46.0,
+          "2023-24-gw29": 29.0,
+          "2023-24-gw30": 46.0,
+          "2023-24-gw31": 66.0,
+          "2023-24-gw32": 60.0,
+          "2023-24-gw33": 77.0,
+          "2023-24-gw34": 119.0,
+          "2023-24-gw35": 66.0,
+          "2023-24-gw36": 91.0,
+          "2023-24-gw37": 110.0,
+          "2023-24-gw38": 54.0,
+          "2024-25-gw02": 73.0,
+          "2024-25-gw03": 71.0,
+          "2024-25-gw04": 51.0,
+          "2024-25-gw05": 64.0,
+          "2024-25-gw06": 49.0,
+          "2024-25-gw07": 43.0,
+          "2024-25-gw08": 29.0,
+          "2024-25-gw09": 67.0,
+          "2024-25-gw10": 62.0,
+          "2024-25-gw11": 54.0,
+          "2024-25-gw12": 62.0,
+          "2024-25-gw13": 81.0,
+          "2024-25-gw14": 86.0,
+          "2024-25-gw15": 60.0,
+          "2024-25-gw16": 60.0,
+          "2024-25-gw17": 97.0,
+          "2024-25-gw18": 80.0,
+          "2024-25-gw19": 59.0,
+          "2024-25-gw20": 75.0,
+          "2024-25-gw21": 54.0,
+          "2024-25-gw22": 54.0,
+          "2024-25-gw23": 84.0,
+          "2024-25-gw24": 134.0,
+          "2024-25-gw25": 82.0,
+          "2024-25-gw26": 63.0,
+          "2024-25-gw27": 52.0,
+          "2024-25-gw28": 70.0,
+          "2024-25-gw29": 60.0,
+          "2024-25-gw30": 55.0,
+          "2024-25-gw31": 31.0,
+          "2024-25-gw32": 93.0,
+          "2024-25-gw33": 67.0,
+          "2024-25-gw34": 65.0,
+          "2024-25-gw35": 53.0,
+          "2024-25-gw36": 58.0,
+          "2024-25-gw37": 48.0,
+          "2024-25-gw38": 56.0
+        }
+      },
+      "gradient_boosting": {
+        "source_table_sha256": "96ac55769c894047d2e4f77131f6cd873dc1481bb89cf6334c33b94125831666",
+        "model_version": "phase_c_control_components_gbm_v1",
+        "ridge_control_mean": 58.523809523809526,
+        "component_mean": 62.666666666666664,
+        "diagnostics": {
+          "attempted_folds": 147,
+          "candidate_autosub_points": 397.0,
+          "candidate_losses": 55,
+          "candidate_vice_captain_recoveries": 12,
+          "candidate_wins": 88,
+          "candidate_zero_minute_starters": 108,
+          "comparable_folds": 147,
+          "control_autosub_points": 187.0,
+          "control_vice_captain_recoveries": 8,
+          "control_zero_minute_starters": 74,
+          "mean_difference": 4.142857142857143,
+          "median_difference": 4.0,
+          "season_mean_differences": {
+            "2021-22": 0.9459459459459459,
+            "2022-23": 7.611111111111111,
+            "2023-24": 5.243243243243243,
+            "2024-25": 2.864864864864865
+          },
+          "ties": 4
+        },
+        "folds": {
+          "2021-22-gw02": 66.0,
+          "2021-22-gw03": 50.0,
+          "2021-22-gw04": 61.0,
+          "2021-22-gw05": 37.0,
+          "2021-22-gw06": 62.0,
+          "2021-22-gw07": 41.0,
+          "2021-22-gw08": 51.0,
+          "2021-22-gw09": 59.0,
+          "2021-22-gw10": 49.0,
+          "2021-22-gw11": 36.0,
+          "2021-22-gw12": 51.0,
+          "2021-22-gw13": 55.0,
+          "2021-22-gw14": 69.0,
+          "2021-22-gw15": 52.0,
+          "2021-22-gw16": 66.0,
+          "2021-22-gw17": 60.0,
+          "2021-22-gw18": 49.0,
+          "2021-22-gw19": 49.0,
+          "2021-22-gw20": 41.0,
+          "2021-22-gw21": 34.0,
+          "2021-22-gw22": 62.0,
+          "2021-22-gw23": 30.0,
+          "2021-22-gw24": 78.0,
+          "2021-22-gw25": 84.0,
+          "2021-22-gw26": 78.0,
+          "2021-22-gw27": 48.0,
+          "2021-22-gw28": 78.0,
+          "2021-22-gw29": 82.0,
+          "2021-22-gw30": 70.0,
+          "2021-22-gw31": 37.0,
+          "2021-22-gw32": 60.0,
+          "2021-22-gw33": 78.0,
+          "2021-22-gw34": 79.0,
+          "2021-22-gw35": 61.0,
+          "2021-22-gw36": 121.0,
+          "2021-22-gw37": 89.0,
+          "2021-22-gw38": 62.0,
+          "2022-23-gw02": 57.0,
+          "2022-23-gw03": 52.0,
+          "2022-23-gw04": 40.0,
+          "2022-23-gw05": 67.0,
+          "2022-23-gw06": 59.0,
+          "2022-23-gw08": 76.0,
+          "2022-23-gw09": 93.0,
+          "2022-23-gw10": 56.0,
+          "2022-23-gw11": 53.0,
+          "2022-23-gw12": 35.0,
+          "2022-23-gw13": 58.0,
+          "2022-23-gw14": 71.0,
+          "2022-23-gw15": 54.0,
+          "2022-23-gw16": 61.0,
+          "2022-23-gw17": 82.0,
+          "2022-23-gw18": 42.0,
+          "2022-23-gw19": 64.0,
+          "2022-23-gw20": 79.0,
+          "2022-23-gw21": 73.0,
+          "2022-23-gw22": 82.0,
+          "2022-23-gw23": 102.0,
+          "2022-23-gw24": 63.0,
+          "2022-23-gw25": 90.0,
+          "2022-23-gw26": 63.0,
+          "2022-23-gw27": 75.0,
+          "2022-23-gw28": 53.0,
+          "2022-23-gw29": 85.0,
+          "2022-23-gw30": 54.0,
+          "2022-23-gw31": 64.0,
+          "2022-23-gw32": 66.0,
+          "2022-23-gw33": 106.0,
+          "2022-23-gw34": 89.0,
+          "2022-23-gw35": 81.0,
+          "2022-23-gw36": 101.0,
+          "2022-23-gw37": 53.0,
+          "2022-23-gw38": 51.0,
+          "2023-24-gw02": 44.0,
+          "2023-24-gw03": 40.0,
+          "2023-24-gw04": 77.0,
+          "2023-24-gw05": 59.0,
+          "2023-24-gw06": 47.0,
+          "2023-24-gw07": 53.0,
+          "2023-24-gw08": 36.0,
+          "2023-24-gw09": 82.0,
+          "2023-24-gw10": 58.0,
+          "2023-24-gw11": 40.0,
+          "2023-24-gw12": 95.0,
+          "2023-24-gw13": 46.0,
+          "2023-24-gw14": 62.0,
+          "2023-24-gw15": 38.0,
+          "2023-24-gw16": 62.0,
+          "2023-24-gw17": 44.0,
+          "2023-24-gw18": 53.0,
+          "2023-24-gw19": 41.0,
+          "2023-24-gw20": 73.0,
+          "2023-24-gw21": 33.0,
+          "2023-24-gw22": 47.0,
+          "2023-24-gw23": 46.0,
+          "2023-24-gw24": 46.0,
+          "2023-24-gw25": 77.0,
+          "2023-24-gw26": 52.0,
+          "2023-24-gw27": 83.0,
+          "2023-24-gw28": 42.0,
+          "2023-24-gw29": 47.0,
+          "2023-24-gw30": 38.0,
+          "2023-24-gw31": 90.0,
+          "2023-24-gw32": 49.0,
+          "2023-24-gw33": 83.0,
+          "2023-24-gw34": 124.0,
+          "2023-24-gw35": 69.0,
+          "2023-24-gw36": 80.0,
+          "2023-24-gw37": 112.0,
+          "2023-24-gw38": 55.0,
+          "2024-25-gw02": 77.0,
+          "2024-25-gw03": 53.0,
+          "2024-25-gw04": 45.0,
+          "2024-25-gw05": 50.0,
+          "2024-25-gw06": 67.0,
+          "2024-25-gw07": 52.0,
+          "2024-25-gw08": 44.0,
+          "2024-25-gw09": 56.0,
+          "2024-25-gw10": 60.0,
+          "2024-25-gw11": 54.0,
+          "2024-25-gw12": 79.0,
+          "2024-25-gw13": 74.0,
+          "2024-25-gw14": 59.0,
+          "2024-25-gw15": 79.0,
+          "2024-25-gw16": 59.0,
+          "2024-25-gw17": 65.0,
+          "2024-25-gw18": 76.0,
+          "2024-25-gw19": 79.0,
+          "2024-25-gw20": 72.0,
+          "2024-25-gw21": 54.0,
+          "2024-25-gw22": 39.0,
+          "2024-25-gw23": 52.0,
+          "2024-25-gw24": 82.0,
+          "2024-25-gw25": 88.0,
+          "2024-25-gw26": 57.0,
+          "2024-25-gw27": 64.0,
+          "2024-25-gw28": 56.0,
+          "2024-25-gw29": 68.0,
+          "2024-25-gw30": 38.0,
+          "2024-25-gw31": 37.0,
+          "2024-25-gw32": 96.0,
+          "2024-25-gw33": 79.0,
+          "2024-25-gw34": 71.0,
+          "2024-25-gw35": 60.0,
+          "2024-25-gw36": 49.0,
+          "2024-25-gw37": 55.0,
+          "2024-25-gw38": 59.0
+        }
+      }
+    },
+    "note": "The points-MAE rule of the declared comparison preferred the candidate; this decision-level reading is reported beside it, not as part of the rule. Its interval crosses zero with a negative mean, so it does not support the promotion on its own and it does not refute the candidate either."
+  },
+  "locked_holdout_accessed": true
+}

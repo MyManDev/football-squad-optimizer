@@ -153,8 +153,8 @@
   transform: translateX(-100%);
   visibility: hidden;
   transition:
-    transform 200ms ease,
-    visibility 0s linear 200ms;
+    transform var(--motion-ui) var(--motion-ease),
+    visibility 0s linear var(--motion-ui);
 }
 
 .shell[data-layout="phone"][data-drawer] .sidebar {
@@ -162,7 +162,7 @@
   visibility: visible;
   box-shadow: var(--shadow-drawer);
   transition:
-    transform 200ms ease,
+    transform var(--motion-ui) var(--motion-ease),
     visibility 0s;
 }
 
@@ -175,7 +175,7 @@
   width: 316px;
   border-right: 0;
   box-shadow: var(--shadow-drawer);
-  animation: drawer-in 200ms ease;
+  animation: drawer-in var(--motion-ui) var(--motion-ease);
 }
 
 @keyframes drawer-in {
@@ -245,9 +245,65 @@
   flex: none;
 }
 
-.who:empty,
 .plan:empty {
   display: none;
+}
+
+/* The identity block: the league, the member and Değiştir. It sits on the sidebar's
+   surface, so its quiet lines are ink2, never ink3. */
+.who {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--color-line);
+}
+
+.whoText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  margin: 0;
+}
+
+.whoLeague {
+  color: var(--color-text-muted);
+  font-size: var(--step--2);
+  line-height: 16px;
+  overflow-wrap: anywhere;
+}
+
+.whoName {
+  color: var(--color-text);
+  font-weight: 600;
+  line-height: 20px;
+  overflow-wrap: anywhere;
+}
+
+.whoTeam {
+  color: var(--color-text-muted);
+  font-size: var(--step--2);
+  line-height: 16px;
+  overflow-wrap: anywhere;
+}
+
+.whoChange {
+  flex: none;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-s);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.whoChange:hover {
+  background: var(--color-bg);
 }
 
 .plan {
@@ -360,9 +416,18 @@
   padding: 0;
 }
 
-.sidebar[data-mode="rail"] .who,
+/* The plan slot stays mounted for the page that fills it; the rail shows its icon instead.
+   The identity block is drawn as its own icon there (.whoRail), so it is not hidden here. */
 .sidebar[data-mode="rail"] .plan {
   display: none;
+}
+
+/* The identity block's face in the rail: one 44 px icon over the navigation, ruled off
+   from it as the block is. */
+.whoRail {
+  flex: none;
+  padding-bottom: var(--space-1);
+  border-bottom: 1px solid var(--color-line);
 }
 
 .sidebar[data-mode="rail"] .nav {
@@ -440,6 +505,13 @@
 }
 
 /* ---- Main: the one column that scrolls with the document ---- */
+
+/* Main and a page's heading take focus after a step in front of the page (focusPage);
+   a pointer user sees no ring for it, a keyboard user still does. */
+.main:focus,
+.main h1[tabindex="-1"]:focus:not(:focus-visible) {
+  outline: none;
+}
 
 .main {
   grid-column: 2;
