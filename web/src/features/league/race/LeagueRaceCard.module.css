@@ -1,0 +1,194 @@
+/* The league race (#1135): one row per place and one column per gameweek, so the lines of
+   a large league stay apart and a long season scrolls sideways inside the chart. The
+   member brought forward is drawn on top in the primary ink with its gained and lost
+   weeks marked; the selected gameweek's band moves in the data time of the motion tokens,
+   and a line's change of state in the card time; reduced motion makes both instant. */
+
+.race {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+}
+
+.basis,
+.quiet {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--step--1);
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--space-3);
+}
+
+.member {
+  display: grid;
+  gap: var(--space-1);
+  font-weight: 600;
+}
+
+.member select {
+  min-height: 44px;
+  max-width: 100%;
+  font: inherit;
+}
+
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.step {
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--color-text);
+  border-radius: var(--radius-s);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--step-1);
+  cursor: pointer;
+}
+
+.step:disabled {
+  border-color: var(--color-line);
+  color: var(--color-text-muted);
+  cursor: default;
+}
+
+.weekLabel {
+  min-width: 6.5rem;
+  font-family: var(--font-display);
+  font-weight: 700;
+  text-align: center;
+}
+
+.chart {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.chart svg {
+  display: block;
+}
+
+.guide {
+  fill: var(--color-surface-2);
+  transition: transform var(--motion-data) var(--motion-ease);
+}
+
+.place,
+.gameweek {
+  fill: var(--color-text-muted);
+  font-family: var(--font-display);
+  font-size: 12px;
+  dominant-baseline: middle;
+}
+
+.place {
+  text-anchor: end;
+}
+
+.gameweek {
+  text-anchor: middle;
+}
+
+.hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 14px;
+  pointer-events: stroke;
+  cursor: pointer;
+}
+
+.line {
+  fill: none;
+  stroke: var(--color-line);
+  stroke-width: 2px;
+  stroke-linejoin: round;
+  transition: stroke var(--motion-ui) var(--motion-ease);
+}
+
+.member[data-highlighted] .line {
+  stroke: var(--color-primary);
+  stroke-width: 3px;
+}
+
+.mark {
+  fill: var(--color-primary);
+}
+
+.mark[data-move="gained"] {
+  fill: var(--color-good);
+}
+
+.mark[data-move="lost"] {
+  fill: var(--color-bad);
+}
+
+.week {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.weekTitle {
+  margin: 0;
+  font-size: var(--step-0);
+}
+
+.moves {
+  display: grid;
+  gap: 2px;
+  max-width: 28rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.moves li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.moved {
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+
+.moves li[data-move="gained"] .moved {
+  color: var(--color-good);
+}
+
+.moves li[data-move="lost"] .moved {
+  color: var(--color-bad);
+}
+
+.table {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.table table {
+  border-collapse: collapse;
+  font-size: var(--step--1);
+}
+
+.table caption {
+  font-weight: 600;
+  text-align: left;
+}
+
+.table th,
+.table td {
+  padding: 2px var(--space-2);
+  text-align: right;
+}

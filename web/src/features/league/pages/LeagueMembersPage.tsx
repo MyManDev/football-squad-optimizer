@@ -13,6 +13,8 @@ import type { ScoreboardState } from "../components/karne";
 import { DisclosureIcon } from "../components/memberIcons";
 import { SystemKarne, SystemScoreboardDetails } from "../components/SystemKarne";
 import { ViewerChips } from "../components/ViewerChips";
+import { leagueRace } from "../race/leagueRace";
+import { LeagueRaceCard } from "../race/LeagueRaceCard";
 import { LeagueDataMissing } from "../data";
 import { useViewerEntry } from "../identity/useViewerEntry";
 import { useEntrySquad, useLeagueMembers, useLeagueScoreboard } from "../queries";
@@ -123,6 +125,8 @@ export function LeagueMembersView({
   const deadline = gameweekDeadline(fixtures, view.season, view.gameweek);
   const cells = viewerRow ? scoreBugCells(viewerRow, rows.length, squad, locale, copy) : [];
   const count = (value: number) => points(value, 0, locale);
+  const race =
+    scoreboard?.status === "ready" ? leagueRace(scoreboard.envelope.payload, view.members) : null;
 
   return (
     <div className={styles.page}>
@@ -334,6 +338,17 @@ export function LeagueMembersView({
                 )}
               </p>
             ) : null}
+          </div>
+        ) : null}
+
+        {/* The race reads the same scoreboard: across both columns, under the table. */}
+        {race ? (
+          <div className={styles.fullScoreboard}>
+            <LeagueRaceCard
+              race={race}
+              members={view.members}
+              initialEntry={viewerRow?.entry_id ?? null}
+            />
           </div>
         ) : null}
 
