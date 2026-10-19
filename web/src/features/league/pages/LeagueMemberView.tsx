@@ -11,6 +11,7 @@ import { useShell } from "../../../design/shell/ShellContext";
 import { useLanguage } from "../../../i18n/context";
 import { clubCodesFromFixtures } from "../../../lib/clubs";
 import { AdviceRequestPanel } from "../advice/AdviceRequestPanel";
+import { ChipTimingCard } from "../advice/ChipTimingCard";
 import { COMPUTE_COPY } from "../advice/computeCopy";
 import { MemberDecisionControls } from "../advice/MemberDecisionControls";
 import { deviceEndedWithoutPlan } from "../device/useDevicePlan";
@@ -331,6 +332,12 @@ function LeagueMemberContent({
           capabilities={capabilities}
           onDevice={onDevice}
           part="advanced"
+        />
+        {/* Beside the chip control: the chip timing the device read with the plain plan. */}
+        <ChipTimingCard
+          squad={view}
+          timing={device.state.phase === "done" ? device.state.chipTiming : null}
+          fixtures={fixtures}
         />
         <DecisionPreferencesPanel squad={view} available={capabilities?.preferences === true} />
         <TemplatePicker

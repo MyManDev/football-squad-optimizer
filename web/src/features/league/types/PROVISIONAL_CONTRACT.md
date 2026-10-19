@@ -72,8 +72,12 @@ The member index and a newly computed chip advice response may carry `chip_forec
 Its envelope binds season, league, entry, decision gameweek, source capture, held fifteen
 and present bench to `chip_forecast_v1`. The producer passes only gains already computed
 on that path. A new single-chip response never borrows the other published gains.
-No page reads the field: the member page has no chip forecast card, so no automatic chip
-selection or additional calculation is triggered by it.
+No page reads the published field. The member page's chip timing card states the same
+`chip_forecast_v1` reading computed on the member's device (`device/chipForecast`), in
+every league: from the capture's table, the member's entry and the fixture calendar the
+page already reads, with each held chip's gain solved beside the plain one-week plan in
+the same device run. The published field stays the parity reference
+(`chipForecast.shipped.test.ts`). The card plays no chip and changes no plan.
 
 `status=unavailable` carries a translated refusal code, null forecast,
 `calendar_has_structure=null` and `calendar_range=null`. An available reading carries a

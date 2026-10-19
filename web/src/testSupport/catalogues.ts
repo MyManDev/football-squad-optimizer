@@ -1,4 +1,5 @@
 import { CHIP_COPY } from "../features/league/advice/chipCopy";
+import { CHIP_TIMING_COPY } from "../features/league/advice/chipTimingCopy";
 import { COMPUTE_COPY } from "../features/league/advice/computeCopy";
 import { EVIDENCE_COPY } from "../features/league/advice/evidenceCopy";
 import { TOP100_COPY } from "../features/league/advice/top100Copy";
@@ -22,6 +23,7 @@ export const CATALOGUES = {
   evidenceCopy: EVIDENCE_COPY,
   top100Copy: TOP100_COPY,
   chipCopy: CHIP_COPY,
+  chipTimingCopy: CHIP_TIMING_COPY,
   computeCopy: COMPUTE_COPY,
   fixturesCopy: FIXTURES_COPY,
 } as const satisfies Record<string, Record<Language, object>>;
