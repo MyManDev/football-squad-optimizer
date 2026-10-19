@@ -284,6 +284,30 @@ describe("the member's reading is refused with the publisher's code", () => {
     );
   });
 
+  it("calendar_unreadable is read where the publisher reads it: after the capture and chips", () => {
+    const unreadable = (v: MemberChipForecastInputs) =>
+      void (v.fixtures!.gameweeks[20]!.fixtures[0]!.home.name = "Beta");
+    expect(
+      refused((v) => {
+        unreadable(v);
+        v.squad.chips!.known = false;
+      }),
+    ).toBe("chip_history_unknown");
+    expect(
+      refused((v) => {
+        unreadable(v);
+        v.fixtures!.source_snapshot_id = "another";
+      }),
+    ).toBe("capture_mismatch");
+    // An unreadable calendar states no season, so its season is not compared.
+    expect(
+      refused((v) => {
+        unreadable(v);
+        v.fixtures!.season = "2025-26";
+      }),
+    ).toBe("calendar_unreadable");
+  });
+
   it("fixtures_unscheduled: a fixture has no gameweek yet", () => {
     expect(refused((v) => void (v.fixtures!.unscheduled_count = 2))).toBe("fixtures_unscheduled");
   });

@@ -46,13 +46,18 @@ export class ForecastUnavailable extends Error {
   }
 }
 
-/** The calendar as the forecast reads it: its capture, and every club it names by name. */
+/**
+ * The calendar as the forecast reads it: its capture, and every club it names by name. A
+ * calendar whose clubs cannot be read carries no calendar and says why, and is refused
+ * where the counts are read, after the capture and the chips, as the publisher refuses it.
+ */
 export interface ForecastSource {
   snapshot_id: string;
   season: string;
-  calendar: FixturesPayload;
+  calendar: FixturesPayload | null;
   /** Club name to club id; empty when the calendar names no club. */
   club_ids_by_name: Map<string, number>;
+  unavailable_reason: ForecastRefusal | null;
 }
 
 /**
@@ -66,26 +71,26 @@ export function forecastSource(
   fixtures: FixturesPayload | null | undefined,
 ): ForecastSource | null {
   if (!fixtures) return null;
+  const unreadable: ForecastSource = {
+    snapshot_id: fixtures.source_snapshot_id,
+    season: fixtures.season,
+    calendar: null,
+    club_ids_by_name: new Map(),
+    unavailable_reason: "calendar_unreadable",
+  };
   const names = new Map<number, string>();
   for (const week of fixtures.gameweeks) {
     for (const fixture of week.fixtures) {
       for (const team of [fixture.home, fixture.away]) {
         const known = names.get(team.team_id);
-        if (known !== undefined && known !== team.name) {
-          throw new ForecastUnavailable("calendar_unreadable");
-        }
+        if (known !== undefined && known !== team.name) return unreadable;
         names.set(team.team_id, team.name);
       }
     }
   }
   const ids = new Map([...names].map(([club, name]) => [name, club]));
-  if (ids.size !== names.size) throw new ForecastUnavailable("calendar_unreadable");
-  return {
-    snapshot_id: fixtures.source_snapshot_id,
-    season: fixtures.season,
-    calendar: fixtures,
-    club_ids_by_name: ids,
-  };
+  if (ids.size !== names.size) return unreadable;
+  return { ...unreadable, calendar: fixtures, club_ids_by_name: ids, unavailable_reason: null };
 }
 
 /**
@@ -99,6 +104,9 @@ export function calendarCounts(
   { first, last }: { first: number; last: number },
 ): GameweekFixtures[] {
   const calendar = source.calendar;
+  if (calendar === null) {
+    throw new ForecastUnavailable(source.unavailable_reason ?? "calendar_missing");
+  }
   if (calendar.unscheduled_count !== 0) throw new ForecastUnavailable("fixtures_unscheduled");
   const clubs = [...source.club_ids_by_name.values()];
   if (clubs.length === 0) throw new ForecastUnavailable("club_roster_missing");
@@ -203,13 +211,13 @@ function reading(
   ids: number[],
 ): Pick<MemberChipForecast, "forecast" | "calendar_has_structure" | "calendar_range"> {
   const week = table.gameweek;
-  if (!fixtures) throw new ForecastUnavailable("calendar_missing");
-  const source = forecastSource(fixtures)!;
+  const source = forecastSource(fixtures);
+  if (source === null) throw new ForecastUnavailable("calendar_missing");
   if (
     source.snapshot_id !== table.source_snapshot_id ||
     squad.source_snapshot_id !== table.source_snapshot_id ||
     squad.season !== table.season ||
-    source.season !== table.season ||
+    (source.calendar !== null && source.season !== table.season) ||
     squad.gameweek !== week ||
     (squad.chips !== undefined && squad.chips.gameweek !== week)
   ) {
