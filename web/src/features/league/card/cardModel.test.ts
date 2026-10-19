@@ -290,6 +290,21 @@ describe("squadCardSvg", () => {
     expect(out).toHaveLength(1);
     expect(out[0]!.right).toBeLessThan(arrow.left);
   });
+
+  it("ends the grass at the pitch, so the bench row sits on the board", () => {
+    const doc = parse(svgOf(["lineup"]).svg);
+    const pitch = doc.querySelector(`rect[fill="${CARD_COLOURS["--color-pitch"]}"]`)!;
+    const bottom = num(pitch, "y") + num(pitch, "height");
+    const stripes = doc.querySelectorAll(`rect[fill="${CARD_COLOURS["--color-pitch-2"]}"]`);
+    expect(stripes.length).toBeGreaterThan(0);
+    for (const stripe of stripes) {
+      expect(num(stripe, "y") + num(stripe, "height")).toBeLessThanOrEqual(bottom);
+    }
+    const bench = Array.from(doc.querySelectorAll("text")).find(
+      (line) => line.textContent === "Bench",
+    )!;
+    expect(num(bench, "y") - num(bench, "font-size")).toBeGreaterThanOrEqual(bottom);
+  });
 });
 
 describe("fitText", () => {

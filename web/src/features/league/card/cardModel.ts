@@ -116,6 +116,7 @@ export const CARD_WIDTH = 1080;
 const PAD = 56;
 const ROW = 104;
 const LINE = 62;
+const STRIPE = 80;
 
 // A name plate fills its slot on the row less a gap, so neighbours never touch; the name
 // on it shrinks to fit, the same size across the row, and is cut short only at the floor.
@@ -309,10 +310,12 @@ export function squadCardSvg(
       });
       y += ROW;
     });
+    // The grass ends where the bench row begins: the last stripe stops at the pitch's edge,
+    // so the bench is read on the board, never on the grass.
     const pitchHeight = y - pitchTop;
-    const stripes = Array.from({ length: Math.ceil(pitchHeight / 80) }, (_, index) =>
+    const stripes = Array.from({ length: Math.ceil(pitchHeight / STRIPE) }, (_, index) =>
       index % 2
-        ? `<rect x="0" y="${pitchTop + index * 80}" width="${CARD_WIDTH}" height="80" fill="${PITCH_STRIPE}"/>`
+        ? `<rect x="0" y="${pitchTop + index * STRIPE}" width="${CARD_WIDTH}" height="${Math.min(STRIPE, pitchHeight - index * STRIPE)}" fill="${PITCH_STRIPE}"/>`
         : "",
     ).join("");
     body.unshift(
