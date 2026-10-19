@@ -1,8 +1,10 @@
 /* A page change the View Transitions API runs (design/viewTransition.ts, #1131): the old
    picture fades into the new one in the card time of the motion tokens. Opacity only, as
    the browser's own crossfade is; under reduced motion the token is zero and the script
-   does not start one. */
+   does not start one. The group that holds the two pictures is timed with them, or it
+   keeps the browser's own quarter second and the step ends later than its fade. */
 
+::view-transition-group(root),
 ::view-transition-old(root),
 ::view-transition-new(root) {
   animation-duration: var(--motion-ui);

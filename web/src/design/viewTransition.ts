@@ -2,8 +2,11 @@ import { flushSync } from "react-dom";
 
 import { MOTION_MS, prefersReducedMotion } from "./motion";
 
+/** What a started transition hands back: three promises the browser may reject. */
+type StartedTransition = Partial<Pick<ViewTransition, "ready" | "finished" | "updateCallbackDone">>;
+
 type TransitionDocument = Document & {
-  startViewTransition?: (update: () => Promise<void> | void) => unknown;
+  startViewTransition?: (update: () => Promise<void> | void) => StartedTransition | undefined;
 };
 
 type MediaSource = Pick<Window, "matchMedia"> | undefined;
@@ -16,6 +19,11 @@ type MediaSource = Pick<Window, "matchMedia"> | undefined;
  * so a step that draws its page a moment later fades into that page and not into a
  * loading screen. A browser without the API, or a viewer who asked for reduced motion,
  * gets the change at once: that is the fallback, not an error.
+ *
+ * The transition is kept so its three promises are handled. A browser skips a transition
+ * when another starts before it is drawn and rejects its `ready` with an AbortError, though
+ * the update still runs; an update that throws rejects all three. Neither is left to
+ * surface as an unhandled rejection.
  */
 export function crossfade(
   update: () => void,
@@ -31,7 +39,7 @@ export function crossfade(
     update();
     return;
   }
-  document.startViewTransition(async () => {
+  const transition: StartedTransition | undefined = document.startViewTransition(async () => {
     flushSync(update);
     if (ready) {
       await Promise.race([
@@ -40,4 +48,7 @@ export function crossfade(
       ]);
     }
   });
+  for (const settled of [transition?.ready, transition?.finished, transition?.updateCallbackDone]) {
+    settled?.catch(() => {});
+  }
 }

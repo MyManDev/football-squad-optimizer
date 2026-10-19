@@ -70,9 +70,18 @@ export function MemberGate({ children }: { children: ReactNode }) {
     arrived.current = null;
   }, [status, ownPage]);
 
+  // One step per Onayla: a second confirm before the first transition's update has run
+  // (two Enter presses in one frame) is ignored, so it neither starts a transition that
+  // skips the first nor writes the claim and the history entry again. The update clears
+  // it, and where there is no transition the update has already run when `crossfade`
+  // returns.
+  const stepping = useRef(false);
   const confirm = (entry: RosterEntry) => {
+    if (stepping.current) return;
+    stepping.current = true;
     crossfade(
       () => {
+        stepping.current = false;
         claimMember({ leagueId: league.leagueId, leagueName: league.leagueName, ...entry });
         focusAfterClaim.current = true;
         // A new key at the same address, so the shell's scroll to an id in it (#kadro) runs
