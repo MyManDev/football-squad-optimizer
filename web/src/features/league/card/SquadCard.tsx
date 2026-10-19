@@ -46,8 +46,19 @@ export function SquadCard({ view, squad, draw = drawCard }: Props) {
   const copy = MESSAGES[language].leagueMembers;
   const [fields, setFields] = useState<ReadonlySet<CardField>>(new Set(DEFAULT_CARD_FIELDS));
   const [state, setState] = useState<State>({ phase: "idle" });
+  const [shareFailed, setShareFailed] = useState(false);
   const data = useMemo(() => cardData(view, squad), [view, squad]);
   const preview = useRef<HTMLImageElement>(null);
+  // False once the tool is gone (a plan switch unmounts it): a card that finishes drawing
+  // after that gets no object URL, since nothing would be left to revoke it.
+  const mounted = useRef(true);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
   const url = state.phase === "ready" ? state.url : null;
   // Only the card on screen keeps an object URL: a redraw or leaving the page revokes it.
@@ -92,13 +103,26 @@ export function SquadCard({ view, squad, draw = drawCard }: Props) {
     // The button keeps the focus while the card is drawn, so a second press ends here.
     if (busy) return;
     setState({ phase: "drawing" });
+    setShareFailed(false);
     try {
       const card = squadCardSvg(data, fields, cardCopy);
       const blob = await draw(card.svg, card.width, card.height);
+      if (!mounted.current) return;
       const file = new File([blob], fileName, { type: "image/png" });
       setState({ phase: "ready", url: URL.createObjectURL(blob), file, data, fields, language });
     } catch {
-      setState({ phase: "failed" });
+      if (mounted.current) setState({ phase: "failed" });
+    }
+  };
+
+  const share = async (file: File) => {
+    setShareFailed(false);
+    try {
+      await navigator.share({ files: [file] });
+    } catch (error) {
+      // A share the member cancels is no failure; any other refusal is said.
+      const cancelled = error instanceof DOMException && error.name === "AbortError";
+      if (!cancelled && mounted.current) setShareFailed(true);
     }
   };
 
@@ -164,12 +188,17 @@ export function SquadCard({ view, squad, draw = drawCard }: Props) {
               <button
                 type="button"
                 className={styles.action}
-                onClick={() => void navigator.share({ files: [drawn.file] }).catch(() => undefined)}
+                onClick={() => void share(drawn.file)}
               >
                 {copy.cardShare}
               </button>
             ) : null}
           </div>
+          {shareFailed ? (
+            <p className={styles.note} role="alert">
+              {copy.cardShareFailed}
+            </p>
+          ) : null}
         </div>
       ) : null}
     </div>

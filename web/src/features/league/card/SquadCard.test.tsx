@@ -26,6 +26,9 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  for (const name of ["canShare", "share"] as const) {
+    Reflect.deleteProperty(navigator, name);
+  }
 });
 
 const png = async (_svg: string, _width: number, _height: number) =>
@@ -50,6 +53,16 @@ function heldDraw() {
       }),
   );
   return { draw, finish: () => finish() };
+}
+
+function offerShare(share: () => Promise<void>, canShare = true) {
+  Object.defineProperty(navigator, "canShare", {
+    value: vi.fn(() => canShare),
+    configurable: true,
+  });
+  const spy = vi.fn(share);
+  Object.defineProperty(navigator, "share", { value: spy, configurable: true });
+  return spy;
 }
 
 it("draws the card from the fields the member picked, on the device", async () => {
@@ -130,10 +143,66 @@ it("keeps one object URL, for the card on screen, and lets it go on a redraw and
   expect(revokeObjectURL).toHaveBeenLastCalledWith("blob:card-2");
 });
 
+it("makes no object URL for a card that finishes after the tool has gone", async () => {
+  const { draw, finish } = heldDraw();
+  const { unmount } = render(
+    <LanguageProvider initialLanguage="tr">
+      <SquadCard view={view} squad={squad} draw={draw} />
+    </LanguageProvider>,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Kartı oluştur" }));
+  unmount();
+  await act(async () => finish());
+  expect(draw).toHaveBeenCalledTimes(1);
+  expect(createObjectURL).not.toHaveBeenCalled();
+});
+
 it("says so when the card cannot be drawn", async () => {
   renderCard(vi.fn(async () => Promise.reject(new Error("no canvas"))));
   fireEvent.click(screen.getByRole("button", { name: "Kartı oluştur" }));
   expect(await screen.findByRole("alert")).toHaveTextContent("Kart çizilemedi.");
+});
+
+it("offers sharing only where the device can share the file, and shares the card", async () => {
+  const share = offerShare(async () => undefined);
+  renderCard();
+  fireEvent.click(screen.getByRole("button", { name: "Kartı oluştur" }));
+  await screen.findByRole("img");
+  fireEvent.click(screen.getByRole("button", { name: "Paylaş" }));
+  await waitFor(() => expect(share).toHaveBeenCalledTimes(1));
+  const [shared] = share.mock.calls[0] as unknown as [{ files: File[] }];
+  expect(shared.files[0]!.name).toBe(`squadopt-gw${view.gameweek}.png`);
+  expect(screen.queryByRole("alert")).toBeNull();
+});
+
+it("offers no sharing where the device cannot share the file", async () => {
+  offerShare(async () => undefined, false);
+  renderCard();
+  fireEvent.click(screen.getByRole("button", { name: "Kartı oluştur" }));
+  await screen.findByRole("img");
+  expect(screen.getByRole("link", { name: "Kaydet" })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Paylaş" })).toBeNull();
+});
+
+it("says nothing when the member cancels the share", async () => {
+  const share = offerShare(async () => Promise.reject(new DOMException("cancelled", "AbortError")));
+  renderCard();
+  fireEvent.click(screen.getByRole("button", { name: "Kartı oluştur" }));
+  await screen.findByRole("img");
+  fireEvent.click(screen.getByRole("button", { name: "Paylaş" }));
+  await waitFor(() => expect(share).toHaveBeenCalledTimes(1));
+  await act(async () => undefined);
+  expect(screen.queryByRole("alert")).toBeNull();
+});
+
+it("says so when the device refuses the share, and keeps the card", async () => {
+  offerShare(async () => Promise.reject(new DOMException("refused", "NotAllowedError")));
+  renderCard();
+  fireEvent.click(screen.getByRole("button", { name: "Kartı oluştur" }));
+  await screen.findByRole("img");
+  fireEvent.click(screen.getByRole("button", { name: "Paylaş" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("Kart paylaşılamadı.");
+  expect(screen.getByRole("link", { name: "Kaydet" })).toBeInTheDocument();
 });
 
 it("offers no card for a plan without an eleven", () => {
