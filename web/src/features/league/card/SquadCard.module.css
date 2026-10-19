@@ -38,7 +38,7 @@
   min-height: 44px;
   padding: 0 16px;
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--radius-s);
   background: var(--color-primary);
   color: var(--color-primary-text);
   font: inherit;
@@ -68,7 +68,7 @@
   width: 100%;
   max-width: 540px;
   height: auto;
-  border-radius: 12px;
+  border-radius: var(--radius-m);
 }
 
 .actions {
