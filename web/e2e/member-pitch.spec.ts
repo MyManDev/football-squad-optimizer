@@ -1,4 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
+import { atRest } from "./atRest";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
 import { MESSAGES } from "../src/i18n/messages";
@@ -400,6 +401,7 @@ test("the plan link reveals the decision, pitch and honesty together on a laptop
   expect(rail.x + rail.width).toBe(1440);
   expect(rail.y).toBe(0);
   expect(rail.height).toBe(900);
+  await atRest(page);
   const blocking = (await new AxeBuilder({ page }).analyze()).violations.filter((violation) =>
     ["serious", "critical"].includes(violation.impact ?? ""),
   );

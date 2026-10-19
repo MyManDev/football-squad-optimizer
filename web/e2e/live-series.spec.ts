@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { installLeagueMocks } from "./leagueMocks";
 import AxeBuilder from "@axe-core/playwright";
+import { atRest } from "./atRest";
 import { mockSuggestionOverview } from "../src/fixtures/weeklySuggestionOverview";
 import type { Scoreboard } from "../src/features/league/types";
 import { MESSAGES } from "../src/i18n/messages";
@@ -96,6 +97,7 @@ for (const language of ["en", "tr"] as const) {
       .locator("section")
       .filter({ has: page.getByRole("heading", { name: copy.liveSeries.title, exact: true }) });
     await expect(card.getByRole("link", { name: "101", exact: true })).toHaveCount(2);
+    await atRest(page);
     expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
     await card.screenshot({ path: testInfo.outputPath("series-desktop.png") });
     await page.setViewportSize({ width: 390, height: 844 });
@@ -112,6 +114,7 @@ for (const language of ["en", "tr"] as const) {
     await expect
       .poll(() => scrollRegion.evaluate((region) => region.scrollLeft))
       .toBeGreaterThan(0);
+    await atRest(page);
     expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
     const summaryWidth = await card
       .getByRole("table")

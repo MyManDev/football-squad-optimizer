@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
+import { atRest } from "./atRest";
 import { installLeagueMocks } from "./leagueMocks";
 import { mockEntryAdviceEnvelope, mockEntrySquadEnvelopes } from "../src/fixtures/league";
 import { MESSAGES } from "../src/i18n/messages";
@@ -100,6 +101,7 @@ for (const language of ["tr", "en"] as const) {
         () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
       ),
     ).toBe(true);
+    await atRest(page);
     const results = await new AxeBuilder({ page }).analyze();
     expect(
       results.violations.filter((v) => ["serious", "critical"].includes(v.impact ?? "")),

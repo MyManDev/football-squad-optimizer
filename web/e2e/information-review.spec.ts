@@ -1,4 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
+import { atRest } from "./atRest";
 import { expect, test } from "@playwright/test";
 import { mockEntryAdviceEnvelope, mockEntrySquadEnvelopes } from "../src/fixtures/league";
 import { mockInformationReview } from "../src/fixtures/information";
@@ -404,6 +405,7 @@ for (const [window, width, modelVersion] of [
         ),
       ),
     ).toBe(true);
+    await atRest(page);
     const accessibility = await new AxeBuilder({ page }).analyze();
     expect(
       accessibility.violations
