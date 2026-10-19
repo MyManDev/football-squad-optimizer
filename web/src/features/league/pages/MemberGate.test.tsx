@@ -34,7 +34,7 @@ import {
 } from "../../../testSupport/league";
 import { LeagueDataError, LeagueDataMissing, type LeagueTree } from "../data";
 import type { PublishedLeague } from "../directory";
-import { readMemberClaim } from "../identity/memberClaim";
+import { readMemberClaim, writeMemberClaim } from "../identity/memberClaim";
 import type { EntryView, LeagueMembers, LeagueViewEnvelope } from "../types";
 import { MemberGate } from "./MemberGate";
 
@@ -600,11 +600,19 @@ describe("the step from the picker to the page (#1131)", () => {
     delete (window as { matchMedia?: unknown }).matchMedia;
   });
 
-  async function pickAndConfirm() {
+  async function pickAndConfirm(name = /Seda Kaya/) {
     const user = userEvent.setup();
     const group = await picker("tr");
-    await user.click(within(group).getByRole("radio", { name: /Seda Kaya/ }));
+    await user.click(within(group).getByRole("radio", { name }));
     await user.click(screen.getByRole("button", { name: "Onayla" }));
+  }
+
+  function reduceMotion() {
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      writable: true,
+      value: (query: string) => ({ matches: query === "(prefers-reduced-motion: reduce)" }),
+    });
   }
 
   it("crossfades into the page asked for, the claim made inside the transition", async () => {
@@ -675,14 +683,33 @@ describe("the step from the picker to the page (#1131)", () => {
   });
 
   it("changes at once under reduced motion", async () => {
-    Object.defineProperty(window, "matchMedia", {
-      configurable: true,
-      writable: true,
-      value: (query: string) => ({ matches: query === "(prefers-reduced-motion: reduce)" }),
-    });
+    reduceMotion();
     open();
     await pickAndConfirm();
     expect(document.startViewTransition).not.toHaveBeenCalled();
     expect(await screen.findByRole("heading", { name: "League page" })).toBeInTheDocument();
   });
+
+  it.each(["with a transition", "without the API", "under reduced motion"] as const)(
+    "takes the step again once the member is dropped, %s",
+    async (path) => {
+      if (path === "without the API") {
+        delete (document as { startViewTransition?: unknown }).startViewTransition;
+      }
+      if (path === "under reduced motion") reduceMotion();
+      open();
+      await pickAndConfirm();
+      await act(async () => {
+        await Promise.all(started);
+      });
+      expect(readMemberClaim()?.entryId).toBe(35249003);
+      // The first step's update has run, so the second Onayla is not taken for a repeat.
+      act(() => writeMemberClaim(null));
+      await pickAndConfirm(/Mert Işık/);
+      await act(async () => {
+        await Promise.all(started);
+      });
+      expect(readMemberClaim()?.entryId).toBe(35249002);
+    },
+  );
 });
