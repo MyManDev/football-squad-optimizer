@@ -2,6 +2,7 @@ import { OfficialInformationCard } from "../advice/OfficialInformationCard";
 import { useId, type CSSProperties } from "react";
 
 import { Badge } from "../../../design/components/Badge";
+import { CountingNumber } from "../../../design/CountingNumber";
 import { useLanguage } from "../../../i18n/context";
 import { clubCodesFromFixtures, type ClubCodes } from "../../../lib/clubs";
 import { figure, points, signedFigure, signedPoints, utcShort } from "../../../lib/format";
@@ -32,6 +33,7 @@ import type {
 import type { AdviceIssue, ShownAdvice } from "./memberPageTypes";
 import styles from "./LeagueMemberPage.module.css";
 import board from "./MemberDecision.module.css";
+import { hasPublishedPlan, STORY_ANCHORS } from "./storyPlan";
 import lineup from "./MemberLineup.module.css";
 
 /**
@@ -106,16 +108,6 @@ function squadBasisNote(entryBasis?: string, adviceBasis?: string): SquadBasisNo
   if (adviceBasis !== undefined && adviceBasis !== entryBasis) return { kind: "unconfirmed" };
   const week = /^pre_free_hit_gw(\d{2})$/.exec(entryBasis)?.[1];
   return week === undefined ? null : { kind: "week", week: Number(week) };
-}
-
-function hasPublishedPlan(view: EntryAdvice): boolean {
-  return (
-    (view.solver_status === "OPTIMAL" || view.solver_status === "FEASIBLE") &&
-    view.starting_xi?.length === 11 &&
-    view.bench?.length === 4 &&
-    view.captain != null &&
-    view.vice_captain != null
-  );
 }
 
 /**
@@ -813,7 +805,7 @@ function CaptainLine({ view, codes }: { view: EntryAdvice; codes: ClubCodes }) {
   const { captain, vice_captain: vice } = view;
   if (!captain || !vice) return null;
   return (
-    <p className={board.captain}>
+    <p className={board.captain} id={STORY_ANCHORS.captain} tabIndex={-1}>
       <span className={board.armband}>
         <span className={board.armLabel}>{copy.captainLabel}</span>
         <span className={board.markCaptain} aria-hidden="true">
@@ -1145,7 +1137,12 @@ function ChipChoiceSection({ view }: { view: EntryAdvice }) {
   if (!choice) return null;
   const name = messages.leagueMembers.chipNames[choice.chip] ?? choice.chip;
   return (
-    <section className={styles.adviceSection} data-testid="chip-choice">
+    <section
+      className={styles.adviceSection}
+      data-testid="chip-choice"
+      id={STORY_ANCHORS.chip}
+      tabIndex={-1}
+    >
       <h3 className={styles.lineupTitle}>{copy.title}</h3>
       <p className={styles.muted}>{copy.chosen(name)}</p>
       {finiteNumber(choice.gain_vs_no_chip) ? (
@@ -1410,7 +1407,13 @@ function WindowComparison({ view, control }: { view: EntryAdvice; control: Entry
       <dl className={styles.armband}>
         <div>
           <dt>{copy.windowSelectedTotal}</dt>
-          <dd className="num">{points(selected, 1, locale)}</dd>
+          <dd className="num">
+            <CountingNumber
+              countKey={`window-total:${view.league_id}:${view.entry_id}:${view.gameweek}:${view.window}`}
+              value={selected}
+              format={(value) => points(value, 1, locale)}
+            />
+          </dd>
         </div>
         <div>
           <dt>{copy.windowPureTotal}</dt>
