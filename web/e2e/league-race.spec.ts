@@ -8,11 +8,12 @@ import { shippedTrees } from "../src/testSupport/shippedTrees";
 import { shippedClaim } from "./identity";
 import { installLeagueMocks } from "./leagueMocks";
 
-// The league race (#1135) on the narrowest phones of the matrix, with a manager name of 40
-// characters (names may run to 64): the card stays inside its column, so every place-change
-// count is on screen. The shell clips sideways overflow, so the page's own scroll width
-// cannot show a card that runs past it; the card's scroll width can.
-const LONG = "Abdurrahman Alparslan Karamanoğlu Sezgin";
+// The league race (#1135) on the narrowest phones of the matrix, with a manager name of 64
+// characters, the longest a published name may be: the card stays inside its column, so every
+// place-change count is on screen. A shorter name fits a 360 px column without the card's width
+// rules, so only the longest one holds them at both widths. The shell clips sideways overflow,
+// so the page's own scroll width cannot show a card that runs past it; the card's can.
+const LONG = "Abdurrahman Alparslan Karamanoğlu Sezgin Büyükkaraağaçlıoğulları";
 
 for (const width of [320, 360]) {
   test(`the race card fits its column at ${width} px with a long manager name`, async ({
@@ -27,6 +28,7 @@ for (const width of [320, 360]) {
     const first = table.payload.members.find(
       (member: { member_kind: string }) => member.member_kind === "human",
     );
+    expect(LONG).toHaveLength(64);
     first.manager_name = LONG;
     await page.route("**/data/league/members.json", (route) =>
       route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(table) }),

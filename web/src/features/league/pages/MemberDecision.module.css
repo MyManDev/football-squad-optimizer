@@ -239,8 +239,11 @@
     line-height: 28px;
   }
 
+  /* The incoming panel arrives from 12 px to the right (boardMotion.ts), more than this
+     4 px bezel holds; the panels clip it, so it never shows past the board's frame. */
   .panels {
     gap: 4px;
+    overflow: clip;
   }
 
   .panel {
