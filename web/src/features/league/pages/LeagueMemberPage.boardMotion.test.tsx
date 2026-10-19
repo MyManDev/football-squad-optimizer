@@ -5,7 +5,8 @@
  * per change of the pair on a board's place, not on a re-render, and not at all under the
  * reduced-motion preference, where the board is in its end state at once.
  */
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { StrictMode } from "react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -17,6 +18,7 @@ import {
   mockLeagueMembersEnvelope,
 } from "../../../fixtures/league";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
+import { LanguageToggle } from "../../../i18n/LanguageToggle";
 import { MESSAGES } from "../../../i18n/messages";
 import { withLeague } from "../../../testSupport/league";
 import type { AdviceMove, AdvicePlayer, EntryAdvice, LeagueViewEnvelope } from "../types";
@@ -63,6 +65,7 @@ interface Started {
   element: Element;
   keyframes: Keyframe[];
   options: KeyframeAnimationOptions;
+  animation: { cancel: ReturnType<typeof vi.fn> };
 }
 let started: Started[] = [];
 // What the recorded animations answer when asked whether they have finished.
@@ -77,13 +80,14 @@ beforeEach(() => {
     configurable: true,
     writable: true,
     value(this: Element, keyframes: Keyframe[], options: KeyframeAnimationOptions) {
-      started.push({ element: this, keyframes, options });
-      return {
+      const animation = {
         get playState() {
           return playState;
         },
         cancel: vi.fn(),
-      } as unknown as Animation;
+      };
+      started.push({ element: this, keyframes, options, animation });
+      return animation as unknown as Animation;
     },
   });
 });
@@ -114,6 +118,8 @@ function withMoves(moves: AdviceMove[]): LeagueViewEnvelope<EntryAdvice> {
 function view(advice: LeagueViewEnvelope<EntryAdvice>) {
   return (
     <LanguageProvider initialLanguage="tr">
+      {/* The shell's language switch, beside the page as the app holds it. */}
+      <LanguageToggle />
       <MemoryRouter initialEntries={[`/league/352490/members/${ENTRY}`]}>
         {withLeague(
           <LeagueMemberView
@@ -176,6 +182,23 @@ describe("the substitution board's motion", () => {
     expect(boards()[0]!.contains(started[first]!.element)).toBe(true);
   });
 
+  it("stops a board's motion when its pair changes mid-motion, and only that board's", () => {
+    const moves = BASE.payload.moves;
+    const { rerender } = render(view(withMoves(moves)));
+    const [changing, kept] = boards();
+    const old = started.filter(({ element }) => changing!.contains(element));
+    const others = started.filter(({ element }) => kept!.contains(element));
+    expect(old).toHaveLength(3);
+    expect(others).toHaveLength(3);
+    const changed = {
+      ...moves[0]!,
+      player_in: { ...moves[0]!.player_in!, player_id: 999_001, name: "Yeni Oyuncu" },
+    };
+    rerender(view(withMoves([changed, ...moves.slice(1)])));
+    for (const { animation } of old) expect(animation.cancel).toHaveBeenCalledTimes(1);
+    for (const { animation } of others) expect(animation.cancel).not.toHaveBeenCalled();
+  });
+
   it("moves a board again when its pair comes back after a decision without that board", () => {
     const one = BASE.payload.moves[0]!;
     const { rerender } = render(view(withMoves([one])));
@@ -201,6 +224,17 @@ describe("the substitution board's motion", () => {
     expect(boards()[1]!.contains(started[14]!.element)).toBe(true);
   });
 
+  it("neither moves nor stops a board when the language switches mid-motion", () => {
+    render(view(BASE));
+    const count = started.length;
+    fireEvent.click(screen.getByRole("button", { name: "EN · English" }));
+    expect(screen.getAllByRole("article", { name: /^Change \d+\/\d+$/ })).toHaveLength(
+      BASE.payload.moves.length,
+    );
+    expect(started).toHaveLength(count);
+    for (const { animation } of started) expect(animation.cancel).not.toHaveBeenCalled();
+  });
+
   it("does not move again when the same selection's boards mount again after their motion", () => {
     const first = render(view(BASE));
     const count = started.length;
@@ -216,6 +250,18 @@ describe("the substitution board's motion", () => {
     first.unmount();
     render(view(BASE));
     expect(started).toHaveLength(count * 2);
+  });
+
+  it("still moves under StrictMode, whose double effect stops the first motion at once", () => {
+    // The app renders under StrictMode (main.tsx): in development the effect runs, is
+    // cleaned up and runs again, and the second run is the motion the viewer sees.
+    render(<StrictMode>{view(BASE)}</StrictMode>);
+    const count = BASE.payload.moves.length * 3;
+    expect(started).toHaveLength(count * 2);
+    for (const { animation } of started.slice(0, count))
+      expect(animation.cancel).toHaveBeenCalledTimes(1);
+    for (const { animation } of started.slice(count))
+      expect(animation.cancel).not.toHaveBeenCalled();
   });
 
   it("does not move at all under reduced motion, and shows the board's end state at once", () => {

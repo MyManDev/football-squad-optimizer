@@ -634,8 +634,12 @@ function SubstitutionBoard({
   const gain = useRef<HTMLParagraphElement>(null);
   const pair = `${move.player_out?.player_id ?? "-"}>${move.player_in?.player_id ?? "-"}`;
   // The board moves when its place shows a new pair (the week's first decision, or a
-  // switch that changes the pair), never on a re-render. A motion stopped before it ends,
-  // as a remount stops it, leaves the pair unclaimed so it can run again.
+  // switch that changes the pair), never on a re-render. A motion stopped before it ends
+  // leaves the pair unclaimed so it can run again. That release is for StrictMode
+  // (main.tsx): in development it runs this effect, its cleanup and the effect again at
+  // once, and without the release the second run would find the pair claimed and the
+  // board would never move. In a build it means a remount mid-motion that keeps the pair,
+  // as a quick switch to a window with the same move, plays the arrival again.
   useEffect(() => {
     if (!claimPair(slot, pair)) return;
     const running = playBoard({
