@@ -101,6 +101,81 @@ const PAD = 56;
 const ROW = 104;
 const LINE = 62;
 
+// A name plate fills its slot on the row less a gap, so neighbours never touch; the name
+// on it shrinks to fit, the same size across the row, and is cut short only at the floor.
+const PLATE_HEIGHT = 56;
+const PLATE_MAX = 220;
+const PLATE_GAP = 12;
+const PLATE_PAD = 8;
+const NAME_SIZE = 28;
+const NAME_FLOOR = 20;
+// The captain's and vice's disc sits on the plate's top right corner, inside its width.
+const BADGE = 20;
+
+/*
+ * An SVG drawn through an image cannot use the page's fonts or measure its own text, so a
+ * line's width is estimated from its letters. The advances are fractions of the font size
+ * taken on the wide side of the faces system-ui resolves to (Segoe UI, San Francisco,
+ * Roboto, Arial) at 700, wider still for capitals and wide letters, so a line that fits by
+ * the estimate fits on the device.
+ */
+const ADVANCES: readonly (readonly [string, number])[] = [
+  [" ijlı.,:;'!|", 0.3],
+  ["ftI", 0.4],
+  ["r-()·", 0.44],
+  ["J", 0.56],
+  ["w", 0.84],
+  ["m", 0.94],
+  ["MW", 1.04],
+  ["…→&", 1],
+];
+const ADVANCE = new Map(
+  ADVANCES.flatMap(([letters, em]) => Array.from(letters, (letter) => [letter, em] as const)),
+);
+
+function advance(letter: string): number {
+  // A Turkish or accented letter takes its base letter's width: ş as s, İ as I.
+  const base = letter.normalize("NFD").charAt(0) || letter;
+  const known = ADVANCE.get(letter) ?? ADVANCE.get(base);
+  if (known !== undefined) return known;
+  if (/[a-z]/.test(base)) return 0.58;
+  if (/[A-Z]/.test(base)) return 0.78;
+  if (/[0-9]/.test(base)) return 0.6;
+  return (base.codePointAt(0) ?? 0) >= 0x2e80 ? 1.05 : 0.8;
+}
+
+/** The width a line takes on the card, by the estimate above. */
+export function textWidth(value: string, size: number, weight = 600): number {
+  const em = Array.from(value).reduce((sum, letter) => sum + advance(letter), 0);
+  return em * size * (weight >= 800 ? 1.05 : 1);
+}
+
+/**
+ * The line at the largest size from `size` down to `floor` that fits `room`; a line still
+ * too wide at the floor is cut and ends in an ellipsis.
+ */
+export function fitText(
+  value: string,
+  room: number,
+  size: number,
+  floor = size,
+  weight = 600,
+): { value: string; size: number } {
+  const em = textWidth(value, 1, weight);
+  if (em * size <= room) return { value, size };
+  const shrunk = Math.floor(room / em);
+  if (shrunk >= floor) return { value, size: shrunk };
+  const letters = Array.from(value);
+  for (let end = letters.length - 1; end > 0; end -= 1) {
+    const cut = `${letters
+      .slice(0, end)
+      .join("")
+      .replace(/[\s·.,:-]+$/u, "")}…`;
+    if (textWidth(cut, floor, weight) <= room) return { value: cut, size: floor };
+  }
+  return { value: "…", size: floor };
+}
+
 const escape = (text: string) =>
   text
     .replaceAll("&", "&amp;")
@@ -113,20 +188,37 @@ function text(
   x: number,
   y: number,
   value: string,
-  { size = 32, weight = 600, fill = CHIP_TEXT, anchor = "start", tabular = false } = {},
+  {
+    size = 32,
+    weight = 600,
+    fill = CHIP_TEXT,
+    anchor = "start",
+    tabular = false,
+    room = Infinity,
+    floor = Math.round(size * 0.75),
+  } = {},
 ): string {
+  const line = fitText(value, room, size, floor, weight);
   const numbers = tabular ? ' font-variant-numeric="tabular-nums"' : "";
-  return `<text x="${x}" y="${y}" font-family="${FONT}" font-size="${size}" font-weight="${weight}" fill="${fill}" text-anchor="${anchor}"${numbers}>${escape(value)}</text>`;
+  return `<text x="${x}" y="${y}" font-family="${FONT}" font-size="${line.size}" font-weight="${weight}" fill="${fill}" text-anchor="${anchor}"${numbers}>${escape(line.value)}</text>`;
 }
 
-function chip(cx: number, y: number, label: string, mark: string | null): string {
-  const width = Math.min(220, Math.max(140, label.length * 19 + 40));
+const plateWidth = (slot: number) => Math.min(PLATE_MAX, slot - PLATE_GAP);
+
+function plate(
+  cx: number,
+  y: number,
+  width: number,
+  name: { value: string; size: number },
+  mark: string | null,
+): string {
   const x = cx - width / 2;
   const badge =
     mark === null
       ? ""
-      : `<circle cx="${x + width - 6}" cy="${y + 6}" r="22" fill="${ACCENT}"/>${text(x + width - 6, y + 16, mark, { size: 26, weight: 800, anchor: "middle" })}`;
-  return `<rect x="${x}" y="${y}" width="${width}" height="56" rx="12" fill="${CHIP}"/>${text(cx, y + 38, label, { size: 28, anchor: "middle" })}${badge}`;
+      : `<circle cx="${x + width - BADGE}" cy="${y - 8}" r="${BADGE}" fill="${ACCENT}"/>${text(x + width - BADGE, y, mark, { size: 24, weight: 800, anchor: "middle" })}`;
+  const baseline = y + PLATE_HEIGHT / 2 + Math.round(name.size * 0.35);
+  return `<g class="plate"><rect x="${x}" y="${y}" width="${width}" height="${PLATE_HEIGHT}" rx="12" fill="${CHIP}"/>${text(cx, baseline, name.value, { size: name.size, anchor: "middle" })}${badge}</g>`;
 }
 
 const ORDER: Position[] = ["GK", "DEF", "MID", "FWD"];
@@ -141,14 +233,35 @@ export function squadCardSvg(
   let y = PAD;
 
   // The header always names the week, so a card never travels without its gameweek.
-  parts.push(text(PAD, y + 44, copy.title(data.gameweek), { size: 48, weight: 800, fill: ACCENT }));
+  parts.push(
+    text(PAD, y + 44, copy.title(data.gameweek), {
+      size: 48,
+      weight: 800,
+      fill: ACCENT,
+      room: CARD_WIDTH - 2 * PAD,
+    }),
+  );
   y += 72;
   if (fields.has("team") && data.teamName) {
-    parts.push(text(PAD, y + 34, data.teamName, { size: 36, weight: 700, fill: CHIP }));
+    parts.push(
+      text(PAD, y + 34, data.teamName, {
+        size: 36,
+        weight: 700,
+        fill: CHIP,
+        room: CARD_WIDTH - 2 * PAD,
+      }),
+    );
     y += 46;
   }
   if (fields.has("team") && data.managerName) {
-    parts.push(text(PAD, y + 34, data.managerName, { size: 28, weight: 500, fill: BOARD_MUTED }));
+    parts.push(
+      text(PAD, y + 34, data.managerName, {
+        size: 28,
+        weight: 500,
+        fill: BOARD_MUTED,
+        room: CARD_WIDTH - 2 * PAD,
+      }),
+    );
     y += 46;
   }
   const headerBottom = y + 16;
@@ -157,10 +270,18 @@ export function squadCardSvg(
   y = headerBottom + 32;
   if (fields.has("lineup")) {
     const pitchTop = y - 16;
+    // Room above the first row for a captain's disc, which rises above its plate.
+    y += 20;
     const rows = ORDER.map((position) => data.starters.filter((p) => p.position === position));
     rows.forEach((row) => {
+      const slot = CARD_WIDTH / (row.length + 1);
+      const width = plateWidth(slot);
+      const room = width - 2 * PLATE_PAD;
+      const size = Math.min(
+        NAME_SIZE,
+        ...row.map((p) => fitText(p.name, room, NAME_SIZE, NAME_FLOOR).size),
+      );
       row.forEach((p, index) => {
-        const cx = (CARD_WIDTH * (index + 1)) / (row.length + 1);
         const mark = !fields.has("captain")
           ? null
           : p.id === data.captain?.id
@@ -168,7 +289,7 @@ export function squadCardSvg(
             : p.id === data.viceCaptain?.id
               ? "V"
               : null;
-        body.push(chip(cx, y, p.name, mark));
+        body.push(plate(slot * (index + 1), y, width, fitText(p.name, room, size), mark));
       });
       y += ROW;
     });
@@ -181,12 +302,14 @@ export function squadCardSvg(
     body.unshift(
       `<rect x="0" y="${pitchTop}" width="${CARD_WIDTH}" height="${pitchHeight}" fill="${PITCH}"/>${stripes}`,
     );
+    const benchAt = PAD + Math.ceil(textWidth(copy.bench, 26, 700)) + 20;
     body.push(text(PAD, y + 34, copy.bench, { size: 26, weight: 700, fill: BOARD_MUTED }));
     body.push(
-      text(PAD + 150, y + 34, data.bench.map((p) => p.name).join(" · "), {
+      text(benchAt, y + 34, data.bench.map((p) => p.name).join(" · "), {
         size: 28,
         weight: 500,
         fill: CHIP,
+        room: CARD_WIDTH - PAD - benchAt,
       }),
     );
     y += LINE + 8;
@@ -195,7 +318,9 @@ export function squadCardSvg(
     const line = data.viceCaptain
       ? `${copy.captain}: ${data.captain.name} · ${copy.viceCaptain}: ${data.viceCaptain.name}`
       : `${copy.captain}: ${data.captain.name}`;
-    body.push(text(PAD, y + 34, line, { size: 32, weight: 700, fill: CHIP }));
+    body.push(
+      text(PAD, y + 34, line, { size: 32, weight: 700, fill: CHIP, room: CARD_WIDTH - 2 * PAD }),
+    );
     y += LINE;
   }
   if (fields.has("transfers")) {
@@ -205,16 +330,29 @@ export function squadCardSvg(
       body.push(text(PAD, y + 34, copy.noTransfers, { size: 30, weight: 600, fill: CHIP }));
       y += LINE;
     }
+    const arrow = CARD_WIDTH / 2 - 10;
     data.moves.forEach((move) => {
       body.push(`<rect x="${PAD}" y="${y + 6}" width="12" height="40" rx="3" fill="${OUT}"/>`);
-      body.push(text(PAD + 28, y + 38, move.out, { size: 30, weight: 600, fill: CHIP }));
       body.push(
-        text(CARD_WIDTH / 2 - 10, y + 38, "→", { size: 30, fill: BOARD_MUTED, anchor: "middle" }),
+        text(PAD + 28, y + 38, move.out, {
+          size: 30,
+          weight: 600,
+          fill: CHIP,
+          room: arrow - 28 - (PAD + 28),
+        }),
       );
+      body.push(text(arrow, y + 38, "→", { size: 30, fill: BOARD_MUTED, anchor: "middle" }));
       body.push(
         `<rect x="${CARD_WIDTH / 2 + 20}" y="${y + 6}" width="12" height="40" rx="3" fill="${IN}"/>`,
       );
-      body.push(text(CARD_WIDTH / 2 + 48, y + 38, move.in, { size: 30, weight: 600, fill: CHIP }));
+      body.push(
+        text(CARD_WIDTH / 2 + 48, y + 38, move.in, {
+          size: 30,
+          weight: 600,
+          fill: CHIP,
+          room: CARD_WIDTH - PAD - (CARD_WIDTH / 2 + 48),
+        }),
+      );
       y += LINE;
     });
     if (data.hitPoints > 0) {

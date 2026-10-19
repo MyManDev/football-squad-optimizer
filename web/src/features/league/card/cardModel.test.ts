@@ -2,8 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import { mockEntryAdviceEnvelope, mockEntrySquadEnvelopes } from "../../../fixtures/league";
 import {
+  CARD_WIDTH,
   cardData,
+  fitText,
   squadCardSvg,
+  textWidth,
   type CardCopy,
   type CardField,
   type CardPlayer,
@@ -50,6 +53,40 @@ function elevenWithMidfield(names: string[]): CardPlayer[] {
     starter(20, "Haaland", "FWD"),
     starter(21, "Isak", "FWD"),
   ];
+}
+
+const parse = (svg: string) => new DOMParser().parseFromString(svg, "image/svg+xml");
+const num = (element: Element | null, name: string) => Number(element?.getAttribute(name));
+
+/** Each name plate as drawn: its box, the name on it and the disc on its corner, if any. */
+function platesOf(svg: string) {
+  return Array.from(parse(svg).querySelectorAll("g.plate"), (plate) => {
+    const rect = plate.querySelector("rect");
+    const [name, mark] = Array.from(plate.querySelectorAll("text"));
+    const disc = plate.querySelector("circle");
+    return {
+      x: num(rect, "x"),
+      y: num(rect, "y"),
+      width: num(rect, "width"),
+      height: num(rect, "height"),
+      name: name?.textContent ?? "",
+      size: num(name ?? null, "font-size"),
+      mark: mark?.textContent ?? null,
+      disc: disc === null ? null : { cx: num(disc, "cx"), cy: num(disc, "cy"), r: num(disc, "r") },
+    };
+  });
+}
+
+/** Where each line of text reaches across the card, by the same estimate the card fits by. */
+function linesOf(svg: string) {
+  return Array.from(parse(svg).querySelectorAll("text"), (line) => {
+    const value = line.textContent ?? "";
+    const width = textWidth(value, num(line, "font-size"), num(line, "font-weight"));
+    const x = num(line, "x");
+    const anchor = line.getAttribute("text-anchor");
+    const left = anchor === "middle" ? x - width / 2 : anchor === "end" ? x - width : x;
+    return { value, size: num(line, "font-size"), left, right: left + width };
+  });
 }
 
 describe("cardData", () => {
@@ -147,5 +184,125 @@ describe("squadCardSvg", () => {
     expect(svg.match(/>V</g)).toHaveLength(1);
     // The goalkeeper's plate comes first and carries no armband; the C follows Cole's name.
     expect(svg.indexOf(">C<")).toBeGreaterThan(svg.lastIndexOf(">Palmer<"));
+  });
+
+  it("sets a long row of five on plates that never overlap, each name in full", () => {
+    const row = ["Maitland-Niles", "Dewsbury-Hall", "Gibbs-White", "Szoboszlai", "Calvert-Lewin"];
+    const eleven = elevenWithMidfield(row);
+    // The captain and the vice side by side, so their discs sit on neighbouring plates.
+    const data = {
+      ...plan().data,
+      starters: eleven,
+      captain: eleven[4]!,
+      viceCaptain: eleven[5]!,
+    };
+    const plates = platesOf(
+      squadCardSvg(data, new Set<CardField>(["lineup", "captain"]), copy).svg,
+    );
+    expect(plates).toHaveLength(11);
+
+    const rows = new Map<number, typeof plates>();
+    for (const plate of plates) rows.set(plate.y, [...(rows.get(plate.y) ?? []), plate]);
+    const midfield = [...rows.values()].find((line) => line.length === 5)!;
+    expect(midfield.map((plate) => plate.name)).toEqual(row);
+    expect(midfield.map((plate) => plate.mark)).toEqual(["C", "V", null, null, null]);
+    for (const line of rows.values()) {
+      const sorted = [...line].sort((a, b) => a.x - b.x);
+      sorted.slice(1).forEach((plate, index) => {
+        expect(sorted[index]!.x + sorted[index]!.width).toBeLessThan(plate.x);
+      });
+      // One size across the row, never under the floor.
+      expect(new Set(line.map((plate) => plate.size)).size).toBe(1);
+      expect(line[0]!.size).toBeGreaterThanOrEqual(20);
+    }
+    const rowTops = [...rows.keys()].sort((a, b) => a - b);
+    for (const plate of plates) {
+      // The name keeps 8 px clear of each edge of its plate.
+      expect(textWidth(plate.name, plate.size)).toBeLessThanOrEqual(plate.width - 16);
+      if (plate.disc === null) continue;
+      // The disc stays inside its plate's width and clear of the plate on the row above.
+      expect(plate.disc.cx - plate.disc.r).toBeGreaterThanOrEqual(plate.x);
+      expect(plate.disc.cx + plate.disc.r).toBeLessThanOrEqual(plate.x + plate.width);
+      const above = rowTops.filter((top) => top < plate.y).at(-1);
+      if (above !== undefined) {
+        expect(plate.disc.cy - plate.disc.r).toBeGreaterThan(above + plate.height);
+      }
+    }
+  });
+
+  it("cuts a name too long for its plate even at the smallest size, with an ellipsis", () => {
+    const long = "Wolfeschlegelsteinhausenbergerdorff";
+    const eleven = elevenWithMidfield(["Saka", long, "Rice", "Ødegaard", "Merino"]);
+    const data = { ...plan().data, starters: eleven };
+    const plates = platesOf(squadCardSvg(data, new Set<CardField>(["lineup"]), copy).svg);
+    const cut = plates.find((plate) => plate.name.startsWith("Wolfe"))!;
+    expect(cut.name).toMatch(/^Wolfe\S+…$/u);
+    expect(cut.size).toBe(20);
+    expect(textWidth(cut.name, cut.size)).toBeLessThanOrEqual(cut.width - 16);
+    expect(plates.find((plate) => plate.name === "Saka")!.size).toBe(20);
+  });
+
+  it("keeps every line inside the card's margins, however long the names", () => {
+    const long = "Featherstonehaugh Wolfeschlegelsteinhausenbergerdorff Montmorency";
+    const manager = "MAXIMILIAN ".repeat(6).slice(0, 64);
+    const { data } = plan();
+    const eleven = elevenWithMidfield([
+      "Maitland-Niles",
+      "Dewsbury-Hall",
+      "Gibbs-White",
+      "Szoboszlai",
+      "Calvert-Lewin",
+    ]);
+    const tall = {
+      ...data,
+      teamName: `${long} ${long}`,
+      managerName: manager,
+      starters: eleven,
+      bench: [eleven[4]!, eleven[5]!, eleven[7]!, eleven[8]!],
+      captain: { ...eleven[4]!, name: long },
+      viceCaptain: { ...eleven[5]!, name: long },
+      moves: [{ out: long, in: long }],
+      hitPoints: 12,
+      chip: "3xc" as const,
+      expectedPoints: 56.55,
+    };
+    const all = new Set<CardField>(["team", "lineup", "captain", "transfers", "points"]);
+    const lines = linesOf(squadCardSvg(tall, all, copy).svg);
+    for (const line of lines) {
+      expect(line.left, line.value).toBeGreaterThanOrEqual(56);
+      expect(line.right, line.value).toBeLessThanOrEqual(CARD_WIDTH - 56);
+    }
+    // A 64-letter manager name ran past the card's edge: it shrinks to fit, and a team name
+    // too long even at its smallest size is cut.
+    const managerLine = lines.find((line) => line.value.startsWith("MAXIMILIAN"))!;
+    expect(managerLine.value).toBe(manager);
+    expect(managerLine.size).toBeLessThan(28);
+    const teamLine = lines.find((line) => line.value.startsWith("Featherstonehaugh"))!;
+    expect(teamLine.value).toMatch(/^Featherstonehaugh .*…$/u);
+    expect(teamLine.size).toBe(27);
+    // The name leaving the squad stops short of the arrow between the two names.
+    const arrow = lines.find((line) => line.value === "→")!;
+    const out = lines.filter((line) => line.value.startsWith("Feather") && line.left === 84);
+    expect(out).toHaveLength(1);
+    expect(out[0]!.right).toBeLessThan(arrow.left);
+  });
+});
+
+describe("fitText", () => {
+  it("keeps a line that fits, shrinks one that does not, and cuts it only at the floor", () => {
+    expect(fitText("Saka", 200, 28, 20)).toEqual({ value: "Saka", size: 28 });
+    const shrunk = fitText("Maitland-Niles", 160, 28, 20);
+    expect(shrunk.value).toBe("Maitland-Niles");
+    expect(shrunk.size).toBeLessThan(28);
+    expect(textWidth(shrunk.value, shrunk.size)).toBeLessThanOrEqual(160);
+    const cut = fitText("Maitland-Niles", 100, 28, 20);
+    expect(cut.size).toBe(20);
+    expect(cut.value).toMatch(/^Mait\S*…$/u);
+    expect(textWidth(cut.value, 20)).toBeLessThanOrEqual(100);
+  });
+
+  it("reads Turkish letters at their base letter's width", () => {
+    expect(textWidth("Kadıoğlu", 28)).toBe(textWidth("Kadioglu", 28));
+    expect(textWidth("İŞÇ", 28)).toBe(textWidth("ISC", 28));
   });
 });
