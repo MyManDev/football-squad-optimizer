@@ -19,6 +19,15 @@ import { claimMember, shippedClaim, type SeededClaim } from "./identity";
 // site's origin.
 
 const COPY = MESSAGES.tr.leagueMembers;
+
+/**
+ * By default the shipped tree is walked for two members: 6879786, whose published reading
+ * plays chips this week, and the first member whose reading only holds. Every member is
+ * walked, and the device time of each run printed for all of them, with
+ * CHIP_TIMING_ALL_MEMBERS=1.
+ */
+const ALL_MEMBERS = process.env.CHIP_TIMING_ALL_MEMBERS === "1";
+const PLAYS_NOW = 6879786;
 const read = <T>(path: string): T => JSON.parse(readFileSync(path, "utf-8")) as T;
 
 interface Published {
@@ -43,6 +52,21 @@ function shippedMembers() {
     return [{ entryId: Number(match[1]), published, held }];
   });
   return { tree, members };
+}
+
+/** Whether the published reading names a chip to play this week. */
+function playsNow(published: Published | null): boolean {
+  return (published?.forecast?.chips ?? []).some((chip) => chip.verdict === "play_now");
+}
+
+/** The members the shipped walk covers: every one, or the two the default names. */
+function walked<T extends { entryId: number; published: Published | null }>(members: T[]): T[] {
+  if (ALL_MEMBERS) return members;
+  const playing = members.find((member) => member.entryId === PLAYS_NOW);
+  const holding = members.find(
+    (member) => shownChips(member.published).length > 0 && !playsNow(member.published),
+  );
+  return [playing, holding].filter((member): member is T => member !== undefined);
 }
 
 /** The chips the published reading names to play or hold, in its order. */
@@ -158,15 +182,16 @@ async function openChipSettings(page: Page) {
   return tool;
 }
 
-test("every shipped member's chip timing is read on the device, beside the chip control", async ({
+test("shipped members' chip timing is read on the device, beside the chip control", async ({
   page,
 }) => {
-  test.setTimeout(600_000);
-  const { tree, members } = shippedMembers();
+  test.setTimeout(ALL_MEMBERS ? 600_000 : 120_000);
+  const { tree, members: shipped } = shippedMembers();
+  const members = walked(shipped);
   const claim = shippedClaim();
   const gameweek = read<{ payload: { gameweek: number } }>(join(tree.root, "members.json")).payload
     .gameweek;
-  expect(members.length).toBeGreaterThan(0);
+  expect(members.length).toBe(ALL_MEMBERS ? shipped.length : 2);
   await openPage(page, claim, gameweek);
   const timings: ({ entry: number; chips: number } & Omit<Run, "requested">)[] = [];
   let scanned = false;
@@ -189,6 +214,13 @@ test("every shipped member's chip timing is read on the device, beside the chip 
         .locator("[data-chip]")
         .evaluateAll((rows) => rows.map((row) => row.getAttribute("data-chip")));
       expect(names, String(entryId)).toEqual(expected);
+      // One chip a gameweek: where the reading plays chips now, one row says this week.
+      const now = await card
+        .locator("[data-chip] dd")
+        .evaluateAll(
+          (cells) => cells.filter((cell) => /^Bu hafta, /.test(cell.textContent ?? "")).length,
+        );
+      expect(now, String(entryId)).toBe(playsNow(published) ? 1 : 0);
       if (!scanned) {
         await atRest(page);
         const results = await new AxeBuilder({ page }).include("[data-chip-timing]").analyze();
