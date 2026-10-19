@@ -26,7 +26,12 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function renderCard(draw = vi.fn(async () => new Blob(["png"], { type: "image/png" }))) {
+function renderCard(
+  draw = vi.fn(
+    async (_svg: string, _width: number, _height: number) =>
+      new Blob(["png"], { type: "image/png" }),
+  ),
+) {
   render(
     <LanguageProvider initialLanguage="tr">
       <SquadCard view={view} squad={squad} draw={draw} />
