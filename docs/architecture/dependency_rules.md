@@ -256,9 +256,10 @@ entries, and they may only shrink (rule 1 above):
 6. `The decision core imports no OS or process module`: `contracts`, `optimization`,
    `planning`, `scenarios` and `evaluation` import no `os`, `shutil`, `tempfile` or
    `subprocess`.
-7. `The decision core imports no storage or source module`: the same five packages, and
-   `application.ports`, the home ADR 0011 gives the use-case storage ports, import none of the
-   storage and source modules of `data`.
+7. `The decision core imports no storage or source module`: the same five packages,
+   `prediction` (with its zone owner's agreement, #1081) and `application.ports`, the home ADR
+   0011 gives the use-case storage ports, import none of the storage and source modules of
+   `data`.
 8. `The CP-SAT solver stays in the decision core`: only `optimization`, `planning`,
    `scenarios`, `evaluation` and `backtest` may import `ortools`.
 9. `Use cases and domain records import no process, thread, event-loop or command-line module`:
