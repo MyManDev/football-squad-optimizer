@@ -1,4 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
+import { atRest } from "./atRest";
 import { expect, test } from "@playwright/test";
 
 import { settledRecommendationFixture } from "../src/fixtures/settledRecommendation";
@@ -33,6 +34,7 @@ test("the real settled contract fills the scorecard and player rows at 390px", a
   }));
   expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth);
 
+  await atRest(page);
   const results = await new AxeBuilder({ page }).analyze();
   const blocking = results.violations.filter((violation) =>
     new Set(["critical", "serious"]).has(violation.impact ?? ""),

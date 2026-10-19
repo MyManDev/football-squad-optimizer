@@ -2,6 +2,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { cp, readFile, rm } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
+import { atRest } from "./atRest";
 
 import type { EntryAdvice, LeagueViewEnvelope } from "../src/features/league/types";
 import { COMPUTE_COPY } from "../src/features/league/advice/computeCopy";
@@ -163,6 +164,7 @@ test("member selections compute, reload uses cache, and a stopped backend leaves
   expect(await job.json()).toMatchObject({ job_id: jobId, status: "completed" });
   await expect(page.getByText("Plan hazır", { exact: true })).toBeVisible();
   await expect(page.getByText("Hesap sonucu", { exact: true })).toBeVisible();
+  await atRest(page);
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
   await expect(page.getByText(context.snapshotId, { exact: false })).toBeVisible();
   const advice = page.locator('[aria-labelledby="entry-advice-title"]');
