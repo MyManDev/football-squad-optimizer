@@ -94,6 +94,8 @@ describe("the crossfade", () => {
     async (name) => {
       const unhandled: unknown[] = [];
       const record = (reason: unknown) => unhandled.push(reason);
+      const reported = vi.fn();
+      vi.stubGlobal("reportError", reported);
       process.on("unhandledRejection", record);
       try {
         const document = {
@@ -105,8 +107,11 @@ describe("the crossfade", () => {
         // Node reports a rejection nobody handled once the microtasks have run.
         await new Promise((resolve) => setTimeout(resolve, 0));
         expect(unhandled).toEqual([]);
+        // A skip is the browser's own business: nothing is reported.
+        expect(reported).not.toHaveBeenCalled();
       } finally {
         process.off("unhandledRejection", record);
+        vi.unstubAllGlobals();
       }
     },
   );
