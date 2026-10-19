@@ -358,3 +358,9 @@ td.total {
     vertical-align: bottom;
   }
 }
+
+/* The league race, across both columns under the table. */
+.race {
+  grid-column: 1 / -1;
+  min-width: 0;
+}

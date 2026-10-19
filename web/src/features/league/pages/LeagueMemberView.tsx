@@ -14,6 +14,9 @@ import { AdviceRequestPanel } from "../advice/AdviceRequestPanel";
 import { COMPUTE_COPY } from "../advice/computeCopy";
 import { MemberDecisionControls } from "../advice/MemberDecisionControls";
 import { deviceEndedWithoutPlan } from "../device/useDevicePlan";
+import { isDevicePlanEntry } from "../device/types";
+import { advisedFifteen } from "../device/whatIf";
+import { WhatIfPanel } from "../device/WhatIfPanel";
 import { DecisionPreferencesPanel } from "../advice/DecisionPreferencesPanel";
 import { ModelComparison } from "../advice/ModelComparison";
 import { DecisionWorkbench } from "../advice/DecisionWorkbench";
@@ -123,6 +126,7 @@ function LeagueMemberContent({
   computeService = "static",
   computePending = false,
   deviceDependencies,
+  whatIfDependencies,
   deviceRivals,
   rivalSquad = null,
   duelSquad = null,
@@ -178,6 +182,8 @@ function LeagueMemberContent({
     selection.status === "not-listed" &&
     ((computeAvailable && selection.computable !== undefined) ||
       (device.available && deadlinePassed === null && !deviceEndedWithoutPlan(device.state)));
+  // The what-if mode starts from the plan on screen when it is a solved week without a chip.
+  const advised = advisedFifteen(shown?.envelope.payload);
   // The duel (#1133): the other human members, and the one `?duel=` names among them.
   const duelCandidates = rivalCandidates(members, view.entry.entry_id);
   const duelId = duelRivalId(searchParams, members, view.entry.entry_id);
@@ -523,6 +529,11 @@ function LeagueMemberContent({
               />
             ) : null}
           </Tool>
+          {advised !== null && isDevicePlanEntry(view.device_plan) ? (
+            <Tool title={copy.whatIfTitle}>
+              <WhatIfPanel squad={view} advised={advised} dependencies={whatIfDependencies} />
+            </Tool>
+          ) : null}
           {canDuel(squad) && duelCandidates.length > 0 ? (
             <Tool title={copy.duelTitle} open={duelId !== null}>
               <RivalDuel

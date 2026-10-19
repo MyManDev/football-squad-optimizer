@@ -11,9 +11,11 @@ import { gameweekDeadline, useDeadlinePassed } from "../advice/deadline";
 import { ExampleDataBadge } from "../components/ExampleDataBadge";
 import { DisclosureIcon } from "../components/memberIcons";
 import { ViewerChips } from "../components/ViewerChips";
+import { leagueRace } from "../race/leagueRace";
+import { LeagueRaceCard } from "../race/LeagueRaceCard";
 import { LeagueDataMissing } from "../data";
 import { useLeagueIdentity } from "../identity/useLeagueIdentity";
-import { useEntrySquad, useLeagueMembers } from "../queries";
+import { useEntrySquad, useLeagueMembers, useLeagueScoreboard } from "../queries";
 import { follower, gapToLeader, leaderTotal, netWeekPoints } from "../standing";
 import type {
   EntrySquad,
@@ -21,6 +23,7 @@ import type {
   LeagueMembers,
   LeagueViewEnvelope,
   RankMovement,
+  Scoreboard,
 } from "../types";
 import { ScoreBug, TopWeek } from "./MemberTopBar";
 import { scoreBugCells } from "./scoreBug";
@@ -36,6 +39,8 @@ export function LeagueMembersPage() {
   // the bank, the free transfers and the chips. The member page shares the read.
   const viewerSquad = useEntrySquad(viewer?.entryId, viewer !== null);
   const fixtures = useFixtures();
+  // The scoreboard the league race is drawn from; a missing or failed read draws no race.
+  const scoreboard = useLeagueScoreboard();
   // Re-read once a minute, so an open page notices its deadline passing.
   const deadlinePassed = useDeadlinePassed(
     query.data?.payload.season,
@@ -61,6 +66,7 @@ export function LeagueMembersPage() {
       viewerSquad={viewer !== null ? (viewerSquad.data ?? null) : null}
       fixtures={fixtures.data ?? null}
       deadlinePassed={deadlinePassed !== null}
+      scoreboard={scoreboard.isError ? null : (scoreboard.data?.payload ?? null)}
     />
   );
 }
@@ -79,8 +85,11 @@ export function LeagueMembersView({
   viewerSquad = null,
   fixtures = null,
   deadlinePassed = false,
+  scoreboard = null,
 }: {
   envelope: LeagueViewEnvelope<LeagueMembers>;
+  /** The published scoreboard the league race is drawn from; none, no race. */
+  scoreboard?: Scoreboard | null;
   /** The viewer's own squad document, for the bank, the free transfers and the chips. */
   viewerSquad?: LeagueViewEnvelope<EntrySquad> | null;
   fixtures?: FixturesPayload | null;
@@ -107,6 +116,8 @@ export function LeagueMembersView({
   const deadline = gameweekDeadline(fixtures, view.season, view.gameweek);
   const cells = viewerRow ? scoreBugCells(viewerRow, rows.length, squad, locale, copy) : [];
   const count = (value: number) => points(value, 0, locale);
+  const race =
+    scoreboard !== null ? leagueRace(scoreboard, view.members, view.scored_gameweek) : null;
 
   return (
     <div className={styles.page}>
@@ -248,6 +259,17 @@ export function LeagueMembersView({
                 )}
               </p>
             ) : null}
+          </div>
+        ) : null}
+
+        {/* The league race, from the scoreboard the page reads for it, across both columns. */}
+        {race ? (
+          <div className={styles.race}>
+            <LeagueRaceCard
+              race={race}
+              members={view.members}
+              initialEntry={viewerRow?.entry_id ?? null}
+            />
           </div>
         ) : null}
       </div>
