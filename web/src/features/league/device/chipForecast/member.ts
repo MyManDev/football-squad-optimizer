@@ -132,6 +132,19 @@ export function calendarCounts(
 
 type ChipBlock = EntrySquad["chips"];
 
+/** The chip's windows that cover `gameweek` and are still unspent. */
+function openWindows(chips: NonNullable<ChipBlock>, name: ChipName, gameweek: number) {
+  return CHIP_HALVES.flatMap((half) => {
+    const window = chips.states[name]?.[half];
+    return window != null &&
+      window.start_event <= gameweek &&
+      gameweek <= window.stop_event &&
+      window.state === "available"
+      ? [window]
+      : [];
+  });
+}
+
 /**
  * The chips the member holds in `gameweek`, in the game's order, as the publisher's chip
  * menu reads them; null where the history is not known. These are the chips the device
@@ -146,17 +159,7 @@ export function heldChips(chips: ChipBlock, gameweek: number): ChipName[] | null
     }),
   );
   if (windows.some((window) => window.state === "unknown")) return null;
-  return CHIP_NAMES.filter((name) =>
-    CHIP_HALVES.some((half) => {
-      const window = chips.states[name]?.[half];
-      return (
-        window != null &&
-        window.start_event <= gameweek &&
-        gameweek <= window.stop_event &&
-        window.state === "available"
-      );
-    }),
-  );
+  return CHIP_NAMES.filter((name) => openWindows(chips, name, gameweek).length > 0);
 }
 
 /** The chip_forecast_v1 document as the device states it: the rule's, without `limits`. */
@@ -226,15 +229,7 @@ function reading(
   const held = heldChips(squad.chips, week);
   if (held === null) throw new ForecastUnavailable("chip_history_unknown");
   const chips: HeldChip[] = held.map((name) => {
-    const active = CHIP_HALVES.flatMap((half) => {
-      const window = squad.chips!.states[name]?.[half];
-      return window != null &&
-        window.start_event <= week &&
-        week <= window.stop_event &&
-        window.state === "available"
-        ? [window]
-        : [];
-    });
+    const active = openWindows(squad.chips!, name, week);
     if (active.length !== 1) throw new ForecastUnavailable("chip_window_unreadable");
     return {
       name,
@@ -320,8 +315,8 @@ export function memberChipForecast(inputs: MemberChipForecastInputs): MemberChip
   try {
     return { ...envelope, status: "available", ...reading(inputs, ids) };
   } catch (error) {
-    // Any other failure is an input the rule cannot state itself on, as the publisher
-    // reads its own rule's refusals and every malformed input.
+    // Any other failure, the rule's own input checks included, is an input the reading
+    // cannot be stated on, which the publisher codes the same way.
     return {
       ...envelope,
       reason: error instanceof ForecastUnavailable ? error.reason : "forecast_inputs_unreadable",
