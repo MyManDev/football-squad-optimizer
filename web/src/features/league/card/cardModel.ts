@@ -84,16 +84,32 @@ export function cardData(view: EntryAdvice, squad: EntrySquad): SquadCardData | 
   };
 }
 
-// The card's colours mirror tokens.css: the board, the pitch, the chip and the one accent.
-const BOARD = "#10261a";
-const BOARD_MUTED = "#cfe3d3";
-const PITCH = "#3f8f58";
-const PITCH_STRIPE = "#48995f";
-const CHIP = "#ffffff";
-const CHIP_TEXT = "#10261a";
-const ACCENT = "#c6ff3d";
-const OUT = "#c62828";
-const IN = "#1e7b45";
+/**
+ * The card's colours. An SVG drawn through an image cannot read the page's custom
+ * properties, so the card carries a copy of each token it uses, and the card's test holds
+ * every copy equal to its value in tokens.css.
+ */
+export const CARD_COLOURS = {
+  "--color-board": "#10261a",
+  "--color-board-muted": "#cfe3d3",
+  "--color-pitch": "#3f8f58",
+  "--color-pitch-2": "#48995f",
+  "--color-chip": "#ffffff",
+  "--color-chip-text": "#10261a",
+  "--color-lime": "#c6ff3d",
+  "--color-out-panel": "#c62828",
+  "--color-in-panel": "#1e7b45",
+} as const;
+
+const BOARD = CARD_COLOURS["--color-board"];
+const BOARD_MUTED = CARD_COLOURS["--color-board-muted"];
+const PITCH = CARD_COLOURS["--color-pitch"];
+const PITCH_STRIPE = CARD_COLOURS["--color-pitch-2"];
+const CHIP = CARD_COLOURS["--color-chip"];
+const CHIP_TEXT = CARD_COLOURS["--color-chip-text"];
+const ACCENT = CARD_COLOURS["--color-lime"];
+const OUT = CARD_COLOURS["--color-out-panel"];
+const IN = CARD_COLOURS["--color-in-panel"];
 const FONT = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
 
 export const CARD_WIDTH = 1080;
@@ -191,7 +207,7 @@ function text(
   {
     size = 32,
     weight = 600,
-    fill = CHIP_TEXT,
+    fill = CHIP_TEXT as string,
     anchor = "start",
     tabular = false,
     room = Infinity,

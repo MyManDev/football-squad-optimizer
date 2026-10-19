@@ -1,7 +1,11 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import { mockEntryAdviceEnvelope, mockEntrySquadEnvelopes } from "../../../fixtures/league";
 import {
+  CARD_COLOURS,
   CARD_WIDTH,
   cardData,
   fitText,
@@ -304,5 +308,18 @@ describe("fitText", () => {
   it("reads Turkish letters at their base letter's width", () => {
     expect(textWidth("Kadıoğlu", 28)).toBe(textWidth("Kadioglu", 28));
     expect(textWidth("İŞÇ", 28)).toBe(textWidth("ISC", 28));
+  });
+});
+
+describe("the card's colours", () => {
+  const tokens = readFileSync(join(__dirname, "../../../design/tokens.css"), "utf-8").replace(
+    /\/\*[\s\S]*?\*\//g,
+    "",
+  );
+  const root = tokens.match(/:root\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
+
+  it.each(Object.entries(CARD_COLOURS))("draws %s as tokens.css sets it", (token, value) => {
+    const set = root.match(new RegExp(`\\s${token}:\\s*(#[0-9a-fA-F]{6});`))?.[1];
+    expect(set?.toLowerCase()).toBe(value);
   });
 });
