@@ -460,12 +460,24 @@ def test_every_artifact_that_flags_a_holdout_read_is_named_in_the_header() -> No
 PROJECTION_AUDIT = DOCS / "live_projection_audit.json"
 PROJECTION_AUDIT_PREREG = DOCS / "live_projection_audit_prereg.md"
 NEVER_MIXED = "never mixed with a live one"
-# The pooling rule the reader below re-derives, copied here rather than imported from the runner:
-# if the runner changes its rule, the record states the new one and this copy has to stop the
-# check, which an import would change along with the runner and never do.
-POOLING_RULE = (
+# The pooling rules the reader below knows, copied here rather than imported from the runner:
+# if the runner changes its rule, the record states the new one and these copies have to stop
+# the check, which an import would change along with the runner and never do.
+#
+# The rule the committed record was written under: it pooled whichever handoff the ledger named,
+# and so stacked GW4's control replay beside GW5's live handoff.
+LEDGER_POOLING_RULE = (
     "the handoff the ledger's decision names for that gameweek; where the ledger names "
     "none of the kept handoffs, the last one by file name"
+)
+# The repaired rule (#1122 question 2 (a)): the handoff the week's published advice read, each
+# handoff labelled, a replay never pooled.
+PUBLISHED_POOLING_RULE = (
+    "the handoff written before the deadline that the week's published advice read: the one "
+    "the retained advice records of the last publish before the deadline name, with their "
+    "capture (docs/defcon_component_prereg.md section 4); a week whose retained advice names "
+    "no such handoff is not pooled, and a handoff written after the deadline is labelled "
+    "replay and never pooled"
 )
 
 
@@ -483,26 +495,41 @@ def _replays_pooled_beside_a_live_week(record: dict[str, Any]) -> list[str]:
     """Fingerprints of the replay handoffs a projection audit's pool stacks beside another week.
 
     Each pooled gameweek enters with the handoff the runner's rule picks, which the record
-    states as ``primary_projection_rule``: the one the ledger names, or the last kept one when
-    the ledger names none. A pool of replays alone mixes nothing, so it returns no fingerprint.
+    states as ``primary_projection_rule``. A pool of replays alone mixes nothing, so it returns
+    no fingerprint. The reader knows two rules and stops on any other with a message saying the
+    runner's rule changed.
 
-    It re-derives that choice from ``in_ledger``, which the runner sets from the ledger's own
-    fingerprint whatever it pools. A runner repaired to pool GW4's elite handoff in the replay's
-    place would still mark the replay ``in_ledger``, and this reader would still report it as
-    pooled. So it reads only a record whose stated rule is the one it implements, and stops on
-    any other with a message saying the runner's rule changed.
+    Under the ledger rule the record names no pooled handoff, so the reader re-derives the
+    choice from ``in_ledger``: the one the ledger names, or the last kept one when the ledger
+    names none. That is only right for a record that states this rule, because ``in_ledger`` is
+    set from the ledger's own fingerprint whatever the runner pools.
+
+    Under the published-advice rule each projection carries its ``label`` and exactly one per
+    pooled gameweek is ``pooled``; the runner never pools one it labels ``replay``. A pooled
+    handoff the ledger still holds as a replay is reported, so a record that pooled one is held
+    to the row as well.
     """
 
     rule = record["pooled"].get("primary_projection_rule")
-    assert rule == POOLING_RULE, (
+    assert rule in (LEDGER_POOLING_RULE, PUBLISHED_POOLING_RULE), (
         "The runner's pooling rule changed: docs/live_projection_audit.json now states "
-        f"{rule!r}, and this reader re-derives the pooled handoff from `in_ledger` under the old "
-        f"rule ({POOLING_RULE!r}). The runner sets `in_ledger` from the ledger whatever it pools, "
-        "so update this reader to the new rule before holding the index row to it."
+        f"{rule!r}, and this reader knows only the ledger rule ({LEDGER_POOLING_RULE!r}) and the "
+        f"published-advice rule ({PUBLISHED_POOLING_RULE!r}). Update this reader to the new rule "
+        "before holding the index row to it."
     )
     chosen = []
     for gameweek in record["pooled"]["gameweeks"]:
         projections = record["gameweeks"][str(gameweek)]["projections"]
+        if rule == PUBLISHED_POOLING_RULE:
+            pooled = [
+                projection for projection in projections if projection.get("label") == "pooled"
+            ]
+            assert len(pooled) == 1, (
+                f"Gameweek {gameweek} is pooled, and {len(pooled)} of its handoffs are labelled "
+                "`pooled`; the published-advice rule pools exactly one."
+            )
+            chosen.append(pooled[0])
+            continue
         held = [projection for projection in projections if projection.get("in_ledger")]
         chosen.append(held[0] if held else projections[-1])
     replays = [
@@ -521,10 +548,12 @@ def test_the_projection_audit_row_says_when_its_pool_mixes_a_replay_with_a_live_
     table does not say a replay is in it. So the index row that quotes them has to name the
     replay handoff and the clause the pool breaks.
 
-    This does not pass on its own once the runner is repaired. A runner that changes which
-    handoff it pools states a new ``primary_projection_rule``, and the reader stops on it, so the
-    repair has to update the reader to its rule; only then does a pool with no replay leave this
-    check nothing to hold the row to.
+    The runner was repaired to pool the handoff the week's published advice read, and the
+    reader knows that rule too. The committed record still states the ledger rule until it is
+    regenerated from the weekly run's stores, so the row still names the replay; once the record
+    states the repaired rule and its pool holds no replay, this check has nothing to hold the row
+    to. A runner that changes its rule again states a new ``primary_projection_rule``, and the
+    reader stops on it until it is taught that rule as well.
     """
 
     prereg = " ".join(PROJECTION_AUDIT_PREREG.read_text(encoding="utf-8").split())
@@ -552,23 +581,54 @@ def test_the_mix_check_tells_a_mixed_pool_from_a_clean_one() -> None:
     replay = {"handoff_fingerprint": "e7abac4d", "in_ledger": True, "ledger_mode": "replay"}
     elite = {"handoff_fingerprint": "48f9e1ea", "in_ledger": False, "ledger_mode": None}
     live = {"handoff_fingerprint": "a8984200", "in_ledger": True, "ledger_mode": "live"}
-    pooled = {"gameweeks": [4, 5], "primary_projection_rule": POOLING_RULE}
 
-    def record(week_four: list[dict[str, Any]], week_five: list[dict[str, Any]]) -> dict[str, Any]:
+    def record(
+        week_four: list[dict[str, Any]], week_five: list[dict[str, Any]], rule: str
+    ) -> dict[str, Any]:
         weeks = {"4": {"projections": week_four}, "5": {"projections": week_five}}
-        return {"gameweeks": weeks, "pooled": pooled}
+        return {
+            "gameweeks": weeks,
+            "pooled": {"gameweeks": [4, 5], "primary_projection_rule": rule},
+        }
 
-    assert _replays_pooled_beside_a_live_week(record([replay, elite], [live])) == ["e7abac4d"]
-    assert _replays_pooled_beside_a_live_week(record([elite, replay], [live])) == ["e7abac4d"]
-    assert _replays_pooled_beside_a_live_week(record([elite], [live])) == []
-    assert _replays_pooled_beside_a_live_week(record([replay], [replay])) == []
+    ledger = LEDGER_POOLING_RULE
+    assert _replays_pooled_beside_a_live_week(record([replay, elite], [live], ledger)) == [
+        "e7abac4d"
+    ]
+    assert _replays_pooled_beside_a_live_week(record([elite, replay], [live], ledger)) == [
+        "e7abac4d"
+    ]
+    assert _replays_pooled_beside_a_live_week(record([elite], [live], ledger)) == []
+    assert _replays_pooled_beside_a_live_week(record([replay], [replay], ledger)) == []
+
+    # Under the published-advice rule the label says which handoff is pooled, whatever the
+    # ledger names: GW4's elite handoff pooled beside the labelled replay mixes nothing.
+    published = PUBLISHED_POOLING_RULE
+    labelled_replay = {**replay, "label": "replay"}
+    pooled_elite = {**elite, "label": "pooled"}
+    pooled_live = {**live, "label": "pooled"}
+    assert (
+        _replays_pooled_beside_a_live_week(
+            record([labelled_replay, pooled_elite], [pooled_live], published)
+        )
+        == []
+    )
+    pooled_replay = {**replay, "label": "pooled"}
+    assert _replays_pooled_beside_a_live_week(
+        record([pooled_replay, {**elite, "label": "beside"}], [pooled_live], published)
+    ) == ["e7abac4d"]
+    with pytest.raises(AssertionError, match="exactly one"):
+        _replays_pooled_beside_a_live_week(
+            record([labelled_replay, {**elite, "label": "beside"}], [pooled_live], published)
+        )
 
 
 def test_the_mix_check_stops_when_the_runner_pools_by_another_rule() -> None:
-    """The elite-handoff repair pools 48f9e1ea for GW4 while the ledger still names the replay,
-    so the runner still writes ``in_ledger`` on e7abac4d. Read under the old rule, that record
-    would report a replay the pool no longer holds. The reader has to stop and say the rule
-    changed, not pass or fail on a pool it has misread; a record that states no rule stops too.
+    """The repaired runner pools 48f9e1ea for GW4 while the ledger still names the replay, so
+    it still writes ``in_ledger`` on e7abac4d. Read under the ledger rule, that record would
+    report a replay the pool no longer holds, which is why the reader reads each record by the
+    rule it states. A rule it does not know has to stop it, not pass or fail on a pool it has
+    misread; a record that states no rule stops too.
     """
 
     replay = {"handoff_fingerprint": "e7abac4d", "in_ledger": True, "ledger_mode": "replay"}
