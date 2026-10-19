@@ -73,8 +73,15 @@ Who imports these modules:
   (`src/squadopt/live/football_composite_basis.py:22`), and `prediction.football_composite_core`
   reads the unit, unit point, score, score projection, phase, phase coupling and observed
   tactical inputs (`src/squadopt/prediction/football_composite_core.py:21-50`).
-- The other input modules, and `football_flag_inputs.py` besides the producer: their
-  `prediction` models and the `football_*_experiment` modules of the laboratory.
+- `football_flag_inputs.py` besides the producer, `football_load_inputs.py`,
+  `football_phase_inputs.py`, `football_score_state_inputs.py`, `football_tactical_inputs.py`
+  and `football_unit_inputs.py`: their `prediction` models and the laboratory's
+  `football_*_experiment` module of the same family.
+- `football_observed_load.py`, `football_observed_tactical_inputs.py` and
+  `football_score_replay.py`: `prediction` models only (`football_observed_load` and
+  `football_composite_weeks`; the observed tactical models and `football_composite_core`;
+  `football_score_state` and `football_score_serving`), and for the score replay also the live
+  recipe above. No laboratory module imports them.
 - `football_unit_catalog.py`, `football_fm_attributes.py`, `football_phase_replay.py`,
   `football_phase_credits.py` and `football_observed_tactical_readers.py`: no module under
   `src`. Tests and offline operators call them to prepare historical source inputs
