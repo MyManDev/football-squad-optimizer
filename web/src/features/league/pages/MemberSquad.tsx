@@ -6,6 +6,7 @@ import type { ClubCodes } from "../../../lib/clubs";
 import { figure } from "../../../lib/format";
 import { ClubMark } from "../components/ClubMark";
 import { MemberBench, MemberPitch, type PitchPlayer } from "../components/MemberPitch";
+import { PitchLookControl } from "../components/PitchLookControl";
 import { PointsUnit } from "../components/PointsUnit";
 import { expectedLineupLabel } from "../advice/expectedLineupLabel";
 import type { EntryAdvice, EntrySquad, EntrySquadPlayer } from "../types";
@@ -94,6 +95,7 @@ export function MemberSquad({
       <div className={styles.pitchView} hidden={hasList && view !== "pitch"}>
         <MemberPitch players={onPitch.eleven} codes={codes} />
         <MemberBench players={onPitch.bench} codes={codes} />
+        <PitchLookControl />
       </div>
       {hasList ? (
         <div className={styles.listView} hidden={view !== "list"}>

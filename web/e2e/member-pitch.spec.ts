@@ -518,3 +518,36 @@ for (const [width, height] of [
     // The language switch stays reachable in the sidebar.
     await expect(page.locator("#sidebar").getByRole("button", { name: /^TR/ })).toBeAttached();
   });
+
+// The viewer's pitch look (#1136): checked grass and club-coloured plates, chosen under the
+// bench, kept after a reload, inside the page at a phone's width, and readable by axe's own
+// contrast check over every plate's fill and text.
+for (const [width, height] of [
+  [320, 720],
+  [1280, 720],
+] as const)
+  test(`the pitch look is kept, fits and reads at ${width} px`, async ({ page }) => {
+    await open(page, width, height, PLAN, false, codedCalendar(Object.keys(CLUB_COLOURS)));
+    const looks = page.locator('[data-mark="pitch-look"]');
+    const choose = (group: string, option: string) =>
+      looks.getByRole("group", { name: group }).getByRole("button", { name: option });
+    await choose(copy.leagueMembers.pitchLookLabel, copy.leagueMembers.pitchLookChecks).click();
+    await choose(copy.leagueMembers.clubColoursLabel, copy.leagueMembers.clubColoursOn).click();
+    const pitch = page.locator('[data-mark="pitch"]');
+    await expect(pitch).toHaveAttribute("data-grass", "checks");
+    expect(await pitch.locator("[data-club]").count()).toBeGreaterThan(0);
+    await page.reload();
+    await expect(pitch).toHaveAttribute("data-grass", "checks");
+    expect(await pitch.locator("[data-club]").count()).toBeGreaterThan(0);
+    await expect(
+      choose(copy.leagueMembers.clubColoursLabel, copy.leagueMembers.clubColoursOn),
+    ).toHaveAttribute("aria-pressed", "true");
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+    await atRest(page);
+    const blocking = (await new AxeBuilder({ page }).analyze()).violations.filter((violation) =>
+      ["serious", "critical"].includes(violation.impact ?? ""),
+    );
+    expect(blocking).toEqual([]);
+  });

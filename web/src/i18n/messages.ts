@@ -953,6 +953,13 @@ const en = {
     viewLabel: "View",
     viewPitch: "Pitch",
     viewList: "List",
+    pitchLookLabel: "Grass",
+    pitchLookStripes: "Stripes",
+    pitchLookPlain: "Plain",
+    pitchLookChecks: "Checks",
+    clubColoursLabel: "Club colours",
+    clubColoursOff: "Off",
+    clubColoursOn: "On",
     railWeeks: (weeks: readonly number[]) =>
       weeks.length === 1
         ? `Gameweek ${weeks[0]}`
@@ -1993,6 +2000,13 @@ const tr: MessageSchema<typeof en> = {
     viewLabel: "Görünüm",
     viewPitch: "Saha",
     viewList: "Liste",
+    pitchLookLabel: "Çim",
+    pitchLookStripes: "Çizgili",
+    pitchLookPlain: "Düz",
+    pitchLookChecks: "Kareli",
+    clubColoursLabel: "Kulüp renkleri",
+    clubColoursOff: "Kapalı",
+    clubColoursOn: "Açık",
     railWeeks: (weeks) =>
       weeks.length === 1
         ? `${weeks[0]}. hafta`

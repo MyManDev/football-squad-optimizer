@@ -8,8 +8,10 @@
  * Every plate is centred on its point, so a line is symmetric about the pitch's axis.
  *
  * Nothing small is written on the grass: names, codes, figures and the direction of
- * attack sit on white plates (ink 16.3:1, ink2 7.6:1 on white). The stripes are the one
- * pattern the page allows, and they are only on the grass.
+ * attack sit on white plates (ink 16.3:1, ink2 7.6:1 on white). The grass's pattern is the
+ * one pattern the page allows, and it is only on the grass: stripes by default, or the
+ * plain or checked look the viewer chose (pitchLook.ts, #1136), all in the two grass tokens.
+ * In club colours a plate takes its club's fill with one text colour that reads 4.5:1 on it.
  */
 
 .wrap {
@@ -28,6 +30,17 @@
     var(--color-pitch) 0 9.0909%,
     var(--color-pitch-2) 9.0909% 18.1818%
   );
+}
+
+/* The viewer's grass looks, in both orientations: one colour, or a checked mowing pattern
+   whose cells keep the stripes' depth (a tile is two cells each way). */
+.wrap[data-grass="plain"] .field {
+  background: var(--color-pitch);
+}
+
+.wrap[data-grass="checks"] .field {
+  background: repeating-conic-gradient(var(--color-pitch) 0 25%, var(--color-pitch-2) 0 50%) 0 0 /
+    40% 18.1818%;
 }
 
 .descAcross {
@@ -276,6 +289,21 @@
   white-space: nowrap;
 }
 
+/* A plate in its club's colours: every line in the one text colour chosen for the fill. */
+.plate[data-club] {
+  background: var(--plate-fill);
+  color: var(--plate-text);
+}
+
+.plate[data-club] .code {
+  color: inherit;
+}
+
+/* A plate in its club's first colour is itself the swatch. */
+.plate[data-club="primary"] .swatch {
+  display: none;
+}
+
 /* Upright, YENİ and the armband stand centred over their own plate, outside it, so a
    narrow plate keeps its name and a tag never reads as the next plate's. Where a plate
    carries both, they stand side by side about its centre. */
@@ -360,6 +388,10 @@
       var(--color-pitch) 0 9.0909%,
       var(--color-pitch-2) 9.0909% 18.1818%
     );
+  }
+
+  .wrap[data-grass="checks"] .field {
+    background-size: 18.1818% 40%;
   }
 
   .descAcross {

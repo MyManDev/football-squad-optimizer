@@ -4,6 +4,7 @@ import { useLanguage } from "../../../i18n/context";
 import { clubCode, clubSwatch, type ClubCodes } from "../../../lib/clubs";
 import { figure } from "../../../lib/format";
 import styles from "./MemberPitch.module.css";
+import { clubPlate, usePitchLook } from "./pitchLook";
 
 /** One player as the pitch draws them: a white name plate on the grass. */
 export interface PitchPlayer {
@@ -63,13 +64,31 @@ function ArrowIcon() {
   );
 }
 
-function Plate({ player, codes }: { player: PitchPlayer; codes: ClubCodes }) {
+function Plate({
+  player,
+  codes,
+  clubColours,
+}: {
+  player: PitchPlayer;
+  codes: ClubCodes;
+  clubColours: boolean;
+}) {
   const { locale, messages } = useLanguage();
   const code = clubCode(player.team, codes);
   const swatch = clubSwatch(code);
+  // In club colours the plate takes its club's fill and one readable text colour (#1136).
+  const club = clubColours ? clubPlate(code) : null;
   const shortName = player.shortName.trim() || player.name;
   return (
-    <div className={styles.plate}>
+    <div
+      className={styles.plate}
+      data-club={club?.colour}
+      style={
+        club
+          ? ({ "--plate-fill": club.fill, "--plate-text": club.text } as CSSProperties)
+          : undefined
+      }
+    >
       <span className={styles.name} title={player.name}>
         {swatch ? (
           <span
@@ -144,6 +163,7 @@ export function MemberPitch({ players, codes }: { players: PitchPlayer[]; codes:
   const { messages } = useLanguage();
   const copy = messages.leagueMembers;
   const describedBy = useId();
+  const [look] = usePitchLook();
   const lines = LINES.map((position) => ({
     position,
     players: players.filter((player) => player.position === position),
@@ -159,6 +179,7 @@ export function MemberPitch({ players, codes }: { players: PitchPlayer[]; codes:
     <div
       className={styles.wrap}
       data-mark="pitch"
+      data-grass={look.grass}
       data-def-crowded={defenders >= 4 ? "true" : undefined}
       style={{ "--hh": `${height}px` } as CSSProperties}
     >
@@ -209,7 +230,7 @@ export function MemberPitch({ players, codes }: { players: PitchPlayer[]; codes:
                     className={styles.token}
                     style={{ "--i": index } as CSSProperties}
                   >
-                    <Plate player={player} codes={codes} />
+                    <Plate player={player} codes={codes} clubColours={look.clubColours} />
                     {line.position === labelLine && index === 0 ? <AttackLabel at="first" /> : null}
                     {line.position === "DEF" && defenders >= 4 && index === defenders - 1 ? (
                       <AttackLabel at="last" />
