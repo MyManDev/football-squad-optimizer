@@ -1846,6 +1846,80 @@ def test_before_its_first_deadline_the_chain_writes_nothing(
     assert lines[-1] == "waiting: no first chain week has both a passed deadline and a forecast"
 
 
+def _reads(monkeypatch: pytest.MonkeyPatch) -> list[int]:
+    """The gameweeks the runner reads, in order, through the world's own reader."""
+
+    read: list[int] = []
+    loader = chain._week
+
+    def week(index: object, snapshots: Path, artifacts: Path, gameweek: int, **roots: Any) -> Any:
+        read.append(gameweek)
+        return loader(index, snapshots, artifacts, gameweek, **roots)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(chain, "_week", week)
+    return read
+
+
+def test_a_start_through_gw6_never_reads_gw7_and_writes_gw6s_skip_once(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Rule 6: one run decides only weeks served from its two roots, through
+    `--through-gameweek`, so a start reads no week after it, even with GW6 missing and GW7's
+    deadline passed. GW6's skip is written once (rule 24), naming its roots."""
+
+    missing = ("no_artifact", {"snapshot_id": "capture-gw6", "reason": "no_artifact"})
+    root, solved = _chain_world(tmp_path, monkeypatch, {6: missing, 7: _week(7)})
+    read = _reads(monkeypatch)
+    lines: list[str] = []
+    now = T0 + timedelta(days=7, hours=1)
+    chain.decide(*ROOTS(tmp_path), root, 6, "issuecomment-1", now=now, emit=lines.append)
+    assert read == [6] and solved == []
+    assert not (root / "protocol.json").exists() and not (root / "gw07").exists()
+    assert lines[-1] == "waiting: no first chain week has both a passed deadline and a forecast"
+    skip = json.loads((root / "skipped" / "gw06.json").read_text(encoding="utf-8"))
+    assert skip["gameweek"] == 6 and skip["missing_reason"] == "no_artifact"
+    assert skip["receipt"] == missing[1] and skip["identity"]["repository_commit"] == "b"
+    assert skip["outcome_read"] is False and skip["locked_holdout_accessed"] is False
+
+
+def test_a_written_skip_is_read_back_and_its_week_is_never_read_from_other_roots(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Rules 5 and 6: the operator decides through the old roots' last week and continues with
+    the new, so GW6 stays skipped even where the new roots would bind it."""
+
+    missing = ("no_artifact", {"snapshot_id": "capture-gw6", "reason": "no_artifact"})
+    weeks: dict[int, object] = {6: missing, 7: _week(7)}
+    root, solved = _chain_world(tmp_path, monkeypatch, weeks)
+    read = _reads(monkeypatch)
+    now = T0 + timedelta(days=7, hours=1)
+    chain.decide(*ROOTS(tmp_path), root, 6, "issuecomment-1", now=now)
+    weeks[6] = _week(6)
+    chain.decide(*ROOTS(tmp_path), root, 7, "issuecomment-1", now=now)
+    assert read == [6, 7, 7]
+    protocol = json.loads((root / "protocol.json").read_text(encoding="utf-8"))
+    assert protocol["first_chain_week"] == 7 and protocol["bound_week"] == 6
+    assert protocol["skipped_weeks"] == [{"gameweek": 6, "reason": "no_artifact"}]
+    assert not (root / "gw06").exists() and (root / "gw07" / "manifest.json").exists()
+    assert {week for _, week in solved} == {7} and len(solved) == 15
+
+
+def test_a_written_skip_read_back_under_another_identity_is_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Rule 3: a skip binds the run that wrote it, as the protocol record does."""
+
+    missing = ("no_artifact", {"snapshot_id": "capture-gw6", "reason": "no_artifact"})
+    root, solved = _chain_world(tmp_path, monkeypatch, {6: missing, 7: _week(7)})
+    now = T0 + timedelta(days=7, hours=1)
+    chain.decide(*ROOTS(tmp_path), root, 6, "issuecomment-1", now=now)
+    identity = chain.source_identity()
+    monkeypatch.setattr(chain, "source_identity", lambda: {**identity, "python": "3.12.0"})
+    with pytest.raises(chain.ChainError, match="python differs"):
+        chain.decide(*ROOTS(tmp_path), root, 7, "issuecomment-1", now=now)
+    assert not (root / "protocol.json").exists() and solved == []
+
+
 def test_the_decision_step_needs_an_answer_and_a_permitted_day(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

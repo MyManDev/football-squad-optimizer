@@ -1395,10 +1395,14 @@ def bind_protocol(output: Path, identity: Mapping[str, object]) -> dict[str, Any
     if not path.exists():
         return None
     recorded = cast(dict[str, Any], json.loads(path.read_text(encoding="utf-8")))
+    _refuse_other_identity(recorded, identity)
+    return recorded
+
+
+def _refuse_other_identity(recorded: Mapping[str, Any], identity: Mapping[str, object]) -> None:
     for key, value in identity.items():
         if recorded.get(key) != value:
             raise ChainError(f"This run's {key} differs from the frozen source's.")
-    return recorded
 
 
 # ---------------------------------------------------------------------------------------------
@@ -1687,13 +1691,16 @@ def start_chain(
     snapshot_root: Path,
     artifact_root: Path,
     moment: datetime,
+    through_gameweek: int,
     *,
     handoff_root: Path | None = None,
 ) -> dict[str, Any] | None:
     """Rules 2, 9 and 40: the first chain week, its squads and the protocol record, once.
 
-    Nothing is written until a week whose deadline has passed has a usable forecast; a missing
-    week before it is skipped and listed. Returns the protocol record, or None while waiting.
+    No week after ``through_gameweek`` is read (rule 6). A missing week before the first chain
+    week is skipped and listed, and its skip is written once under ``skipped/``, so a later run,
+    perhaps given other roots, reads the skip back and never reads that week again (rules 5 and
+    6). Returns the protocol record, or None while waiting.
     """
 
     if moment > deadline_of(index, snapshot_root, LAPSE_GAMEWEEK):
@@ -1704,11 +1711,26 @@ def start_chain(
     commits = cast(Mapping[str, Mapping[str, str]], identity["binding_commits"])
     bound_week = first_bound_week(index, snapshot_root, commits)
     skipped: list[dict[str, object]] = []
-    for gameweek in range(bound_week, LAST_GAMEWEEK + 1):
+    for gameweek in range(bound_week, min(through_gameweek, LAST_GAMEWEEK) + 1):
         if moment <= deadline_of(index, snapshot_root, gameweek):
             return None
+        skip = output / "skipped" / f"gw{gameweek:02d}.json"
+        if skip.exists():
+            recorded = json.loads(skip.read_text(encoding="utf-8"))
+            _refuse_other_identity(recorded["identity"], identity)
+            skipped.append({"gameweek": gameweek, "reason": recorded["missing_reason"]})
+            continue
         week = _week(index, snapshot_root, artifact_root, gameweek, handoff_root=handoff_root)
         if not isinstance(week, WeekInputs):
+            write_document_once(
+                _record(
+                    gameweek=gameweek,
+                    missing_reason=week[0],
+                    receipt=dict(week[1]),
+                    identity=dict(identity),
+                ),
+                skip,
+            )
             skipped.append({"gameweek": gameweek, "reason": week[0]})
             continue
         squads = initial_states(week.forecast, gameweek)
@@ -1734,6 +1756,8 @@ def start_chain(
         }
         write_document_once(protocol, output / "protocol.json")
         return protocol
+    if through_gameweek < LAST_GAMEWEEK:
+        return None
     raise ChainError("No gameweek in the season has a usable forecast.")
 
 
@@ -1823,6 +1847,7 @@ def _decide_weeks(
             snapshot_root,
             artifact_root,
             moment,
+            through_gameweek,
             handoff_root=handoff_root,
         )
         if protocol is None:
