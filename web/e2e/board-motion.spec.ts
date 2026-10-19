@@ -90,3 +90,33 @@ test("with motion the boards move, and under reduced motion they end the same wi
   await moving.close();
   await still.close();
 });
+
+test("on a 320 px phone the incoming panel stays inside the board's frame while it moves", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 800 });
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await openDecision(page);
+  // The motion held at a few points of its run, the first frame among them, where the
+  // incoming panel is furthest to the right; at each, no board is wider than its frame.
+  const frames = await page.evaluate(() => {
+    const boards = [...document.querySelectorAll("article")].filter((board) =>
+      /^(Değişiklik|Change) \d+\/\d+$/.test(board.querySelector("h3")?.textContent ?? ""),
+    );
+    const moving = document
+      .getAnimations()
+      .filter((animation) =>
+        (animation.effect as KeyframeEffect | null)?.target?.closest("article"),
+      );
+    for (const animation of moving) animation.pause();
+    const widths = [0, 100, 200, 300].map((time) => {
+      for (const animation of moving) animation.currentTime = time;
+      return boards.map((board) => [board.scrollWidth, board.clientWidth]);
+    });
+    for (const animation of moving) animation.play();
+    return { moving: moving.length, widths };
+  });
+  expect(frames.moving).toBeGreaterThan(0);
+  for (const boards of frames.widths)
+    for (const [scrollWidth, clientWidth] of boards) expect(scrollWidth).toBe(clientWidth);
+});
