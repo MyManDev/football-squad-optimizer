@@ -5,6 +5,7 @@ import type { AdviceClient, AdviceSource } from "../advice/adviceClient";
 import type { PublishedAdviceStatus } from "../advice/adviceSelection";
 import type { DeviceRivalReads } from "../device/computable";
 import type { DevicePlanDependencies } from "../device/useDevicePlan";
+import type { WhatIfDependencies } from "../device/useWhatIf";
 import type {
   EntryAdvice,
   EntryAdviceIndex,
@@ -48,6 +49,8 @@ export interface LeagueMemberViewProps {
   computePending?: boolean;
   /** The device solve's document loader and worker; the page's own unless a test injects them. */
   deviceDependencies?: DevicePlanDependencies;
+  /** The what-if mode's table loader and worker; the page's own unless a test injects them. */
+  whatIfDependencies?: WhatIfDependencies;
   /**
    * What the page has read of the other members' entry documents. The device offers a
    * rival strategy only against a rival among them it can use; none given, it offers no rival.
