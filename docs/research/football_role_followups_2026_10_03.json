@@ -11,6 +11,17 @@
     "temperature": {
       "run_label": "math100-role-temperature01",
       "contract": "conditional_role_temperature_research_v1",
+      "committed_code": {
+        "folder": "docs/research/football_role_followups_2026_10_03",
+        "copied_byte_for_byte_from": "owner archive math100-role-20261007",
+        "sha256": {
+          "math100-role-temperature.py": "ee9a92fbc564f1e0504162cd81c3c6e1de28b933c08e949a15d9941d34c47072",
+          "test_math100_role_temperature.py": "435baf0635d02a2128f10c2ba049dd5435e8294d66022a2a19583753ee732c8b",
+          "math100-role-temperature01/temperature-protocol.json": "777c04f03c034f97f053047a01bd1d2f20d89f2ee9a8f4efb6c445d02cd48454"
+        },
+        "runner_and_test_hashes_recorded_before_the_first_fit_in": "math100-role-temperature01/temperature-protocol.json, key operator_and_test_sha256",
+        "machine_paths_kept": "lines 23-29 of math100-role-temperature.py name the folders on the machine that ran it; they are kept so the hashes hold"
+      },
       "completed": true,
       "development_gate_accepted": false,
       "predictive_superiority_verified": false,
@@ -215,6 +226,19 @@
     "retained-support": {
       "run_label": "math100-role-retained-support01",
       "contract": "conditional_role_retained_history_support_research_v1",
+      "committed_code": {
+        "folder": "docs/research/football_role_followups_2026_10_03",
+        "copied_byte_for_byte_from": "owner archive math100-role-20261007",
+        "sha256": {
+          "math100-role-retained-support.py": "0d3e0bec33d7abfbbf97b599c500f5eb4e779869972ba709eb4c6fb508ac7db6",
+          "test_math100_role_retained_support.py": "6ef56a40748130d1dc11e2480df743a73573d2949d150d22f4376a9de3dba080",
+          "math100-role-retained-support.md": "8867ae9876c4e04a5ba3775256acd74331b460956183078ea304a3073c53f7ab",
+          "math100-role-retained-support-preregistered.json": "320a4e8cb6d52f4a442a6574eca960b53b7e6d84c35ed71da53e34cabc832758",
+          "math100-role-retained-support01/retained-support-protocol.json": "b45a16131a0badd5f1ac702111652152c869b3a4ae918e0bcabf2b10c683c233"
+        },
+        "runner_and_test_hashes_recorded_before_the_first_fit_in": "math100-role-retained-support01/retained-support-protocol.json, key operator_inputs_sha256",
+        "machine_paths_kept": "lines 26-32 of math100-role-retained-support.py name the folders on the machine that ran it; they are kept so the hashes hold"
+      },
       "completed": true,
       "development_gate_accepted": true,
       "predictive_superiority_verified": false,

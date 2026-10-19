@@ -4,6 +4,8 @@ A retained-history indicator passes the prespecified development gates. A scalar
 
 Both use the unchanged joint start/cameo model as the reference. The run commit is `64362f2c06a1957ebaa12128ce74cd9157e0227f`; measured source hashes match `49b451ae011eba21e59a0932e3deea9333a1ca7d`. There are 13 origins: GW11, 19, 27 and 35 of 2023-24 and 2024-25, plus settled GW1-5 of 2026-27. The historical readset contains 12 files from 2022-23, 2023-24 and 2024-25, with 2022-23 used for priors. No 2025-26 access is reported. Current evidence is capture `fpl-live-20261001T233218Z-7945d6b3c732`, captured at `2026-10-01T23:32:18.344567Z`.
 
+The code that ran is committed byte for byte in [football_role_followups_2026_10_03/](football_role_followups_2026_10_03/): the temperature runner `math100-role-temperature.py` with its test `test_math100_role_temperature.py`, the retained-history runner `math100-role-retained-support.py` with its test `test_math100_role_retained_support.py`, its note and its preregistration, and each run's protocol. The record's `committed_code` blocks give each file's sha256, and each runner and test hash equals the one its protocol recorded before the first fit. The folder constants near the top of both runners name the machine that ran them; they stay as they ran so the hashes hold.
+
 Each candidate changes only the conditional start/cameo law, preserving appearance `q`, within-role minute laws and other fitted heads. Derived minutes and points can still change through the role mixture. Results use identical known-role populations and average origins equally. Negative differences are better.
 
 | Candidate | Cohort | Role log-loss change | Role Brier change | Minutes MAE change | Points MAE change |
