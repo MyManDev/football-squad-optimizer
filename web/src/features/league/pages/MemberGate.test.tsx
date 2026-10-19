@@ -577,3 +577,65 @@ describe("the step's words", () => {
     },
   );
 });
+
+describe("the step from the picker to the page (#1131)", () => {
+  let started: Array<Promise<void> | void> = [];
+  beforeEach(() => {
+    started = [];
+    Object.defineProperty(document, "startViewTransition", {
+      configurable: true,
+      writable: true,
+      value: vi.fn((update: () => Promise<void> | void) => {
+        started.push(update());
+        return {};
+      }),
+    });
+  });
+  afterEach(() => {
+    delete (document as { startViewTransition?: unknown }).startViewTransition;
+    delete (window as { matchMedia?: unknown }).matchMedia;
+  });
+
+  async function pickAndConfirm() {
+    const user = userEvent.setup();
+    const group = await picker("tr");
+    await user.click(within(group).getByRole("radio", { name: /Seda Kaya/ }));
+    await user.click(screen.getByRole("button", { name: "Onayla" }));
+  }
+
+  it("crossfades into the page asked for, the claim made inside the transition", async () => {
+    open();
+    await pickAndConfirm();
+    expect(document.startViewTransition).toHaveBeenCalledOnce();
+    await started[0];
+    expect(readMemberClaim()?.entryId).toBe(35249003);
+    expect(screen.getByRole("heading", { name: "League page" })).toBeInTheDocument();
+  });
+
+  it("crossfades into the visitor's own page once it is drawn, not into a placeholder", async () => {
+    open({
+      entry: { pathname: membersAddress(LEAGUE), state: FIND_YOURSELF },
+      page: <h1>Own page</h1>,
+    });
+    await pickAndConfirm();
+    expect(document.startViewTransition).toHaveBeenCalledOnce();
+    await act(async () => {
+      await started[0];
+    });
+    // When the new picture is taken, the router is already on the visitor's page.
+    expect(where()).toBe(memberAddress(LEAGUE, 35249003));
+    expect(screen.getByRole("heading", { name: "Own page" })).toBeInTheDocument();
+  });
+
+  it("changes at once under reduced motion", async () => {
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      writable: true,
+      value: (query: string) => ({ matches: query === "(prefers-reduced-motion: reduce)" }),
+    });
+    open();
+    await pickAndConfirm();
+    expect(document.startViewTransition).not.toHaveBeenCalled();
+    expect(await screen.findByRole("heading", { name: "League page" })).toBeInTheDocument();
+  });
+});
