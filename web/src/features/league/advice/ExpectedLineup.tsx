@@ -1,3 +1,4 @@
+import { CountingNumber } from "../../../design/CountingNumber";
 import { useLanguage } from "../../../i18n/context";
 import { points } from "../../../lib/format";
 import type { EntryAdvice } from "../types";
@@ -64,7 +65,13 @@ export function ExpectedLineup({ view }: { view: EntryAdvice }) {
       </ul>
       <p>
         {copy.net}:{" "}
-        <strong className="num">{points(expectation.expected_net_points, 1, locale)}</strong>
+        <strong className="num">
+          <CountingNumber
+            countKey={`net:${view.entry_id}:${view.gameweek}`}
+            value={expectation.expected_net_points}
+            format={(value) => points(value, 1, locale)}
+          />
+        </strong>
       </p>
     </section>
   );

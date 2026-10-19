@@ -1,5 +1,6 @@
 import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, expect, it } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
+import { forgetCounts } from "../../../design/countMotion";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { mockEntryAdviceEnvelope } from "../../../fixtures/league";
 import type { AdviceLineupExpectation } from "../types";
@@ -68,4 +69,42 @@ it("keeps legacy documents unchanged and rejects invalid expected scores", () =>
   expect(
     isAdvicePayload({ ...view, lineup_expectation: { ...expectation, scoring_multipliers: {} } }),
   ).toBe(false);
+});
+
+it("counts the net expected points when the shown plan changes, also after a remount", () => {
+  const animate = vi.fn(() => ({
+    effect: { getComputedTiming: () => ({ progress: 0 }) },
+    playState: "running",
+    addEventListener: () => undefined,
+    cancel: () => undefined,
+  }));
+  Object.defineProperty(HTMLElement.prototype, "animate", { value: animate, configurable: true });
+  vi.stubGlobal("matchMedia", () => ({ matches: false }) as MediaQueryList);
+  vi.stubGlobal("requestAnimationFrame", () => 0);
+  try {
+    const base = mockEntryAdviceEnvelope(101, "saf-puan", 1).payload;
+    const plan = (net: number) => ({
+      ...base,
+      lineup_expectation: { ...expectation, expected_net_points: net },
+    });
+    const view = (net: number) => (
+      <LanguageProvider initialLanguage="en">
+        <ExpectedLineup view={plan(net)} />
+      </LanguageProvider>
+    );
+    const { rerender, unmount } = render(view(42.75));
+    expect(animate).not.toHaveBeenCalled();
+    rerender(view(42.75));
+    expect(animate).not.toHaveBeenCalled();
+    rerender(view(46.5));
+    expect(animate).toHaveBeenCalledTimes(1);
+    // The details are unmounted while the next plan loads; the count still starts from 46.5.
+    unmount();
+    render(view(44));
+    expect(animate).toHaveBeenCalledTimes(2);
+  } finally {
+    forgetCounts();
+    vi.unstubAllGlobals();
+    delete (HTMLElement.prototype as { animate?: unknown }).animate;
+  }
 });
