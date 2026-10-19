@@ -221,6 +221,15 @@ describe("the member's reading", () => {
     ]);
   });
 
+  it("states a later blank alone as structure, and a blank after every held window as none", () => {
+    const later = inputs();
+    later.fixtures!.gameweeks[9]!.fixtures = [fixture(101, 1, 2)];
+    expect(memberChipForecast(later).calendar_has_structure).toBe(true);
+    const after = inputs();
+    after.fixtures!.gameweeks[24]!.fixtures = [fixture(251, 1, 2)];
+    expect(memberChipForecast(after).calendar_has_structure).toBe(false);
+  });
+
   it("holds no chip with only this week's calendar read", () => {
     const base = inputs();
     for (const halves of Object.values(base.squad.chips!.states)) {
@@ -282,6 +291,17 @@ describe("the member's reading is refused with the publisher's code", () => {
     expect(refused((v) => void (v.fixtures!.gameweeks[20]!.fixtures[0]!.home.name = "Beta"))).toBe(
       "calendar_unreadable",
     );
+  });
+
+  it("calendar_unreadable: two clubs under one name all season", () => {
+    expect(
+      refused((v) => {
+        for (const week of v.fixtures!.gameweeks) {
+          for (const match of week.fixtures)
+            if (match.away.team_id === 4) match.away.name = "Gamma";
+        }
+      }),
+    ).toBe("calendar_unreadable");
   });
 
   it("calendar_unreadable is read where the publisher reads it: after the capture and chips", () => {
