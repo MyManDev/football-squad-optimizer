@@ -22,6 +22,7 @@ import {
 } from "../../../fixtures/league";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { MESSAGES, type Language } from "../../../i18n/messages";
+import { CLUB_COLOURS } from "../../../lib/clubs";
 import type { FixturesPayload } from "../../fixtures/types";
 import type { AdvicePlayer, EntryAdvice, LeagueViewEnvelope } from "../types";
 import { LeagueMemberView } from "./LeagueMemberPage";
@@ -194,7 +195,6 @@ function view(props: Partial<LeagueMemberViewProps> = {}): LeagueMemberViewProps
     members: MEMBERS,
     index: mockEntryAdviceIndex(ENTRY).payload,
     fixtures: CALENDAR,
-    leagueName: mockLeagueMembersEnvelope.payload.league_name,
     ...props,
   };
 }
@@ -436,6 +436,21 @@ describe("the fixture rail", () => {
       expect(
         within(rows[0]!).getAllByRole("cell")[1]!.querySelector("[data-venue]"),
       ).toHaveAttribute("data-venue", "away");
+      // Every opponent in a week cell carries its two colours before its code; a blank week
+      // has no club to colour.
+      const played = [
+        ...aside.querySelectorAll<HTMLElement>('[data-venue="home"], [data-venue="away"]'),
+      ];
+      expect(played.length).toBeGreaterThan(0);
+      for (const fixture of played) {
+        const [mark, code] = [...fixture.children] as HTMLElement[];
+        const colours = CLUB_COLOURS[code!.textContent!]!;
+        expect(mark).toHaveAttribute("aria-hidden", "true");
+        expect(mark!.textContent).toBe("");
+        expect(mark!.style.getPropertyValue("--club-primary")).toBe(colours.primary);
+        expect(mark!.style.getPropertyValue("--club-secondary")).toBe(colours.secondary);
+      }
+      expect(aside.querySelectorAll('[data-venue="none"] [aria-hidden="true"]')).toHaveLength(0);
       // Block C: players of the eleven who face each other that week, home side first.
       const meet = within(aside).getByRole("region", { name: copy.railMeet(GW) });
       expect(
@@ -447,6 +462,19 @@ describe("the fixture rail", () => {
         "SUN - BHABrobbey / Cuyper, Groß",
         "LIV - MCISzoboszlai / Guéhi, Haaland",
       ]);
+      // Each side of a meeting carries its club's two colours, beside the code.
+      for (const item of within(meet).getAllByRole("listitem")) {
+        const [home, away] = item.firstElementChild!.textContent!.split(" - ");
+        const marks = [...item.querySelectorAll<HTMLElement>("[aria-hidden='true']")];
+        expect(marks.map((mark) => mark.style.getPropertyValue("--club-primary"))).toEqual([
+          CLUB_COLOURS[home!]!.primary,
+          CLUB_COLOURS[away!]!.primary,
+        ]);
+        expect(marks.map((mark) => mark.style.getPropertyValue("--club-secondary"))).toEqual([
+          CLUB_COLOURS[home!]!.secondary,
+          CLUB_COLOURS[away!]!.secondary,
+        ]);
+      }
       // No legend under the tables.
       expect(aside).not.toHaveTextContent(/E: ev|H: home|zorluk derecesi|Fixture difficulty/);
     },

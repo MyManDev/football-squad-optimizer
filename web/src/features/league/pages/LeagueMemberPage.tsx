@@ -2,18 +2,14 @@ import { membersAddress } from "../../../lib/leagueAddresses";
 import { useLeagueId } from "../useLeague";
 import { Link, useParams, useSearchParams } from "react-router";
 
-import { Badge } from "../../../design/components/Badge";
-import { Card } from "../../../design/components/Card";
 import { EmptyState } from "../../../design/components/EmptyState";
 import { useLanguage } from "../../../i18n/context";
 import { useFixtures } from "../../fixtures/data";
-import { SquadPage } from "../../squad/pages/SquadPage";
 import { LeagueDataMissing } from "../data";
 import { useDeadlinePassed } from "../advice/deadline";
 import { LeagueMemberView } from "./LeagueMemberView";
 import type { AdviceIssue } from "./memberPageTypes";
 import { useLeagueMemberData } from "./useLeagueMemberData";
-import styles from "./LeagueMemberPage.module.css";
 
 export { LeagueMemberView };
 export type { AdviceIssue } from "./memberPageTypes";
@@ -35,6 +31,8 @@ export function LeagueMemberPage() {
     adviceEnabled,
     advice,
     rival,
+    duel,
+    duelId,
     deviceRivals,
     windowControl,
     client,
@@ -49,7 +47,6 @@ export function LeagueMemberPage() {
   // The same calendar the deadline is read from; the query is shared, so nothing more is read.
   const fixtures = useFixtures();
 
-  if (entryParam === "squadopt") return <SystemLeagueMemberPage />;
   if (!validEntryId) return <EmptyState title={copy.invalidEntry} />;
   if (squad.isPending) return <EmptyState title={copy.loadingEntry} />;
   if (squad.isError) {
@@ -96,6 +93,18 @@ export function LeagueMemberPage() {
       squad={squad.data}
       advice={adviceEnabled && !advice.isError ? (advice.data ?? null) : null}
       rivalSquad={rival.data ?? null}
+      duelSquad={duelId !== null && !duel.isError ? (duel.data ?? null) : null}
+      duelIssue={
+        duelId === null
+          ? undefined
+          : duel.isError
+            ? duel.error instanceof LeagueDataMissing
+              ? "missing"
+              : "unreadable"
+            : duel.isPending
+              ? "loading"
+              : undefined
+      }
       deviceRivals={deviceRivals}
       windowControl={windowControl.isError ? null : (windowControl.data ?? null)}
       adviceIssue={adviceIssue}
@@ -126,31 +135,6 @@ export function LeagueMemberPage() {
       deadlinePassed={deadlinePassed}
       fixtures={fixtures.data ?? null}
       fixturesPending={fixtures.isPending}
-      leagueName={membersQuery.data?.payload.league_name}
     />
-  );
-}
-
-function SystemLeagueMemberPage() {
-  const { messages } = useLanguage();
-  const leagueId = useLeagueId();
-  const copy = messages.leagueMembers;
-  return (
-    <div className={styles.systemPage}>
-      <Link className={styles.back} to={membersAddress(leagueId)}>
-        {copy.backToMembers}
-      </Link>
-      <Card
-        title={copy.systemTeamTitle}
-        aside={
-          <Badge tone="accent">
-            <span aria-hidden="true">◈</span> {copy.systemTeamBadge}
-          </Badge>
-        }
-      >
-        <p className={styles.honesty}>{copy.independentAdviceRule}</p>
-      </Card>
-      <SquadPage />
-    </div>
   );
 }

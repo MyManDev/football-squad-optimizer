@@ -49,6 +49,15 @@ for (const language of ["tr", "en"] as const) {
     await expect(
       page.getByRole("combobox", { name: tr ? "Pozisyon" : "Position", exact: true }),
     ).toBeDisabled();
+    // The page states no moderation rule and no roster header.
+    await expect(
+      page.getByText(
+        tr
+          ? "Yorumlar yönetici onayından sonra herkese açılır."
+          : "Comments become public after moderation.",
+      ),
+    ).toHaveCount(0);
+    await expect(page.getByText(tr ? /Tüm FPL oyuncuları/ : /Complete FPL roster/)).toHaveCount(0);
     await page
       .getByRole("combobox", { name: tr ? "Takım" : "Team", exact: true })
       .selectOption("10");

@@ -5256,5 +5256,6 @@
       "rule": "The candidate is preferred only if (i) its primary-season points MAE is lower than the control's, (ii) the 90% season-aware moving-block interval of the per-fold paired differences (control MAE minus candidate MAE) on the primary season lies entirely above zero, and (iii) the same interval on the previous-era season does not lie entirely below zero. Otherwise there is no selection and the control remains the reference. No minimum effect size is imposed and none is added afterwards.",
       "verdict": "candidate_preferred"
     }
-  }
+  },
+  "locked_holdout_accessed": true
 }

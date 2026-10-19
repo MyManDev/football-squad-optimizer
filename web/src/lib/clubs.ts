@@ -61,32 +61,46 @@ const FALLBACK_CODES: Readonly<Record<string, string>> = {
   Sunderland: "SUN",
 };
 
+/** A club's two recognised home colours: the one its shirt is known by, then the other. */
+export interface ClubColours {
+  primary: string;
+  secondary: string;
+}
+
 /**
- * One swatch per club code (a 10 px square with an ink outline next to the code). The
- * colour is decoration: the code is always printed beside it.
+ * Two colours per club code. The primary is the one-colour swatch beside a code on the
+ * boards, plates and squad lists, and it keeps the value those pages have always drawn; a
+ * fixture list draws both, split on the diagonal with the primary top left. Either is
+ * decoration: the code or the name is always printed beside it, and the ink outline keeps
+ * a white half visible on a light page.
  */
-export const CLUB_SWATCHES: Readonly<Record<string, string>> = {
-  ARS: "#EF0107",
-  AVL: "#670E36",
-  BHA: "#0057B8",
-  BOU: "#B50E12",
-  BRE: "#E30613",
-  CHE: "#034694",
-  COV: "#6CBFE8",
-  CRY: "#1B458F",
-  EVE: "#003399",
-  FUL: "#000000",
-  HUL: "#F5A12D",
-  IPS: "#3A64A3",
-  LEE: "#FFCD00",
-  LIV: "#C8102E",
-  MCI: "#6CABDD",
-  MUN: "#DA291C",
-  NEW: "#241F20",
-  NFO: "#DD0000",
-  SUN: "#EB172B",
-  TOT: "#132257",
+export const CLUB_COLOURS: Readonly<Record<string, ClubColours>> = {
+  ARS: { primary: "#EF0107", secondary: "#FFFFFF" },
+  AVL: { primary: "#670E36", secondary: "#95BFE5" },
+  BHA: { primary: "#0057B8", secondary: "#FFFFFF" },
+  BOU: { primary: "#B50E12", secondary: "#000000" },
+  BRE: { primary: "#E30613", secondary: "#FFFFFF" },
+  CHE: { primary: "#034694", secondary: "#FFFFFF" },
+  COV: { primary: "#6CBFE8", secondary: "#FFFFFF" },
+  CRY: { primary: "#1B458F", secondary: "#C4122E" },
+  EVE: { primary: "#003399", secondary: "#FFFFFF" },
+  FUL: { primary: "#000000", secondary: "#FFFFFF" },
+  HUL: { primary: "#F5A12D", secondary: "#000000" },
+  IPS: { primary: "#3A64A3", secondary: "#FFFFFF" },
+  LEE: { primary: "#FFCD00", secondary: "#FFFFFF" },
+  LIV: { primary: "#C8102E", secondary: "#FFFFFF" },
+  MCI: { primary: "#6CABDD", secondary: "#FFFFFF" },
+  MUN: { primary: "#DA291C", secondary: "#FFFFFF" },
+  NEW: { primary: "#241F20", secondary: "#FFFFFF" },
+  NFO: { primary: "#DD0000", secondary: "#FFFFFF" },
+  SUN: { primary: "#EB172B", secondary: "#FFFFFF" },
+  TOT: { primary: "#132257", secondary: "#FFFFFF" },
 };
+
+/** One swatch per club code: its primary colour, read from CLUB_COLOURS. */
+export const CLUB_SWATCHES: Readonly<Record<string, string>> = Object.fromEntries(
+  Object.entries(CLUB_COLOURS).map(([code, colours]) => [code, colours.primary]),
+);
 
 const key = (name: string) => name.trim().toLocaleLowerCase("en-GB");
 
@@ -116,8 +130,13 @@ export function clubCode(team: string, fromFixtures?: ClubCodes | null): string 
   return fromFixtures?.get(name) ?? FALLBACK.get(name) ?? null;
 }
 
-/** The swatch colour for a club code, or `null` when the code has none. */
-export function clubSwatch(code: string | null | undefined): string | null {
+/** Both colours for a club code, or `null` when the code has none. */
+export function clubColours(code: string | null | undefined): ClubColours | null {
   if (!code) return null;
-  return CLUB_SWATCHES[code.toUpperCase()] ?? null;
+  return CLUB_COLOURS[code.toUpperCase()] ?? null;
+}
+
+/** The swatch colour for a club code (its primary), or `null` when the code has none. */
+export function clubSwatch(code: string | null | undefined): string | null {
+  return clubColours(code)?.primary ?? null;
 }

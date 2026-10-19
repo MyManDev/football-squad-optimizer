@@ -1,0 +1,171 @@
+/* The duel (#1133): the member's eleven and a rival's with the difference strip between
+   them. On a phone the three stack (member, strip, rival); from 640 px of room they stand in
+   one row. The players both start are dimmed and the ones only one side starts carry the
+   page's one bright accent; switching the rival changes those states in the data time of
+   the motion tokens, which reduced motion makes instant. */
+
+.duel {
+  display: grid;
+  gap: var(--space-3);
+  container: duel / inline-size;
+}
+
+.picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.pick {
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-text);
+  border-radius: var(--radius-s);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color var(--motion-ui) var(--motion-ease),
+    color var(--motion-ui) var(--motion-ease);
+}
+
+.pick[aria-pressed="true"] {
+  background: var(--color-text);
+  color: var(--color-primary-text);
+}
+
+.state {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.board {
+  display: grid;
+  gap: var(--space-3);
+}
+
+@container duel (min-width: 640px) {
+  .board {
+    grid-template-columns: minmax(0, 1fr) minmax(9rem, 11rem) minmax(0, 1fr);
+    align-items: start;
+  }
+}
+
+.side {
+  min-width: 0;
+}
+
+.sideTitle {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-1);
+}
+
+.team {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.total {
+  flex: none;
+  font-family: var(--font-display);
+}
+
+.eleven {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.player {
+  display: grid;
+  grid-template-columns: 2.5rem minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 32px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-s);
+  background: var(--color-lime);
+  color: var(--color-text);
+  font-weight: 600;
+  transition:
+    background-color var(--motion-data) var(--motion-ease),
+    color var(--motion-data) var(--motion-ease);
+}
+
+.player[data-shared] {
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font-weight: 400;
+}
+
+.position {
+  font-size: var(--step--1);
+}
+
+.name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.captain {
+  grid-column: 3;
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+
+.points {
+  grid-column: 4;
+  font-family: var(--font-display);
+}
+
+/* The strip is a small scoreboard: the board's ground, the lime for the difference. */
+.strip {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-3);
+  border-radius: var(--radius-m);
+  background: var(--color-board);
+  color: var(--color-board-muted);
+}
+
+.strip dd {
+  margin: 0;
+}
+
+.headline dt {
+  font-size: var(--step--1);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.headline dd {
+  color: var(--color-lime);
+  font-family: var(--font-display);
+  font-size: var(--step-2);
+  font-weight: 700;
+}
+
+.part {
+  display: grid;
+  gap: 2px;
+  font-size: var(--step--1);
+}
+
+.part dd {
+  font-family: var(--font-display);
+}
+
+.captains {
+  overflow-wrap: anywhere;
+}

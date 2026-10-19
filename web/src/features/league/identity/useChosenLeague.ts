@@ -1,4 +1,8 @@
-/** The league the visitor opened by its number; nothing under /league renders without one. */
+/**
+ * The league the visitor opened by its number, remembered in this browser and shared across
+ * its tabs; nothing under /league renders without one. Internal to the identity module:
+ * pages read the league through `useLeagueIdentity`.
+ */
 import { useCallback, useSyncExternalStore } from "react";
 
 const STORAGE_KEY = "squadopt.league";
@@ -56,10 +60,8 @@ function snapshot(): number | null {
 export function useChosenLeague(): {
   leagueId: number | null;
   choose: (leagueId: number) => void;
-  forget: () => void;
 } {
   const leagueId = useSyncExternalStore(subscribe, snapshot, () => null);
   const choose = useCallback((id: number) => writeChosenLeague(id), []);
-  const forget = useCallback(() => writeChosenLeague(null), []);
-  return { leagueId, choose, forget };
+  return { leagueId, choose };
 }

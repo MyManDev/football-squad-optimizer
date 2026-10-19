@@ -25,7 +25,16 @@ for (const language of ["en", "tr"] as const) {
       ...state,
     }));
     await page.addInitScript((value) => localStorage.setItem("squadopt.language", value), language);
-    await installLeagueMocks(page);
+    // The visitor has said they are a member this list serves.
+    await installLeagueMocks(page, {
+      claim: {
+        leagueId: publication.payload.league_id,
+        entryId: 101,
+        managerName: "Movement member 0",
+        teamName: human.team_name,
+        leagueName: publication.payload.league_name,
+      },
+    });
     await page.route("**/data/league/members.json", (route) =>
       route.fulfill({ json: publication }),
     );

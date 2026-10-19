@@ -218,7 +218,11 @@ describe("league member surfaces", () => {
       renderPage(<LeagueMembersView envelope={mockLeagueMembersEnvelope} />, undefined, language);
       expect(screen.queryByText(SYSTEM_SCORE_NOTE)).not.toBeInTheDocument();
       expect(screen.queryByRole("link", { name: "SquadOpt" })).not.toBeInTheDocument();
-      expect(screen.queryByText(copy.leagueMembers.systemTeamBadge)).not.toBeInTheDocument();
+      // No row, badge or link of the system's own team: the table lists the members only.
+      expect(document.querySelector("#league-member-list tbody")).not.toHaveTextContent("SquadOpt");
+      expect(screen.queryByRole("link", { name: /SquadOpt/ })).not.toBeInTheDocument();
+      expect(document.querySelector('a[href$="/squadopt"]')).toBeNull();
+      expect(copy.leagueMembers).not.toHaveProperty("systemTeamBadge");
       cleanup();
       const entryId = 35249001;
       renderPage(
@@ -268,10 +272,22 @@ describe("league member surfaces", () => {
 
     expect(screen.getAllByRole("row")).toHaveLength(live.payload.members.length + 1);
     expect(screen.queryByRole("link", { name: "SquadOpt" })).not.toBeInTheDocument();
-    expect(
-      screen.getByText(MESSAGES.tr.leagueMembers.memberCount(live.payload.members.length)),
-    ).toBeInTheDocument();
   });
+
+  it.each(["tr", "en"] as const)(
+    "titles the page with the league's name alone, with no count or gameweek line, in %s",
+    (language) => {
+      renderPage(<LeagueMembersView envelope={mockLeagueMembersEnvelope} />, undefined, language);
+      const view = mockLeagueMembersEnvelope.payload;
+      expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(view.league_name);
+      expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+      const text = document.body.textContent ?? "";
+      expect(text).not.toMatch(/hafta sonunda|after gameweek/);
+      expect(text).not.toMatch(/\b\d+ (üye|members)\b/);
+      expect(text).not.toMatch(/Hangisi sensin\?|Which one is you\?/);
+      expect(text).not.toMatch(/Bu benim|This is me/);
+    },
+  );
 
   it.each(["tr", "en"] as const)(
     "names the column's basis, because it is not the one the FPL site shows, in %s",
@@ -305,16 +321,15 @@ describe("league member surfaces", () => {
       (member) => member.member_kind === "human",
     );
     expect(screen.getAllByRole("row")).toHaveLength(humans.length + 1);
-    expect(
-      screen.getByText(MESSAGES.tr.leagueMembers.memberCount(humans.length)),
-    ).toBeInTheDocument();
-    expect(screen.queryByText("SquadOpt · sistem takımı")).not.toBeInTheDocument();
+    expect(screen.queryByText(/SquadOpt · /)).not.toBeInTheDocument();
   });
 
   it("renders member standings, the public-data notice and an example badge", () => {
     renderPage(<LeagueMembersView envelope={mockLeagueMembersEnvelope} />);
 
-    expect(screen.getByRole("heading", { level: 1, name: "Lig tablosu" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { level: 1, name: "SquadOpt Classic League" }),
+    ).toBeInTheDocument();
     expect(screen.getByText("örnek veri")).toBeInTheDocument();
     expect(screen.getByText(/son tarihinden sonra herkese açık FPL verisidir/)).toBeInTheDocument();
     expect(screen.getAllByRole("row")).toHaveLength(11);

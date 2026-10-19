@@ -1,0 +1,13 @@
+/* A club's swatch: a 10 px square with an ink outline that sits on the text's baseline, the
+   primary colour alone or both colours split on the diagonal. */
+.swatch {
+  display: inline-block;
+  flex: none;
+  width: 10px;
+  height: 10px;
+  outline: 1px solid var(--color-board);
+}
+
+.split {
+  background: linear-gradient(135deg, var(--club-primary) 50%, var(--club-secondary) 50%);
+}
