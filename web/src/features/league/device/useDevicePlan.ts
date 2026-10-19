@@ -6,9 +6,10 @@
  * chip the member still holds played that week, a rival strategy against a named rival
  * whose entry document gives their eleven, or a Top 100 weight the member block names. The shared document (and the rival's) is read
  * when the member asks, the solve runs in a worker, and the answer is shown as the advice
- * document the page already reads. A new selection starts clean, and a reset or a new
- * selection stops a solve still running: its worker is ended, not left computing an
- * answer nobody will read. A worker that does not answer within the solve's ceiling, and
+ * document the page already reads. The plain plan's run also solves each chip the member
+ * holds once against that plan, for the chip timing card. A new selection starts clean,
+ * and a reset or a new selection stops a solve still running: its worker is ended, not
+ * left computing an answer nobody will read. A worker that does not answer within the solve's ceiling, and
  * a grace beyond it, is ended too and the run fails. That watchdog counts only the time the
  * page is visible, not the time a hidden tab spends suspended. Each run leaves User Timing
  * marks and measures of its stages (`DeviceTimeline`); the device spec prints the measures.
@@ -28,7 +29,13 @@ import {
 } from "./solve/ceiling";
 import type { DevicePlanReply, DevicePlanRequest } from "./deviceSolver.worker";
 import { deviceSelection, offeredDeviceSelection, rivalFromSquad } from "./selection";
-import { isDevicePlanEntry, type DevicePlanDocument, type DevicePlanEntry } from "./types";
+import { heldChips } from "./chipForecast/member";
+import {
+  isDevicePlanEntry,
+  type DeviceChip,
+  type DevicePlanDocument,
+  type DevicePlanEntry,
+} from "./types";
 
 export { deviceChip, deviceSelection } from "./selection";
 
@@ -36,11 +43,27 @@ export type DevicePlanPhase =
   | { phase: "idle" }
   | { phase: "loading" }
   | { phase: "solving" }
-  | { phase: "done"; envelope: LeagueViewEnvelope<EntryAdvice>; seconds: number }
+  | {
+      phase: "done";
+      envelope: LeagueViewEnvelope<EntryAdvice>;
+      seconds: number;
+      /** With the plain plan: what the chip timing reads, solved in the same run. */
+      chipTiming?: DeviceChipTiming | null;
+    }
   | { phase: "refused"; status: string }
   | { phase: "other-capture" }
   | { phase: "unpublished" }
   | { phase: "failed" };
+
+/**
+ * The table the plain plan was solved from and each held chip's gain this week against
+ * that plan, null where its solve was refused. The chip timing card reads its reading from
+ * these and the page's own squad and calendar.
+ */
+export interface DeviceChipTiming {
+  table: DevicePlanDocument;
+  gains: Partial<Record<DeviceChip, number | null>>;
+}
 
 /**
  * Whether the device's last run ended without a plan: it failed, refused the selection,
@@ -396,6 +419,10 @@ export function useDevicePlan(
         return;
       }
       const chip = selection.kind === "chip" ? selection.chip : null;
+      // The plain one-week plan also solves each chip the member holds once beside it, for
+      // the chip timing (#1003): 1 + n solves in the one request, under its one ceiling.
+      const chipGains =
+        selection.kind === "plain" ? (heldChips(squad.chips, document.gameweek) ?? []) : [];
       // A worker that cannot be created, load or evaluate answers as a failure, and the
       // next press creates a fresh one rather than reusing a dead worker.
       let worker: DeviceSolver;
@@ -454,6 +481,7 @@ export function useDevicePlan(
             chip,
             strategy,
             top100Weight: selection.kind === "top100" ? selection.weight : 0,
+            ...(chipGains.length > 0 ? { chipGains } : {}),
           });
         } catch {
           settle(null);
@@ -478,6 +506,9 @@ export function useDevicePlan(
             tree.league.leagueId,
           ),
           seconds: reply.answer.seconds,
+          chipTiming: reply.answer.chip_gains
+            ? { table: document, gains: reply.answer.chip_gains }
+            : null,
         });
       }
     })().finally(() => {

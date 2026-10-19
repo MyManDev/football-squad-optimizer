@@ -27,6 +27,7 @@ import {
   DEVICE_REPLY_GRACE_SECONDS,
   DEVICE_SOLVE_CEILING_SECONDS,
 } from "./solve/ceiling";
+import { solveRequest } from "./requests";
 import { solvePlan } from "./solve/week";
 import type { DevicePlanDocument, DevicePlanEntry } from "./types";
 import {
@@ -1592,5 +1593,87 @@ describe("the marks a run leaves", () => {
     );
     await act(async () => screen.getByText("run").click());
     await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("done"));
+  });
+});
+
+describe("the chip timing's gains", () => {
+  /** A worker answering with the real request, keeping each request posted to it. */
+  function recording() {
+    const posted: DevicePlanRequest[] = [];
+    const solver = new InProcessSolver((request) => {
+      posted.push(request);
+      return { id: request.id, kind: "answer", answer: solveRequest(highs, request, () => 0) };
+    });
+    return { posted, solver };
+  }
+
+  async function runOnce(squad: EntrySquad, request: AdviceRequest, solver: DeviceSolver) {
+    const seen = { latest: { phase: "idle" } as DevicePlanPhase };
+    render(
+      withLeague(
+        <Harness
+          squad={squad}
+          request={request}
+          loadDocument={async () => envelope(document)}
+          solver={solver}
+          onState={(s) => {
+            seen.latest = s;
+          }}
+        />,
+      ),
+    );
+    await act(async () => screen.getByText("run").click());
+    await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("done"));
+    return seen.latest;
+  }
+
+  it("are asked with the plain plan, each held chip once, and the run keeps them with its table", async () => {
+    const { posted, solver } = recording();
+    const latest = await runOnce(squadWith(entry), REQUEST, solver);
+    // The example member holds all four chips in the first half, so all four are solved.
+    expect(posted.map((request) => request.chipGains)).toEqual([
+      ["wildcard", "freehit", "bboost", "3xc"],
+    ]);
+    if (latest.phase !== "done") throw new Error("The run did not finish.");
+    expect(latest.chipTiming?.table).toBe(document);
+    expect(Object.keys(latest.chipTiming?.gains ?? {})).toEqual([
+      "wildcard",
+      "freehit",
+      "bboost",
+      "3xc",
+    ]);
+    // The plan shown is still the plain plan.
+    expect(latest.envelope.payload.chip ?? null).toBeNull();
+  });
+
+  it("are not asked with a chip, and that run carries none", async () => {
+    const { posted, solver } = recording();
+    const latest = await runOnce(squadWith(entry), { ...REQUEST, chip: "3xc" }, solver);
+    expect(posted).toHaveLength(1);
+    expect(posted[0]!.chipGains).toBeUndefined();
+    expect(latest.phase === "done" && latest.chipTiming).toBeNull();
+  });
+
+  it("are not asked where the member holds no chip or the history is unknown", async () => {
+    const base = squadWith(entry);
+    const spent = {
+      ...base,
+      chips: {
+        ...base.chips!,
+        states: Object.fromEntries(
+          Object.entries(base.chips!.states).map(([name, halves]) => [
+            name,
+            { ...halves, first_half: { ...halves!.first_half!, state: "used" as const } },
+          ]),
+        ),
+      },
+    };
+    for (const squad of [spent, { ...base, chips: { ...base.chips!, known: false } }]) {
+      const { posted, solver } = recording();
+      const latest = await runOnce(squad, REQUEST, solver);
+      expect(posted[0]!.chipGains).toBeUndefined();
+      expect(latest.phase === "done" && latest.chipTiming).toBeNull();
+      cleanup();
+    }
   });
 });
