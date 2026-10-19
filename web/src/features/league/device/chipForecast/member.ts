@@ -14,11 +14,14 @@ import type { DevicePlanDocument, DevicePlanPlayer } from "../types";
 import {
   chipForecast,
   MEASURED_RESERVATION,
+  nextPointsAt,
   MEASURED_THRESHOLD_POLICY,
   PROTOCOL_HOLDING_VALUES,
+  type ChipForecastInputs,
   type ChipName,
   type GameweekFixtures,
   type HeldChip,
+  type PointsAt,
   type SquadRow,
 } from "./rule";
 
@@ -209,10 +212,11 @@ function positiveInteger(value: unknown): number {
   return value;
 }
 
-function reading(
+/** The rule's inputs for one member, or the publisher's refusal as `ForecastUnavailable`. */
+function ruleInputs(
   { table, squad, fixtures, gains }: MemberChipForecastInputs,
   ids: number[],
-): Pick<MemberChipForecast, "forecast" | "calendar_has_structure" | "calendar_range"> {
+): ChipForecastInputs {
   const week = table.gameweek;
   const source = forecastSource(fixtures);
   if (source === null) throw new ForecastUnavailable("calendar_missing");
@@ -266,7 +270,7 @@ function reading(
       is_captain: captains.has(id),
     };
   });
-  const forecast = chipForecast({
+  return {
     decision_gameweek: week,
     chips,
     squad: rows,
@@ -274,8 +278,17 @@ function reading(
     holding_values: PROTOCOL_HOLDING_VALUES,
     threshold: MEASURED_THRESHOLD_POLICY,
     reserve: MEASURED_RESERVATION,
-  });
-  const later = calendar.filter((item) => item.gameweek > week);
+  };
+}
+
+function reading(
+  inputs: MemberChipForecastInputs,
+  ids: number[],
+): Pick<MemberChipForecast, "forecast" | "calendar_has_structure" | "calendar_range"> {
+  const rule = ruleInputs(inputs, ids);
+  const forecast = chipForecast(rule);
+  const week = rule.decision_gameweek;
+  const later = rule.calendar.filter((item) => item.gameweek > week);
   // The counts are complete maps, so a blank is a stated zero and a double a two.
   const structured = later.some((item) =>
     Object.values(item.fixture_count_by_club).some((count) => count !== 1),
@@ -290,6 +303,10 @@ function reading(
   };
 }
 
+function fifteen(squad: MemberChipForecastInputs["squad"]): number[] {
+  return [...squad.starting_xi, ...squad.bench].map((player) => player.player_id);
+}
+
 /**
  * One complete reading for one member, or the publisher's refusal code. Gains from another
  * capture or another request are never combined into it: the caller passes the gains of
@@ -297,7 +314,7 @@ function reading(
  */
 export function memberChipForecast(inputs: MemberChipForecastInputs): MemberChipForecast {
   const { table, squad } = inputs;
-  const ids = [...squad.starting_xi, ...squad.bench].map((player) => player.player_id);
+  const ids = fifteen(squad);
   const envelope: MemberChipForecast = {
     season: table.season,
     league_id: squad.league_id,
@@ -321,5 +338,22 @@ export function memberChipForecast(inputs: MemberChipForecastInputs): MemberChip
       ...envelope,
       reason: error instanceof ForecastUnavailable ? error.reason : "forecast_inputs_unreadable",
     };
+  }
+}
+
+/**
+ * The rule's next named gameweek for a held chip after `after`, on the same inputs as the
+ * member's reading (`nextPointsAt`); null where none crosses, or where the reading itself
+ * is refused.
+ */
+export function memberNextPointsAt(
+  inputs: MemberChipForecastInputs,
+  name: ChipName,
+  after: number,
+): PointsAt | null {
+  try {
+    return nextPointsAt(ruleInputs(inputs, fifteen(inputs.squad)), name, after);
+  } catch {
+    return null;
   }
 }
