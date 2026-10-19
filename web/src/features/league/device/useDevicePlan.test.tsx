@@ -27,7 +27,7 @@ import {
   DEVICE_REPLY_GRACE_SECONDS,
   DEVICE_SOLVE_CEILING_SECONDS,
 } from "./solve/ceiling";
-import { solveRequest } from "./requests";
+import { replyTo } from "./replies";
 import { solvePlan } from "./solve/week";
 import type { DevicePlanDocument, DevicePlanEntry } from "./types";
 import {
@@ -317,7 +317,7 @@ describe("the worker", () => {
     // The worker cannot load here (its wasm comes from the built assets), so its wiring is
     // read from its source; the ceiling itself is tested in solve/ceiling.test.ts.
     const source = readFileSync(join(__dirname, "deviceSolver.worker.ts"), "utf8");
-    expect(source).toContain("solveRequest(withinCeiling(loaded), event.data)");
+    expect(source).toContain("replyTo(withinCeiling(loaded), event.data,");
   });
 });
 
@@ -1597,43 +1597,107 @@ describe("the marks a run leaves", () => {
 });
 
 describe("the chip timing's gains", () => {
-  /** A worker answering with the real request, keeping each request posted to it. */
-  function recording() {
-    const posted: DevicePlanRequest[] = [];
-    const solver = new InProcessSolver((request) => {
-      posted.push(request);
-      return { id: request.id, kind: "answer", answer: solveRequest(highs, request, () => 0) };
-    });
-    return { posted, solver };
+  /** The worker, answered in process through its own replies, keeping each request. */
+  class ReplyingSolver implements DeviceSolver {
+    onmessage: ((event: MessageEvent<DevicePlanReply>) => void) | null = null;
+    readonly posted: DevicePlanRequest[] = [];
+    terminate(): void {}
+    postMessage(request: DevicePlanRequest): void {
+      this.posted.push(request);
+      const replies: DevicePlanReply[] = [{ id: request.id, kind: "ready" }];
+      replyTo(
+        highs,
+        request,
+        (reply) => replies.push(reply),
+        () => 0,
+      );
+      queueMicrotask(() => {
+        for (const reply of replies)
+          this.onmessage?.({ data: reply } as MessageEvent<DevicePlanReply>);
+      });
+    }
   }
 
-  async function runOnce(squad: EntrySquad, request: AdviceRequest, solver: DeviceSolver) {
+  /**
+   * A worker that posts ready and the plain plan at once, and the gains only when the test
+   * releases them, as many times as it likes and for whichever run.
+   */
+  class HeldGainsSolver implements DeviceSolver {
+    onmessage: ((event: MessageEvent<DevicePlanReply>) => void) | null = null;
+    readonly posted: DevicePlanRequest[] = [];
+    terminated = false;
+    terminate(): void {
+      this.terminated = true;
+    }
+    /** Hold the plan too, until `releasePlan`. */
+    holdPlan = false;
+    postMessage(request: DevicePlanRequest): void {
+      this.posted.push(request);
+      queueMicrotask(() => {
+        this.onmessage?.({
+          data: { id: request.id, kind: "ready" },
+        } as MessageEvent<DevicePlanReply>);
+        if (!this.holdPlan) this.releasePlan(this.posted.length - 1);
+      });
+    }
+    /** The plain plan of the request posted `index`th. */
+    releasePlan(index: number): void {
+      const request = this.posted[index]!;
+      const plan = { ...solvePlan(highs, request.document, request.entry, () => 0), seconds: 0.4 };
+      this.onmessage?.({
+        data: { id: request.id, kind: "plan", answer: plan },
+      } as MessageEvent<DevicePlanReply>);
+    }
+    /** The gains of the request posted `index`th, or a run that failed after its plan. */
+    release(index: number, gains: Record<string, number | null> | null = { wildcard: 9 }): void {
+      this.onmessage?.({
+        data: { id: this.posted[index]!.id, kind: "gains", gains, seconds: 3.2 },
+      } as MessageEvent<DevicePlanReply>);
+    }
+  }
+
+  function mount(
+    squad: EntrySquad,
+    request: AdviceRequest,
+    solver: DeviceSolver,
+    timers?: HandTimers,
+  ) {
     const seen = { latest: { phase: "idle" } as DevicePlanPhase };
-    render(
+    const view = (asked: AdviceRequest) =>
       withLeague(
         <Harness
           squad={squad}
-          request={request}
+          request={asked}
           loadDocument={async () => envelope(document)}
           solver={solver}
+          timers={timers}
           onState={(s) => {
             seen.latest = s;
           }}
         />,
-      ),
-    );
+      );
+    const { rerender } = render(view(request));
+    return { seen, rerender: (asked: AdviceRequest) => rerender(view(asked)) };
+  }
+
+  async function runOnce(squad: EntrySquad, request: AdviceRequest, solver: DeviceSolver) {
+    const { seen } = mount(squad, request, solver);
     await act(async () => screen.getByText("run").click());
     await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("done"));
-    return seen.latest;
+    return seen;
   }
 
   it("are asked with the plain plan, each held chip once, and the run keeps them with its table", async () => {
-    const { posted, solver } = recording();
-    const latest = await runOnce(squadWith(entry), REQUEST, solver);
+    const solver = new ReplyingSolver();
+    const seen = await runOnce(squadWith(entry), REQUEST, solver);
     // The example member holds all four chips in the first half, so all four are solved.
-    expect(posted.map((request) => request.chipGains)).toEqual([
+    expect(solver.posted.map((request) => request.chipGains)).toEqual([
       ["wildcard", "freehit", "bboost", "3xc"],
     ]);
+    await waitFor(() =>
+      expect(seen.latest.phase === "done" && seen.latest.chipTiming).toBeTruthy(),
+    );
+    const latest = seen.latest;
     if (latest.phase !== "done") throw new Error("The run did not finish.");
     expect(latest.chipTiming?.table).toBe(document);
     expect(Object.keys(latest.chipTiming?.gains ?? {})).toEqual([
@@ -1646,12 +1710,88 @@ describe("the chip timing's gains", () => {
     expect(latest.envelope.payload.chip ?? null).toBeNull();
   });
 
+  it("follow the plan: it is shown first, with its own time, and the gains do not change it", async () => {
+    const solver = new HeldGainsSolver();
+    const seen = await runOnce(squadWith(entry), REQUEST, solver);
+    const first = seen.latest;
+    if (first.phase !== "done") throw new Error("The plan was not shown.");
+    expect(first.chipTiming).toBeNull();
+    // The timing line counts the plain plan's solve only, as before the chip timing.
+    expect(first.seconds).toBe(0.4);
+    await act(async () => solver.release(0));
+    const after = seen.latest;
+    if (after.phase !== "done") throw new Error("The plan was lost.");
+    expect(after.chipTiming?.gains).toEqual({ wildcard: 9 });
+    expect(after.seconds).toBe(0.4);
+    expect(after.envelope).toBe(first.envelope);
+  });
+
+  it("are dropped for a run a reset or a new selection ended", async () => {
+    const solver = new HeldGainsSolver();
+    const { seen, rerender } = mount(squadWith(entry), REQUEST, solver);
+    await act(async () => screen.getByText("run").click());
+    await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("done"));
+    await act(async () => screen.getByText("reset").click());
+    await act(async () => solver.release(0));
+    expect(seen.latest).toEqual({ phase: "idle" });
+    // Again, and this time the member moves to a three-week window before the gains come.
+    await act(async () => screen.getByText("run").click());
+    await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("done"));
+    expect(solver.terminated).toBe(true);
+    rerender({ ...REQUEST, window: 3 });
+    await act(async () => solver.release(1));
+    expect(seen.latest).toEqual({ phase: "idle" });
+    // And back: the hook still holds that run's plan for this selection (the page resets
+    // it on a new selection), but the gains that run never received do not surface.
+    rerender(REQUEST);
+    await act(async () => solver.release(1));
+    expect(seen.latest).toMatchObject({ phase: "done", chipTiming: null });
+  });
+
+  it("are never another run's: an ended run's plan and gains reach no later run", async () => {
+    const solver = new HeldGainsSolver();
+    const { seen } = mount(squadWith(entry), REQUEST, solver);
+    solver.holdPlan = true;
+    await act(async () => screen.getByText("run").click());
+    await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("solving"));
+    await act(async () => screen.getByText("reset").click());
+    // The ended run's plan comes late: the page stays as the reset left it.
+    await act(async () => solver.releasePlan(0));
+    expect(seen.latest).toEqual({ phase: "idle" });
+    solver.holdPlan = false;
+    await act(async () => screen.getByText("run").click());
+    await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("done"));
+    // The first run's gains reach the same worker's next run, which does not take them.
+    await act(async () => solver.release(0, { wildcard: 99 }));
+    expect(seen.latest).toMatchObject({ phase: "done", chipTiming: null });
+    await act(async () => solver.release(1));
+    expect(seen.latest.phase === "done" && seen.latest.chipTiming?.gains).toEqual({ wildcard: 9 });
+  });
+
+  it("keep the plan, with no chip timing, when the run fails or is stopped after it", async () => {
+    const solver = new HeldGainsSolver();
+    const seen = await runOnce(squadWith(entry), REQUEST, solver);
+    await act(async () => solver.release(0, null));
+    expect(seen.latest).toMatchObject({ phase: "done", chipTiming: null });
+    cleanup();
+    const timers = new HandTimers();
+    const held = new HeldGainsSolver();
+    const stopped = mount(squadWith(entry), REQUEST, held, timers);
+    await act(async () => screen.getByText("run").click());
+    await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("done"));
+    // The solve's watchdog ends the worker before the gains arrive.
+    await act(async () => timers.fireAll());
+    expect(held.terminated).toBe(true);
+    await act(async () => held.release(0));
+    expect(stopped.seen.latest).toMatchObject({ phase: "done", chipTiming: null });
+  });
+
   it("are not asked with a chip, and that run carries none", async () => {
-    const { posted, solver } = recording();
-    const latest = await runOnce(squadWith(entry), { ...REQUEST, chip: "3xc" }, solver);
-    expect(posted).toHaveLength(1);
-    expect(posted[0]!.chipGains).toBeUndefined();
-    expect(latest.phase === "done" && latest.chipTiming).toBeNull();
+    const solver = new ReplyingSolver();
+    const seen = await runOnce(squadWith(entry), { ...REQUEST, chip: "3xc" }, solver);
+    expect(solver.posted).toHaveLength(1);
+    expect(solver.posted[0]!.chipGains).toBeUndefined();
+    expect(seen.latest.phase === "done" && seen.latest.chipTiming).toBeNull();
   });
 
   it("are not asked where the member holds no chip or the history is unknown", async () => {
@@ -1669,10 +1809,10 @@ describe("the chip timing's gains", () => {
       },
     };
     for (const squad of [spent, { ...base, chips: { ...base.chips!, known: false } }]) {
-      const { posted, solver } = recording();
-      const latest = await runOnce(squad, REQUEST, solver);
-      expect(posted[0]!.chipGains).toBeUndefined();
-      expect(latest.phase === "done" && latest.chipTiming).toBeNull();
+      const solver = new ReplyingSolver();
+      const seen = await runOnce(squad, REQUEST, solver);
+      expect(solver.posted[0]!.chipGains).toBeUndefined();
+      expect(seen.latest.phase === "done" && seen.latest.chipTiming).toBeNull();
       cleanup();
     }
   });

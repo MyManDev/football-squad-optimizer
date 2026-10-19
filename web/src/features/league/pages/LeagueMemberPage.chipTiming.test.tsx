@@ -87,9 +87,10 @@ function calendar(): FixturesPayload {
 }
 
 /**
- * The plain plan as the reference states it, with the chip gains the request asked for:
- * Wildcard and Free Hit far above their thresholds, Bench Boost refused (unknown) and
- * Triple Captain at nothing. It keeps every request posted to it.
+ * The worker's two replies for chip gains: the plain plan as the reference states it, at
+ * once, then the gains the request asked for when the test releases them. Wildcard and
+ * Free Hit far above their thresholds, Bench Boost refused (unknown) and Triple Captain
+ * at nothing. It keeps every request posted to it.
  */
 class ChipGainsSolver implements DeviceSolver {
   onmessage: ((event: MessageEvent<DevicePlanReply>) => void) | null = null;
@@ -97,10 +98,9 @@ class ChipGainsSolver implements DeviceSolver {
   terminate(): void {}
   postMessage(request: DevicePlanRequest): void {
     this.posted.push(request);
-    const gains = { wildcard: 30, freehit: 30, bboost: null, "3xc": 0 };
-    const reply: DevicePlanReply = {
+    const plan: DevicePlanReply = {
       id: request.id,
-      kind: "answer",
+      kind: request.chipGains ? "plan" : "answer",
       answer: {
         objective_scaled: 0,
         chip: null,
@@ -118,19 +118,27 @@ class ChipGainsSolver implements DeviceSolver {
         moves: member.reference.moves,
         expected_gain_vs_hold: member.reference.expected_gain_vs_hold,
         seconds: 0.42,
-        ...(request.chipGains
-          ? {
-              chip_gains: Object.fromEntries(request.chipGains.map((chip) => [chip, gains[chip]])),
-            }
-          : {}),
       },
     };
     queueMicrotask(() => {
       this.onmessage?.({
         data: { id: request.id, kind: "ready" },
       } as MessageEvent<DevicePlanReply>);
-      this.onmessage?.({ data: reply } as MessageEvent<DevicePlanReply>);
+      this.onmessage?.({ data: plan } as MessageEvent<DevicePlanReply>);
     });
+  }
+  /** The gains of the last request, as the worker posts them after the plan. */
+  release(): void {
+    const request = this.posted.at(-1)!;
+    const gains = { wildcard: 30, freehit: 30, bboost: null, "3xc": 0 };
+    this.onmessage?.({
+      data: {
+        id: request.id,
+        kind: "gains",
+        gains: Object.fromEntries(request.chipGains!.map((chip) => [chip, gains[chip]])),
+        seconds: 3.2,
+      },
+    } as MessageEvent<DevicePlanReply>);
   }
 }
 
@@ -177,6 +185,11 @@ describe("the chip timing card on the member page", () => {
     expect(solver.posted.map((request) => request.chipGains)).toEqual([
       ["wildcard", "freehit", "bboost", "3xc"],
     ]);
+    // The plan is on the page before the gains; the card waits for them.
+    expect(container.querySelector("[data-chip-timing]")).toBeNull();
+    await act(async () => solver.release());
+    // The timing line still counts the plain plan's solve only.
+    expect(container).toHaveTextContent(copy.deviceDone("0,4"));
     const card = container.querySelector<HTMLElement>("[data-chip-timing]")!;
     expect(card).not.toBeNull();
     // In the same settings tool as the chip control, right after it.
@@ -194,9 +207,11 @@ describe("the chip timing card on the member page", () => {
   });
 
   it("draws nothing where the reading is refused", async () => {
-    const { container } = renderView(new ChipGainsSolver(), null);
+    const solver = new ChipGainsSolver();
+    const { container } = renderView(solver, null);
     await act(async () => deviceButton().click());
     await waitFor(() => expect(container).toHaveTextContent(copy.deviceDone("0,4")));
+    await act(async () => solver.release());
     expect(container.querySelector("[data-chip-timing]")).toBeNull();
     expect(container).not.toHaveTextContent("Çip zamanı");
   });

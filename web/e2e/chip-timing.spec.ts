@@ -66,32 +66,48 @@ async function openPage(page: Page, claim: SeededClaim, gameweek: number): Promi
   await page.clock.setFixedTime(beforeDeadline(gameweek));
   await page.route("**/api/v1/**", (route) => route.abort("connectionrefused"));
   await claimMember(page, claim);
-  // The worker's own count of its solving time, read from each answer it posts. The fixed
-  // clock stands in for the page's User Timing, so the page's measures cannot be read.
+  // Each reply the worker posts, with its own solving time and the moment the page got it,
+  // and each press. The fixed clock stands in for the page's User Timing, so the page's
+  // measures cannot be read; an event's own time stamp is not the clock's.
   await page.addInitScript(() => {
-    const seconds: number[] = [];
-    Object.assign(window, { deviceSeconds: seconds });
+    const replies: { kind: string; seconds: number | null; at: number }[] = [];
+    const presses: number[] = [];
+    Object.assign(window, { deviceReplies: replies, devicePresses: presses });
+    document.addEventListener("click", (event) => presses.push(event.timeStamp), true);
     const Original = window.Worker;
     window.Worker = class extends Original {
       constructor(url: string | URL, options?: WorkerOptions) {
         super(url, options);
         this.addEventListener("message", (event: MessageEvent) => {
-          const data = event.data as { kind?: string; answer?: { seconds?: number } };
-          if (data.kind === "answer" && typeof data.answer?.seconds === "number") {
-            seconds.push(data.answer.seconds);
-          }
+          const data = event.data as {
+            kind: string;
+            seconds?: number;
+            answer?: { seconds?: number };
+          };
+          const seconds = data.answer?.seconds ?? data.seconds ?? null;
+          replies.push({ kind: data.kind, seconds, at: event.timeStamp });
         });
       }
     };
   });
 }
 
+/** One device run: its plain plan, then its gains, each from the press and by the worker. */
+interface Run {
+  requested: string[];
+  /** The worker's solving time for the plain plan, and for the whole run. */
+  planSeconds: number;
+  gainsSeconds: number | null;
+  /** From the press to the plan's arrival on the page, and to the gains'. */
+  planArrival: number;
+  gainsArrival: number | null;
+}
+
 /**
- * Opens a member's one-week plan, presses compute on this device and waits for the plan.
- * Returns the requests made from the press on and the run's solving time in seconds as the
- * worker counts it: the plain plan and each held chip, 1 + n solves.
+ * Opens a member's one-week plan, presses compute on this device, waits for the plan and
+ * then for the end of the run, and returns every request made from the press on.
  */
-async function solve(page: Page, address: string): Promise<{ requested: string[]; solve: number }> {
+async function solve(page: Page, address: string): Promise<Run> {
   const requested: string[] = [];
   let pressed = false;
   const listen = (request: { url(): string }) => {
@@ -104,11 +120,35 @@ async function solve(page: Page, address: string): Promise<{ requested: string[]
   pressed = true;
   await button.click();
   await expect(page.locator("[data-device-state='done']")).toBeVisible({ timeout: 120_000 });
-  page.off("request", listen);
-  const solve = await page.evaluate(() =>
-    (window as unknown as { deviceSeconds: number[] }).deviceSeconds.at(-1)!,
+  // The run ends with its gains, or with its one answer where it asked for none.
+  await page.waitForFunction(
+    () =>
+      (window as unknown as { deviceReplies: { kind: string }[] }).deviceReplies.some(
+        (reply) => reply.kind === "gains" || reply.kind === "answer",
+      ),
+    undefined,
+    { timeout: 120_000 },
   );
-  return { requested, solve };
+  page.off("request", listen);
+  return {
+    requested,
+    ...(await page.evaluate(() => {
+      const { deviceReplies: replies, devicePresses: presses } = window as unknown as {
+        deviceReplies: { kind: string; seconds: number | null; at: number }[];
+        devicePresses: number[];
+      };
+      const press = presses.at(-1)!;
+      const plan = replies.find((reply) => reply.kind === "plan" || reply.kind === "answer")!;
+      const gains = replies.find((reply) => reply.kind === "gains") ?? null;
+      const round = (seconds: number) => Math.round(seconds * 1000) / 1000;
+      return {
+        planSeconds: round(plan.seconds!),
+        gainsSeconds: gains?.seconds == null ? null : round(gains.seconds),
+        planArrival: round((plan.at - press) / 1000),
+        gainsArrival: gains === null ? null : round((gains.at - press) / 1000),
+      };
+    })),
+  };
 }
 
 /** The settings tool that holds the chip control, opened. */
@@ -128,10 +168,10 @@ test("every shipped member's chip timing is read on the device, beside the chip 
     .gameweek;
   expect(members.length).toBeGreaterThan(0);
   await openPage(page, claim, gameweek);
-  const timings: { entry: number; chips: number; seconds: number }[] = [];
+  const timings: ({ entry: number; chips: number } & Omit<Run, "requested">)[] = [];
   let scanned = false;
   for (const { entryId, published, held } of members) {
-    const { requested, solve: seconds } = await solve(
+    const { requested, ...run } = await solve(
       page,
       `/league/${claim.leagueId}/members/${entryId}?mode=saf-puan&window=1`,
     );
@@ -156,19 +196,26 @@ test("every shipped member's chip timing is read on the device, beside the chip 
         scanned = true;
       }
     }
-    timings.push({ entry: entryId, chips: held, seconds: Number(seconds.toFixed(3)) });
+    timings.push({ entry: entryId, chips: held, ...run });
   }
-  const sorted = timings.map((row) => row.seconds).sort((a, b) => a - b);
-  const median =
-    sorted.length % 2 === 1
-      ? sorted[(sorted.length - 1) / 2]!
-      : (sorted[sorted.length / 2 - 1]! + sorted[sorted.length / 2]!) / 2;
-  // One JSON line with the device time of the 1 + n solves for each member; it asserts nothing.
+  const summary = (values: (number | null)[]) => {
+    const sorted = values.filter((value) => value !== null).sort((a, b) => a - b);
+    const middle = sorted.length / 2;
+    const median =
+      sorted.length % 2 === 1
+        ? sorted[Math.floor(middle)]!
+        : (sorted[middle - 1]! + sorted[middle]!) / 2;
+    return { median: Number(median.toFixed(2)), maximum: Number(sorted.at(-1)!.toFixed(2)) };
+  };
+  // One JSON line with each member's run: the plain plan, then the 1 + n solves' gains, by
+  // the worker's count and from the press. It asserts nothing.
   console.log(
     JSON.stringify({
-      chipTimingSolves: timings,
-      median: Number(median.toFixed(2)),
-      maximum: Number(sorted.at(-1)!.toFixed(2)),
+      chipTimingRuns: timings,
+      planSeconds: summary(timings.map((row) => row.planSeconds)),
+      gainsSeconds: summary(timings.map((row) => row.gainsSeconds)),
+      planArrival: summary(timings.map((row) => row.planArrival)),
+      gainsArrival: summary(timings.map((row) => row.gainsArrival)),
     }),
   );
 });
