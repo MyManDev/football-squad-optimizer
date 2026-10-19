@@ -198,27 +198,26 @@
       },
       "current_GW1_levels": {
         "fold": "2026-27-gw01",
+        "position": "ALL",
         "paired_role_rows": 593,
         "base": {
           "role_nll": 1.584764215634885,
           "role_brier": 0.7604865010805957,
-          "minutes_mae_6dp": 28.959372
+          "minutes_mae": 28.959371819540493,
+          "points_mae": 1.6027620647380956
         },
         "candidate": {
           "role_nll": 1.5780561949479357,
-          "role_brier": 0.7601235461841677
+          "role_brier": 0.7601235461841677,
+          "minutes_mae": 28.96958734841259,
+          "points_mae": 1.601636799665755
         },
         "sources": {
-          "base role_nll and role_brier": "research/football_role_reference_2026_10_03.json, diagnostics.current_gw1.role_losses.joint_role; its generated_artifact_sha256 names the same baseline scores.json, role-scores.json and role-diagnostics.json as baseline_output_sha256 here",
-          "candidate role_nll and role_brier": "base + current_GW1_delta in floating point; the last digit can differ from the run's own value",
-          "minutes_mae_6dp": "six decimals as the readout gives them; their difference agrees with current_GW1_delta.minutes_mae_delta to within 1e-6"
+          "base": "math100-role-measure02/scores.json in the owner archive (sha256 as baseline_output_sha256 scores.json), row fold 2026-27-gw01, position ALL, arm joint_role",
+          "candidate": "math100-role-temperature01/temperature-scores.json in the owner archive (sha256 as receipt_sha256 temperature-scores.json), row fold 2026-27-gw01, position ALL, arm joint_role_temperature_research",
+          "read": "only the GW1 rows of the score receipts; the receipts are not committed"
         },
-        "not_recorded": [
-          "candidate minutes_mae",
-          "base points_mae",
-          "candidate points_mae"
-        ],
-        "not_recorded_reason": "full-precision GW1 minutes and points MAE levels are held only in the GW1 rows of the score receipts, which were not read for this record"
+        "check": "candidate minus base equals current_GW1_delta for all four metrics within 1e-12"
       },
       "reported_archive_file_count": 12,
       "temperature_by_origin": {
@@ -1095,27 +1094,26 @@
       },
       "current_GW1_levels": {
         "fold": "2026-27-gw01",
+        "position": "ALL",
         "paired_role_rows": 593,
         "base": {
           "role_nll": 1.584764215634885,
           "role_brier": 0.7604865010805957,
-          "minutes_mae_6dp": 28.959372
+          "minutes_mae": 28.959371819540493,
+          "points_mae": 1.6027620647380956
         },
         "candidate": {
           "role_nll": 1.5883583554718408,
           "role_brier": 0.7620844720681237,
-          "minutes_mae_6dp": 29.004465
+          "minutes_mae": 29.00446469450318,
+          "points_mae": 1.594282924451819
         },
         "sources": {
-          "base role_nll and role_brier": "research/football_role_reference_2026_10_03.json, diagnostics.current_gw1.role_losses.joint_role; its generated_artifact_sha256 names the same baseline scores.json, role-scores.json and role-diagnostics.json as baseline_output_sha256 here",
-          "candidate role_nll and role_brier": "base + current_GW1_delta in floating point; the last digit can differ from the run's own value",
-          "minutes_mae_6dp": "six decimals as the readout gives them; their difference agrees with current_GW1_delta.minutes_mae_delta to within 1e-6"
+          "base": "math100-role-measure02/scores.json in the owner archive (sha256 as baseline_output_sha256 scores.json), row fold 2026-27-gw01, position ALL, arm joint_role",
+          "candidate": "math100-role-retained-support01/retained-support-scores.json in the owner archive (sha256 as receipt_sha256 retained-support-scores.json), row fold 2026-27-gw01, position ALL, arm joint_role_retained_history_support_research",
+          "read": "only the GW1 rows of the score receipts; the receipts are not committed"
         },
-        "not_recorded": [
-          "base points_mae",
-          "candidate points_mae"
-        ],
-        "not_recorded_reason": "full-precision GW1 minutes and points MAE levels are held only in the GW1 rows of the score receipts, which were not read for this record"
+        "check": "candidate minus base equals current_GW1_delta for all four metrics within 1e-12"
       },
       "reported_archive_file_count": 12,
       "training_support_by_origin": {
