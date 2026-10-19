@@ -9,8 +9,8 @@
  * document the page already reads. The plain plan's run also solves each chip the member
  * holds once against that plan, for the chip timing card. A new selection starts clean,
  * and a reset or a new selection stops a solve still running: its worker is ended, not
- * left computing an answer nobody will read. A worker that does not answer within the solve's ceiling, and
- * a grace beyond it, is ended too and the run fails. That watchdog counts only the time the
+ * left computing an answer nobody will read. A worker that does not answer within the
+ * solve's ceiling, and a grace beyond it, is ended too and the run fails. That watchdog counts only the time the
  * page is visible, not the time a hidden tab spends suspended. Each run leaves User Timing
  * marks and measures of its stages (`DeviceTimeline`); the device spec prints the measures.
  */

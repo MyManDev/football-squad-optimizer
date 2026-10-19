@@ -29,7 +29,7 @@ export interface ChipTimingRow {
 /** The rule's next named gameweek for a chip after `after`, on the reading's own inputs. */
 export type NextPointsAt = (name: ChipName, after: number) => PointsAt | null;
 
-/** The one of two candidates the game's single chip keeps: the larger margin, then the game's order. */
+/** Of two chips, the one a gameweek keeps: the larger margin, then the game's order. */
 function keeps<T extends { name: ChipName; margin: number }>(a: T, b: T): T {
   if (a.margin !== b.margin) return a.margin > b.margin ? a : b;
   return CHIP_NAMES.indexOf(a.name) <= CHIP_NAMES.indexOf(b.name) ? a : b;

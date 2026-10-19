@@ -26,7 +26,7 @@ interface Published {
   forecast: { chips: { name: string; verdict: string }[] } | null;
 }
 
-/** The first tree the site ships, its members with device inputs, and each one's published reading. */
+/** The first tree the site ships and its members with device inputs, with their readings. */
 function shippedMembers() {
   const tree = shippedTrees()[0]!;
   const members = readdirSync(join(tree.root, "entries")).flatMap((name) => {
