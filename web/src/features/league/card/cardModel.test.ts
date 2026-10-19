@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import { mockEntryAdviceEnvelope, mockEntrySquadEnvelopes } from "../../../fixtures/league";
-import { cardData, squadCardSvg, type CardCopy, type CardField } from "./cardModel";
+import {
+  cardData,
+  squadCardSvg,
+  type CardCopy,
+  type CardField,
+  type CardPlayer,
+} from "./cardModel";
 
 const ENTRY = 35249001;
 const copy: CardCopy = {
@@ -26,12 +32,33 @@ function plan() {
 
 const svgOf = (fields: CardField[]) => squadCardSvg(plan().data, new Set(fields), copy);
 
+const starter = (id: number, name: string, position: CardPlayer["position"]): CardPlayer => ({
+  id,
+  name,
+  position,
+  team: "ARS",
+});
+
+/** A 3-5-2 whose midfield is the given row, so the five plates share one line of the pitch. */
+function elevenWithMidfield(names: string[]): CardPlayer[] {
+  return [
+    starter(1, "Raya", "GK"),
+    starter(2, "Gabriel", "DEF"),
+    starter(3, "Saliba", "DEF"),
+    starter(4, "Timber", "DEF"),
+    ...names.map((name, index) => starter(10 + index, name, "MID")),
+    starter(20, "Haaland", "FWD"),
+    starter(21, "Isak", "FWD"),
+  ];
+}
+
 describe("cardData", () => {
   it("reads the plan's eleven, bench, captain and moves", () => {
     const { view, data } = plan();
     expect(data.starters).toHaveLength(11);
     expect(data.bench).toHaveLength(4);
-    expect(data.captain).toBe(view.captain!.short_name || view.captain!.name);
+    expect(data.captain?.id).toBe(view.captain!.player_id);
+    expect(data.captain?.name).toBe(view.captain!.short_name || view.captain!.name);
     expect(data.gameweek).toBe(view.gameweek);
   });
 
@@ -50,7 +77,7 @@ describe("squadCardSvg", () => {
     if (data.teamName) expect(svg).toContain(data.teamName);
     for (const starter of data.starters) expect(svg).toContain(`>${starter.name}<`);
     expect(svg).toContain(">Bench<");
-    expect(svg).toContain(`Captain: ${data.captain}`);
+    expect(svg).toContain(`Captain: ${data.captain!.name}`);
     expect(svg).toContain(">C<");
     expect(svg).not.toContain(">Transfers<");
     expect(svg).not.toContain(">Expected points<");
@@ -101,5 +128,24 @@ describe("squadCardSvg", () => {
     );
     expect(svg).toContain(">Hit 4.0<");
     expect(svg).toContain(">Chip: Triple Captain<");
+  });
+
+  it("puts the armbands on the captain's and the vice's plates by player, not by name", () => {
+    // Alex Palmer keeps goal while Cole Palmer captains: one plate takes the C, not both.
+    const eleven = elevenWithMidfield(["Palmer", "Rice", "Saka", "Merino", "Zubimendi"]);
+    eleven[0] = { id: 112520, name: "Palmer", position: "GK", team: "IPS" };
+    eleven[4] = { ...eleven[4]!, id: 244851, team: "CHE" };
+    const data = {
+      ...plan().data,
+      starters: eleven,
+      captain: eleven[4]!,
+      viceCaptain: eleven[5]!,
+    };
+    const { svg } = squadCardSvg(data, new Set<CardField>(["lineup", "captain"]), copy);
+    expect(svg.match(/>Palmer</g)).toHaveLength(2);
+    expect(svg.match(/>C</g)).toHaveLength(1);
+    expect(svg.match(/>V</g)).toHaveLength(1);
+    // The goalkeeper's plate comes first and carries no armband; the C follows Cole's name.
+    expect(svg.indexOf(">C<")).toBeGreaterThan(svg.lastIndexOf(">Palmer<"));
   });
 });

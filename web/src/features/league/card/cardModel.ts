@@ -15,6 +15,7 @@ export const DEFAULT_CARD_FIELDS: readonly CardField[] = ["team", "lineup", "cap
 type Position = AdvicePlayer["position"];
 
 export interface CardPlayer {
+  id: number;
   name: string;
   position: Position;
   team: string;
@@ -26,8 +27,8 @@ export interface SquadCardData {
   managerName: string | null;
   starters: CardPlayer[];
   bench: CardPlayer[];
-  captain: string | null;
-  viceCaptain: string | null;
+  captain: CardPlayer | null;
+  viceCaptain: CardPlayer | null;
   moves: { out: string; in: string }[];
   hitPoints: number;
   expectedPoints: number | null;
@@ -49,6 +50,7 @@ export interface CardCopy {
 }
 
 const player = (value: AdvicePlayer): CardPlayer => ({
+  id: value.player_id,
   name: value.short_name || value.name,
   position: value.position,
   team: value.team,
@@ -65,8 +67,8 @@ export function cardData(view: EntryAdvice, squad: EntrySquad): SquadCardData | 
     managerName: squad.entry.manager_name,
     starters: view.starting_xi.map(player),
     bench: view.bench.map(player),
-    captain: view.captain.short_name || view.captain.name,
-    viceCaptain: view.vice_captain ? view.vice_captain.short_name || view.vice_captain.name : null,
+    captain: player(view.captain),
+    viceCaptain: view.vice_captain ? player(view.vice_captain) : null,
     moves: view.moves
       .filter((move) => move.player_out && move.player_in)
       .map((move) => ({
@@ -159,10 +161,11 @@ export function squadCardSvg(
     rows.forEach((row) => {
       row.forEach((p, index) => {
         const cx = (CARD_WIDTH * (index + 1)) / (row.length + 1);
-        const mark =
-          fields.has("captain") && p.name === data.captain
+        const mark = !fields.has("captain")
+          ? null
+          : p.id === data.captain?.id
             ? "C"
-            : fields.has("captain") && p.name === data.viceCaptain
+            : p.id === data.viceCaptain?.id
               ? "V"
               : null;
         body.push(chip(cx, y, p.name, mark));
@@ -190,8 +193,8 @@ export function squadCardSvg(
   }
   if (fields.has("captain") && data.captain !== null) {
     const line = data.viceCaptain
-      ? `${copy.captain}: ${data.captain} · ${copy.viceCaptain}: ${data.viceCaptain}`
-      : `${copy.captain}: ${data.captain}`;
+      ? `${copy.captain}: ${data.captain.name} · ${copy.viceCaptain}: ${data.viceCaptain.name}`
+      : `${copy.captain}: ${data.captain.name}`;
     body.push(text(PAD, y + 34, line, { size: 32, weight: 700, fill: CHIP }));
     y += LINE;
   }
