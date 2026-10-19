@@ -5,6 +5,7 @@ import type { AdviceClient, AdviceSource } from "../advice/adviceClient";
 import type { PublishedAdviceStatus } from "../advice/adviceSelection";
 import type { DeviceRivalReads } from "../device/computable";
 import type { DevicePlanDependencies } from "../device/useDevicePlan";
+import type { WhatIfDependencies } from "../device/useWhatIf";
 import type {
   EntryAdvice,
   EntryAdviceIndex,
@@ -48,6 +49,8 @@ export interface LeagueMemberViewProps {
   computePending?: boolean;
   /** The device solve's document loader and worker; the page's own unless a test injects them. */
   deviceDependencies?: DevicePlanDependencies;
+  /** The what-if mode's table loader and worker; the page's own unless a test injects them. */
+  whatIfDependencies?: WhatIfDependencies;
   /**
    * What the page has read of the other members' entry documents. The device offers a
    * rival strategy only against a rival among them it can use; none given, it offers no rival.
@@ -60,6 +63,13 @@ export interface LeagueMemberViewProps {
    */
   deadlinePassed?: string | null;
   rivalSquad?: LeagueViewEnvelope<EntrySquad> | null;
+  /** The entry document of the rival `?duel=` names (#1133); null while none is named or read. */
+  duelSquad?: LeagueViewEnvelope<EntrySquad> | null;
+  /**
+   * Why a named duel rival has no document yet: still being read, not in the week's
+   * publication, or a read that failed.
+   */
+  duelIssue?: "loading" | "missing" | "unreadable";
   /**
    * The published fixture calendar the page already reads for the deadline: the open
    * deadline in the top bar and the clubs' next three gameweeks on the boards come from it.

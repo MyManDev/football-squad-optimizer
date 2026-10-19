@@ -144,9 +144,10 @@ test.describe("a return visit", () => {
 
       await page.goto("/league/members");
       await expect(page).toHaveURL(`/league/${LEAGUE}/members`);
-      // The members list, not the sidebar, which names the member too once claimed.
+      // The members list's own link: the sidebar names the member too once claimed, and
+      // the league race names every member.
       await expect(
-        page.getByRole("main").getByText(member.manager_name!, { exact: true }),
+        page.getByRole("main").getByRole("link", { name: member.manager_name!, exact: true }),
       ).toBeVisible();
     });
   }

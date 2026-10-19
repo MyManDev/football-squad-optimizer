@@ -1,0 +1,91 @@
+/* The week's story (#1134): up to three short cards above the decision. On a phone they sit
+   in one row that scrolls sideways inside itself, never the page; on wider screens they share
+   the row. A chip card that opens lifts by a few pixels with a transform, so no other card
+   moves, in the motion tokens' card time. */
+
+.story {
+  margin-block: var(--space-3) var(--space-4);
+}
+
+/* The row scrolls sideways, which makes it a scroll container that clips at its padding
+   box in both directions. Its padding is the room the open card needs: 8 px above for the
+   3 px lift and the shadow's 2 px above the card, 4 px on each side for the shadow's 4 px
+   blur, and 16 px below for its 6 px. The negative margin gives the room back, so the cards
+   keep the page's own edges and the row its place. */
+.cards {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(9.5rem, 1fr);
+  gap: var(--space-2);
+  margin: calc(-1 * var(--space-2)) calc(-1 * var(--space-1)) 0;
+  padding: var(--space-2) var(--space-1) var(--space-4);
+  overflow-x: auto;
+  list-style: none;
+}
+
+.card {
+  align-self: start;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-surface);
+  transition:
+    transform var(--motion-ui) var(--motion-ease),
+    box-shadow var(--motion-ui) var(--motion-ease);
+}
+
+.card[data-open] {
+  transform: translateY(-3px);
+  box-shadow: 0 2px 4px rgba(16, 38, 26, 0.18);
+}
+
+.link {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  min-height: 44px;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  background: none;
+  color: var(--color-text);
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.label {
+  color: var(--color-text-muted);
+  font-size: var(--step--2);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.value {
+  font-family: var(--font-display);
+  font-size: var(--step-1);
+  font-weight: 700;
+}
+
+.detail {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--step--1);
+}
+
+.opened {
+  display: grid;
+  gap: var(--space-1);
+  padding: 0 var(--space-3) var(--space-2);
+}
+
+/* The link's text is small and its target is not: 44 px for a thumb, with the negative
+   margin keeping the card the height its text needs. */
+.more {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  min-height: 44px;
+  margin-block: -12px;
+  font-size: var(--step--1);
+}

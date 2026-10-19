@@ -3,6 +3,7 @@ import { Navigate, useLocation, useNavigate } from "react-router";
 
 import { EmptyState } from "../../../design/components/EmptyState";
 import { useShell } from "../../../design/shell/ShellContext";
+import { crossfade } from "../../../design/viewTransition";
 import { useLanguage } from "../../../i18n/context";
 import { asksForOwnPage, memberAddress } from "../../../lib/leagueAddresses";
 import { useLeagueIdentity, type Roster, type RosterEntry } from "../identity/useLeagueIdentity";
@@ -58,17 +59,38 @@ export function MemberGate({ children }: { children: ReactNode }) {
     }
   }, [status, shell]);
 
+  // The step from the picker to the page is one crossfade (#1131). The visitor's own page
+  // is drawn a moment after the claim, once the redirect lands, so the new picture waits
+  // for it.
+  const arrived = useRef<(() => void) | null>(null);
+  const ownPage = asksForOwnPage(location.state);
+  useEffect(() => {
+    if (status !== "claimed" || ownPage || arrived.current === null) return;
+    arrived.current();
+    arrived.current = null;
+  }, [status, ownPage]);
+
   const confirm = (entry: RosterEntry) => {
-    claimMember({ leagueId: league.leagueId, leagueName: league.leagueName, ...entry });
-    focusAfterClaim.current = true;
-    // A new key at the same address, so the shell's scroll to an id in it (#kadro) runs
-    // again now that the page is drawn.
-    if (!asksForOwnPage(location.state)) {
-      navigate(
-        { pathname: location.pathname, search: location.search, hash: location.hash },
-        { replace: true, state: location.state },
-      );
-    }
+    crossfade(
+      () => {
+        claimMember({ leagueId: league.leagueId, leagueName: league.leagueName, ...entry });
+        focusAfterClaim.current = true;
+        // A new key at the same address, so the shell's scroll to an id in it (#kadro) runs
+        // again now that the page is drawn.
+        if (!ownPage) {
+          navigate(
+            { pathname: location.pathname, search: location.search, hash: location.hash },
+            { replace: true, state: location.state },
+          );
+        }
+      },
+      ownPage
+        ? () =>
+            new Promise<void>((resolve) => {
+              arrived.current = resolve;
+            })
+        : undefined,
+    );
   };
 
   if (status === "claimed" && member) {
