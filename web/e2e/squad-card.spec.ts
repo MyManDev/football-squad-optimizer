@@ -22,8 +22,11 @@ test("the squad card is drawn on the device and saved as an image", async ({ pag
   });
   await tool.getByRole("button", { name: "Kartı oluştur" }).click();
 
+  // The card takes the focus when it is ready, and the tool says so.
   const preview = tool.getByRole("img", { name: /hafta kadro kartı$/ });
   await expect(preview).toBeVisible();
+  await expect(preview).toBeFocused();
+  await expect(tool.getByRole("status")).toHaveText("Kart hazır.");
   const size = await preview.evaluate((image: HTMLImageElement) => ({
     width: image.naturalWidth,
     height: image.naturalHeight,

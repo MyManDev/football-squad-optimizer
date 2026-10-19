@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useLanguage } from "../../../i18n/context";
 import { MESSAGES } from "../../../i18n/messages";
@@ -47,13 +47,20 @@ export function SquadCard({ view, squad, draw = drawCard }: Props) {
   const [fields, setFields] = useState<ReadonlySet<CardField>>(new Set(DEFAULT_CARD_FIELDS));
   const [state, setState] = useState<State>({ phase: "idle" });
   const data = useMemo(() => cardData(view, squad), [view, squad]);
+  const preview = useRef<HTMLImageElement>(null);
 
+  const url = state.phase === "ready" ? state.url : null;
+  // Only the card on screen keeps an object URL: a redraw or leaving the page revokes it.
   useEffect(
     () => () => {
-      if (state.phase === "ready") URL.revokeObjectURL(state.url);
+      if (url !== null) URL.revokeObjectURL(url);
     },
-    [state],
+    [url],
   );
+  // A new card takes the focus, so the keyboard lands on what was made.
+  useEffect(() => {
+    if (url !== null) preview.current?.focus();
+  }, [url]);
 
   if (data === null) return <p className={styles.note}>{copy.cardUnavailable}</p>;
 
@@ -71,6 +78,7 @@ export function SquadCard({ view, squad, draw = drawCard }: Props) {
     formatPoints: (value) => points(value, 1, locale),
   };
   const fileName = `squadopt-gw${data.gameweek}.png`;
+  const busy = state.phase === "drawing";
 
   const toggle = (field: CardField) =>
     setFields((current) => {
@@ -81,6 +89,8 @@ export function SquadCard({ view, squad, draw = drawCard }: Props) {
     });
 
   const create = async () => {
+    // The button keeps the focus while the card is drawn, so a second press ends here.
+    if (busy) return;
     setState({ phase: "drawing" });
     try {
       const card = squadCardSvg(data, fields, cardCopy);
@@ -115,7 +125,7 @@ export function SquadCard({ view, squad, draw = drawCard }: Props) {
               type="checkbox"
               checked={fields.has(field)}
               onChange={() => toggle(field)}
-              disabled={state.phase === "drawing"}
+              disabled={busy}
             />
             {copy.cardFieldNames[field]}
           </label>
@@ -125,21 +135,26 @@ export function SquadCard({ view, squad, draw = drawCard }: Props) {
         type="button"
         className={styles.action}
         onClick={() => void create()}
-        disabled={state.phase === "drawing"}
+        aria-disabled={busy}
       >
-        {state.phase === "drawing" ? copy.cardDrawing : copy.cardCreate}
+        {busy ? copy.cardDrawing : copy.cardCreate}
       </button>
       {state.phase === "failed" ? (
         <p className={styles.note} role="alert">
           {copy.cardFailed}
         </p>
       ) : null}
+      <p className="visually-hidden" role="status">
+        {drawn !== null ? copy.cardReady : ""}
+      </p>
       {drawn !== null ? (
         <div className={styles.result}>
           <img
+            ref={preview}
             className={styles.preview}
             src={drawn.url}
             alt={copy.cardPreviewAlt(data.gameweek)}
+            tabIndex={-1}
           />
           <div className={styles.actions}>
             <a className={styles.action} href={drawn.url} download={fileName}>
