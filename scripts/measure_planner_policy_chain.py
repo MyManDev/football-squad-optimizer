@@ -26,6 +26,10 @@ evidence (rule 39), and U the #632 comment that answers Question PC1:
 The evidence under ``artifacts/`` is ignored and uncommitted until the final reading, and
 ``git worktree remove`` deletes ignored files, so ``decide`` refuses an unlocked worktree and
 copies every decided week to E.
+
+A runner fixed under rule 4 runs from the same worktree with only this file replaced. Before it
+decides its first week it recomputes the last week already decided and must reproduce it, and
+``runner_fix.json`` and every later record name its sha256 and its first week.
 """
 
 from __future__ import annotations
@@ -55,7 +59,7 @@ from squadopt.application import advice as window_advice
 from squadopt.application.football_participation import FOOTBALL_PARTICIPATION_VERSION
 from squadopt.application.lineup_publication import lineup_fields
 from squadopt.data._long_paths import addressable
-from squadopt.data.atomic import write_bytes_once, write_document_once
+from squadopt.data.atomic import document_bytes, write_bytes_once, write_document_once
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import list_snapshot_ids, read_snapshot
 from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FPL_LIVE_SOURCE, gameweek_deadlines
@@ -1195,9 +1199,14 @@ def stated_constants_hold() -> None:
 
 
 def source_identity() -> dict[str, object]:
-    """Rule 3: the frozen commit, the two files' sha256, the interpreter, platform and packages."""
+    """Rule 3: the frozen commit, the two files' sha256, the interpreter, platform and packages.
 
-    if _git("status", "--porcelain"):
+    Rule 4 admits one change to the checkout, this runner replaced by its fix; ``runner_fix``
+    names it, and the identity stays the frozen source's.
+    """
+
+    changed = set(_git("diff", "--name-only", "HEAD").splitlines())
+    if changed - {RUNNER_FILE} or _git("ls-files", "--others", "--exclude-standard"):
         raise ChainError("The checkout is not clean; the frozen source cannot be named.")
     if not Path(squadopt.__file__).resolve().is_relative_to(REPOSITORY / "src"):
         raise ChainError("squadopt does not resolve into this checkout's src/.")
@@ -1243,6 +1252,43 @@ def first_bound_week(
         or _instant(commits["runner"]["committed_utc"]) >= RUNNER_MERGED_BEFORE
     )
     return max(week, TARGET_FIRST_WEEK + 1) if late else week
+
+
+def runner_fix() -> dict[str, str] | None:
+    """Rule 4: the replaced runner's sha256 when this file differs from the frozen commit's, else
+    None. The digest is taken with line endings as git stores them, so every checkout of one fix
+    names one digest."""
+
+    if RUNNER_FILE not in _git("diff", "--name-only", "HEAD").splitlines():
+        return None
+    return {"sha256": hashlib.sha256(RUNNER_PATH.read_bytes().replace(b"\r\n", b"\n")).hexdigest()}
+
+
+def declare_runner_fix(
+    output: Path, fix: Mapping[str, str] | None, gameweek: int, reproduced: int | None = None
+) -> dict[str, object] | None:
+    """Rule 4: the fix and its first week, declared once before the replaced runner writes its
+    first record, and named by every record after it."""
+
+    if fix is None:
+        return None
+    path = output / "runner_fix.json"
+    if not path.exists():
+        write_document_once(
+            _record(sha256=fix["sha256"], first_week=gameweek, reproduced_gameweek=reproduced),
+            path,
+        )
+    declared = json.loads(path.read_text(encoding="utf-8"))
+    if declared["sha256"] != fix["sha256"]:
+        raise ChainError(
+            "runner_fix.json declares another replaced runner; a second fix needs its own "
+            "pull request (rule 4)."
+        )
+    return {"sha256": declared["sha256"], "first_week": int(declared["first_week"])}
+
+
+def _declared(runner_fix: Mapping[str, object] | None) -> dict[str, object]:
+    return {} if runner_fix is None else {"runner_fix": dict(runner_fix)}
 
 
 def refuse_unlocked_worktree() -> None:
@@ -1571,12 +1617,17 @@ def decide_week(
     commit: object,
     last_max_free_transfers: int,
     moment: datetime | None = None,
+    *,
+    runner_fix: Mapping[str, object] | None = None,
+    recompute: bool = False,
 ) -> tuple[dict[tuple[str, str], ChainState], int, str]:
     """Rules 17 to 24 for one gameweek: every chain is computed, checked, then written.
 
     A record already on disk from an interrupted run is carried as it stands rather than
     solved again (rule 24). Returns the states after the week, the free-transfer maximum a
-    later missing week holds to, and the manifest's sha256 for the operator's receipt.
+    later missing week holds to, and the manifest's sha256 for the operator's receipt. With
+    ``recompute``, every chain is solved again and each document must equal the one written,
+    and nothing is written (rule 4).
     """
 
     directory = output / f"gw{gameweek:02d}"
@@ -1595,7 +1646,7 @@ def decide_week(
     records: dict[tuple[str, str], ChainRecord] = {}
     for chain, state in sorted(states.items()):
         path = directory / f"{chain[0]}-{chain[1]}.json"
-        if path.exists():
+        if path.exists() and not recompute:
             document = cast(dict[str, object], json.loads(path.read_text(encoding="utf-8")))
             is_blocked = document["status"] == "blocked"
             after = (
@@ -1609,13 +1660,20 @@ def decide_week(
             continue
         records[chain] = _chain_record(chain, state, gameweek, week, blocked, commit, max_free)
     _refuse_unequal_twins(records)
-    write_document_once(_record(gameweek=gameweek, **dict(receipt)), directory / "receipt.json")
+    publish = _reproduced if recompute else _write_once
+    publish(_record(gameweek=gameweek, **dict(receipt)), directory / "receipt.json")
     if isinstance(week, WeekInputs):
-        write_bytes_once(week.artifact_bytes, directory / "forecast.json")
+        forecast = directory / "forecast.json"
+        if not recompute:
+            write_bytes_once(week.artifact_bytes, forecast)
+        elif not forecast.exists() or forecast.read_bytes() != week.artifact_bytes:
+            raise ChainError(
+                f"The replaced runner does not reproduce {directory.name}/forecast.json."
+            )
     digests: dict[str, str] = {}
     for record in records.values():
         path = directory / record.name
-        write_document_once(record.document, path, replay_identity=replay_identity)
+        publish(record.document, path, replay_identity)
         digests[record.name] = hashlib.sha256(path.read_bytes()).hexdigest()
     manifest = _record(
         gameweek=gameweek,
@@ -1625,14 +1683,36 @@ def decide_week(
         records=digests,
         evidence_digest=evidence_digest(directory),
         work={"decided_at_utc": None if moment is None else moment.isoformat()},
+        **_declared(runner_fix),
     )
-    write_document_once(manifest, directory / "manifest.json", replay_identity=replay_identity)
+    publish(manifest, directory / "manifest.json", replay_identity)
     after_states = {chain: record.state_after for chain, record in records.items()}
     return (
         after_states,
         max_free,
         hashlib.sha256((directory / "manifest.json").read_bytes()).hexdigest(),
     )
+
+
+def _write_once(
+    document: Mapping[str, object],
+    path: Path,
+    identity: Callable[[Mapping[str, object]], object] | None = None,
+) -> None:
+    write_document_once(document, path, replay_identity=identity)
+
+
+def _reproduced(
+    document: Mapping[str, object],
+    path: Path,
+    identity: Callable[[Mapping[str, object]], object] | None = None,
+) -> None:
+    """Rule 4: a recomputed document must be the written one, as a replay would accept it."""
+
+    same = (lambda loaded: loaded) if identity is None else identity
+    written = json.loads(path.read_text(encoding="utf-8")) if path.exists() else None
+    if written is None or same(written) != same(json.loads(document_bytes(document))):
+        raise ChainError(f"The replaced runner does not reproduce {path.parent.name}/{path.name}.")
 
 
 def _load_week(
@@ -1694,6 +1774,7 @@ def start_chain(
     through_gameweek: int,
     *,
     handoff_root: Path | None = None,
+    fix: Mapping[str, str] | None = None,
 ) -> dict[str, Any] | None:
     """Rules 2, 9 and 40: the first chain week, its squads and the protocol record, once.
 
@@ -1728,11 +1809,13 @@ def start_chain(
                     missing_reason=week[0],
                     receipt=dict(week[1]),
                     identity=dict(identity),
+                    **_declared(declare_runner_fix(output, fix, gameweek)),
                 ),
                 skip,
             )
             skipped.append({"gameweek": gameweek, "reason": week[0]})
             continue
+        declared = declare_runner_fix(output, fix, gameweek)
         squads = initial_states(week.forecast, gameweek)
         for profile, state in squads.states.items():
             write_document_once(
@@ -1753,6 +1836,7 @@ def start_chain(
             "squad_statuses": {k: list(v) for k, v in squads.statuses.items()},
             "outcome_read": False,
             "locked_holdout_accessed": False,
+            **_declared(declared),
         }
         write_document_once(protocol, output / "protocol.json")
         return protocol
@@ -1786,6 +1870,7 @@ def decide(
         refuse_evidence_root(evidence_copy_root, output, snapshot_root, artifact_root, handoff_root)
     refuse_unlocked_worktree()
     identity = source_identity()
+    fix = runner_fix()
     with single_run(output):
         lines: list[str] = []
 
@@ -1805,6 +1890,7 @@ def decide(
                 say,
                 handoff_root=handoff_root,
                 evidence_copy_root=evidence_copy_root,
+                fix=fix,
             )
         except ChainError as error:
             lines.append(f"refused: {error}")
@@ -1832,11 +1918,14 @@ def _decide_weeks(
     *,
     handoff_root: Path | None = None,
     evidence_copy_root: Path | None = None,
+    fix: Mapping[str, str] | None = None,
 ) -> None:
     inventory = capture_inventory(snapshot_root, handoff_root)
     index = inventory.entries
     if inventory.closed:
         emit(f"left out {len(inventory.closed)} captures taken after every deadline")
+    if fix is not None:
+        emit(f"runner replaced under rule 4: sha256 {fix['sha256']}")
     protocol = bind_protocol(output, identity)
     if protocol is None:
         protocol = start_chain(
@@ -1849,6 +1938,7 @@ def _decide_weeks(
             moment,
             through_gameweek,
             handoff_root=handoff_root,
+            fix=fix,
         )
         if protocol is None:
             emit("waiting: no first chain week has both a passed deadline and a forecast")
@@ -1868,15 +1958,36 @@ def _decide_weeks(
     # Rule 21: a first week that reads as missing on a later read still holds to the season
     # maximum the first read recorded, never to zero.
     max_free = int(protocol.get("max_free_transfers", 0))
+    # Rule 4: the last week already decided, with the states it was decided from.
+    last: tuple[int, dict[tuple[str, str], ChainState], set[tuple[str, str]], int] | None = None
     for gameweek in range(first, min(through_gameweek, LAST_GAMEWEEK) + 1):
         directory = output / f"gw{gameweek:02d}"
         if (directory / "manifest.json").exists():
+            last = (gameweek, dict(states), set(blocked), max_free)
             states, max_free = _load_week(directory, blocked)
             _copy_evidence(directory, evidence_copy_root, emit)
             continue
         if moment <= deadline_of(index, snapshot_root, gameweek):
             emit(f"GW{gameweek:02d} pending: its deadline has not passed")
             return
+        reproduced = None
+        if fix is not None and last is not None and not (output / "runner_fix.json").exists():
+            reproduced, before, held, before_max = last
+            written = output / f"gw{reproduced:02d}" / "manifest.json"
+            decide_week(
+                output,
+                reproduced,
+                _week(index, snapshot_root, artifact_root, reproduced, handoff_root=handoff_root),
+                before,
+                held,
+                identity["repository_commit"],
+                before_max,
+                moment,
+                runner_fix=json.loads(written.read_text(encoding="utf-8")).get("runner_fix"),
+                recompute=True,
+            )
+            emit(f"GW{reproduced:02d} reproduced by the replaced runner")
+        declared = declare_runner_fix(output, fix, gameweek, reproduced)
         week = _week(index, snapshot_root, artifact_root, gameweek, handoff_root=handoff_root)
         states, max_free, digest = decide_week(
             output,
@@ -1887,6 +1998,7 @@ def _decide_weeks(
             identity["repository_commit"],
             max_free,
             moment,
+            runner_fix=declared,
         )
         source = (
             week.receipt["snapshot_id"] if isinstance(week, WeekInputs) else f"missing {week[0]}"

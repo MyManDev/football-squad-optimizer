@@ -1624,10 +1624,14 @@ def test_the_recorded_lineup_is_the_published_one_and_the_scorer_accepts_it(tmp_
 # Rules 3, 4 and 39: the frozen source, where the chain writes, when and how often it runs
 
 
-def _fake_git(monkeypatch: pytest.MonkeyPatch, *, head: str = "b", dirty: str = "") -> None:
+def _fake_git(
+    monkeypatch: pytest.MonkeyPatch, *, head: str = "b", changed: str = "", untracked: str = ""
+) -> None:
     def git(*arguments: str, cwd: Path | None = None) -> str:
-        if arguments[:1] == ("status",):
-            return dirty
+        if arguments == ("diff", "--name-only", "HEAD"):
+            return changed
+        if arguments == ("ls-files", "--others", "--exclude-standard"):
+            return untracked
         if arguments[:2] == ("rev-parse", "HEAD"):
             return head
         if arguments[:2] == ("rev-list", "--first-parent"):
@@ -1665,9 +1669,30 @@ def test_a_run_from_another_commit_or_a_dirty_tree_is_refused(
     _fake_git(monkeypatch, head="later")
     with pytest.raises(chain.ChainError, match="frozen commit b"):
         chain.source_identity()
-    _fake_git(monkeypatch, dirty=" M scripts/measure_planner_policy_chain.py")
+    _fake_git(monkeypatch, changed=f"src/squadopt/planning/guarded.py\n{chain.RUNNER_FILE}")
     with pytest.raises(chain.ChainError, match="not clean"):
         chain.source_identity()
+    _fake_git(monkeypatch, untracked="notes.txt")
+    with pytest.raises(chain.ChainError, match="not clean"):
+        chain.source_identity()
+
+
+def test_the_frozen_commit_with_only_the_runner_replaced_is_admitted_and_named(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Rule 4: the fixed runner runs from the frozen commit with only its own file replaced;
+    the identity stays the frozen source's and the fix is named by its sha256, taken with the
+    line endings git stores."""
+
+    _fake_git(monkeypatch)
+    frozen = chain.source_identity()
+    assert chain.runner_fix() is None
+    _fake_git(monkeypatch, changed=chain.RUNNER_FILE)
+    assert chain.source_identity() == frozen
+    runner = tmp_path / "runner.py"
+    runner.write_bytes(b"fixed\r\nrunner\r\n")
+    monkeypatch.setattr(chain, "RUNNER_PATH", runner)
+    assert chain.runner_fix() == {"sha256": hashlib.sha256(b"fixed\nrunner\n").hexdigest()}
 
 
 def test_a_frozen_source_whose_window_constants_moved_is_refused(
@@ -1773,6 +1798,7 @@ def _chain_world(
         lambda root, *roots: chain.CaptureInventory((), ("late-capture",)),
     )
     monkeypatch.setattr(chain, "refuse_unlocked_worktree", lambda: None)
+    monkeypatch.setattr(chain, "runner_fix", lambda: None)
     monkeypatch.setattr(chain, "first_bound_week", lambda index, root, bound: 6)
     monkeypatch.setattr(
         chain, "deadline_of", lambda index, root, week: T0 + timedelta(days=7 * (week - 6))
@@ -1918,6 +1944,108 @@ def test_a_written_skip_read_back_under_another_identity_is_refused(
     with pytest.raises(chain.ChainError, match="python differs"):
         chain.decide(*ROOTS(tmp_path), root, 7, "issuecomment-1", now=now)
     assert not (root / "protocol.json").exists() and solved == []
+
+
+FIX = {"sha256": "f" * 64}
+
+
+def _json(path: Path) -> Any:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def test_a_replaced_runner_declares_its_fix_in_every_record_it_writes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Rule 4: the fix and its first week are a declared deviation in every later record; with
+    no week decided before it, there is nothing to recompute."""
+
+    missing = ("no_artifact", {"snapshot_id": "capture-gw6", "reason": "no_artifact"})
+    root, solved = _chain_world(tmp_path, monkeypatch, {6: missing, 7: _week(7), 8: _week(8)})
+    monkeypatch.setattr(chain, "runner_fix", lambda: FIX)
+    lines: list[str] = []
+    now = T0 + timedelta(days=7, hours=1)
+    chain.decide(*ROOTS(tmp_path), root, 7, "issuecomment-1", now=now, emit=lines.append)
+    declared = {"sha256": FIX["sha256"], "first_week": 6}
+    fix = _json(root / "runner_fix.json")
+    assert (fix["sha256"], fix["first_week"], fix["reproduced_gameweek"]) == (
+        FIX["sha256"],
+        6,
+        None,
+    )
+    assert _json(root / "skipped" / "gw06.json")["runner_fix"] == declared
+    assert _json(root / "protocol.json")["runner_fix"] == declared
+    assert _json(root / "gw07" / "manifest.json")["runner_fix"] == declared
+    assert f"runner replaced under rule 4: sha256 {FIX['sha256']}" in lines
+    assert not any("reproduced" in line for line in lines)
+    later = T0 + timedelta(days=14, hours=1)
+    chain.decide(*ROOTS(tmp_path), root, 8, "issuecomment-1", now=later, emit=lines.append)
+    assert _json(root / "gw08" / "manifest.json")["runner_fix"] == declared
+    assert [week for _, week in solved] == [7] * 15 + [8] * 15
+
+
+def test_an_unchanged_runner_records_no_fix(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root, _ = _chain_world(tmp_path, monkeypatch, {6: _week(6)})
+    chain.decide(*ROOTS(tmp_path), root, 6, "issuecomment-1", now=T0 + timedelta(hours=1))
+    assert not (root / "runner_fix.json").exists()
+    assert "runner_fix" not in _json(root / "protocol.json")
+    assert "runner_fix" not in _json(root / "gw06" / "manifest.json")
+
+
+def test_a_replaced_runner_reproduces_the_last_decided_week_before_its_first(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Rule 4: the fixed runner recomputes the last week already decided, must reproduce it
+    exactly, writes nothing for it, and only then decides another; decisions written stand."""
+
+    root, solved = _chain_world(tmp_path, monkeypatch, {6: _week(6), 7: _week(7), 8: _week(8)})
+    chain.decide(*ROOTS(tmp_path), root, 6, "issuecomment-1", now=T0 + timedelta(hours=1))
+    gw06 = {path.name: path.read_bytes() for path in (root / "gw06").iterdir()}
+    monkeypatch.setattr(chain, "runner_fix", lambda: FIX)
+    lines: list[str] = []
+    now = T0 + timedelta(days=7, hours=1)
+    chain.decide(*ROOTS(tmp_path), root, 7, "issuecomment-1", now=now, emit=lines.append)
+    assert [week for _, week in solved] == [6] * 15 + [6] * 15 + [7] * 15
+    assert {path.name: path.read_bytes() for path in (root / "gw06").iterdir()} == gw06
+    assert "GW06 reproduced by the replaced runner" in lines
+    fix = _json(root / "runner_fix.json")
+    assert (fix["first_week"], fix["reproduced_gameweek"]) == (7, 6)
+    assert _json(root / "gw07" / "manifest.json")["runner_fix"]["first_week"] == 7
+    assert "runner_fix" not in _json(root / "protocol.json")
+    later = T0 + timedelta(days=14, hours=1)
+    chain.decide(*ROOTS(tmp_path), root, 8, "issuecomment-1", now=later)
+    assert [week for _, week in solved][45:] == [8] * 15
+
+
+def test_a_replaced_runner_that_does_not_reproduce_the_last_week_decides_nothing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root, _ = _chain_world(tmp_path, monkeypatch, {6: _week(6), 7: _week(7)})
+    chain.decide(*ROOTS(tmp_path), root, 6, "issuecomment-1", now=T0 + timedelta(hours=1))
+    gw06 = {path.name: path.read_bytes() for path in (root / "gw06").iterdir()}
+    monkeypatch.setattr(chain, "runner_fix", lambda: FIX)
+    monkeypatch.setattr(
+        chain, "run_arm", lambda name, week, held: _outcome(None, failure="no_plan")
+    )
+    now = T0 + timedelta(days=7, hours=1)
+    with pytest.raises(chain.ChainError, match=r"does not reproduce gw06/p1000-hold_3\.json"):
+        chain.decide(*ROOTS(tmp_path), root, 7, "issuecomment-1", now=now)
+    assert {path.name: path.read_bytes() for path in (root / "gw06").iterdir()} == gw06
+    assert not (root / "gw07").exists() and not (root / "runner_fix.json").exists()
+
+
+def test_a_second_replaced_runner_is_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root, _ = _chain_world(tmp_path, monkeypatch, {6: _week(6), 7: _week(7)})
+    monkeypatch.setattr(chain, "runner_fix", lambda: FIX)
+    chain.decide(*ROOTS(tmp_path), root, 6, "issuecomment-1", now=T0 + timedelta(hours=1))
+    monkeypatch.setattr(chain, "runner_fix", lambda: {"sha256": "e" * 64})
+    now = T0 + timedelta(days=7, hours=1)
+    with pytest.raises(chain.ChainError, match="another replaced runner"):
+        chain.decide(*ROOTS(tmp_path), root, 7, "issuecomment-1", now=now)
+    assert not (root / "gw07").exists()
 
 
 def test_the_decision_step_needs_an_answer_and_a_permitted_day(
