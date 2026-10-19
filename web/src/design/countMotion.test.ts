@@ -98,8 +98,8 @@ describe("countTo", () => {
   it("counts on opacity for the data duration and ends on the final value", () => {
     const element = document.createElement("span");
     const { animate, last } = fakeAnimate(element);
-    const animation = countTo(element, 40, 50, format, motion);
-    expect(animation).not.toBeNull();
+    const count = countTo(element, 40, 50, format, motion);
+    expect(count).not.toBeNull();
     expect(animate).toHaveBeenCalledTimes(1);
     const [keyframes, options] = animate.mock.calls[0]!;
     expect(keyframes).toEqual([{ opacity: 0.6 }, { opacity: 1 }]);
@@ -115,16 +115,30 @@ describe("countTo", () => {
     expect(frames).toHaveLength(0);
   });
 
-  it("leaves the final value written when the count is cancelled", () => {
+  it("leaves the final value written when the animation is cancelled from outside", () => {
     const element = document.createElement("span");
     const { last } = fakeAnimate(element);
-    const animation = countTo(element, 40, 50, format, motion)!;
+    countTo(element, 40, 50, format, motion);
     last().setProgress(0.25);
     runFrame();
     expect(element.textContent).toBe("42.5");
-    animation.cancel();
+    last().animation.cancel();
     runFrame();
     expect(element.textContent).toBe("50.0");
+  });
+
+  it("stops where it is, returns the value on screen and writes nothing after", () => {
+    const element = document.createElement("span");
+    const { last } = fakeAnimate(element);
+    const count = countTo(element, 40, 50, format, motion)!;
+    expect(count.running).toBe(true);
+    last().setProgress(0.3);
+    runFrame();
+    expect(count.stop()).toBe(43);
+    expect(count.running).toBe(false);
+    runFrame();
+    expect(element.textContent).toBe("43.0");
+    expect(frames).toHaveLength(0);
   });
 });
 

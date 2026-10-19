@@ -67,7 +67,7 @@ export function ExpectedLineup({ view }: { view: EntryAdvice }) {
         {copy.net}:{" "}
         <strong className="num">
           <CountingNumber
-            countKey={`net:${view.entry_id}:${view.gameweek}`}
+            countKey={`net:${view.league_id}:${view.entry_id}:${view.gameweek}`}
             value={expectation.expected_net_points}
             format={(value) => points(value, 1, locale)}
           />

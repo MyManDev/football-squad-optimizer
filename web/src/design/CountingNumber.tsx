@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef } from "react";
 
-import { countTo, rememberCount } from "./countMotion";
+import { countTo, rememberCount, type Count } from "./countMotion";
 
 type Props = {
   /** Names the figure for this page session, so a remounted figure counts from its last value. */
@@ -25,7 +25,8 @@ export function CountingNumber({ countKey, value, format, className }: Props) {
   useLayoutEffect(() => {
     formatRef.current = format;
   });
-  // A new language or locale rewrites the same value in its own format, without a count.
+  // The count in flight, if any.
+  const count = useRef<Count | null>(null);
   const text = format(value);
 
   useLayoutEffect(() => {
@@ -33,12 +34,26 @@ export function CountingNumber({ countKey, value, format, className }: Props) {
     if (figure === null) return undefined;
     const from = rememberCount(countKey, value);
     if (from === null || from === value) {
-      figure.textContent = text;
+      figure.textContent = formatRef.current(value);
       return undefined;
     }
-    const animation = countTo(figure, from, value, (current) => formatRef.current(current));
-    return () => animation?.cancel();
-  }, [countKey, value, text]);
+    const running = countTo(figure, from, value, (current) => formatRef.current(current));
+    if (running === null) return undefined;
+    count.current = running;
+    // A new value, or an unmount, mid-count: the next count starts from the number on screen,
+    // and this one writes nothing more.
+    return () => {
+      count.current = null;
+      rememberCount(countKey, running.stop());
+    };
+  }, [countKey, value]);
+
+  // A new language or locale rewrites the figure in its own format, without a count. A count in
+  // flight reads the format on each frame, so it carries on in the new one and ends on its value.
+  useLayoutEffect(() => {
+    if (count.current?.running) return;
+    if (element.current !== null) element.current.textContent = text;
+  }, [text]);
 
   return <span ref={element} className={className} data-counting-number="" />;
 }

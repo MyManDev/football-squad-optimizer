@@ -1409,7 +1409,7 @@ function WindowComparison({ view, control }: { view: EntryAdvice; control: Entry
           <dt>{copy.windowSelectedTotal}</dt>
           <dd className="num">
             <CountingNumber
-              countKey={`window-total:${view.entry_id}:${view.gameweek}:${view.window}`}
+              countKey={`window-total:${view.league_id}:${view.entry_id}:${view.gameweek}:${view.window}`}
               value={selected}
               format={(value) => points(value, 1, locale)}
             />
