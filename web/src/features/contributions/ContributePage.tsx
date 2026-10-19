@@ -161,11 +161,6 @@ export function ContributePage() {
             ? "Bir oyuncunun rolü, dakikaları veya takımındaki değişiklikler hakkında gözlemini paylaş. Varsa haberin kaynağını ekle."
             : "Share observations about a player's role, minutes or team changes. Include a news source when available."}
         </p>
-        <p>
-          {tr
-            ? "Yorumlar yönetici onayından sonra herkese açılır."
-            : "Comments become public after moderation."}
-        </p>
       </header>
       {players.isPending ? (
         <p role="status">{tr ? "Oyuncular yükleniyor…" : "Loading players…"}</p>
@@ -236,11 +231,6 @@ export function ContributePage() {
               ))}
             </select>
           </label>
-          <small>
-            {tr ? "Tüm FPL oyuncuları" : "Complete FPL roster"} · {season} ·{" "}
-            {players.data?.players.length} {tr ? "oyuncu" : "players"} ·{" "}
-            {players.data && new Date(players.data.captured_at_utc).toLocaleString(locale)}
-          </small>
           {playerId && (
             <>
               <form onSubmit={send} className={styles.form}>

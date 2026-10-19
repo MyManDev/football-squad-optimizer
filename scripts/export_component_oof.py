@@ -52,6 +52,7 @@ from squadopt.data.sources.vaastav import (
     load_team_codes,
 )
 from squadopt.data.tables import write_export_table
+from squadopt.features import FeatureConfig
 from squadopt.features.component_targets import (
     START_TARGET_STATUS,
     START_TARGET_SUPPORTED_SEASONS,
@@ -62,7 +63,7 @@ from squadopt.prediction.component_dataset import (
     COMPONENT_FEATURE_CONFIG,
     COMPONENT_TRAINING_SEASONS,
     DATASET_CONTRACT_VERSION,
-    FEATURE_CONTRACT_VERSION,
+    FEATURE_CONTRACTS,
     build_component_modelling_frame,
     component_feature_columns,
     excluded_ratio_features,
@@ -71,16 +72,30 @@ from squadopt.prediction.component_dataset import (
 )
 from squadopt.prediction.component_models import (
     COMPONENT_MODEL_VERSION,
+    DISTRIBUTION_COLUMNS,
     EQUAL_WEIGHTING,
     GRADIENT_BOOSTING_ESTIMATOR,
     GRADIENT_BOOSTING_MODEL_VERSION,
+    GRADIENT_BOOSTING_POINTS_ESTIMATOR,
+    GRADIENT_BOOSTING_POINTS_MODEL_VERSION,
     LINEAR_ESTIMATOR,
+    MINUTES_FULL_THRESHOLD_PER_FIXTURE,
+    MINUTES_SCALE_FLOOR,
+    MIXTURE_ESTIMATOR,
+    MIXTURE_MODEL_VERSION,
+    POINTS_RETURN_THRESHOLD,
+    POINTS_SCALE_FLOOR,
+    REGIME_ESTIMATOR,
+    REGIME_GATE_TERMS,
+    REGIME_LABELS,
+    REGIME_MODEL_VERSION,
     SEASON_HALF_LIFE_WEIGHTING,
     SEASON_WEIGHT_BASE,
     SEASON_WEIGHTED_MODEL_VERSION,
     ComponentModelConfig,
     SeasonAgeWeighting,
     fit_component_models,
+    predict_component_distribution,
     predict_components,
 )
 from squadopt.preflight import compute_table_sha256
@@ -103,8 +118,47 @@ WEIGHTING_LABELS = {"equal": EQUAL_WEIGHTING, "season_half_life": SEASON_HALF_LI
 # weighting, with the three linear estimators replaced by the gradient-boosted ensembles
 # of `ComponentModelConfig` (constants, never searched). Its table name carries the arm so
 # the two candidates cannot overwrite each other or the control.
-ESTIMATOR_ARMS = (LINEAR_ESTIMATOR, GRADIENT_BOOSTING_ESTIMATOR)
-ESTIMATOR_TABLE_SUFFIX = {LINEAR_ESTIMATOR: "", GRADIENT_BOOSTING_ESTIMATOR: "_gradient_boosting"}
+# The fourth: the gated mixture of `docs/research/moe_mixture_prereg.md`, which also writes
+# the distribution sidecar every v2 export declares beside its table.
+# The fifth: the regime-gated experts of `docs/research/moe_regime_prereg.md`, which
+# declare no predictive distribution and so write no sidecar.
+ESTIMATOR_ARMS = (
+    LINEAR_ESTIMATOR,
+    GRADIENT_BOOSTING_ESTIMATOR,
+    GRADIENT_BOOSTING_POINTS_ESTIMATOR,
+    MIXTURE_ESTIMATOR,
+    REGIME_ESTIMATOR,
+)
+# The declared feature contracts. v2 adds the one-gameweek and ten-gameweek windows for
+# minutes and appearance and is a v2 development arm only; the v1 contract fits the frozen
+# feature set.
+FEATURE_CONTRACT_ARMS = tuple(FEATURE_CONTRACTS)
+FEATURE_CONTRACT_TABLE_SUFFIX = {"v1": "", "v2": "_features_v2"}
+ESTIMATOR_TABLE_SUFFIX = {
+    LINEAR_ESTIMATOR: "",
+    GRADIENT_BOOSTING_ESTIMATOR: "_gradient_boosting",
+    GRADIENT_BOOSTING_POINTS_ESTIMATOR: "_gradient_boosting_points",
+    MIXTURE_ESTIMATOR: "_mixture",
+    REGIME_ESTIMATOR: "_regime",
+}
+ESTIMATOR_MODEL_VERSIONS = {
+    GRADIENT_BOOSTING_ESTIMATOR: GRADIENT_BOOSTING_MODEL_VERSION,
+    GRADIENT_BOOSTING_POINTS_ESTIMATOR: GRADIENT_BOOSTING_POINTS_MODEL_VERSION,
+    MIXTURE_ESTIMATOR: MIXTURE_MODEL_VERSION,
+    REGIME_ESTIMATOR: REGIME_MODEL_VERSION,
+}
+# The sidecar a v2 export writes beside its table when the arm declares a predictive
+# distribution: the linear arm's single Gaussian residual and the mixture's two experts with
+# their gate. Keyed like the table; one row per component-model row of a fitted fold.
+DISTRIBUTION_KEY_COLUMNS = ("season", "target_gameweek", "fold_id", "player_id")
+DISTRIBUTION_SIDECAR_SUFFIX = ".distribution.csv"
+DISTRIBUTION_RULE = (
+    "one row per component_model row of a fitted, non-blank fold; the gate is the weight of "
+    "the high expert (minutes: full, points: return); the means are the experts' outputs "
+    "before the public bounds; a scale is the expert's residual standard deviation (ddof=1) "
+    "on its own training rows, floored; the linear arm writes gaussian_1 with gate 0 and the "
+    "high slots missing"
+)
 ESTIMATOR_RULES = {
     LINEAR_ESTIMATOR: (
         "standardized logistic regression (appearance) and ridge regression (minutes and "
@@ -113,6 +167,24 @@ ESTIMATOR_RULES = {
     GRADIENT_BOOSTING_ESTIMATOR: (
         "histogram gradient-boosted trees for all three estimators: fixed rounds, no early "
         "stopping, constants from ComponentModelConfig; equal weighting only"
+    ),
+    GRADIENT_BOOSTING_POINTS_ESTIMATOR: (
+        "the linear appearance and minutes estimators with a histogram gradient-boosted "
+        "conditional points estimator (same constants); equal weighting only"
+    ),
+    MIXTURE_ESTIMATOR: (
+        "the linear appearance estimator kept; conditional minutes and points each a gated "
+        "mixture of two standardized ridge experts (full/short minutes, return/no-return "
+        "points) with a standardized logistic-regression gate on the same features; the "
+        "expected value is the gate-weighted mean; equal weighting only"
+    ),
+    REGIME_ESTIMATOR: (
+        "one linear expert set (the control's estimators and constants) per regime label, "
+        "fixture regime (single, double) by rule era (pre_defcon, defcon), fitted on that "
+        "regime's rows; mixed by a standardized multinomial logistic gate on the v1 "
+        "features plus the regime terms (double indicator, defcon indicator, season age); "
+        "an expert below the minimum rows is absent and the gate mass is renormalized; "
+        "equal weighting only"
     ),
 }
 WEIGHTING_RULES = {
@@ -211,6 +283,7 @@ def _parse_arguments() -> argparse.Namespace:
     parser.add_argument("--development-scope", choices=DEVELOPMENT_SCOPES, default="v1")
     parser.add_argument("--season-weighting", choices=SEASON_WEIGHTINGS, default="equal")
     parser.add_argument("--estimator", choices=ESTIMATOR_ARMS, default=LINEAR_ESTIMATOR)
+    parser.add_argument("--feature-contract", choices=FEATURE_CONTRACT_ARMS, default="v1")
     parser.add_argument(
         "--output-dir", type=Path, default=REPOSITORY_ROOT / "artifacts" / "phase_c"
     )
@@ -219,7 +292,9 @@ def _parse_arguments() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def _modelling_frame(archive_root: Path, seasons: tuple[str, ...]) -> tuple[pd.DataFrame, ...]:
+def _modelling_frame(
+    archive_root: Path, seasons: tuple[str, ...], config: FeatureConfig = COMPONENT_FEATURE_CONFIG
+) -> tuple[pd.DataFrame, ...]:
     """Return the panel and the joined modelling frame for the requested seasons."""
 
     panel = build_panel(archive_root, seasons=seasons)
@@ -235,7 +310,7 @@ def _modelling_frame(archive_root: Path, seasons: tuple[str, ...]) -> tuple[pd.D
         fixtures,
         team_codes,
         seasons=seasons,
-        config=COMPONENT_FEATURE_CONFIG,
+        config=config,
     )
 
 
@@ -363,6 +438,8 @@ class WalkSummary:
     training_rows_seen: int
     scored_folds: int
     folds: tuple[FoldRecord, ...]
+    # The distribution sidecar rows, or ``None`` when the arm declares no distribution.
+    distribution: pd.DataFrame | None = None
 
 
 def declared_season_weights(
@@ -382,6 +459,7 @@ def build_oof_table(
     weighting: str = "equal",
     contract_version: str = OOF_CONTRACT_VERSION,
     estimator: str = LINEAR_ESTIMATOR,
+    feature_contract: str = "v1",
 ) -> tuple[pd.DataFrame, WalkSummary]:
     """Walk the decisions, fitting before each and predicting at it.
 
@@ -406,23 +484,32 @@ def build_oof_table(
         )
     if estimator not in ESTIMATOR_ARMS:
         raise DataError(f"Unknown estimator {estimator!r}.")
-    boosted = estimator == GRADIENT_BOOSTING_ESTIMATOR
-    if boosted and (not development or weighting != "equal"):
+    candidate_estimator = estimator != LINEAR_ESTIMATOR
+    if candidate_estimator and (not development or weighting != "equal"):
         raise DataError(
-            "The gradient-boosting candidate is a Phase C v2 development arm under equal "
+            "The candidate estimators are Phase C v2 development arms under equal "
             "weighting; the v1 contract and the weighted arm fit only the linear estimators."
         )
     config = replace(ComponentModelConfig() if config is None else config, estimator=estimator)
+    if feature_contract not in FEATURE_CONTRACTS:
+        raise DataError(f"Unknown feature contract {feature_contract!r}.")
+    if feature_contract != "v1" and not development:
+        raise DataError(
+            "The v2 feature contract is a Phase C v2 development arm; the v1 contract fits "
+            "the frozen feature set."
+        )
+    feature_contract_version, feature_config = FEATURE_CONTRACTS[feature_contract]
     arm_model_version = (
-        GRADIENT_BOOSTING_MODEL_VERSION
-        if boosted
+        ESTIMATOR_MODEL_VERSIONS[estimator]
+        if candidate_estimator
         else COMPONENT_MODEL_VERSION
         if weighting == "equal"
         else SEASON_WEIGHTED_MODEL_VERSION
     )
-    columns = component_feature_columns()
+    columns = component_feature_columns(feature_config)
     ranks = {season: rank for rank, season in enumerate(season_order)}
     pieces: list[pd.DataFrame] = []
+    distribution_pieces: list[pd.DataFrame] = []
     refused: list[str] = []
     records: list[FoldRecord] = []
     training_rows = 0
@@ -468,7 +555,11 @@ def build_oof_table(
         )
         season_weights = declared_season_weights(training_seasons, rule=rule)
         models = fit_component_models(
-            training, feature_columns=columns, config=config, weighting=rule
+            training,
+            feature_columns=columns,
+            config=config,
+            weighting=rule,
+            target_season=decision.season,
         )
         if models is None:
             refused.append(decision.fold_id)
@@ -498,7 +589,7 @@ def build_oof_table(
                 scored_rows=len(scoring),
                 model_fitted=models is not None,
                 model_version=arm_model_version,
-                feature_contract_version=FEATURE_CONTRACT_VERSION,
+                feature_contract_version=feature_contract_version,
                 target_contract_version=TARGET_CONTRACT_VERSION,
                 weighting=WEIGHTING_LABELS[weighting] if development else None,
                 training_weight_by_season=season_weights if development else None,
@@ -527,6 +618,15 @@ def build_oof_table(
         )
         piece["fold_id"] = decision.fold_id
         pieces.append(piece)
+        if development:
+            distribution = predict_component_distribution(models, scoring, feature_columns=columns)
+            if not distribution.empty:
+                keyed = scoring.loc[distribution.index, ["season", "gameweek", "player_id"]]
+                keyed = keyed.rename(columns={"gameweek": "target_gameweek"})
+                keyed["fold_id"] = decision.fold_id
+                distribution_pieces.append(
+                    pd.concat([keyed, distribution], axis=1).reset_index(drop=True)
+                )
 
     if not pieces:
         raise DataError("No decision produced a scoring population.")
@@ -535,7 +635,7 @@ def build_oof_table(
     table = table.rename(columns={"gameweek": "target_gameweek"})
     table["contract_version"] = contract_version
     table["model_version"] = arm_model_version
-    table["feature_contract_version"] = FEATURE_CONTRACT_VERSION
+    table["feature_contract_version"] = feature_contract_version
     table["target_contract_version"] = TARGET_CONTRACT_VERSION
     table["dataset_contract_version"] = DATASET_CONTRACT_VERSION
     # The archive publishes no deadline, and `src/squadopt/data/schema.py` refuses to recover
@@ -548,11 +648,24 @@ def build_oof_table(
         .sort_values(["season", "target_gameweek", "player_id"], kind="stable")
         .reset_index(drop=True)
     )
+    distribution_table: pd.DataFrame | None = None
+    if distribution_pieces:
+        distribution_table = (
+            pd.concat(distribution_pieces, ignore_index=True)
+            .loc[:, [*DISTRIBUTION_KEY_COLUMNS, *DISTRIBUTION_COLUMNS]]
+            .sort_values(["season", "target_gameweek", "player_id"], kind="stable")
+            .reset_index(drop=True)
+        )
+        for column in DISTRIBUTION_COLUMNS[1:]:
+            distribution_table[column] = (
+                distribution_table[column].astype("Float64").round(PREDICTED_POINTS_DECIMALS)
+            )
     return table, WalkSummary(
         refused_folds=tuple(refused),
         training_rows_seen=training_rows,
         scored_folds=len(pieces),
         folds=tuple(records),
+        distribution=distribution_table,
     )
 
 
@@ -592,11 +705,68 @@ def build_decision_roster(panel: pd.DataFrame, table: pd.DataFrame) -> pd.DataFr
     )
 
 
+def estimator_constants(estimator: str, config: ComponentModelConfig) -> dict[str, object]:
+    """The declared constants of every estimator an arm fits, for its manifest.
+
+    The points-only arm fits the linear appearance and minutes estimators beside the boosted
+    points estimator, so it records the constants of all three.
+    """
+    linear: dict[str, object] = {
+        "appearance_regularization": config.appearance_regularization,
+        "minutes_alpha": config.minutes_alpha,
+        "points_alpha": config.points_alpha,
+    }
+    boosted: dict[str, object] = {
+        "learning_rate": config.boosting_learning_rate,
+        "iterations": config.boosting_iterations,
+        "max_leaf_nodes": config.boosting_max_leaf_nodes,
+        "min_samples_leaf": config.boosting_min_samples_leaf,
+        "l2_regularization": config.boosting_l2_regularization,
+        "early_stopping": False,
+    }
+    if estimator == LINEAR_ESTIMATOR:
+        return {
+            **linear,
+            "minutes_scale_floor": MINUTES_SCALE_FLOOR,
+            "points_scale_floor": POINTS_SCALE_FLOOR,
+        }
+    if estimator == GRADIENT_BOOSTING_POINTS_ESTIMATOR:
+        return {
+            "appearance_regularization": linear["appearance_regularization"],
+            "minutes_alpha": linear["minutes_alpha"],
+            **boosted,
+        }
+    if estimator == MIXTURE_ESTIMATOR:
+        return {
+            **linear,
+            "minutes_full_threshold_per_fixture": MINUTES_FULL_THRESHOLD_PER_FIXTURE,
+            "points_return_threshold": POINTS_RETURN_THRESHOLD,
+            "minutes_scale_floor": MINUTES_SCALE_FLOOR,
+            "points_scale_floor": POINTS_SCALE_FLOOR,
+            "minimum_regime_rows": max(2, config.minimum_training_rows // 4),
+        }
+    if estimator == REGIME_ESTIMATOR:
+        return {
+            "regime_labels": list(REGIME_LABELS),
+            "fixture_regime": "double when fixture_count >= 2, else single",
+            "rule_era": "defcon for season start year 2025 or later",
+            "gate_terms": list(REGIME_GATE_TERMS),
+            "gate": "StandardScaler + LogisticRegression (lbfgs, C "
+            f"{config.appearance_regularization}) over the regime labels",
+            "expert_appearance_regularization": config.appearance_regularization,
+            "expert_minutes_alpha": config.minutes_alpha,
+            "expert_points_alpha": config.points_alpha,
+            "minimum_training_rows_per_expert": config.minimum_training_rows,
+        }
+    return boosted
+
+
 def main() -> int:
     arguments = _parse_arguments()
     scope = str(arguments.development_scope)
     weighting = str(arguments.season_weighting)
     estimator = str(arguments.estimator)
+    feature_contract = str(arguments.feature_contract)
     development = scope == "v2"
     contract_version = DEVELOPMENT_OOF_CONTRACT_VERSION if development else OOF_CONTRACT_VERSION
     default_seasons = DEVELOPMENT_SEASONS_V2 if development else DEFAULT_SEASONS
@@ -617,8 +787,14 @@ def main() -> int:
             return 1
         if estimator != LINEAR_ESTIMATOR:
             print(
-                "The gradient-boosting estimator is a Phase C v2 development candidate. Run "
+                f"The {estimator} estimator is a Phase C v2 development candidate. Run "
                 "it with --development-scope v2; the v1 contract fits only the linear control."
+            )
+            return 1
+        if feature_contract != "v1":
+            print(
+                "The v2 feature contract is a Phase C v2 development candidate. Run it with "
+                "--development-scope v2; the v1 contract fits the frozen feature set."
             )
             return 1
         if LOCKED_HOLDOUT_SEASON in seasons:
@@ -637,7 +813,7 @@ def main() -> int:
             return 1
         if estimator != LINEAR_ESTIMATOR and weighting != "equal":
             print(
-                "The gradient-boosting candidate is declared under equal weighting only; "
+                f"The {estimator} candidate is declared under equal weighting only; "
                 "the weighted arm fits the linear estimators."
             )
             return 1
@@ -662,9 +838,15 @@ def main() -> int:
         print(f"Archive not found at {archive_root}.")
         return 1
     config = ComponentModelConfig(minimum_training_rows=int(arguments.minimum_training_rows))
+    feature_contract_version, feature_config = FEATURE_CONTRACTS[feature_contract]
 
     try:
-        panel, frame = _modelling_frame(archive_root, seasons)
+        # The v1 call keeps its two-argument shape, which is what the offline suite patches.
+        panel, frame = (
+            _modelling_frame(archive_root, seasons)
+            if feature_contract == "v1"
+            else _modelling_frame(archive_root, seasons, config=feature_config)
+        )
         ranks = season_ranks(panel)
         season_order = tuple(sorted(ranks, key=lambda season: ranks[season]))
         decisions = walk_forward_decision_points(panel, seasons=seasons)
@@ -678,6 +860,7 @@ def main() -> int:
             weighting=weighting,
             contract_version=contract_version,
             estimator=estimator,
+            feature_contract=feature_contract,
         )
         roster = build_decision_roster(panel, table)
     except DataError as error:
@@ -687,7 +870,10 @@ def main() -> int:
     if arguments.table_name is not None:
         table_name = str(arguments.table_name)
     elif development:
-        table_name = f"{contract_version}_{weighting}{ESTIMATOR_TABLE_SUFFIX[estimator]}"
+        table_name = (
+            f"{contract_version}_{weighting}{ESTIMATOR_TABLE_SUFFIX[estimator]}"
+            f"{FEATURE_CONTRACT_TABLE_SUFFIX[feature_contract]}"
+        )
     else:
         table_name = contract_version
     output_dir: Path = arguments.output_dir
@@ -698,6 +884,18 @@ def main() -> int:
     write_export_table(roster, roster_path)
     digest = compute_table_sha256(table_path)
     roster_digest = compute_table_sha256(roster_path)
+    distribution_sidecar: dict[str, object] | None = None
+    if development and walk.distribution is not None:
+        distribution_path = output_dir / f"{table_name}{DISTRIBUTION_SIDECAR_SUFFIX}"
+        write_export_table(walk.distribution, distribution_path)
+        distribution_sidecar = {
+            "path": distribution_path.name,
+            "sha256": compute_table_sha256(distribution_path),
+            "row_count": len(walk.distribution),
+            "columns": [*DISTRIBUTION_KEY_COLUMNS, *DISTRIBUTION_COLUMNS],
+            "family": str(walk.distribution["distribution_family"].iloc[0]),
+            "rule": DISTRIBUTION_RULE,
+        }
 
     modelled = int((table["composition_route"] == "component_model").sum())
     model_version = str(table["model_version"].iloc[0])
@@ -705,11 +903,16 @@ def main() -> int:
         "python -m scripts.export_component_oof"
         + (f" --development-scope v2 --season-weighting {weighting}" if development else "")
         + (f" --estimator {estimator}" if development and estimator != LINEAR_ESTIMATOR else "")
+        + (
+            f" --feature-contract {feature_contract}"
+            if development and feature_contract != "v1"
+            else ""
+        )
     )
     manifest = {
         "contract_version": contract_version,
         "model_version": model_version,
-        "feature_contract_version": FEATURE_CONTRACT_VERSION,
+        "feature_contract_version": feature_contract_version,
         "target_contract_version": TARGET_CONTRACT_VERSION,
         "dataset_contract_version": DATASET_CONTRACT_VERSION,
         "roster_contract_version": ROSTER_CONTRACT_VERSION,
@@ -746,8 +949,8 @@ def main() -> int:
         "row_count": len(table),
         "component_model_rows": modelled,
         "direct_control_rows": int(len(table) - modelled),
-        "feature_columns": list(component_feature_columns()),
-        "excluded_ratio_features": list(excluded_ratio_features()),
+        "feature_columns": list(component_feature_columns(feature_config)),
+        "excluded_ratio_features": list(excluded_ratio_features(feature_config)),
         "start_target_status": START_TARGET_STATUS,
         "start_target_supported_seasons": list(START_TARGET_SUPPORTED_SEASONS),
         "missing_data_policy": (
@@ -819,26 +1022,20 @@ def main() -> int:
                     "normalization": WEIGHT_NORMALIZATION,
                     "declared_before_measurement": True,
                 },
+                "feature_contract": {
+                    "name": feature_contract,
+                    "version": feature_contract_version,
+                    "minutes_windows": list(feature_config.minutes_windows),
+                    "points_windows": list(feature_config.points_windows),
+                    "appearance_windows": list(feature_config.appearance_windows),
+                    "declared_before_measurement": True,
+                },
                 "estimator": {
                     "name": estimator,
                     "model_version": model_version,
                     "rule": ESTIMATOR_RULES[estimator],
-                    "constants": (
-                        {
-                            "learning_rate": config.boosting_learning_rate,
-                            "iterations": config.boosting_iterations,
-                            "max_leaf_nodes": config.boosting_max_leaf_nodes,
-                            "min_samples_leaf": config.boosting_min_samples_leaf,
-                            "l2_regularization": config.boosting_l2_regularization,
-                            "early_stopping": False,
-                        }
-                        if estimator == GRADIENT_BOOSTING_ESTIMATOR
-                        else {
-                            "appearance_regularization": config.appearance_regularization,
-                            "minutes_alpha": config.minutes_alpha,
-                            "points_alpha": config.points_alpha,
-                        }
-                    ),
+                    "constants": estimator_constants(estimator, config),
+                    "distribution_sidecar": distribution_sidecar,
                     "declared_before_measurement": True,
                 },
                 "rule_era": {
@@ -869,7 +1066,10 @@ def main() -> int:
     print(f"  table sha256      {digest}")
     print(f"  roster sha256     {roster_digest}")
     if development:
-        print(f"  scope             v2 development (weighting {weighting}, estimator {estimator})")
+        print(
+            f"  scope             v2 development (weighting {weighting}, estimator {estimator}, "
+            f"features {feature_contract})"
+        )
         read = "read as development data" if manifest["locked_holdout_read"] else "not read"
         print(f"  locked holdout    {read} ({LOCKED_HOLDOUT_SEASON})")
     else:

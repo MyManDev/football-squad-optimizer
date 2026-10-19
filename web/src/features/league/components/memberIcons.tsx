@@ -66,23 +66,6 @@ export function InfoIcon() {
   );
 }
 
-/** Up and down chevrons: the WHO block's 'change member'. */
-export function SwitchIcon() {
-  return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 14 14"
-      aria-hidden="true"
-      focusable="false"
-      strokeWidth={1.6}
-      {...STROKE}
-    >
-      <path d="M4 5.5L7 2.5l3 3M4 8.5l3 3 3-3" />
-    </svg>
-  );
-}
-
 /** A disclosure's chevron, turned by the stylesheet when the section opens. */
 export function DisclosureIcon({ className }: { className?: string }) {
   return (

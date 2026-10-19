@@ -16,6 +16,7 @@
     "format:check": "prettier --check .",
     "test": "vitest",
     "e2e": "playwright test",
+    "e2e:engines": "playwright test -c playwright.engines.config.ts",
     "gen:types": "json2ts ../docs/contracts/ui_view_v1.schema.json --output src/data/schema.ts --bannerComment \"/* Generated from docs/contracts/ui_view_v1.schema.json by npm run gen:types - do not edit. */\"",
     "check:deployment": "node scripts/check-deployment-assets.mjs",
     "smoke:deployment": "node scripts/smoke-deployment.mjs",

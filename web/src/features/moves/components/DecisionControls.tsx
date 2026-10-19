@@ -5,7 +5,7 @@ import { Badge } from "../../../design/components/Badge";
 import { Card } from "../../../design/components/Card";
 import { useLanguage } from "../../../i18n/context";
 import { WINDOWS } from "../../../lib/decisionVocabulary";
-import { lookupPublishedLeague, membersAddress } from "../../league";
+import { FIND_YOURSELF, lookupPublishedLeague, membersAddress } from "../../league";
 import { useDecisionSelection } from "../decisionSelection";
 import { readHorizonEvidence } from "../horizonEvidence";
 import { MODE_PRICE_FOLDS, getPlayModes } from "../modePrices";
@@ -46,7 +46,8 @@ export function DecisionControls({ horizonEvidence }: { horizonEvidence?: unknow
       // A static site can only open the league it precomputed; the published members
       // document says which one that is, and its absence is the honest "not yet" state.
       const found = await lookupPublishedLeague(requested);
-      if (found.status === "connected") navigate(membersAddress(requested));
+      if (found.status === "connected")
+        navigate(membersAddress(requested), { state: FIND_YOURSELF });
       else setLeagueState({ kind: "mismatch", requestedId: requested });
     } catch {
       setLeagueState({ kind: "unavailable" });
