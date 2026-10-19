@@ -10,6 +10,7 @@ import type { FixturesPayload } from "../../fixtures/types";
 import { CHIP_COPY, chipRescores, type ChipCopy } from "../advice/chipCopy";
 import { EVIDENCE_COPY, QUOTE_WITHHELD } from "../advice/evidenceCopy";
 import { comparedRivalPlayers } from "../advice/rivalPlayers";
+import { modelChangeOf } from "../advice/modelSwitch";
 import { boardSlot, claimPair, playBoard, releasePair, releaseSlotsFrom } from "./boardMotion";
 import { publishedPrice } from "../advice/publishedPrice";
 import { InformationReview } from "../advice/InformationReview";
@@ -284,6 +285,7 @@ export function AdviceDecision({
         </div>
       )}
       <GainStrip view={view} squad={squad.payload} measured={rowsAreShares} chipBasis={chipBasis} />
+      <ModelChangeLine view={view} />
       <CaptainLine view={view} codes={codes} />
       <div className={board.states}>
         {basisNote ? (
@@ -1459,5 +1461,37 @@ function WindowComparison({ view, control }: { view: EntryAdvice; control: Entry
         </div>
       </dl>
     </section>
+  );
+}
+
+/**
+ * What the switch of prediction model changed, under the gain strip (#1131): how many players
+ * the new model's plan brings in, marked on the pitch, and the difference in the week's net
+ * expected points, counted up once from zero. Nothing is said when the plan was not reached by
+ * a model switch.
+ */
+function ModelChangeLine({ view }: { view: EntryAdvice }) {
+  const { locale, messages } = useLanguage();
+  const copy = messages.leagueMembers;
+  const change = modelChangeOf(view);
+  if (change === null) return null;
+  return (
+    <p className={board.modelChange} data-model-change={change.to}>
+      <span>{copy.modelChangePlayers(copy.modelNames[change.to], change.changed.size)}</span>
+      {change.difference !== null ? (
+        <>
+          {" "}
+          <span>{copy.modelChangeDifference}</span>{" "}
+          <strong className="num">
+            <CountingNumber
+              countKey={change.key}
+              value={change.difference}
+              format={(value) => signedPoints(value, 1, locale)}
+            />
+          </strong>{" "}
+          <PointsUnit />
+        </>
+      ) : null}
+    </p>
   );
 }

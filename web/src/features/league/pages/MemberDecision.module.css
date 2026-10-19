@@ -716,3 +716,16 @@
   flex-direction: column;
   gap: var(--space-4);
 }
+
+/* The model-switch line under the gain strip (#1131): one quiet sentence and the counted
+   difference in the scoreboard face. */
+.modelChange {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--step--1);
+}
+
+.modelChange strong {
+  color: var(--color-text);
+  font-family: var(--font-display);
+}

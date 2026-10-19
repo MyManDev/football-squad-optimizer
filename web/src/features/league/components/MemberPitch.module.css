@@ -708,3 +708,11 @@
     grid-area: xp;
   }
 }
+
+/* A player a switch of prediction model brought into the plan (#1131): a static ring in the
+   page's one accent, until the next plan. The plate's one short rise is script, on the
+   motion tokens' data time; the ring itself never moves. */
+.token[data-model-changed] .plate {
+  outline: 2px solid var(--color-lime);
+  outline-offset: 1px;
+}

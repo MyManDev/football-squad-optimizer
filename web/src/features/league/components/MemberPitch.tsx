@@ -1,8 +1,9 @@
-import { useId, type CSSProperties } from "react";
+import { useEffect, useId, useRef, type CSSProperties } from "react";
 
 import { useLanguage } from "../../../i18n/context";
 import { clubCode, clubSwatch, type ClubCodes } from "../../../lib/clubs";
 import { figure } from "../../../lib/format";
+import { popChanged, releasePop, type ModelChange } from "../advice/modelSwitch";
 import styles from "./MemberPitch.module.css";
 
 /** One player as the pitch draws them: a white name plate on the grass. */
@@ -69,7 +70,7 @@ function Plate({ player, codes }: { player: PitchPlayer; codes: ClubCodes }) {
   const swatch = clubSwatch(code);
   const shortName = player.shortName.trim() || player.name;
   return (
-    <div className={styles.plate}>
+    <div className={styles.plate} data-plate="">
       <span className={styles.name} title={player.name}>
         {swatch ? (
           <span
@@ -140,7 +141,30 @@ function AttackLabel({ at }: { at: "first" | "last" }) {
  * of attack is written on a white plate directly under the first defender in the published
  * order; where the defence is too crowded for that across the pitch, under the whole line.
  */
-export function MemberPitch({ players, codes }: { players: PitchPlayer[]; codes: ClubCodes }) {
+export function MemberPitch({
+  players,
+  codes,
+  modelChange = null,
+}: {
+  players: PitchPlayer[];
+  codes: ClubCodes;
+  /** The players a switch of prediction model brought into this plan (#1131). */
+  modelChange?: Pick<ModelChange, "key" | "changed"> | null;
+}) {
+  const field = useRef<HTMLDivElement>(null);
+  const changeKey = modelChange?.key ?? null;
+  // The changed players' plates move once per change; the mark stays until the next plan.
+  useEffect(() => {
+    if (changeKey === null || field.current === null) return undefined;
+    const running = popChanged(changeKey, [
+      ...field.current.querySelectorAll<HTMLElement>("[data-model-changed] [data-plate]"),
+    ]);
+    return () => {
+      const unfinished = running.filter((motion) => motion.playState !== "finished");
+      unfinished.forEach((motion) => motion.cancel());
+      if (unfinished.length > 0) releasePop(changeKey);
+    };
+  }, [changeKey]);
   const { messages } = useLanguage();
   const copy = messages.leagueMembers;
   const describedBy = useId();
@@ -157,6 +181,7 @@ export function MemberPitch({ players, codes }: { players: PitchPlayer[]; codes:
   const labelLine = defenders > 0 ? "DEF" : "GK";
   return (
     <div
+      ref={field}
       className={styles.wrap}
       data-mark="pitch"
       data-def-crowded={defenders >= 4 ? "true" : undefined}
@@ -208,6 +233,7 @@ export function MemberPitch({ players, codes }: { players: PitchPlayer[]; codes:
                     key={player.playerId}
                     className={styles.token}
                     style={{ "--i": index } as CSSProperties}
+                    data-model-changed={modelChange?.changed.has(player.playerId) ? "" : undefined}
                   >
                     <Plate player={player} codes={codes} />
                     {line.position === labelLine && index === 0 ? <AttackLabel at="first" /> : null}

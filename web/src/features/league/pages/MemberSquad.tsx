@@ -8,6 +8,7 @@ import { ClubMark } from "../components/ClubMark";
 import { MemberBench, MemberPitch, type PitchPlayer } from "../components/MemberPitch";
 import { PointsUnit } from "../components/PointsUnit";
 import { expectedLineupLabel } from "../advice/expectedLineupLabel";
+import { modelChangeOf } from "../advice/modelSwitch";
 import type { EntryAdvice, EntrySquad, EntrySquadPlayer } from "../types";
 import { finite, heldBench, type SquadOnPitch } from "./squadOnPitch";
 import styles from "./MemberSquad.module.css";
@@ -92,7 +93,11 @@ export function MemberSquad({
         ) : null}
       </div>
       <div className={styles.pitchView} hidden={hasList && view !== "pitch"}>
-        <MemberPitch players={onPitch.eleven} codes={codes} />
+        <MemberPitch
+          players={onPitch.eleven}
+          codes={codes}
+          modelChange={planned ? modelChangeOf(plan) : null}
+        />
         <MemberBench players={onPitch.bench} codes={codes} />
       </div>
       {hasList ? (

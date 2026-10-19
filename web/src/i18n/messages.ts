@@ -871,6 +871,14 @@ const en = {
       "current" | "football",
       string
     >,
+    // The model-switch line (#1131): the players the other model's plan brings in.
+    modelChangePlayers: (model: string, count: number) =>
+      count === 0
+        ? `${model}: the same players.`
+        : count === 1
+          ? `${model}: 1 player changed.`
+          : `${model}: ${count} players changed.`,
+    modelChangeDifference: "Points difference",
     experimentalTag: "Experimental",
     modelNote:
       "The football model forecasts goals, assists, clean sheets and DEFCON per fixture. The Top 100 weight applies to the selected model.",
@@ -1896,6 +1904,9 @@ const tr: MessageSchema<typeof en> = {
     optionNotes: "Seçenekler hakkında",
     modelLegend: "Model",
     modelNames: { current: "Mevcut model", football: "Futbol modeli" },
+    modelChangePlayers: (model, count) =>
+      count === 0 ? `${model}: oyuncular aynı.` : `${model}: ${count} oyuncu değişti.`,
+    modelChangeDifference: "Puan farkı",
     experimentalTag: "Deneysel",
     modelNote:
       "Futbol modeli gol, asist, gol yememe ve DEFCON bileşenlerini fikstürlere göre hesaplar. Top 100 ağırlığı seçtiğin modele uygulanır.",
