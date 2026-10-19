@@ -1,5 +1,6 @@
 import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, expect, it } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
+import { forgetCounts } from "../../../design/countMotion";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { mockEntryAdviceEnvelope } from "../../../fixtures/league";
 import type { AdviceLineupExpectation } from "../types";
@@ -68,4 +69,60 @@ it("keeps legacy documents unchanged and rejects invalid expected scores", () =>
   expect(
     isAdvicePayload({ ...view, lineup_expectation: { ...expectation, scoring_multipliers: {} } }),
   ).toBe(false);
+});
+
+/** Runs `test` with a stand-in `element.animate` and motion allowed, and returns its calls. */
+function withCounting(test: (animate: ReturnType<typeof vi.fn>) => void): void {
+  const animate = vi.fn(() => ({
+    effect: { getComputedTiming: () => ({ progress: 0 }) },
+    playState: "running",
+    addEventListener: () => undefined,
+    cancel: () => undefined,
+  }));
+  Object.defineProperty(HTMLElement.prototype, "animate", { value: animate, configurable: true });
+  vi.stubGlobal("matchMedia", () => ({ matches: false }) as MediaQueryList);
+  vi.stubGlobal("requestAnimationFrame", () => 0);
+  try {
+    test(animate);
+  } finally {
+    forgetCounts();
+    vi.unstubAllGlobals();
+    delete (HTMLElement.prototype as { animate?: unknown }).animate;
+  }
+}
+
+const base = mockEntryAdviceEnvelope(101, "saf-puan", 1).payload;
+const planWithNet = (net: number, leagueId = base.league_id) => ({
+  ...base,
+  league_id: leagueId,
+  lineup_expectation: { ...expectation, expected_net_points: net },
+});
+const lineup = (net: number, leagueId?: number) => (
+  <LanguageProvider initialLanguage="en">
+    <ExpectedLineup view={planWithNet(net, leagueId)} />
+  </LanguageProvider>
+);
+
+it("counts the net expected points when the shown plan changes, also after a remount", () => {
+  withCounting((animate) => {
+    const { rerender, unmount } = render(lineup(42.75));
+    expect(animate).not.toHaveBeenCalled();
+    rerender(lineup(42.75));
+    expect(animate).not.toHaveBeenCalled();
+    rerender(lineup(46.5));
+    expect(animate).toHaveBeenCalledTimes(1);
+    // The details are unmounted while the next plan loads; the count still starts from 46.5.
+    unmount();
+    render(lineup(44));
+    expect(animate).toHaveBeenCalledTimes(2);
+  });
+});
+
+it("writes the same entry's first figure in another league as it is", () => {
+  withCounting((animate) => {
+    render(lineup(42.75)).unmount();
+    render(lineup(44, base.league_id + 1));
+    expect(animate).not.toHaveBeenCalled();
+    expect(screen.getByTestId("lineup-expectation")).toHaveTextContent("44.0");
+  });
 });

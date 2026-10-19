@@ -2,6 +2,7 @@ import { OfficialInformationCard } from "../advice/OfficialInformationCard";
 import { useId, type CSSProperties } from "react";
 
 import { Badge } from "../../../design/components/Badge";
+import { CountingNumber } from "../../../design/CountingNumber";
 import { useLanguage } from "../../../i18n/context";
 import { clubCodesFromFixtures, type ClubCodes } from "../../../lib/clubs";
 import { figure, points, signedFigure, signedPoints, utcShort } from "../../../lib/format";
@@ -1406,7 +1407,13 @@ function WindowComparison({ view, control }: { view: EntryAdvice; control: Entry
       <dl className={styles.armband}>
         <div>
           <dt>{copy.windowSelectedTotal}</dt>
-          <dd className="num">{points(selected, 1, locale)}</dd>
+          <dd className="num">
+            <CountingNumber
+              countKey={`window-total:${view.league_id}:${view.entry_id}:${view.gameweek}:${view.window}`}
+              value={selected}
+              format={(value) => points(value, 1, locale)}
+            />
+          </dd>
         </div>
         <div>
           <dt>{copy.windowPureTotal}</dt>

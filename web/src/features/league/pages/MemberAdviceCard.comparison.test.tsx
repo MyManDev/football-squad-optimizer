@@ -1,13 +1,17 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
-import { afterEach, expect, it } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
+import { forgetCounts } from "../../../design/countMotion";
 import { mockEntryAdviceEnvelope, mockEntrySquadEnvelopes } from "../../../fixtures/league";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import type { EntryAdvice, LeagueViewEnvelope } from "../types";
 import { TOP100_COPY } from "../advice/top100Copy";
 import { AdviceCard } from "./MemberAdviceCard";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  forgetCounts();
+});
 const ENTRY = 35249001;
 function plan(mode: "saf-puan" | "fark-yarat", score: number): LeagueViewEnvelope<EntryAdvice> {
   const base = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 3);
@@ -26,12 +30,12 @@ function plan(mode: "saf-puan" | "fark-yarat", score: number): LeagueViewEnvelop
     },
   };
 }
-function show(
+function card(
   selected: LeagueViewEnvelope<EntryAdvice>,
   control: LeagueViewEnvelope<EntryAdvice> | null,
   language: "en" | "tr" = "en",
 ) {
-  render(
+  return (
     <LanguageProvider initialLanguage={language}>
       <MemoryRouter>
         <AdviceCard
@@ -41,8 +45,15 @@ function show(
           windowControl={control}
         />
       </MemoryRouter>
-    </LanguageProvider>,
+    </LanguageProvider>
   );
+}
+function show(
+  selected: LeagueViewEnvelope<EntryAdvice>,
+  control: LeagueViewEnvelope<EntryAdvice> | null,
+  language: "en" | "tr" = "en",
+) {
+  render(card(selected, control, language));
 }
 it.each(["en", "tr"] as const)(
   "shows two base totals and no difference, with no sentence under them, in %s",
@@ -99,4 +110,31 @@ it("shows a Top 100 pure-points selection against the published plan at zero", (
   });
   expect(region).toHaveTextContent("153.0");
   expect(region).toHaveTextContent("168.0");
+});
+it("counts the selected total when the shown plan for the same window changes", () => {
+  const animate = vi.fn(() => ({
+    effect: { getComputedTiming: () => ({ progress: 0 }) },
+    playState: "running",
+    addEventListener: () => undefined,
+    cancel: () => undefined,
+  }));
+  Object.defineProperty(HTMLElement.prototype, "animate", { value: animate, configurable: true });
+  vi.stubGlobal("matchMedia", () => ({ matches: false }) as MediaQueryList);
+  vi.stubGlobal("requestAnimationFrame", () => 0);
+  try {
+    const control = plan("saf-puan", 60);
+    const { rerender } = render(card(plan("fark-yarat", 70), control));
+    const region = screen.getByRole("region", { name: TOP100_COPY.en.windowComparisonTitle });
+    const total = region.querySelector("[data-counting-number]");
+    expect(total).toHaveTextContent("198.0");
+    expect(animate).not.toHaveBeenCalled();
+    rerender(card(plan("fark-yarat", 75), control));
+    expect(animate).toHaveBeenCalledTimes(1);
+    expect(animate.mock.contexts[0]).toBe(total);
+    // The count starts from the total on screen.
+    expect(total).toHaveTextContent("198.0");
+  } finally {
+    vi.unstubAllGlobals();
+    delete (HTMLElement.prototype as { animate?: unknown }).animate;
+  }
 });
