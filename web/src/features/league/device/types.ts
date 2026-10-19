@@ -182,6 +182,11 @@ export interface DevicePlanAnswer {
    * net of its hits. Absent without a chip.
    */
   gain_vs_no_chip?: number;
+  /**
+   * With chip gains asked for: each held chip's gain this week against this plain plan,
+   * null where its solve was refused. Absent otherwise.
+   */
+  chip_gains?: Partial<Record<DeviceChip, number | null>>;
   /** With a rival strategy: the band's account. Absent for the plain plan and a chip. */
   rival?: DeviceRivalFields;
   /** With a Top 100 weight: its account. */
