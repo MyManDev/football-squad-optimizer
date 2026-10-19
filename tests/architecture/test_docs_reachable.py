@@ -193,7 +193,6 @@ NOT_NAMED_IN_THE_INDEX: frozenset[str] = frozenset(
         "docs/handover_2026-08-23.md",
         "docs/live_score_view.md",
         "docs/mode_price_list_prereg.md",
-        "docs/opening_backtest.md",
         "docs/opening_newcomer_note.md",
         "docs/opponent_aware_projection_prereg.md",
         "docs/overlap_scaled_edge_prereg.md",
@@ -241,7 +240,7 @@ NOT_NAMED_IN_THE_INDEX: frozenset[str] = frozenset(
 
 #: The size of each list. Lower it when a document leaves its list; raising it is the growth
 #: the lists refuse, so a new unreachable document cannot join one by being added to it.
-LIST_SIZES = {"NAMED_IN_THE_INDEX_WITHOUT_A_LINK": 114, "NOT_NAMED_IN_THE_INDEX": 69}
+LIST_SIZES = {"NAMED_IN_THE_INDEX_WITHOUT_A_LINK": 114, "NOT_NAMED_IN_THE_INDEX": 68}
 
 
 def _documents(listed: list[str]) -> list[str]:
