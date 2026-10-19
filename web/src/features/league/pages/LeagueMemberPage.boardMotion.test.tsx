@@ -176,6 +176,31 @@ describe("the substitution board's motion", () => {
     expect(boards()[0]!.contains(started[first]!.element)).toBe(true);
   });
 
+  it("moves a board again when its pair comes back after a decision without that board", () => {
+    const one = BASE.payload.moves[0]!;
+    const { rerender } = render(view(withMoves([one])));
+    expect(started).toHaveLength(3);
+    playState = "finished";
+    // A hold week: no board, so the place shows no pair.
+    rerender(view(withMoves([])));
+    expect(screen.queryAllByRole("article", { name: /^Değişiklik \d+\/\d+$/ })).toEqual([]);
+    rerender(view(withMoves([one])));
+    expect(started).toHaveLength(6);
+  });
+
+  it("moves the second board again when two moves come back after a plan with one", () => {
+    const moves = BASE.payload.moves;
+    const other = move("gw-3", player(6, "Saka"), player(7, "Gordon"), 1.1);
+    const { rerender } = render(view(withMoves(moves)));
+    expect(started).toHaveLength(6);
+    playState = "finished";
+    rerender(view(withMoves([other])));
+    expect(started).toHaveLength(9);
+    rerender(view(withMoves(moves)));
+    expect(started).toHaveLength(15);
+    expect(boards()[1]!.contains(started[14]!.element)).toBe(true);
+  });
+
   it("does not move again when the same selection's boards mount again after their motion", () => {
     const first = render(view(BASE));
     const count = started.length;

@@ -53,6 +53,11 @@ export function playBoard(parts: BoardParts, source?: MediaSource): Animation[] 
 // with the pair it showed before (a reload of the same selection) does not move again.
 const shownPairs = new Map<string, string>();
 
+/** The slot of a member's board at `index`: the member and the board's place. */
+export function boardSlot(member: number, index: number): string {
+  return `${member}:${index}`;
+}
+
 /**
  * Whether a board slot is showing a pair it has not shown before, and if so records it.
  * `slot` names the member and the board's place; `pair` the players out and in.
@@ -66,6 +71,18 @@ export function claimPair(slot: string, pair: string): boolean {
 /** Lets a slot's pair move again, for a motion that was stopped before it finished. */
 export function releasePair(slot: string, pair: string): void {
   if (shownPairs.get(slot) === pair) shownPairs.delete(slot);
+}
+
+/**
+ * Empties a member's slots from `count` on, for a decision drawn with `count` boards (none
+ * for a hold week): those places show no pair now, so a pair that comes back to one of
+ * them later is a change of the pair and moves.
+ */
+export function releaseSlotsFrom(member: number, count: number): void {
+  for (const slot of shownPairs.keys()) {
+    const [owner, place] = slot.split(":");
+    if (owner === String(member) && Number(place) >= count) shownPairs.delete(slot);
+  }
 }
 
 /** For tests: every slot starts unseen. */

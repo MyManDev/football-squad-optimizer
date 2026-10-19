@@ -9,7 +9,7 @@ import type { FixturesPayload } from "../../fixtures/types";
 import { CHIP_COPY, chipRescores, type ChipCopy } from "../advice/chipCopy";
 import { EVIDENCE_COPY, QUOTE_WITHHELD } from "../advice/evidenceCopy";
 import { comparedRivalPlayers } from "../advice/rivalPlayers";
-import { claimPair, playBoard, releasePair } from "./boardMotion";
+import { boardSlot, claimPair, playBoard, releasePair, releaseSlotsFrom } from "./boardMotion";
 import { publishedPrice } from "../advice/publishedPrice";
 import { InformationReview } from "../advice/InformationReview";
 import { ExpectedLineup } from "../advice/ExpectedLineup";
@@ -240,6 +240,11 @@ export function AdviceDecision({
   // Boards that share a caption say it once, under them; a caption that differs stays with
   // its own board.
   const sharedReason = reasons.every((reason) => reason === reasons[0]);
+  // The board places this decision leaves empty (all of them for a hold week) show no
+  // pair, so a pair that comes back to one of them later moves its board again.
+  useEffect(() => {
+    releaseSlotsFrom(view.entry_id, view.moves.length);
+  }, [view.entry_id, view.moves.length]);
   return (
     <>
       {origin === "published-while-computing" ? (
@@ -257,7 +262,7 @@ export function AdviceDecision({
               <div className={board.cell} key={move.move_id}>
                 <SubstitutionBoard
                   move={move}
-                  slot={`${view.entry_id}:${index}`}
+                  slot={boardSlot(view.entry_id, index)}
                   index={index}
                   count={view.moves.length}
                   measured={rowsAreShares}
