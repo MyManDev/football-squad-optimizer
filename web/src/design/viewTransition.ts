@@ -22,8 +22,9 @@ type MediaSource = Pick<Window, "matchMedia"> | undefined;
  *
  * The transition is kept so its three promises are handled. A browser skips a transition
  * when another starts before it is drawn and rejects its `ready` with an AbortError, though
- * the update still runs; an update that throws rejects all three. Neither is left to
- * surface as an unhandled rejection.
+ * the update still runs: that is quiet. An update that throws rejects all three; its error
+ * is reported once, as an uncaught error would be, and not three times as unhandled
+ * rejections.
  */
 export function crossfade(
   update: () => void,
@@ -48,7 +49,10 @@ export function crossfade(
       ]);
     }
   });
-  for (const settled of [transition?.ready, transition?.finished, transition?.updateCallbackDone]) {
-    settled?.catch(() => {});
-  }
+  transition?.ready?.catch(() => {});
+  transition?.finished?.catch(() => {});
+  transition?.updateCallbackDone?.catch((error: unknown) => {
+    if (!(error instanceof DOMException && error.name === "AbortError"))
+      globalThis.reportError?.(error);
+  });
 }

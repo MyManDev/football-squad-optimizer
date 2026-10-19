@@ -110,6 +110,32 @@ describe("the crossfade", () => {
       }
     },
   );
+
+  it("reports an update that throws once, and not as an unhandled rejection", async () => {
+    const unhandled: unknown[] = [];
+    const record = (reason: unknown) => unhandled.push(reason);
+    const reported = vi.fn();
+    vi.stubGlobal("reportError", reported);
+    process.on("unhandledRejection", record);
+    try {
+      const failure = new Error("the update failed");
+      const document = {
+        startViewTransition: vi.fn(() => ({
+          ready: Promise.reject(failure),
+          finished: Promise.reject(failure),
+          updateCallbackDone: Promise.reject(failure),
+        })),
+      } as unknown as Document;
+      crossfade(() => {}, undefined, media(false), document);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(unhandled).toEqual([]);
+      expect(reported).toHaveBeenCalledOnce();
+      expect(reported).toHaveBeenCalledWith(failure);
+    } finally {
+      process.off("unhandledRejection", record);
+      vi.unstubAllGlobals();
+    }
+  });
 });
 
 describe("the crossfade's stylesheet", () => {
