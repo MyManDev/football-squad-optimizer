@@ -85,6 +85,29 @@ describe("the league race", () => {
     expect(alone.get(33)).toEqual([2, 3]);
   });
 
+  it("keeps a member who did not move in the place the table gives it the week before", () => {
+    // Week 1: 22 and 33 are level on 60. None of the three moved, so the table's places for
+    // week 1 are its places for week 2, and 33 is third in both, not level second.
+    const table = [
+      { ...raceMember(11), rank: 1, movement: "same" as const, movement_places: 0 },
+      { ...raceMember(22), rank: 2, movement: "same" as const, movement_places: 0 },
+      { ...raceMember(33), rank: 3, movement: "same" as const, movement_places: 0 },
+      RACE_SYSTEM,
+    ];
+    const race = leagueRace(
+      raceScoreboard([
+        raceWeek(1, { 11: 70, 22: 60, 33: 60 }),
+        raceWeek(2, { 11: 120, 22: 110, 33: 90 }),
+      ]),
+      table,
+      2,
+    )!;
+    const byId = new Map(race.lines.map((line) => [line.entryId, line.ranks]));
+    expect(byId.get(11)).toEqual([1, 1]);
+    expect(byId.get(22)).toEqual([2, 2]);
+    expect(byId.get(33)).toEqual([3, 3]);
+  });
+
   it("keeps the shared place for a week the table's movement cannot reach", () => {
     const table = [
       { ...raceMember(11), rank: 1, movement: "unknown" as const, movement_places: null },
