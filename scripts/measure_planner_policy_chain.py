@@ -121,6 +121,11 @@ RUNNER_PATH = Path(__file__).resolve()
 OUTPUT_ROOT = REPOSITORY / "artifacts" / "planner_policy_chain"
 
 PROTOCOL_ID = "planner_policy_chain_v1"
+#: Rule 6: the owner's written reading of which roots count as served, accepted on the chain's
+#: tracking issue before GW7 was decided. Every record written from then on names it.
+SERVED_ROOTS_READING = "#1121 issuecomment-6276054386"
+#: The fields a record written after rule 4's fix adds, which a recomputed week takes as written.
+DECLARED_FIELDS = ("runner_fix", "served_roots_reading")
 SEASON = "2026-27"
 LAST_GAMEWEEK = 38
 
@@ -1288,7 +1293,12 @@ def declare_runner_fix(
 
 
 def _declared(runner_fix: Mapping[str, object] | None) -> dict[str, object]:
-    return {} if runner_fix is None else {"runner_fix": dict(runner_fix)}
+    """What every record written from now on names: the served roots reading, and the fix."""
+
+    named: dict[str, object] = {"served_roots_reading": SERVED_ROOTS_READING}
+    if runner_fix is not None:
+        named["runner_fix"] = dict(runner_fix)
+    return named
 
 
 def refuse_unlocked_worktree() -> None:
@@ -1618,7 +1628,7 @@ def decide_week(
     last_max_free_transfers: int,
     moment: datetime | None = None,
     *,
-    runner_fix: Mapping[str, object] | None = None,
+    declared: Mapping[str, object] | None = None,
     recompute: bool = False,
 ) -> tuple[dict[tuple[str, str], ChainState], int, str]:
     """Rules 17 to 24 for one gameweek: every chain is computed, checked, then written.
@@ -1683,7 +1693,7 @@ def decide_week(
         records=digests,
         evidence_digest=evidence_digest(directory),
         work={"decided_at_utc": None if moment is None else moment.isoformat()},
-        **_declared(runner_fix),
+        **({} if declared is None else dict(declared)),
     )
     publish(manifest, directory / "manifest.json", replay_identity)
     after_states = {chain: record.state_after for chain, record in records.items()}
@@ -1983,7 +1993,11 @@ def _decide_weeks(
                 identity["repository_commit"],
                 before_max,
                 moment,
-                runner_fix=json.loads(written.read_text(encoding="utf-8")).get("runner_fix"),
+                declared={
+                    key: value
+                    for key, value in json.loads(written.read_text(encoding="utf-8")).items()
+                    if key in DECLARED_FIELDS
+                },
                 recompute=True,
             )
             emit(f"GW{reproduced:02d} reproduced by the replaced runner")
@@ -1998,7 +2012,7 @@ def _decide_weeks(
             identity["repository_commit"],
             max_free,
             moment,
-            runner_fix=declared,
+            declared=_declared(declared),
         )
         source = (
             week.receipt["snapshot_id"] if isinstance(week, WeekInputs) else f"missing {week[0]}"

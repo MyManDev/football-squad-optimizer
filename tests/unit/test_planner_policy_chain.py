@@ -2048,6 +2048,42 @@ def test_a_second_replaced_runner_is_refused(
     assert not (root / "gw07").exists()
 
 
+def test_every_record_written_names_the_served_roots_reading(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The owner's answer on #1121 (6276054386): every record names the reading of rule 6 that
+    says which roots count as served."""
+
+    assert chain.SERVED_ROOTS_READING == "#1121 issuecomment-6276054386"
+    missing = ("no_artifact", {"snapshot_id": "capture-gw6", "reason": "no_artifact"})
+    root, _ = _chain_world(tmp_path, monkeypatch, {6: missing, 7: _week(7)})
+    monkeypatch.setattr(chain, "runner_fix", lambda: FIX)
+    now = T0 + timedelta(days=7, hours=1)
+    chain.decide(*ROOTS(tmp_path), root, 7, "issuecomment-1", now=now)
+    for record in ("skipped/gw06.json", "protocol.json", "gw07/manifest.json"):
+        assert _json(root / record)["served_roots_reading"] == chain.SERVED_ROOTS_READING
+
+
+def test_a_week_decided_before_the_reading_is_reproduced_as_it_was_written(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Rule 4: decisions already written stand, so the recompute takes the declared fields of
+    the frozen runner's manifest as written, and only later weeks name the fix and the reading."""
+
+    root, _ = _chain_world(tmp_path, monkeypatch, {6: _week(6), 7: _week(7)})
+    with monkeypatch.context() as frozen:
+        frozen.setattr(chain, "_declared", lambda runner_fix: {})
+        chain.decide(*ROOTS(tmp_path), root, 6, "issuecomment-1", now=T0 + timedelta(hours=1))
+    assert not set(chain.DECLARED_FIELDS) & set(_json(root / "gw06" / "manifest.json"))
+    monkeypatch.setattr(chain, "runner_fix", lambda: FIX)
+    now = T0 + timedelta(days=7, hours=1)
+    chain.decide(*ROOTS(tmp_path), root, 7, "issuecomment-1", now=now)
+    assert not set(chain.DECLARED_FIELDS) & set(_json(root / "gw06" / "manifest.json"))
+    manifest = _json(root / "gw07" / "manifest.json")
+    assert manifest["served_roots_reading"] == chain.SERVED_ROOTS_READING
+    assert manifest["runner_fix"] == {"sha256": FIX["sha256"], "first_week": 7}
+
+
 def test_the_decision_step_needs_an_answer_and_a_permitted_day(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
