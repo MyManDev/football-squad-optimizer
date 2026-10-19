@@ -39,12 +39,14 @@ export interface CardCopy {
   title: (gameweek: number) => string;
   captain: string;
   viceCaptain: string;
+  captainMark: string;
+  viceMark: string;
   bench: string;
   transfers: string;
   noTransfers: string;
-  hit: (points: string) => string;
+  hit: (points: number) => string;
   expectedPoints: string;
-  chip: (name: string) => string;
+  chip: string;
   chipNames: Record<string, string>;
   formatPoints: (value: number) => string;
 }
@@ -249,13 +251,32 @@ export function squadCardSvg(
   const parts: string[] = [];
   let y = PAD;
 
-  // The header always names the week, so a card never travels without its gameweek.
+  // The header always names the week and the chip played in it, so a card never travels
+  // without either: the eleven, the captain and the points all stand on the chip.
+  let titleRoom = CARD_WIDTH - 2 * PAD;
+  if (data.chip !== null) {
+    const tag = `${copy.chip}: ${copy.chipNames[data.chip] ?? data.chip}`;
+    const width = Math.ceil(textWidth(tag, 26, 700)) + 32;
+    const x = CARD_WIDTH - PAD - width;
+    parts.push(
+      `<rect x="${x}" y="${y + 4}" width="${width}" height="44" rx="6" fill="${ACCENT}"/>`,
+    );
+    parts.push(
+      text(x + width / 2, y + 35, tag, {
+        size: 26,
+        weight: 700,
+        fill: CHIP_TEXT,
+        anchor: "middle",
+      }),
+    );
+    titleRoom -= width + 24;
+  }
   parts.push(
     text(PAD, y + 44, copy.title(data.gameweek), {
       size: 48,
       weight: 800,
       fill: ACCENT,
-      room: CARD_WIDTH - 2 * PAD,
+      room: titleRoom,
     }),
   );
   y += 72;
@@ -302,9 +323,9 @@ export function squadCardSvg(
         const mark = !fields.has("captain")
           ? null
           : p.id === data.captain?.id
-            ? "C"
+            ? copy.captainMark
             : p.id === data.viceCaptain?.id
-              ? "V"
+              ? copy.viceMark
               : null;
         body.push(plate(slot * (index + 1), y, width, fitText(p.name, room, size), mark));
       });
@@ -376,21 +397,11 @@ export function squadCardSvg(
     });
     if (data.hitPoints > 0) {
       body.push(
-        text(PAD, y + 34, copy.hit(copy.formatPoints(data.hitPoints)), {
+        text(PAD, y + 34, copy.hit(data.hitPoints), {
           size: 28,
           weight: 600,
           fill: BOARD_MUTED,
           tabular: true,
-        }),
-      );
-      y += LINE;
-    }
-    if (data.chip !== null) {
-      body.push(
-        text(PAD, y + 34, copy.chip(copy.chipNames[data.chip] ?? data.chip), {
-          size: 28,
-          weight: 600,
-          fill: BOARD_MUTED,
         }),
       );
       y += LINE;

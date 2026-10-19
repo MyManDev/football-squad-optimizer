@@ -3,6 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 import { mockEntryAdviceEnvelope, mockEntrySquadEnvelopes } from "../../../fixtures/league";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
+import type { EntryAdvice } from "../types";
 import { SquadCard } from "./SquadCard";
 
 const ENTRY = 35249001;
@@ -34,10 +35,10 @@ afterEach(() => {
 const png = async (_svg: string, _width: number, _height: number) =>
   new Blob(["png"], { type: "image/png" });
 
-function renderCard(draw = vi.fn(png)) {
+function renderCard(draw = vi.fn(png), plan: EntryAdvice = view) {
   render(
     <LanguageProvider initialLanguage="tr">
-      <SquadCard view={view} squad={squad} draw={draw} />
+      <SquadCard view={plan} squad={squad} draw={draw} />
     </LanguageProvider>,
   );
   return draw;
@@ -84,6 +85,20 @@ it("draws the card from the fields the member picked, on the device", async () =
   const save = screen.getByRole("link", { name: "Kaydet" });
   expect(save).toHaveAttribute("download", `squadopt-gw${view.gameweek}.png`);
   expect(fetchSpy).not.toHaveBeenCalled();
+});
+
+it("prints the plan's figures and labels as the page does", async () => {
+  const plan = { ...view, expected_own_points: 56.55, transfer_hit_points: 12 };
+  const draw = renderCard(vi.fn(png), plan);
+  fireEvent.click(screen.getByRole("checkbox", { name: "Beklenen puan" }));
+  fireEvent.click(screen.getByRole("button", { name: "Kartı oluştur" }));
+  await screen.findByRole("img");
+  const [svg] = draw.mock.calls[0]!;
+  // The squad heading's 56,55, not one decimal of its own.
+  expect(svg).toContain(">56,55<");
+  expect(svg).toContain(">12 ceza puanı<");
+  expect(svg).toContain(`Yedek kaptan: ${plan.vice_captain!.short_name}`);
+  expect(svg).not.toContain("Yardımcı");
 });
 
 it("keeps the focus while drawing, then moves it to the card and says it is ready", async () => {

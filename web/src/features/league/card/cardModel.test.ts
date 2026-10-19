@@ -20,15 +20,17 @@ const ENTRY = 35249001;
 const copy: CardCopy = {
   title: (gameweek) => `Gameweek ${gameweek} plan`,
   captain: "Captain",
-  viceCaptain: "Vice",
+  viceCaptain: "Vice-captain",
+  captainMark: "C",
+  viceMark: "V",
   bench: "Bench",
   transfers: "Transfers",
   noTransfers: "No transfers",
-  hit: (points) => `Hit ${points}`,
+  hit: (points) => `${points} hit points`,
   expectedPoints: "Expected points",
-  chip: (name) => `Chip: ${name}`,
+  chip: "Chip",
   chipNames: { "3xc": "Triple Captain" },
-  formatPoints: (value) => value.toFixed(1),
+  formatPoints: (value) => value.toFixed(2),
 };
 
 function plan() {
@@ -135,7 +137,7 @@ describe("squadCardSvg", () => {
     }
     if (data.expectedPoints !== null) {
       expect(svg).toContain(">Expected points<");
-      expect(svg).toContain(`>${data.expectedPoints.toFixed(1)}<`);
+      expect(svg).toContain(`>${data.expectedPoints.toFixed(2)}<`);
     }
     const inMoves = new Set(data.moves.flatMap((move) => [move.out, move.in]));
     const starter = data.starters.find((player) => !inMoves.has(player.name))!;
@@ -160,15 +162,16 @@ describe("squadCardSvg", () => {
     expect(svg).not.toContain("<Rovers>");
   });
 
-  it("names the hit and the chip with the transfers when the plan has them", () => {
+  it("names the hit with the transfers and the chip in the header, whatever the fields", () => {
     const { data } = plan();
-    const { svg } = squadCardSvg(
-      { ...data, hitPoints: 4, chip: "3xc" },
-      new Set<CardField>(["transfers"]),
-      copy,
-    );
-    expect(svg).toContain(">Hit 4.0<");
-    expect(svg).toContain(">Chip: Triple Captain<");
+    const tripled = { ...data, hitPoints: 4, chip: "3xc" as const };
+    const transfers = squadCardSvg(tripled, new Set<CardField>(["transfers"]), copy).svg;
+    expect(transfers).toContain(">4 hit points<");
+    expect(transfers).toContain(">Chip: Triple Captain<");
+    const armbands = squadCardSvg(tripled, new Set<CardField>(["lineup", "captain"]), copy).svg;
+    expect(armbands).toContain(">Chip: Triple Captain<");
+    expect(armbands).not.toContain("hit points");
+    expect(svgOf(["lineup", "captain"]).svg).not.toContain("Chip:");
   });
 
   it("puts the armbands on the captain's and the vice's plates by player, not by name", () => {

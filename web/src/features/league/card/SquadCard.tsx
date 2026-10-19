@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useLanguage } from "../../../i18n/context";
 import { MESSAGES } from "../../../i18n/messages";
-import { points } from "../../../lib/format";
+import { figure } from "../../../lib/format";
 import type { EntryAdvice, EntrySquad } from "../types";
 import { drawCard } from "./drawCard";
 import {
@@ -75,18 +75,22 @@ export function SquadCard({ view, squad, draw = drawCard }: Props) {
 
   if (data === null) return <p className={styles.note}>{copy.cardUnavailable}</p>;
 
+  // The page's own labels, and its figures as it prints the same plan: the expected points
+  // as the squad heading does, the hit as the gain strip says it.
   const cardCopy: CardCopy = {
     title: copy.cardWeekTitle,
-    captain: copy.cardCaptain,
-    viceCaptain: copy.cardViceCaptain,
-    bench: copy.cardBench,
+    captain: copy.captainLabel,
+    viceCaptain: copy.viceCaptainLabel,
+    captainMark: copy.captainMark,
+    viceMark: copy.viceMark,
+    bench: copy.bench,
     transfers: copy.cardTransfers,
     noTransfers: copy.cardNoTransfers,
-    hit: copy.cardHit,
+    hit: (value) => copy.hitPointsFact(value.toLocaleString(locale, { maximumFractionDigits: 1 })),
     expectedPoints: copy.cardExpectedPoints,
-    chip: copy.cardChip,
+    chip: copy.chipLabel,
     chipNames: copy.chipNames,
-    formatPoints: (value) => points(value, 1, locale),
+    formatPoints: (value) => figure(value, locale),
   };
   const fileName = `squadopt-gw${data.gameweek}.png`;
   const busy = state.phase === "drawing";
