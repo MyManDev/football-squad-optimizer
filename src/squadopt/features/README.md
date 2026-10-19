@@ -6,7 +6,7 @@ tables a decision reads, the record of what happened, and the inputs of the priv
 models. Every time-dependent aggregation of the feature builder and of `strength.py` passes
 through one shifted-rolling primitive, so the timing rule has one implementation there. The
 football lane takes its own windows (`src/squadopt/prediction/football_features.py:116`,
-`src/squadopt/prediction/football.py:130`), so its timing is audited in `prediction`. Its
+`src/squadopt/prediction/football.py:137-138`), so its timing is audited in `prediction`. Its
 callers are `prediction`, `evaluation`, `live`, `application`, `platform`, the laboratory and
 the scripts.
 
@@ -65,14 +65,16 @@ that check them before a row is returned.
 
 Who imports these modules:
 
-- `football_flag_captures.py`: only the retained flag producer
-  (`src/squadopt/application/football_live.py:24`).
+- `football_flag_captures.py` and `football_flag_inputs.py`: the retained flag producer, which
+  takes the captures and `football_flag_inputs.TrainingWeek`
+  (`src/squadopt/application/football_live.py:24-25`). Nothing else under `src` imports
+  `football_flag_captures.py`.
 - The live composite recipe: `live.football_composite_basis` reads the score replay contract
   (`src/squadopt/live/football_composite_basis.py:22`), and `prediction.football_composite_core`
   reads the unit, unit point, score, score projection, phase, phase coupling and observed
   tactical inputs (`src/squadopt/prediction/football_composite_core.py:21-50`).
-- The other input modules: their `prediction` models and the `football_*_experiment` modules of
-  the laboratory.
+- The other input modules, and `football_flag_inputs.py` besides the producer: their
+  `prediction` models and the `football_*_experiment` modules of the laboratory.
 - `football_unit_catalog.py`, `football_fm_attributes.py`, `football_phase_replay.py`,
   `football_phase_credits.py` and `football_observed_tactical_readers.py`: no module under
   `src`. Tests and offline operators call them to prepare historical source inputs
@@ -95,7 +97,7 @@ law (`src/squadopt/features/football_score_replay.py:50`,
 | `football_score_state_inputs.py` | Strict score-process inputs (`football_score_fixture_input_v1`); a receipt assertion does not admit real data. |
 | `football_score_projection.py` | Explicit uniform forecast-clock point intervals preserve supplied native minute atoms; past duration receipts and approximation assumptions remain separate from a learned substitution law (`football_score_projection.py:174`). |
 | `football_tactical_inputs.py` | Named tactical facts and supplied paired pre-decision states (`football_tactical_inputs_v1`). |
-| `football_unit_inputs.py` | Immutable inputs of the club-unit models (`football_unit_inputs_v1`). Replayed public-revision observations and 2025-26 enter only with `allow_released_2025_26`, and a fit on them records the unit replay fit contracts of `prediction.football_unit_strength` ([operator contract](../../../docs/operations/football_unit_replay.md)). |
+| `football_unit_inputs.py` | Immutable inputs of the club-unit models (`football_unit_inputs_v1`), with the public-revision replay receipt and the exposure clocks; it takes no release option itself. The fit in `prediction.football_unit_strength` admits a replayed observation only with the v2 native baseline replay receipt, and a 2025-26 row only with `allow_released_2025_26` (`src/squadopt/prediction/football_unit_strength.py:424-430`). A replay fit records `football_unit_public_replay_quantized_prefix_fit_v2`, or `football_unit_public_replay_physical_duration_fit_v2` on the physical clock; a 2025-26 fit without a replay records `football_unit_explicit_release_fit_v2` (`src/squadopt/prediction/football_unit_strength.py:485-492`, `src/squadopt/prediction/football_unit_strength.py:539-542`; [operator contract](../../../docs/operations/football_unit_replay.md)). |
 | `football_unit_catalog.py` | The strict private JSON input boundary of the club-unit experiment; it touches no network or file. |
 | `football_fm_attributes.py` | Reads a full private FM export and prepares its exact active player/club scope for a catalog (`football_fm_csv_attributes_v1`, `football_fm_scoped_attributes_v1`), retaining unknown traits and refusing inferred identity or absent mapped UIDs (`src/squadopt/features/football_fm_attributes.py:296`). |
 | `football_unit_point.py` | Declared deterministic XI point from complete native starter probabilities, with exact structural support and a retained basis receipt (`src/squadopt/features/football_unit_point.py:48`). |

@@ -87,12 +87,12 @@ The experimental football model has native, family and composite contracts. Its 
 recipe imports the compact models and recomposes retained inputs; the fixture core calls
 the unit, score, tactical recipient and phase boundaries
 (`src/squadopt/live/football_composite_basis.py:38`,
-`src/squadopt/prediction/football_composite_core.py:53`).
+`src/squadopt/prediction/football_composite_core.py:53-56`).
 The following modules are reached by `live`, `application` or `platform`, directly or
 through the football models. The fixture, joint-role and flag models keep their fit
-interfaces for the producer (`src/squadopt/application/football_live.py:34`,
-`src/squadopt/application/football_live.py:61`), and the composite recipe restores the
-compact serving models (`src/squadopt/live/football_composite_basis.py:62-69`).
+interfaces for the producer (`src/squadopt/application/football_live.py:34-42`,
+`src/squadopt/application/football_live.py:67-69`), and the composite recipe restores the
+compact serving models (`src/squadopt/live/football_composite_basis.py:58-68`).
 
 | Module | What it does |
 | --- | --- |
@@ -114,7 +114,7 @@ compact serving models (`src/squadopt/live/football_composite_basis.py:62-69`).
 | `football_score_state.py` | A paired score process with fitted lead and trail intensities in three thirds of the match clock (`football_score_state_v1`). |
 | `football_score_serving.py` | Strict compact score parameters with a separate artifact digest and inference receipt (`football_score_serving_v1`). |
 | `football_tactical_matchup.py` | Learned paired intensities and conditional tactical recipient marginals from supplied pre-decision states (`football_tactical_matchup_v1`). |
-| `football_unit_strength.py` | A baseline-relative projected club-unit model with private inputs (`football_projected_unit_strength_v1`). Its replay fits record `football_unit_public_replay_quantized_prefix_fit_v2` and `football_unit_public_replay_physical_duration_fit_v2`; 2025-26 enters only with `allow_released_2025_26` ([operator contract](../../../docs/operations/football_unit_replay.md)). |
+| `football_unit_strength.py` | A baseline-relative projected club-unit model with private inputs (`football_projected_unit_strength_v1`). Its replay fits record `football_unit_public_replay_quantized_prefix_fit_v2` or `football_unit_public_replay_physical_duration_fit_v2`, and a 2025-26 fit without a replay records `football_unit_explicit_release_fit_v2`; 2025-26 enters only with `allow_released_2025_26` ([operator contract](../../../docs/operations/football_unit_replay.md)). |
 | `football_unit_serving.py` | Exports and strictly reads immutable pooled v4 parameters, then predicts paired rates from current typed unit inputs (`src/squadopt/prediction/football_unit_serving.py:315`, `src/squadopt/prediction/football_unit_serving.py:425`, `src/squadopt/prediction/football_unit_serving.py:516`). |
 | `football_composite_core.py` | Composes current compact family models over final seven-atom minute marginals, with distinct source and derived-stage receipts and exact full bypass (`src/squadopt/prediction/football_composite_core.py:161`, `src/squadopt/prediction/football_composite_core.py:193`, `src/squadopt/prediction/football_composite_core.py:617`). |
 | `football_observed_load.py` | Observed non-PL reported-record tilt of the whole native weekly law, with distinct missing-value features and a first-week composite caller (`src/squadopt/prediction/football_observed_load.py:295`). |
@@ -141,7 +141,8 @@ The older synthetic workload model remains private to its experiment
 
 - **Private names.** ARCHITECTURE.md's private-names row lists six laboratory imports of
   `prediction.football`: `experiments.football_components` and `experiments.football_minutes`
-  each take `_fit`, `_matrix` and `_pipeline` (`tests/architecture/test_private_imports.py:57-87`).
+  each take `_fit`, `_matrix` and `_pipeline` (`tests/architecture/test_private_imports.py:57-65`,
+  `tests/architecture/test_private_imports.py:81-87`).
   The way out it names is that `prediction.football` publishes the three names; until then they
   stay on the allowlist.
 - **The run-time load of `data`.** Every `data` module this package imports runs
@@ -151,8 +152,11 @@ The older synthetic workload model remains private to its experiment
   although no import statement here names them. ADR 0011 leaves that load to the data owner
   ([ADR 0011](../../../docs/architecture/decisions/0011-storage-ports-and-platform-split.md),
   "Not changed here"); the [data guide](../data/README.md) records it.
-- **A route through `features`.** `football_phase_duties.py` imports types, digests and
-  validators from `features.football_phase_inputs`, which imports `data.snapshots`,
-  `data.sources.fpl_live` and `data.sources.fpl_set_pieces`, so importing that model also loads
-  `data.sources` with `fpl_live`, `fpl_set_pieces` and `vaastav`. The import is indirect, and the
-  features ratchet in `pyproject.toml` holds the edge.
+- **A route through `features`.** `football_phase_duties.py`, `football_phase_serving.py` and
+  `football_composite_core.py` import types, constants or validators from
+  `features.football_phase_inputs` (`src/squadopt/prediction/football_phase_duties.py:21`,
+  `src/squadopt/prediction/football_phase_serving.py:22`,
+  `src/squadopt/prediction/football_composite_core.py:32`), which imports `data.snapshots`,
+  `data.sources.fpl_live` and `data.sources.fpl_set_pieces`, so importing any of the three also
+  loads `data.sources` with `fpl_live`, `fpl_set_pieces` and `vaastav`. The import is indirect,
+  and the features ratchet in `pyproject.toml` holds the edge.
