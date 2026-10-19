@@ -40,6 +40,7 @@ import { useMemberAdviceView } from "./useMemberAdviceView";
 import { rivalCandidates } from "../advice/adviceSelection";
 import { canDuel, duelRivalId } from "./duelSides";
 import { RivalDuel } from "./RivalDuel";
+import { SquadCard } from "../card/SquadCard";
 import { WeekStory } from "./WeekStory";
 import styles from "./LeagueMemberPage.module.css";
 
@@ -547,6 +548,11 @@ function LeagueMemberContent({
           <Tool title={copy.chipsAndTransfers}>
             <MemberResourceCards squad={view} />
           </Tool>
+          {!adviceLoading && shown ? (
+            <Tool title={copy.cardTitle}>
+              <SquadCard view={shown.envelope.payload} squad={view} />
+            </Tool>
+          ) : null}
         </div>
       </div>
       {railPlacement === "column" ? rail : null}
