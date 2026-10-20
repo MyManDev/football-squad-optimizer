@@ -7,9 +7,10 @@
  * here too: ink3 and the good green stay off the sidebar (--color-surface-2), and no small
  * text sits directly on the grass, so both stay below 4.5:1 there and the header stays true.
  *
- * The viewer's pitch looks join it: every club plate's fill and text colour reach 4.5:1,
- * and every grass look is drawn in the two grass tokens only, so the grass limits above
- * hold for each look.
+ * The viewer's pitch looks join it: every club plate's fill and text colour reach 4.5:1
+ * (the header's one exception to the white plates), and every grass look is drawn in the
+ * two grass tokens only. Of those two, only the darker (--color-pitch) is held below 4.5:1
+ * for white and ink above; --color-pitch-2 is not held.
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";

@@ -23,7 +23,9 @@
    5.6:1 on --color-out-panel and 5.3:1 on --color-in-panel; lime and --color-board-muted
    are 13.5:1 and 11.9:1 on the board; ink is 9.8:1 on --color-seg2 and 13.5:1 on lime.
    No small text sits directly on the grass (white 3.98:1, ink 4.02:1): it goes on the
-   white plates (--color-chip, ink2 on them 7.6:1).
+   white plates (--color-chip, ink2 on them 7.6:1). The one approved exception: with club
+   colours on (pitchLook.ts, #1136), a plate takes its club's fill with ink or white at
+   4.5:1 or more, held per club by contrast.test.ts.
 
    Motion (#1136): every transition and animation takes its duration and easing from the
    tokens below, never a literal of its own, and src/design/motion.ts mirrors them for the

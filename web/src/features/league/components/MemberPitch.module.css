@@ -8,10 +8,11 @@
  * Every plate is centred on its point, so a line is symmetric about the pitch's axis.
  *
  * Nothing small is written on the grass: names, codes, figures and the direction of
- * attack sit on white plates (ink 16.3:1, ink2 7.6:1 on white). The grass's pattern is the
- * one pattern the page allows, and it is only on the grass: stripes by default, or the
- * plain or checked look the viewer chose (pitchLook.ts, #1136), all in the two grass tokens.
- * In club colours a plate takes its club's fill with one text colour that reads 4.5:1 on it.
+ * attack sit on plates, white by default (ink 16.3:1, ink2 7.6:1 on white). The grass's
+ * pattern is the one pattern the page allows, and it is only on the grass: stripes by
+ * default, or the plain or checked look the viewer chose (pitchLook.ts, #1136), all in the
+ * two grass tokens. In club colours a player's plate takes its club's fill with one text
+ * colour that reads 4.5:1 on it; the direction of attack keeps its white plate.
  */
 
 .wrap {

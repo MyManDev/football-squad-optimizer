@@ -6,7 +6,7 @@ import { figure } from "../../../lib/format";
 import styles from "./MemberPitch.module.css";
 import { clubPlate, usePitchLook } from "./pitchLook";
 
-/** One player as the pitch draws them: a white name plate on the grass. */
+/** One player as the pitch draws them: a name plate on the grass, white or in club colours. */
 export interface PitchPlayer {
   playerId: number;
   name: string;

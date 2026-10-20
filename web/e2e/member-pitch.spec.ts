@@ -521,10 +521,10 @@ for (const [width, height] of [
 
 // The viewer's pitch look (#1136): checked grass and club-coloured plates, chosen under the
 // bench, kept after a reload, inside the page at a phone's width, and readable by axe's own
-// contrast check over every plate's fill and text.
-for (const [width, height] of [
-  [320, 720],
-  [1280, 720],
+// contrast check over every plate's fill and text, in the upright and the across drawing.
+for (const [width, height, across] of [
+  [320, 720, false],
+  [1366, 768, true],
 ] as const)
   test(`the pitch look is kept, fits and reads at ${width} px`, async ({ page }) => {
     await open(page, width, height, PLAN, false, codedCalendar(Object.keys(CLUB_COLOURS)));
@@ -534,6 +534,11 @@ for (const [width, height] of [
     await choose(copy.leagueMembers.pitchLookLabel, copy.leagueMembers.pitchLookChecks).click();
     await choose(copy.leagueMembers.clubColoursLabel, copy.leagueMembers.clubColoursOn).click();
     const pitch = page.locator('[data-mark="pitch"]');
+    await expect(
+      page.getByRole("list", { name: copy.squad.pitchLabel }),
+    ).toHaveAccessibleDescription(
+      across ? copy.leagueMembers.pitchHorizontal : copy.leagueMembers.pitchVertical,
+    );
     await expect(pitch).toHaveAttribute("data-grass", "checks");
     expect(await pitch.locator("[data-club]").count()).toBeGreaterThan(0);
     await page.reload();
