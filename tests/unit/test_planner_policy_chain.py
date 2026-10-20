@@ -1838,6 +1838,7 @@ def test_the_chain_starts_at_the_first_week_with_a_forecast_and_lists_the_skippe
     assert not (root / "gw06").exists() and (root / "gw07" / "manifest.json").exists()
     assert {week for _, week in solved} == {7} and len(solved) == 15
     assert lines[0] == "left out 1 captures taken after every deadline"
+    assert lines[1] == "GW06 skipped: no_artifact; written once to skipped/gw06.json"
     assert lines[-1].startswith("GW07 decided from capture-gw7; manifest sha256 ")
     (logged,) = (root / "runs.log").read_text(encoding="utf-8").splitlines()
     assert logged.startswith(f"{now.isoformat()} b ") and "GW07 decided from capture-gw7" in logged
@@ -1901,7 +1902,12 @@ def test_a_start_through_gw6_never_reads_gw7_and_writes_gw6s_skip_once(
     chain.decide(*ROOTS(tmp_path), root, 6, "issuecomment-1", now=now, emit=lines.append)
     assert read == [6] and solved == []
     assert not (root / "protocol.json").exists() and not (root / "gw07").exists()
-    assert lines[-1] == "waiting: no first chain week has both a passed deadline and a forecast"
+    assert lines[-2:] == [
+        "GW06 skipped: no_artifact; written once to skipped/gw06.json",
+        "stopped: reached --through-gameweek 6 with no week to decide",
+    ]
+    (logged,) = (root / "runs.log").read_text(encoding="utf-8").splitlines()
+    assert "GW06 skipped: no_artifact" in logged and "stopped: reached" in logged
     skip = json.loads((root / "skipped" / "gw06.json").read_text(encoding="utf-8"))
     assert skip["gameweek"] == 6 and skip["missing_reason"] == "no_artifact"
     assert skip["receipt"] == missing[1] and skip["identity"]["repository_commit"] == "b"
@@ -1921,8 +1927,11 @@ def test_a_written_skip_is_read_back_and_its_week_is_never_read_from_other_roots
     now = T0 + timedelta(days=7, hours=1)
     chain.decide(*ROOTS(tmp_path), root, 6, "issuecomment-1", now=now)
     weeks[6] = _week(6)
-    chain.decide(*ROOTS(tmp_path), root, 7, "issuecomment-1", now=now)
+    lines: list[str] = []
+    chain.decide(*ROOTS(tmp_path), root, 7, "issuecomment-1", now=now, emit=lines.append)
     assert read == [6, 7, 7]
+    assert lines[1] == "GW06 skipped: no_artifact; written once to skipped/gw06.json"
+    assert not any(line.startswith(("waiting", "stopped")) for line in lines)
     protocol = json.loads((root / "protocol.json").read_text(encoding="utf-8"))
     assert protocol["first_chain_week"] == 7 and protocol["bound_week"] == 6
     assert protocol["skipped_weeks"] == [{"gameweek": 6, "reason": "no_artifact"}]

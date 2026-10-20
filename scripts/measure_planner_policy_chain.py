@@ -1785,13 +1785,15 @@ def start_chain(
     *,
     handoff_root: Path | None = None,
     fix: Mapping[str, str] | None = None,
+    emit: Callable[[str], None] = print,
 ) -> dict[str, Any] | None:
     """Rules 2, 9 and 40: the first chain week, its squads and the protocol record, once.
 
     No week after ``through_gameweek`` is read (rule 6). A missing week before the first chain
     week is skipped and listed, and its skip is written once under ``skipped/``, so a later run,
     perhaps given other roots, reads the skip back and never reads that week again (rules 5 and
-    6). Returns the protocol record, or None while waiting.
+    6). Returns the protocol record, or None after saying why it stopped (rule 24): a deadline
+    still pending, or the limit reached with no week to decide.
     """
 
     if moment > deadline_of(index, snapshot_root, LAPSE_GAMEWEEK):
@@ -1804,12 +1806,14 @@ def start_chain(
     skipped: list[dict[str, object]] = []
     for gameweek in range(bound_week, min(through_gameweek, LAST_GAMEWEEK) + 1):
         if moment <= deadline_of(index, snapshot_root, gameweek):
+            emit("waiting: no first chain week has both a passed deadline and a forecast")
             return None
         skip = output / "skipped" / f"gw{gameweek:02d}.json"
         if skip.exists():
             recorded = json.loads(skip.read_text(encoding="utf-8"))
             _refuse_other_identity(recorded["identity"], identity)
             skipped.append({"gameweek": gameweek, "reason": recorded["missing_reason"]})
+            emit(_skip_line(gameweek, recorded["missing_reason"]))
             continue
         week = _week(index, snapshot_root, artifact_root, gameweek, handoff_root=handoff_root)
         if not isinstance(week, WeekInputs):
@@ -1824,6 +1828,7 @@ def start_chain(
                 skip,
             )
             skipped.append({"gameweek": gameweek, "reason": week[0]})
+            emit(_skip_line(gameweek, week[0]))
             continue
         declared = declare_runner_fix(output, fix, gameweek)
         squads = initial_states(week.forecast, gameweek)
@@ -1851,8 +1856,15 @@ def start_chain(
         write_document_once(protocol, output / "protocol.json")
         return protocol
     if through_gameweek < LAST_GAMEWEEK:
+        emit(f"stopped: reached --through-gameweek {through_gameweek} with no week to decide")
         return None
     raise ChainError("No gameweek in the season has a usable forecast.")
+
+
+def _skip_line(gameweek: int, reason: object) -> str:
+    """Rule 24: the run log says when a week is skipped, whether written now or read back."""
+
+    return f"GW{gameweek:02d} skipped: {reason}; written once to skipped/gw{gameweek:02d}.json"
 
 
 def decide(
@@ -1949,9 +1961,9 @@ def _decide_weeks(
             through_gameweek,
             handoff_root=handoff_root,
             fix=fix,
+            emit=emit,
         )
         if protocol is None:
-            emit("waiting: no first chain week has both a passed deadline and a forecast")
             return
     first = int(protocol["first_chain_week"])
     states: dict[tuple[str, str], ChainState] = {}
