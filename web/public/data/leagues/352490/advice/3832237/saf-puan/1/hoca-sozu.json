@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-10-14T14:20:21Z",
+  "generated_at_utc": "2026-10-16T07:13:49Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "saf-puan",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20261014T135921Z-a48d1521c87f",
+    "source_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd",
     "moves": [
       {
         "move_id": "gw07-1",
@@ -78,13 +78,13 @@
           "team": "Spurs"
         },
         "player_in": {
-          "player_id": 173878,
-          "name": "Jay Dasilva",
-          "short_name": "Dasilva",
+          "player_id": 226182,
+          "name": "Jayden Bogle",
+          "short_name": "Bogle",
           "position": "DEF",
-          "team": "Coventry City"
+          "team": "Leeds"
         },
-        "expected_points_delta": 0.1800997369736166,
+        "expected_points_delta": 0.9040700052131712,
         "reason_code": "points_gain"
       },
       {
@@ -97,13 +97,13 @@
           "team": "Man City"
         },
         "player_in": {
-          "player_id": 226182,
-          "name": "Jayden Bogle",
-          "short_name": "Bogle",
+          "player_id": 451284,
+          "name": "Milan van Ewijk",
+          "short_name": "Ewijk",
           "position": "DEF",
-          "team": "Leeds"
+          "team": "Coventry City"
         },
-        "expected_points_delta": 0.7239702682395546,
+        "expected_points_delta": 0.0,
         "reason_code": "points_gain"
       }
     ],
@@ -239,12 +239,12 @@
         "expected_points": 2.675533530463721
       },
       {
-        "player_id": 173878,
-        "name": "Jay Dasilva",
-        "short_name": "Dasilva",
+        "player_id": 451284,
+        "name": "Milan van Ewijk",
+        "short_name": "Ewijk",
         "position": "DEF",
         "team": "Coventry City",
-        "expected_points": 2.617779194421131
+        "expected_points": 1.4066334647628316
       },
       {
         "player_id": 106611,
@@ -269,7 +269,7 @@
       "rule_version": "managers_word_rule_v3",
       "source_kind": "synthetic_fixture",
       "source_label": "club_news_v1.fixture.json",
-      "evidence_table": "rotation_evidence_v4_2026-27_gw07_a48d1521c87f.csv",
+      "evidence_table": "rotation_evidence_v4_2026-27_gw07_b1702d00c8cd.csv",
       "clubs_covered": [
         "Arsenal",
         "Man Utd"

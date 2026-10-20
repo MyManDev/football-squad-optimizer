@@ -1,8 +1,8 @@
 /*
- * The league table in direction D (D-Lig): the top bar, then the table as the page's one
- * focal point with the system's record, the viewer's chips and their chaser in a quieter
- * column beside it where the page is wide enough, under it where it is not. The table
- * never scrolls sideways: on a phone the gap to the leader goes and the rest narrows.
+ * The league table in direction D (D-Lig): the top bar, then the league's name and the
+ * table as the page's one focal point, with the viewer's chips and their chaser in a
+ * quieter column beside it where the page is wide enough, under it where it is not. The
+ * table never scrolls sideways: on a phone the gap to the leader goes and the rest narrows.
  */
 
 /* The page uses the whole main column from 1180 px, as D-Lig does. */
@@ -41,14 +41,7 @@
   min-width: 0;
 }
 
-/* ---- Heading row ---- */
-
-.heading {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--space-1) var(--space-3);
-}
+/* ---- The league's name ---- */
 
 .title {
   margin: 0;
@@ -56,60 +49,7 @@
   font-size: 22px;
   font-weight: 700;
   line-height: 28px;
-}
-
-.context {
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: var(--step--2);
-  line-height: 16px;
-}
-
-.context span + span::before {
-  content: " · ";
-}
-
-/* ---- Who the visitor is, one quiet line ---- */
-
-.viewer {
-  min-width: 0;
-}
-
-.viewerLine {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0 var(--space-3);
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: var(--step--1);
-  line-height: 20px;
-}
-
-.viewerLine strong {
-  color: var(--color-text);
-  font-weight: 600;
-}
-
-.viewerState {
-  flex-basis: 100%;
-}
-
-.viewerAction,
-.viewerClear {
-  display: inline-flex;
-  align-items: center;
-  min-height: 28px;
-  font-size: var(--step--1);
-}
-
-.viewerClear {
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--color-accent);
-  text-decoration: underline;
-  cursor: pointer;
+  overflow-wrap: anywhere;
 }
 
 /* ---- The table ---- */
@@ -217,18 +157,16 @@ td.total {
   line-height: 20px;
 }
 
-/* Name over manager, and 'Bu benim' at the end of the cell (on a phone, at the end of the
-   manager's line). The whole cell opens the member's page: the manager's link is
-   stretched over it, and the button sits above the stretch. */
+/* Name over manager. The whole cell opens the member's page: the manager's link is
+   stretched over it. */
 .teamCell {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-areas:
-    "name select"
-    "manager select";
+    "name"
+    "manager";
   align-items: center;
-  column-gap: var(--space-2);
   min-width: 0;
 }
 
@@ -270,58 +208,6 @@ td.total {
 .teamCell:hover .teamName,
 .memberLink:hover {
   text-decoration: underline;
-}
-
-/* A quiet text action, not a box on every row: fifteen bordered buttons would outweigh
-   the names and figures the table is for. */
-.viewerSelect {
-  grid-area: select;
-  position: relative;
-  z-index: 1;
-  min-height: 28px;
-  padding: 0 var(--space-1);
-  border: 0;
-  border-radius: var(--radius-s);
-  background: transparent;
-  color: var(--color-accent);
-  font-size: var(--step--2);
-  font-weight: 500;
-  line-height: 16px;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.viewerSelect:hover {
-  color: var(--color-text);
-  text-decoration-thickness: 2px;
-}
-
-/* Once the visitor has said who they are, the other rows' 'Bu benim' waits for the pointer
-   (or the keyboard) on a desktop, so the table reads as D-Lig draws it. Touch screens
-   always show it. */
-@media (hover: hover) and (pointer: fine) and (min-width: 1180px) {
-  .table[data-viewer] .teamCell {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-areas:
-      "name"
-      "manager";
-  }
-
-  /* Out of the flow while it waits, so the names keep the whole cell. */
-  .table[data-viewer] .viewerSelect {
-    position: absolute;
-    top: 50%;
-    right: 0;
-    transform: translateY(-50%);
-    opacity: 0;
-  }
-
-  .table[data-viewer] tr:hover .viewerSelect,
-  .table[data-viewer] tr:focus-within .viewerSelect {
-    opacity: 1;
-  }
 }
 
 /* The viewer's own row: a lime fill with ink on it (13.5:1), nothing else changes. */
@@ -375,7 +261,7 @@ td.total {
 
 .aboutIcon {
   flex: none;
-  transition: transform 150ms ease;
+  transition: transform var(--motion-ui-fast) var(--motion-ease);
 }
 
 .about[open] .aboutIcon {
@@ -422,23 +308,11 @@ td.total {
   font-weight: 600;
 }
 
-/* The whole scoreboard under both columns, where its table has room to read. */
-.fullScoreboard {
-  grid-column: 1 / -1;
-}
-
 /* ---- Touch: every control is at least 44 px under 1180 px ---- */
 
 @media (max-width: 1179.98px) {
-  .viewerSelect,
-  .viewerClear,
-  .viewerAction,
   .aboutSummary {
     min-height: 44px;
-  }
-
-  .viewerSelect {
-    padding: 0 var(--space-2);
   }
 
   .table tbody td {
@@ -455,10 +329,6 @@ td.total {
 
   th.move {
     width: 40px;
-  }
-
-  .viewerSelect {
-    padding: 0 var(--space-1);
   }
 
   th.week,
@@ -480,12 +350,6 @@ td.total {
     display: none;
   }
 
-  .teamCell {
-    grid-template-areas:
-      "name name"
-      "manager select";
-  }
-
   /* A heading that wraps in the narrow figure columns ('Son hafta') keeps its last line on
      the same baseline as the one-line headings beside it. */
   .table thead th {
@@ -493,4 +357,10 @@ td.total {
     padding-block: var(--space-1);
     vertical-align: bottom;
   }
+}
+
+/* The league race, across both columns under the table. */
+.race {
+  grid-column: 1 / -1;
+  min-width: 0;
 }

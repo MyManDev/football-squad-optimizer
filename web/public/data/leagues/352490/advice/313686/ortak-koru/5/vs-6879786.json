@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-10-14T14:20:21Z",
+  "generated_at_utc": "2026-10-16T07:13:49Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "ortak-koru",
     "window": 5,
-    "source_snapshot_id": "fpl-live-20261014T135921Z-a48d1521c87f",
+    "source_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd",
     "moves": [
       {
         "move_id": "gw07-1",
@@ -33,10 +33,10 @@
     ],
     "transfer_hit_points": 0.0,
     "expected_gain_vs_hold": 0.22112512469917078,
-    "expected_points_cost": 4.746897800581223,
+    "expected_points_cost": 5.241807478627322,
     "rival_label": "entry-6879786",
-    "solver_status": "FEASIBLE",
-    "optimality_gap": 2.0579999999999927,
+    "solver_status": "OPTIMAL",
+    "optimality_gap": 0.0,
     "wall_clock_stopped_the_search": false,
     "expected_own_points": 56.59615290972977,
     "captain": {
@@ -237,27 +237,27 @@
         "gameweek": 9,
         "transfers_in": [
           {
-            "player_id": 661888,
-            "name": "Caleb Yirenkyi",
-            "short_name": "Yirenkyi",
+            "player_id": 437730,
+            "name": "Antoine Semenyo",
+            "short_name": "Semenyo",
             "position": "MID",
-            "team": "Coventry City"
+            "team": "Man City"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 577725,
-            "name": "Josh King",
-            "short_name": "King",
+            "player_id": 244851,
+            "name": "Cole Palmer",
+            "short_name": "Palmer",
             "position": "MID",
-            "team": "Fulham"
+            "team": "Chelsea"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 57.824375503824044
+        "expected_points": 57.91129192338887
       },
       {
         "gameweek": 10,
@@ -283,33 +283,33 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 58.696702707017124
+        "expected_points": 58.783619126581954
       },
       {
         "gameweek": 11,
         "transfers_in": [
           {
-            "player_id": 437730,
-            "name": "Antoine Semenyo",
-            "short_name": "Semenyo",
+            "player_id": 201666,
+            "name": "Harvey Barnes",
+            "short_name": "Barnes",
             "position": "MID",
-            "team": "Man City"
+            "team": "Newcastle"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 222531,
-            "name": "Morgan Gibbs-White",
-            "short_name": "Gibbs-White",
+            "player_id": 577725,
+            "name": "Josh King",
+            "short_name": "King",
             "position": "MID",
-            "team": "Nott'm Forest"
+            "team": "Fulham"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 59.106890366420004
+        "expected_points": 59.26046149150797
       }
     ],
     "stated_limits": [
@@ -324,8 +324,9 @@
     "data_quality": "complete",
     "missing_fields": [],
     "squad_basis": "captured",
-    "control_solver_status": "FEASIBLE",
-    "control_optimality_gap": 1.9590000000000032,
+    "expected_points_cost_ceiling": 5.241807478627322,
+    "control_solver_status": "OPTIMAL",
+    "control_optimality_gap": 0.0,
     "rival_entry_id": 6879786,
     "overlap_count": 5,
     "transfer_cap": 1,

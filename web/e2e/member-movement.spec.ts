@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { installLeagueMocks } from "./leagueMocks";
 import AxeBuilder from "@axe-core/playwright";
+import { atRest } from "./atRest";
 import { mockLeagueMembersEnvelope } from "../src/fixtures/league";
 import { MESSAGES } from "../src/i18n/messages";
 import { AS_A_CHANCE } from "../src/testSupport/honesty";
@@ -25,7 +26,16 @@ for (const language of ["en", "tr"] as const) {
       ...state,
     }));
     await page.addInitScript((value) => localStorage.setItem("squadopt.language", value), language);
-    await installLeagueMocks(page);
+    // The visitor has said they are a member this list serves.
+    await installLeagueMocks(page, {
+      claim: {
+        leagueId: publication.payload.league_id,
+        entryId: 101,
+        managerName: "Movement member 0",
+        teamName: human.team_name,
+        leagueName: publication.payload.league_name,
+      },
+    });
     await page.route("**/data/league/members.json", (route) =>
       route.fulfill({ json: publication }),
     );
@@ -50,6 +60,7 @@ for (const language of ["en", "tr"] as const) {
       await expect(cell.locator('[aria-hidden="true"]').first()).toHaveText(mark!);
     }
     expect(await page.locator("main").textContent()).not.toMatch(AS_A_CHANCE);
+    await atRest(page);
     expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
     await page.screenshot({ path: testInfo.outputPath("movement-desktop.png"), fullPage: true });
     await page.setViewportSize({ width: 390, height: 844 });

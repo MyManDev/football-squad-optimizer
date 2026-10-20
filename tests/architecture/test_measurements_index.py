@@ -74,7 +74,6 @@ ADR = DOCS / "architecture" / "decisions" / "0003-measurement-artifacts.md"
 # improvement; they are simply not owed.
 GRANDFATHERED_BY_RULE_4: tuple[str, ...] = (
     "baseline_benchmark.json",
-    "opening_backtest.json",
     "rank_objective_rehearsal_heldout.json",
     "risk_frontier_shrunk.json",
     "scenario_calibration_audit_dev_dgw.json",

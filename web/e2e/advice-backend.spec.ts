@@ -2,10 +2,12 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { cp, readFile, rm } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
+import { atRest } from "./atRest";
 
 import type { EntryAdvice, LeagueViewEnvelope } from "../src/features/league/types";
 import { COMPUTE_COPY } from "../src/features/league/advice/computeCopy";
 import { MESSAGES } from "../src/i18n/messages";
+import { pickMember, publishedMember } from "./identity";
 
 const context = JSON.parse(process.env.SQUADOPT_BROWSER_CONTEXT ?? "null");
 
@@ -91,16 +93,14 @@ test("member selections compute, reload uses cache, and a stopped backend leaves
   await leagueField.fill(String(context.leagueId));
   await findLeague.click();
   await expect(page).toHaveURL("/league/352490/members");
-  // The member page asks the service what it computes, once, and says about how long.
+  // After the number, "Sen kimsin?"; the member page then asks the service what it
+  // computes, once, and says about how long.
+  await expect(page.getByRole("heading", { level: 1, name: "Sen kimsin?" })).toBeVisible();
   const capabilities = page.waitForResponse(
     (response) =>
       response.url() === `${context.apiOrigin}/api/v1/leagues/${context.leagueId}/capabilities`,
   );
-  await page
-    .getByRole("row")
-    .filter({ has: page.locator(`a[href="/league/352490/members/${context.entryId}"]`) })
-    .getByRole("button", { name: "Bu benim" })
-    .click();
+  await pickMember(page, publishedMember(`${built}/league/members.json`, context.entryId));
   expect(await (await capabilities).json()).toMatchObject({
     contract_version: "league_capabilities_v1",
     capture_snapshot_id: context.snapshotId,
@@ -120,8 +120,7 @@ test("member selections compute, reload uses cache, and a stopped backend leaves
     page.getByText("Bir haftalık planın hesabı birkaç saniye ile yarım dakika arasında sürer"),
   ).toBeVisible();
   await expect(page).toHaveURL(`/league/352490/members/${context.entryId}`);
-  expect(await page.evaluate(() => localStorage.getItem("squadopt.viewer"))).toBeNull();
-  await expect(page.getByRole("button", { name: "Seçimi Kaldır" })).toBeVisible();
+  await expect(page.locator("#sidebar").getByRole("button", { name: "Değiştir" })).toBeVisible();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Browser smoke team");
   await expect(page.getByRole("list", { name: "Pozisyona göre ilk on bir" })).toBeVisible();
   await expect(page.getByText("Listelenen öneri dosyası bulunamadı.")).toBeVisible();
@@ -165,6 +164,7 @@ test("member selections compute, reload uses cache, and a stopped backend leaves
   expect(await job.json()).toMatchObject({ job_id: jobId, status: "completed" });
   await expect(page.getByText("Plan hazır", { exact: true })).toBeVisible();
   await expect(page.getByText("Hesap sonucu", { exact: true })).toBeVisible();
+  await atRest(page);
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
   await expect(page.getByText(context.snapshotId, { exact: false })).toBeVisible();
   const advice = page.locator('[aria-labelledby="entry-advice-title"]');

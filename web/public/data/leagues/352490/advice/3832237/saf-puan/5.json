@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-10-14T14:20:21Z",
+  "generated_at_utc": "2026-10-16T07:13:49Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,36 +9,16 @@
     "league_id": 352490,
     "mode": "saf-puan",
     "window": 5,
-    "source_snapshot_id": "fpl-live-20261014T135921Z-a48d1521c87f",
-    "moves": [
-      {
-        "move_id": "gw07-1",
-        "player_out": {
-          "player_id": 424876,
-          "name": "Dominik Szoboszlai",
-          "short_name": "Szoboszlai",
-          "position": "MID",
-          "team": "Liverpool"
-        },
-        "player_in": {
-          "player_id": 60307,
-          "name": "Pascal Gro\u00df",
-          "short_name": "Gro\u00df",
-          "position": "MID",
-          "team": "Brighton"
-        },
-        "expected_points_delta": 2.737923768529946,
-        "reason_code": "window_value"
-      }
-    ],
+    "source_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd",
+    "moves": [],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 2.737923768529946,
+    "expected_gain_vs_hold": 0.0,
     "expected_points_cost": 0.0,
     "rival_label": null,
     "solver_status": "FEASIBLE",
-    "optimality_gap": 12.837999999999965,
+    "optimality_gap": 33.761000000000024,
     "wall_clock_stopped_the_search": false,
-    "expected_own_points": 46.38563201772037,
+    "expected_own_points": 43.64770824919042,
     "captain": {
       "player_id": 437730,
       "name": "Antoine Semenyo",
@@ -48,12 +28,12 @@
       "expected_points": 5.047195818515282
     },
     "vice_captain": {
-      "player_id": 60307,
-      "name": "Pascal Gro\u00df",
-      "short_name": "Gro\u00df",
+      "player_id": 430871,
+      "name": "Matheus Santos Carneiro da Cunha",
+      "short_name": "Cunha",
       "position": "MID",
-      "team": "Brighton",
-      "expected_points": 4.658321948335153
+      "team": "Man Utd",
+      "expected_points": 4.534211502720818
     },
     "starting_xi": [
       {
@@ -97,14 +77,6 @@
         "expected_points": 5.047195818515282
       },
       {
-        "player_id": 60307,
-        "name": "Pascal Gro\u00df",
-        "short_name": "Gro\u00df",
-        "position": "MID",
-        "team": "Brighton",
-        "expected_points": 4.658321948335153
-      },
-      {
         "player_id": 430871,
         "name": "Matheus Santos Carneiro da Cunha",
         "short_name": "Cunha",
@@ -127,6 +99,14 @@
         "position": "MID",
         "team": "Sunderland",
         "expected_points": 2.785268800341046
+      },
+      {
+        "player_id": 424876,
+        "name": "Dominik Szoboszlai",
+        "short_name": "Szoboszlai",
+        "position": "MID",
+        "team": "Liverpool",
+        "expected_points": 1.9203981798052088
       },
       {
         "player_id": 502500,
@@ -183,91 +163,49 @@
     "plan_weeks": [
       {
         "gameweek": 7,
-        "transfers_in": [
-          {
-            "player_id": 60307,
-            "name": "Pascal Gro\u00df",
-            "short_name": "Gro\u00df",
-            "position": "MID",
-            "team": "Brighton"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 424876,
-            "name": "Dominik Szoboszlai",
-            "short_name": "Szoboszlai",
-            "position": "MID",
-            "team": "Liverpool"
-          }
-        ],
+        "transfers_in": [],
+        "transfers_out": [],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 5,
         "free_transfers_after": 5,
-        "expected_points": 46.385632017720376
+        "expected_points": 43.64770824919042
       },
       {
         "gameweek": 8,
         "transfers_in": [
           {
-            "player_id": 154043,
-            "name": "Ainsley Maitland-Niles",
-            "short_name": "Maitland-Niles",
-            "position": "DEF",
-            "team": "Everton"
+            "player_id": 444102,
+            "name": "Francisco Evanilson de Lima Barbosa",
+            "short_name": "Barbosa",
+            "position": "FWD",
+            "team": "Bournemouth"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 441164,
-            "name": "Pedro Porro Sauceda",
-            "short_name": "Sauceda",
-            "position": "DEF",
-            "team": "Spurs"
+            "player_id": 169432,
+            "name": "Oli McBurnie",
+            "short_name": "McBurnie",
+            "position": "FWD",
+            "team": "Hull City"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 5,
         "free_transfers_after": 5,
-        "expected_points": 47.671765270820366
+        "expected_points": 44.57553710621715
       },
       {
         "gameweek": 9,
         "transfers_in": [
           {
-            "player_id": 173878,
-            "name": "Jay Dasilva",
-            "short_name": "Dasilva",
-            "position": "DEF",
-            "team": "Coventry City"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 472769,
-            "name": "Nico O'Reilly",
-            "short_name": "O'Reilly",
-            "position": "DEF",
-            "team": "Man City"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 5,
-        "free_transfers_after": 5,
-        "expected_points": 47.671765270820366
-      },
-      {
-        "gameweek": 10,
-        "transfers_in": [
-          {
-            "player_id": 631786,
-            "name": "Jonah Kusi-Asare",
-            "short_name": "Kusi-Asare",
+            "player_id": 543968,
+            "name": "Emersonn Correia da Silva",
+            "short_name": "Silva",
             "position": "FWD",
-            "team": "Fulham"
+            "team": "Ipswich Town"
           }
         ],
         "transfers_out": [
@@ -283,33 +221,59 @@
         "chip": null,
         "free_transfers_before": 5,
         "free_transfers_after": 5,
-        "expected_points": 47.671765270820366
+        "expected_points": 45.46962266850983
       },
       {
-        "gameweek": 11,
+        "gameweek": 10,
         "transfers_in": [
           {
-            "player_id": 223094,
-            "name": "Erling Haaland",
-            "short_name": "Haaland",
-            "position": "FWD",
-            "team": "Man City"
+            "player_id": 204480,
+            "name": "Declan Rice",
+            "short_name": "Rice",
+            "position": "MID",
+            "team": "Arsenal"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 502500,
-            "name": "Igor Thiago Nascimento Rodrigues",
-            "short_name": "Rodrigues",
-            "position": "FWD",
-            "team": "Brentford"
+            "player_id": 424876,
+            "name": "Dominik Szoboszlai",
+            "short_name": "Szoboszlai",
+            "position": "MID",
+            "team": "Liverpool"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 5,
         "free_transfers_after": 5,
-        "expected_points": 55.17698248965584
+        "expected_points": 46.59552252270542
+      },
+      {
+        "gameweek": 11,
+        "transfers_in": [
+          {
+            "player_id": 482973,
+            "name": "Igor Jesus Maciel da Cruz",
+            "short_name": "Cruz",
+            "position": "FWD",
+            "team": "Nott'm Forest"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 444102,
+            "name": "Francisco Evanilson de Lima Barbosa",
+            "short_name": "Barbosa",
+            "position": "FWD",
+            "team": "Bournemouth"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 5,
+        "free_transfers_after": 5,
+        "expected_points": 45.77742893555602
       }
     ],
     "stated_limits": [

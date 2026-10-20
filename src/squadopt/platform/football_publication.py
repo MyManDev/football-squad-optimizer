@@ -12,6 +12,7 @@ from squadopt.data.snapshots import CapturedSnapshot
 from squadopt.live import RecommendationInputs
 from squadopt.live.football_artifact import football_artifact_path, read_football_forecast
 from squadopt.platform.football_minute_basis import _basis_from_snapshot, football_components_path
+from squadopt.prediction.football_capabilities import football_capabilities
 
 
 def _existing_agrees(path: Path, document: dict[str, Any]) -> None:
@@ -44,6 +45,11 @@ def publish_football_artifacts(
     an interrupted nor a competing writer may overwrite an existing document.
     """
     target = football_artifact_path(artifact_root, inputs.snapshot_id)
+    if (
+        football_capabilities(document.get("model_version")).requires_reprojection
+        and companion is None
+    ):
+        raise ValueError("Composite publication requires its complete reprojection companion.")
     component_target = (
         football_components_path(artifact_root, inputs.snapshot_id)
         if companion is not None

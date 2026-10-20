@@ -5,6 +5,7 @@ import { App } from "./app/App";
 import { forgetRetiredTheme } from "./design/retiredTheme";
 import "./design/fonts.css";
 import "./design/tokens.css";
+import "./design/transitions.css";
 
 forgetRetiredTheme();
 

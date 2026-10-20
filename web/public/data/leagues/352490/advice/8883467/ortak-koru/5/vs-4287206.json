@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-10-14T14:20:21Z",
+  "generated_at_utc": "2026-10-16T07:13:49Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,16 +9,16 @@
     "league_id": 352490,
     "mode": "ortak-koru",
     "window": 5,
-    "source_snapshot_id": "fpl-live-20261014T135921Z-a48d1521c87f",
+    "source_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd",
     "moves": [
       {
         "move_id": "gw07-1",
         "player_out": {
-          "player_id": 491279,
-          "name": "Micky van de Ven",
-          "short_name": "Ven",
+          "player_id": 226597,
+          "name": "Gabriel dos Santos Magalh\u00e3es",
+          "short_name": "Magalh\u00e3es",
           "position": "DEF",
-          "team": "Spurs"
+          "team": "Arsenal"
         },
         "player_in": {
           "player_id": 455084,
@@ -27,18 +27,18 @@
           "position": "DEF",
           "team": "Ipswich Town"
         },
-        "expected_points_delta": 0.0,
+        "expected_points_delta": -1.2211603324592488,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 0.0,
-    "expected_points_cost": 2.4451580277763014,
+    "expected_gain_vs_hold": -1.2211603324592488,
+    "expected_points_cost": 26.870902506931657,
     "rival_label": "entry-4287206",
-    "solver_status": "OPTIMAL",
-    "optimality_gap": 0.0,
+    "solver_status": "FEASIBLE",
+    "optimality_gap": 26.002999999999986,
     "wall_clock_stopped_the_search": false,
-    "expected_own_points": 55.40234448128419,
+    "expected_own_points": 54.18118414882494,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
@@ -65,14 +65,6 @@
         "expected_points": 3.568590651677484
       },
       {
-        "player_id": 226597,
-        "name": "Gabriel dos Santos Magalh\u00e3es",
-        "short_name": "Magalh\u00e3es",
-        "position": "DEF",
-        "team": "Arsenal",
-        "expected_points": 4.142429251761448
-      },
-      {
         "player_id": 209036,
         "name": "Marc Gu\u00e9hi",
         "short_name": "Gu\u00e9hi",
@@ -87,6 +79,14 @@
         "position": "DEF",
         "team": "Brighton",
         "expected_points": 3.7099911306959767
+      },
+      {
+        "player_id": 191866,
+        "name": "Kristoffer Ajer",
+        "short_name": "Ajer",
+        "position": "DEF",
+        "team": "Brentford",
+        "expected_points": 2.921268919302201
       },
       {
         "player_id": 244851,
@@ -155,12 +155,12 @@
         "expected_points": 2.8518327944307034
       },
       {
-        "player_id": 191866,
-        "name": "Kristoffer Ajer",
-        "short_name": "Ajer",
+        "player_id": 491279,
+        "name": "Micky van de Ven",
+        "short_name": "Ven",
         "position": "DEF",
-        "team": "Brentford",
-        "expected_points": 2.921268919302201
+        "team": "Spurs",
+        "expected_points": 2.6868998876274
       },
       {
         "player_id": 169432,
@@ -194,32 +194,6 @@
         ],
         "transfers_out": [
           {
-            "player_id": 491279,
-            "name": "Micky van de Ven",
-            "short_name": "Ven",
-            "position": "DEF",
-            "team": "Spurs"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 2,
-        "free_transfers_after": 2,
-        "expected_points": 55.40234448128419
-      },
-      {
-        "gameweek": 8,
-        "transfers_in": [
-          {
-            "player_id": 17761,
-            "name": "James Tarkowski",
-            "short_name": "Tarkowski",
-            "position": "DEF",
-            "team": "Everton"
-          }
-        ],
-        "transfers_out": [
-          {
             "player_id": 226597,
             "name": "Gabriel dos Santos Magalh\u00e3es",
             "short_name": "Magalh\u00e3es",
@@ -231,17 +205,17 @@
         "chip": null,
         "free_transfers_before": 2,
         "free_transfers_after": 2,
-        "expected_points": 55.58365820112326
+        "expected_points": 54.18118414882494
       },
       {
-        "gameweek": 9,
+        "gameweek": 8,
         "transfers_in": [
           {
-            "player_id": 437730,
-            "name": "Antoine Semenyo",
-            "short_name": "Semenyo",
+            "player_id": 244850,
+            "name": "Morgan Rogers",
+            "short_name": "Rogers",
             "position": "MID",
-            "team": "Man City"
+            "team": "Chelsea"
           }
         ],
         "transfers_out": [
@@ -257,17 +231,69 @@
         "chip": null,
         "free_transfers_before": 2,
         "free_transfers_after": 2,
-        "expected_points": 56.954448182825544
+        "expected_points": 54.90093830841565
+      },
+      {
+        "gameweek": 9,
+        "transfers_in": [
+          {
+            "player_id": 551499,
+            "name": "Victor Munoz",
+            "short_name": "Munoz",
+            "position": "MID",
+            "team": "Liverpool"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 204580,
+            "name": "Vitaly Janelt",
+            "short_name": "Janelt",
+            "position": "MID",
+            "team": "Brentford"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 2,
+        "free_transfers_after": 2,
+        "expected_points": 54.428936455810714
       },
       {
         "gameweek": 10,
         "transfers_in": [
           {
-            "player_id": 215413,
-            "name": "Kiernan Dewsbury-Hall",
-            "short_name": "Dewsbury-Hall",
+            "player_id": 517052,
+            "name": "Nicolas Jackson",
+            "short_name": "Jackson",
+            "position": "FWD",
+            "team": "Aston Villa"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 223094,
+            "name": "Erling Haaland",
+            "short_name": "Haaland",
+            "position": "FWD",
+            "team": "Man City"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 2,
+        "free_transfers_after": 2,
+        "expected_points": 45.989918790311336
+      },
+      {
+        "gameweek": 11,
+        "transfers_in": [
+          {
+            "player_id": 141746,
+            "name": "Bruno Borges Fernandes",
+            "short_name": "Fernandes",
             "position": "MID",
-            "team": "Everton"
+            "team": "Man Utd"
           }
         ],
         "transfers_out": [
@@ -283,33 +309,7 @@
         "chip": null,
         "free_transfers_before": 2,
         "free_transfers_after": 2,
-        "expected_points": 57.63902253363956
-      },
-      {
-        "gameweek": 11,
-        "transfers_in": [
-          {
-            "player_id": 154043,
-            "name": "Ainsley Maitland-Niles",
-            "short_name": "Maitland-Niles",
-            "position": "DEF",
-            "team": "Everton"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 191866,
-            "name": "Kristoffer Ajer",
-            "short_name": "Ajer",
-            "position": "DEF",
-            "team": "Brentford"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 2,
-        "free_transfers_after": 2,
-        "expected_points": 58.203933503954744
+        "expected_points": 49.85668472030931
       }
     ],
     "stated_limits": [
@@ -324,7 +324,7 @@
     "data_quality": "complete",
     "missing_fields": [],
     "squad_basis": "captured",
-    "expected_points_cost_ceiling": 2.4451580277763014,
+    "expected_points_cost_ceiling": 26.870902506931657,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0,
     "rival_entry_id": 4287206,
@@ -334,7 +334,7 @@
     "overlap_applied": 4,
     "plan_kind": "within_free_transfers",
     "alternative_plan": null,
-    "expected_gap_vs_rival": 6.986448978156737,
+    "expected_gap_vs_rival": 5.765288645697488,
     "captain_agreement": false
   }
 }

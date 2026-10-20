@@ -181,6 +181,14 @@ def read_fixture(
     )
 
 
+def test_raw_snapshot_cannot_claim_internal_composite_offset():
+    document = snapshot_document()
+    document["projection"]["native_model_version"] = source.COMPOSITE_OFFSET_VERSION
+    document["projection"]["native_basis_kind"] = "prospective"
+    with pytest.raises(ValueError, match="cannot mint"):
+        read_fixture(document)
+
+
 def training(fixture: ScoreFixture | None = None) -> TrainingScoreFixture:
     fixture = read_fixture() if fixture is None else fixture
     return TrainingScoreFixture(

@@ -1,9 +1,11 @@
 import AxeBuilder from "@axe-core/playwright";
+import { atRest } from "./atRest";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
 import { MESSAGES } from "../src/i18n/messages";
 import { mockEntryAdviceEnvelope, mockEntrySquadEnvelopes } from "../src/fixtures/league";
 import type { AdvicePlayer, EntryAdvice } from "../src/features/league/types";
+import { CLUB_COLOURS } from "../src/lib/clubs";
 import { installLeagueMocks, openCalendar } from "./leagueMocks";
 
 const ENTRY = 35249001;
@@ -56,18 +58,21 @@ function twoMoves(): typeof PLAN {
 /**
  * The open calendar with the week's round filled in: every club of the plan plays, under a
  * three-letter short name, so the plates print club codes as the published calendar gives
- * them (the mock's clubs are not the league's, so no static code would name them).
+ * them (the mock's clubs are not the league's, so no static code would name them). With
+ * `codes`, the clubs take those short names in turn instead.
  */
-function codedCalendar() {
+function codedCalendar(codes: readonly string[] = []) {
   const calendar = openCalendar();
   const players = [...PLAN.payload.starting_xi!, ...(PLAN.payload.bench ?? [])];
   const teams = [...new Set(players.map((player) => player.team))].map((name, index) => ({
     team_id: index + 1,
     name,
-    short_name: name
-      .replace(/[^A-Za-z]/g, "")
-      .slice(0, 3)
-      .toUpperCase(),
+    short_name:
+      codes[index] ??
+      name
+        .replace(/[^A-Za-z]/g, "")
+        .slice(0, 3)
+        .toUpperCase(),
   }));
   if (teams.length % 2 === 1) teams.push({ team_id: 99, name: "Visitors", short_name: "VIS" });
   const fixtures = teams
@@ -90,11 +95,18 @@ function codedCalendar() {
  * capture rather than example data, as the real GW6 week is, so no example-data tag takes
  * a line of its own where the fold is measured.
  */
-async function open(page: Page, width: number, height: number, plan = PLAN, live = false) {
+async function open(
+  page: Page,
+  width: number,
+  height: number,
+  plan = PLAN,
+  live = false,
+  calendar = codedCalendar(),
+) {
   await page.setViewportSize({ width, height });
   await installLeagueMocks(page);
   await page.route("**/data/fixtures.json", (route) =>
-    route.fulfill({ contentType: "application/json", body: JSON.stringify(codedCalendar()) }),
+    route.fulfill({ contentType: "application/json", body: JSON.stringify(calendar) }),
   );
   const served = live ? { ...plan, source_kind: "live" as const } : plan;
   await page.route(`**/data/league/advice/${ENTRY}/saf-puan/1.json`, (route) =>
@@ -315,6 +327,57 @@ for (const [width, height] of [
   });
 }
 
+/** A colour from CLUB_COLOURS as the browser computes it. */
+const rgb = (hex: string) => {
+  const [r, g, b] = [1, 3, 5].map((start) => parseInt(hex.slice(start, start + 2), 16));
+  return `rgb(${r}, ${g}, ${b})`;
+};
+
+// Column beside the page, beside the squad on a tablet, and the phone's sheet.
+for (const [width, height] of [
+  [1440, 900],
+  [1180, 900],
+  [820, 1180],
+  [390, 844],
+] as const) {
+  test(`the rail's week cells hold each opponent's two colours, code and venue at ${width}x${height}`, async ({
+    page,
+  }) => {
+    await open(page, width, height, twoMoves(), false, codedCalendar(Object.keys(CLUB_COLOURS)));
+    const cells = await page.locator('[data-mark="rail"]').evaluate((rail) =>
+      [...rail.querySelectorAll<HTMLElement>('[data-venue="home"], [data-venue="away"]')].map(
+        (cell) => {
+          const own = cell.getBoundingClientRect();
+          const parts = [...cell.children].map((child) => child.getBoundingClientRect());
+          const mark = cell.querySelector<HTMLElement>("[aria-hidden='true']");
+          return {
+            code: cell.querySelector("[class*='opponent']")?.textContent ?? "",
+            fits:
+              cell.scrollWidth <= cell.clientWidth &&
+              parts.every((part) => part.left >= own.left && part.right <= own.right),
+            width: mark?.getBoundingClientRect().width ?? 0,
+            painted: mark
+              ? (getComputedStyle(mark).backgroundImage.match(/rgba?\([^)]*\)/g) ?? [])
+              : [],
+          };
+        },
+      ),
+    );
+    expect(cells.filter(({ code }) => code in CLUB_COLOURS).length).toBeGreaterThan(0);
+    for (const { code, fits, width: size, painted } of cells) {
+      expect(fits, `${code} fits its week cell`).toBe(true);
+      const colours = CLUB_COLOURS[code];
+      // A club with no colours is printed by its code alone.
+      if (!colours) {
+        expect(size, code).toBe(0);
+        continue;
+      }
+      expect(size, code).toBe(10);
+      expect(painted, code).toEqual([rgb(colours.primary), rgb(colours.secondary)]);
+    }
+  });
+}
+
 test("the plan link reveals the decision, pitch and honesty together on a laptop", async ({
   page,
 }, testInfo) => {
@@ -338,6 +401,7 @@ test("the plan link reveals the decision, pitch and honesty together on a laptop
   expect(rail.x + rail.width).toBe(1440);
   expect(rail.y).toBe(0);
   expect(rail.height).toBe(900);
+  await atRest(page);
   const blocking = (await new AxeBuilder({ page }).analyze()).violations.filter((violation) =>
     ["serious", "critical"].includes(violation.impact ?? ""),
   );

@@ -7,7 +7,8 @@
  * first. This draws the page as the site does, for every member of the first tree the
  * site lists (`testSupport/shippedTrees.ts`; `shippedTree.test.ts` holds every tree to the
  * validators) and in both languages: the real gate (which reads the
- * directory, and the one legacy tree as the directory of one), the real loaders, the real
+ * directory, and the one legacy tree as the directory of one, then holds the page until the
+ * visitor has said who they are: each page is opened as that member), the real loaders, the real
  * validators, the shell and the route's error boundary, with each request answered from
  * `public/` on disk. Nothing leaves the process, and a request outside `data/` fails the
  * test.
@@ -28,6 +29,7 @@ import { RouteErrorBoundary } from "../../../app/RouteErrorBoundary";
 import { PageShell } from "../../../design/components/PageShell";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { MESSAGES, type Language } from "../../../i18n/messages";
+import { claimIn, forgetIdentity } from "../../../testSupport/league";
 import { isRefusedMemberIndex, refusedMemberIndex } from "../../../testSupport/refusedMember";
 import { PUBLIC_ROOT as PUBLIC, shippedTrees } from "../../../testSupport/shippedTrees";
 import { resolvePublishedAdvice } from "../advice/adviceSelection";
@@ -99,6 +101,7 @@ const advised = firstAdvisedMember();
 const advisedAfterFirst = humans.slice(1).find(isAdvised);
 
 beforeEach(() => {
+  forgetIdentity();
   vi.stubEnv("MODE", "production");
   vi.stubEnv("DEV", false);
   vi.stubGlobal(
@@ -139,6 +142,8 @@ afterEach(() => {
 });
 
 function openMemberPage(entryId: number, language: Language) {
+  // The visitor has entered the league and said they are this member.
+  claimIn(entryId, league.league_id);
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
   clients.push(client);
   return render(

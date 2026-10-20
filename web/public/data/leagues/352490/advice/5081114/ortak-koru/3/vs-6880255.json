@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-10-14T14:20:21Z",
+  "generated_at_utc": "2026-10-16T07:13:49Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "ortak-koru",
     "window": 3,
-    "source_snapshot_id": "fpl-live-20261014T135921Z-a48d1521c87f",
+    "source_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd",
     "moves": [
       {
         "move_id": "gw07-1",
@@ -27,13 +27,13 @@
           "position": "DEF",
           "team": "Spurs"
         },
-        "expected_points_delta": 0.58068578395239,
+        "expected_points_delta": 0.6230559679874261,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 0.58068578395239,
-    "expected_points_cost": 0.8707459492708551,
+    "expected_gain_vs_hold": 0.6230559679874261,
+    "expected_points_cost": 1.1802713436263161,
     "rival_label": "entry-6880255",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
@@ -220,18 +220,18 @@
         ],
         "transfers_out": [
           {
-            "player_id": 540324,
-            "name": "Mohamed Belloumi",
-            "short_name": "Belloumi",
+            "player_id": 577725,
+            "name": "Josh King",
+            "short_name": "King",
             "position": "MID",
-            "team": "Hull City"
+            "team": "Fulham"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 56.249058316717594
+        "expected_points": 56.094295619539864
       },
       {
         "gameweek": 9,
@@ -246,18 +246,18 @@
         ],
         "transfers_out": [
           {
-            "player_id": 199798,
-            "name": "Ezri Konsa Ngoyo",
-            "short_name": "Ngoyo",
+            "player_id": 146426,
+            "name": "Semi Ajayi",
+            "short_name": "Ajayi",
             "position": "DEF",
-            "team": "Arsenal"
+            "team": "Hull City"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 57.47728091081187
+        "expected_points": 57.32251821363414
       }
     ],
     "stated_limits": [
@@ -272,7 +272,7 @@
     "data_quality": "complete",
     "missing_fields": [],
     "squad_basis": "captured",
-    "expected_points_cost_ceiling": 0.8707459492708551,
+    "expected_points_cost_ceiling": 1.1802713436263161,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0,
     "rival_entry_id": 6880255,

@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
+import { atRest } from "./atRest";
 
 for (const language of ["tr", "en"] as const) {
   test(`an origin-less build hides Contribute (${language})`, async ({ page }) => {
@@ -49,6 +50,15 @@ for (const language of ["tr", "en"] as const) {
     await expect(
       page.getByRole("combobox", { name: tr ? "Pozisyon" : "Position", exact: true }),
     ).toBeDisabled();
+    // The page states no moderation rule and no roster header.
+    await expect(
+      page.getByText(
+        tr
+          ? "Yorumlar yönetici onayından sonra herkese açılır."
+          : "Comments become public after moderation.",
+      ),
+    ).toHaveCount(0);
+    await expect(page.getByText(tr ? /Tüm FPL oyuncuları/ : /Complete FPL roster/)).toHaveCount(0);
     await page
       .getByRole("combobox", { name: tr ? "Takım" : "Team", exact: true })
       .selectOption("10");
@@ -71,6 +81,7 @@ for (const language of ["tr", "en"] as const) {
     expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(
       false,
     );
+    await atRest(page);
     const audit = await new AxeBuilder({ page }).analyze();
     expect(
       audit.violations.filter((v) => ["serious", "critical"].includes(v.impact ?? "")),

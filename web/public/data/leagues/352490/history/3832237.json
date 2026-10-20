@@ -1,21 +1,21 @@
 {
   "contract_version": "weekly_suggestion_history_v1",
-  "generated_at_utc": "2026-10-14T13:59:21.062647Z",
+  "generated_at_utc": "2026-10-16T06:01:54.275749Z",
   "payload": {
     "league_id": 352490,
     "entry_id": 3832237,
     "season": "2026-27",
-    "as_of_snapshot_id": "fpl-live-20261014T135921Z-a48d1521c87f",
+    "as_of_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd",
     "weeks": [
       {
         "gameweek": 7,
         "status": "unsettled",
         "reason": "not_settled",
         "deadline_utc": "2026-10-17T10:00:00Z",
-        "advice_snapshot_id": "fpl-live-20261014T135921Z-a48d1521c87f",
-        "advice_captured_at_utc": "2026-10-14T13:59:21.062647Z",
-        "advice_generated_at_utc": "2026-10-14T14:20:21Z",
-        "advice_sha256": "bf365eeadbce5860ac677e4d2cb53b0e074cb6d688ea1c87c6ee3825547cdef2",
+        "advice_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd",
+        "advice_captured_at_utc": "2026-10-16T06:01:54.275749Z",
+        "advice_generated_at_utc": "2026-10-16T07:13:49Z",
+        "advice_sha256": "1094a57daf440b2f81f9ccf33c6d0ecea482d3255788db254d9c67ec899cced0",
         "outcome_snapshot_id": null,
         "outcome_captured_at_utc": null,
         "expected_own_points": 55.859259896228295,
@@ -47,11 +47,11 @@
               },
               {
                 "player_out": "Pedro Porro Sauceda",
-                "player_in": "Jay Dasilva"
+                "player_in": "Jayden Bogle"
               },
               {
                 "player_out": "Nico O'Reilly",
-                "player_in": "Jayden Bogle"
+                "player_in": "Milan van Ewijk"
               }
             ],
             "expected_points_cost": 0.0
@@ -85,8 +85,8 @@
                 "player_in": "Maxim De Cuyper"
               }
             ],
-            "expected_points_cost": 3.5712237311164756,
-            "expected_points_cost_ceiling": 3.5712237311164756
+            "expected_points_cost": 3.6135939151515117,
+            "expected_points_cost_ceiling": 3.6135939151515117
           },
           {
             "published_path": "advice/3832237/fark-yarat/1/vs-5081114.json",
@@ -110,11 +110,11 @@
               },
               {
                 "player_out": "Pedro Porro Sauceda",
-                "player_in": "Jay Dasilva"
+                "player_in": "Jayden Bogle"
               },
               {
                 "player_out": "Nico O'Reilly",
-                "player_in": "Jayden Bogle"
+                "player_in": "Milan van Ewijk"
               }
             ],
             "expected_points_cost": 0.0,
@@ -142,16 +142,814 @@
               },
               {
                 "player_out": "Pedro Porro Sauceda",
-                "player_in": "Jay Dasilva"
+                "player_in": "Jayden Bogle"
               },
               {
                 "player_out": "Nico O'Reilly",
-                "player_in": "Jayden Bogle"
+                "player_in": "Milan van Ewijk"
               }
             ],
             "expected_points_cost": 0.0,
             "expected_points_cost_ceiling": 0.0,
             "managers_word": true
+          },
+          {
+            "published_path": "advice/3832237/saf-puan/1/top100-5.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "David Raya Martín",
+                "player_in": "Michael Zetterer"
+              },
+              {
+                "player_out": "Ollie Watkins",
+                "player_in": "Erling Haaland"
+              },
+              {
+                "player_out": "Gabriel dos Santos Magalhães",
+                "player_in": "Ainsley Maitland-Niles"
+              },
+              {
+                "player_out": "Dominik Szoboszlai",
+                "player_in": "Pascal Groß"
+              },
+              {
+                "player_out": "Nico O'Reilly",
+                "player_in": "Maxim De Cuyper"
+              }
+            ],
+            "expected_points_cost": 0.0,
+            "expected_points_cost_ceiling": 0.0,
+            "top100_weight": 5
+          },
+          {
+            "published_path": "advice/3832237/saf-puan/1/top100-5-hoca-sozu.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "David Raya Martín",
+                "player_in": "Michael Zetterer"
+              },
+              {
+                "player_out": "Ollie Watkins",
+                "player_in": "Erling Haaland"
+              },
+              {
+                "player_out": "Gabriel dos Santos Magalhães",
+                "player_in": "Ainsley Maitland-Niles"
+              },
+              {
+                "player_out": "Dominik Szoboszlai",
+                "player_in": "Pascal Groß"
+              },
+              {
+                "player_out": "Nico O'Reilly",
+                "player_in": "Maxim De Cuyper"
+              }
+            ],
+            "expected_points_cost": 0.0,
+            "expected_points_cost_ceiling": 0.0,
+            "top100_weight": 5,
+            "managers_word": true
+          },
+          {
+            "published_path": "advice/3832237/saf-puan/1/top100-10.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "David Raya Martín",
+                "player_in": "Michael Zetterer"
+              },
+              {
+                "player_out": "Ollie Watkins",
+                "player_in": "Erling Haaland"
+              },
+              {
+                "player_out": "Gabriel dos Santos Magalhães",
+                "player_in": "Ainsley Maitland-Niles"
+              },
+              {
+                "player_out": "Dominik Szoboszlai",
+                "player_in": "Pascal Groß"
+              },
+              {
+                "player_out": "Nico O'Reilly",
+                "player_in": "Maxim De Cuyper"
+              }
+            ],
+            "expected_points_cost": 0.0,
+            "expected_points_cost_ceiling": 0.0,
+            "top100_weight": 10
+          },
+          {
+            "published_path": "advice/3832237/saf-puan/1/top100-10-hoca-sozu.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "David Raya Martín",
+                "player_in": "Michael Zetterer"
+              },
+              {
+                "player_out": "Ollie Watkins",
+                "player_in": "Erling Haaland"
+              },
+              {
+                "player_out": "Gabriel dos Santos Magalhães",
+                "player_in": "Ainsley Maitland-Niles"
+              },
+              {
+                "player_out": "Dominik Szoboszlai",
+                "player_in": "Pascal Groß"
+              },
+              {
+                "player_out": "Nico O'Reilly",
+                "player_in": "Maxim De Cuyper"
+              }
+            ],
+            "expected_points_cost": 0.0,
+            "expected_points_cost_ceiling": 0.0,
+            "top100_weight": 10,
+            "managers_word": true
+          },
+          {
+            "published_path": "advice/3832237/saf-puan/1/top100-20.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ollie Watkins",
+                "player_in": "Dominic Calvert-Lewin"
+              },
+              {
+                "player_out": "Gabriel dos Santos Magalhães",
+                "player_in": "Ainsley Maitland-Niles"
+              },
+              {
+                "player_out": "Dominik Szoboszlai",
+                "player_in": "Pascal Groß"
+              },
+              {
+                "player_out": "Nico O'Reilly",
+                "player_in": "Maxim De Cuyper"
+              },
+              {
+                "player_out": "Igor Thiago Nascimento Rodrigues",
+                "player_in": "Erling Haaland"
+              }
+            ],
+            "expected_points_cost": 0.1986853867077798,
+            "expected_points_cost_ceiling": 0.1986853867077798,
+            "top100_weight": 20
+          },
+          {
+            "published_path": "advice/3832237/saf-puan/1/top100-20-hoca-sozu.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ollie Watkins",
+                "player_in": "Dominic Calvert-Lewin"
+              },
+              {
+                "player_out": "Gabriel dos Santos Magalhães",
+                "player_in": "Ainsley Maitland-Niles"
+              },
+              {
+                "player_out": "Dominik Szoboszlai",
+                "player_in": "Pascal Groß"
+              },
+              {
+                "player_out": "Nico O'Reilly",
+                "player_in": "Maxim De Cuyper"
+              },
+              {
+                "player_out": "Igor Thiago Nascimento Rodrigues",
+                "player_in": "Erling Haaland"
+              }
+            ],
+            "expected_points_cost": 0.1986853867077798,
+            "expected_points_cost_ceiling": 0.1986853867077798,
+            "top100_weight": 20,
+            "managers_word": true
+          },
+          {
+            "published_path": "advice/3832237/saf-puan/1/top100-30.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ollie Watkins",
+                "player_in": "Erling Haaland"
+              },
+              {
+                "player_out": "Gabriel dos Santos Magalhães",
+                "player_in": "Ainsley Maitland-Niles"
+              },
+              {
+                "player_out": "Dominik Szoboszlai",
+                "player_in": "Pascal Groß"
+              },
+              {
+                "player_out": "Matheus Santos Carneiro da Cunha",
+                "player_in": "Harvey Barnes"
+              },
+              {
+                "player_out": "Nico O'Reilly",
+                "player_in": "Maxim De Cuyper"
+              }
+            ],
+            "expected_points_cost": 0.3418758252832248,
+            "expected_points_cost_ceiling": 0.3418758252832248,
+            "top100_weight": 30
+          },
+          {
+            "published_path": "advice/3832237/saf-puan/1/top100-30-hoca-sozu.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ollie Watkins",
+                "player_in": "Erling Haaland"
+              },
+              {
+                "player_out": "Gabriel dos Santos Magalhães",
+                "player_in": "Ainsley Maitland-Niles"
+              },
+              {
+                "player_out": "Dominik Szoboszlai",
+                "player_in": "Pascal Groß"
+              },
+              {
+                "player_out": "Matheus Santos Carneiro da Cunha",
+                "player_in": "Harvey Barnes"
+              },
+              {
+                "player_out": "Nico O'Reilly",
+                "player_in": "Maxim De Cuyper"
+              }
+            ],
+            "expected_points_cost": 0.3418758252832248,
+            "expected_points_cost_ceiling": 0.3418758252832248,
+            "top100_weight": 30,
+            "managers_word": true
+          },
+          {
+            "published_path": "advice/3832237/saf-puan/1/top100-40.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ollie Watkins",
+                "player_in": "Erling Haaland"
+              },
+              {
+                "player_out": "Gabriel dos Santos Magalhães",
+                "player_in": "Ainsley Maitland-Niles"
+              },
+              {
+                "player_out": "Dominik Szoboszlai",
+                "player_in": "Pascal Groß"
+              },
+              {
+                "player_out": "Matheus Santos Carneiro da Cunha",
+                "player_in": "Harvey Barnes"
+              },
+              {
+                "player_out": "Nico O'Reilly",
+                "player_in": "Maxim De Cuyper"
+              }
+            ],
+            "expected_points_cost": 0.3418758252832248,
+            "expected_points_cost_ceiling": 0.3418758252832248,
+            "top100_weight": 40
+          },
+          {
+            "published_path": "advice/3832237/saf-puan/1/top100-40-hoca-sozu.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ollie Watkins",
+                "player_in": "Erling Haaland"
+              },
+              {
+                "player_out": "Gabriel dos Santos Magalhães",
+                "player_in": "Ainsley Maitland-Niles"
+              },
+              {
+                "player_out": "Dominik Szoboszlai",
+                "player_in": "Pascal Groß"
+              },
+              {
+                "player_out": "Matheus Santos Carneiro da Cunha",
+                "player_in": "Harvey Barnes"
+              },
+              {
+                "player_out": "Nico O'Reilly",
+                "player_in": "Maxim De Cuyper"
+              }
+            ],
+            "expected_points_cost": 0.3418758252832248,
+            "expected_points_cost_ceiling": 0.3418758252832248,
+            "top100_weight": 40,
+            "managers_word": true
+          },
+          {
+            "published_path": "advice/3832237/saf-puan/1/top100-50.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ollie Watkins",
+                "player_in": "Erling Haaland"
+              },
+              {
+                "player_out": "Gabriel dos Santos Magalhães",
+                "player_in": "Maxim De Cuyper"
+              },
+              {
+                "player_out": "Dominik Szoboszlai",
+                "player_in": "Pascal Groß"
+              },
+              {
+                "player_out": "Nico O'Reilly",
+                "player_in": "Riccardo Calafiori"
+              },
+              {
+                "player_out": "Igor Thiago Nascimento Rodrigues",
+                "player_in": "Vakhtang Salia"
+              }
+            ],
+            "expected_points_cost": 1.3871124697780033,
+            "expected_points_cost_ceiling": 1.3871124697780033,
+            "top100_weight": 50
+          },
+          {
+            "published_path": "advice/3832237/saf-puan/1/top100-50-hoca-sozu.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ollie Watkins",
+                "player_in": "Erling Haaland"
+              },
+              {
+                "player_out": "Gabriel dos Santos Magalhães",
+                "player_in": "Maxim De Cuyper"
+              },
+              {
+                "player_out": "Dominik Szoboszlai",
+                "player_in": "Pascal Groß"
+              },
+              {
+                "player_out": "Nico O'Reilly",
+                "player_in": "Riccardo Calafiori"
+              },
+              {
+                "player_out": "Igor Thiago Nascimento Rodrigues",
+                "player_in": "Vakhtang Salia"
+              }
+            ],
+            "expected_points_cost": 1.3871124697780033,
+            "expected_points_cost_ceiling": 1.3871124697780033,
+            "top100_weight": 50,
+            "managers_word": true
+          },
+          {
+            "published_path": "advice/3832237/ortak-koru/1/vs-5081114/top100-5.json",
+            "strategy": "ortak-koru",
+            "window": 1,
+            "rival_entry_id": 5081114,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ollie Watkins",
+                "player_in": "Erling Haaland"
+              },
+              {
+                "player_out": "Gabriel dos Santos Magalhães",
+                "player_in": "Daniel Muñoz Mejía"
+              },
+              {
+                "player_out": "Dominik Szoboszlai",
+                "player_in": "Mohamed Belloumi"
+              },
+              {
+                "player_out": "Bryan Mbeumo",
+                "player_in": "Josh King"
+              },
+              {
+                "player_out": "Nico O'Reilly",
+                "player_in": "Maxim De Cuyper"
+              }
+            ],
+            "expected_points_cost": 3.6135939151515117,
+            "expected_points_cost_ceiling": 3.6135939151515117,
+            "top100_weight": 5
+          },
+          {
+            "published_path": "advice/3832237/ortak-koru/1/vs-5081114/top100-10.json",
+            "strategy": "ortak-koru",
+            "window": 1,
+            "rival_entry_id": 5081114,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ollie Watkins",
+                "player_in": "Erling Haaland"
+              },
+              {
+                "player_out": "Gabriel dos Santos Magalhães",
+                "player_in": "Daniel Muñoz Mejía"
+              },
+              {
+                "player_out": "Dominik Szoboszlai",
+                "player_in": "Mohamed Belloumi"
+              },
+              {
+                "player_out": "Bryan Mbeumo",
+                "player_in": "Josh King"
+              },
+              {
+                "player_out": "Nico O'Reilly",
+                "player_in": "Maxim De Cuyper"
+              }
+            ],
+            "expected_points_cost": 3.6135939151515117,
+            "expected_points_cost_ceiling": 3.6135939151515117,
+            "top100_weight": 10
+          },
+          {
+            "published_path": "advice/3832237/ortak-koru/1/vs-5081114/top100-20.json",
+            "strategy": "ortak-koru",
+            "window": 1,
+            "rival_entry_id": 5081114,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ollie Watkins",
+                "player_in": "Erling Haaland"
+              },
+              {
+                "player_out": "Gabriel dos Santos Magalhães",
+                "player_in": "Daniel Muñoz Mejía"
+              },
+              {
+                "player_out": "Dominik Szoboszlai",
+                "player_in": "Mohamed Belloumi"
+              },
+              {
+                "player_out": "Matheus Santos Carneiro da Cunha",
+                "player_in": "Josh King"
+              },
+              {
+                "player_out": "Nico O'Reilly",
+                "player_in": "Maxim De Cuyper"
+              }
+            ],
+            "expected_points_cost": 3.7674604743507842,
+            "expected_points_cost_ceiling": 3.7674604743507842,
+            "top100_weight": 20
+          },
+          {
+            "published_path": "advice/3832237/ortak-koru/1/vs-5081114/top100-30.json",
+            "strategy": "ortak-koru",
+            "window": 1,
+            "rival_entry_id": 5081114,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ollie Watkins",
+                "player_in": "Erling Haaland"
+              },
+              {
+                "player_out": "Gabriel dos Santos Magalhães",
+                "player_in": "Daniel Muñoz Mejía"
+              },
+              {
+                "player_out": "Dominik Szoboszlai",
+                "player_in": "Mohamed Belloumi"
+              },
+              {
+                "player_out": "Matheus Santos Carneiro da Cunha",
+                "player_in": "Josh King"
+              },
+              {
+                "player_out": "Nico O'Reilly",
+                "player_in": "Maxim De Cuyper"
+              }
+            ],
+            "expected_points_cost": 3.7674604743507842,
+            "expected_points_cost_ceiling": 3.7674604743507842,
+            "top100_weight": 30
+          },
+          {
+            "published_path": "advice/3832237/ortak-koru/1/vs-5081114/top100-40.json",
+            "strategy": "ortak-koru",
+            "window": 1,
+            "rival_entry_id": 5081114,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ollie Watkins",
+                "player_in": "Erling Haaland"
+              },
+              {
+                "player_out": "Gabriel dos Santos Magalhães",
+                "player_in": "Daniel Muñoz Mejía"
+              },
+              {
+                "player_out": "Dominik Szoboszlai",
+                "player_in": "Mohamed Belloumi"
+              },
+              {
+                "player_out": "Matheus Santos Carneiro da Cunha",
+                "player_in": "Josh King"
+              },
+              {
+                "player_out": "Nico O'Reilly",
+                "player_in": "Maxim De Cuyper"
+              }
+            ],
+            "expected_points_cost": 3.7674604743507842,
+            "expected_points_cost_ceiling": 3.7674604743507842,
+            "top100_weight": 40
+          },
+          {
+            "published_path": "advice/3832237/ortak-koru/1/vs-5081114/top100-50.json",
+            "strategy": "ortak-koru",
+            "window": 1,
+            "rival_entry_id": 5081114,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ollie Watkins",
+                "player_in": "Erling Haaland"
+              },
+              {
+                "player_out": "Gabriel dos Santos Magalhães",
+                "player_in": "Daniel Muñoz Mejía"
+              },
+              {
+                "player_out": "Dominik Szoboszlai",
+                "player_in": "Mohamed Belloumi"
+              },
+              {
+                "player_out": "Matheus Santos Carneiro da Cunha",
+                "player_in": "Josh King"
+              },
+              {
+                "player_out": "Nico O'Reilly",
+                "player_in": "Maxim De Cuyper"
+              }
+            ],
+            "expected_points_cost": 3.7674604743507842,
+            "expected_points_cost_ceiling": 3.7674604743507842,
+            "top100_weight": 50
+          },
+          {
+            "published_path": "advice/3832237/fark-yarat/1/vs-5081114/top100-5.json",
+            "strategy": "fark-yarat",
+            "window": 1,
+            "rival_entry_id": 5081114,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "David Raya Martín",
+                "player_in": "Michael Zetterer"
+              },
+              {
+                "player_out": "Ollie Watkins",
+                "player_in": "Erling Haaland"
+              },
+              {
+                "player_out": "Gabriel dos Santos Magalhães",
+                "player_in": "Ainsley Maitland-Niles"
+              },
+              {
+                "player_out": "Dominik Szoboszlai",
+                "player_in": "Pascal Groß"
+              },
+              {
+                "player_out": "Nico O'Reilly",
+                "player_in": "Maxim De Cuyper"
+              }
+            ],
+            "expected_points_cost": 0.0,
+            "expected_points_cost_ceiling": 0.0,
+            "top100_weight": 5
+          },
+          {
+            "published_path": "advice/3832237/fark-yarat/1/vs-5081114/top100-10.json",
+            "strategy": "fark-yarat",
+            "window": 1,
+            "rival_entry_id": 5081114,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "David Raya Martín",
+                "player_in": "Michael Zetterer"
+              },
+              {
+                "player_out": "Ollie Watkins",
+                "player_in": "Erling Haaland"
+              },
+              {
+                "player_out": "Gabriel dos Santos Magalhães",
+                "player_in": "Ainsley Maitland-Niles"
+              },
+              {
+                "player_out": "Dominik Szoboszlai",
+                "player_in": "Pascal Groß"
+              },
+              {
+                "player_out": "Nico O'Reilly",
+                "player_in": "Maxim De Cuyper"
+              }
+            ],
+            "expected_points_cost": 0.0,
+            "expected_points_cost_ceiling": 0.0,
+            "top100_weight": 10
+          },
+          {
+            "published_path": "advice/3832237/fark-yarat/1/vs-5081114/top100-20.json",
+            "strategy": "fark-yarat",
+            "window": 1,
+            "rival_entry_id": 5081114,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ollie Watkins",
+                "player_in": "Dominic Calvert-Lewin"
+              },
+              {
+                "player_out": "Gabriel dos Santos Magalhães",
+                "player_in": "Ainsley Maitland-Niles"
+              },
+              {
+                "player_out": "Dominik Szoboszlai",
+                "player_in": "Pascal Groß"
+              },
+              {
+                "player_out": "Nico O'Reilly",
+                "player_in": "Maxim De Cuyper"
+              },
+              {
+                "player_out": "Igor Thiago Nascimento Rodrigues",
+                "player_in": "Erling Haaland"
+              }
+            ],
+            "expected_points_cost": 0.1986853867077798,
+            "expected_points_cost_ceiling": 0.1986853867077798,
+            "top100_weight": 20
+          },
+          {
+            "published_path": "advice/3832237/fark-yarat/1/vs-5081114/top100-30.json",
+            "strategy": "fark-yarat",
+            "window": 1,
+            "rival_entry_id": 5081114,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ollie Watkins",
+                "player_in": "Erling Haaland"
+              },
+              {
+                "player_out": "Gabriel dos Santos Magalhães",
+                "player_in": "Ainsley Maitland-Niles"
+              },
+              {
+                "player_out": "Dominik Szoboszlai",
+                "player_in": "Pascal Groß"
+              },
+              {
+                "player_out": "Matheus Santos Carneiro da Cunha",
+                "player_in": "Harvey Barnes"
+              },
+              {
+                "player_out": "Nico O'Reilly",
+                "player_in": "Maxim De Cuyper"
+              }
+            ],
+            "expected_points_cost": 0.3418758252832248,
+            "expected_points_cost_ceiling": 0.3418758252832248,
+            "top100_weight": 30
+          },
+          {
+            "published_path": "advice/3832237/fark-yarat/1/vs-5081114/top100-40.json",
+            "strategy": "fark-yarat",
+            "window": 1,
+            "rival_entry_id": 5081114,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ollie Watkins",
+                "player_in": "Erling Haaland"
+              },
+              {
+                "player_out": "Gabriel dos Santos Magalhães",
+                "player_in": "Ainsley Maitland-Niles"
+              },
+              {
+                "player_out": "Dominik Szoboszlai",
+                "player_in": "Pascal Groß"
+              },
+              {
+                "player_out": "Matheus Santos Carneiro da Cunha",
+                "player_in": "Harvey Barnes"
+              },
+              {
+                "player_out": "Nico O'Reilly",
+                "player_in": "Maxim De Cuyper"
+              }
+            ],
+            "expected_points_cost": 0.3418758252832248,
+            "expected_points_cost_ceiling": 0.3418758252832248,
+            "top100_weight": 40
+          },
+          {
+            "published_path": "advice/3832237/fark-yarat/1/vs-5081114/top100-50.json",
+            "strategy": "fark-yarat",
+            "window": 1,
+            "rival_entry_id": 5081114,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ollie Watkins",
+                "player_in": "Erling Haaland"
+              },
+              {
+                "player_out": "Gabriel dos Santos Magalhães",
+                "player_in": "Maxim De Cuyper"
+              },
+              {
+                "player_out": "Dominik Szoboszlai",
+                "player_in": "Pascal Groß"
+              },
+              {
+                "player_out": "Nico O'Reilly",
+                "player_in": "Riccardo Calafiori"
+              },
+              {
+                "player_out": "Igor Thiago Nascimento Rodrigues",
+                "player_in": "Vakhtang Salia"
+              }
+            ],
+            "expected_points_cost": 1.3871124697780033,
+            "expected_points_cost_ceiling": 1.3871124697780033,
+            "top100_weight": 50
           },
           {
             "published_path": "advice/3832237/saf-puan/1/chip-wildcard.json",
@@ -170,10 +968,6 @@
                 "player_in": "James Tarkowski"
               },
               {
-                "player_out": "David Raya Martín",
-                "player_in": "Michael Zetterer"
-              },
-              {
                 "player_out": "Oli McBurnie",
                 "player_in": "Erling Haaland"
               },
@@ -183,7 +977,7 @@
               },
               {
                 "player_out": "Gianluigi Donnarumma",
-                "player_in": "Bart Verbruggen"
+                "player_in": "Bernd Leno"
               },
               {
                 "player_out": "Gabriel dos Santos Magalhães",
@@ -199,7 +993,7 @@
               },
               {
                 "player_out": "Pedro Porro Sauceda",
-                "player_in": "Milan van Ewijk"
+                "player_in": "Leif Davis"
               },
               {
                 "player_out": "Bryan Mbeumo",
@@ -208,6 +1002,10 @@
               {
                 "player_out": "Nico O'Reilly",
                 "player_in": "Maxim De Cuyper"
+              },
+              {
+                "player_out": "Igor Thiago Nascimento Rodrigues",
+                "player_in": "Charalampos Kostoulas"
               }
             ],
             "expected_points_cost": 0.0
@@ -229,10 +1027,6 @@
                 "player_in": "James Tarkowski"
               },
               {
-                "player_out": "David Raya Martín",
-                "player_in": "Michael Zetterer"
-              },
-              {
                 "player_out": "Oli McBurnie",
                 "player_in": "Erling Haaland"
               },
@@ -242,7 +1036,7 @@
               },
               {
                 "player_out": "Gianluigi Donnarumma",
-                "player_in": "Bart Verbruggen"
+                "player_in": "Bernd Leno"
               },
               {
                 "player_out": "Gabriel dos Santos Magalhães",
@@ -258,7 +1052,7 @@
               },
               {
                 "player_out": "Pedro Porro Sauceda",
-                "player_in": "Milan van Ewijk"
+                "player_in": "Leif Davis"
               },
               {
                 "player_out": "Bryan Mbeumo",
@@ -267,6 +1061,10 @@
               {
                 "player_out": "Nico O'Reilly",
                 "player_in": "Maxim De Cuyper"
+              },
+              {
+                "player_out": "Igor Thiago Nascimento Rodrigues",
+                "player_in": "Charalampos Kostoulas"
               }
             ],
             "expected_points_cost": 0.0
@@ -297,7 +1095,7 @@
               },
               {
                 "player_out": "Nico O'Reilly",
-                "player_in": "Jayden Bogle"
+                "player_in": "James Justin"
               }
             ],
             "expected_points_cost": 0.0
@@ -313,8 +1111,8 @@
         "advice_captured_at_utc": "2026-10-10T03:57:32.746463Z",
         "advice_generated_at_utc": "2026-10-10T06:07:04Z",
         "advice_sha256": "6070fa5b874734e4221fcf07083f75e91a8df083d6673c4b73730b6995e93f12",
-        "outcome_snapshot_id": "fpl-live-20261014T135921Z-a48d1521c87f",
-        "outcome_captured_at_utc": "2026-10-14T13:59:21.062647Z",
+        "outcome_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd",
+        "outcome_captured_at_utc": "2026-10-16T06:01:54.275749Z",
         "expected_own_points": 55.13888696273176,
         "suggested": {
           "gross_points": 61.0,
@@ -1654,8 +2452,8 @@
         "advice_captured_at_utc": "2026-09-18T12:25:16.241963Z",
         "advice_generated_at_utc": "2026-09-18T14:05:59Z",
         "advice_sha256": "ce6eb2340cdf8d467ea9416917d533661134c24a6d3b4b55468ad86be5245ed9",
-        "outcome_snapshot_id": "fpl-live-20261014T135921Z-a48d1521c87f",
-        "outcome_captured_at_utc": "2026-10-14T13:59:21.062647Z",
+        "outcome_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd",
+        "outcome_captured_at_utc": "2026-10-16T06:01:54.275749Z",
         "expected_own_points": 54.03405326604533,
         "suggested": {
           "gross_points": 52.0,
@@ -1894,8 +2692,8 @@
         "advice_captured_at_utc": "2026-09-12T10:00:00.227050Z",
         "advice_generated_at_utc": "2026-09-12T10:50:08Z",
         "advice_sha256": "b860656d5dd21970f99d0add9fe9d8c1a9ea14c01101d37c0d736ca056813001",
-        "outcome_snapshot_id": "fpl-live-20261014T135921Z-a48d1521c87f",
-        "outcome_captured_at_utc": "2026-10-14T13:59:21.062647Z",
+        "outcome_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd",
+        "outcome_captured_at_utc": "2026-10-16T06:01:54.275749Z",
         "expected_own_points": 51.90067139132923,
         "suggested": {
           "gross_points": 44.0,

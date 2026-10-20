@@ -17,10 +17,12 @@ from pathlib import Path
 import pandas as pd
 import pytest
 from scripts.measure_component_fidelity import (
+    CANDIDATE_FIDELITY_CONTRACT_VERSION,
     DEVELOPMENT_FIDELITY_CONTRACT_VERSION,
     FIDELITY_CONTRACT_VERSION,
     METRIC_NAMES,
     FidelityBindingError,
+    _candidate_from_arguments,
     _development_from_arguments,
     measure_fidelity,
     provenance_block,
@@ -37,7 +39,9 @@ from squadopt.scenarios import ScenarioConfig
 from squadopt.scenarios.components import (
     COMPONENT_SCENARIO_CONTRACT_VERSION,
     CONDITIONAL_RESIDUAL_CONTRACT_VERSION,
+    TEAM_MATCH_BLOCK_CONTRACT_VERSION,
     ConditionalResidualConfig,
+    TeamMatchBlockConfig,
 )
 
 PLAYERS = (101, 102, 103)
@@ -501,7 +505,7 @@ def test_the_development_run_is_pinned_to_the_reference_and_its_sampler() -> Non
         "b" * 64,
         "c" * 64,
     )
-    assert pinned.conditional_residuals == SAMPLER
+    assert pinned.sampler == SAMPLER
 
     with pytest.raises(FidelityBindingError, match="64-hex"):
         _development_from_arguments(_development_arguments(expected_manifest_sha256=None))  # type: ignore[arg-type]
@@ -553,3 +557,108 @@ def test_the_development_provenance_names_the_reference_it_read() -> None:
         development=True,
     )
     assert weighted["phase_c_weighting"] == SEASON_HALF_LIFE_WEIGHTING
+
+
+# --- the team-match block candidate on the v1 contract -----------------------
+
+
+def _candidate_arguments(**overrides: object) -> object:
+    fields: dict[str, object] = {
+        "team_match_block": True,
+        "expected_table_sha256": "a" * 64,
+        "expected_roster_sha256": "b" * 64,
+        "expected_manifest_sha256": "c" * 64,
+        "json_output": Path("candidate.json"),
+    }
+    fields.update(overrides)
+    return _arguments(**fields)
+
+
+def test_a_v1_candidate_run_is_pinned_and_names_one_sampler() -> None:
+    from scripts.measure_component_fidelity import DEFAULT_OUTPUT
+
+    assert _candidate_from_arguments(_arguments()) is None  # type: ignore[arg-type]
+    assert _candidate_from_arguments(_development_arguments(team_match_block=True)) is None  # type: ignore[arg-type]
+    pinned = _candidate_from_arguments(_candidate_arguments())  # type: ignore[arg-type]
+    assert pinned is not None
+    assert pinned.sampler == TeamMatchBlockConfig()
+    assert (pinned.table_sha256, pinned.roster_sha256, pinned.manifest_sha256) == (
+        "a" * 64,
+        "b" * 64,
+        "c" * 64,
+    )
+    # The digests belong to the candidate run, so the v1 refusal of them stands aside.
+    assert _development_from_arguments(_candidate_arguments()) is None  # type: ignore[arg-type]
+    with pytest.raises(FidelityBindingError, match="64-hex"):
+        _candidate_from_arguments(_candidate_arguments(expected_table_sha256=None))  # type: ignore[arg-type]
+    with pytest.raises(FidelityBindingError, match="one"):
+        _candidate_from_arguments(_candidate_arguments(conditional_residual_fraction=0.15))  # type: ignore[arg-type]
+    with pytest.raises(FidelityBindingError, match="frozen v1 artifact path"):
+        _candidate_from_arguments(_candidate_arguments(json_output=DEFAULT_OUTPUT))  # type: ignore[arg-type]
+    # On the development contract the flag selects the sampler the same way.
+    development = _development_from_arguments(
+        _development_arguments(
+            team_match_block=True,
+            conditional_residual_fraction=None,
+            conditional_residual_minimum_rows=None,
+        )
+    )  # type: ignore[arg-type]
+    assert development is not None and development.sampler == TeamMatchBlockConfig()
+    with pytest.raises(FidelityBindingError, match="one"):
+        _development_from_arguments(_development_arguments(team_match_block=True))  # type: ignore[arg-type]
+
+
+def test_the_candidate_document_names_its_contract_and_sampler_and_joins_the_club() -> None:
+    document = measure_fidelity(
+        _oof(), _roster(), MANIFEST, config=CONFIG, team_match_block=TeamMatchBlockConfig()
+    )
+
+    assert document["contract_version"] == CANDIDATE_FIDELITY_CONTRACT_VERSION
+    assert document["binding"] is False and document["development_only"] is False
+    assert document["phase_c_contract"] == "phase_c_component_oof_v1"
+    assert document["sampler"] == {
+        "contract_version": TEAM_MATCH_BLOCK_CONTRACT_VERSION,
+        "residual_selection": "team_match_block",
+        "conditional_residual_fraction": None,
+        "conditional_residual_minimum_rows": None,
+    }
+    assert document["candidate_prereg_document"].endswith("team_match_block_sampler_prereg.md")  # type: ignore[union-attr]
+    # The club came from the roster: the same fold is measured, by the same five metrics.
+    record = _target_fold(document)
+    assert record["appearance_mean_difference"] == pytest.approx(0.0)
+    assert record["points_conditional_mean_difference"] == pytest.approx(1.0)
+    with pytest.raises(FidelityBindingError, match="one candidate sampler"):
+        measure_fidelity(
+            _oof(),
+            _roster(),
+            MANIFEST,
+            config=CONFIG,
+            conditional_residuals=SAMPLER,
+            team_match_block=TeamMatchBlockConfig(),
+        )
+
+
+def test_the_candidate_provenance_carries_the_pinned_reference_fields() -> None:
+    manifest = {
+        **MANIFEST,
+        "repository_commit": "e" * 40,
+        "target_contract_version": "synthetic-targets-v1",
+        "dataset_contract_version": "synthetic-dataset-v1",
+    }
+    files = {
+        "oof_table": ("t.csv", "a" * 64),
+        "roster": ("r.csv", "b" * 64),
+        "manifest": ("m.json", "c" * 64),
+    }
+    block = provenance_block(
+        manifest, revision="f" * 40, dirty=False, files=files, development=False, candidate=True
+    )
+
+    assert block["phase_c_contract"] == "phase_c_component_oof_v1"
+    assert block["phase_c_producer_repository_commit"] == "e" * 40
+    assert block["pinned_by_arguments"] is True
+    assert "development_method_document" not in block
+    plain = provenance_block(
+        manifest, revision="f" * 40, dirty=False, files=files, development=False
+    )
+    assert "pinned_by_arguments" not in plain

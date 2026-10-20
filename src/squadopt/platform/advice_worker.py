@@ -99,7 +99,11 @@ from squadopt.platform.worker_heartbeat import (
     prune_stale_heartbeats,
 )
 from squadopt.platform.worker_metrics import serve_worker_metrics
-from squadopt.prediction.football import FOOTBALL_MODEL_VERSION, JOINT_ROLE_MODEL_VERSIONS
+from squadopt.prediction.football import (
+    FOOTBALL_MODEL_VERSION,
+    JOINT_ROLE_FLAG_MODEL_VERSION,
+    JOINT_ROLE_MODEL_VERSIONS,
+)
 from squadopt.prediction.football_match_context import MATCH_CONTEXT_MODEL_VERSION
 from squadopt.prediction.football_team_form import TEAM_FORM_MODEL_VERSION
 
@@ -417,7 +421,7 @@ def build_advice_compute(
                     and "future_values_not_recovered" in participation_assumptions
                     else []
                 ),
-                # Only the versions that split attacking shares before availability.
+                # Flag forecasts retain the legacy share rule after the first week.
                 *(
                     [SHARES_BEFORE_AVAILABILITY_LIMIT]
                     if football.horizon.model_version
@@ -426,6 +430,10 @@ def build_advice_compute(
                         MATCH_CONTEXT_MODEL_VERSION,
                         *JOINT_ROLE_MODEL_VERSIONS,
                         TEAM_FORM_MODEL_VERSION,
+                    )
+                    or (
+                        football.horizon.model_version == JOINT_ROLE_FLAG_MODEL_VERSION
+                        and spec.window > 1
                     )
                     else []
                 ),

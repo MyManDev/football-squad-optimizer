@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-10-14T14:20:21Z",
+  "generated_at_utc": "2026-10-16T07:13:49Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "fark-yarat",
     "window": 5,
-    "source_snapshot_id": "fpl-live-20261014T135921Z-a48d1521c87f",
+    "source_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd",
     "moves": [
       {
         "move_id": "gw07-1",
@@ -33,10 +33,10 @@
     ],
     "transfer_hit_points": 0.0,
     "expected_gain_vs_hold": 0.8723272031930804,
-    "expected_points_cost": 2.0038255544964727,
+    "expected_points_cost": 1.4825109209253924,
     "rival_label": "entry-313686",
     "solver_status": "FEASIBLE",
-    "optimality_gap": 1.379000000000019,
+    "optimality_gap": 0.7549999999999955,
     "wall_clock_stopped_the_search": false,
     "expected_own_points": 55.13205198739978,
     "captain": {
@@ -211,11 +211,11 @@
         "gameweek": 8,
         "transfers_in": [
           {
-            "player_id": 466052,
-            "name": "Rayan Cherki",
-            "short_name": "Cherki",
+            "player_id": 222531,
+            "name": "Morgan Gibbs-White",
+            "short_name": "Gibbs-White",
             "position": "MID",
-            "team": "Man City"
+            "team": "Nott'm Forest"
           }
         ],
         "transfers_out": [
@@ -231,36 +231,10 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 56.38303042441372
+        "expected_points": 56.38717857121382
       },
       {
         "gameweek": 9,
-        "transfers_in": [
-          {
-            "player_id": 201666,
-            "name": "Harvey Barnes",
-            "short_name": "Barnes",
-            "position": "MID",
-            "team": "Newcastle"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 513418,
-            "name": "Kevin Schade",
-            "short_name": "Schade",
-            "position": "MID",
-            "team": "Brentford"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 56.85987278933972
-      },
-      {
-        "gameweek": 10,
         "transfers_in": [
           {
             "player_id": 154043,
@@ -283,7 +257,33 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 57.84143720063639
+        "expected_points": 57.3687429825105
+      },
+      {
+        "gameweek": 10,
+        "transfers_in": [
+          {
+            "player_id": 201666,
+            "name": "Harvey Barnes",
+            "short_name": "Barnes",
+            "position": "MID",
+            "team": "Newcastle"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 513418,
+            "name": "Kevin Schade",
+            "short_name": "Schade",
+            "position": "MID",
+            "team": "Brentford"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 1,
+        "free_transfers_after": 1,
+        "expected_points": 57.8455853474365
       },
       {
         "gameweek": 11,
@@ -309,7 +309,7 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 58.20768771982911
+        "expected_points": 58.211835866629215
       }
     ],
     "stated_limits": [
@@ -324,9 +324,8 @@
     "data_quality": "complete",
     "missing_fields": [],
     "squad_basis": "captured",
-    "expected_points_cost_ceiling": 2.0038255544964727,
-    "control_solver_status": "OPTIMAL",
-    "control_optimality_gap": 0.0,
+    "control_solver_status": "FEASIBLE",
+    "control_optimality_gap": 0.9869999999999663,
     "rival_entry_id": 313686,
     "overlap_count": 5,
     "transfer_cap": 1,

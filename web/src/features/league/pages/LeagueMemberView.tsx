@@ -1,27 +1,27 @@
-import { memberAddress, memberHistoryAddress, membersAddress } from "../../../lib/leagueAddresses";
+import { memberHistoryAddress } from "../../../lib/leagueAddresses";
 import { useLeagueId } from "../useLeague";
 import { NewInformationNotice } from "../advice/OfficialInformationCard";
 import { useMemo, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { Link, useNavigate, useSearchParams } from "react-router";
+import { Link, useSearchParams } from "react-router";
 
-import { Card } from "../../../design/components/Card";
 import { EmptyState } from "../../../design/components/EmptyState";
 import { useShellLayout } from "../../../design/shell/layout";
 import { useShell } from "../../../design/shell/ShellContext";
-import { ShellPortal } from "../../../design/shell/ShellPortal";
 import { useLanguage } from "../../../i18n/context";
 import { clubCodesFromFixtures } from "../../../lib/clubs";
 import { AdviceRequestPanel } from "../advice/AdviceRequestPanel";
 import { COMPUTE_COPY } from "../advice/computeCopy";
 import { MemberDecisionControls } from "../advice/MemberDecisionControls";
 import { deviceEndedWithoutPlan } from "../device/useDevicePlan";
+import { isDevicePlanEntry } from "../device/types";
+import { advisedFifteen } from "../device/whatIf";
+import { WhatIfPanel } from "../device/WhatIfPanel";
 import { DecisionPreferencesPanel } from "../advice/DecisionPreferencesPanel";
 import { ModelComparison } from "../advice/ModelComparison";
 import { DecisionWorkbench } from "../advice/DecisionWorkbench";
 import { EVIDENCE_COPY } from "../advice/evidenceCopy";
 import type { AdviceJob } from "../advice/useAdviceJob";
-import { useViewerEntry } from "../identity/useViewerEntry";
 import { TemplatePicker } from "../templates/TemplatePicker";
 import { MemberResourceCards } from "../components/MemberResourceCards";
 import { MemberFixtureRail, type RailPlacement } from "../components/MemberFixtureRail";
@@ -37,9 +37,14 @@ import {
 } from "./MemberAdviceCard";
 import { HeldSquad, MemberSquad } from "./MemberSquad";
 import { hasLineup, squadOnPitch } from "./squadOnPitch";
-import { MemberTopBar, MemberWho } from "./MemberTopBar";
+import { MemberTopBar } from "./MemberTopBar";
 import type { LeagueMemberViewProps } from "./memberPageTypes";
 import { useMemberAdviceView } from "./useMemberAdviceView";
+import { rivalCandidates } from "../advice/adviceSelection";
+import { canDuel, duelRivalId } from "./duelSides";
+import { RivalDuel } from "./RivalDuel";
+import { SquadCard } from "../card/SquadCard";
+import { WeekStory } from "./WeekStory";
 import styles from "./LeagueMemberPage.module.css";
 
 export function LeagueMemberView(props: LeagueMemberViewProps) {
@@ -85,9 +90,18 @@ function computeEcho(copy: MemberCopy, state: AdviceJob["state"]): string | null
 }
 
 /** A closed section of the page's secondary tools, read one click away. */
-function Tool({ title, children }: { title: string; children: ReactNode }) {
+function Tool({
+  title,
+  open,
+  children,
+}: {
+  title: string;
+  /** Opened by the address, as the duel is by a link that names a rival. */
+  open?: boolean;
+  children: ReactNode;
+}) {
   return (
-    <details className={styles.tool}>
+    <details className={styles.tool} open={open || undefined}>
       <summary className={styles.toolSummary}>
         <DisclosureIcon className={styles.toolIcon} />
         <span>{title}</span>
@@ -113,13 +127,15 @@ function LeagueMemberContent({
   computeService = "static",
   computePending = false,
   deviceDependencies,
+  whatIfDependencies,
   deviceRivals,
   rivalSquad = null,
+  duelSquad = null,
+  duelIssue,
   windowControl = null,
   deadlinePassed = null,
   fixtures = null,
   fixturesPending = false,
-  leagueName,
 }: LeagueMemberViewProps) {
   const { language, locale, messages } = useLanguage();
   const leagueId = useLeagueId();
@@ -127,9 +143,7 @@ function LeagueMemberContent({
   const layout = useShellLayout();
   const shell = useShell();
   const view = squad.payload;
-  const [searchParams] = useSearchParams();
-  const { viewer, clear } = useViewerEntry(leagueId);
-  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const {
     entryId,
     resolve,
@@ -169,6 +183,11 @@ function LeagueMemberContent({
     selection.status === "not-listed" &&
     ((computeAvailable && selection.computable !== undefined) ||
       (device.available && deadlinePassed === null && !deviceEndedWithoutPlan(device.state)));
+  // The what-if mode starts from the plan on screen when it is a solved week without a chip.
+  const advised = advisedFifteen(shown?.envelope.payload);
+  // The duel (#1133): the other human members, and the one `?duel=` names among them.
+  const duelCandidates = rivalCandidates(members, view.entry.entry_id);
+  const duelId = duelRivalId(searchParams, members, view.entry.entry_id);
   const selectedRival = members.find(
     (member) => member.entry_id === selection.request.rivalEntryId,
   );
@@ -379,9 +398,6 @@ function LeagueMemberContent({
           fixtures={fixtures}
           deadlinePassed={deadlinePassed}
         />
-        <ShellPortal slot="who">
-          <MemberWho squad={squad} leagueName={leagueName} />
-        </ShellPortal>
 
         {deadlinePassed !== null ? (
           <section className={styles.notice} aria-labelledby="deadline-passed-title">
@@ -406,6 +422,8 @@ function LeagueMemberContent({
             {copy.membersAuxiliaryUnavailable}
           </p>
         ) : null}
+
+        {plan ? <WeekStory view={plan} /> : null}
 
         <section aria-labelledby="entry-advice-title" className={styles.adviceSection}>
           <div className={styles.decision} data-mark="decision">
@@ -483,40 +501,6 @@ function LeagueMemberContent({
 
         {planSettings}
 
-        {viewer ? (
-          <Card tone="muted" title={copy.viewerTitle}>
-            <p className={styles.notice}>{copy.viewerBody}</p>
-            <p className={styles.notice}>
-              <strong>
-                {copy.viewerSelected(
-                  viewer.entryId === entryId
-                    ? (view.entry.manager_name ?? `#${viewer.entryId}`)
-                    : `#${viewer.entryId}`,
-                )}
-              </strong>{" "}
-              <Link className={styles.viewerAction} to={membersAddress(leagueId)}>
-                {copy.viewerChange}
-              </Link>{" "}
-              <button
-                type="button"
-                className={styles.viewerClear}
-                onClick={() => {
-                  clear();
-                  navigate(membersAddress(leagueId), { replace: true });
-                }}
-              >
-                {copy.viewerClear}
-              </button>
-            </p>
-            {viewer.entryId !== entryId ? (
-              <p className={styles.notice}>
-                <strong>{copy.notYourPageTitle}</strong> {copy.notYourPageBody}{" "}
-                <Link to={memberAddress(leagueId, viewer.entryId)}>{copy.notYourPageLink}</Link>
-              </p>
-            ) : null}
-          </Card>
-        ) : null}
-
         <div className={styles.tools}>
           {onPitch.source === "plan" && view.starting_xi.length > 0 ? (
             <Tool title={copy.memberSquad}>
@@ -546,9 +530,40 @@ function LeagueMemberContent({
               />
             ) : null}
           </Tool>
+          {advised !== null && isDevicePlanEntry(view.device_plan) ? (
+            <Tool title={copy.whatIfTitle}>
+              <WhatIfPanel squad={view} advised={advised} dependencies={whatIfDependencies} />
+            </Tool>
+          ) : null}
+          {canDuel(squad) && duelCandidates.length > 0 ? (
+            <Tool title={copy.duelTitle} open={duelId !== null}>
+              <RivalDuel
+                squad={squad}
+                candidates={duelCandidates}
+                selected={duelId}
+                rival={duelSquad?.payload.entry.entry_id === duelId ? duelSquad : null}
+                issue={duelIssue}
+                onSelect={(rivalId) =>
+                  setSearchParams(
+                    (current) => {
+                      const next = new URLSearchParams(current);
+                      next.set("duel", String(rivalId));
+                      return next;
+                    },
+                    { replace: true },
+                  )
+                }
+              />
+            </Tool>
+          ) : null}
           <Tool title={copy.chipsAndTransfers}>
             <MemberResourceCards squad={view} />
           </Tool>
+          {!adviceLoading && shown ? (
+            <Tool title={copy.cardTitle}>
+              <SquadCard view={shown.envelope.payload} squad={view} />
+            </Tool>
+          ) : null}
         </div>
       </div>
       {railPlacement === "column" ? rail : null}

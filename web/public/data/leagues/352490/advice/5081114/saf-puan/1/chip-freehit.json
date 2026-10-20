@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-10-14T14:20:21Z",
+  "generated_at_utc": "2026-10-16T07:13:49Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "saf-puan",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20261014T135921Z-a48d1521c87f",
+    "source_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd",
     "moves": [
       {
         "move_id": "gw07-1",
@@ -65,7 +65,7 @@
           "position": "MID",
           "team": "Brighton"
         },
-        "expected_points_delta": 1.6869581257357282,
+        "expected_points_delta": 1.6869581257357424,
         "reason_code": "points_gain"
       },
       {
@@ -122,7 +122,7 @@
           "position": "DEF",
           "team": "Everton"
         },
-        "expected_points_delta": 0.9982888496716242,
+        "expected_points_delta": 1.0406590337066461,
         "reason_code": "points_gain"
       },
       {
@@ -173,13 +173,13 @@
           "team": "Nott'm Forest"
         },
         "player_in": {
-          "player_id": 455084,
-          "name": "Leif Davis",
-          "short_name": "Davis",
+          "player_id": 610799,
+          "name": "Luka Vu\u0161kovi\u0107",
+          "short_name": "Vu\u0161kovi\u0107",
           "position": "DEF",
-          "team": "Ipswich Town"
+          "team": "Brighton"
         },
-        "expected_points_delta": 0.0,
+        "expected_points_delta": 0.6309570053117284,
         "reason_code": "points_gain"
       },
       {
@@ -192,13 +192,13 @@
           "team": "Brentford"
         },
         "player_in": {
-          "player_id": 647850,
-          "name": "Charalampos Kostoulas",
-          "short_name": "Kostoulas",
+          "player_id": 661313,
+          "name": "Juan Angulo",
+          "short_name": "Angulo",
           "position": "FWD",
-          "team": "Brighton"
+          "team": "Sunderland"
         },
-        "expected_points_delta": -0.6475341769973255,
+        "expected_points_delta": -1.1871269035375036,
         "reason_code": "points_gain"
       },
       {
@@ -236,18 +236,18 @@
           "position": "MID",
           "team": "Man City"
         },
-        "expected_points_delta": 1.9210692987381321,
+        "expected_points_delta": 1.9210692987381464,
         "reason_code": "points_gain"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 5.725872556119839,
+    "expected_gain_vs_hold": 5.8596070189264395,
     "expected_points_cost": 0.0,
     "rival_label": null,
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
     "wall_clock_stopped_the_search": false,
-    "expected_own_points": 59.7072869631493,
+    "expected_own_points": 59.798651241920865,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
@@ -298,6 +298,14 @@
         "expected_points": 3.7099911306959767
       },
       {
+        "player_id": 610799,
+        "name": "Luka Vu\u0161kovi\u0107",
+        "short_name": "Vu\u0161kovi\u0107",
+        "position": "DEF",
+        "team": "Brighton",
+        "expected_points": 3.6023208279111465
+      },
+      {
         "player_id": 141746,
         "name": "Bruno Borges Fernandes",
         "short_name": "Fernandes",
@@ -344,14 +352,6 @@
         "position": "FWD",
         "team": "Man City",
         "expected_points": 8.35545188174385
-      },
-      {
-        "player_id": 647850,
-        "name": "Charalampos Kostoulas",
-        "short_name": "Kostoulas",
-        "position": "FWD",
-        "team": "Brighton",
-        "expected_points": 3.5109565491395935
       }
     ],
     "bench": [
@@ -372,20 +372,20 @@
         "expected_points": 2.617779194421131
       },
       {
-        "player_id": 455084,
-        "name": "Leif Davis",
-        "short_name": "Davis",
-        "position": "DEF",
-        "team": "Ipswich Town",
-        "expected_points": 2.590615382532553
-      },
-      {
         "player_id": 601767,
         "name": "Vakhtang Salia",
         "short_name": "Salia",
         "position": "FWD",
         "team": "Newcastle",
         "expected_points": 1.3473254086181279
+      },
+      {
+        "player_id": 661313,
+        "name": "Juan Angulo",
+        "short_name": "Angulo",
+        "position": "FWD",
+        "team": "Sunderland",
+        "expected_points": 1.3119278147917366
       }
     ],
     "chip": "freehit",
@@ -401,7 +401,7 @@
     "control_optimality_gap": 0.0,
     "chip_choice": {
       "chip": "freehit",
-      "gain_vs_no_chip": 4.4976499620255765,
+      "gain_vs_no_chip": 4.631384424832149,
       "basis": "one_week_expected_points_v1",
       "windows_left": {
         "first_half": {

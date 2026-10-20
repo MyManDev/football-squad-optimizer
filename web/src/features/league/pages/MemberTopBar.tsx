@@ -1,13 +1,8 @@
-import { membersAddress } from "../../../lib/leagueAddresses";
-import { useLeagueId } from "../useLeague";
-import { Link } from "react-router";
-
 import { useLanguage } from "../../../i18n/context";
 import { deadlineLong, deadlineShort } from "../../../lib/format";
 import type { FixturesPayload } from "../../fixtures/types";
 import { gameweekDeadline } from "../advice/deadline";
 import { ExampleDataBadge } from "../components/ExampleDataBadge";
-import { SwitchIcon } from "../components/memberIcons";
 import type { EntrySquad, EntryView, LeagueViewEnvelope } from "../types";
 import { scoreBugCells, type ScoreCell } from "./scoreBug";
 import styles from "./LeagueMemberPage.module.css";
@@ -96,37 +91,4 @@ export function ScoreBug({ cells }: { cells: ScoreCell[] }) {
       ))}
     </dl>
   ) : null;
-}
-
-/**
- * The sidebar's WHO block: the league, and the member this page is about as a link back
- * to the member list, where another member is picked. The page's address names the member;
- * the visitor's own claim (in memory only) is not read here.
- */
-export function MemberWho({
-  squad,
-  leagueName,
-}: {
-  squad: LeagueViewEnvelope<EntrySquad>;
-  leagueName?: string;
-}) {
-  const { messages } = useLanguage();
-  const leagueId = useLeagueId();
-  const copy = messages.leagueMembers;
-  const entry = squad.payload.entry;
-  return (
-    <div className={styles.who}>
-      <p className={styles.whoLeague}>{leagueName ?? copy.leagueNumber(squad.payload.league_id)}</p>
-      <Link to={membersAddress(leagueId)} className={styles.whoLink}>
-        <span className={styles.whoText}>
-          <span className={styles.whoTeam}>{entry.team_name ?? copy.unknownTeam}</span>
-          <span className={styles.whoManager}>
-            {copy.memberLine(entry.manager_name ?? copy.unknownMember, entry.entry_id)}
-          </span>
-        </span>
-        <SwitchIcon />
-        <span className="visually-hidden">{messages.shell.changeMember}</span>
-      </Link>
-    </div>
-  );
 }

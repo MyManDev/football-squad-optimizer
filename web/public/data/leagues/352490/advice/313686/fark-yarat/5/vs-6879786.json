@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-10-14T14:20:21Z",
+  "generated_at_utc": "2026-10-16T07:13:49Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "fark-yarat",
     "window": 5,
-    "source_snapshot_id": "fpl-live-20261014T135921Z-a48d1521c87f",
+    "source_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd",
     "moves": [
       {
         "move_id": "gw07-1",
@@ -35,8 +35,8 @@
     "expected_gain_vs_hold": 1.8281528551472945,
     "expected_points_cost": 0.0,
     "rival_label": "entry-6879786",
-    "solver_status": "FEASIBLE",
-    "optimality_gap": 1.9590000000000032,
+    "solver_status": "OPTIMAL",
+    "optimality_gap": 0.0,
     "wall_clock_stopped_the_search": false,
     "expected_own_points": 58.20318064017789,
     "captain": {
@@ -211,58 +211,6 @@
         "gameweek": 8,
         "transfers_in": [
           {
-            "player_id": 437730,
-            "name": "Antoine Semenyo",
-            "short_name": "Semenyo",
-            "position": "MID",
-            "team": "Man City"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 244851,
-            "name": "Cole Palmer",
-            "short_name": "Palmer",
-            "position": "MID",
-            "team": "Chelsea"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 58.290097059742706
-      },
-      {
-        "gameweek": 9,
-        "transfers_in": [
-          {
-            "player_id": 201666,
-            "name": "Harvey Barnes",
-            "short_name": "Barnes",
-            "position": "MID",
-            "team": "Newcastle"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 577725,
-            "name": "Josh King",
-            "short_name": "King",
-            "position": "MID",
-            "team": "Fulham"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 58.98806454936788
-      },
-      {
-        "gameweek": 10,
-        "transfers_in": [
-          {
             "player_id": 154043,
             "name": "Ainsley Maitland-Niles",
             "short_name": "Maitland-Niles",
@@ -283,17 +231,69 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 59.26046149150797
+        "expected_points": 58.47557758231797
+      },
+      {
+        "gameweek": 9,
+        "transfers_in": [
+          {
+            "player_id": 437730,
+            "name": "Antoine Semenyo",
+            "short_name": "Semenyo",
+            "position": "MID",
+            "team": "Man City"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 244851,
+            "name": "Cole Palmer",
+            "short_name": "Palmer",
+            "position": "MID",
+            "team": "Chelsea"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 1,
+        "free_transfers_after": 1,
+        "expected_points": 58.5624940018828
+      },
+      {
+        "gameweek": 10,
+        "transfers_in": [
+          {
+            "player_id": 466052,
+            "name": "Rayan Cherki",
+            "short_name": "Cherki",
+            "position": "MID",
+            "team": "Man City"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 577725,
+            "name": "Josh King",
+            "short_name": "King",
+            "position": "MID",
+            "team": "Fulham"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 1,
+        "free_transfers_after": 1,
+        "expected_points": 60.06922749441796
       },
       {
         "gameweek": 11,
         "transfers_in": [
           {
-            "player_id": 502500,
-            "name": "Igor Thiago Nascimento Rodrigues",
-            "short_name": "Rodrigues",
+            "player_id": 444102,
+            "name": "Francisco Evanilson de Lima Barbosa",
+            "short_name": "Barbosa",
             "position": "FWD",
-            "team": "Brentford"
+            "team": "Bournemouth"
           }
         ],
         "transfers_out": [
@@ -309,7 +309,7 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 60.05359105059979
+        "expected_points": 60.3072287148633
       }
     ],
     "stated_limits": [
@@ -324,8 +324,9 @@
     "data_quality": "complete",
     "missing_fields": [],
     "squad_basis": "captured",
-    "control_solver_status": "FEASIBLE",
-    "control_optimality_gap": 1.9590000000000032,
+    "expected_points_cost_ceiling": 0.0,
+    "control_solver_status": "OPTIMAL",
+    "control_optimality_gap": 0.0,
     "rival_entry_id": 6879786,
     "overlap_count": 4,
     "transfer_cap": 1,

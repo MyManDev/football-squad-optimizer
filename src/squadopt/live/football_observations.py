@@ -14,7 +14,7 @@ import pandas as pd
 
 from squadopt.planning.models import InitialSquadState, PlanningHorizon
 from squadopt.planning.recourse import ObservationNode
-from squadopt.prediction.football import FOOTBALL_MODEL_VERSION, JOINT_ROLE_MODEL_VERSIONS
+from squadopt.prediction.football import FOOTBALL_MODEL_VERSION, JOINT_ROLE_COMPONENT_MODEL_VERSIONS
 from squadopt.prediction.football_match_context import MATCH_CONTEXT_MODEL_VERSION
 from squadopt.prediction.football_team_form import TEAM_FORM_MODEL_VERSION
 
@@ -76,7 +76,7 @@ def availability_observations(
     if model_version not in (
         FOOTBALL_MODEL_VERSION,
         MATCH_CONTEXT_MODEL_VERSION,
-        *JOINT_ROLE_MODEL_VERSIONS,
+        *JOINT_ROLE_COMPONENT_MODEL_VERSIONS,
         TEAM_FORM_MODEL_VERSION,
     ):
         return result("conditional_team_components_unavailable")

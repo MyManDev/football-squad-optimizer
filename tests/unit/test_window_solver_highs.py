@@ -1376,12 +1376,14 @@ def _measure(
     """Two members, every piece replaced; the clock, the order and the refusals are real."""
 
     seen = _Measure()
-    inputs = runner.PublishedInputs({}, {1: {}, 2: {}}, {}, Path("unused"))
-    monkeypatch.setattr(runner, "load_inputs", lambda: inputs)
+    inputs = runner.PublishedInputs({"gameweek": 6}, {1: {}, 2: {}}, {}, Path("unused"))
+    monkeypatch.setattr(runner, "load_inputs", lambda *args: inputs)
     monkeypatch.setattr(runner, "datetime", _clock(moment))
     monkeypatch.setattr(runner, "_git_revision", lambda: ("a" * 40, False))
     monkeypatch.setattr(
-        runner, "preflight_driver", lambda build, name: seen.preflights.append(name)
+        runner,
+        "preflight_driver",
+        lambda build, name, out_dir=None: seen.preflights.append(name),
     )
     monkeypatch.setattr(
         runner, "rebuild_check", lambda _, entry: {"entry_id": entry, "passed": rebuild}
@@ -1393,7 +1395,7 @@ def _measure(
         return _Reference(entry, window, side(entry, window, run))
 
     def highs_run(
-        build: str, instance: _Reference, budget: float, node: str
+        build: str, instance: _Reference, budget: float, node: str, out_dir: Path | None = None
     ) -> tuple[dict[str, Any], None]:
         seen.budgets.append((instance.entry_id, instance.window, build, budget))
         return dict(reported[build]), None
@@ -1512,7 +1514,7 @@ def _instance_for_runs() -> Any:
 
 
 def test_a_driver_that_could_not_start_stops_the_run(monkeypatch: pytest.MonkeyPatch) -> None:
-    def missing(job: Any, *, timeout: float) -> Any:
+    def missing(job: Any, *, timeout: float, out_dir: Path | None = None) -> Any:
         raise runner.DriverFailed("exit 1: ModuleNotFoundError: No module named 'highspy'")
 
     monkeypatch.setattr(runner, "_run_native_child", missing)
@@ -1523,7 +1525,7 @@ def test_a_driver_that_could_not_start_stops_the_run(monkeypatch: pytest.MonkeyP
 def test_a_driver_that_crashes_mid_solve_scores_as_an_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    def crash(job: Any, *, timeout: float) -> Any:
+    def crash(job: Any, *, timeout: float, out_dir: Path | None = None) -> Any:
         raise runner.DriverFailed("exit 3221225477: ")
 
     monkeypatch.setattr(runner, "_run_native_child", crash)

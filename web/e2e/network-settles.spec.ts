@@ -3,7 +3,10 @@ import { join } from "node:path";
 
 import { expect, test, type Page, type Request, type Route } from "@playwright/test";
 
+import { MESSAGES } from "../src/i18n/messages";
+
 import { shippedTrees } from "../src/testSupport/shippedTrees";
+import { claimMember, shippedClaim } from "./identity";
 
 /**
  * No page leaves a request open. Chromium keeps a response whose body is never read open
@@ -44,12 +47,25 @@ async function openRequestsAfter(page: Page, path: string): Promise<string[]> {
 test.beforeEach(async ({ page }) => {
   // CI builds with the production API origin; no spec may reach it (e2e/leagueMocks.ts).
   await page.route("**/api/v1/**", (route) => route.abort("connectionrefused"));
+  // The visitor has said who they are, so each page draws itself rather than the step.
+  await claimMember(page, shippedClaim());
 });
+
+/** The page itself is drawn, not "Sen kimsin?": its heading, or the missing member's state. */
+async function expectPageDrawn(page: Page, path: string) {
+  await expect(page.locator("[data-member-picker]"), path).toHaveCount(0);
+  if (path.endsWith("/members/1")) {
+    await expect(page.getByText(MESSAGES.tr.leagueMembers.entryNotAvailable)).toBeVisible();
+  } else {
+    await expect(page.locator("main h1"), path).toBeVisible();
+  }
+}
 
 const PAGES = [
   "/",
   "/moves",
   "/rivals",
+  "/gw/2026-27/1",
   "/fixtures",
   "/status",
   league,
@@ -61,6 +77,7 @@ const PAGES = [
 for (const path of PAGES) {
   test(`${path} leaves no request open`, async ({ page }) => {
     expect(await openRequestsAfter(page, path)).toEqual([]);
+    await expectPageDrawn(page, path);
   });
 }
 
@@ -77,5 +94,6 @@ for (const { reader, path, unpublish } of REFUSALS) {
   test(`${reader} refused leaves no request open`, async ({ page }) => {
     if (unpublish) await page.route(unpublish, unpublished);
     expect(await openRequestsAfter(page, path)).toEqual([]);
+    if (path.includes("/league/") && !unpublish) await expectPageDrawn(page, path);
   });
 }

@@ -3,24 +3,42 @@ import { useLocation, useNavigate } from "react-router";
 
 import { Card } from "../../../design/components/Card";
 import { useLanguage } from "../../../i18n/context";
-import { legacyLeagueAddress, membersAddress } from "../../../lib/leagueAddresses";
+import {
+  FIND_YOURSELF,
+  legacyLeagueAddress,
+  membersAddress,
+  PICK_HERE,
+} from "../../../lib/leagueAddresses";
 import { LeagueDataMissing, lookupPublishedLeague } from "../data";
-import { useChosenLeague } from "../identity/useChosenLeague";
+import { useLeagueIdentity } from "../identity/useLeagueIdentity";
 import styles from "./LeagueEntryPage.module.css";
 
 type State = "idle" | "invalid" | "loading" | "unsupported" | "missing" | "failed";
 
 /**
+ * The league number, the first of the two steps in front of every league page. A
+ * connected league opens its members list, where the second step asks who the visitor is
+ * and then opens their own page.
+ *
  * `inPlace`: the gate rendered this form at a league address. A connected league then
  * opens the page the address named under that league (an address from before the number
  * is rewritten with it), or the members list where the address named another league.
+ *
+ * `stay` (with `inPlace`): the gate rendered this form in front of a page whose address
+ * names no league. A connected league keeps the address, and the member step follows there.
  */
-export function LeagueEntryPage({ inPlace = false }: { inPlace?: boolean }) {
+export function LeagueEntryPage({
+  inPlace = false,
+  stay = false,
+}: {
+  inPlace?: boolean;
+  stay?: boolean;
+}) {
   const { messages } = useLanguage();
   const copy = messages.leagueEntry;
   const navigate = useNavigate();
   const location = useLocation();
-  const { leagueId: remembered, choose } = useChosenLeague();
+  const { leagueId: remembered, chooseLeague } = useLeagueIdentity();
   const [value, setValue] = useState(remembered === null ? "" : String(remembered));
   const [state, setState] = useState<State>("idle");
   // The number the last lookup asked for, named in the answer that it is not published.
@@ -48,12 +66,26 @@ export function LeagueEntryPage({ inPlace = false }: { inPlace?: boolean }) {
       const result = await lookupPublishedLeague(leagueId);
       if (!active.current) return;
       if (result.status === "connected") {
-        choose(leagueId);
-        const here = inPlace ? legacyLeagueAddress(location.pathname, leagueId) : null;
-        navigate(
-          here === null ? membersAddress(leagueId) : `${here}${location.search}${location.hash}`,
-          { replace: inPlace },
-        );
+        const here = inPlace && !stay ? legacyLeagueAddress(location.pathname, leagueId) : null;
+        if (here !== null) {
+          // An address from before the number, rewritten with it: the member step is asked
+          // there, and its state puts focus on the picker as on the other two paths. The
+          // gate at the new address chooses the league it names, as it does for any league
+          // reached by its address. Choosing it here first would let the gate rewrite the
+          // old address on its own before this navigation lands, without the step state.
+          navigate(`${here}${location.search}${location.hash}`, {
+            replace: true,
+            state: PICK_HERE,
+          });
+          return;
+        }
+        chooseLeague(leagueId);
+        if (inPlace && stay)
+          navigate(
+            { pathname: location.pathname, search: location.search, hash: location.hash },
+            { replace: true, state: PICK_HERE },
+          );
+        else navigate(membersAddress(leagueId), { replace: inPlace, state: FIND_YOURSELF });
       } else setState("unsupported");
     } catch (error) {
       if (active.current) setState(error instanceof LeagueDataMissing ? "missing" : "failed");

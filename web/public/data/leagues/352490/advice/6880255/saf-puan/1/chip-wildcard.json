@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-10-14T14:20:21Z",
+  "generated_at_utc": "2026-10-16T07:13:49Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "saf-puan",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20261014T135921Z-a48d1521c87f",
+    "source_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd",
     "moves": [
       {
         "move_id": "gw07-1",
@@ -21,13 +21,13 @@
           "team": "Spurs"
         },
         "player_in": {
-          "player_id": 204936,
-          "name": "Gianluigi Donnarumma",
-          "short_name": "Donnarumma",
+          "player_id": 155465,
+          "name": "Michael Zetterer",
+          "short_name": "Zetterer",
           "position": "GK",
-          "team": "Man City"
+          "team": "Leeds"
         },
-        "expected_points_delta": 0.3012300895468485,
+        "expected_points_delta": 0.0,
         "reason_code": "points_gain"
       },
       {
@@ -46,7 +46,7 @@
           "position": "DEF",
           "team": "Everton"
         },
-        "expected_points_delta": 3.2000732286357447,
+        "expected_points_delta": 3.2000732286357305,
         "reason_code": "points_gain"
       },
       {
@@ -65,7 +65,7 @@
           "position": "DEF",
           "team": "Everton"
         },
-        "expected_points_delta": 1.548955119360258,
+        "expected_points_delta": 1.5489551193602722,
         "reason_code": "points_gain"
       },
       {
@@ -192,13 +192,13 @@
           "team": "Brighton"
         },
         "player_in": {
-          "player_id": 481283,
-          "name": "James Wright",
-          "short_name": "Wright",
+          "player_id": 204936,
+          "name": "Gianluigi Donnarumma",
+          "short_name": "Donnarumma",
           "position": "GK",
-          "team": "Aston Villa"
+          "team": "Man City"
         },
-        "expected_points_delta": 0.0,
+        "expected_points_delta": 0.3012300895468485,
         "reason_code": "points_gain"
       },
       {
@@ -375,11 +375,11 @@
     ],
     "bench": [
       {
-        "player_id": 481283,
-        "name": "James Wright",
-        "short_name": "Wright",
+        "player_id": 155465,
+        "name": "Michael Zetterer",
+        "short_name": "Zetterer",
         "position": "GK",
-        "team": "Aston Villa",
+        "team": "Leeds",
         "expected_points": 1.1976225854383358
       },
       {

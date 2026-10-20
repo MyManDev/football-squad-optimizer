@@ -1,8 +1,16 @@
 import AxeBuilder from "@axe-core/playwright";
+import { atRest } from "./atRest";
 import { expect, test } from "@playwright/test";
 
 import { settledRecommendationFixture } from "../src/fixtures/settledRecommendation";
 import { installSettledRecommendationMock } from "./settledMocks";
+import { claimMember, shippedClaim } from "./identity";
+
+// The gameweek page stands behind the league number and "Sen kimsin?"; this visitor has
+// taken both, as the published league's first member.
+test.beforeEach(async ({ page }) => {
+  await claimMember(page, shippedClaim());
+});
 
 test("the real settled contract fills the scorecard and player rows at 390px", async ({ page }) => {
   await installSettledRecommendationMock(page);
@@ -26,6 +34,7 @@ test("the real settled contract fills the scorecard and player rows at 390px", a
   }));
   expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth);
 
+  await atRest(page);
   const results = await new AxeBuilder({ page }).analyze();
   const blocking = results.violations.filter((violation) =>
     new Set(["critical", "serious"]).has(violation.impact ?? ""),

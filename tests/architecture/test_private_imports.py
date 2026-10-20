@@ -32,8 +32,8 @@ PACKAGE = "squadopt"
 #: The remedy of an entry, as ARCHITECTURE.md's known violations write it.
 EXPECTED_LINEUP = (
     "scenarios.expected_lineup publishes the inputs, the decision, prepare, score and the "
-    "autosub multipliers, keeping the private aliases for one release; Phase 3, once the owner "
-    "decides whether football_exact_lineup is product or laboratory"
+    "autosub multipliers, keeping the private aliases for one release; Phase 3, when "
+    "football_exact_lineup, laboratory code by the owner's decision on #1054, leaves planning"
 )
 FROZEN_DECISION = (
     "evaluation.scoring publishes validate_frozen_decision, keeping the private alias for one "

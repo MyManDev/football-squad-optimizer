@@ -81,13 +81,14 @@ Run the same list locally before opening a PR; the browser half is described bel
 
 ## Playwright configurations
 
-The browser specs live in `e2e/`. Three configurations select from them:
+The browser specs live in `e2e/`. Four configurations select from them:
 
-| Configuration                  | Runs                                                                                                                          | When                                                                                                                                       |
-| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `playwright.config.ts`         | Every spec except `advice-backend.spec.ts` and `live-smoke.spec.ts`, against the production build served by `npm run preview` | `npm run e2e`, in CI and locally                                                                                                           |
-| `playwright.backend.config.ts` | `advice-backend.spec.ts`, against a real local API and worker                                                                 | Only through `tests/integration/test_advice_browser.py`, which supplies its context ([below](#browser-check-with-the-real-advice-backend)) |
-| `playwright.live.config.ts`    | `live-smoke.spec.ts`, read-only, against a deployed site named by `LIVE_BASE_URL`                                             | By hand after a release; it refuses to run in CI ([deployment runbook](../docs/deployment_runbook.md#post-deployment-smoke))               |
+| Configuration                  | Runs                                                                                                                                                                     | When                                                                                                                                       |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `playwright.config.ts`         | Every spec except `advice-backend.spec.ts` and `live-smoke.spec.ts`, against the production build served by `npm run preview`                                            | `npm run e2e`, in CI and locally                                                                                                           |
+| `playwright.backend.config.ts` | `advice-backend.spec.ts`, against a real local API and worker                                                                                                            | Only through `tests/integration/test_advice_browser.py`, which supplies its context ([below](#browser-check-with-the-real-advice-backend)) |
+| `playwright.live.config.ts`    | `live-smoke.spec.ts`, read-only, against a deployed site named by `LIVE_BASE_URL`                                                                                        | By hand after a release; it refuses to run in CI ([deployment runbook](../docs/deployment_runbook.md#post-deployment-smoke))               |
+| `playwright.engines.config.ts` | `device-plan.spec.ts` on Chromium, WebKit and Firefox, against the same build and server as `playwright.config.ts`; each test prints its device timings as one JSON line | `npm run e2e:engines`, by hand after `npx playwright install webkit firefox`; CI does not run it yet (#981 step 4)                         |
 
 ## Deployment checks
 

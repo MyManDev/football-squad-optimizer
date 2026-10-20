@@ -2,7 +2,8 @@
  * The member's fixture rail: a 340 px column of its own from 1180 px (panel background,
  * left hairline, scrolling inside itself), a region beside the squad on a tablet, and a
  * sheet from the right on a phone. Three blocks with sentence-case headings, then the
- * legend. Home is a filled cell, away an outlined one; nothing else is encoded.
+ * legend. Home is a filled cell, away an outlined one; nothing else is encoded (each
+ * club's two colours beside its code are decoration).
  *
  * Contrast: ink3 labels are 5.17:1 on the panel and 4.78:1 on the page; ink2 on a filled
  * home cell (--color-surface-2) is 6.1:1; the ÇIKAN and GİREN tags are 6.2:1 and 5.0:1 on
@@ -182,11 +183,13 @@
   line-height: 16px;
 }
 
+/* The opponent's two colours, its code and the venue letter. The 2 px gaps keep all three
+   inside a 50 px week column (44 px inside the cell's padding and border). */
 .fixture {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 2px;
   height: 24px;
   border: 1px solid var(--color-line);
   border-radius: var(--radius-s);
@@ -242,8 +245,12 @@
   padding: 4px 0;
 }
 
+/* Each side's two colours face the dash, as on the fixtures page. */
 .match {
   flex: none;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
   min-width: 76px;
   font-family: var(--font-mono);
   font-weight: 600;
@@ -296,8 +303,8 @@
   transform: translateX(100%);
   visibility: hidden;
   transition:
-    transform 200ms ease,
-    visibility 0s linear 200ms;
+    transform var(--motion-ui) var(--motion-ease),
+    visibility 0s linear var(--motion-ui);
 }
 
 .rail[data-placement="sheet"][data-open] {
@@ -305,7 +312,7 @@
   visibility: visible;
   box-shadow: var(--shadow-drawer);
   transition:
-    transform 200ms ease,
+    transform var(--motion-ui) var(--motion-ease),
     visibility 0s;
 }
 

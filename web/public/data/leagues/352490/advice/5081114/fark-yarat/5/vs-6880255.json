@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-10-14T14:20:21Z",
+  "generated_at_utc": "2026-10-16T07:13:49Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "fark-yarat",
     "window": 5,
-    "source_snapshot_id": "fpl-live-20261014T135921Z-a48d1521c87f",
+    "source_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd",
     "moves": [
       {
         "move_id": "gw07-1",
@@ -27,16 +27,16 @@
           "position": "DEF",
           "team": "Everton"
         },
-        "expected_points_delta": 0.99828884967161,
+        "expected_points_delta": 1.0406590337066461,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 0.99828884967161,
+    "expected_gain_vs_hold": 1.0406590337066461,
     "expected_points_cost": 0.0,
     "rival_label": "entry-6880255",
     "solver_status": "FEASIBLE",
-    "optimality_gap": 1.3450000000000273,
+    "optimality_gap": 1.6550000000000296,
     "wall_clock_stopped_the_search": false,
     "expected_own_points": 54.97970325670107,
     "captain": {
@@ -220,21 +220,47 @@
         ],
         "transfers_out": [
           {
-            "player_id": 577725,
-            "name": "Josh King",
-            "short_name": "King",
+            "player_id": 540324,
+            "name": "Mohamed Belloumi",
+            "short_name": "Belloumi",
             "position": "MID",
-            "team": "Fulham"
+            "team": "Hull City"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 56.511898685259084
+        "expected_points": 56.666661382436814
       },
       {
         "gameweek": 9,
+        "transfers_in": [
+          {
+            "player_id": 437730,
+            "name": "Antoine Semenyo",
+            "short_name": "Semenyo",
+            "position": "MID",
+            "team": "Man City"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 223340,
+            "name": "Bukayo Saka",
+            "short_name": "Saka",
+            "position": "MID",
+            "team": "Arsenal"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 1,
+        "free_transfers_after": 1,
+        "expected_points": 56.80258734132369
+      },
+      {
+        "gameweek": 10,
         "transfers_in": [
           {
             "player_id": 610799,
@@ -257,50 +283,24 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 57.618629396717
-      },
-      {
-        "gameweek": 10,
-        "transfers_in": [
-          {
-            "player_id": 204580,
-            "name": "Vitaly Janelt",
-            "short_name": "Janelt",
-            "position": "MID",
-            "team": "Brentford"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 540324,
-            "name": "Mohamed Belloumi",
-            "short_name": "Belloumi",
-            "position": "MID",
-            "team": "Hull City"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 57.806167314349906
+        "expected_points": 57.909318052781614
       },
       {
         "gameweek": 11,
         "transfers_in": [
           {
-            "player_id": 243413,
-            "name": "Regan Slater",
-            "short_name": "Slater",
+            "player_id": 201666,
+            "name": "Harvey Barnes",
+            "short_name": "Barnes",
             "position": "MID",
-            "team": "Hull City"
+            "team": "Newcastle"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 153366,
-            "name": "Harrison Reed",
-            "short_name": "Reed",
+            "player_id": 577725,
+            "name": "Josh King",
+            "short_name": "King",
             "position": "MID",
             "team": "Fulham"
           }
@@ -309,7 +309,7 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 57.806167314349906
+        "expected_points": 58.60728554240676
       }
     ],
     "stated_limits": [
@@ -325,7 +325,7 @@
     "missing_fields": [],
     "squad_basis": "captured",
     "control_solver_status": "FEASIBLE",
-    "control_optimality_gap": 1.3450000000000273,
+    "control_optimality_gap": 1.6550000000000296,
     "rival_entry_id": 6880255,
     "overlap_count": 3,
     "transfer_cap": 1,

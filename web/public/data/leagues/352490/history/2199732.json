@@ -1,21 +1,21 @@
 {
   "contract_version": "weekly_suggestion_history_v1",
-  "generated_at_utc": "2026-10-14T13:59:21.062647Z",
+  "generated_at_utc": "2026-10-16T06:01:54.275749Z",
   "payload": {
     "league_id": 352490,
     "entry_id": 2199732,
     "season": "2026-27",
-    "as_of_snapshot_id": "fpl-live-20261014T135921Z-a48d1521c87f",
+    "as_of_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd",
     "weeks": [
       {
         "gameweek": 7,
         "status": "unsettled",
         "reason": "not_settled",
         "deadline_utc": "2026-10-17T10:00:00Z",
-        "advice_snapshot_id": "fpl-live-20261014T135921Z-a48d1521c87f",
-        "advice_captured_at_utc": "2026-10-14T13:59:21.062647Z",
-        "advice_generated_at_utc": "2026-10-14T14:20:21Z",
-        "advice_sha256": "0109598530720e8daa341fd126042abd1722e9f0bbcccf7825156d70adce3818",
+        "advice_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd",
+        "advice_captured_at_utc": "2026-10-16T06:01:54.275749Z",
+        "advice_generated_at_utc": "2026-10-16T07:13:49Z",
+        "advice_sha256": "8ef8a73d97f0f0bfb1bbed45eeccd5f98b9a76597beec55bdce945c979c6eba7",
         "outcome_snapshot_id": null,
         "outcome_captured_at_utc": null,
         "expected_own_points": 58.482802268551836,
@@ -120,6 +120,612 @@
             "expected_points_cost": 0.0,
             "expected_points_cost_ceiling": 0.0,
             "managers_word": true
+          },
+          {
+            "published_path": "advice/2199732/saf-puan/1/top100-5.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Marc Guéhi",
+                "player_in": "James Tarkowski"
+              },
+              {
+                "player_out": "Dominik Szoboszlai",
+                "player_in": "Antoine Semenyo"
+              },
+              {
+                "player_out": "Riccardo Calafiori",
+                "player_in": "Ainsley Maitland-Niles"
+              }
+            ],
+            "expected_points_cost": 0.0,
+            "expected_points_cost_ceiling": 0.0,
+            "top100_weight": 5
+          },
+          {
+            "published_path": "advice/2199732/saf-puan/1/top100-5-hoca-sozu.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Marc Guéhi",
+                "player_in": "James Tarkowski"
+              },
+              {
+                "player_out": "Dominik Szoboszlai",
+                "player_in": "Antoine Semenyo"
+              },
+              {
+                "player_out": "Riccardo Calafiori",
+                "player_in": "Ainsley Maitland-Niles"
+              }
+            ],
+            "expected_points_cost": 0.0,
+            "expected_points_cost_ceiling": 0.0,
+            "top100_weight": 5,
+            "managers_word": true
+          },
+          {
+            "published_path": "advice/2199732/saf-puan/1/top100-10.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Marc Guéhi",
+                "player_in": "James Tarkowski"
+              },
+              {
+                "player_out": "Dominik Szoboszlai",
+                "player_in": "Antoine Semenyo"
+              },
+              {
+                "player_out": "Iliman Ndiaye",
+                "player_in": "Diego Gómez Amarilla"
+              }
+            ],
+            "expected_points_cost": 0.2723969421400767,
+            "expected_points_cost_ceiling": 0.2723969421400767,
+            "top100_weight": 10
+          },
+          {
+            "published_path": "advice/2199732/saf-puan/1/top100-10-hoca-sozu.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Marc Guéhi",
+                "player_in": "James Tarkowski"
+              },
+              {
+                "player_out": "Dominik Szoboszlai",
+                "player_in": "Antoine Semenyo"
+              },
+              {
+                "player_out": "Iliman Ndiaye",
+                "player_in": "Diego Gómez Amarilla"
+              }
+            ],
+            "expected_points_cost": 0.2723969421400767,
+            "expected_points_cost_ceiling": 0.2723969421400767,
+            "top100_weight": 10,
+            "managers_word": true
+          },
+          {
+            "published_path": "advice/2199732/saf-puan/1/top100-20.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Marc Guéhi",
+                "player_in": "James Tarkowski"
+              },
+              {
+                "player_out": "Dominik Szoboszlai",
+                "player_in": "Antoine Semenyo"
+              },
+              {
+                "player_out": "Iliman Ndiaye",
+                "player_in": "Diego Gómez Amarilla"
+              }
+            ],
+            "expected_points_cost": 0.2723969421400767,
+            "expected_points_cost_ceiling": 0.2723969421400767,
+            "top100_weight": 20
+          },
+          {
+            "published_path": "advice/2199732/saf-puan/1/top100-20-hoca-sozu.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Marc Guéhi",
+                "player_in": "James Tarkowski"
+              },
+              {
+                "player_out": "Dominik Szoboszlai",
+                "player_in": "Antoine Semenyo"
+              },
+              {
+                "player_out": "Iliman Ndiaye",
+                "player_in": "Diego Gómez Amarilla"
+              }
+            ],
+            "expected_points_cost": 0.2723969421400767,
+            "expected_points_cost_ceiling": 0.2723969421400767,
+            "top100_weight": 20,
+            "managers_word": true
+          },
+          {
+            "published_path": "advice/2199732/saf-puan/1/top100-30.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Marc Guéhi",
+                "player_in": "James Tarkowski"
+              },
+              {
+                "player_out": "Dominik Szoboszlai",
+                "player_in": "Antoine Semenyo"
+              },
+              {
+                "player_out": "Iliman Ndiaye",
+                "player_in": "Diego Gómez Amarilla"
+              }
+            ],
+            "expected_points_cost": 0.2723969421400767,
+            "expected_points_cost_ceiling": 0.2723969421400767,
+            "top100_weight": 30
+          },
+          {
+            "published_path": "advice/2199732/saf-puan/1/top100-30-hoca-sozu.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Marc Guéhi",
+                "player_in": "James Tarkowski"
+              },
+              {
+                "player_out": "Dominik Szoboszlai",
+                "player_in": "Antoine Semenyo"
+              },
+              {
+                "player_out": "Iliman Ndiaye",
+                "player_in": "Diego Gómez Amarilla"
+              }
+            ],
+            "expected_points_cost": 0.2723969421400767,
+            "expected_points_cost_ceiling": 0.2723969421400767,
+            "top100_weight": 30,
+            "managers_word": true
+          },
+          {
+            "published_path": "advice/2199732/saf-puan/1/top100-40.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Marc Guéhi",
+                "player_in": "James Tarkowski"
+              },
+              {
+                "player_out": "Dominik Szoboszlai",
+                "player_in": "Antoine Semenyo"
+              },
+              {
+                "player_out": "Iliman Ndiaye",
+                "player_in": "Diego Gómez Amarilla"
+              }
+            ],
+            "expected_points_cost": 0.2723969421400767,
+            "expected_points_cost_ceiling": 0.2723969421400767,
+            "top100_weight": 40
+          },
+          {
+            "published_path": "advice/2199732/saf-puan/1/top100-40-hoca-sozu.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Marc Guéhi",
+                "player_in": "James Tarkowski"
+              },
+              {
+                "player_out": "Dominik Szoboszlai",
+                "player_in": "Antoine Semenyo"
+              },
+              {
+                "player_out": "Iliman Ndiaye",
+                "player_in": "Diego Gómez Amarilla"
+              }
+            ],
+            "expected_points_cost": 0.2723969421400767,
+            "expected_points_cost_ceiling": 0.2723969421400767,
+            "top100_weight": 40,
+            "managers_word": true
+          },
+          {
+            "published_path": "advice/2199732/saf-puan/1/top100-50.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Marc Guéhi",
+                "player_in": "James Tarkowski"
+              },
+              {
+                "player_out": "Dominik Szoboszlai",
+                "player_in": "Antoine Semenyo"
+              },
+              {
+                "player_out": "Iliman Ndiaye",
+                "player_in": "Diego Gómez Amarilla"
+              }
+            ],
+            "expected_points_cost": 0.2723969421400767,
+            "expected_points_cost_ceiling": 0.2723969421400767,
+            "top100_weight": 50
+          },
+          {
+            "published_path": "advice/2199732/saf-puan/1/top100-50-hoca-sozu.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Marc Guéhi",
+                "player_in": "James Tarkowski"
+              },
+              {
+                "player_out": "Dominik Szoboszlai",
+                "player_in": "Antoine Semenyo"
+              },
+              {
+                "player_out": "Iliman Ndiaye",
+                "player_in": "Diego Gómez Amarilla"
+              }
+            ],
+            "expected_points_cost": 0.2723969421400767,
+            "expected_points_cost_ceiling": 0.2723969421400767,
+            "top100_weight": 50,
+            "managers_word": true
+          },
+          {
+            "published_path": "advice/2199732/ortak-koru/1/vs-7252721/top100-5.json",
+            "strategy": "ortak-koru",
+            "window": 1,
+            "rival_entry_id": 7252721,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "David Raya Martín",
+                "player_in": "Bart Verbruggen"
+              },
+              {
+                "player_out": "Issa Diop",
+                "player_in": "Tyrick Mitchell"
+              },
+              {
+                "player_out": "Dominik Szoboszlai",
+                "player_in": "Morgan Gibbs-White"
+              }
+            ],
+            "expected_points_cost": 1.56051160975791,
+            "expected_points_cost_ceiling": 1.56051160975791,
+            "top100_weight": 5
+          },
+          {
+            "published_path": "advice/2199732/ortak-koru/1/vs-7252721/top100-10.json",
+            "strategy": "ortak-koru",
+            "window": 1,
+            "rival_entry_id": 7252721,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "David Raya Martín",
+                "player_in": "Bart Verbruggen"
+              },
+              {
+                "player_out": "Issa Diop",
+                "player_in": "Tyrick Mitchell"
+              },
+              {
+                "player_out": "Dominik Szoboszlai",
+                "player_in": "Morgan Gibbs-White"
+              }
+            ],
+            "expected_points_cost": 1.56051160975791,
+            "expected_points_cost_ceiling": 1.56051160975791,
+            "top100_weight": 10
+          },
+          {
+            "published_path": "advice/2199732/ortak-koru/1/vs-7252721/top100-20.json",
+            "strategy": "ortak-koru",
+            "window": 1,
+            "rival_entry_id": 7252721,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ezri Konsa Ngoyo",
+                "player_in": "Tyrick Mitchell"
+              },
+              {
+                "player_out": "Marc Guéhi",
+                "player_in": "Joško Gvardiol"
+              },
+              {
+                "player_out": "Dominik Szoboszlai",
+                "player_in": "Bryan Mbeumo"
+              }
+            ],
+            "expected_points_cost": 1.691998134544363,
+            "expected_points_cost_ceiling": 1.691998134544363,
+            "top100_weight": 20
+          },
+          {
+            "published_path": "advice/2199732/ortak-koru/1/vs-7252721/top100-30.json",
+            "strategy": "ortak-koru",
+            "window": 1,
+            "rival_entry_id": 7252721,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ezri Konsa Ngoyo",
+                "player_in": "Tyrick Mitchell"
+              },
+              {
+                "player_out": "Marc Guéhi",
+                "player_in": "Joško Gvardiol"
+              },
+              {
+                "player_out": "Dominik Szoboszlai",
+                "player_in": "Bryan Mbeumo"
+              }
+            ],
+            "expected_points_cost": 1.691998134544363,
+            "expected_points_cost_ceiling": 1.691998134544363,
+            "top100_weight": 30
+          },
+          {
+            "published_path": "advice/2199732/ortak-koru/1/vs-7252721/top100-40.json",
+            "strategy": "ortak-koru",
+            "window": 1,
+            "rival_entry_id": 7252721,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ezri Konsa Ngoyo",
+                "player_in": "Tyrick Mitchell"
+              },
+              {
+                "player_out": "Marc Guéhi",
+                "player_in": "Joško Gvardiol"
+              },
+              {
+                "player_out": "Dominik Szoboszlai",
+                "player_in": "Bryan Mbeumo"
+              }
+            ],
+            "expected_points_cost": 1.691998134544363,
+            "expected_points_cost_ceiling": 1.691998134544363,
+            "top100_weight": 40
+          },
+          {
+            "published_path": "advice/2199732/ortak-koru/1/vs-7252721/top100-50.json",
+            "strategy": "ortak-koru",
+            "window": 1,
+            "rival_entry_id": 7252721,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ezri Konsa Ngoyo",
+                "player_in": "Tyrick Mitchell"
+              },
+              {
+                "player_out": "Marc Guéhi",
+                "player_in": "Joško Gvardiol"
+              },
+              {
+                "player_out": "Dominik Szoboszlai",
+                "player_in": "Bryan Mbeumo"
+              }
+            ],
+            "expected_points_cost": 1.691998134544363,
+            "expected_points_cost_ceiling": 1.691998134544363,
+            "top100_weight": 50
+          },
+          {
+            "published_path": "advice/2199732/fark-yarat/1/vs-7252721/top100-5.json",
+            "strategy": "fark-yarat",
+            "window": 1,
+            "rival_entry_id": 7252721,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Dominik Szoboszlai",
+                "player_in": "Matheus Santos Carneiro da Cunha"
+              },
+              {
+                "player_out": "Iliman Ndiaye",
+                "player_in": "Antoine Semenyo"
+              },
+              {
+                "player_out": "João Pedro Junqueira de Jesus",
+                "player_in": "Vakhtang Salia"
+              }
+            ],
+            "expected_points_cost": 0.08779153136352136,
+            "expected_points_cost_ceiling": 0.08779153136352136,
+            "top100_weight": 5
+          },
+          {
+            "published_path": "advice/2199732/fark-yarat/1/vs-7252721/top100-10.json",
+            "strategy": "fark-yarat",
+            "window": 1,
+            "rival_entry_id": 7252721,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Marc Guéhi",
+                "player_in": "James Tarkowski"
+              },
+              {
+                "player_out": "Dominik Szoboszlai",
+                "player_in": "John McGinn"
+              },
+              {
+                "player_out": "Iliman Ndiaye",
+                "player_in": "Rayan Cherki"
+              }
+            ],
+            "expected_points_cost": 0.6867327483430614,
+            "expected_points_cost_ceiling": 0.6867327483430614,
+            "top100_weight": 10
+          },
+          {
+            "published_path": "advice/2199732/fark-yarat/1/vs-7252721/top100-20.json",
+            "strategy": "fark-yarat",
+            "window": 1,
+            "rival_entry_id": 7252721,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Marc Guéhi",
+                "player_in": "James Tarkowski"
+              },
+              {
+                "player_out": "Dominik Szoboszlai",
+                "player_in": "John McGinn"
+              },
+              {
+                "player_out": "Iliman Ndiaye",
+                "player_in": "Rayan Cherki"
+              }
+            ],
+            "expected_points_cost": 0.6867327483430614,
+            "expected_points_cost_ceiling": 0.6867327483430614,
+            "top100_weight": 20
+          },
+          {
+            "published_path": "advice/2199732/fark-yarat/1/vs-7252721/top100-30.json",
+            "strategy": "fark-yarat",
+            "window": 1,
+            "rival_entry_id": 7252721,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Marc Guéhi",
+                "player_in": "James Tarkowski"
+              },
+              {
+                "player_out": "Dominik Szoboszlai",
+                "player_in": "John McGinn"
+              },
+              {
+                "player_out": "Iliman Ndiaye",
+                "player_in": "Rayan Cherki"
+              }
+            ],
+            "expected_points_cost": 0.6867327483430614,
+            "expected_points_cost_ceiling": 0.6867327483430614,
+            "top100_weight": 30
+          },
+          {
+            "published_path": "advice/2199732/fark-yarat/1/vs-7252721/top100-40.json",
+            "strategy": "fark-yarat",
+            "window": 1,
+            "rival_entry_id": 7252721,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Marc Guéhi",
+                "player_in": "James Tarkowski"
+              },
+              {
+                "player_out": "Dominik Szoboszlai",
+                "player_in": "John McGinn"
+              },
+              {
+                "player_out": "Iliman Ndiaye",
+                "player_in": "Rayan Cherki"
+              }
+            ],
+            "expected_points_cost": 0.6867327483430614,
+            "expected_points_cost_ceiling": 0.6867327483430614,
+            "top100_weight": 40
+          },
+          {
+            "published_path": "advice/2199732/fark-yarat/1/vs-7252721/top100-50.json",
+            "strategy": "fark-yarat",
+            "window": 1,
+            "rival_entry_id": 7252721,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Marc Guéhi",
+                "player_in": "James Tarkowski"
+              },
+              {
+                "player_out": "Dominik Szoboszlai",
+                "player_in": "John McGinn"
+              },
+              {
+                "player_out": "Iliman Ndiaye",
+                "player_in": "Rayan Cherki"
+              }
+            ],
+            "expected_points_cost": 0.6867327483430614,
+            "expected_points_cost_ceiling": 0.6867327483430614,
+            "top100_weight": 50
           },
           {
             "published_path": "advice/2199732/saf-puan/1/chip-wildcard.json",
@@ -273,8 +879,8 @@
         "advice_captured_at_utc": "2026-10-10T03:57:32.746463Z",
         "advice_generated_at_utc": "2026-10-10T06:07:04Z",
         "advice_sha256": "a2857140ac5abc2b79c1988c8ce4c4540546cd7b541fe35e36727fc0f8b6e085",
-        "outcome_snapshot_id": "fpl-live-20261014T135921Z-a48d1521c87f",
-        "outcome_captured_at_utc": "2026-10-14T13:59:21.062647Z",
+        "outcome_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd",
+        "outcome_captured_at_utc": "2026-10-16T06:01:54.275749Z",
         "expected_own_points": 56.75799335902773,
         "suggested": {
           "gross_points": 80.0,
@@ -1234,8 +1840,8 @@
         "advice_captured_at_utc": "2026-09-18T12:25:16.241963Z",
         "advice_generated_at_utc": "2026-09-18T14:05:59Z",
         "advice_sha256": "36358a8b790f1240a4a24b23887cd7a9ee1827d41ee7968f0febb9bf673f8376",
-        "outcome_snapshot_id": "fpl-live-20261014T135921Z-a48d1521c87f",
-        "outcome_captured_at_utc": "2026-10-14T13:59:21.062647Z",
+        "outcome_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd",
+        "outcome_captured_at_utc": "2026-10-16T06:01:54.275749Z",
         "expected_own_points": 57.113332619233816,
         "suggested": {
           "gross_points": 55.0,
@@ -1474,8 +2080,8 @@
         "advice_captured_at_utc": "2026-09-12T10:00:00.227050Z",
         "advice_generated_at_utc": "2026-09-12T10:50:08Z",
         "advice_sha256": "2e69c50665c677452fdbdfc36857e1e45536ad534b65a5e22febe22f8565bed7",
-        "outcome_snapshot_id": "fpl-live-20261014T135921Z-a48d1521c87f",
-        "outcome_captured_at_utc": "2026-10-14T13:59:21.062647Z",
+        "outcome_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd",
+        "outcome_captured_at_utc": "2026-10-16T06:01:54.275749Z",
         "expected_own_points": 58.00754952072998,
         "suggested": {
           "gross_points": 77.0,

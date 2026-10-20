@@ -112,9 +112,6 @@ NAMED_IN_THE_INDEX_WITHOUT_A_LINK: frozenset[str] = frozenset(
         "docs/phase_c_v2_development_method.md",
         "docs/phase_d_component_fidelity_prereg.md",
         "docs/phase_d_component_squad_calibration_prereg.md",
-        "docs/planner_doe.md",
-        "docs/planner_horizon_rolling.md",
-        "docs/planner_horizon_seasons.md",
         "docs/positional_defence.md",
         "docs/positional_defence_prereg.md",
         "docs/prior_minutes_level.md",
@@ -141,13 +138,11 @@ NAMED_IN_THE_INDEX_WITHOUT_A_LINK: frozenset[str] = frozenset(
         "docs/scenario_calibration_audit.md",
         "docs/scenario_path_dependence.md",
         "docs/schedule_signal_study.md",
-        "docs/season_chain.md",
         "docs/season_chain_blind.md",
         "docs/season_chain_freehit.md",
         "docs/season_chain_hybrid.md",
         "docs/season_chain_tuned.md",
         "docs/season_chain_value.md",
-        "docs/selection_optimism.md",
         "docs/settled_outcomes.md",
         "docs/shrinkage_grid.md",
         "docs/strategy_screening.md",
@@ -198,7 +193,6 @@ NOT_NAMED_IN_THE_INDEX: frozenset[str] = frozenset(
         "docs/handover_2026-08-23.md",
         "docs/live_score_view.md",
         "docs/mode_price_list_prereg.md",
-        "docs/opening_backtest.md",
         "docs/opening_newcomer_note.md",
         "docs/opponent_aware_projection_prereg.md",
         "docs/overlap_scaled_edge_prereg.md",
@@ -208,10 +202,6 @@ NOT_NAMED_IN_THE_INDEX: frozenset[str] = frozenset(
         "docs/phase_d_fixed_decision_readout_prereg.md",
         "docs/phase_d_monte_carlo_v2_prereg.md",
         "docs/phase_d_v2_development_method.md",
-        "docs/phase_e_candidate_selection_prereg.md",
-        "docs/phase_e_conditional_development_method.md",
-        "docs/planner_horizon_rolling_note.md",
-        "docs/planner_horizon_seasons_note.md",
         "docs/prediction_ranking_gate.md",
         "docs/rank_cost_calibration_note.md",
         "docs/rank_objective_rehearsal_heldout.md",
@@ -250,7 +240,7 @@ NOT_NAMED_IN_THE_INDEX: frozenset[str] = frozenset(
 
 #: The size of each list. Lower it when a document leaves its list; raising it is the growth
 #: the lists refuse, so a new unreachable document cannot join one by being added to it.
-LIST_SIZES = {"NAMED_IN_THE_INDEX_WITHOUT_A_LINK": 119, "NOT_NAMED_IN_THE_INDEX": 73}
+LIST_SIZES = {"NAMED_IN_THE_INDEX_WITHOUT_A_LINK": 114, "NOT_NAMED_IN_THE_INDEX": 68}
 
 
 def _documents(listed: list[str]) -> list[str]:

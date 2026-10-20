@@ -7,7 +7,7 @@ measures against the control, and the models of the experimental football lane. 
 are `live`, `scenarios` and `evaluation` in the domain ring, `application`, `platform`, the
 laboratory and the scripts.
 
-Its 35 Python files sit in one folder. This page places every one of them in exactly one
+Its 48 Python files sit in one folder. This page places every one of them in exactly one
 family.
 
 Review: İbrahim, the data side ([ownership](../../../docs/architecture/ownership.md)). Within 24
@@ -20,8 +20,9 @@ hours either side of a deadline only a blocker fix merges here
   `optimization` and above `features`, so it may import `features`, `data` and `contracts`,
   and today it imports each of them. Of `data` it imports only vocabulary modules (`errors`,
   `schema` and `timestamps`).
-- **It imports no storage or source module of `data`.** No contract makes it a source yet:
-  "The decision core imports no storage or source module" adds it when its zone owner agrees.
+- **It imports no storage or source module of `data`.** "The decision core imports no storage
+  or source module" holds it, with its zone owner's agreement (#1081); the contract allows
+  indirect imports, so the route through `features` in the known violations below stays open.
 - **It touches no file.** `tests/architecture/test_core_file_io.py` holds it to no `open`,
   no file method of `Path`, no pandas reader or writer it lists and no file function of `os`,
   `glob`, NumPy or joblib, with no allowlist entry.
@@ -41,7 +42,7 @@ Of third-party libraries it imports pandas, NumPy, SciPy and scikit-learn.
 | `baseline.py` | The deterministic baseline expected-points projection: a scoring rate scaled by expected playing time, simple enough to verify by hand. |
 | `integration.py` | The model-neutral hand-off from predicted points to the optimizer contract (`prediction_to_optimization_v1`): `PredictionProvenance`, `PredictionSnapshot` and `prepare_optimizer_projection`. |
 | `components.py` | Typed component predictions before the point-estimate hand-off (`component_prediction_v1`). |
-| `config.py` | Explicit configuration of the baseline projection, its coefficients and fallbacks, and the package's errors (`PredictionError`, `PredictionConfigurationError`). |
+| `config.py` | Explicit configuration of the baseline projection, its coefficients and fallbacks, and the package's errors (`PredictionError`, `PredictionConfigurationError`). Two modules raise outside that hierarchy: `defcon_component.py` (`DefconComponentError`, a `ValueError`) and `football_observed_tactical.py` (`ObservedTacticalOptimizationError`, a `ValueError`). |
 | `factors.py` | Maps experiment factors to prediction configuration (`FormWindowMapping`, `form_window_v1`). |
 
 ## The operational control
@@ -55,8 +56,8 @@ carry-over, and the Top-100 variant of each.
 | --- | --- |
 | `opening.py` | Projections for a season that has not started, from a roster and earlier seasons. |
 | `in_season.py` | The control extended into a season that has started (`in-season-carry-over-v1`), blending the completed season with the current one. |
-| `component_dataset.py` | The leakage-safe modelling frame the Phase C control components are fitted on: which columns may be features and which rows may be training data (`phase_c_component_dataset_v1`). |
-| `component_models.py` | The Phase C control components (`phase_c_control_components_v1`): appearance, conditional minutes and conditional points, declared rather than searched. |
+| `component_dataset.py` | The leakage-safe modelling frame the Phase C control components are fitted on: which columns may be features and which rows may be training data (`phase_c_component_dataset_v1`); the served feature contract and the declared v2 contract with the one-week and ten-week windows (`docs/research/phase_c_feature_contract_v2_method.md`). |
+| `component_models.py` | The Phase C control components (`phase_c_control_components_v1`): appearance, conditional minutes and conditional points, declared rather than searched. Also the declared gradient-boosting candidate (`phase_c_control_components_gbm_v1`, `ComponentModelConfig(estimator="gradient_boosting")`), measured under the v2 development path; see `docs/research/phase_c_gradient_boosting_method.md`. The points-only candidate (`phase_c_control_components_gbm_points_v1`, `estimator="gradient_boosting_points"`) keeps the linear appearance and minutes estimators and boosts only the conditional points; see `docs/research/phase_c_gradient_boosting_points_method.md`. The mixture candidate (`phase_c_control_components_mixture_v1`, `estimator="mixture"`) keeps the appearance estimator and replaces each conditional ridge by a gated mixture of two ridge experts, with `predict_component_distribution` exposing the experts and the gate; see `docs/research/moe_mixture_prereg.md`. The regime-gated candidate (`phase_c_control_components_regime_v1`, `estimator="regime"`) fits one linear expert set per fixture-regime-by-rule-era label and mixes them by a multinomial logistic gate; see `docs/research/moe_regime_prereg.md`. |
 | `elite_evidence.py` | The conservative Top-100 evidence adjustment of the operational point handoff (`phase_c_operational_elite_policy_v1`), and the two Top-100 model versions. |
 
 ## Adjustments to a projection
@@ -83,35 +84,53 @@ under `scripts/` import these modules by their module path; the
 
 ## The football lane
 
-The models of the experimental football model a member can choose in place of the current
-model; the [package map](../README.md#two-cross-cutting-names) describes the lane as a whole.
-
-These nine are imported by `live`, `application` or `platform`, directly or through one
-another:
+The experimental football model has native, family and composite contracts. Its live
+recipe imports the compact models and recomposes retained inputs; the fixture core calls
+the unit, score, tactical recipient and phase boundaries
+(`src/squadopt/live/football_composite_basis.py:38`,
+`src/squadopt/prediction/football_composite_core.py:53-56`).
+The following modules are reached by `live`, `application` or `platform`, directly or
+through the football models. The fixture, joint-role and flag models keep their fit
+interfaces for the producer (`src/squadopt/application/football_live.py:34-42`,
+`src/squadopt/application/football_live.py:67-69`), and the composite recipe restores the
+compact serving models (`src/squadopt/live/football_composite_basis.py:58-68`).
 
 | Module | What it does |
 | --- | --- |
+| `football_capabilities.py` | Code-owned dispatch for role components, applied eligibility and required composite reprojection (`src/squadopt/prediction/football_capabilities.py:43`). |
+| `football_composite_contract.py` | Validates the six-family public manifest and binds served appearance to every final weekly law receipt (`src/squadopt/prediction/football_composite_contract.py:52`). |
 | `football.py` | The opt-in fixture football candidate (`football_team_share_v1`, with its role-transition and joint-role variants); fitting it never changes the promoted control. |
 | `football_features.py` | History-only fixture features for the football candidate; target rows supply identity, position and venue only. |
 | `football_minutes_role.py` | Joint starting role and fixture minutes (`joint_start_cameo_minutes_v1`), fitted only on known past labels. |
 | `football_components.py` | The v1 model's per-fixture components for one capture (`football_fixture_components_v1`), bound to the served forecast of the same producer call. |
+| `football_flag_components.py` | Converts a learned whole-week flag law into fixture minutes and nonlinear scoring, conserving each complete club's attacking mass (`src/squadopt/prediction/football_flag_components.py:84`, `src/squadopt/prediction/football_flag_components.py:162`). |
+| `football_flag_minutes.py` | A categorical-flag weekly hurdle and conditional fixture-minute model (`football_flag_minutes_v1`), fitted offline by the optional retained-capture producer; source labels remain categories (`src/squadopt/application/football_live.py:686`). |
 | `football_contextual.py` | The opt-in contextual extension of the frozen fixture model (`football_contextual_v3`): captured availability enters once, as an eligibility multiplier. |
 | `football_strength.py` | A sequential, opponent-adjusted Gamma filter of team scoring strength, used by the contextual extension. |
 | `football_match_context.py` | A separate Premier League workload and venue candidate (`football_match_context_v1`). |
 | `football_match_context_features.py` | Causal Premier League workload and venue context from recorded player-fixture history, for `football_match_context.py`. |
 | `football_team_form.py` | Causal club form for an explicitly selected fixture-football experiment (`football_team_form_v1`). |
+| `football_phase_duties.py` | Learned goal and assist marginals with conserved full-club attacking mass (`football_phase_duties_v1`); captured ranks are explanatory observations. A fit records `football_phase_duty_fit_v2`, or `football_phase_duty_replay_fit_v2` when it holds a replayed duty capture or, with `allow_released_2025_26`, a 2025-26 row (`src/squadopt/prediction/football_phase_duties.py:434-440`). |
+| `football_phase_serving.py` | Compact phase parameter export and byte-checked restoration with a distinct serving receipt; shares allocation arithmetic with the fitted model (`src/squadopt/prediction/football_phase_serving.py:256`, `src/squadopt/prediction/football_phase_serving.py:304`, `src/squadopt/prediction/football_phase_serving.py:354`). |
+| `football_score_state.py` | A paired score process with fitted lead and trail intensities in three thirds of the match clock (`football_score_state_v1`). |
+| `football_score_serving.py` | Strict compact score parameters with a separate artifact digest and inference receipt (`football_score_serving_v1`). |
+| `football_tactical_matchup.py` | Learned paired intensities and conditional tactical recipient marginals from supplied pre-decision states (`football_tactical_matchup_v1`). |
+| `football_unit_strength.py` | A baseline-relative projected club-unit model with private inputs (`football_projected_unit_strength_v1`). Its replay fits record `football_unit_public_replay_quantized_prefix_fit_v2` or `football_unit_public_replay_physical_duration_fit_v2`, and a 2025-26 fit without a replay records `football_unit_explicit_release_fit_v2`; 2025-26 enters only with `allow_released_2025_26` ([operator contract](../../../docs/operations/football_unit_replay.md)). |
+| `football_unit_serving.py` | Exports and strictly reads immutable pooled v4 parameters, then predicts paired rates from current typed unit inputs (`src/squadopt/prediction/football_unit_serving.py:315`, `src/squadopt/prediction/football_unit_serving.py:425`, `src/squadopt/prediction/football_unit_serving.py:516`). |
+| `football_composite_core.py` | Composes current compact family models over final seven-atom minute marginals, with distinct source and derived-stage receipts and exact full bypass (`src/squadopt/prediction/football_composite_core.py:161`, `src/squadopt/prediction/football_composite_core.py:193`, `src/squadopt/prediction/football_composite_core.py:617`). |
+| `football_observed_load.py` | Observed non-PL reported-record tilt of the whole native weekly law, with distinct missing-value features and a first-week composite caller (`src/squadopt/prediction/football_observed_load.py:295`). |
+| `football_joint_week_law.py` | Pure whole-week flag/LOAD transport and explicit evidence interventions with immutable joint support and lineage (`src/squadopt/prediction/football_joint_week_law.py:37`). |
+| `football_observed_tactical.py` | Fits paired Poisson rates and conditional goal/assist recipients at full-roster native marginal context, with training-only observed-value transforms and missingness masks; exposes recipient-only inference without the count head (`src/squadopt/prediction/football_observed_tactical.py:92`, `src/squadopt/prediction/football_observed_tactical.py:648`, `src/squadopt/prediction/football_observed_tactical.py:751`). |
+| `football_observed_tactical_recipients.py` | Fits only conditional goal/assist recipient heads under a distinct metadata contract, retaining native offsets, training receipts and diagnostics (`src/squadopt/prediction/football_observed_tactical_recipients.py:41`, `src/squadopt/prediction/football_observed_tactical_recipients.py:134`). |
+| `football_observed_tactical_serving.py` | Exports and restores compact recipient parameters with explicit byte integrity and separate original-model provenance; reuses the pure recipient allocator (`src/squadopt/prediction/football_observed_tactical_serving.py:64`, `src/squadopt/prediction/football_observed_tactical_serving.py:329`, `src/squadopt/prediction/football_observed_tactical_serving.py:387`). |
+| `football_composite_weeks.py` | Validates the full declared captured roster and calendar before composing original-native LOAD, first-week flag or later shared eligibility, and verified evidence (`src/squadopt/prediction/football_composite_weeks.py:366`). |
 
-These six are private models: outside this package, each is imported only by its
-`football_*_experiment` module in [`squadopt.experiments`](../experiments/README.md).
+The older synthetic workload model remains private to its experiment
+(`src/squadopt/experiments/football_load_experiment.py:28`).
 
 | Module | What it does |
 | --- | --- |
-| `football_flag_minutes.py` | A categorical-flag weekly hurdle and conditional fixture-minute model (`football_flag_minutes_v1`); source labels are categories, never percentages. |
 | `football_load_minutes.py` | A whole-week workload tilt over an admitted native minute law (`football_all_competition_load_v1`); it never applies player eligibility. |
-| `football_phase_duties.py` | Learned goal and assist marginals with conserved full-club attacking mass (`football_phase_duties_v1`); captured ranks are explanatory observations. |
-| `football_score_state.py` | A paired score process with fitted lead and trail intensities in three thirds of the match clock (`football_score_state_v1`). |
-| `football_tactical_matchup.py` | Learned paired intensities and conditional tactical recipient marginals from supplied pre-decision states (`football_tactical_matchup_v1`). |
-| `football_unit_strength.py` | A baseline-relative projected club-unit model with private inputs (`football_projected_unit_strength_v1`). |
 
 ## Package surface
 
@@ -121,8 +140,24 @@ These six are private models: outside this package, each is imported only by its
 
 ## Known violations here
 
-None of its own in ARCHITECTURE.md's list. One applies through `data`: every `data` module this
-package imports runs `src/squadopt/data/__init__.py` first, which loads the storage modules `adapters`,
-`loaders`, `pipeline` and `snapshots`, so importing `squadopt.prediction` loads them at run
-time although no import statement here names them (the `data` entry, an open question in
-ADR 0010).
+- **Private names.** ARCHITECTURE.md's private-names row lists six laboratory imports of
+  `prediction.football`: `experiments.football_components` and `experiments.football_minutes`
+  each take `_fit`, `_matrix` and `_pipeline` (`tests/architecture/test_private_imports.py:57-65`,
+  `tests/architecture/test_private_imports.py:81-87`).
+  The way out it names is that `prediction.football` publishes the three names; until then they
+  stay on the allowlist.
+- **The run-time load of `data`.** Every `data` module this package imports runs
+  `src/squadopt/data/__init__.py` first, which imports `adapters`, `loaders`, `pipeline` and
+  `snapshots`; through them `snapshots` loads `atomic` and `checksums` and `atomic` loads
+  `_long_paths`, so importing `squadopt.prediction` loads seven storage modules at run time
+  although no import statement here names them. ADR 0011 leaves that load to the data owner
+  ([ADR 0011](../../../docs/architecture/decisions/0011-storage-ports-and-platform-split.md),
+  "Not changed here"); the [data guide](../data/README.md) records it.
+- **A route through `features`.** `football_phase_duties.py`, `football_phase_serving.py` and
+  `football_composite_core.py` import types, constants or validators from
+  `features.football_phase_inputs` (`src/squadopt/prediction/football_phase_duties.py:21`,
+  `src/squadopt/prediction/football_phase_serving.py:22`,
+  `src/squadopt/prediction/football_composite_core.py:32`), which imports `data.snapshots`,
+  `data.sources.fpl_live` and `data.sources.fpl_set_pieces`, so importing any of the three also
+  loads `data.sources` with `fpl_live`, `fpl_set_pieces` and `vaastav`. The import is indirect,
+  and the features ratchet in `pyproject.toml` holds the edge.
