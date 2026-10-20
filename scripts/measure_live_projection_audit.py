@@ -15,7 +15,8 @@ and a handoff fingerprint, the rule ``docs/defcon_component_prereg.md`` section 
 other handoff of that capture is shown beside it and never pooled, and one the ledger records
 as ``replay``, or that only advice published after the deadline names, is labelled ``replay``.
 A week whose retained advice names no pre-deadline handoff is listed with the reason and not
-pooled; no later file stands in for it.
+pooled; no later file stands in for it. A second kept file with the pooled fingerprint is the
+same projection kept twice, so the first copy is pooled and the rest are shown beside it.
 
 No solver runs, so the record is deterministic given the captures and is **regenerated** after
 each settled gameweek. It names every capture and handoff it read, so a number that moved can
@@ -506,9 +507,14 @@ def measure(
                 ledger_mode=mode,
                 after_deadline=week.after_deadline,
             )
-            if label == POOLED and gameweek not in primary_frames:
-                primary_frames[gameweek] = frame
-                pooled_handoffs[str(gameweek)] = handoff.fingerprint
+            if label == POOLED:
+                if gameweek in primary_frames:
+                    # A second file with the pooled fingerprint is the same projection kept
+                    # twice: the first copy is pooled and every later one is shown beside it.
+                    label = BESIDE
+                else:
+                    primary_frames[gameweek] = frame
+                    pooled_handoffs[str(gameweek)] = handoff.fingerprint
             readings.append(
                 {
                     "model_name": handoff.model_name,

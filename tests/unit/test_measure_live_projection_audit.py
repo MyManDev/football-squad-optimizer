@@ -65,20 +65,30 @@ class Disk:
     def settle(self) -> CapturedSnapshot:
         return _capture("2026-09-30T23:00:00Z", self.settled_through)
 
-    def handoff(self, week: int, name: str, marker: float) -> str:
-        capture = _pre_deadline(week).metadata.snapshot_id
+    def handoff(
+        self,
+        week: int,
+        name: str,
+        marker: float,
+        *,
+        capture: CapturedSnapshot | None = None,
+        filename: str | None = None,
+        diagnostics: dict[str, object] | None = None,
+    ) -> str:
+        identifier = (capture or _pre_deadline(week)).metadata.snapshot_id
         projection = InSeasonProjection(
             season=SEASON,
             gameweek=week,
-            source_snapshot_id=capture,
+            source_snapshot_id=identifier,
             model_name="synthetic",
             model_version=name,
             feature_contract_version="synthetic",
             expected_points={1: marker},
+            diagnostics=diagnostics or {},
         )
-        directory = self.root / "handoffs" / "by-capture" / capture
+        directory = self.root / "handoffs" / "by-capture" / identifier
         directory.mkdir(parents=True, exist_ok=True)
-        write_projection_handoff(directory / f"{name}.json", projection)
+        write_projection_handoff(directory / f"{filename or name}.json", projection)
         return projection.fingerprint
 
     def advice(
@@ -89,6 +99,8 @@ class Disk:
         published: str,
         entry: int = 101,
         capture: CapturedSnapshot | None = None,
+        captured_at: str | None = None,
+        stated_week: int | None = None,
     ) -> None:
         source = capture or _pre_deadline(week)
         identifier = source.metadata.snapshot_id
@@ -99,11 +111,11 @@ class Disk:
         document = {
             "contract_version": "member_advice_record_v2",
             "season": SEASON,
-            "gameweek": week,
+            "gameweek": week if stated_week is None else stated_week,
             "entry_id": entry,
             "capture": {
                 "snapshot_id": identifier,
-                "captured_at_utc": source.metadata.captured_at_utc,
+                "captured_at_utc": captured_at or source.metadata.captured_at_utc,
             },
             "generated_at_utc": published,
             "provenance": {"projection_handoff_fingerprint": fingerprint},
@@ -273,6 +285,8 @@ def test_a_week_whose_advice_names_no_pre_deadline_handoff_is_listed_and_not_poo
         ("no_handoff", "names no projection handoff"),
         ("not_kept", "is not kept"),
         ("late_capture", "capture taken after the deadline"),
+        ("missing_capture", "is not among the captures on disk"),
+        ("capture_time", "disagree on when it was taken"),
     ],
 )
 def test_a_published_handoff_that_cannot_be_proved_is_not_pooled(
@@ -287,15 +301,89 @@ def test_a_published_handoff_that_cannot_be_proved_is_not_pooled(
         disk.advice(5, None, published=_before(5))
     elif spoil == "not_kept":
         disk.advice(5, "f" * 64, published=_before(5))
-    else:
+    elif spoil == "late_capture":
         late = _capture("2026-09-13T12:30:00Z")
         disk.captures.append(late)
         disk.advice(5, first, published=_before(5), capture=late)
+    elif spoil == "missing_capture":
+        # The advice names a capture taken before the publish that is not kept on disk.
+        disk.advice(5, first, published=_before(5), capture=_capture("2026-09-13T08:00:00Z"))
+    else:
+        # The capture is on disk under the id the advice names, taken an hour later than the
+        # advice says: not the capture the publish read.
+        disk.advice(5, first, published=_before(5), captured_at="2026-09-13T08:00:00Z")
 
     record = _measure(disk.root, through_gameweek=5)
 
     assert record["pooled"]["gameweeks"] == []
     assert reason in record["not_pooled"]["5"]
+    assert "pooled" not in _labels(record, 5).values()
+
+
+def test_a_publish_at_the_deadline_instant_is_after_it(disk: Disk) -> None:
+    """A record counts when it was published strictly before the deadline."""
+
+    live = disk.handoff(5, "a-live", 5.1)
+    disk.advice(5, live, published=_deadline(5))
+
+    at_the_deadline = _measure(disk.root, through_gameweek=5)
+    disk.advice(5, live, published="2026-09-13T11:59:59Z")
+    a_second_before = _measure(disk.root, through_gameweek=5)
+
+    assert at_the_deadline["pooled"]["gameweeks"] == []
+    assert "only after it" in at_the_deadline["not_pooled"]["5"]
+    assert _labels(at_the_deadline, 5) == {"a-live": "replay"}
+    assert a_second_before["pooled_handoffs"] == {"5": live}
+    assert _labels(a_second_before, 5) == {"a-live": "pooled"}
+
+
+def test_a_capture_taken_after_the_publish_that_names_it_is_not_pooled(disk: Disk) -> None:
+    """The advice says it was published at 10:00 from a capture taken at 11:00, before the
+    deadline: the record contradicts itself, so nothing is pooled, and the week shows the
+    handoffs of the last capture before the deadline, which is that 11:00 capture."""
+
+    between = _capture("2026-09-13T11:00:00Z")
+    disk.captures.append(between)
+    disk.handoff(5, "a-early", 5.1)
+    named = disk.handoff(5, "b-between", 5.2, capture=between)
+    disk.advice(5, named, published=_before(5), capture=between)
+
+    record = _measure(disk.root, through_gameweek=5)
+
+    assert record["pooled"]["gameweeks"] == []
+    assert "after the publish" in record["not_pooled"]["5"]
+    assert record["gameweeks"]["5"]["pre_deadline_capture"] == between.metadata.snapshot_id
+    assert record["gameweeks"]["5"]["capture_source"] == "last_before_deadline"
+    assert _labels(record, 5) == {"b-between": "beside"}
+
+
+def test_a_record_filed_under_one_week_that_states_another_is_not_read(disk: Disk) -> None:
+    live = disk.handoff(5, "a-live", 5.1)
+    disk.advice(5, live, published=_before(5), stated_week=6)
+
+    record = _measure(disk.root, through_gameweek=5)
+
+    assert record["pooled"]["gameweeks"] == []
+    assert "another contract, season or gameweek" in record["not_pooled"]["5"]
+    assert _labels(record, 5) == {"a-live": "beside"}
+
+
+def test_a_second_file_of_the_pooled_handoff_is_shown_beside_it(disk: Disk) -> None:
+    """Two kept files with one fingerprint are one projection; it is pooled once."""
+
+    live = disk.handoff(5, "live", 5.1, filename="a-live")
+    copy = disk.handoff(5, "live", 5.1, filename="b-copy", diagnostics={"copy": "second"})
+    disk.advice(5, live, published=_before(5))
+    kept = disk.root / "handoffs" / "by-capture" / _pre_deadline(5).metadata.snapshot_id
+
+    record = _measure(disk.root, through_gameweek=5)
+
+    assert copy == live
+    assert (kept / "a-live.json").read_bytes() != (kept / "b-copy.json").read_bytes()
+    assert record["pooled_handoffs"] == {"5": live}
+    assert record["pooled"]["markers"] == {"5": 5.1}
+    labels = [p["label"] for p in record["gameweeks"]["5"]["projections"]]
+    assert labels == ["pooled", "beside"]
 
 
 def test_through_gameweek_reads_no_settled_week_after_it(disk: Disk) -> None:
