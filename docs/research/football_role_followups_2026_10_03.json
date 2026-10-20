@@ -1865,24 +1865,24 @@
         "event": "both tests last written",
         "time": [
           "2026-10-03T07:02:44Z",
-          "2026-10-03T07:07:24Z"
+          "2026-10-03T07:07:25Z"
         ],
         "files": [
           "test_math100_role_temperature.py",
           "test_math100_role_retained_support.py"
         ],
-        "source": "file modification times in the owner archive"
+        "source": "file modification times in the owner's archive folder, to the second"
       },
       {
         "event": "both runners, the retained note and its preregistration last written",
-        "time": "2026-10-03T07:17:12Z",
+        "time": "2026-10-03T07:17:13Z",
         "files": [
           "math100-role-temperature.py",
           "math100-role-retained-support.py",
           "math100-role-retained-support.md",
           "math100-role-retained-support-preregistered.json"
         ],
-        "source": "file modification times in the owner archive"
+        "source": "file modification times in the owner's archive folder, to the second"
       },
       {
         "event": "public statement that both procedures have a fixed readset, causal cutoff, fit limit and unchanged acceptance gates, that their 30 synthetic tests passed, and that the runs had not started",
@@ -1893,25 +1893,25 @@
         "event": "temperature run: protocol written before the first fit, last receipt",
         "time": [
           "2026-10-03T07:31:30Z",
-          "2026-10-03T07:33:18Z"
+          "2026-10-03T07:33:19Z"
         ],
-        "source": "modification times of math100-role-temperature01/temperature-protocol.json and temperature-result.json in the owner archive"
+        "source": "modification times of math100-role-temperature01/temperature-protocol.json and temperature-result.json in the owner's archive folder, to the second"
       },
       {
         "event": "retained run: protocol written before the first fit, last receipt",
         "time": [
-          "2026-10-03T07:34:08Z",
+          "2026-10-03T07:34:09Z",
           "2026-10-03T07:35:56Z"
         ],
-        "source": "modification times of math100-role-retained-support01/retained-support-protocol.json and retained-support-result.json in the owner archive"
+        "source": "modification times of math100-role-retained-support01/retained-support-protocol.json and retained-support-result.json in the owner's archive folder, to the second"
       }
     ],
     "checks": [
-      "The protocols, written before the first fit, record the runner and test sha256 that the committed files have, so the code that ran is the code last written at 07:17:12Z.",
-      "Each run spans 108 seconds between its protocol and its last receipt, against total_wall_seconds of 109.057 and 107.204."
+      "The protocols, written before the first fit, record the runner and test sha256 that the committed files have, so the code that ran is the code last written at 07:17:13Z.",
+      "In the owner's folder each run spans 108.9 and 107.1 seconds between its protocol and its last receipt, each just under its total_wall_seconds of 109.057 and 107.204; to the second the spans are 109 and 107."
     ],
     "limits": [
-      "File modification times come from the archive copy, not from a log; the run logs hold no timestamps.",
+      "File modification times come from the owner's archive folder as he read them for the review of #1175 (comment 6286257721), not from a log; the run logs hold no timestamps. The zip copy of the archive carries 2-second DOS stamps that run up to 2 seconds early (07:17:12Z for 07:17:13Z), so the zip cannot give these times.",
       "The archive keeps local times; they are read as UTC+3, the zone of the machine that ran both runs, and agree with the times issue #997 names."
     ]
   }
