@@ -1,8 +1,9 @@
 /**
- * What a switch of prediction model changed (#1131): only a model switch for the same
- * selection is a change; the change names the players the new plan brings in and the net
- * points difference, stays for re-renders, primes its counter at zero, and moves the changed
- * plates once, never under reduced motion.
+ * What a switch of prediction model changed (#1131): only a model switch against the plan
+ * shown just before, for the same selection, is a change; the change names the players the
+ * new plan brings into the eleven or onto the bench and the net points difference, stays for
+ * re-renders, primes its counter at zero and lets the plates rise again on a repeat, and moves
+ * the changed plates once, never under reduced motion.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -11,6 +12,7 @@ import { REDUCED_MOTION_QUERY } from "../../../design/motion";
 import { mockEntryAdviceEnvelope } from "../../../fixtures/league";
 import type { AdvicePlayer, EntryAdvice } from "../types";
 import {
+  changedPlayers,
   forgetShownPlans,
   MODEL_POP,
   modelChangeOf,
@@ -20,6 +22,14 @@ import {
 } from "./modelSwitch";
 
 const BASE = mockEntryAdviceEnvelope(35249001, "saf-puan", 1).payload;
+const IDS = Array.from({ length: 15 }, (_, i) => i + 1);
+
+const plate = () => {
+  const element = document.createElement("div");
+  const animate = vi.fn(() => ({ playState: "running", cancel: vi.fn() }) as unknown as Animation);
+  Object.defineProperty(element, "animate", { value: animate });
+  return { element, animate };
+};
 
 function player(id: number): AdvicePlayer {
   return { player_id: id, name: `P${id}`, short_name: `P${id}`, position: "MID", team: "X" };
@@ -109,6 +119,48 @@ describe("a model switch", () => {
     expect(modelChangeOf(plan("football", patch))).toBeNull();
   });
 
+  it("reads only the plan shown just before, so a strategy switch is never a model change", () => {
+    // Saf puan under the current model, then ortak koru under both, then back to saf puan
+    // under football: the member changed the strategy, and the saf puan plan under football
+    // is not compared with the saf puan plan seen three plans ago.
+    modelChangeOf(plan("current"));
+    expect(
+      modelChangeOf(plan("current", { mode: "ortak-koru" }, [...IDS.slice(0, 13), 40, 41])),
+    ).toBeNull();
+    const switched = modelChangeOf(
+      plan("football", { mode: "ortak-koru" }, [...IDS.slice(0, 11), 40, 41, 42, 43]),
+    )!;
+    expect([...switched.changed].sort((a, b) => a - b)).toEqual([42, 43]);
+    expect(modelChangeOf(plan("football", {}, [50, 51, ...IDS.slice(2)]))).toBeNull();
+  });
+
+  it("counts a bench player the new model brings into the eleven, with the same fifteen", () => {
+    modelChangeOf(plan("current"));
+    // 12 comes off the bench for 3, and 3 goes to the bench: one change, not the same players.
+    const change = modelChangeOf(
+      plan("football", {}, [1, 2, 12, 4, 5, 6, 7, 8, 9, 10, 11, 3, 13, 14, 15]),
+    )!;
+    expect([...change.changed]).toEqual([12]);
+  });
+
+  it("counts a player the new model brings onto the bench from outside", () => {
+    modelChangeOf(plan("current"));
+    const change = modelChangeOf(plan("football", {}, [...IDS.slice(0, 14), 60]))!;
+    expect([...change.changed]).toEqual([60]);
+  });
+
+  it("lets the plates rise again on a repeat of the same switch", () => {
+    const a = plate();
+    modelChangeOf(plan("current"));
+    const first = modelChangeOf(plan("football"))!;
+    expect(popChanged(first.key, [a.element])).toHaveLength(1);
+    expect(popChanged(first.key, [a.element])).toEqual([]);
+    modelChangeOf(plan("current"));
+    const again = modelChangeOf(plan("football"))!;
+    expect(again.key).toBe(first.key);
+    expect(popChanged(again.key, [a.element])).toHaveLength(1);
+  });
+
   it("is not a change when the same model shows a new plan", () => {
     modelChangeOf(plan("current"));
     expect(
@@ -131,16 +183,17 @@ describe("a model switch", () => {
   });
 });
 
-describe("the changed plates' motion", () => {
-  const plate = () => {
-    const element = document.createElement("div");
-    const animate = vi.fn(
-      () => ({ playState: "running", cancel: vi.fn() }) as unknown as Animation,
-    );
-    Object.defineProperty(element, "animate", { value: animate });
-    return { element, animate };
-  };
+describe("the changed players", () => {
+  it("are those new to the eleven and those new to the squad on the bench", () => {
+    const before = { eleven: [1, 2, 3], bench: [4, 5] };
+    // 4 comes up from the bench, 9 comes in; 3 goes down to the bench and 8 joins it.
+    const after = { eleven: [1, 4, 9], bench: [3, 8] };
+    expect([...changedPlayers(before, after)]).toEqual([4, 9, 8]);
+    expect(changedPlayers(before, before).size).toBe(0);
+  });
+});
 
+describe("the changed plates' motion", () => {
   it("moves each plate once per change, by transform only", () => {
     const a = plate();
     const b = plate();

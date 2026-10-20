@@ -3,16 +3,22 @@ import { MOTION_EASE, motionDuration } from "../../../design/motion";
 import type { EntryAdvice } from "../types";
 
 /**
- * What a switch of prediction model changed in the shown plan (#1131): the players who are in
- * the new plan and were not in the plan the other model gave for the same selection, and the
- * difference in the week's net expected points. Only a model switch counts. A switch of
- * strategy, window, rival, weight, word or chip is a different selection, and a new plan under
- * the same model is a new publish, not a model's doing.
+ * What a switch of prediction model changed in the shown plan (#1131): the players the new
+ * plan brings into the eleven and the players it brings onto the bench from outside the
+ * squad, against the plan shown just before it, and the difference in the week's net expected
+ * points. Only a model switch counts: the plan shown just before must answer the same
+ * selection under the other model. A switch of strategy, window, rival, weight, word or chip
+ * is a different selection, and a new plan under the same model is a new publish, not a
+ * model's doing.
  */
 export interface ModelChange {
   from: PlanModel;
   to: PlanModel;
-  /** Player ids in the new plan's eleven and bench that the other model's plan did not have. */
+  /**
+   * Player ids the new plan brings into the eleven, from the bench or from outside, and the
+   * ids it brings onto the bench from outside the other plan's fifteen. Every one of them is
+   * marked on the pitch or the bench, so the line's count is the number of marks.
+   */
   changed: ReadonlySet<number>;
   /** New net minus old net, in expected points; null where either is not stated. */
   difference: number | null;
@@ -23,26 +29,32 @@ export interface ModelChange {
 export type PlanModel = "current" | "football";
 
 interface Shown {
+  selection: string;
   model: PlanModel;
   players: string;
-  ids: number[];
+  eleven: number[];
+  bench: number[];
   net: number | null;
   change: ModelChange | null;
 }
 
-// The plan last shown for each selection, for the page's life.
+// The plan shown last for each member's week, for the page's life: one entry per league,
+// entry and gameweek, whatever the selection, so a change is read only against the plan the
+// viewer saw just before.
 const shown = new Map<string, Shown>();
 
 export function planModel(view: EntryAdvice): PlanModel {
   return view.prediction_model?.id === "football" ? "football" : "current";
 }
 
+/** The member's week: the plans a viewer sees one after another on one page. */
+function week(view: EntryAdvice): string {
+  return [view.league_id, view.entry_id, view.gameweek].join(":");
+}
+
 /** The selection a plan answers, the model left out. */
 function selection(view: EntryAdvice): string {
   return [
-    view.league_id,
-    view.entry_id,
-    view.gameweek,
     view.mode,
     view.window,
     view.rival_entry_id ?? "-",
@@ -52,9 +64,8 @@ function selection(view: EntryAdvice): string {
   ].join(":");
 }
 
-function playerIds(view: EntryAdvice): number[] {
-  return [...(view.starting_xi ?? []), ...(view.bench ?? [])].map((player) => player.player_id);
-}
+const ids = (players: EntryAdvice["starting_xi"]): number[] =>
+  (players ?? []).map((player) => player.player_id);
 
 /** The first week's net expected points, the figure the plan's own counter shows. */
 function net(view: EntryAdvice): number | null {
@@ -65,42 +76,68 @@ function net(view: EntryAdvice): number | null {
     : null;
 }
 
+/** The players the new plan brings into the eleven, and onto the bench from outside. */
+export function changedPlayers(
+  before: { eleven: readonly number[]; bench: readonly number[] },
+  after: { eleven: readonly number[]; bench: readonly number[] },
+): Set<number> {
+  const eleven = new Set(before.eleven);
+  const fifteen = new Set([...before.eleven, ...before.bench]);
+  return new Set([
+    ...after.eleven.filter((id) => !eleven.has(id)),
+    ...after.bench.filter((id) => !fifteen.has(id)),
+  ]);
+}
+
 /**
  * The model change the shown plan answers, or null. Asking again for the same plan gives the
- * same answer, so the pitch and the decision can both ask in one render; the change stays
- * until the selection shows another plan. The first change of a key primes its difference's
- * counter at zero, so the difference counts up from nothing once.
+ * same answer, so the pitch, the bench and the decision can all ask in one render; the change
+ * stays until the member's week shows another plan. The first change of a key primes its
+ * difference's counter at zero and lets its plates move again, so the difference counts up
+ * from nothing and the plates rise once for every switch, a repeat of an earlier pair too.
  */
 export function modelChangeOf(view: EntryAdvice | null | undefined): ModelChange | null {
   if (!view) return null;
-  const ids = playerIds(view);
-  if (ids.length === 0) return null;
-  const slot = selection(view);
+  const eleven = ids(view.starting_xi);
+  const bench = ids(view.bench);
+  if (eleven.length + bench.length === 0) return null;
+  const slot = week(view);
+  const current = selection(view);
   const model = planModel(view);
-  const players = [...ids].sort((a, b) => a - b).join(",");
+  const players = [...eleven, ...bench].sort((a, b) => a - b).join(",");
   const last = shown.get(slot);
-  if (last && last.model === model && last.players === players) return last.change;
+  if (last && last.selection === current && last.model === model && last.players === players)
+    return last.change;
   let change: ModelChange | null = null;
-  if (last && last.model !== model) {
-    const before = new Set(last.ids);
+  if (last && last.selection === current && last.model !== model) {
     const now = net(view);
-    const key = `model-diff:${slot}:${last.model}>${model}:${last.players}>${players}`;
+    const key = `model-diff:${slot}:${current}:${last.model}>${model}:${last.players}>${players}`;
     change = {
       from: last.model,
       to: model,
-      changed: new Set(ids.filter((id) => !before.has(id))),
+      changed: changedPlayers(last, { eleven, bench }),
       difference: now !== null && last.net !== null ? now - last.net : null,
       key,
     };
-    // Primed at zero: the counter's next showing of this key counts up to the difference,
-    // and a switch back and forth to the same pair counts it again.
+    // Primed at zero and released: the counter's next showing of this key counts up to the
+    // difference, and the plates rise again, so a switch back and forth to the same pair
+    // counts and moves each time.
     rememberCount(key, 0);
+    popped.delete(key);
   }
-  shown.set(slot, { model, players, ids, net: net(view), change });
+  shown.set(slot, {
+    selection: current,
+    model,
+    players,
+    eleven,
+    bench,
+    net: net(view),
+    change,
+  });
   return change;
 }
 
-/** For tests: every selection starts unseen. */
+/** For tests: every member's week starts unseen. */
 export function forgetShownPlans(): void {
   shown.clear();
   popped.clear();

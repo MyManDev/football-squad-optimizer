@@ -729,3 +729,8 @@
   color: var(--color-text);
   font-family: var(--font-display);
 }
+
+/* The figure and its unit stay on one line at 320 px. */
+.modelChangeFigure {
+  white-space: nowrap;
+}

@@ -1,9 +1,9 @@
-import { useEffect, useId, useRef, type CSSProperties } from "react";
+import { useId, type CSSProperties } from "react";
 
 import { useLanguage } from "../../../i18n/context";
 import { clubCode, clubSwatch, type ClubCodes } from "../../../lib/clubs";
 import { figure } from "../../../lib/format";
-import { popChanged, releasePop, type ModelChange } from "../advice/modelSwitch";
+import type { ModelChange } from "../advice/modelSwitch";
 import styles from "./MemberPitch.module.css";
 
 /** One player as the pitch draws them: a white name plate on the grass. */
@@ -64,7 +64,19 @@ function ArrowIcon() {
   );
 }
 
-function Plate({ player, codes }: { player: PitchPlayer; codes: ClubCodes }) {
+/** A plate's parts that depend on the plan shown before it (#1131). */
+export type PlateChange = Pick<ModelChange, "key" | "changed"> | null;
+
+function Plate({
+  player,
+  codes,
+  changed,
+}: {
+  player: PitchPlayer;
+  codes: ClubCodes;
+  /** Brought in by a switch of prediction model: said in the plate's text, as 'New' is. */
+  changed: boolean;
+}) {
   const { locale, messages } = useLanguage();
   const code = clubCode(player.team, codes);
   const swatch = clubSwatch(code);
@@ -84,6 +96,9 @@ function Plate({ player, codes }: { player: PitchPlayer; codes: ClubCodes }) {
         </span>
       </span>
       {shortName !== player.name ? <span className="visually-hidden">{player.name}</span> : null}
+      {changed ? (
+        <span className="visually-hidden"> {messages.leagueMembers.modelChangedMark}</span>
+      ) : null}
       <span className={styles.code}>
         {swatch ? (
           <span
@@ -148,23 +163,13 @@ export function MemberPitch({
 }: {
   players: PitchPlayer[];
   codes: ClubCodes;
-  /** The players a switch of prediction model brought into this plan (#1131). */
-  modelChange?: Pick<ModelChange, "key" | "changed"> | null;
+  /**
+   * The players a switch of prediction model brought into this plan (#1131): each of them is
+   * marked, with the mark named in its plate's text. The one short rise is the squad's to
+   * start, over the pitch and the bench together.
+   */
+  modelChange?: PlateChange;
 }) {
-  const field = useRef<HTMLDivElement>(null);
-  const changeKey = modelChange?.key ?? null;
-  // The changed players' plates move once per change; the mark stays until the next plan.
-  useEffect(() => {
-    if (changeKey === null || field.current === null) return undefined;
-    const running = popChanged(changeKey, [
-      ...field.current.querySelectorAll<HTMLElement>("[data-model-changed] [data-plate]"),
-    ]);
-    return () => {
-      const unfinished = running.filter((motion) => motion.playState !== "finished");
-      unfinished.forEach((motion) => motion.cancel());
-      if (unfinished.length > 0) releasePop(changeKey);
-    };
-  }, [changeKey]);
   const { messages } = useLanguage();
   const copy = messages.leagueMembers;
   const describedBy = useId();
@@ -181,7 +186,6 @@ export function MemberPitch({
   const labelLine = defenders > 0 ? "DEF" : "GK";
   return (
     <div
-      ref={field}
       className={styles.wrap}
       data-mark="pitch"
       data-def-crowded={defenders >= 4 ? "true" : undefined}
@@ -235,7 +239,11 @@ export function MemberPitch({
                     style={{ "--i": index } as CSSProperties}
                     data-model-changed={modelChange?.changed.has(player.playerId) ? "" : undefined}
                   >
-                    <Plate player={player} codes={codes} />
+                    <Plate
+                      player={player}
+                      codes={codes}
+                      changed={modelChange?.changed.has(player.playerId) ?? false}
+                    />
                     {line.position === labelLine && index === 0 ? <AttackLabel at="first" /> : null}
                     {line.position === "DEF" && defenders >= 4 && index === defenders - 1 ? (
                       <AttackLabel at="last" />
@@ -263,8 +271,20 @@ export interface BenchPlayer {
   order: number | null;
 }
 
-/** The bench under the pitch, read left to right in the published order. */
-export function MemberBench({ players, codes }: { players: BenchPlayer[]; codes: ClubCodes }) {
+/**
+ * The bench under the pitch, read left to right in the published order. A player a switch of
+ * prediction model brought onto it from outside the squad is marked as a changed plate is,
+ * with the mark named in the item's text.
+ */
+export function MemberBench({
+  players,
+  codes,
+  modelChange = null,
+}: {
+  players: BenchPlayer[];
+  codes: ClubCodes;
+  modelChange?: PlateChange;
+}) {
   const { locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
   const titleId = useId();
@@ -280,13 +300,21 @@ export function MemberBench({ players, codes }: { players: BenchPlayer[]; codes:
             const code = clubCode(player.team, codes);
             const swatch = clubSwatch(code);
             const shortName = player.shortName.trim() || player.name;
+            const changed = modelChange?.changed.has(player.playerId) ?? false;
             return (
-              <li key={player.playerId} className={styles.benchItem}>
+              <li
+                key={player.playerId}
+                className={styles.benchItem}
+                data-model-changed={changed ? "" : undefined}
+              >
                 <span className={styles.benchOrder}>{player.order ?? "-"}</span>
-                <strong className={styles.benchName}>
+                <strong className={styles.benchName} data-plate="">
                   <span aria-hidden={shortName !== player.name || undefined}>{shortName}</span>
                   {shortName !== player.name ? (
                     <span className="visually-hidden">{player.name}</span>
+                  ) : null}
+                  {changed ? (
+                    <span className="visually-hidden"> {copy.modelChangedMark}</span>
                   ) : null}
                 </strong>
                 <span className={styles.benchMeta}>

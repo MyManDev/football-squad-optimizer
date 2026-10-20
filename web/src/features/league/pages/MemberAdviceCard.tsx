@@ -1466,9 +1466,10 @@ function WindowComparison({ view, control }: { view: EntryAdvice; control: Entry
 
 /**
  * What the switch of prediction model changed, under the gain strip (#1131): how many players
- * the new model's plan brings in, marked on the pitch, and the difference in the week's net
- * expected points, counted up once from zero. Nothing is said when the plan was not reached by
- * a model switch.
+ * the new model's plan brings in, each marked on the pitch or the bench, and the difference in
+ * the first week's net expected points, counted up once from zero. On a plan of several weeks
+ * the label says it is this week's, since the window total stands beside it. Nothing is said
+ * when the plan was not reached by a model switch.
  */
 function ModelChangeLine({ view }: { view: EntryAdvice }) {
   const { locale, messages } = useLanguage();
@@ -1481,15 +1482,19 @@ function ModelChangeLine({ view }: { view: EntryAdvice }) {
       {change.difference !== null ? (
         <>
           {" "}
-          <span>{copy.modelChangeDifference}</span>{" "}
-          <strong className="num">
-            <CountingNumber
-              countKey={change.key}
-              value={change.difference}
-              format={(value) => signedPoints(value, 1, locale)}
-            />
-          </strong>{" "}
-          <PointsUnit />
+          <span>
+            {view.window > 1 ? copy.modelChangeDifferenceWeek : copy.modelChangeDifference}
+          </span>{" "}
+          <span className={board.modelChangeFigure}>
+            <strong className="num">
+              <CountingNumber
+                countKey={change.key}
+                value={change.difference}
+                format={(value) => signedPoints(value, 1, locale)}
+              />
+            </strong>{" "}
+            <PointsUnit />
+          </span>
         </>
       ) : null}
     </p>

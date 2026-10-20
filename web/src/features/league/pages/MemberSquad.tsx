@@ -1,4 +1,4 @@
-import { useId, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 
 import { EmptyState } from "../../../design/components/EmptyState";
 import { useLanguage } from "../../../i18n/context";
@@ -8,7 +8,7 @@ import { ClubMark } from "../components/ClubMark";
 import { MemberBench, MemberPitch, type PitchPlayer } from "../components/MemberPitch";
 import { PointsUnit } from "../components/PointsUnit";
 import { expectedLineupLabel } from "../advice/expectedLineupLabel";
-import { modelChangeOf } from "../advice/modelSwitch";
+import { modelChangeOf, popChanged, releasePop } from "../advice/modelSwitch";
 import type { EntryAdvice, EntrySquad, EntrySquadPlayer } from "../types";
 import { finite, heldBench, type SquadOnPitch } from "./squadOnPitch";
 import styles from "./MemberSquad.module.css";
@@ -40,6 +40,23 @@ export function MemberSquad({
   const copy = messages.leagueMembers;
   const titleId = useId();
   const [view, setView] = useState<"pitch" | "list">("pitch");
+  const field = useRef<HTMLDivElement>(null);
+  const planned = onPitch.source === "plan";
+  const modelChange = planned ? modelChangeOf(plan) : null;
+  const changeKey = modelChange?.key ?? null;
+  // The changed players' plates, on the pitch and the bench, move once per change; the marks
+  // stay until the next plan.
+  useEffect(() => {
+    if (changeKey === null || field.current === null) return undefined;
+    const running = popChanged(changeKey, [
+      ...field.current.querySelectorAll<HTMLElement>("[data-model-changed] [data-plate]"),
+    ]);
+    return () => {
+      const unfinished = running.filter((motion) => motion.playState !== "finished");
+      unfinished.forEach((motion) => motion.cancel());
+      if (unfinished.length > 0) releasePop(changeKey);
+    };
+  }, [changeKey]);
   if (onPitch.source === null) {
     return (
       <section id="kadro" className={styles.squad} aria-labelledby={titleId}>
@@ -50,7 +67,6 @@ export function MemberSquad({
       </section>
     );
   }
-  const planned = onPitch.source === "plan";
   const hasList = planned && list != null;
   const own = planned && finite(plan?.expected_own_points) ? plan.expected_own_points : null;
   // The list view states the plan's own total in its first line, so the heading row
@@ -92,13 +108,9 @@ export function MemberSquad({
           </div>
         ) : null}
       </div>
-      <div className={styles.pitchView} hidden={hasList && view !== "pitch"}>
-        <MemberPitch
-          players={onPitch.eleven}
-          codes={codes}
-          modelChange={planned ? modelChangeOf(plan) : null}
-        />
-        <MemberBench players={onPitch.bench} codes={codes} />
+      <div ref={field} className={styles.pitchView} hidden={hasList && view !== "pitch"}>
+        <MemberPitch players={onPitch.eleven} codes={codes} modelChange={modelChange} />
+        <MemberBench players={onPitch.bench} codes={codes} modelChange={modelChange} />
       </div>
       {hasList ? (
         <div className={styles.listView} hidden={view !== "list"}>
