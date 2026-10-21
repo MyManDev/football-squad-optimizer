@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 
 import { EmptyState } from "../../../design/components/EmptyState";
+import type { FixturesPayload } from "../../fixtures/types";
 import type { CoachAbsence } from "../advice/coachAbsences";
 import { CoachNews } from "../components/CoachNews";
 import { useLanguage } from "../../../i18n/context";
@@ -8,11 +9,14 @@ import type { ClubCodes } from "../../../lib/clubs";
 import { figure } from "../../../lib/format";
 import { ClubMark } from "../components/ClubMark";
 import { MemberBench, MemberPitch, type PitchPlayer } from "../components/MemberPitch";
+import { PitchLookControl } from "../components/PitchLookControl";
+import { PlayerDetails } from "../components/PlayerDetails";
 import { PointsUnit } from "../components/PointsUnit";
 import { expectedLineupLabel } from "../advice/expectedLineupLabel";
 import { modelChangeOf, popChanged, releasePop } from "../advice/modelSwitch";
 import type { EntryAdvice, EntrySquad, EntrySquadPlayer } from "../types";
 import { finite, heldBench, type SquadOnPitch } from "./squadOnPitch";
+import { usePitchMovement } from "./usePitchMovement";
 import styles from "./MemberSquad.module.css";
 
 /** '3-4-3' for a full eleven with one keeper; nothing for a partial one. */
@@ -33,6 +37,7 @@ export function MemberSquad({
   list,
   news = new Map<number, CoachAbsence>(),
   held,
+  fixtures,
 }: {
   onPitch: SquadOnPitch;
   plan: EntryAdvice | null;
@@ -41,6 +46,7 @@ export function MemberSquad({
   list: ReactNode;
   news?: ReadonlyMap<number, CoachAbsence>;
   held?: EntrySquad;
+  fixtures?: FixturesPayload | null;
 }) {
   const { language, locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
@@ -48,6 +54,27 @@ export function MemberSquad({
   const [view, setView] = useState<"pitch" | "list">("pitch");
   const field = useRef<HTMLDivElement>(null);
   const planned = onPitch.source === "plan";
+  const basis = planned ? plan : held;
+  const context = basis
+    ? JSON.stringify([
+        basis.league_id,
+        "entry_id" in basis ? basis.entry_id : basis.entry.entry_id,
+        basis.season,
+        basis.gameweek,
+        basis.source_snapshot_id,
+      ])
+    : null;
+  const layoutKey = JSON.stringify([
+    onPitch.eleven.map((player) => [player.playerId, player.position]),
+    onPitch.bench.map((player) => [player.playerId, player.order]),
+  ]);
+  usePitchMovement(field, context, layoutKey, view === "pitch", planned);
+  const [selection, setSelection] = useState<{ context: string | null; id: number } | null>(null);
+  const selected =
+    selection?.context === context
+      ? [...onPitch.eleven, ...onPitch.bench].find((player) => player.playerId === selection?.id)
+      : undefined;
+  const selectPlayer = (id: number) => setSelection({ context, id });
   const modelChange = planned ? modelChangeOf(plan) : null;
   const changeKey = modelChange?.key ?? null;
   // The changed players' plates, on the pitch and the bench, move once per change; the marks
@@ -120,8 +147,21 @@ export function MemberSquad({
         ) : null}
       </div>
       <div ref={field} className={styles.pitchView} hidden={hasList && view !== "pitch"}>
-        <MemberPitch players={onPitch.eleven} codes={codes} modelChange={modelChange} news={news} />
-        <MemberBench players={onPitch.bench} codes={codes} modelChange={modelChange} news={news} />
+        <MemberPitch
+          players={onPitch.eleven}
+          codes={codes}
+          modelChange={modelChange}
+          news={news}
+          onSelectPlayer={selectPlayer}
+        />
+        <MemberBench
+          players={onPitch.bench}
+          codes={codes}
+          modelChange={modelChange}
+          news={news}
+          onSelectPlayer={selectPlayer}
+        />
+        <PitchLookControl />
       </div>
       {hasList ? (
         <div className={styles.listView} hidden={view !== "list"}>
@@ -129,6 +169,18 @@ export function MemberSquad({
         </div>
       ) : null}
       <CoachNews news={news} players={newsPlayers} />
+      {selected ? (
+        <PlayerDetails
+          key={`${context}:${selected.playerId}`}
+          player={selected}
+          plan={planned ? plan : null}
+          held={held}
+          fixtures={fixtures}
+          codes={codes}
+          news={news}
+          onClose={() => setSelection(null)}
+        />
+      ) : null}
     </section>
   );
 }

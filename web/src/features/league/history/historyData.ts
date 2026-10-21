@@ -11,6 +11,22 @@ export interface WeeklyScore {
   net_points: number;
 }
 
+export interface ActualContribution {
+  player_id: number;
+  name: string;
+  points: number;
+  multiplier: number;
+  counted_points: number;
+}
+
+export interface ActualScore extends WeeklyScore {
+  details?: {
+    source_snapshot_id: string;
+    captain: ActualContribution;
+    transfers: { player_out: string; player_in: ActualContribution }[];
+  } | null;
+}
+
 export interface SuggestedScore extends WeeklyScore {
   captain_bonus_points: number;
   autosub_points: number;
@@ -59,7 +75,7 @@ export interface WeekReview {
   outcome_captured_at_utc: string | null;
   expected_own_points: number | null;
   suggested: SuggestedScore | null;
-  actual: WeeklyScore | null;
+  actual: ActualScore | null;
   actual_reason: string | null;
   net_difference: number | null;
   players: PlayerReview[];
@@ -103,6 +119,35 @@ function score(value: unknown): WeeklyScore {
       same(row.gross_points - row.transfer_hit_points, row.net_points),
   );
   return row as unknown as WeeklyScore;
+}
+
+function contribution(value: unknown) {
+  const row = object(value);
+  requireThat(Number.isSafeInteger(row.player_id) && Number(row.player_id) > 0 && text(row.name));
+  requireThat(number(row.points) && number(row.counted_points));
+  requireThat(
+    Number.isInteger(row.multiplier) && Number(row.multiplier) >= 0 && Number(row.multiplier) <= 3,
+  );
+  requireThat(same(row.points * Number(row.multiplier), row.counted_points));
+}
+
+function actualDetails(value: unknown) {
+  if (value === undefined || value === null) return;
+  const detail = object(value);
+  requireThat(text(detail.source_snapshot_id));
+  contribution(detail.captain);
+  requireThat(Array.isArray(detail.transfers));
+  const counted = new Set<number>();
+  for (const item of detail.transfers) {
+    const move = object(item);
+    requireThat(text(move.player_out));
+    contribution(move.player_in);
+    const player = object(move.player_in);
+    if (Number(player.multiplier) > 0) {
+      requireThat(!counted.has(Number(player.player_id)));
+      counted.add(Number(player.player_id));
+    }
+  }
 }
 
 /** Validate identity, settled state and published arithmetic before displaying a score. */
@@ -235,6 +280,7 @@ export function checkedHistory(
     );
     if (row.actual !== null) {
       const actual = score(row.actual);
+      actualDetails(object(row.actual).details);
       requireThat(
         row.actual_reason === null &&
           number(row.net_difference) &&

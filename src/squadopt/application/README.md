@@ -105,6 +105,7 @@ The static JSON trees the website reads: the per-member league trees and the sea
 | `live_score.py` | A replaceable live score view, never an immutable ledger outcome (`live_score_v1`). |
 | `live_price_honesty.py` | Stated price against realized cost, from recorded advice; solves nothing. |
 | `weekly_suggestion_eval.py` | Read-only, settled evaluation of recorded member advice; never invokes a solver. |
+| `settled_member.py` | Reads official captain and transfer contributions from settled captured picks, checked against the member's gross score. |
 
 ## Evidence exports and handoffs
 

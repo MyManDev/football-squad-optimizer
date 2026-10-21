@@ -201,6 +201,8 @@ export interface DeviceComputable {
   rivals: number[];
   /** The Top 100 weights the device solves for the one-week pure-points plan; zero always. */
   top100Weights: Top100Weight[];
+  /** Chips playable this week according to the entry's captured chip states. */
+  chips?: MemberChip[];
   /**
    * The rivals' entry documents are still being read, so `rivals` is not final. Until it
    * is, the rival a link names is kept, and the page reads as loading rather than unlisted.
@@ -381,14 +383,9 @@ export function resolvePublishedAdvice(
   onDevice?: DeviceComputable,
 ): PublishedAdviceSelection {
   const preferences = preferencesFromUrl(searchParams);
-  const published = resolveFromIndex(
+  const published = withDeviceChoices(
+    resolveFromIndex(searchParams, leagueId, entryId, members, index, context, onDevice),
     searchParams,
-    leagueId,
-    entryId,
-    members,
-    index,
-    context,
-    onDevice,
   );
   if (
     !capabilities ||
@@ -419,6 +416,46 @@ export function resolvePublishedAdvice(
     };
   }
   return result;
+}
+
+/** Device choices need no published answer, and never acquire a fabricated file path. */
+function withDeviceChoices(
+  published: PublishedAdviceSelection,
+  searchParams: URLSearchParams,
+): PublishedAdviceSelection {
+  const device = published.onDevice;
+  if (
+    !device ||
+    published.status === "declared-unavailable" ||
+    published.request.strategy !== "saf-puan" ||
+    published.request.window !== 1 ||
+    !device.strategies.includes("saf-puan") ||
+    !device.windows.includes(1) ||
+    searchParams.get("model") === "football" ||
+    searchParams.get(EVIDENCE_PARAMETER) === "on" ||
+    !preferencesFromUrl(searchParams).valid ||
+    preferencesFromUrl(searchParams).value
+  )
+    return published;
+
+  const askedWeight = parseTop100(searchParams).weight;
+  const weight = device.top100Weights.includes(askedWeight) ? askedWeight : published.top100.weight;
+  const askedChip = parseChip(searchParams);
+  const chip =
+    weight === 0 &&
+    askedChip.chip !== null &&
+    askedChip.chip !== "auto" &&
+    device.chips?.includes(askedChip.chip)
+      ? askedChip.chip
+      : published.chip.chip;
+  if (weight === published.top100.weight && chip === published.chip.chip) return published;
+  return {
+    ...published,
+    status: "not-listed",
+    path: null,
+    top100: { ...published.top100, weight, notOffered: false },
+    chip: { ...published.chip, chip, notOffered: chip === null && published.chip.notOffered },
+  };
 }
 
 function notComputable(strategies: MemberStrategy[] = []): ComputableAdvice {
