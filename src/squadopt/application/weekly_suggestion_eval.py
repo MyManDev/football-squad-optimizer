@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 import math
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
@@ -603,6 +603,7 @@ def review_member_weeks(
     entry_ids: Sequence[int],
     selected_records: dict[tuple[int, int], dict[str, Any]] | None = None,
     published: PublishedCaptures | None = None,
+    read_capture: Callable[[Path, str], CapturedSnapshot] | None = None,
 ) -> dict[int, tuple[WeekReview, ...]]:
     """Review every recorded week of every member, newest gameweek first, from evidence only.
 
@@ -618,7 +619,7 @@ def review_member_weeks(
     cutoff = as_instant(as_of_snapshot.metadata.captured_at_utc)
     captures = []
     for identifier in list_snapshot_ids(snapshot_root, source=FPL_LIVE_SOURCE):
-        captured = read_snapshot(snapshot_root, identifier)
+        captured = (read_capture or read_snapshot)(snapshot_root, identifier)
         if (
             as_instant(captured.metadata.captured_at_utc) <= cutoff
             and infer_season(captured) == season
@@ -915,6 +916,7 @@ def publish_suggestion_histories(
     out_dir: Path,
     published: PublishedCaptures,
     policy: DetectionPolicy = DEFAULT_DETECTION_POLICY,
+    read_capture: Callable[[Path, str], CapturedSnapshot] | None = None,
 ) -> tuple[Path, ...]:
     """Publish member-safe derived documents from existing verified, bounded captures.
 
@@ -938,6 +940,7 @@ def publish_suggestion_histories(
         entry_ids=entry_ids,
         selected_records=selected_records,
         published=published,
+        read_capture=read_capture,
     )
     # Validate the whole replacement before writing the first member. An incomplete
     # record store must not turn a previously published week into a week that vanished.
