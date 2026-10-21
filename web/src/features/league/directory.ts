@@ -114,13 +114,17 @@ export async function loadLeagueDirectory(options?: RequestOptions): Promise<Lea
     ) {
       throw new LeagueDataError("The published league directory is not the expected shape.");
     }
-    const leagues = envelope.payload.leagues.map(publishedLeague);
-    if (leagues.some((league) => league === null)) {
-      throw new LeagueDataError(
-        "The published league directory names a league it cannot describe.",
-      );
+    const rows = envelope.payload.leagues;
+    const valid = rows.map(publishedLeague).filter((league) => league !== null);
+    const counts = new Map<number, number>();
+    for (const league of valid) counts.set(league.leagueId, (counts.get(league.leagueId) ?? 0) + 1);
+    // A broken row affects that league only. Duplicate identities are ambiguous, so
+    // neither copy is chosen; independent leagues remain available.
+    const leagues = valid.filter((league) => counts.get(league.leagueId) === 1);
+    if (rows.length > 0 && leagues.length === 0) {
+      throw new LeagueDataError("The published league directory has no usable league records.");
     }
-    return { leagues: leagues as PublishedLeague[] };
+    return { leagues };
   } catch (error) {
     if (!(error instanceof LeagueDataMissing)) throw error;
   }

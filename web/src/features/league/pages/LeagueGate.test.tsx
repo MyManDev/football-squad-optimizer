@@ -192,10 +192,12 @@ describe.each(["tr", "en"] as const)("league gate in %s", (language) => {
 
   it("asks again, in place, when the address names a league the site does not publish", async () => {
     const fetcher = legacySite();
-    writeChosenLeague(OTHER);
+    writeChosenLeague(LEAGUE);
     open(language, memberAddress(OTHER, ENTRY));
     expect(await screen.findByRole("heading", { name: copy.title })).toBeInTheDocument();
     expect(screen.getByLabelText(copy.label)).toHaveValue(String(OTHER));
+    expect(screen.getByRole("status")).toHaveTextContent(copy.unsupported(OTHER));
+    expect(readChosenLeague()).toBe(LEAGUE);
     expect(screen.queryByRole("heading", { name: "Member page" })).toBeNull();
     expect(location()).toBe(memberAddress(OTHER, ENTRY));
     expect(asked(fetcher)).toEqual(DIRECTORY_READS);
