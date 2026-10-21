@@ -30,19 +30,22 @@ type State = "idle" | "invalid" | "loading" | "unsupported" | "missing" | "faile
 export function LeagueEntryPage({
   inPlace = false,
   stay = false,
+  unpublishedLeagueId = null,
 }: {
   inPlace?: boolean;
   stay?: boolean;
+  unpublishedLeagueId?: number | null;
 }) {
   const { messages } = useLanguage();
   const copy = messages.leagueEntry;
   const navigate = useNavigate();
   const location = useLocation();
   const { leagueId: remembered, chooseLeague } = useLeagueIdentity();
-  const [value, setValue] = useState(remembered === null ? "" : String(remembered));
-  const [state, setState] = useState<State>("idle");
+  const initialLeague = unpublishedLeagueId ?? remembered;
+  const [value, setValue] = useState(initialLeague === null ? "" : String(initialLeague));
+  const [state, setState] = useState<State>(unpublishedLeagueId === null ? "idle" : "unsupported");
   // The number the last lookup asked for, named in the answer that it is not published.
-  const [asked, setAsked] = useState(0);
+  const [asked, setAsked] = useState(unpublishedLeagueId ?? 0);
   const active = useRef(true);
   useEffect(() => {
     active.current = true;

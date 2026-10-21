@@ -90,7 +90,15 @@ export function LeagueGate({
       </EmptyState>
     );
   }
-  if (league === null) return <LeagueEntryPage inPlace stay={source === "visitor"} />;
+  if (league === null)
+    return (
+      <LeagueEntryPage
+        key={named}
+        inPlace
+        stay={source === "visitor"}
+        unpublishedLeagueId={named}
+      />
+    );
   return (
     <LeagueProvider league={league}>
       <MemberGate>{children}</MemberGate>
