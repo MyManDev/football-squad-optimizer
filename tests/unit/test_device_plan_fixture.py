@@ -189,6 +189,17 @@ def test_the_rival_cases_exercise_both_decisions_and_a_refusal() -> None:
         and case["reference"]["control_solver_status"] == "OPTIMAL"
         for case in world["top100_cases"]
     )
+    weighted = world["weighted_cases"]
+    assert len(weighted) == len(world["cases"]) * 2
+    assert {case["weight"] for case in weighted} == {20, 50}
+    answered_weighted = [case["reference"] for case in weighted if not case["reference"]["refused"]]
+    assert any(case["reference"]["refused"] for case in weighted)
+    assert any(case["changed"] for case in answered_weighted)
+    assert {case["plan_kind"] for case in answered_weighted} == {
+        "within_free_transfers",
+        "with_hits",
+    }
+    assert all(case["solver_status"] == "OPTIMAL" for case in answered_weighted)
     # Every player in the world is on his own number, so no tie decides a case.
     points = [p["expected_points"] for p in world["document"]["players"]]
     assert len(set(points)) == len(points)

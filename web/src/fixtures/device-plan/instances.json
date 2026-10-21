@@ -4077,6 +4077,1044 @@
      "changed": true
     }
    }
+  ],
+  "weighted_cases": [
+   {
+    "entry_id": 101,
+    "rival_entry_id": 202,
+    "strategy": "ortak-koru",
+    "weight": 20,
+    "reference": {
+     "refused": false,
+     "solver_status": "OPTIMAL",
+     "control_solver_status": "OPTIMAL",
+     "starting_xi": [
+      1003,
+      1004,
+      1006,
+      1007,
+      1009,
+      1012,
+      1013,
+      1016,
+      1017,
+      1023,
+      1024
+     ],
+     "captain": 1024,
+     "vice_captain": 1016,
+     "bench": [
+      1002,
+      1020,
+      1014,
+      1005
+     ],
+     "transfers_in": [
+      1003,
+      1009,
+      1017,
+      1023,
+      1024
+     ],
+     "transfers_out": [
+      1001,
+      1008,
+      1015,
+      1021,
+      1022
+     ],
+     "moves": [
+      {
+       "out": 1001,
+       "in": 1003,
+       "gain": -0.4799999999999969,
+       "reason": "top100_preference"
+      },
+      {
+       "out": 1008,
+       "in": 1009,
+       "gain": 0.39000000000000057,
+       "reason": "top100_preference"
+      },
+      {
+       "out": 1015,
+       "in": 1017,
+       "gain": -0.480000000000004,
+       "reason": "top100_preference"
+      },
+      {
+       "out": 1021,
+       "in": 1023,
+       "gain": -0.4799999999999969,
+       "reason": "top100_preference"
+      },
+      {
+       "out": 1022,
+       "in": 1024,
+       "gain": 12.190000000000005,
+       "reason": "mode_tradeoff"
+      }
+     ],
+     "transfer_hit_points": 16.0,
+     "expected_own_points": 45.580000000000005,
+     "expected_gain_vs_hold": 11.140000000000008,
+     "expected_points_cost": 14.100000000000001,
+     "expected_points_cost_ceiling": 14.100000000000001,
+     "overlap_count": 9,
+     "transfer_cap": 1,
+     "overlap_target": 9,
+     "overlap_applied": 9,
+     "plan_kind": "with_hits",
+     "alternative_plan": null,
+     "expected_gap_vs_rival": -0.10999999999999233,
+     "captain_agreement": false,
+     "changed": true
+    }
+   },
+   {
+    "entry_id": 101,
+    "rival_entry_id": 202,
+    "strategy": "ortak-koru",
+    "weight": 50,
+    "reference": {
+     "refused": false,
+     "solver_status": "OPTIMAL",
+     "control_solver_status": "OPTIMAL",
+     "starting_xi": [
+      1003,
+      1004,
+      1007,
+      1009,
+      1012,
+      1013,
+      1016,
+      1017,
+      1020,
+      1023,
+      1024
+     ],
+     "captain": 1024,
+     "vice_captain": 1016,
+     "bench": [
+      1002,
+      1006,
+      1014,
+      1005
+     ],
+     "transfers_in": [
+      1003,
+      1009,
+      1017,
+      1023,
+      1024
+     ],
+     "transfers_out": [
+      1001,
+      1008,
+      1015,
+      1021,
+      1022
+     ],
+     "moves": [
+      {
+       "out": 1001,
+       "in": 1003,
+       "gain": -0.4799999999999969,
+       "reason": "top100_preference"
+      },
+      {
+       "out": 1008,
+       "in": 1009,
+       "gain": 0.030000000000001137,
+       "reason": "top100_preference"
+      },
+      {
+       "out": 1015,
+       "in": 1017,
+       "gain": -0.480000000000004,
+       "reason": "top100_preference"
+      },
+      {
+       "out": 1021,
+       "in": 1023,
+       "gain": -0.4799999999999969,
+       "reason": "top100_preference"
+      },
+      {
+       "out": 1022,
+       "in": 1024,
+       "gain": 12.189999999999998,
+       "reason": "mode_tradeoff"
+      }
+     ],
+     "transfer_hit_points": 16.0,
+     "expected_own_points": 45.22,
+     "expected_gain_vs_hold": 10.780000000000001,
+     "expected_points_cost": 14.460000000000008,
+     "expected_points_cost_ceiling": 14.460000000000008,
+     "overlap_count": 9,
+     "transfer_cap": 1,
+     "overlap_target": 9,
+     "overlap_applied": 9,
+     "plan_kind": "with_hits",
+     "alternative_plan": null,
+     "expected_gap_vs_rival": -0.46999999999999886,
+     "captain_agreement": false,
+     "changed": true
+    }
+   },
+   {
+    "entry_id": 101,
+    "rival_entry_id": 202,
+    "strategy": "fark-yarat",
+    "weight": 20,
+    "reference": {
+     "refused": false,
+     "solver_status": "OPTIMAL",
+     "control_solver_status": "OPTIMAL",
+     "starting_xi": [
+      1001,
+      1004,
+      1007,
+      1009,
+      1013,
+      1015,
+      1016,
+      1017,
+      1020,
+      1022,
+      1024
+     ],
+     "captain": 1024,
+     "vice_captain": 1022,
+     "bench": [
+      1002,
+      1014,
+      1011,
+      1008
+     ],
+     "transfers_in": [
+      1009,
+      1011,
+      1017,
+      1024
+     ],
+     "transfers_out": [
+      1005,
+      1006,
+      1012,
+      1021
+     ],
+     "moves": [
+      {
+       "out": 1005,
+       "in": 1009,
+       "gain": 0.39000000000000057,
+       "reason": "mode_tradeoff"
+      },
+      {
+       "out": 1006,
+       "in": 1011,
+       "gain": -0.35999999999999943,
+       "reason": "top100_preference"
+      },
+      {
+       "out": 1012,
+       "in": 1017,
+       "gain": -0.45000000000000284,
+       "reason": "top100_preference"
+      },
+      {
+       "out": 1021,
+       "in": 1024,
+       "gain": 12.700000000000003,
+       "reason": "mode_tradeoff"
+      }
+     ],
+     "transfer_hit_points": 12.0,
+     "expected_own_points": 46.72,
+     "expected_gain_vs_hold": 12.280000000000001,
+     "expected_points_cost": 8.960000000000008,
+     "expected_points_cost_ceiling": 8.960000000000008,
+     "overlap_count": 5,
+     "transfer_cap": 1,
+     "overlap_target": 5,
+     "overlap_applied": 5,
+     "plan_kind": "with_hits",
+     "alternative_plan": null,
+     "expected_gap_vs_rival": 5.030000000000001,
+     "captain_agreement": false,
+     "changed": false
+    }
+   },
+   {
+    "entry_id": 101,
+    "rival_entry_id": 202,
+    "strategy": "fark-yarat",
+    "weight": 50,
+    "reference": {
+     "refused": false,
+     "solver_status": "OPTIMAL",
+     "control_solver_status": "OPTIMAL",
+     "starting_xi": [
+      1001,
+      1007,
+      1009,
+      1010,
+      1013,
+      1015,
+      1016,
+      1017,
+      1020,
+      1022,
+      1024
+     ],
+     "captain": 1024,
+     "vice_captain": 1022,
+     "bench": [
+      1002,
+      1014,
+      1008,
+      1005
+     ],
+     "transfers_in": [
+      1009,
+      1010,
+      1017,
+      1024
+     ],
+     "transfers_out": [
+      1004,
+      1006,
+      1012,
+      1021
+     ],
+     "moves": [
+      {
+       "out": 1004,
+       "in": 1009,
+       "gain": -0.44999999999999574,
+       "reason": "top100_preference"
+      },
+      {
+       "out": 1006,
+       "in": 1010,
+       "gain": 0.5700000000000003,
+       "reason": "top100_preference"
+      },
+      {
+       "out": 1012,
+       "in": 1017,
+       "gain": -0.45000000000000284,
+       "reason": "top100_preference"
+      },
+      {
+       "out": 1021,
+       "in": 1024,
+       "gain": 12.670000000000002,
+       "reason": "mode_tradeoff"
+      }
+     ],
+     "transfer_hit_points": 12.0,
+     "expected_own_points": 46.78,
+     "expected_gain_vs_hold": 12.340000000000003,
+     "expected_points_cost": 8.900000000000006,
+     "expected_points_cost_ceiling": 8.900000000000006,
+     "overlap_count": 5,
+     "transfer_cap": 1,
+     "overlap_target": 5,
+     "overlap_applied": 5,
+     "plan_kind": "with_hits",
+     "alternative_plan": null,
+     "expected_gap_vs_rival": 5.090000000000003,
+     "captain_agreement": false,
+     "changed": true
+    }
+   },
+   {
+    "entry_id": 101,
+    "rival_entry_id": 203,
+    "strategy": "ortak-koru",
+    "weight": 20,
+    "reference": {
+     "refused": true,
+     "reason": "The 'ortak-koru' band cannot be satisfied from this squad against entry 203: no provable plan exists."
+    }
+   },
+   {
+    "entry_id": 101,
+    "rival_entry_id": 203,
+    "strategy": "ortak-koru",
+    "weight": 50,
+    "reference": {
+     "refused": true,
+     "reason": "The 'ortak-koru' band cannot be satisfied from this squad against entry 203: no provable plan exists."
+    }
+   },
+   {
+    "entry_id": 101,
+    "rival_entry_id": 203,
+    "strategy": "fark-yarat",
+    "weight": 20,
+    "reference": {
+     "refused": false,
+     "solver_status": "OPTIMAL",
+     "control_solver_status": "OPTIMAL",
+     "starting_xi": [
+      1001,
+      1004,
+      1007,
+      1009,
+      1012,
+      1013,
+      1015,
+      1016,
+      1021,
+      1022,
+      1024
+     ],
+     "captain": 1024,
+     "vice_captain": 1022,
+     "bench": [
+      1002,
+      1006,
+      1014,
+      1008
+     ],
+     "transfers_in": [
+      1009,
+      1024
+     ],
+     "transfers_out": [
+      1005,
+      1020
+     ],
+     "moves": [
+      {
+       "out": 1005,
+       "in": 1009,
+       "gain": 0.39000000000000057,
+       "reason": "mode_tradeoff"
+      },
+      {
+       "out": 1020,
+       "in": 1024,
+       "gain": 12.850000000000001,
+       "reason": "mode_tradeoff"
+      }
+     ],
+     "transfer_hit_points": 4.0,
+     "expected_own_points": 47.68,
+     "expected_gain_vs_hold": 13.240000000000002,
+     "expected_points_cost": 7.105427357601002e-15,
+     "expected_points_cost_ceiling": 7.105427357601002e-15,
+     "overlap_count": 4,
+     "transfer_cap": 1,
+     "overlap_target": 5,
+     "overlap_applied": 5,
+     "plan_kind": "with_hits",
+     "alternative_plan": null,
+     "expected_gap_vs_rival": 6.1299999999999955,
+     "captain_agreement": false,
+     "changed": false
+    }
+   },
+   {
+    "entry_id": 101,
+    "rival_entry_id": 203,
+    "strategy": "fark-yarat",
+    "weight": 50,
+    "reference": {
+     "refused": false,
+     "solver_status": "OPTIMAL",
+     "control_solver_status": "OPTIMAL",
+     "starting_xi": [
+      1001,
+      1004,
+      1007,
+      1009,
+      1012,
+      1013,
+      1015,
+      1016,
+      1021,
+      1022,
+      1024
+     ],
+     "captain": 1024,
+     "vice_captain": 1022,
+     "bench": [
+      1002,
+      1006,
+      1014,
+      1008
+     ],
+     "transfers_in": [
+      1009,
+      1024
+     ],
+     "transfers_out": [
+      1005,
+      1020
+     ],
+     "moves": [
+      {
+       "out": 1005,
+       "in": 1009,
+       "gain": 0.030000000000001137,
+       "reason": "mode_tradeoff"
+      },
+      {
+       "out": 1020,
+       "in": 1024,
+       "gain": 13.21,
+       "reason": "mode_tradeoff"
+      }
+     ],
+     "transfer_hit_points": 4.0,
+     "expected_own_points": 47.68,
+     "expected_gain_vs_hold": 13.240000000000002,
+     "expected_points_cost": 7.105427357601002e-15,
+     "expected_points_cost_ceiling": 7.105427357601002e-15,
+     "overlap_count": 4,
+     "transfer_cap": 1,
+     "overlap_target": 5,
+     "overlap_applied": 5,
+     "plan_kind": "with_hits",
+     "alternative_plan": null,
+     "expected_gap_vs_rival": 6.1299999999999955,
+     "captain_agreement": false,
+     "changed": false
+    }
+   },
+   {
+    "entry_id": 102,
+    "rival_entry_id": 202,
+    "strategy": "ortak-koru",
+    "weight": 20,
+    "reference": {
+     "refused": false,
+     "solver_status": "OPTIMAL",
+     "control_solver_status": "OPTIMAL",
+     "starting_xi": [
+      1001,
+      1004,
+      1007,
+      1009,
+      1012,
+      1013,
+      1016,
+      1019,
+      1022,
+      1023,
+      1024
+     ],
+     "captain": 1024,
+     "vice_captain": 1022,
+     "bench": [
+      1002,
+      1006,
+      1014,
+      1008
+     ],
+     "transfers_in": [
+      1019
+     ],
+     "transfers_out": [
+      1015
+     ],
+     "moves": [
+      {
+       "out": 1015,
+       "in": 1019,
+       "gain": 0.5399999999999991,
+       "reason": "mode_tradeoff"
+      }
+     ],
+     "transfer_hit_points": 0.0,
+     "expected_own_points": 47.74,
+     "expected_gain_vs_hold": 0.5399999999999991,
+     "expected_points_cost": 0.4200000000000017,
+     "expected_points_cost_ceiling": 0.4200000000000017,
+     "overlap_count": 7,
+     "transfer_cap": 1,
+     "overlap_target": 9,
+     "overlap_applied": 7,
+     "plan_kind": "within_free_transfers",
+     "alternative_plan": {
+      "kind": "with_hits",
+      "overlap_applied": 9,
+      "transfer_hit_points": 12.0,
+      "expected_points_cost": 12.420000000000002,
+      "expected_points_cost_ceiling": 12.420000000000002
+     },
+     "expected_gap_vs_rival": 18.050000000000004,
+     "captain_agreement": false,
+     "changed": true
+    }
+   },
+   {
+    "entry_id": 102,
+    "rival_entry_id": 202,
+    "strategy": "ortak-koru",
+    "weight": 50,
+    "reference": {
+     "refused": false,
+     "solver_status": "OPTIMAL",
+     "control_solver_status": "OPTIMAL",
+     "starting_xi": [
+      1001,
+      1004,
+      1007,
+      1009,
+      1012,
+      1013,
+      1015,
+      1017,
+      1022,
+      1023,
+      1024
+     ],
+     "captain": 1024,
+     "vice_captain": 1022,
+     "bench": [
+      1002,
+      1006,
+      1014,
+      1008
+     ],
+     "transfers_in": [
+      1017
+     ],
+     "transfers_out": [
+      1016
+     ],
+     "moves": [
+      {
+       "out": 1016,
+       "in": 1017,
+       "gain": -0.990000000000002,
+       "reason": "top100_preference"
+      }
+     ],
+     "transfer_hit_points": 0.0,
+     "expected_own_points": 46.21,
+     "expected_gain_vs_hold": -0.990000000000002,
+     "expected_points_cost": 1.9500000000000028,
+     "expected_points_cost_ceiling": 1.9500000000000028,
+     "overlap_count": 7,
+     "transfer_cap": 1,
+     "overlap_target": 9,
+     "overlap_applied": 7,
+     "plan_kind": "within_free_transfers",
+     "alternative_plan": {
+      "kind": "with_hits",
+      "overlap_applied": 9,
+      "transfer_hit_points": 12.0,
+      "expected_points_cost": 14.399999999999999,
+      "expected_points_cost_ceiling": 14.399999999999999
+     },
+     "expected_gap_vs_rival": 16.520000000000003,
+     "captain_agreement": false,
+     "changed": true
+    }
+   },
+   {
+    "entry_id": 102,
+    "rival_entry_id": 202,
+    "strategy": "fark-yarat",
+    "weight": 20,
+    "reference": {
+     "refused": false,
+     "solver_status": "OPTIMAL",
+     "control_solver_status": "OPTIMAL",
+     "starting_xi": [
+      1001,
+      1004,
+      1007,
+      1009,
+      1012,
+      1013,
+      1015,
+      1016,
+      1022,
+      1023,
+      1024
+     ],
+     "captain": 1024,
+     "vice_captain": 1022,
+     "bench": [
+      1002,
+      1014,
+      1011,
+      1008
+     ],
+     "transfers_in": [
+      1011
+     ],
+     "transfers_out": [
+      1006
+     ],
+     "moves": [
+      {
+       "out": 1006,
+       "in": 1011,
+       "gain": 0.0,
+       "reason": "mode_tradeoff"
+      }
+     ],
+     "transfer_hit_points": 0.0,
+     "expected_own_points": 47.2,
+     "expected_gain_vs_hold": 0.0,
+     "expected_points_cost": 0.9600000000000009,
+     "expected_points_cost_ceiling": 0.9600000000000009,
+     "overlap_count": 5,
+     "transfer_cap": 1,
+     "overlap_target": 5,
+     "overlap_applied": 5,
+     "plan_kind": "within_free_transfers",
+     "alternative_plan": {
+      "kind": "with_hits",
+      "overlap_applied": 5,
+      "transfer_hit_points": 0.0,
+      "expected_points_cost": 0.9600000000000009,
+      "expected_points_cost_ceiling": 0.9600000000000009
+     },
+     "expected_gap_vs_rival": 17.510000000000005,
+     "captain_agreement": false,
+     "changed": false
+    }
+   },
+   {
+    "entry_id": 102,
+    "rival_entry_id": 202,
+    "strategy": "fark-yarat",
+    "weight": 50,
+    "reference": {
+     "refused": false,
+     "solver_status": "OPTIMAL",
+     "control_solver_status": "OPTIMAL",
+     "starting_xi": [
+      1001,
+      1004,
+      1007,
+      1009,
+      1012,
+      1013,
+      1015,
+      1016,
+      1022,
+      1023,
+      1024
+     ],
+     "captain": 1024,
+     "vice_captain": 1022,
+     "bench": [
+      1002,
+      1014,
+      1011,
+      1008
+     ],
+     "transfers_in": [
+      1011
+     ],
+     "transfers_out": [
+      1006
+     ],
+     "moves": [
+      {
+       "out": 1006,
+       "in": 1011,
+       "gain": 0.0,
+       "reason": "mode_tradeoff"
+      }
+     ],
+     "transfer_hit_points": 0.0,
+     "expected_own_points": 47.2,
+     "expected_gain_vs_hold": 0.0,
+     "expected_points_cost": 0.9600000000000009,
+     "expected_points_cost_ceiling": 0.9600000000000009,
+     "overlap_count": 5,
+     "transfer_cap": 1,
+     "overlap_target": 5,
+     "overlap_applied": 5,
+     "plan_kind": "within_free_transfers",
+     "alternative_plan": {
+      "kind": "with_hits",
+      "overlap_applied": 5,
+      "transfer_hit_points": 0.0,
+      "expected_points_cost": 0.9600000000000009,
+      "expected_points_cost_ceiling": 0.9600000000000009
+     },
+     "expected_gap_vs_rival": 17.510000000000005,
+     "captain_agreement": false,
+     "changed": false
+    }
+   },
+   {
+    "entry_id": 102,
+    "rival_entry_id": 203,
+    "strategy": "ortak-koru",
+    "weight": 20,
+    "reference": {
+     "refused": false,
+     "solver_status": "OPTIMAL",
+     "control_solver_status": "OPTIMAL",
+     "starting_xi": [
+      1001,
+      1004,
+      1007,
+      1009,
+      1012,
+      1013,
+      1015,
+      1016,
+      1019,
+      1022,
+      1024
+     ],
+     "captain": 1024,
+     "vice_captain": 1022,
+     "bench": [
+      1002,
+      1006,
+      1023,
+      1008
+     ],
+     "transfers_in": [
+      1019
+     ],
+     "transfers_out": [
+      1014
+     ],
+     "moves": [
+      {
+       "out": 1014,
+       "in": 1019,
+       "gain": 0.9600000000000009,
+       "reason": "mode_tradeoff"
+      }
+     ],
+     "transfer_hit_points": 0.0,
+     "expected_own_points": 48.160000000000004,
+     "expected_gain_vs_hold": 0.9600000000000009,
+     "expected_points_cost": 0.0,
+     "expected_points_cost_ceiling": 0.0,
+     "overlap_count": 6,
+     "transfer_cap": 1,
+     "overlap_target": 9,
+     "overlap_applied": 6,
+     "plan_kind": "within_free_transfers",
+     "alternative_plan": {
+      "kind": "with_hits",
+      "overlap_applied": 9,
+      "transfer_hit_points": 12.0,
+      "expected_points_cost": 12.030000000000001,
+      "expected_points_cost_ceiling": 12.030000000000001
+     },
+     "expected_gap_vs_rival": 10.61,
+     "captain_agreement": false,
+     "changed": false
+    }
+   },
+   {
+    "entry_id": 102,
+    "rival_entry_id": 203,
+    "strategy": "ortak-koru",
+    "weight": 50,
+    "reference": {
+     "refused": false,
+     "solver_status": "OPTIMAL",
+     "control_solver_status": "OPTIMAL",
+     "starting_xi": [
+      1001,
+      1004,
+      1007,
+      1009,
+      1012,
+      1013,
+      1015,
+      1019,
+      1022,
+      1023,
+      1024
+     ],
+     "captain": 1024,
+     "vice_captain": 1022,
+     "bench": [
+      1002,
+      1016,
+      1006,
+      1008
+     ],
+     "transfers_in": [
+      1019
+     ],
+     "transfers_out": [
+      1014
+     ],
+     "moves": [
+      {
+       "out": 1014,
+       "in": 1019,
+       "gain": 0.030000000000001137,
+       "reason": "mode_tradeoff"
+      }
+     ],
+     "transfer_hit_points": 0.0,
+     "expected_own_points": 47.230000000000004,
+     "expected_gain_vs_hold": 0.030000000000001137,
+     "expected_points_cost": 0.9299999999999997,
+     "expected_points_cost_ceiling": 0.9299999999999997,
+     "overlap_count": 6,
+     "transfer_cap": 1,
+     "overlap_target": 9,
+     "overlap_applied": 6,
+     "plan_kind": "within_free_transfers",
+     "alternative_plan": {
+      "kind": "with_hits",
+      "overlap_applied": 9,
+      "transfer_hit_points": 12.0,
+      "expected_points_cost": 12.96,
+      "expected_points_cost_ceiling": 12.96
+     },
+     "expected_gap_vs_rival": 9.68,
+     "captain_agreement": false,
+     "changed": true
+    }
+   },
+   {
+    "entry_id": 102,
+    "rival_entry_id": 203,
+    "strategy": "fark-yarat",
+    "weight": 20,
+    "reference": {
+     "refused": false,
+     "solver_status": "OPTIMAL",
+     "control_solver_status": "OPTIMAL",
+     "starting_xi": [
+      1001,
+      1004,
+      1007,
+      1009,
+      1012,
+      1013,
+      1015,
+      1016,
+      1021,
+      1022,
+      1024
+     ],
+     "captain": 1024,
+     "vice_captain": 1022,
+     "bench": [
+      1002,
+      1006,
+      1014,
+      1008
+     ],
+     "transfers_in": [
+      1021
+     ],
+     "transfers_out": [
+      1023
+     ],
+     "moves": [
+      {
+       "out": 1023,
+       "in": 1021,
+       "gain": 0.4799999999999969,
+       "reason": "mode_tradeoff"
+      }
+     ],
+     "transfer_hit_points": 0.0,
+     "expected_own_points": 47.68,
+     "expected_gain_vs_hold": 0.4799999999999969,
+     "expected_points_cost": 0.480000000000004,
+     "expected_points_cost_ceiling": 0.480000000000004,
+     "overlap_count": 4,
+     "transfer_cap": 1,
+     "overlap_target": 5,
+     "overlap_applied": 5,
+     "plan_kind": "within_free_transfers",
+     "alternative_plan": {
+      "kind": "with_hits",
+      "overlap_applied": 5,
+      "transfer_hit_points": 0.0,
+      "expected_points_cost": 0.480000000000004,
+      "expected_points_cost_ceiling": 0.480000000000004
+     },
+     "expected_gap_vs_rival": 10.129999999999995,
+     "captain_agreement": false,
+     "changed": false
+    }
+   },
+   {
+    "entry_id": 102,
+    "rival_entry_id": 203,
+    "strategy": "fark-yarat",
+    "weight": 50,
+    "reference": {
+     "refused": false,
+     "solver_status": "OPTIMAL",
+     "control_solver_status": "OPTIMAL",
+     "starting_xi": [
+      1001,
+      1004,
+      1007,
+      1009,
+      1012,
+      1013,
+      1015,
+      1017,
+      1022,
+      1023,
+      1024
+     ],
+     "captain": 1024,
+     "vice_captain": 1022,
+     "bench": [
+      1002,
+      1006,
+      1014,
+      1008
+     ],
+     "transfers_in": [
+      1017
+     ],
+     "transfers_out": [
+      1016
+     ],
+     "moves": [
+      {
+       "out": 1016,
+       "in": 1017,
+       "gain": -0.990000000000002,
+       "reason": "top100_preference"
+      }
+     ],
+     "transfer_hit_points": 0.0,
+     "expected_own_points": 46.21,
+     "expected_gain_vs_hold": -0.990000000000002,
+     "expected_points_cost": 1.9500000000000028,
+     "expected_points_cost_ceiling": 1.9500000000000028,
+     "overlap_count": 5,
+     "transfer_cap": 1,
+     "overlap_target": 5,
+     "overlap_applied": 5,
+     "plan_kind": "within_free_transfers",
+     "alternative_plan": {
+      "kind": "with_hits",
+      "overlap_applied": 5,
+      "transfer_hit_points": 0.0,
+      "expected_points_cost": 1.9500000000000028,
+      "expected_points_cost_ceiling": 1.9500000000000028
+     },
+     "expected_gap_vs_rival": 8.659999999999997,
+     "captain_agreement": false,
+     "changed": true
+    }
+   }
   ]
  },
  "preferences": {

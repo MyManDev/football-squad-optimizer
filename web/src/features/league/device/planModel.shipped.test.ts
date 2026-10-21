@@ -6,8 +6,8 @@
  * document (`top100-<weight>.json`). The squad, the eleven, the bench order, the captain,
  * the vice, the transfers, every move row's gain and the planner's objective must be what
  * the tree publishes, player by player, and so must the strategy's account beside them. A
- * named document the device declines by contract (a rival strategy with a Top 100 weight,
- * the manager's word, a window beyond one week) is listed by name with its reason, and the
+ * named document the device declines by contract (the manager's word or a window beyond
+ * one week) is listed by name with its reason, and the
  * device is held to declining it; nothing is passed over silently. The chip documents are
  * `planModel.chips.shipped.test.ts`'s. The trees are whatever publication the repository
  * holds (`testSupport/shippedTrees.ts`).
@@ -35,7 +35,6 @@ import { deviceRivalUsable } from "./computable";
 import type { LpSolver } from "./lp/problem";
 import { solveRequest, type DevicePlanRequest } from "./requests";
 import { deviceSelection, rivalFromSquad } from "./selection";
-import { DevicePlanRefused } from "./solve/week";
 import { benchCoefficient, top100Coefficients } from "./strategies/top100";
 import {
   isDevicePlanDocument,
@@ -54,7 +53,7 @@ const reader =
   <T>(relative: string): T =>
     JSON.parse(readFileSync(join(root, relative), "utf-8")) as T;
 
-type Kind = "saf-puan" | "rival" | "top100";
+type Kind = "saf-puan" | "rival" | "top100" | "rival-top100";
 
 /** A document the device is asked for, with the request that asks for it. */
 interface Case {
@@ -75,7 +74,6 @@ interface Declined {
   request: AdviceRequest;
 }
 
-const RIVAL_WITH_WEIGHT = "a rival strategy with a Top 100 weight";
 const MANAGERS_WORD = "the manager's word";
 const LONGER_WINDOW = "a window beyond one week";
 const NO_MEMBER_INPUTS = "no device inputs for the member";
@@ -196,13 +194,11 @@ function gather(ROOT: string): Tree {
           ? LONGER_WINDOW
           : request.managersWord
             ? MANAGERS_WORD
-            : weight !== 0 && rivalEntryId !== null
-              ? RIVAL_WITH_WEIGHT
-              : weight !== 0 &&
-                  document.rules.top100 === undefined &&
-                  entry.top100_weights === undefined
-                ? NO_TOP100_INPUTS
-                : null;
+            : weight !== 0 &&
+                document.rules.top100 === undefined &&
+                entry.top100_weights === undefined
+              ? NO_TOP100_INPUTS
+              : null;
       if (reason !== null) {
         declined.push({ entryId, path, reason, squad, request });
         continue;
@@ -229,12 +225,13 @@ function gather(ROOT: string): Tree {
       }
       cases.push({
         entryId,
-        kind: "rival",
+        kind: weight === 0 ? "rival" : "rival-top100",
         path,
         squad,
         published,
         request: {
           strategy: { name: request.strategy, rival: rivalFromSquad(rivalEntryId, rivalSquad)! },
+          top100Weight: weight,
         },
       });
     }
@@ -275,7 +272,9 @@ const ids = (players: Array<{ player_id: number }>) => players.map((p) => p.play
 /** The (squad, starter, captain) a document is chosen on: the base points or a weight's. */
 function coefficientsFor(kind: Kind, weight: number) {
   return (player: DevicePlanPlayer): [number, number, number] =>
-    kind === "top100" ? top100Coefficients(player, weight) : player.coefficients;
+    kind === "top100" || kind === "rival-top100"
+      ? top100Coefficients(player, weight)
+      : player.coefficients;
 }
 
 /**
@@ -317,7 +316,7 @@ function expectPublished(document: DevicePlanDocument, c: Case, answer: DevicePl
   // its own, which may be the better plan. On the planner's own objective the proven plan
   // may not fall below the published one; a rival strategy's only within the same band.
   if (published.solver_status !== "OPTIMAL") {
-    if (c.kind === "rival") {
+    if (c.kind === "rival" || c.kind === "rival-top100") {
       expect(answer.rival!.plan_kind).toBe(published.plan_kind);
       expect(answer.rival!.overlap_applied).toBe(published.overlap_applied);
     }
@@ -359,7 +358,7 @@ function expectPublished(document: DevicePlanDocument, c: Case, answer: DevicePl
   }
   // The price is a difference between two plans; it is held where the server proved both.
   const priced = published.control_solver_status === "OPTIMAL";
-  if (c.kind === "rival") {
+  if (c.kind === "rival" || c.kind === "rival-top100") {
     const rival = answer.rival!;
     expect(rival.mode).toBe(published.mode);
     expect(rival.rival_entry_id).toBe(published.rival_entry_id);
@@ -393,7 +392,7 @@ function expectPublished(document: DevicePlanDocument, c: Case, answer: DevicePl
       }
     }
   }
-  if (c.kind === "top100") {
+  if (c.kind === "top100" || c.kind === "rival-top100") {
     const top100 = answer.top100!;
     expect(top100.weight).toBe(published.top100!.weight);
     expect(top100.changed).toBe(published.top100!.changed);
@@ -462,10 +461,14 @@ describe("the shipped one-week plans", () => {
         ["saf-puan", "the pure-points plan"],
         ["rival", "a rival strategy (vs-*)"],
         ["top100", "a Top 100 weight (top100-*)"],
+        ["rival-top100", "a rival strategy with a Top 100 weight"],
       ];
       for (const [kind, label] of kinds) {
         const named = tree.cases.filter((c) => c.kind === kind);
-        const shipped = kind === "rival" && !ALL_RIVAL_PLANS ? firstOfEachStrategy(named) : named;
+        const shipped =
+          (kind === "rival" || kind === "rival-top100") && !ALL_RIVAL_PLANS
+            ? firstOfEachStrategy(named)
+            : named;
         if (shipped.length === 0) {
           it.skip(`${label}: no member's index names such a document, so none is solved`, () => {});
           continue;
@@ -508,24 +511,6 @@ describe("the shipped one-week plans", () => {
             // Declined, not missing: the publish wrote what its index names.
             expect(existsSync(join(ROOT, d.path))).toBe(true);
             expect(deviceSelection(d.request, d.squad)).toBeNull();
-            if (reason !== RIVAL_WITH_WEIGHT) return;
-            // And the solve itself refuses the combination, whatever rival it is given.
-            if (!isDevicePlanDocument(document) || !isDevicePlanEntry(d.squad.device_plan)) {
-              throw new Error("the tree's device inputs are not the published shapes");
-            }
-            const strategy = d.request.strategy;
-            if (!isRivalStrategy(strategy)) throw new Error(`not a rival strategy: ${strategy}`);
-            expect(() =>
-              solveRequest(solver, {
-                document,
-                entry: d.squad.device_plan as DevicePlanEntry,
-                strategy: {
-                  name: strategy,
-                  rival: { entry_id: d.request.rivalEntryId!, starting_xi: [], captain: 0 },
-                },
-                top100Weight: d.request.top100Weight,
-              }),
-            ).toThrow(DevicePlanRefused);
           },
         );
       }

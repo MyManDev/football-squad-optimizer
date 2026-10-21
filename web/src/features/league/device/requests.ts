@@ -8,7 +8,7 @@ import type { LpSolver } from "./lp/problem";
 import { DevicePlanRefused, solvePlan } from "./solve/week";
 import { gainVsNoChip } from "./strategies/chips";
 import { solveRival } from "./strategies/rival";
-import { solveTop100 } from "./strategies/top100";
+import { solveRivalWithTop100, solveTop100 } from "./strategies/top100";
 import type {
   DeviceChip,
   DevicePlanAnswer,
@@ -38,8 +38,8 @@ export interface DevicePlanRequest {
 /**
  * The plan asked for. With a chip: the chip week and, beside it, the member's own no-chip
  * plan the chip is measured against, exactly as the server measures `gain_vs_no_chip`.
- * With a rival strategy: the banded plan with its price and labels. The two combine with
- * nothing, as on the server. With chip gains: the plain plan, and each held chip's gain
+ * With a rival strategy: the banded plan with its price and labels, optionally chosen on
+ * a Top 100 weight. Chips combine with neither. With chip gains: the plain plan, and each held chip's gain
  * against it, or null where its solve was refused; they too combine with nothing. The
  * plain plan is handed to `onPlan` as soon as it is solved, before any chip.
  */
@@ -63,11 +63,17 @@ export function solveRequest(
     return solveChipGains(solver, document, entry, chipGains, now, onPlan);
   }
   if (top100Weight !== 0) {
-    // The device takes a weight on the one-week pure-points plan only. The server also
-    // publishes a rival strategy at a weight; the device declines that by contract.
-    if (chip !== null || strategy !== null) {
-      throw new DevicePlanRefused("a weight with a chip or a rival strategy", "plan");
-    }
+    if (chip !== null) throw new DevicePlanRefused("a weight with a chip", "plan");
+    if (strategy !== null)
+      return solveRivalWithTop100(
+        solver,
+        document,
+        entry,
+        strategy.rival,
+        strategy.name,
+        top100Weight,
+        now,
+      );
     return solveTop100(solver, document, entry, top100Weight, now);
   }
   if (strategy !== null) {

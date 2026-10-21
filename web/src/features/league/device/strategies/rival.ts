@@ -25,6 +25,7 @@ import type {
   DevicePlanAnswer,
   DevicePlanDocument,
   DevicePlanEntry,
+  DevicePlanPlayer,
   DeviceRival,
   DeviceRivalFields,
   DeviceRivalPlanKind,
@@ -65,6 +66,12 @@ interface Candidate {
   kind: DeviceRivalPlanKind;
 }
 
+/** A setting chooses the candidates on other points; all published numbers stay on base. */
+export interface RivalChoice {
+  choice: NonNullable<MemberWeekOptions["choice"]>;
+  points: (player: DevicePlanPlayer) => number;
+}
+
 /** What a candidate pays in hits: the arrivals beyond the free transfers, at the charge. */
 function hitsOf(
   document: DevicePlanDocument,
@@ -100,6 +107,7 @@ function withinFreeTransfers(
   rivalIds: readonly number[],
   band: OverlapBandRule,
   transferCap: number,
+  choice?: RivalChoice["choice"],
 ): Candidate | null {
   const levels: Array<{ minimum?: number; maximum?: number; level: number }> = [];
   if (band.overlap_floor !== null) {
@@ -114,6 +122,7 @@ function withinFreeTransfers(
     const solution = solveWeek(solver, document, entry, {
       overlap: { ids: rivalIds, ...bounds },
       transferCap,
+      choice,
     });
     if (solution) return { solution, applied: level, kind: "within_free_transfers" };
   }
@@ -127,6 +136,7 @@ export function solveRival(
   rival: DeviceRival,
   strategy: RivalStrategy,
   now: () => number = () => performance.now(),
+  setting?: RivalChoice,
 ): DevicePlanAnswer {
   const started = now();
   const document = inSolverOrder(published);
@@ -145,8 +155,17 @@ export function solveRival(
     Math.min(entry.free_transfers, document.rules.max_free_transfers),
   );
 
-  const withinFree = withinFreeTransfers(solver, document, entry, rivalIds, band, transferCap);
+  const withinFree = withinFreeTransfers(
+    solver,
+    document,
+    entry,
+    rivalIds,
+    band,
+    transferCap,
+    setting?.choice,
+  );
   const target_options: MemberWeekOptions = {
+    choice: setting?.choice,
     overlap: {
       ids: rivalIds,
       ...(band.overlap_floor !== null ? { minimum: band.overlap_floor } : {}),
@@ -161,9 +180,22 @@ export function solveRival(
     throw new DevicePlanRefused("band unsatisfiable", "plan");
   }
   const net = (candidate: Candidate) => netOf(document, entry, candidate.solution);
+  const selectionPoints = new Map(
+    document.players.map((player) => [
+      player.id,
+      setting?.points(player) ?? player.expected_points,
+    ]),
+  );
+  const selectionNet = ({ solution }: Candidate) =>
+    solution.startingXi.reduce((total, id) => total + selectionPoints.get(id)!, 0) +
+    selectionPoints.get(solution.captain)! -
+    hitsOf(document, entry, solution);
   let chosen: Candidate;
   let other: Candidate | null;
-  if (withinFree !== null && (withHits === null || net(withinFree) >= net(withHits))) {
+  if (
+    withinFree !== null &&
+    (withHits === null || selectionNet(withinFree) >= selectionNet(withHits))
+  ) {
     chosen = withinFree;
     other = withHits;
   } else {
@@ -180,7 +212,7 @@ export function solveRival(
   if (other !== null) nets.push(net(other));
   const controlNet = Math.max(...nets);
 
-  const answer = answerFrom(solver, document, entry, chosen.solution, {});
+  const answer = answerFrom(solver, document, entry, chosen.solution, { choice: setting?.choice });
   const points = new Map(document.players.map((p) => [p.id, p.expected_points]));
   const rivalExpected =
     rivalIds.reduce((total, id) => total + (points.get(id) ?? 0), 0) +
