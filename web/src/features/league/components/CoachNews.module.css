@@ -1,0 +1,77 @@
+.mark {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  min-height: 24px;
+  margin-block: -4px;
+  padding-inline: 2px;
+  border-radius: var(--radius-s);
+  background: var(--color-chip);
+  color: var(--color-out-panel);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 16px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.mark:focus-visible {
+  outline: 2px solid var(--color-text);
+  outline-offset: 2px;
+}
+
+.news {
+  margin-top: var(--space-4);
+}
+
+.heading {
+  margin: 0 0 var(--space-3);
+  font-family: var(--font-display);
+  font-size: var(--step-0);
+}
+
+.list {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  min-width: 0;
+  padding: var(--space-3);
+  border-left: 3px solid var(--color-out-panel);
+  background: var(--color-chip);
+  color: var(--color-chip-text);
+  overflow-wrap: anywhere;
+}
+
+.out {
+  margin: var(--space-1) 0;
+  font-size: var(--step--1);
+  font-weight: 600;
+}
+
+.quote {
+  margin: var(--space-2) 0;
+  font-size: var(--step--1);
+  line-height: 1.5;
+}
+
+.source {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  font-size: var(--step--2);
+}
+
+.source a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  color: var(--color-accent);
+}

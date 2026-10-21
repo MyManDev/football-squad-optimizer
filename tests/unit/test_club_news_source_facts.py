@@ -50,6 +50,115 @@ def test_jsonld_page_identity_uses_only_explicit_same_page_references(address, v
     assert publication_metadata(raw, "text/html", URL).verified is verified
 
 
+@pytest.mark.parametrize("canonical", ["/en/arsenal/news", "https://club.example/en/arsenal/news"])
+@pytest.mark.parametrize("link_first", [True, False])
+def test_jsonld_can_name_the_pages_explicit_same_origin_canonical(canonical, link_first):
+    link = f'<link rel="canonical" href="{canonical}">'
+    schema = (
+        '<script type="application/ld+json">'
+        + json.dumps(
+            {
+                "@type": "NewsArticle",
+                "url": "https://club.example/en/arsenal/news",
+                "datePublished": "2026-09-12T13:00:00Z",
+            }
+        )
+        + "</script>"
+    )
+    raw = ("<head>" + (link + schema if link_first else schema + link) + "</head>").encode()
+    result = publication_metadata(raw, "text/html", URL)
+    assert result.verified
+    assert result.published_at_utc == "2026-09-12T13:00:00Z"
+    assert result.published_precision == "instant"
+    assert result.source == "jsonld_datePublished"
+    assert result.source_sha256 == hashlib.sha256(raw).hexdigest()
+
+
+@pytest.mark.parametrize(
+    "links,address",
+    [
+        ("", "https://club.example/en/arsenal/news"),
+        (
+            '<head><link rel="canonical" href="https://other.example/news"></head>',
+            "https://other.example/news",
+        ),
+        (
+            '<head><link rel="canonical" href="http://club.example/news"></head>',
+            "http://club.example/news",
+        ),
+        (
+            '<head><link rel="canonical" href="//club.example/en/arsenal/news"></head>',
+            "https://club.example/en/arsenal/news",
+        ),
+        (
+            '<head><link rel="canonical" href="../en/arsenal/news"></head>',
+            "https://club.example/en/arsenal/news",
+        ),
+        (
+            '<head><link rel="canonical" href="/en/arsenal/news">'
+            '<link rel="canonical" href="/other"></head>',
+            "https://club.example/en/arsenal/news",
+        ),
+        (
+            '<body><link rel="canonical" href="/en/arsenal/news"></body>',
+            "https://club.example/en/arsenal/news",
+        ),
+        (
+            '<head><link rel="canonical" href="/en/arsenal/news"></head>',
+            "https://club.example/recommended-story",
+        ),
+    ],
+)
+def test_canonical_does_not_authorize_external_conflicting_or_related_article_dates(links, address):
+    schema = json.dumps(
+        {"@type": "NewsArticle", "url": address, "datePublished": "2026-09-12T13:00:00Z"}
+    )
+    raw = (links + f'<script type="application/ld+json">{schema}</script>').encode()
+    assert not publication_metadata(raw, "text/html", URL).verified
+
+
+def test_canonical_date_still_conflicts_with_a_different_explicit_publication_field():
+    raw = (
+        b'<head><link rel="canonical" href="/en/arsenal/news">'
+        b'<meta property="article:published_time" content="2026-09-13T13:00:00Z">'
+        b'<script type="application/ld+json">{"@type":"NewsArticle",'
+        b'"url":"https://club.example/en/arsenal/news",'
+        b'"datePublished":"2026-09-12T13:00:00Z"}</script></head>'
+    )
+    result = publication_metadata(raw, "text/html", URL)
+    assert not result.verified
+    assert result.reason == "publication_metadata_conflict"
+
+
+@pytest.mark.parametrize(
+    "language,alternate,address,verified",
+    [
+        ("en", "/arsenal/news", "https://club.example/en/arsenal/news", True),
+        ("en", "https://club.example/arsenal/news", "/en/arsenal/news", True),
+        ("", "/arsenal/news", "/en/arsenal/news", False),
+        ("fr", "/arsenal/news", "/en/arsenal/news", False),
+        ("en", "/other", "/en/arsenal/news", False),
+        ("en", "https://other.example/arsenal/news", "/en/arsenal/news", False),
+        ("en", "/arsenal/news", "/en/recommended-story", False),
+        ("en", "/arsenal/news", "https://other.example/en/arsenal/news", False),
+    ],
+)
+def test_language_alias_needs_page_language_canonical_and_same_article_hreflang(
+    language, alternate, address, verified
+):
+    schema = json.dumps(
+        {"@type": "NewsArticle", "url": address, "datePublished": "2026-09-12T13:00:00Z"}
+    )
+    raw = (
+        f'<html lang="{language}"><head><link rel="canonical" href="{URL}">'
+        f'<link rel="alternate" hreflang="en" href="{alternate}"></head>'
+        f'<body><script type="application/ld+json">{schema}</script></body></html>'
+    ).encode()
+    result = publication_metadata(raw, "text/html", URL)
+    assert result.verified is verified
+    assert result.source_sha256 == hashlib.sha256(raw).hexdigest()
+
+
 @pytest.mark.parametrize(
     "content,media,expected,precision",
     [
@@ -195,6 +304,33 @@ def test_current_absence_and_source_publication_survive_without_moving_quote_off
     assert resolve_span(document.readable, claim) == quote.encode()
     assert claim.span_start == document.readable.index(quote.encode())
     assert claim.publication_source_sha256 == hashlib.sha256(document.content).hexdigest()
+
+
+def test_localized_article_date_reaches_the_absence_rule_without_changing_its_citation():
+    quote = "Saka will miss the next Premier League match."
+    base = _document(quote)
+    schema = json.dumps(
+        {
+            "@type": "NewsArticle",
+            "url": "https://club.example/en/arsenal/news",
+            "datePublished": "2026-09-12T13:00:00Z",
+        }
+    )
+    raw = (
+        f'<html lang="en"><head><link rel="canonical" href="{URL}">'
+        f'<link rel="alternate" hreflang="en" href="{URL}"></head>'
+        f'<body><p>{quote}</p><script type="application/ld+json">{schema}</script></body></html>'
+    ).encode()
+    document = replace(base, content_type="text/html", content=raw, byte_length=len(raw))
+    claim = parse_claim_response(
+        locate_claim_response(_response(quote=quote, label="stated_expected_absent"), (document,)),
+        (document,),
+    )[0]
+    assert claim.scope_verified and claim.publication_verified
+    assert claim.source_url == URL
+    assert claim.published_at_utc == "2026-09-12T13:00:00Z"
+    assert resolve_span(document.readable, claim) == quote.encode()
+    assert claim.publication_source_sha256 == hashlib.sha256(raw).hexdigest()
 
 
 ABSENCE = "Saka will miss the next Premier League match."
