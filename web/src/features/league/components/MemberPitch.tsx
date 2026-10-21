@@ -7,8 +7,9 @@ import type { CoachAbsence } from "../advice/coachAbsences";
 import type { ModelChange } from "../advice/modelSwitch";
 import { CoachNewsMark } from "./CoachNews";
 import styles from "./MemberPitch.module.css";
+import { clubPlate, usePitchLook } from "./pitchLook";
 
-/** One player as the pitch draws them: a white name plate on the grass. */
+/** One player as the pitch draws them: a name plate on the grass, white or in club colours. */
 export interface PitchPlayer {
   playerId: number;
   name: string;
@@ -73,20 +74,33 @@ function Plate({
   player,
   codes,
   changed,
+  clubColours,
   news,
 }: {
   player: PitchPlayer;
   codes: ClubCodes;
   /** Brought in by a switch of prediction model: said in the plate's text, as 'New' is. */
   changed: boolean;
+  clubColours: boolean;
   news?: CoachAbsence;
 }) {
   const { locale, messages } = useLanguage();
   const code = clubCode(player.team, codes);
   const swatch = clubSwatch(code);
+  // In club colours the plate takes its club's fill and one readable text colour (#1136).
+  const club = clubColours ? clubPlate(code) : null;
   const shortName = player.shortName.trim() || player.name;
   return (
-    <div className={styles.plate} data-plate="">
+    <div
+      className={styles.plate}
+      data-plate=""
+      data-club={club?.colour}
+      style={
+        club
+          ? ({ "--plate-fill": club.fill, "--plate-text": club.text } as CSSProperties)
+          : undefined
+      }
+    >
       <span className={styles.name} title={player.name}>
         {swatch ? (
           <span
@@ -184,6 +198,7 @@ export function MemberPitch({
   const { messages } = useLanguage();
   const copy = messages.leagueMembers;
   const describedBy = useId();
+  const [look] = usePitchLook();
   const lines = LINES.map((position) => ({
     position,
     players: players.filter((player) => player.position === position),
@@ -199,6 +214,7 @@ export function MemberPitch({
     <div
       className={styles.wrap}
       data-mark="pitch"
+      data-grass={look.grass}
       data-def-crowded={defenders >= 4 ? "true" : undefined}
       style={{ "--hh": `${height}px` } as CSSProperties}
     >
@@ -253,6 +269,7 @@ export function MemberPitch({
                     <Plate
                       player={player}
                       codes={codes}
+                      clubColours={look.clubColours}
                       news={news?.get(player.playerId)}
                       changed={modelChange?.changed.has(player.playerId) ?? false}
                     />
