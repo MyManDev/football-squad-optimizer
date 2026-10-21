@@ -101,6 +101,6 @@ sleep 20
 sh "$S/deploy.sh" "$TAG" || { log "deploy.sh stopped"; exit 1; }
 sleep 45
 # shellcheck disable=SC2086  # SETTLED_ARGS is one optional flag pair, deliberately split.
-"$PY" "$S/verify_live.py" "$ACCEPTED_STAMP" $SETTLED_ARGS || { sleep 60; "$PY" "$S/verify_live.py" "$ACCEPTED_STAMP" $SETTLED_ARGS || { log "live verification found failures"; exit 1; }; }
+"$PY" "$S/verify_live.py" "$ACCEPTED_STAMP" --expected-data-root "$WT/web/public/data" $SETTLED_ARGS || { sleep 60; "$PY" "$S/verify_live.py" "$ACCEPTED_STAMP" --expected-data-root "$WT/web/public/data" $SETTLED_ARGS || { log "live verification found failures"; exit 1; }; }
 log "LIVE"
 log "Next: cd web && LIVE_BASE_URL=https://squadopt.mymandev.com npx playwright test --config playwright.live.config.ts (read-only browser check after verify_live.py)"
