@@ -239,7 +239,11 @@ export function MemberDecisionControls({
   const chipCopy = CHIP_COPY[language];
   const chip = selection.chip;
   const chipOptions = [
-    ...new Set([...chip.options, ...(capabilities?.chipsByEntry?.[entryId] ?? [])]),
+    ...new Set([
+      ...chip.options,
+      ...(capabilities?.chipsByEntry?.[entryId] ?? []),
+      ...(selection.request.model !== "football" ? (onDevice?.chips ?? []) : []),
+    ]),
   ];
   const chipStrategy = computable?.chipStrategy === true;
   const chipsAvailable = chipOptions.length > 0 || chipStrategy;
