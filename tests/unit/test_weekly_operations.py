@@ -1121,16 +1121,25 @@ def test_a_reused_capture_recorded_from_another_commit_refuses_before_any_solve(
     # The league stage stamps the commit of the package it runs from, which in a test is
     # not the synthetic checkout, so each run's stamp is stated as the commit it runs on.
     monkeypatch.setattr(league_views, "repository_commit", lambda: recorded)
+    monkeypatch.setattr(
+        "squadopt.application.league_publication.repository_commit", lambda: recorded
+    )
     assert weekly.main([*args, "--record-advice", "--run-id", "recorded"]) == 0
     record = paths.records / "2026-27/gw02/entry-101" / snapshot / "advice.json"
     kept = record.read_bytes()
     assert json.loads(kept)["provenance"]["repository_commit"] == recorded
+    baseline = paths.baselines / "2026-27/gw02/entry-101" / snapshot / "advice.json"
+    baseline_kept = baseline.read_bytes()
+    assert json.loads(baseline_kept)["provenance"]["repository_commit"] == recorded
 
     (checkout / "source.py").write_text("merged after the recording run")
     _git(checkout, "commit", "-qam", "develop moved")
     current = _git(checkout, "rev-parse", "HEAD")
     _origin_develop_at_head(checkout)
     monkeypatch.setattr(league_views, "repository_commit", lambda: current)
+    monkeypatch.setattr(
+        "squadopt.application.league_publication.repository_commit", lambda: current
+    )
 
     solved: list[LeaguePublicationRequest] = []
 
@@ -1154,6 +1163,7 @@ def test_a_reused_capture_recorded_from_another_commit_refuses_before_any_solve(
     assert all(stage["status"] == "pending" for stage in doc["stages"][1:])
     assert not (checkout / ".codex-tmp").exists()
     assert record.read_bytes() == kept
+    assert baseline.read_bytes() == baseline_kept
 
     assert weekly.main([*args, "--publish", "--no-advice-record", "--run-id", "escaped"]) == 0
     assert len(solved) == 1 and solved[0].record_root is None
