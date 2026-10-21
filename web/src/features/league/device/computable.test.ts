@@ -46,6 +46,9 @@ describe("the rivals the device offers", () => {
     expect(deviceRivalUsable(own, squad(35249002))).toBe(true);
     expect(deviceRivalUsable(own, benchedCaptain(35249002))).toBe(false);
     expect(deviceComputable(own, MEMBERS, read([benchedCaptain(35249002)]))?.rivals).toEqual([]);
+    expect(
+      deviceComputable(own, MEMBERS, read([benchedCaptain(35249002)]))?.captainMissingRivals,
+    ).toEqual([35249002]);
   });
 
   it("are none before any rival document is read, and the statement is absent without inputs", () => {
