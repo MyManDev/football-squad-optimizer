@@ -703,8 +703,6 @@ def publish_prepared_league(
         site_data, request.snapshot_id, table_payload, remedy=BUILDER_TABLE_REMEDY
     )
     history_root = request.history_record_root or request.record_root
-    if request.league_id != SUPPORTED_LEAGUE_ID:
-        history_root = None
     # Read before the build below rewrites the tree: the tree this publication replaces is
     # the only place that says which capture each earlier week showed each member.
     shown = published_advice_captures(out_dir) if history_root is not None else {}

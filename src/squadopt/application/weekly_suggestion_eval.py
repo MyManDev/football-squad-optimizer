@@ -231,6 +231,7 @@ def select_record(
     entry_id: int,
     deadline_utc: str,
     published: PublishedCaptures | None = None,
+    league_id: int = SUPPORTED_LEAGUE_ID,
 ) -> dict[str, Any] | None:
     """Select the recorded advice for one member-week, checking both clocks and all identities.
 
@@ -248,6 +249,7 @@ def select_record(
 
     An unreadable candidate is refused instead of silently falling back to an older one.
     """
+    _identifier(league_id)
     deadline = as_instant(normalize_utc_timestamp(deadline_utc, label="deadline_utc"))
     candidates: list[tuple[datetime, str, dict[str, Any]]] = []
     for capture in recorded_captures(root, season, gameweek, entry_id):
@@ -257,7 +259,7 @@ def select_record(
             or record.get("season") != season
             or _identifier(record.get("gameweek")) != gameweek
             or _identifier(record.get("entry_id")) != entry_id
-            or _identifier(record.get("league_id")) != SUPPORTED_LEAGUE_ID
+            or _identifier(record.get("league_id")) != league_id
             or record.get("player_id_space") != "fpl_element_code"
         ):
             raise SuggestionEvaluationError("Record identity does not match the requested member.")
@@ -461,11 +463,13 @@ def evaluate_week(
     captures: Sequence[CapturedSnapshot],
     selected_records: dict[tuple[int, int], dict[str, Any]] | None = None,
     published: PublishedCaptures | None = None,
+    league_id: int = SUPPORTED_LEAGUE_ID,
 ) -> WeekReview:
     base: dict[str, Any] = {"gameweek": gameweek, "deadline_utc": deadline_utc}
     try:
         record = select_record(
             root,
+            league_id=league_id,
             season=season,
             gameweek=gameweek,
             entry_id=entry_id,
@@ -598,8 +602,9 @@ def review_member_weeks(
     same weeks are the same reviews rather than two walks that could drift apart.
     ``published`` is passed to :func:`select_record` for every week.
     """
-    if league_id != SUPPORTED_LEAGUE_ID or not re.fullmatch(r"\d{4}-\d{2}", season):
-        raise SuggestionEvaluationError("Only league 352490 and a valid season are supported.")
+    _identifier(league_id)
+    if not re.fullmatch(r"\d{4}-\d{2}", season):
+        raise SuggestionEvaluationError("A valid season is required.")
     if infer_season(as_of_snapshot) != season:
         raise SuggestionEvaluationError("The publication anchor belongs to another season.")
     cutoff = as_instant(as_of_snapshot.metadata.captured_at_utc)
@@ -631,6 +636,7 @@ def review_member_weeks(
                 weeks.append(
                     evaluate_week(
                         record_root,
+                        league_id=league_id,
                         season=season,
                         gameweek=week,
                         entry_id=entry_id,
@@ -925,6 +931,23 @@ def publish_suggestion_histories(
         selected_records=selected_records,
         published=published,
     )
+    # Validate the whole replacement before writing the first member. An incomplete
+    # record store must not turn a previously published week into a week that vanished.
+    for entry_id in entry_ids:
+        previous = out_dir / "history" / f"{entry_id}.json"
+        if not previous.is_file():
+            continue
+        old = json.loads(previous.read_text(encoding="utf-8"))["payload"]
+        if old.get("season") != season:
+            continue
+        if old.get("entry_id") != entry_id or old.get("league_id") != league_id:
+            raise SuggestionEvaluationError(f"History identity does not match {previous}.")
+        old_weeks = {_identifier(row["gameweek"]) for row in old["weeks"]}
+        dropped = sorted(old_weeks - {week.gameweek for week in reviews[entry_id]})
+        if dropped:
+            raise SuggestionEvaluationError(
+                f"Entry {entry_id} history would drop gameweeks {dropped}; restore the records."
+            )
     written = []
     for entry_id in entry_ids:
         weeks = []

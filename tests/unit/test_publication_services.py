@@ -407,6 +407,34 @@ def _standings_page(league_id: int, *entries: int) -> bytes:
     ).encode("utf-8")
 
 
+def test_second_league_publishes_empty_histories_without_inventing_records(tmp_path: Path) -> None:
+    request = publication_world(tmp_path)
+    payloads = dict(read_snapshot(request.snapshot_root, request.snapshot_id).payloads)
+    payloads["league-755941-standings.json"] = _standings_page(755941, member_fixture.ENTRY_ID)
+    identifier = write_snapshot(
+        request.snapshot_root,
+        source="fpl-live",
+        captured_at_utc="2026-08-27T09:30:00Z",
+        payloads=payloads,
+    ).snapshot_id
+    result = publish_league(
+        replace(
+            request,
+            league_id=755941,
+            snapshot_id=identifier,
+            handoff_path=handoff_fixture._handoff(tmp_path / "second-handoff", identifier),
+            record_root=None,
+            history_record_root=tmp_path / "empty-records",
+            rival_menu=False,
+        )
+    )
+    history = request.out_dir / "data/leagues/755941/history" / f"{member_fixture.ENTRY_ID}.json"
+    assert history in result.output_paths
+    payload = json.loads(history.read_text())["payload"]
+    assert payload["league_id"] == 755941 and payload["weeks"] == []
+    assert not (tmp_path / "empty-records").exists()
+
+
 def test_a_league_renders_the_members_its_standings_page_names(tmp_path: Path) -> None:
     """The registry holds every league's members; a league prepares its own, and a league
     none of the registered entries is in is refused before anything is solved."""
