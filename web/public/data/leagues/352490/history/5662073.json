@@ -586,7 +586,29 @@
         "actual": {
           "gross_points": 88.0,
           "transfer_hit_points": 0.0,
-          "net_points": 88.0
+          "net_points": 88.0,
+          "details": {
+            "source_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd",
+            "captain": {
+              "player_id": 184029,
+              "name": "Ødegaard",
+              "points": 1.0,
+              "multiplier": 2,
+              "counted_points": 2.0
+            },
+            "transfers": [
+              {
+                "player_out": "Isak",
+                "player_in": {
+                  "player_id": 517052,
+                  "name": "N.Jackson",
+                  "points": 9.0,
+                  "multiplier": 1,
+                  "counted_points": 9.0
+                }
+              }
+            ]
+          }
         },
         "actual_reason": null,
         "net_difference": -14.0,
@@ -1336,7 +1358,99 @@
         "actual": {
           "gross_points": 39.0,
           "transfer_hit_points": 0.0,
-          "net_points": 39.0
+          "net_points": 39.0,
+          "details": {
+            "source_snapshot_id": "fpl-live-20261010T035732Z-c77d032165af",
+            "captain": {
+              "player_id": 222531,
+              "name": "Gibbs-White",
+              "points": 2.0,
+              "multiplier": 2,
+              "counted_points": 4.0
+            },
+            "transfers": [
+              {
+                "player_out": "Kinsky",
+                "player_in": {
+                  "player_id": 489639,
+                  "name": "Verbruggen",
+                  "points": 6.0,
+                  "multiplier": 0,
+                  "counted_points": 0.0
+                }
+              },
+              {
+                "player_out": "Virgil",
+                "player_in": {
+                  "player_id": 224967,
+                  "name": "Mykolenko",
+                  "points": 5.0,
+                  "multiplier": 1,
+                  "counted_points": 5.0
+                }
+              },
+              {
+                "player_out": "Maguire",
+                "player_in": {
+                  "player_id": 477424,
+                  "name": "Gvardiol",
+                  "points": 4.0,
+                  "multiplier": 1,
+                  "counted_points": 4.0
+                }
+              },
+              {
+                "player_out": "Maatsen",
+                "player_in": {
+                  "player_id": 199798,
+                  "name": "Konsa",
+                  "points": 1.0,
+                  "multiplier": 1,
+                  "counted_points": 1.0
+                }
+              },
+              {
+                "player_out": "Mbeumo",
+                "player_in": {
+                  "player_id": 466052,
+                  "name": "Cherki",
+                  "points": 8.0,
+                  "multiplier": 1,
+                  "counted_points": 8.0
+                }
+              },
+              {
+                "player_out": "Buendía",
+                "player_in": {
+                  "player_id": 244851,
+                  "name": "Palmer",
+                  "points": 2.0,
+                  "multiplier": 1,
+                  "counted_points": 2.0
+                }
+              },
+              {
+                "player_out": "Brobbey",
+                "player_in": {
+                  "player_id": 647850,
+                  "name": "Kostoulas",
+                  "points": 10.0,
+                  "multiplier": 0,
+                  "counted_points": 0.0
+                }
+              },
+              {
+                "player_out": "B.Fernandes",
+                "player_in": {
+                  "player_id": 222531,
+                  "name": "Gibbs-White",
+                  "points": 2.0,
+                  "multiplier": 2,
+                  "counted_points": 4.0
+                }
+              }
+            ]
+          }
         },
         "actual_reason": null,
         "net_difference": 22.0,
@@ -1576,7 +1690,8 @@
         "actual": {
           "gross_points": 66.0,
           "transfer_hit_points": 0.0,
-          "net_points": 66.0
+          "net_points": 66.0,
+          "details": null
         },
         "actual_reason": null,
         "net_difference": 3.0,
