@@ -46,6 +46,25 @@ export function useLeagueMemberData(entryParam: string | undefined, searchParams
   });
   const members = membersQuery.data?.payload.members ?? [];
   const index = indexQuery.isError ? null : (indexQuery.data?.payload ?? null);
+  const newsPath =
+    index?.evidence?.available && index.evidence.source_kind === "club_news_capture"
+      ? index.evidence.path
+      : null;
+  // News is a player fact even when its optional planning constraint is switched off.
+  // This reads one existing published document and never submits a computation.
+  const coachNews = useQuery({
+    queryKey: [
+      "published-coach-news",
+      league.leagueId,
+      entryId,
+      squad.data?.generated_at_utc,
+      squad.data?.payload.source_snapshot_id,
+      newsPath,
+    ],
+    queryFn: ({ signal }) => tree.entryAdviceEvidence(entryId, newsPath!, { signal }),
+    enabled: validEntryId && !!squad.data && newsPath !== null,
+    ...LEAGUE_READ,
+  });
   // A build with no compute service has a client that cannot be asked, and this query
   // never runs: the page is the static site. With one, what it computes right now is read
   // on entry and again on focus once stale. A service that is down, slow or answering
@@ -216,6 +235,7 @@ export function useLeagueMemberData(entryParam: string | undefined, searchParams
     indexQuery,
     members,
     index,
+    coachNews,
     selection,
     adviceEnabled,
     advice,

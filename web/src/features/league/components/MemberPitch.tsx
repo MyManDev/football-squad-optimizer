@@ -3,6 +3,8 @@ import { useId, type CSSProperties } from "react";
 import { useLanguage } from "../../../i18n/context";
 import { clubCode, clubSwatch, type ClubCodes } from "../../../lib/clubs";
 import { figure } from "../../../lib/format";
+import type { CoachAbsence } from "../advice/coachAbsences";
+import { CoachNewsMark } from "./CoachNews";
 import styles from "./MemberPitch.module.css";
 
 /** One player as the pitch draws them: a white name plate on the grass. */
@@ -63,7 +65,15 @@ function ArrowIcon() {
   );
 }
 
-function Plate({ player, codes }: { player: PitchPlayer; codes: ClubCodes }) {
+function Plate({
+  player,
+  codes,
+  news,
+}: {
+  player: PitchPlayer;
+  codes: ClubCodes;
+  news?: CoachAbsence;
+}) {
   const { locale, messages } = useLanguage();
   const code = clubCode(player.team, codes);
   const swatch = clubSwatch(code);
@@ -93,10 +103,15 @@ function Plate({ player, codes }: { player: PitchPlayer; codes: ClubCodes }) {
         ) : null}
         <span className={styles.codeText}>{code ?? player.team}</span>
       </span>
-      {player.expectedPoints !== null && Number.isFinite(player.expectedPoints) ? (
+      {news || (player.expectedPoints !== null && Number.isFinite(player.expectedPoints)) ? (
         <span className={styles.xp}>
-          {figure(player.expectedPoints, locale)}
-          <span className="visually-hidden"> {messages.leagueMembers.pointsUnitSpoken}</span>
+          {player.expectedPoints !== null && Number.isFinite(player.expectedPoints) ? (
+            <>
+              {figure(player.expectedPoints, locale)}
+              <span className="visually-hidden"> {messages.leagueMembers.pointsUnitSpoken}</span>
+            </>
+          ) : null}
+          {news ? <CoachNewsMark news={news} name={player.name} /> : null}
         </span>
       ) : null}
       {player.isNew ? <span className={styles.new}>{messages.leagueMembers.boardNew}</span> : null}
@@ -140,7 +155,15 @@ function AttackLabel({ at }: { at: "first" | "last" }) {
  * of attack is written on a white plate directly under the first defender in the published
  * order; where the defence is too crowded for that across the pitch, under the whole line.
  */
-export function MemberPitch({ players, codes }: { players: PitchPlayer[]; codes: ClubCodes }) {
+export function MemberPitch({
+  players,
+  codes,
+  news,
+}: {
+  players: PitchPlayer[];
+  codes: ClubCodes;
+  news?: ReadonlyMap<number, CoachAbsence>;
+}) {
   const { messages } = useLanguage();
   const copy = messages.leagueMembers;
   const describedBy = useId();
@@ -209,7 +232,7 @@ export function MemberPitch({ players, codes }: { players: PitchPlayer[]; codes:
                     className={styles.token}
                     style={{ "--i": index } as CSSProperties}
                   >
-                    <Plate player={player} codes={codes} />
+                    <Plate player={player} codes={codes} news={news?.get(player.playerId)} />
                     {line.position === labelLine && index === 0 ? <AttackLabel at="first" /> : null}
                     {line.position === "DEF" && defenders >= 4 && index === defenders - 1 ? (
                       <AttackLabel at="last" />
@@ -238,7 +261,15 @@ export interface BenchPlayer {
 }
 
 /** The bench under the pitch, read left to right in the published order. */
-export function MemberBench({ players, codes }: { players: BenchPlayer[]; codes: ClubCodes }) {
+export function MemberBench({
+  players,
+  codes,
+  news,
+}: {
+  players: BenchPlayer[];
+  codes: ClubCodes;
+  news?: ReadonlyMap<number, CoachAbsence>;
+}) {
   const { locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
   const titleId = useId();
@@ -279,13 +310,21 @@ export function MemberBench({ players, codes }: { players: BenchPlayer[]; codes:
                     </span>
                   ) : null}
                 </span>
-                {player.expectedPoints !== null && Number.isFinite(player.expectedPoints) ? (
+                {news?.has(player.playerId) ||
+                (player.expectedPoints !== null && Number.isFinite(player.expectedPoints)) ? (
                   <span className={styles.benchXp}>
-                    {figure(player.expectedPoints, locale)}
-                    <span className="visually-hidden">
-                      {" "}
-                      {messages.leagueMembers.pointsUnitSpoken}
-                    </span>
+                    {player.expectedPoints !== null && Number.isFinite(player.expectedPoints) ? (
+                      <>
+                        {figure(player.expectedPoints, locale)}
+                        <span className="visually-hidden">
+                          {" "}
+                          {messages.leagueMembers.pointsUnitSpoken}
+                        </span>
+                      </>
+                    ) : null}
+                    {news?.get(player.playerId) ? (
+                      <CoachNewsMark news={news.get(player.playerId)!} name={player.name} />
+                    ) : null}
                   </span>
                 ) : null}
               </li>
