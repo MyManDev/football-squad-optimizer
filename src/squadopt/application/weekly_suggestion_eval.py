@@ -22,6 +22,7 @@ import pandas as pd
 
 from squadopt.application.advice_record import (
     MEMBER_ADVICE_RECORD_CONTRACT_VERSION,
+    MEMBER_BASELINE_RECORD_CONTRACT_VERSION,
     load_member_advice_record,
     recorded_captures,
 )
@@ -254,12 +255,19 @@ def select_record(
     candidates: list[tuple[datetime, str, dict[str, Any]]] = []
     for capture in recorded_captures(root, season, gameweek, entry_id):
         record = load_member_advice_record(root, season, gameweek, entry_id, capture.snapshot_id)
+        baseline = record.get("contract_version") == MEMBER_BASELINE_RECORD_CONTRACT_VERSION
         if (
-            record.get("contract_version") != MEMBER_ADVICE_RECORD_CONTRACT_VERSION
+            record.get("contract_version")
+            not in (MEMBER_ADVICE_RECORD_CONTRACT_VERSION, MEMBER_BASELINE_RECORD_CONTRACT_VERSION)
             or record.get("season") != season
             or _identifier(record.get("gameweek")) != gameweek
             or _identifier(record.get("entry_id")) != entry_id
-            or _identifier(record.get("league_id")) != league_id
+            or (
+                "league_id" in record
+                if baseline
+                else _identifier(record.get("league_id")) != league_id
+            )
+            or (baseline and record.get("source") != "server_one_week_baseline")
             or record.get("player_id_space") != "fpl_element_code"
         ):
             raise SuggestionEvaluationError("Record identity does not match the requested member.")

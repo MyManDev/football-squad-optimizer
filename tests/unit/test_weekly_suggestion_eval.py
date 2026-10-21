@@ -19,6 +19,7 @@ import pytest
 from squadopt.application import weekly_suggestion_eval as review
 from squadopt.application.advice_record import (
     MEMBER_ADVICE_RECORD_CONTRACT_VERSION,
+    MEMBER_BASELINE_RECORD_CONTRACT_VERSION,
     RECORD_FILE,
     record_member_advice,
 )
@@ -109,6 +110,37 @@ def choose(root: Path) -> dict[str, Any] | None:
     return review.select_record(
         root, season=SEASON, gameweek=4, entry_id=101, deadline_utc=DEADLINE
     )
+
+
+def test_one_baseline_is_read_by_both_leagues(tmp_path: Path) -> None:
+    record = recorded()
+    del record["league_id"]
+    record["contract_version"] = MEMBER_BASELINE_RECORD_CONTRACT_VERSION
+    record["source"] = "server_one_week_baseline"
+    record_member_advice(tmp_path, record)
+    for league in (352490, 755941):
+        selected = review.select_record(
+            tmp_path,
+            season=SEASON,
+            gameweek=4,
+            entry_id=101,
+            deadline_utc=DEADLINE,
+            published={(101, 4): "capture-a"},
+            league_id=league,
+        )
+        assert selected == record
+        assert (
+            review.score_recorded_advice(record, review._advice(record), points())[0].net_points
+            == 20
+        )
+
+
+def test_baseline_cannot_carry_a_league_identity(tmp_path: Path) -> None:
+    record = recorded()
+    record["contract_version"] = MEMBER_BASELINE_RECORD_CONTRACT_VERSION
+    record_member_advice(tmp_path, record)
+    with pytest.raises(review.SuggestionEvaluationError, match="identity"):
+        choose(tmp_path)
 
 
 def snapshot(
