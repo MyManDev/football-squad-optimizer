@@ -328,6 +328,29 @@ function reading(chip: HeldChip, inputs: ChipForecastInputs): ChipReading {
   return result;
 }
 
+/**
+ * The first gameweek after `after` in the held chip's window where the same later-week
+ * loop as `points_at_gameweek` crosses its threshold, or null where none does. The card
+ * reads it for a chip that gives up its named gameweek to the other chip; the document
+ * itself is never changed by it.
+ */
+export function nextPointsAt(
+  raw: ChipForecastInputs,
+  name: ChipName,
+  after: number,
+): PointsAt | null {
+  const inputs = checked(raw);
+  const chip = inputs.chips.find((held) => held.name === name);
+  if (chip === undefined) return null;
+  const later = inputs.calendar.filter(
+    (week) =>
+      Math.max(after, inputs.decision_gameweek) < week.gameweek &&
+      chip.first_gameweek <= week.gameweek &&
+      week.gameweek <= chip.last_gameweek,
+  );
+  return pointsAt(chip, inputs, later);
+}
+
 export function chipForecast(raw: ChipForecastInputs) {
   const inputs = checked(raw);
   const now = inputs.calendar[0]!.fixture_count_by_club;
