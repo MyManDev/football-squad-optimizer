@@ -110,9 +110,17 @@ function gather(ROOT: string): Tree {
   };
   const cases: Case[] = [];
   const declined: Declined[] = [];
+  let deviceMembers = 0;
   for (const member of members) {
     if (member.member_kind !== "human") continue;
     const entryId = member.entry_id;
+    const index = read<LeagueViewEnvelope<EntryAdviceIndex>>(
+      `advice/${entryId}/index.json`,
+    ).payload;
+    if (index.menu === "device") {
+      deviceMembers += 1;
+      continue;
+    }
     const squad = squadOf(entryId);
     if (squad === null) throw new Error(`entry ${entryId} is listed without an entry document`);
     const base: AdviceRequest = {
@@ -135,9 +143,6 @@ function gather(ROOT: string): Tree {
       continue;
     }
     const entry: DevicePlanEntry = squad.device_plan;
-    const index = read<LeagueViewEnvelope<EntryAdviceIndex>>(
-      `advice/${entryId}/index.json`,
-    ).payload;
     const named: Array<{ path: string; request: AdviceRequest }> = [
       { path: `advice/${entryId}/saf-puan/1.json`, request: base },
     ];
@@ -226,7 +231,14 @@ function gather(ROOT: string): Tree {
       });
     }
   }
-  return { absent: null, cases, declined };
+  return {
+    absent:
+      deviceMembers === members.filter((member) => member.member_kind === "human").length
+        ? "the device league publishes inputs and no server answers to compare"
+        : null,
+    cases,
+    declined,
+  };
 }
 
 const trees = shippedTrees().map(({ path, root }) => ({ path, root, tree: gather(root) }));

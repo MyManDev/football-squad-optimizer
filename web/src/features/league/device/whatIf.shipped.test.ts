@@ -14,7 +14,13 @@ import { join, relative } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { shippedTrees } from "../../../testSupport/shippedTrees";
-import type { EntryAdvice, EntrySquad, LeagueMembers, LeagueViewEnvelope } from "../types";
+import type {
+  EntryAdvice,
+  EntryAdviceIndex,
+  EntrySquad,
+  LeagueMembers,
+  LeagueViewEnvelope,
+} from "../types";
 import type { LpSolver } from "./lp/problem";
 import { isDevicePlanEntry, type DevicePlanDocument } from "./types";
 import { advisedFifteen, whatIfAccount, whatIfDocument, whatIfValues } from "./whatIf";
@@ -58,8 +64,16 @@ for (const { path, root } of shippedTrees()) {
     const members = read<LeagueViewEnvelope<LeagueMembers>>("members.json").payload.members;
     const cases: { file: string; squad: EntrySquad; plan: EntryAdvice; advised: number[] }[] = [];
     let declined = 0;
+    let deviceMembers = 0;
     for (const member of members) {
       if (member.member_kind !== "human") continue;
+      const index = read<LeagueViewEnvelope<EntryAdviceIndex>>(
+        `advice/${member.entry_id}/index.json`,
+      ).payload;
+      if (index.menu === "device") {
+        deviceMembers += 1;
+        continue;
+      }
       const squad = read<LeagueViewEnvelope<EntrySquad>>(`entries/${member.entry_id}.json`).payload;
       if (!isDevicePlanEntry(squad.device_plan)) continue;
       for (const file of adviceDocuments(root, member.entry_id)) {
@@ -71,6 +85,11 @@ for (const { path, root } of shippedTrees()) {
     }
 
     it("offers the mode on the one-week base plans and declines every other document", () => {
+      if (deviceMembers === members.filter((member) => member.member_kind === "human").length) {
+        expect(cases).toEqual([]);
+        expect(declined).toBe(0);
+        return;
+      }
       expect(cases.length).toBeGreaterThan(0);
       expect(declined).toBeGreaterThan(0);
       for (const { plan } of cases) {
