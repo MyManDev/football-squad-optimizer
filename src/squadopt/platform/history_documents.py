@@ -35,6 +35,44 @@ def history_schema() -> dict[str, Any]:
         },
         "required": [*score["required"], "captain_bonus_points", "autosub_points", "chip"],
     }
+    contribution_fields = {
+        "player_id": identifier,
+        "name": text,
+        "points": number,
+        "multiplier": {"type": "integer", "minimum": 0, "maximum": 3},
+        "counted_points": number,
+    }
+    contribution = {
+        "type": "object",
+        "properties": contribution_fields,
+        "required": list(contribution_fields),
+        "additionalProperties": False,
+    }
+    actual_detail = {
+        "type": "object",
+        "properties": {
+            "source_snapshot_id": text,
+            "captain": contribution,
+            "transfers": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {"player_out": text, "player_in": contribution},
+                    "required": ["player_out", "player_in"],
+                    "additionalProperties": False,
+                },
+            },
+        },
+        "required": ["source_snapshot_id", "captain", "transfers"],
+        "additionalProperties": False,
+    }
+    actual_score = {
+        **score,
+        "properties": {
+            **score["properties"],
+            "details": {"anyOf": [{"type": "null"}, actual_detail]},
+        },
+    }
     player = {
         "player_id": identifier,
         "name": text,
@@ -90,7 +128,7 @@ def history_schema() -> dict[str, Any]:
         "expected_own_points": nullable_number,
         "net_difference": nullable_number,
         "suggested": {"anyOf": [{"type": "null"}, suggested]},
-        "actual": {"anyOf": [{"type": "null"}, score]},
+        "actual": {"anyOf": [{"type": "null"}, actual_score]},
         "players": {
             "type": "array",
             "items": {"type": "object", "properties": player, "required": list(player)},

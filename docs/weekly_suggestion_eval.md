@@ -120,6 +120,31 @@ separate local mock preview. It is not imported by the production UI.
 outcomes, shown as the result-data date. The advice's build time remains separate and
 can be later than its input capture.
 
+## Personal season report
+
+The member's own history has a collapsed season report. It compares the settled actual
+and suggested net totals, shows the actual transfer hit once, and, where captured picks
+and transfers permit it, lists the scoring captain and each incoming player's contribution.
+Visibility follows the existing local member selection, which is an unverified claim,
+not authentication or a new restriction on the already public history documents.
+
+The optional `actual.details` block carries its source snapshot, captain, and transfers.
+Each contribution names the player, raw points, official multiplier and counted points.
+The settled picks must reproduce the actual gross total exactly. Official multipliers
+retain automatic substitutions and a vice-captain inheriting the armband. A player bought
+more than once in a week counts on their last acquisition only; an intermediate purchase
+counts zero. Transfer hits remain the weekly charge, never a charge on each move.
+
+Older records keep their totals and omit absent details. An inconsistent detail block
+does not invalidate the independently captured actual score; it is omitted by the producer.
+The browser validates the optional arithmetic before rendering it. Unfinished weeks never
+enter the report.
+
+The synthetic two-transfer report below is captured by `personal-season-report.spec.ts`
+at 360 px. The same test runs in both languages and checks accessibility and overflow.
+
+![Synthetic personal season report](product/screenshots/personal-report-tr.png)
+
 ## Verification and current data
 
 Verified locally on 10 September 2026:
