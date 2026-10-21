@@ -228,7 +228,10 @@ export function MemberDecisionControls({
   const top100Service = (computable?.top100Weights.length ?? 0) > 1;
   // The device solves a weight for the one-week pure-points plan only.
   const top100Device =
-    strategy === "saf-puan" && windowSize === 1 && (onDevice?.top100Weights.length ?? 0) > 1;
+    isMemberStrategy(strategy) &&
+    onDevice?.strategies.includes(strategy) === true &&
+    windowSize === 1 &&
+    (onDevice.top100Weights.length ?? 0) > 1;
   const top100Computable = top100Service || top100Device;
   const weightSelectable = (weight: number) =>
     (top100Applies && top100.weights.some((offered) => offered === weight)) ||

@@ -130,12 +130,12 @@ export interface DeviceRivalFields {
 /** What a Top 100 weight publishes beyond the plan: the price on base points and each row's reason. */
 export interface DeviceTop100Fields {
   weight: number;
-  /** Whether the weighted choice differs from the pure-points plan in a move, the eleven or the captain. */
+  /** Whether the weighted choice differs from the same strategy at zero in a move, the eleven or the captain. */
   changed: boolean;
   expected_points_cost: number;
   expected_points_cost_ceiling: number;
-  /** One per move row, in the rows' order: `points_gain` or `top100_preference`. */
-  reasons: Array<"points_gain" | "top100_preference">;
+  /** One per move row, preserving the unweighted strategy's reason for a shared move. */
+  reasons: Array<"points_gain" | "mode_tradeoff" | "top100_preference">;
 }
 
 /** One member's side of the problem, from `entries/<id>.json`. */

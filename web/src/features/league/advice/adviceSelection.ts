@@ -199,7 +199,7 @@ export interface DeviceComputable {
   strategies: MemberStrategy[];
   windows: WindowSize[];
   rivals: number[];
-  /** The Top 100 weights the device solves for the one-week pure-points plan; zero always. */
+  /** The Top 100 weights the device solves for either one-week strategy; zero always. */
   top100Weights: Top100Weight[];
   /** Chips playable this week according to the entry's captured chip states. */
   chips?: MemberChip[];
@@ -427,9 +427,9 @@ function withDeviceChoices(
   if (
     !device ||
     published.status === "declared-unavailable" ||
-    published.request.strategy !== "saf-puan" ||
     published.request.window !== 1 ||
-    !device.strategies.includes("saf-puan") ||
+    !isMemberStrategy(published.request.strategy) ||
+    !device.strategies.includes(published.request.strategy) ||
     !device.windows.includes(1) ||
     searchParams.get("model") === "football" ||
     searchParams.get(EVIDENCE_PARAMETER) === "on" ||
@@ -442,6 +442,7 @@ function withDeviceChoices(
   const weight = device.top100Weights.includes(askedWeight) ? askedWeight : published.top100.weight;
   const askedChip = parseChip(searchParams);
   const chip =
+    published.request.strategy === "saf-puan" &&
     weight === 0 &&
     askedChip.chip !== null &&
     askedChip.chip !== "auto" &&
@@ -565,10 +566,11 @@ function withComputable(
     (published.evidence.available || word);
   const asked = parseTop100(searchParams).weight;
   const target: Top100Target = { strategy, window, rivalEntryId };
-  // A weight the device computes for the one-week pure-points plan stands even where the
+  // A weight the device computes for the selected one-week strategy stands even where the
   // service does not offer it; the selection then stays not listed until the device answers.
   const onDeviceWeight =
-    strategy === "saf-puan" &&
+    isMemberStrategy(strategy) &&
+    published.onDevice?.strategies.includes(strategy) === true &&
     window === 1 &&
     !wordOn &&
     published.onDevice?.top100Weights.includes(asked) === true;
