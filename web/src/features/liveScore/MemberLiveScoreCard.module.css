@@ -1,0 +1,59 @@
+.refresh {
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  padding: 0.45rem 0.75rem;
+  min-height: 44px;
+  cursor: pointer;
+}
+
+.refresh:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.bonus {
+  margin: 0.5rem 0 1rem;
+}
+
+.details {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  gap: 0.75rem 1.5rem;
+  margin: 0;
+}
+
+.details dt,
+.substitutions small {
+  font-size: 0.8rem;
+}
+
+.details dd {
+  margin: 0.2rem 0 0;
+  overflow-wrap: anywhere;
+}
+
+.substitutions h3 {
+  font: inherit;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.substitutions ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.substitutions li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 0.5rem;
+  padding-block: 0.35rem;
+}
+
+.substitutions span {
+  overflow-wrap: anywhere;
+}
