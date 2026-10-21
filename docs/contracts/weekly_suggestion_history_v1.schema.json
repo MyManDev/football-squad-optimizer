@@ -36,6 +36,109 @@
                   },
                   {
                     "properties": {
+                      "details": {
+                        "anyOf": [
+                          {
+                            "type": "null"
+                          },
+                          {
+                            "additionalProperties": false,
+                            "properties": {
+                              "captain": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "counted_points": {
+                                    "type": "number"
+                                  },
+                                  "multiplier": {
+                                    "maximum": 3,
+                                    "minimum": 0,
+                                    "type": "integer"
+                                  },
+                                  "name": {
+                                    "minLength": 1,
+                                    "type": "string"
+                                  },
+                                  "player_id": {
+                                    "minimum": 1,
+                                    "type": "integer"
+                                  },
+                                  "points": {
+                                    "type": "number"
+                                  }
+                                },
+                                "required": [
+                                  "player_id",
+                                  "name",
+                                  "points",
+                                  "multiplier",
+                                  "counted_points"
+                                ],
+                                "type": "object"
+                              },
+                              "source_snapshot_id": {
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "transfers": {
+                                "items": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "player_in": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "counted_points": {
+                                          "type": "number"
+                                        },
+                                        "multiplier": {
+                                          "maximum": 3,
+                                          "minimum": 0,
+                                          "type": "integer"
+                                        },
+                                        "name": {
+                                          "minLength": 1,
+                                          "type": "string"
+                                        },
+                                        "player_id": {
+                                          "minimum": 1,
+                                          "type": "integer"
+                                        },
+                                        "points": {
+                                          "type": "number"
+                                        }
+                                      },
+                                      "required": [
+                                        "player_id",
+                                        "name",
+                                        "points",
+                                        "multiplier",
+                                        "counted_points"
+                                      ],
+                                      "type": "object"
+                                    },
+                                    "player_out": {
+                                      "minLength": 1,
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "player_out",
+                                    "player_in"
+                                  ],
+                                  "type": "object"
+                                },
+                                "type": "array"
+                              }
+                            },
+                            "required": [
+                              "source_snapshot_id",
+                              "captain",
+                              "transfers"
+                            ],
+                            "type": "object"
+                          }
+                        ]
+                      },
                       "gross_points": {
                         "type": "number"
                       },
