@@ -367,7 +367,7 @@ def test_default_preview_can_resume_in_clean_git_checkout_but_source_drift_canno
     args = [*base, "--run-id", "git-resume"]
     actual_scoreboard = weekly.publish_scoreboard
 
-    def interrupt(request):
+    def interrupt(request, **kwargs):
         raise OSError("synthetic interruption after preview member/site build")
 
     monkeypatch.setattr(weekly, "publish_scoreboard", interrupt)

@@ -64,7 +64,7 @@ from squadopt.contracts.league_tree import (
 )
 from squadopt.contracts.run_logs import LOG_ROOT_NAME
 from squadopt.data.errors import DataError, SourceRevisionError
-from squadopt.data.snapshots import list_snapshot_ids, read_snapshot
+from squadopt.data.snapshots import CapturedSnapshot, list_snapshot_ids, read_snapshot
 from squadopt.data.source_revision import source_revision
 from squadopt.features.evidence_artifact import read_player_evidence_artifact
 from squadopt.features.rotation_evidence_artifact import read_rotation_evidence_artifact
@@ -227,6 +227,7 @@ class WeeklyOperations:
             request.season, request.gameweek, "decision", publish_suffix
         )
         self.values: dict[str, dict[str, Any]] = {}
+        self._publication_captures: dict[tuple[Path, str], CapturedSnapshot] = {}
         self.plan = request.plan()
         if handoff is not None and not request.skip_top100:
             raise WeekError(
@@ -877,7 +878,12 @@ class WeeklyOperations:
             recorded = record and records_advice_for(league_id)
             request = self._league_request(league_id, recorded)
             with league_mapper(request, self.request.workers) as mapper:
-                result = publish_league(request, mapper=mapper, beside=beside)
+                result = publish_league(
+                    request,
+                    mapper=mapper,
+                    beside=beside,
+                    read_capture=self._capture_for_publication,
+                )
             if result.published is not None:
                 beside.append(result.published)
             gameweek = result.gameweek
@@ -949,6 +955,18 @@ class WeeklyOperations:
             },
         )
 
+    def _capture_for_publication(self, root: Path, identifier: str) -> CapturedSnapshot:
+        """Read immutable capture bytes once across this run's league publications.
+
+        The cache belongs to this operation, never to a request sent to member workers
+        or another run. Resolve the root as well as the identifier so two archives cannot
+        share a cached capture by name alone.
+        """
+        key = (root.resolve(), identifier)
+        if key not in self._publication_captures:
+            self._publication_captures[key] = read_snapshot(root, identifier)
+        return self._publication_captures[key]
+
     def _scoreboard(self) -> WeeklyStageResult:
         outputs: list[Path] = []
         kept: dict[str, list[object]] = {}
@@ -967,7 +985,8 @@ class WeeklyOperations:
                     cohort_snapshot_id=self._cohort_id(),
                     elite_snapshot_id=self._elite_id(),
                     evidence_root=self.paths.evidence,
-                )
+                ),
+                read_capture=self._capture_for_publication,
             )
             outputs.extend(result.output_paths)
             kept[str(league_id)] = list(result.ours_kept_from_published)
