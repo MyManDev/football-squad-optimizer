@@ -360,9 +360,6 @@ class ChipForecastInputs:
             raise ChipForecastError(
                 f"The present bench must be orders 1 to {BENCH_SIZE}, once each; got {bench!r}."
             )
-        captains = [row for row in self.squad if row.is_captain]
-        if len(captains) != 1 or captains[0].bench_order is not None:
-            raise ChipForecastError("The present eleven must hold exactly one captain.")
 
     def _check_calendar(self) -> None:
         weeks = [week.gameweek for week in self.calendar]
