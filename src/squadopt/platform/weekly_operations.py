@@ -56,7 +56,7 @@ from squadopt.application.weekly_plan import (
     rotation_pair_is_readable,
     rotation_source_capture,
 )
-from squadopt.contracts.league_list import LEAGUE_LIST_FILE, LeagueListError, read_league_menus
+from squadopt.contracts.league_list import LEAGUE_LIST_FILE, LeagueListError
 from squadopt.contracts.league_tree import (
     LEGACY_TREE,
     LeagueDirectoryError,
@@ -75,6 +75,7 @@ from squadopt.platform.fpl_capture import capture
 from squadopt.platform.publication_workers import league_mapper
 from squadopt.platform.runlog import RunLog, configure_run_logging
 from squadopt.platform.storage._queue_lock import QueueFileLock
+from squadopt.platform.storage.league_list import read_league_menus
 from squadopt.platform.storage.projection_retention import (
     publish_retained_handoff,
     retained_handoff_path,

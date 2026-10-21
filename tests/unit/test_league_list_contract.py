@@ -11,8 +11,8 @@ from squadopt.contracts.league_list import (
     LeagueListError,
     parse_league_list,
     read_league_list,
-    read_league_menus,
 )
+from squadopt.platform.storage.league_list import read_league_menus
 
 ROOT = Path(__file__).resolve().parents[2]
 

@@ -53,17 +53,17 @@ def parse_league_list(document: Any) -> tuple[int, ...]:
 def read_league_list(path: Path) -> tuple[int, ...]:
     """The league ids the file at ``path`` lists."""
 
-    return tuple(read_league_menus(path))
-
-
-def read_league_menus(path: Path) -> dict[int, str]:
-    """Read ids and publication menus together; older lists retain the full menu."""
-
     try:
         document = json.loads(Path(path).read_text(encoding="utf-8"))
     except FileNotFoundError as error:
         raise LeagueListError(f"No league list at {path}.") from error
     except ValueError as error:
         raise LeagueListError(f"{path} does not parse as JSON.") from error
+    return parse_league_list(document)
+
+
+def parse_league_menus(document: Any) -> dict[int, str]:
+    """The publication menus; older documents retain the full menu."""
+
     parse_league_list(document)
     return {row["league_id"]: row.get("menu", "full") for row in document["leagues"]}
