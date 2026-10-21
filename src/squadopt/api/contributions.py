@@ -13,6 +13,7 @@ from jsonschema import ValidationError
 from starlette.concurrency import run_in_threadpool
 
 from squadopt.application.player_catalog import validate_catalog
+from squadopt.platform.advice_submit import client_address_bucket
 from squadopt.platform.contributions import ContributionsLimitedError, ContributionStore
 
 
@@ -38,7 +39,7 @@ def contribution_routes(store: ContributionStore, data_root: Path) -> APIRouter:
     def comments(
         response: Response,
         season: str = Query(pattern=r"^[0-9]{4}-[0-9]{2}$"),
-        player_id: int = Query(gt=0),
+        player_id: int = Query(gt=0, le=2**63 - 1),
         before: int = Query(default=2**63 - 1, gt=0, le=2**63 - 1),
     ) -> dict[str, Any]:
         response.headers["Cache-Control"] = "no-store"
@@ -50,7 +51,8 @@ def contribution_routes(store: ContributionStore, data_root: Path) -> APIRouter:
 
     @router.post("", status_code=202)
     async def submit(request: Request) -> dict[str, Any]:
-        if request.headers.get("content-type", "").split(";")[0].strip() != "application/json":
+        media_type = request.headers.get("content-type", "").split(";")[0].strip().lower()
+        if media_type != "application/json":
             raise ContributionError(415, "JSON required")
         raw = bytearray()
         async for chunk in request.stream():
@@ -59,7 +61,7 @@ def contribution_routes(store: ContributionStore, data_root: Path) -> APIRouter:
             raw.extend(chunk)
         try:
             body = json.loads(raw)
-        except (ValueError, UnicodeDecodeError) as exc:
+        except (ValueError, RecursionError) as exc:
             raise ContributionError(422, "Invalid JSON") from exc
         fields = {"season", "player_id", "author", "body", "source", "consent"}
         if not isinstance(body, dict) or set(body) != fields or body["consent"] is not True:
@@ -70,6 +72,10 @@ def contribution_routes(store: ContributionStore, data_root: Path) -> APIRouter:
             value = body[name]
             if not isinstance(value, str) or not minimum <= len(value.strip()) <= maximum:
                 raise ContributionError(422, "Invalid comment fields")
+            try:
+                value.encode("utf-8")
+            except UnicodeEncodeError as exc:
+                raise ContributionError(422, "Invalid comment text") from exc
             if any(ord(char) < 32 and char not in "\n\t" for char in value):
                 raise ContributionError(422, "Control characters are not allowed")
             body[name] = value.strip()
@@ -93,7 +99,7 @@ def contribution_routes(store: ContributionStore, data_root: Path) -> APIRouter:
                 author=body["author"],
                 body=body["body"],
                 source=body["source"],
-                client=request.client.host if request.client else "unknown",
+                client=client_address_bucket(request.client.host if request.client else "unknown"),
             )
         except ContributionsLimitedError as exc:
             raise ContributionError(
