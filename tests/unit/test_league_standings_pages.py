@@ -106,6 +106,32 @@ def test_a_1001st_member_is_refused_without_fetching_more(monkeypatch: pytest.Mo
     assert calls == []
 
 
+@pytest.mark.parametrize("canonical_matches", [True, False])
+def test_a_separately_cached_first_page_is_refreshed_once_without_relaxing_coherence(
+    monkeypatch: pytest.MonkeyPatch, canonical_matches: bool
+) -> None:
+    stale = json.loads(page(1, 1, 50, more=True))
+    stale["last_updated_data"] = "2026-10-21T19:00:00Z"
+    payloads = {FIRST: json.dumps(stale).encode()}
+    calls: list[str] = []
+
+    def fetch(url: str) -> bytes:
+        calls.append(url)
+        if url.endswith("=2"):
+            return page(2, 51, 77)
+        return page(1, 1, 50, more=True) if canonical_matches else json.dumps(stale).encode()
+
+    monkeypatch.setattr(fpl_capture, "fetch", fetch)
+    if canonical_matches:
+        fpl_capture.complete_league_standings(payloads, [LEAGUE])
+        assert len(fpl_captured_league_standings(payloads, league_id=LEAGUE)) == 77
+        assert payloads[FIRST] == page(1, 1, 50, more=True)
+    else:
+        with pytest.raises(DataError, match="changed between pages"):
+            fpl_capture.complete_league_standings(payloads, [LEAGUE])
+    assert [url.rsplit("=", 1)[1] for url in calls] == ["2", "1"]
+
+
 def test_an_endless_page_chain_stops_at_twenty_pages(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[str] = []
 

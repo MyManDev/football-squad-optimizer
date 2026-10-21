@@ -133,6 +133,20 @@ def complete_league_standings(
             page = fpl_league_standings_page(
                 payloads[name], league_id=league_id, expected_page=number
             )
+            if number == 2 and updated is not None and page.last_updated_data != updated:
+                # The unnumbered URL can be cached separately from the numbered pages.
+                # Read canonical page one once, then retain the same coherence checks.
+                first_name = league_standings_payload(league_id)
+                first_path = next(iter(league_standings_page_endpoint_path(league_id, 1).values()))
+                first_url = f"{BASE_URL}/{first_path}"
+                first_raw = fetch(first_url)
+                first = fpl_league_standings_page(first_raw, league_id=league_id, expected_page=1)
+                if not first.has_next or first.last_updated_data != page.last_updated_data:
+                    raise DataSourceError(f"League {league_id} standings changed between pages.")
+                payloads[first_name] = first_raw
+                added[first_name] = first_url
+                count = len(first.members)
+                updated = first.last_updated_data
             if updated is not None and page.last_updated_data != updated:
                 raise DataSourceError(f"League {league_id} standings changed between pages.")
             updated = page.last_updated_data
