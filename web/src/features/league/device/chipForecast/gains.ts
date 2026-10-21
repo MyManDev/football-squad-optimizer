@@ -4,6 +4,8 @@
  * the request makes 1 + n solves rather than a chip request's two for each chip. A chip
  * whose solve is refused, the device's ceiling included, has an unknown gain: null, never
  * zero, so the rule reads it as unknown this week and the plan itself still stands.
+ * The plain plan, with its own solving time, is handed to `onPlan` before the first chip
+ * is solved, so the page can show it at the plain plan's pace.
  */
 
 import type { LpSolver } from "../lp/problem";
@@ -23,9 +25,11 @@ export function solveChipGains(
   entry: DevicePlanEntry,
   chips: readonly DeviceChip[],
   now: () => number = () => performance.now(),
+  onPlan?: (plan: DevicePlanAnswer) => void,
 ): DevicePlanAnswer {
   const started = now();
   const plain = solvePlan(solver, document, entry, now);
+  onPlan?.(plain);
   const gains: Partial<Record<DeviceChip, number | null>> = {};
   // Each chip once, in the game's order, whatever order or repeats the request named.
   for (const chip of DEVICE_CHIPS.filter((name) => chips.includes(name))) {

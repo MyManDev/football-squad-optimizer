@@ -40,7 +40,8 @@ export interface DevicePlanRequest {
  * plan the chip is measured against, exactly as the server measures `gain_vs_no_chip`.
  * With a rival strategy: the banded plan with its price and labels. The two combine with
  * nothing, as on the server. With chip gains: the plain plan, and each held chip's gain
- * against it, or null where its solve was refused; they too combine with nothing.
+ * against it, or null where its solve was refused; they too combine with nothing. The
+ * plain plan is handed to `onPlan` as soon as it is solved, before any chip.
  */
 export function solveRequest(
   solver: LpSolver,
@@ -53,12 +54,13 @@ export function solveRequest(
     chipGains = [],
   }: Omit<DevicePlanRequest, "id">,
   now: () => number = () => performance.now(),
+  onPlan?: (plan: DevicePlanAnswer) => void,
 ): DevicePlanAnswer {
   if (chipGains.length > 0) {
     if (chip !== null || strategy !== null || top100Weight !== 0) {
       throw new DevicePlanRefused("chip gains with a chip, a rival strategy or a weight", "plan");
     }
-    return solveChipGains(solver, document, entry, chipGains, now);
+    return solveChipGains(solver, document, entry, chipGains, now, onPlan);
   }
   if (top100Weight !== 0) {
     // The device takes a weight on the one-week pure-points plan only. The server also

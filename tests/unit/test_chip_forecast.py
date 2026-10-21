@@ -9,6 +9,7 @@ import copy
 import json
 import re
 from collections.abc import Iterator, Mapping, Sequence
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -802,13 +803,19 @@ def test_inputs_that_would_make_the_forecast_guess_are_refused() -> None:
         HeldChip("3xc", 19, 1, None)
 
 
-def test_a_squad_that_is_not_a_fifteen_with_a_bench_and_one_captain_is_refused() -> None:
+def test_a_squad_that_is_not_a_fifteen_with_an_ordered_bench_is_refused() -> None:
     squad = list(_squad())
     with pytest.raises(ChipForecastError, match="15 distinct"):
         _inputs([], squad=squad[:-1])
     with pytest.raises(ChipForecastError, match="bench"):
         _inputs([], squad=[*squad[:-1], SquadRow(115, 15, "DEF", 2.0, 3)])
-    with pytest.raises(ChipForecastError, match="captain"):
-        _inputs([], squad=[SquadRow(101, 1, "GK", 8.0, None, False), *squad[1:]])
     with pytest.raises(ChipForecastError, match="does not list"):
         _inputs([], squad=[SquadRow(101, 99, "GK", 8.0, None, True), *squad[1:]])
+
+
+@pytest.mark.parametrize("captains", [(), (115,), (101, 102)])
+def test_chip_timing_does_not_depend_on_the_captured_armband(captains: tuple[int, ...]) -> None:
+    chips = [HeldChip(name, 1, 19, 1.0) for name in CHIP_NAMES]
+    expected = chip_forecast(_inputs(chips))
+    squad = [replace(row, is_captain=row.player_id in captains) for row in _squad()]
+    assert chip_forecast(_inputs(chips, squad=squad)) == expected
