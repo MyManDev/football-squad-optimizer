@@ -20,8 +20,9 @@ hours either side of a deadline only a blocker fix merges here
   `optimization` and above `features`, so it may import `features`, `data` and `contracts`,
   and today it imports each of them. Of `data` it imports only vocabulary modules (`errors`,
   `schema` and `timestamps`).
-- **It imports no storage or source module of `data`.** No contract makes it a source yet:
-  "The decision core imports no storage or source module" adds it when its zone owner agrees.
+- **It imports no storage or source module of `data`.** "The decision core imports no storage
+  or source module" holds it, with its zone owner's agreement (#1081); the contract allows
+  indirect imports, so the route through `features` in the known violations below stays open.
 - **It touches no file.** `tests/architecture/test_core_file_io.py` holds it to no `open`,
   no file method of `Path`, no pandas reader or writer it lists and no file function of `os`,
   `glob`, NumPy or joblib, with no allowlist entry.

@@ -1,0 +1,78 @@
+/* The squad card tool (#1135 part 3): the field choice, the make button and the drawn card. */
+.card {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.fields legend {
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+
+.field {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+}
+
+.field input {
+  width: 20px;
+  height: 20px;
+}
+
+.action {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: var(--radius-s);
+  background: var(--color-primary);
+  color: var(--color-primary-text);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.action[aria-disabled="true"] {
+  cursor: progress;
+  opacity: 0.7;
+}
+
+.note {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.result {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.preview {
+  display: block;
+  width: 100%;
+  max-width: 540px;
+  height: auto;
+  border-radius: var(--radius-m);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}

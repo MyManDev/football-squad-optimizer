@@ -197,3 +197,84 @@ def test_store_unavailable_fails_honestly(tmp_path: Path):
         create_app(data_root=tmp_path, contributions=ContributionStore(path))
     ) as client:
         assert client.post(BASE, json=body()).status_code == 503
+
+
+@pytest.mark.parametrize("depth", [1100, 5000])
+def test_deep_json_is_a_client_error_and_writes_nothing(tmp_path, depth):
+    store = ContributionStore(tmp_path / "inbox.db")
+    with TestClient(
+        create_app(data_root=tmp_path, contributions=store), raise_server_exceptions=False
+    ) as client:
+        response = client.post(
+            BASE,
+            content="[" * depth + "0" + "]" * depth,
+            headers={"Content-Type": "application/json"},
+        )
+        assert response.status_code == 422
+        assert response.headers["Cache-Control"] == "no-store"
+        assert client.get("/health").status_code == 200
+    assert not store.path.exists()
+
+
+@pytest.mark.parametrize("field", ["author", "body", "source"])
+def test_unpaired_surrogate_is_refused_before_storage(tmp_path, field):
+    store = ContributionStore(tmp_path / "inbox.db")
+    with TestClient(
+        create_app(data_root=tmp_path, contributions=store), raise_server_exceptions=False
+    ) as client:
+        response = client.post(
+            BASE,
+            content=json.dumps(body(**{field: "https://example.com/\ud800"})),
+            headers={"Content-Type": "application/json"},
+        )
+        assert response.status_code == 422
+    assert not store.path.exists()
+
+
+@pytest.mark.parametrize("player_id", [2**63, 10**100])
+def test_out_of_range_player_id_is_refused_before_storage(tmp_path, player_id):
+    store = ContributionStore(tmp_path / "inbox.db")
+    with TestClient(
+        create_app(data_root=tmp_path, contributions=store), raise_server_exceptions=False
+    ) as client:
+        response = client.get(BASE, params={"season": "2026-27", "player_id": player_id})
+        assert response.status_code == 422
+    assert not store.path.exists()
+
+
+@pytest.mark.parametrize(
+    ("hosts", "other"),
+    [
+        (["2001:db8::1", "2001:0db8::2", "2001:db8::3", "2001:db8::4"], "2001:db8:0:1::1"),
+        (["192.0.2.1", "::ffff:192.0.2.1", "::ffff:c000:201", "192.0.2.1"], "192.0.2.2"),
+    ],
+)
+def test_client_address_aliases_share_the_submission_quota(tmp_path, hosts, other):
+    store = ContributionStore(tmp_path / "inbox.db")
+    app = create_app(data_root=tmp_path, contributions=store)
+    for index, host in enumerate(hosts):
+        with TestClient(app, client=(host, 50000)) as client:
+            response = client.post(
+                BASE,
+                json=body(body=f"Distinct observation number {index}"),
+                headers={"X-Forwarded-For": f"198.51.100.{index + 1}"},
+            )
+        assert response.status_code == (202 if index < 3 else 429)
+    assert response.headers["Retry-After"] == "3600"
+    assert len(store.pending()) == 3
+    with TestClient(app, client=(other, 50000)) as client:
+        response = client.post(BASE, json=body(body="A separate visitor's observation"))
+        assert response.status_code == 202
+
+
+def test_valid_unicode_and_case_insensitive_json_media_type(tmp_path):
+    store = ContributionStore(tmp_path / "inbox.db")
+    comment = body(author="Ömer", body="İkinci bölümde geride oynuyor. ⚽ \U0001f600")
+    with TestClient(create_app(data_root=tmp_path, contributions=store)) as client:
+        response = client.post(
+            BASE,
+            content=json.dumps(comment),
+            headers={"Content-Type": "Application/JSON; charset=utf-8"},
+        )
+        assert response.status_code == 202
+    assert store.pending()[0]["body"] == comment["body"]

@@ -30,6 +30,7 @@ export function LeagueMemberPage() {
     selection,
     adviceEnabled,
     advice,
+    coachNews,
     rival,
     duel,
     duelId,
@@ -92,6 +93,7 @@ export function LeagueMemberPage() {
     <LeagueMemberView
       squad={squad.data}
       advice={adviceEnabled && !advice.isError ? (advice.data ?? null) : null}
+      coachNews={coachNews.isError ? null : (coachNews.data ?? null)}
       rivalSquad={rival.data ?? null}
       duelSquad={duelId !== null && !duel.isError ? (duel.data ?? null) : null}
       duelIssue={

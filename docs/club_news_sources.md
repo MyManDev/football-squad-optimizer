@@ -35,6 +35,9 @@ terms. What the code does is narrower:
   a same-origin redirect served the page somewhere else, so a page that is served at another
   path should be registered where it is served. A link whose printed or resolved path has a
   `.` or `..` segment, written out or percent-encoded, is skipped rather than resolved. Each
+  explicit two-part `listing/<name>` or `category/<name>` route under that path is a news
+  index, so it does not consume the article allowance. The same rule applies to referrals;
+  deeper paths such as `category/men/injury-update` remain eligible articles. Each
   article is asked of the same `robots.txt`, waits the same interval and meets the same
   refusals as a registered page, and is stored as its own document with its own readable
   text. A link to another host is never requested, an article's own links are not followed,

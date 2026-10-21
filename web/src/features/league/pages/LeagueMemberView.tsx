@@ -21,6 +21,7 @@ import { DecisionPreferencesPanel } from "../advice/DecisionPreferencesPanel";
 import { ModelComparison } from "../advice/ModelComparison";
 import { DecisionWorkbench } from "../advice/DecisionWorkbench";
 import { EVIDENCE_COPY } from "../advice/evidenceCopy";
+import { coachAbsences } from "../advice/coachAbsences";
 import type { AdviceJob } from "../advice/useAdviceJob";
 import { TemplatePicker } from "../templates/TemplatePicker";
 import { MemberResourceCards } from "../components/MemberResourceCards";
@@ -43,6 +44,7 @@ import { useMemberAdviceView } from "./useMemberAdviceView";
 import { rivalCandidates } from "../advice/adviceSelection";
 import { canDuel, duelRivalId } from "./duelSides";
 import { RivalDuel } from "./RivalDuel";
+import { SquadCard } from "../card/SquadCard";
 import { WeekStory } from "./WeekStory";
 import styles from "./LeagueMemberPage.module.css";
 
@@ -113,6 +115,7 @@ function Tool({
 function LeagueMemberContent({
   squad,
   advice,
+  coachNews = null,
   adviceIssue,
   adviceLoading = false,
   membersIssue,
@@ -142,6 +145,7 @@ function LeagueMemberContent({
   const layout = useShellLayout();
   const shell = useShell();
   const view = squad.payload;
+  const news = useMemo(() => coachAbsences(coachNews ?? advice, squad), [coachNews, advice, squad]);
   const [searchParams, setSearchParams] = useSearchParams();
   const {
     entryId,
@@ -289,6 +293,8 @@ function LeagueMemberContent({
           onPitch={onPitch}
           plan={plan}
           codes={codes}
+          news={news}
+          held={view}
           list={plan && hasLineup(plan) ? <PlanLineup view={plan} codes={codes} /> : null}
         />
         {railPlacement === "flow" ? rail : null}
@@ -558,6 +564,11 @@ function LeagueMemberContent({
           <Tool title={copy.chipsAndTransfers}>
             <MemberResourceCards squad={view} />
           </Tool>
+          {!adviceLoading && shown ? (
+            <Tool title={copy.cardTitle}>
+              <SquadCard view={shown.envelope.payload} squad={view} />
+            </Tool>
+          ) : null}
         </div>
       </div>
       {railPlacement === "column" ? rail : null}

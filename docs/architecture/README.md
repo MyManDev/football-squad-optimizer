@@ -29,6 +29,7 @@ repeated below.
 | [Ownership](ownership.md) | Who approves a change in each zone, the shared boundaries and the live-path freeze | |
 | [Branching and protection](branching.md) | The trunk, branch protection, the gates, tag namespaces and production deploys | `tests/architecture/test_operations_docs_match_the_workflows.py` holds its production step names |
 | [PR discipline](pr_discipline.md) | How a change is scoped and reviewed, and the replay check on the live path | `tests/architecture/test_mypy_file_set_is_described.py` holds its list of type-checked scripts |
+| [Local checkout](local_checkout.md) | Worktree commands and the clean checkout required by weekly publication | |
 | [Development workflow](development_workflow.md) | The baseline of 9 September 2026 and how archived work is recovered | |
 
 ## Runtime boundaries

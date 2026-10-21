@@ -24,6 +24,7 @@ runners live in `scripts/`, and its records are committed under `docs/`.
 | Price changes at later deadlines (#1013 step 1a) | [Price change pre-registration](../price_change_prereg.md) |
 | Multi-week planning and lookahead | [Planner state and learning](planner_state_and_learning.md), [explicit lookahead measurement](explicit_lookahead_measurement.md), [observed rollout](observed_rollout.md), [temporal refinement](temporal_refinement.md), [incumbent protection](incumbent_protection_design.md), [purchase basis](acquisition_accounting.md) |
 | Human decisions over computed alternatives | [Human decision board](human_decision_board.md) |
+| October 2026 forecast literature review | [Methods, source feasibility, existing verdicts and ranked research choices](literature_forecast_accuracy_2026_10.md) |
 
 ## Topics
 

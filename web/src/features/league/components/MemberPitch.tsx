@@ -3,7 +3,9 @@ import { useId, type CSSProperties } from "react";
 import { useLanguage } from "../../../i18n/context";
 import { clubCode, clubSwatch, type ClubCodes } from "../../../lib/clubs";
 import { figure } from "../../../lib/format";
+import type { CoachAbsence } from "../advice/coachAbsences";
 import type { ModelChange } from "../advice/modelSwitch";
+import { CoachNewsMark } from "./CoachNews";
 import styles from "./MemberPitch.module.css";
 
 /** One player as the pitch draws them: a white name plate on the grass. */
@@ -71,11 +73,13 @@ function Plate({
   player,
   codes,
   changed,
+  news,
 }: {
   player: PitchPlayer;
   codes: ClubCodes;
   /** Brought in by a switch of prediction model: said in the plate's text, as 'New' is. */
   changed: boolean;
+  news?: CoachAbsence;
 }) {
   const { locale, messages } = useLanguage();
   const code = clubCode(player.team, codes);
@@ -109,10 +113,15 @@ function Plate({
         ) : null}
         <span className={styles.codeText}>{code ?? player.team}</span>
       </span>
-      {player.expectedPoints !== null && Number.isFinite(player.expectedPoints) ? (
+      {news || (player.expectedPoints !== null && Number.isFinite(player.expectedPoints)) ? (
         <span className={styles.xp}>
-          {figure(player.expectedPoints, locale)}
-          <span className="visually-hidden"> {messages.leagueMembers.pointsUnitSpoken}</span>
+          {player.expectedPoints !== null && Number.isFinite(player.expectedPoints) ? (
+            <>
+              {figure(player.expectedPoints, locale)}
+              <span className="visually-hidden"> {messages.leagueMembers.pointsUnitSpoken}</span>
+            </>
+          ) : null}
+          {news ? <CoachNewsMark news={news} name={player.name} /> : null}
         </span>
       ) : null}
       {player.isNew ? <span className={styles.new}>{messages.leagueMembers.boardNew}</span> : null}
@@ -160,6 +169,7 @@ export function MemberPitch({
   players,
   codes,
   modelChange = null,
+  news,
 }: {
   players: PitchPlayer[];
   codes: ClubCodes;
@@ -169,6 +179,7 @@ export function MemberPitch({
    * start, over the pitch and the bench together.
    */
   modelChange?: PlateChange;
+  news?: ReadonlyMap<number, CoachAbsence>;
 }) {
   const { messages } = useLanguage();
   const copy = messages.leagueMembers;
@@ -242,6 +253,7 @@ export function MemberPitch({
                     <Plate
                       player={player}
                       codes={codes}
+                      news={news?.get(player.playerId)}
                       changed={modelChange?.changed.has(player.playerId) ?? false}
                     />
                     {line.position === labelLine && index === 0 ? <AttackLabel at="first" /> : null}
@@ -280,10 +292,12 @@ export function MemberBench({
   players,
   codes,
   modelChange = null,
+  news,
 }: {
   players: BenchPlayer[];
   codes: ClubCodes;
   modelChange?: PlateChange;
+  news?: ReadonlyMap<number, CoachAbsence>;
 }) {
   const { locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
@@ -328,18 +342,26 @@ export function MemberBench({
                   <span className={code ? styles.benchCode : undefined}>{code ?? player.team}</span>
                   {Object.hasOwn(messages.positions, player.position) ? (
                     <span>
-                      {" · "}
+                      {" Â· "}
                       {messages.positions[player.position as keyof typeof messages.positions]}
                     </span>
                   ) : null}
                 </span>
-                {player.expectedPoints !== null && Number.isFinite(player.expectedPoints) ? (
+                {news?.has(player.playerId) ||
+                (player.expectedPoints !== null && Number.isFinite(player.expectedPoints)) ? (
                   <span className={styles.benchXp}>
-                    {figure(player.expectedPoints, locale)}
-                    <span className="visually-hidden">
-                      {" "}
-                      {messages.leagueMembers.pointsUnitSpoken}
-                    </span>
+                    {player.expectedPoints !== null && Number.isFinite(player.expectedPoints) ? (
+                      <>
+                        {figure(player.expectedPoints, locale)}
+                        <span className="visually-hidden">
+                          {" "}
+                          {messages.leagueMembers.pointsUnitSpoken}
+                        </span>
+                      </>
+                    ) : null}
+                    {news?.get(player.playerId) ? (
+                      <CoachNewsMark news={news.get(player.playerId)!} name={player.name} />
+                    ) : null}
                   </span>
                 ) : null}
               </li>
