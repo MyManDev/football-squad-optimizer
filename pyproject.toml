@@ -80,6 +80,9 @@ markers = [
 target-version = "py311"
 line-length = 100
 src = ["src", "tests"]
+# The role follow-up runners and their tests are the record of what ran (#997); their sha256
+# is recorded, so neither the linter nor the formatter may touch them.
+extend-exclude = ["docs/research/football_role_followups_2026_10_03"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]

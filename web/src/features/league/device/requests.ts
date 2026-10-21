@@ -3,6 +3,7 @@
  * come through here; nothing else knows which module solves which selection.
  */
 
+import { solveChipGains } from "./chipForecast/gains";
 import type { LpSolver } from "./lp/problem";
 import { DevicePlanRefused, solvePlan } from "./solve/week";
 import { gainVsNoChip } from "./strategies/chips";
@@ -27,13 +28,19 @@ export interface DevicePlanRequest {
   strategy?: { name: RivalStrategy; rival: DeviceRival } | null;
   /** A Top 100 weight the plan is chosen on; 0 or absent for the base points. */
   top100Weight?: number;
+  /**
+   * The held chips whose gain this week the chip timing reads: the plain plan, then each
+   * chip solved once beside it. Empty or absent asks for none.
+   */
+  chipGains?: DeviceChip[];
 }
 
 /**
  * The plan asked for. With a chip: the chip week and, beside it, the member's own no-chip
  * plan the chip is measured against, exactly as the server measures `gain_vs_no_chip`.
  * With a rival strategy: the banded plan with its price and labels. The two combine with
- * nothing, as on the server.
+ * nothing, as on the server. With chip gains: the plain plan, and each held chip's gain
+ * against it, or null where its solve was refused; they too combine with nothing.
  */
 export function solveRequest(
   solver: LpSolver,
@@ -43,9 +50,16 @@ export function solveRequest(
     chip = null,
     strategy = null,
     top100Weight = 0,
+    chipGains = [],
   }: Omit<DevicePlanRequest, "id">,
   now: () => number = () => performance.now(),
 ): DevicePlanAnswer {
+  if (chipGains.length > 0) {
+    if (chip !== null || strategy !== null || top100Weight !== 0) {
+      throw new DevicePlanRefused("chip gains with a chip, a rival strategy or a weight", "plan");
+    }
+    return solveChipGains(solver, document, entry, chipGains, now);
+  }
   if (top100Weight !== 0) {
     // The device takes a weight on the one-week pure-points plan only. The server also
     // publishes a rival strategy at a weight; the device declines that by contract.
