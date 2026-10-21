@@ -106,7 +106,8 @@ def test_a_season_with_no_deadline_ahead_refuses(tmp_path: Path) -> None:
 def test_a_club_news_capture_rides_on_the_rotation_stage() -> None:
     news = "club-news-20261023T050000Z-abc"
     out = _powershell(
-        f"(Build-WeeklyArguments '2026-27' 8 15 'rid' 'friday-20261023' '{news}') -join ' '",
+        "(Build-WeeklyArguments 'friday' '2026-27' 8 15 'rid' 'friday-20261023' "
+        f"'{news}') -join ' '",
         f"Captured-NewsId @('Read          41 documents', 'Capture       {news}')",
         "\"[{0}]\" -f (Captured-NewsId @('Refused: no key'))",
     )
@@ -121,7 +122,8 @@ def test_run_id_suffix_and_argument_line_follow_the_cadence() -> None:
         "$now = [datetime]::Parse('2026-10-16T06:00:00Z').ToUniversalTime()",
         "Weekly-RunId 'friday' '2026-27' 7 $now",
         "Weekly-Suffix 'friday' $now",
-        "(Build-WeeklyArguments '2026-27' 7 15 'rid' 'friday-20261016') -join ' '",
+        "(Build-WeeklyArguments 'friday' '2026-27' 7 15 'rid' 'friday-20261016' "
+        "'club-news-held') -join ' '",
     )
     run_id, suffix, arguments = out.splitlines()
     assert run_id == "2026-27-gw07-friday-20261016T0600Z"
@@ -129,8 +131,88 @@ def test_run_id_suffix_and_argument_line_follow_the_cadence() -> None:
     assert arguments == (
         "-m squadopt.platform.weekly_operations --season 2026-27 --gameweek 7 "
         "--league-list config/leagues.json --workers 15 --projection component-only "
-        "--rotation --record-advice --publish --publish-suffix friday-20261016 --run-id rid"
+        "--rotation --rotation-capture club-news-held --record-advice --publish "
+        "--publish-suffix friday-20261016 --run-id rid"
     )
+
+
+def test_friday_refuses_the_fixture_but_tuesday_keeps_its_existing_arguments() -> None:
+    out = _powershell(
+        "try { Build-WeeklyArguments 'friday' '2026-27' 8 15 'rid' 'friday' } "
+        "catch { Write-Output ('refused: ' + $_.Exception.Message) }",
+        "(Build-WeeklyArguments 'tuesday' '2026-27' 8 15 'rid' 'tuesday') -join ' '",
+    )
+    refused, tuesday = out.splitlines()
+    assert refused.startswith("refused: A Friday decision requires a real club-news capture")
+    assert "--rotation --record-advice" in tuesday
+    assert "--rotation-capture" not in tuesday
+
+
+@pytest.mark.parametrize("exit_code", [0, 1])
+def test_acquisition_requires_success_and_keeps_its_own_receipt(
+    tmp_path: Path, exit_code: int
+) -> None:
+    snapshots = tmp_path / "data" / "snapshots"
+    (snapshots / "fpl-live-held").mkdir(parents=True)
+    weekly_log = tmp_path / "weekly.log"
+    news_log = tmp_path / "weekly.club-news.log"
+    out = _powershell(
+        "function Fake-NewsPython { "
+        "if ($args -contains '--check-config') { "
+        "$global:LASTEXITCODE = 0; Write-Output 'Configuration valid'; return }; "
+        f"$global:LASTEXITCODE = {exit_code}; "
+        "Write-Output 'Raw claims    3'; Write-Output 'Capture       club-news-held' }",
+        f"try {{ Acquire-WeeklyNews 'Fake-NewsPython' '{tmp_path}' '' '{news_log}' }} "
+        "catch { Write-Output ('refused: ' + $_.Exception.Message) }",
+        f"Set-Content -LiteralPath '{weekly_log}' -Value 'Weekly run output'",
+    )
+    assert out == (
+        "club-news-held"
+        if exit_code == 0
+        else "refused: Club-news acquisition failed; the weekly decision was not started. "
+        "Read the club-news log."
+    )
+    assert "Configuration valid" in news_log.read_text(encoding="utf-8-sig")
+    assert "Raw claims    3" in news_log.read_text(encoding="utf-8-sig")
+    assert "Weekly run output" not in news_log.read_text(encoding="utf-8-sig")
+
+
+def test_missing_configuration_stops_before_any_page_is_requested(tmp_path: Path) -> None:
+    log = tmp_path / "club-news.log"
+    out = _powershell(
+        "function Fake-NewsPython { "
+        "if ($args -notcontains '--check-config') { throw 'A page was requested' }; "
+        "$global:LASTEXITCODE = 1; Write-Output 'Refused: API key is not configured' }",
+        f"try {{ Acquire-WeeklyNews 'Fake-NewsPython' '{tmp_path}' '' '{log}' }} "
+        "catch { Write-Output ('refused: ' + $_.Exception.Message) }",
+    )
+    assert "configuration failed its offline check; no news was requested" in out
+    assert "API key is not configured" in log.read_text(encoding="utf-8-sig")
+
+
+@pytest.mark.parametrize(
+    "kind,include,preview,expected,calls",
+    [
+        ("friday", False, False, "club-news-held", 1),
+        ("friday", False, True, "<club-news capture>", 0),
+        ("tuesday", False, False, "", 0),
+        ("tuesday", True, False, "club-news-held", 1),
+    ],
+)
+def test_the_default_friday_acquires_news_but_preview_and_normal_tuesday_do_not(
+    tmp_path: Path, kind: str, include: bool, preview: bool, expected: str, calls: int
+) -> None:
+    settings = tmp_path / "private.toml"
+    settings.write_text("# Synthetic configuration, never read by a provider.\n", encoding="ascii")
+    out = _powershell(
+        f"$env:SQUADOPT_CLUB_NEWS_SETTINGS = '{settings}'",
+        "$script:newsCalls = 0",
+        "function Acquire-WeeklyNews { $script:newsCalls += 1; return 'club-news-held' }",
+        f"$capture = Weekly-NewsCapture '{kind}' 'not-a-provider' '{tmp_path}' '' "
+        f"${str(include).lower()} ${str(preview).lower()} '{tmp_path / 'news.log'}'",
+        "Write-Output ('[' + $capture + ']'); Write-Output $script:newsCalls",
+    )
+    assert out.splitlines() == [f"[{expected}]", str(calls)]
 
 
 @pytest.mark.parametrize(

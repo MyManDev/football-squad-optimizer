@@ -1,0 +1,114 @@
+{
+  "contract": "conditional_role_temperature_research_v1",
+  "source_commit": "64362f2c06a1957ebaa12128ce74cd9157e0227f",
+  "measured_code_commit": "49b451ae011eba21e59a0932e3deea9333a1ca7d",
+  "full_gate_commit": "49b451ae011eba21e59a0932e3deea9333a1ca7d",
+  "docs_head_commit": "64362f2c06a1957ebaa12128ce74cd9157e0227f",
+  "operator_and_test_sha256": {
+    "math100-role-temperature.py": "ee9a92fbc564f1e0504162cd81c3c6e1de28b933c08e949a15d9941d34c47072",
+    "test_math100_role_temperature.py": "435baf0635d02a2128f10c2ba049dd5435e8294d66022a2a19583753ee732c8b"
+  },
+  "source_sha256": {
+    "scripts/measure_football_role_minutes.py": "5a3f3964c37aa29ce57a445fd6f7498b9a7b94b4cf2ff1299bbb82b3f896fd20",
+    "src/squadopt/application/football_live.py": "c934958666cb936aebf8e2ce82ec41ca5d6c99ec74723c73d6cc8eb77d1c7774",
+    "src/squadopt/data/sources/football_history.py": "dfad934c7cb6c1ca5ee6a7ca3e7574f25845e0257600fc95a109f5beb57ed84a",
+    "src/squadopt/prediction/football.py": "3e71ad27a941c004bc196ff8f12ac48d73187c541f52907d002718edc42a4f6c",
+    "src/squadopt/prediction/football_features.py": "af24356b989fc13c7f23940a01ea2371265c9bc5c7dddbd9b6c759e9ef2317b9",
+    "src/squadopt/prediction/football_minutes_role.py": "a4fd0f0e799b64a81429875593e549572d657218511a58f7b63d8b6e4e77530b"
+  },
+  "outer_origins": [
+    [
+      "2023-24",
+      11
+    ],
+    [
+      "2023-24",
+      19
+    ],
+    [
+      "2023-24",
+      27
+    ],
+    [
+      "2023-24",
+      35
+    ],
+    [
+      "2024-25",
+      11
+    ],
+    [
+      "2024-25",
+      19
+    ],
+    [
+      "2024-25",
+      27
+    ],
+    [
+      "2024-25",
+      35
+    ],
+    [
+      "2026-27",
+      1
+    ],
+    [
+      "2026-27",
+      2
+    ],
+    [
+      "2026-27",
+      3
+    ],
+    [
+      "2026-27",
+      4
+    ],
+    [
+      "2026-27",
+      5
+    ]
+  ],
+  "inner_validation": "last_four_settled_distinct_season_GW_groups_of_causal_train",
+  "inner_prefix": "before_first_validation_kickoff_minus_90m_and_plus3h_settled",
+  "support": {
+    "prefix_known_min": 100,
+    "validation_known_min": 100,
+    "validation_each_label_min": 10,
+    "prefix_classes_required": 2
+  },
+  "fallback": "T1_unavailable_without_support_or_with_wrong_deterministic_endpoint",
+  "objective": "stable_unfloored_conditional_binary_NLL",
+  "beta_bounds": [
+    0.5,
+    1.0
+  ],
+  "temperature_bounds": [
+    1.0,
+    2.0
+  ],
+  "bisections": 48,
+  "fit_cap": {
+    "outer": 13,
+    "inner_role": 13
+  },
+  "additional_full_model_fits": 0,
+  "acceptance": [
+    "ALL historical/current roleNLL and Brier nonworse",
+    "overall ALL roleNLL strict gain",
+    "each position historical/current/overall roleNLL and Brier at most1percent worse",
+    "ALL historical/current pointsMAE and minutesMAE nonworse"
+  ],
+  "no_retry_or_search_after_failure": true,
+  "promotion": false,
+  "development_assumption": "temperature learned on prefix role head transfers to refitted full outer role head",
+  "shared_q_caveat": "appearance error affects absolute NLL but cancels in paired conditional-role NLL differences",
+  "unchanged": [
+    "q",
+    "zero mass",
+    "role conditional minutes",
+    "other fitted heads"
+  ],
+  "external_evaluation_log_floor": 1e-12
+}
