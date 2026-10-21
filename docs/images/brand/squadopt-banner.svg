@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="320" viewBox="0 0 1200 320" role="img" aria-labelledby="title description">
+  <title id="title">SquadOpt</title>
+  <desc id="description">A football crest inspired by the red and green substitution-board mark, beside the SquadOpt wordmark and a formation on a pitch.</desc>
+  <rect width="1200" height="320" rx="16" fill="#ecf3e6"/>
+  <path d="M0 262H1200M0 278H1200M0 294H1200" stroke="#ddebd4" stroke-width="2"/>
+  <path d="M57 57H201V157C201 210 166 241 129 261C92 241 57 210 57 157Z" fill="#17402a"/>
+  <path d="M68 68H190V157C190 201 162 228 129 247C96 228 68 201 68 157Z" fill="none" stroke="#b9da93" stroke-width="2"/>
+  <rect x="87" y="101" width="84" height="43" rx="5" fill="#c62828"/>
+  <rect x="87" y="155" width="84" height="43" rx="5" fill="#1e7b45"/>
+  <path d="M145 122H111L121 112M111 122L121 132M113 177H147L137 167M147 177L137 187" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="249" y="116" fill="#56705f" font-family="Segoe UI,Arial,sans-serif" font-size="15" font-weight="600" letter-spacing="4">FANTASY PREMIER LEAGUE</text>
+  <text x="243" y="190" fill="#10261a" font-family="Segoe UI,Arial,sans-serif" font-size="72" font-weight="750" letter-spacing="-3">SquadOpt</text>
+  <text x="249" y="229" fill="#3d5a47" font-family="Segoe UI,Arial,sans-serif" font-size="20">Your squad. Your league. Your next decision.</text>
+  <g transform="translate(883 37)">
+    <rect width="252" height="246" rx="8" fill="#17402a"/>
+    <path d="M0 49H252M0 147H252" stroke="#1c4d32" stroke-width="49"/>
+    <g fill="none" stroke="#aec7a1" stroke-width="1.5" opacity=".65">
+      <rect x="17" y="17" width="218" height="212"/>
+      <path d="M17 123H235M77 17V56H175V17M91 17V35H161V17M77 229V190H175V229M91 229V211H161V229"/>
+      <circle cx="126" cy="123" r="27"/>
+    </g>
+    <g fill="#ecf3e6" stroke="#17402a" stroke-width="3">
+      <circle cx="126" cy="208" r="10"/>
+      <circle cx="57" cy="166" r="10"/><circle cx="103" cy="166" r="10"/><circle cx="149" cy="166" r="10"/><circle cx="195" cy="166" r="10"/>
+      <circle cx="66" cy="104" r="10"/><circle cx="126" cy="104" r="10"/><circle cx="186" cy="104" r="10"/>
+      <circle cx="66" cy="48" r="10"/><circle cx="126" cy="48" r="10"/><circle cx="186" cy="48" r="10"/>
+    </g>
+    <circle cx="126" cy="48" r="10" fill="#d4eb79" stroke="#17402a" stroke-width="3"/>
+  </g>
+</svg>

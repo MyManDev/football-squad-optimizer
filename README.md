@@ -1,15 +1,63 @@
 # SquadOpt
 
-SquadOpt turns captured Fantasy Premier League data into reproducible squad decisions and
-published league-member views. It combines a Python decision engine, a React member website
-and an optional advice API with independent workers.
+<p align="center">
+  <img src="docs/images/brand/squadopt-banner.svg" alt="SquadOpt: a football crest, a substitution board and a pitch" width="100%" />
+</p>
 
-Start with the [architecture overview](ARCHITECTURE.md), the
-[documentation guide](docs/README.md), the
-[current system map](docs/architecture/system_map.md) or the
-[product and research roadmap](docs/product/roadmap.md).
+<p align="center">
+  <a href="https://github.com/MyManDev/football-squad-optimizer/actions/workflows/ci.yml"><img src="https://github.com/MyManDev/football-squad-optimizer/actions/workflows/ci.yml/badge.svg?branch=develop" alt="CI on develop" /></a>
+  <img src="https://img.shields.io/badge/Python-3.11%2B-17402a?style=flat-square" alt="Python 3.11 and newer" />
+  <img src="https://img.shields.io/badge/React-19-17402a?style=flat-square" alt="React 19" />
+  <img src="https://img.shields.io/badge/Node.js-22-17402a?style=flat-square" alt="Node.js 22" />
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-17402a?style=flat-square" alt="MIT license" /></a>
+</p>
+
+<p align="center">
+  <a href="https://squadopt.mymandev.com">Open SquadOpt</a> ·
+  <a href="#development">Get started</a> ·
+  <a href="ARCHITECTURE.md">Architecture</a> ·
+  <a href="docs/README.md">Documentation</a> ·
+  <a href="CONTRIBUTING.md">Contribute</a>
+</p>
+
+**A Fantasy Premier League decision workspace, from captured data to the squad on the pitch.**
+
+SquadOpt brings transfers, captain choices, fixtures and league results into one member
+website. A Python decision engine builds reproducible weekly plans; React and TypeScript
+present them, and a Web Worker running HiGHS computes supported one-week plans on the
+member's device. The optional advice API and its workers serve additional requests.
+
+| Plan your week | Follow your league | Trace every decision |
+| --- | --- | --- |
+| Squad and bench on the pitch, transfer boards, captain choices and fixtures | Member views, the league table, settled history and the league race | Captured inputs, versioned contracts, provenance and offline verification |
+
+The currently published league is **352490**. Enter its number on the site, choose your
+member, and open your squad. The member selection is a navigation preference, not an account
+or authentication system. The [league list](config/leagues.json) and published capabilities
+define what is available; the [roadmap](docs/product/roadmap.md#current-position) records the
+product's scope and evidence.
+
+## How it fits together
+
+```text
+Captured FPL inputs
+        |
+        v
+Python application + decision engine
+        |
+        v
+Versioned weekly publication -----> React member website
+                                         |          |
+                              One-week device    Optional advice
+                              worker (HiGHS)     API + workers
+```
+
+The product and the research laboratory share a repository with enforced import boundaries.
+Research records document measured results; installing research code does not activate a
+model. Start with the [architecture overview](ARCHITECTURE.md),
+[documentation guide](docs/README.md) or [system map](docs/architecture/system_map.md).
 [ADR 0007](docs/architecture/decisions/0007-enterprise-transition.md) records the enterprise
-transition: what it changed, what was accepted and what still waits on a real environment.
+transition and its acceptance boundaries.
 
 ## Repository layout
 
@@ -59,6 +107,11 @@ historical record paths also appear in code and provenance.
 
 ## Development
 
+**Python 3.11+ · Node.js 22 · npm · Git worktrees**
+
+Use a worktree for changes and keep the main checkout on `develop` clean. See the
+[worktree rule below](#do-the-work-in-a-worktree-not-in-this-checkout) before editing.
+
 Python 3.11 is the supported floor. Python 3.13 with `constraints.txt` reproduces the pinned
 package versions used by the container and measurement checks:
 
@@ -69,8 +122,17 @@ python -m venv .venv
 ```
 
 For Python 3.11, install the declared ranges without `-c constraints.txt`. For the website,
-use Node 22, run `npm ci` in `web/`, then `npm run dev`. See
-[Contributing](CONTRIBUTING.md) and the [web guide](web/README.md) for the checks CI runs.
+use Node 22:
+
+```console
+cd web
+npm ci
+npm run dev
+```
+
+The checked-in publication supplies the member website's data. The frontend does not need
+a live backend for its static views or supported device plans. See
+[Contributing](CONTRIBUTING.md) and the [web guide](web/README.md) for the complete CI checks.
 
 ### Do the work in a worktree, not in this checkout
 
@@ -81,6 +143,9 @@ git worktree add .codex-tmp/worktrees/<name> -b <branch> origin/develop
 ```
 
 Two reasons, and both have already cost time.
+
+<details>
+<summary>Why the main checkout must stay clean and the branch must start from origin/develop</summary>
 
 **The weekly run executes from this checkout and refuses three ways.** A modified tree raises
 `Weekly evidence requires a clean source checkout`. A `HEAD` that is not the declared revision
@@ -104,6 +169,8 @@ A worktree is cheap and disposable. `git worktree remove <path>` when the branch
 never delete a directory another worktree is using: on Windows a recursive delete follows
 directory junctions and takes the target's contents with it, which is how the live captures were
 lost on 2026-09-10.
+
+</details>
 
 ## Running the system
 
