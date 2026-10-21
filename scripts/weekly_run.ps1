@@ -17,16 +17,19 @@ publishes, tags, deploys or restarts anything.
   powershell -ExecutionPolicy Bypass -File scripts\weekly_run.ps1 -Kind friday -Gameweek 8
   powershell -ExecutionPolicy Bypass -File scripts\weekly_run.ps1 -Kind friday -ClubNewsSettings C:\private\club-news.settings.toml
 
-With -ClubNewsSettings (or the SQUADOPT_CLUB_NEWS_SETTINGS environment variable) the script
-first acquires the week's club news (scripts.capture_club_news, which fetches the registered
-club pages and codes them with the model named in that private file) from the newest capture's
+Every Friday run first acquires the week's club news. Use -ClubNewsSettings (or the
+SQUADOPT_CLUB_NEWS_SETTINGS environment variable) for the private settings file.
+The script runs scripts.capture_club_news, which fetches the registered
+club pages and codes them with the configured model, from the newest capture's
 roster, and passes the new capture to the weekly command as --rotation-capture, so the
 manager's word rides on real news instead of the committed fixture. -ClubNews does the same
 with no file, from the shell's own SQUADOPT_LLM_PROVIDER, SQUADOPT_LLM_API_KEY and optional
 SQUADOPT_LLM_MODEL (set them in the window that runs this script; the script never prints
 them). A capture that produces no id is a refusal: the run does not fall back to the fixture
 silently, because a published week without the word is exactly what the option exists to
-prevent.
+prevent. Acquisition output is kept in <run id>.club-news.log, separately from the weekly
+command's <run id>.log, so starting the weekly command cannot overwrite the news receipt.
+Tuesday keeps its existing cadence; -ClubNews or -ClubNewsSettings opts it into acquisition.
 
 The exit code is the weekly command's (0 when the run completed and the site pull request
 is open), 2 for a refusal before anything ran. A Tuesday run is the next gameweek's run
@@ -73,7 +76,10 @@ function Weekly-Suffix([string]$kind, [datetime]$now) {
     return ('{0}-{1}' -f $kind, $now.ToUniversalTime().ToString('yyyyMMdd'))
 }
 
-function Build-WeeklyArguments([string]$season, [int]$gameweek, [int]$workers, [string]$runId, [string]$suffix, [string]$rotationCapture = '') {
+function Build-WeeklyArguments([string]$kind, [string]$season, [int]$gameweek, [int]$workers, [string]$runId, [string]$suffix, [string]$rotationCapture = '') {
+    if ($kind -eq 'friday' -and -not $rotationCapture) {
+        throw 'A Friday decision requires a real club-news capture; the example fixture cannot be published instead.'
+    }
     # The cadence's arguments, as the 10 and 14 October publishes ran them; a club-news
     # capture, when one was acquired, is what the rotation stage reads instead of the fixture.
     $arguments = @(
@@ -108,6 +114,36 @@ function Captured-NewsId([string[]]$lines) {
         if ($line -match '^Capture\s+(club-news-\S+)') { return $Matches[1] }
     }
     return ''
+}
+
+function Acquire-WeeklyNews([string]$python, [string]$repo, [string]$settings, [string]$newsLog) {
+    $configuration = @('-m', 'scripts.capture_club_news', '--check-config')
+    if ($settings) { $configuration += @('--settings-file', $settings) }
+    $checkLines = @(& $python @configuration 2>&1 | ForEach-Object { [string]$_ })
+    $checkExit = $LASTEXITCODE
+    $checkLines | Set-Content -LiteralPath $newsLog -Encoding UTF8
+    if ($checkExit -ne 0) {
+        throw 'Club-news configuration failed its offline check; no news was requested. Read the club-news log.'
+    }
+    $roster = Latest-Capture $repo
+    $arguments = @('-m', 'scripts.capture_club_news', '--roster-snapshot', $roster)
+    if ($settings) { $arguments += @('--settings-file', $settings) }
+    $newsLines = @(& $python @arguments 2>&1 | ForEach-Object { [string]$_ })
+    $newsExit = $LASTEXITCODE
+    $newsLines | Add-Content -LiteralPath $newsLog -Encoding UTF8
+    if ($newsExit -ne 0) { throw 'Club-news acquisition failed; the weekly decision was not started. Read the club-news log.' }
+    $capture = Captured-NewsId $newsLines
+    if (-not $capture) { throw 'Club-news acquisition produced no capture id; the weekly decision was not started.' }
+    return $capture
+}
+
+function Weekly-NewsCapture([string]$kind, [string]$python, [string]$repo, [string]$settings, [bool]$includeNews, [bool]$preview, [string]$newsLog) {
+    if ($kind -ne 'friday' -and -not $includeNews -and -not $settings) { return '' }
+    if (-not $settings) { $settings = $env:SQUADOPT_CLUB_NEWS_SETTINGS }
+    if (-not $settings) { $settings = [Environment]::GetEnvironmentVariable('SQUADOPT_CLUB_NEWS_SETTINGS', 'User') }
+    if ($settings -and -not (Test-Path -LiteralPath $settings)) { throw "Club-news settings file not found at $settings." }
+    if ($preview) { return '<club-news capture>' }
+    return (Acquire-WeeklyNews $python $repo $settings $newsLog)
 }
 
 function Suggested-Tag([string]$kind, [string]$season, [int]$gameweek, [string[]]$existingTags) {
@@ -162,29 +198,15 @@ $python = Join-Path $RepoRoot '.venv\Scripts\python.exe'
 $logDirectory = Join-Path $RepoRoot 'data\logs\weekly'
 New-Item -ItemType Directory -Force -Path $logDirectory | Out-Null
 $log = Join-Path $logDirectory ($runId + '.log')
-if (-not $ClubNewsSettings -and $env:SQUADOPT_CLUB_NEWS_SETTINGS) { $ClubNewsSettings = $env:SQUADOPT_CLUB_NEWS_SETTINGS }
-$rotationCapture = ''
-if ($ClubNewsSettings -or $ClubNews) {
-    if ($ClubNewsSettings -and -not (Test-Path -LiteralPath $ClubNewsSettings)) { Write-Output "Refused: club-news settings file not found at $ClubNewsSettings."; exit 2 }
-    if (-not $ClubNewsSettings -and -not ($env:SQUADOPT_LLM_PROVIDER -and $env:SQUADOPT_LLM_API_KEY)) {
-        Write-Output 'Refused: -ClubNews needs SQUADOPT_LLM_PROVIDER and SQUADOPT_LLM_API_KEY in this window (never printed, never committed).'; exit 2
-    }
-    if (-not $DryRun) {
-        $roster = Latest-Capture $RepoRoot
-        Write-Output ("club news: acquiring from the roster of {0}" -f $roster)
-        $env:PYTHONPATH = (Join-Path $RepoRoot 'src') + ';' + $RepoRoot
-        $newsArguments = @('-m', 'scripts.capture_club_news', '--roster-snapshot', $roster)
-        if ($ClubNewsSettings) { $newsArguments += @('--settings-file', $ClubNewsSettings) }
-        $newsLines = @(& $python @newsArguments 2>&1 | ForEach-Object { [string]$_ })
-        $newsLines | Add-Content -LiteralPath $log
-        $rotationCapture = Captured-NewsId $newsLines
-        if (-not $rotationCapture) { Write-Output 'Refused: the club-news acquisition produced no capture id; read the log, fix the cause, and run again.'; Write-Output ("log: {0}" -f $log); exit 2 }
-        Write-Output ("club news: capture {0}" -f $rotationCapture)
-    } else {
-        $rotationCapture = '<club-news capture>'
-    }
+$newsLog = Join-Path $logDirectory ($runId + '.club-news.log')
+$env:PYTHONPATH = (Join-Path $RepoRoot 'src') + ';' + $RepoRoot
+try { $rotationCapture = Weekly-NewsCapture $Kind $python $RepoRoot $ClubNewsSettings ([bool]$ClubNews) ([bool]$DryRun) $newsLog }
+catch { Write-Output ("Refused: {0}" -f $_.Exception.Message); Write-Output ("club-news log: {0}" -f $newsLog); exit 2 }
+if ($rotationCapture -and -not $DryRun) {
+    Write-Output ("club news: capture {0}" -f $rotationCapture)
+    Write-Output ("club-news log: {0}" -f $newsLog)
 }
-$arguments = Build-WeeklyArguments $season $Gameweek $Workers $runId $suffix $rotationCapture
+$arguments = Build-WeeklyArguments $Kind $season $Gameweek $Workers $runId $suffix $rotationCapture
 $tags = @(& git -C $RepoRoot ls-remote --tags origin ('site-{0}-gw*' -f $season) | ForEach-Object { ($_ -split '\s+')[1] -replace '^refs/tags/', '' } | Where-Object { $_ -notmatch '\^\{\}$' })
 $tag = Suggested-Tag $Kind $season $Gameweek $tags
 
