@@ -76,6 +76,7 @@ function Plate({
   changed,
   clubColours,
   news,
+  onSelectPlayer,
 }: {
   player: PitchPlayer;
   codes: ClubCodes;
@@ -83,8 +84,9 @@ function Plate({
   changed: boolean;
   clubColours: boolean;
   news?: CoachAbsence;
+  onSelectPlayer?: (id: number) => void;
 }) {
-  const { locale, messages } = useLanguage();
+  const { language, locale, messages } = useLanguage();
   const code = clubCode(player.team, codes);
   const swatch = clubSwatch(code);
   // In club colours the plate takes its club's fill and one readable text colour (#1136).
@@ -101,6 +103,14 @@ function Plate({
           : undefined
       }
     >
+      {onSelectPlayer ? (
+        <button
+          type="button"
+          className={styles.playerButton}
+          aria-label={`${player.name}: ${language === "tr" ? "Oyuncu ayrıntıları" : "Player details"}`}
+          onClick={() => onSelectPlayer(player.playerId)}
+        />
+      ) : null}
       <span className={styles.name} title={player.name}>
         {swatch ? (
           <span
@@ -184,6 +194,7 @@ export function MemberPitch({
   codes,
   modelChange = null,
   news,
+  onSelectPlayer,
 }: {
   players: PitchPlayer[];
   codes: ClubCodes;
@@ -194,6 +205,7 @@ export function MemberPitch({
    */
   modelChange?: PlateChange;
   news?: ReadonlyMap<number, CoachAbsence>;
+  onSelectPlayer?: (id: number) => void;
 }) {
   const { messages } = useLanguage();
   const copy = messages.leagueMembers;
@@ -266,13 +278,16 @@ export function MemberPitch({
                     style={{ "--i": index } as CSSProperties}
                     data-model-changed={modelChange?.changed.has(player.playerId) ? "" : undefined}
                   >
-                    <Plate
-                      player={player}
-                      codes={codes}
-                      clubColours={look.clubColours}
-                      news={news?.get(player.playerId)}
-                      changed={modelChange?.changed.has(player.playerId) ?? false}
-                    />
+                    <div data-player-motion={player.playerId}>
+                      <Plate
+                        player={player}
+                        codes={codes}
+                        clubColours={look.clubColours}
+                        news={news?.get(player.playerId)}
+                        changed={modelChange?.changed.has(player.playerId) ?? false}
+                        onSelectPlayer={onSelectPlayer}
+                      />
+                    </div>
                     {line.position === labelLine && index === 0 ? <AttackLabel at="first" /> : null}
                     {line.position === "DEF" && defenders >= 4 && index === defenders - 1 ? (
                       <AttackLabel at="last" />
@@ -310,13 +325,15 @@ export function MemberBench({
   codes,
   modelChange = null,
   news,
+  onSelectPlayer,
 }: {
   players: BenchPlayer[];
   codes: ClubCodes;
   modelChange?: PlateChange;
   news?: ReadonlyMap<number, CoachAbsence>;
+  onSelectPlayer?: (id: number) => void;
 }) {
-  const { locale, messages } = useLanguage();
+  const { language, locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
   const titleId = useId();
   if (players.length === 0) return null;
@@ -337,6 +354,7 @@ export function MemberBench({
                 key={player.playerId}
                 className={styles.benchItem}
                 data-model-changed={changed ? "" : undefined}
+                data-player-motion={player.playerId}
               >
                 <span className={styles.benchOrder}>{player.order ?? "-"}</span>
                 <strong className={styles.benchName} data-plate="">
@@ -380,6 +398,14 @@ export function MemberBench({
                       <CoachNewsMark news={news.get(player.playerId)!} name={player.name} />
                     ) : null}
                   </span>
+                ) : null}
+                {onSelectPlayer ? (
+                  <button
+                    type="button"
+                    className={styles.playerButton}
+                    aria-label={`${player.name}: ${language === "tr" ? "Oyuncu ayrıntıları" : "Player details"}`}
+                    onClick={() => onSelectPlayer(player.playerId)}
+                  />
                 ) : null}
               </li>
             );

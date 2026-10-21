@@ -14,6 +14,7 @@ windows still come from the advice backend. The weekly run takes its leagues fro
 | --- | --- |
 | Which product and research phases are implemented or gated? | [Product roadmap](roadmap.md) |
 | How is the frontend developed and checked? | [Web README](../../web/README.md) |
+| What opens from a player plate, and when do players move? | [Player details and pitch movement](player_details.md) |
 | What does a member's rank movement compare? | [Captured rank movement](member_rank_movement.md) |
 | Which strategy hypotheses are being tested? | [Strategy screening declaration](../strategy_screening_prereg.md) |
 | What was measured for strategy behavior? | [Strategy bench record](../strategy_bench.md) and [declaration](../strategy_bench_prereg.md) |
