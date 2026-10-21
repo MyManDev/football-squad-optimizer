@@ -1174,7 +1174,12 @@ def record_member_advice(root: Path, record: Mapping[str, object]) -> Path:
         landed = False
         try:
             Path(addressable(staging / RECORD_FILE)).write_bytes(payload)
-            write_manifest(staging, contract_version=str(record["contract_version"]))
+            write_manifest(
+                staging,
+                contract_version=str(
+                    record.get("contract_version", MEMBER_ADVICE_RECORD_CONTRACT_VERSION)
+                ),
+            )
             verify_manifest(staging)
             # One rename: the record exists complete or does not exist at all. Windows
             # refuses that rename while anything still holds a handle on the bytes written

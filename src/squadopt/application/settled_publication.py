@@ -47,6 +47,10 @@ from squadopt.application.weekly_suggestion_eval import (
 )
 from squadopt.contracts.league_publication_identity import IDENTITY_FILE
 from squadopt.contracts.league_tree import LEAGUE_DIRECTORY_FILE, find_league_tree
+from squadopt.contracts.legacy_publication_config import (
+    APPROVED_SETTLED_PUBLICATION,
+    LEGACY_ADVICE_LEAGUE_ID,
+)
 from squadopt.data.atomic import replace_retrying
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import CapturedSnapshot, read_snapshot
@@ -83,7 +87,7 @@ class SettledPublicationRequest:
     out_dir: Path
     season: str
     gameweek: int
-    league_id: int = 352490
+    league_id: int = LEGACY_ADVICE_LEAGUE_ID
 
 
 @dataclass(frozen=True, slots=True)
@@ -160,8 +164,11 @@ def _allowed(name: str, request: SettledPublicationRequest) -> bool:
 def _preflight(
     request: SettledPublicationRequest,
 ) -> tuple[dict[str, bytes], dict[str, Any], CapturedSnapshot, dict[int, EntryGameweekPoints]]:
-    if (request.season, request.gameweek, request.league_id) != ("2026-27", 5, 352490):
-        raise DataError("This approved publisher is limited to 2026-27 GW5, league 352490.")
+    if (request.season, request.gameweek, request.league_id) != APPROVED_SETTLED_PUBLICATION:
+        season, week, league = APPROVED_SETTLED_PUBLICATION
+        raise DataError(
+            f"This approved publisher is limited to {season} GW{week}, league {league}."
+        )
     out = request.out_dir.resolve()
     inputs = (
         request.accepted_dir,

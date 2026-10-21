@@ -8,4 +8,6 @@ This record makes no claim about a published page address or exact page bytes. I
 
 Storage retains the existing create-once and replay rules. A later capture has its own directory; a second write to the same key must reproduce the recorded decision. The manifest identifies this contract. Legacy `member_advice_record_v2` publication records remain readable with their original league identity and are never rewritten as baselines.
 
-The record builder and settled reader support this contract. The weekly run must supply the server baseline once per distinct entry and capture when it adopts the new record path; page output is not an input to this builder.
+The weekly run computes one CP-SAT baseline per distinct tracked entry before rendering any league. Full menus reuse that control; device menus need no member solver during rendering. The writer lands a record in `data/member_baselines/<season>/gw<NN>/entry-<id>/<capture>/` after that member's page is emitted. A second league reuses the immutable record. Missing picks are named in the run receipt.
+
+History reads both this store and the retained `data/advice_records` archive. For the same entry and capture, the original league keeps its legacy publication record and digest. Another league reads the independent baseline. Neither store may silently hide a corrupt record; all previously published weeks must remain present when a history is replaced.
