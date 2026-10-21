@@ -313,7 +313,7 @@
   display: none;
 }
 
-/* Upright, YENÄ° and the armband stand centred over their own plate, outside it, so a
+/* Upright, YENİ and the armband stand centred over their own plate, outside it, so a
    narrow plate keeps its name and a tag never reads as the next plate's. Where a plate
    carries both, they stand side by side about its centre. */
 .new,
@@ -555,7 +555,7 @@
     display: none;
   }
 
-  /* Across, two lines: the name, then the club, YENÄ° and the figure. */
+  /* Across, two lines: the name, then the club, YENİ and the figure. */
   .plate {
     grid-template-columns: auto auto minmax(0, 1fr) auto;
     grid-template-areas:
