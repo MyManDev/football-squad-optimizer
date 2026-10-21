@@ -78,7 +78,7 @@ These are scoped follow-up investigations, not claims of verified vulnerabilitie
 | 1 | Dependency and release supply chain: `.github/`, `constraints.txt`, `pyproject.toml`, `web/package-lock.json`, `Dockerfile` | Inventory direct/transitive runtime and build dependencies, run advisory checks against the actual locks, and review secret permissions and untrusted PR execution. Separate confirmed advisories from update suggestions; gate on actionable findings with a documented exception process. Existing Dependabot config currently updates Actions only. Coordinate lock changes with the frontend owner. |
 | 2 | Publication privacy and provenance: `platform/operations`, publication commands and release packaging | Trace every private input to the public JSON/artifact allowlist, and demonstrate that secrets, raw visitor identity and private runtime paths cannot be packaged. Add adversarial fixtures where a concrete missing guard is found. Verify the immutable tag/artifact and rollback path using synthetic inputs. |
 | 3 | Operational data recovery: backup commands, SQLite inbox and deployment mounts | Verify what backs up captures, ledger and the inbox; exercise a consistent SQLite backup and restore with active writes in an isolated environment. State the measured recovery result and any missing production configuration. Existing Git/CI artifacts are not evidence of private-data recovery. |
-| 4 | Remaining public API exposure, while it is served: API runtime, proxy launchers and deployment ingress | Verify actual trusted proxy peers, public route/metrics exposure, size/time/concurrency limits and quota behavior across restarts/replicas. Keep application and edge limits explicit; test with a local deployment. Avoid expanding the retiring backend. |
+| 4 | Remaining public API exposure, while it is served: API runtime, proxy launchers and deployment ingress | Verify actual trusted proxy peers, public route/metrics exposure, size/time/concurrency limits and quota behavior across restarts/replicas. Keep application and edge limits explicit; test with a local deployment. Preserve the VM operating model until a new hosting decision. |
 
 The table retains the security follow-ups identified on 18 October. At the owner's backlog
 cleanup on 21 October, new work planning is deferred until the existing work is closed.
@@ -105,3 +105,7 @@ Final full result: **14,181 passed, 33 skipped, zero failures** in 766.76 second
 include historical-capture-specific fixtures, optional dependencies and opt-in browser,
 capacity and container acceptance. The remaining warnings are the existing history date
 parsing and Gaussian-process convergence warnings in unrelated tests.
+
+The figures above are the 18 October verification. The 21 October cleanup rebases this
+slice onto current develop and records its fresh checks in
+[PR #1181](https://github.com/MyManDev/football-squad-optimizer/pull/1181).
