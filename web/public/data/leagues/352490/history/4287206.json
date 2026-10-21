@@ -741,7 +741,18 @@
         "actual": {
           "gross_points": 75.0,
           "transfer_hit_points": 0.0,
-          "net_points": 75.0
+          "net_points": 75.0,
+          "details": {
+            "source_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd",
+            "captain": {
+              "player_id": 244851,
+              "name": "Palmer",
+              "points": 8.0,
+              "multiplier": 2,
+              "counted_points": 16.0
+            },
+            "transfers": []
+          }
         },
         "actual_reason": null,
         "net_difference": -4.0,
@@ -1550,7 +1561,29 @@
         "actual": {
           "gross_points": 31.0,
           "transfer_hit_points": 0.0,
-          "net_points": 31.0
+          "net_points": 31.0,
+          "details": {
+            "source_snapshot_id": "fpl-live-20261010T035732Z-c77d032165af",
+            "captain": {
+              "player_id": 244851,
+              "name": "Palmer",
+              "points": 2.0,
+              "multiplier": 2,
+              "counted_points": 4.0
+            },
+            "transfers": [
+              {
+                "player_out": "Cunha",
+                "player_in": {
+                  "player_id": 466052,
+                  "name": "Cherki",
+                  "points": 8.0,
+                  "multiplier": 1,
+                  "counted_points": 8.0
+                }
+              }
+            ]
+          }
         },
         "actual_reason": null,
         "net_difference": 9.0,
@@ -1790,7 +1823,8 @@
         "actual": {
           "gross_points": 81.0,
           "transfer_hit_points": 0.0,
-          "net_points": 81.0
+          "net_points": 81.0,
+          "details": null
         },
         "actual_reason": null,
         "net_difference": -2.0,

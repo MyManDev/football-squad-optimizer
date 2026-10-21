@@ -27,6 +27,52 @@ test.describe("a first visit", () => {
     const entry = MESSAGES[language].leagueEntry;
     const picker = MESSAGES[language].memberPicker;
 
+    test(`an unpublished address keeps its number and another valid league remains usable in ${language}`, async ({
+      page,
+    }) => {
+      await page.addInitScript(
+        ({ language, league }) => {
+          localStorage.setItem("squadopt.language", language);
+          localStorage.setItem("squadopt.league", String(league));
+        },
+        { language, league: LEAGUE },
+      );
+      await servePublished(page);
+      await page.route("**/data/leagues.json", (route) =>
+        route.fulfill({
+          contentType: "application/json",
+          body: JSON.stringify({
+            contract_version: "league_directory_v1",
+            payload: {
+              leagues: [
+                null,
+                {
+                  league_id: LEAGUE,
+                  league_name: published.payload.league_name,
+                  season: published.payload.season,
+                  gameweek: published.payload.gameweek,
+                  path: "league",
+                },
+              ],
+            },
+          }),
+        }),
+      );
+      const address = `/league/123456/members/${member.entry_id}?mode=saf-puan`;
+      await page.goto(address);
+      await expect(page.getByLabel(entry.label)).toHaveValue("123456");
+      await expect(page.getByRole("status")).toHaveText(entry.unsupported(123456));
+      await expect(page).toHaveURL(address);
+      expect(await page.evaluate(() => localStorage.getItem("squadopt.league"))).toBe(
+        String(LEAGUE),
+      );
+
+      await page.getByLabel(entry.label).fill(String(LEAGUE));
+      await page.getByRole("button", { name: entry.submit }).click();
+      await expect(page.getByRole("heading", { level: 1, name: picker.title })).toBeVisible();
+      await expect(page).toHaveURL(`/league/${LEAGUE}/members`);
+    });
+
     test(`a direct link from before the league number asks for the number first in ${language}`, async ({
       page,
     }) => {

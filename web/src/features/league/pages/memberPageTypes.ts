@@ -32,6 +32,8 @@ export interface ShownAdvice {
 export interface LeagueMemberViewProps {
   squad: LeagueViewEnvelope<EntrySquad>;
   advice: LeagueViewEnvelope<EntryAdvice> | null;
+  /** Published coach statements, independent of the selected plan or its news switch. */
+  coachNews?: LeagueViewEnvelope<EntryAdvice> | null;
   adviceIssue?: AdviceIssue;
   adviceLoading?: boolean;
   membersIssue?: "missing" | "unavailable";

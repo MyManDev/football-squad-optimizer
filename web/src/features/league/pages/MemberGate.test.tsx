@@ -13,6 +13,7 @@ import { MemoryRouter, Route, Routes, useLocation, useNavigationType } from "rea
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PageShell } from "../../../design/components/PageShell";
+import { MOTION_MS } from "../../../design/motion";
 import { mockLeagueMembersEnvelope } from "../../../fixtures/league";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { MESSAGES, type Language } from "../../../i18n/messages";
@@ -33,7 +34,7 @@ import {
 } from "../../../testSupport/league";
 import { LeagueDataError, LeagueDataMissing, type LeagueTree } from "../data";
 import type { PublishedLeague } from "../directory";
-import { readMemberClaim } from "../identity/memberClaim";
+import { readMemberClaim, writeMemberClaim } from "../identity/memberClaim";
 import type { EntryView, LeagueMembers, LeagueViewEnvelope } from "../types";
 import { MemberGate } from "./MemberGate";
 
@@ -580,12 +581,15 @@ describe("the step's words", () => {
 
 describe("the step from the picker to the page (#1131)", () => {
   let started: Array<Promise<void> | void> = [];
+  let startedAt: number[] = [];
   beforeEach(() => {
     started = [];
+    startedAt = [];
     Object.defineProperty(document, "startViewTransition", {
       configurable: true,
       writable: true,
       value: vi.fn((update: () => Promise<void> | void) => {
+        startedAt.push(performance.now());
         started.push(update());
         return {};
       }),
@@ -596,11 +600,19 @@ describe("the step from the picker to the page (#1131)", () => {
     delete (window as { matchMedia?: unknown }).matchMedia;
   });
 
-  async function pickAndConfirm() {
+  async function pickAndConfirm(name = /Seda Kaya/) {
     const user = userEvent.setup();
     const group = await picker("tr");
-    await user.click(within(group).getByRole("radio", { name: /Seda Kaya/ }));
+    await user.click(within(group).getByRole("radio", { name }));
     await user.click(screen.getByRole("button", { name: "Onayla" }));
+  }
+
+  function reduceMotion() {
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      writable: true,
+      value: (query: string) => ({ matches: query === "(prefers-reduced-motion: reduce)" }),
+    });
   }
 
   it("crossfades into the page asked for, the claim made inside the transition", async () => {
@@ -619,23 +631,85 @@ describe("the step from the picker to the page (#1131)", () => {
     });
     await pickAndConfirm();
     expect(document.startViewTransition).toHaveBeenCalledOnce();
+    let settledAt = Number.POSITIVE_INFINITY;
     await act(async () => {
       await started[0];
+      settledAt = performance.now();
     });
     // When the new picture is taken, the router is already on the visitor's page.
     expect(where()).toBe(memberAddress(LEAGUE, 35249003));
     expect(screen.getByRole("heading", { name: "Own page" })).toBeInTheDocument();
+    // The page's arrival ends the wait, not the data time that caps it.
+    expect(settledAt - startedAt[0]).toBeLessThan(MOTION_MS.data);
+  });
+
+  it("takes one step for two confirms made before the first one's update runs", async () => {
+    const waiting: Array<() => Promise<void> | void> = [];
+    Object.defineProperty(document, "startViewTransition", {
+      configurable: true,
+      writable: true,
+      value: vi.fn((update: () => Promise<void> | void) => {
+        waiting.push(update);
+        return {};
+      }),
+    });
+    const writes = vi.spyOn(Storage.prototype, "setItem");
+    const keys: string[] = [];
+    function Page() {
+      const { key } = useLocation();
+      useEffect(() => {
+        keys.push(key);
+      }, [key]);
+      return <h1>League page</h1>;
+    }
+    open({ page: <Page /> });
+    const user = userEvent.setup();
+    const group = await picker("tr");
+    const before = probe().dataset.key;
+    await user.click(within(group).getByRole("radio", { name: /Seda Kaya/ }));
+    const button = screen.getByRole("button", { name: "Onayla" });
+    await user.click(button);
+    await user.click(button);
+    expect(document.startViewTransition).toHaveBeenCalledOnce();
+    await act(async () => {
+      for (const update of waiting) await update();
+    });
+    expect(writes.mock.calls.filter(([name]) => name === "squadopt.member")).toHaveLength(1);
+    // The page is drawn under the address's first key, then under the one key the step
+    // replaces it with.
+    expect(keys.filter((key) => key !== before)).toHaveLength(1);
+    expect(probe().dataset.type).toBe("REPLACE");
+    expect(screen.getByRole("heading", { name: "League page" })).toBeInTheDocument();
   });
 
   it("changes at once under reduced motion", async () => {
-    Object.defineProperty(window, "matchMedia", {
-      configurable: true,
-      writable: true,
-      value: (query: string) => ({ matches: query === "(prefers-reduced-motion: reduce)" }),
-    });
+    reduceMotion();
     open();
     await pickAndConfirm();
     expect(document.startViewTransition).not.toHaveBeenCalled();
     expect(await screen.findByRole("heading", { name: "League page" })).toBeInTheDocument();
   });
+
+  it.each(["with a transition", "without the API", "under reduced motion"] as const)(
+    "takes the step again once the member is dropped, %s",
+    async (path) => {
+      if (path === "without the API") {
+        delete (document as { startViewTransition?: unknown }).startViewTransition;
+      }
+      if (path === "under reduced motion") reduceMotion();
+      open();
+      await pickAndConfirm();
+      await act(async () => {
+        await Promise.all(started);
+      });
+      expect(readMemberClaim()?.entryId).toBe(35249003);
+      // The first step's update has run, so the second Onayla is not taken for a repeat.
+      act(() => writeMemberClaim(null));
+      await pickAndConfirm(/Mert Işık/);
+      await act(async () => {
+        await Promise.all(started);
+      });
+      expect(readMemberClaim()?.entryId).toBe(35249002);
+    },
+  );
 });

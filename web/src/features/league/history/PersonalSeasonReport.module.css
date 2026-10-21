@@ -1,0 +1,80 @@
+.report {
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-surface);
+  min-width: 0;
+}
+
+.report > summary {
+  min-height: 44px;
+  padding: var(--space-3) var(--space-4);
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.weeks {
+  display: grid;
+  gap: var(--space-5);
+  padding: var(--space-4);
+}
+
+.week {
+  min-width: 0;
+}
+
+.week h2,
+.week h3 {
+  font-family: var(--font-display);
+  margin: 0 0 var(--space-2);
+}
+
+.week h3 {
+  font-size: var(--step-1);
+  margin-top: var(--space-4);
+}
+
+.totals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3) var(--space-5);
+  margin: 0;
+}
+
+.totals dt,
+.basis {
+  color: var(--color-text-muted);
+}
+
+.totals dd {
+  margin: var(--space-1) 0 0;
+  font-family: var(--font-mono);
+  font-size: var(--step-2);
+}
+
+.basis {
+  margin: var(--space-2) 0 0;
+  font-size: var(--step--1);
+  max-width: var(--measure);
+}
+
+.row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--color-line);
+  overflow-wrap: anywhere;
+}
+
+.row > :last-child {
+  flex: none;
+  font-family: var(--font-mono);
+}
+
+.moves {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}

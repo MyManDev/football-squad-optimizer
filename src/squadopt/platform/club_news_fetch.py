@@ -844,6 +844,12 @@ def _has_dot_segment(path: str) -> bool:
     return "." in segments or ".." in segments
 
 
+def _discovery_index_path(relative_path: str) -> bool:
+    """Recognise explicit category/listing routes without excluding nested articles."""
+    segments = urllib.parse.unquote(relative_path).strip("/").split("/")
+    return len(segments) == 2 and segments[0].casefold() in {"listing", "category"}
+
+
 def _ranked_article_links(source: ClubSource, index: RawDocument) -> dict[str, int]:
     """The article URLs a registered page links to, under the one rule this lane follows.
 
@@ -907,11 +913,14 @@ def _ranked_article_links(source: ClubSource, index: RawDocument) -> dict[str, i
             continue
         if not (parts.path.startswith(prefix) and len(parts.path) > len(prefix)):
             continue
+        relative_path = parts.path[len(prefix) :]
+        if _discovery_index_path(relative_path):
+            continue
         url = urllib.parse.urlunsplit(
             (registered.scheme, registered.netloc, parts.path, parts.query, "")
         )
         if _printable_ascii(url):
-            priority = _article_priority(parts.path[len(prefix) :], " ".join(labels))
+            priority = _article_priority(relative_path, " ".join(labels))
             # A duplicate card may provide a useful heading after an empty image
             # link. Keep its earliest position but consider its most useful label.
             links[url] = min(priority, links.get(url, priority))
@@ -939,6 +948,7 @@ def registered_article_url(source: ClubSource, url: str) -> str | None:
         or not target.path.startswith(prefix)
         or len(target.path) <= len(prefix)
         or _has_dot_segment(target.path)
+        or _discovery_index_path(target.path[len(prefix) :])
         or not _printable_ascii(url)
     ):
         return None

@@ -9,8 +9,8 @@
 import { rivalCandidates, type DeviceComputable } from "../advice/adviceSelection";
 import { isTop100Weight } from "../advice/top100";
 import type { EntrySquad, EntryView } from "../types";
-import { rivalFromSquad } from "./selection";
-import { isDevicePlanEntry, RIVAL_STRATEGIES } from "./types";
+import { deviceChip, rivalFromSquad } from "./selection";
+import { DEVICE_CHIPS, isDevicePlanEntry, RIVAL_STRATEGIES } from "./types";
 
 export type { DeviceComputable } from "../advice/adviceSelection";
 
@@ -53,7 +53,7 @@ export function deviceRivalUsable(
  * kept rather than dropped (`resolvePublishedAdvice`).
  */
 export function deviceComputable(
-  squad: Pick<EntrySquad, "device_plan" | "source_snapshot_id" | "entry">,
+  squad: Pick<EntrySquad, "device_plan" | "source_snapshot_id" | "entry" | "chips">,
   members: EntryView[],
   reads: DeviceRivalReads,
 ): DeviceComputable | undefined {
@@ -68,7 +68,16 @@ export function deviceComputable(
     windows: [1],
     rivals: candidates.filter(usable),
     top100Weights: [0, ...(squad.device_plan.top100_weights ?? []).filter(isTop100Weight)],
+    chips: DEVICE_CHIPS.filter((chip) => deviceChip({ chip }, squad) === chip),
     loading: reads.loading,
     unreadRivals: candidates.filter((id) => reads.unreadable.includes(id)),
+    captainMissingRivals: candidates.filter((id) =>
+      reads.squads.some(
+        (rival) =>
+          rival.entry.entry_id === id &&
+          rival.source_snapshot_id === squad.source_snapshot_id &&
+          rivalFromSquad(id, rival) === null,
+      ),
+    ),
   };
 }

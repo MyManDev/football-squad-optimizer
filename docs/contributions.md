@@ -60,6 +60,13 @@ duplicates after a lost response. A hard limit of 10,000 retained comments fails
 Quota refusal returns 429 and Retry-After 3600; unavailable storage returns 503. The browser
 keeps failed text in memory and only clears it after a validated pending receipt.
 
+The API uses the advice service's address bucketing before computing the daily digest:
+IPv4 by address, IPv4-mapped IPv6 as IPv4, and native IPv6 by /64. Rotating addresses within
+one IPv6 subnet therefore does not grant more submissions. The socket client identity comes
+from the configured trusted proxy handling; this route never reads forwarded headers itself.
+Malformed Unicode, excessive JSON nesting and player ids outside SQLite's signed 64-bit
+range are refused with 422 before the inbox is opened. Valid Unicode remains supported.
+
 Raw visitor addresses are never stored in the database. Daily HMAC digests require the random
 local database salt; quota entries older than 24 hours are removed on the next accepted
 transaction. These are abuse controls, not proof of identity. Shared networks share a quota,

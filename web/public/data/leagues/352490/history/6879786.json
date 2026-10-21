@@ -646,7 +646,29 @@
         "actual": {
           "gross_points": 60.0,
           "transfer_hit_points": 0.0,
-          "net_points": 60.0
+          "net_points": 60.0,
+          "details": {
+            "source_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd",
+            "captain": {
+              "player_id": 222531,
+              "name": "Gibbs-White",
+              "points": 2.0,
+              "multiplier": 2,
+              "counted_points": 4.0
+            },
+            "transfers": [
+              {
+                "player_out": "Maatsen",
+                "player_in": {
+                  "player_id": 465730,
+                  "name": "De Cuyper",
+                  "points": 15.0,
+                  "multiplier": 1,
+                  "counted_points": 15.0
+                }
+              }
+            ]
+          }
         },
         "actual_reason": null,
         "net_difference": 8.0,
@@ -1500,7 +1522,29 @@
         "actual": {
           "gross_points": 52.0,
           "transfer_hit_points": 0.0,
-          "net_points": 52.0
+          "net_points": 52.0,
+          "details": {
+            "source_snapshot_id": "fpl-live-20261010T035732Z-c77d032165af",
+            "captain": {
+              "player_id": 244851,
+              "name": "Palmer",
+              "points": 2.0,
+              "multiplier": 3,
+              "counted_points": 6.0
+            },
+            "transfers": [
+              {
+                "player_out": "Elanga",
+                "player_in": {
+                  "player_id": 222531,
+                  "name": "Gibbs-White",
+                  "points": 2.0,
+                  "multiplier": 1,
+                  "counted_points": 2.0
+                }
+              }
+            ]
+          }
         },
         "actual_reason": null,
         "net_difference": -11.0,
@@ -1740,7 +1784,8 @@
         "actual": {
           "gross_points": 86.0,
           "transfer_hit_points": 0.0,
-          "net_points": 86.0
+          "net_points": 86.0,
+          "details": null
         },
         "actual_reason": null,
         "net_difference": -29.0,

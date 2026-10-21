@@ -1,5 +1,5 @@
 import { OfficialInformationCard } from "../advice/OfficialInformationCard";
-import { useId, type CSSProperties } from "react";
+import { useEffect, useId, useRef, type CSSProperties, type Ref } from "react";
 
 import { Badge } from "../../../design/components/Badge";
 import { CountingNumber } from "../../../design/CountingNumber";
@@ -10,6 +10,8 @@ import type { FixturesPayload } from "../../fixtures/types";
 import { CHIP_COPY, chipRescores, type ChipCopy } from "../advice/chipCopy";
 import { EVIDENCE_COPY, QUOTE_WITHHELD } from "../advice/evidenceCopy";
 import { comparedRivalPlayers } from "../advice/rivalPlayers";
+import { modelChangeOf } from "../advice/modelSwitch";
+import { boardSlot, claimPair, playBoard, releasePair, releaseSlotsFrom } from "./boardMotion";
 import { publishedPrice } from "../advice/publishedPrice";
 import { InformationReview } from "../advice/InformationReview";
 import { ExpectedLineup } from "../advice/ExpectedLineup";
@@ -240,6 +242,11 @@ export function AdviceDecision({
   // Boards that share a caption say it once, under them; a caption that differs stays with
   // its own board.
   const sharedReason = reasons.every((reason) => reason === reasons[0]);
+  // The board places this decision leaves empty (all of them for a hold week) show no
+  // pair, so a pair that comes back to one of them later moves its board again.
+  useEffect(() => {
+    releaseSlotsFrom(view.entry_id, view.moves.length);
+  }, [view.entry_id, view.moves.length]);
   return (
     <>
       {origin === "published-while-computing" ? (
@@ -257,6 +264,7 @@ export function AdviceDecision({
               <div className={board.cell} key={move.move_id}>
                 <SubstitutionBoard
                   move={move}
+                  slot={boardSlot(view.entry_id, index)}
                   index={index}
                   count={view.moves.length}
                   measured={rowsAreShares}
@@ -277,6 +285,7 @@ export function AdviceDecision({
         </div>
       )}
       <GainStrip view={view} squad={squad.payload} measured={rowsAreShares} chipBasis={chipBasis} />
+      <ModelChangeLine view={view} />
       <CaptainLine view={view} codes={codes} />
       <div className={board.states}>
         {basisNote ? (
@@ -538,8 +547,10 @@ function BoardPanel({
   fixtures,
   season,
   gameweek,
+  ref,
 }: {
   kind: "out" | "in";
+  ref?: Ref<HTMLDivElement>;
   player: AdvicePlayer | null;
   codes: ClubCodes;
   fixtures: FixturesPayload | null;
@@ -549,7 +560,7 @@ function BoardPanel({
   const { messages } = useLanguage();
   const copy = messages.leagueMembers;
   return (
-    <div className={`${board.panel} ${kind === "out" ? board.out : board.in}`}>
+    <div className={`${board.panel} ${kind === "out" ? board.out : board.in}`} ref={ref}>
       <span className={board.word}>
         <BoardArrow direction={kind === "out" ? "down" : "up"} />
         {kind === "out" ? copy.out : copy.in}
@@ -594,6 +605,7 @@ function BoardPanel({
  */
 function SubstitutionBoard({
   move,
+  slot,
   index,
   count,
   measured,
@@ -603,6 +615,8 @@ function SubstitutionBoard({
   gameweek,
 }: {
   move: AdviceMove;
+  /** The member and the board's place, so the motion runs once per pair on each place. */
+  slot: string;
   index: number;
   count: number;
   measured: boolean;
@@ -618,6 +632,30 @@ function SubstitutionBoard({
     measured && finiteNumber(move.expected_points_delta)
       ? signedFigure(move.expected_points_delta, locale)
       : null;
+  const outgoing = useRef<HTMLDivElement>(null);
+  const incoming = useRef<HTMLDivElement>(null);
+  const gain = useRef<HTMLParagraphElement>(null);
+  const pair = `${move.player_out?.player_id ?? "-"}>${move.player_in?.player_id ?? "-"}`;
+  // The board moves when its place shows a new pair (the week's first decision, or a
+  // switch that changes the pair), never on a re-render. A motion stopped before it ends
+  // leaves the pair unclaimed so it can run again. That release is for StrictMode
+  // (main.tsx): in development it runs this effect, its cleanup and the effect again at
+  // once, and without the release the second run would find the pair claimed and the
+  // board would never move. In a build it means a remount mid-motion that keeps the pair,
+  // as a quick switch to a window with the same move, plays the arrival again.
+  useEffect(() => {
+    if (!claimPair(slot, pair)) return;
+    const running = playBoard({
+      outgoing: outgoing.current,
+      incoming: incoming.current,
+      gain: gain.current,
+    });
+    return () => {
+      const unfinished = running.filter((animation) => animation.playState !== "finished");
+      unfinished.forEach((animation) => animation.cancel());
+      if (unfinished.length > 0) releasePair(slot, pair);
+    };
+  }, [slot, pair]);
   return (
     <article className={board.board} aria-labelledby={headId}>
       <h3 className={board.boardHead} id={headId}>
@@ -626,6 +664,7 @@ function SubstitutionBoard({
       <div className={board.panels}>
         <BoardPanel
           kind="out"
+          ref={outgoing}
           player={move.player_out}
           codes={codes}
           fixtures={fixtures}
@@ -634,6 +673,7 @@ function SubstitutionBoard({
         />
         <BoardPanel
           kind="in"
+          ref={incoming}
           player={move.player_in}
           codes={codes}
           fixtures={fixtures}
@@ -641,7 +681,7 @@ function SubstitutionBoard({
           gameweek={gameweek}
         />
       </div>
-      <p className={board.led}>
+      <p className={board.led} ref={gain}>
         {value !== null ? (
           <>
             <span className={board.ledValue}>{value}</span>
@@ -1421,5 +1461,42 @@ function WindowComparison({ view, control }: { view: EntryAdvice; control: Entry
         </div>
       </dl>
     </section>
+  );
+}
+
+/**
+ * What the switch of prediction model changed, under the gain strip (#1131): how many players
+ * the new model's plan brings in, each marked on the pitch or the bench, and the difference in
+ * the first week's net expected points, counted up once from zero. On a plan of several weeks
+ * the label says it is this week's, since the window total stands beside it. Nothing is said
+ * when the plan was not reached by a model switch.
+ */
+function ModelChangeLine({ view }: { view: EntryAdvice }) {
+  const { locale, messages } = useLanguage();
+  const copy = messages.leagueMembers;
+  const change = modelChangeOf(view);
+  if (change === null) return null;
+  return (
+    <p className={board.modelChange} data-model-change={change.to}>
+      <span>{copy.modelChangePlayers(copy.modelNames[change.to], change.changed.size)}</span>
+      {change.difference !== null ? (
+        <>
+          {" "}
+          <span>
+            {view.window > 1 ? copy.modelChangeDifferenceWeek : copy.modelChangeDifference}
+          </span>{" "}
+          <span className={board.modelChangeFigure}>
+            <strong className="num">
+              <CountingNumber
+                countKey={change.key}
+                value={change.difference}
+                format={(value) => signedPoints(value, 1, locale)}
+              />
+            </strong>{" "}
+            <PointsUnit />
+          </span>
+        </>
+      ) : null}
+    </p>
   );
 }

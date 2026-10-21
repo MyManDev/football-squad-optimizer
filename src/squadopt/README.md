@@ -39,7 +39,7 @@ to `pyproject.toml`.
 | `scenarios` | R2 | 12 | the owner | C1, C2, C4, C5, C6, C7 | imports a private name of `evaluation.scoring` |
 | `evaluation` | R2 | 13 | the owner | C1, C2, C4, C5, C6, C7 | reads files (`component_handoff.py`) |
 | `optimization` | R2 | 14 | the owner; `config.py` both | C1, C2, C4, C5, C6, C7 | none |
-| `prediction` | R2 | 15 | İbrahim | C1, C2, C4, C5, C8 | none |
+| `prediction` | R2 | 15 | İbrahim | C1, C2, C4, C5, C7, C8 | none |
 | `features` | R2 | 16 | İbrahim | C1, C2, C4, C5, C8, C10 | imports the storage half of `data`; reads files |
 | `data` | R1, R4 | 17 | İbrahim; `schema.py` both | C1, C2, C4, C5, C8 | one package in two rings, at the bottom of the layer order; three vocabulary modules import the storage half |
 | `contracts` | R1 | 18 | both | C1, C2, C4, C5, C6, C7, C8 | reads and writes files (`league_list.py`, `league_tree.py`); names `docs/contracts` by a relative path (`schema_paths.py`, the one resolver) |

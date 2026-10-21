@@ -8,8 +8,11 @@
  * Every plate is centred on its point, so a line is symmetric about the pitch's axis.
  *
  * Nothing small is written on the grass: names, codes, figures and the direction of
- * attack sit on white plates (ink 16.3:1, ink2 7.6:1 on white). The stripes are the one
- * pattern the page allows, and they are only on the grass.
+ * attack sit on plates, white by default (ink 16.3:1, ink2 7.6:1 on white). The grass's
+ * pattern is the one pattern the page allows, and it is only on the grass: stripes by
+ * default, or the plain or checked look the viewer chose (pitchLook.ts, #1136), all in the
+ * two grass tokens. In club colours a player's plate takes its club's fill with one text
+ * colour that reads 4.5:1 on it; the direction of attack keeps its white plate.
  */
 
 .wrap {
@@ -28,6 +31,17 @@
     var(--color-pitch) 0 9.0909%,
     var(--color-pitch-2) 9.0909% 18.1818%
   );
+}
+
+/* The viewer's grass looks, in both orientations: one colour, or a checked mowing pattern
+   whose cells keep the stripes' depth (a tile is two cells each way). */
+.wrap[data-grass="plain"] .field {
+  background: var(--color-pitch);
+}
+
+.wrap[data-grass="checks"] .field {
+  background: repeating-conic-gradient(var(--color-pitch) 0 25%, var(--color-pitch-2) 0 50%) 0 0 /
+    40% 18.1818%;
 }
 
 .descAcross {
@@ -276,6 +290,29 @@
   white-space: nowrap;
 }
 
+.xp:has([data-coach-absence]),
+.benchXp:has([data-coach-absence]) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+
+/* A plate in its club's colours: every line in the one text colour chosen for the fill. */
+.plate[data-club] {
+  background: var(--plate-fill);
+  color: var(--plate-text);
+}
+
+.plate[data-club] .code {
+  color: inherit;
+}
+
+/* A plate in its club's first colour is itself the swatch. */
+.plate[data-club="primary"] .swatch {
+  display: none;
+}
+
 /* Upright, YENİ and the armband stand centred over their own plate, outside it, so a
    narrow plate keeps its name and a tag never reads as the next plate's. Where a plate
    carries both, they stand side by side about its centre. */
@@ -360,6 +397,10 @@
       var(--color-pitch) 0 9.0909%,
       var(--color-pitch-2) 9.0909% 18.1818%
     );
+  }
+
+  .wrap[data-grass="checks"] .field {
+    background-size: 18.1818% 40%;
   }
 
   .descAcross {
@@ -611,11 +652,12 @@
 }
 
 .benchItem {
+  position: relative;
   display: grid;
   grid-template-columns: 12px auto minmax(0, 1fr) auto;
   align-items: baseline;
   gap: 0 var(--space-2);
-  min-height: 28px;
+  min-height: 44px;
   padding: 4px 0;
   font-size: var(--step--2);
   line-height: 16px;
@@ -625,6 +667,33 @@
   color: var(--color-text-faint);
   font-family: var(--font-mono);
   font-weight: 500;
+}
+
+/* A full plate is a touch target. The separate source link stays above it. */
+.playerButton {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  width: 100%;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-s);
+  background: transparent;
+  cursor: pointer;
+}
+
+.playerButton:hover {
+  box-shadow: inset 0 0 0 1px currentColor;
+}
+.playerButton:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+.plate a,
+.benchItem a {
+  position: relative;
+  z-index: 2;
 }
 
 .benchName {
@@ -707,4 +776,22 @@
   .benchXp {
     grid-area: xp;
   }
+}
+
+/* A player a switch of prediction model brought into the plan (#1131): a static ring in the
+   page's one accent, until the next plan, with an ink edge on either side so the ring reads
+   at 3:1 or more on both grass stripes and on the bench's surface (the accent alone is under
+   3:1 on the lighter stripe). The plate's one short rise is script, on the motion tokens'
+   data time; the ring itself never moves. The bench item carries the same ring. */
+.token[data-model-changed] .plate,
+.benchItem[data-model-changed] .benchName {
+  outline: 2px solid var(--color-lime);
+  outline-offset: 1px;
+  box-shadow:
+    0 0 0 1px var(--color-text),
+    0 0 0 4px var(--color-text);
+}
+
+.benchItem[data-model-changed] .benchName {
+  border-radius: var(--radius-s);
 }

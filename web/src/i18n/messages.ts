@@ -636,6 +636,10 @@ const en = {
       "Player names cannot be compared: matching league, season, gameweek, capture and complete player lists are required.",
     rivalLabel: "The member you are playing against",
     rivalChoose: "Choose a rival",
+    rivalEntryLabel: "Another member's entry ID",
+    rivalEntryChoose: "Choose member",
+    rivalEntryNotListed: "Enter another member's ID from this league.",
+    rivalCaptainMissing: "No captain in this rival's starting eleven",
     rivalDefaultSuffix: "(nearest above in the standings)",
     rivalUnavailableSuffix: "(not computed)",
     rivalNone: "No other member's squad is published for this week.",
@@ -807,6 +811,29 @@ const en = {
     duelFromCaptains: "Captains",
     duelSharedMark: "shared",
     duelShared: (count: number) => (count === 1 ? "1 shared player" : `${count} shared players`),
+    // The squad card (#1135 part 3): the plan on screen drawn on the device as one image.
+    cardTitle: "Squad card",
+    cardUnavailable: "This plan carries no eleven for a card.",
+    cardFieldsLegend: "On the card",
+    cardFieldNames: {
+      team: "Team and manager",
+      lineup: "Eleven and bench",
+      captain: "Captain",
+      transfers: "Transfers",
+      points: "Expected points",
+    } as Record<"team" | "lineup" | "captain" | "transfers" | "points", string>,
+    cardCreate: "Make the card",
+    cardDrawing: "Drawing the card",
+    cardFailed: "The card could not be drawn.",
+    cardReady: "The card is ready.",
+    cardPreviewAlt: (gameweek: number) => `Squad card for gameweek ${gameweek}`,
+    cardSave: "Save",
+    cardShare: "Share",
+    cardShareFailed: "The card could not be shared.",
+    cardWeekTitle: (gameweek: number) => `Gameweek ${gameweek} plan`,
+    cardTransfers: "Transfers",
+    cardNoTransfers: "No transfers",
+    cardExpectedPoints: "Expected points",
     top100Weight: (weight: number) => `Top 100 weight ${weight}`,
     // The league race (#1135): each member's place after every settled gameweek.
     raceTitle: "League race",
@@ -871,6 +898,17 @@ const en = {
       "current" | "football",
       string
     >,
+    // The model-switch line (#1131): the players the other model's plan brings in.
+    modelChangePlayers: (model: string, count: number) =>
+      count === 0
+        ? `${model}: the same players.`
+        : count === 1
+          ? `${model}: 1 player changed.`
+          : `${model}: ${count} players changed.`,
+    modelChangeDifference: "Points difference",
+    modelChangeDifferenceWeek: "This week's points difference",
+    // Spoken in a marked plate, as 'New' is written on a transferred one.
+    modelChangedMark: "changed by the model",
     experimentalTag: "Experimental",
     modelNote:
       "The football model forecasts goals, assists, clean sheets and DEFCON per fixture. The Top 100 weight applies to the selected model.",
@@ -930,6 +968,13 @@ const en = {
     viewLabel: "View",
     viewPitch: "Pitch",
     viewList: "List",
+    pitchLookLabel: "Grass",
+    pitchLookStripes: "Stripes",
+    pitchLookPlain: "Plain",
+    pitchLookChecks: "Checks",
+    clubColoursLabel: "Club colours",
+    clubColoursOff: "Off",
+    clubColoursOn: "On",
     railWeeks: (weeks: readonly number[]) =>
       weeks.length === 1
         ? `Gameweek ${weeks[0]}`
@@ -1678,6 +1723,10 @@ const tr: MessageSchema<typeof en> = {
       "Oyuncu adları karşılaştırılamıyor: lig, sezon, oyun haftası ve veri kesiti eşleşmeli; oyuncu listeleri tam olmalı.",
     rivalLabel: "Karşısında oynadığın üye",
     rivalChoose: "Bir rakip seç",
+    rivalEntryLabel: "Başka bir üyenin takım numarası",
+    rivalEntryChoose: "Üyeyi seç",
+    rivalEntryNotListed: "Bu ligdeki başka bir üyenin takım numarasını gir.",
+    rivalCaptainMissing: "Rakibin ilk 11’inde kaptan bilgisi yok",
     rivalDefaultSuffix: "(sıralamada hemen üstün)",
     rivalUnavailableSuffix: "(hesaplanamadı)",
     rivalNone: "Bu hafta için başka bir üyenin kadrosu yayınlanmamış.",
@@ -1838,6 +1887,28 @@ const tr: MessageSchema<typeof en> = {
     duelFromCaptains: "Kaptanlar",
     duelSharedMark: "ortak",
     duelShared: (count) => `${count} ortak oyuncu`,
+    cardTitle: "Kadro kartı",
+    cardUnavailable: "Bu planda kart için bir ilk 11 yok.",
+    cardFieldsLegend: "Kartta olsun",
+    cardFieldNames: {
+      team: "Takım ve menajer",
+      lineup: "İlk 11 ve yedekler",
+      captain: "Kaptan",
+      transfers: "Transferler",
+      points: "Beklenen puan",
+    },
+    cardCreate: "Kartı oluştur",
+    cardDrawing: "Kart çiziliyor",
+    cardFailed: "Kart çizilemedi.",
+    cardReady: "Kart hazır.",
+    cardPreviewAlt: (gameweek) => `${gameweek}. hafta kadro kartı`,
+    cardSave: "Kaydet",
+    cardShare: "Paylaş",
+    cardShareFailed: "Kart paylaşılamadı.",
+    cardWeekTitle: (gameweek) => `${gameweek}. hafta planı`,
+    cardTransfers: "Transferler",
+    cardNoTransfers: "Transfer yok",
+    cardExpectedPoints: "Beklenen puan",
     top100Weight: (weight) => `Top 100 ağırlığı ${weight}`,
     raceTitle: "Lig yarışı",
     raceMember: "Üye",
@@ -1896,6 +1967,11 @@ const tr: MessageSchema<typeof en> = {
     optionNotes: "Seçenekler hakkında",
     modelLegend: "Model",
     modelNames: { current: "Mevcut model", football: "Futbol modeli" },
+    modelChangePlayers: (model, count) =>
+      count === 0 ? `${model}: oyuncular aynı.` : `${model}: ${count} oyuncu değişti.`,
+    modelChangeDifference: "Puan farkı",
+    modelChangeDifferenceWeek: "Bu haftanın puan farkı",
+    modelChangedMark: "modelle değişti",
     experimentalTag: "Deneysel",
     modelNote:
       "Futbol modeli gol, asist, gol yememe ve DEFCON bileşenlerini fikstürlere göre hesaplar. Top 100 ağırlığı seçtiğin modele uygulanır.",
@@ -1948,6 +2024,13 @@ const tr: MessageSchema<typeof en> = {
     viewLabel: "Görünüm",
     viewPitch: "Saha",
     viewList: "Liste",
+    pitchLookLabel: "Çim",
+    pitchLookStripes: "Çizgili",
+    pitchLookPlain: "Düz",
+    pitchLookChecks: "Kareli",
+    clubColoursLabel: "Kulüp renkleri",
+    clubColoursOff: "Kapalı",
+    clubColoursOn: "Açık",
     railWeeks: (weeks) =>
       weeks.length === 1
         ? `${weeks[0]}. hafta`

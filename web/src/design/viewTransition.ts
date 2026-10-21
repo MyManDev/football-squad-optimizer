@@ -2,8 +2,11 @@ import { flushSync } from "react-dom";
 
 import { MOTION_MS, prefersReducedMotion } from "./motion";
 
+/** What a started transition hands back: three promises the browser may reject. */
+type StartedTransition = Partial<Pick<ViewTransition, "ready" | "finished" | "updateCallbackDone">>;
+
 type TransitionDocument = Document & {
-  startViewTransition?: (update: () => Promise<void> | void) => unknown;
+  startViewTransition?: (update: () => Promise<void> | void) => StartedTransition | undefined;
 };
 
 type MediaSource = Pick<Window, "matchMedia"> | undefined;
@@ -16,6 +19,12 @@ type MediaSource = Pick<Window, "matchMedia"> | undefined;
  * so a step that draws its page a moment later fades into that page and not into a
  * loading screen. A browser without the API, or a viewer who asked for reduced motion,
  * gets the change at once: that is the fallback, not an error.
+ *
+ * The transition is kept so its three promises are handled. A browser skips a transition
+ * when another starts before it is drawn and rejects its `ready` with an AbortError, though
+ * the update still runs: that is quiet. An update that throws rejects all three; its error
+ * is reported once, as an uncaught error would be, and not three times as unhandled
+ * rejections.
  */
 export function crossfade(
   update: () => void,
@@ -31,7 +40,7 @@ export function crossfade(
     update();
     return;
   }
-  document.startViewTransition(async () => {
+  const transition: StartedTransition | undefined = document.startViewTransition(async () => {
     flushSync(update);
     if (ready) {
       await Promise.race([
@@ -39,5 +48,11 @@ export function crossfade(
         new Promise<void>((resolve) => setTimeout(resolve, MOTION_MS.data)),
       ]);
     }
+  });
+  transition?.ready?.catch(() => {});
+  transition?.finished?.catch(() => {});
+  transition?.updateCallbackDone?.catch((error: unknown) => {
+    if (!(error instanceof DOMException && error.name === "AbortError"))
+      globalThis.reportError?.(error);
   });
 }

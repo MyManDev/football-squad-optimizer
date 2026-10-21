@@ -1,4 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
+import { atRest } from "./atRest";
 import { expect, test } from "@playwright/test";
 
 import { installLeagueMocks } from "./leagueMocks";
@@ -52,6 +53,7 @@ test("at 1440 the table and the viewer's chips share one screen", async ({ page 
   );
 
   expect(await page.locator("main").textContent()).not.toContain("%");
+  await atRest(page);
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
 });
 

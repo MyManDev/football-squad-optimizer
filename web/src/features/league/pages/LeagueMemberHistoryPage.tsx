@@ -16,6 +16,7 @@ import {
 } from "../history/historyData";
 import styles from "./LeagueMemberHistoryPage.module.css";
 import { summarizeHistory } from "../history/historySummary";
+import { PersonalSeasonReport } from "../history/PersonalSeasonReport";
 import { EVIDENCE_COPY } from "../advice/evidenceCopy";
 import { TOP100_COPY } from "../advice/top100Copy";
 import { publishedPrice } from "../advice/publishedPrice";
@@ -95,6 +96,7 @@ export function LeagueMemberHistoryView({
           {copy.outcomeAsOf}: {utcShort(history.generated_at_utc, locale)}
         </p>
       </header>
+      <PersonalSeasonReport history={history} />
       {weeks.length === 0 ? (
         <EmptyState title={copy.empty}>
           <p>{copy.emptyBody}</p>

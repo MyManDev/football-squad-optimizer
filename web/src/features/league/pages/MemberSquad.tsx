@@ -1,15 +1,22 @@
-import { useId, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 
 import { EmptyState } from "../../../design/components/EmptyState";
+import type { FixturesPayload } from "../../fixtures/types";
+import type { CoachAbsence } from "../advice/coachAbsences";
+import { CoachNews } from "../components/CoachNews";
 import { useLanguage } from "../../../i18n/context";
 import type { ClubCodes } from "../../../lib/clubs";
 import { figure } from "../../../lib/format";
 import { ClubMark } from "../components/ClubMark";
 import { MemberBench, MemberPitch, type PitchPlayer } from "../components/MemberPitch";
+import { PitchLookControl } from "../components/PitchLookControl";
+import { PlayerDetails } from "../components/PlayerDetails";
 import { PointsUnit } from "../components/PointsUnit";
 import { expectedLineupLabel } from "../advice/expectedLineupLabel";
+import { modelChangeOf, popChanged, releasePop } from "../advice/modelSwitch";
 import type { EntryAdvice, EntrySquad, EntrySquadPlayer } from "../types";
 import { finite, heldBench, type SquadOnPitch } from "./squadOnPitch";
+import { usePitchMovement } from "./usePitchMovement";
 import styles from "./MemberSquad.module.css";
 
 /** '3-4-3' for a full eleven with one keeper; nothing for a partial one. */
@@ -28,17 +35,61 @@ export function MemberSquad({
   plan,
   codes,
   list,
+  news = new Map<number, CoachAbsence>(),
+  held,
+  fixtures,
 }: {
   onPitch: SquadOnPitch;
   plan: EntryAdvice | null;
   codes: ClubCodes;
   /** The plan's lineup as a list; without one there is no list view and no toggle. */
   list: ReactNode;
+  news?: ReadonlyMap<number, CoachAbsence>;
+  held?: EntrySquad;
+  fixtures?: FixturesPayload | null;
 }) {
   const { language, locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
   const titleId = useId();
   const [view, setView] = useState<"pitch" | "list">("pitch");
+  const field = useRef<HTMLDivElement>(null);
+  const planned = onPitch.source === "plan";
+  const basis = planned ? plan : held;
+  const context = basis
+    ? JSON.stringify([
+        basis.league_id,
+        "entry_id" in basis ? basis.entry_id : basis.entry.entry_id,
+        basis.season,
+        basis.gameweek,
+        basis.source_snapshot_id,
+      ])
+    : null;
+  const layoutKey = JSON.stringify([
+    onPitch.eleven.map((player) => [player.playerId, player.position]),
+    onPitch.bench.map((player) => [player.playerId, player.order]),
+  ]);
+  usePitchMovement(field, context, layoutKey, view === "pitch", planned);
+  const [selection, setSelection] = useState<{ context: string | null; id: number } | null>(null);
+  const selected =
+    selection?.context === context
+      ? [...onPitch.eleven, ...onPitch.bench].find((player) => player.playerId === selection?.id)
+      : undefined;
+  const selectPlayer = (id: number) => setSelection({ context, id });
+  const modelChange = planned ? modelChangeOf(plan) : null;
+  const changeKey = modelChange?.key ?? null;
+  // The changed players' plates, on the pitch and the bench, move once per change; the marks
+  // stay until the next plan.
+  useEffect(() => {
+    if (changeKey === null || field.current === null) return undefined;
+    const running = popChanged(changeKey, [
+      ...field.current.querySelectorAll<HTMLElement>("[data-model-changed] [data-plate]"),
+    ]);
+    return () => {
+      const unfinished = running.filter((motion) => motion.playState !== "finished");
+      unfinished.forEach((motion) => motion.cancel());
+      if (unfinished.length > 0) releasePop(changeKey);
+    };
+  }, [changeKey]);
   if (onPitch.source === null) {
     return (
       <section id="kadro" className={styles.squad} aria-labelledby={titleId}>
@@ -49,9 +100,13 @@ export function MemberSquad({
       </section>
     );
   }
-  const planned = onPitch.source === "plan";
   const hasList = planned && list != null;
   const own = planned && finite(plan?.expected_own_points) ? plan.expected_own_points : null;
+  const newsPlayers = new Map(
+    [...onPitch.eleven, ...onPitch.bench].map((player) => [player.playerId, player.name]),
+  );
+  for (const player of [...(held?.starting_xi ?? []), ...(held?.bench ?? [])])
+    newsPlayers.set(player.player_id, player.name);
   // The list view states the plan's own total in its first line, so the heading row
   // does not say it twice.
   const line = [
@@ -91,14 +146,40 @@ export function MemberSquad({
           </div>
         ) : null}
       </div>
-      <div className={styles.pitchView} hidden={hasList && view !== "pitch"}>
-        <MemberPitch players={onPitch.eleven} codes={codes} />
-        <MemberBench players={onPitch.bench} codes={codes} />
+      <div ref={field} className={styles.pitchView} hidden={hasList && view !== "pitch"}>
+        <MemberPitch
+          players={onPitch.eleven}
+          codes={codes}
+          modelChange={modelChange}
+          news={news}
+          onSelectPlayer={selectPlayer}
+        />
+        <MemberBench
+          players={onPitch.bench}
+          codes={codes}
+          modelChange={modelChange}
+          news={news}
+          onSelectPlayer={selectPlayer}
+        />
+        <PitchLookControl />
       </div>
       {hasList ? (
         <div className={styles.listView} hidden={view !== "list"}>
           {list}
         </div>
+      ) : null}
+      <CoachNews news={news} players={newsPlayers} />
+      {selected ? (
+        <PlayerDetails
+          key={`${context}:${selected.playerId}`}
+          player={selected}
+          plan={planned ? plan : null}
+          held={held}
+          fixtures={fixtures}
+          codes={codes}
+          news={news}
+          onClose={() => setSelection(null)}
+        />
       ) : null}
     </section>
   );

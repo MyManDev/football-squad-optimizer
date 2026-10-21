@@ -4,12 +4,11 @@ import { useMemo } from "react";
 import type { ComputeService } from "../advice/AdviceRequestPanel";
 import { capabilitiesForPage } from "../advice/adviceCapabilities";
 import { createAdviceClient } from "../advice/adviceClient";
-import { resolvePublishedAdvice, rivalCandidates } from "../advice/adviceSelection";
+import { resolvePublishedAdvice } from "../advice/adviceSelection";
 import { checkedAdvice } from "../advice/adviceResponse";
 import type { DeviceRivalReads } from "../device/computable";
 import { offeredDeviceSelection } from "../device/selection";
 import { isDevicePlanEntry } from "../device/types";
-import type { EntryView } from "../types";
 import { useLeague } from "../useLeague";
 import {
   CAPABILITIES_READ,
@@ -21,13 +20,7 @@ import {
 } from "../queries";
 import { duelRivalId } from "./duelSides";
 import { deviceRequestFor, memberSelection } from "./memberSelection";
-
-/** The other human members' entry ids: the rivals a rival strategy may name. */
-function rivalCandidateIds(members: EntryView[], entryId: number): number[] {
-  return rivalCandidates(members, entryId)
-    .map((member) => member.entry_id)
-    .filter((id): id is number => typeof id === "number");
-}
+import { boundedRivalIds } from "./rivalReads";
 
 /** Read only the publication authorized by the current member index and URL. */
 export function useLeagueMemberData(entryParam: string | undefined, searchParams: URLSearchParams) {
@@ -46,6 +39,25 @@ export function useLeagueMemberData(entryParam: string | undefined, searchParams
   });
   const members = membersQuery.data?.payload.members ?? [];
   const index = indexQuery.isError ? null : (indexQuery.data?.payload ?? null);
+  const newsPath =
+    index?.evidence?.available && index.evidence.source_kind === "club_news_capture"
+      ? index.evidence.path
+      : null;
+  // News is a player fact even when its optional planning constraint is switched off.
+  // This reads one existing published document and never submits a computation.
+  const coachNews = useQuery({
+    queryKey: [
+      "published-coach-news",
+      league.leagueId,
+      entryId,
+      squad.data?.generated_at_utc,
+      squad.data?.payload.source_snapshot_id,
+      newsPath,
+    ],
+    queryFn: ({ signal }) => tree.entryAdviceEvidence(entryId, newsPath!, { signal }),
+    enabled: validEntryId && !!squad.data && newsPath !== null,
+    ...LEAGUE_READ,
+  });
   // A build with no compute service has a client that cannot be asked, and this query
   // never runs: the page is the static site. With one, what it computes right now is read
   // on entry and again on focus once stale. A service that is down, slow or answering
@@ -76,13 +88,20 @@ export function useLeagueMemberData(entryParam: string | undefined, searchParams
         : capabilities
           ? "ready"
           : "other-capture";
-  // The other members' entry documents, read where the publish wrote this member's device
-  // inputs: the device offers a rival strategy only against a rival whose document it can
-  // use, and the view is handed the same documents to make the same statement from.
+  // Read the standings neighbours, the published default and one explicit choice.
+  // The device and the view share these documents; a large league never fans out into
+  // one squad request per member on page open.
   const ownSquad = squad.data?.payload;
   const deviceInputs = isDevicePlanEntry(ownSquad?.device_plan) && !!ownSquad?.source_snapshot_id;
   const rivalReads = useEntrySquads(
-    ownSquad ? rivalCandidateIds(members, ownSquad.entry.entry_id) : [],
+    ownSquad
+      ? boundedRivalIds(
+          members,
+          ownSquad.entry.entry_id,
+          index?.default_rival_entry_id ?? null,
+          searchParams.get("rival"),
+        )
+      : [],
     deviceInputs,
   );
   // Until the member list and those documents are read, the device's statement is not
@@ -216,6 +235,7 @@ export function useLeagueMemberData(entryParam: string | undefined, searchParams
     indexQuery,
     members,
     index,
+    coachNews,
     selection,
     adviceEnabled,
     advice,

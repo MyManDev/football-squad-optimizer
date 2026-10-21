@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
+import { atRest } from "./atRest";
 import fixture from "../src/fixtures/weeklySuggestionHistory.json" with { type: "json" };
 import recordedPlans from "../src/fixtures/recordedPlanRows.json" with { type: "json" };
 import { TOP100_COPY } from "../src/features/league/advice/top100Copy";
@@ -105,6 +106,7 @@ test("member can open recorded history and inspect the Python-scored result on m
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
   );
+  await atRest(page);
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
   await page.screenshot({ path: testInfo.outputPath("history-mobile.png"), fullPage: true });
   await page.reload();
@@ -186,6 +188,7 @@ test("overview accumulates weeks, preserves totals while scrolling and opens wee
   });
   await expect(overview.getByRole("button", { name: "Oyun haftası 4" })).toBeInViewport();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await atRest(page);
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
   await page.screenshot({ path: testInfo.outputPath("overview-mobile.png"), fullPage: true });
 });

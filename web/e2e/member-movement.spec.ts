@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { installLeagueMocks } from "./leagueMocks";
 import AxeBuilder from "@axe-core/playwright";
+import { atRest } from "./atRest";
 import { mockLeagueMembersEnvelope } from "../src/fixtures/league";
 import { MESSAGES } from "../src/i18n/messages";
 import { AS_A_CHANCE } from "../src/testSupport/honesty";
@@ -59,6 +60,7 @@ for (const language of ["en", "tr"] as const) {
       await expect(cell.locator('[aria-hidden="true"]').first()).toHaveText(mark!);
     }
     expect(await page.locator("main").textContent()).not.toMatch(AS_A_CHANCE);
+    await atRest(page);
     expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
     await page.screenshot({ path: testInfo.outputPath("movement-desktop.png"), fullPage: true });
     await page.setViewportSize({ width: 390, height: 844 });
