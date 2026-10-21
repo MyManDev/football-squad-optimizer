@@ -54,23 +54,11 @@ describe("the Top 100 inputs", () => {
   });
 });
 
-describe("a weight combines with nothing", () => {
-  it("is refused beside a chip or a rival strategy, and where the document lacks it", () => {
+describe("a weight's boundaries", () => {
+  it("is refused beside a chip, and where the document lacks it", () => {
     const entry = members["101"]!;
     expect(() =>
       solveRequest(solver, { document, entry, top100Weight: 20, chip: "3xc" }, () => 0),
-    ).toThrow(DevicePlanRefused);
-    expect(() =>
-      solveRequest(
-        solver,
-        {
-          document,
-          entry,
-          top100Weight: 20,
-          strategy: { name: "fark-yarat", rival: world.rivals["202"] as never },
-        },
-        () => 0,
-      ),
     ).toThrow(DevicePlanRefused);
     expect(() => solveRequest(solver, { document, entry, top100Weight: 15 }, () => 0)).toThrow(
       DevicePlanRefused,

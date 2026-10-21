@@ -19,7 +19,10 @@ import type {
   DevicePlanEntry,
   DevicePlanPlayer,
   DeviceTop100Fields,
+  DeviceRival,
+  RivalStrategy,
 } from "../types";
+import { solveRival } from "./rival";
 
 /** The server's bench coefficient from a scaled integer: round half up of a tenth. */
 export function benchCoefficient(scaled: number): number {
@@ -94,4 +97,48 @@ export function solveTop100(
     reasons,
   };
   return { ...answer, top100: fields, seconds: (now() - started) / 1000 };
+}
+
+/** The server's combined setting: weighted candidates, base prices, setting-zero row labels. */
+export function solveRivalWithTop100(
+  solver: LpSolver,
+  document: DevicePlanDocument,
+  entry: DevicePlanEntry,
+  rival: DeviceRival,
+  strategy: RivalStrategy,
+  weight: number,
+  now: () => number = () => performance.now(),
+): DevicePlanAnswer {
+  const started = now();
+  if (!offersWeight(document, weight)) throw new DevicePlanRefused("weight not offered", "plan");
+  const reference = solveRival(solver, document, entry, rival, strategy, now);
+  const answer = solveRival(solver, document, entry, rival, strategy, now, {
+    choice: (player) => top100Coefficients(player, weight),
+    // Candidate comparison uses the unrounded weighted projection, as Python does.
+    points: (player) =>
+      player.expected_points * (1 + (weight / 100) * ((player.top100_count ?? 0) / 100)),
+  });
+  const pair = (move: DevicePlanAnswer["moves"][number]) => `${move.out}:${move.in}`;
+  const shared = new Set(reference.moves.map(pair));
+  const signature = (plan: DevicePlanAnswer) =>
+    JSON.stringify([
+      plan.moves.map(pair).sort(),
+      [...plan.starting_xi].sort((a, b) => a - b),
+      plan.captain,
+    ]);
+  return {
+    ...answer,
+    top100: {
+      weight,
+      changed: signature(answer) !== signature(reference),
+      expected_points_cost: answer.rival!.expected_points_cost,
+      expected_points_cost_ceiling: answer.rival!.expected_points_cost_ceiling,
+      reasons: answer.moves.map((move) =>
+        shared.has(pair(move)) && !(move.gain !== null && move.gain < -1e-9)
+          ? "mode_tradeoff"
+          : "top100_preference",
+      ),
+    },
+    seconds: (now() - started) / 1000,
+  };
 }

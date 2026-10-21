@@ -1,7 +1,7 @@
 /**
  * Which selections the device can solve from the published inputs, and what each one
  * needs: the plain pure-points plan over one week; the same with a chip the member still
- * holds; a rival strategy over one week against a named rival; the pure-points plan at a
+ * holds; a rival strategy over one week against a named rival; either plan at a
  * Top 100 weight the member block names. Nothing switched on beyond that (the club's word,
  * the football model, preferences, a longer window) is the service's.
  */
@@ -20,7 +20,7 @@ import {
 export type DeviceSelection =
   | { kind: "plain" }
   | { kind: "chip"; chip: DeviceChip }
-  | { kind: "rival"; strategy: RivalStrategy; rivalEntryId: number }
+  | { kind: "rival"; strategy: RivalStrategy; rivalEntryId: number; weight?: number }
   | { kind: "top100"; weight: number };
 
 /**
@@ -68,13 +68,15 @@ export function deviceSelection(
   const rivalEntryId = request.rivalEntryId ?? null;
   const weight = request.top100Weight ?? 0;
   if (weight !== 0) {
-    // The weight applies to the one-week pure-points plan only, where the document
-    // carries it; the entry block names the weights it does.
+    // The entry block names the weights the shared document carries.
     const offered = isDevicePlanEntry(squad.device_plan)
       ? (squad.device_plan.top100_weights ?? [])
       : [];
-    if (request.strategy !== "saf-puan" || rivalEntryId !== null || chip !== null) return null;
-    return offered.includes(weight) ? { kind: "top100", weight } : null;
+    if (!offered.includes(weight) || chip !== null) return null;
+    if (request.strategy === "saf-puan")
+      return rivalEntryId === null ? { kind: "top100", weight } : null;
+    if (!isRivalStrategy(request.strategy) || rivalEntryId === null) return null;
+    return { kind: "rival", strategy: request.strategy, rivalEntryId, weight };
   }
   if (request.strategy === "saf-puan") {
     if (rivalEntryId !== null) return null;
