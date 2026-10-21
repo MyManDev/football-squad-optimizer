@@ -24,6 +24,8 @@ from squadopt.data.sources.fpl_live import (
     FIXTURES_PAYLOAD,
     FPL_LIVE_SOURCE,
     FREE_HIT_CHIP,
+    MAX_PUBLISHED_LEAGUE_MEMBERS,
+    MAX_PUBLISHED_LEAGUE_PAGES,
     entry_active_chip,
     entry_endpoint_paths,
     entry_picks_endpoint_path,
@@ -31,8 +33,12 @@ from squadopt.data.sources.fpl_live import (
     entry_transfer_history,
     entry_transfers_endpoint_path,
     entry_transfers_payload,
+    fpl_captured_league_standings,
+    fpl_league_standings_page,
     gameweek_deadlines,
     league_standings_endpoint_path,
+    league_standings_page_endpoint_path,
+    league_standings_payload,
     live_endpoint_path,
     next_open_deadline,
     player_snapshot,
@@ -111,6 +117,46 @@ def _utc_now() -> str:
     # Preserve the precision the clock supplies. Truncating a 12:00:00.900 read to
     # 12:00:00 would recreate the early time-of-knowledge claim this stamp prevents.
     return datetime.now(UTC).isoformat().replace("+00:00", "Z")
+
+
+def complete_league_standings(
+    payloads: dict[str, bytes], league_ids: Sequence[int]
+) -> dict[str, str]:
+    """Fetch missing standings pages before the capture's knowledge-time stamp."""
+
+    added: dict[str, str] = {}
+    for league_id in dict.fromkeys(league_ids):
+        name = league_standings_payload(league_id)
+        count = 0
+        updated: str | None = None
+        for number in range(1, MAX_PUBLISHED_LEAGUE_PAGES + 1):
+            page = fpl_league_standings_page(
+                payloads[name], league_id=league_id, expected_page=number
+            )
+            if updated is not None and page.last_updated_data != updated:
+                raise DataSourceError(f"League {league_id} standings changed between pages.")
+            updated = page.last_updated_data
+            if not page.members and (page.has_next or number > 1):
+                raise DataSourceError(f"League {league_id} standings page {number} is empty.")
+            count += len(page.members)
+            if count > MAX_PUBLISHED_LEAGUE_MEMBERS or (
+                page.has_next
+                and (count == MAX_PUBLISHED_LEAGUE_MEMBERS or number == MAX_PUBLISHED_LEAGUE_PAGES)
+            ):
+                raise DataSourceError(
+                    f"League {league_id} exceeds the 20-page / 1000-member limit."
+                )
+            if not page.has_next:
+                break
+            name, path = next(
+                iter(league_standings_page_endpoint_path(league_id, number + 1).items())
+            )
+            url = f"{BASE_URL}/{path}"
+            payloads[name] = fetch(url)
+            added[name] = url
+            print(f"  read     {name}  ({len(payloads[name]):,} bytes)")
+        fpl_captured_league_standings(payloads, league_id=league_id)
+    return added
 
 
 def _ordered_positions(counts: dict[str, int]) -> str:
@@ -300,7 +346,7 @@ def capture(
     The last five supply the exact shifted minutes and points used by the operational
     Phase C component model; the football history needs all of them. Passing
     ``entry_registry`` adds the three documents each registered entry publishes, and
-    ``league_ids`` adds each league's standings page, so a capture can record who was in
+    ``league_ids`` adds every page of each league's standings, so a capture records who was in
     the league when a recommendation was made. Each entry's transfers list and opening
     picks follow (``purchase_price_endpoints``); they sharpen a budget rather than make
     one, so a document the source still refuses after the retries is left out with a line
@@ -343,6 +389,7 @@ def capture(
         for name, url in extra.items():
             payloads[name] = fetch(url)
             print(f"  read     {name}  ({len(payloads[name]):,} bytes)")
+        extra.update(complete_league_standings(payloads, league_ids))
         # A Free Hit week's picks are not the squad the member holds next; read the
         # week before, and keep reading back while that week was a Free Hit as well.
         while earlier := free_hit_basis_endpoints(payloads):

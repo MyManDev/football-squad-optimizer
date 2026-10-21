@@ -23,7 +23,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Final, Protocol
 
-from squadopt.data.sources.fpl_live import fpl_league_standings
+from squadopt.data.sources.fpl_live import fpl_captured_league_standings
 from squadopt.live.free_hit import FREE_HIT_CHIP, played_free_hit_last_week
 from squadopt.live.rules import CHIP_NAMES, SeasonRules
 from squadopt.live.transfers import HeldSquad
@@ -231,7 +231,7 @@ class EntryRegistry:
                 f"league {league_id} is not known."
             )
         members = {
-            row.entry_id for row in fpl_league_standings(payloads[name], league_id=league_id)
+            row.entry_id for row in fpl_captured_league_standings(payloads, league_id=league_id)
         }
         return EntryRegistry(
             entries=tuple(entry for entry in self.entries if entry.entry_id in members),
