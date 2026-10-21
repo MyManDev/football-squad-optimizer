@@ -2,13 +2,16 @@
 
 import functools
 import multiprocessing
-from collections.abc import Callable, Iterable, Iterator
+import pickle
+from collections.abc import Callable, Iterable, Iterator, Mapping
 from concurrent.futures import Executor, ProcessPoolExecutor
 from contextlib import contextmanager
+from io import BytesIO
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any
 
-from squadopt.application.advice import member_horizon_builder
+from squadopt.application.advice import MemberControl, member_horizon_builder
 from squadopt.application.capture_entries import CapturePicksProvider
 from squadopt.application.chip_forecast_publication import forecast_source
 from squadopt.application.league_publication import (
@@ -91,9 +94,35 @@ def _worker_init(
     )
 
 
-def _render_in_worker(task: MemberRenderTask) -> MemberRender:
+def _frozen_mapping(values: dict[Any, Any]) -> Mapping[Any, Any]:
+    return MappingProxyType(values)
+
+
+class _ControlPickler(pickle.Pickler):
+    """Transport internal controls without changing Python's global pickle registry."""
+
+    def reducer_override(self, value: Any) -> Any:
+        if isinstance(value, MappingProxyType):
+            return _frozen_mapping, (dict(value),)
+        return NotImplemented
+
+
+def _control_bytes(control: MemberControl | None) -> bytes | None:
+    if control is None:
+        return None
+    stream = BytesIO()
+    _ControlPickler(stream).dump(control)
+    return stream.getvalue()
+
+
+def _render_in_worker(task: MemberRenderTask, encoded: bytes | None = None) -> MemberRender:
+    # Only the parent process creates these bytes; files and external input never do.
+    control = None if encoded is None else pickle.loads(encoded)
+    if control is not None and not isinstance(control, MemberControl):
+        raise ValueError("The worker received an invalid member control.")
+    controls = None if control is None else {task.entry_id: control}
     with native_window_executor(execute_native_window):
-        return render_member(task, **_WORKER_CONTEXT)
+        return render_member(task, **_WORKER_CONTEXT, controls=controls)
 
 
 def pool_mapper(
@@ -116,7 +145,15 @@ def pool_mapper(
     ) -> Iterable[MemberRender]:
         if not (isinstance(function, functools.partial) and function.func is render_member):
             raise ValueError("The pool mapper runs render_member only.")
-        return executor.map(_render_in_worker, list(tasks))
+        listed = list(tasks)
+        controls = function.keywords.get("controls")
+        if controls is None:
+            return executor.map(_render_in_worker, listed)
+        return executor.map(
+            _render_in_worker,
+            listed,
+            [_control_bytes(controls.get(task.entry_id)) for task in listed],
+        )
 
     return mapper
 
@@ -127,7 +164,7 @@ def league_mapper(request: LeaguePublicationRequest, workers: int = 1) -> Iterat
 
     if workers < 1:
         raise ValueError("--workers must be at least 1")
-    if workers == 1:
+    if workers == 1 or request.menu == "device":
         with native_window_executor(execute_native_window):
             yield map
         return

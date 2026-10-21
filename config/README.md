@@ -9,6 +9,11 @@ The list of classic leagues the site serves, in the `league_list_v1` contract. E
 a positive `league_id`, and no league appears twice; the committed file also gives each line a
 `label` for people. The list names at least one league. Today it names one, league 352490.
 
+`menu` is `full` or `device`; omitting it keeps `full`. A device league publishes the
+standings, member squads, chip states and a device index without solving member advice.
+The weekly journal reports preparation, projection, member and publication timings for
+each league. League 352490 keeps its full menu during the transition.
+
 | Reader | How it reads the list |
 | --- | --- |
 | `squadopt.contracts.league_list` | Defines the contract, the default path (`LEAGUE_LIST_FILE`) and `read_league_list`, which refuses a document that is not `league_list_v1` |

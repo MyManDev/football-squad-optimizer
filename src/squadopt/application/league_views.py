@@ -253,6 +253,7 @@ def render_member(
     manager_words: ManagerWords | None = None,
     top100_counts: Top100Counts | None = None,
     chip_forecast_source: ForecastSource | None = None,
+    controls: Mapping[int, MemberControl] | None = None,
 ) -> MemberRender:
     """Solve one member's control once, then every (rival strategy, rival) from it, and
     every saf-puan window and Top 100 weight the task names.
@@ -272,7 +273,11 @@ def render_member(
 
     try:
         picks = provider.picks(task.entry_id, task.season, task.gameweek - 1)
-        control = solve_member_control(picks, inputs, projection, rules)
+        control = controls.get(task.entry_id) if controls is not None else None
+        if control is not None and control.picks != picks:
+            raise EntryError("The baseline control belongs to different member picks.")
+        if control is None:
+            control = solve_member_control(picks, inputs, projection, rules)
         baseline = advise_entry(
             AdviseEntryRequest(
                 season=task.season,
@@ -895,7 +900,11 @@ class LeagueViewsReport:
 
 
 def _prune_unpublished_members(
-    out: Path, published: Collection[int], *, refused: Collection[int] = ()
+    out: Path,
+    published: Collection[int],
+    *,
+    refused: Collection[int] = (),
+    device: Collection[int] = (),
 ) -> tuple[str, ...]:
     """Remove the member documents this run did not write, and name them.
 
@@ -933,7 +942,7 @@ def _prune_unpublished_members(
     """
 
     removed: list[str] = []
-    kept = frozenset(refused)
+    kept = frozenset(refused) | frozenset(device)
 
     def _stale(name: str) -> bool:
         try:
@@ -944,7 +953,12 @@ def _prune_unpublished_members(
     entries = out / "entries"
     if entries.is_dir():
         for path in sorted(entries.iterdir()):
-            if path.is_file() and path.suffix == ".json" and _stale(path.stem):
+            if (
+                path.is_file()
+                and path.suffix == ".json"
+                and _stale(path.stem)
+                and path.stem not in {str(entry) for entry in device}
+            ):
                 path.unlink()
                 removed.append(f"entries/{path.name}")
     advice = out / "advice"
@@ -1261,6 +1275,8 @@ def build_league_views(
     top100_counts: Top100Counts | None = None,
     top100_unavailable_reason: str | None = None,
     chip_forecast_source: ForecastSource | None = None,
+    controls: Mapping[int, MemberControl] | None = None,
+    device_only: bool = False,
 ) -> LeagueViewsReport:
     """Render every registered member's squad and advice under ``out_dir``.
 
@@ -1472,23 +1488,28 @@ def build_league_views(
         )
         for registration in registrations
     ]
-    renders = {
-        render.entry_id: render
-        for render in mapper(
-            functools.partial(
-                render_member,
-                provider=provider,
-                inputs=inputs,
-                projection=projection,
-                rules=rules,
-                horizon_builder=horizon_builder,
-                manager_words=manager_words,
-                top100_counts=top100_counts,
-                chip_forecast_source=chip_forecast_source,
-            ),
-            tasks,
-        )
-    }
+    renders = (
+        {}
+        if device_only
+        else {
+            render.entry_id: render
+            for render in mapper(
+                functools.partial(
+                    render_member,
+                    provider=provider,
+                    inputs=inputs,
+                    projection=projection,
+                    rules=rules,
+                    horizon_builder=horizon_builder,
+                    manager_words=manager_words,
+                    top100_counts=top100_counts,
+                    chip_forecast_source=chip_forecast_source,
+                    controls=controls,
+                ),
+                tasks,
+            )
+        }
+    )
     # Stamped here, once every member is solved and before the first file is written: the
     # envelopes and each member's record carry it, and the member history shows it as the
     # advice's build time. Taken before the solves, it was earlier than every file it
@@ -1524,10 +1545,67 @@ def build_league_views(
     published_indexes: dict[int, tuple[str, bytes]] = {}
     #: Members with no advice this week, whose index names why.
     refused: set[int] = set()
+    device_members: set[int] = set()
 
     for registration, task in zip(registrations, tasks, strict=True):
         entry_id = int(registration.entry_id)
         picks_or_error = fetched[entry_id]
+        if device_only:
+            block = (
+                _device_plan_block(picks_or_error, inputs, projection, rules, prices, top100_counts)
+                if isinstance(picks_or_error, EntryPicks)
+                else None
+            )
+            if not isinstance(picks_or_error, EntryPicks) or block is None:
+                reason = (
+                    str(picks_or_error)
+                    if isinstance(picks_or_error, str)
+                    else "device_inputs_unavailable"
+                )
+                refused.add(entry_id)
+                results.append(MemberViewResult(entry_id, labels[entry_id], False, reason=reason))
+                member_rows.append(_row(entry_id, labels[entry_id], "empty"))
+                _write(f"advice/{entry_id}/index.json", _refused_member_index(task, reason=reason))
+                continue
+            missing = [
+                field
+                for field, known in (
+                    ("free_transfers", picks_or_error.free_transfers_known),
+                    ("purchase_prices", picks_or_error.purchase_prices_known),
+                )
+                if not known
+            ]
+            member_row = _row(entry_id, labels[entry_id], "partial" if missing else "complete")
+            squad_payload = _entry_squad_payload(
+                picks_or_error,
+                inputs,
+                projection,
+                rules,
+                league_id=league_id,
+                member_row=member_row,
+                missing=missing,
+                scored_gameweek=scored_gameweek,
+            )
+            squad_payload["device_plan"] = block
+            _write(f"entries/{entry_id}.json", squad_payload)
+            index = _refused_member_index(task, reason="on_device")
+            index.update(
+                menu="device",
+                unavailable=[],
+                source_snapshot_id=inputs.snapshot_id,
+                suggested_strategy=_suggested_strategy(
+                    task, placings=placings, gameweek=gameweek, scored_gameweek=scored_gameweek
+                ),
+                chip_states=squad_payload["chips"],
+                chips={"available": False, "reason": "on_device"},
+                top100={"available": False, "reason": "on_device"},
+                evidence={"available": False, "reason": "on_device"},
+            )
+            _write(f"advice/{entry_id}/index.json", index)
+            device_members.add(entry_id)
+            member_rows.append(member_row)
+            results.append(MemberViewResult(entry_id, labels[entry_id], True))
+            continue
         render = renders[entry_id]
         if not isinstance(picks_or_error, EntryPicks) or render.baseline is None:
             reason = "; ".join(
@@ -2096,7 +2174,7 @@ def build_league_views(
     # into is last week's. Removed after members.json rather than before the renders, so a
     # run that dies mid-batch leaves the old tree whole rather than half-deleted.
     removed = _prune_unpublished_members(
-        out, {picks.entry_id for picks, *_ in publications}, refused=refused
+        out, {picks.entry_id for picks, *_ in publications}, refused=refused, device=device_members
     )
 
     # The record comes last, after every published file is on disk: a refusal here must

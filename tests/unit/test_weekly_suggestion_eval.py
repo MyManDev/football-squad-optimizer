@@ -19,6 +19,7 @@ import pytest
 from squadopt.application import weekly_suggestion_eval as review
 from squadopt.application.advice_record import (
     MEMBER_ADVICE_RECORD_CONTRACT_VERSION,
+    MEMBER_BASELINE_RECORD_CONTRACT_VERSION,
     RECORD_FILE,
     record_member_advice,
 )
@@ -108,6 +109,101 @@ def points() -> pd.DataFrame:
 def choose(root: Path) -> dict[str, Any] | None:
     return review.select_record(
         root, season=SEASON, gameweek=4, entry_id=101, deadline_utc=DEADLINE
+    )
+
+
+def test_one_baseline_is_read_by_both_leagues(tmp_path: Path) -> None:
+    record = recorded()
+    del record["league_id"]
+    record["contract_version"] = MEMBER_BASELINE_RECORD_CONTRACT_VERSION
+    record["source"] = "server_one_week_baseline"
+    record_member_advice(tmp_path, record)
+    for league in (352490, 755941):
+        selected = review.select_record(
+            tmp_path,
+            season=SEASON,
+            gameweek=4,
+            entry_id=101,
+            deadline_utc=DEADLINE,
+            published={(101, 4): "capture-a"},
+            league_id=league,
+        )
+        assert selected == record
+        assert (
+            review.score_recorded_advice(record, review._advice(record), points())[0].net_points
+            == 20
+        )
+
+
+def test_baseline_cannot_carry_a_league_identity(tmp_path: Path) -> None:
+    record = recorded()
+    record["contract_version"] = MEMBER_BASELINE_RECORD_CONTRACT_VERSION
+    record_member_advice(tmp_path, record)
+    with pytest.raises(review.SuggestionEvaluationError, match="identity"):
+        choose(tmp_path)
+
+
+def _baseline(**kwargs: Any) -> dict[str, Any]:
+    record = recorded(**kwargs)
+    del record["league_id"]
+    record.update(
+        contract_version=MEMBER_BASELINE_RECORD_CONTRACT_VERSION,
+        source="server_one_week_baseline",
+    )
+    return record
+
+
+def test_dual_stores_keep_the_original_digest_and_serve_the_second_league(tmp_path):
+    legacy = recorded()
+    baseline = _baseline(digest="b" * 64)
+    record_member_advice(tmp_path / "records", legacy)
+    record_member_advice(tmp_path / "baselines", baseline)
+    for league, expected in [(352490, legacy), (755941, baseline)]:
+        assert (
+            review.select_record(
+                tmp_path / "records",
+                baseline_record_root=tmp_path / "baselines",
+                season=SEASON,
+                gameweek=4,
+                entry_id=101,
+                league_id=league,
+                deadline_utc=DEADLINE,
+                published={(101, 4): "capture-a"},
+            )
+            == expected
+        )
+
+
+@pytest.mark.parametrize("fault", ["source", "generated_at_utc"])
+def test_legacy_record_cannot_hide_a_broken_baseline(tmp_path, fault):
+    baseline = _baseline()
+    baseline[fault] = "wrong" if fault == "source" else "2026-09-01T00:00:00Z"
+    record_member_advice(tmp_path / "records", recorded())
+    record_member_advice(tmp_path / "baselines", baseline)
+    with pytest.raises(review.SuggestionEvaluationError):
+        review.select_record(
+            tmp_path / "records",
+            baseline_record_root=tmp_path / "baselines",
+            season=SEASON,
+            gameweek=4,
+            entry_id=101,
+            deadline_utc=DEADLINE,
+        )
+
+
+def test_late_legacy_publication_cannot_borrow_the_baseline_clock(tmp_path):
+    record_member_advice(tmp_path / "records", recorded(published="2026-09-13T12:00:00Z"))
+    record_member_advice(tmp_path / "baselines", _baseline())
+    assert (
+        review.select_record(
+            tmp_path / "records",
+            baseline_record_root=tmp_path / "baselines",
+            season=SEASON,
+            gameweek=4,
+            entry_id=101,
+            deadline_utc=DEADLINE,
+        )
+        is None
     )
 
 
@@ -658,6 +754,58 @@ def test_a_rerender_keeps_every_week_or_refuses_before_any_history_changes(tmp_p
             published=shown_everywhere((101, 202), (3, 4)),
         )
     assert {path: path.read_bytes() for path in paths} == before
+
+
+def test_baseline_store_keeps_legacy_bytes_then_adds_a_week_without_dropping_either_store(
+    tmp_path: Path,
+) -> None:
+    anchor = settled_two_weeks(tmp_path)
+    paths = published(tmp_path, anchor)
+    before = {path: path.read_bytes() for path in paths}
+    baselines = tmp_path / "baselines"
+    for entry in (101, 202):
+        record_member_advice(
+            baselines,
+            _baseline(entry_id=entry, digest="b" * 64),
+        )
+    arguments = dict(
+        record_root=tmp_path / "records",
+        baseline_record_root=baselines,
+        snapshot_root=tmp_path / "snapshots",
+        as_of_snapshot=anchor,
+        season=SEASON,
+        league_id=352490,
+        entry_ids=[101, 202],
+        out_dir=tmp_path / "out",
+        published=shown_everywhere((101, 202), (3, 4)),
+    )
+    review.publish_suggestion_histories(**arguments)
+    assert {path: path.read_bytes() for path in paths} == before
+    for entry in (101, 202):
+        record_member_advice(
+            baselines,
+            _baseline(
+                entry_id=entry,
+                gameweek=5,
+                captured="2026-09-16T06:00:00Z",
+                published="2026-09-16T07:00:00Z",
+            ),
+        )
+    arguments["as_of_snapshot"] = capture_with(
+        tmp_path / "snapshots", events={3: True, 4: True, 5: False}
+    )
+    arguments["published"] = shown_everywhere((101, 202), (3, 4, 5))
+    outputs = review.publish_suggestion_histories(**arguments)
+    after = {path: path.read_bytes() for path in outputs}
+    for entry in (101, 202):
+        history = json.loads((tmp_path / f"out/history/{entry}.json").read_bytes())
+        assert [week["gameweek"] for week in history["payload"]["weeks"]] == [5, 4, 3]
+    # Losing the new store is as serious as losing an old archive week.
+    with pytest.raises(review.SuggestionEvaluationError, match="history would drop"):
+        review.publish_suggestion_histories(
+            **{**arguments, "baseline_record_root": tmp_path / "missing-baselines"}
+        )
+    assert {path: path.read_bytes() for path in outputs} == after
 
 
 def test_later_other_strategy_does_not_displace_the_pure_points_record(tmp_path: Path) -> None:

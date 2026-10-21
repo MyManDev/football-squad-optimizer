@@ -677,6 +677,7 @@ def plan_transfers(
     chip: str | None = None,
     transfer_hit_cost_points: float | None = None,
     expected_lineups: bool = False,
+    linearization_level: int | None = None,
 ) -> tuple[TransferPlanResult, TransferDecision, TransferPlanningConfig]:
     """Decide this deadline's transfers from the held squad with a one-week horizon.
 
@@ -705,6 +706,7 @@ def plan_transfers(
         prepared.settings,
         prepared.transfer_config,
         chips=prepared.availability,
+        linearization_level=linearization_level,
     )
     if not plan.has_solution or not plan.weeks:
         raise DataSourceError(

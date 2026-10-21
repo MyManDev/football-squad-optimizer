@@ -24,6 +24,7 @@ from squadopt.application.league_publication import (
     league_tree_capture,
     leagues_beside,
     prepare_league_publication,
+    prepare_tracked_baselines,
     publish_league,
     remove_device_tables,
     settle_legacy_tree,
@@ -274,9 +275,12 @@ def test_installed_member_publication_and_pool_write_the_same_contracts(
     assert document["payload"]["weeks"][0]["status"] == "unsettled"
     assert document["payload"]["weeks"][0]["advice_generated_at_utc"] == "2026-08-27T10:00:00Z"
 
-    parallel = replace(request, out_dir=tmp_path / "parallel")
+    parallel = replace(
+        request, out_dir=tmp_path / "parallel", baseline_record_root=tmp_path / "baselines"
+    )
+    baselines = prepare_tracked_baselines([parallel])
     with league_mapper(parallel, workers=2) as mapper:
-        second = publish_league(parallel, mapper=mapper)
+        second = publish_league(parallel, mapper=mapper, baselines=baselines)
     assert first.report.files == second.report.files
     for output in (request.out_dir, parallel.out_dir):
         index = output / "data/leagues/352490/advice" / str(member_fixture.ENTRY_ID) / "index.json"

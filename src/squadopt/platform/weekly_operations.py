@@ -10,6 +10,7 @@ import re
 import secrets
 import shutil
 import sys
+import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass, replace
 from datetime import UTC, datetime
@@ -22,6 +23,7 @@ from squadopt.application.entries import EntryRegistry
 from squadopt.application.evidence_io import write_json
 from squadopt.application.league_publication import (
     LeaguePublicationRequest,
+    prepare_tracked_baselines,
     publish_league,
     records_advice_for,
     remove_device_tables,
@@ -55,7 +57,7 @@ from squadopt.application.weekly_plan import (
     rotation_pair_is_readable,
     rotation_source_capture,
 )
-from squadopt.contracts.league_list import LEAGUE_LIST_FILE, LeagueListError, read_league_list
+from squadopt.contracts.league_list import LEAGUE_LIST_FILE, LeagueListError, parse_league_menus
 from squadopt.contracts.league_tree import (
     LEGACY_TREE,
     LeagueDirectoryError,
@@ -111,6 +113,10 @@ class WeeklyPaths:
     """Root above every component's log directory, never qualified with a component."""
     records: Path
     club_news_fixture: Path
+
+    @property
+    def baselines(self) -> Path:
+        return self.records.parent / "member_baselines"
 
     @classmethod
     def under(cls, workspace: Path, *, out: Path | None = None) -> WeeklyPaths:
@@ -251,7 +257,10 @@ class WeeklyOperations:
             self.stages.append("publish")
         self.rule_snapshot = request.snapshot_id or latest_live_snapshot(paths.snapshots)
         self.ledger_inputs = sorted((paths.ledger / request.season).glob("gw*"))
-        self.record_inputs = recorded_capture_directories(paths.records, request.season)
+        self.record_inputs = [
+            *recorded_capture_directories(paths.records, request.season),
+            *recorded_capture_directories(paths.baselines, request.season),
+        ]
         if resume:
             prior = read_run_request(paths.journal, run_id)
             # Derived reads belong to the original preflight, even after this run captures
@@ -372,13 +381,14 @@ class WeeklyOperations:
         capture = self.request.snapshot_id
         if capture is None or not self.records_advice:
             return
-        recorded = recorded_commits(
-            self.paths.records, self.request.season, self.request.gameweek, capture
-        )
         by_commit: dict[str, list[int]] = {}
-        for entry_id, commit in sorted(recorded.items()):
-            if commit is not None and commit != self.repository_commit:
-                by_commit.setdefault(str(commit), []).append(entry_id)
+        for root in (self.paths.records, self.paths.baselines):
+            recorded = recorded_commits(root, self.request.season, self.request.gameweek, capture)
+            for entry_id, commit in sorted(recorded.items()):
+                if commit is not None and commit != self.repository_commit:
+                    entries = by_commit.setdefault(str(commit), [])
+                    if entry_id not in entries:
+                        entries.append(entry_id)
         if not by_commit:
             return
         named = "; ".join(
@@ -791,11 +801,13 @@ class WeeklyOperations:
             self.paths.registry,
             self.paths.out,
             league_id,
+            menu="device" if league_id in self.request.device_league_ids else "full",
             season=self.request.season,
             gameweek=self.request.gameweek,
             handoff_path=Path(self.values["handoff"]["path"]),
             record_root=self.paths.records if record else None,
             history_record_root=self.paths.records,
+            baseline_record_root=self.paths.baselines,
             # The manager's word rides on the rotation stage: when it ran, its table and
             # the source the claims came from reach every member's menu as a switchable,
             # priced constraint; when it did not, the index says there is none.
@@ -859,6 +871,22 @@ class WeeklyOperations:
         leagues: dict[str, dict[str, object]] = {}
         beside: list[PublishedLeague] = []
         gameweek: int | None = None
+        baselines = None
+        baseline_seconds = 0.0
+        if record:
+            baseline_started = time.perf_counter()
+            baselines = prepare_tracked_baselines(
+                tuple(self._league_request(league, False) for league in self.request.league_ids),
+                read_capture=self._capture_for_publication,
+            )
+            baseline_seconds = round(time.perf_counter() - baseline_started, 6)
+            if getattr(self, "log", None) is not None:
+                self.log.event(
+                    "tick.week.baselines.prepared",
+                    entries=len(baselines.records),
+                    refused=dict(baselines.refused),
+                    elapsed_seconds=baseline_seconds,
+                )
         # A tree from before the league directory is settled before any league renders,
         # whatever the order of the list: adopted by the league it names, or removed as a
         # leftover beside a directory; one that names a league the list does not have is
@@ -875,21 +903,57 @@ class WeeklyOperations:
             # Each league is stamped after its own solves (the stamp is when the advice
             # was published, read against the deadline); the directory the last league
             # writes carries the latest stamp, and the release check reads that one.
-            recorded = record and records_advice_for(league_id)
+            recorded = (
+                record
+                and league_id not in self.request.device_league_ids
+                and records_advice_for(league_id)
+            )
             request = self._league_request(league_id, recorded)
+            started = time.perf_counter()
+            timings: dict[str, float] = {}
+
+            def on_stage(
+                stage: str,
+                *,
+                timings: dict[str, float] = timings,
+                started: float = started,
+                request: LeaguePublicationRequest = request,
+            ) -> None:
+                timings[stage] = round(time.perf_counter() - started, 6)
+                if getattr(self, "log", None) is not None:
+                    self.log.event(
+                        "tick.week.league.substage",
+                        league_id=request.league_id,
+                        menu=request.menu,
+                        stage=stage,
+                        elapsed_seconds=timings[stage],
+                    )
+
             with league_mapper(request, self.request.workers) as mapper:
                 result = publish_league(
                     request,
                     mapper=mapper,
                     beside=beside,
                     read_capture=self._capture_for_publication,
+                    on_stage=on_stage,
+                    baselines=baselines,
                 )
             if result.published is not None:
                 beside.append(result.published)
             gameweek = result.gameweek
             outputs.extend(result.output_paths)
             leagues[str(league_id)] = {
-                "advice_recorded": recorded,
+                "menu": request.menu,
+                "timings": timings,
+                "advice_recorded": recorded
+                or (
+                    baselines is not None
+                    and any(
+                        member.entry_id in baselines.records
+                        for member in result.report.members
+                        if member.rendered
+                    )
+                ),
                 # What the build told the operator about individual members (a name it
                 # changed, a mode or the manager's word it could not solve) and the files
                 # it removed from the tree, so a run is not "completed" in silence.
@@ -905,14 +969,12 @@ class WeeklyOperations:
                 # the rest; empty when the capture held no member's picks.
                 "purchase_prices_note": result.purchase_prices_note,
             }
-        # Whether this run recorded advice at all, which the publish stage requires: a run
-        # asked to record whose leagues the record does not name recorded nothing, and
-        # says so where the status page reads.
+        # The publication receipt names whether any rendered member was recorded.
         recorded_any = any(bool(row["advice_recorded"]) for row in leagues.values())
         if record and not recorded_any and getattr(self, "log", None) is not None:
             self.log.event(
                 "tick.week.advice_record.skipped",
-                reason="no league of the list is the one the advice record names",
+                reason="no rendered member has a complete server baseline",
                 leagues=list(self.request.league_ids),
                 capture=self._capture_id(),
             )
@@ -922,6 +984,11 @@ class WeeklyOperations:
                 "snapshot_id": self._capture_id(),
                 "gameweek": gameweek,
                 "advice_recorded": recorded_any,
+                "baselines": {
+                    "entries": 0 if baselines is None else len(baselines.records),
+                    "refused": {} if baselines is None else dict(baselines.refused),
+                    "elapsed_seconds": baseline_seconds,
+                },
                 # A tree from before the league directory, and what became of it.
                 "legacy_tree": (
                     None if legacy is None else {"outcome": legacy[0], "league_id": legacy[1]}
@@ -1364,6 +1431,17 @@ def _revision(workspace: Path, supplied: str | None) -> str:
     return revision.commit
 
 
+def read_league_menus(path: Path) -> dict[int, str]:
+    """Read the weekly operator configuration at its filesystem boundary."""
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError as error:
+        raise LeagueListError(f"No league list at {path}.") from error
+    except ValueError as error:
+        raise LeagueListError(f"{path} does not parse as JSON.") from error
+    return parse_league_menus(document)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -1385,10 +1463,15 @@ def main(argv: list[str] | None = None) -> int:
             return 0 if result["status"] == "completed" and result["missed"] is not True else 1
         if args.league and args.league_list is not None:
             parser.error("--league and --league-list name the leagues two ways; use one")
+        device_league_ids: tuple[int, ...] = ()
         if args.league_list is not None:
             try:
                 # Relative to the workspace, like --out and --handoff.
-                league_ids = read_league_list(root / args.league_list)
+                menus = read_league_menus(root / args.league_list)
+                league_ids = tuple(menus)
+                device_league_ids = tuple(
+                    league for league, menu in menus.items() if menu == "device"
+                )
             except LeagueListError as error:
                 parser.error(str(error))
         else:
@@ -1416,6 +1499,7 @@ def main(argv: list[str] | None = None) -> int:
             args.workers,
             args.publish,
             args.rotation_capture,
+            device_league_ids,
         )
         print(request.plan().describe())
         for identifier in args.benchmark_picks_freeze:

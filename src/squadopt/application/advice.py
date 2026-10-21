@@ -452,6 +452,7 @@ def solve_member_control(
     rules: SeasonRules,
     *,
     phase_e_diagnostic: TransferAdviceDiagnostic | None = None,
+    linearization_level: int | None = None,
 ) -> MemberControl:
     """Solve the member's one-week pure-points plan from their own squad."""
 
@@ -462,10 +463,17 @@ def solve_member_control(
     held = held_squad_from_picks(picks, current_prices=prices)
     if projection.diagnostics.get("model_name") == "fixture_football_candidate":
         plan, decision, transfer_config = plan_transfers(
-            inputs, projection, held, rules, expected_lineups=True
+            inputs,
+            projection,
+            held,
+            rules,
+            expected_lineups=True,
+            linearization_level=linearization_level,
         )
     else:
-        plan, decision, transfer_config = plan_transfers(inputs, projection, held, rules)
+        plan, decision, transfer_config = plan_transfers(
+            inputs, projection, held, rules, linearization_level=linearization_level
+        )
     try:
         run_transfer_advice_diagnostic(
             plan,
