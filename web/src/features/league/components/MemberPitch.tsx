@@ -4,6 +4,7 @@ import { useLanguage } from "../../../i18n/context";
 import { clubCode, clubSwatch, type ClubCodes } from "../../../lib/clubs";
 import { figure } from "../../../lib/format";
 import type { CoachAbsence } from "../advice/coachAbsences";
+import type { ModelChange } from "../advice/modelSwitch";
 import { CoachNewsMark } from "./CoachNews";
 import styles from "./MemberPitch.module.css";
 
@@ -65,13 +66,19 @@ function ArrowIcon() {
   );
 }
 
+/** A plate's parts that depend on the plan shown before it (#1131). */
+export type PlateChange = Pick<ModelChange, "key" | "changed"> | null;
+
 function Plate({
   player,
   codes,
+  changed,
   news,
 }: {
   player: PitchPlayer;
   codes: ClubCodes;
+  /** Brought in by a switch of prediction model: said in the plate's text, as 'New' is. */
+  changed: boolean;
   news?: CoachAbsence;
 }) {
   const { locale, messages } = useLanguage();
@@ -79,7 +86,7 @@ function Plate({
   const swatch = clubSwatch(code);
   const shortName = player.shortName.trim() || player.name;
   return (
-    <div className={styles.plate}>
+    <div className={styles.plate} data-plate="">
       <span className={styles.name} title={player.name}>
         {swatch ? (
           <span
@@ -93,6 +100,9 @@ function Plate({
         </span>
       </span>
       {shortName !== player.name ? <span className="visually-hidden">{player.name}</span> : null}
+      {changed ? (
+        <span className="visually-hidden"> {messages.leagueMembers.modelChangedMark}</span>
+      ) : null}
       <span className={styles.code}>
         {swatch ? (
           <span
@@ -158,10 +168,17 @@ function AttackLabel({ at }: { at: "first" | "last" }) {
 export function MemberPitch({
   players,
   codes,
+  modelChange = null,
   news,
 }: {
   players: PitchPlayer[];
   codes: ClubCodes;
+  /**
+   * The players a switch of prediction model brought into this plan (#1131): each of them is
+   * marked, with the mark named in its plate's text. The one short rise is the squad's to
+   * start, over the pitch and the bench together.
+   */
+  modelChange?: PlateChange;
   news?: ReadonlyMap<number, CoachAbsence>;
 }) {
   const { messages } = useLanguage();
@@ -231,8 +248,14 @@ export function MemberPitch({
                     key={player.playerId}
                     className={styles.token}
                     style={{ "--i": index } as CSSProperties}
+                    data-model-changed={modelChange?.changed.has(player.playerId) ? "" : undefined}
                   >
-                    <Plate player={player} codes={codes} news={news?.get(player.playerId)} />
+                    <Plate
+                      player={player}
+                      codes={codes}
+                      news={news?.get(player.playerId)}
+                      changed={modelChange?.changed.has(player.playerId) ?? false}
+                    />
                     {line.position === labelLine && index === 0 ? <AttackLabel at="first" /> : null}
                     {line.position === "DEF" && defenders >= 4 && index === defenders - 1 ? (
                       <AttackLabel at="last" />
@@ -260,14 +283,20 @@ export interface BenchPlayer {
   order: number | null;
 }
 
-/** The bench under the pitch, read left to right in the published order. */
+/**
+ * The bench under the pitch, read left to right in the published order. A player a switch of
+ * prediction model brought onto it from outside the squad is marked as a changed plate is,
+ * with the mark named in the item's text.
+ */
 export function MemberBench({
   players,
   codes,
+  modelChange = null,
   news,
 }: {
   players: BenchPlayer[];
   codes: ClubCodes;
+  modelChange?: PlateChange;
   news?: ReadonlyMap<number, CoachAbsence>;
 }) {
   const { locale, messages } = useLanguage();
@@ -285,13 +314,21 @@ export function MemberBench({
             const code = clubCode(player.team, codes);
             const swatch = clubSwatch(code);
             const shortName = player.shortName.trim() || player.name;
+            const changed = modelChange?.changed.has(player.playerId) ?? false;
             return (
-              <li key={player.playerId} className={styles.benchItem}>
+              <li
+                key={player.playerId}
+                className={styles.benchItem}
+                data-model-changed={changed ? "" : undefined}
+              >
                 <span className={styles.benchOrder}>{player.order ?? "-"}</span>
-                <strong className={styles.benchName}>
+                <strong className={styles.benchName} data-plate="">
                   <span aria-hidden={shortName !== player.name || undefined}>{shortName}</span>
                   {shortName !== player.name ? (
                     <span className="visually-hidden">{player.name}</span>
+                  ) : null}
+                  {changed ? (
+                    <span className="visually-hidden"> {copy.modelChangedMark}</span>
                   ) : null}
                 </strong>
                 <span className={styles.benchMeta}>

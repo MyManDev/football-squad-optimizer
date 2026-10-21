@@ -716,3 +716,21 @@
     grid-area: xp;
   }
 }
+
+/* A player a switch of prediction model brought into the plan (#1131): a static ring in the
+   page's one accent, until the next plan, with an ink edge on either side so the ring reads
+   at 3:1 or more on both grass stripes and on the bench's surface (the accent alone is under
+   3:1 on the lighter stripe). The plate's one short rise is script, on the motion tokens'
+   data time; the ring itself never moves. The bench item carries the same ring. */
+.token[data-model-changed] .plate,
+.benchItem[data-model-changed] .benchName {
+  outline: 2px solid var(--color-lime);
+  outline-offset: 1px;
+  box-shadow:
+    0 0 0 1px var(--color-text),
+    0 0 0 4px var(--color-text);
+}
+
+.benchItem[data-model-changed] .benchName {
+  border-radius: var(--radius-s);
+}
