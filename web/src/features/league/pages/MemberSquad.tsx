@@ -1,6 +1,8 @@
 import { useId, useState, type ReactNode } from "react";
 
 import { EmptyState } from "../../../design/components/EmptyState";
+import type { CoachAbsence } from "../advice/coachAbsences";
+import { CoachNews } from "../components/CoachNews";
 import { useLanguage } from "../../../i18n/context";
 import type { ClubCodes } from "../../../lib/clubs";
 import { figure } from "../../../lib/format";
@@ -28,12 +30,16 @@ export function MemberSquad({
   plan,
   codes,
   list,
+  news = new Map<number, CoachAbsence>(),
+  held,
 }: {
   onPitch: SquadOnPitch;
   plan: EntryAdvice | null;
   codes: ClubCodes;
   /** The plan's lineup as a list; without one there is no list view and no toggle. */
   list: ReactNode;
+  news?: ReadonlyMap<number, CoachAbsence>;
+  held?: EntrySquad;
 }) {
   const { language, locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
@@ -52,6 +58,11 @@ export function MemberSquad({
   const planned = onPitch.source === "plan";
   const hasList = planned && list != null;
   const own = planned && finite(plan?.expected_own_points) ? plan.expected_own_points : null;
+  const newsPlayers = new Map(
+    [...onPitch.eleven, ...onPitch.bench].map((player) => [player.playerId, player.name]),
+  );
+  for (const player of [...(held?.starting_xi ?? []), ...(held?.bench ?? [])])
+    newsPlayers.set(player.player_id, player.name);
   // The list view states the plan's own total in its first line, so the heading row
   // does not say it twice.
   const line = [
@@ -92,14 +103,15 @@ export function MemberSquad({
         ) : null}
       </div>
       <div className={styles.pitchView} hidden={hasList && view !== "pitch"}>
-        <MemberPitch players={onPitch.eleven} codes={codes} />
-        <MemberBench players={onPitch.bench} codes={codes} />
+        <MemberPitch players={onPitch.eleven} codes={codes} news={news} />
+        <MemberBench players={onPitch.bench} codes={codes} news={news} />
       </div>
       {hasList ? (
         <div className={styles.listView} hidden={view !== "list"}>
           {list}
         </div>
       ) : null}
+      <CoachNews news={news} players={newsPlayers} />
     </section>
   );
 }

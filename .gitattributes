@@ -10,3 +10,8 @@ scripts/release/*.sh text eol=lf
 # other checkout can reproduce - and refuse to start on a tree that has them right.
 docs/shadow_calibration_*.json text eol=lf
 data/sources/vaastav_fpl_manifest.json text eol=lf
+
+# The role follow-up runners, tests and protocols are committed byte for byte as the record of
+# what ran (#997), and the record and the protocols name their sha256. Most of them hold CRLF and
+# one holds LF; no checkout may convert either.
+docs/research/football_role_followups_2026_10_03/** -text

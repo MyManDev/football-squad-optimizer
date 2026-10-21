@@ -1,8 +1,10 @@
 """Read publication facts from held source bytes, without changing quoted text.
 
-Only explicit publication fields are admitted. Transport Last-Modified, fetch time,
-unlabelled dates and dateModified are not publication facts. Multiple conflicting
-fields, multi-item feeds and malformed metadata remain unverified.
+Only explicit publication fields are admitted. An article's JSON-LD may identify the
+page's single, same-origin canonical URL declared in its head. A language prefix also
+needs the page's own language and matching hreflang declaration. Transport Last-Modified,
+fetch time, unlabelled dates and dateModified are not publication facts. Multiple
+conflicting fields, multi-item feeds and malformed metadata remain unverified.
 """
 
 import hashlib
@@ -73,18 +75,24 @@ def _page_identity(value: str) -> tuple[str, str, str] | None:
     return match[1].lower(), match[2].lower(), path + (match[4] or "")
 
 
+def _page_reference(value: str, base: str) -> tuple[str, str, str] | None:
+    """Resolve only absolute, root-relative and fragment page references."""
+    original = _page_identity(base)
+    if original is None or not value or re.search(r"[\x00-\x20\x7f\\]", value):
+        return None
+    if value.startswith("#"):
+        return original
+    if value.startswith("/"):
+        if value.startswith("//"):
+            return None
+        value = f"{original[0]}://{original[1]}{value}"
+    return _page_identity(value)
+
+
 def _same_page(value: str, base: str) -> bool:
     """Admit absolute, root-relative and fragment references; never infer other relatives."""
     original = _page_identity(base)
-    if original is None or not value or re.search(r"[\x00-\x20\x7f\\]", value):
-        return False
-    if value.startswith("#"):
-        return True
-    if value.startswith("/"):
-        if value.startswith("//"):
-            return False
-        value = f"{original[0]}://{original[1]}{value}"
-    return _page_identity(value) == original
+    return original is not None and _page_reference(value, base) == original
 
 
 class _MetadataReader(HTMLParser):
@@ -95,11 +103,34 @@ class _MetadataReader(HTMLParser):
         self.invalid = False
         self._json: list[str] | None = None
         self._unbound_articles = 0
+        self._in_head = False
+        self._canonical_urls: list[str] = []
+        self._addressed_dates: list[tuple[str, str]] = []
+        self._language: str | None = None
+        self._language_urls: list[tuple[str, str]] = []
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         values = dict(attrs)
-        if tag in ("meta", "time", "script") and len(values) != len(attrs):
+        if tag in ("meta", "time", "script", "link") and len(values) != len(attrs):
             self.invalid = True
+        if tag == "head":
+            self._in_head = True
+        if tag == "html":
+            self._language = (values.get("lang") or "").lower()
+        if (
+            tag == "link"
+            and self._in_head
+            and "canonical" in (values.get("rel") or "").lower().split()
+        ):
+            self._canonical_urls.append(values.get("href") or "")
+        if (
+            tag == "link"
+            and self._in_head
+            and "alternate" in (values.get("rel") or "").lower().split()
+        ):
+            self._language_urls.append(
+                ((values.get("hreflang") or "").lower(), values.get("href") or "")
+            )
         if tag == "meta" and (values.get("property") or values.get("name") or "").casefold() in {
             "article:published_time",
             "datepublished",
@@ -119,6 +150,8 @@ class _MetadataReader(HTMLParser):
             self._json.append(data)
 
     def handle_endtag(self, tag: str) -> None:
+        if tag == "head":
+            self._in_head = False
         if tag != "script" or self._json is None:
             return
         text, self._json = "".join(self._json), None
@@ -157,11 +190,48 @@ class _MetadataReader(HTMLParser):
                             self.candidates.append(
                                 (value if isinstance(value, str) else "", "jsonld_datePublished")
                             )
+                    elif isinstance(address, str) and item.get("datePublished") is not None:
+                        value = item["datePublished"]
+                        self._addressed_dates.append(
+                            (address, value if isinstance(value, str) else "")
+                        )
                 # Only top-level objects and @graph are page metadata. Do not read
                 # dates from recommended articles nested inside an ItemList.
                 graph = item.get("@graph")
                 if isinstance(graph, list):
                     pending.extend(graph)
+
+    def canonical_dates(self) -> list[tuple[str, str]]:
+        """Use the page's own unambiguous canonical identity, never a related article."""
+        original = _page_identity(self.url)
+        identities = {_page_reference(url, self.url) for url in self._canonical_urls}
+        if original is None or len(identities) != 1:
+            return []
+        canonical = identities.pop()
+        if canonical is None or canonical[:2] != original[:2]:
+            return []
+        address = f"{canonical[0]}://{canonical[1]}{canonical[2]}"
+        # Some sites omit the language prefix in their canonical and hreflang URLs
+        # but include it in the article schema. Require all three source declarations
+        # and the identical article path; a locale alone never aliases another page.
+        language = self._language
+        localized: tuple[str, str, str] | None = None
+        if (
+            canonical == original
+            and language is not None
+            and re.fullmatch(r"[a-z]{2}(?:-[a-z]{2})?", language)
+            and any(
+                lang == language and _page_reference(url, self.url) == canonical
+                for lang, url in self._language_urls
+            )
+        ):
+            localized = (canonical[0], canonical[1], f"/{language}{canonical[2]}")
+        return [
+            (value, "jsonld_datePublished")
+            for url, value in self._addressed_dates
+            if _same_page(url, address)
+            or (localized is not None and _page_reference(url, self.url) == localized)
+        ]
 
 
 def _unique_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
@@ -197,7 +267,7 @@ def publication_metadata(content: bytes, content_type: str, source_url: str) -> 
             return missing("publication_metadata_invalid")
         if reader.invalid or reader._json is not None:
             return missing("publication_metadata_invalid")
-        candidates = reader.candidates
+        candidates = [*reader.candidates, *reader.canonical_dates()]
     elif media == "text/plain":
         candidates = [
             (match.group(1), "text_published")

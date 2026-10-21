@@ -1,0 +1,143 @@
+{
+  "contract": "conditional_role_retained_history_support_research_v1",
+  "status": "prepared_not_executed",
+  "source_commit": "64362f2c06a1957ebaa12128ce74cd9157e0227f",
+  "source_sha256": {
+    "scripts/measure_football_role_minutes.py": "5a3f3964c37aa29ce57a445fd6f7498b9a7b94b4cf2ff1299bbb82b3f896fd20",
+    "src/squadopt/application/football_live.py": "c934958666cb936aebf8e2ce82ec41ca5d6c99ec74723c73d6cc8eb77d1c7774",
+    "src/squadopt/data/sources/football_history.py": "dfad934c7cb6c1ca5ee6a7ca3e7574f25845e0257600fc95a109f5beb57ed84a",
+    "src/squadopt/prediction/football.py": "3e71ad27a941c004bc196ff8f12ac48d73187c541f52907d002718edc42a4f6c",
+    "src/squadopt/prediction/football_features.py": "af24356b989fc13c7f23940a01ea2371265c9bc5c7dddbd9b6c759e9ef2317b9",
+    "src/squadopt/prediction/football_minutes_role.py": "a4fd0f0e799b64a81429875593e549572d657218511a58f7b63d8b6e4e77530b"
+  },
+  "frozen_input_receipts": {
+    "input-hashes.json": {
+      "data/2022-23/gws/merged_gw.csv": "b78a6d0456141f9033c32fc4122931baae780ac4a4938683451b1fce7a4fdd15",
+      "data/2022-23/players_raw.csv": "a874c12817bbf4d454e60a5765629742b528d4ad0c2f39f56e4fc89640605f7f",
+      "data/2022-23/teams.csv": "be6a1fe120a61f9c441a0751ca177c933bcbf234c1d28d49b3cd8827ca18066b",
+      "data/2022-23/fixtures.csv": "e783060da73700d4ec6fd12acec4568524eac8bb3ba3ccd8ce68a374dadba8f8",
+      "data/2023-24/gws/merged_gw.csv": "e9c09c8856f1c86b4f920f46ddd5033af83409439dfda53be925df2a3e7c8a9e",
+      "data/2023-24/players_raw.csv": "43d8cf5efb3d901f2499558c40b392b7f0ee22afe28030f36266ad29024c63d9",
+      "data/2023-24/teams.csv": "7795f091ccea17fda0752cb07b935e1515b09a9d3f924147997cbf28139edd49",
+      "data/2023-24/fixtures.csv": "d8521bdbb80edb5141bc17df71bf6026275f2e56fd6a6dc6041b3ae23a39ce6a",
+      "data/2024-25/gws/merged_gw.csv": "5bbbcba6353b4c72ad273adcc8e3aa451946a826564679788f45b1cb3325b84e",
+      "data/2024-25/players_raw.csv": "75686051b265cbe7755ac71213ecaad21b26ee1cc46a8bafbba19c39ce894b05",
+      "data/2024-25/teams.csv": "d10a6db8feca6db9e44a3ba50b15168396667ea387fee9235d6b211c7f598c3b",
+      "data/2024-25/fixtures.csv": "ce696e187569ca7c45da2562811d3c38f525b58e65575531be37bebd0769ee28"
+    },
+    "current-evidence.json": {
+      "status": "available",
+      "snapshot_id": "fpl-live-20261001T233218Z-7945d6b3c732",
+      "fingerprint": "7945d6b3c732bd3e38bd11009d32070f733e93d9dbc3570d69f53d1b21452e8d",
+      "captured_at_utc": "2026-10-01T23:32:18.344567Z",
+      "payload_sha256": {
+        "bootstrap-static.json": "4a4ff5144ba70f76742a6609654e808362b638d9127b9e93baef03985cbc134a",
+        "event-gw01-live.json": "0974be7e805ad6b65b3345bee327fee541c4e445837b2871473ed9ba1d794d87",
+        "event-gw02-live.json": "2bc0e5b3ca2035f0f0cce42a4c77d699d6c316bc290342cddf562b1a317f5715",
+        "event-gw03-live.json": "c33c2af4674b0a9d4276b412a441ebae8b87e01a3d093cd113446e7ef6a02482",
+        "event-gw04-live.json": "a4ebf3dac44cb598e6f62a1dd5333e3d5ce7206303dbda62f513830ae7cfd095",
+        "event-gw05-live.json": "aeee6dd5b56567b04ef9b4e5b9828ee4d81e094803dc0e6553cd3b394178c6dd",
+        "fixtures.json": "113c3c674e681542b8a7926a02036cab9d438f7f1c0bd5d4410afa367a31ad04"
+      },
+      "gameweeks": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "rows": 3191
+    },
+    "folds.json": [
+      [
+        "2023-24",
+        11
+      ],
+      [
+        "2023-24",
+        19
+      ],
+      [
+        "2023-24",
+        27
+      ],
+      [
+        "2023-24",
+        35
+      ],
+      [
+        "2024-25",
+        11
+      ],
+      [
+        "2024-25",
+        19
+      ],
+      [
+        "2024-25",
+        27
+      ],
+      [
+        "2024-25",
+        35
+      ],
+      [
+        "2026-27",
+        1
+      ],
+      [
+        "2026-27",
+        2
+      ],
+      [
+        "2026-27",
+        3
+      ],
+      [
+        "2026-27",
+        4
+      ],
+      [
+        "2026-27",
+        5
+      ]
+    ]
+  },
+  "candidate": "append has_retained_player_history=(past_rows>0) to conditional two-class start/cameo head only",
+  "fit_cap": {
+    "outer": 13,
+    "additional_role_head": 13,
+    "additional_full_model": 0
+  },
+  "estimator": {
+    "scaler": "StandardScaler",
+    "model": "LogisticRegression",
+    "C": 1,
+    "max_iter": 1000,
+    "random_state": 0
+  },
+  "fallback": "native constant recorded class or unchanged no-known-labels role law",
+  "unchanged": [
+    "global FEATURES",
+    "appearance head and q",
+    "within-role minute heads",
+    "role/bin minute means",
+    "other fitted heads",
+    "frozen v1"
+  ],
+  "acceptance": [
+    "all13origins and all5positions with exact equal nonempty role populations",
+    "ALL historical/current roleNLL and Brier nonworse",
+    "overall ALL roleNLL strict gain",
+    "each position historical/current/overall roleNLL and Brier at most1percent worse; zero baseline requireszero",
+    "ALL historical/current pointMAE and minuteMAE nonworse"
+  ],
+  "search": false,
+  "retries": 0,
+  "promotion": false,
+  "realized_gain_claim": false,
+  "failure": "preserve partial receipts, stop later fits and do not replace the candidate",
+  "measured_code_commit": "49b451ae011eba21e59a0932e3deea9333a1ca7d",
+  "full_gate_commit": "49b451ae011eba21e59a0932e3deea9333a1ca7d",
+  "docs_head_commit": "64362f2c06a1957ebaa12128ce74cd9157e0227f"
+}
