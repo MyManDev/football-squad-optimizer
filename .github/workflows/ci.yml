@@ -142,6 +142,67 @@ jobs:
           include-hidden-files: true
           retention-days: 7
 
+  # #981 step 4: keep the three-engine device check separate from the required web job.
+  # The official image includes browser libraries, so this job needs no apt installation.
+  # Update its version and digest together with the package-lock version guard below.
+  device_engines:
+    name: device engines (Playwright)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    container:
+      image: mcr.microsoft.com/playwright:v1.62.1-noble@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e
+      options: --ipc=host
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Require matching Playwright image and package
+        run: |
+          node --input-type=module <<'JS'
+          import { readFileSync } from "node:fs";
+          const lock = JSON.parse(readFileSync("package-lock.json", "utf8"));
+          const version = lock.packages["node_modules/@playwright/test"].version;
+          if (version !== "1.62.1") {
+            throw new Error(`Playwright ${version}: update the device_engines image version, digest and guard together.`);
+          }
+          JS
+
+      - name: Install web dependencies
+        run: npm ci
+
+      - name: Build the static site
+        env:
+          VITE_ADVICE_API_ORIGIN: ""
+        run: npm run build
+
+      - name: Device spec on Chromium, WebKit and Firefox
+        timeout-minutes: 8
+        shell: bash
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/device-engines.json
+        run: npm run e2e:engines -- --workers=1 --reporter=line,json | tee device-engines.log
+
+      - name: Retain engine results and device timings
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: device-engines
+          path: |
+            web/device-engines.log
+            web/test-results
+          if-no-files-found: ignore
+          retention-days: 7
+
   web:
     name: web (node 22)
     runs-on: ubuntu-24.04
