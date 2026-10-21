@@ -29,6 +29,9 @@ def test_fixture_covers_the_required_branches() -> None:
         "one-gameweek-window",
         "exact-threshold",
         "triple-captain-tie",
+        "no-captain",
+        "bench-captain",
+        "multiple-captains",
     } <= cases.keys()
     assert {chip["verdict"] for chip in cases["exact-threshold"]["reference"]["chips"]} == {"hold"}
     tie = next(
@@ -36,6 +39,8 @@ def test_fixture_covers_the_required_branches() -> None:
     )
     assert tie["points_at_gameweek"]["player_ids"] == [101]
     assert "limits" not in json.dumps(fixture)
+    for name in ("no-captain", "bench-captain", "multiple-captains"):
+        assert cases[name]["reference"] == cases["measured-rule"]["reference"]
 
 
 def test_fixture_exercises_review_boundaries() -> None:

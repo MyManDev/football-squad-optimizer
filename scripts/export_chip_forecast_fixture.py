@@ -77,6 +77,15 @@ def build_fixture() -> dict[str, Any]:
         cases.append({"name": name, "inputs": raw, "reference": reference(raw)})
 
     add("measured-rule", base_inputs())
+    for name, captains in (
+        ("no-captain", ()),
+        ("bench-captain", (115,)),
+        ("multiple-captains", (101, 102)),
+    ):
+        raw = base_inputs()
+        for row in raw["squad"]:
+            row["is_captain"] = row["player_id"] in captains
+        add(name, raw)
     raw = base_inputs()
     raw["calendar"][0]["fixture_count_by_club"]["1"] = 0
     raw["squad"][0]["expected_points"] = 0.0
@@ -182,7 +191,6 @@ def build_fixture() -> dict[str, Any]:
         ("bench-order-boolean", ("squad", 12, "bench_order"), True),
         ("bench-order-text", ("squad", 12, "bench_order"), "2"),
         ("captain-flag", ("squad", 0, "is_captain"), 1),
-        ("no-captain", ("squad", 0, "is_captain"), False),
         ("calendar-start", ("calendar", 0, "gameweek"), 5),
         ("calendar-count", ("calendar", 0, "fixture_count_by_club", "1"), -1),
         ("calendar-count-boolean", ("calendar", 0, "fixture_count_by_club", "1"), True),
@@ -203,7 +211,6 @@ def build_fixture() -> dict[str, Any]:
         "short-squad",
         "duplicate-player",
         "duplicate-bench",
-        "bench-captain",
         "empty-calendar",
         "calendar-gap",
         "duplicate-week",
@@ -229,9 +236,6 @@ def build_fixture() -> dict[str, Any]:
             raw["squad"][1]["player_id"] = raw["squad"][0]["player_id"]
         elif name == "duplicate-bench":
             raw["squad"][-1]["bench_order"] = 3
-        elif name == "bench-captain":
-            raw["squad"][0]["is_captain"] = False
-            raw["squad"][-1]["is_captain"] = True
         elif name == "empty-calendar":
             raw["calendar"] = []
         elif name == "calendar-gap":
