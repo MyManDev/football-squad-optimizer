@@ -2,7 +2,8 @@
  * The page-change crossfade (#1131): the View Transitions API where the browser has it and
  * the viewer has not asked for reduced motion, the change at once otherwise; the update is
  * committed inside the transition, and a `ready` the transition waits for is capped at the
- * data time so a page that never says it is drawn cannot hold the old picture.
+ * data time so a page that never says it is drawn cannot hold the old picture. A transition
+ * the browser skips or an update that throws leaves no unhandled rejection behind.
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -87,6 +88,59 @@ describe("the crossfade", () => {
     await vi.advanceTimersByTimeAsync(1);
     expect(done).toBe(true);
   });
+
+  it.each(["ready", "finished", "updateCallbackDone"] as const)(
+    "handles a rejected %s, so a skipped transition logs no unhandled rejection",
+    async (name) => {
+      const unhandled: unknown[] = [];
+      const record = (reason: unknown) => unhandled.push(reason);
+      const reported = vi.fn();
+      vi.stubGlobal("reportError", reported);
+      process.on("unhandledRejection", record);
+      try {
+        const document = {
+          startViewTransition: vi.fn(() => ({
+            [name]: Promise.reject(new DOMException("Transition was skipped", "AbortError")),
+          })),
+        } as unknown as Document;
+        crossfade(() => {}, undefined, media(false), document);
+        // Node reports a rejection nobody handled once the microtasks have run.
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(unhandled).toEqual([]);
+        // A skip is the browser's own business: nothing is reported.
+        expect(reported).not.toHaveBeenCalled();
+      } finally {
+        process.off("unhandledRejection", record);
+        vi.unstubAllGlobals();
+      }
+    },
+  );
+
+  it("reports an update that throws once, and not as an unhandled rejection", async () => {
+    const unhandled: unknown[] = [];
+    const record = (reason: unknown) => unhandled.push(reason);
+    const reported = vi.fn();
+    vi.stubGlobal("reportError", reported);
+    process.on("unhandledRejection", record);
+    try {
+      const failure = new Error("the update failed");
+      const document = {
+        startViewTransition: vi.fn(() => ({
+          ready: Promise.reject(failure),
+          finished: Promise.reject(failure),
+          updateCallbackDone: Promise.reject(failure),
+        })),
+      } as unknown as Document;
+      crossfade(() => {}, undefined, media(false), document);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(unhandled).toEqual([]);
+      expect(reported).toHaveBeenCalledOnce();
+      expect(reported).toHaveBeenCalledWith(failure);
+    } finally {
+      process.off("unhandledRejection", record);
+      vi.unstubAllGlobals();
+    }
+  });
 });
 
 describe("the crossfade's stylesheet", () => {
@@ -94,6 +148,15 @@ describe("the crossfade's stylesheet", () => {
     const css = readFileSync(join(__dirname, "transitions.css"), "utf-8");
     expect(css).toMatch(
       /::view-transition-old\(root\),\s*::view-transition-new\(root\)\s*\{[^}]*animation-duration: var\(--motion-ui\);[^}]*animation-timing-function: var\(--motion-ease\)/,
+    );
+  });
+
+  it("times the group that holds the two pictures in the same rule", () => {
+    // Left out, the group keeps the browser's own quarter second and the step ends later
+    // than its fade.
+    const css = readFileSync(join(__dirname, "transitions.css"), "utf-8");
+    expect(css).toMatch(
+      /::view-transition-group\(root\),\s*::view-transition-old\(root\),\s*::view-transition-new\(root\)\s*\{[^}]*animation-duration: var\(--motion-ui\);/,
     );
   });
 
