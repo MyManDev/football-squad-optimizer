@@ -157,7 +157,7 @@ export function readPicks(value: unknown, entryId: number, week: number): EntryP
 }
 
 /** UTC microseconds preserve the Python deadline boundary, including fractional seconds. */
-function instant(value: unknown): bigint {
+export function timestampMicros(value: unknown): bigint {
   const match =
     typeof value === "string" &&
     /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,6}))?(Z|[+-]\d{2}:\d{2})$/.exec(
@@ -201,12 +201,12 @@ export function planGameweek(bootstrap: unknown, asOf: string): number {
     .map((value) => {
       const row = object(value, "event");
       flag(row.finished, "event.finished");
-      return { week: gameweek(row.id), deadline: instant(row.deadline_time) };
+      return { week: gameweek(row.id), deadline: timestampMicros(row.deadline_time) };
     })
     .sort((a, b) => a.week - b.week);
   if (new Set(rows.map((row) => row.week)).size !== rows.length)
     throw new EntryStateError("Duplicate deadline gameweek.");
-  const now = instant(asOf);
+  const now = timestampMicros(asOf);
   const next = rows.find((row) => row.deadline > now);
   if (!next) throw new EntryStateError("No open deadline.");
   return next.week;
