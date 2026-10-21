@@ -30,7 +30,12 @@ def test_shared_member_has_one_server_solve_and_one_record(tmp_path, monkeypatch
         # The record's decision is computed before any member page exists.
         assert not list(operation.paths.out.rglob("entries/101.json"))
         calls.append(picks.entry_id)
-        return original(picks, *args, **kwargs)
+        control = original(picks, *args, **kwargs)
+        assert control.plan.diagnostics["solver_backend"] == "ortools-cp-sat"
+        assert control.plan.diagnostics["linearization_level"] == 2
+        assert control.plan.diagnostics["solver_deterministic_time_limit"] == 20.0
+        assert control.plan.diagnostics["wall_time_limit_seconds"] == 300.0
+        return control
 
     def unexpected_solve(*args, **kwargs):
         pytest.fail("A page repeated the already computed server baseline")

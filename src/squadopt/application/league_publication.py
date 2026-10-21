@@ -211,7 +211,10 @@ def prepare_tracked_baselines(
         except EntryError as error:
             refused[entry_id] = str(error)
             continue
-        control = solve_member_control(picks, inputs, projection, rules)
+        # The complete CP-SAT linear relaxation proves the five-free-transfer
+        # baseline from the second-league rehearsal inside the existing budget.
+        # The model, deterministic ceiling and one-week solver stay unchanged.
+        control = solve_member_control(picks, inputs, projection, rules, linearization_level=2)
         payload = advise_entry(
             AdviseEntryRequest(season, int(inputs.deadline.gameweek), first.league_id, entry_id),
             provider=provider,
