@@ -718,7 +718,18 @@
         "actual": {
           "gross_points": 84.0,
           "transfer_hit_points": 0.0,
-          "net_points": 84.0
+          "net_points": 84.0,
+          "details": {
+            "source_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd",
+            "captain": {
+              "player_id": 475168,
+              "name": "João Pedro",
+              "points": 12.0,
+              "multiplier": 2,
+              "counted_points": 24.0
+            },
+            "transfers": []
+          }
         },
         "actual_reason": null,
         "net_difference": -6.0,
@@ -1512,7 +1523,49 @@
         "actual": {
           "gross_points": 58.0,
           "transfer_hit_points": 8.0,
-          "net_points": 50.0
+          "net_points": 50.0,
+          "details": {
+            "source_snapshot_id": "fpl-live-20261010T035732Z-c77d032165af",
+            "captain": {
+              "player_id": 244851,
+              "name": "Palmer",
+              "points": 2.0,
+              "multiplier": 2,
+              "counted_points": 4.0
+            },
+            "transfers": [
+              {
+                "player_out": "Araujo",
+                "player_in": {
+                  "player_id": 465730,
+                  "name": "De Cuyper",
+                  "points": 6.0,
+                  "multiplier": 1,
+                  "counted_points": 6.0
+                }
+              },
+              {
+                "player_out": "Mendy",
+                "player_in": {
+                  "player_id": 191866,
+                  "name": "Ajer",
+                  "points": 7.0,
+                  "multiplier": 0,
+                  "counted_points": 0.0
+                }
+              },
+              {
+                "player_out": "Damsgaard",
+                "player_in": {
+                  "player_id": 60307,
+                  "name": "Groß",
+                  "points": 14.0,
+                  "multiplier": 1,
+                  "counted_points": 14.0
+                }
+              }
+            ]
+          }
         },
         "actual_reason": null,
         "net_difference": -7.0,
@@ -1752,7 +1805,8 @@
         "actual": {
           "gross_points": 84.0,
           "transfer_hit_points": 4.0,
-          "net_points": 80.0
+          "net_points": 80.0,
+          "details": null
         },
         "actual_reason": null,
         "net_difference": 0.0,

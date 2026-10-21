@@ -893,7 +893,18 @@
         "actual": {
           "gross_points": 85.0,
           "transfer_hit_points": 0.0,
-          "net_points": 85.0
+          "net_points": 85.0,
+          "details": {
+            "source_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd",
+            "captain": {
+              "player_id": 223094,
+              "name": "Haaland",
+              "points": 6.0,
+              "multiplier": 2,
+              "counted_points": 12.0
+            },
+            "transfers": []
+          }
         },
         "actual_reason": null,
         "net_difference": -5.0,
@@ -1854,7 +1865,18 @@
         "actual": {
           "gross_points": 46.0,
           "transfer_hit_points": 0.0,
-          "net_points": 46.0
+          "net_points": 46.0,
+          "details": {
+            "source_snapshot_id": "fpl-live-20261010T035732Z-c77d032165af",
+            "captain": {
+              "player_id": 223094,
+              "name": "Haaland",
+              "points": 6.0,
+              "multiplier": 2,
+              "counted_points": 12.0
+            },
+            "transfers": []
+          }
         },
         "actual_reason": null,
         "net_difference": 9.0,
@@ -2094,7 +2116,8 @@
         "actual": {
           "gross_points": 114.0,
           "transfer_hit_points": 0.0,
-          "net_points": 114.0
+          "net_points": 114.0,
+          "details": null
         },
         "actual_reason": null,
         "net_difference": -37.0,
