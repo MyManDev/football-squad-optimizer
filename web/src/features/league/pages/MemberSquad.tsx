@@ -91,7 +91,7 @@ export function MemberSquad({
       : null,
   ]
     .filter(Boolean)
-    .join(" Â· ");
+    .join(" · ");
   return (
     <section id="kadro" className={styles.squad} aria-labelledby={titleId}>
       <div className={styles.head}>
@@ -173,7 +173,7 @@ export function HeldSquad({ squad, codes }: { squad: EntrySquad; codes: ClubCode
       ) : null}
       <span className={styles.heldMeta}>
         <ClubMark team={player.team} codes={codes} />
-        {onBench ? ` Â· ${position(player.position)}` : null}
+        {onBench ? ` · ${position(player.position)}` : null}
       </span>
       {finite(player.expected_points) ? (
         <span className={styles.heldXp}>

@@ -342,7 +342,7 @@ export function MemberBench({
                   <span className={code ? styles.benchCode : undefined}>{code ?? player.team}</span>
                   {Object.hasOwn(messages.positions, player.position) ? (
                     <span>
-                      {" Â· "}
+                      {" · "}
                       {messages.positions[player.position as keyof typeof messages.positions]}
                     </span>
                   ) : null}
