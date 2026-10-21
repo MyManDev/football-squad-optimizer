@@ -1,4 +1,4 @@
-<img align="right" src="docs/images/brand/squadopt-mark.svg" alt="SquadOpt crest" width="64" />
+<img align="right" src="web/public/favicon.svg" alt="SquadOpt" width="40" height="40" />
 
 # SquadOpt
 
@@ -10,13 +10,16 @@ It helps us plan the next gameweek, compare transfers and keep up with the leagu
 
 **[Open SquadOpt](https://squadopt.mymandev.com)** — enter league **352490**, then choose your name.
 
+For now, the site serves this one league. We plan to open it to other FPL managers and
+classic leagues as well.
+
 The member page puts your squad on the pitch, with transfer suggestions, captain choices
 and upcoming fixtures. You can follow the league race and save a squad card to share.
 Supported one-week plans can also be calculated on your own device.
 
 The app is built with Python, React and TypeScript, with HiGHS for device calculations.
-The [product roadmap](docs/product/roadmap.md#current-position) covers what works today
-and what we're still working on.
+The [product roadmap](docs/product/roadmap.md#current-position) covers the current limits
+and the work towards wider access.
 
 ## Run locally
 
