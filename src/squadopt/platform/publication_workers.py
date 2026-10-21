@@ -32,6 +32,8 @@ from squadopt.live import (
     read_projection_handoff,
     read_season_rules,
 )
+from squadopt.planning.native_highs import native_window_executor
+from squadopt.platform.native_windows import execute_native_window
 
 _WORKER_CONTEXT: dict[str, Any] = {}
 
@@ -90,7 +92,8 @@ def _worker_init(
 
 
 def _render_in_worker(task: MemberRenderTask) -> MemberRender:
-    return render_member(task, **_WORKER_CONTEXT)
+    with native_window_executor(execute_native_window):
+        return render_member(task, **_WORKER_CONTEXT)
 
 
 def pool_mapper(
@@ -125,7 +128,8 @@ def league_mapper(request: LeaguePublicationRequest, workers: int = 1) -> Iterat
     if workers < 1:
         raise ValueError("--workers must be at least 1")
     if workers == 1:
-        yield map
+        with native_window_executor(execute_native_window):
+            yield map
         return
     with ProcessPoolExecutor(
         max_workers=workers,

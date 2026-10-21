@@ -61,6 +61,7 @@ from squadopt.contracts.injuries import require_official_injury_source
 from squadopt.contracts.league import LEAGUE_VIEW_CONTRACT_VERSION
 from squadopt.contracts.preferences import DecisionPreferences
 from squadopt.live.football_artifact import SHARES_BEFORE_AVAILABILITY_LIMIT
+from squadopt.planning.native_highs import native_window_executor
 from squadopt.platform.advice_cache import AdviceCacheRepository, advice_cache_key
 from squadopt.platform.advice_documents import AdviceDocumentError, validate_advice_document
 from squadopt.platform.advice_job_spec import AdviceJobSpec, AdviceJobSpecError, AdviceJobSpecStore
@@ -91,6 +92,7 @@ from squadopt.platform.backend_runtime import (
 )
 from squadopt.platform.capture_context import AdviceCaptureContext
 from squadopt.platform.jobs_contract import AdviceJob
+from squadopt.platform.native_windows import execute_native_window
 from squadopt.platform.queue_contracts import DEFAULT_ARCHIVE_AFTER_SECONDS, QueueLockTimeout
 from squadopt.platform.worker_heartbeat import (
     IDLE_WAIT_SECONDS,
@@ -360,18 +362,19 @@ def build_advice_compute(
                     "there is no squad to advise from yet.",
                 )
         try:
-            advice = advise_menu_entry(
-                request,
-                provider=capture.provider,
-                inputs=capture.inputs,
-                projection=projection,
-                rules=capture.rules,
-                horizon_builder=horizon_builder,
-                top100_counts=capture.top100_counts,
-                manager_words=capture.manager_words,
-                chip_forecast_source=capture.chip_forecast_source if football is None else None,
-                prerequisite=lambda address: cached_plain(spec, address),
-            )
+            with native_window_executor(execute_native_window):
+                advice = advise_menu_entry(
+                    request,
+                    provider=capture.provider,
+                    inputs=capture.inputs,
+                    projection=projection,
+                    rules=capture.rules,
+                    horizon_builder=horizon_builder,
+                    top100_counts=capture.top100_counts,
+                    manager_words=capture.manager_words,
+                    chip_forecast_source=capture.chip_forecast_source if football is None else None,
+                    prerequisite=lambda address: cached_plain(spec, address),
+                )
         except ChipUnavailable as error:
             raise AdviceComputeRefused(error.code, str(error)) from error
         except ManagersWordNotSolved as error:

@@ -62,6 +62,7 @@ from squadopt.planning.models import (
     TransferPlanningValidationError,
     TransferPlanResult,
 )
+from squadopt.planning.native_highs import solve_window_model
 from squadopt.planning.pricing import sell_price_tenths
 
 # The wall ceiling bounds each phase rather than being divided between them, so a solve
@@ -1422,7 +1423,9 @@ def optimize_transfer_plan(
             for index in range(len(artifacts.model.proto.variables)):
                 variable = artifacts.model.get_int_var_from_proto_index(index)
                 artifacts.model.add_hint(variable, probe.value(variable))
-    raw_primary_status = _solve(artifacts.model, primary_solver)
+    primary_solver, raw_primary_status, native_details = solve_window_model(
+        artifacts.model, primary_solver, _solve, weeks=len(verified_horizon.gameweeks)
+    )
     primary_status = _map_solver_status(raw_primary_status)
     used_incumbent = False
     if protect_incumbent:
@@ -1446,9 +1449,16 @@ def optimize_transfer_plan(
     if hold_solver is not None and primary_status is SolverStatus.INFEASIBLE:
         raise SolverExecutionError("Full search contradicts its verified feasible hold plan.")
     primary_deterministic_time = _deterministic_time_used(primary_solver, raw_primary_status)
+    # Keep runtime work in the existing top-level counters. Nested metadata also
+    # enters immutable horizon records and must not retain a per-run clock.
+    verification_work = native_details.pop("verification_work_before_fallback", 0.0)
+    assert isinstance(verification_work, (int, float))
+    primary_deterministic_time += verification_work
     divisor = settings.objective_weight_scale * optimization_config.expected_points_scale
     diagnostics: dict[str, object] = {
-        "solver_backend": "ortools-cp-sat",
+        "solver_backend": (
+            "highs-native" if native_details.get("selected") is True else "ortools-cp-sat"
+        ),
         "solver_status_name": _raw_status_name(raw_primary_status),
         "solve_time_seconds": perf_counter() - started_at,
         "best_objective_bound": None,
@@ -1513,6 +1523,9 @@ def optimize_transfer_plan(
         "tiebreak_status": None,
         "tiebreak_completed": False,
     }
+    if native_details:
+        diagnostics["native_window"] = native_details
+        diagnostics["tiebreak_backend"] = "ortools-cp-sat"
     if incumbent_plan is not None:
         diagnostics["incumbent_hint"] = {
             # Runtime work remains in the existing top-level runtime counters.

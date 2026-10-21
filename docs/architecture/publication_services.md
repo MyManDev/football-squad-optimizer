@@ -31,6 +31,17 @@ one worker or a spawn-based pool for multiple workers. Its initializer receives 
 request's capture ID, archive and handoff paths, season and target gameweek. It still
 refuses to substitute `render_member` for an arbitrary callable.
 
+Both mapper modes bind the native window executor for three- and five-week primary
+searches. The API advice worker binds the same executor per request. Its pinned HiGHS
+1.15.1 driver runs in a separate interpreter because the Linux libraries shipped by
+OR-Tools and highspy cannot be loaded together. The planner checks the rounded native
+solution against every exact integer MILP row and then the original CP-SAT model. Only
+a proved optimum is accepted. Unsupported models, failed children and unproved answers
+fall back to CP-SAT with the primary wall time remaining; a clock-limited native answer
+does not seed fallback. One-week solves, hold probes and the deterministic tie-break
+retain CP-SAT. The model, strategies and configured ceilings are unchanged. Published
+diagnostics name the selected primary backend and any native fallback reason.
+
 The offline element-to-code translation and `CapturePicksProvider` now live in
 `application.capture_entries`, and callers import them from there;
 the HTTP context still composes its own backend identity and handoff requirements above
