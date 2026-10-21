@@ -64,7 +64,7 @@ function view() {
 
 const pitch = (container: HTMLElement) => container.querySelector('[data-mark="pitch"]')!;
 const plates = (container: HTMLElement) => [
-  ...pitch(container).querySelectorAll<HTMLElement>('[role="listitem"] > div > div'),
+  ...pitch(container).querySelectorAll<HTMLElement>("[data-plate]"),
 ];
 const group = (name: string) => screen.getByRole("group", { name });
 
