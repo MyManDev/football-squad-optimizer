@@ -119,11 +119,6 @@ function checked(inputs: ChipForecastInputs): ChipForecastInputs {
     .flatMap((row) => (row.bench_order === null ? [] : [row.bench_order]))
     .sort();
   requireInput(bench.join(",") === "1,2,3,4", "The bench must list each order once.");
-  const captains = inputs.squad.filter((row) => row.is_captain);
-  requireInput(
-    captains.length === 1 && captains[0]!.bench_order === null,
-    "The eleven must hold exactly one captain.",
-  );
   const calendar = [...inputs.calendar].sort((a, b) => a.gameweek - b.gameweek);
   requireInput(
     calendar.length > 0 && calendar[0]!.gameweek === inputs.decision_gameweek,

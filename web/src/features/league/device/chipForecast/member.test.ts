@@ -159,6 +159,19 @@ describe("the calendar counts", () => {
 });
 
 describe("the member's reading", () => {
+  it.each([{ captains: [] }, { captains: [114] }, { captains: [101, 102] }])(
+    "does not depend on captured captain flags $captains",
+    ({ captains }) => {
+      const value = inputs();
+      const expected = memberChipForecast(value);
+      for (const player of [...value.squad.starting_xi, ...value.squad.bench]) {
+        player.is_captain = captains.includes(player.player_id);
+      }
+      expect(memberChipForecast(value)).toEqual(expected);
+      expect(expected.status).toBe("available");
+    },
+  );
+
   it("binds the rule to the table, the entry and the calendar", () => {
     const reading = memberChipForecast({ ...inputs(), gains: { wildcard: 9, bboost: 0 } });
     expect(reading).toMatchObject({
@@ -382,14 +395,6 @@ describe("the member's reading is refused with the publisher's code", () => {
 
   it.each<[string, (value: MemberChipForecastInputs) => void]>([
     ["a table that lists a player twice", (v) => void v.table.players.push(v.table.players[0]!)],
-    [
-      // 5349883 in the GW6 tree: the captured armband sat on the bench.
-      "an armband on the bench",
-      (v) => {
-        v.squad.starting_xi[0]!.is_captain = false;
-        v.squad.bench[2]!.is_captain = true;
-      },
-    ],
     ["a squad short of fifteen", (v) => void v.squad.bench.pop()],
     [
       "a chip window without its gameweeks",
