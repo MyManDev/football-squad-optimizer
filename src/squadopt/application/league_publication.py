@@ -213,10 +213,14 @@ def resolve_live_snapshot_id(root: Path, requested: str | None) -> str:
     return live[-1]
 
 
-def prepare_league_publication(request: LeaguePublicationRequest) -> PreparedLeaguePublication:
+def prepare_league_publication(
+    request: LeaguePublicationRequest,
+    *,
+    read_capture: Callable[[Path, str], CapturedSnapshot] | None = None,
+) -> PreparedLeaguePublication:
     """Read and validate the capture/registry without solving or writing a publication."""
 
-    snapshot = read_snapshot(request.snapshot_root, request.snapshot_id)
+    snapshot = (read_capture or read_snapshot)(request.snapshot_root, request.snapshot_id)
     season = request.season or infer_season(snapshot)
     if request.training_seasons is not None:
         explicit_archive_seasons(request.training_seasons, current_season=season)
@@ -285,17 +289,23 @@ def publish_league(
     on_prepared: Callable[[PreparedLeaguePublication], None] | None = None,
     on_mode_paths: Callable[[ModePathsSummary], None] | None = None,
     beside: Sequence[PublishedLeague] = (),
+    read_capture: Callable[[Path, str], CapturedSnapshot] | None = None,
     on_stage: Callable[[str], None] | None = None,
 ) -> LeaguePublicationResult:
     """Publish the existing contracts; callbacks observe progress without owning the work."""
 
-    prepared = prepare_league_publication(request)
+    prepared = prepare_league_publication(request, read_capture=read_capture)
     if on_stage is not None:
         on_stage("prepared")
     if on_prepared is not None:
         on_prepared(prepared)
     return publish_prepared_league(
-        prepared, mapper=mapper, on_mode_paths=on_mode_paths, beside=beside, on_stage=on_stage
+        prepared,
+        mapper=mapper,
+        on_mode_paths=on_mode_paths,
+        beside=beside,
+        read_capture=read_capture,
+        on_stage=on_stage,
     )
 
 
@@ -643,6 +653,7 @@ def publish_prepared_league(
     mapper: MemberMapper = map,
     on_mode_paths: Callable[[ModePathsSummary], None] | None = None,
     beside: Sequence[PublishedLeague] = (),
+    read_capture: Callable[[Path, str], CapturedSnapshot] | None = None,
     on_stage: Callable[[str], None] | None = None,
 ) -> LeaguePublicationResult:
     """Complete a prepared publication without rereading a possibly changing selector.
@@ -770,6 +781,7 @@ def publish_prepared_league(
                 entry_ids=[entry.entry_id for entry in prepared.registrations],
                 out_dir=out_dir,
                 published=shown,
+                read_capture=read_capture,
             )
         )
     if request.record_root is not None and request.menu == "full":

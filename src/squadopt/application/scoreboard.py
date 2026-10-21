@@ -59,7 +59,7 @@ Where each number comes from, and what it is:
 
 import json
 import re
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -78,7 +78,7 @@ from squadopt.contracts.league_tree import (
 )
 from squadopt.data._long_paths import addressable
 from squadopt.data.errors import DataError
-from squadopt.data.snapshots import list_snapshot_ids, read_snapshot
+from squadopt.data.snapshots import CapturedSnapshot, list_snapshot_ids, read_snapshot
 from squadopt.data.sources import FPL_LIVE_SOURCE
 from squadopt.data.sources.fpl_live import (
     BOOTSTRAP_PAYLOAD,
@@ -643,10 +643,15 @@ def resolve_live_snapshot_id(root: Path, requested: str | None) -> str:
     return live[-1]
 
 
-def read_cohort(root: Path, snapshot_id: str) -> CohortCapture:
+def read_cohort(
+    root: Path,
+    snapshot_id: str,
+    *,
+    read_capture: Callable[[Path, str], CapturedSnapshot] | None = None,
+) -> CohortCapture:
     """A Top-100 capture's bootstrap and its Overall standings pages, in page order."""
 
-    snapshot = read_snapshot(root, snapshot_id)
+    snapshot = (read_capture or read_snapshot)(root, snapshot_id)
     payloads = snapshot.payloads
     if BOOTSTRAP_PAYLOAD not in payloads:
         raise DataError(f"Cohort capture {snapshot_id} carries no bootstrap.")
@@ -665,7 +670,12 @@ def read_cohort(root: Path, snapshot_id: str) -> CohortCapture:
     )
 
 
-def read_cohort_picks(root: Path, snapshot_id: str) -> CohortPicks:
+def read_cohort_picks(
+    root: Path,
+    snapshot_id: str,
+    *,
+    read_capture: Callable[[Path, str], CapturedSnapshot] | None = None,
+) -> CohortPicks:
     """One elite-picks capture's net week per cohort member, from their own histories.
 
     Every picks document in the capture must describe the same gameweek and carry an
@@ -673,7 +683,7 @@ def read_cohort_picks(root: Path, snapshot_id: str) -> CohortPicks:
     from some rows and not others would be neither gross nor net.
     """
 
-    snapshot = read_snapshot(root, snapshot_id)
+    snapshot = (read_capture or read_snapshot)(root, snapshot_id)
     net: dict[int, int] = {}
     hits: dict[int, int] = {}
     gameweeks: set[int] = set()
@@ -767,11 +777,16 @@ def _retained_publication_capture(tree: Path) -> str | None:
     return capture
 
 
-def publish_scoreboard(request: ScoreboardPublicationRequest) -> ScoreboardPublicationResult:
+def publish_scoreboard(
+    request: ScoreboardPublicationRequest,
+    *,
+    read_capture: Callable[[Path, str], CapturedSnapshot] | None = None,
+) -> ScoreboardPublicationResult:
     """Write the existing scoreboard from explicitly named captured inputs."""
 
     snapshot_id = request.snapshot_id
-    snapshot = read_snapshot(request.snapshot_root, snapshot_id)
+    reader = read_capture or read_snapshot
+    snapshot = reader(request.snapshot_root, snapshot_id)
     if BOOTSTRAP_PAYLOAD not in snapshot.payloads:
         raise DataError(f"Capture {snapshot_id} carries no bootstrap.")
     season = request.season or infer_season(snapshot)
@@ -808,7 +823,7 @@ def publish_scoreboard(request: ScoreboardPublicationRequest) -> ScoreboardPubli
         if identifier
     }
     baseline_snapshots = tuple(
-        snapshot if name == snapshot_id else read_snapshot(request.snapshot_root, name)
+        snapshot if name == snapshot_id else reader(request.snapshot_root, name)
         for name in sorted(needed_ids & set(snapshot_ids))
     )
     human_baselines = human_baseline_rows(
@@ -839,12 +854,14 @@ def publish_scoreboard(request: ScoreboardPublicationRequest) -> ScoreboardPubli
     # decisions were made, their local record is what is missing. Keep the rows.
     published_ours = _published_ours(target, season) if not entries else {}
     cohort = (
-        read_cohort(request.snapshot_root, request.cohort_snapshot_id)
+        read_cohort(request.snapshot_root, request.cohort_snapshot_id, read_capture=read_capture)
         if request.cohort_snapshot_id
         else None
     )
     cohort_picks = (
-        read_cohort_picks(request.snapshot_root, request.elite_snapshot_id)
+        read_cohort_picks(
+            request.snapshot_root, request.elite_snapshot_id, read_capture=read_capture
+        )
         if request.elite_snapshot_id
         else None
     )
