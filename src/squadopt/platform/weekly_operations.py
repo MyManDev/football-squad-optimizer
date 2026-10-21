@@ -56,7 +56,7 @@ from squadopt.application.weekly_plan import (
     rotation_pair_is_readable,
     rotation_source_capture,
 )
-from squadopt.contracts.league_list import LEAGUE_LIST_FILE, LeagueListError
+from squadopt.contracts.league_list import LEAGUE_LIST_FILE, LeagueListError, parse_league_menus
 from squadopt.contracts.league_tree import (
     LEGACY_TREE,
     LeagueDirectoryError,
@@ -75,7 +75,6 @@ from squadopt.platform.fpl_capture import capture
 from squadopt.platform.publication_workers import league_mapper
 from squadopt.platform.runlog import RunLog, configure_run_logging
 from squadopt.platform.storage._queue_lock import QueueFileLock
-from squadopt.platform.storage.league_list import read_league_menus
 from squadopt.platform.storage.projection_retention import (
     publish_retained_handoff,
     retained_handoff_path,
@@ -1372,6 +1371,17 @@ def _revision(workspace: Path, supplied: str | None) -> str:
         if revision.checkout.modified:
             raise WeekError("Weekly evidence requires a clean source checkout.")
     return revision.commit
+
+
+def read_league_menus(path: Path) -> dict[int, str]:
+    """Read the weekly operator configuration at its filesystem boundary."""
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError as error:
+        raise LeagueListError(f"No league list at {path}.") from error
+    except ValueError as error:
+        raise LeagueListError(f"{path} does not parse as JSON.") from error
+    return parse_league_menus(document)
 
 
 def main(argv: list[str] | None = None) -> int:
