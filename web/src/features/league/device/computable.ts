@@ -70,5 +70,13 @@ export function deviceComputable(
     top100Weights: [0, ...(squad.device_plan.top100_weights ?? []).filter(isTop100Weight)],
     loading: reads.loading,
     unreadRivals: candidates.filter((id) => reads.unreadable.includes(id)),
+    captainMissingRivals: candidates.filter((id) =>
+      reads.squads.some(
+        (rival) =>
+          rival.entry.entry_id === id &&
+          rival.source_snapshot_id === squad.source_snapshot_id &&
+          rivalFromSquad(id, rival) === null,
+      ),
+    ),
   };
 }
