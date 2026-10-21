@@ -30,7 +30,13 @@ import secrets
 import sys
 import urllib.error
 import urllib.request
+from pathlib import Path
 from typing import Any
+
+from squadopt.contracts.league_publication_identity import (
+    IDENTITY_FILE,
+    verify_publication_identity,
+)
 
 BASE = "https://squadopt.mymandev.com"
 UA = {"User-Agent": "squadopt-verify/1.0"}
@@ -259,7 +265,45 @@ def smoke_checks(trees: list[Tree]) -> tuple[list[str], list[str], list[str]]:
     return routes, documents, absent
 
 
-def main(accepted_generated_at: str, settled_gameweek: int | None = None) -> int:
+def _accepted_identity(tree: str, members: dict[str, Any], expected_data_root: Path) -> bool:
+    """Verify the served protected files against the accepted release's identity.
+
+    A report refresh retains its source clocks. Its contents, rather than a new
+    source timestamp, prove which release is served.
+    """
+    path = f"/data/{tree}/{IDENTITY_FILE}"
+    status, body = fetch(path)
+    documents: dict[str, Any] = {"members.json": members}
+    try:
+        if status != 200:
+            raise ValueError(f"HTTP {status}")
+        documents[IDENTITY_FILE] = json.loads(body)
+
+        def read(name: str) -> Any:
+            if name not in documents:
+                documents[name] = _document(f"/data/{tree}/{name}")
+            return documents[name]
+
+        identity = verify_publication_identity(read)
+        if identity is None:
+            raise ValueError("The identity document is empty.")
+        expected = json.loads((expected_data_root / tree / IDENTITY_FILE).read_bytes())
+        if identity != expected:
+            raise ValueError("The served identity differs from the accepted release.")
+        print(
+            f"  ok  {tree}: all {len(identity['files'])} protected files match the accepted release"
+        )
+        return True
+    except (OSError, ValueError, TypeError, KeyError, AttributeError, RecursionError) as error:
+        print(f"  BAD publication identity of {tree}: {error}")
+        return False
+
+
+def main(
+    accepted_generated_at: str,
+    settled_gameweek: int | None = None,
+    expected_data_root: Path | None = None,
+) -> int:
     failures = 0
 
     trees, directory_ok, directory_stamp = published_trees()
@@ -309,6 +353,7 @@ def main(accepted_generated_at: str, settled_gameweek: int | None = None) -> int
     settled_by_tree: list[list[Any]] = []
     captures: dict[str, str] = {}
     stamps: list[str] = []
+    verified_identities = 0
     for _league_id, tree in trees:
         if len(trees) > 1:
             print(f"  -- {tree}")
@@ -337,6 +382,10 @@ def main(accepted_generated_at: str, settled_gameweek: int | None = None) -> int
             elif capture is not None:
                 captures[tree] = capture
             if matches:
+                if expected_data_root is not None and document is not None:
+                    identity_ok = _accepted_identity(tree, document, expected_data_root)
+                    failures += not identity_ok
+                    verified_identities += identity_ok
                 stamps.append(generated)
         failures += not matches
         print(f"  {'ok ' if matches else 'BAD'} generated_at_utc {generated}  ({rule})")
@@ -406,9 +455,13 @@ def main(accepted_generated_at: str, settled_gameweek: int | None = None) -> int
             failures += not ok
             print(f"  {'ok ' if ok else 'BAD'} {label}")
 
-    # The directory is written by the last league the publication rendered, from that
-    # league's own stamp, so one tree carries it; every tree older is a stale publication.
-    if directory_stamp is not None and stamps and max(stamps) != directory_stamp:
+    # Without accepted content identities, retain the original stale-tree refusal.
+    if (
+        directory_stamp is not None
+        and stamps
+        and max(stamps) != directory_stamp
+        and verified_identities != len(trees)
+    ):
         failures += 1
         print(
             f"  BAD no tree carries the publication stamp {directory_stamp} (newest {max(stamps)})"
@@ -437,9 +490,17 @@ def _arguments(argv: list[str]) -> argparse.Namespace:
         default=None,
         help="the gameweek this release settles; asserted rather than printed",
     )
+    parser.add_argument(
+        "--expected-data-root",
+        type=Path,
+        help=(
+            "data directory from the accepted release checkout; "
+            "verify its protected file identities"
+        ),
+    )
     return parser.parse_args(argv)
 
 
 if __name__ == "__main__":
     parsed = _arguments(sys.argv[1:])
-    sys.exit(main(parsed.accepted_generated_at, parsed.settled))
+    sys.exit(main(parsed.accepted_generated_at, parsed.settled, parsed.expected_data_root))
