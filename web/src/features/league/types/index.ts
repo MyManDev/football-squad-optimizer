@@ -333,6 +333,10 @@ export type IndexChips =
 
 /** What the producer computed for one member, and what it could not, with the reason. */
 export interface EntryAdviceIndex {
+  /** A device menu promises inputs, with no published advice documents. */
+  menu?: "full" | "device";
+  source_snapshot_id?: string;
+  chip_states?: EntryChipAvailability;
   /** Optional evidence is validated separately; a bad forecast must not remove the plan. */
   chip_forecast?: unknown;
   league_id: number;

@@ -42,6 +42,19 @@ const SQUAD: EntrySquad = {
   },
 };
 const DEVICE = deviceComputable(SQUAD, MEMBERS, NO_DEVICE_RIVALS)!;
+const DEVICE_INDEX: EntryAdviceIndex = {
+  ...mockEntryAdviceIndex(ENTRY).payload,
+  gameweek: 7,
+  menu: "device",
+  source_snapshot_id: "device-menu-capture",
+  windows: { "saf-puan": [], "ortak-koru": [], "fark-yarat": [] },
+  computed: [],
+  unavailable: [],
+  chip_states: SQUAD.chips,
+  chips: { available: false, reason: "on_device" },
+  top100: { available: false, reason: "on_device" },
+  evidence: { available: false, reason: "on_device" },
+};
 
 function resolve(query: string, index: EntryAdviceIndex | null = null) {
   return memberSelection({
@@ -68,7 +81,11 @@ describe("the device menu without published chip answers", () => {
     ).toEqual([]);
   });
 
-  it.each([null, { ...mockEntryAdviceIndex(ENTRY).payload, gameweek: 7, chips: undefined }])(
+  it.each([
+    null,
+    DEVICE_INDEX,
+    { ...mockEntryAdviceIndex(ENTRY).payload, gameweek: 7, chips: undefined },
+  ])(
     "asks the worker for the chosen chip without reading a nonexistent answer file (%j)",
     (index) => {
       const selected = resolve("chip=3xc", index);
@@ -104,6 +121,16 @@ describe("the device menu without published chip answers", () => {
       kind: "top100",
       weight: 20,
     });
+  });
+
+  it("keeps device weights and the default plan available through the device index", () => {
+    for (const query of ["", "top100=20"]) {
+      const selected = resolve(query, DEVICE_INDEX);
+      expect(selected.path).toBeNull();
+      expect(deviceSelection(deviceRequestFor(selected), SQUAD)).toEqual(
+        query ? { kind: "top100", weight: 20 } : { kind: "plain" },
+      );
+    }
   });
 
   it("does not offer unknown, played or future chips", () => {

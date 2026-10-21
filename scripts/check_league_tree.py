@@ -266,6 +266,33 @@ def page_refusal(index: object, entry: int) -> str | None:
     for field, ok in checks:
         if not ok:
             return field
+    if index.get("menu", "full") not in ("full", "device"):
+        return "menu"
+    if index.get("menu") == "device":
+        chips = index.get("chip_states")
+        if (
+            computed != []
+            or unavailable != []
+            or not isinstance(windows, dict)
+            or any(windows.values())
+            or not strategies
+            or strategies[0] != PURE
+            or not isinstance(index.get("source_snapshot_id"), str)
+            or not index["source_snapshot_id"]
+            or not isinstance(chips, dict)
+            or not isinstance(chips.get("known"), bool)
+            or chips.get("gameweek") != index.get("gameweek")
+            or not isinstance(chips.get("states"), dict)
+            or (
+                index["default_rival_entry_id"] is not None
+                and index["default_rival_entry_id"] not in (rivals or [])
+            )
+            or any(
+                index.get(key) != {"available": False, "reason": "on_device"}
+                for key in ("chips", "top100", "evidence")
+            )
+        ):
+            return "device menu"
     suggestion = index.get("suggested_strategy")
     if suggestion is not None and not (
         isinstance(suggestion, dict)
@@ -388,6 +415,25 @@ def check_variants(read: Callable[[str], Any]) -> list[str]:
         refused = refusal(index)
         if refused is not None:
             absences.append((entry, f"no advice this week: {refused}"))
+            continue
+        if index.get("menu") == "device":
+            squad = read(f"entries/{entry}.json")
+            payload = squad.get("payload", {}) if isinstance(squad, dict) else {}
+            block = payload.get("device_plan")
+            if (
+                not isinstance(block, dict)
+                or not isinstance(block.get("held"), list)
+                or len(set(block["held"])) != 15
+                or payload.get("source_snapshot_id") != index["source_snapshot_id"]
+                or payload.get("chips") != index["chip_states"]
+                or payload.get("entry", {}).get("entry_id") != entry
+                or payload.get("league_id") != index["league_id"]
+                or payload.get("gameweek") != index["gameweek"]
+                or payload.get("season") != index["season"]
+            ):
+                problems.append(f"{entry}: device menu has no matching squad inputs")
+            if read(f"advice/{entry}/{PURE}/1.json") is not None:
+                problems.append(f"{entry}: device menu retains a published baseline")
             continue
         rival = index["default_rival_entry_id"]
         windows = index.get("windows") or {}
