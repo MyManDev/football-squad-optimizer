@@ -356,14 +356,6 @@ export function MemberBench({
                 data-model-changed={changed ? "" : undefined}
                 data-player-motion={player.playerId}
               >
-                {onSelectPlayer ? (
-                  <button
-                    type="button"
-                    className={styles.playerButton}
-                    aria-label={`${player.name}: ${language === "tr" ? "Oyuncu ayrıntıları" : "Player details"}`}
-                    onClick={() => onSelectPlayer(player.playerId)}
-                  />
-                ) : null}
                 <span className={styles.benchOrder}>{player.order ?? "-"}</span>
                 <strong className={styles.benchName} data-plate="">
                   <span aria-hidden={shortName !== player.name || undefined}>{shortName}</span>
@@ -406,6 +398,14 @@ export function MemberBench({
                       <CoachNewsMark news={news.get(player.playerId)!} name={player.name} />
                     ) : null}
                   </span>
+                ) : null}
+                {onSelectPlayer ? (
+                  <button
+                    type="button"
+                    className={styles.playerButton}
+                    aria-label={`${player.name}: ${language === "tr" ? "Oyuncu ayrıntıları" : "Player details"}`}
+                    onClick={() => onSelectPlayer(player.playerId)}
+                  />
                 ) : null}
               </li>
             );
