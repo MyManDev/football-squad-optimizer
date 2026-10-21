@@ -295,6 +295,7 @@ function LeagueMemberContent({
           codes={codes}
           news={news}
           held={view}
+          fixtures={fixtures}
           list={plan && hasLineup(plan) ? <PlanLineup view={plan} codes={codes} /> : null}
         />
         {railPlacement === "flow" ? rail : null}
