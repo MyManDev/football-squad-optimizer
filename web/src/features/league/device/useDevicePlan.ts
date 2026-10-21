@@ -6,10 +6,12 @@
  * chip the member still holds played that week, a rival strategy against a named rival
  * whose entry document gives their eleven, or a Top 100 weight the member block names. The shared document (and the rival's) is read
  * when the member asks, the solve runs in a worker, and the answer is shown as the advice
- * document the page already reads. A new selection starts clean, and a reset or a new
- * selection stops a solve still running: its worker is ended, not left computing an
- * answer nobody will read. A worker that does not answer within the solve's ceiling, and
- * a grace beyond it, is ended too and the run fails. That watchdog counts only the time the
+ * document the page already reads. The plain plan's run also solves each chip the member
+ * holds once against that plan, for the chip timing card: the plan is shown as soon as the
+ * worker posts it, and the gains join it when they arrive. A new selection starts clean,
+ * and a reset or a new selection stops a solve still running: its worker is ended, not
+ * left computing an answer nobody will read. A worker that does not answer within the
+ * solve's ceiling, and a grace beyond it, is ended too and the run fails. That watchdog counts only the time the
  * page is visible, not the time a hidden tab spends suspended. Each run leaves User Timing
  * marks and measures of its stages (`DeviceTimeline`); the device spec prints the measures.
  */
@@ -28,7 +30,14 @@ import {
 } from "./solve/ceiling";
 import type { DevicePlanReply, DevicePlanRequest } from "./deviceSolver.worker";
 import { deviceSelection, offeredDeviceSelection, rivalFromSquad } from "./selection";
-import { isDevicePlanEntry, type DevicePlanDocument, type DevicePlanEntry } from "./types";
+import { heldChips } from "./chipForecast/member";
+import {
+  isDevicePlanEntry,
+  type DeviceChip,
+  type DevicePlanAnswer,
+  type DevicePlanDocument,
+  type DevicePlanEntry,
+} from "./types";
 
 export { deviceChip, deviceSelection } from "./selection";
 
@@ -36,11 +45,32 @@ export type DevicePlanPhase =
   | { phase: "idle" }
   | { phase: "loading" }
   | { phase: "solving" }
-  | { phase: "done"; envelope: LeagueViewEnvelope<EntryAdvice>; seconds: number }
+  | {
+      phase: "done";
+      envelope: LeagueViewEnvelope<EntryAdvice>;
+      seconds: number;
+      /**
+       * With the plain plan: what the chip timing reads, solved in the same run after the
+       * plan. Null until the gains arrive, and where none were asked for or none came.
+       */
+      chipTiming?: DeviceChipTiming | null;
+    }
   | { phase: "refused"; status: string }
   | { phase: "other-capture" }
   | { phase: "unpublished" }
   | { phase: "failed" };
+
+type DevicePlanDone = Extract<DevicePlanPhase, { phase: "done" }>;
+
+/**
+ * The table the plain plan was solved from and each held chip's gain this week against
+ * that plan, null where its solve was refused. The chip timing card reads its reading from
+ * these and the page's own squad and calendar.
+ */
+export interface DeviceChipTiming {
+  table: DevicePlanDocument;
+  gains: Partial<Record<DeviceChip, number | null>>;
+}
 
 /**
  * Whether the device's last run ended without a plan: it failed, refused the selection,
@@ -396,6 +426,10 @@ export function useDevicePlan(
         return;
       }
       const chip = selection.kind === "chip" ? selection.chip : null;
+      // The plain one-week plan also solves each chip the member holds once beside it, for
+      // the chip timing (#1003): 1 + n solves in the one request, under its one ceiling.
+      const chipGains =
+        selection.kind === "plain" ? (heldChips(squad.chips, document.gameweek) ?? []) : [];
       // A worker that cannot be created, load or evaluate answers as a failure, and the
       // next press creates a fresh one rather than reusing a dead worker.
       let worker: DeviceSolver;
@@ -408,6 +442,14 @@ export function useDevicePlan(
       }
       // Whether the worker said it was ready: only then is there a solve to measure.
       let ready = false;
+      const planDone = (answer: DevicePlanAnswer): DevicePlanDone => ({
+        phase: "done",
+        envelope: deviceAdviceEnvelope(document, squad, answer, now(), tree.league.leagueId),
+        seconds: answer.seconds,
+        chipTiming: null,
+      });
+      // With chip gains asked for, the plain plan the worker posts first, shown at once.
+      const early: { shown: DevicePlanDone | null } = { shown: null };
       const reply = await new Promise<DevicePlanReply | null>((resolve) => {
         // A worker that never answers is ended: the load gets its allowance, and the
         // solves their ceiling, each with a grace beyond it, counted while the page is visible.
@@ -438,6 +480,14 @@ export function useDevicePlan(
             if (alive()) setState({ phase: "solving" });
             return;
           }
+          if (event.data.kind === "plan") {
+            // The plan is on the page from here; the run goes on until its gains arrive.
+            timing.mark("answer");
+            if (ready) timing.measure("solve", "ready", "answer");
+            early.shown = planDone(event.data.answer);
+            if (alive()) setState(early.shown);
+            return;
+          }
           settle(event.data);
         };
         worker.onerror = () => {
@@ -454,31 +504,39 @@ export function useDevicePlan(
             chip,
             strategy,
             top100Weight: selection.kind === "top100" ? selection.weight : 0,
+            ...(chipGains.length > 0 ? { chipGains } : {}),
           });
         } catch {
           settle(null);
         }
       });
       if (!alive()) return;
-      const ending = reply === null || reply.kind === "ready" ? "failed" : reply.kind;
+      const shown = early.shown;
+      if (shown !== null) {
+        // The plan stands whatever follows it. The gains come with this run's own id, so a
+        // run a reset or a new selection ended never shows them; a run that fails or is
+        // stopped after its plan keeps the plan and has no chip timing.
+        if (reply?.kind === "gains") {
+          timing.mark("gains");
+          timing.measure("gains", "answer", "gains");
+          if (reply.gains !== null) {
+            setState({ ...shown, chipTiming: { table: document, gains: reply.gains } });
+          }
+        }
+        return;
+      }
+      const ending =
+        reply === null || reply.kind === "ready" || reply.kind === "plan" || reply.kind === "gains"
+          ? "failed"
+          : reply.kind;
       timing.mark(ending);
       if (ready) timing.measure("solve", "ready", ending);
-      if (reply === null || reply.kind === "failed" || reply.kind === "ready") {
+      if (reply === null || ending === "failed") {
         setState({ phase: "failed" });
       } else if (reply.kind === "refused") {
         setState({ phase: "refused", status: reply.status });
-      } else {
-        setState({
-          phase: "done",
-          envelope: deviceAdviceEnvelope(
-            document,
-            squad,
-            reply.answer,
-            now(),
-            tree.league.leagueId,
-          ),
-          seconds: reply.answer.seconds,
-        });
+      } else if (reply.kind === "answer") {
+        setState(planDone(reply.answer));
       }
     })().finally(() => {
       if (inFlight.current === run) inFlight.current = null;
