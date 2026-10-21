@@ -47,8 +47,11 @@ from squadopt.application.advice import (
     _paired_by_position,
     advise_entry,
     advise_with_top100,
+    solve_member_control,
+    solve_pricing_control,
 )
 from squadopt.application.advice_chips import chip_week_points
+from squadopt.application.advice_variants import advise_rival_with_top100
 from squadopt.application.device_plan import device_plan_entry, device_plan_table
 from squadopt.application.entries import EntryError, held_squad_from_picks
 from squadopt.application.lineup_publication import (
@@ -545,7 +548,11 @@ def build_rival_fixture() -> dict[str, Any]:
         for entry_id in RIVAL_ELEVENS
     }
     cases = []
+    weighted_cases = []
     for entry_id in RIVAL_MEMBERS:
+        control = solve_member_control(picks[entry_id], inputs, projection, rules)
+        held = held_squad_from_picks(picks[entry_id], current_prices=prices)
+        pricing = solve_pricing_control(inputs, projection, held, rules, control)
         for rival_id in RIVAL_ELEVENS:
             for strategy in RIVAL_STRATEGIES:
                 request = AdviseEntryRequest(
@@ -578,6 +585,38 @@ def build_rival_fixture() -> dict[str, Any]:
                         "reference": reference,
                     }
                 )
+                for weight in TOP100_CASE_WEIGHTS:
+                    try:
+                        weighted = advise_rival_with_top100(
+                            request,
+                            weight=weight,
+                            counts=counts,
+                            provider=provider,
+                            inputs=inputs,
+                            projection=projection,
+                            rules=rules,
+                            control=control,
+                            pricing=pricing,
+                            reference_payload={} if reference["refused"] else payload,
+                        )
+                    except EntryError as error:
+                        weighted_reference = {"refused": True, "reason": str(error)}
+                    else:
+                        selected = dict(weighted.payload)
+                        weighted_reference = {
+                            "refused": False,
+                            **_rival_reference(selected),
+                            **_top100_reference(selected),
+                        }
+                    weighted_cases.append(
+                        {
+                            "entry_id": entry_id,
+                            "rival_entry_id": rival_id,
+                            "strategy": strategy,
+                            "weight": weight,
+                            "reference": weighted_reference,
+                        }
+                    )
     top100_cases = []
     for entry_id in RIVAL_MEMBERS:
         for weight in TOP100_CASE_WEIGHTS:
@@ -608,6 +647,7 @@ def build_rival_fixture() -> dict[str, Any]:
         "rivals": rivals,
         "cases": cases,
         "top100_cases": top100_cases,
+        "weighted_cases": weighted_cases,
     }
 
 

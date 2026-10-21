@@ -32,7 +32,7 @@ file that never holds the personal field cannot leak it either.
 
 import argparse
 import sys
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -45,7 +45,7 @@ from squadopt.data.snapshots import list_snapshot_ids, read_snapshot
 from squadopt.data.sources import FPL_LIVE_SOURCE
 from squadopt.data.sources.fpl_live import (
     LeagueStanding,
-    fpl_league_standings,
+    fpl_captured_league_standings,
     league_standings_payload,
 )
 
@@ -53,13 +53,15 @@ SNAPSHOT_ROOT = REPOSITORY_ROOT / "data" / "snapshots"
 REGISTRY_PATH = REPOSITORY_ROOT / "data" / "entries" / "registry.json"
 
 
-def _standings_bytes(
+def _standings_payloads(
     *, league_id: int, snapshot_id: str | None, standings_file: Path | None
-) -> tuple[bytes, str]:
-    """Return the standings payload and a one-line description of where it came from."""
+) -> tuple[Mapping[str, bytes], str]:
+    """Return captured standings pages and a description of where they came from."""
 
     if standings_file is not None:
-        return standings_file.read_bytes(), f"file {standings_file}"
+        return {
+            league_standings_payload(league_id): standings_file.read_bytes()
+        }, f"file {standings_file}"
 
     if snapshot_id is not None:
         chosen = snapshot_id
@@ -85,7 +87,18 @@ def _standings_bytes(
             "endpoint was wired in will not have it; pass --standings-file for the first "
             "seed, or name a later snapshot with --snapshot-id."
         )
-    return snapshot.payloads[name], f"snapshot {chosen}"
+    return snapshot.payloads, f"snapshot {chosen}"
+
+
+def _standings_bytes(
+    *, league_id: int, snapshot_id: str | None, standings_file: Path | None
+) -> tuple[bytes, str]:
+    """Compatibility for callers reading the first page; the seed reads every page."""
+
+    payloads, origin = _standings_payloads(
+        league_id=league_id, snapshot_id=snapshot_id, standings_file=standings_file
+    )
+    return payloads[league_standings_payload(league_id)], origin
 
 
 def _printable(value: str) -> str:
@@ -167,12 +180,12 @@ def main() -> int:
     members: list[LeagueStanding] = []
     try:
         for league_id in league_ids:
-            payload, origin = _standings_bytes(
+            payloads, origin = _standings_payloads(
                 league_id=league_id,
                 snapshot_id=arguments.snapshot_id,
                 standings_file=arguments.standings_file,
             )
-            standings = fpl_league_standings(payload, league_id=league_id)
+            standings = fpl_captured_league_standings(payloads, league_id=league_id)
             print(f"League    {league_id}  ({origin})")
             print(f"Members   {len(standings)}")
             for member in standings:

@@ -33,7 +33,7 @@ served from the site's own assets) in a Web Worker:
 | `publication/rows.ts` | The server's publication rules: the move rows and their gains, the vice-captain, the bench order. |
 | `strategies/chips.ts` | A chip's effect on the objective and on what the week scores, and its gain against the no-chip plan. |
 | `strategies/rival.ts` | A rival strategy: `advice._advise_against_rival` restated. |
-| `strategies/top100.ts` | A Top 100 weight: `advice.advise_with_top100` restated. |
+| `strategies/top100.ts` | A Top 100 weight: `advice.advise_with_top100` and `advice_variants.advise_rival_with_top100` restated. |
 | `deviceAdvice.ts` | The answer as the advice document the page already reads. |
 | `useDevicePlan.ts` | Reads the documents when the member asks, holds them to the capture on screen, runs the worker. |
 | `deviceSolver.worker.ts` | The solve off the page's thread: a ready signal once loaded, then one request in; an answer, a refusal or a failure out. |
@@ -182,10 +182,15 @@ same table, each captain doubled, net of the plan's hits.
 
 ## What the device refuses
 
-`requests.ts` refuses two combinations before any solve: a Top 100 weight beside a chip or
-a rival strategy, and a chip beside a rival strategy. The server's one-week chip combines
-with nothing. A rival strategy at a Top 100 weight the server does publish
-(`advice_variants.advise_rival_with_top100`), and the device declines it by contract.
+At a Top 100 weight, both rival candidates are chosen on the weighted integer coefficients
+and compared on the unrounded weighted eleven's points net of hits, as
+`advice_variants.advise_rival_with_top100` does. Every published number stays on base points,
+including the price against the base pricing control and the alternative's price. `changed`
+compares the answer to the same rival strategy at zero. A move shared with that reference
+keeps `mode_tradeoff`; a new move or a row with a negative base gain is `top100_preference`.
+
+`requests.ts` refuses a Top 100 weight beside a chip, and a chip beside a rival strategy.
+The server's one-week chip combines with neither.
 
 A solve that ends other than optimal, at the plan, the tie-break or the hold stage, is
 refused, so a plan that was not proved is never shown. Only a rival candidate may prove
@@ -199,7 +204,7 @@ document does not carry and a player with no weighted points at it. Each is a
 The page asks the device only for what `selection.ts` takes: window one, without the
 manager's word, on the current model and without preferences; a chip only as above; a
 rival strategy only against a named rival, without a chip, and only against a rival the
-statement names; a weight only on the pure-points plan and only one the member block
+statement names; a weight on either one-week strategy and only one the member block
 names. It answers without a plan where the shared document is not published, where it or
 the rival's entry document is from another capture, and where the rival's eleven marks no
 captain. It fails where the shared document is not the expected shape or the rival's entry
@@ -225,11 +230,12 @@ the held squad's points on the published basis, and the move rows with their att
 gains; the `chips` instances, each chip forced on two of the fifteens; and the `rivals`
 world, whose document the real producer writes with the bands, the charge and the Top 100
 inputs, answered by `advise_entry` under each rival strategy against each rival and by
-`advise_with_top100` at two weights. `tests/unit/test_device_plan_fixture.py` requires the
+`advise_with_top100` and `advise_rival_with_top100` at two weights. The drift test requires the
 recorded answers to still be the planner's and the service's; in
 `web/src/features/league/device/`, `planModel.parity.test.ts` requires the device to return
 the plain and chip answers, `rival.parity.test.ts` the rival answers and the refusal, and
-`top100.parity.test.ts` the weighted answers and the refused combinations.
+`top100.parity.test.ts` the weighted pure-points answers and the refused combinations, and
+`rivalTop100.parity.test.ts` the combined rival answers, prices, move reasons and refusals.
 `tests/unit/test_device_plan.py` rebuilds the problem from the two published documents
 alone and gets the plan the same build published. `planModel.chips.shipped.test.ts` solves
 every chip document of the committed tree on the device and requires what the tree

@@ -61,9 +61,9 @@ from squadopt.data.sources import FPL_LIVE_SOURCE
 from squadopt.data.sources.fpl_live import (
     BOOTSTRAP_PAYLOAD,
     EntryGameweekPoints,
+    fpl_captured_league_standings,
     fpl_entry_history_points,
     fpl_league_name,
-    fpl_league_standings,
     scored_gameweeks,
 )
 from squadopt.data.sources.vaastav import build_panel
@@ -250,7 +250,7 @@ def prepare_league_publication(
     )
     scores = member_points(payloads, registered, gameweek=scored) if scored is not None else {}
     if standings_name in payloads:
-        rows = fpl_league_standings(payloads[standings_name], league_id=request.league_id)
+        rows = fpl_captured_league_standings(payloads, league_id=request.league_id)
         league_name = fpl_league_name(payloads[standings_name], league_id=request.league_id)
         standings = {
             row.entry_id: MemberStanding(

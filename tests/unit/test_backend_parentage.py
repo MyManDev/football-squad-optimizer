@@ -179,7 +179,9 @@ def test_the_restart_refuses_under_an_agent_but_a_dry_run_is_not_refused(tmp_pat
     refusal = _flat(real.stderr)
     assert "Refusing to restart the backend: this runs under python.exe" in refusal
     # The watch task starts a missing backend; it never replaces a running one.
-    assert "Run it from a plain Windows PowerShell window." in refusal
+    # PowerShell can wrap inside a word, depending on the parent PID's digit count.
+    instruction = "Run it from a plain Windows PowerShell window."
+    assert "".join(instruction.split()) in "".join(real.stderr.split())
     assert "SquadOptBackendWatch" not in refusal
     dry = _powershell(*arguments, "-RepoRoot", str(tmp_path), "-DryRun", agents="python.exe")
     assert "Refusing to" not in dry.stdout + dry.stderr
