@@ -143,6 +143,28 @@ describe("a model switch", () => {
     expect([...change.changed]).toEqual([12]);
   });
 
+  it("remembers an updated eleven under the same model before the next model switch", () => {
+    modelChangeOf(plan("current"));
+    const reordered = [1, 2, 12, 4, 5, 6, 7, 8, 9, 10, 11, 3, 13, 14, 15];
+    expect(modelChangeOf(plan("current", {}, reordered))).toBeNull();
+    expect(modelChangeOf(plan("football", {}, reordered))!.changed.size).toBe(0);
+  });
+
+  it("uses updated points even when a new plan keeps the same fifteen", () => {
+    modelChangeOf(plan("current"));
+    expect(modelChangeOf(plan("current", { expected_own_points: 63 }))).toBeNull();
+    expect(modelChangeOf(plan("football", { expected_own_points: 64 }))!.difference).toBe(1);
+    expect(modelChangeOf(plan("football", { expected_own_points: 65 }))).toBeNull();
+  });
+
+  it.each([{ season: "2027-28" }, { source_snapshot_id: "another-capture" }])(
+    "does not compare plans from a different publication context %j",
+    (patch) => {
+      modelChangeOf(plan("current"));
+      expect(modelChangeOf(plan("football", patch))).toBeNull();
+    },
+  );
+
   it("counts a player the new model brings onto the bench from outside", () => {
     modelChangeOf(plan("current"));
     const change = modelChangeOf(plan("football", {}, [...IDS.slice(0, 14), 60]))!;

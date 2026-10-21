@@ -49,7 +49,9 @@ export function planModel(view: EntryAdvice): PlanModel {
 
 /** The member's week: the plans a viewer sees one after another on one page. */
 function week(view: EntryAdvice): string {
-  return [view.league_id, view.entry_id, view.gameweek].join(":");
+  return [view.season, view.league_id, view.entry_id, view.gameweek, view.source_snapshot_id].join(
+    ":",
+  );
 }
 
 /** The selection a plan answers, the model left out. */
@@ -104,13 +106,22 @@ export function modelChangeOf(view: EntryAdvice | null | undefined): ModelChange
   const slot = week(view);
   const current = selection(view);
   const model = planModel(view);
-  const players = [...eleven, ...bench].sort((a, b) => a - b).join(",");
+  const players = JSON.stringify([
+    [...eleven].sort((a, b) => a - b),
+    [...bench].sort((a, b) => a - b),
+  ]);
+  const now = net(view);
   const last = shown.get(slot);
-  if (last && last.selection === current && last.model === model && last.players === players)
+  if (
+    last &&
+    last.selection === current &&
+    last.model === model &&
+    last.players === players &&
+    last.net === now
+  )
     return last.change;
   let change: ModelChange | null = null;
   if (last && last.selection === current && last.model !== model) {
-    const now = net(view);
     const key = `model-diff:${slot}:${current}:${last.model}>${model}:${last.players}>${players}`;
     change = {
       from: last.model,
@@ -131,7 +142,7 @@ export function modelChangeOf(view: EntryAdvice | null | undefined): ModelChange
     players,
     eleven,
     bench,
-    net: net(view),
+    net: now,
     change,
   });
   return change;
