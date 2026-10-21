@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="88" height="104" viewBox="0 0 88 104" role="img" aria-labelledby="title">
+  <title id="title">SquadOpt crest</title>
+  <path d="M4 4H84V55C84 75 66 91 44 101C22 91 4 75 4 55Z" fill="#17402a"/>
+  <path d="M10 10H78V55C78 71 63 85 44 95C25 85 10 71 10 55Z" fill="none" stroke="#a6c28f" stroke-width="1.5"/>
+  <rect x="22" y="26" width="44" height="21" rx="3" fill="#c62828"/>
+  <rect x="22" y="52" width="44" height="21" rx="3" fill="#1e7b45"/>
+  <path d="M54 36.5H34L40 30.5M34 36.5L40 42.5M34 62.5H54L48 56.5M54 62.5L48 68.5" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
