@@ -26,7 +26,8 @@ self.onmessage = async (event: MessageEvent<DevicePlanRequest>) => {
     const loaded = await highs();
     // The page shows the solver as loading until here, and as computing from here.
     self.postMessage({ id, kind: "ready" } satisfies DevicePlanReply);
-    // Every solve of the request shares one ceiling; a solve it stops is refused.
+    // Every solve of the request shares one ceiling; a solve it stops is refused. A chip
+    // gain it stops is unknown, and the plain plan solved before it is still the answer.
     reply = { id, kind: "answer", answer: solveRequest(withinCeiling(loaded), event.data) };
   } catch (error) {
     reply =

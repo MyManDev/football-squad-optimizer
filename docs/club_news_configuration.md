@@ -33,6 +33,26 @@ different from `--check-config`. Feed the resulting news capture into the normal
 flow with `--rotation --rotation-capture <news-capture>`. The news must precede the
 decision capture; a new model selection does not rewrite earlier captures.
 
+The Friday launcher (`scripts/weekly_run_friday.ps1`) requires a real news capture before
+starting the weekly decision. It checks configuration offline, acquires the news, and
+refuses a failed acquisition even if its output contains a capture id. There is no fallback
+to the example fixture. Tuesday keeps its existing cadence and only acquires news with
+an explicit `-ClubNews` or `-ClubNewsSettings` argument.
+
+Pass `-ClubNewsSettings <private-file>`, or save only the private file's path for the
+launcher's next run:
+
+```powershell
+[Environment]::SetEnvironmentVariable('SQUADOPT_CLUB_NEWS_SETTINGS', 'C:\private\club-news.settings.toml', 'User')
+```
+
+The launcher reads that user setting even when the planner was opened before the setting
+changed. An explicit argument takes precedence, followed by the current process's setting.
+The API key stays in the private file. Acquisition output, including the coding and coverage
+counts, stays in `data/logs/weekly/<run id>.club-news.log`; the weekly command writes its
+separate `<run id>.log`. `-DryRun` on this PowerShell launcher previews the commands without
+contacting news hosts or a model.
+
 The environment-only configuration remains supported. `SQUADOPT_LLM_PROVIDER`,
 `SQUADOPT_LLM_MODEL` and `SQUADOPT_LLM_API_KEY` override matching file defaults.
 OpenAI settings also accept `SQUADOPT_LLM_BASE_URL`, `SQUADOPT_LLM_RESPONSE_FORMAT`,
