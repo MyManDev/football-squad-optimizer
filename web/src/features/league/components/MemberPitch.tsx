@@ -3,6 +3,9 @@ import { useId, type CSSProperties } from "react";
 import { useLanguage } from "../../../i18n/context";
 import { clubCode, clubSwatch, type ClubCodes } from "../../../lib/clubs";
 import { figure } from "../../../lib/format";
+import type { CoachAbsence } from "../advice/coachAbsences";
+import type { ModelChange } from "../advice/modelSwitch";
+import { CoachNewsMark } from "./CoachNews";
 import styles from "./MemberPitch.module.css";
 import { clubPlate, usePitchLook } from "./pitchLook";
 
@@ -64,14 +67,22 @@ function ArrowIcon() {
   );
 }
 
+/** A plate's parts that depend on the plan shown before it (#1131). */
+export type PlateChange = Pick<ModelChange, "key" | "changed"> | null;
+
 function Plate({
   player,
   codes,
+  changed,
   clubColours,
+  news,
 }: {
   player: PitchPlayer;
   codes: ClubCodes;
+  /** Brought in by a switch of prediction model: said in the plate's text, as 'New' is. */
+  changed: boolean;
   clubColours: boolean;
+  news?: CoachAbsence;
 }) {
   const { locale, messages } = useLanguage();
   const code = clubCode(player.team, codes);
@@ -82,6 +93,7 @@ function Plate({
   return (
     <div
       className={styles.plate}
+      data-plate=""
       data-club={club?.colour}
       style={
         club
@@ -102,6 +114,9 @@ function Plate({
         </span>
       </span>
       {shortName !== player.name ? <span className="visually-hidden">{player.name}</span> : null}
+      {changed ? (
+        <span className="visually-hidden"> {messages.leagueMembers.modelChangedMark}</span>
+      ) : null}
       <span className={styles.code}>
         {swatch ? (
           <span
@@ -112,10 +127,15 @@ function Plate({
         ) : null}
         <span className={styles.codeText}>{code ?? player.team}</span>
       </span>
-      {player.expectedPoints !== null && Number.isFinite(player.expectedPoints) ? (
+      {news || (player.expectedPoints !== null && Number.isFinite(player.expectedPoints)) ? (
         <span className={styles.xp}>
-          {figure(player.expectedPoints, locale)}
-          <span className="visually-hidden"> {messages.leagueMembers.pointsUnitSpoken}</span>
+          {player.expectedPoints !== null && Number.isFinite(player.expectedPoints) ? (
+            <>
+              {figure(player.expectedPoints, locale)}
+              <span className="visually-hidden"> {messages.leagueMembers.pointsUnitSpoken}</span>
+            </>
+          ) : null}
+          {news ? <CoachNewsMark news={news} name={player.name} /> : null}
         </span>
       ) : null}
       {player.isNew ? <span className={styles.new}>{messages.leagueMembers.boardNew}</span> : null}
@@ -159,7 +179,22 @@ function AttackLabel({ at }: { at: "first" | "last" }) {
  * of attack is written on a white plate directly under the first defender in the published
  * order; where the defence is too crowded for that across the pitch, under the whole line.
  */
-export function MemberPitch({ players, codes }: { players: PitchPlayer[]; codes: ClubCodes }) {
+export function MemberPitch({
+  players,
+  codes,
+  modelChange = null,
+  news,
+}: {
+  players: PitchPlayer[];
+  codes: ClubCodes;
+  /**
+   * The players a switch of prediction model brought into this plan (#1131): each of them is
+   * marked, with the mark named in its plate's text. The one short rise is the squad's to
+   * start, over the pitch and the bench together.
+   */
+  modelChange?: PlateChange;
+  news?: ReadonlyMap<number, CoachAbsence>;
+}) {
   const { messages } = useLanguage();
   const copy = messages.leagueMembers;
   const describedBy = useId();
@@ -229,8 +264,15 @@ export function MemberPitch({ players, codes }: { players: PitchPlayer[]; codes:
                     key={player.playerId}
                     className={styles.token}
                     style={{ "--i": index } as CSSProperties}
+                    data-model-changed={modelChange?.changed.has(player.playerId) ? "" : undefined}
                   >
-                    <Plate player={player} codes={codes} clubColours={look.clubColours} />
+                    <Plate
+                      player={player}
+                      codes={codes}
+                      clubColours={look.clubColours}
+                      news={news?.get(player.playerId)}
+                      changed={modelChange?.changed.has(player.playerId) ?? false}
+                    />
                     {line.position === labelLine && index === 0 ? <AttackLabel at="first" /> : null}
                     {line.position === "DEF" && defenders >= 4 && index === defenders - 1 ? (
                       <AttackLabel at="last" />
@@ -258,8 +300,22 @@ export interface BenchPlayer {
   order: number | null;
 }
 
-/** The bench under the pitch, read left to right in the published order. */
-export function MemberBench({ players, codes }: { players: BenchPlayer[]; codes: ClubCodes }) {
+/**
+ * The bench under the pitch, read left to right in the published order. A player a switch of
+ * prediction model brought onto it from outside the squad is marked as a changed plate is,
+ * with the mark named in the item's text.
+ */
+export function MemberBench({
+  players,
+  codes,
+  modelChange = null,
+  news,
+}: {
+  players: BenchPlayer[];
+  codes: ClubCodes;
+  modelChange?: PlateChange;
+  news?: ReadonlyMap<number, CoachAbsence>;
+}) {
   const { locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
   const titleId = useId();
@@ -275,13 +331,21 @@ export function MemberBench({ players, codes }: { players: BenchPlayer[]; codes:
             const code = clubCode(player.team, codes);
             const swatch = clubSwatch(code);
             const shortName = player.shortName.trim() || player.name;
+            const changed = modelChange?.changed.has(player.playerId) ?? false;
             return (
-              <li key={player.playerId} className={styles.benchItem}>
+              <li
+                key={player.playerId}
+                className={styles.benchItem}
+                data-model-changed={changed ? "" : undefined}
+              >
                 <span className={styles.benchOrder}>{player.order ?? "-"}</span>
-                <strong className={styles.benchName}>
+                <strong className={styles.benchName} data-plate="">
                   <span aria-hidden={shortName !== player.name || undefined}>{shortName}</span>
                   {shortName !== player.name ? (
                     <span className="visually-hidden">{player.name}</span>
+                  ) : null}
+                  {changed ? (
+                    <span className="visually-hidden"> {copy.modelChangedMark}</span>
                   ) : null}
                 </strong>
                 <span className={styles.benchMeta}>
@@ -295,18 +359,26 @@ export function MemberBench({ players, codes }: { players: BenchPlayer[]; codes:
                   <span className={code ? styles.benchCode : undefined}>{code ?? player.team}</span>
                   {Object.hasOwn(messages.positions, player.position) ? (
                     <span>
-                      {" · "}
+                      {" Ã‚Â· "}
                       {messages.positions[player.position as keyof typeof messages.positions]}
                     </span>
                   ) : null}
                 </span>
-                {player.expectedPoints !== null && Number.isFinite(player.expectedPoints) ? (
+                {news?.has(player.playerId) ||
+                (player.expectedPoints !== null && Number.isFinite(player.expectedPoints)) ? (
                   <span className={styles.benchXp}>
-                    {figure(player.expectedPoints, locale)}
-                    <span className="visually-hidden">
-                      {" "}
-                      {messages.leagueMembers.pointsUnitSpoken}
-                    </span>
+                    {player.expectedPoints !== null && Number.isFinite(player.expectedPoints) ? (
+                      <>
+                        {figure(player.expectedPoints, locale)}
+                        <span className="visually-hidden">
+                          {" "}
+                          {messages.leagueMembers.pointsUnitSpoken}
+                        </span>
+                      </>
+                    ) : null}
+                    {news?.get(player.playerId) ? (
+                      <CoachNewsMark news={news.get(player.playerId)!} name={player.name} />
+                    ) : null}
                   </span>
                 ) : null}
               </li>

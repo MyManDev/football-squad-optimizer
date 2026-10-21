@@ -290,6 +290,14 @@
   white-space: nowrap;
 }
 
+.xp:has([data-coach-absence]),
+.benchXp:has([data-coach-absence]) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+
 /* A plate in its club's colours: every line in the one text colour chosen for the fill. */
 .plate[data-club] {
   background: var(--plate-fill);
@@ -305,7 +313,7 @@
   display: none;
 }
 
-/* Upright, YENİ and the armband stand centred over their own plate, outside it, so a
+/* Upright, YENÄ° and the armband stand centred over their own plate, outside it, so a
    narrow plate keeps its name and a tag never reads as the next plate's. Where a plate
    carries both, they stand side by side about its centre. */
 .new,
@@ -547,7 +555,7 @@
     display: none;
   }
 
-  /* Across, two lines: the name, then the club, YENİ and the figure. */
+  /* Across, two lines: the name, then the club, YENÄ° and the figure. */
   .plate {
     grid-template-columns: auto auto minmax(0, 1fr) auto;
     grid-template-areas:
@@ -740,4 +748,22 @@
   .benchXp {
     grid-area: xp;
   }
+}
+
+/* A player a switch of prediction model brought into the plan (#1131): a static ring in the
+   page's one accent, until the next plan, with an ink edge on either side so the ring reads
+   at 3:1 or more on both grass stripes and on the bench's surface (the accent alone is under
+   3:1 on the lighter stripe). The plate's one short rise is script, on the motion tokens'
+   data time; the ring itself never moves. The bench item carries the same ring. */
+.token[data-model-changed] .plate,
+.benchItem[data-model-changed] .benchName {
+  outline: 2px solid var(--color-lime);
+  outline-offset: 1px;
+  box-shadow:
+    0 0 0 1px var(--color-text),
+    0 0 0 4px var(--color-text);
+}
+
+.benchItem[data-model-changed] .benchName {
+  border-radius: var(--radius-s);
 }
