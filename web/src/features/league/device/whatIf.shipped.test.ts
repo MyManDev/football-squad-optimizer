@@ -13,6 +13,7 @@ import { join, relative } from "node:path";
 
 import { beforeAll, describe, expect, it } from "vitest";
 
+import { isRefusedMemberIndex } from "../../../testSupport/refusedMember";
 import { shippedTrees } from "../../../testSupport/shippedTrees";
 import type {
   EntryAdvice,
@@ -65,6 +66,7 @@ for (const { path, root } of shippedTrees()) {
     const cases: { file: string; squad: EntrySquad; plan: EntryAdvice; advised: number[] }[] = [];
     let declined = 0;
     let deviceMembers = 0;
+    let refusedMembers = 0;
     for (const member of members) {
       if (member.member_kind !== "human") continue;
       const index = read<LeagueViewEnvelope<EntryAdviceIndex>>(
@@ -72,6 +74,12 @@ for (const { path, root } of shippedTrees()) {
       ).payload;
       if (index.menu === "device") {
         deviceMembers += 1;
+        continue;
+      }
+      if (isRefusedMemberIndex(index)) {
+        expect(member.data_quality).toBe("empty");
+        expect(existsSync(join(root, `entries/${member.entry_id}.json`))).toBe(false);
+        refusedMembers += 1;
         continue;
       }
       const squad = read<LeagueViewEnvelope<EntrySquad>>(`entries/${member.entry_id}.json`).payload;
@@ -85,7 +93,10 @@ for (const { path, root } of shippedTrees()) {
     }
 
     it("offers the mode on the one-week base plans and declines every other document", () => {
-      if (deviceMembers === members.filter((member) => member.member_kind === "human").length) {
+      if (
+        deviceMembers + refusedMembers ===
+        members.filter((member) => member.member_kind === "human").length
+      ) {
         expect(cases).toEqual([]);
         expect(declined).toBe(0);
         return;

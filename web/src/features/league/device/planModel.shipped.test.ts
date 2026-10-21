@@ -19,6 +19,7 @@ import { join } from "node:path";
 
 import { beforeAll, describe, expect, it } from "vitest";
 
+import { isRefusedMemberIndex } from "../../../testSupport/refusedMember";
 import { shippedTrees } from "../../../testSupport/shippedTrees";
 import type { AdviceRequest } from "../advice/adviceClient";
 import type {
@@ -111,6 +112,7 @@ function gather(ROOT: string): Tree {
   const cases: Case[] = [];
   const declined: Declined[] = [];
   let deviceMembers = 0;
+  let refusedMembers = 0;
   for (const member of members) {
     if (member.member_kind !== "human") continue;
     const entryId = member.entry_id;
@@ -119,6 +121,12 @@ function gather(ROOT: string): Tree {
     ).payload;
     if (index.menu === "device") {
       deviceMembers += 1;
+      continue;
+    }
+    if (isRefusedMemberIndex(index)) {
+      expect(member.data_quality).toBe("empty");
+      expect(squadOf(entryId)).toBeNull();
+      refusedMembers += 1;
       continue;
     }
     const squad = squadOf(entryId);
@@ -233,8 +241,9 @@ function gather(ROOT: string): Tree {
   }
   return {
     absent:
-      deviceMembers === members.filter((member) => member.member_kind === "human").length
-        ? "the device league publishes inputs and no server answers to compare"
+      deviceMembers + refusedMembers ===
+      members.filter((member) => member.member_kind === "human").length
+        ? `${deviceMembers} device members and ${refusedMembers} explicit refusals publish no server answers`
         : null,
     cases,
     declined,
