@@ -239,8 +239,11 @@
     line-height: 28px;
   }
 
+  /* The incoming panel arrives from 12 px to the right (boardMotion.ts), more than this
+     4 px bezel holds; the panels clip it, so it never shows past the board's frame. */
   .panels {
     gap: 4px;
+    overflow: clip;
   }
 
   .panel {
@@ -712,4 +715,22 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+}
+
+/* The model-switch line under the gain strip (#1131): one quiet sentence and the counted
+   difference in the scoreboard face. */
+.modelChange {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--step--1);
+}
+
+.modelChange strong {
+  color: var(--color-text);
+  font-family: var(--font-display);
+}
+
+/* The figure and its unit stay on one line at 320 px. */
+.modelChangeFigure {
+  white-space: nowrap;
 }

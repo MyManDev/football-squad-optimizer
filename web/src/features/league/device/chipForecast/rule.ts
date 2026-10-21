@@ -119,11 +119,6 @@ function checked(inputs: ChipForecastInputs): ChipForecastInputs {
     .flatMap((row) => (row.bench_order === null ? [] : [row.bench_order]))
     .sort();
   requireInput(bench.join(",") === "1,2,3,4", "The bench must list each order once.");
-  const captains = inputs.squad.filter((row) => row.is_captain);
-  requireInput(
-    captains.length === 1 && captains[0]!.bench_order === null,
-    "The eleven must hold exactly one captain.",
-  );
   const calendar = [...inputs.calendar].sort((a, b) => a.gameweek - b.gameweek);
   requireInput(
     calendar.length > 0 && calendar[0]!.gameweek === inputs.decision_gameweek,
@@ -331,6 +326,29 @@ function reading(chip: HeldChip, inputs: ChipForecastInputs): ChipReading {
     result.hold_reason = "gain_not_above_threshold";
   }
   return result;
+}
+
+/**
+ * The first gameweek after `after` in the held chip's window where the same later-week
+ * loop as `points_at_gameweek` crosses its threshold, or null where none does. The card
+ * reads it for a chip that gives up its named gameweek to the other chip; the document
+ * itself is never changed by it.
+ */
+export function nextPointsAt(
+  raw: ChipForecastInputs,
+  name: ChipName,
+  after: number,
+): PointsAt | null {
+  const inputs = checked(raw);
+  const chip = inputs.chips.find((held) => held.name === name);
+  if (chip === undefined) return null;
+  const later = inputs.calendar.filter(
+    (week) =>
+      Math.max(after, inputs.decision_gameweek) < week.gameweek &&
+      chip.first_gameweek <= week.gameweek &&
+      week.gameweek <= chip.last_gameweek,
+  );
+  return pointsAt(chip, inputs, later);
 }
 
 export function chipForecast(raw: ChipForecastInputs) {

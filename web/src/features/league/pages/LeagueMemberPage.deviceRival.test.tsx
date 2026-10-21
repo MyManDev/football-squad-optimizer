@@ -341,13 +341,16 @@ describe("a rival strategy solved on the member's device", () => {
     expect(offeredRivals()).not.toContain(BENCHED_CAPTAIN);
     cleanup();
 
-    // Named in the link, he is still not the rival once the documents are read: the device
-    // has nothing to offer.
+    // The named member remains visible with the exact refusal, never silently dropped.
     const { container } = renderPage(`mode=ortak-koru&window=1&rival=${BENCHED_CAPTAIN}`);
     await waitFor(() => {
       expect(offeredRivals()).toContain(RIVAL);
-      expect(offeredRivals()).not.toContain(BENCHED_CAPTAIN);
+      expect(offeredRivals()).toContain(BENCHED_CAPTAIN);
+      expect(
+        screen.getByRole("option", { name: new RegExp(copy.rivalCaptainMissing) }),
+      ).toBeDisabled();
     });
+    expect(screen.getByText(copy.rivalCaptainMissing, { exact: true })).toBeVisible();
     expect(deviceButton()).toBeNull();
     expect(container).not.toHaveTextContent(copy.deviceRefused);
   }, 60_000);

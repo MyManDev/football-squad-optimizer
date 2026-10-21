@@ -46,6 +46,7 @@ from squadopt.platform.club_news_fetch import (
     fetch_registered_documents,
     load_club_sources,
     read_url,
+    registered_article_url,
     robots_allows,
 )
 
@@ -1497,6 +1498,55 @@ def test_team_news_beyond_ten_commercial_links_is_fetched_within_the_same_cap() 
     assert len(articles) == MAXIMUM_ARTICLES_PER_HOST
     assert articles[:2] == urls[-2:]
     assert len(opener.requested) == MAXIMUM_ARTICLES_PER_HOST + 2  # robots + index
+
+
+def test_category_and_listing_pages_do_not_spend_the_article_budget() -> None:
+    navigation = ["listing/mens-team-news", "listing/academy-team-news", "category/men"]
+    articles = ["injury-update", "press-conference"]
+    markup = "".join(f"<a href='/team-news/{path}'>Team news</a>" for path in navigation + articles)
+    urls = [f"https://club.example/team-news/{path}" for path in articles]
+    opener = _Opener(
+        {
+            ROBOTS: _allowing_robots(),
+            PAGE: _Reply(markup.encode()),
+            **{url: _Reply(b"<p>Article body.</p>", final_url=url) for url in urls},
+        }
+    )
+
+    documents, refused = fetch_registered_documents(
+        (SOURCE,),
+        opener=opener,
+        now=lambda: FIXED_NOW,
+        sleeper=lambda _: None,
+        articles_per_host=2,
+    )
+
+    assert refused == ()
+    assert [document.requested_url for document in documents] == [PAGE, *urls]
+    assert opener.requested == [ROBOTS, PAGE, *urls]
+
+
+@pytest.mark.parametrize(
+    ("path", "eligible"),
+    [
+        ("listing/mens-team-news", False),
+        ("category/men/", False),
+        ("%6cisting/mens-team-news?sort=latest", False),
+        ("CATEGORY/men#latest", False),
+        ("category/men/injury-update", True),
+        ("category-news", True),
+        ("listing", True),
+    ],
+)
+def test_referrals_and_page_links_apply_the_same_index_filter(path: str, eligible: bool) -> None:
+    url = f"{PAGE}/{path}"
+    markup = f"<a href='{url}'>Team news</a>".encode()
+    opener = _Opener({ROBOTS: _allowing_robots(), PAGE: _Reply(markup)})
+    index = fetch_club_document(SOURCE, opener=opener, now=lambda: FIXED_NOW)
+    canonical = url.split("#", 1)[0]
+
+    assert article_links(SOURCE, index) == ((canonical,) if eligible else ())
+    assert registered_article_url(SOURCE, url) == (canonical if eligible else None)
 
 
 def test_a_failed_article_costs_the_article_and_not_the_club() -> None:

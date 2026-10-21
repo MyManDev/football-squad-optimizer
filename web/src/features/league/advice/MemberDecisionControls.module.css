@@ -142,7 +142,9 @@
   max-width: 24rem;
 }
 
-.rivalField select {
+.rivalField select,
+.rivalField input,
+.rivalField button {
   width: 100%;
   min-height: 44px;
   padding: 4px 8px;

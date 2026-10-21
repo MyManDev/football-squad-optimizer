@@ -25,16 +25,22 @@ from squadopt.application.advice_record import (
     load_member_advice_record,
     recorded_captures,
 )
+from squadopt.application.settled_member import ActualMemberDetails, settled_member_details
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import CapturedSnapshot, list_snapshot_ids, read_snapshot
 from squadopt.data.sources.fpl_live import (
     BOOTSTRAP_PAYLOAD,
     FPL_LIVE_SOURCE,
     entry_history_payload,
+    entry_picks_payload,
+    entry_squad_from_picks,
+    entry_transfers,
+    entry_transfers_payload,
     fpl_entry_history_points,
     gameweek_deadlines,
     live_event_outcomes,
     live_payload,
+    player_codes,
     scored_gameweeks,
 )
 from squadopt.data.timestamps import as_instant, normalize_utc_timestamp
@@ -86,6 +92,7 @@ class ActualScore:
     gross_points: float
     transfer_hit_points: float
     net_points: float
+    details: ActualMemberDetails | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -392,6 +399,58 @@ def _advice(record: Mapping[str, Any]) -> Mapping[str, Any]:
     return found[0]
 
 
+def _actual_member_details(
+    capture: CapturedSnapshot,
+    outcomes: pd.DataFrame,
+    *,
+    entry_id: int,
+    gameweek: int,
+    deadline_utc: str,
+    gross_points: float,
+) -> ActualMemberDetails:
+    """Decode the captured source here; contribution arithmetic reads no storage."""
+    bootstrap = capture.payloads[BOOTSTRAP_PAYLOAD]
+    if gameweek not in scored_gameweeks(bootstrap) or as_instant(
+        capture.metadata.captured_at_utc
+    ) < as_instant(deadline_utc):
+        raise DataError("The member report requires settled outcomes.")
+    raw = capture.payloads[entry_picks_payload(entry_id, gameweek)]
+    named = entry_squad_from_picks(raw, entry_id=entry_id, gameweek=gameweek)
+    document = json.loads(raw)
+    history = document.get("entry_history")
+    if (
+        not isinstance(history, dict)
+        or type(history.get("event")) is not int
+        or history["event"] != gameweek
+    ):
+        raise DataError("The captured picks do not identify this gameweek.")
+    names = {
+        element["id"]: element["web_name"].strip()
+        for element in json.loads(bootstrap)["elements"]
+        if isinstance(element.get("web_name"), str) and element["web_name"].strip()
+    }
+    transfers = tuple(
+        move
+        for move in entry_transfers(
+            capture.payloads[entry_transfers_payload(entry_id)], entry_id=entry_id
+        )
+        if move.event == gameweek
+    )
+    if any(as_instant(move.time_utc) >= as_instant(deadline_utc) for move in transfers):
+        raise DataError("A transfer for the week was recorded after its deadline.")
+    return settled_member_details(
+        outcomes,
+        source_snapshot_id=capture.metadata.snapshot_id,
+        picks=[(pick["element"], pick.get("multiplier")) for pick in document["picks"]],
+        codes=player_codes(bootstrap),
+        names=names,
+        captain=named.captain,
+        vice_captain=named.vice_captain,
+        transfers=[(move.element_in, move.element_out) for move in transfers],
+        gross_points=gross_points,
+    )
+
+
 def evaluate_week(
     root: Path,
     *,
@@ -482,6 +541,34 @@ def evaluate_week(
             actual_reason = None
     except (DataError, ValueError, TypeError):
         actual_reason = "actual_score_invalid"
+    if actual is not None:
+        for held_capture in sorted(
+            settled, key=lambda item: as_instant(item.metadata.captured_at_utc), reverse=True
+        ):
+            if not all(
+                path in held_capture.payloads
+                for path in (
+                    entry_picks_payload(entry_id, gameweek),
+                    entry_transfers_payload(entry_id),
+                )
+            ):
+                continue
+            try:
+                details = _actual_member_details(
+                    held_capture,
+                    outcomes,
+                    entry_id=entry_id,
+                    gameweek=gameweek,
+                    deadline_utc=deadline_utc,
+                    gross_points=actual.gross_points,
+                )
+                actual = ActualScore(
+                    actual.gross_points, actual.transfer_hit_points, actual.net_points, details
+                )
+            except (DataError, ValueError, TypeError, KeyError):
+                # Optional detail cannot invalidate the independently captured total.
+                pass
+            break
     return WeekReview(
         **base,
         status="available",

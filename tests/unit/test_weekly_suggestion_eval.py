@@ -120,6 +120,8 @@ def snapshot(
     actual: bool = True,
     outcomes: bool = True,
     hits: int | None = 8,
+    details: bool = False,
+    gross: int = 30,
 ) -> CapturedSnapshot:
     bootstrap = {
         "events": [
@@ -144,10 +146,44 @@ def snapshot(
             }
         ).encode()
     if actual:
-        history = {"event": 4, "points": 30, "total_points": 150}
+        history = {"event": 4, "points": gross, "total_points": 150}
         if hits is not None:
             history["event_transfers_cost"] = hits
         payloads["entry-101-history.json"] = json.dumps({"current": [history]}).encode()
+    if details:
+        bootstrap["elements"] = [
+            {"id": i + 100, "code": i, "web_name": f"Player {i}"} for i in range(1, 18)
+        ]
+        payloads["bootstrap-static.json"] = json.dumps(bootstrap).encode()
+        payloads["entry-101-picks-gw04.json"] = json.dumps(
+            {
+                "entry_history": {"event": 4},
+                "picks": [
+                    {
+                        "element": i + 100,
+                        "position": i,
+                        "is_captain": i == 1,
+                        "is_vice_captain": i == 2,
+                        "multiplier": 2 if i == 1 else int(i <= 11),
+                    }
+                    for i in range(1, 16)
+                ],
+            }
+        ).encode()
+        payloads["entry-101-transfers.json"] = json.dumps(
+            [
+                {
+                    "entry": 101,
+                    "event": 4,
+                    "element_in": incoming,
+                    "element_out": outgoing,
+                    "element_in_cost": 50,
+                    "element_out_cost": 50,
+                    "time": "2026-09-11T09:00:00Z",
+                }
+                for incoming, outgoing in [(101, 116), (103, 117)]
+            ]
+        ).encode()
     metadata = write_snapshot(root, source="fpl-live", captured_at_utc=captured, payloads=payloads)
     return read_snapshot(root, metadata.snapshot_id)
 
@@ -478,6 +514,33 @@ def test_settled_score_uses_stable_codes_and_actual_gross_minus_hits(tmp_path: P
     assert result.advice_generated_at_utc == PUBLISHED
     assert result.outcome_snapshot_id == capture.metadata.snapshot_id
     assert [player.player_id for player in result.players] == STARTERS + BENCH
+
+
+@pytest.mark.parametrize("gross", [24, 30])
+def test_optional_actual_details_follow_the_settled_total(tmp_path: Path, gross: int) -> None:
+    record_member_advice(tmp_path / "records", recorded())
+    capture = snapshot(tmp_path / "snapshots", details=True, gross=gross)
+    result = evaluate(tmp_path / "records", [capture])
+    assert result.actual is not None and result.actual.net_points == gross - 8
+    assert result.actual_reason is None
+    if gross == 24:
+        detail = result.actual.details
+        assert detail is not None and detail.source_snapshot_id == capture.metadata.snapshot_id
+        assert detail.captain.player_id == 1 and detail.captain.counted_points == 4
+        assert len(detail.transfers) == 2
+        schema = json.loads(
+            (
+                Path(__file__).parents[2]
+                / "docs/contracts/weekly_suggestion_history_v1.schema.json"
+            ).read_text(encoding="utf-8")
+        )
+        jsonschema.validate(
+            json.loads(json.dumps(asdict(result.actual))),
+            schema["properties"]["payload"]["properties"]["weeks"]["items"]["properties"]["actual"],
+        )
+    else:
+        # The existing independently captured score survives inconsistent optional picks.
+        assert result.actual.details is None
 
 
 @pytest.mark.parametrize("options", [{"actual": False}, {"hits": None}])

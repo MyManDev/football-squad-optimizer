@@ -198,7 +198,7 @@ do not move.
 | `export_decided_appearance.py` | artifact-only runner | `artifacts/double_reduction/`; the `--fitted` input of `measure_double_reduction.py` | 2026-09-26 |
 | `measure_availability_transitions.py` | artifact-only runner | a fresh `--output` directory the operator names (`record.json`, `summary.md`); refuses the snapshot root and the repository's `data/` and `docs/`; protocol `docs/availability_transitions_prereg.md` | 2026-10-02 |
 | `measure_football_lead_reliability.py` | artifact-only runner | a fresh `--output` directory the operator names (`record.json`, `summary.md`, `forecasts.csv`); refuses the archive and the repository's `data/` and `docs/`; protocol `docs/football_lead_reliability_prereg.md` | 2026-10-07 |
-| `measure_planner_policy_chain.py` | artifact-only runner | `artifacts/planner_policy_chain/` (receipts, forecast copies, decision records, weekly manifests), each week copied to `--evidence-copy-root` outside the checkout; reads no outcome; protocol `docs/research/planner_policy_chain_prereg.md` | 2026-10-06 |
+| `measure_planner_policy_chain.py` | artifact-only runner | `artifacts/planner_policy_chain/` (receipts, forecast copies, decision records, weekly manifests, `skipped/gwNN.json` skip records, `runner_fix.json`, `runs.log`), each week copied to `--evidence-copy-root` outside the checkout; reads no outcome; protocol `docs/research/planner_policy_chain_prereg.md` | 2026-10-06 |
 | `measure_published_difficulty_live.py` | artifact-only runner | private JSON/CSV under ignored `artifacts/`; usage in `docs/research/published_difficulty_live_runner.md`; one reading after settled GW20 | 2026-10-11 |
 | `plan_transfer_horizon.py` | artifact-only runner | `data/handoffs/`; `docs/projection_horizon_contract.md` | 2026-08-31 |
 | `preview_football_candidate.py` | artifact-only runner | a fresh `--output` directory (`report.json`) from an explicit offline input bundle; usage in `docs/research/football_candidate_development.md` | 2026-09-22 |
@@ -216,6 +216,7 @@ do not move.
 | `export_chip_forecast_fixture.py` | fixture generator | `web/src/fixtures/chip-forecast/cases.json`; #1003 | 2026-10-11 |
 | `export_device_plan_fixture.py` | fixture generator | `web/src/fixtures/device-plan/instances.json`: synthetic instances with the server planner's answers, which the device solver's web test must reproduce; `docs/contracts/league_device_plan_v1.md` | 2026-10-11 |
 | `export_official_scoring_vectors.py` | fixture generator | `web/src/features/liveScore/officialScoring.vectors.json`; synthetic official finished-week scores for #1008 | 2026-10-11 |
+| `export_entry_state_vectors.py` | fixture generator | `web/src/features/league/entryState/vectors.json`; synthetic picks, banking, Free Hit, chip-state and deadline answers for the offline device entry readers (#983) | 2026-10-21 |
 | `generate_club_news_coding_fixture.py` | fixture generator | committed coding fixture; `docs/rotation_claim_coding.md` | 2026-09-10 |
 | `generate_club_news_fixture.py` | fixture generator | committed club-news fixture | 2026-09-08 |
 | `generate_honesty_stems.py` | code generator | `src/squadopt/contracts/honesty_stems.py` from `docs/contracts/honesty_words.json`, so an installed wheel needs no `docs/` folder | 2026-09-19 |

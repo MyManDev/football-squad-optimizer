@@ -30,7 +30,8 @@
         "actual": {
           "gross_points": 30.0,
           "transfer_hit_points": 8.0,
-          "net_points": 22.0
+          "net_points": 22.0,
+          "details": null
         },
         "actual_reason": null,
         "net_difference": -2.0,

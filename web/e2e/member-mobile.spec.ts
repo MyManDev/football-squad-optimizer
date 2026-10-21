@@ -1,4 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
+import { atRest } from "./atRest";
 import { expect, test, type Page } from "@playwright/test";
 import { MESSAGES } from "../src/i18n/messages";
 import { mockEntryAdviceEnvelope, mockEntrySquadEnvelopes } from "../src/fixtures/league";
@@ -13,6 +14,7 @@ async function noSidewaysScroll(page: Page): Promise<boolean> {
 }
 
 async function blocking(page: Page) {
+  await atRest(page);
   const results = await new AxeBuilder({ page }).analyze();
   return results.violations.filter((v) => ["serious", "critical"].includes(v.impact ?? ""));
 }

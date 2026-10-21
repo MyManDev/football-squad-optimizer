@@ -1125,7 +1125,18 @@
         "actual": {
           "gross_points": 51.0,
           "transfer_hit_points": 0.0,
-          "net_points": 51.0
+          "net_points": 51.0,
+          "details": {
+            "source_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd",
+            "captain": {
+              "player_id": 154561,
+              "name": "Raya",
+              "points": 3.0,
+              "multiplier": 2,
+              "counted_points": 6.0
+            },
+            "transfers": []
+          }
         },
         "actual_reason": null,
         "net_difference": 10.0,
@@ -2466,7 +2477,18 @@
         "actual": {
           "gross_points": 44.0,
           "transfer_hit_points": 0.0,
-          "net_points": 44.0
+          "net_points": 44.0,
+          "details": {
+            "source_snapshot_id": "fpl-live-20261010T035732Z-c77d032165af",
+            "captain": {
+              "player_id": 154561,
+              "name": "Raya",
+              "points": 1.0,
+              "multiplier": 2,
+              "counted_points": 2.0
+            },
+            "transfers": []
+          }
         },
         "actual_reason": null,
         "net_difference": 8.0,
@@ -2706,7 +2728,8 @@
         "actual": {
           "gross_points": 60.0,
           "transfer_hit_points": 0.0,
-          "net_points": 60.0
+          "net_points": 60.0,
+          "details": null
         },
         "actual_reason": null,
         "net_difference": -16.0,

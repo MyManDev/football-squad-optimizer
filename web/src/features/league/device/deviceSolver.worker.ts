@@ -1,38 +1,31 @@
 /**
  * The device solve, off the page's thread. One message in (the two published documents
- * and the selection), one message out (the answer, or why there is none). The solver is
- * loaded once per worker and the wasm binary comes from the app's own assets, so nothing
- * is fetched from anywhere but the site.
+ * and the selection), and out the answer or why there is none (`replies.ts`): for chip
+ * gains, the plain plan first and the gains after it. The solver is loaded once per worker
+ * and the wasm binary comes from the app's own assets, so nothing is fetched from anywhere
+ * but the site.
  */
 
 import { highs } from "./lp/highs";
-import { solveRequest, type DevicePlanRequest } from "./requests";
+import { replyTo, type DevicePlanReply } from "./replies";
+import type { DevicePlanRequest } from "./requests";
 import { withinCeiling } from "./solve/ceiling";
-import { DevicePlanRefused } from "./solve/week";
-import type { DevicePlanAnswer } from "./types";
 
 export type { DevicePlanRequest } from "./requests";
-
-export type DevicePlanReply =
-  | { id: number; kind: "ready" }
-  | { id: number; kind: "answer"; answer: DevicePlanAnswer }
-  | { id: number; kind: "refused"; status: string; stage: string }
-  | { id: number; kind: "failed" };
+export type { DevicePlanReply } from "./replies";
 
 self.onmessage = async (event: MessageEvent<DevicePlanRequest>) => {
   const { id } = event.data;
-  let reply: DevicePlanReply;
+  let loaded: Awaited<ReturnType<typeof highs>>;
   try {
-    const loaded = await highs();
-    // The page shows the solver as loading until here, and as computing from here.
-    self.postMessage({ id, kind: "ready" } satisfies DevicePlanReply);
-    // Every solve of the request shares one ceiling; a solve it stops is refused.
-    reply = { id, kind: "answer", answer: solveRequest(withinCeiling(loaded), event.data) };
-  } catch (error) {
-    reply =
-      error instanceof DevicePlanRefused
-        ? { id, kind: "refused", status: error.status, stage: error.stage }
-        : { id, kind: "failed" };
+    loaded = await highs();
+  } catch {
+    self.postMessage({ id, kind: "failed" } satisfies DevicePlanReply);
+    return;
   }
-  self.postMessage(reply);
+  // The page shows the solver as loading until here, and as computing from here.
+  self.postMessage({ id, kind: "ready" } satisfies DevicePlanReply);
+  // Every solve of the request shares one ceiling; a solve it stops is refused. A chip
+  // gain it stops is unknown, and the plain plan solved before it is still the answer.
+  replyTo(withinCeiling(loaded), event.data, (reply) => self.postMessage(reply));
 };

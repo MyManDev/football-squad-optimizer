@@ -118,82 +118,93 @@ test("a member's plan is solved on the device and drawn as a computation result"
   expect(foreign).toEqual([]);
 });
 
-test("a chip the member holds is solved on the device with its gain against the plain plan", async ({
-  page,
-}) => {
-  await installLeagueMocks(page);
-  const squad = mockEntrySquadEnvelopes[ENTRY]!;
-  const withInputs = {
-    ...squad,
-    payload: {
-      ...squad.payload,
-      source_snapshot_id: fixture.document.source_snapshot_id,
-      device_plan: member.entry,
-    },
-  };
-  await page.route(/\/data\/league\/entries\/35249001\.json(?:\?.*)?$/, (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify(withInputs),
-    }),
-  );
-  // The publish lists the chip, so the page offers it; its document is the publisher's.
-  const index = mockEntryAdviceIndex(ENTRY);
-  await page.route(/\/data\/league\/advice\/35249001\/index\.json(?:\?.*)?$/, (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({
-        ...index,
-        payload: {
-          ...index.payload,
-          chips: {
-            available: true,
-            paths: { "3xc": chipPath(ENTRY, "3xc") },
-            unavailable: [],
-            held: ["3xc"],
-          },
-        },
-      }),
-    }),
-  );
-  await page.route(
-    /\/data\/league\/advice\/35249001\/saf-puan\/1\/chip-3xc\.json(?:\?.*)?$/,
-    (route) =>
+for (const publishedChip of [true, false]) {
+  test(`a held chip is solved on the device with ${publishedChip ? "a published answer" : "no advice index"}`, async ({
+    page,
+  }) => {
+    await installLeagueMocks(page);
+    const squad = mockEntrySquadEnvelopes[ENTRY]!;
+    const withInputs = {
+      ...squad,
+      payload: {
+        ...squad.payload,
+        source_snapshot_id: fixture.document.source_snapshot_id,
+        device_plan: member.entry,
+      },
+    };
+    await page.route(/\/data\/league\/entries\/35249001\.json(?:\?.*)?$/, (route) =>
       route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify(mockEntryAdviceChipEnvelope(ENTRY, "3xc")),
+        body: JSON.stringify(withInputs),
       }),
-  );
-  await page.route(/\/data\/league\/device-plan\.json(?:\?.*)?$/, (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({
-        contract_version: "provisional_league_ui_v1",
-        generated_at_utc: "2026-10-03T00:00:00Z",
-        source_kind: "live",
-        // The synthetic instances name league 1; the producer writes the league's own id.
-        payload: { ...fixture.document, league_id: squad.payload.league_id },
+    );
+    // With no advice index, the entry's own chip states must still offer the chip.
+    const index = mockEntryAdviceIndex(ENTRY);
+    await page.route(/\/data\/league\/advice\/35249001\/index\.json(?:\?.*)?$/, (route) =>
+      !publishedChip
+        ? route.fulfill({ status: 404, body: "" })
+        : route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify({
+              ...index,
+              payload: {
+                ...index.payload,
+                chips: {
+                  available: true,
+                  paths: { "3xc": chipPath(ENTRY, "3xc") },
+                  unavailable: [],
+                  held: ["3xc"],
+                },
+              },
+            }),
+          }),
+    );
+    await page.route(
+      /\/data\/league\/advice\/35249001\/saf-puan\/1\/chip-3xc\.json(?:\?.*)?$/,
+      (route) =>
+        route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify(mockEntryAdviceChipEnvelope(ENTRY, "3xc")),
+        }),
+    );
+    await page.route(/\/data\/league\/device-plan\.json(?:\?.*)?$/, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          contract_version: "provisional_league_ui_v1",
+          generated_at_utc: "2026-10-03T00:00:00Z",
+          source_kind: "live",
+          // The synthetic instances name league 1; the producer writes the league's own id.
+          payload: { ...fixture.document, league_id: squad.payload.league_id },
+        }),
       }),
-    }),
-  );
+    );
 
-  await page.goto(`/league/352490/members/${ENTRY}?mode=saf-puan&window=1&chip=3xc`);
-  await expect(page.locator("main")).toContainText("Triple Captain bu hafta oynanıyor");
-  const button = page.getByRole("button", { name: "Bu cihazda hesapla" });
-  await expect(button).toBeVisible();
-  await button.click();
-  await expect(page.locator("[data-device-state='done']")).toBeVisible({ timeout: 60_000 });
-  await expect(page.getByText("Hesap sonucu")).toBeVisible();
-  // The captain tripled: the reference's captain scores once more than the plain plan,
-  // and the chip section states the gain the device measured against that plan.
-  const names = new Map(fixture.document.players.map((p) => [p.id, p.name]));
-  await expect(page.getByText(names.get(member.reference.captain)!).first()).toBeVisible();
-  await expect(page.locator("main")).toContainText(/Çipsiz kendi planına göre bu hafta ~\+/);
-});
+    const chipReads: string[] = [];
+    page.on("request", (request) => {
+      if (request.url().includes("chip-3xc.json")) chipReads.push(request.url());
+    });
+    await page.goto(`/league/352490/members/${ENTRY}?mode=saf-puan&window=1&chip=3xc`);
+    await expect(page.locator('input[name="chip"][value="3xc"]')).toBeChecked();
+    if (publishedChip)
+      await expect(page.locator("main")).toContainText("Triple Captain bu hafta oynanıyor");
+    const button = page.getByRole("button", { name: "Bu cihazda hesapla" });
+    await expect(button).toBeVisible();
+    await button.click();
+    await expect(page.locator("[data-device-state='done']")).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByText("Hesap sonucu")).toBeVisible();
+    // The captain tripled: the reference's captain scores once more than the plain plan,
+    // and the chip section states the gain the device measured against that plan.
+    const names = new Map(fixture.document.players.map((p) => [p.id, p.name]));
+    await expect(page.getByText(names.get(member.reference.captain)!).first()).toBeVisible();
+    await expect(page.locator("main")).toContainText(/Çipsiz kendi planına göre bu hafta ~\+/);
+    if (!publishedChip) expect(chipReads).toEqual([]);
+  });
+}
 
 test("a rival strategy is solved on the device against the rival's published eleven", async ({
   page,

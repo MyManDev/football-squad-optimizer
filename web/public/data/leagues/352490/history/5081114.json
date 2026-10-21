@@ -676,7 +676,29 @@
         "actual": {
           "gross_points": 49.0,
           "transfer_hit_points": 0.0,
-          "net_points": 49.0
+          "net_points": 49.0,
+          "details": {
+            "source_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd",
+            "captain": {
+              "player_id": 223094,
+              "name": "Haaland",
+              "points": 6.0,
+              "multiplier": 2,
+              "counted_points": 12.0
+            },
+            "transfers": [
+              {
+                "player_out": "Dedić",
+                "player_in": {
+                  "player_id": 465730,
+                  "name": "De Cuyper",
+                  "points": 15.0,
+                  "multiplier": 1,
+                  "counted_points": 15.0
+                }
+              }
+            ]
+          }
         },
         "actual_reason": null,
         "net_difference": -11.0,
@@ -1552,7 +1574,39 @@
         "actual": {
           "gross_points": 34.0,
           "transfer_hit_points": 0.0,
-          "net_points": 34.0
+          "net_points": 34.0,
+          "details": {
+            "source_snapshot_id": "fpl-live-20261010T035732Z-c77d032165af",
+            "captain": {
+              "player_id": 223094,
+              "name": "Haaland",
+              "points": 6.0,
+              "multiplier": 2,
+              "counted_points": 12.0
+            },
+            "transfers": [
+              {
+                "player_out": "E.Le Fée",
+                "player_in": {
+                  "player_id": 540324,
+                  "name": "Belloumi",
+                  "points": 4.0,
+                  "multiplier": 1,
+                  "counted_points": 4.0
+                }
+              },
+              {
+                "player_out": "Shaw",
+                "player_in": {
+                  "player_id": 146426,
+                  "name": "Ajayi",
+                  "points": 1.0,
+                  "multiplier": 1,
+                  "counted_points": 1.0
+                }
+              }
+            ]
+          }
         },
         "actual_reason": null,
         "net_difference": 12.0,
@@ -1792,7 +1846,8 @@
         "actual": {
           "gross_points": 64.0,
           "transfer_hit_points": 0.0,
-          "net_points": 64.0
+          "net_points": 64.0,
+          "details": null
         },
         "actual_reason": null,
         "net_difference": -7.0,

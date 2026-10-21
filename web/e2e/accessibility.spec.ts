@@ -1,4 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
+import { atRest } from "./atRest";
 import { expect, test } from "@playwright/test";
 
 import { installLeagueMocks, openCalendar } from "./leagueMocks";
@@ -24,6 +25,7 @@ async function waitForPage(page: import("@playwright/test").Page) {
 
 /** The ids of axe's critical and serious findings on the page as it stands. */
 async function blockingViolations(page: import("@playwright/test").Page) {
+  await atRest(page);
   const results = await new AxeBuilder({ page }).analyze();
   return results.violations
     .filter((violation) => BLOCKING_IMPACTS.has(violation.impact ?? ""))
@@ -32,6 +34,7 @@ async function blockingViolations(page: import("@playwright/test").Page) {
 
 /** axe's critical and serious findings with the first nodes of each, so a failure says where. */
 async function blockingSummary(page: import("@playwright/test").Page) {
+  await atRest(page);
   const results = await new AxeBuilder({ page }).analyze();
   return results.violations
     .filter((violation) => BLOCKING_IMPACTS.has(violation.impact ?? ""))

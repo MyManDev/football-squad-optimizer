@@ -11,6 +11,7 @@ import { useShell } from "../../../design/shell/ShellContext";
 import { useLanguage } from "../../../i18n/context";
 import { clubCodesFromFixtures } from "../../../lib/clubs";
 import { AdviceRequestPanel } from "../advice/AdviceRequestPanel";
+import { ChipTimingCard } from "../advice/ChipTimingCard";
 import { COMPUTE_COPY } from "../advice/computeCopy";
 import { MemberDecisionControls } from "../advice/MemberDecisionControls";
 import { deviceEndedWithoutPlan } from "../device/useDevicePlan";
@@ -21,6 +22,7 @@ import { DecisionPreferencesPanel } from "../advice/DecisionPreferencesPanel";
 import { ModelComparison } from "../advice/ModelComparison";
 import { DecisionWorkbench } from "../advice/DecisionWorkbench";
 import { EVIDENCE_COPY } from "../advice/evidenceCopy";
+import { coachAbsences } from "../advice/coachAbsences";
 import type { AdviceJob } from "../advice/useAdviceJob";
 import { TemplatePicker } from "../templates/TemplatePicker";
 import { MemberResourceCards } from "../components/MemberResourceCards";
@@ -43,6 +45,7 @@ import { useMemberAdviceView } from "./useMemberAdviceView";
 import { rivalCandidates } from "../advice/adviceSelection";
 import { canDuel, duelRivalId } from "./duelSides";
 import { RivalDuel } from "./RivalDuel";
+import { SquadCard } from "../card/SquadCard";
 import { WeekStory } from "./WeekStory";
 import styles from "./LeagueMemberPage.module.css";
 
@@ -113,6 +116,7 @@ function Tool({
 function LeagueMemberContent({
   squad,
   advice,
+  coachNews = null,
   adviceIssue,
   adviceLoading = false,
   membersIssue,
@@ -142,6 +146,7 @@ function LeagueMemberContent({
   const layout = useShellLayout();
   const shell = useShell();
   const view = squad.payload;
+  const news = useMemo(() => coachAbsences(coachNews ?? advice, squad), [coachNews, advice, squad]);
   const [searchParams, setSearchParams] = useSearchParams();
   const {
     entryId,
@@ -289,6 +294,9 @@ function LeagueMemberContent({
           onPitch={onPitch}
           plan={plan}
           codes={codes}
+          news={news}
+          held={view}
+          fixtures={fixtures}
           list={plan && hasLineup(plan) ? <PlanLineup view={plan} codes={codes} /> : null}
         />
         {railPlacement === "flow" ? rail : null}
@@ -330,6 +338,12 @@ function LeagueMemberContent({
           capabilities={capabilities}
           onDevice={onDevice}
           part="advanced"
+        />
+        {/* Beside the chip control: the chip timing the device read with the plain plan. */}
+        <ChipTimingCard
+          squad={view}
+          timing={device.state.phase === "done" ? device.state.chipTiming : null}
+          fixtures={fixtures}
         />
         <DecisionPreferencesPanel squad={view} available={capabilities?.preferences === true} />
         <TemplatePicker
@@ -558,6 +572,11 @@ function LeagueMemberContent({
           <Tool title={copy.chipsAndTransfers}>
             <MemberResourceCards squad={view} />
           </Tool>
+          {!adviceLoading && shown ? (
+            <Tool title={copy.cardTitle}>
+              <SquadCard view={shown.envelope.payload} squad={view} />
+            </Tool>
+          ) : null}
         </div>
       </div>
       {railPlacement === "column" ? rail : null}
