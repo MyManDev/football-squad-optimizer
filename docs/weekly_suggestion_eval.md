@@ -1,8 +1,9 @@
 # Weekly suggestion evaluation
 
-The first version compares a member's recorded one-week pure-points suggestion with
-their actual weekly result. It is limited to league **352490**. The implementation is
-on `feat/weekly-suggestion-eval`, based on enterprise review commit `4b55253f`.
+The publisher compares a member's recorded one-week pure-points suggestion with their
+actual weekly result. Histories accept any positive league id and validate each legacy
+record against that league. A new league with no records gets empty histories for its
+members. Entry/capture baseline recording for additional leagues remains work in #982.
 
 ## Evidence and selection
 
@@ -26,6 +27,8 @@ on `feat/weekly-suggestion-eval`, based on enterprise review commit `4b55253f`.
 - Reject ambiguous or corrupt evidence instead of substituting an older result.
 - Show only weeks with an actual member record directory. An empty archive is an
   empty history; no earlier recommendations are reconstructed or solved again.
+- Before replacing any history, refuse a same-season publication that would drop a week
+  already shown for a member. Restore the missing records before retrying.
 - The archive records publisher output. It does not establish that a member viewed
   the page, followed the suggestion, or obtained a causal benefit from it.
 

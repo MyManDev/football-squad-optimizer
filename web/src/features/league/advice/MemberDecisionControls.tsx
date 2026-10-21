@@ -68,6 +68,7 @@ import { EVIDENCE_COPY, evidenceUnavailable } from "./evidenceCopy";
 import { TOP100_PARAMETER, TOP100_WEIGHTS } from "./top100";
 import { TOP100_COPY, top100Unavailable } from "./top100Copy";
 import styles from "./MemberDecisionControls.module.css";
+import { RivalEntryInput } from "./RivalEntryInput";
 
 /** Which part of the controls to render; all of them, in turn, when none is named. */
 export type DecisionControlsPart = "plan" | "notes" | "top100" | "advanced";
@@ -115,6 +116,7 @@ export function MemberDecisionControls({
       ...selection.rivals.map((rival) => rival.entryId),
       ...(computable?.rivals ?? []),
       ...(onDevice?.rivals ?? []),
+      ...(onDevice?.captainMissingRivals ?? []),
     ]),
   ];
   const defaultRival = index?.default_rival_entry_id ?? null;
@@ -378,7 +380,11 @@ export function MemberDecisionControls({
                   <option key={rivalId} value={rivalId} disabled={!rivalSelectable(rivalId)}>
                     {nameOf(rivalId)}
                     {rivalId === defaultRival ? ` ${copy.rivalDefaultSuffix}` : ""}
-                    {rivalSelectable(rivalId) ? "" : ` ${copy.rivalUnavailableSuffix}`}
+                    {rivalSelectable(rivalId)
+                      ? ""
+                      : onDevice?.captainMissingRivals?.includes(rivalId)
+                        ? ` (${copy.rivalCaptainMissing})`
+                        : ` ${copy.rivalUnavailableSuffix}`}
                   </option>
                 ))}
               </select>
@@ -389,6 +395,19 @@ export function MemberDecisionControls({
           ) : null}
           {rivalIds.length > 0 && rivalsUnread ? (
             <p className={styles.line}>{copy.rivalsUnreadable}</p>
+          ) : null}
+          {typeof chosenRival === "number" &&
+          !rivalSelectable(chosenRival) &&
+          onDevice?.captainMissingRivals?.includes(chosenRival) ? (
+            <p className={styles.line}>{copy.rivalCaptainMissing}</p>
+          ) : null}
+          {onDevice ? (
+            <RivalEntryInput
+              key={entryId}
+              members={members}
+              entryId={entryId}
+              onSelect={(id) => update({ rival: String(id) })}
+            />
           ) : null}
         </div>
       ) : null}

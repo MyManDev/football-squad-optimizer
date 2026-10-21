@@ -71,5 +71,13 @@ export function deviceComputable(
     chips: DEVICE_CHIPS.filter((chip) => deviceChip({ chip }, squad) === chip),
     loading: reads.loading,
     unreadRivals: candidates.filter((id) => reads.unreadable.includes(id)),
+    captainMissingRivals: candidates.filter((id) =>
+      reads.squads.some(
+        (rival) =>
+          rival.entry.entry_id === id &&
+          rival.source_snapshot_id === squad.source_snapshot_id &&
+          rivalFromSquad(id, rival) === null,
+      ),
+    ),
   };
 }

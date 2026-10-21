@@ -7,7 +7,7 @@ from typing import Any
 from squadopt.application.advice_capabilities import TOP100_WEIGHTS
 from squadopt.application.mode_selection import MODE_SLUGS
 from squadopt.application.strategies import STRATEGY_CATALOG
-from squadopt.application.weekly_suggestion_eval import CONTRACT_VERSION, SUPPORTED_LEAGUE_ID
+from squadopt.application.weekly_suggestion_eval import CONTRACT_VERSION
 from squadopt.live.rules import CHIP_NAMES
 
 
@@ -153,7 +153,7 @@ def history_schema() -> dict[str, Any]:
         },
     }
     payload = {
-        "league_id": {"const": SUPPORTED_LEAGUE_ID},
+        "league_id": {"type": "integer", "minimum": 1},
         "entry_id": identifier,
         "season": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}$"},
         "as_of_snapshot_id": text,
