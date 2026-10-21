@@ -1641,10 +1641,9 @@ def fpl_league_name(standings: bytes, *, league_id: int) -> str | None:
 def fpl_league_standings(standings: bytes, *, league_id: int) -> tuple[LeagueStanding, ...]:
     """Return a classic league's members, in the order the page ranks them.
 
-    Refuses a truncated league rather than returning part of one. The standings page is
-    paginated and a capture holds its first page; a league large enough to spill over
-    would otherwise seed a registry that silently omits members, which is the kind of gap
-    that surfaces weeks later as a missing recommendation.
+    Refuses a truncated league rather than returning part of one. Captures with multiple
+    pages use ``fpl_captured_league_standings``; callers holding only the first page must
+    not silently omit the rest of the league.
     """
 
     identifier = _positive(league_id, "league id")
@@ -1692,6 +1691,59 @@ def fpl_league_standings(standings: bytes, *, league_id: int) -> tuple[LeagueSta
             )
         )
     return tuple(members)
+
+
+MAX_PUBLISHED_LEAGUE_MEMBERS = 1000
+MAX_PUBLISHED_LEAGUE_PAGES = 20
+
+
+def fpl_captured_league_standings(
+    payloads: Mapping[str, bytes], *, league_id: int
+) -> tuple[LeagueStanding, ...]:
+    """Read the complete bounded league, refusing missing or inconsistent pages.
+
+    Old one-page captures keep their original reader and ordering. Numbered extra pages
+    must share one source update timestamp and a continuous rank_sort, with each entry
+    occurring once. No member can silently disappear at a page boundary.
+    """
+
+    first_name = league_standings_payload(league_id)
+    first = payloads.get(first_name)
+    if first is None:
+        raise DataSourceError(f"Missing captured standings: {first_name}.")
+    section = _document(first, "League standings").get("standings")
+    if not isinstance(section, dict) or section.get("has_next") is not True:
+        members = fpl_league_standings(first, league_id=league_id)
+        if len(members) > MAX_PUBLISHED_LEAGUE_MEMBERS:
+            raise DataSourceError(f"League {league_id} exceeds 1000 members.")
+        return members
+
+    collected: list[LeagueStanding] = []
+    seen: set[int] = set()
+    updated: str | None = None
+    for number in range(1, MAX_PUBLISHED_LEAGUE_PAGES + 1):
+        name = first_name if number == 1 else league_standings_page_payload(league_id, number)
+        content = payloads.get(name)
+        if content is None:
+            raise DataSourceError(f"Missing captured standings page: {name}.")
+        page = fpl_league_standings_page(content, league_id=league_id, expected_page=number)
+        if updated is not None and page.last_updated_data != updated:
+            raise DataSourceError(f"League {league_id} standings changed between pages.")
+        updated = page.last_updated_data
+        if not page.members:
+            raise DataSourceError(f"League {league_id} standings page {number} is empty.")
+        for member in page.members:
+            if member.entry_id in seen:
+                raise DuplicateRecordsError(f"League {league_id} repeats entry {member.entry_id}.")
+            if member.rank_sort != len(collected) + 1:
+                raise DataSourceError(f"League {league_id} has a gap or overlap in rank_sort.")
+            seen.add(member.entry_id)
+            collected.append(member)
+            if len(collected) > MAX_PUBLISHED_LEAGUE_MEMBERS:
+                raise DataSourceError(f"League {league_id} exceeds 1000 members.")
+        if not page.has_next:
+            return tuple(collected)
+    raise DataSourceError(f"League {league_id} exceeds the 20-page / 1000-member limit.")
 
 
 @dataclass(frozen=True, slots=True)
