@@ -36,6 +36,7 @@ import { resolvePublishedAdvice } from "./advice/adviceSelection";
 import { isAdvicePayload } from "./advice/adviceShape";
 import { TOP100_WEIGHTS, top100TargetPath } from "./advice/top100";
 import { checkedHistory } from "./history/historyData";
+import { isDevicePlanEntry } from "./device/types";
 import { summarizeLiveSeries } from "./history/liveSeries";
 import { assertAdviceIndex, assertEnvelope, assertMembers, assertSquad } from "./publicationShape";
 import type {
@@ -69,7 +70,7 @@ function holdMemberIndex(
   document: unknown,
   members: EntryView[],
   squadPublished: boolean,
-): { kind: "advised"; path: string } | { kind: "refused" } | { kind: "no-strategies" } {
+): { kind: "advised"; path: string } | { kind: "refused" | "device" | "no-strategies" } {
   const index = assertAdviceIndex(assertEnvelope<EntryAdviceIndex>(document), entryId).payload;
   const label = `advice/${entryId}/index.json`;
   const selection = resolvePublishedAdvice(
@@ -79,6 +80,13 @@ function holdMemberIndex(
     members,
     index,
   );
+  if (index.menu === "device") {
+    expect(selection.path, label).toBeNull();
+    expect(selection.status, label).not.toBe("ready");
+    expect(squadPublished, label).toBe(true);
+    expect(members.find((row) => row.entry_id === entryId)?.data_quality, label).not.toBe("empty");
+    return { kind: "device" };
+  }
   if (isRefusedMemberIndex(index)) {
     expect(selection.status, label).not.toBe("ready");
     expect(selection.path, label).toBeNull();
@@ -151,6 +159,32 @@ describe("a member the producer could not advise", () => {
     reasonless.payload.unavailable = reasonless.payload.unavailable.slice(1);
     expect(() => holdMemberIndex(ENTRY, reasonless, list, false)).toThrow();
   });
+
+  function device(): LeagueViewEnvelope<EntryAdviceIndex> {
+    const document = refused();
+    Object.assign(document.payload, {
+      menu: "device",
+      source_snapshot_id: "capture-a",
+      unavailable: [],
+      chip_states: { known: false, gameweek: 6, states: {} },
+      evidence: { available: false, reason: "on_device" },
+      chips: { available: false, reason: "on_device" },
+      top100: { available: false, reason: "on_device" },
+    });
+    return document;
+  }
+
+  it("accepts a device menu with a squad and no promised server plan", () => {
+    const members = [member(ENTRY, "partial"), member(RIVAL, "partial")];
+    expect(holdMemberIndex(ENTRY, device(), members, true)).toEqual({ kind: "device" });
+    expect(() => holdMemberIndex(ENTRY, device(), members, false)).toThrow();
+    const promised = device();
+    promised.payload.windows = { "saf-puan": [1] };
+    expect(() => holdMemberIndex(ENTRY, promised, members, true)).toThrow();
+    const unknown = device();
+    delete unknown.payload.source_snapshot_id;
+    expect(() => holdMemberIndex(ENTRY, unknown, members, true)).toThrow();
+  });
 });
 
 describe.each(shippedTrees())("the shipped league tree $path", ({ root: ROOT }) => {
@@ -196,7 +230,15 @@ describe.each(shippedTrees())("the shipped league tree $path", ({ root: ROOT }) 
         continue;
       }
       try {
-        assertSquad(assertEnvelope<EntrySquad>(read(relative)), entryId);
+        const squad = assertSquad(assertEnvelope<EntrySquad>(read(relative)), entryId).payload;
+        const index = (read(`advice/${entryId}/index.json`) as { payload: EntryAdviceIndex })
+          .payload;
+        if (index.menu === "device") {
+          expect(isDevicePlanEntry(squad.device_plan), relative).toBe(true);
+          expect(squad.source_snapshot_id, relative).toBe(index.source_snapshot_id);
+          expect(squad.chips, relative).toEqual(index.chip_states);
+          expect(existsSync(join(ROOT, `advice/${entryId}/saf-puan/1.json`))).toBe(false);
+        }
       } catch (error) {
         refused.push(`${relative}: ${(error as Error).message}`);
       }
