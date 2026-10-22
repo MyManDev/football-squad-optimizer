@@ -94,6 +94,13 @@ def test_missing_conflicting_or_unrelated_identity_evidence_is_refused(changes, 
     assert not publication_metadata(source(**changes), "text/html", URL).verified
 
 
+@pytest.mark.parametrize("source", [_source, _streamed])
+def test_a_page_that_displays_no_time_cannot_corroborate_the_identifier(source):
+    raw = source().replace(f'<time datetime="{INSTANT}">hours ago</time>'.encode(), b"")
+    assert b"<time" not in raw
+    assert not publication_metadata(raw, "text/html", URL).verified
+
+
 def test_a_displayed_time_is_not_a_publication_field_without_date_published():
     raw = _source().replace(b'"datePublished"', b'"dateModified"')
     assert not publication_metadata(raw, "text/html", URL).verified
