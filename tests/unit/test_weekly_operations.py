@@ -45,16 +45,25 @@ def world(
     pages: dict[int, tuple[int, ...]] | None = None,
     seeded_from: tuple[int, ...] | None = None,
     record_advice: bool = False,
+    captured: tuple[int, ...] = (),
 ) -> weekly.WeeklyOperations:
     """The synthetic weekly run; ``pages`` re-captures it with those standings pages (and
-    a handoff for that capture), ``seeded_from`` records the registry's seed leagues."""
+    a handoff for that capture), ``seeded_from`` records the registry's seed leagues and
+    ``captured`` registers further entries, captured with the synthetic member's squad."""
 
     publication = publication_world(tmp_path)
+    if captured and pages is None:
+        raise ValueError("Further captured entries need the standings pages that list them.")
     if pages is not None:
         snapshot = read_snapshot(publication.snapshot_root, publication.snapshot_id)
         payloads = dict(snapshot.payloads)
         for league_id, entries in pages.items():
             payloads[f"league-{league_id}-standings.json"] = _standings_page(league_id, *entries)
+        member = f"entry-{handoff_fixture.ENTRY_ID}-"
+        for entry_id in captured:
+            for name, body in snapshot.payloads.items():
+                if name.startswith(member):
+                    payloads[f"entry-{entry_id}-{name.removeprefix(member)}"] = body
         recaptured = write_snapshot(
             publication.snapshot_root,
             source="fpl-live",
@@ -66,9 +75,13 @@ def world(
             snapshot_id=recaptured,
             handoff_path=handoff_fixture._handoff(tmp_path / "recaptured-handoffs", recaptured),
         )
-    if seeded_from is not None:
+    if seeded_from is not None or captured:
         registry = json.loads(publication.registry_path.read_text(encoding="utf-8"))
-        registry["seeded_from_leagues"] = list(seeded_from)
+        if seeded_from is not None:
+            registry["seeded_from_leagues"] = list(seeded_from)
+        registry["entries"].extend(
+            {"entry_id": entry_id, "label": f"Synthetic member {entry_id}"} for entry_id in captured
+        )
         publication.registry_path.write_text(json.dumps(registry), encoding="utf-8")
     snapshots = tmp_path / "weekly-snapshots"
     shutil.copytree(

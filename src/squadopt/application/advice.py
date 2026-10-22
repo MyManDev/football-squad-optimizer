@@ -118,13 +118,23 @@ WINDOW_DETERMINISTIC_UNITS_PER_WEEK = 20.0
 #: on work this machine has been seen to do, and still ends a run that is twelve times
 #: slower than any measured one.
 WINDOW_WALL_CEILING_SECONDS = 1800.0
-#: CP-SAT's linearization level for a member window, and for nothing else. At the
-#: solver's default every published three- and five-week plan of the GW5 capture was
-#: an incumbent with sixteen to fifty-nine points between it and its bound; at 2, under
-#: the same deterministic budget, fifteen of fifteen three-week plans and twelve of
-#: fifteen five-week plans are proved. The one-week plan, the system's own horizon path
-#: and every measurement runner do not pass it and solve as they always did.
+#: CP-SAT's linearization level for a member window. At the solver's default every
+#: published three- and five-week plan of the GW5 capture was an incumbent with sixteen
+#: to fifty-nine points between it and its bound; at 2, under the same deterministic
+#: budget, fifteen of fifteen three-week plans and twelve of fifteen five-week plans are
+#: proved. The system's own horizon path and every measurement runner do not pass it and
+#: solve as they always did. The tracked member's one-week control has its own constant
+#: below.
 WINDOW_LINEARIZATION_LEVEL = 2
+#: CP-SAT's linearization level for a tracked member's one-week control: the batch that
+#: solves each entry's server baseline before any league renders, and the full-menu page
+#: that solves a member the batch has no control for. Both paths read this one value, so a
+#: member's published plan does not depend on whether the run records advice. At 2 the
+#: complete linear relaxation proves the five-free-transfer baseline of the second-league
+#: rehearsal inside the existing budget; the model and the deterministic ceiling are
+#: unchanged. Every other one-week caller (the on-demand menu, the rival price anchor, the
+#: manager's word and the Top 100 plans) does not pass it and solves at the default.
+TRACKED_MEMBER_LINEARIZATION_LEVEL = 2
 EXPECTED_LINEUP_PLAN_LIMIT = (
     "Complete plans are compared using expected automatic substitutions and vice-captain "
     "recovery. The limited search does not prove the best possible plan or future performance."
