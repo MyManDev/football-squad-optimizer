@@ -11,10 +11,14 @@ TAG="${1:?release tag, for example site-2026-27-gw07-decision}"
 HOST="${SQUADOPT_VM_HOST:-squadopt@74.248.153.181}"
 KEY="${SQUADOPT_VM_KEY:-$HOME/.ssh/squadopt_azure}"
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
-SSH="ssh -i $KEY -o BatchMode=yes -o ServerAliveInterval=10 -o ServerAliveCountMax=12 -o ConnectTimeout=20"
+SSH=(ssh -i "$KEY" -o BatchMode=yes -o ServerAliveInterval=10 -o ServerAliveCountMax=12 -o ConnectTimeout=20)
 cd "$REPO"
+# A retained release can bind all four roots elsewhere. Copying the ordinary folders in
+# that layout would leave the served capture unchanged. Check before any remote write.
+"${SSH[@]}" "$HOST" 'python3 -' < scripts/release/check_vm_layout.py
+scp -q -i "$KEY" -o BatchMode=yes scripts/release/check_vm_layout.py "$HOST:vm_check_layout.py"
 scp -q -i "$KEY" -o BatchMode=yes scripts/vm_sync.sh "$HOST:vm_sync.sh"
-tar -czf - data/snapshots data/handoffs artifacts/phase_b artifacts/rotation | $SSH "$HOST" '
+tar -czf - data/snapshots data/handoffs artifacts/phase_b artifacts/rotation | "${SSH[@]}" "$HOST" '
   set -e
   mkdir -p ~/squadopt/incoming
   tar -xzf - -C ~/squadopt/incoming
@@ -25,4 +29,5 @@ tar -czf - data/snapshots data/handoffs artifacts/phase_b artifacts/rotation | $
   rm -rf ~/squadopt/incoming
   echo "inputs synced $(date -u +%T): $(ls ~/squadopt/snapshots | wc -l) captures"
 '
-$SSH "$HOST" "bash ~/vm_sync.sh $TAG"
+printf -v REMOTE_TAG '%q' "$TAG"
+"${SSH[@]}" "$HOST" "bash ~/vm_sync.sh $REMOTE_TAG"

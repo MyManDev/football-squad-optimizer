@@ -11,9 +11,12 @@
 set -euo pipefail
 TAG="${1:?release tag}"
 BASE="$HOME/squadopt"
+python3 "$HOME/vm_check_layout.py"
 git -C "$BASE/repo" fetch -q --tags origin
 git -C "$BASE/repo" checkout -q "$TAG"
 COMMIT="$(git -C "$BASE/repo" rev-parse HEAD)"
+# The target release may change Compose. Refuse before copying site data or restarting.
+python3 "$HOME/vm_check_layout.py"
 rsync -a --delete "$BASE/repo/web/public/data/" "$BASE/site/"
 docker build -q --build-arg "SQUADOPT_REPOSITORY_COMMIT=$COMMIT" -t "squadopt-backend:$TAG" "$BASE/repo" >/dev/null
 sed -i "s#^SQUADOPT_BACKEND_IMAGE=.*#SQUADOPT_BACKEND_IMAGE=squadopt-backend:$TAG#" "$BASE/.env"

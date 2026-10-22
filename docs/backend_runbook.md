@@ -102,6 +102,17 @@ SQUADOPT_BACKEND_ARTIFACT_ROOT=<path to artifacts/>
 SQUADOPT_BACKEND_CLUB_NEWS_SOURCE=<path to data/sample/club_news_v1.fixture.json>
 ```
 
+### VM data root selection
+
+The VM sync helpers support the ordinary `~/squadopt/{site,snapshots,handoffs,artifacts}`
+layout. Before transferring files, `vm_push.sh` checks both services' resolved Compose
+configuration and running mounts. `vm_sync.sh` repeats this check before changing the
+checkout and again against the target release's Compose file. A separately retained
+release package or a symlinked data root refuses the ordinary sync. Prepare and validate
+the complete new package and explicitly activate its selected roots with a retained
+rollback; copying ordinary folders does not update a separately mounted package. The
+preflight prints no environment values and changes no files or running services.
+
 ### Persistent native Windows artifact selection
 
 The native launcher can retain a separately prepared immutable artifact root across
