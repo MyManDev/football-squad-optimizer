@@ -301,6 +301,50 @@ describe("the resolver with the service's capabilities", () => {
   });
 
   it.each([
+    ["gameweek", { ...INDEX, gameweek: BASE.gameweek + 1 }],
+    ["league", { ...INDEX, league_id: BASE.league_id + 1 }],
+    ["season", { ...INDEX, season: "1999-00" }],
+  ])(
+    "keeps an index from another %s unreadable beside the model or preferences",
+    (_name, index) => {
+      const preferences = encodeURIComponent(JSON.stringify({ no_hits: true }));
+      const service: AdviceCapabilities = {
+        ...WHOLE_MENU,
+        preferences: true,
+        models: ["current", "football"],
+      };
+      for (const capabilities of [
+        null,
+        WHOLE_MENU,
+        service,
+        { ...WHOLE_MENU, leagueId: BASE.league_id + 1 },
+        { ...WHOLE_MENU, gameweek: BASE.gameweek + 1 },
+      ]) {
+        for (const link of [
+          "mode=saf-puan",
+          "mode=saf-puan&model=football",
+          `mode=saf-puan&preferences=${preferences}`,
+          "mode=saf-puan&preferences=x",
+          `mode=saf-puan&model=football&preferences=${preferences}`,
+        ]) {
+          expect(resolve(link, capabilities, index)).toMatchObject({
+            status: "index-error",
+            path: null,
+          });
+        }
+      }
+      // A readable index still reads the same links as not listed.
+      for (const link of [
+        "mode=saf-puan&model=football",
+        `mode=saf-puan&preferences=${preferences}`,
+      ]) {
+        expect(resolve(link, null).status).toBe("not-listed");
+        expect(resolve(link, service).status).toBe("not-listed");
+      }
+    },
+  );
+
+  it.each([
     ["another league", { ...WHOLE_MENU, leagueId: BASE.league_id + 1 }],
     ["another gameweek", { ...WHOLE_MENU, gameweek: BASE.gameweek + 1 }],
     ["another season", { ...WHOLE_MENU, season: "1999-00" }],
