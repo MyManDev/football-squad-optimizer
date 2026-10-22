@@ -12,6 +12,7 @@
 | Deploy the static website | [Deployment runbook](../deployment_runbook.md) |
 | Measure whether FPL answers Cloudflare's network before an FPL forwarder is built | [FPL forwarder probe](../fpl_forwarder_probe.md) |
 | Prepare and accept the separate advice API/worker | [Backend runbook](../backend_runbook.md) |
+| Move a gameweek's inputs and football bundle to the backend VM, prove them beside the live project, then switch with a kept rollback | [VM release package](vm_release_package.md) |
 | Run the advice API/worker on the owner's PC behind a Cloudflare Tunnel, and the zero-cost hosting comparison | [Backend free hosting](../backend_free_hosting.md) |
 | Read the committed season summary | [2026-27 season ledger](../season_ledger_2026-27.md) |
 | Understand storage responsibilities | [Persistence boundaries](../architecture/decisions/0005-persistence-boundaries.md) |
