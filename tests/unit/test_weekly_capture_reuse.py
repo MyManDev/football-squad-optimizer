@@ -236,8 +236,12 @@ def test_reused_club_news_capture_preserves_league_bytes(
             if name == "disk":
                 patch.setattr(weekly, "publish_league", without_reader)
             operation._league()
-        # Only the cached arm reads through the run's reader.
-        assert bool(operation._publication_captures) is (name == "cached")
+        # The disk arm's patch decides only what publish_league reads, and there only the
+        # manager's word reads the club-news capture. So that capture is in the run's
+        # cache after the cached arm and absent after the disk arm. Other reads of the
+        # stage, such as the decision capture, may use the cache in either arm.
+        news = (operation.paths.snapshots.resolve(), str(operation.request.rotation_capture))
+        assert (news in operation._publication_captures) is (name == "cached")
         published.append(_published(operation))
     disk, cached = published
     for league in TWO:
