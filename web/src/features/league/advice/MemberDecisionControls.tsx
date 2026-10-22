@@ -235,6 +235,11 @@ export function MemberDecisionControls({
     windowSize === 1 &&
     (onDevice.top100Weights.length ?? 0) > 1;
   const top100Computable = top100Service || top100Device;
+  // A weight the device solves and this publish has no plan for is offered, so its note
+  // says so rather than that only 0 is available.
+  const top100DeviceUnpublished =
+    top100Device &&
+    onDevice?.top100Weights.some((weight) => !top100.weights.includes(weight)) === true;
   const weightSelectable = (weight: number) =>
     (top100Applies && top100.weights.some((offered) => offered === weight)) ||
     (top100Service && computable!.top100Weights.some((offered) => offered === weight)) ||
@@ -285,15 +290,17 @@ export function MemberDecisionControls({
       ? chipCopy.switchesOff
       : top100Service && TOP100_WEIGHTS.some((weight) => !top100.weights.includes(weight))
         ? computeCopy.top100Computable
-        : !top100.available
-          ? top100Unavailable(top100Copy, top100.reason)
-          : !top100Applies
-            ? top100Copy.notForSelection
-            : top100.notOffered
-              ? top100Copy.notOffered
-              : top100.weights.length < TOP100_WEIGHTS.length
-                ? top100Copy.notSolved
-                : top100Copy.published;
+        : top100DeviceUnpublished
+          ? computeCopy.top100Computable
+          : !top100.available
+            ? top100Unavailable(top100Copy, top100.reason)
+            : !top100Applies
+              ? top100Copy.notForSelection
+              : top100.notOffered
+                ? top100Copy.notOffered
+                : top100.weights.length < TOP100_WEIGHTS.length
+                  ? top100Copy.notSolved
+                  : top100Copy.published;
 
   // The model is offered only where the service computes the football model, or where the
   // link already asks for it (so the choice can be seen and undone).

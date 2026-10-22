@@ -456,7 +456,10 @@ function withDeviceChoices(
   if (weight === published.top100.weight && chip === published.chip.chip) return published;
   return {
     ...published,
-    status: "not-listed",
+    // A rejected index stays rejected, so the page still says it cannot be read and offers
+    // the retry. The device needs no index, so the choice is kept: the controls, which are
+    // given no index then, show the same choice the device is asked for.
+    status: published.status === "index-error" ? "index-error" : "not-listed",
     path: null,
     top100: { ...published.top100, weight, notOffered: false },
     chip: { ...published.chip, chip, notOffered: chip === null && published.chip.notOffered },
