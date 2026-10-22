@@ -1,0 +1,348 @@
+# Club-news join counts of the GW8 decision run: pre-registration
+
+Status: pre-registered on 2026-10-22, before the GW8 club-news capture, the GW8 decision
+capture or any GW8 model response exists. It fixes the inputs, every count and its exact
+computation, and the reading that decides #1006. It changes no stage of the weekly run, no
+capture, no table, no member page and no contract, and it promotes nothing. Issues: #524,
+#1006 and #1140.
+
+## Why this is written
+
+- **#524.** The owner's closing condition, given on #1168 on 19 October (comment
+  6276053750): one real-capture Friday run this season, the GW8 decision run on Friday
+  23 October with club news on, plus the join-count record.
+- **#1006.** The owner's decision of 19 October (comment 6276743450): the issue stays open
+  until the GW8 join-count record shows whether club-news statements are being lost. With
+  none lost it closes. With losses its data-zone items 3, 7, 4 and 10 go to İbrahim
+  (`@SpeedyV5`), who owns club news (`docs/architecture/ownership.md`).
+- **Nothing on develop reports these counts.** The exporter keeps the no-match, ambiguous
+  and unverifiable counts only in the attributes of the table it builds in memory
+  (`claims_unresolved` and `claims_unverifiable_citation` in
+  `src/squadopt/features/rotation_evidence.py`); the manifest does not carry them. Claims
+  dropped about another club's players and identical repeats are counted nowhere (#1006
+  item 4).
+- **The 21 October checkpoint** (#524 comment 6321111742) was a one-club scratch run, not the
+  Friday run: capture `club-news-20261021T161737Z-ca7354f945c2`, one answered call, zero raw
+  claims, eleven Liverpool documents; with the roster of
+  `fpl-live-20261021T162132Z-877ebba8712d`, 668 rows, unique joins 0, no-match 0, ambiguous
+  0, no refused response, no unverifiable citation, no constraining statement, no exclusion,
+  and the reader's source check `nothing_cited`. It could not show a loss either way, and it
+  is not this record.
+- **The data exists only on the owner's PC.** The club-news capture, the decision capture, the
+  acquisition receipt and the rotation pair are written there by the Friday run and are not
+  in the repository. So the counting is fixed here, before the run, and is done there by a
+  reporter that reads only those local files.
+
+## What has been read
+
+- Issues #524, #1006 and #1140 with every comment, and the owner's answers on #1168.
+- On develop at `ce0c6431`:
+  - `scripts/weekly_run.ps1`: the Friday launcher acquires news with no `--club` filter and
+    the default budget of three model calls, keeps the acquisition output in
+    `data/logs/weekly/<run id>.club-news.log` and passes the capture to the weekly command as
+    `--rotation-capture`. The run id has the form `2026-27-gw08-friday-<yyyyMMddTHHmmZ>`.
+  - `src/squadopt/platform/club_news_acquire.py`: the receipt's `Capture`, `Raw claims` and
+    `Call budget` lines, and the coverage report's `Read refusal:` and `Coding refusal:`
+    lines (`src/squadopt/platform/club_news_coverage.py`).
+  - `src/squadopt/application/rotation_export.py` (`_inputs_from_capture` and `_export`),
+    `src/squadopt/features/rotation_evidence.py` (`build_rotation_evidence_table` and
+    `_resolved_claims`), `src/squadopt/data/claim_identity.py` (`resolve_claim_player`),
+    `src/squadopt/data/sources/club_news_coding.py` (`locate_claims_reporting`),
+    `src/squadopt/data/sources/club_news_claims.py` (`parse_claim_response`) and
+    `src/squadopt/application/manager_words.py` (the reader and `managers_word_rule_v3`).
+  - `data/sources/club_news_sources.json`: Liverpool, Newcastle and Crystal Palace on three
+    hosts, and the Example FC placeholder, which is refused before any request.
+  - `docs/club_news_configuration.md` and `docs/club_news_sources.md`.
+
+## Inputs, and how each is found after the run
+
+Everything is on the publishing PC, in the checkout the Friday run used.
+
+1. **The run id**, printed by the Friday launcher on its `friday run:` line, with the receipt's
+   path on its `club-news log:` line.
+2. **The acquisition receipt** `data\logs\weekly\<run id>.club-news.log`. Its `Capture` line
+   names the club-news capture, `club-news-<stamp>-<hash>`; the launcher also prints it as
+   `club news: capture <id>`.
+3. **The club-news capture** `data\snapshots\<club-news id>`.
+4. **The rotation pair** the weekly run exported from that capture:
+   `artifacts\rotation\rotation_evidence_v4_2026-27_gw08_<last 12 characters of the club-news id>_decision_<last 12 characters of the decision id>.csv`
+   and the `.manifest.json` beside it. The reporter finds it from the receipt's capture id and
+   refuses unless exactly one table matches.
+5. **The decision capture**, named by the manifest's `roster_snapshot_id`:
+   `data\snapshots\fpl-live-<stamp>-<hash>`.
+6. **The source registry** `data\sources\club_news_sources.json` as committed.
+
+If more than one Friday run completes for GW8, the record is made for the run whose decision
+capture the GW8 publish carries, and its Markdown names the other run ids as not counted.
+
+## The command the owner runs
+
+After the Friday run has finished, from the publishing checkout, with nothing merged into it
+since the run:
+
+```powershell
+.venv\Scripts\python -m scripts.report_club_news_join_counts --club-news-log data\logs\weekly\<run id>.club-news.log --output data\logs\weekly\<run id>.join-counts.json
+```
+
+It prints the record as JSON and writes the same bytes to the `--output` file, which must not
+exist yet; `data/logs/` is ignored by git, so the checkout stays clean for the next run. It
+exits 0. On any refusal it prints one `Refused: <reason>` line, writes nothing and exits 1;
+that line is posted in place of the record.
+
+The reporter rebuilds the rotation table with the code of the checkout it runs from. If the
+checkout has moved past the commit the rotation manifest names (`repository_commit`), the
+rebuilt table may differ and the reporter refuses. It is then run from a worktree at that
+commit, with the worktree's own code first on the path, as the launcher sets it:
+
+```powershell
+git worktree add ..\squadopt-gw8-counts <repository_commit of the manifest>
+cd ..\squadopt-gw8-counts
+$env:PYTHONPATH = "$PWD\src;$PWD"
+..\<checkout>\.venv\Scripts\python -m scripts.report_club_news_join_counts --club-news-log ..\<checkout>\data\logs\weekly\<run id>.club-news.log --snapshot-root ..\<checkout>\data\snapshots --rotation-dir ..\<checkout>\artifacts\rotation --registry ..\<checkout>\data\sources\club_news_sources.json --output ..\<checkout>\data\logs\weekly\<run id>.join-counts.json
+```
+
+This needs the reporter at that commit, which is why it merges before the Friday run.
+
+## What the reporter reads, and when it refuses
+
+It reads the snapshot store, the rotation pair, the registry and the receipt, and nothing
+else. It opens no network connection, calls no model, and writes only the `--output` file.
+
+It rebuilds the rotation table from the two captures through the exporter's own functions
+(`_inputs_from_capture`, then `build_rotation_evidence_table` with the manifest's season,
+gameweek and deadline), and prints the record only when the rebuilt bytes hash to the
+manifest's `table_sha256`. The counts the manifest does not carry are taken from that rebuilt
+table, so they are the counts of the published table.
+
+It refuses, naming the reason, when:
+
+- the manifest's `club_news_source_kind` is not `capture` (the fixture is not club news);
+- the receipt names a different capture from the manifest's `club_news_snapshot_id`, or no
+  capture, or more than one;
+- the club-news capture was not completed before the decision capture;
+- the rebuilt table differs from the published one;
+- its own reading of the responses disagrees with the exporter's (refused responses,
+  own-club unverifiable citations, claims reaching the join);
+- the counts below do not add up, or `placed` differs from the table's observed rows or the
+  manifest's `claims_coded`;
+- the receipt's `Raw claims` line differs from `raw_per_coded_club`;
+- the capture declares a club the registry does not register, or holds a document from a host
+  no declared club registers.
+
+## Every count, and how it is computed
+
+The record's version is `club_news_join_counts_v1`. Its top level carries `record_version`,
+`protocol` (this file), `reporter` (the script), `repository_commit` and `repository_dirty`
+(the checkout the reporter ran from), and the manifest's `season`, `target_gameweek` and
+`deadline_timestamp_utc`.
+
+### `inputs`
+
+`club_news_capture_id` and `club_news_captured_at_utc` (the news capture's id and completion
+instant), `decision_capture_id` and `decision_captured_at_utc`, `rotation_table_file` and
+`rotation_table_sha256` (the published table's name and the manifest's digest),
+`rotation_export_repository_commit` (the manifest's `repository_commit`), the manifest's
+`provider`, `model_identifier`, `model_version` and `prompt_sha256`, `registry_file` and
+`registry_sha256` (the registry read and the digest of its bytes), and `club_news_log_file`
+(the receipt's file name, or null when none was read).
+
+### `checks`
+
+Each is true in a printed record, because a false one refuses: `source_kind` (`capture`),
+`news_capture_precedes_decision_capture`, `replay_matches_published_table` with
+`replay_table_sha256`, and `claims_accounted` (the identities below). `log_capture_id_matches`
+and `log_raw_claims_match` are null when no receipt, or no `Raw claims` line, was read.
+
+### `hosts` and `registered_pages`
+
+The Example FC placeholder is never contacted and is left out of every host and page count. A
+host is the scheme and host of a registry URL, in lower case.
+
+- `registered`: distinct hosts in the registry.
+- `asked`: distinct hosts of the registry entries whose club is in the capture's
+  `clubs_declared`. The Friday run passes no `--club`, so every registered host is asked. A
+  host whose terms reading had expired is refused before contact and counts as asked and
+  refused, because the capture cannot tell the two apart.
+- `answered`: asked hosts from which the capture retains at least one document, by the host of
+  the document's requested URL.
+- `refused`: `asked` minus `answered`. `asked_hosts`, `answered_hosts` and `refused_hosts` list
+  them.
+- `registered_pages`: `asked`, the registry entries of declared clubs, and `read`, those whose
+  URL is the requested URL of a retained document.
+
+### `clubs`
+
+`declared`, `covered_in_capture` and `partially_covered_in_capture` (the capture index's three
+lists), `covered_in_table` (the manifest's `clubs_covered`, after the exporter has removed
+clubs whose response it refused or whose every claim lost its citation), and `read_not_coded`
+(clubs with a retained document and no stored response).
+
+### `documents`
+
+`retained`: documents in the capture (registered pages and the articles they link to).
+`by_club`: the same per club. `with_verified_publication`: documents whose own held fields
+state a publication time verifiably, the test the acquisition report calls a dated article.
+
+### `responses`
+
+- `stored`: entries of the capture's response index, one per coded club.
+- `distinct`: distinct response texts; the exporter reads each distinct text once.
+- `reused_from_earlier_capture`: entries that carry `reused_from_snapshot` (none is expected:
+  the Friday launcher passes no earlier capture).
+- `refused_whole`: distinct texts the exporter's reading refuses entirely, that is
+  `locate_claims_reporting` or `parse_claim_response` raises: a format breach, a claims or
+  documents list that cannot be read, or one player coded twice in one response.
+  `refused_clubs` names their clubs.
+- `refused_without_claims_list`: of those, the texts that hold no readable list of claims (not
+  JSON, not an object, or no `claims` array).
+
+### `acquisition_log`
+
+Read from the receipt, which PowerShell writes with a byte order mark; null when no receipt
+was read. `raw_claims_printed` from the `Raw claims    N;` line, `model_call_budget` and
+`model_calls_attempted` from the `Call budget   B; A attempted;` line, and the numbers of
+`Read refusal:` lines (`read_refusal_lines`) and `Coding refusal:` lines
+(`coding_refusal_lines`). The capture stores no call count (#1006 item 10), so
+`model_calls_attempted` comes from the receipt only.
+
+### `claims`
+
+Each distinct response text is followed as `_inputs_from_capture` reads it: located against
+the documents of its own clubs only, then parsed.
+
+- `raw`: the length of the `claims` array, summed over distinct texts (zero for a text with no
+  readable list).
+- `raw_per_coded_club`: the same summed per coded club, as the receipt's `Raw claims` line
+  counts it. It equals `raw` unless two clubs' responses are byte for byte the same.
+- `in_refused_responses`: claims listed in responses refused whole.
+- `unverifiable_citation_own_club`: claims `locate_claims_reporting` sets aside (a quote not
+  found exactly once in the cited page, a page that was not fetched, an empty field, a claim
+  the parser refuses on its own, or the twin of one set aside) whose `team_name` is a club of
+  the response. The exporter counts these as `claims_unverifiable_citation`, and the reporter
+  checks the two agree.
+- `unverifiable_citation_other_club`: the same claims when they name another club's player.
+  The exporter drops these without counting them.
+- `reached_join`: claims `parse_claim_response` returns; the exporter hands exactly these to
+  the identity join, and the reporter checks the two agree.
+- The identity join, `resolve_claim_player` against the decision capture's roster within the
+  claim's club: `unknown_team` (the roster carries no such club), `no_match` (the club has no
+  player of that name), `ambiguous` (two or more players match, so the claim resolves to
+  nobody by rule), and `joined_to_one_player` = `reached_join` - `no_match` - `unknown_team` -
+  `ambiguous`. These are #524's three counts: one player, none (`no_match` and `unknown_team`,
+  kept apart) and ambiguous.
+- After the join, as `_resolved_claims` records them: `other_club_source` (joined to a player
+  of a club other than the cited page's), `unverified_club_source` (the cited page and digest
+  belong to no retained document), `conflicting_player_claims` (claims on a player who was
+  given two different statements; all of them are set aside), and `unresolved_by_reason` (the
+  table's `claims_unresolved` as it stands, including any reason not named here).
+- `identical_repeats`: claims equal in every recorded field to one already placed on the same
+  player, which the table does not store twice. The exporter does not count them, so this is
+  `reached_join` - `placed` - the sum of `unresolved_by_reason`. A repeat of a statement that a
+  later contradiction sets aside stays a repeat; its statement is counted under
+  `conflicting_player_claims`.
+- `placed`: claims that became a player row's disposition (`claims_coded`).
+
+The identities, checked before anything is printed (`claims_accounted`):
+`raw` = `in_refused_responses` + `unverifiable_citation_own_club` +
+`unverifiable_citation_other_club` + `reached_join`, and `reached_join` = `placed` +
+`identical_repeats` + the sum of `unresolved_by_reason`, with `identical_repeats` not
+negative.
+
+### `table`
+
+From the published table and its manifest: `rows`, `roster_size`, `players_with_statement`
+(rows with `rotation_claim_observed`), `players_not_addressed`,
+`players_with_unverifiable_citation` and `players_with_conflicting_claims` (the players the
+table flags `rotation_claim_unresolved` for each reason), and `statements_by_disposition`
+(rows per disposition).
+
+### `reader`
+
+The table read with `load_manager_words` exactly as the publish reads it: the rotation table,
+the club-news capture directory as the source and the snapshot store as the root.
+
+- `source_check`: `cited_documents_held`, or `nothing_cited` when the table cites no document.
+- `statements_read`: rows with a disposition.
+- `constraining_statements`: statements the rule gives a role.
+- `excluded_not_starting` and `excluded_not_captain`: the sizes of the solver's two sets. A
+  player kept out of the eleven is kept out of the captaincy too, so he is in both.
+- `double_gameweek_reason`: statements given `ambiguous_current_week_fixture`.
+- `words_withheld` and `words_unresolved`: statements whose words are withheld for figure
+  wording or could not be resolved from the held page.
+- `absence_or_doubt_statements`: statements with `stated_expected_absent` or
+  `stated_rotation_risk`, the two dispositions the rule acts on.
+- `absence_or_doubt_not_applied_by_scope`: of those, the ones with no role and no
+  double-gameweek reason, counted by the table's scope label.
+
+## The reading that decides #1006
+
+A **statement** is one raw claim. A statement is **lost** in one of two ways.
+
+- `lost_before_table`: it never becomes a player row's disposition:
+  `in_refused_responses` + `unverifiable_citation_own_club` +
+  `unverifiable_citation_other_club` + the sum of `unresolved_by_reason`. An identical repeat is
+  not lost, because its statement is carried once. A claim set aside under a declared rule (an
+  ambiguous name, another club's page, two statements about one player) is lost: it did not
+  reach the decision, and the record names the rule beside it.
+- `lost_unapplied`: it becomes a row with `stated_expected_absent` or `stated_rotation_risk`,
+  the reader gives it no role and no double-gameweek reason, and its scope label is neither
+  `other_competition` nor `past`. A statement naming a day ("Saturday's Premier League
+  match"), one naming the player by his full name, a hedge, and a statement from a page whose
+  publication time cannot be verified all end here, under the shared labels `unspecified` and
+  `ambiguous` or with the scope flag withheld, and the record cannot tell them apart; that is
+  what items 3 and 7 are about. The two labels that show the statement names another
+  competition or a past match are not counted. Other dispositions are not counted either: the
+  rule gives them no role by its own declaration.
+
+`lost` = `lost_before_table` + `lost_unapplied`. The record's `loss` section carries these
+three counts with its `verdict` and `issue_1006`, which are:
+
+| `verdict` | When | `issue_1006` | What follows |
+| --- | --- | --- | --- |
+| `no_raw_claims` | `raw` is 0 and no refused response lacks a readable claims list | `unanswered` | No statement existed to lose, so the record cannot answer the question, as on 21 October. #1006 neither closes nor moves on this record; it stays open and the next step is the owner's. |
+| `no_statement_lost` | `raw` is at least 1, `lost` is 0, and no refused response lacks a readable claims list | `close` | #1006 closes, by the owner's decision of 19 October. |
+| `statements_lost` | `lost` is at least 1, or a refused response lacks a readable claims list (its statements cannot be counted, which is the defect item 4 names) | `route_items_3_7_4_10` | Items 3, 7, 4 and 10 of #1006 go to İbrahim. The record says how many statements were lost in each place; it does not rank the items. |
+
+There is no threshold: one lost statement routes the items. The reading is made once, from the
+one record of the GW8 decision run, and is not repeated with another capture.
+
+It decides nothing else: not whether stated news predicts who plays, not whether any count is
+good or bad, not a change to the coding contract or the artifact contract, and not #1140's live
+acceptance.
+
+## What the record means for #524
+
+The owner's condition is a real-capture Friday run with club news on, plus this record. The
+record shows the run's part through its checks: `source_kind` is `capture`, the news capture
+precedes the decision capture, and the rebuilt table matches the published one. Whatever the
+verdict, `no_raw_claims` included, the record then exists; whether #524 closes stays the
+owner's call.
+
+If no GW8 club-news capture exists (the acquisition refused and the launcher stopped before
+the weekly decision), or no rotation pair was exported from it, there is no record. The
+receipt's `Refused:` line is posted on #524 instead, the reporter is not run, and neither issue
+moves under this protocol.
+
+## Where the record lands
+
+- `docs/research/club_news_join_counts_gw8.json`: the reporter's output, byte for byte.
+- `docs/research/club_news_join_counts_gw8.md`: the inputs, the counts, the verdict and what
+  follows from it, in the terms of this protocol and nothing beyond them.
+- A row in `docs/measurements_index.md` naming both, and this protocol's line in
+  `docs/research/README.md` pointed at the record.
+
+They arrive in one pull request after the GW8 publish, outside any run window. It changes no
+code. The record carries counts, ids, club names and digests only: no quote, no paraphrase and
+no player name, nothing the evidence table itself does not carry.
+
+## What may not change after the data exists
+
+The inputs, every count's definition, the identities, the definition of a lost statement and
+the verdict table above. A count found to be missing after the data exists is added in the
+record's Markdown as an addition made after the data, and does not enter the verdict.
+
+## Checked before this was frozen
+
+The reporter, `scripts/report_club_news_join_counts.py`, was run only on synthetic captures
+written and exported by the real code, in its unit tests. No real capture was read: none is on
+the machine this was written on.
