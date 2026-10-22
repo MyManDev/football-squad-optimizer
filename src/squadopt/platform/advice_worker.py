@@ -61,7 +61,11 @@ from squadopt.contracts.injuries import require_official_injury_source
 from squadopt.contracts.league import LEAGUE_VIEW_CONTRACT_VERSION
 from squadopt.contracts.preferences import DecisionPreferences
 from squadopt.live.football_artifact import SHARES_BEFORE_AVAILABILITY_LIMIT
-from squadopt.planning.native_highs import native_window_executor
+from squadopt.planning.native_highs import (
+    NativeWindowOutcome,
+    native_window_executor,
+    native_window_outcomes,
+)
 from squadopt.platform.advice_cache import AdviceCacheRepository, advice_cache_key
 from squadopt.platform.advice_documents import AdviceDocumentError, validate_advice_document
 from squadopt.platform.advice_job_spec import AdviceJobSpec, AdviceJobSpecError, AdviceJobSpecStore
@@ -92,7 +96,7 @@ from squadopt.platform.backend_runtime import (
 )
 from squadopt.platform.capture_context import AdviceCaptureContext
 from squadopt.platform.jobs_contract import AdviceJob
-from squadopt.platform.native_windows import execute_native_window
+from squadopt.platform.native_windows import execute_native_window, summarize_native_windows
 from squadopt.platform.queue_contracts import DEFAULT_ARCHIVE_AFTER_SECONDS, QueueLockTimeout
 from squadopt.platform.worker_heartbeat import (
     IDLE_WAIT_SECONDS,
@@ -361,8 +365,12 @@ def build_advice_compute(
                     f"{label} {entry} is not in the capture this backend answers from, so "
                     "there is no squad to advise from yet.",
                 )
+        native_windows: list[NativeWindowOutcome] = []
         try:
-            with native_window_executor(execute_native_window):
+            with (
+                native_window_executor(execute_native_window),
+                native_window_outcomes() as native_windows,
+            ):
                 advice = advise_menu_entry(
                     request,
                     provider=capture.provider,
@@ -391,6 +399,11 @@ def build_advice_compute(
                 "PLAN_NOT_FOUND",
                 "No plan was found for this selection from this capture.",
             ) from error
+        finally:
+            # Which backend answered each window search, and why any fell back: on the
+            # job's terminal log event, whatever the outcome. The answer never carries it.
+            if job_log_fields is not None and native_windows:
+                job_log_fields["window_solvers"] = summarize_native_windows(native_windows)
         if football is not None:
             advice["decision_information"] = capture.switches.decision_information(
                 capture.inputs.snapshot_id

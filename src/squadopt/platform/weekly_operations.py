@@ -71,8 +71,10 @@ from squadopt.data.source_revision import source_revision
 from squadopt.features.evidence_artifact import read_player_evidence_artifact
 from squadopt.features.rotation_evidence_artifact import read_rotation_evidence_artifact
 from squadopt.live import handoff_path_for, load_entry, read_projection_handoff, read_season_rules
+from squadopt.planning.native_highs import NATIVE_VERSION
 from squadopt.platform import benchmark_capture, cohort_capture, elite_capture
 from squadopt.platform.fpl_capture import capture
+from squadopt.platform.native_windows import native_window_version, summarize_native_windows
 from squadopt.platform.publication_workers import league_mapper
 from squadopt.platform.runlog import RunLog, configure_run_logging
 from squadopt.platform.storage._queue_lock import QueueFileLock
@@ -363,8 +365,34 @@ class WeeklyOperations:
                 "decide": prepared.decide,
                 "decide_skip_reason": prepared.decide_skip_reason,
                 "mode_rule": MODE_RULE,
+                "native_window_solver": self._native_window_solver(),
             },
         )
+
+    def _native_window_solver(self) -> str:
+        """Ask the isolated child which HiGHS it loads, before anything is spent.
+
+        The league stage's three- and five-week searches run on that child. Without the
+        pinned highspy every one of them would fall back to CP-SAT, which publishes, but
+        not the plans this commit is meant to publish; so the week stops here instead.
+        """
+
+        remedy = (
+            f"Install the pin into this environment (python -m pip install "
+            f"highspy=={NATIVE_VERSION}) and run again."
+        )
+        try:
+            version = native_window_version()
+        except (OSError, RuntimeError, ValueError) as error:
+            raise WeekError(
+                f"The native window solver cannot start in this environment: {error} {remedy}"
+            ) from error
+        if version != NATIVE_VERSION:
+            raise WeekError(
+                f"The native window solver loads HiGHS {version}; this commit pins "
+                f"{NATIVE_VERSION}. {remedy}"
+            )
+        return f"highspy {version}"
 
     def _refuse_a_record_from_another_commit(self) -> None:
         """Stop a reused capture that already holds advice records from another commit.
@@ -942,6 +970,23 @@ class WeeklyOperations:
                 beside.append(result.published)
             gameweek = result.gameweek
             outputs.extend(result.output_paths)
+            # Which backend answered each member's three- and five-week searches, and why
+            # any fell back to CP-SAT: in the receipt, and one run-log line per member and
+            # window length beside the league's substage lines. No member page carries it.
+            window_solvers = {
+                str(member.entry_id): summarize_native_windows(member.native_windows)
+                for member in result.report.members
+                if getattr(member, "native_windows", ())
+            }
+            if getattr(self, "log", None) is not None:
+                for entry_id, rows in window_solvers.items():
+                    for row in rows:
+                        self.log.event(
+                            "tick.week.league.window_solver",
+                            league_id=request.league_id,
+                            entry_id=int(entry_id),
+                            **row,
+                        )
             leagues[str(league_id)] = {
                 "menu": request.menu,
                 "timings": timings,
@@ -968,6 +1013,10 @@ class WeeklyOperations:
                 # Whose purchase prices were rebuilt from the transfers list, and why not
                 # the rest; empty when the capture held no member's picks.
                 "purchase_prices_note": result.purchase_prices_note,
+                # Per member, per window length: searches answered by native HiGHS and by
+                # the CP-SAT fallback, the HiGHS version the child reported, and each
+                # fallback reason with its count. Empty for a device menu.
+                "window_solvers": window_solvers,
             }
         # The publication receipt names whether any rendered member was recorded.
         recorded_any = any(bool(row["advice_recorded"]) for row in leagues.values())

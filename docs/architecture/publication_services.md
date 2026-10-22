@@ -46,8 +46,17 @@ CP-SAT alone would have planned; a window whose native attempt and fallback both
 the ceiling can therefore spend two ceilings on its primary search. A clock-limited
 native answer does not seed fallback. One-week solves, hold probes and the
 deterministic tie-break retain CP-SAT. The model, strategies and configured ceilings
-are unchanged. Published diagnostics name the selected primary backend and any native
-fallback reason.
+are unchanged.
+
+No published document names the backend: a window document still carries only
+`solver_status` and `optimality_gap` from the search. The operator reads it instead.
+Each member render collects one outcome per window search (the backend that answered,
+the HiGHS version the child reported, and any fallback reason, which includes the tail
+of a failed child's standard error). The weekly league stage writes them per member
+and window length under `leagues.<id>.window_solvers` in its receipt and as one
+`tick.week.league.window_solver` run-log event each; the API worker adds the same rows
+as `window_solvers` on the job's terminal log event. The weekly preflight starts the
+child once and refuses the week, before any capture, unless it loads highspy 1.15.1.
 
 The offline element-to-code translation and `CapturePicksProvider` now live in
 `application.capture_entries`, and callers import them from there;

@@ -380,6 +380,27 @@ def export_milp(proto: Any, name: str = "model") -> Milp:
 
 NativeExecutor = Callable[[Mapping[str, Any], float], Mapping[str, Any]]
 _EXECUTOR: ContextVar[NativeExecutor | None] = ContextVar("native_window_executor", default=None)
+NATIVE_BACKEND: Final = "highs-native"
+CP_SAT_BACKEND: Final = "ortools-cp-sat"
+
+
+@dataclass(frozen=True, slots=True)
+class NativeWindowOutcome:
+    """Which backend answered one three- or five-week primary search, for the operator.
+
+    ``version`` is the HiGHS version the isolated child reported, or ``None`` when no
+    child answered. ``fallback_reason`` is empty when the native optimum was accepted.
+    """
+
+    weeks: int
+    backend: str
+    version: str | None
+    fallback_reason: str
+
+
+_OUTCOMES: ContextVar[list[NativeWindowOutcome] | None] = ContextVar(
+    "native_window_outcomes", default=None
+)
 
 
 @contextmanager
@@ -395,6 +416,22 @@ def native_window_executor(execute: NativeExecutor) -> Iterator[None]:
         yield
     finally:
         _EXECUTOR.reset(token)
+
+
+@contextmanager
+def native_window_outcomes() -> Iterator[list[NativeWindowOutcome]]:
+    """Collect one outcome per native window attempt made in this context, in order.
+
+    Only searches that ran with an executor bound are listed: one-week solves and callers
+    without the process port never attempt the native solver, so they add nothing.
+    """
+
+    collected: list[NativeWindowOutcome] = []
+    token = _OUTCOMES.set(collected)
+    try:
+        yield collected
+    finally:
+        _OUTCOMES.reset(token)
 
 
 def _wire_model(milp: Milp, seed: int) -> dict[str, Any]:
@@ -427,9 +464,16 @@ def _checked_values(milp: Milp, result: Mapping[str, Any]) -> tuple[list[int], i
     """
 
     if result.get("version") != NATIVE_VERSION or result.get("threads") != 1:
-        raise ValueError("The native solver version or thread count is wrong.")
+        raise ValueError(
+            f"The native solver reported version {result.get('version')!r} with "
+            f"{result.get('threads')!r} threads; {NATIVE_VERSION} on one thread is required."
+        )
     if result.get("optimal") is not True:
-        raise ValueError("The native solve did not prove an optimum.")
+        status = result.get("status")
+        raise ValueError(
+            "The native solve did not prove an optimum"
+            + (f" (HiGHS status: {status})." if isinstance(status, str) and status else ".")
+        )
     values = result["values"]
     if not isinstance(values, list) or len(values) != len(milp.columns):
         raise ValueError("The native solution has the wrong number of columns.")
@@ -492,11 +536,13 @@ def solve_window_model(
     wall = float(solver.parameters.max_time_in_seconds)
     deterministic = float(solver.parameters.max_deterministic_time)
     verification_work = 0.0
-    details: dict[str, object] = {"version": NATIVE_VERSION, "selected": False}
+    details: dict[str, object] = {"version": None, "selected": False}
     try:
         milp = export_milp(model.proto)
         packet = _wire_model(milp, int(solver.parameters.random_seed))
         response = execute(packet, wall)
+        reported = response.get("version")
+        details["version"] = reported if isinstance(reported, str) else None
         values, exact = _checked_values(milp, response)
         fixed = model.clone()
         fixed.clear_hints()  # type: ignore[no-untyped-call]
@@ -513,13 +559,40 @@ def solve_window_model(
         if abs(float(certificate.objective_value) - exact) >= 0.5:
             raise ValueError("The original CP objective disagrees with the native witness.")
         details["selected"] = True
+        _record(weeks, details)
         return certificate, int(cp_model.OPTIMAL), details
     except (KeyError, TypeError, ValueError, RuntimeError, OSError) as error:
-        details["fallback_reason"] = str(error)
+        details["fallback_reason"] = str(error) or type(error).__name__
     # The solver's own limits are left as the caller set them. Work the certificate spent
     # on a rejected witness is reported beside the search, never taken from its budget.
     details["verification_work_before_fallback"] = verification_work
+    _record(weeks, details)
     return solver, solve(model, solver), details
+
+
+def _record(weeks: int, details: Mapping[str, object]) -> None:
+    outcomes = _OUTCOMES.get()
+    if outcomes is None:
+        return
+    version = details.get("version")
+    selected = details.get("selected") is True
+    outcomes.append(
+        NativeWindowOutcome(
+            weeks=weeks,
+            backend=NATIVE_BACKEND if selected else CP_SAT_BACKEND,
+            version=version if isinstance(version, str) else None,
+            fallback_reason="" if selected else str(details.get("fallback_reason", "")),
+        )
+    )
+
+
+def native_version() -> dict[str, Any]:
+    """Run in the platform's isolated interpreter: the HiGHS build it would solve with."""
+
+    import highspy
+
+    highs = highspy.Highs()  # type: ignore[no-untyped-call]
+    return {"version": highs.version()}
 
 
 def native_solve(packet: Mapping[str, Any], seconds: float) -> dict[str, Any]:
@@ -529,7 +602,9 @@ def native_solve(packet: Mapping[str, Any], seconds: float) -> dict[str, Any]:
 
     highs = highspy.Highs()  # type: ignore[no-untyped-call]
     if highs.version() != NATIVE_VERSION:
-        raise RuntimeError(f"Native HiGHS {NATIVE_VERSION} is required.")
+        raise RuntimeError(
+            f"Native HiGHS {NATIVE_VERSION} is required; this interpreter loads {highs.version()}."
+        )
     for name, value in {
         "output_flag": False,
         "threads": 1,
@@ -564,10 +639,12 @@ def native_solve(packet: Mapping[str, Any], seconds: float) -> dict[str, Any]:
         raise RuntimeError("HiGHS refused the window model.")
     highs.run()
     info = highs.getInfo()
-    optimal = highs.getModelStatus() == highspy.HighsModelStatus.kOptimal
+    status = highs.getModelStatus()
+    optimal = status == highspy.HighsModelStatus.kOptimal
     return {
         "version": highs.version(),
         "threads": highs.getOptionValue("threads")[1],
+        "status": highs.modelStatusToString(status),
         "optimal": optimal,
         "values": list(highs.getSolution().col_value) if optimal else [],
         "objective": float(info.objective_function_value) if optimal else None,

@@ -80,6 +80,20 @@ Start after the previous gameweek's picks are public and inside the lead-time wi
 `--dry-run` prints the plan and runs nothing. Without `--decide` the ledger is not
 touched and the loop is the members' loop alone.
 
+**The native window solver.** The three- and five-week searches run on native HiGHS in a
+separate interpreter, with CP-SAT as the fallback. The preflight starts that interpreter
+once and refuses the week, before any capture, unless it loads `highspy` 1.15.1; its
+receipt says `native_window_solver: highspy 1.15.1`. To check the weekly venv by hand
+before a run, `python -c "import highspy; print(highspy.Highs().version())"` must print
+`1.15.1`; otherwise `python -m pip install highspy==1.15.1` (the package pins it, so a
+fresh `pip install -e .` installs it too). After the league stage, its receipt's
+`leagues.<id>.window_solvers` gives, per member and window length, how many searches
+native HiGHS answered, how many fell back to CP-SAT, the HiGHS version the child
+reported and each fallback reason with its count; the run log carries the same rows as
+`tick.week.league.window_solver` events. A fallback publishes what CP-SAT alone would
+have published. The same reason on every member's windows points at the environment
+rather than a member.
+
 The preview now defaults to `data/runtime/weekly/<run-id>/preview`, rather than tracked
 `web/public`. `--out` still selects another destination. A source-controlled destination can
 make the checkout dirty and must be reconciled before a resume; the default avoids that.

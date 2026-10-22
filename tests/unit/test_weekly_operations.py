@@ -19,6 +19,12 @@ from squadopt.application.build import _recent_events
 from squadopt.application.weekly_plan import WeekError, WeeklyRequest, rotation_artifact
 from squadopt.contracts.run_logs import LOG_ROOT_NAME
 from squadopt.data.snapshots import read_snapshot, write_snapshot
+from squadopt.planning.native_highs import (
+    CP_SAT_BACKEND,
+    NATIVE_BACKEND,
+    NATIVE_VERSION,
+    NativeWindowOutcome,
+)
 from squadopt.platform import weekly_operations as weekly
 from squadopt.platform.weekly_journal import WeeklyJournalError, fingerprint_paths, inspect_run
 from squadopt.platform.weekly_publish import tree_digests
@@ -1479,3 +1485,93 @@ def test_completed_preview_league_and_scoreboard_share_valid_identity(tmp_path):
     assert identity is not None
     assert "scoreboard.json" in identity["files"]
     assert identity["source_snapshot_id"] == operation.request.snapshot_id
+
+
+def test_the_preflight_names_the_native_window_solver_or_refuses_the_week(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The weekly environment must load the pinned highspy in the isolated child before
+    anything is captured or solved; the preflight asks the child itself."""
+
+    operation = world(tmp_path)
+    operation.run.directory.mkdir(parents=True)
+    # The real child, in this environment.
+    assert operation._preflight().value["native_window_solver"] == f"highspy {NATIVE_VERSION}"
+
+    monkeypatch.setattr(weekly, "native_window_version", lambda: "1.14.0")
+    with pytest.raises(WeekError) as refusal:
+        operation._preflight()
+    assert "loads HiGHS 1.14.0" in str(refusal.value)
+    assert f"python -m pip install highspy=={NATIVE_VERSION}" in str(refusal.value)
+
+    def missing() -> str:
+        raise RuntimeError(
+            "The isolated native window solver failed with exit code 1. Child stderr: "
+            "ModuleNotFoundError: No module named 'highspy'"
+        )
+
+    monkeypatch.setattr(weekly, "native_window_version", missing)
+    with pytest.raises(WeekError, match="No module named 'highspy'"):
+        operation._preflight()
+
+
+def test_the_league_receipt_and_run_log_name_each_window_solver(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Which backend answered each member's window searches, and why any fell back, is in
+    the league receipt and in one run-log event per member and window length."""
+
+    operation = world(tmp_path)
+    operation.values["capture"] = {"snapshot_id": operation.request.snapshot_id}
+    operation.values["handoff"] = {"path": str(operation.supplied_handoff)}
+    timed_out = "The native solve did not prove an optimum (HiGHS status: Time limit reached)."
+    outcomes = (
+        NativeWindowOutcome(3, NATIVE_BACKEND, NATIVE_VERSION, ""),
+        NativeWindowOutcome(5, CP_SAT_BACKEND, NATIVE_VERSION, timed_out),
+        NativeWindowOutcome(5, NATIVE_BACKEND, NATIVE_VERSION, ""),
+    )
+    members = (
+        SimpleNamespace(entry_id=101, rendered=True, reason="", native_windows=outcomes),
+        SimpleNamespace(entry_id=102, rendered=False, reason="no picks", native_windows=()),
+    )
+
+    def publish(request: Any, **kwargs: Any) -> SimpleNamespace:
+        return SimpleNamespace(
+            output_paths=(),
+            snapshot_id=request.snapshot_id,
+            gameweek=2,
+            report=SimpleNamespace(members=members, removed=()),
+            top100_note="",
+            purchase_prices_note="",
+            legacy_tree="",
+            published=None,
+        )
+
+    monkeypatch.setattr(weekly, "publish_league", publish)
+    events: list[tuple[str, dict[str, Any]]] = []
+    operation.log = SimpleNamespace(event=lambda name, **fields: events.append((name, fields)))
+    receipt = operation._league().value["leagues"]["352490"]["window_solvers"]
+    assert receipt == {
+        "101": [
+            {
+                "weeks": 3,
+                "solves": 1,
+                "native": 1,
+                "fallback": 0,
+                "backends": [NATIVE_BACKEND],
+                "native_versions": [NATIVE_VERSION],
+                "fallback_reasons": {},
+            },
+            {
+                "weeks": 5,
+                "solves": 2,
+                "native": 1,
+                "fallback": 1,
+                "backends": [NATIVE_BACKEND, CP_SAT_BACKEND],
+                "native_versions": [NATIVE_VERSION],
+                "fallback_reasons": {timed_out: 1},
+            },
+        ]
+    }
+    logged = [fields for name, fields in events if name == "tick.week.league.window_solver"]
+    assert logged == [{"league_id": 352490, "entry_id": 101, **row} for row in receipt["101"]]

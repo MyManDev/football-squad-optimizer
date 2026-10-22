@@ -1,6 +1,7 @@
-"""Native window acceptance, exact certification and bounded fallback."""
+"""Native window acceptance, exact certification, fallback budgets and operator outcomes."""
 
 import ast
+import subprocess
 from dataclasses import replace
 from pathlib import Path
 
@@ -18,8 +19,20 @@ from squadopt.planning import (
     native_highs,
     optimize_transfer_plan,
 )
-from squadopt.planning.native_highs import native_window_executor, solve_window_model
-from squadopt.platform.native_windows import execute_native_window
+from squadopt.planning.native_highs import (
+    CP_SAT_BACKEND,
+    NATIVE_BACKEND,
+    NativeWindowOutcome,
+    native_window_executor,
+    native_window_outcomes,
+    solve_window_model,
+)
+from squadopt.platform import native_windows
+from squadopt.platform.native_windows import (
+    execute_native_window,
+    native_window_version,
+    summarize_native_windows,
+)
 
 
 def _model(offset=7):
@@ -227,6 +240,107 @@ def test_a_bound_half_a_unit_away_does_not_prove_the_witness(drift):
     assert details["selected"] is False
     assert "bound" in details["fallback_reason"]
     assert status == cp_model.OPTIMAL and result.objective_value == exact
+
+
+def test_the_version_is_the_one_the_child_reported():
+    model, _, _ = _model()
+    with native_window_executor(lambda packet, seconds: _answer(version="1.14.0")):
+        _, _, details = solve_window_model(model, _solver(), solve, weeks=3)
+    assert details["version"] == "1.14.0" and details["selected"] is False
+    assert "1.14.0" in details["fallback_reason"] and "1.15.1" in details["fallback_reason"]
+
+    def unavailable(packet, seconds):
+        raise RuntimeError("native unavailable")
+
+    with native_window_executor(unavailable):
+        _, _, details = solve_window_model(model, _solver(), solve, weeks=3)
+    assert details["version"] is None
+
+
+def test_an_unproved_answer_names_the_status_highs_gave():
+    model, _, _ = _model()
+    answer = _answer(optimal=False, status="Time limit reached")
+    with native_window_executor(lambda packet, seconds: answer):
+        _, _, details = solve_window_model(model, _solver(), solve, weeks=5)
+    assert details["fallback_reason"] == (
+        "The native solve did not prove an optimum (HiGHS status: Time limit reached)."
+    )
+
+
+def test_outcomes_name_each_window_search_backend_version_and_reason():
+    replies = iter([_answer(), RuntimeError("native unavailable"), _answer()])
+
+    def execute(packet, seconds):
+        reply = next(replies)
+        if isinstance(reply, Exception):
+            raise reply
+        return reply
+
+    model, _, _ = _model()
+    with native_window_executor(execute), native_window_outcomes() as outcomes:
+        solve_window_model(model, _solver(), solve, weeks=1)
+        solve_window_model(model, _solver(), solve, weeks=3)
+        solve_window_model(model, _solver(), solve, weeks=5)
+        solve_window_model(model, _solver(), solve, weeks=5)
+    assert outcomes == [
+        NativeWindowOutcome(3, NATIVE_BACKEND, "1.15.1", ""),
+        NativeWindowOutcome(5, CP_SAT_BACKEND, None, "native unavailable"),
+        NativeWindowOutcome(5, NATIVE_BACKEND, "1.15.1", ""),
+    ]
+    assert summarize_native_windows(outcomes) == [
+        {
+            "weeks": 3,
+            "solves": 1,
+            "native": 1,
+            "fallback": 0,
+            "backends": [NATIVE_BACKEND],
+            "native_versions": ["1.15.1"],
+            "fallback_reasons": {},
+        },
+        {
+            "weeks": 5,
+            "solves": 2,
+            "native": 1,
+            "fallback": 1,
+            "backends": [NATIVE_BACKEND, CP_SAT_BACKEND],
+            "native_versions": ["1.15.1"],
+            "fallback_reasons": {"native unavailable": 1},
+        },
+    ]
+    # Outside the context nothing is collected, and the search is unchanged.
+    with native_window_executor(lambda packet, seconds: _answer()):
+        _, status, details = solve_window_model(model, _solver(), solve, weeks=3)
+    assert status == cp_model.OPTIMAL and details["selected"] is True
+    assert len(outcomes) == 3
+
+
+def test_a_failed_child_names_the_tail_of_its_standard_error():
+    # A packet without bounds makes the real child raise after it has loaded HiGHS.
+    with pytest.raises(RuntimeError) as caught:
+        execute_native_window({"seed": 0}, 60.0)
+    message = str(caught.value)
+    assert message.startswith("The isolated native window solver failed with exit code 1.")
+    assert message.endswith("KeyError: 'bounds'")
+    assert len(message) <= 200 + native_windows.STDERR_TAIL_CHARACTERS
+
+
+def test_a_timed_out_child_names_its_ceiling_and_standard_error(monkeypatch):
+    def expire(command, **kwargs):
+        raise subprocess.TimeoutExpired(
+            command, kwargs["timeout"], stderr=b"noise " * 500 + b"last words"
+        )
+
+    monkeypatch.setattr(native_windows.subprocess, "run", expire)
+    with pytest.raises(TimeoutError) as caught:
+        execute_native_window({}, 12.5)
+    message = str(caught.value)
+    assert message.startswith("The native window reached its wall ceiling of 12.5s.")
+    assert message.endswith("noise last words")
+    assert len(message) <= 200 + native_windows.STDERR_TAIL_CHARACTERS
+
+
+def test_the_probe_reports_the_highs_this_environment_loads():
+    assert native_window_version() == "1.15.1"
 
 
 def test_native_translation_handles_enforcement_maximum_and_element():
