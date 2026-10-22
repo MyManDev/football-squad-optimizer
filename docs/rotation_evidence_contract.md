@@ -121,6 +121,19 @@ HTTP `Last-Modified` or an invented time. Its closed sources are `html_publicati
 `consistent_publication_fields`. The date, precision, source and digest are retained. A
 verified day-only date remains day-only and cannot authorize an exact-time intervention.
 
+A single article's JSON-LD WebPage identifier may replace the page path's slashes with
+hyphens. This exact identifier form is admitted only when the page's canonical and Open
+Graph URLs both identify the fetched page, the Open Graph and article headlines agree,
+and every displayed datetime equals the explicit `datePublished` instant. A query string,
+another article, a missing or conflicting declaration, or an explicit article URL using
+this malformed form is refused. The displayed time only corroborates the JSON-LD field;
+an unlabelled time on its own still establishes no publication date. The held bytes and
+`jsonld_datePublished` source remain unchanged.
+These corroborating declarations may be streamed directly under the HTML body only when
+the head declares none of them. Nested article content cannot supply them, and streamed
+metadata cannot override a head declaration. Ordinary canonical aliases still require
+the head declaration.
+
 The artifact reader validates these fields' shape. The manager-word consumer independently
 resolves the citation, recomputes source publication and scope, and checks the decision
 calendar before granting a role constraint. Numeric participation/minute consumers apply
