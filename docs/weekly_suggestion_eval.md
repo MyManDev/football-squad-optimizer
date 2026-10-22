@@ -30,8 +30,22 @@ for its league at the same capture. A new league with no records gets empty hist
 - Reject ambiguous or corrupt evidence instead of substituting an older result.
 - Show only weeks with an actual member record directory. An empty archive is an
   empty history; no earlier recommendations are reconstructed or solved again.
+- A record's path names no league, so a member of two leagues has one directory per week
+  for both. Each league's history reads only its own records there: a week whose records
+  are all another league's is not shown, and a week both leagues recorded is selected from
+  this league's records. A record counts as another league's only when it is sound for the
+  member-week in every other identity; an unreadable record, or one naming no league, is
+  refused as before.
+- A record that never landed can leave its member-week directory with no record in it.
+  Only league 352490 records advice (`records_advice_for`), so for any other league such
+  a directory in the legacy archive is 352490's and its week is not shown. League 352490
+  shows it as `no_pre_deadline_record`, as before.
+- A baseline record names no league and is every league's. A week the baseline store
+  holds a directory for is shown for each league the member is in, even when its record
+  never landed, and another league's legacy record beside it is absent.
 - Before replacing any history, refuse a same-season publication that would drop a week
-  already shown for a member. Restore the missing records before retrying.
+  already shown for a member. Restore the missing records before retrying. A row shown
+  without advice for a week that is another league's, as above, is withdrawn instead.
 - The legacy archive records publisher output; the baseline store records the server's
   independent one-week answer. Neither establishes that a member viewed
   the page, followed the suggestion, or obtained a causal benefit from it.

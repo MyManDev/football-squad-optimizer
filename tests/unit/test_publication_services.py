@@ -439,6 +439,48 @@ def test_second_league_publishes_empty_histories_without_inventing_records(tmp_p
     assert not (tmp_path / "empty-records").exists()
 
 
+def test_a_second_league_shows_no_week_only_the_recording_league_recorded(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The weekly run reads every league's histories from the one records root, whose paths
+    name no league. A member of both leagues therefore has a week directory there for each
+    week the recording league recorded; none of those weeks is the second league's."""
+
+    monkeypatch.setenv("SQUADOPT_REPOSITORY_COMMIT", "c" * 40)
+    world = publication_world(tmp_path)
+    assert world.record_root is not None
+    entry_id = member_fixture.ENTRY_ID
+    # One capture serves both leagues, as in the weekly run, and the member is in both.
+    payloads = dict(read_snapshot(world.snapshot_root, world.snapshot_id).payloads)
+    payloads["league-755941-standings.json"] = _standings_page(755941, entry_id)
+    identifier = write_snapshot(
+        world.snapshot_root,
+        source="fpl-live",
+        captured_at_utc="2026-08-27T09:30:00Z",
+        payloads=payloads,
+    ).snapshot_id
+    first = replace(
+        world,
+        snapshot_id=identifier,
+        handoff_path=handoff_fixture._handoff(tmp_path / "shared-handoff", identifier),
+    )
+    publish_league(first)
+    records = world.record_root
+    assert (records / "2026-27" / "gw02" / f"entry-{entry_id}" / identifier).is_dir()
+    leagues = first.out_dir / "data" / "leagues"
+    recording = (leagues / "352490" / "history" / f"{entry_id}.json").read_bytes()
+    assert [row["gameweek"] for row in json.loads(recording)["payload"]["weeks"]] == [2]
+
+    # The weekly run's request for a league that records nothing: the shared root to read.
+    second = replace(first, league_id=755941, record_root=None, history_record_root=records)
+    for _ in range(2):  # A rerender reads its own history back and finds nothing dropped.
+        publish_league(second)
+        history = leagues / "755941" / "history" / f"{entry_id}.json"
+        payload = json.loads(history.read_text(encoding="utf-8"))["payload"]
+        assert payload["league_id"] == 755941 and payload["weeks"] == []
+    assert (leagues / "352490" / "history" / f"{entry_id}.json").read_bytes() == recording
+
+
 def test_a_league_renders_the_members_its_standings_page_names(tmp_path: Path) -> None:
     """The registry holds every league's members; a league prepares its own, and a league
     none of the registered entries is in is refused before anything is solved."""

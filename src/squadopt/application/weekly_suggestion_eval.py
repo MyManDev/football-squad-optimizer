@@ -226,6 +226,75 @@ def published_advice_captures(league_dir: Path) -> dict[tuple[int, int], str]:
     return carried
 
 
+class _AnotherLeaguesWeek(Exception):
+    """The member-week is another league's: not this league's week.
+
+    Either every record in it belongs to another league, or it holds no record and this
+    league records none (:func:`_records_advice`). Not a :class:`DataError`, so
+    :func:`_evaluate_week` cannot report it as an unavailable week; the walk that asked for
+    it leaves the week out. The public :func:`select_record` and :func:`evaluate_week` never
+    raise it.
+    """
+
+
+def _records_advice(league_id: int) -> bool:
+    """Whether publications of ``league_id`` write member advice records.
+
+    The rule ``league_publication.records_advice_for`` applies, which this module cannot
+    import. Only a league that records advice can leave one of its own member-week
+    directories without a record, from a write that never landed. For any other league
+    such a directory was left by the league that does record.
+    """
+    return league_id == SUPPORTED_LEAGUE_ID
+
+
+def _check_record_identity(
+    record: Mapping[str, Any], *, season: str, gameweek: int, entry_id: int, league_id: int
+) -> None:
+    if (
+        record.get("contract_version") != MEMBER_ADVICE_RECORD_CONTRACT_VERSION
+        or record.get("season") != season
+        or _identifier(record.get("gameweek")) != gameweek
+        or _identifier(record.get("entry_id")) != entry_id
+        or _identifier(record.get("league_id")) != league_id
+        or record.get("player_id_space") != "fpl_element_code"
+    ):
+        raise SuggestionEvaluationError("Record identity does not match the requested member.")
+
+
+def _check_baseline_identity(
+    record: Mapping[str, Any], *, season: str, gameweek: int, entry_id: int
+) -> None:
+    if (
+        record.get("contract_version") != MEMBER_BASELINE_RECORD_CONTRACT_VERSION
+        or record.get("season") != season
+        or _identifier(record.get("gameweek")) != gameweek
+        or _identifier(record.get("entry_id")) != entry_id
+        or "league_id" in record
+        or record.get("source") != "server_one_week_baseline"
+        or record.get("player_id_space") != "fpl_element_code"
+    ):
+        raise SuggestionEvaluationError("Record identity does not match the requested member.")
+
+
+def _another_leagues_record(
+    record: Mapping[str, Any], *, season: str, gameweek: int, entry_id: int, league_id: int
+) -> bool:
+    """Whether ``record`` is a sound record of this member-week for a league not ``league_id``.
+
+    Only a record sound in every other identity belongs to the league it names. One naming no
+    league, or wrong in any other identity, belongs to no other league and stays refused.
+    """
+    try:
+        named = _identifier(record.get("league_id"))
+        _check_record_identity(
+            record, season=season, gameweek=gameweek, entry_id=entry_id, league_id=named
+        )
+    except SuggestionEvaluationError:
+        return False
+    return named != league_id
+
+
 def select_record(
     root: Path,
     *,
@@ -253,41 +322,90 @@ def select_record(
 
     An unreadable candidate is refused instead of silently falling back to an older one.
     """
+    return _select_record(
+        root,
+        season=season,
+        gameweek=gameweek,
+        entry_id=entry_id,
+        deadline_utc=deadline_utc,
+        published=published,
+        league_id=league_id,
+        other_leagues_absent=False,
+        baseline_record_root=baseline_record_root,
+    )
+
+
+def _select_record(
+    root: Path,
+    *,
+    season: str,
+    gameweek: int,
+    entry_id: int,
+    deadline_utc: str,
+    published: PublishedCaptures | None,
+    league_id: int,
+    other_leagues_absent: bool,
+    baseline_record_root: Path | None = None,
+) -> dict[str, Any] | None:
+    """:func:`select_record`, and for the history walk the weeks that are another league's.
+
+    A record's path names no league, so a member of two leagues has one directory per week
+    for both. With ``other_leagues_absent`` a sound record of another league is absent
+    rather than refused, and a week whose records are all another league's raises
+    :class:`_AnotherLeaguesWeek`, as does a week holding no record for a league that records
+    none. Without it, another league's record is refused as before, unless
+    ``baseline_record_root`` is given: a legacy record of another league is then absent too.
+    Only :func:`review_member_weeks` sets ``other_leagues_absent``, and it is the one caller
+    that catches the signal.
+    """
     _identifier(league_id)
     deadline = as_instant(normalize_utc_timestamp(deadline_utc, label="deadline_utc"))
     stores = [root] if baseline_record_root is None else [baseline_record_root, root]
+    listed = [(store, recorded_captures(store, season, gameweek, entry_id)) for store in stores]
+    total = sum(len(captures) for _, captures in listed)
+    if (
+        other_leagues_absent
+        and not total
+        and not _records_advice(league_id)
+        and not (
+            baseline_record_root is not None
+            and (baseline_record_root / season / f"gw{gameweek:02d}" / f"entry-{entry_id}").is_dir()
+        )
+    ):
+        # A directory a record never landed in, left by the league that records advice.
+        # That league shows it without advice; for this league it is no week at all. A
+        # baseline directory is every league's, so a week it names stays this league's.
+        raise _AnotherLeaguesWeek
+    others = 0
     held: dict[str, tuple[datetime, str, dict[str, Any]] | None] = {}
-    for store in stores:
-        for capture in recorded_captures(store, season, gameweek, entry_id):
+    for store, captures in listed:
+        for capture in captures:
             record = load_member_advice_record(
                 store, season, gameweek, entry_id, capture.snapshot_id
             )
-            baseline = record.get("contract_version") == MEMBER_BASELINE_RECORD_CONTRACT_VERSION
-            other_league = (
-                baseline_record_root is not None
-                and store == root
-                and record.get("contract_version") == MEMBER_ADVICE_RECORD_CONTRACT_VERSION
-                and _identifier(record.get("league_id")) != league_id
-            )
+            # A legacy record names its league; a baseline record names none and is every
+            # league's. With the baseline store, as in the history walk, a sound legacy
+            # record of another league is absent rather than refused.
             if (
-                record.get("contract_version")
-                not in (
-                    MEMBER_ADVICE_RECORD_CONTRACT_VERSION,
-                    MEMBER_BASELINE_RECORD_CONTRACT_VERSION,
+                store == root
+                and (other_leagues_absent or baseline_record_root is not None)
+                and _another_leagues_record(
+                    record,
+                    season=season,
+                    gameweek=gameweek,
+                    entry_id=entry_id,
+                    league_id=league_id,
                 )
-                or record.get("season") != season
-                or _identifier(record.get("gameweek")) != gameweek
-                or _identifier(record.get("entry_id")) != entry_id
-                or (
-                    "league_id" in record
-                    if baseline
-                    else not other_league and _identifier(record.get("league_id")) != league_id
-                )
-                or (baseline and record.get("source") != "server_one_week_baseline")
-                or record.get("player_id_space") != "fpl_element_code"
             ):
-                raise SuggestionEvaluationError(
-                    "Record identity does not match the requested member."
+                others += 1
+                continue
+            if record.get("contract_version") == MEMBER_BASELINE_RECORD_CONTRACT_VERSION:
+                _check_baseline_identity(
+                    record, season=season, gameweek=gameweek, entry_id=entry_id
+                )
+            else:
+                _check_record_identity(
+                    record, season=season, gameweek=gameweek, entry_id=entry_id, league_id=league_id
                 )
             stamp = record.get("generated_at_utc")
             if not isinstance(stamp, str):
@@ -304,11 +422,12 @@ def select_record(
                         raise
                 else:
                     candidate = (stamped, capture.snapshot_id, record)
-            if not other_league:
-                # Check every input before merging stores. A valid legacy record must
-                # not hide a broken baseline; a late legacy publication must not borrow
-                # the earlier baseline's clock. Its original digest remains authoritative.
-                held[capture.snapshot_id] = candidate
+            # Check every input before merging stores. A valid legacy record must not hide
+            # a broken baseline; a late legacy publication must not borrow the earlier
+            # baseline's clock. Its original digest remains authoritative.
+            held[capture.snapshot_id] = candidate
+    if other_leagues_absent and total and others == total:
+        raise _AnotherLeaguesWeek
     candidates = [candidate for candidate in held.values() if candidate is not None]
     if not candidates:
         return None
@@ -499,9 +618,39 @@ def evaluate_week(
     league_id: int = SUPPORTED_LEAGUE_ID,
     baseline_record_root: Path | None = None,
 ) -> WeekReview:
+    return _evaluate_week(
+        root,
+        season=season,
+        gameweek=gameweek,
+        entry_id=entry_id,
+        deadline_utc=deadline_utc,
+        captures=captures,
+        selected_records=selected_records,
+        published=published,
+        league_id=league_id,
+        other_leagues_absent=False,
+        baseline_record_root=baseline_record_root,
+    )
+
+
+def _evaluate_week(
+    root: Path,
+    *,
+    season: str,
+    gameweek: int,
+    entry_id: int,
+    deadline_utc: str,
+    captures: Sequence[CapturedSnapshot],
+    selected_records: dict[tuple[int, int], dict[str, Any]] | None,
+    published: PublishedCaptures | None,
+    league_id: int,
+    other_leagues_absent: bool,
+    baseline_record_root: Path | None = None,
+) -> WeekReview:
+    """:func:`evaluate_week`; ``other_leagues_absent`` as :func:`_select_record` takes it."""
     base: dict[str, Any] = {"gameweek": gameweek, "deadline_utc": deadline_utc}
     try:
-        record = select_record(
+        record = _select_record(
             root,
             league_id=league_id,
             season=season,
@@ -509,6 +658,7 @@ def evaluate_week(
             entry_id=entry_id,
             deadline_utc=deadline_utc,
             published=published,
+            other_leagues_absent=other_leagues_absent,
             baseline_record_root=baseline_record_root,
         )
         if record is None:
@@ -632,12 +782,17 @@ def review_member_weeks(
     published: PublishedCaptures | None = None,
     read_capture: Callable[[Path, str], CapturedSnapshot] | None = None,
     baseline_record_root: Path | None = None,
+    other_league_weeks: set[tuple[int, int]] | None = None,
 ) -> dict[int, tuple[WeekReview, ...]]:
     """Review every recorded week of every member, newest gameweek first, from evidence only.
 
     This is the body the publisher serializes, so the document and any later reading of the
     same weeks are the same reviews rather than two walks that could drift apart.
     ``published`` is passed to :func:`select_record` for every week.
+
+    A week whose records all belong to another league is not one of this league's weeks and
+    is left out, as is a week holding no record when this league records none.
+    ``other_league_weeks``, when given, receives each such ``(entry_id, week)``.
     """
     _identifier(league_id)
     if not re.fullmatch(r"\d{4}-\d{2}", season):
@@ -675,21 +830,26 @@ def review_member_weeks(
         for week in sorted(recorded_weeks, reverse=True):
             if week not in deadlines:
                 weeks.append(WeekReview(week, "unavailable", "missing_deadline"))
-            else:
-                weeks.append(
-                    evaluate_week(
-                        record_root,
-                        league_id=league_id,
-                        season=season,
-                        gameweek=week,
-                        entry_id=entry_id,
-                        deadline_utc=deadlines[week],
-                        captures=captures,
-                        selected_records=selected_records,
-                        published=published,
-                        baseline_record_root=baseline_record_root,
-                    )
+                continue
+            try:
+                reviewed = _evaluate_week(
+                    record_root,
+                    league_id=league_id,
+                    season=season,
+                    gameweek=week,
+                    entry_id=entry_id,
+                    deadline_utc=deadlines[week],
+                    captures=captures,
+                    selected_records=selected_records,
+                    published=published,
+                    other_leagues_absent=True,
+                    baseline_record_root=baseline_record_root,
                 )
+            except _AnotherLeaguesWeek:
+                if other_league_weeks is not None:
+                    other_league_weeks.add((entry_id, week))
+                continue
+            weeks.append(reviewed)
         reviews[entry_id] = tuple(weeks)
     return reviews
 
@@ -967,6 +1127,7 @@ def publish_suggestion_histories(
     the member was told only when its record is the capture that tree names.
     """
     selected_records: dict[tuple[int, int], dict[str, Any]] = {}
+    other_league_weeks: set[tuple[int, int]] = set()
     reviews = review_member_weeks(
         record_root=record_root,
         snapshot_root=snapshot_root,
@@ -978,6 +1139,7 @@ def publish_suggestion_histories(
         published=published,
         read_capture=read_capture,
         baseline_record_root=baseline_record_root,
+        other_league_weeks=other_league_weeks,
     )
     # Validate the whole replacement before writing the first member. An incomplete
     # record store must not turn a previously published week into a week that vanished.
@@ -991,7 +1153,15 @@ def publish_suggestion_histories(
         if old.get("entry_id") != entry_id or old.get("league_id") != league_id:
             raise SuggestionEvaluationError(f"History identity does not match {previous}.")
         old_weeks = {_identifier(row["gameweek"]) for row in old["weeks"]}
-        dropped = sorted(old_weeks - {week.gameweek for week in reviews[entry_id]})
+        # A history written before the walk left out other leagues' weeks shows each of them
+        # without advice. Withdrawing such a row loses no record; a row naming advice stays.
+        withdrawn = {
+            row["gameweek"]
+            for row in old["weeks"]
+            if row.get("advice_snapshot_id") is None
+            and (entry_id, row["gameweek"]) in other_league_weeks
+        }
+        dropped = sorted(old_weeks - withdrawn - {week.gameweek for week in reviews[entry_id]})
         if dropped:
             raise SuggestionEvaluationError(
                 f"Entry {entry_id} history would drop gameweeks {dropped}; restore the records."

@@ -1074,6 +1074,8 @@ class WeeklyOperations:
     def _capture_for_publication(self, root: Path, identifier: str) -> CapturedSnapshot:
         """Read immutable capture bytes once across this run's league publications.
 
+        The league, history and scoreboard builders read through it, and so does the
+        manager's word: its club-news capture and the roster capture its evidence names.
         The cache belongs to this operation, never to a request sent to member workers
         or another run. Resolve the root as well as the identifier so two archives cannot
         share a cached capture by name alone.
