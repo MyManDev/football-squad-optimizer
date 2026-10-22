@@ -134,6 +134,11 @@ the head declares none of them. Nested article content cannot supply them, and s
 metadata cannot override a head declaration. Ordinary canonical aliases still require
 the head declaration.
 
+The publication metadata reader closes the elements whose end tags HTML lets a page omit,
+such as `<p>`, `<li>`, `<option>` and table rows and cells, so a run of them is not nesting.
+A page with more than 256 elements open at once is refused as `publication_markup_too_deep`
+and gets no publication date. The limit keeps the search behind each end tag short.
+
 The artifact reader validates these fields' shape. The manager-word consumer independently
 resolves the citation, recomputes source publication and scope, and checks the decision
 calendar before granting a role constraint. Numeric participation/minute consumers apply

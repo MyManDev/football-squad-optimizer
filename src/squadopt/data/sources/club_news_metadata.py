@@ -19,7 +19,62 @@ from html.parser import HTMLParser
 PUBLICATION_METADATA_VERSION = "source_publication_metadata_v1"
 MAX_SOURCE_BYTES = 2 * 1024 * 1024
 _ARTICLE_TYPES = {"Article", "NewsArticle", "BlogPosting", "ReportageNewsArticle"}
+# Deeper real nesting refuses the page. The cap keeps each end tag's search short.
 _MAX_HTML_DEPTH = 256
+_TABLE_SECTIONS = {"tbody", "tfoot", "thead"}
+# HTML lets a page omit these end tags. An open element closes when a start tag listed for
+# it begins, with any of these elements still open inside it. A table or form start tag
+# does not close a paragraph here, because HTML's parser does not always close it.
+_IMPLIED_ENDS = {
+    "p": {
+        "address",
+        "article",
+        "aside",
+        "blockquote",
+        "dd",
+        "details",
+        "dialog",
+        "div",
+        "dl",
+        "dt",
+        "fieldset",
+        "figcaption",
+        "figure",
+        "footer",
+        "h1",
+        "h2",
+        "h3",
+        "h4",
+        "h5",
+        "h6",
+        "header",
+        "hgroup",
+        "hr",
+        "li",
+        "main",
+        "menu",
+        "nav",
+        "ol",
+        "p",
+        "pre",
+        "search",
+        "section",
+        "ul",
+    },
+    "li": {"li"},
+    "dd": {"dd", "dt"},
+    "dt": {"dd", "dt"},
+    "option": {"optgroup", "option"},
+    "optgroup": {"optgroup"},
+    "rp": {"rp", "rt"},
+    "rt": {"rp", "rt"},
+    "td": {"td", "th"},
+    "th": {"td", "th"},
+    "tr": {"tr"},
+    "tbody": _TABLE_SECTIONS,
+    "tfoot": _TABLE_SECTIONS,
+    "thead": _TABLE_SECTIONS,
+}
 _VOID_TAGS = {
     "area",
     "base",
@@ -126,6 +181,7 @@ class _MetadataReader(HTMLParser):
         self.url = url
         self.candidates: list[tuple[str, str]] = []
         self.invalid = False
+        self.too_deep = False
         self._json: list[str] | None = None
         self._unbound_articles = 0
         self._in_head = False
@@ -146,12 +202,14 @@ class _MetadataReader(HTMLParser):
         if self.invalid:
             return
         values = dict(attrs)
-        body_root = self._tag_stack in (["body"], ["html", "body"])
+        stack = self._tag_stack
+        self._close_implied_ends(tag)
+        body_root = stack in (["body"], ["html", "body"])
         if tag not in _VOID_TAGS:
-            if len(self._tag_stack) >= _MAX_HTML_DEPTH:
-                self.invalid = True
+            if len(stack) >= _MAX_HTML_DEPTH:
+                self.too_deep = self.invalid = True
                 return
-            self._tag_stack.append(tag)
+            stack.append(tag)
         if tag in ("meta", "time", "script", "link") and len(values) != len(attrs):
             self.invalid = True
         if tag == "head":
@@ -199,6 +257,17 @@ class _MetadataReader(HTMLParser):
             self.candidates.append((values.get("datetime") or "", "html_publication_time"))
         if tag == "script" and (values.get("type") or "").casefold() == "application/ld+json":
             self._json = []
+
+    def _close_implied_ends(self, tag: str) -> None:
+        """Close the open elements this start tag ends where the page omits their end tags."""
+        stack = self._tag_stack
+        end = len(stack)
+        for index in range(len(stack) - 1, -1, -1):
+            if stack[index] not in _IMPLIED_ENDS:
+                break
+            if tag in _IMPLIED_ENDS[stack[index]]:
+                end = index
+        del stack[end:]
 
     def handle_data(self, data: str) -> None:
         if self.invalid:
@@ -382,6 +451,8 @@ def publication_metadata(content: bytes, content_type: str, source_url: str) -> 
             reader.close()
         except (ValueError, RecursionError):
             return missing("publication_metadata_invalid")
+        if reader.too_deep:
+            return missing("publication_markup_too_deep")
         if reader.invalid or reader._json is not None:
             return missing("publication_metadata_invalid")
         candidates = [*reader.candidates, *reader.canonical_dates()]
