@@ -512,12 +512,15 @@ def test_each_record_is_compared_with_the_committed_one_line_endings_aside(root:
     _git(root, "init", "-q")
     _git(root, "add", "docs")
     _git(root, "commit", "-q", "-m", "records")
+    head = subprocess.run(
+        ["git", "-C", str(root), "rev-parse", "HEAD"], check=True, capture_output=True, text=True
+    ).stdout.strip()
     code, output = _run(root, "first")
     first = {row["record"]: row for row in _read_csv(output / "records.csv")}
 
     assert code == 0
     assert {row["matches_commit"] for row in first.values()} == {"true"}
-    assert len({row["commit"] for row in first.values()}) == 1
+    assert {row["commit"] for row in first.values()} == {head}
     assert all(row["blob_at_commit"] == row["git_blob_lf"] for row in first.values())
 
     # A Windows checkout under core.autocrlf holds the same record with CRLF line endings.
