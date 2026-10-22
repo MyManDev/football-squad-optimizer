@@ -397,8 +397,16 @@ export function resolvePublishedAdvice(
     (context &&
       (capabilities.season !== context.season || capabilities.gameweek !== context.gameweek))
   ) {
+    // A rejected index stays rejected beside the model or preferences, so the page still
+    // says it cannot be read and offers the retry.
     return !preferences.valid || preferences.value || searchParams.get("model") === "football"
-      ? { ...published, status: "not-listed", path: null, windows: [], strategies: [] }
+      ? {
+          ...published,
+          status: published.status === "index-error" ? "index-error" : "not-listed",
+          path: null,
+          windows: [],
+          strategies: [],
+        }
       : published;
   }
   const result = withComputable(published, searchParams, entryId, members, index, capabilities);
@@ -411,7 +419,7 @@ export function resolvePublishedAdvice(
       !(preferences.value?.save_chips && searchParams.has("chip"));
     return {
       ...result,
-      status: "not-listed",
+      status: result.status === "index-error" ? "index-error" : "not-listed",
       path: null,
       computable: result.computable && {
         ...result.computable,
