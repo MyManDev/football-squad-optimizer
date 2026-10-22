@@ -379,3 +379,101 @@ def test_vm_sync_preflight_resolves_compose_exactly_as_its_restart(
         assert directory == restart_directory
         assert arguments[:-3] == restart_arguments[:-2]
         assert arguments[-3:] == ["config", "--format", "json"]
+
+
+RUNBOOK = SCRIPTS.parent / "docs" / "backend_runbook.md"
+
+
+def _activation_blocks() -> list[str]:
+    """The Bash blocks of "VM data root selection", with list indentation and joins undone."""
+    text = RUNBOOK.read_text(encoding="utf-8")
+    start = text.index("### VM data root selection")
+    section = text[start : text.index("\n### ", start)]
+    blocks = []
+    for chunk in section.split("```bash\n")[1:]:
+        lines = chunk[: chunk.index("```")].splitlines()
+        indent = min(len(line) - len(line.lstrip()) for line in lines if line.strip())
+        blocks.append("\n".join(line[indent:] for line in lines) + "\n")
+    return blocks
+
+
+def test_runbook_compose_calls_are_the_vm_sync_restart_from_its_directory() -> None:
+    """The activation check, restart and rollback resolve Compose as the preflight does."""
+    restart = next(
+        line
+        for line in (SCRIPTS / "vm_sync.sh").read_text(encoding="utf-8").splitlines()
+        if line.startswith("docker compose ")
+    )
+    assert restart.endswith(" up -d")
+    selection = restart.replace('"', "").replace("$BASE", "~/squadopt").removesuffix(" up -d")
+    calls = []
+    for block in _activation_blocks():
+        lines = block.replace("\\\n", "").splitlines()
+        for number, line in enumerate(lines):
+            if "docker compose" in line:
+                assert "cd ~/squadopt/repo" in lines[:number], block
+                calls.append(" ".join(line.split()))
+    # Step 4 resolves the selection and restarts; step 6 restarts on the rollback.
+    assert calls == [
+        selection + " config --format json | python3 -c '",
+        selection + " up -d",
+        selection + " up -d",
+    ]
+
+
+def test_runbook_activation_check_prints_only_the_image_and_binds(
+    layout: Any, tmp_path: Path
+) -> None:
+    """Step 4's check runs as written and shows what the operator compares, and no environment."""
+    _bash()
+    config, _, base = layout
+    (base / "repo").mkdir()
+    for service in config["services"].values():
+        service["image"] = "squadopt-backend:" + TAG
+    documents = tmp_path / "documents"
+    documents.mkdir()
+    (documents / "config.json").write_text(json.dumps(config), encoding="utf-8")
+    log = tmp_path / "calls.log"
+    binary = _stubs(
+        tmp_path,
+        {
+            "docker": LOG_CALL + 'cat "$DOCUMENTS/config.json"\n',
+            "python3": 'exec "$REAL_PYTHON" "$@"\n',
+        },
+    )
+    check = next(block for block in _activation_blocks() if "config --format json" in block)
+    script = tmp_path / "activation_check.sh"
+    script.write_text("set -euo pipefail\n" + check, encoding="utf-8")
+    result = subprocess.run(
+        [
+            _bash(),
+            "-c",
+            'export PATH="$(cd "$VM_TEST_BIN" && pwd -P):$PATH"; exec bash "$@"',
+            "activation-check",
+            script.as_posix(),
+        ],
+        env={
+            **os.environ,
+            "HOME": str(base.parent),
+            "VM_TEST_BIN": binary.as_posix(),
+            "CALL_LOG": str(log),
+            "DOCUMENTS": str(documents),
+            "REAL_PYTHON": Path(sys.executable).as_posix(),
+        },
+        capture_output=True,
+        text=True,
+        timeout=15,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    expected = []
+    for service in ("api", "worker"):
+        expected.append(f"{service} squadopt-backend:{TAG}")
+        expected.extend(
+            f"    /mnt/{name} bind {base / name} ro"
+            for name in ("site", "snapshots", "handoffs", "artifacts")
+        )
+    assert result.stdout.splitlines() == expected
+    assert "never-disclose" not in result.stdout + result.stderr
+    [(_, directory, _)] = _calls(log)
+    assert directory == str((base / "repo").resolve())

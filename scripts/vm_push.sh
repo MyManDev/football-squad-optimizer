@@ -1,11 +1,16 @@
 #!/usr/bin/env bash
 # After every release: move the backend VM to the release tag. Run on the PC from Git Bash.
 #   bash scripts/vm_push.sh site-2026-27-gw07-decision
-# Streams the captures, handoffs and the per-capture artifacts the backend reads (the Top 100
-# evidence and the rotation tables) to the VM in one tar over SSH, then runs scripts/vm_sync.sh
-# there, which checks the tag out, refreshes the site data the backend reads, rebuilds the
-# image for the tag and restarts the two containers. Nothing here holds a secret: the host and
-# the key path come from the environment, with the defaults of the first VM.
+# First it runs the read-only layout preflight scripts/release/check_vm_layout.py on the VM
+# over SSH. A refusal stops the script there, before any remote write; see "VM data root
+# selection" in docs/backend_runbook.md. It then copies the preflight to ~/vm_check_layout.py,
+# which vm_sync.sh runs before and after its checkout.
+# Then it streams the captures, handoffs and the per-capture artifacts the backend reads (the
+# Top 100 evidence and the rotation tables) to the VM in one tar over SSH, and runs
+# scripts/vm_sync.sh there, which checks the tag out, refreshes the site data the backend
+# reads, rebuilds the image for the tag and restarts the two containers. Nothing here holds a
+# secret: the host and the key path come from the environment, with the defaults of the first
+# VM.
 set -euo pipefail
 TAG="${1:?release tag, for example site-2026-27-gw07-decision}"
 HOST="${SQUADOPT_VM_HOST:-squadopt@74.248.153.181}"

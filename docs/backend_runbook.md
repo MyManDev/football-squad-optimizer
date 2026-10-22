@@ -132,17 +132,27 @@ serves, so the preflight refuses and points here. This is a person's act on the 
 script performs it. A value written `<OWNER: ...>` is not recorded in the repository: read
 it from the VM before following the step, and do not guess it.
 
-**What selects the roots.** `deploy/compose.yaml` binds `/mnt/site`, `/mnt/snapshots` and
-`/mnt/handoffs` from `SQUADOPT_SITE_PATH`, `SQUADOPT_SNAPSHOT_PATH` and
-`SQUADOPT_HANDOFF_PATH`, and takes the image from `SQUADOPT_BACKEND_IMAGE`, all set in
-`~/squadopt/.env`. The `/mnt/artifacts` bind and `SQUADOPT_BACKEND_ARTIFACT_ROOT` come from
-`~/squadopt/compose.artifacts.yaml`, which is not in the repository; it names its artifact
-bind source as `<OWNER: a literal path in compose.artifacts.yaml, or a variable in
-~/squadopt/.env>`. That override also mounts the club-news source: `<OWNER: whether a
-package carries its own club-news source, and where>`. Because an override can also replace
-a base bind, the package served now is `<OWNER: current package directory, and the file that
-selects each of its four roots>`. The store (`SQUADOPT_STORE_PATH`) is not part of a package
-and stays as it is.
+**What selects the roots.** The restart in `vm_sync.sh` reads two Compose files,
+`deploy/compose.yaml` and the override `~/squadopt/compose.artifacts.yaml`, which is not in
+the repository, with variables from `~/squadopt/.env`. The base file binds `/mnt/site`,
+`/mnt/snapshots` and `/mnt/handoffs` from `SQUADOPT_SITE_PATH`, `SQUADOPT_SNAPSHOT_PATH` and
+`SQUADOPT_HANDOFF_PATH`, and takes the image from `SQUADOPT_BACKEND_IMAGE`. The override adds
+the `/mnt/artifacts` bind, sets `SQUADOPT_BACKEND_ARTIFACT_ROOT` and mounts the club-news
+fixture. Compose merges a service's volumes by their target, so a volume entry in the
+override for `/mnt/site`, `/mnt/snapshots` or `/mnt/handoffs` replaces the base bind, and the
+matching `.env` variable then selects nothing. Before step 1, read both files on the VM and
+record which one selects each mount; step 4 changes each root there and nowhere else. The
+package served now is `<OWNER: current package directory>`.
+
+| Mount | Selected by |
+| --- | --- |
+| `/mnt/site` | `<OWNER: SQUADOPT_SITE_PATH in ~/squadopt/.env, or an entry in compose.artifacts.yaml>` |
+| `/mnt/snapshots` | `<OWNER: SQUADOPT_SNAPSHOT_PATH in ~/squadopt/.env, or an entry in compose.artifacts.yaml>` |
+| `/mnt/handoffs` | `<OWNER: SQUADOPT_HANDOFF_PATH in ~/squadopt/.env, or an entry in compose.artifacts.yaml>` |
+| `/mnt/artifacts` | `<OWNER: a literal path in compose.artifacts.yaml, or a variable in ~/squadopt/.env>` |
+| club-news source | `<OWNER: whether a package carries its own club-news source, where, and which file names it>` |
+
+The store (`SQUADOPT_STORE_PATH`) is not part of a package and stays as it is.
 
 1. **Record the current selection; it is the rollback.**
 
@@ -169,9 +179,10 @@ and stays as it is.
    ```
 
 3. **Prepare the package**, `<PACKAGE>` below: `<OWNER: package directory for this
-   release>`. It is a directory that neither service mounts now, never the current package.
-   Give it the four roots the backend reads, filled from the same release the ordinary sync
-   would carry:
+   release>`. It is a directory that neither service mounts now, never the current package,
+   and it is written as an absolute path, because Compose resolves a relative bind source
+   against `deploy/`. Give it the four roots the backend reads, filled from the same release
+   the ordinary sync would carry:
 
    - `site/`: `rsync -a --delete ~/squadopt/repo/web/public/data/ <PACKAGE>/site/`, the copy
      `vm_sync.sh` makes into the ordinary `site/`;
@@ -189,12 +200,41 @@ and stays as it is.
    the PC, for example `find . -type f -print0 | sort -z | xargs -0 sha256sum` inside each,
    and stop on any difference.
 
-4. **Activate.** Change only the selection. In `~/squadopt/.env`, set
-   `SQUADOPT_SITE_PATH=<PACKAGE>/site`, `SQUADOPT_SNAPSHOT_PATH=<PACKAGE>/snapshots`,
-   `SQUADOPT_HANDOFF_PATH=<PACKAGE>/handoffs` and
-   `SQUADOPT_BACKEND_IMAGE=squadopt-backend:<tag>`. Point the artifact bind source at
-   `<PACKAGE>/artifacts` wherever it is named (above), and the club-news source as the
-   package requires. Then restart with the command `vm_sync.sh` uses, from the same
+4. **Activate.** Change only the selection, each root in the file that selects it, as
+   recorded in the table under "What selects the roots":
+
+   - the source of `/mnt/site`, `/mnt/snapshots`, `/mnt/handoffs` and `/mnt/artifacts`
+     becomes `<PACKAGE>/site`, `<PACKAGE>/snapshots`, `<PACKAGE>/handoffs` and
+     `<PACKAGE>/artifacts`, each changed where the table records it: a variable in
+     `~/squadopt/.env` or an entry in the override;
+   - the club-news source as the package requires;
+   - `SQUADOPT_BACKEND_IMAGE=squadopt-backend:<tag>` in `~/squadopt/.env`, the line
+     `vm_sync.sh` rewrites.
+
+   Leave `SQUADOPT_STORE_PATH` and the `SQUADOPT_BACKEND_*_ROOT` variables as they are.
+   Before any restart, resolve the new selection the way the preflight and the restart do,
+   from the same directory with the same arguments, and print only the image and the binds:
+
+   ```bash
+   cd ~/squadopt/repo
+   docker compose --env-file ~/squadopt/.env -f deploy/compose.yaml -f ~/squadopt/compose.artifacts.yaml \
+     config --format json | python3 -c '
+   import json, sys
+   services = json.load(sys.stdin)["services"]
+   for name in ("api", "worker"):
+       print(name, services[name]["image"])
+       for mount in services[name].get("volumes", []):
+           print("   ", mount["target"], mount.get("type"), mount.get("source"), "ro" if mount.get("read_only") else "rw")
+   '
+   ```
+
+   Both services must print the image `squadopt-backend:<tag>` and exactly one read-only bind
+   for each of `/mnt/site`, `/mnt/snapshots`, `/mnt/handoffs` and `/mnt/artifacts`, whose
+   source is `<PACKAGE>/site`, `<PACKAGE>/snapshots`, `<PACKAGE>/handoffs` and
+   `<PACKAGE>/artifacts`; `/mnt/store` keeps the source recorded in step 1. If the command
+   fails or any of these differs, do not restart: correct the file that selects that root and
+   run the check again, or put the selection back with the first two `cp` lines of step 6.
+   When the check passes, restart with the command `vm_sync.sh` uses, from the same
    directory:
 
    ```bash
@@ -214,9 +254,9 @@ and stays as it is.
    curl -s http://127.0.0.1:8000/api/v1/leagues/352490/capabilities; echo
    ```
 
-   Both services must show the four data mounts under `<PACKAGE>`, `/ready` must report
-   `"ready": true`, and `capture_snapshot_id` must be the release's decision capture. Any
-   other answer is a rollback.
+   Both services must show the four data mounts at the `<PACKAGE>` sources step 4 resolved.
+   `/ready` must report `"ready": true`, and `capture_snapshot_id` must be the release's
+   decision capture. Any other answer is a rollback.
 
 6. **Roll back** with the `STAMP` from step 1:
 
@@ -232,9 +272,14 @@ and stays as it is.
    Keep `<PACKAGE>` for inspection.
 
 **Returning to the ordinary sync.** `vm_push.sh` passes again only when all four roots are
-the ordinary folders. That is the same procedure with `~/squadopt` as `<PACKAGE>`: record
-the selection (step 1), fill the ordinary folders with exactly what the selected package
-serves and compare the checksums (step 3), then select them (step 4) and check (step 5).
+the ordinary folders. That is the same procedure with `$HOME/squadopt` as `<PACKAGE>`:
+record the selection (step 1), fill the ordinary folders with exactly what the selected
+package serves and compare the checksums (step 3), then select them, resolve them before
+the restart (step 4) and check (step 5). To confirm, run the preflight the way `vm_push.sh`
+does, from the publishing checkout, with the key and host it takes from `SQUADOPT_VM_KEY`
+and `SQUADOPT_VM_HOST`:
+`ssh -i <key> <host> 'python3 -' < scripts/release/check_vm_layout.py`. It must print that
+the configured and running data roots match the ordinary sync destinations.
 
 ### Persistent native Windows artifact selection
 
