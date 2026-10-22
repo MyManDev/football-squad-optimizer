@@ -6,6 +6,11 @@ computation, and the reading that decides #1006. It changes no stage of the week
 capture, no table, no member page and no contract, and it promotes nothing. Issues: #524,
 #1006 and #1140.
 
+Amended on the same day, on review and still before any GW8 data existed: a model call that
+was attempted and failed now rules out `no_statement_lost`, the receipt is required, every
+not-applied statement carries its cause, and the replay is held to the whole manifest and to
+the commit the table was exported at.
+
 ## Why this is written
 
 - **#524.** The owner's closing condition, given on #1168 on 19 October (comment
@@ -15,12 +20,15 @@ capture, no table, no member page and no contract, and it promotes nothing. Issu
   until the GW8 join-count record shows whether club-news statements are being lost. With
   none lost it closes. With losses its data-zone items 3, 7, 4 and 10 go to İbrahim
   (`@SpeedyV5`), who owns club news (`docs/architecture/ownership.md`).
-- **Nothing on develop reports these counts.** The exporter keeps the no-match, ambiguous
-  and unverifiable counts only in the attributes of the table it builds in memory
-  (`claims_unresolved` and `claims_unverifiable_citation` in
-  `src/squadopt/features/rotation_evidence.py`); the manifest does not carry them. Claims
-  dropped about another club's players and identical repeats are counted nowhere (#1006
-  item 4).
+- **Nothing on develop reports these counts.** The exporter keeps the no-match,
+  unknown-team, club-source and conflict counts (`claims_unresolved`) and the unverifiable
+  citations (`claims_unverifiable_citation` and `players_with_unverifiable_citation`) only in
+  the attributes of the table it builds in memory (`src/squadopt/features/rotation_evidence.py`).
+  The manifest carries the ambiguous count (`claims_ambiguous`), the placed claims and the
+  players with conflicting claims, and none of the others. Claims dropped about another club's
+  players and identical repeats are counted nowhere (#1006 item 4). A club whose model call
+  failed leaves nothing in the capture at all; only the acquisition receipt names it (#1006
+  item 10).
 - **The 21 October checkpoint** (#524 comment 6321111742) was a one-club scratch run, not the
   Friday run: capture `club-news-20261021T161737Z-ca7354f945c2`, one answered call, zero raw
   claims, eleven Liverpool documents; with the roster of
@@ -37,13 +45,15 @@ capture, no table, no member page and no contract, and it promotes nothing. Issu
 
 - Issues #524, #1006 and #1140 with every comment, and the owner's answers on #1168.
 - On develop at `ce0c6431`:
-  - `scripts/weekly_run.ps1`: the Friday launcher acquires news with no `--club` filter and
-    the default budget of three model calls, keeps the acquisition output in
+  - `scripts/weekly_run.ps1`: the Friday launcher refuses a checkout that is not clean or not
+    on develop, pulls develop, acquires news with no `--club` filter and the default budget
+    of three model calls, keeps the acquisition output in
     `data/logs/weekly/<run id>.club-news.log` and passes the capture to the weekly command as
     `--rotation-capture`. The run id has the form `2026-27-gw08-friday-<yyyyMMddTHHmmZ>`.
   - `src/squadopt/platform/club_news_acquire.py`: the receipt's `Capture`, `Raw claims` and
-    `Call budget` lines, and the coverage report's `Read refusal:` and `Coding refusal:`
-    lines (`src/squadopt/platform/club_news_coverage.py`).
+    `Call budget` lines; the coverage report's `Read refusal:` and `Coding refusal:` lines and
+    the coding stage's outcome lines (`src/squadopt/platform/club_news_coverage.py`); and the
+    four kinds of coding refusal in `code_week` (`src/squadopt/platform/club_news_provider.py`).
   - `src/squadopt/application/rotation_export.py` (`_inputs_from_capture` and `_export`),
     `src/squadopt/features/rotation_evidence.py` (`build_rotation_evidence_table` and
     `_resolved_claims`), `src/squadopt/data/claim_identity.py` (`resolve_claim_player`),
@@ -77,22 +87,25 @@ capture the GW8 publish carries, and its Markdown names the other run ids as not
 
 ## The command the owner runs
 
-After the Friday run has finished, from the publishing checkout, with nothing merged into it
-since the run:
+After the Friday run has finished, from the publishing checkout, still clean and still at the
+commit the run used (the launcher pulls develop when it starts; a pull after the run moves the
+checkout off that commit):
 
 ```powershell
 .venv\Scripts\python -m scripts.report_club_news_join_counts --club-news-log data\logs\weekly\<run id>.club-news.log --output data\logs\weekly\<run id>.join-counts.json
 ```
 
-It prints the record as JSON and writes the same bytes to the `--output` file, which must not
-exist yet; `data/logs/` is ignored by git, so the checkout stays clean for the next run. It
-exits 0. On any refusal it prints one `Refused: <reason>` line, writes nothing and exits 1;
-that line is posted in place of the record.
+`--club-news-log` is required: the receipt is the only record of which clubs' model calls
+failed. The reporter prints the record as JSON and writes the same bytes to the `--output`
+file, which must not exist yet; `data/logs/` is ignored by git, so the checkout stays clean
+for the next run. It exits 0. On any refusal it prints one `Refused: <reason>` line, writes
+nothing and exits 1; that line is posted in place of the record.
 
-The reporter rebuilds the rotation table with the code of the checkout it runs from. If the
-checkout has moved past the commit the rotation manifest names (`repository_commit`), the
-rebuilt table may differ and the reporter refuses. It is then run from a worktree at that
-commit, with the worktree's own code first on the path, as the launcher sets it:
+The reporter rebuilds the rotation table with the code of the checkout it runs from, so it
+refuses unless that checkout is clean and its HEAD is the commit the rotation manifest names
+(`repository_commit`). If the checkout has moved, or has local changes, it is run from a
+worktree at that commit, with the worktree's own code first on the path, as the launcher sets
+it:
 
 ```powershell
 git worktree add ..\squadopt-gw8-counts <repository_commit of the manifest>
@@ -110,17 +123,34 @@ else. It opens no network connection, calls no model, and writes only the `--out
 
 It rebuilds the rotation table from the two captures through the exporter's own functions
 (`_inputs_from_capture`, then `build_rotation_evidence_table` with the manifest's season,
-gameweek and deadline), and prints the record only when the rebuilt bytes hash to the
-manifest's `table_sha256`. The counts the manifest does not carry are taken from that rebuilt
-table, so they are the counts of the published table.
+gameweek and deadline), and holds the replay to what was published in three ways:
+
+- the rebuilt bytes must hash to the manifest's `table_sha256`, which binds every row;
+- the manifest rebuilt from the replay with the exporter's own writer and serialization must
+  equal the published manifest in every field but `generated_at_utc`, which binds every
+  attribute the manifest carries (`claims_coded`, `claims_ambiguous`,
+  `players_with_conflicting_claims`, `players_not_addressed`, `clubs_covered`,
+  `document_sha256s`, `response_sha256s` and the rest);
+- the checkout must be clean and at the manifest's `repository_commit`. The counts the
+  manifest does not carry (`claims_unresolved` apart from its ambiguous entry,
+  `claims_unverifiable_citation`, `players_with_unverifiable_citation`) are read from the
+  replay's attributes, and only this binds them to the published run: the replay then runs
+  the export's own code on the export's own captures.
 
 It refuses, naming the reason, when:
 
 - the manifest's `club_news_source_kind` is not `capture` (the fixture is not club news);
+- the checkout is not at the manifest's `repository_commit`, or has local changes;
 - the receipt names a different capture from the manifest's `club_news_snapshot_id`, or no
   capture, or more than one;
+- the receipt does not print its `Raw claims` line, its `Call budget` line and each of the
+  coding stage's four outcome lines exactly once (every acquisition that writes a capture
+  prints all of them), or an outcome line's count differs from the clubs it lists;
+- the clubs those four outcome lines name differ from the clubs the capture holds pages and
+  no answer for (`read_not_coded`);
 - the club-news capture was not completed before the decision capture;
-- the rebuilt table differs from the published one;
+- the rebuilt table differs from the published one, or the manifest rebuilt from it differs
+  from the published manifest;
 - its own reading of the responses disagrees with the exporter's (refused responses,
   own-club unverifiable citations, claims reaching the join);
 - the counts below do not add up, or `placed` differs from the table's observed rows or the
@@ -133,8 +163,8 @@ It refuses, naming the reason, when:
 
 The record's version is `club_news_join_counts_v1`. Its top level carries `record_version`,
 `protocol` (this file), `reporter` (the script), `repository_commit` and `repository_dirty`
-(the checkout the reporter ran from), and the manifest's `season`, `target_gameweek` and
-`deadline_timestamp_utc`.
+(the checkout the reporter ran from: the export's commit, and not dirty, in a printed record),
+and the manifest's `season`, `target_gameweek` and `deadline_timestamp_utc`.
 
 ### `inputs`
 
@@ -144,14 +174,16 @@ instant), `decision_capture_id` and `decision_captured_at_utc`, `rotation_table_
 `rotation_export_repository_commit` (the manifest's `repository_commit`), the manifest's
 `provider`, `model_identifier`, `model_version` and `prompt_sha256`, `registry_file` and
 `registry_sha256` (the registry read and the digest of its bytes), and `club_news_log_file`
-(the receipt's file name, or null when none was read).
+(the receipt's file name).
 
 ### `checks`
 
 Each is true in a printed record, because a false one refuses: `source_kind` (`capture`),
-`news_capture_precedes_decision_capture`, `replay_matches_published_table` with
-`replay_table_sha256`, and `claims_accounted` (the identities below). `log_capture_id_matches`
-and `log_raw_claims_match` are null when no receipt, or no `Raw claims` line, was read.
+`checkout_at_export_commit`, `news_capture_precedes_decision_capture`,
+`replay_matches_published_table` with `replay_table_sha256`, `replay_matches_manifest`,
+`claims_accounted` (the identities below), `log_capture_id_matches`, `log_raw_claims_match`
+and `log_outcomes_match_capture` (the four outcome lines name exactly the clubs in
+`read_not_coded`).
 
 ### `hosts` and `registered_pages`
 
@@ -198,12 +230,24 @@ state a publication time verifiably, the test the acquisition report calls a dat
 
 ### `acquisition_log`
 
-Read from the receipt, which PowerShell writes with a byte order mark; null when no receipt
-was read. `raw_claims_printed` from the `Raw claims    N;` line, `model_call_budget` and
-`model_calls_attempted` from the `Call budget   B; A attempted;` line, and the numbers of
-`Read refusal:` lines (`read_refusal_lines`) and `Coding refusal:` lines
-(`coding_refusal_lines`). The capture stores no call count (#1006 item 10), so
-`model_calls_attempted` comes from the receipt only.
+Read from the receipt, which PowerShell writes with a byte order mark.
+
+- `raw_claims_printed` from the `Raw claims    N;` line, `model_call_budget` and
+  `model_calls_attempted` from the `Call budget   B; A attempted;` line, and the numbers of
+  `Read refusal:` lines (`read_refusal_lines`) and `Coding refusal:` lines
+  (`coding_refusal_lines`). The capture stores no call count (#1006 item 10), so
+  `model_calls_attempted` comes from the receipt only.
+- `call_failed_clubs`, `budget_stopped_clubs`, `refused_before_call_clubs` and
+  `nothing_selected_clubs`, from the coding stage's four outcome lines, printed as
+  `<label>: N [<club>, <club>]` with the labels `Call attempted and failed`,
+  `Stopped by the call budget, no call attempted`, `Refused before a call was attempted` and
+  `No document selected for coding`. A club the capture holds pages and no answer for is in
+  exactly one of them, and no other club is in any.
+- Only `call_failed_clubs` names model calls that were made. `code_week` gives a club that
+  outcome when its call was attempted and did not give a usable answer: an answer refused
+  after it arrived (stopped at the token ceiling, not JSON, the wrong contract, a decline)
+  and a call that never answered (a timeout, a provider error) alike. The receipt's reason
+  text is not read, and the capture stores neither kind.
 
 ### `claims`
 
@@ -286,25 +330,68 @@ A **statement** is one raw claim. A statement is **lost** in one of two ways.
   reach the decision, and the record names the rule beside it.
 - `lost_unapplied`: it becomes a row with `stated_expected_absent` or `stated_rotation_risk`,
   the reader gives it no role and no double-gameweek reason, and its scope label is neither
-  `other_competition` nor `past`. A statement naming a day ("Saturday's Premier League
-  match"), one naming the player by his full name, a hedge, and a statement from a page whose
-  publication time cannot be verified all end here, under the shared labels `unspecified` and
-  `ambiguous` or with the scope flag withheld, and the record cannot tell them apart; that is
-  what items 3 and 7 are about. The two labels that show the statement names another
+  `other_competition` nor `past`. The two labels that show the statement names another
   competition or a past match are not counted. Other dispositions are not counted either: the
   rule gives them no role by its own declaration.
 
-`lost` = `lost_before_table` + `lost_unapplied`. The record's `loss` section carries these
-three counts with its `verdict` and `issue_1006`, which are:
+A statement on a page whose publication time the rule cannot use, a hedge, a statement naming
+a day ("Saturday's Premier League match") and one naming the player by his full name all end
+in `lost_unapplied`. They stay losses whatever the cause, as a claim set aside under a declared
+rule does above, and the record names the cause beside them. `lost_unapplied_by_cause` counts
+each under the first condition of the rule's role that it fails, tested in this order, so the
+four counts add up to `lost_unapplied`:
+
+- `publication_unverified`: the reader does not verify the page's publication time (the page
+  states none, as undated listing pages do, or the stated time does not recheck);
+- `publication_day_precision`: the page's publication is verified to the day only;
+- `scope_unverified`: the page is dated to the instant and the scope is not verified (a hedge,
+  a day name, a full name, a wording the scope rule does not read, or no single next match in
+  the gameweek). `lost_unapplied_scope_unverified_by_scope` counts these by the table's scope
+  label. Within it the labels `unspecified` and `ambiguous` are each shared by several of
+  those cases and cannot tell them apart, which is what item 3 is about;
+- `publication_not_before_fetch`: publication and scope are both verified at instant
+  precision and the rule still gives no role, which it does only for a page with no fetch
+  instant or one stating a publication instant after its fetch.
+
+Publication is tested first because the exporter verifies a next-match scope only from an
+instant publication time, so a page without one never verifies its scope either. The order
+keeps `scope_unverified`, where items 3 and 7 act, to pages dated to the instant. A loss under
+`publication_unverified` or `publication_day_precision` is one that items 3 and 7 do not
+address; it still counts toward the verdict, because the owner's rule routes the items on any
+loss and does not ask which item would have prevented it, and the record's Markdown says so
+when such a loss is counted.
+
+`lost` = `lost_before_table` + `lost_unapplied`. Two further counts name answers whose
+statements, if they hold any, cannot be counted at all:
+
+- `responses_without_claims_list`: stored responses refused whole that hold no readable list
+  of claims (`refused_without_claims_list`);
+- `calls_attempted_and_failed`: the clubs in `call_failed_clubs`. Whatever the model answered
+  for such a club, if it answered, was dropped before any capture.
+
+A failed call is read as a loss, the same way as a stored response without a readable list of
+claims: in both the model was asked and what it said cannot be counted, and they differ only
+in whether the answer was refused before or after it was stored. That is item 4 (the record
+cannot show what happened to every statement the model returned) and item 10 (the capture
+stores no call counts). A call that never answered cannot be told apart from one whose answer
+was refused, so both are read alike. A club stopped by the call budget, refused before its
+call, or with no document selected had no call, so no statement of it existed to lose; it is
+named in `acquisition_log` and does not enter the verdict.
+
+The record's `loss` section carries `lost_before_table`, `lost_unapplied`,
+`lost_unapplied_by_cause`, `lost_unapplied_scope_unverified_by_scope`, `lost`,
+`responses_without_claims_list` and `calls_attempted_and_failed`, with its `verdict` and
+`issue_1006`, which are:
 
 | `verdict` | When | `issue_1006` | What follows |
 | --- | --- | --- | --- |
-| `no_raw_claims` | `raw` is 0 and no refused response lacks a readable claims list | `unanswered` | No statement existed to lose, so the record cannot answer the question, as on 21 October. #1006 neither closes nor moves on this record; it stays open and the next step is the owner's. |
-| `no_statement_lost` | `raw` is at least 1, `lost` is 0, and no refused response lacks a readable claims list | `close` | #1006 closes, by the owner's decision of 19 October. |
-| `statements_lost` | `lost` is at least 1, or a refused response lacks a readable claims list (its statements cannot be counted, which is the defect item 4 names) | `route_items_3_7_4_10` | Items 3, 7, 4 and 10 of #1006 go to İbrahim. The record says how many statements were lost in each place; it does not rank the items. |
+| `no_raw_claims` | `raw` is 0, `responses_without_claims_list` is 0 and `calls_attempted_and_failed` is 0 | `unanswered` | No statement existed to lose, so the record cannot answer the question, as on 21 October. #1006 neither closes nor moves on this record; it stays open and the next step is the owner's. |
+| `no_statement_lost` | `raw` is at least 1, `lost` is 0, `responses_without_claims_list` is 0 and `calls_attempted_and_failed` is 0 | `close` | #1006 closes, by the owner's decision of 19 October. |
+| `statements_lost` | `lost` is at least 1, or `responses_without_claims_list` is at least 1, or `calls_attempted_and_failed` is at least 1 | `route_items_3_7_4_10` | Items 3, 7, 4 and 10 of #1006 go to İbrahim. The record says how many statements were lost in each place and for what cause, and which clubs' calls failed; it does not rank the items. |
 
-There is no threshold: one lost statement routes the items. The reading is made once, from the
-one record of the GW8 decision run, and is not repeated with another capture.
+There is no threshold: one lost statement, one response without a readable list of claims or
+one failed call routes the items. The reading is made once, from the one record of the GW8
+decision run, and is not repeated with another capture.
 
 It decides nothing else: not whether stated news predicts who plays, not whether any count is
 good or bad, not a change to the coding contract or the artifact contract, and not #1140's live
@@ -344,5 +431,8 @@ record's Markdown as an addition made after the data, and does not enter the ver
 ## Checked before this was frozen
 
 The reporter, `scripts/report_club_news_join_counts.py`, was run only on synthetic captures
-written and exported by the real code, in its unit tests. No real capture was read: none is on
-the machine this was written on.
+written and exported by the real code, in its unit tests, with receipts whose coding stage is
+printed by the acquisition's own formatter. They include a failed call beside a clean answer
+and beside an empty one, a club stopped by the budget, statements not applied for each cause,
+and a replay whose counts differ from the manifest while its rows do not. No real capture was
+read: none is on the machine this was written on.
