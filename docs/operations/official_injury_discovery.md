@@ -71,12 +71,12 @@ merely because the league links to them. A Details link must be an absolute addr
 with no `.` or `..` segment, in printable ASCII. A two-part `listing/<name>` or
 `category/<name>` route below the registered path is dropped by the club reader's
 own rule in [club news sources](../club_news_sources.md), so it is never requested.
-The eligible links join that reader's priority order. A Details link has no label,
-so `article_priority` reads its whole path, the registered part included, and it
-follows the index's own links within a priority. The existing robots, terms,
-ten-article host budget, source timestamp and claim validation rules remain in
-force. Central injury descriptions themselves neither authorize an absence nor
-change minutes.
+The eligible links join that reader's priority order. For a Details link,
+`article_priority` reads the whole path, the registered part included, and no
+label, and the link follows the index's own links within a priority. The existing
+robots, terms, ten-article host budget, source timestamp and claim validation
+rules remain in force. Central injury descriptions themselves neither authorize an
+absence nor change minutes.
 
 Before coding, explicit women's, youth, commercial, international-roundup and
 match-report pages are withheld. A selected article takes precedence over its
