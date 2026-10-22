@@ -121,18 +121,48 @@ HTTP `Last-Modified` or an invented time. Its closed sources are `html_publicati
 `consistent_publication_fields`. The date, precision, source and digest are retained. A
 verified day-only date remains day-only and cannot authorize an exact-time intervention.
 
+A JSON-LD article's `datePublished` dates the fetched page when the article's address
+names that page. The address is the article's `url`, else its `mainEntityOfPage` (or that
+object's `@id`), else its `@id`. One dated article without an address counts as the
+page's own; a second makes the metadata invalid. Page identities compare the scheme and
+host without case and the path and query exactly, and drop the fragment. Two aliases
+also count, and both rest on declarations inside the page's `<head>`:
+
+- **The ordinary canonical alias.** The head declares one canonical identity on the
+  fetched page's scheme, host and port, and the article's address names it. The canonical
+  may sit at any path on that host, the site root included. So a fetched address with a
+  query, or with a trailing slash the canonical lacks, takes the canonical's date.
+- **The language alias.** The article's address is `/<lang>` followed by the fetched
+  page's path, as `/en-gb/news/story` for `/news/story`. It needs three declarations. The
+  page's `<html lang>` is two letters with an optional two-letter region, read in lower
+  case against `[a-z]{2}(-[a-z]{2})?`, so `lang="en-GB"` admits `/en-gb/...` and not
+  `/en-GB/...`. The head canonical names the fetched page itself. A head `hreflang`
+  alternate for that language names the fetched page too.
+
+Both aliases are refused for a canonical on another host, scheme or port; for a
+protocol-relative (`//host/path`) or document-relative (`story`, `../story`) href, while
+a root-relative `/path` resolves on the fetched page's origin; for two canonicals naming
+different pages, while two naming the same page count as one; for a canonical outside the
+head, the body included; and for an article addressed to any third page. A refused alias
+adds no date, so a page with no other publication field stays unverified with the one
+reason `publication_not_declared`. An admitted alias date still meets the page's other
+publication fields, and a different value is a `publication_metadata_conflict`. The
+recorded source stays `jsonld_datePublished`, so the record does not show that a date came
+through an alias. A day-only `datePublished` stays day-only.
+
 A single article's JSON-LD WebPage identifier may replace the page path's slashes with
 hyphens. This exact identifier form is admitted only when the page's canonical and Open
 Graph URLs both identify the fetched page, the Open Graph and article headlines agree,
-and every displayed datetime equals the explicit `datePublished` instant. A query string,
-another article, a missing or conflicting declaration, or an explicit article URL using
-this malformed form is refused. The displayed time only corroborates the JSON-LD field;
+and at least one displayed datetime, and every one on the page, equals the explicit
+`datePublished` instant. A query string, another article, a page with no displayed
+datetime, a missing or conflicting declaration, or an explicit article URL using this
+malformed form is refused. The displayed time only corroborates the JSON-LD field;
 an unlabelled time on its own still establishes no publication date. The held bytes and
 `jsonld_datePublished` source remain unchanged.
 These corroborating declarations may be streamed directly under the HTML body only when
 the head declares none of them. Nested article content cannot supply them, and streamed
-metadata cannot override a head declaration. Ordinary canonical aliases still require
-the head declaration.
+metadata cannot override a head declaration. The ordinary canonical alias and the
+language alias still require the head declaration.
 
 The artifact reader validates these fields' shape. The manager-word consumer independently
 resolves the citation, recomputes source publication and scope, and checks the decision
