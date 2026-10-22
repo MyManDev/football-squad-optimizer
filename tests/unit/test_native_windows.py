@@ -22,12 +22,12 @@ from squadopt.planning.native_highs import native_window_executor, solve_window_
 from squadopt.platform.native_windows import execute_native_window
 
 
-def _model():
+def _model(offset=7):
     model = cp_model.CpModel()
     x = model.new_int_var(0, 5, "x")
     y = model.new_int_var(0, 5, "y")
     model.add(x + y <= 6)
-    model.maximize(3 * x + y + 7)
+    model.maximize(3 * x + y + offset)
     return model, x, y
 
 
@@ -199,6 +199,34 @@ def test_a_fallback_after_a_native_timeout_plans_what_cp_sat_alone_plans(
     ):
         assert actual.diagnostics[key] == expected.diagnostics[key], key
     _assert_same_decisions(actual, expected)
+
+
+@pytest.mark.parametrize("drift", [6.17e-06, 4e-05, 0.49, -0.49])
+def test_a_witness_is_accepted_on_its_exact_integer_objective(drift):
+    """HiGHS reports its objective and bound as floats. At the planner's scale the #1147
+    record shows them up to 6.17e-06 away from the exact value; on an integer objective
+    anything within half a unit names the same integer, so the exact value is what counts."""
+
+    exact = 173_442_000
+    model, x, y = _model(offset=exact - 16)
+    answer = _answer(objective=exact + drift, bound=exact + drift)
+    with native_window_executor(lambda packet, seconds: answer):
+        result, status, details = solve_window_model(model, _solver(), solve, weeks=5)
+    assert details["selected"] is True, details.get("fallback_reason")
+    assert status == cp_model.OPTIMAL
+    assert (result.value(x), result.value(y), result.objective_value) == (5, 1, exact)
+
+
+@pytest.mark.parametrize("drift", [0.5, -0.5, 1.0])
+def test_a_bound_half_a_unit_away_does_not_prove_the_witness(drift):
+    exact = 173_442_000
+    model, _, _ = _model(offset=exact - 16)
+    answer = _answer(objective=exact, bound=exact + drift)
+    with native_window_executor(lambda packet, seconds: answer):
+        result, status, details = solve_window_model(model, _solver(), solve, weeks=3)
+    assert details["selected"] is False
+    assert "bound" in details["fallback_reason"]
+    assert status == cp_model.OPTIMAL and result.objective_value == exact
 
 
 def test_native_translation_handles_enforcement_maximum_and_element():

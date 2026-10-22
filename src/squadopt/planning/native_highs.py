@@ -417,7 +417,15 @@ def _wire_model(milp: Milp, seed: int) -> dict[str, Any]:
     }
 
 
-def _checked_values(milp: Milp, result: Mapping[str, Any]) -> list[int]:
+def _checked_values(milp: Milp, result: Mapping[str, Any]) -> tuple[list[int], int]:
+    """The witness's CP-SAT variable values and its exact integer objective, or a refusal.
+
+    Acceptance reads the exact objective of the rounded witness, never HiGHS's own float
+    objective: at the planner's scale (about 10**8 units) that float drifted from the
+    exact value by up to 6.17e-06 in the #1147 record. The proof is the dual bound lying
+    within half a unit of the exact value, which on an integer objective is equality.
+    """
+
     if result.get("version") != NATIVE_VERSION or result.get("threads") != 1:
         raise ValueError("The native solver version or thread count is wrong.")
     if result.get("optimal") is not True:
@@ -441,15 +449,19 @@ def _checked_values(milp: Milp, result: Mapping[str, Any]) -> list[int]:
             row.upper is not None and value > row.upper
         ):
             raise ValueError("A native solution violates an exact integer row.")
-    objective = milp.objective_offset + sum(
-        coefficient * rounded[index] for index, coefficient in milp.objective.items()
+    # ``_wire_model`` refused any objective whose coefficients or offset are not whole
+    # numbers, so this sum is computed in Python integers, exactly.
+    exact = int(milp.objective_offset) + sum(
+        int(coefficient) * rounded[index] for index, coefficient in milp.objective.items()
     )
     reported, bound = float(result["objective"]), float(result["bound"])
     if not math.isfinite(reported) or not math.isfinite(bound):
         raise ValueError("The native optimum or bound is not finite.")
-    if abs(reported - objective) > 1e-5 or abs(bound - objective) >= 0.5:
-        raise ValueError("The native objective or bound disagrees with its integer witness.")
-    return rounded[: milp.variables]
+    if abs(bound - exact) >= 0.5:
+        raise ValueError("The native bound does not prove the integer witness optimal.")
+    if abs(reported - exact) >= 0.5:
+        raise ValueError("The native objective disagrees with its integer witness.")
+    return rounded[: milp.variables], exact
 
 
 def solve_window_model(
@@ -485,7 +497,7 @@ def solve_window_model(
         milp = export_milp(model.proto)
         packet = _wire_model(milp, int(solver.parameters.random_seed))
         response = execute(packet, wall)
-        values = _checked_values(milp, response)
+        values, exact = _checked_values(milp, response)
         fixed = model.clone()
         fixed.clear_hints()  # type: ignore[no-untyped-call]
         for index, value in enumerate(values):
@@ -498,7 +510,7 @@ def solve_window_model(
         verification_work = float(certificate.response_proto.deterministic_time)
         if raw != cp_model.OPTIMAL:
             raise ValueError("The native witness failed verification in the original CP model.")
-        if abs(float(certificate.objective_value) - float(response["objective"])) > 1e-5:
+        if abs(float(certificate.objective_value) - exact) >= 0.5:
             raise ValueError("The original CP objective disagrees with the native witness.")
         details["selected"] = True
         return certificate, int(cp_model.OPTIMAL), details

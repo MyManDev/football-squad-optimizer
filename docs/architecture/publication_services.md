@@ -36,15 +36,18 @@ searches. The API advice worker binds the same executor per request. Its pinned 
 1.15.1 driver runs in a separate interpreter because the Linux libraries shipped by
 OR-Tools and highspy cannot be loaded together. The planner checks the rounded native
 solution against every exact integer MILP row and then the original CP-SAT model. Only
-a proved optimum is accepted. The native attempt is a phase of its own, bounded by
-the primary's per-phase wall ceiling, as every phase already is. Unsupported models,
-failed children and unproved answers fall back to CP-SAT with the primary's own
-unchanged wall ceiling and deterministic budget, so a fallback plans what CP-SAT alone
-would have planned; a window whose native attempt and fallback both reach the ceiling
-can therefore spend two ceilings on its primary search. A clock-limited native answer
-does not seed fallback. One-week solves, hold probes and the deterministic tie-break
-retain CP-SAT. The model, strategies and configured ceilings are unchanged. Published
-diagnostics name the selected primary backend and any native fallback reason.
+a proved optimum is accepted: the dual bound HiGHS reports must lie within half a unit
+of the witness's exact integer objective, which is computed from the rounded witness
+and never read from HiGHS's floating-point objective. The native attempt is a phase of
+its own, bounded by the primary's per-phase wall ceiling, as every phase already is.
+Unsupported models, failed children and unproved answers fall back to CP-SAT with the
+primary's own unchanged wall ceiling and deterministic budget, so a fallback plans what
+CP-SAT alone would have planned; a window whose native attempt and fallback both reach
+the ceiling can therefore spend two ceilings on its primary search. A clock-limited
+native answer does not seed fallback. One-week solves, hold probes and the
+deterministic tie-break retain CP-SAT. The model, strategies and configured ceilings
+are unchanged. Published diagnostics name the selected primary backend and any native
+fallback reason.
 
 The offline element-to-code translation and `CapturePicksProvider` now live in
 `application.capture_entries`, and callers import them from there;
