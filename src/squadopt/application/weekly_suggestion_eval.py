@@ -223,6 +223,46 @@ def published_advice_captures(league_dir: Path) -> dict[tuple[int, int], str]:
     return carried
 
 
+class _AnotherLeaguesWeek(Exception):
+    """Every record of the member-week belongs to another league: not this league's week.
+
+    Not a :class:`DataError`, so :func:`evaluate_week` cannot report it as an unavailable
+    week; the walk that asked for it leaves the week out.
+    """
+
+
+def _check_record_identity(
+    record: Mapping[str, Any], *, season: str, gameweek: int, entry_id: int, league_id: int
+) -> None:
+    if (
+        record.get("contract_version") != MEMBER_ADVICE_RECORD_CONTRACT_VERSION
+        or record.get("season") != season
+        or _identifier(record.get("gameweek")) != gameweek
+        or _identifier(record.get("entry_id")) != entry_id
+        or _identifier(record.get("league_id")) != league_id
+        or record.get("player_id_space") != "fpl_element_code"
+    ):
+        raise SuggestionEvaluationError("Record identity does not match the requested member.")
+
+
+def _another_leagues_record(
+    record: Mapping[str, Any], *, season: str, gameweek: int, entry_id: int, league_id: int
+) -> bool:
+    """Whether ``record`` is a sound record of this member-week for a league not ``league_id``.
+
+    Only a record sound in every other identity belongs to the league it names. One naming no
+    league, or wrong in any other identity, belongs to no other league and stays refused.
+    """
+    try:
+        named = _identifier(record.get("league_id"))
+        _check_record_identity(
+            record, season=season, gameweek=gameweek, entry_id=entry_id, league_id=named
+        )
+    except SuggestionEvaluationError:
+        return False
+    return named != league_id
+
+
 def select_record(
     root: Path,
     *,
@@ -232,6 +272,7 @@ def select_record(
     deadline_utc: str,
     published: PublishedCaptures | None = None,
     league_id: int = SUPPORTED_LEAGUE_ID,
+    other_leagues_absent: bool = False,
 ) -> dict[str, Any] | None:
     """Select the recorded advice for one member-week, checking both clocks and all identities.
 
@@ -248,21 +289,27 @@ def select_record(
     :func:`publish_suggestion_histories` requires the map.
 
     An unreadable candidate is refused instead of silently falling back to an older one.
+
+    A record's path names no league, so a member of two leagues has one directory per week
+    for both. With ``other_leagues_absent`` a sound record of another league is absent
+    rather than refused, and a week whose records are all another league's raises
+    :class:`_AnotherLeaguesWeek`. Without it, another league's record is refused as before.
     """
     _identifier(league_id)
     deadline = as_instant(normalize_utc_timestamp(deadline_utc, label="deadline_utc"))
     candidates: list[tuple[datetime, str, dict[str, Any]]] = []
-    for capture in recorded_captures(root, season, gameweek, entry_id):
+    captures = recorded_captures(root, season, gameweek, entry_id)
+    others = 0
+    for capture in captures:
         record = load_member_advice_record(root, season, gameweek, entry_id, capture.snapshot_id)
-        if (
-            record.get("contract_version") != MEMBER_ADVICE_RECORD_CONTRACT_VERSION
-            or record.get("season") != season
-            or _identifier(record.get("gameweek")) != gameweek
-            or _identifier(record.get("entry_id")) != entry_id
-            or _identifier(record.get("league_id")) != league_id
-            or record.get("player_id_space") != "fpl_element_code"
+        if other_leagues_absent and _another_leagues_record(
+            record, season=season, gameweek=gameweek, entry_id=entry_id, league_id=league_id
         ):
-            raise SuggestionEvaluationError("Record identity does not match the requested member.")
+            others += 1
+            continue
+        _check_record_identity(
+            record, season=season, gameweek=gameweek, entry_id=entry_id, league_id=league_id
+        )
         stamp = record.get("generated_at_utc")
         if not isinstance(stamp, str):
             raise SuggestionEvaluationError("Recorded publication time is missing.")
@@ -277,6 +324,8 @@ def select_record(
                     continue
                 raise
             candidates.append((stamped, capture.snapshot_id, record))
+    if captures and others == len(captures):
+        raise _AnotherLeaguesWeek
     if not candidates:
         return None
     if published is not None:
@@ -464,6 +513,7 @@ def evaluate_week(
     selected_records: dict[tuple[int, int], dict[str, Any]] | None = None,
     published: PublishedCaptures | None = None,
     league_id: int = SUPPORTED_LEAGUE_ID,
+    other_leagues_absent: bool = False,
 ) -> WeekReview:
     base: dict[str, Any] = {"gameweek": gameweek, "deadline_utc": deadline_utc}
     try:
@@ -475,6 +525,7 @@ def evaluate_week(
             entry_id=entry_id,
             deadline_utc=deadline_utc,
             published=published,
+            other_leagues_absent=other_leagues_absent,
         )
         if record is None:
             return WeekReview(**base, status="unavailable", reason="no_pre_deadline_record")
@@ -596,12 +647,16 @@ def review_member_weeks(
     selected_records: dict[tuple[int, int], dict[str, Any]] | None = None,
     published: PublishedCaptures | None = None,
     read_capture: Callable[[Path, str], CapturedSnapshot] | None = None,
+    other_league_weeks: set[tuple[int, int]] | None = None,
 ) -> dict[int, tuple[WeekReview, ...]]:
     """Review every recorded week of every member, newest gameweek first, from evidence only.
 
     This is the body the publisher serializes, so the document and any later reading of the
     same weeks are the same reviews rather than two walks that could drift apart.
     ``published`` is passed to :func:`select_record` for every week.
+
+    A week whose records all belong to another league is not one of this league's weeks and
+    is left out; ``other_league_weeks``, when given, receives each such ``(entry_id, week)``.
     """
     _identifier(league_id)
     if not re.fullmatch(r"\d{4}-\d{2}", season):
@@ -633,20 +688,25 @@ def review_member_weeks(
             week = int(directory.name[2:])
             if week not in deadlines:
                 weeks.append(WeekReview(week, "unavailable", "missing_deadline"))
-            else:
-                weeks.append(
-                    evaluate_week(
-                        record_root,
-                        league_id=league_id,
-                        season=season,
-                        gameweek=week,
-                        entry_id=entry_id,
-                        deadline_utc=deadlines[week],
-                        captures=captures,
-                        selected_records=selected_records,
-                        published=published,
-                    )
+                continue
+            try:
+                reviewed = evaluate_week(
+                    record_root,
+                    league_id=league_id,
+                    season=season,
+                    gameweek=week,
+                    entry_id=entry_id,
+                    deadline_utc=deadlines[week],
+                    captures=captures,
+                    selected_records=selected_records,
+                    published=published,
+                    other_leagues_absent=True,
                 )
+            except _AnotherLeaguesWeek:
+                if other_league_weeks is not None:
+                    other_league_weeks.add((entry_id, week))
+                continue
+            weeks.append(reviewed)
         reviews[entry_id] = tuple(weeks)
     return reviews
 
@@ -923,6 +983,7 @@ def publish_suggestion_histories(
     the member was told only when its record is the capture that tree names.
     """
     selected_records: dict[tuple[int, int], dict[str, Any]] = {}
+    other_league_weeks: set[tuple[int, int]] = set()
     reviews = review_member_weeks(
         record_root=record_root,
         snapshot_root=snapshot_root,
@@ -933,6 +994,7 @@ def publish_suggestion_histories(
         selected_records=selected_records,
         published=published,
         read_capture=read_capture,
+        other_league_weeks=other_league_weeks,
     )
     # Validate the whole replacement before writing the first member. An incomplete
     # record store must not turn a previously published week into a week that vanished.
@@ -946,7 +1008,15 @@ def publish_suggestion_histories(
         if old.get("entry_id") != entry_id or old.get("league_id") != league_id:
             raise SuggestionEvaluationError(f"History identity does not match {previous}.")
         old_weeks = {_identifier(row["gameweek"]) for row in old["weeks"]}
-        dropped = sorted(old_weeks - {week.gameweek for week in reviews[entry_id]})
+        # A history written before the walk left out other leagues' weeks shows each of them
+        # without advice. Withdrawing such a row loses no record; a row naming advice stays.
+        withdrawn = {
+            row["gameweek"]
+            for row in old["weeks"]
+            if row.get("advice_snapshot_id") is None
+            and (entry_id, row["gameweek"]) in other_league_weeks
+        }
+        dropped = sorted(old_weeks - withdrawn - {week.gameweek for week in reviews[entry_id]})
         if dropped:
             raise SuggestionEvaluationError(
                 f"Entry {entry_id} history would drop gameweeks {dropped}; restore the records."

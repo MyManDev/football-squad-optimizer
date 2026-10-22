@@ -27,8 +27,15 @@ members. Entry/capture baseline recording for additional leagues remains work in
 - Reject ambiguous or corrupt evidence instead of substituting an older result.
 - Show only weeks with an actual member record directory. An empty archive is an
   empty history; no earlier recommendations are reconstructed or solved again.
+- A record's path names no league, so a member of two leagues has one directory per week
+  for both. Each league's history reads only its own records there: a week whose records
+  are all another league's is not shown, and a week both leagues recorded is selected from
+  this league's records. A record counts as another league's only when it is sound for the
+  member-week in every other identity; an unreadable record, or one naming no league, is
+  refused as before.
 - Before replacing any history, refuse a same-season publication that would drop a week
-  already shown for a member. Restore the missing records before retrying.
+  already shown for a member. Restore the missing records before retrying. A row shown
+  without advice for a week whose records are all another league's is withdrawn instead.
 - The archive records publisher output. It does not establish that a member viewed
   the page, followed the suggestion, or obtained a causal benefit from it.
 
