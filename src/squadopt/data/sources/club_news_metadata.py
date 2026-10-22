@@ -1,10 +1,17 @@
 """Read publication facts from held source bytes, without changing quoted text.
 
 Only explicit publication fields are admitted. An article's JSON-LD may identify the
-page's single, same-origin canonical URL declared in its head. A language prefix also
-needs the page's own language and matching hreflang declaration. Transport Last-Modified,
-fetch time, unlabelled dates and dateModified are not publication facts. Multiple
-conflicting fields, multi-item feeds and malformed metadata remain unverified.
+fetched page, or the page's single, same-origin canonical URL declared in its head at any
+path on that host. A language prefix also needs the page's own language, a head canonical
+naming the fetched page and a matching hreflang declaration. A single article's WebPage
+identifier that writes the page path's slashes as hyphens counts only when the canonical
+and Open Graph URLs name the fetched page, the headlines agree and at least one displayed
+time, and every one, equals the instant; those declarations may be streamed directly under
+the body only when the head has none. A canonical on another origin, a protocol-relative
+or document-relative one, two different ones, one outside the head and an article
+addressed to a third page date nothing. Transport Last-Modified, fetch time, unlabelled
+dates and dateModified are not publication facts. Multiple conflicting fields, multi-item
+feeds and malformed metadata remain unverified.
 """
 
 import hashlib
