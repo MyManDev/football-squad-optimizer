@@ -254,6 +254,53 @@ def test_a_second_league_walk_keeps_the_weeks_the_baseline_store_holds(tmp_path:
     assert review.review_member_weeks(**walk)[101] == ()
 
 
+def test_a_baseline_directory_keeps_its_week_beside_another_leagues_record(
+    tmp_path: Path,
+) -> None:
+    """A baseline directory whose record never landed still names a week of every league,
+    even when the legacy archive holds only another league's record for that week."""
+    records, baselines = tmp_path / "records", tmp_path / "baselines"
+    publish_for(records, gameweek=3, entry_id=101)
+    day = DEADLINES[4][:10]
+    record_member_advice(
+        baselines,
+        _baseline(
+            gameweek=4,
+            entry_id=101,
+            captured=f"{day}T06:00:00Z",
+            published=f"{day}T07:00:00Z",
+            name="capture-b",
+            digest="b" * 64,
+        ),
+    )
+    (baselines / SEASON / "gw03" / "entry-101").mkdir(parents=True)
+    anchor = capture_with(
+        tmp_path / "snapshots", events={3: True, 4: True}, actuals={101: {3: 18, 4: 25}}
+    )
+    walk = dict(
+        record_root=records,
+        snapshot_root=tmp_path / "snapshots",
+        as_of_snapshot=anchor,
+        season=SEASON,
+        league_id=755941,
+        entry_ids=[101],
+        published={(101, 4): "capture-b"},
+    )
+    found: set[tuple[int, int]] = set()
+    weeks = review.review_member_weeks(
+        **walk, baseline_record_root=baselines, other_league_weeks=found
+    )[101]
+    assert [(week.gameweek, week.status) for week in weeks] == [
+        (4, "available"),
+        (3, "unavailable"),
+    ]
+    assert weeks[1].reason == "no_pre_deadline_record"
+    assert found == set()
+    # Without the baseline store the only record of week 3 is another league's.
+    assert review.review_member_weeks(**walk, other_league_weeks=found)[101] == ()
+    assert found == {(101, 3)}
+
+
 def snapshot(
     root: Path,
     *,
