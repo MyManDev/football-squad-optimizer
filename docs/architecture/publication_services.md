@@ -32,21 +32,23 @@ request's capture ID, archive and handoff paths, season and target gameweek. It 
 refuses to substitute `render_member` for an arbitrary callable.
 
 Both mapper modes bind the native window executor for three- and five-week primary
-searches. The API advice worker binds the same executor per request. Its pinned HiGHS
-1.15.1 driver runs in a separate interpreter because the Linux libraries shipped by
-OR-Tools and highspy cannot be loaded together. The planner checks the rounded native
-solution against every exact integer MILP row and then the original CP-SAT model. Only
-a proved optimum is accepted: the dual bound HiGHS reports must lie within half a unit
-of the witness's exact integer objective, which is computed from the rounded witness
-and never read from HiGHS's floating-point objective. The native attempt is a phase of
-its own, bounded by the primary's per-phase wall ceiling, as every phase already is.
-Unsupported models, failed children and unproved answers fall back to CP-SAT with the
-primary's own unchanged wall ceiling and deterministic budget, so a fallback plans what
-CP-SAT alone would have planned; a window whose native attempt and fallback both reach
-the ceiling can therefore spend two ceilings on its primary search. A clock-limited
-native answer does not seed fallback. One-week solves, hold probes and the
-deterministic tie-break retain CP-SAT. The model, strategies and configured ceilings
-are unchanged.
+searches, unless the caller passes `native_windows=False`: then nothing is bound and
+every window search runs on CP-SAT alone, as in a comparison build with
+`scripts.build_league_site --cp-sat-windows`. The API advice worker binds the same
+executor per request. Its pinned HiGHS 1.15.1 driver runs in a separate interpreter
+because the Linux libraries shipped by OR-Tools and highspy cannot be loaded together.
+The planner checks the rounded native solution against every exact integer MILP row and
+then the original CP-SAT model. Only a proved optimum is accepted: the dual bound HiGHS
+reports must lie within half a unit of the witness's exact integer objective, which is
+computed from the rounded witness and never read from HiGHS's floating-point objective.
+The native attempt is a phase of its own, bounded by the primary's per-phase wall
+ceiling, as every phase already is. Unsupported models, failed children and unproved
+answers fall back to CP-SAT with the primary's own unchanged wall ceiling and
+deterministic budget, so a fallback plans what CP-SAT alone would have planned; a window
+whose native attempt and fallback both reach the ceiling can therefore spend two
+ceilings on its primary search. A clock-limited native answer does not seed fallback.
+One-week solves, hold probes and the deterministic tie-break retain CP-SAT. The model,
+strategies and configured ceilings are unchanged.
 
 No published document names the backend: a window document still carries only
 `solver_status` and `optimality_gap` from the search. The operator reads it instead.
@@ -57,6 +59,8 @@ and window length under `leagues.<id>.window_solvers` in its receipt and as one
 `tick.week.league.window_solver` run-log event each; the API worker adds the same rows
 as `window_solvers` on the job's terminal log event. The weekly preflight starts the
 child once and refuses the week, before any capture, unless it loads highspy 1.15.1.
+`scripts.build_league_site` makes the same check before it solves and prints the same rows
+per member after the build.
 
 The offline element-to-code translation and `CapturePicksProvider` now live in
 `application.capture_entries`, and callers import them from there;

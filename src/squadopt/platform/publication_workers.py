@@ -5,7 +5,7 @@ import multiprocessing
 import pickle
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from concurrent.futures import Executor, ProcessPoolExecutor
-from contextlib import contextmanager
+from contextlib import AbstractContextManager, contextmanager, nullcontext
 from io import BytesIO
 from pathlib import Path
 from types import MappingProxyType
@@ -39,6 +39,9 @@ from squadopt.planning.native_highs import native_window_executor
 from squadopt.platform.native_windows import execute_native_window
 
 _WORKER_CONTEXT: dict[str, Any] = {}
+#: Whether this process's renders bind the native window executor. Kept apart from
+#: ``_WORKER_CONTEXT``, which is passed to ``render_member`` as its keyword arguments.
+_WORKER_OPTIONS: dict[str, bool] = {"native_windows": True}
 
 
 def _worker_init(
@@ -51,7 +54,9 @@ def _worker_init(
     rotation_evidence: str | None = None,
     club_news_source: str | None = None,
     request: LeaguePublicationRequest | None = None,
+    native_windows: bool = True,
 ) -> None:
+    _WORKER_OPTIONS["native_windows"] = native_windows
     snapshot = read_snapshot(Path(snapshot_root), snapshot_id)
     season = season or infer_season(snapshot)
     inputs = read_inputs(snapshot, season=season, gameweek=gameweek)
@@ -121,8 +126,18 @@ def _render_in_worker(task: MemberRenderTask, encoded: bytes | None = None) -> M
     if control is not None and not isinstance(control, MemberControl):
         raise ValueError("The worker received an invalid member control.")
     controls = None if control is None else {task.entry_id: control}
-    with native_window_executor(execute_native_window):
+    with _window_executor(_WORKER_OPTIONS["native_windows"]):
         return render_member(task, **_WORKER_CONTEXT, controls=controls)
+
+
+def _window_executor(native_windows: bool) -> AbstractContextManager[None]:
+    """The native process port for three- and five-week searches, or no binding at all.
+
+    Unbound, every window search runs on CP-SAT alone, exactly as before the native
+    solver: what a comparison build publishes, and what a fallback reproduces.
+    """
+
+    return native_window_executor(execute_native_window) if native_windows else nullcontext()
 
 
 def pool_mapper(
@@ -159,13 +174,19 @@ def pool_mapper(
 
 
 @contextmanager
-def league_mapper(request: LeaguePublicationRequest, workers: int = 1) -> Iterator[MemberMapper]:
-    """Yield the ordinary mapper or workers pinned to the same capture and handoff."""
+def league_mapper(
+    request: LeaguePublicationRequest, workers: int = 1, *, native_windows: bool = True
+) -> Iterator[MemberMapper]:
+    """Yield the ordinary mapper or workers pinned to the same capture and handoff.
+
+    Either way each render binds the native window executor, unless ``native_windows`` is
+    false: then no executor is bound and every window search runs on CP-SAT alone.
+    """
 
     if workers < 1:
         raise ValueError("--workers must be at least 1")
     if workers == 1 or request.menu == "device":
-        with native_window_executor(execute_native_window):
+        with _window_executor(native_windows):
             yield map
         return
     with ProcessPoolExecutor(
@@ -182,6 +203,7 @@ def league_mapper(request: LeaguePublicationRequest, workers: int = 1) -> Iterat
             str(request.rotation_evidence) if request.rotation_evidence else None,
             str(request.club_news_source) if request.club_news_source else None,
             request,
+            native_windows,
         ),
     ) as executor:
         yield pool_mapper(executor)

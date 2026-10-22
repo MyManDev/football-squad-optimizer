@@ -64,7 +64,11 @@ capture's own.
 By hand, `scripts.build_league_site --league <id>` rebuilds one league from a capture. It
 keeps the other leagues the directory lists only when their trees were rendered from the same
 capture, and refuses otherwise (the site would serve two captures); it records advice only
-for the league the record names.
+for the league the record names. Before solving it makes the preflight's native window check
+and refuses unless the child loads `highspy` 1.15.1; `--cp-sat-windows` binds no native
+solver instead, so every window search runs on CP-SAT alone. After the build it prints one
+`windows` line per member and window length with the counts the receipt's `window_solvers`
+carries, and each fallback reason with its count below it.
 
 `--decide` is deliberately absent from that line. It is the members' loop that runs every
 week; our own squad is a separate decision with a precondition that is not currently met

@@ -65,7 +65,7 @@ def _three_week_task(request: Any) -> MemberRenderTask:
 
 
 def _worker_context(
-    request: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    request: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *, native_windows: bool = True
 ) -> dict[str, Any]:
     """The pool worker's own context for this capture, with a horizon that covers a window.
 
@@ -75,6 +75,7 @@ def _worker_context(
     """
 
     monkeypatch.setattr(publication_workers, "_WORKER_CONTEXT", {})
+    monkeypatch.setattr(publication_workers, "_WORKER_OPTIONS", {"native_windows": True})
     publication_workers._worker_init(
         str(request.snapshot_root),
         request.snapshot_id,
@@ -83,6 +84,7 @@ def _worker_context(
         str(request.archive_root),
         request.gameweek,
         request=request,
+        native_windows=native_windows,
     )
     context = publication_workers._WORKER_CONTEXT
     path = tmp_path / "football-forecast.json"
@@ -127,6 +129,48 @@ def test_the_pool_worker_binds_the_native_executor(
     # this process so the fake replaces the executor it binds.
     render = publication_workers._render_in_worker(_three_week_task(request))
     _assert_three_week_window_reached_the_executor(render, recorder)
+
+
+def test_a_cp_sat_only_mapper_and_worker_bind_no_executor(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, recorder: RecordingExecutor
+) -> None:
+    """The comparison build: the same three-week window, solved on CP-SAT alone."""
+
+    request = publication_world(tmp_path)
+    context = dict(_worker_context(request, tmp_path, monkeypatch, native_windows=False))
+    task = _three_week_task(request)
+    with publication_workers.league_mapper(request, workers=1, native_windows=False) as mapper:
+        (serial,) = mapper(functools.partial(render_member, **context), [task])
+    pooled = publication_workers._render_in_worker(task)
+    assert recorder.calls == []
+    for render in (serial, pooled):
+        assert [weeks for weeks, _ in render.window_payloads] == [3]
+        assert render.native_windows == ()
+
+
+def test_the_pool_hands_its_workers_the_native_choice(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    request = publication_world(tmp_path)
+    started: list[tuple[Any, ...]] = []
+
+    class Pool:
+        def __init__(self, **keywords: Any) -> None:
+            started.append(keywords["initargs"])
+
+        def __enter__(self) -> "Pool":
+            return self
+
+        def __exit__(self, *_: object) -> None:
+            return None
+
+    monkeypatch.setattr(publication_workers, "ProcessPoolExecutor", Pool)
+    for native_windows in (True, False):
+        with publication_workers.league_mapper(request, workers=2, native_windows=native_windows):
+            pass
+    # ``_worker_init`` takes the choice last, after the request.
+    assert [initargs[-1] for initargs in started] == [True, False]
+    assert all(initargs[-2] is request for initargs in started)
 
 
 def test_the_api_advice_worker_binds_the_native_executor_and_logs_its_outcome(
