@@ -6,6 +6,31 @@ estimate to the matching fixture. The fixture calendar must match the plan's cap
 season; an absent estimate is left out. A verified manager absence includes the exact
 source words and a link to the club page.
 
+A player gets the **Out** mark on the pitch, and the manager's statement with its words,
+link and publication time in their details, only when every check below holds. The rule is
+`coachAbsences` in `web/src/features/league/advice/coachAbsences.ts`. A player who fails
+any check gets neither, and nothing stands in their place.
+
+- The news document is from the squad's own publication: the same generation time, a full
+  instant with its offset, and the same capture, league, entry, season and gameweek. Its
+  window is 1.
+- Its evidence is a club news read (`club_news_capture`) under `managers_word_rule_v3`.
+- The player has exactly one applied statement in it. Its speaker is `manager`, its role
+  `not_starting` and its disposition `stated_expected_absent`.
+- Its words are shown, not blank, and carry none of the figures the site withholds, such
+  as a percentage, a chance or odds.
+- Its publication time has `instant` precision. Publication is at or before the fetch,
+  and the fetch at or before the document's generation, each a full instant with its
+  offset.
+- Its source is an HTTPS address with a host, and no whitespace, backslash, user name or
+  password.
+
+The page reads this news from the document the member's advice index names for the
+switched-on plan, when that evidence is a club news read. It does so even when the member
+has the manager's word switched off for planning, and reading it never submits a
+computation. Until that document is read, and whenever the index names none or it cannot
+be read, the check runs on the advice the page shows.
+
 Each plate has a named button with a touch target at least 44 px high. Enter opens it,
 Escape or Close dismisses it, and focus returns to the button. The source link remains a
 separate control.
