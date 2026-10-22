@@ -127,6 +127,11 @@ def test_original_cp_model_catches_a_bad_exporter(monkeypatch):
         result, status, details = solve_window_model(model, _solver(), solve, weeks=3)
     assert status == cp_model.OPTIMAL and (result.value(x), result.value(y)) == (5, 1)
     assert "verification" in details["fallback_reason"]
+    # The certificate's work on the rejected witness is reported, not taken from the
+    # fallback's budget.
+    assert details["verification_work_before_fallback"] >= 0
+    assert result.parameters.max_deterministic_time == 4.0
+    assert result.parameters.max_time_in_seconds == 30.0
 
 
 def test_unsupported_constraint_uses_cp_sat_without_starting_native():
@@ -142,21 +147,58 @@ def test_unsupported_constraint_uses_cp_sat_without_starting_native():
     assert "all_diff" in details["fallback_reason"]
 
 
-def test_native_timeout_cannot_add_another_full_wall_budget(monkeypatch):
+def test_a_native_timeout_leaves_the_fallback_its_whole_phase_budget(monkeypatch):
+    """The native attempt is a phase bounded by the per-phase wall ceiling, as
+    ``optimizer.py`` bounds every phase; the CP-SAT fallback then runs with its own
+    unchanged wall ceiling and deterministic budget, as it would have without HiGHS."""
+
+    now = [0.0]
+    monkeypatch.setattr(native_highs, "perf_counter", lambda: now[0])
+    asked = []
+
+    def timed_out(packet, seconds):
+        asked.append(seconds)
+        now[0] += seconds  # the child spent the whole of its phase
+        raise TimeoutError("ceiling reached")
+
+    model, x, y = _model()
+    solver = _solver()
+    with native_window_executor(timed_out):
+        result, status, details = solve_window_model(model, solver, solve, weeks=3)
+    assert asked == [30.0]
+    assert result is solver
+    assert result.parameters.max_time_in_seconds == 30.0
+    assert result.parameters.max_deterministic_time == 4.0
+    assert status == cp_model.OPTIMAL and (result.value(x), result.value(y)) == (5, 1)
+    assert details["selected"] is False and details["fallback_reason"] == "ceiling reached"
+
+
+@pytest.mark.parametrize("weeks", [3, 5])
+def test_a_fallback_after_a_native_timeout_plans_what_cp_sat_alone_plans(
+    known_optimum_players, small_config, monkeypatch, weeks
+):
+    horizon, initial, config, transfer = _window(known_optimum_players, small_config, weeks)
+    expected = optimize_transfer_plan(horizon, initial, config, transfer, protect_hold=True)
     now = [0.0]
     monkeypatch.setattr(native_highs, "perf_counter", lambda: now[0])
 
     def timed_out(packet, seconds):
-        assert seconds == 30
-        now[0] = 30.0
+        now[0] += seconds
         raise TimeoutError("ceiling reached")
 
-    model, _, _ = _model()
     with native_window_executor(timed_out):
-        result, status, details = solve_window_model(model, _solver(), solve, weeks=3)
-    assert result.parameters.max_time_in_seconds == 0
-    assert status == cp_model.UNKNOWN
-    assert details["selected"] is False
+        actual = optimize_transfer_plan(horizon, initial, config, transfer, protect_hold=True)
+    assert actual.diagnostics["solver_backend"] == "ortools-cp-sat"
+    assert actual.diagnostics["native_window"]["fallback_reason"] == "ceiling reached"
+    assert actual.solver_status is expected.solver_status
+    for key in (
+        "solver_status_name",
+        "scaled_model_objective_value",
+        "deterministic_time_budget_exhausted",
+        "tiebreak_completed",
+    ):
+        assert actual.diagnostics[key] == expected.diagnostics[key], key
+    _assert_same_decisions(actual, expected)
 
 
 def test_native_translation_handles_enforcement_maximum_and_element():
@@ -194,13 +236,9 @@ def test_only_the_planning_driver_imports_highspy():
     assert importers == {"planning/native_highs.py"}
 
 
-@pytest.mark.parametrize("weeks", [3, 5])
-@pytest.mark.parametrize("chip", [False, True])
-def test_complete_window_keeps_cp_sat_tiebreak_and_decisions(
-    known_optimum_players, small_config, weeks, chip
-):
+def _window(players, small_config, weeks):
     table = pd.concat(
-        [known_optimum_players.assign(gameweek=week) for week in range(1, weeks + 1)],
+        [players.assign(gameweek=week) for week in range(1, weeks + 1)],
         ignore_index=True,
     )
     table["buy_price_tenths"] = table["price_tenths"]
@@ -208,7 +246,23 @@ def test_complete_window_keeps_cp_sat_tiebreak_and_decisions(
     horizon = PlanningHorizon(table)
     initial = InitialSquadState(("GK_A", "DEF_A", "MID_A", "FWD_A"), 0, 1)
     config = replace(small_config, solver_time_limit_seconds=30, solver_deterministic_time_limit=4)
-    transfer = TransferPlanningConfig(acquisition_sell_on_fee=0.5)
+    return horizon, initial, config, TransferPlanningConfig(acquisition_sell_on_fee=0.5)
+
+
+def _assert_same_decisions(actual, expected):
+    for left, right in zip(actual.weeks, expected.weeks, strict=True):
+        assert set(left.selected_squad.player_id) == set(right.selected_squad.player_id)
+        assert set(left.starting_xi.player_id) == set(right.starting_xi.player_id)
+        assert left.captain["player_id"] == right.captain["player_id"]
+        assert left.bench.player_id.tolist() == right.bench.player_id.tolist()
+
+
+@pytest.mark.parametrize("weeks", [3, 5])
+@pytest.mark.parametrize("chip", [False, True])
+def test_complete_window_keeps_cp_sat_tiebreak_and_decisions(
+    known_optimum_players, small_config, weeks, chip
+):
+    horizon, initial, config, transfer = _window(known_optimum_players, small_config, weeks)
     rights = ChipAvailability({"wildcard": {1, 2}}) if chip else ChipAvailability()
     expected = optimize_transfer_plan(
         horizon, initial, config, transfer, chips=rights, protect_hold=True
@@ -225,8 +279,4 @@ def test_complete_window_keeps_cp_sat_tiebreak_and_decisions(
         actual.diagnostics["scaled_model_objective_value"]
         == expected.diagnostics["scaled_model_objective_value"]
     )
-    for left, right in zip(actual.weeks, expected.weeks, strict=True):
-        assert set(left.selected_squad.player_id) == set(right.selected_squad.player_id)
-        assert set(left.starting_xi.player_id) == set(right.starting_xi.player_id)
-        assert left.captain["player_id"] == right.captain["player_id"]
-        assert left.bench.player_id.tolist() == right.bench.player_id.tolist()
+    _assert_same_decisions(actual, expected)

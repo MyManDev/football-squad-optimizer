@@ -461,8 +461,12 @@ def solve_window_model(
 ) -> tuple[cp_model.CpSolver, int, dict[str, object]]:
     """Try native primary search for three/five weeks; certify or fall back.
 
-    One-week calls and unbound callers are unchanged. Native elapsed time, process
-    startup and verification all consume the existing primary wall ceiling. A native
+    One-week calls and unbound callers are unchanged. The native attempt is a phase of
+    its own: the child, its startup and the certificate together stay inside one primary
+    wall ceiling, the same per-phase bound ``optimizer.py`` gives every phase. The CP-SAT
+    fallback then runs on the caller's solver exactly as configured, with its whole wall
+    ceiling and deterministic budget, so a fallback answers what CP-SAT alone would have
+    answered and a native timeout can never leave it without time. A native
     clock-limited witness never seeds fallback: that would make a later deterministic
     CP-SAT search depend on the machine's speed. The existing CP-SAT tie-break remains.
     """
@@ -480,8 +484,7 @@ def solve_window_model(
     try:
         milp = export_milp(model.proto)
         packet = _wire_model(milp, int(solver.parameters.random_seed))
-        remaining = max(0.0, wall - (perf_counter() - started))
-        response = execute(packet, remaining)
+        response = execute(packet, wall)
         values = _checked_values(milp, response)
         fixed = model.clone()
         fixed.clear_hints()  # type: ignore[no-untyped-call]
@@ -501,10 +504,8 @@ def solve_window_model(
         return certificate, int(cp_model.OPTIMAL), details
     except (KeyError, TypeError, ValueError, RuntimeError, OSError) as error:
         details["fallback_reason"] = str(error)
-    # Fallback keeps the original deterministic limit, minus actual certificate work;
-    # it receives only wall time not already spent by the native attempt.
-    solver.parameters.max_time_in_seconds = max(0.0, wall - (perf_counter() - started))
-    solver.parameters.max_deterministic_time = max(0.0, deterministic - verification_work)
+    # The solver's own limits are left as the caller set them. Work the certificate spent
+    # on a rejected witness is reported beside the search, never taken from its budget.
     details["verification_work_before_fallback"] = verification_work
     return solver, solve(model, solver), details
 

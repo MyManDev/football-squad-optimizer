@@ -1449,11 +1449,13 @@ def optimize_transfer_plan(
     if hold_solver is not None and primary_status is SolverStatus.INFEASIBLE:
         raise SolverExecutionError("Full search contradicts its verified feasible hold plan.")
     primary_deterministic_time = _deterministic_time_used(primary_solver, raw_primary_status)
-    # Keep runtime work in the existing top-level counters. Nested metadata also
-    # enters immutable horizon records and must not retain a per-run clock.
+    # A CP-SAT fallback ran with its whole budget, so the work the certificate spent on a
+    # rejected native witness is not the search's. It stays out of the primary counter,
+    # the exhaustion flag, the tie-break's remaining budget and ``deterministic_time_used``
+    # (which callers hold to their own budgets), and is reported at the top level, where
+    # runtime counters live: nested metadata also enters immutable horizon records.
     verification_work = native_details.pop("verification_work_before_fallback", 0.0)
     assert isinstance(verification_work, (int, float))
-    primary_deterministic_time += verification_work
     divisor = settings.objective_weight_scale * optimization_config.expected_points_scale
     diagnostics: dict[str, object] = {
         "solver_backend": (
@@ -1525,6 +1527,7 @@ def optimize_transfer_plan(
     }
     if native_details:
         diagnostics["native_window"] = native_details
+        diagnostics["native_verification_deterministic_time"] = float(verification_work)
         diagnostics["tiebreak_backend"] = "ortools-cp-sat"
     if incumbent_plan is not None:
         diagnostics["incumbent_hint"] = {
