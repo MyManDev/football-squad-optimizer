@@ -270,10 +270,13 @@ def page_refusal(index: object, entry: int) -> str | None:
         return "menu"
     if index.get("menu") == "device":
         chips = index.get("chip_states")
+        # A full menu may leave ``windows`` out, but the page's ``!index.windows`` refuses a
+        # device menu without it, so the default above must not stand in for it here.
         if (
             computed != []
             or unavailable != []
-            or not isinstance(windows, dict)
+            or "windows" not in index
+            or not isinstance(index["windows"], dict)
             or any(windows.values())
             or not strategies
             or strategies[0] != PURE
