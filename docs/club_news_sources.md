@@ -48,8 +48,11 @@ terms. What the code does is narrower:
   preview, press conference, medical update, fit for or squad update. Unclassified links
   come next. Links in an academy, youth, women's, ladies', U18, U19, U21, U23, tickets, shop
   or hospitality category come last, whatever else they say. A link printed twice keeps its
-  first place and the better of its priorities. With the cap of ten, the priority decides
-  which ten articles a host gives.
+  first place and the better of its priorities. Each registered page's links are ranked on
+  their own, and registered pages are read in registry order. So the priority decides which
+  of a page's links get the host's remaining slots. On a host with two registered pages, the
+  first page's last-rank links come before the second page's first-rank links. A link that
+  `robots.txt` disallows takes no slot.
 - It never requests a **two-part `listing/<name>` or `category/<name>` route** under the
   registered path. Such a route is a news index, not an article: it is not asked of
   `robots.txt`, is recorded nowhere and takes no slot. The match ignores case and reads the
@@ -60,9 +63,13 @@ terms. What the code does is narrower:
   `a-story`, `category`, `listing`, `shop/kit`, `b-story`, `c-story`,
   `team-news-injury-update` and `category/men/injury-update` is therefore read as
   `team-news-injury-update`, `category/men/injury-update`, `a-story`, `category`, `listing`,
-  `b-story`, `c-story`, `shop/kit`. The registered path, dot-segment, route and priority
-  rules apply to [referrals](operations/official_injury_discovery.md) too: the official
-  injury page's Details links, a route that is disabled today.
+  `b-story`, `c-story`, `shop/kit`. The registered path, dot-segment and route rules apply
+  to [referrals](operations/official_injury_discovery.md) too: the official injury page's
+  Details links, a route that is disabled today. A referral is ranked differently. Its
+  priority is read on its whole path, the registered part included, with no label. Within
+  a priority it comes after the page's own links, and a referral the page also lists keeps
+  that link's place. Under Palace's `/news/first-team/`, a referral therefore ranks first
+  unless its path names a last-rank category.
 - It asks a host for its `robots.txt` **once per run**, however many registered paths that
   host serves, and decides each path against the one file it read. One club with three pages
   is one question, not three.

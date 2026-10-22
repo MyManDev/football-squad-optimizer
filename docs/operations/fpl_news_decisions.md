@@ -36,12 +36,14 @@ categorical quote. Per-player outcomes explain accepted and withheld statements.
 ## Bounded collection
 
 The existing registry, robots checks, origin restrictions and document bounds
-still apply. Article links are ranked by `article_priority` before the ten-article
-host cap is spent: explicit availability and match links first (injury, fitness,
-team news, pre-match and the like), unclassified links next, and youth, women's
-and commercial links last. Page order decides only within a rank, as
-[club news sources](../club_news_sources.md) states in full. FPL player coverage
-and the much smaller registered coach-news coverage are separate facts.
+still apply. Each registered page's article links are ranked by `article_priority`:
+explicit availability and match links first (injury, fitness, team news, pre-match
+and the like), unclassified links next, and youth, women's and commercial links
+last. Page order decides only within a rank. Registered pages are read in registry
+order, so the rank decides which of a page's links get what is left of the host's
+ten-article cap, as [club news sources](../club_news_sources.md) states in full.
+FPL player coverage and the much smaller registered coach-news coverage are
+separate facts.
 
 `capture_club_news` accepts `--max-model-calls` (default 3, range 0 to 20).
 Configured providers make no automatic transport retries. A failed provider call

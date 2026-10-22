@@ -1,17 +1,23 @@
 """Read publication facts from held source bytes, without changing quoted text.
 
 Only explicit publication fields are admitted. An article's JSON-LD may identify the
-fetched page, or the page's single, same-origin canonical URL declared in its head at any
-path on that host. A language prefix also needs the page's own language, a head canonical
-naming the fetched page and a matching hreflang declaration. A single article's WebPage
-identifier that writes the page path's slashes as hyphens counts only when the canonical
-and Open Graph URLs name the fetched page, the headlines agree and at least one displayed
-time, and every one, equals the instant; those declarations may be streamed directly under
-the body only when the head has none. A canonical on another origin, a protocol-relative
-or document-relative one, two different ones, one outside the head and an article
-addressed to a third page date nothing. Transport Last-Modified, fetch time, unlabelled
-dates and dateModified are not publication facts. Multiple conflicting fields, multi-item
-feeds and malformed metadata remain unverified.
+fetched page. One dated article with no address counts as the page's own, and a second
+makes the metadata invalid. The article may also identify the page's single, same-origin
+canonical URL declared in its head, at any path on that host. A language prefix also needs
+the page's own language, a head canonical naming the fetched page and a matching hreflang
+declaration. For these two aliases, a canonical on another origin, a protocol-relative or
+document-relative one, two different ones or one outside the head dates nothing. An
+article addressed to a third page dates nothing either.
+
+A single article's WebPage identifier may write the page path's slashes as hyphens. It
+counts only when the canonical and Open Graph URLs name the fetched page and the headlines
+agree. The page must display at least one time, and every displayed time must equal the
+instant. These declarations may be streamed directly under the body only when the head has
+none.
+
+Transport Last-Modified, fetch time, unlabelled dates and dateModified are not publication
+facts. Multiple conflicting fields, multi-item feeds and malformed metadata remain
+unverified.
 """
 
 import hashlib

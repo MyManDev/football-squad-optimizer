@@ -35,9 +35,11 @@ retained within each priority, at most :data:`MAXIMUM_ARTICLES_PER_HOST` per hos
 A link whose printed or resolved path has a ``.`` or ``..`` segment is skipped rather than
 resolved, and a two-part ``listing/<name>`` or ``category/<name>`` route under the
 registered path is a news index that is never requested. Referred addresses, the official
-injury page's Details links, pass the same checks and join the same order. Each article is
-asked of the same ``robots.txt``, waited for under the same interval and judged by the same
-refusals as a registered page, and is stored as its own document with its own readable text.
+injury page's Details links, pass the same checks. A referral the page does not list is
+ranked on its whole path with no label, and within a priority it follows the page's own
+links. Each article is asked of the same ``robots.txt``, waited for under the same interval
+and judged by the same refusals as a registered page, and is stored as its own document
+with its own readable text.
 A link to any other host is never requested, whatever it says.
 
 **A redirect is followed only within the origin that was asked.** :func:`default_opener`
@@ -944,10 +946,11 @@ def article_links(source: ClubSource, index: RawDocument) -> tuple[str, ...]:
 def registered_article_url(source: ClubSource, url: str) -> str | None:
     """Validate an externally discovered referral by the rules a page's own links meet.
 
-    The referral must be an absolute address on the registered scheme and host, strictly
-    under a registered path that is not the host's root, with no ``.`` or ``..`` segment,
-    not a two-part ``listing/<name>`` or ``category/<name>`` route and in printable ASCII.
-    It is returned in the registered origin's spelling, without its fragment.
+    The referral must be an absolute address on the registered scheme and host. It must sit
+    strictly under the source's registered path, and that path must not be the host's root.
+    It has no ``.`` or ``..`` segment, is not a two-part ``listing/<name>`` or
+    ``category/<name>`` route and is printable ASCII. It is returned in the registered
+    origin's spelling, without its fragment.
     """
     try:
         registered = urllib.parse.urlsplit(source.url)

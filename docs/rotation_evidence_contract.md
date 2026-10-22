@@ -122,9 +122,11 @@ HTTP `Last-Modified` or an invented time. Its closed sources are `html_publicati
 verified day-only date remains day-only and cannot authorize an exact-time intervention.
 
 A JSON-LD article's `datePublished` dates the fetched page when the article's address
-names that page. The address is the article's `url`, else its `mainEntityOfPage` (or that
-object's `@id`), else its `@id`. One dated article without an address counts as the
-page's own; a second makes the metadata invalid. Page identities compare the scheme and
+names that page. The address comes from the first of `url`, `mainEntityOfPage` and `@id`
+that the article has, and an object gives its `@id`. A null value, or an object without
+`@id`, is no address. One dated article without an address counts as the page's own; a
+second makes the metadata invalid. So a lone article with a null `url` and an `@id`
+naming another page still dates the fetched page. Page identities compare the scheme and
 host without case and the path and query exactly, and drop the fragment. Two aliases
 also count, and both rest on declarations inside the page's `<head>`:
 
@@ -139,16 +141,21 @@ also count, and both rest on declarations inside the page's `<head>`:
   `/en-GB/...`. The head canonical names the fetched page itself. A head `hreflang`
   alternate for that language names the fetched page too.
 
-Both aliases are refused for a canonical on another host, scheme or port; for a
-protocol-relative (`//host/path`) or document-relative (`story`, `../story`) href, while
-a root-relative `/path` resolves on the fetched page's origin; for two canonicals naming
-different pages, while two naming the same page count as one; for a canonical outside the
-head, the body included; and for an article addressed to any third page. A refused alias
-adds no date, so a page with no other publication field stays unverified with the one
-reason `publication_not_declared`. An admitted alias date still meets the page's other
-publication fields, and a different value is a `publication_metadata_conflict`. The
-recorded source stays `jsonld_datePublished`, so the record does not show that a date came
-through an alias. A day-only `datePublished` stays day-only.
+Both aliases are refused in these cases:
+
+- The canonical is on another host, scheme or port.
+- The canonical href is protocol-relative (`//host/path`) or document-relative (`story`,
+  `../story`). A root-relative `/path` resolves on the fetched page's origin.
+- Two canonicals name different pages. Two that name the same page count as one.
+- The canonical is outside the head, the body included.
+- The article is addressed to any third page.
+
+A refused alias adds no date. A page with no other publication field then stays
+unverified with the one reason `publication_not_declared`. An admitted alias date still
+meets the page's other publication fields, and a different value is a
+`publication_metadata_conflict`. The recorded source stays `jsonld_datePublished`, so the
+record does not show that a date came through an alias. A day-only `datePublished` stays
+day-only.
 
 A single article's JSON-LD WebPage identifier may replace the page path's slashes with
 hyphens. This exact identifier form is admitted only when the page's canonical and Open
