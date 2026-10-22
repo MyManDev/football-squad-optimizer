@@ -19,6 +19,7 @@ from html.parser import HTMLParser
 PUBLICATION_METADATA_VERSION = "source_publication_metadata_v1"
 MAX_SOURCE_BYTES = 2 * 1024 * 1024
 _ARTICLE_TYPES = {"Article", "NewsArticle", "BlogPosting", "ReportageNewsArticle"}
+_MAX_HTML_DEPTH = 256
 _VOID_TAGS = {
     "area",
     "base",
@@ -142,9 +143,14 @@ class _MetadataReader(HTMLParser):
         self._streamed_open_graph_titles: list[str] = []
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if self.invalid:
+            return
         values = dict(attrs)
         body_root = self._tag_stack in (["body"], ["html", "body"])
         if tag not in _VOID_TAGS:
+            if len(self._tag_stack) >= _MAX_HTML_DEPTH:
+                self.invalid = True
+                return
             self._tag_stack.append(tag)
         if tag in ("meta", "time", "script", "link") and len(values) != len(attrs):
             self.invalid = True
@@ -195,14 +201,17 @@ class _MetadataReader(HTMLParser):
             self._json = []
 
     def handle_data(self, data: str) -> None:
+        if self.invalid:
+            return
         if self._json is not None:
             self._json.append(data)
 
     def handle_endtag(self, tag: str) -> None:
+        if self.invalid:
+            return
         if tag in self._tag_stack:
-            self._tag_stack = self._tag_stack[
-                : len(self._tag_stack) - 1 - self._tag_stack[::-1].index(tag)
-            ]
+            start = len(self._tag_stack) - 1 - self._tag_stack[::-1].index(tag)
+            del self._tag_stack[start:]
         if tag == "head":
             self._in_head = False
         if tag != "script" or self._json is None:

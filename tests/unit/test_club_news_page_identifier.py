@@ -130,3 +130,11 @@ def test_another_explicit_publication_field_still_causes_a_conflict():
     result = publication_metadata(raw, "text/html", URL)
     assert not result.verified
     assert result.reason == "publication_metadata_conflict"
+
+
+def test_excessively_nested_html_is_refused_before_page_identity_is_used():
+    raw = _source(extra_body="<div>" * 10_000 + "</div>" * 10_000)
+    result = publication_metadata(raw, "text/html", URL)
+    assert not result.verified
+    assert result.reason == "publication_metadata_invalid"
+    assert result.source_sha256 == hashlib.sha256(raw).hexdigest()
