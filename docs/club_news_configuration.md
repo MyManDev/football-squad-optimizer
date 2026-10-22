@@ -179,7 +179,7 @@ when everything else is the same: provider, model, prompt, endpoint, output form
 limit, the season, gameweek and deadline, the roster, the versions of the document selection
 and publication metadata rules, and the selected documents with their bytes and
 `Last-Modified`. The model is shown each document's publication metadata, so a change to
-how it is read moves that version. The observation can still change which documents are
+how it is read must move that version. The observation can still change which documents are
 selected (a newly eligible article, one that has aged out of the seven days), and a
 different selection is a different question. What a later run adds to a reused answer is
 when it read the pages.

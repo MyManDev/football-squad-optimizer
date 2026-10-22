@@ -217,6 +217,10 @@ class _MetadataReader(HTMLParser):
             return
         values = dict(attrs)
         stack = self._tag_stack
+        if tag == "html" and (stack or self._language is not None):
+            # HTML merges a nested or later <html> tag into the root element. It opens
+            # nothing here, and its lang is not read.
+            return
         if tag == "head":
             # Only the page's own head counts. HTML ignores a later or nested head tag.
             if not self._head_allowed or stack not in ([], ["html"]):
@@ -294,6 +298,9 @@ class _MetadataReader(HTMLParser):
     def handle_endtag(self, tag: str) -> None:
         if self.invalid:
             return
+        if tag == "html":
+            # HTML ignores a head start tag after </html>.
+            self._head_allowed = False
         if tag in self._tag_stack:
             start = len(self._tag_stack) - 1 - self._tag_stack[::-1].index(tag)
             del self._tag_stack[start:]

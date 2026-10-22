@@ -135,10 +135,11 @@ metadata cannot override a head declaration. Ordinary canonical aliases still re
 the head declaration.
 
 "Head" means the page's parsed head element. The publication metadata reader takes the
-first `<head>` start tag that comes before any body content and ignores any later one, such
-as a `<head>` inside an `<svg>`. The head ends at `</head>`, at `<body>`, or at the first
-element placed directly in it that cannot be in a head, as HTML ends a head whose end tag
-the page omits. A canonical, alternate or Open Graph declaration after that point is body
+first `<head>` start tag, with only `<html>` open, that comes before any body content and
+before `</html>`. It ignores any other, such as a `<head>` inside an `<svg>`. The head ends
+at `</head>`, at `<body>`, or at the first element placed directly in it that cannot be in a
+head, as HTML ends a head whose end tag the page omits. A nested or later `<html>` tag opens
+nothing. A canonical, alternate or Open Graph declaration after the head's end is body
 content.
 
 The publication metadata reader closes the elements whose end tags HTML lets a page omit,

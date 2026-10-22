@@ -126,10 +126,12 @@ def test_canonical_does_not_authorize_external_conflicting_or_related_article_da
         (f"<html><head><title>News</title><body><article>{CANONICAL}</article>", False),
         (f"<html><head><title>News</title></head><body><article>{CANONICAL}</article>", False),
         (f"<html><head><title>News</title><div>{CANONICAL}</div>", False),
+        (f"<head><title>News</title><html><div>{CANONICAL}</div>", False),
         (f"<html><head><noscript><body><article>{CANONICAL}</article>", False),
         (f"<noscript><head>{CANONICAL}</head></noscript><body>", False),
         (f"<html><head></head><body><svg><head>{CANONICAL}</head></svg>", False),
         (f"<html><head></head><head>{CANONICAL}</head><body>", False),
+        (f"<html></html><head>{CANONICAL}</head><body>", False),
     ],
 )
 def test_only_the_parsed_head_element_declares_the_canonical(page, verified):
@@ -186,6 +188,26 @@ def test_language_alias_needs_page_language_canonical_and_same_article_hreflang(
     result = publication_metadata(raw, "text/html", URL)
     assert result.verified is verified
     assert result.source_sha256 == hashlib.sha256(raw).hexdigest()
+
+
+@pytest.mark.parametrize("later", ["<body><html", "</html><html"])
+@pytest.mark.parametrize("language,other,verified", [("en", "fr", True), ("fr", "en", False)])
+def test_a_nested_or_later_html_tag_does_not_replace_the_page_language(
+    later, language, other, verified
+):
+    schema = json.dumps(
+        {
+            "@type": "NewsArticle",
+            "url": "https://club.example/en/arsenal/news",
+            "datePublished": "2026-09-12T13:00:00Z",
+        }
+    )
+    raw = (
+        f'<html lang="{language}"><head><link rel="canonical" href="{URL}">'
+        f'<link rel="alternate" hreflang="en" href="{URL}"></head>'
+        f'{later} lang="{other}"><script type="application/ld+json">{schema}</script>'
+    ).encode()
+    assert publication_metadata(raw, "text/html", URL).verified is verified
 
 
 @pytest.mark.parametrize(
