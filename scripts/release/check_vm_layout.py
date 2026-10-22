@@ -56,20 +56,51 @@ def check_layout(config: dict[str, Any], containers: list[dict[str, Any]], base:
                 ):
                     raise ValueError(
                         "VM sync refused: a selected data mount differs from its ordinary "
-                        "transfer destination. Prepare and validate a complete release package, "
-                        "then explicitly activate that package; preserve the current selection."
+                        "transfer destination. No service was restarted and no selection was "
+                        "changed. To serve a release from a separate package, follow "
+                        '"Activating a separately prepared package" in docs/backend_runbook.md.'
                     )
         configured_env = declared["environment"]
         observed_env = dict(item.split("=", 1) for item in observed["Config"]["Env"])
         for name, variable in ROOTS.items():
             target = f"/mnt/{name}"
             if configured_env.get(variable) != target or observed_env.get(variable) != target:
-                raise ValueError("VM sync refused: a runtime data root differs from its mount.")
+                raise ValueError(
+                    "VM sync refused: a runtime data root differs from its mount. No service "
+                    'was restarted; see "VM data root selection" in docs/backend_runbook.md.'
+                )
 
 
-def _docker_json(arguments: list[str]) -> Any:
+def compose_config_command(base: Path) -> tuple[list[str], Path]:
+    """The restart in `vm_sync.sh` as a `config` call: the same arguments and directory.
+
+    `vm_sync.sh` restarts from `$BASE/repo` with `--env-file "$BASE/.env" -f
+    deploy/compose.yaml -f "$BASE/compose.artifacts.yaml" up -d` and no
+    `--project-directory`, so Compose resolves relative paths against `deploy/`. Any
+    other directory or project directory could approve bind sources that the restart
+    then resolves differently. A test runs both through `vm_sync.sh` and compares them.
+    """
+    return (
+        [
+            "docker",
+            "compose",
+            "--env-file",
+            str(base / ".env"),
+            "-f",
+            "deploy/compose.yaml",
+            "-f",
+            str(base / "compose.artifacts.yaml"),
+            "config",
+            "--format",
+            "json",
+        ],
+        base / "repo",
+    )
+
+
+def _docker_json(command: list[str], directory: Path | None = None) -> Any:
     result = subprocess.run(
-        ["docker", *arguments], capture_output=True, text=True, timeout=30, check=False
+        command, cwd=directory, capture_output=True, text=True, timeout=30, check=False
     )
     if result.returncode:
         raise ValueError("Could not inspect the VM layout; no sync is permitted.")
@@ -79,23 +110,8 @@ def _docker_json(arguments: list[str]) -> Any:
 def main() -> int:
     base = Path.home() / "squadopt"
     try:
-        config = _docker_json(
-            [
-                "compose",
-                "--project-directory",
-                str(base / "repo"),
-                "--env-file",
-                str(base / ".env"),
-                "-f",
-                str(base / "repo/deploy/compose.yaml"),
-                "-f",
-                str(base / "compose.artifacts.yaml"),
-                "config",
-                "--format",
-                "json",
-            ]
-        )
-        containers = _docker_json(["inspect", "squadopt-api-1", "squadopt-worker-1"])
+        config = _docker_json(*compose_config_command(base))
+        containers = _docker_json(["docker", "inspect", "squadopt-api-1", "squadopt-worker-1"])
         check_layout(config, containers, base)
     except ValueError as error:
         if isinstance(error, json.JSONDecodeError):

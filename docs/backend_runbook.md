@@ -104,14 +104,137 @@ SQUADOPT_BACKEND_CLUB_NEWS_SOURCE=<path to data/sample/club_news_v1.fixture.json
 
 ### VM data root selection
 
-The VM sync helpers support the ordinary `~/squadopt/{site,snapshots,handoffs,artifacts}`
-layout. Before transferring files, `vm_push.sh` checks both services' resolved Compose
-configuration and running mounts. `vm_sync.sh` repeats this check before changing the
-checkout and again against the target release's Compose file. A separately retained
-release package or a symlinked data root refuses the ordinary sync. Prepare and validate
-the complete new package and explicitly activate its selected roots with a retained
-rollback; copying ordinary folders does not update a separately mounted package. The
-preflight prints no environment values and changes no files or running services.
+The VM sync helpers support only the ordinary layout:
+`~/squadopt/{site,snapshots,handoffs,artifacts}`, each bound read-only at `/mnt/<name>` in
+both services, with `SQUADOPT_BACKEND_SITE_DATA_ROOT`, `SQUADOPT_BACKEND_SNAPSHOT_ROOT`,
+`SQUADOPT_BACKEND_HANDOFF_ROOT` and `SQUADOPT_BACKEND_ARTIFACT_ROOT` naming those mounts.
+Before any remote write, `vm_push.sh` runs the read-only preflight
+`scripts/release/check_vm_layout.py` on the VM over SSH. It checks both services' resolved
+Compose configuration and running mounts, and it resolves Compose from `~/squadopt/repo`
+with the same `--env-file` and `-f` arguments as the restart in `vm_sync.sh`, so it reads
+the bind sources that restart would mount.
+`vm_push.sh` then copies the preflight to `~/vm_check_layout.py`, where `vm_sync.sh` runs
+it before changing the checkout and again after it, against the target release's Compose
+file; without that file `vm_sync.sh` stops before the checkout. A separately retained
+package, a symlinked data root, a missing, repeated or writable data bind, or a runtime
+root that names another path refuses the ordinary sync. The preflight prints no
+environment values and changes no files or running services.
+
+A refusal leaves what is served unchanged: no site data is copied, no image is built,
+`~/squadopt/.env` is not edited and no service is restarted. A refusal from the check
+after the checkout leaves `~/squadopt/repo` at the new tag while both services still run
+the previous image and mounts.
+
+#### Activating a separately prepared package
+
+Copying files into the ordinary folders does not change what a separately mounted package
+serves, so the preflight refuses and points here. This is a person's act on the VM; no
+script performs it. A value written `<OWNER: ...>` is not recorded in the repository: read
+it from the VM before following the step, and do not guess it.
+
+**What selects the roots.** `deploy/compose.yaml` binds `/mnt/site`, `/mnt/snapshots` and
+`/mnt/handoffs` from `SQUADOPT_SITE_PATH`, `SQUADOPT_SNAPSHOT_PATH` and
+`SQUADOPT_HANDOFF_PATH`, and takes the image from `SQUADOPT_BACKEND_IMAGE`, all set in
+`~/squadopt/.env`. The `/mnt/artifacts` bind and `SQUADOPT_BACKEND_ARTIFACT_ROOT` come from
+`~/squadopt/compose.artifacts.yaml`, which is not in the repository; it names its artifact
+bind source as `<OWNER: a literal path in compose.artifacts.yaml, or a variable in
+~/squadopt/.env>`. That override also mounts the club-news source: `<OWNER: whether a
+package carries its own club-news source, and where>`. Because an override can also replace
+a base bind, the package served now is `<OWNER: current package directory, and the file that
+selects each of its four roots>`. The store (`SQUADOPT_STORE_PATH`) is not part of a package
+and stays as it is.
+
+1. **Record the current selection; it is the rollback.**
+
+   ```bash
+   STAMP="$(date -u +%Y%m%dT%H%M%SZ)"; echo "$STAMP"
+   cp -p ~/squadopt/.env ~/squadopt/.env.rollback-$STAMP
+   cp -p ~/squadopt/compose.artifacts.yaml ~/squadopt/compose.artifacts.rollback-$STAMP.yaml
+   git -C ~/squadopt/repo rev-parse HEAD > ~/squadopt/repo.rollback-$STAMP
+   docker inspect --format '{{.Name}} {{.Config.Image}}{{range .Mounts}} {{.Source}}:{{.Destination}}{{end}}' \
+     squadopt-api-1 squadopt-worker-1 > ~/squadopt/mounts.rollback-$STAMP
+   ```
+
+   Do not edit, move or delete the current package, and do not remove the image it runs,
+   while it is the rollback.
+
+2. **Move the checkout and build the image for the release**, as `vm_sync.sh` does. Neither
+   step touches the running services.
+
+   ```bash
+   git -C ~/squadopt/repo fetch -q --tags origin
+   git -C ~/squadopt/repo checkout -q <tag>
+   docker build -q --build-arg "SQUADOPT_REPOSITORY_COMMIT=$(git -C ~/squadopt/repo rev-parse HEAD)" \
+     -t "squadopt-backend:<tag>" ~/squadopt/repo
+   ```
+
+3. **Prepare the package**, `<PACKAGE>` below: `<OWNER: package directory for this
+   release>`. It is a directory that neither service mounts now, never the current package.
+   Give it the four roots the backend reads, filled from the same release the ordinary sync
+   would carry:
+
+   - `site/`: `rsync -a --delete ~/squadopt/repo/web/public/data/ <PACKAGE>/site/`, the copy
+     `vm_sync.sh` makes into the ordinary `site/`;
+   - `snapshots/` and `handoffs/`: the publishing checkout's `data/snapshots/` and
+     `data/handoffs/`, which `vm_push.sh` streams, including the decision capture and the
+     club-news capture it names;
+   - `artifacts/`: `phase_b/` and `rotation/`, which `vm_push.sh` streams, and `football/`,
+     where the backend reads the decision capture's forecast and ready bundle.
+     `vm_push.sh` does not carry `football/`.
+
+   Seal the bundle on the publishing PC before the copy with `scripts.prepare_football_bundle`
+   (see the native Windows section below) and keep its `"status": "ready"` output with its
+   `bundle_sha256`. The files cross to the VM by `<OWNER: transfer used for the current
+   package>`. After the copy, list the checksums of each root on the VM and of its source on
+   the PC, for example `find . -type f -print0 | sort -z | xargs -0 sha256sum` inside each,
+   and stop on any difference.
+
+4. **Activate.** Change only the selection. In `~/squadopt/.env`, set
+   `SQUADOPT_SITE_PATH=<PACKAGE>/site`, `SQUADOPT_SNAPSHOT_PATH=<PACKAGE>/snapshots`,
+   `SQUADOPT_HANDOFF_PATH=<PACKAGE>/handoffs` and
+   `SQUADOPT_BACKEND_IMAGE=squadopt-backend:<tag>`. Point the artifact bind source at
+   `<PACKAGE>/artifacts` wherever it is named (above), and the club-news source as the
+   package requires. Then restart with the command `vm_sync.sh` uses, from the same
+   directory:
+
+   ```bash
+   cd ~/squadopt/repo
+   docker compose --env-file ~/squadopt/.env -f deploy/compose.yaml -f ~/squadopt/compose.artifacts.yaml up -d
+   ```
+
+   The worker finishes the job in hand before it stops; `deploy/compose.yaml` gives it 180
+   seconds (`stop_grace_period`).
+
+5. **Check.** Wait until `/ready` answers 200, as `vm_sync.sh` does, then:
+
+   ```bash
+   docker inspect --format '{{.Name}}{{range .Mounts}} {{.Source}}:{{.Destination}}{{end}}' \
+     squadopt-api-1 squadopt-worker-1
+   curl -s http://127.0.0.1:8000/ready; echo
+   curl -s http://127.0.0.1:8000/api/v1/leagues/352490/capabilities; echo
+   ```
+
+   Both services must show the four data mounts under `<PACKAGE>`, `/ready` must report
+   `"ready": true`, and `capture_snapshot_id` must be the release's decision capture. Any
+   other answer is a rollback.
+
+6. **Roll back** with the `STAMP` from step 1:
+
+   ```bash
+   cp -p ~/squadopt/.env.rollback-$STAMP ~/squadopt/.env
+   cp -p ~/squadopt/compose.artifacts.rollback-$STAMP.yaml ~/squadopt/compose.artifacts.yaml
+   git -C ~/squadopt/repo checkout -q "$(cat ~/squadopt/repo.rollback-$STAMP)"
+   cd ~/squadopt/repo
+   docker compose --env-file ~/squadopt/.env -f deploy/compose.yaml -f ~/squadopt/compose.artifacts.yaml up -d
+   ```
+
+   Then repeat step 5 and compare the mounts with `~/squadopt/mounts.rollback-$STAMP`.
+   Keep `<PACKAGE>` for inspection.
+
+**Returning to the ordinary sync.** `vm_push.sh` passes again only when all four roots are
+the ordinary folders. That is the same procedure with `~/squadopt` as `<PACKAGE>`: record
+the selection (step 1), fill the ordinary folders with exactly what the selected package
+serves and compare the checksums (step 3), then select them (step 4) and check (step 5).
 
 ### Persistent native Windows artifact selection
 
