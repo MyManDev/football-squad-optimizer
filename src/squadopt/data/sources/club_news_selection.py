@@ -14,7 +14,7 @@ from squadopt.data.sources.club_news import RawDocument
 from squadopt.data.sources.club_news_metadata import publication_metadata
 from squadopt.data.timestamps import as_instant
 
-SELECTION_POLICY_VERSION = "first_team_document_selection_v2"
+SELECTION_POLICY_VERSION = "first_team_document_selection_v3"
 MAX_DOCUMENT_AGE_DAYS = 7
 
 
@@ -144,11 +144,15 @@ def select_coding_documents(
         decisions.append(
             DocumentSelectionReason(document.club, document.requested_url, eligible, reason)
         )
+    # A page is a discovery index when another selected page of its club sits below its
+    # address. The page itself never counts: an address ending in "/" starts with its own
+    # prefix, and comparing a page with itself would drop every such article.
     indexes = {
         doc.requested_url
         for doc in selected
         if any(
             other.club == doc.club
+            and other.requested_url != doc.requested_url
             and other.requested_url.startswith(doc.requested_url.rstrip("/") + "/")
             for other in selected
         )
