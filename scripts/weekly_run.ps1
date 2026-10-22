@@ -238,9 +238,10 @@ Write-Output ''
 Write-Output 'Next, a person: once the site pull request is merged through the queue, read the accepted'
 Write-Output 'stamp (data/leagues.json generated_at_utc in the preview) and release from Git Bash:'
 Write-Output ("  sh scripts/release/ship.sh {0} {1} release/{2} <accepted generated-at ISO> '<summary>'{3}" -f $number, $tag, ($tag -replace '^site-[0-9]{4}-[0-9]{2}-', ''), $settledArgument)
-Write-Output ('Then move the VM to the release: bash scripts/vm_push.sh ' + $tag)
+Write-Output ('Then move the VM to the release (docs/operations/vm_release_package.md): pack, push, then remote prepare, candidate and activate with')
+Write-Output ('  python scripts/release/vm_football_release.py pack --gameweek ' + $Gameweek + ' --tag ' + $tag + ' --capture <this run''s fpl-live capture> ...')
 if ($rotationCapture) {
-    Write-Output ("The manager's word rode on club-news capture {0}; the football bundle must be sealed with it:" -f $rotationCapture)
-    Write-Output ('  python -m scripts.prepare_football_bundle ... --news-capture-id ' + $rotationCapture + ' --rotation-table artifacts\rotation\<the rotation_evidence_v4 table this run wrote>')
+    Write-Output ("The manager's word rode on club-news capture {0}; pack it with the rotation table this run wrote:" -f $rotationCapture)
+    Write-Output ('  --news-capture ' + $rotationCapture + ' --rotation-manifest artifacts\rotation\<the rotation_evidence_v4 manifest this run wrote>')
 }
 exit 0
