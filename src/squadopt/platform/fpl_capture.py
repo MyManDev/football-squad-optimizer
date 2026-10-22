@@ -6,6 +6,7 @@ module under ``scripts``.
 """
 
 import http.client
+import json
 import re
 import time
 import urllib.error
@@ -117,6 +118,79 @@ def _utc_now() -> str:
     # Preserve the precision the clock supplies. Truncating a 12:00:00.900 read to
     # 12:00:00 would recreate the early time-of-knowledge claim this stamp prevents.
     return datetime.now(UTC).isoformat().replace("+00:00", "Z")
+
+
+#: Where FPL serves a head-to-head league's table. The capture keeps nothing read from here:
+#: it asks only after the classic endpoint has refused a listed league, to say which kind of
+#: refusal it is.
+HEAD_TO_HEAD_STANDINGS_PATH = "leagues-h2h/{league_id}/standings/"
+
+
+class HeadToHeadLeagueError(DataSourceError):
+    """A listed league is a head-to-head league, and the site publishes classic leagues only."""
+
+
+def _declares_league(content: bytes, league_id: int) -> bool:
+    """Whether an answer is a JSON object whose ``league.id`` is this league.
+
+    That is the declaration the classic page reader requires of every standings page; nothing
+    else in the answer is read.
+    """
+
+    try:
+        document = json.loads(content)
+    except ValueError:
+        return False
+    league = document.get("league") if isinstance(document, dict) else None
+    declared = league.get("id") if isinstance(league, dict) else None
+    return isinstance(declared, int) and not isinstance(declared, bool) and declared == league_id
+
+
+def _not_a_classic_league(league_id: int, classic_url: str) -> DataSourceError:
+    """The refusal for a listed league whose classic standings FPL answers with HTTP 404."""
+
+    url = f"{BASE_URL}/{HEAD_TO_HEAD_STANDINGS_PATH.format(league_id=league_id)}"
+    try:
+        answer = fetch(url, attempts=1)
+    except DataSourceError as error:
+        heard = str(error)
+    else:
+        if _declares_league(answer, league_id):
+            return HeadToHeadLeagueError(
+                f"League {league_id} is a head-to-head league: FPL serves its table at {url} "
+                f"and has no classic standings for it at {classic_url}. The site publishes "
+                "classic leagues only, because the members, ranks and rivals it publishes are "
+                f"read from classic standings. Remove league {league_id} from the leagues "
+                "this run names (config/leagues.json or --league)."
+            )
+        heard = f"{url} answered without declaring league {league_id}."
+    return DataSourceError(
+        f"League {league_id} has no classic standings: {classic_url} returned HTTP 404, and "
+        f"FPL did not confirm it as a head-to-head league either: {heard} The site publishes "
+        f"classic leagues only; check league {league_id} where this run names it "
+        "(config/leagues.json or --league)."
+    )
+
+
+def classic_standings(league_id: int, url: str) -> bytes:
+    """Read a listed league's first classic standings page, or refuse it with the reason.
+
+    The capture reads classic standings only. HTTP 404 from the classic endpoint says the id
+    is not a classic league FPL serves; it may name a head-to-head league, whose table FPL
+    keeps at a separate endpoint, or no league at all. The head-to-head endpoint is then asked
+    once, and a league it serves under this id is refused as head-to-head. Every other answer
+    is ``fetch``'s, unchanged, so a classic league is read exactly as before and nothing is
+    asked of the head-to-head endpoint for it.
+    """
+
+    try:
+        return fetch(url)
+    except DataSourceError as error:
+        # ``fetch`` raises every HTTP refusal from the source's own HTTPError.
+        cause = error.__cause__
+        if not isinstance(cause, urllib.error.HTTPError) or cause.code != 404:
+            raise
+        raise _not_a_classic_league(league_id, url) from error
 
 
 def complete_league_standings(
@@ -361,7 +435,9 @@ def capture(
     Phase C component model; the football history needs all of them. Passing
     ``entry_registry`` adds the three documents each registered entry publishes, and
     ``league_ids`` adds every page of each league's standings, so a capture records who was in
-    the league when a recommendation was made. Each entry's transfers list and opening
+    the league when a recommendation was made. A listed league without classic standings, a
+    head-to-head league among them, stops the capture with its reason (``classic_standings``)
+    before anything is written. Each entry's transfers list and opening
     picks follow (``purchase_price_endpoints``); they sharpen a budget rather than make
     one, so a document the source still refuses after the retries is left out with a line
     saying so, and that member's budget stays the stated worth.
@@ -400,8 +476,9 @@ def capture(
     )
     if extra:
         print(f"Reading {len(extra)} registered-entry endpoint(s)")
+        listed = {league_standings_payload(league_id): league_id for league_id in league_ids}
         for name, url in extra.items():
-            payloads[name] = fetch(url)
+            payloads[name] = classic_standings(listed[name], url) if name in listed else fetch(url)
             print(f"  read     {name}  ({len(payloads[name]):,} bytes)")
         extra.update(complete_league_standings(payloads, league_ids))
         # A Free Hit week's picks are not the squad the member holds next; read the
