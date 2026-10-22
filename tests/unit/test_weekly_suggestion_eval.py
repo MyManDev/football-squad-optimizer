@@ -3,9 +3,11 @@
 import copy
 import dataclasses
 import hashlib
+import inspect
 import json
 import math
 import re
+import shutil
 from collections.abc import Sequence
 from dataclasses import asdict
 from pathlib import Path
@@ -22,6 +24,7 @@ from squadopt.application.advice_record import (
     RECORD_FILE,
     record_member_advice,
 )
+from squadopt.application.league_publication import records_advice_for
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import CapturedSnapshot, read_snapshot, write_snapshot
 from squadopt.evaluation.live_series import (
@@ -51,13 +54,14 @@ def recorded(
     gameweek: int = 4,
     entry_id: int = 101,
     digest: str = "a" * 64,
+    league_id: int = 352490,
 ) -> dict[str, Any]:
     return {
         "contract_version": MEMBER_ADVICE_RECORD_CONTRACT_VERSION,
         "season": SEASON,
         "gameweek": gameweek,
         "entry_id": entry_id,
-        "league_id": 352490,
+        "league_id": league_id,
         "player_id_space": "fpl_element_code",
         "generated_at_utc": published,
         "capture": {"snapshot_id": name, "captured_at_utc": captured},
@@ -660,6 +664,231 @@ def test_a_rerender_keeps_every_week_or_refuses_before_any_history_changes(tmp_p
     assert {path: path.read_bytes() for path in paths} == before
 
 
+def second_league(
+    tmp_path: Path, anchor: CapturedSnapshot, entry_ids: Sequence[int]
+) -> dict[int, list[dict[str, Any]]]:
+    """Publish league 755941's histories from the shared records root; each member's weeks."""
+    written = review.publish_suggestion_histories(
+        record_root=tmp_path / "records",
+        snapshot_root=tmp_path / "snapshots",
+        as_of_snapshot=anchor,
+        season=SEASON,
+        league_id=755941,
+        entry_ids=entry_ids,
+        out_dir=tmp_path / "second",
+        published=shown_everywhere(entry_ids, (3, 4)),
+    )
+    payloads = [
+        json.loads(path.read_text(encoding="utf-8"))["payload"]
+        for path in written
+        if path.parent.name == "history"
+    ]
+    return {payload["entry_id"]: payload["weeks"] for payload in payloads}
+
+
+def test_each_league_shows_only_the_weeks_its_own_records_hold(tmp_path: Path) -> None:
+    """A record's path names no league, so a member of two leagues has one directory per
+    week for both. Neither league's history shows a week only the other one recorded."""
+    records = tmp_path / "records"
+    for entry_id, week in ((101, 3), (202, 3), (202, 4)):
+        publish_for(records, gameweek=week, entry_id=entry_id)
+    anchor = capture_with(
+        tmp_path / "snapshots",
+        events={3: True, 4: True},
+        actuals={101: {3: 18, 4: 25}, 202: {3: 20, 4: 22}, 303: {4: 30}},
+    )
+    recording = {path: path.read_bytes() for path in published(tmp_path, anchor)}
+    # League 755941 records its members: 303, and 101, who is in league 352490 as well.
+    for entry_id in (101, 303):
+        publish_for(records, gameweek=4, entry_id=entry_id, league_id=755941)
+    # League 352490's documents keep their bytes with the other league's records beside them.
+    assert {path: path.read_bytes() for path in published(tmp_path, anchor)} == recording
+    weeks = second_league(tmp_path, anchor, (101, 202, 303))
+    assert {entry_id: [row["gameweek"] for row in rows] for entry_id, rows in weeks.items()} == {
+        101: [4],
+        202: [],
+        303: [4],
+    }
+    assert {row["status"] for rows in weeks.values() for row in rows} == {"available"}
+
+
+def test_a_week_both_leagues_recorded_reads_each_leagues_own_record(tmp_path: Path) -> None:
+    """Another league's record in the same week is absent, not a reason to refuse the week."""
+    records = tmp_path / "records"
+    publish_for(records, gameweek=4, entry_id=101)
+    publish_for(
+        records, gameweek=4, entry_id=101, league_id=755941, name="capture-b", digest="b" * 64
+    )
+    anchor = capture_with(tmp_path / "snapshots", events={4: True}, actuals={101: {4: 25}})
+    for league_id, capture, digest in ((352490, "capture-a", "a"), (755941, "capture-b", "b")):
+        (week,) = review.review_member_weeks(
+            record_root=records,
+            snapshot_root=tmp_path / "snapshots",
+            as_of_snapshot=anchor,
+            season=SEASON,
+            league_id=league_id,
+            entry_ids=[101],
+            published={(101, 4): capture},
+        )[101]
+        assert (week.status, week.advice_snapshot_id) == ("available", capture)
+        assert week.advice_sha256 == digest * 64
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [None, {"league_id": None}, {"player_id_space": "element"}],
+    ids=["unreadable", "no-league", "unsound-identity"],
+)
+def test_a_record_unsound_beyond_its_league_keeps_its_week(
+    tmp_path: Path, changes: dict[str, Any] | None
+) -> None:
+    """Only a record sound for the member-week in every other identity is another league's.
+    One that cannot be read, names no league or is wrong elsewhere keeps its week as before."""
+    value = recorded()
+    directory = record_member_advice(tmp_path / "records", value)
+    if changes is None:
+        (directory / RECORD_FILE).write_bytes(b"{}")
+    else:
+        from squadopt.live.ledger import write_manifest
+
+        value.update(changes)
+        (directory / RECORD_FILE).write_text(json.dumps(value), encoding="utf-8")
+        write_manifest(directory, contract_version=MEMBER_ADVICE_RECORD_CONTRACT_VERSION)
+    reviews = review.review_member_weeks(
+        record_root=tmp_path / "records",
+        snapshot_root=tmp_path / "snapshots",
+        as_of_snapshot=snapshot(tmp_path / "snapshots"),
+        season=SEASON,
+        league_id=755941,
+        entry_ids=[101],
+    )
+    assert [(week.gameweek, week.reason) for week in reviews[101]] == [(4, "invalid_record")]
+
+
+def week_without_a_record(tmp_path: Path, leftover: str | None = None) -> CapturedSnapshot:
+    """League 352490 recorded member 101 in gameweek 4, and its gameweek 3 write never
+    landed: the member-week directory holds no record, only ``leftover`` if one is named."""
+    records = tmp_path / "records"
+    publish_for(records, gameweek=4, entry_id=101)
+    directory = records / SEASON / "gw03" / "entry-101"
+    directory.mkdir(parents=True)
+    if leftover is not None and leftover.endswith("/"):
+        (directory / leftover).mkdir()
+    elif leftover is not None:
+        (directory / leftover).write_bytes(b"")
+    return capture_with(
+        tmp_path / "snapshots", events={3: True, 4: True}, actuals={101: {3: 18, 4: 25}}
+    )
+
+
+@pytest.mark.parametrize(
+    "leftover",
+    [None, ".capture-b.lock", ".capture-b.staging-1-0a1b2c3d/"],
+    ids=["empty", "writer-lock", "writer-staging"],
+)
+@pytest.mark.parametrize("league_id", [352490, 755941])
+def test_a_member_week_holding_no_record_is_the_recording_leagues_week(
+    tmp_path: Path, league_id: int, leftover: str | None
+) -> None:
+    """A record that never landed can leave its member-week directory with no record in it,
+    or only the writer's hidden lock or staging. Only the league that records advice writes
+    there: it shows the week without advice, as before, and a league that records none
+    does not show it at all."""
+    anchor = week_without_a_record(tmp_path, leftover)
+    other_league_weeks: set[tuple[int, int]] = set()
+    reviews = review.review_member_weeks(
+        record_root=tmp_path / "records",
+        snapshot_root=tmp_path / "snapshots",
+        as_of_snapshot=anchor,
+        season=SEASON,
+        league_id=league_id,
+        entry_ids=[101],
+        published=shown_everywhere([101], (3, 4)),
+        other_league_weeks=other_league_weeks,
+    )
+    weeks = [(week.gameweek, week.status, week.reason) for week in reviews[101]]
+    # The publisher's own rule decides which league records, so the two cannot drift apart.
+    if records_advice_for(league_id):
+        assert weeks == [(4, "available", None), (3, "unavailable", "no_pre_deadline_record")]
+        assert other_league_weeks == set()
+    else:
+        assert weeks == [] and other_league_weeks == {(101, 3), (101, 4)}
+
+
+def test_the_public_readers_still_refuse_another_leagues_record(tmp_path: Path) -> None:
+    """Only the history walk leaves another league's weeks out. A direct reader, such as a
+    measurement script, refuses another league's record and reads a week holding no record
+    as none, as before, and never meets the walk's private signal."""
+    anchor = week_without_a_record(tmp_path)
+    shared: dict[str, Any] = {
+        "season": SEASON,
+        "entry_id": 101,
+        "league_id": 755941,
+        "published": shown_everywhere([101], (3, 4)),
+    }
+    for reader in (review.select_record, review.evaluate_week):
+        assert "other_leagues_absent" not in inspect.signature(reader).parameters
+    with pytest.raises(review.SuggestionEvaluationError, match="Record identity"):
+        review.select_record(tmp_path / "records", gameweek=4, deadline_utc=DEADLINES[4], **shared)
+    assert (
+        review.select_record(tmp_path / "records", gameweek=3, deadline_utc=DEADLINES[3], **shared)
+        is None
+    )
+    weeks = [
+        review.evaluate_week(
+            tmp_path / "records",
+            gameweek=week,
+            deadline_utc=DEADLINES[week],
+            captures=[anchor],
+            **shared,
+        )
+        for week in (4, 3)
+    ]
+    assert [(week.gameweek, week.reason) for week in weeks] == [
+        (4, "invalid_record"),
+        (3, "no_pre_deadline_record"),
+    ]
+
+
+def test_a_rerender_withdraws_a_row_shown_for_a_week_holding_no_record(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A second-league history written before such a week was left out showed it without
+    advice. The next publication withdraws that row rather than refusing to drop it."""
+    anchor = week_without_a_record(tmp_path)
+    with monkeypatch.context() as earlier:  # The walk as it was: the empty week is shown.
+        earlier.setattr(review, "_records_advice", lambda _: True)
+        weeks = second_league(tmp_path, anchor, (101,))
+    assert [(row["gameweek"], row["reason"]) for row in weeks[101]] == [
+        (3, "no_pre_deadline_record")
+    ]
+    assert second_league(tmp_path, anchor, (101,)) == {101: []}
+
+
+def test_a_rerender_withdraws_rows_shown_for_another_leagues_records(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A history written before the walk left out other leagues' weeks showed each of them
+    without advice. The next publication withdraws those rows rather than refusing to drop
+    them, and still refuses to drop a row that named this league's advice."""
+    anchor = settled_two_weeks(tmp_path)  # League 352490 recorded members 101 and 202.
+    publish_for(tmp_path / "records", gameweek=4, entry_id=303, league_id=755941)
+    with monkeypatch.context() as earlier:  # The walk as it was: every record is this league's.
+        earlier.setattr(review, "_another_leagues_record", lambda *_, **__: False)
+        weeks = second_league(tmp_path, anchor, (101, 303))
+    assert [(row["gameweek"], row["reason"]) for row in weeks[101]] == [
+        (4, "invalid_record"),
+        (3, "invalid_record"),
+    ]
+    weeks = second_league(tmp_path, anchor, (101, 303))
+    assert weeks[101] == [] and [row["gameweek"] for row in weeks[303]] == [4]
+    # Member 303's week named advice. With only another league's record left, it would drop.
+    shutil.rmtree(tmp_path / "records" / SEASON / "gw04" / "entry-303")
+    publish_for(tmp_path / "records", gameweek=4, entry_id=303)
+    with pytest.raises(review.SuggestionEvaluationError, match=r"Entry 303 .* gameweeks \[4\]"):
+        second_league(tmp_path, anchor, (101, 303))
+
+
 def test_later_other_strategy_does_not_displace_the_pure_points_record(tmp_path: Path) -> None:
     early = recorded()
     record_member_advice(tmp_path, early)
@@ -754,6 +983,7 @@ def publish_for(
     digest: str = "a" * 64,
     name: str = "capture-a",
     published_hour: str = "07",
+    league_id: int = 352490,
 ) -> None:
     """Record one member's pre-deadline advice for one gameweek."""
     day = DEADLINES[gameweek][:10]
@@ -766,6 +996,7 @@ def publish_for(
             published=f"{day}T{published_hour}:00:00Z",
             name=name,
             digest=digest,
+            league_id=league_id,
         ),
     )
 
