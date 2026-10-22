@@ -16,7 +16,7 @@ from datetime import UTC, date, datetime
 from email.utils import parsedate_to_datetime
 from html.parser import HTMLParser
 
-PUBLICATION_METADATA_VERSION = "source_publication_metadata_v1"
+PUBLICATION_METADATA_VERSION = "source_publication_metadata_v2"
 MAX_SOURCE_BYTES = 2 * 1024 * 1024
 _ARTICLE_TYPES = {"Article", "NewsArticle", "BlogPosting", "ReportageNewsArticle"}
 # Deeper real nesting refuses the page. The cap keeps each end tag's search short.

@@ -57,6 +57,7 @@ from squadopt.data.sources.club_news_coding import (
     coding_prompt_sha256,
     require_requested_coding_contract,
 )
+from squadopt.data.sources.club_news_metadata import PUBLICATION_METADATA_VERSION
 from squadopt.data.sources.club_news_selection import (
     SELECTION_POLICY_VERSION,
     DocumentSelection,
@@ -393,6 +394,7 @@ def coding_input_fingerprint(
         "provider": config.provider,
         "model": config.model_identifier,
         "selection_policy": SELECTION_POLICY_VERSION,
+        "publication_metadata": PUBLICATION_METADATA_VERSION,
         "prompt": coding_prompt_sha256(config.model_identifier),
         "target": target,
         "instrument": {
