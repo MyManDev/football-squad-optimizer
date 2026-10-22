@@ -14,18 +14,23 @@ record and the JSON pointer (RFC 6901) of each, so any cell can be checked again
 The output directory (default `artifacts/paper_record_tables/`, git-ignored; inside the
 checkout only a folder under `artifacts/` is accepted) receives:
 
-- `records.csv`: every record read, with the SHA-256 of its bytes, to match the reading to a
-  commit;
-- `table_*.csv` and `tables.md`: the tables; Markdown rounds to six significant digits, the CSV
-  files carry the record's value unchanged;
+- `records.csv`: every record read, with the SHA-256 and the git blob id of its bytes after
+  CRLF is turned into LF (so a Windows checkout under `core.autocrlf` gives the same digests
+  as any other), the commit checked out and whether the record read is the one committed there;
+- `table_*.csv` and `tables.md`: the tables; Markdown rounds to six significant digits and
+  shows a long statement up to its first semicolon, the CSV files carry the record's value
+  unchanged;
 - `provenance.csv`: one row per table cell read from a record, with its record and pointer;
 - `figure_*.csv`: one row per plotted point, with the record and pointers on the row;
-- `checks.csv`: arithmetic checks of each record against its own per-fold values (a recorded
-  mean against the mean of its folds, a recorded count against the count of its fold flags),
-  with the recomputed value beside the recorded one.
+- `checks.csv`: arithmetic checks of each record against its own detail (a recorded mean
+  against the mean of its folds or seeds, a recorded count against the count of its flags, a
+  gate flag against its recorded bounds, a pooled error against its seasons) and, in a git
+  checkout, of each record against the one committed at the checked-out commit, with the
+  recomputed value beside the recorded one.
 
-The exit status is 1 when a check fails, and when a record is missing or lacks a key this file
-reads (then nothing is written); it is 0 otherwise.
+The exit status is 1 when a check fails, so also when a record read differs from the committed
+one, and when a record is missing or lacks a key this file reads (then nothing is written); it
+is 0 otherwise.
 """
 
 from __future__ import annotations
@@ -35,6 +40,8 @@ import csv
 import hashlib
 import io
 import json
+import statistics
+import subprocess
 import sys
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
@@ -93,8 +100,11 @@ class Candidate:
     linear_arm: str
 
 
+DECISION = "/decision_level_reading"
+
+
 def _candidate(key: str, label: str, record: str, arm: str, prefix: str) -> Candidate:
-    block = "/decision_level_reading"
+    block = DECISION
     return Candidate(
         key=key,
         label=label,
@@ -181,13 +191,55 @@ def resolve(document: Any, pointer: str) -> Any:
     return value
 
 
+def git_blob_id(content: bytes) -> str:
+    """The id git gives a blob of these bytes (what `git hash-object` prints for them)."""
+
+    header = b"blob %d\0" % len(content)
+    return hashlib.sha1(header + content, usedforsecurity=False).hexdigest()
+
+
+@dataclass(frozen=True)
+class Digest:
+    """A record's bytes as read: SHA-256 and blob id after CRLF to LF, and the raw blob id."""
+
+    sha256_lf: str
+    blob_lf: str
+    blob_raw: str
+
+    @classmethod
+    def of(cls, raw: bytes) -> Digest:
+        lf = raw.replace(b"\r\n", b"\n")
+        return cls(hashlib.sha256(lf).hexdigest(), git_blob_id(lf), git_blob_id(raw))
+
+
+def _git(root: Path, *arguments: str) -> str | None:
+    """One read-only git command in `root`; None when git is absent or the command fails."""
+
+    try:
+        completed = subprocess.run(
+            ["git", "-C", str(root), *arguments], capture_output=True, text=True, check=False
+        )
+    except OSError:
+        return None
+    return completed.stdout.strip() if completed.returncode == 0 else None
+
+
+def checked_out_commit(root: Path) -> str | None:
+    """HEAD of `root` when `root` is the top of a git checkout with a commit, else None."""
+
+    top = _git(root, "rev-parse", "--show-toplevel")
+    if top is None or Path(top).resolve() != root.resolve():
+        return None
+    return _git(root, "rev-parse", "--verify", "--quiet", "HEAD")
+
+
 class Records:
     """The committed JSON records under `<root>/docs`, read once each and never written."""
 
     def __init__(self, root: Path) -> None:
         self.root = root.resolve()
         self._documents: dict[str, Any] = {}
-        self.digests: dict[str, str] = {}
+        self.digests: dict[str, Digest] = {}
 
     def document(self, record: str) -> Any:
         if record not in self._documents:
@@ -202,7 +254,7 @@ class Records:
                 self._documents[record] = json.loads(raw)
             except json.JSONDecodeError as error:
                 raise RecordError(f"{record}: not JSON ({error})") from error
-            self.digests[record] = hashlib.sha256(raw).hexdigest()
+            self.digests[record] = Digest.of(raw)
         return self._documents[record]
 
     def cell(self, record: str, pointer: str) -> Cell:
@@ -211,6 +263,14 @@ class Records:
         except KeyError as error:
             raise RecordError(f"{record}: no key {pointer} (missing {error})") from error
         return Cell(value, record, pointer)
+
+    def optional(self, record: str, pointer: str) -> Cell | None:
+        """The cell at `pointer`, or None when the record does not hold that key."""
+
+        try:
+            return Cell(resolve(self.document(record), pointer), record, pointer)
+        except KeyError:
+            return None
 
     def keys(self, record: str, pointer: str) -> list[str]:
         value = self.cell(record, pointer).value
@@ -227,10 +287,13 @@ class Records:
 
 @dataclass
 class Table:
+    """A table; `statements` are text columns that Markdown shows to their first semicolon."""
+
     name: str
     title: str
     columns: tuple[str, ...]
     rows: list[dict[str, Cell]]
+    statements: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -248,13 +311,18 @@ def _text(value: Any) -> str:
         return "true" if value else "false"
     if value is None:
         return ""
+    if isinstance(value, list | dict):
+        return json.dumps(value)
     return str(value)
 
 
-def _shown(value: Any) -> str:
+def _shown(value: Any, statement: bool = False) -> str:
     if isinstance(value, float):
         return f"{value:.6g}"
-    return _text(value)
+    text = _text(value)
+    if statement and ";" in text:
+        text = text.split(";", 1)[0] + "; ..."
+    return text.replace("|", "\\|")
 
 
 def _label(value: str) -> Cell:
@@ -265,6 +333,13 @@ def player_level_table(records: Records) -> Table:
     columns = (
         "candidate",
         "reference_arm",
+        "candidate_arm",
+        "reference_fold_count",
+        "reference_scored_fold_count",
+        "candidate_fold_count",
+        "candidate_scored_fold_count",
+        "reference_points_observations",
+        "candidate_points_observations",
         "reference_appearance_log_loss",
         "candidate_appearance_log_loss",
         "reference_minutes_mae",
@@ -288,13 +363,18 @@ def player_level_table(records: Records) -> Table:
         at = partial(records.cell, candidate.record)
         row = {
             "candidate": _label(candidate.label),
-            "reference_arm": at("/comparison/arms/control/name"),
             "primary_reference_points_mae": at("/comparison/primary_season/control_points_mae"),
             "primary_candidate_points_mae": at("/comparison/primary_season/candidate_points_mae"),
             "verdict": at("/comparison/verdict/verdict"),
         }
         for side, arm in (("reference", "control"), ("candidate", "candidate")):
+            name = at(f"/comparison/arms/{arm}/name")
+            manifest = f"/arm_manifests/{_escape(str(name.value))}"
             overall = f"/comparison/metrics/{arm}/overall"
+            row[f"{side}_arm"] = name
+            row[f"{side}_fold_count"] = at(f"{manifest}/fold_count")
+            row[f"{side}_scored_fold_count"] = at(f"{manifest}/scored_fold_count")
+            row[f"{side}_points_observations"] = at(f"{overall}/points/observations")
             row[f"{side}_appearance_log_loss"] = at(f"{overall}/appearance/log_loss")
             row[f"{side}_minutes_mae"] = at(f"{overall}/minutes/mean_absolute_error")
             row[f"{side}_points_mae"] = at(f"{overall}/points/mean_absolute_error")
@@ -307,8 +387,9 @@ def player_level_table(records: Records) -> Table:
     return Table(
         "table_candidates_player_level",
         "Player-level metrics of each candidate against the reference arm of its own record "
-        "(pooled over the record's folds; paired differences are reference MAE minus candidate "
-        "MAE, so a positive value favours the candidate)",
+        "(pooled over the record's folds: the fold counts are each arm's manifest, the "
+        "observations its pooled points rows; paired differences are reference MAE minus "
+        "candidate MAE, so a positive value favours the candidate)",
         columns,
         rows,
     )
@@ -330,6 +411,9 @@ def decision_level_table(records: Records) -> Table:
         "wins",
         "ties",
         "losses",
+        "added_after_result",
+        "descriptive_only",
+        "scope",
     )
     rows = []
     for candidate in CANDIDATES:
@@ -339,24 +423,30 @@ def decision_level_table(records: Records) -> Table:
             candidate.candidate_arm,
             candidate.wins_ties_losses,
         )
-        rows.append(
-            {
-                "candidate": _label(candidate.label),
-                "paired_folds": at(candidate.paired_folds),
-                "ridge_control_mean": at(f"{linear}/ridge_control_mean"),
-                "linear_component_mean": at(f"{linear}/component_mean"),
-                "candidate_component_mean": at(f"{mine}/component_mean"),
-                "linear_minus_ridge_mean": at(f"{linear}/diagnostics/mean_difference"),
-                "candidate_minus_ridge_mean": at(f"{mine}/diagnostics/mean_difference"),
-                "candidate_minus_linear_mean": at(candidate.mean),
-                "candidate_minus_linear_median": at(candidate.median),
-                "interval_90_low": at(f"{candidate.interval}/0"),
-                "interval_90_high": at(f"{candidate.interval}/1"),
-                "wins": at(f"{tally}/0"),
-                "ties": at(f"{tally}/1"),
-                "losses": at(f"{tally}/2"),
-            }
-        )
+        row = {
+            "candidate": _label(candidate.label),
+            "paired_folds": at(candidate.paired_folds),
+            "ridge_control_mean": at(f"{linear}/ridge_control_mean"),
+            "linear_component_mean": at(f"{linear}/component_mean"),
+            "candidate_component_mean": at(f"{mine}/component_mean"),
+            "linear_minus_ridge_mean": at(f"{linear}/diagnostics/mean_difference"),
+            "candidate_minus_ridge_mean": at(f"{mine}/diagnostics/mean_difference"),
+            "candidate_minus_linear_mean": at(candidate.mean),
+            "candidate_minus_linear_median": at(candidate.median),
+            "interval_90_low": at(f"{candidate.interval}/0"),
+            "interval_90_high": at(f"{candidate.interval}/1"),
+            "wins": at(f"{tally}/0"),
+            "ties": at(f"{tally}/1"),
+            "losses": at(f"{tally}/2"),
+        }
+        # Whether the reading was declared with the rule or added after the result, in the
+        # record's own words: the scope always, the two flags where the record carries them.
+        for column in ("added_after_result", "descriptive_only"):
+            flag = records.optional(candidate.record, f"{DECISION}/{column}")
+            if flag is not None:
+                row[column] = flag
+        row["scope"] = at(f"{DECISION}/scope")
+        rows.append(row)
     frozen = partial(records.cell, FROZEN_EVALUATION)
     rows.append(
         {
@@ -373,7 +463,45 @@ def decision_level_table(records: Records) -> Table:
         "table_candidates_decision_level",
         "Realized squad points a gameweek on the 147 frozen decision folds, each candidate's "
         "arm against the linear components of its own record; the last row is the frozen v1 "
-        "evaluation of the linear components against the ridge control",
+        "evaluation of the linear components against the ridge control. The scope is the "
+        "record's own statement of the reading, including whether it was declared with the "
+        "rule or added after the result; added_after_result and descriptive_only are shown "
+        "where the record carries them, and table_candidates_reading_status gives each "
+        "record's declaration, scope and note in full",
+        columns,
+        rows,
+        statements=("scope",),
+    )
+
+
+def reading_status_table(records: Records) -> Table:
+    """When each decision-level reading was declared, in its record's words, in full."""
+
+    columns = (
+        "candidate",
+        "declaration",
+        "added_after_result",
+        "descriptive_only",
+        "scope",
+        "note",
+    )
+    rows = []
+    for candidate in CANDIDATES:
+        row = {
+            "candidate": _label(candidate.label),
+            "declaration": records.cell(candidate.record, "/declaration"),
+        }
+        for column in columns[2:]:
+            cell = records.optional(candidate.record, f"{DECISION}/{column}")
+            if cell is not None:
+                row[column] = cell
+        row["scope"] = records.cell(candidate.record, f"{DECISION}/scope")
+        rows.append(row)
+    return Table(
+        "table_candidates_reading_status",
+        "The status of each candidate's decision-level reading as its record states it: the "
+        "declaration document the record names, the two flags where the record carries them, "
+        "and the reading's scope and note in full",
         columns,
         rows,
     )
@@ -386,9 +514,13 @@ def sampler_table(records: Records) -> Table:
         "arm",
         "fold_count",
         "mean_pit",
+        "s1_bounds_low",
+        "s1_bounds_high",
         "s1_within",
         "below_q10_count",
         "below_q10_rate",
+        "s2_bounds_low",
+        "s2_bounds_high",
         "s2_within",
     )
     names = {
@@ -403,28 +535,68 @@ def sampler_table(records: Records) -> Table:
         for column, key in names.items():
             row[column] = records.cell(record, f"{arm}/{key}")
         if arm == "/verdict":
+            # The binding foundation record keeps only its pass flags; its bounds are in its
+            # Markdown pre-registration, which this file does not read.
             row["s1_within"] = records.cell(record, "/verdict/s1_passes")
             row["s2_within"] = records.cell(record, "/verdict/s2_passes")
         else:
+            for gate in ("s1", "s2"):
+                row[f"{gate}_bounds_low"] = records.cell(record, f"{arm}/{gate}_bounds/0")
+                row[f"{gate}_bounds_high"] = records.cell(record, f"{arm}/{gate}_bounds/1")
             row["s1_within"] = records.cell(record, f"{arm}/mean_pit_within_s1_bounds")
             row["s2_within"] = records.cell(record, f"{arm}/tail_rate_within_s2_bounds")
         rows.append(row)
     return Table(
         "table_sampler_calibration",
         "S1 (mean PIT) and S2 (share of folds realized below the scenario tenth percentile) "
-        "of each sampler arm, as each record reads them",
+        "of each sampler arm, with the bounds each record holds, as each record reads them; "
+        "the binding foundation record holds no bounds, only its pass flags",
         columns,
         rows,
     )
 
 
+def sampler_gate_checks(records: Records) -> list[Check]:
+    """Each arm's recorded S1 and S2 flags against its own value and bounds (both inclusive)."""
+
+    checks = []
+    gates = (
+        ("s1", "mean_probability_integral_transform", "mean_pit_within_s1_bounds"),
+        ("s2", "realized_below_lower_quantile_rate", "tail_rate_within_s2_bounds"),
+    )
+    for sampler, record, arm, _ in SAMPLER_ARMS:
+        if arm == "/verdict":
+            continue
+        for gate, value, flag in gates:
+            low = float(records.cell(record, f"{arm}/{gate}_bounds/0").value)
+            high = float(records.cell(record, f"{arm}/{gate}_bounds/1").value)
+            within = low <= float(records.cell(record, f"{arm}/{value}").value) <= high
+            recorded = records.cell(record, f"{arm}/{flag}").value
+            checks.append(
+                Check(
+                    f"{sampler} {arm}: recorded {gate.upper()} flag agrees with its value and "
+                    "bounds",
+                    record,
+                    f"{arm}/{flag}",
+                    recorded,
+                    within,
+                    recorded is within,
+                )
+            )
+    return checks
+
+
+SEEDS = "/seed_sensitivity_added_after_the_result"
+
+
 def seed_table(records: Records) -> Table:
-    base = "/seed_sensitivity_added_after_the_result"
     columns = ("arm", "seed", "below_q10_count", "band_ceiling_count")
     rows = []
-    ceiling = records.cell(JOINT, f"{base}/plug_in_lower_tail_count/candidate/band_ceiling_count")
-    for arm in records.keys(JOINT, f"{base}/arms"):
-        counts = f"{base}/arms/{_escape(arm)}/counts_by_seed"
+    for arm in records.keys(JOINT, f"{SEEDS}/arms"):
+        counts = f"{SEEDS}/arms/{_escape(arm)}/counts_by_seed"
+        ceiling = records.cell(
+            JOINT, f"{SEEDS}/plug_in_lower_tail_count/{_escape(arm)}/band_ceiling_count"
+        )
         for seed in records.keys(JOINT, counts):
             rows.append(
                 {
@@ -441,6 +613,85 @@ def seed_table(records: Records) -> Table:
         columns,
         rows,
     )
+
+
+def seed_summary_table(records: Records) -> Table:
+    columns = (
+        "arm",
+        "min_count",
+        "max_count",
+        "mean_count",
+        "band_ceiling_count",
+        "seeds_within_s2_band",
+        "seeds_within_s2_band_ids",
+        "fixed_count_outside_the_redrawn_folds",
+        "status",
+    )
+    rows = []
+    for arm in records.keys(JOINT, f"{SEEDS}/arms"):
+        at = f"{SEEDS}/arms/{_escape(arm)}"
+        row = {"arm": _label(arm)}
+        for column in columns[1:-1]:
+            if column == "band_ceiling_count":
+                pointer = f"{SEEDS}/plug_in_lower_tail_count/{_escape(arm)}/{column}"
+            else:
+                pointer = f"{at}/{column}"
+            row[column] = records.cell(JOINT, pointer)
+        row["status"] = records.cell(JOINT, f"{SEEDS}/status")
+        rows.append(row)
+    return Table(
+        "table_joint_sampler_seed_summary",
+        "The seed reading of each arm as the joint sampler record summarises it: lower-tail "
+        "counts over the redrawn seeds, the S2 band ceiling as a count, and the seeds whose "
+        "count is within the band, with the record's status of the reading",
+        columns,
+        rows,
+        statements=("status",),
+    )
+
+
+def seed_checks(records: Records) -> list[Check]:
+    """Each arm's recorded seed summary against its counts by seed and its band ceiling.
+
+    A seed is within the band when its count is at most the band ceiling count, the one edge
+    of the S2 band the seed reading holds as a count.
+    """
+
+    checks = []
+    for arm in records.keys(JOINT, f"{SEEDS}/arms"):
+        at = f"{SEEDS}/arms/{_escape(arm)}"
+        by_seed = records.cell(JOINT, f"{at}/counts_by_seed").value
+        if not isinstance(by_seed, dict) or not by_seed:
+            raise RecordError(f"{JOINT}: {at}/counts_by_seed is not a non-empty object")
+        ceiling = records.cell(
+            JOINT, f"{SEEDS}/plug_in_lower_tail_count/{_escape(arm)}/band_ceiling_count"
+        ).value
+        counts = [int(count) for count in by_seed.values()]
+        within = [str(seed) for seed, count in by_seed.items() if int(count) <= int(ceiling)]
+        expected: tuple[tuple[str, Any], ...] = (
+            ("min_count", min(counts)),
+            ("max_count", max(counts)),
+            ("mean_count", statistics.fmean(counts)),
+            ("seeds_within_s2_band", len(within)),
+            ("seeds_within_s2_band_ids", within),
+        )
+        for key, recomputed in expected:
+            recorded = records.cell(JOINT, f"{at}/{key}").value
+            if isinstance(recomputed, float):
+                holds = abs(float(recorded) - recomputed) <= FOLD_TOLERANCE
+            else:
+                holds = recorded == recomputed
+            checks.append(
+                Check(
+                    f"seeds {arm}: recorded {key} equals its counts by seed",
+                    JOINT,
+                    f"{at}/{key}",
+                    recorded,
+                    recomputed,
+                    holds,
+                )
+            )
+    return checks
 
 
 def distribution_table(records: Records) -> Table:
@@ -676,36 +927,94 @@ def sampler_folds(records: Records) -> tuple[list[dict[str, Cell]], list[Check]]
     return points, checks
 
 
+def _points_mae(records: Records, record: str, arm: str) -> dict[str, Cell]:
+    """An arm's points MAE pooled over every season of its comparison, then season by season
+    with the observations of each, so a plot can match the seasons of the decision folds."""
+
+    metrics = f"/comparison/metrics/{arm}"
+    cells = {
+        "points_mae_pooled_all_seasons": records.cell(
+            record, f"{metrics}/overall/points/mean_absolute_error"
+        )
+    }
+    for season in records.keys(record, f"{metrics}/by_season"):
+        at = f"{metrics}/by_season/{_escape(season)}/points"
+        cells[f"points_mae_{season}"] = records.cell(record, f"{at}/mean_absolute_error")
+        cells[f"points_observations_{season}"] = records.cell(record, f"{at}/observations")
+    return cells
+
+
 def mae_against_decision(records: Records) -> list[dict[str, Cell]]:
-    """One point per arm: points MAE pooled over every season of the comparison (2021-22 to
-    2025-26) against squad points on the decision folds (2021-22 to 2024-25), as recorded."""
+    """One point per arm: points MAE against squad points on the decision folds, as recorded.
+
+    The pooled MAE covers every season of the comparison (2021-22 to 2025-26) and the squad
+    points only the decision seasons (2021-22 to 2024-25), so each season's MAE and
+    observations are on the row as well: their observation-weighted mean over the decision
+    seasons is the matched value (`checks.csv` shows that the pooled MAE is that mean over
+    every season)."""
 
     first = CANDIDATES[0]
     points = [
         {
             "arm": _label("Linear components"),
-            "points_mae_pooled_all_seasons": records.cell(
-                first.record, "/comparison/metrics/control/overall/points/mean_absolute_error"
-            ),
             "squad_points_decision_folds": records.cell(
                 first.record, f"{first.linear_arm}/component_mean"
             ),
+            **_points_mae(records, first.record, "control"),
         }
     ]
     for candidate in CANDIDATES:
         points.append(
             {
                 "arm": _label(candidate.label),
-                "points_mae_pooled_all_seasons": records.cell(
-                    candidate.record,
-                    "/comparison/metrics/candidate/overall/points/mean_absolute_error",
-                ),
                 "squad_points_decision_folds": records.cell(
                     candidate.record, f"{candidate.candidate_arm}/component_mean"
                 ),
+                **_points_mae(records, candidate.record, "candidate"),
             }
         )
     return points
+
+
+def pooled_mae_checks(records: Records) -> list[Check]:
+    """Each arm's pooled points MAE and observations against its seasons."""
+
+    checks = []
+    for candidate in CANDIDATES:
+        for arm in ("control", "candidate"):
+            metrics = f"/comparison/metrics/{arm}"
+            pooled = records.cell(candidate.record, f"{metrics}/overall/points/mean_absolute_error")
+            count = records.cell(candidate.record, f"{metrics}/overall/points/observations")
+            weighted = 0.0
+            observations = 0
+            for season in records.keys(candidate.record, f"{metrics}/by_season"):
+                at = f"{metrics}/by_season/{_escape(season)}/points"
+                n = int(records.cell(candidate.record, f"{at}/observations").value)
+                mae = float(records.cell(candidate.record, f"{at}/mean_absolute_error").value)
+                weighted += mae * n
+                observations += n
+            mean = weighted / observations if observations else float("nan")
+            checks += [
+                Check(
+                    f"{candidate.key} {arm}: pooled points MAE equals the observation-weighted "
+                    "mean of its seasons",
+                    candidate.record,
+                    pooled.pointer,
+                    pooled.value,
+                    mean,
+                    abs(float(pooled.value) - mean) <= FOLD_TOLERANCE,
+                ),
+                Check(
+                    f"{candidate.key} {arm}: pooled points observations equal the sum of its "
+                    "seasons",
+                    candidate.record,
+                    count.pointer,
+                    count.value,
+                    observations,
+                    count.value == observations,
+                ),
+            ]
+    return checks
 
 
 def decision_by_season(records: Records) -> list[dict[str, Cell]]:
@@ -772,6 +1081,8 @@ def _figure_csv(name: str, rows: list[dict[str, Cell]]) -> str:
     sourced = [column for column in columns if rows[0][column].record]
     lines = []
     for row in rows:
+        if list(row) != columns:
+            raise RecordError(f"{name}: a figure row must read the keys of the first row")
         records = {row[column].record for column in sourced}
         if len(records) != 1:
             raise RecordError(f"{name}: a figure row must read one record, not {sorted(records)}")
@@ -790,16 +1101,20 @@ def _markdown(tables: Sequence[Table]) -> str:
         "# Paper record tables",
         "",
         "Extracted by `scripts/paper_record_tables.py` from committed JSON records; nothing was "
-        "fitted or measured. Numbers are rounded to six significant digits here; the CSV files "
-        "carry each record's value, and `provenance.csv` names the record and JSON pointer of "
-        "every cell.",
+        "fitted or measured. Numbers are rounded to six significant digits here and a long "
+        "statement is shown up to its first semicolon; the CSV files carry each record's value "
+        "in full, `provenance.csv` names the record and JSON pointer of every cell, and "
+        "`records.csv` the commit and digest of every record.",
     ]
     for table in tables:
         lines += ["", f"## {table.name}", "", table.title + ".", ""]
         lines.append("| " + " | ".join(table.columns) + " |")
         lines.append("|" + " --- |" * len(table.columns))
         for row in table.rows:
-            cells = [_shown(row[column].value) if column in row else "" for column in table.columns]
+            cells = [
+                _shown(row[column].value, column in table.statements) if column in row else ""
+                for column in table.columns
+            ]
             lines.append("| " + " | ".join(cells) + " |")
     return "\n".join(lines) + "\n"
 
@@ -817,15 +1132,52 @@ def _resolve_output(root: Path, output: Path | None) -> Path:
     return directory
 
 
-def extract(root: Path, output_dir: Path) -> list[Check]:
-    """Write every table and figure file under `output_dir`; return the record checks."""
+def commit_rows(records: Records, commit: str | None) -> tuple[list[list[str]], list[Check]]:
+    """`records.csv` rows, and in a git checkout one check per record that it is committed.
+
+    A record read matches the commit when its blob id, after CRLF to LF or as read, is the one
+    the commit holds at its path; a record edited, regenerated or not committed fails.
+    """
+
+    rows: list[list[str]] = []
+    checks: list[Check] = []
+    for record, digest in sorted(records.digests.items()):
+        if commit is None:
+            rows.append([record, digest.sha256_lf, digest.blob_lf, "", "", ""])
+            continue
+        committed = _git(records.root, "rev-parse", "--verify", "--quiet", f"{commit}:{record}")
+        read = digest.blob_raw if committed == digest.blob_raw else digest.blob_lf
+        holds = committed == read
+        rows.append(
+            [record, digest.sha256_lf, digest.blob_lf, commit, committed or "", _text(holds)]
+        )
+        checks.append(
+            Check(
+                f"{record}: the record read is the one committed at the checked-out commit",
+                record,
+                "",
+                committed or "",
+                read,
+                holds,
+            )
+        )
+    return rows, checks
+
+
+def extract(root: Path, output_dir: Path) -> tuple[list[Check], str | None]:
+    """Write every table and figure file under `output_dir`.
+
+    Returns the record checks and the commit checked out at `root` (None outside a checkout).
+    """
 
     records = Records(root)
     tables = [
         player_level_table(records),
         decision_level_table(records),
+        reading_status_table(records),
         sampler_table(records),
         seed_table(records),
+        seed_summary_table(records),
         distribution_table(records),
         distribution_fold_table(records),
         planning_table(records),
@@ -839,7 +1191,16 @@ def extract(root: Path, output_dir: Path) -> list[Check]:
         "figure_sampler_pit": pit_points,
         "figure_s2_counts": s2_counts(records),
     }
-    checks = fold_checks + pit_checks
+    checks = [
+        *fold_checks,
+        *pit_checks,
+        *sampler_gate_checks(records),
+        *seed_checks(records),
+        *pooled_mae_checks(records),
+    ]
+    commit = checked_out_commit(records.root)
+    digests, commit_checks = commit_rows(records, commit)
+    checks += commit_checks
 
     provenance: list[dict[str, Cell]] = [
         {
@@ -861,7 +1222,10 @@ def extract(root: Path, output_dir: Path) -> list[Check]:
     )
     files |= {f"{name}.csv": _figure_csv(name, rows) for name, rows in figures.items()}
     files["tables.md"] = _markdown(tables)
-    files["records.csv"] = _csv(("record", "sha256"), sorted(records.digests.items()))
+    files["records.csv"] = _csv(
+        ("record", "sha256_lf", "git_blob_lf", "commit", "blob_at_commit", "matches_commit"),
+        digests,
+    )
     files["checks.csv"] = _csv(
         ("check", "record", "pointer", "recorded", "recomputed", "holds"),
         (
@@ -879,7 +1243,7 @@ def extract(root: Path, output_dir: Path) -> list[Check]:
     output_dir.mkdir(parents=True, exist_ok=True)
     for name, text in files.items():
         (output_dir / name).write_text(text, encoding="utf-8", newline="\n")
-    return checks
+    return checks, commit
 
 
 def _parse_arguments(argv: Sequence[str] | None) -> argparse.Namespace:
@@ -904,12 +1268,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     root: Path = arguments.root
     try:
         output_dir = _resolve_output(root, arguments.output_dir)
-        checks = extract(root, output_dir)
+        checks, commit = extract(root, output_dir)
     except RecordError as error:
         print(f"Paper record tables refused: {error}")
         return 1
     failed = [check for check in checks if not check.holds]
     print(f"Wrote the paper record tables to {output_dir}")
+    if commit is None:
+        print("  no git commit read at the root: records.csv names none to match")
+    else:
+        print(f"  records compared with commit {commit}")
     print(f"  {len(checks) - len(failed)} of {len(checks)} record checks hold")
     for check in failed:
         print(f"  FAILS: {check.name} ({check.record} {check.pointer})")

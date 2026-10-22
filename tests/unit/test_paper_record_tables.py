@@ -3,14 +3,19 @@
 The runner's promise is that every number it writes can be found again in a record: each
 provenance row and each figure pointer is resolved here against the fixture it was read from.
 The fixtures carry three decision folds and four sampler folds, written with the summaries the
-records would hold, so the arithmetic checks hold until a test breaks one on purpose.
+records would hold, so the arithmetic checks hold until a test breaks one on purpose. Every
+candidate record and every sampler arm has numbers of its own, and the expected pairing of
+labels and records is written out below by path, so a label read from the wrong record fails.
 """
 
 from __future__ import annotations
 
 import csv
 import json
+import shutil
 import socket
+import statistics
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -21,14 +26,50 @@ from scripts.paper_record_tables import RecordError, Records, main, resolve
 LINEAR_FOLDS = {"2021-22-gw02": 50.0, "2021-22-gw03": 60.0, "2022-23-gw02": 40.0}
 CANDIDATE_FOLDS = {"2021-22-gw02": 52.0, "2021-22-gw03": 60.0, "2022-23-gw02": 35.0}
 
+#: Each candidate's label, its record by path and the shift that gives its numbers their own
+#: values: the candidate's folds, MAE and scope all move with it.
+CANDIDATE_RECORDS: dict[str, tuple[str, float]] = {
+    "Boosted pair": ("docs/research/phase_c_gradient_boosting_comparison.json", 0.0),
+    "Boosted pair, v2 feature contract": (
+        "docs/research/phase_c_feature_contract_v2_comparison.json",
+        1.0,
+    ),
+    "Points-only boosting": ("docs/research/phase_c_gradient_boosting_points_comparison.json", 2.0),
+    "Regime-gated experts": ("docs/research/moe_regime.json", 3.0),
+    "Gated mixture": ("docs/research/moe_mixture.json", 4.0),
+}
+
+FOUNDATION = "docs/phase_d_component_squad_calibration.json"
+BLOCK = "docs/research/team_match_block_sampler.json"
+JOINT = "docs/research/moe_sampler.json"
+
+#: Each sampler arm by record path and arm pointer: its label and four fold PITs of its own.
+SAMPLER_ARMS: dict[tuple[str, str], tuple[str, tuple[float, ...]]] = {
+    (FOUNDATION, "/verdict"): ("foundation", (0.05, 0.5, 0.6, 0.95)),
+    (BLOCK, "/control_arm"): ("foundation", (0.04, 0.45, 0.55, 0.9)),
+    (BLOCK, "/candidate_arm"): ("team_match_block", (0.08, 0.3, 0.7, 0.85)),
+    (JOINT, "/control_arm"): ("foundation", (0.02, 0.06, 0.6, 0.8)),
+    (JOINT, "/block_arm"): ("team_match_block", (0.07, 0.35, 0.65, 0.99)),
+    (JOINT, "/candidate_arm"): ("team_match_joint", (0.2, 0.4, 0.5, 0.75)),
+}
+
+S1_BOUNDS = [0.43, 0.57]
+S2_BOUNDS = [0.04, 0.16]
+
 
 def _metrics(log_loss: float, minutes: float, points: float) -> dict[str, Any]:
+    # Two seasons of ten rows each around the pooled MAE, so the pooled value is their mean.
+    seasons = {
+        season: {"points": {"mean_absolute_error": points + offset, "observations": 10}}
+        for season, offset in (("2024-25", -0.01), ("2025-26", 0.01))
+    }
     return {
         "overall": {
             "appearance": {"log_loss": log_loss},
             "minutes": {"mean_absolute_error": minutes},
-            "points": {"mean_absolute_error": points},
-        }
+            "points": {"mean_absolute_error": points, "observations": 20},
+        },
+        "by_season": seasons,
     }
 
 
@@ -53,33 +94,42 @@ def _arm(folds: dict[str, float]) -> dict[str, Any]:
     }
 
 
-def _summary(prefix: str) -> dict[str, Any]:
-    differences = [CANDIDATE_FOLDS[fold] - LINEAR_FOLDS[fold] for fold in LINEAR_FOLDS]
+def _summary(prefix: str, candidate_folds: dict[str, float]) -> dict[str, Any]:
+    differences = [candidate_folds[fold] - LINEAR_FOLDS[fold] for fold in LINEAR_FOLDS]
+    wins = sum(difference > 0 for difference in differences)
+    ties = sum(difference == 0 for difference in differences)
     return {
         "paired_folds": len(differences),
         f"{prefix}mean": sum(differences) / len(differences),
-        f"{prefix}median": 0.0,
+        f"{prefix}median": statistics.median(differences),
         f"{prefix}interval_90": [-3.0, 1.5],
-        "wins_ties_losses": [1, 1, 1],
+        "wins_ties_losses": [wins, ties, len(differences) - wins - ties],
         "by_season_mean": {"2021-22": 1.0, "2022-23": -5.0},
     }
 
 
-def _candidate_record(candidate: tables.Candidate) -> dict[str, Any]:
+def _candidate_record(candidate: tables.Candidate, shift: float) -> dict[str, Any]:
     arm = candidate.candidate_arm.rsplit("/", 1)[1]
     linear = candidate.linear_arm.rsplit("/", 1)[1]
-    arms = {arm: _arm(CANDIDATE_FOLDS), linear: _arm(LINEAR_FOLDS)}
+    folds = {fold: score + shift for fold, score in CANDIDATE_FOLDS.items()}
+    arms = {arm: _arm(folds), linear: _arm(LINEAR_FOLDS)}
     if candidate.mean.endswith("/mean"):
-        decision: dict[str, Any] = {"v2_features_minus_linear": _summary(""), "arms": arms}
+        decision: dict[str, Any] = {"v2_features_minus_linear": _summary("", folds), "arms": arms}
     else:
         prefix = candidate.mean.rsplit("/", 1)[1].removesuffix("mean")
-        decision = {**_summary(prefix), "arms": arms}
+        decision = {**_summary(prefix, folds), "arms": arms}
+    decision["scope"] = f"reading {shift:g}; how it was scored"
     return {
+        "declaration": f"docs/research/declaration_{shift:g}.md",
+        "arm_manifests": {
+            "control_arm": {"fold_count": 6, "scored_fold_count": 6},
+            "candidate_arm": {"fold_count": 6, "scored_fold_count": 5},
+        },
         "comparison": {
             "arms": {"control": {"name": "control_arm"}, "candidate": {"name": "candidate_arm"}},
             "metrics": {
                 "control": _metrics(0.35, 16.0, 1.07),
-                "candidate": _metrics(0.33, 15.0, 1.05),
+                "candidate": _metrics(0.33, 15.0, 1.05 + shift / 100),
             },
             "primary_season": _season("2025-26", 0.02),
             "control_era_season": _season("2024-25", 0.01),
@@ -89,63 +139,85 @@ def _candidate_record(candidate: tables.Candidate) -> dict[str, Any]:
     }
 
 
-PITS = (0.05, 0.5, 0.6, 0.95)
-
-
 def _sampler_arm(pits: tuple[float, ...], seasons: bool = True) -> dict[str, Any]:
     below = sum(pit < 0.1 for pit in pits)
+    mean = sum(pits) / len(pits)
+    rate = below / len(pits)
     block: dict[str, Any] = {
         "fold_count": len(pits),
-        "mean_probability_integral_transform": sum(pits) / len(pits),
+        "mean_probability_integral_transform": mean,
         "realized_below_lower_quantile_count": below,
-        "realized_below_lower_quantile_rate": below / len(pits),
-        "mean_pit_within_s1_bounds": True,
-        "tail_rate_within_s2_bounds": False,
+        "realized_below_lower_quantile_rate": rate,
     }
     if seasons:
-        block["seasons"] = {
-            "2021-22": {"fold_count": 2, "realized_below_lower_quantile_count": below}
+        block |= {
+            "s1_bounds": S1_BOUNDS,
+            "s2_bounds": S2_BOUNDS,
+            "mean_pit_within_s1_bounds": S1_BOUNDS[0] <= mean <= S1_BOUNDS[1],
+            "tail_rate_within_s2_bounds": S2_BOUNDS[0] <= rate <= S2_BOUNDS[1],
+            "seasons": {"2021-22": {"fold_count": 2, "realized_below_lower_quantile_count": below}},
         }
     return block
 
 
-def _fold(index: int, pit: float, **arms: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "fold_id": f"2021-22-gw{index + 11:02d}",
-        "probability_integral_transform": pit,
-        "realized_below_q10": pit < 0.1,
-        **arms,
-    }
-
-
-def _sampler_fold_arm(pit: float) -> dict[str, Any]:
+def _sampler_fold(pit: float) -> dict[str, Any]:
     return {"probability_integral_transform": pit, "realized_below_q10": pit < 0.1}
 
 
+def _sampler_record(record: str) -> dict[str, Any]:
+    """The record's arms, and four folds holding its top-level arm and each other arm's PIT."""
+
+    arms = {arm: pits for (path, arm), (_, pits) in SAMPLER_ARMS.items() if path == record}
+    top = "/verdict" if "/verdict" in arms else "/candidate_arm"
+    document: dict[str, Any] = {
+        arm[1:]: _sampler_arm(pits, seasons=arm != "/verdict") for arm, pits in arms.items()
+    }
+    document["folds"] = [
+        {
+            "fold_id": f"2021-22-gw{index + 11:02d}",
+            **_sampler_fold(arms[top][index]),
+            **{arm[1:]: _sampler_fold(pits[index]) for arm, pits in arms.items() if arm != top},
+        }
+        for index in range(4)
+    ]
+    return document
+
+
+def _seed_arm(counts: dict[str, int], ceiling: int) -> dict[str, Any]:
+    within = [seed for seed, count in counts.items() if count <= ceiling]
+    return {
+        "counts_by_seed": counts,
+        "min_count": min(counts.values()),
+        "max_count": max(counts.values()),
+        "mean_count": statistics.fmean(counts.values()),
+        "seeds_within_s2_band": len(within),
+        "seeds_within_s2_band_ids": within,
+        "fixed_count_outside_the_redrawn_folds": 1,
+    }
+
+
 def _records() -> dict[str, Any]:
-    records: dict[str, Any] = {c.record: _candidate_record(c) for c in tables.CANDIDATES}
-    verdict = _sampler_arm(PITS, seasons=False)
-    verdict.update({"s1_passes": True, "s2_passes": False})
-    records[tables.FOUNDATION] = {
-        "verdict": verdict,
-        "folds": [_fold(i, pit) for i, pit in enumerate(PITS)],
+    structure = {candidate.record: candidate for candidate in tables.CANDIDATES}
+    records: dict[str, Any] = {
+        record: _candidate_record(structure[record], shift)
+        for record, shift in CANDIDATE_RECORDS.values()
     }
-    records[tables.BLOCK] = {
-        "candidate_arm": _sampler_arm(PITS),
-        "control_arm": _sampler_arm(PITS),
-        "folds": [_fold(i, pit, control_arm=_sampler_fold_arm(pit)) for i, pit in enumerate(PITS)],
-    }
-    records[tables.JOINT] = {
-        "candidate_arm": _sampler_arm(PITS),
-        "block_arm": _sampler_arm(PITS),
-        "control_arm": _sampler_arm(PITS),
-        "folds": [
-            _fold(i, pit, control_arm=_sampler_fold_arm(pit), block_arm=_sampler_fold_arm(pit))
-            for i, pit in enumerate(PITS)
-        ],
-        "seed_sensitivity_added_after_the_result": {
-            "arms": {"candidate": {"counts_by_seed": {"0": 1, "1": 2}}},
-            "plug_in_lower_tail_count": {"candidate": {"band_ceiling_count": 1}},
+    v2 = records["docs/research/phase_c_feature_contract_v2_comparison.json"]
+    v2["decision_level_reading"] |= {"added_after_result": True, "descriptive_only": True}
+    boosted = records["docs/research/phase_c_gradient_boosting_comparison.json"]
+    boosted["decision_level_reading"]["note"] = "reported beside the rule; not part of it"
+    for record in (FOUNDATION, BLOCK, JOINT):
+        records[record] = _sampler_record(record)
+    records[FOUNDATION]["verdict"].update({"s1_passes": True, "s2_passes": False})
+    records[JOINT]["seed_sensitivity_added_after_the_result"] = {
+        "status": "descriptive, added after the result; decides nothing",
+        "arms": {
+            "block_arm": _seed_arm({"0": 3, "1": 4}, ceiling=3),
+            "candidate": _seed_arm({"0": 1, "1": 2, "2": 1}, ceiling=1),
+        },
+        "plug_in_lower_tail_count": {
+            "block_arm": {"band_ceiling_count": 3},
+            "candidate": {"band_ceiling_count": 1},
         },
     }
     scores = {
@@ -211,7 +283,7 @@ def _write(root: Path, records: dict[str, Any]) -> None:
     for record, document in records.items():
         path = root / record
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(document), encoding="utf-8")
+        path.write_text(json.dumps(document, indent=1), encoding="utf-8")
 
 
 def _read_csv(path: Path) -> list[dict[str, str]]:
@@ -225,8 +297,8 @@ def root(tmp_path: Path) -> Path:
     return tmp_path
 
 
-def _run(root: Path) -> tuple[int, Path]:
-    output = root / "artifacts" / "tables"
+def _run(root: Path, folder: str = "tables") -> tuple[int, Path]:
+    output = root / "artifacts" / folder
     return main(["--root", str(root), "--output-dir", str(output)]), output
 
 
@@ -238,8 +310,10 @@ def test_every_table_number_resolves_to_its_record_and_pointer(root: Path) -> No
     assert {row["table"] for row in provenance} == {
         "table_candidates_player_level",
         "table_candidates_decision_level",
+        "table_candidates_reading_status",
         "table_sampler_calibration",
         "table_joint_sampler_seeds",
+        "table_joint_sampler_seed_summary",
         "table_mixture_distribution",
         "table_mixture_log_score_folds",
         "table_planning_measurements",
@@ -275,6 +349,56 @@ def test_every_figure_value_resolves_to_its_pointer(root: Path) -> None:
                     assert tables._text(resolved[0]) == value
 
 
+def test_each_candidate_label_reads_its_own_record(root: Path) -> None:
+    _, output = _run(root)
+
+    provenance = _read_csv(output / "provenance.csv")
+    for name in (
+        "table_candidates_player_level",
+        "table_candidates_decision_level",
+        "table_candidates_reading_status",
+    ):
+        for index, row in enumerate(_read_csv(output / f"{name}.csv")):
+            if row["candidate"] not in CANDIDATE_RECORDS:
+                continue
+            record, shift = CANDIDATE_RECORDS[row["candidate"]]
+            cited = {
+                cell["record"]
+                for cell in provenance
+                if cell["table"] == name and cell["row"] == str(index)
+            }
+            assert cited == {record}, (name, row["candidate"])
+            if name == "table_candidates_decision_level":
+                assert float(row["candidate_minus_linear_mean"]) == shift - 1.0
+            if name == "table_candidates_player_level":
+                assert float(row["candidate_points_mae"]) == 1.05 + shift / 100
+    for name, label in (
+        ("figure_decision_fold_differences", "candidate"),
+        ("figure_decision_by_season", "candidate"),
+        ("figure_points_mae_against_squad_points", "arm"),
+    ):
+        for row in _read_csv(output / f"{name}.csv"):
+            expected = CANDIDATE_RECORDS.get(row[label], (CANDIDATE_RECORDS["Boosted pair"][0],))
+            assert row["record"] == expected[0], (name, row[label])
+
+
+def test_each_sampler_arm_reads_its_own_folds(root: Path) -> None:
+    _, output = _run(root)
+
+    calibration = _read_csv(output / "table_sampler_calibration.csv")
+    assert [(row["record"], row["arm"]) for row in calibration] == list(SAMPLER_ARMS)
+    pits: dict[tuple[str, str], list[float]] = {}
+    for row in _read_csv(output / "figure_sampler_pit.csv"):
+        key = (row["record"], row["arm"])
+        assert row["sampler"] == SAMPLER_ARMS[key][0], key
+        pits.setdefault(key, []).append(float(row["pit"]))
+    assert pits == {key: list(arm[1]) for key, arm in SAMPLER_ARMS.items()}
+    for row in calibration:
+        label, arm_pits = SAMPLER_ARMS[(row["record"], row["arm"])]
+        assert row["sampler"] == label
+        assert float(row["mean_pit"]) == sum(arm_pits) / len(arm_pits)
+
+
 def test_the_fold_differences_reproduce_each_recorded_summary(root: Path) -> None:
     _, output = _run(root)
 
@@ -285,10 +409,15 @@ def test_the_fold_differences_reproduce_each_recorded_summary(root: Path) -> Non
     assert [row["difference"] for row in differences[:3]] == ["2.0", "0.0", "-5.0"]
 
 
-def test_a_recorded_mean_that_its_folds_do_not_give_fails_its_check(root: Path) -> None:
+def test_a_recorded_summary_that_its_detail_does_not_give_fails_its_check(root: Path) -> None:
     records = _records()
     records[tables.MIXTURE]["decision_level_reading"]["candidate_minus_linear_mean"] = 0.25
-    records[tables.JOINT]["candidate_arm"]["realized_below_lower_quantile_count"] = 0
+    records[JOINT]["candidate_arm"]["realized_below_lower_quantile_count"] = 3
+    records[BLOCK]["candidate_arm"]["tail_rate_within_s2_bounds"] = True
+    seeds = records[JOINT]["seed_sensitivity_added_after_the_result"]
+    seeds["arms"]["candidate"]["seeds_within_s2_band"] = 3
+    regime = records[tables.REGIME]["comparison"]["metrics"]["candidate"]
+    regime["overall"]["points"]["mean_absolute_error"] = 0.9
     _write(root, records)
 
     code, output = _run(root)
@@ -297,8 +426,119 @@ def test_a_recorded_mean_that_its_folds_do_not_give_fails_its_check(root: Path) 
     failed = [check for check in _read_csv(output / "checks.csv") if check["holds"] == "false"]
     assert [(check["record"], check["pointer"]) for check in failed] == [
         (tables.MIXTURE, "/decision_level_reading/candidate_minus_linear_mean"),
-        (tables.JOINT, "/candidate_arm/realized_below_lower_quantile_count"),
+        (JOINT, "/candidate_arm/realized_below_lower_quantile_count"),
+        (BLOCK, "/candidate_arm/tail_rate_within_s2_bounds"),
+        (JOINT, "/seed_sensitivity_added_after_the_result/arms/candidate/seeds_within_s2_band"),
+        (tables.REGIME, "/comparison/metrics/candidate/overall/points/mean_absolute_error"),
     ]
+
+
+def test_each_seed_row_cites_the_band_ceiling_of_its_own_arm(root: Path) -> None:
+    _, output = _run(root)
+
+    rows = _read_csv(output / "table_joint_sampler_seeds.csv")
+    assert {(row["arm"], row["band_ceiling_count"]) for row in rows} == {
+        ("block_arm", "3"),
+        ("candidate", "1"),
+    }
+    ceilings = [
+        row
+        for row in _read_csv(output / "provenance.csv")
+        if row["table"] == "table_joint_sampler_seeds" and row["column"] == "band_ceiling_count"
+    ]
+    for cell, row in zip(ceilings, rows, strict=True):
+        assert f"/plug_in_lower_tail_count/{row['arm']}/" in cell["pointer"]
+    summary = _read_csv(output / "table_joint_sampler_seed_summary.csv")
+    assert [(row["arm"], row["seeds_within_s2_band"]) for row in summary] == [
+        ("block_arm", "1"),
+        ("candidate", "2"),
+    ]
+
+
+def test_the_reading_status_is_shown_as_each_record_states_it(root: Path) -> None:
+    _, output = _run(root)
+
+    decision = {
+        row["candidate"]: row for row in _read_csv(output / "table_candidates_decision_level.csv")
+    }
+    assert decision["Boosted pair, v2 feature contract"]["added_after_result"] == "true"
+    assert decision["Boosted pair, v2 feature contract"]["descriptive_only"] == "true"
+    assert decision["Boosted pair"]["added_after_result"] == ""
+    assert decision["Gated mixture"]["scope"] == "reading 4; how it was scored"
+    status = {
+        row["candidate"]: row for row in _read_csv(output / "table_candidates_reading_status.csv")
+    }
+    assert status["Boosted pair"]["note"] == "reported beside the rule; not part of it"
+    assert status["Gated mixture"]["declaration"] == "docs/research/declaration_4.md"
+    markdown = (output / "tables.md").read_text(encoding="utf-8")
+    decision_section = markdown.split("## table_candidates_decision_level")[1].split("## ")[0]
+    assert "| reading 4; ... |" in decision_section
+    status_section = markdown.split("## table_candidates_reading_status")[1].split("## ")[0]
+    assert "| reading 4; how it was scored |" in status_section
+
+
+def test_the_mae_figure_carries_each_season_beside_the_pooled_value(root: Path) -> None:
+    _, output = _run(root)
+
+    rows = _read_csv(output / "figure_points_mae_against_squad_points.csv")
+    mixture = next(row for row in rows if row["arm"] == "Gated mixture")
+    assert float(mixture["points_mae_2025-26"]) == 1.05 + 4.0 / 100 + 0.01
+    assert mixture["points_observations_2025-26"] == "10"
+    assert mixture["points_mae_2025-26_pointer"] == (
+        "/comparison/metrics/candidate/by_season/2025-26/points/mean_absolute_error"
+    )
+
+
+def test_outside_a_git_checkout_the_records_name_no_commit(root: Path) -> None:
+    code, output = _run(root)
+
+    assert code == 0
+    rows = _read_csv(output / "records.csv")
+    assert len(rows) == 11
+    assert {(row["commit"], row["matches_commit"]) for row in rows} == {("", "")}
+    checks = _read_csv(output / "checks.csv")
+    assert not [check for check in checks if "committed" in check["check"]]
+
+
+def _git(root: Path, *arguments: str) -> None:
+    identity = ("-c", "user.name=fixture", "-c", "user.email=fixture@example.invalid")
+    settings = ("-c", "commit.gpgsign=false", "-c", "core.autocrlf=false")
+    command = ["git", "-C", str(root), *identity, *settings, *arguments]
+    subprocess.run(command, check=True, capture_output=True)
+
+
+@pytest.mark.skipif(shutil.which("git") is None, reason="needs git")
+def test_each_record_is_compared_with_the_committed_one_line_endings_aside(root: Path) -> None:
+    _git(root, "init", "-q")
+    _git(root, "add", "docs")
+    _git(root, "commit", "-q", "-m", "records")
+    code, output = _run(root, "first")
+    first = {row["record"]: row for row in _read_csv(output / "records.csv")}
+
+    assert code == 0
+    assert {row["matches_commit"] for row in first.values()} == {"true"}
+    assert len({row["commit"] for row in first.values()}) == 1
+    assert all(row["blob_at_commit"] == row["git_blob_lf"] for row in first.values())
+
+    # A Windows checkout under core.autocrlf holds the same record with CRLF line endings.
+    path = root / tables.REGIME
+    path.write_bytes(path.read_bytes().replace(b"\n", b"\r\n"))
+    code, output = _run(root, "crlf")
+    crlf = {row["record"]: row for row in _read_csv(output / "records.csv")}
+
+    assert code == 0
+    assert crlf == first
+
+    records = _records()
+    records[tables.MIXTURE]["comparison"]["verdict"]["verdict"] = "edited"
+    _write(root, records)
+    code, output = _run(root, "edited")
+    edited = {row["record"]: row for row in _read_csv(output / "records.csv")}
+
+    assert code == 1
+    assert edited[tables.MIXTURE]["matches_commit"] == "false"
+    failed = [check for check in _read_csv(output / "checks.csv") if check["holds"] == "false"]
+    assert [check["record"] for check in failed] == [tables.MIXTURE]
 
 
 def test_a_missing_key_is_refused_with_its_record_and_pointer(
@@ -369,6 +609,11 @@ def test_the_extraction_opens_no_connection(root: Path, monkeypatch: pytest.Monk
     code, _ = _run(root)
 
     assert code == 0
+
+
+def test_a_git_blob_id_is_the_one_git_gives() -> None:
+    # `printf 'hello\n' | git hash-object --stdin`
+    assert tables.git_blob_id(b"hello\n") == "ce013625030ba8dba906f756967f9e9ca394464a"
 
 
 def test_a_json_pointer_unescapes_its_tokens_and_indexes_lists() -> None:
