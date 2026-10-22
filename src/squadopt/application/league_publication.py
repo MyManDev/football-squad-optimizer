@@ -309,8 +309,16 @@ def publish_league(
     )
 
 
-def load_publication_manager_words(request: LeaguePublicationRequest) -> ManagerWords | None:
-    """The manager's word for this publication, or ``None`` when it names no evidence."""
+def load_publication_manager_words(
+    request: LeaguePublicationRequest,
+    *,
+    read_capture: Callable[[Path, str], CapturedSnapshot] | None = None,
+) -> ManagerWords | None:
+    """The manager's word for this publication, or ``None`` when it names no evidence.
+
+    ``read_capture`` is the publication's capture reader, so a weekly run's leagues read the
+    club-news and roster captures once between them rather than once per league.
+    """
 
     if request.rotation_evidence is None and request.club_news_source is None:
         return None
@@ -323,6 +331,7 @@ def load_publication_manager_words(request: LeaguePublicationRequest) -> Manager
         request.rotation_evidence,
         club_news_source=request.club_news_source,
         snapshot_root=request.snapshot_root,
+        read_capture=read_capture,
     )
 
 
@@ -698,7 +707,7 @@ def publish_prepared_league(
     # or writes the league's path, so its histories carry over.
     legacy = settle_legacy_tree(site_data, (request.league_id,))
     out_dir = league_tree_dir(site_data, request.league_id)
-    manager_words = load_publication_manager_words(request)
+    manager_words = load_publication_manager_words(request, read_capture=read_capture)
     if manager_words is not None and (manager_words.season, manager_words.gameweek) != (
         season,
         int(inputs.deadline.gameweek),
