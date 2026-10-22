@@ -118,9 +118,24 @@ def test_a_query_string_is_not_erased_to_make_the_page_identifier_match():
     assert not publication_metadata(_source(), "text/html", URL + "?article=other").verified
 
 
-def test_nested_article_content_cannot_supply_the_page_identity():
-    raw = _source().replace(b"<head>", b"<body><article>").replace(b"</head>", b"</article>")
+@pytest.mark.parametrize(
+    "opening",
+    [
+        b"<body><article>",
+        b"<head><title>Team news</title><body><article>",
+        b"<head><title>Team news</title><article>",
+        b"<head></head><body><svg><head><article>",
+    ],
+)
+def test_nested_article_content_cannot_supply_the_page_identity(opening):
+    metadata, body = _source().split(b"</head>", 1)
+    raw = opening + metadata.removeprefix(b"<head>") + b"</article>" + body
     assert not publication_metadata(raw, "text/html", URL).verified
+
+
+def test_a_head_without_its_end_tag_still_holds_the_declarations_before_the_body():
+    raw = _source().replace(b"</head>", b"")
+    assert publication_metadata(raw, "text/html", URL).verified
 
 
 def test_streamed_metadata_at_body_root_needs_the_same_corroboration():

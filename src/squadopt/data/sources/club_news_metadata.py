@@ -21,6 +21,20 @@ MAX_SOURCE_BYTES = 2 * 1024 * 1024
 _ARTICLE_TYPES = {"Article", "NewsArticle", "BlogPosting", "ReportageNewsArticle"}
 # Deeper real nesting refuses the page. The cap keeps each end tag's search short.
 _MAX_HTML_DEPTH = 256
+# The elements HTML keeps in a head. Any other element placed directly in it ends the head.
+_HEAD_TAGS = {
+    "base",
+    "basefont",
+    "bgsound",
+    "link",
+    "meta",
+    "noframes",
+    "noscript",
+    "script",
+    "style",
+    "template",
+    "title",
+}
 _TABLE_SECTIONS = {"tbody", "tfoot", "thead"}
 # HTML lets a page omit these end tags. An open element closes when a start tag listed for
 # it begins, with any of these elements still open inside it. A table or form start tag
@@ -184,7 +198,7 @@ class _MetadataReader(HTMLParser):
         self.too_deep = False
         self._json: list[str] | None = None
         self._unbound_articles = 0
-        self._in_head = False
+        self._head_allowed = True
         self._canonical_urls: list[str] = []
         self._addressed_dates: list[_AddressedDate] = []
         self._language: str | None = None
@@ -203,7 +217,19 @@ class _MetadataReader(HTMLParser):
             return
         values = dict(attrs)
         stack = self._tag_stack
+        if tag == "head":
+            # Only the page's own head counts. HTML ignores a later or nested head tag.
+            if not self._head_allowed or stack not in ([], ["html"]):
+                return
+            self._head_allowed = False
+        elif tag != "html" and tag not in _HEAD_TAGS:
+            self._head_allowed = False
+            # Without </head>, HTML ends the head at the body or at the first element that
+            # cannot be in it, so the links and metas after it are body content.
+            if "head" in stack[:2] and (tag == "body" or stack[-1] == "head"):
+                del stack[stack.index("head") :]
         self._close_implied_ends(tag)
+        in_head = "head" in stack[:2]
         body_root = stack in (["body"], ["html", "body"])
         if tag not in _VOID_TAGS:
             if len(stack) >= _MAX_HTML_DEPTH:
@@ -212,11 +238,9 @@ class _MetadataReader(HTMLParser):
             stack.append(tag)
         if tag in ("meta", "time", "script", "link") and len(values) != len(attrs):
             self.invalid = True
-        if tag == "head":
-            self._in_head = True
         if tag == "html":
             self._language = (values.get("lang") or "").lower()
-        if tag == "meta" and self._in_head:
+        if tag == "meta" and in_head:
             if values.get("property") == "og:url":
                 self._open_graph_urls.append(values.get("content") or "")
             if values.get("property") == "og:title":
@@ -230,17 +254,9 @@ class _MetadataReader(HTMLParser):
                 self._streamed_open_graph_titles.append(values.get("content") or "")
         if tag == "time" and values.get("datetime") is not None:
             self._displayed_times.append(values["datetime"] or "")
-        if (
-            tag == "link"
-            and self._in_head
-            and "canonical" in (values.get("rel") or "").lower().split()
-        ):
+        if tag == "link" and in_head and "canonical" in (values.get("rel") or "").lower().split():
             self._canonical_urls.append(values.get("href") or "")
-        if (
-            tag == "link"
-            and self._in_head
-            and "alternate" in (values.get("rel") or "").lower().split()
-        ):
+        if tag == "link" and in_head and "alternate" in (values.get("rel") or "").lower().split():
             self._language_urls.append(
                 ((values.get("hreflang") or "").lower(), values.get("href") or "")
             )
@@ -281,8 +297,6 @@ class _MetadataReader(HTMLParser):
         if tag in self._tag_stack:
             start = len(self._tag_stack) - 1 - self._tag_stack[::-1].index(tag)
             del self._tag_stack[start:]
-        if tag == "head":
-            self._in_head = False
         if tag != "script" or self._json is None:
             return
         text, self._json = "".join(self._json), None
