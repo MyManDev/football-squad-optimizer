@@ -22,10 +22,12 @@ import pandas as pd
 
 from squadopt.application.advice_record import (
     MEMBER_ADVICE_RECORD_CONTRACT_VERSION,
+    MEMBER_BASELINE_RECORD_CONTRACT_VERSION,
     load_member_advice_record,
     recorded_captures,
 )
 from squadopt.application.settled_member import ActualMemberDetails, settled_member_details
+from squadopt.contracts.legacy_publication_config import LEGACY_ADVICE_LEAGUE_ID
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import CapturedSnapshot, list_snapshot_ids, read_snapshot
 from squadopt.data.sources.fpl_live import (
@@ -64,7 +66,8 @@ from squadopt.evaluation.scoring import score_frozen_squad_decision
 from squadopt.live.recommendation import infer_season
 
 CONTRACT_VERSION = "weekly_suggestion_history_v1"
-SUPPORTED_LEAGUE_ID = 352490
+# Kept for older measurement entry points; every reader accepts an explicit league.
+SUPPORTED_LEAGUE_ID = LEGACY_ADVICE_LEAGUE_ID
 
 # The horizon handoff, specified in docs/contracts/member_week_horizon_v1.md. The reader
 # rejects the whole document when any one of these disagrees with the scoreboard it is shown
@@ -232,6 +235,7 @@ def select_record(
     deadline_utc: str,
     published: PublishedCaptures | None = None,
     league_id: int = SUPPORTED_LEAGUE_ID,
+    baseline_record_root: Path | None = None,
 ) -> dict[str, Any] | None:
     """Select the recorded advice for one member-week, checking both clocks and all identities.
 
@@ -251,32 +255,61 @@ def select_record(
     """
     _identifier(league_id)
     deadline = as_instant(normalize_utc_timestamp(deadline_utc, label="deadline_utc"))
-    candidates: list[tuple[datetime, str, dict[str, Any]]] = []
-    for capture in recorded_captures(root, season, gameweek, entry_id):
-        record = load_member_advice_record(root, season, gameweek, entry_id, capture.snapshot_id)
-        if (
-            record.get("contract_version") != MEMBER_ADVICE_RECORD_CONTRACT_VERSION
-            or record.get("season") != season
-            or _identifier(record.get("gameweek")) != gameweek
-            or _identifier(record.get("entry_id")) != entry_id
-            or _identifier(record.get("league_id")) != league_id
-            or record.get("player_id_space") != "fpl_element_code"
-        ):
-            raise SuggestionEvaluationError("Record identity does not match the requested member.")
-        stamp = record.get("generated_at_utc")
-        if not isinstance(stamp, str):
-            raise SuggestionEvaluationError("Recorded publication time is missing.")
-        stamped = as_instant(normalize_utc_timestamp(stamp, label="generated_at_utc"))
-        if stamped < capture.instant:
-            raise SuggestionEvaluationError("Recorded publication precedes its capture.")
-        if capture.instant < deadline and stamped < deadline:
-            try:
-                _advice(record)
-            except SuggestionEvaluationError as error:
-                if str(error) == "missing_advice":
-                    continue
-                raise
-            candidates.append((stamped, capture.snapshot_id, record))
+    stores = [root] if baseline_record_root is None else [baseline_record_root, root]
+    held: dict[str, tuple[datetime, str, dict[str, Any]] | None] = {}
+    for store in stores:
+        for capture in recorded_captures(store, season, gameweek, entry_id):
+            record = load_member_advice_record(
+                store, season, gameweek, entry_id, capture.snapshot_id
+            )
+            baseline = record.get("contract_version") == MEMBER_BASELINE_RECORD_CONTRACT_VERSION
+            other_league = (
+                baseline_record_root is not None
+                and store == root
+                and record.get("contract_version") == MEMBER_ADVICE_RECORD_CONTRACT_VERSION
+                and _identifier(record.get("league_id")) != league_id
+            )
+            if (
+                record.get("contract_version")
+                not in (
+                    MEMBER_ADVICE_RECORD_CONTRACT_VERSION,
+                    MEMBER_BASELINE_RECORD_CONTRACT_VERSION,
+                )
+                or record.get("season") != season
+                or _identifier(record.get("gameweek")) != gameweek
+                or _identifier(record.get("entry_id")) != entry_id
+                or (
+                    "league_id" in record
+                    if baseline
+                    else not other_league and _identifier(record.get("league_id")) != league_id
+                )
+                or (baseline and record.get("source") != "server_one_week_baseline")
+                or record.get("player_id_space") != "fpl_element_code"
+            ):
+                raise SuggestionEvaluationError(
+                    "Record identity does not match the requested member."
+                )
+            stamp = record.get("generated_at_utc")
+            if not isinstance(stamp, str):
+                raise SuggestionEvaluationError("Recorded publication time is missing.")
+            stamped = as_instant(normalize_utc_timestamp(stamp, label="generated_at_utc"))
+            if stamped < capture.instant:
+                raise SuggestionEvaluationError("Recorded publication precedes its capture.")
+            candidate = None
+            if capture.instant < deadline and stamped < deadline:
+                try:
+                    _advice(record)
+                except SuggestionEvaluationError as error:
+                    if str(error) != "missing_advice":
+                        raise
+                else:
+                    candidate = (stamped, capture.snapshot_id, record)
+            if not other_league:
+                # Check every input before merging stores. A valid legacy record must
+                # not hide a broken baseline; a late legacy publication must not borrow
+                # the earlier baseline's clock. Its original digest remains authoritative.
+                held[capture.snapshot_id] = candidate
+    candidates = [candidate for candidate in held.values() if candidate is not None]
     if not candidates:
         return None
     if published is not None:
@@ -464,6 +497,7 @@ def evaluate_week(
     selected_records: dict[tuple[int, int], dict[str, Any]] | None = None,
     published: PublishedCaptures | None = None,
     league_id: int = SUPPORTED_LEAGUE_ID,
+    baseline_record_root: Path | None = None,
 ) -> WeekReview:
     base: dict[str, Any] = {"gameweek": gameweek, "deadline_utc": deadline_utc}
     try:
@@ -475,6 +509,7 @@ def evaluate_week(
             entry_id=entry_id,
             deadline_utc=deadline_utc,
             published=published,
+            baseline_record_root=baseline_record_root,
         )
         if record is None:
             return WeekReview(**base, status="unavailable", reason="no_pre_deadline_record")
@@ -596,6 +631,7 @@ def review_member_weeks(
     selected_records: dict[tuple[int, int], dict[str, Any]] | None = None,
     published: PublishedCaptures | None = None,
     read_capture: Callable[[Path, str], CapturedSnapshot] | None = None,
+    baseline_record_root: Path | None = None,
 ) -> dict[int, tuple[WeekReview, ...]]:
     """Review every recorded week of every member, newest gameweek first, from evidence only.
 
@@ -627,10 +663,16 @@ def review_member_weeks(
         if entry_id in reviews:
             continue
         weeks = []
-        for directory in sorted((record_root / season).glob("gw[0-9][0-9]"), reverse=True):
-            if not (directory / f"entry-{entry_id}").is_dir():
-                continue
-            week = int(directory.name[2:])
+        stores = (
+            [record_root] if baseline_record_root is None else [record_root, baseline_record_root]
+        )
+        recorded_weeks = {
+            int(directory.name[2:])
+            for store in stores
+            for directory in (store / season).glob("gw[0-9][0-9]")
+            if (directory / f"entry-{entry_id}").is_dir()
+        }
+        for week in sorted(recorded_weeks, reverse=True):
             if week not in deadlines:
                 weeks.append(WeekReview(week, "unavailable", "missing_deadline"))
             else:
@@ -645,6 +687,7 @@ def review_member_weeks(
                         captures=captures,
                         selected_records=selected_records,
                         published=published,
+                        baseline_record_root=baseline_record_root,
                     )
                 )
         reviews[entry_id] = tuple(weeks)
@@ -909,6 +952,7 @@ def publish_suggestion_histories(
     published: PublishedCaptures,
     policy: DetectionPolicy = DEFAULT_DETECTION_POLICY,
     read_capture: Callable[[Path, str], CapturedSnapshot] | None = None,
+    baseline_record_root: Path | None = None,
 ) -> tuple[Path, ...]:
     """Publish member-safe derived documents from existing verified, bounded captures.
 
@@ -933,6 +977,7 @@ def publish_suggestion_histories(
         selected_records=selected_records,
         published=published,
         read_capture=read_capture,
+        baseline_record_root=baseline_record_root,
     )
     # Validate the whole replacement before writing the first member. An incomplete
     # record store must not turn a previously published week into a week that vanished.
