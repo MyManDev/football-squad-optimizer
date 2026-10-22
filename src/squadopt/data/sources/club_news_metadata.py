@@ -19,6 +19,22 @@ from html.parser import HTMLParser
 PUBLICATION_METADATA_VERSION = "source_publication_metadata_v1"
 MAX_SOURCE_BYTES = 2 * 1024 * 1024
 _ARTICLE_TYPES = {"Article", "NewsArticle", "BlogPosting", "ReportageNewsArticle"}
+_VOID_TAGS = {
+    "area",
+    "base",
+    "br",
+    "col",
+    "embed",
+    "hr",
+    "img",
+    "input",
+    "link",
+    "meta",
+    "param",
+    "source",
+    "track",
+    "wbr",
+}
 PUBLICATION_SOURCES = (
     "html_publication_meta",
     "html_publication_time",
@@ -38,6 +54,14 @@ class PublicationMetadata:
     verified: bool
     reason: str
     contract_version: str = PUBLICATION_METADATA_VERSION
+
+
+@dataclass(frozen=True, slots=True)
+class _AddressedDate:
+    address: str
+    value: str
+    headline: str
+    page_identifier: bool
 
 
 def _normalise(value: str, source: str) -> tuple[str, str] | None:
@@ -105,18 +129,43 @@ class _MetadataReader(HTMLParser):
         self._unbound_articles = 0
         self._in_head = False
         self._canonical_urls: list[str] = []
-        self._addressed_dates: list[tuple[str, str]] = []
+        self._addressed_dates: list[_AddressedDate] = []
         self._language: str | None = None
         self._language_urls: list[tuple[str, str]] = []
+        self._article_count = 0
+        self._open_graph_urls: list[str] = []
+        self._open_graph_titles: list[str] = []
+        self._displayed_times: list[str] = []
+        self._tag_stack: list[str] = []
+        self._streamed_canonical_urls: list[str] = []
+        self._streamed_open_graph_urls: list[str] = []
+        self._streamed_open_graph_titles: list[str] = []
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         values = dict(attrs)
+        body_root = self._tag_stack in (["body"], ["html", "body"])
+        if tag not in _VOID_TAGS:
+            self._tag_stack.append(tag)
         if tag in ("meta", "time", "script", "link") and len(values) != len(attrs):
             self.invalid = True
         if tag == "head":
             self._in_head = True
         if tag == "html":
             self._language = (values.get("lang") or "").lower()
+        if tag == "meta" and self._in_head:
+            if values.get("property") == "og:url":
+                self._open_graph_urls.append(values.get("content") or "")
+            if values.get("property") == "og:title":
+                self._open_graph_titles.append(values.get("content") or "")
+        if body_root:
+            if tag == "link" and "canonical" in (values.get("rel") or "").lower().split():
+                self._streamed_canonical_urls.append(values.get("href") or "")
+            if tag == "meta" and values.get("property") == "og:url":
+                self._streamed_open_graph_urls.append(values.get("content") or "")
+            if tag == "meta" and values.get("property") == "og:title":
+                self._streamed_open_graph_titles.append(values.get("content") or "")
+        if tag == "time" and values.get("datetime") is not None:
+            self._displayed_times.append(values["datetime"] or "")
         if (
             tag == "link"
             and self._in_head
@@ -150,6 +199,10 @@ class _MetadataReader(HTMLParser):
             self._json.append(data)
 
     def handle_endtag(self, tag: str) -> None:
+        if tag in self._tag_stack:
+            self._tag_stack = self._tag_stack[
+                : len(self._tag_stack) - 1 - self._tag_stack[::-1].index(tag)
+            ]
         if tag == "head":
             self._in_head = False
         if tag != "script" or self._json is None:
@@ -175,6 +228,7 @@ class _MetadataReader(HTMLParser):
                 if isinstance(kinds, list) and any(
                     kind in _ARTICLE_TYPES for kind in kinds if isinstance(kind, str)
                 ):
+                    self._article_count += 1
                     address = item.get("url", item.get("mainEntityOfPage", item.get("@id")))
                     if isinstance(address, dict):
                         address = address.get("@id")
@@ -192,8 +246,17 @@ class _MetadataReader(HTMLParser):
                             )
                     elif isinstance(address, str) and item.get("datePublished") is not None:
                         value = item["datePublished"]
+                        page = item.get("mainEntityOfPage")
+                        headline = item.get("headline")
                         self._addressed_dates.append(
-                            (address, value if isinstance(value, str) else "")
+                            _AddressedDate(
+                                address,
+                                value if isinstance(value, str) else "",
+                                headline if isinstance(headline, str) else "",
+                                "url" not in item
+                                and isinstance(page, dict)
+                                and page.get("@type") == "WebPage",
+                            )
                         )
                 # Only top-level objects and @graph are page metadata. Do not read
                 # dates from recommended articles nested inside an ItemList.
@@ -204,6 +267,22 @@ class _MetadataReader(HTMLParser):
     def canonical_dates(self) -> list[tuple[str, str]]:
         """Use the page's own unambiguous canonical identity, never a related article."""
         original = _page_identity(self.url)
+        # Streaming renderers can emit page metadata directly under body. This is
+        # only corroboration for the identifier form below, never a general body
+        # canonical fallback and never an override of a head declaration.
+        if (
+            original is not None
+            and not self._canonical_urls
+            and not self._open_graph_urls
+            and not self._open_graph_titles
+            and {_page_reference(url, self.url) for url in self._streamed_canonical_urls}
+            == {original}
+        ):
+            return [
+                (item.value, "jsonld_datePublished")
+                for item in self._addressed_dates
+                if self._corroborated_page_identifier(item, original, streamed=True)
+            ]
         identities = {_page_reference(url, self.url) for url in self._canonical_urls}
         if original is None or len(identities) != 1:
             return []
@@ -227,11 +306,40 @@ class _MetadataReader(HTMLParser):
         ):
             localized = (canonical[0], canonical[1], f"/{language}{canonical[2]}")
         return [
-            (value, "jsonld_datePublished")
-            for url, value in self._addressed_dates
-            if _same_page(url, address)
-            or (localized is not None and _page_reference(url, self.url) == localized)
+            (item.value, "jsonld_datePublished")
+            for item in self._addressed_dates
+            if _same_page(item.address, address)
+            or (localized is not None and _page_reference(item.address, self.url) == localized)
+            or (canonical == original and self._corroborated_page_identifier(item, original))
         ]
+
+    def _corroborated_page_identifier(
+        self, item: _AddressedDate, original: tuple[str, str, str], *, streamed: bool = False
+    ) -> bool:
+        """Recognize a page's slash-to-hyphen WebPage id, never repair an article URL.
+
+        Some publishers emit a WebPage identifier rather than a usable URL. Admit
+        this exact form only for one article, with the same canonical and Open Graph
+        URL, matching headlines and a displayed datetime equal to datePublished.
+        The unlabelled time corroborates the explicit publication field; it never
+        supplies a publication date on its own.
+        """
+        if not item.page_identifier or self._article_count != 1 or "?" in original[2]:
+            return False
+        identifier = f"{original[0]}://{original[1]}{original[2].replace('/', '-')}"
+        if item.address != identifier or not item.headline.strip():
+            return False
+        urls = self._streamed_open_graph_urls if streamed else self._open_graph_urls
+        titles = self._streamed_open_graph_titles if streamed else self._open_graph_titles
+        if {_page_reference(url, self.url) for url in urls} != {original}:
+            return False
+        if {title.strip() for title in titles} != {item.headline.strip()}:
+            return False
+        publication = _normalise(item.value, "jsonld_datePublished")
+        displayed = {_normalise(value, "html_publication_time") for value in self._displayed_times}
+        return (
+            publication is not None and publication[1] == "instant" and displayed == {publication}
+        )
 
 
 def _unique_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
