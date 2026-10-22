@@ -27,7 +27,7 @@ import hashlib
 import json
 import logging
 import re
-from collections.abc import Hashable, Iterable, Mapping, Sequence
+from collections.abc import Callable, Hashable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from numbers import Integral
 from pathlib import Path
@@ -454,7 +454,12 @@ def _require_the_coded_documents(
 
 
 def _coding_attested(
-    table: pd.DataFrame, source_kind: str, source_label: str, snapshot_root: Path | None
+    table: pd.DataFrame,
+    source_kind: str,
+    source_label: str,
+    snapshot_root: Path | None,
+    *,
+    read_capture: Callable[[Path, str], CapturedSnapshot] | None = None,
 ) -> bool:
     """Check the bound responses before retaining any capture-backed attestation."""
     news_id = table.attrs.get("club_news_snapshot_id")
@@ -468,7 +473,9 @@ def _coding_attested(
     ):
         return False
     try:
-        snapshot = _club_news_snapshot(snapshot_root / news_id, snapshot_root)
+        snapshot = _club_news_snapshot(
+            snapshot_root / news_id, snapshot_root, read_capture=read_capture
+        )
         if snapshot.metadata.captured_at_utc != table.attrs.get("club_news_captured_at_utc"):
             return False
         responses = read_captured_responses(snapshot)
@@ -512,8 +519,13 @@ def manager_words_from_artifact(
     source_kind: str,
     source_label: str,
     snapshot_root: Path | None = None,
+    read_capture: Callable[[Path, str], CapturedSnapshot] | None = None,
 ) -> ManagerWords:
-    """Read a verified evidence artifact into the statements the rule can act on."""
+    """Read a verified evidence artifact into the statements the rule can act on.
+
+    ``read_capture`` reads the club-news and roster captures; ``None`` reads them from disk.
+    A weekly run passes its own reader so its leagues share one read of each capture.
+    """
 
     table = read_rotation_evidence_artifact(Path(table_path), Path(manifest_path))
     seasons = {str(value) for value in table["season"].tolist()}
@@ -525,8 +537,10 @@ def manager_words_from_artifact(
         )
     clubs = _covered(table, table_path)
     source_check = _require_the_coded_documents(table, table_path, documents, source_label)
-    coding_attested = _coding_attested(table, source_kind, source_label, snapshot_root)
-    target_basis = _decision_fixture_basis(table, snapshot_root)
+    coding_attested = _coding_attested(
+        table, source_kind, source_label, snapshot_root, read_capture=read_capture
+    )
+    target_basis = _decision_fixture_basis(table, snapshot_root, read_capture=read_capture)
     words: list[ManagerWord] = []
     for row in table.to_dict(orient="records"):
         disposition = _text(row.get("rotation_disposition"))
@@ -633,11 +647,16 @@ def manager_words_from_artifact(
     )
 
 
-def _club_news_snapshot(source: Path, snapshot_root: Path | None) -> CapturedSnapshot:
+def _club_news_snapshot(
+    source: Path,
+    snapshot_root: Path | None,
+    *,
+    read_capture: Callable[[Path, str], CapturedSnapshot] | None = None,
+) -> CapturedSnapshot:
     root = Path(snapshot_root) if snapshot_root is not None else source.parent
     if source.resolve() != (root / source.name).resolve():
         raise ManagerWordsError("Configured club-news capture is outside its snapshot root.")
-    snapshot = read_snapshot(root, source.name)
+    snapshot = (read_capture or read_snapshot)(root, source.name)
     if snapshot.metadata.source != CLUB_NEWS_SOURCE:
         raise ManagerWordsError("Configured capture is not a club-news capture.")
     return snapshot
@@ -654,7 +673,10 @@ def club_news_capture_id(source: Path, *, snapshot_root: Path | None = None) -> 
 
 
 def documents_from_source(
-    source: Path, *, snapshot_root: Path | None = None
+    source: Path,
+    *,
+    snapshot_root: Path | None = None,
+    read_capture: Callable[[Path, str], CapturedSnapshot] | None = None,
 ) -> tuple[tuple[RawDocument, ...], str, str]:
     """The captured documents behind an evidence table, with what kind of source they are.
 
@@ -670,7 +692,7 @@ def documents_from_source(
         synthetic = json.loads(path.read_text(encoding="utf-8")).get("synthetic") is True
         return documents, SOURCE_SYNTHETIC_FIXTURE if synthetic else SOURCE_FIXTURE_FILE, path.name
     if path.is_dir():
-        snapshot = _club_news_snapshot(path, snapshot_root)
+        snapshot = _club_news_snapshot(path, snapshot_root, read_capture=read_capture)
         return (
             read_captured_documents(snapshot),
             SOURCE_CLUB_NEWS_CAPTURE,
@@ -680,15 +702,25 @@ def documents_from_source(
 
 
 def load_manager_words(
-    table_path: Path, *, club_news_source: Path, snapshot_root: Path | None = None
+    table_path: Path,
+    *,
+    club_news_source: Path,
+    snapshot_root: Path | None = None,
+    read_capture: Callable[[Path, str], CapturedSnapshot] | None = None,
 ) -> ManagerWords:
-    """The evidence table beside its manifest, joined to the documents it was coded from."""
+    """The evidence table beside its manifest, joined to the documents it was coded from.
+
+    ``read_capture`` reads every capture this needs (the club-news capture and the roster
+    capture the manifest names); ``None`` reads each from disk on every call.
+    """
 
     table = Path(table_path)
     manifest = table.with_suffix(".manifest.json")
     if not Path(addressable(manifest)).is_file():
         raise ManagerWordsError(f"No manifest beside {table.name}: expected {manifest.name}.")
-    documents, kind, label = documents_from_source(club_news_source, snapshot_root=snapshot_root)
+    documents, kind, label = documents_from_source(
+        club_news_source, snapshot_root=snapshot_root, read_capture=read_capture
+    )
     return manager_words_from_artifact(
         table,
         manifest,
@@ -698,18 +730,23 @@ def load_manager_words(
         snapshot_root=(snapshot_root or club_news_source.parent)
         if club_news_source.is_dir()
         else snapshot_root,
+        read_capture=read_capture,
     )
 
 
 def _decision_fixture_basis(
     table: pd.DataFrame,
     snapshot_root: Path | None,
+    *,
+    read_capture: Callable[[Path, str], CapturedSnapshot] | None = None,
 ) -> tuple[pd.DataFrame, dict[int, tuple[str, int, str]], str] | None:
     """Read only the exact immutable decision named by the checked manifest."""
     if snapshot_root is None or "rotation_claim_scope_verified" not in table:
         return None
     try:
-        snapshot = read_snapshot(snapshot_root, str(table.attrs["roster_snapshot_id"]))
+        snapshot = (read_capture or read_snapshot)(
+            snapshot_root, str(table.attrs["roster_snapshot_id"])
+        )
         captured = snapshot.metadata.captured_at_utc
         if set(table.captured_at_utc.astype(str)) != {captured}:
             return None
