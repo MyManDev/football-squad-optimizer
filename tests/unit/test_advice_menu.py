@@ -16,7 +16,13 @@ from tests.unit.test_advice_variants import RIVAL
 from tests.unit.test_member_windows import ENTRY, LEAGUE, SEASON
 from tests.unit.test_top100_weight import _words
 
-from squadopt.application.advice import AdviseEntryRequest, advise_entry
+import squadopt.application.advice_menu as menu_module
+import squadopt.live.transfers as transfers_module
+from squadopt.application.advice import (
+    TRACKED_MEMBER_LINEARIZATION_LEVEL,
+    AdviseEntryRequest,
+    advise_entry,
+)
 from squadopt.application.advice_capabilities import (
     TOP100_WEIGHTS,
     advice_capabilities,
@@ -320,3 +326,48 @@ def test_the_word_and_the_pair_are_the_batchs_payloads(world: dict[str, Any]) ->
     assert set(by_address) == {(50, False), (50, True)}
     assert ask(top100_weight=50) == by_address[(50, False)]
     assert ask(top100_weight=50, managers_word=True) == by_address[(50, True)]
+
+
+def test_a_rebuilt_control_is_solved_at_the_pages_level(
+    world: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The page solves the member's control at ``TRACKED_MEMBER_LINEARIZATION_LEVEL``. A
+    request has no control in hand and rebuilds it; at another level a member whose search
+    does not prove could be answered from a plan their page never showed."""
+
+    plain = advise_entry(_request().entry_request(), **_collaborators(world))
+    words = _words(int(plain["captain"]["player_id"]))  # type: ignore[index,call-overload]
+    collaborators = {
+        **_collaborators(world),
+        "top100_counts": world["counts"],
+        "manager_words": words,
+    }
+    levels: list[int | None] = []
+    original = transfers_module.optimize_transfer_plan
+
+    def spy(*args: Any, **kwargs: Any) -> Any:
+        levels.append(kwargs.get("linearization_level"))
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(transfers_module, "optimize_transfer_plan", spy)
+    # Through the producers' own rebuild, and every plan compared with the control.
+    for selection in ({}, {"managers_word": True}, {"top100_weight": 50}):
+        advise_menu_entry(_request(**selection), **collaborators)
+    assert levels and set(levels) == {TRACKED_MEMBER_LINEARIZATION_LEVEL}
+    # Through the menu's own rebuild for a rival document at a setting.
+    controls: list[Any] = []
+    original_control = menu_module.solve_member_control
+
+    def control(*args: Any, **kwargs: Any) -> Any:
+        controls.append(original_control(*args, **kwargs))
+        return controls[-1]
+
+    monkeypatch.setattr(menu_module, "solve_member_control", control)
+    advise_menu_entry(
+        _request(strategy="ortak-koru", rival_entry_id=RIVAL, top100_weight=50), **collaborators
+    )
+    assert [solved.linearization_level for solved in controls] == [
+        TRACKED_MEMBER_LINEARIZATION_LEVEL
+    ]
+    diagnostics = controls[0].plan.diagnostics
+    assert diagnostics["linearization_level"] == TRACKED_MEMBER_LINEARIZATION_LEVEL

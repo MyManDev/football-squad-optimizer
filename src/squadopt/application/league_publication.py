@@ -12,6 +12,7 @@ from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 
 from squadopt.application.advice import (
+    MEMBER_SOLVE_ERRORS,
     AdviseEntryRequest,
     MemberControl,
     advise_entry,
@@ -19,6 +20,7 @@ from squadopt.application.advice import (
     solve_member_control,
 )
 from squadopt.application.advice_record import (
+    AdviceRecordError,
     RecordCapture,
     build_member_baseline_record,
     record_directory,
@@ -151,8 +153,23 @@ class ModePathsSummary:
     source_id: str
 
 
+#: What one tracked entry's baseline may fail with and still stay that entry's: the member
+#: solve errors a page already refuses a member for, and the record builder's refusal.
+#: ``AdviceRecordError`` is a ``DataError`` today; it is named so the record's refusals
+#: stay covered whatever its base becomes. Anything else is a programming error that would
+#: hit every member alike, and it stops the run, as it does on a page.
+BASELINE_ERRORS: tuple[type[Exception], ...] = (*MEMBER_SOLVE_ERRORS, AdviceRecordError)
+
+
 @dataclass(frozen=True, slots=True)
 class TrackedBaselines:
+    """One server baseline per tracked entry of a capture, solved before any league renders.
+
+    An entry in ``refused`` has neither a control nor a record: its full-menu page solves
+    the member itself, as before the batch, and refuses it there when that solve fails
+    too. No baseline record is written for it.
+    """
+
     snapshot_id: str
     controls: Mapping[int, MemberControl]
     records: Mapping[int, dict[str, object]]
@@ -206,33 +223,39 @@ def prepare_tracked_baselines(
     capture = RecordCapture(inputs.snapshot_id, inputs.captured_at_utc)
     commit = repository_commit()
     for entry_id in entry_ids:
+        # One entry's failure stays that entry's: a squad the capture cannot price, a
+        # planner refusal or a record the builder refuses. The entry keeps no control
+        # and no record, so its full-menu page solves it again as it did before this
+        # batch and refuses it there when that solve fails too, while every other entry
+        # and every league still publish.
         try:
             picks = provider.picks(entry_id, season, int(inputs.deadline.gameweek) - 1)
-        except EntryError as error:
+            # At TRACKED_MEMBER_LINEARIZATION_LEVEL, the level every member control uses.
+            control = solve_member_control(picks, inputs, projection, rules)
+            payload = advise_entry(
+                AdviseEntryRequest(
+                    season, int(inputs.deadline.gameweek), first.league_id, entry_id
+                ),
+                provider=provider,
+                inputs=inputs,
+                projection=projection,
+                rules=rules,
+                control=control,
+            )
+            record = build_member_baseline_record(
+                picks,
+                projection,
+                payload,
+                capture=capture,
+                generated_at_utc=datetime.now(UTC).isoformat(),
+                transfer_config_fingerprint=control.transfer_config.configuration_fingerprint,
+                commit=commit,
+            )
+        except BASELINE_ERRORS as error:
             refused[entry_id] = str(error)
             continue
-        # The complete CP-SAT linear relaxation proves the five-free-transfer
-        # baseline from the second-league rehearsal inside the existing budget.
-        # The model, deterministic ceiling and one-week solver stay unchanged.
-        control = solve_member_control(picks, inputs, projection, rules, linearization_level=2)
-        payload = advise_entry(
-            AdviseEntryRequest(season, int(inputs.deadline.gameweek), first.league_id, entry_id),
-            provider=provider,
-            inputs=inputs,
-            projection=projection,
-            rules=rules,
-            control=control,
-        )
         controls[entry_id] = control
-        records[entry_id] = build_member_baseline_record(
-            picks,
-            projection,
-            payload,
-            capture=capture,
-            generated_at_utc=datetime.now(UTC).isoformat(),
-            transfer_config_fingerprint=control.transfer_config.configuration_fingerprint,
-            commit=commit,
-        )
+        records[entry_id] = record
     return TrackedBaselines(first.snapshot_id, controls, records, refused)
 
 

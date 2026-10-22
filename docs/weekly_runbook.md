@@ -35,7 +35,15 @@ each distinct tracked entry in the capture before rendering its leagues. Full an
 menus reuse that baseline; a device page performs no additional member solve. The independent
 records live under `data/member_baselines/<season>/gw<NN>/entry-<id>/<snapshot id>/`, carry
 their real publication clock and solver status, and are written only after the member page.
-The receipt's `baselines` block reports distinct entries, refusals and preparation time.
+The receipt's `baselines` block reports distinct entries, refusals and preparation time. An
+entry whose picks are missing, or whose solve or record fails, is refused alone with its
+reason: it gets no record, its full-menu page solves it again as before and refuses it there
+when that fails too, and every other entry and league publishes. The batch, that page solve
+and the on-demand menu's rebuild of a member's control run at one CP-SAT linearization level
+(`TRACKED_MEMBER_LINEARIZATION_LEVEL` in `src/squadopt/application/advice.py`), so a
+member's plan is the same whether or not the run records advice and whichever path answers.
+The Top 100 plan, the re-solves under the manager's word and a chosen chip's plan are solved
+at the level of the control they are compared with.
 
 The original league keeps its immutable `data/advice_records` archive. Its history prefers
 those original records; other leagues read the independent baselines. A shared entry is
