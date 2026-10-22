@@ -3,6 +3,7 @@
 import copy
 import dataclasses
 import hashlib
+import inspect
 import json
 import math
 import re
@@ -812,6 +813,41 @@ def test_a_member_week_holding_no_record_is_the_recording_leagues_week(
         assert other_league_weeks == set()
     else:
         assert weeks == [] and other_league_weeks == {(101, 3), (101, 4)}
+
+
+def test_the_public_readers_still_refuse_another_leagues_record(tmp_path: Path) -> None:
+    """Only the history walk leaves another league's weeks out. A direct reader, such as a
+    measurement script, refuses another league's record and reads a week holding no record
+    as none, as before, and never meets the walk's private signal."""
+    anchor = week_without_a_record(tmp_path)
+    shared: dict[str, Any] = {
+        "season": SEASON,
+        "entry_id": 101,
+        "league_id": 755941,
+        "published": shown_everywhere([101], (3, 4)),
+    }
+    for reader in (review.select_record, review.evaluate_week):
+        assert "other_leagues_absent" not in inspect.signature(reader).parameters
+    with pytest.raises(review.SuggestionEvaluationError, match="Record identity"):
+        review.select_record(tmp_path / "records", gameweek=4, deadline_utc=DEADLINES[4], **shared)
+    assert (
+        review.select_record(tmp_path / "records", gameweek=3, deadline_utc=DEADLINES[3], **shared)
+        is None
+    )
+    weeks = [
+        review.evaluate_week(
+            tmp_path / "records",
+            gameweek=week,
+            deadline_utc=DEADLINES[week],
+            captures=[anchor],
+            **shared,
+        )
+        for week in (4, 3)
+    ]
+    assert [(week.gameweek, week.reason) for week in weeks] == [
+        (4, "invalid_record"),
+        (3, "no_pre_deadline_record"),
+    ]
 
 
 def test_a_rerender_withdraws_a_row_shown_for_a_week_holding_no_record(

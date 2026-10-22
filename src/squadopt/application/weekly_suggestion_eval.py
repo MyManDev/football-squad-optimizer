@@ -228,8 +228,9 @@ class _AnotherLeaguesWeek(Exception):
 
     Either every record in it belongs to another league, or it holds no record and this
     league records none (:func:`_records_advice`). Not a :class:`DataError`, so
-    :func:`evaluate_week` cannot report it as an unavailable week; the walk that asked for
-    it leaves the week out.
+    :func:`_evaluate_week` cannot report it as an unavailable week; the walk that asked for
+    it leaves the week out. The public :func:`select_record` and :func:`evaluate_week` never
+    raise it.
     """
 
 
@@ -285,7 +286,6 @@ def select_record(
     deadline_utc: str,
     published: PublishedCaptures | None = None,
     league_id: int = SUPPORTED_LEAGUE_ID,
-    other_leagues_absent: bool = False,
 ) -> dict[str, Any] | None:
     """Select the recorded advice for one member-week, checking both clocks and all identities.
 
@@ -302,12 +302,38 @@ def select_record(
     :func:`publish_suggestion_histories` requires the map.
 
     An unreadable candidate is refused instead of silently falling back to an older one.
+    """
+    return _select_record(
+        root,
+        season=season,
+        gameweek=gameweek,
+        entry_id=entry_id,
+        deadline_utc=deadline_utc,
+        published=published,
+        league_id=league_id,
+        other_leagues_absent=False,
+    )
+
+
+def _select_record(
+    root: Path,
+    *,
+    season: str,
+    gameweek: int,
+    entry_id: int,
+    deadline_utc: str,
+    published: PublishedCaptures | None,
+    league_id: int,
+    other_leagues_absent: bool,
+) -> dict[str, Any] | None:
+    """:func:`select_record`, and for the history walk the weeks that are another league's.
 
     A record's path names no league, so a member of two leagues has one directory per week
     for both. With ``other_leagues_absent`` a sound record of another league is absent
     rather than refused, and a week whose records are all another league's raises
     :class:`_AnotherLeaguesWeek`, as does a week holding no record for a league that records
-    none. Without it, another league's record is refused as before.
+    none. Without it, another league's record is refused as before. Only
+    :func:`review_member_weeks` sets it, and it is the one caller that catches the signal.
     """
     _identifier(league_id)
     deadline = as_instant(normalize_utc_timestamp(deadline_utc, label="deadline_utc"))
@@ -531,11 +557,38 @@ def evaluate_week(
     selected_records: dict[tuple[int, int], dict[str, Any]] | None = None,
     published: PublishedCaptures | None = None,
     league_id: int = SUPPORTED_LEAGUE_ID,
-    other_leagues_absent: bool = False,
 ) -> WeekReview:
+    return _evaluate_week(
+        root,
+        season=season,
+        gameweek=gameweek,
+        entry_id=entry_id,
+        deadline_utc=deadline_utc,
+        captures=captures,
+        selected_records=selected_records,
+        published=published,
+        league_id=league_id,
+        other_leagues_absent=False,
+    )
+
+
+def _evaluate_week(
+    root: Path,
+    *,
+    season: str,
+    gameweek: int,
+    entry_id: int,
+    deadline_utc: str,
+    captures: Sequence[CapturedSnapshot],
+    selected_records: dict[tuple[int, int], dict[str, Any]] | None,
+    published: PublishedCaptures | None,
+    league_id: int,
+    other_leagues_absent: bool,
+) -> WeekReview:
+    """:func:`evaluate_week`; ``other_leagues_absent`` as :func:`_select_record` takes it."""
     base: dict[str, Any] = {"gameweek": gameweek, "deadline_utc": deadline_utc}
     try:
-        record = select_record(
+        record = _select_record(
             root,
             league_id=league_id,
             season=season,
@@ -709,7 +762,7 @@ def review_member_weeks(
                 weeks.append(WeekReview(week, "unavailable", "missing_deadline"))
                 continue
             try:
-                reviewed = evaluate_week(
+                reviewed = _evaluate_week(
                     record_root,
                     league_id=league_id,
                     season=season,
