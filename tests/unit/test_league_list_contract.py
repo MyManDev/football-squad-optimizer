@@ -12,6 +12,7 @@ from squadopt.contracts.league_list import (
     parse_league_list,
     read_league_list,
 )
+from squadopt.platform.weekly_operations import read_league_menus
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -32,6 +33,17 @@ def test_the_list_is_read_in_its_order(tmp_path: Path) -> None:
     target = tmp_path / "leagues.json"
     target.write_text(json.dumps(_document(352490, 7)), encoding="utf-8")
     assert read_league_list(target) == (352490, 7)
+
+
+def test_device_menus_are_opt_in_and_read_with_the_ids(tmp_path: Path) -> None:
+    document = _document(352490, 755941)
+    document["leagues"][1]["menu"] = "device"
+    target = tmp_path / "leagues.json"
+    target.write_text(json.dumps(document), encoding="utf-8")
+    assert read_league_menus(target) == {352490: "full", 755941: "device"}
+    document["leagues"][1]["menu"] = "typo"
+    with pytest.raises(LeagueListError, match="full or device"):
+        parse_league_list(document)
 
 
 @pytest.mark.parametrize(

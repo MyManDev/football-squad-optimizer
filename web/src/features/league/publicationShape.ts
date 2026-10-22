@@ -206,6 +206,28 @@ export function assertAdviceIndex(
   }
   const suggestion = index.suggested_strategy;
   if (
+    (index.menu !== undefined && !["full", "device"].includes(index.menu)) ||
+    (index.menu === "device" &&
+      (index.computed.length !== 0 ||
+        index.unavailable.length !== 0 ||
+        !index.windows ||
+        Object.values(index.windows).some((items) => !items || items.length !== 0) ||
+        index.strategies[0] !== "saf-puan" ||
+        typeof index.source_snapshot_id !== "string" ||
+        !index.source_snapshot_id ||
+        !record(index.chip_states) ||
+        typeof index.chip_states.known !== "boolean" ||
+        index.chip_states.gameweek !== index.gameweek ||
+        !record(index.chip_states.states) ||
+        (index.default_rival_entry_id !== null &&
+          !index.rival_entry_ids.includes(index.default_rival_entry_id)) ||
+        [index.evidence, index.top100, index.chips].some(
+          (menu) => !record(menu) || menu.available !== false || menu.reason !== "on_device",
+        )))
+  ) {
+    throw new LeagueDataError("The published device menu is invalid.");
+  }
+  if (
     suggestion != null &&
     (!record(suggestion) ||
       !["saf-puan", "ortak-koru", "fark-yarat"].includes(String(suggestion.strategy)) ||

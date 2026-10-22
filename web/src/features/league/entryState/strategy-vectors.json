@@ -1,0 +1,3603 @@
+{
+  "rule_id": "gap_and_weeks_strategy_rule_v1",
+  "weekly_points_differential_points": 21.2,
+  "rivals": [
+    {
+      "name": "chaser",
+      "entry_id": 30,
+      "ranks": [
+        [10, 1],
+        [20, 2],
+        [30, 3],
+        [40, 4]
+      ],
+      "candidates": [10, 20, 40],
+      "expected": {
+        "entry_id": 20
+      }
+    },
+    {
+      "name": "leader",
+      "entry_id": 10,
+      "ranks": [
+        [10, 1],
+        [20, 2],
+        [30, 3]
+      ],
+      "candidates": [20, 30],
+      "expected": {
+        "entry_id": 20
+      }
+    },
+    {
+      "name": "missing-member",
+      "entry_id": 90,
+      "ranks": [
+        [10, 1],
+        [20, 2]
+      ],
+      "candidates": [10, 20],
+      "expected": {
+        "entry_id": null
+      }
+    },
+    {
+      "name": "no-candidate",
+      "entry_id": 10,
+      "ranks": [[10, 1]],
+      "candidates": [],
+      "expected": {
+        "entry_id": null
+      }
+    },
+    {
+      "name": "unranked-candidate",
+      "entry_id": 10,
+      "ranks": [[10, 1]],
+      "candidates": [20],
+      "expected": {
+        "entry_id": null
+      }
+    },
+    {
+      "name": "skip-ineligible-neighbour",
+      "entry_id": 30,
+      "ranks": [
+        [10, 1],
+        [20, 2],
+        [30, 3]
+      ],
+      "candidates": [10],
+      "expected": {
+        "entry_id": 10
+      }
+    },
+    {
+      "name": "tied-above",
+      "entry_id": 30,
+      "ranks": [
+        [30, 2],
+        [20, 1],
+        [10, 1]
+      ],
+      "candidates": [10, 20],
+      "expected": {
+        "entry_id": 20
+      }
+    },
+    {
+      "name": "tied-leaders",
+      "entry_id": 30,
+      "ranks": [
+        [30, 1],
+        [20, 1],
+        [10, 1]
+      ],
+      "candidates": [20, 10],
+      "expected": {
+        "entry_id": 10
+      }
+    },
+    {
+      "name": "tied-below",
+      "entry_id": 10,
+      "ranks": [
+        [30, 2],
+        [20, 2],
+        [10, 1]
+      ],
+      "candidates": [30, 20],
+      "expected": {
+        "entry_id": 20
+      }
+    },
+    {
+      "name": "self-candidate",
+      "entry_id": 10,
+      "ranks": [
+        [10, 1],
+        [20, 2]
+      ],
+      "candidates": [10, 20],
+      "expected": {
+        "refused": true
+      }
+    }
+  ],
+  "suggestions": [
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -131,
+        "gameweek": 1,
+        "scored_gameweek": 0
+      },
+      "expected": {
+        "strategy": "fark-yarat",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "behind",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -131,
+        "scored_gameweek": 0,
+        "gameweeks_remaining": 38,
+        "band_edge_points": 130.7
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -130,
+        "gameweek": 1,
+        "scored_gameweek": 0
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -130,
+        "scored_gameweek": 0,
+        "gameweeks_remaining": 38,
+        "band_edge_points": 130.7
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "gameweek": 1,
+        "scored_gameweek": 0
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "scored_gameweek": 0,
+        "gameweeks_remaining": 38,
+        "band_edge_points": 130.7
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 130,
+        "gameweek": 1,
+        "scored_gameweek": 0
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 130,
+        "scored_gameweek": 0,
+        "gameweeks_remaining": 38,
+        "band_edge_points": 130.7
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 131,
+        "gameweek": 1,
+        "scored_gameweek": 0
+      },
+      "expected": {
+        "strategy": "ortak-koru",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "ahead",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 131,
+        "scored_gameweek": 0,
+        "gameweeks_remaining": 38,
+        "band_edge_points": 130.7
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -130,
+        "gameweek": 2,
+        "scored_gameweek": 1
+      },
+      "expected": {
+        "strategy": "fark-yarat",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "behind",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -130,
+        "scored_gameweek": 1,
+        "gameweeks_remaining": 37,
+        "band_edge_points": 129.0
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -129,
+        "gameweek": 2,
+        "scored_gameweek": 1
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -129,
+        "scored_gameweek": 1,
+        "gameweeks_remaining": 37,
+        "band_edge_points": 129.0
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "gameweek": 2,
+        "scored_gameweek": 1
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "scored_gameweek": 1,
+        "gameweeks_remaining": 37,
+        "band_edge_points": 129.0
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 129,
+        "gameweek": 2,
+        "scored_gameweek": 1
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 129,
+        "scored_gameweek": 1,
+        "gameweeks_remaining": 37,
+        "band_edge_points": 129.0
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 130,
+        "gameweek": 2,
+        "scored_gameweek": 1
+      },
+      "expected": {
+        "strategy": "ortak-koru",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "ahead",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 130,
+        "scored_gameweek": 1,
+        "gameweeks_remaining": 37,
+        "band_edge_points": 129.0
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -128,
+        "gameweek": 3,
+        "scored_gameweek": 2
+      },
+      "expected": {
+        "strategy": "fark-yarat",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "behind",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -128,
+        "scored_gameweek": 2,
+        "gameweeks_remaining": 36,
+        "band_edge_points": 127.2
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -127,
+        "gameweek": 3,
+        "scored_gameweek": 2
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -127,
+        "scored_gameweek": 2,
+        "gameweeks_remaining": 36,
+        "band_edge_points": 127.2
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "gameweek": 3,
+        "scored_gameweek": 2
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "scored_gameweek": 2,
+        "gameweeks_remaining": 36,
+        "band_edge_points": 127.2
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 127,
+        "gameweek": 3,
+        "scored_gameweek": 2
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 127,
+        "scored_gameweek": 2,
+        "gameweeks_remaining": 36,
+        "band_edge_points": 127.2
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 128,
+        "gameweek": 3,
+        "scored_gameweek": 2
+      },
+      "expected": {
+        "strategy": "ortak-koru",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "ahead",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 128,
+        "scored_gameweek": 2,
+        "gameweeks_remaining": 36,
+        "band_edge_points": 127.2
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -126,
+        "gameweek": 4,
+        "scored_gameweek": 3
+      },
+      "expected": {
+        "strategy": "fark-yarat",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "behind",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -126,
+        "scored_gameweek": 3,
+        "gameweeks_remaining": 35,
+        "band_edge_points": 125.4
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -125,
+        "gameweek": 4,
+        "scored_gameweek": 3
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -125,
+        "scored_gameweek": 3,
+        "gameweeks_remaining": 35,
+        "band_edge_points": 125.4
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "gameweek": 4,
+        "scored_gameweek": 3
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "scored_gameweek": 3,
+        "gameweeks_remaining": 35,
+        "band_edge_points": 125.4
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 125,
+        "gameweek": 4,
+        "scored_gameweek": 3
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 125,
+        "scored_gameweek": 3,
+        "gameweeks_remaining": 35,
+        "band_edge_points": 125.4
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 126,
+        "gameweek": 4,
+        "scored_gameweek": 3
+      },
+      "expected": {
+        "strategy": "ortak-koru",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "ahead",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 126,
+        "scored_gameweek": 3,
+        "gameweeks_remaining": 35,
+        "band_edge_points": 125.4
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -124,
+        "gameweek": 5,
+        "scored_gameweek": 4
+      },
+      "expected": {
+        "strategy": "fark-yarat",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "behind",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -124,
+        "scored_gameweek": 4,
+        "gameweeks_remaining": 34,
+        "band_edge_points": 123.6
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -123,
+        "gameweek": 5,
+        "scored_gameweek": 4
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -123,
+        "scored_gameweek": 4,
+        "gameweeks_remaining": 34,
+        "band_edge_points": 123.6
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "gameweek": 5,
+        "scored_gameweek": 4
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "scored_gameweek": 4,
+        "gameweeks_remaining": 34,
+        "band_edge_points": 123.6
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 123,
+        "gameweek": 5,
+        "scored_gameweek": 4
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 123,
+        "scored_gameweek": 4,
+        "gameweeks_remaining": 34,
+        "band_edge_points": 123.6
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 124,
+        "gameweek": 5,
+        "scored_gameweek": 4
+      },
+      "expected": {
+        "strategy": "ortak-koru",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "ahead",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 124,
+        "scored_gameweek": 4,
+        "gameweeks_remaining": 34,
+        "band_edge_points": 123.6
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -122,
+        "gameweek": 6,
+        "scored_gameweek": 5
+      },
+      "expected": {
+        "strategy": "fark-yarat",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "behind",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -122,
+        "scored_gameweek": 5,
+        "gameweeks_remaining": 33,
+        "band_edge_points": 121.8
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -121,
+        "gameweek": 6,
+        "scored_gameweek": 5
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -121,
+        "scored_gameweek": 5,
+        "gameweeks_remaining": 33,
+        "band_edge_points": 121.8
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "gameweek": 6,
+        "scored_gameweek": 5
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "scored_gameweek": 5,
+        "gameweeks_remaining": 33,
+        "band_edge_points": 121.8
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 121,
+        "gameweek": 6,
+        "scored_gameweek": 5
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 121,
+        "scored_gameweek": 5,
+        "gameweeks_remaining": 33,
+        "band_edge_points": 121.8
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 122,
+        "gameweek": 6,
+        "scored_gameweek": 5
+      },
+      "expected": {
+        "strategy": "ortak-koru",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "ahead",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 122,
+        "scored_gameweek": 5,
+        "gameweeks_remaining": 33,
+        "band_edge_points": 121.8
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -120,
+        "gameweek": 7,
+        "scored_gameweek": 6
+      },
+      "expected": {
+        "strategy": "fark-yarat",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "behind",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -120,
+        "scored_gameweek": 6,
+        "gameweeks_remaining": 32,
+        "band_edge_points": 119.9
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -119,
+        "gameweek": 7,
+        "scored_gameweek": 6
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -119,
+        "scored_gameweek": 6,
+        "gameweeks_remaining": 32,
+        "band_edge_points": 119.9
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "gameweek": 7,
+        "scored_gameweek": 6
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "scored_gameweek": 6,
+        "gameweeks_remaining": 32,
+        "band_edge_points": 119.9
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 119,
+        "gameweek": 7,
+        "scored_gameweek": 6
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 119,
+        "scored_gameweek": 6,
+        "gameweeks_remaining": 32,
+        "band_edge_points": 119.9
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 120,
+        "gameweek": 7,
+        "scored_gameweek": 6
+      },
+      "expected": {
+        "strategy": "ortak-koru",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "ahead",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 120,
+        "scored_gameweek": 6,
+        "gameweeks_remaining": 32,
+        "band_edge_points": 119.9
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -119,
+        "gameweek": 8,
+        "scored_gameweek": 7
+      },
+      "expected": {
+        "strategy": "fark-yarat",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "behind",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -119,
+        "scored_gameweek": 7,
+        "gameweeks_remaining": 31,
+        "band_edge_points": 118.0
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -118,
+        "gameweek": 8,
+        "scored_gameweek": 7
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -118,
+        "scored_gameweek": 7,
+        "gameweeks_remaining": 31,
+        "band_edge_points": 118.0
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "gameweek": 8,
+        "scored_gameweek": 7
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "scored_gameweek": 7,
+        "gameweeks_remaining": 31,
+        "band_edge_points": 118.0
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 118,
+        "gameweek": 8,
+        "scored_gameweek": 7
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 118,
+        "scored_gameweek": 7,
+        "gameweeks_remaining": 31,
+        "band_edge_points": 118.0
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 119,
+        "gameweek": 8,
+        "scored_gameweek": 7
+      },
+      "expected": {
+        "strategy": "ortak-koru",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "ahead",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 119,
+        "scored_gameweek": 7,
+        "gameweeks_remaining": 31,
+        "band_edge_points": 118.0
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -117,
+        "gameweek": 9,
+        "scored_gameweek": 8
+      },
+      "expected": {
+        "strategy": "fark-yarat",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "behind",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -117,
+        "scored_gameweek": 8,
+        "gameweeks_remaining": 30,
+        "band_edge_points": 116.1
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -116,
+        "gameweek": 9,
+        "scored_gameweek": 8
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -116,
+        "scored_gameweek": 8,
+        "gameweeks_remaining": 30,
+        "band_edge_points": 116.1
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "gameweek": 9,
+        "scored_gameweek": 8
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "scored_gameweek": 8,
+        "gameweeks_remaining": 30,
+        "band_edge_points": 116.1
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 116,
+        "gameweek": 9,
+        "scored_gameweek": 8
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 116,
+        "scored_gameweek": 8,
+        "gameweeks_remaining": 30,
+        "band_edge_points": 116.1
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 117,
+        "gameweek": 9,
+        "scored_gameweek": 8
+      },
+      "expected": {
+        "strategy": "ortak-koru",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "ahead",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 117,
+        "scored_gameweek": 8,
+        "gameweeks_remaining": 30,
+        "band_edge_points": 116.1
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -115,
+        "gameweek": 10,
+        "scored_gameweek": 9
+      },
+      "expected": {
+        "strategy": "fark-yarat",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "behind",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -115,
+        "scored_gameweek": 9,
+        "gameweeks_remaining": 29,
+        "band_edge_points": 114.2
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -114,
+        "gameweek": 10,
+        "scored_gameweek": 9
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -114,
+        "scored_gameweek": 9,
+        "gameweeks_remaining": 29,
+        "band_edge_points": 114.2
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "gameweek": 10,
+        "scored_gameweek": 9
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "scored_gameweek": 9,
+        "gameweeks_remaining": 29,
+        "band_edge_points": 114.2
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 114,
+        "gameweek": 10,
+        "scored_gameweek": 9
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 114,
+        "scored_gameweek": 9,
+        "gameweeks_remaining": 29,
+        "band_edge_points": 114.2
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 115,
+        "gameweek": 10,
+        "scored_gameweek": 9
+      },
+      "expected": {
+        "strategy": "ortak-koru",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "ahead",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 115,
+        "scored_gameweek": 9,
+        "gameweeks_remaining": 29,
+        "band_edge_points": 114.2
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -113,
+        "gameweek": 11,
+        "scored_gameweek": 10
+      },
+      "expected": {
+        "strategy": "fark-yarat",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "behind",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -113,
+        "scored_gameweek": 10,
+        "gameweeks_remaining": 28,
+        "band_edge_points": 112.2
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -112,
+        "gameweek": 11,
+        "scored_gameweek": 10
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -112,
+        "scored_gameweek": 10,
+        "gameweeks_remaining": 28,
+        "band_edge_points": 112.2
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "gameweek": 11,
+        "scored_gameweek": 10
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "scored_gameweek": 10,
+        "gameweeks_remaining": 28,
+        "band_edge_points": 112.2
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 112,
+        "gameweek": 11,
+        "scored_gameweek": 10
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 112,
+        "scored_gameweek": 10,
+        "gameweeks_remaining": 28,
+        "band_edge_points": 112.2
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 113,
+        "gameweek": 11,
+        "scored_gameweek": 10
+      },
+      "expected": {
+        "strategy": "ortak-koru",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "ahead",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 113,
+        "scored_gameweek": 10,
+        "gameweeks_remaining": 28,
+        "band_edge_points": 112.2
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -111,
+        "gameweek": 12,
+        "scored_gameweek": 11
+      },
+      "expected": {
+        "strategy": "fark-yarat",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "behind",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -111,
+        "scored_gameweek": 11,
+        "gameweeks_remaining": 27,
+        "band_edge_points": 110.2
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -110,
+        "gameweek": 12,
+        "scored_gameweek": 11
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -110,
+        "scored_gameweek": 11,
+        "gameweeks_remaining": 27,
+        "band_edge_points": 110.2
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "gameweek": 12,
+        "scored_gameweek": 11
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "scored_gameweek": 11,
+        "gameweeks_remaining": 27,
+        "band_edge_points": 110.2
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 110,
+        "gameweek": 12,
+        "scored_gameweek": 11
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 110,
+        "scored_gameweek": 11,
+        "gameweeks_remaining": 27,
+        "band_edge_points": 110.2
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 111,
+        "gameweek": 12,
+        "scored_gameweek": 11
+      },
+      "expected": {
+        "strategy": "ortak-koru",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "ahead",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 111,
+        "scored_gameweek": 11,
+        "gameweeks_remaining": 27,
+        "band_edge_points": 110.2
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -109,
+        "gameweek": 13,
+        "scored_gameweek": 12
+      },
+      "expected": {
+        "strategy": "fark-yarat",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "behind",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -109,
+        "scored_gameweek": 12,
+        "gameweeks_remaining": 26,
+        "band_edge_points": 108.1
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -108,
+        "gameweek": 13,
+        "scored_gameweek": 12
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -108,
+        "scored_gameweek": 12,
+        "gameweeks_remaining": 26,
+        "band_edge_points": 108.1
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "gameweek": 13,
+        "scored_gameweek": 12
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "scored_gameweek": 12,
+        "gameweeks_remaining": 26,
+        "band_edge_points": 108.1
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 108,
+        "gameweek": 13,
+        "scored_gameweek": 12
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 108,
+        "scored_gameweek": 12,
+        "gameweeks_remaining": 26,
+        "band_edge_points": 108.1
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 109,
+        "gameweek": 13,
+        "scored_gameweek": 12
+      },
+      "expected": {
+        "strategy": "ortak-koru",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "ahead",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 109,
+        "scored_gameweek": 12,
+        "gameweeks_remaining": 26,
+        "band_edge_points": 108.1
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -107,
+        "gameweek": 14,
+        "scored_gameweek": 13
+      },
+      "expected": {
+        "strategy": "fark-yarat",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "behind",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -107,
+        "scored_gameweek": 13,
+        "gameweeks_remaining": 25,
+        "band_edge_points": 106.0
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -106,
+        "gameweek": 14,
+        "scored_gameweek": 13
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -106,
+        "scored_gameweek": 13,
+        "gameweeks_remaining": 25,
+        "band_edge_points": 106.0
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "gameweek": 14,
+        "scored_gameweek": 13
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "scored_gameweek": 13,
+        "gameweeks_remaining": 25,
+        "band_edge_points": 106.0
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 106,
+        "gameweek": 14,
+        "scored_gameweek": 13
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 106,
+        "scored_gameweek": 13,
+        "gameweeks_remaining": 25,
+        "band_edge_points": 106.0
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 107,
+        "gameweek": 14,
+        "scored_gameweek": 13
+      },
+      "expected": {
+        "strategy": "ortak-koru",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "ahead",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 107,
+        "scored_gameweek": 13,
+        "gameweeks_remaining": 25,
+        "band_edge_points": 106.0
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -104,
+        "gameweek": 15,
+        "scored_gameweek": 14
+      },
+      "expected": {
+        "strategy": "fark-yarat",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "behind",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -104,
+        "scored_gameweek": 14,
+        "gameweeks_remaining": 24,
+        "band_edge_points": 103.9
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -103,
+        "gameweek": 15,
+        "scored_gameweek": 14
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -103,
+        "scored_gameweek": 14,
+        "gameweeks_remaining": 24,
+        "band_edge_points": 103.9
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "gameweek": 15,
+        "scored_gameweek": 14
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "scored_gameweek": 14,
+        "gameweeks_remaining": 24,
+        "band_edge_points": 103.9
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 103,
+        "gameweek": 15,
+        "scored_gameweek": 14
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 103,
+        "scored_gameweek": 14,
+        "gameweeks_remaining": 24,
+        "band_edge_points": 103.9
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 104,
+        "gameweek": 15,
+        "scored_gameweek": 14
+      },
+      "expected": {
+        "strategy": "ortak-koru",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "ahead",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 104,
+        "scored_gameweek": 14,
+        "gameweeks_remaining": 24,
+        "band_edge_points": 103.9
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -102,
+        "gameweek": 16,
+        "scored_gameweek": 15
+      },
+      "expected": {
+        "strategy": "fark-yarat",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "behind",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -102,
+        "scored_gameweek": 15,
+        "gameweeks_remaining": 23,
+        "band_edge_points": 101.7
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -101,
+        "gameweek": 16,
+        "scored_gameweek": 15
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -101,
+        "scored_gameweek": 15,
+        "gameweeks_remaining": 23,
+        "band_edge_points": 101.7
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "gameweek": 16,
+        "scored_gameweek": 15
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "scored_gameweek": 15,
+        "gameweeks_remaining": 23,
+        "band_edge_points": 101.7
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 101,
+        "gameweek": 16,
+        "scored_gameweek": 15
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 101,
+        "scored_gameweek": 15,
+        "gameweeks_remaining": 23,
+        "band_edge_points": 101.7
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 102,
+        "gameweek": 16,
+        "scored_gameweek": 15
+      },
+      "expected": {
+        "strategy": "ortak-koru",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "ahead",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 102,
+        "scored_gameweek": 15,
+        "gameweeks_remaining": 23,
+        "band_edge_points": 101.7
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -100,
+        "gameweek": 17,
+        "scored_gameweek": 16
+      },
+      "expected": {
+        "strategy": "fark-yarat",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "behind",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -100,
+        "scored_gameweek": 16,
+        "gameweeks_remaining": 22,
+        "band_edge_points": 99.4
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -99,
+        "gameweek": 17,
+        "scored_gameweek": 16
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -99,
+        "scored_gameweek": 16,
+        "gameweeks_remaining": 22,
+        "band_edge_points": 99.4
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "gameweek": 17,
+        "scored_gameweek": 16
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "scored_gameweek": 16,
+        "gameweeks_remaining": 22,
+        "band_edge_points": 99.4
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 99,
+        "gameweek": 17,
+        "scored_gameweek": 16
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 99,
+        "scored_gameweek": 16,
+        "gameweeks_remaining": 22,
+        "band_edge_points": 99.4
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 100,
+        "gameweek": 17,
+        "scored_gameweek": 16
+      },
+      "expected": {
+        "strategy": "ortak-koru",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "ahead",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 100,
+        "scored_gameweek": 16,
+        "gameweeks_remaining": 22,
+        "band_edge_points": 99.4
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -98,
+        "gameweek": 18,
+        "scored_gameweek": 17
+      },
+      "expected": {
+        "strategy": "fark-yarat",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "behind",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -98,
+        "scored_gameweek": 17,
+        "gameweeks_remaining": 21,
+        "band_edge_points": 97.2
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -97,
+        "gameweek": 18,
+        "scored_gameweek": 17
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -97,
+        "scored_gameweek": 17,
+        "gameweeks_remaining": 21,
+        "band_edge_points": 97.2
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "gameweek": 18,
+        "scored_gameweek": 17
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "scored_gameweek": 17,
+        "gameweeks_remaining": 21,
+        "band_edge_points": 97.2
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 97,
+        "gameweek": 18,
+        "scored_gameweek": 17
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 97,
+        "scored_gameweek": 17,
+        "gameweeks_remaining": 21,
+        "band_edge_points": 97.2
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 98,
+        "gameweek": 18,
+        "scored_gameweek": 17
+      },
+      "expected": {
+        "strategy": "ortak-koru",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "ahead",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 98,
+        "scored_gameweek": 17,
+        "gameweeks_remaining": 21,
+        "band_edge_points": 97.2
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -95,
+        "gameweek": 19,
+        "scored_gameweek": 18
+      },
+      "expected": {
+        "strategy": "fark-yarat",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "behind",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -95,
+        "scored_gameweek": 18,
+        "gameweeks_remaining": 20,
+        "band_edge_points": 94.8
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -94,
+        "gameweek": 19,
+        "scored_gameweek": 18
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -94,
+        "scored_gameweek": 18,
+        "gameweeks_remaining": 20,
+        "band_edge_points": 94.8
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "gameweek": 19,
+        "scored_gameweek": 18
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "scored_gameweek": 18,
+        "gameweeks_remaining": 20,
+        "band_edge_points": 94.8
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 94,
+        "gameweek": 19,
+        "scored_gameweek": 18
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 94,
+        "scored_gameweek": 18,
+        "gameweeks_remaining": 20,
+        "band_edge_points": 94.8
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 95,
+        "gameweek": 19,
+        "scored_gameweek": 18
+      },
+      "expected": {
+        "strategy": "ortak-koru",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "ahead",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 95,
+        "scored_gameweek": 18,
+        "gameweeks_remaining": 20,
+        "band_edge_points": 94.8
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -93,
+        "gameweek": 20,
+        "scored_gameweek": 19
+      },
+      "expected": {
+        "strategy": "fark-yarat",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "behind",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -93,
+        "scored_gameweek": 19,
+        "gameweeks_remaining": 19,
+        "band_edge_points": 92.4
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -92,
+        "gameweek": 20,
+        "scored_gameweek": 19
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -92,
+        "scored_gameweek": 19,
+        "gameweeks_remaining": 19,
+        "band_edge_points": 92.4
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "gameweek": 20,
+        "scored_gameweek": 19
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "scored_gameweek": 19,
+        "gameweeks_remaining": 19,
+        "band_edge_points": 92.4
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 92,
+        "gameweek": 20,
+        "scored_gameweek": 19
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 92,
+        "scored_gameweek": 19,
+        "gameweeks_remaining": 19,
+        "band_edge_points": 92.4
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 93,
+        "gameweek": 20,
+        "scored_gameweek": 19
+      },
+      "expected": {
+        "strategy": "ortak-koru",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "ahead",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 93,
+        "scored_gameweek": 19,
+        "gameweeks_remaining": 19,
+        "band_edge_points": 92.4
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -90,
+        "gameweek": 21,
+        "scored_gameweek": 20
+      },
+      "expected": {
+        "strategy": "fark-yarat",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "behind",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -90,
+        "scored_gameweek": 20,
+        "gameweeks_remaining": 18,
+        "band_edge_points": 89.9
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -89,
+        "gameweek": 21,
+        "scored_gameweek": 20
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -89,
+        "scored_gameweek": 20,
+        "gameweeks_remaining": 18,
+        "band_edge_points": 89.9
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "gameweek": 21,
+        "scored_gameweek": 20
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "scored_gameweek": 20,
+        "gameweeks_remaining": 18,
+        "band_edge_points": 89.9
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 89,
+        "gameweek": 21,
+        "scored_gameweek": 20
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 89,
+        "scored_gameweek": 20,
+        "gameweeks_remaining": 18,
+        "band_edge_points": 89.9
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 90,
+        "gameweek": 21,
+        "scored_gameweek": 20
+      },
+      "expected": {
+        "strategy": "ortak-koru",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "ahead",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 90,
+        "scored_gameweek": 20,
+        "gameweeks_remaining": 18,
+        "band_edge_points": 89.9
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -88,
+        "gameweek": 22,
+        "scored_gameweek": 21
+      },
+      "expected": {
+        "strategy": "fark-yarat",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "behind",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -88,
+        "scored_gameweek": 21,
+        "gameweeks_remaining": 17,
+        "band_edge_points": 87.4
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -87,
+        "gameweek": 22,
+        "scored_gameweek": 21
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -87,
+        "scored_gameweek": 21,
+        "gameweeks_remaining": 17,
+        "band_edge_points": 87.4
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "gameweek": 22,
+        "scored_gameweek": 21
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "scored_gameweek": 21,
+        "gameweeks_remaining": 17,
+        "band_edge_points": 87.4
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 87,
+        "gameweek": 22,
+        "scored_gameweek": 21
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 87,
+        "scored_gameweek": 21,
+        "gameweeks_remaining": 17,
+        "band_edge_points": 87.4
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 88,
+        "gameweek": 22,
+        "scored_gameweek": 21
+      },
+      "expected": {
+        "strategy": "ortak-koru",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "ahead",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 88,
+        "scored_gameweek": 21,
+        "gameweeks_remaining": 17,
+        "band_edge_points": 87.4
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -85,
+        "gameweek": 23,
+        "scored_gameweek": 22
+      },
+      "expected": {
+        "strategy": "fark-yarat",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "behind",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -85,
+        "scored_gameweek": 22,
+        "gameweeks_remaining": 16,
+        "band_edge_points": 84.8
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -84,
+        "gameweek": 23,
+        "scored_gameweek": 22
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -84,
+        "scored_gameweek": 22,
+        "gameweeks_remaining": 16,
+        "band_edge_points": 84.8
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "gameweek": 23,
+        "scored_gameweek": 22
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "scored_gameweek": 22,
+        "gameweeks_remaining": 16,
+        "band_edge_points": 84.8
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 84,
+        "gameweek": 23,
+        "scored_gameweek": 22
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 84,
+        "scored_gameweek": 22,
+        "gameweeks_remaining": 16,
+        "band_edge_points": 84.8
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 85,
+        "gameweek": 23,
+        "scored_gameweek": 22
+      },
+      "expected": {
+        "strategy": "ortak-koru",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "ahead",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 85,
+        "scored_gameweek": 22,
+        "gameweeks_remaining": 16,
+        "band_edge_points": 84.8
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -83,
+        "gameweek": 24,
+        "scored_gameweek": 23
+      },
+      "expected": {
+        "strategy": "fark-yarat",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "behind",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -83,
+        "scored_gameweek": 23,
+        "gameweeks_remaining": 15,
+        "band_edge_points": 82.1
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -82,
+        "gameweek": 24,
+        "scored_gameweek": 23
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -82,
+        "scored_gameweek": 23,
+        "gameweeks_remaining": 15,
+        "band_edge_points": 82.1
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "gameweek": 24,
+        "scored_gameweek": 23
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "scored_gameweek": 23,
+        "gameweeks_remaining": 15,
+        "band_edge_points": 82.1
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 82,
+        "gameweek": 24,
+        "scored_gameweek": 23
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 82,
+        "scored_gameweek": 23,
+        "gameweeks_remaining": 15,
+        "band_edge_points": 82.1
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 83,
+        "gameweek": 24,
+        "scored_gameweek": 23
+      },
+      "expected": {
+        "strategy": "ortak-koru",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "ahead",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 83,
+        "scored_gameweek": 23,
+        "gameweeks_remaining": 15,
+        "band_edge_points": 82.1
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -80,
+        "gameweek": 25,
+        "scored_gameweek": 24
+      },
+      "expected": {
+        "strategy": "fark-yarat",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "behind",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -80,
+        "scored_gameweek": 24,
+        "gameweeks_remaining": 14,
+        "band_edge_points": 79.3
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -79,
+        "gameweek": 25,
+        "scored_gameweek": 24
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -79,
+        "scored_gameweek": 24,
+        "gameweeks_remaining": 14,
+        "band_edge_points": 79.3
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "gameweek": 25,
+        "scored_gameweek": 24
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "scored_gameweek": 24,
+        "gameweeks_remaining": 14,
+        "band_edge_points": 79.3
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 79,
+        "gameweek": 25,
+        "scored_gameweek": 24
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 79,
+        "scored_gameweek": 24,
+        "gameweeks_remaining": 14,
+        "band_edge_points": 79.3
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 80,
+        "gameweek": 25,
+        "scored_gameweek": 24
+      },
+      "expected": {
+        "strategy": "ortak-koru",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "ahead",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 80,
+        "scored_gameweek": 24,
+        "gameweeks_remaining": 14,
+        "band_edge_points": 79.3
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -77,
+        "gameweek": 26,
+        "scored_gameweek": 25
+      },
+      "expected": {
+        "strategy": "fark-yarat",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "behind",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -77,
+        "scored_gameweek": 25,
+        "gameweeks_remaining": 13,
+        "band_edge_points": 76.4
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -76,
+        "gameweek": 26,
+        "scored_gameweek": 25
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -76,
+        "scored_gameweek": 25,
+        "gameweeks_remaining": 13,
+        "band_edge_points": 76.4
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "gameweek": 26,
+        "scored_gameweek": 25
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "scored_gameweek": 25,
+        "gameweeks_remaining": 13,
+        "band_edge_points": 76.4
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 76,
+        "gameweek": 26,
+        "scored_gameweek": 25
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 76,
+        "scored_gameweek": 25,
+        "gameweeks_remaining": 13,
+        "band_edge_points": 76.4
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 77,
+        "gameweek": 26,
+        "scored_gameweek": 25
+      },
+      "expected": {
+        "strategy": "ortak-koru",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "ahead",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 77,
+        "scored_gameweek": 25,
+        "gameweeks_remaining": 13,
+        "band_edge_points": 76.4
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -74,
+        "gameweek": 27,
+        "scored_gameweek": 26
+      },
+      "expected": {
+        "strategy": "fark-yarat",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "behind",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -74,
+        "scored_gameweek": 26,
+        "gameweeks_remaining": 12,
+        "band_edge_points": 73.4
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -73,
+        "gameweek": 27,
+        "scored_gameweek": 26
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -73,
+        "scored_gameweek": 26,
+        "gameweeks_remaining": 12,
+        "band_edge_points": 73.4
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "gameweek": 27,
+        "scored_gameweek": 26
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "scored_gameweek": 26,
+        "gameweeks_remaining": 12,
+        "band_edge_points": 73.4
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 73,
+        "gameweek": 27,
+        "scored_gameweek": 26
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 73,
+        "scored_gameweek": 26,
+        "gameweeks_remaining": 12,
+        "band_edge_points": 73.4
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 74,
+        "gameweek": 27,
+        "scored_gameweek": 26
+      },
+      "expected": {
+        "strategy": "ortak-koru",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "ahead",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 74,
+        "scored_gameweek": 26,
+        "gameweeks_remaining": 12,
+        "band_edge_points": 73.4
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -71,
+        "gameweek": 28,
+        "scored_gameweek": 27
+      },
+      "expected": {
+        "strategy": "fark-yarat",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "behind",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -71,
+        "scored_gameweek": 27,
+        "gameweeks_remaining": 11,
+        "band_edge_points": 70.3
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -70,
+        "gameweek": 28,
+        "scored_gameweek": 27
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -70,
+        "scored_gameweek": 27,
+        "gameweeks_remaining": 11,
+        "band_edge_points": 70.3
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "gameweek": 28,
+        "scored_gameweek": 27
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "scored_gameweek": 27,
+        "gameweeks_remaining": 11,
+        "band_edge_points": 70.3
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 70,
+        "gameweek": 28,
+        "scored_gameweek": 27
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 70,
+        "scored_gameweek": 27,
+        "gameweeks_remaining": 11,
+        "band_edge_points": 70.3
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 71,
+        "gameweek": 28,
+        "scored_gameweek": 27
+      },
+      "expected": {
+        "strategy": "ortak-koru",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "ahead",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 71,
+        "scored_gameweek": 27,
+        "gameweeks_remaining": 11,
+        "band_edge_points": 70.3
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -68,
+        "gameweek": 29,
+        "scored_gameweek": 28
+      },
+      "expected": {
+        "strategy": "fark-yarat",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "behind",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -68,
+        "scored_gameweek": 28,
+        "gameweeks_remaining": 10,
+        "band_edge_points": 67.0
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -67,
+        "gameweek": 29,
+        "scored_gameweek": 28
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -67,
+        "scored_gameweek": 28,
+        "gameweeks_remaining": 10,
+        "band_edge_points": 67.0
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "gameweek": 29,
+        "scored_gameweek": 28
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "scored_gameweek": 28,
+        "gameweeks_remaining": 10,
+        "band_edge_points": 67.0
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 67,
+        "gameweek": 29,
+        "scored_gameweek": 28
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 67,
+        "scored_gameweek": 28,
+        "gameweeks_remaining": 10,
+        "band_edge_points": 67.0
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 68,
+        "gameweek": 29,
+        "scored_gameweek": 28
+      },
+      "expected": {
+        "strategy": "ortak-koru",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "ahead",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 68,
+        "scored_gameweek": 28,
+        "gameweeks_remaining": 10,
+        "band_edge_points": 67.0
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -64,
+        "gameweek": 30,
+        "scored_gameweek": 29
+      },
+      "expected": {
+        "strategy": "fark-yarat",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "behind",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -64,
+        "scored_gameweek": 29,
+        "gameweeks_remaining": 9,
+        "band_edge_points": 63.6
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -63,
+        "gameweek": 30,
+        "scored_gameweek": 29
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -63,
+        "scored_gameweek": 29,
+        "gameweeks_remaining": 9,
+        "band_edge_points": 63.6
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "gameweek": 30,
+        "scored_gameweek": 29
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "scored_gameweek": 29,
+        "gameweeks_remaining": 9,
+        "band_edge_points": 63.6
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 63,
+        "gameweek": 30,
+        "scored_gameweek": 29
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 63,
+        "scored_gameweek": 29,
+        "gameweeks_remaining": 9,
+        "band_edge_points": 63.6
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 64,
+        "gameweek": 30,
+        "scored_gameweek": 29
+      },
+      "expected": {
+        "strategy": "ortak-koru",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "ahead",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 64,
+        "scored_gameweek": 29,
+        "gameweeks_remaining": 9,
+        "band_edge_points": 63.6
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -61,
+        "gameweek": 31,
+        "scored_gameweek": 30
+      },
+      "expected": {
+        "strategy": "fark-yarat",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "behind",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -61,
+        "scored_gameweek": 30,
+        "gameweeks_remaining": 8,
+        "band_edge_points": 60.0
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -60,
+        "gameweek": 31,
+        "scored_gameweek": 30
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -60,
+        "scored_gameweek": 30,
+        "gameweeks_remaining": 8,
+        "band_edge_points": 60.0
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "gameweek": 31,
+        "scored_gameweek": 30
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "scored_gameweek": 30,
+        "gameweeks_remaining": 8,
+        "band_edge_points": 60.0
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 60,
+        "gameweek": 31,
+        "scored_gameweek": 30
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 60,
+        "scored_gameweek": 30,
+        "gameweeks_remaining": 8,
+        "band_edge_points": 60.0
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 61,
+        "gameweek": 31,
+        "scored_gameweek": 30
+      },
+      "expected": {
+        "strategy": "ortak-koru",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "ahead",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 61,
+        "scored_gameweek": 30,
+        "gameweeks_remaining": 8,
+        "band_edge_points": 60.0
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -57,
+        "gameweek": 32,
+        "scored_gameweek": 31
+      },
+      "expected": {
+        "strategy": "fark-yarat",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "behind",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -57,
+        "scored_gameweek": 31,
+        "gameweeks_remaining": 7,
+        "band_edge_points": 56.1
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -56,
+        "gameweek": 32,
+        "scored_gameweek": 31
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -56,
+        "scored_gameweek": 31,
+        "gameweeks_remaining": 7,
+        "band_edge_points": 56.1
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "gameweek": 32,
+        "scored_gameweek": 31
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "scored_gameweek": 31,
+        "gameweeks_remaining": 7,
+        "band_edge_points": 56.1
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 56,
+        "gameweek": 32,
+        "scored_gameweek": 31
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 56,
+        "scored_gameweek": 31,
+        "gameweeks_remaining": 7,
+        "band_edge_points": 56.1
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 57,
+        "gameweek": 32,
+        "scored_gameweek": 31
+      },
+      "expected": {
+        "strategy": "ortak-koru",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "ahead",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 57,
+        "scored_gameweek": 31,
+        "gameweeks_remaining": 7,
+        "band_edge_points": 56.1
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -52,
+        "gameweek": 33,
+        "scored_gameweek": 32
+      },
+      "expected": {
+        "strategy": "fark-yarat",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "behind",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -52,
+        "scored_gameweek": 32,
+        "gameweeks_remaining": 6,
+        "band_edge_points": 51.9
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -51,
+        "gameweek": 33,
+        "scored_gameweek": 32
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -51,
+        "scored_gameweek": 32,
+        "gameweeks_remaining": 6,
+        "band_edge_points": 51.9
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "gameweek": 33,
+        "scored_gameweek": 32
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "scored_gameweek": 32,
+        "gameweeks_remaining": 6,
+        "band_edge_points": 51.9
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 51,
+        "gameweek": 33,
+        "scored_gameweek": 32
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 51,
+        "scored_gameweek": 32,
+        "gameweeks_remaining": 6,
+        "band_edge_points": 51.9
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 52,
+        "gameweek": 33,
+        "scored_gameweek": 32
+      },
+      "expected": {
+        "strategy": "ortak-koru",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "ahead",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 52,
+        "scored_gameweek": 32,
+        "gameweeks_remaining": 6,
+        "band_edge_points": 51.9
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -48,
+        "gameweek": 34,
+        "scored_gameweek": 33
+      },
+      "expected": {
+        "strategy": "fark-yarat",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "behind",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -48,
+        "scored_gameweek": 33,
+        "gameweeks_remaining": 5,
+        "band_edge_points": 47.4
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -47,
+        "gameweek": 34,
+        "scored_gameweek": 33
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -47,
+        "scored_gameweek": 33,
+        "gameweeks_remaining": 5,
+        "band_edge_points": 47.4
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "gameweek": 34,
+        "scored_gameweek": 33
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "scored_gameweek": 33,
+        "gameweeks_remaining": 5,
+        "band_edge_points": 47.4
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 47,
+        "gameweek": 34,
+        "scored_gameweek": 33
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 47,
+        "scored_gameweek": 33,
+        "gameweeks_remaining": 5,
+        "band_edge_points": 47.4
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 48,
+        "gameweek": 34,
+        "scored_gameweek": 33
+      },
+      "expected": {
+        "strategy": "ortak-koru",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "ahead",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 48,
+        "scored_gameweek": 33,
+        "gameweeks_remaining": 5,
+        "band_edge_points": 47.4
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -43,
+        "gameweek": 35,
+        "scored_gameweek": 34
+      },
+      "expected": {
+        "strategy": "fark-yarat",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "behind",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -43,
+        "scored_gameweek": 34,
+        "gameweeks_remaining": 4,
+        "band_edge_points": 42.4
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -42,
+        "gameweek": 35,
+        "scored_gameweek": 34
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -42,
+        "scored_gameweek": 34,
+        "gameweeks_remaining": 4,
+        "band_edge_points": 42.4
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "gameweek": 35,
+        "scored_gameweek": 34
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "scored_gameweek": 34,
+        "gameweeks_remaining": 4,
+        "band_edge_points": 42.4
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 42,
+        "gameweek": 35,
+        "scored_gameweek": 34
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 42,
+        "scored_gameweek": 34,
+        "gameweeks_remaining": 4,
+        "band_edge_points": 42.4
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 43,
+        "gameweek": 35,
+        "scored_gameweek": 34
+      },
+      "expected": {
+        "strategy": "ortak-koru",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "ahead",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 43,
+        "scored_gameweek": 34,
+        "gameweeks_remaining": 4,
+        "band_edge_points": 42.4
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -37,
+        "gameweek": 36,
+        "scored_gameweek": 35
+      },
+      "expected": {
+        "strategy": "fark-yarat",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "behind",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -37,
+        "scored_gameweek": 35,
+        "gameweeks_remaining": 3,
+        "band_edge_points": 36.7
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -36,
+        "gameweek": 36,
+        "scored_gameweek": 35
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -36,
+        "scored_gameweek": 35,
+        "gameweeks_remaining": 3,
+        "band_edge_points": 36.7
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "gameweek": 36,
+        "scored_gameweek": 35
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "scored_gameweek": 35,
+        "gameweeks_remaining": 3,
+        "band_edge_points": 36.7
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 36,
+        "gameweek": 36,
+        "scored_gameweek": 35
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 36,
+        "scored_gameweek": 35,
+        "gameweeks_remaining": 3,
+        "band_edge_points": 36.7
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 37,
+        "gameweek": 36,
+        "scored_gameweek": 35
+      },
+      "expected": {
+        "strategy": "ortak-koru",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "ahead",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 37,
+        "scored_gameweek": 35,
+        "gameweeks_remaining": 3,
+        "band_edge_points": 36.7
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -31,
+        "gameweek": 37,
+        "scored_gameweek": 36
+      },
+      "expected": {
+        "strategy": "fark-yarat",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "behind",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -31,
+        "scored_gameweek": 36,
+        "gameweeks_remaining": 2,
+        "band_edge_points": 30.0
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -30,
+        "gameweek": 37,
+        "scored_gameweek": 36
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -30,
+        "scored_gameweek": 36,
+        "gameweeks_remaining": 2,
+        "band_edge_points": 30.0
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "gameweek": 37,
+        "scored_gameweek": 36
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "scored_gameweek": 36,
+        "gameweeks_remaining": 2,
+        "band_edge_points": 30.0
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 30,
+        "gameweek": 37,
+        "scored_gameweek": 36
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 30,
+        "scored_gameweek": 36,
+        "gameweeks_remaining": 2,
+        "band_edge_points": 30.0
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 31,
+        "gameweek": 37,
+        "scored_gameweek": 36
+      },
+      "expected": {
+        "strategy": "ortak-koru",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "ahead",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 31,
+        "scored_gameweek": 36,
+        "gameweeks_remaining": 2,
+        "band_edge_points": 30.0
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -22,
+        "gameweek": 38,
+        "scored_gameweek": 37
+      },
+      "expected": {
+        "strategy": "fark-yarat",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "behind",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -22,
+        "scored_gameweek": 37,
+        "gameweeks_remaining": 1,
+        "band_edge_points": 21.2
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -21,
+        "gameweek": 38,
+        "scored_gameweek": 37
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -21,
+        "scored_gameweek": 37,
+        "gameweeks_remaining": 1,
+        "band_edge_points": 21.2
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "gameweek": 38,
+        "scored_gameweek": 37
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "scored_gameweek": 37,
+        "gameweeks_remaining": 1,
+        "band_edge_points": 21.2
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 21,
+        "gameweek": 38,
+        "scored_gameweek": 37
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 21,
+        "scored_gameweek": 37,
+        "gameweeks_remaining": 1,
+        "band_edge_points": 21.2
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 22,
+        "gameweek": 38,
+        "scored_gameweek": 37
+      },
+      "expected": {
+        "strategy": "ortak-koru",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "ahead",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 22,
+        "scored_gameweek": 37,
+        "gameweeks_remaining": 1,
+        "band_edge_points": 21.2
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -1,
+        "gameweek": 39,
+        "scored_gameweek": 38
+      },
+      "expected": {
+        "strategy": "fark-yarat",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "behind",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": -1,
+        "scored_gameweek": 38,
+        "gameweeks_remaining": 0,
+        "band_edge_points": 0.0
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "gameweek": 39,
+        "scored_gameweek": 38
+      },
+      "expected": {
+        "strategy": "saf-puan",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "level",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 0,
+        "scored_gameweek": 38,
+        "gameweeks_remaining": 0,
+        "band_edge_points": 0.0
+      }
+    },
+    {
+      "input": {
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 1,
+        "gameweek": 39,
+        "scored_gameweek": 38
+      },
+      "expected": {
+        "strategy": "ortak-koru",
+        "rule_id": "gap_and_weeks_strategy_rule_v1",
+        "band": "ahead",
+        "rival_entry_id": 20,
+        "points_ahead_of_rival": 1,
+        "scored_gameweek": 38,
+        "gameweeks_remaining": 0,
+        "band_edge_points": 0.0
+      }
+    }
+  ]
+}
