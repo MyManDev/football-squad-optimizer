@@ -10,12 +10,15 @@ exported from them, the source registry, and the acquisition receipt
 ``data/logs/weekly/<run id>.club-news.log``. It opens no network connection, calls no model
 and writes nothing unless ``--output`` names a new file.
 
-**The table is replayed, not trusted.** The no-match, ambiguous and unverifiable counts live
-only in the attributes of the table the exporter builds in memory, never in its manifest
-(#1006 item 4). So the rotation table is rebuilt here from the two captures through the
-exporter's own code, and the record is printed only when the rebuilt bytes hash to the
-digest the published manifest declares. A different digest means the code or the captures
-are not the ones the weekly run used, and the command refuses rather than count a table
+**The table is replayed, not trusted.** The no-match, unknown-team, club-source and conflict
+counts and the unverifiable citations live only in the attributes of the table the exporter
+builds in memory, never in its manifest (#1006 item 4); the ambiguous count is the one the
+manifest carries, as ``claims_ambiguous``. So the rotation table is rebuilt here from the two
+captures through the exporter's own code, from a clean checkout at the commit the manifest
+names, and the record is printed only when the rebuilt bytes hash to the digest the
+published manifest declares and the manifest rebuilt from the replay equals the published
+one. The digest binds the rows, the manifest binds every attribute it carries, and the
+commit binds the attributes it does not. Anything else refuses rather than count a table
 nobody published.
 
 **Every raw claim ends in exactly one place.** The claims each stored response lists are
@@ -24,6 +27,12 @@ not be verified (of the response's own club or of another), a claim that reached
 identity join and then matched one player, none or several, a source of another club, a
 conflict, an identical repeat, or a placed row. The record is printed only when those places
 add up to the raw claims, so a count that went missing refuses instead of reading as zero.
+
+**A club whose model call failed is named, from the receipt.** The capture stores only the
+answers that were kept, so a call that was attempted and whose answer was then refused, or
+never came, leaves no trace in it (#1006 item 10). The receipt names those clubs, and the
+record is printed only when its outcomes cover exactly the clubs the capture read and holds
+no answer for.
 """
 
 import argparse
@@ -44,9 +53,16 @@ from squadopt.application.manager_words import (
     NOT_CAPTAIN_DISPOSITIONS,
     WORDS_UNRESOLVED,
     WORDS_WITHHELD_FIGURE,
+    ManagerWord,
     load_manager_words,
 )
-from squadopt.application.rotation_export import _inputs_from_capture, _table_bytes
+from squadopt.application.rotation_export import (
+    _inputs_from_capture,
+    _manifest,
+    _manifest_identity,
+    _table_bytes,
+)
+from squadopt.data.atomic import document_bytes
 from squadopt.data.claim_identity import normalise_claim_name
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import CapturedSnapshot, read_snapshot
@@ -87,6 +103,18 @@ JOIN_REASONS: Final = (
     "conflicting_player_claims",
 )
 
+#: Why an absence or doubt statement that became a row was given no role. Each statement is
+#: counted under the first condition of the rule that fails, tested in this order. The
+#: exporter verifies a next-match scope only from an instant publication time, so a page
+#: without one never verifies scope either; testing publication first keeps
+#: ``scope_unverified`` to statements whose page was dated to the instant.
+UNAPPLIED_CAUSES: Final = (
+    "publication_unverified",
+    "publication_day_precision",
+    "scope_unverified",
+    "publication_not_before_fetch",
+)
+
 VERDICT_NO_RAW_CLAIMS: Final = "no_raw_claims"
 VERDICT_NONE_LOST: Final = "no_statement_lost"
 VERDICT_LOST: Final = "statements_lost"
@@ -102,6 +130,16 @@ _RAW_CLAIMS_LINE: Final = re.compile(r"^Raw claims\s+(\d+);")
 _BUDGET_LINE: Final = re.compile(r"^Call budget\s+(\d+); (\d+) attempted;")
 _READ_REFUSAL: Final = "Read refusal: "
 _CODING_REFUSAL: Final = "Coding refusal: "
+#: The coding stage's four outcomes that are not an answer, as
+#: ``squadopt.platform.club_news_coverage.format_coding_stage`` labels them. The acquisition
+#: prints each once, as ``<label>: <n> [<club>, <club>]``, whenever it read a page, so the
+#: receipt of every acquisition that wrote a capture carries all four.
+CALL_FAILED: Final = "Call attempted and failed"
+BUDGET_STOPPED: Final = "Stopped by the call budget, no call attempted"
+REFUSED_BEFORE_CALL: Final = "Refused before a call was attempted"
+NOTHING_SELECTED: Final = "No document selected for coding"
+_OUTCOME_LABELS: Final = (CALL_FAILED, BUDGET_STOPPED, REFUSED_BEFORE_CALL, NOTHING_SELECTED)
+_OUTCOME_LINE: Final = re.compile(r"^(?P<label>[^:]+): (?P<count>\d+) \[(?P<clubs>[^\]]*)\]$")
 
 
 class JoinCountError(Exception):
@@ -114,11 +152,26 @@ class LogFacts:
 
     file_name: str
     capture_id: str
-    raw_claims_printed: int | None
-    model_call_budget: int | None
-    model_calls_attempted: int | None
+    raw_claims_printed: int
+    model_call_budget: int
+    model_calls_attempted: int
     read_refusal_lines: int
     coding_refusal_lines: int
+    call_failed_clubs: tuple[str, ...]
+    budget_stopped_clubs: tuple[str, ...]
+    refused_before_call_clubs: tuple[str, ...]
+    nothing_selected_clubs: tuple[str, ...]
+
+    @property
+    def not_coded_clubs(self) -> tuple[str, ...]:
+        """Every club the four outcome lines name: read, and given no answer."""
+
+        return (
+            *self.call_failed_clubs,
+            *self.budget_stopped_clubs,
+            *self.refused_before_call_clubs,
+            *self.nothing_selected_clubs,
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -142,9 +195,11 @@ class Funnel:
 def read_log(path: Path) -> LogFacts:
     """Read the acquisition receipt the Friday launcher keeps beside the weekly log.
 
-    PowerShell writes it with a byte order mark, so it is read as ``utf-8-sig``. Only four
-    line shapes are read, all printed by ``squadopt.platform.club_news_acquire``; every
-    other line is left alone.
+    PowerShell writes it with a byte order mark, so it is read as ``utf-8-sig``. Only the
+    line shapes below are read, all printed by ``squadopt.platform.club_news_acquire``;
+    every other line is left alone. An acquisition that wrote a capture prints the capture
+    line, the raw claims line, the call budget line and the four outcome lines exactly once
+    each, so a receipt missing one, or repeating one, is not the receipt of one capture.
     """
 
     try:
@@ -154,6 +209,7 @@ def read_log(path: Path) -> LogFacts:
     captures: list[str] = []
     raw: list[int] = []
     budget: list[tuple[int, int]] = []
+    outcomes: dict[str, list[tuple[str, ...]]] = {label: [] for label in _OUTCOME_LABELS}
     read_refusals = coding_refusals = 0
     for line in (entry.rstrip() for entry in lines):
         if (found := _CAPTURE_LINE.match(line)) is not None:
@@ -166,21 +222,42 @@ def read_log(path: Path) -> LogFacts:
             read_refusals += 1
         elif line.startswith(_CODING_REFUSAL):
             coding_refusals += 1
+        elif (found := _OUTCOME_LINE.match(line)) is not None and found["label"] in outcomes:
+            clubs = tuple(found["clubs"].split(", ")) if found["clubs"] else ()
+            if len(clubs) != int(found["count"]):
+                raise JoinCountError(
+                    f"{path.name} counts {found['count']} clubs on its line "
+                    f"{found['label']!r} and lists {len(clubs)}."
+                )
+            outcomes[found["label"]].append(clubs)
     if len(set(captures)) != 1:
         raise JoinCountError(
             f"{path.name} names {len(set(captures))} club-news captures; the receipt of one "
             "completed acquisition names exactly one."
         )
-    if len(raw) > 1 or len(budget) > 1:
-        raise JoinCountError(f"{path.name} holds more than one acquisition's counts.")
+    printed = {
+        "Raw claims": len(raw),
+        "Call budget": len(budget),
+        **{label: len(outcomes[label]) for label in _OUTCOME_LABELS},
+    }
+    missing = [label for label, times in printed.items() if times != 1]
+    if missing:
+        raise JoinCountError(
+            f"{path.name} does not print each of {missing} exactly once; the receipt of one "
+            "acquisition that wrote a capture does."
+        )
     return LogFacts(
         file_name=path.name,
         capture_id=captures[0],
-        raw_claims_printed=raw[0] if raw else None,
-        model_call_budget=budget[0][0] if budget else None,
-        model_calls_attempted=budget[0][1] if budget else None,
+        raw_claims_printed=raw[0],
+        model_call_budget=budget[0][0],
+        model_calls_attempted=budget[0][1],
         read_refusal_lines=read_refusals,
         coding_refusal_lines=coding_refusals,
+        call_failed_clubs=outcomes[CALL_FAILED][0],
+        budget_stopped_clubs=outcomes[BUDGET_STOPPED][0],
+        refused_before_call_clubs=outcomes[REFUSED_BEFORE_CALL][0],
+        nothing_selected_clubs=outcomes[NOTHING_SELECTED][0],
     )
 
 
@@ -273,14 +350,38 @@ def response_funnel(documents: Sequence[RawDocument], coded: Sequence[CodedClub]
     )
 
 
-def reading(*, raw: int, unreadable_responses: int, lost: int) -> str:
-    """The protocol's verdict, from three counts and nothing else."""
+def reading(*, raw: int, unreadable_responses: int, failed_calls: int, lost: int) -> str:
+    """The protocol's verdict, from four counts and nothing else.
 
-    if raw == 0 and unreadable_responses == 0:
+    A stored response with no readable list of claims, and a call that was attempted and
+    left no stored answer, both hide statements that cannot be counted, so either one is a
+    loss before the other counts are read.
+    """
+
+    if unreadable_responses > 0 or failed_calls > 0:
+        return VERDICT_LOST
+    if raw == 0:
         return VERDICT_NO_RAW_CLAIMS
-    if lost == 0 and unreadable_responses == 0:
+    if lost == 0:
         return VERDICT_NONE_LOST
     return VERDICT_LOST
+
+
+def unapplied_cause(word: ManagerWord) -> str:
+    """The first condition of the rule's role that this statement fails (``UNAPPLIED_CAUSES``).
+
+    Called only for an absence or doubt statement the reader gave no role; the last cause is
+    what remains when the page is dated to the instant and the scope is verified, which the
+    rule refuses only for a page with no fetch instant or one published after its fetch.
+    """
+
+    if not word.publication_verified:
+        return UNAPPLIED_CAUSES[0]
+    if word.published_precision != "instant":
+        return UNAPPLIED_CAUSES[1]
+    if not word.scope_verified:
+        return UNAPPLIED_CAUSES[2]
+    return UNAPPLIED_CAUSES[3]
 
 
 def _origin(url: str) -> str:
@@ -335,7 +436,7 @@ def _hosts(
     )
 
 
-def _manifest(path: Path) -> dict[str, object]:
+def _read_manifest(path: Path) -> dict[str, object]:
     try:
         document = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
@@ -363,21 +464,31 @@ def build_record(
     table_path: Path,
     snapshot_root: Path,
     registry: Path,
-    log: LogFacts | None,
+    log: LogFacts,
     repository_commit: str,
     repository_dirty: bool,
 ) -> dict[str, object]:
     """Every count of the record, or a refusal naming the first one that does not hold."""
 
     manifest_path = table_path.with_suffix(".manifest.json")
-    manifest = _manifest(manifest_path)
+    manifest = _read_manifest(manifest_path)
     if manifest.get("club_news_source_kind") != "capture":
         raise JoinCountError(
             f"{table_path.name} was exported from {manifest.get('club_news_source_kind')!r}, "
             "not from a club-news capture; the fixture is not club news."
         )
+    export_commit = manifest.get("repository_commit")
+    if repository_commit != export_commit or repository_dirty:
+        # The digest binds the rows and the manifest binds what it carries; the counts that
+        # live only in the replay's attributes are bound by running the export's own code.
+        raise JoinCountError(
+            f"This checkout is at {repository_commit}"
+            + (" with local changes" if repository_dirty else "")
+            + f", and {table_path.name} was exported at {export_commit}. Run this from a "
+            "clean worktree at that commit, as the protocol describes."
+        )
     news_id = str(manifest.get("club_news_snapshot_id"))
-    if log is not None and log.capture_id != news_id:
+    if log.capture_id != news_id:
         raise JoinCountError(
             f"{log.file_name} names {log.capture_id}, and {table_path.name} was exported "
             f"from {news_id}; they are receipts of different weeks."
@@ -388,13 +499,22 @@ def build_record(
     if as_instant(news.metadata.captured_at_utc) >= as_instant(decision.metadata.captured_at_utc):
         raise JoinCountError("The club-news capture does not precede the decision capture.")
     documents, coded, declared, covered, partial = read_club_news_capture(news)
+    read_not_coded = sorted({doc.club for doc in documents} - {entry.club for entry in coded})
+    if sorted(log.not_coded_clubs) != read_not_coded:
+        raise JoinCountError(
+            f"{log.file_name} names {sorted(log.not_coded_clubs)} as read and given no "
+            f"answer, and the capture holds pages and no answer for {read_not_coded}."
+        )
 
     # The exporter's own path, call for call (`rotation_export._export`).
     inputs = _inputs_from_capture(news)
+    season = str(manifest["season"])
+    target_gameweek = _int(manifest["target_gameweek"], "target_gameweek")
+    deadline = str(manifest["deadline_timestamp_utc"])
     replay = build_rotation_evidence_table(
-        season=str(manifest["season"]),
-        target_gameweek=_int(manifest["target_gameweek"], "target_gameweek"),
-        deadline_timestamp_utc=str(manifest["deadline_timestamp_utc"]),
+        season=season,
+        target_gameweek=target_gameweek,
+        deadline_timestamp_utc=deadline,
         decision_snapshot=decision,
         claims=inputs.claims,
         documents=inputs.documents,
@@ -410,8 +530,35 @@ def build_record(
     if replay_sha256 != manifest.get("table_sha256"):
         raise JoinCountError(
             f"The replayed table hashes to {replay_sha256}, and {manifest_path.name} declares "
-            f"{manifest.get('table_sha256')}. Run this from the commit the manifest names, "
-            f"{manifest.get('repository_commit')}."
+            f"{manifest.get('table_sha256')}, at the commit it was exported at: the captures "
+            f"in {snapshot_root} are not the ones it was exported from."
+        )
+    # Every attribute the manifest carries, rebuilt from the replay through the exporter's
+    # own writer and serialization. Only the wall-clock stamp is left out, as a replay of
+    # the export leaves it out; the other identity fields are the manifest's own.
+    rebuilt = json.loads(
+        document_bytes(
+            _manifest(
+                replay,
+                season=season,
+                target_gameweek=target_gameweek,
+                deadline_timestamp_utc=deadline,
+                table_file=str(manifest.get("table_file")),
+                table_sha256=replay_sha256,
+                repository_commit=str(export_commit),
+                generated_at_utc=str(manifest.get("generated_at_utc")),
+                news_capture_id=news_id,
+                news_captured_at_utc=inputs.captured_at_utc,
+            )
+        )
+    )
+    expected, held = _manifest_identity(rebuilt), _manifest_identity(manifest)
+    differing = sorted(
+        key for key in expected.keys() | held.keys() if expected.get(key) != held.get(key)
+    )
+    if differing:
+        raise JoinCountError(
+            f"The replayed table's attributes differ from {manifest_path.name} in {differing}."
         )
 
     funnel = response_funnel(documents, coded)
@@ -421,7 +568,7 @@ def build_record(
         or funnel.parsed != len(inputs.claims)
     ):
         raise JoinCountError("The response reading disagrees with the exporter's own reading.")
-    if log is not None and log.raw_claims_printed not in (None, funnel.raw_per_coded_club):
+    if log.raw_claims_printed != funnel.raw_per_coded_club:
         raise JoinCountError(
             f"{log.file_name} printed {log.raw_claims_printed} raw claims and the capture "
             f"lists {funnel.raw_per_coded_club}."
@@ -454,6 +601,7 @@ def build_record(
         and word.fixture_binding_reason is None
         and word.fixture_scope not in SCOPES_NOT_THE_DECISION
     ]
+    causes = Counter(unapplied_cause(word) for word in unapplied)
     lost_before_table = (
         funnel.in_refused_responses
         + funnel.unverifiable_own_club
@@ -462,7 +610,10 @@ def build_record(
     )
     lost = lost_before_table + len(unapplied)
     verdict = reading(
-        raw=funnel.raw, unreadable_responses=funnel.refused_without_claims_list, lost=lost
+        raw=funnel.raw,
+        unreadable_responses=funnel.refused_without_claims_list,
+        failed_calls=len(log.call_failed_clubs),
+        lost=lost,
     )
     host_counts, page_counts = _hosts(registry, documents, declared)
     statements = published["rotation_disposition"].dropna().astype(str).tolist()
@@ -490,18 +641,19 @@ def build_record(
             "prompt_sha256": manifest.get("prompt_sha256"),
             "registry_file": registry.name,
             "registry_sha256": hashlib.sha256(registry.read_bytes()).hexdigest(),
-            "club_news_log_file": None if log is None else log.file_name,
+            "club_news_log_file": log.file_name,
         },
         "checks": {
             "source_kind": "capture",
+            "checkout_at_export_commit": True,
             "news_capture_precedes_decision_capture": True,
             "replay_table_sha256": replay_sha256,
             "replay_matches_published_table": True,
+            "replay_matches_manifest": True,
             "claims_accounted": True,
-            "log_capture_id_matches": None if log is None else True,
-            "log_raw_claims_match": (
-                None if log is None or log.raw_claims_printed is None else True
-            ),
+            "log_capture_id_matches": True,
+            "log_raw_claims_match": True,
+            "log_outcomes_match_capture": True,
         },
         "hosts": host_counts,
         "registered_pages": page_counts,
@@ -510,9 +662,7 @@ def build_record(
             "covered_in_capture": sorted(covered),
             "partially_covered_in_capture": sorted(partial),
             "covered_in_table": sorted(str(club) for club in published.attrs["clubs_covered"]),
-            "read_not_coded": sorted(
-                {doc.club for doc in documents} - {entry.club for entry in coded}
-            ),
+            "read_not_coded": read_not_coded,
         },
         "documents": {
             "retained": len(documents),
@@ -530,14 +680,16 @@ def build_record(
             "refused_clubs": list(funnel.refused_clubs),
             "refused_without_claims_list": funnel.refused_without_claims_list,
         },
-        "acquisition_log": None
-        if log is None
-        else {
+        "acquisition_log": {
             "model_call_budget": log.model_call_budget,
             "model_calls_attempted": log.model_calls_attempted,
             "raw_claims_printed": log.raw_claims_printed,
             "read_refusal_lines": log.read_refusal_lines,
             "coding_refusal_lines": log.coding_refusal_lines,
+            "call_failed_clubs": sorted(log.call_failed_clubs),
+            "budget_stopped_clubs": sorted(log.budget_stopped_clubs),
+            "refused_before_call_clubs": sorted(log.refused_before_call_clubs),
+            "nothing_selected_clubs": sorted(log.nothing_selected_clubs),
         },
         "claims": {
             "raw": funnel.raw,
@@ -593,7 +745,19 @@ def build_record(
         "loss": {
             "lost_before_table": lost_before_table,
             "lost_unapplied": len(unapplied),
+            "lost_unapplied_by_cause": {cause: causes[cause] for cause in UNAPPLIED_CAUSES},
+            "lost_unapplied_scope_unverified_by_scope": dict(
+                sorted(
+                    Counter(
+                        word.fixture_scope
+                        for word in unapplied
+                        if unapplied_cause(word) == "scope_unverified"
+                    ).items()
+                )
+            ),
             "lost": lost,
+            "responses_without_claims_list": funnel.refused_without_claims_list,
+            "calls_attempted_and_failed": len(log.call_failed_clubs),
             "verdict": verdict,
             "issue_1006": ISSUE_1006_READING[verdict],
         },
@@ -605,7 +769,9 @@ def _parse_arguments(argv: Sequence[str] | None) -> argparse.Namespace:
     parser.add_argument(
         "--club-news-log",
         type=Path,
-        help="the acquisition receipt data/logs/weekly/<run id>.club-news.log",
+        required=True,
+        help="the acquisition receipt data/logs/weekly/<run id>.club-news.log; it is the "
+        "only record of which clubs' model calls failed, so it is always read",
     )
     parser.add_argument(
         "--rotation-table",
@@ -617,21 +783,16 @@ def _parse_arguments(argv: Sequence[str] | None) -> argparse.Namespace:
     parser.add_argument("--rotation-dir", type=Path, default=DEFAULT_ROTATION_DIR)
     parser.add_argument("--registry", type=Path, default=DEFAULT_REGISTRY)
     parser.add_argument("--output", type=Path, help="also write the record here, once")
-    arguments = parser.parse_args(argv)
-    if arguments.club_news_log is None and arguments.rotation_table is None:
-        parser.error("name --club-news-log, --rotation-table, or both")
-    return arguments
+    return parser.parse_args(argv)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     arguments = _parse_arguments(argv)
     try:
-        log = None if arguments.club_news_log is None else read_log(arguments.club_news_log)
-        table = arguments.rotation_table
-        if table is None and log is not None:
-            table = find_rotation_table(arguments.rotation_dir, log.capture_id)
-        if table is None:  # pragma: no cover - _parse_arguments requires one of the two
-            raise JoinCountError("No rotation table was named.")
+        log = read_log(arguments.club_news_log)
+        table = arguments.rotation_table or find_rotation_table(
+            arguments.rotation_dir, log.capture_id
+        )
         revision, dirty = _git_revision()
         record = build_record(
             table_path=table,
