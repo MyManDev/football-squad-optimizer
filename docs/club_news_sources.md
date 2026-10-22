@@ -353,3 +353,21 @@ its signed reading together. The reviewed proposal was validated with that loade
 explicitly approved for activation. Only the Palace entry was appended; the prior three
 entries were preserved. This approval is specific to that configuration change and does
 not create a general exception to the project's restriction on manual data edits.
+
+### Palace publication identity check, 2026-10-22
+
+The held HTML for [the four-player team-news article](https://www.cpfc.co.uk/news/first-team/team-news-updates-on-four-players-pre-besiktas/)
+declares `datePublished` at `2026-10-21T17:02:41.251Z`, matching its displayed datetime.
+Its `mainEntityOfPage` WebPage identifier replaces path slashes with hyphens, while its
+canonical and Open Graph URLs identify the fetched page literally. Those declarations
+are streamed directly under the body; the article headline and Open Graph title agree.
+The publication reader now recognizes that exact, corroborated identifier form under
+the [publication contract](rotation_evidence_contract.md). It does not rewrite the source
+address, quoted text, source bytes or their digest.
+
+A replay of 33 held pages from Liverpool, Newcastle and Palace verifies publication
+metadata for all 30 articles, up from 20; the three news indexes remain unverified. The
+replay makes no model calls. It establishes source dates, not usable absence claims: a
+remark about a European fixture still needs its own scope and decision-time checks before
+it can constrain a Premier League selection. No quotation or player warning was published
+as part of this metadata check.

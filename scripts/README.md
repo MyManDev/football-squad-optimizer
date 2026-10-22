@@ -218,6 +218,7 @@ do not move.
 | `export_official_scoring_vectors.py` | fixture generator | `web/src/features/liveScore/officialScoring.vectors.json`; synthetic official finished-week scores for #1008 | 2026-10-11 |
 | `export_entry_state_vectors.py` | fixture generator | `web/src/features/league/entryState/vectors.json`; synthetic picks, banking, Free Hit, chip-state and deadline answers for the offline device entry readers (#983) | 2026-10-21 |
 | `export_entry_price_vectors.py` | fixture generator | `web/src/features/league/entryState/price-vectors.json`; synthetic purchase-price replay, selling-rule and late-joiner fallback answers (#983) | 2026-10-21 |
+| `export_entry_strategy_vectors.py` | fixture generator | `web/src/features/league/entryState/strategy-vectors.json`; synthetic default-rival and accepted strategy-rule answers for every season week (#983) | 2026-10-22 |
 | `generate_club_news_coding_fixture.py` | fixture generator | committed coding fixture; `docs/rotation_claim_coding.md` | 2026-09-10 |
 | `generate_club_news_fixture.py` | fixture generator | committed club-news fixture | 2026-09-08 |
 | `generate_honesty_stems.py` | code generator | `src/squadopt/contracts/honesty_stems.py` from `docs/contracts/honesty_words.json`, so an installed wheel needs no `docs/` folder | 2026-09-19 |
