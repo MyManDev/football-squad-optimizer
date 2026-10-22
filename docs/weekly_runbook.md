@@ -96,7 +96,31 @@ native HiGHS answered, how many fell back to CP-SAT, the HiGHS version the child
 reported and each fallback reason with its count; the run log carries the same rows as
 `tick.week.league.window_solver` events. A fallback publishes what CP-SAT alone would
 have published. The same reason on every member's windows points at the environment
-rather than a member.
+rather than a member. An accepted native answer can publish another plan than CP-SAT
+alone, even at the same value: a five-week window CP-SAT leaves FEASIBLE can now be proved
+(4 of 7 changed value in the #1147 record), its status, gap and the prices measured
+against it change with it, and a window whose CP-SAT tie-break does not finish can
+publish another plan of equal value, because the tie-break now starts from the HiGHS
+solution with almost its whole budget (`docs/architecture/publication_services.md`).
+
+**What the native solver changed on a capture.** The first weekly rehearsal on the commit
+that brings the native solver, and any later week where the owner asks, rebuilds the same
+league from the same capture with CP-SAT alone into a scratch directory and compares the
+two trees:
+
+```bash
+python -m scripts.build_league_site --league 352490 --snapshot-id <capture> --out <scratch> --no-advice-record --cp-sat-windows --workers N --in-season-projection <handoff>
+git diff --no-index --stat <preview>/data/leagues/352490 <scratch>/data/leagues/352490
+```
+
+Add `--rotation-evidence`, `--club-news-source` and `--top100-evidence` when the run's
+league stage read them (its journal lists each input). `scoreboard.json` comes from a later
+stage and is missing from the scratch tree. Every other file listed is a document the two
+backends answered differently, and the rehearsal record lists each of them. The one-week
+documents (`saf-puan/1.json`, `<strategy>/1.json`, `<strategy>/1/vs-<rival>.json`) never
+reach the native solver, so a difference there means the two builds read different inputs:
+fix the command before reading the window differences. The comparison solves the whole menu
+again, so it takes about as long as the league stage.
 
 The preview now defaults to `data/runtime/weekly/<run-id>/preview`, rather than tracked
 `web/public`. `--out` still selects another destination. A source-controlled destination can

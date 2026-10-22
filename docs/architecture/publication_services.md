@@ -50,6 +50,28 @@ ceilings on its primary search. A clock-limited native answer does not seed fall
 One-week solves, hold probes and the deterministic tie-break retain CP-SAT. The model,
 strategies and configured ceilings are unchanged.
 
+An accepted native answer still changes the tie-break, so it can change a published plan
+whose value it does not change. The tie-break is hinted with the HiGHS witness instead of
+CP-SAT's own primary solution, and its deterministic budget is almost the window's whole
+limit (60 units at three weeks, 100 at five), less only the certificate's work of at most
+one unit, where under CP-SAT alone it is the limit less the primary search's work. A
+window whose tie-break did not finish under CP-SAT alone can therefore publish another
+plan of the same value, with a different squad, starting XI, captain, bench or first-week
+moves; a window CP-SAT left FEASIBLE ran no tie-break and now runs one. Where the
+tie-break finishes on both backends it reaches the same tie-break value, so the plan
+differs only where two plans share that value too. The #1147 record
+(`docs/research/window_solver_highs_current.json`, league 352490 at gameweek 7) compared
+primary values only, never plans. Of the 23 windows CP-SAT proved there (all 15
+three-week windows and 8 of the 15 five-week ones), each at the value HiGHS proved, the
+CP-SAT tie-break did not finish on 10: it ended FEASIBLE on the three-week windows of
+3832237, 6879786 and 7252721 and the five-week windows of 4287206, 5349883, 5662073,
+8548384 and 8883467, and UNKNOWN on the five-week windows of 6654210 and 7018833, with
+10.0 and 0.2 units left, so CP-SAT published its primary solution there. The record covers
+the 30 pure-points windows only: the Top 100 and rival-strategy windows the league tree
+also publishes, and the windows the on-demand path solves with a chip, preferences or the
+football model, were not measured. A rehearsal compares a tree with a CP-SAT-only build of
+the same capture to see every document that differs (`docs/weekly_runbook.md`).
+
 No published document names the backend: a window document still carries only
 `solver_status` and `optimality_gap` from the search. The operator reads it instead.
 Each member render collects one outcome per window search (the backend that answered,
