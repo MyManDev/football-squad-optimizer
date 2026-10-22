@@ -123,7 +123,18 @@ def _utc_now() -> str:
 #: Where FPL serves a head-to-head league's table. The capture keeps nothing read from here:
 #: it asks only after the classic endpoint has refused a listed league, to say which kind of
 #: refusal it is.
+#:
+#: Two FPL behaviours are assumed, and no capture in this repository records either: the
+#: classic endpoint answers a head-to-head id with HTTP 404, and this endpoint answers an
+#: anonymous read with a JSON object whose ``league.id`` is the id asked for. Were the first
+#: false, a head-to-head league would be read as classic; were the second false, it would be
+#: refused with the general reason ("has no classic standings") instead of as head-to-head.
 HEAD_TO_HEAD_STANDINGS_PATH = "leagues-h2h/{league_id}/standings/"
+
+
+#: Where a refusal tells the operator to look. The weekly run has no default list: it names its
+#: leagues with --league, or with --league-list and a path that may be any file.
+_LEAGUES_NAMED = "the league list or the --league options this run names"
 
 
 class HeadToHeadLeagueError(DataSourceError):
@@ -151,7 +162,9 @@ def _not_a_classic_league(league_id: int, classic_url: str) -> DataSourceError:
 
     url = f"{BASE_URL}/{HEAD_TO_HEAD_STANDINGS_PATH.format(league_id=league_id)}"
     try:
-        answer = fetch(url, attempts=1)
+        # The same retries as every other read: 429 and 5xx say "later", so a rate limit
+        # late in a long capture does not turn a head-to-head league into the general refusal.
+        answer = fetch(url)
     except DataSourceError as error:
         heard = str(error)
     else:
@@ -160,15 +173,13 @@ def _not_a_classic_league(league_id: int, classic_url: str) -> DataSourceError:
                 f"League {league_id} is a head-to-head league: FPL serves its table at {url} "
                 f"and has no classic standings for it at {classic_url}. The site publishes "
                 "classic leagues only, because the members, ranks and rivals it publishes are "
-                f"read from classic standings. Remove league {league_id} from the leagues "
-                "this run names (config/leagues.json or --league)."
+                f"read from classic standings. Remove league {league_id} from {_LEAGUES_NAMED}."
             )
         heard = f"{url} answered without declaring league {league_id}."
     return DataSourceError(
         f"League {league_id} has no classic standings: {classic_url} returned HTTP 404, and "
         f"FPL did not confirm it as a head-to-head league either: {heard} The site publishes "
-        f"classic leagues only; check league {league_id} where this run names it "
-        "(config/leagues.json or --league)."
+        f"classic leagues only; check league {league_id} in {_LEAGUES_NAMED}."
     )
 
 
@@ -177,10 +188,10 @@ def classic_standings(league_id: int, url: str) -> bytes:
 
     The capture reads classic standings only. HTTP 404 from the classic endpoint says the id
     is not a classic league FPL serves; it may name a head-to-head league, whose table FPL
-    keeps at a separate endpoint, or no league at all. The head-to-head endpoint is then asked
-    once, and a league it serves under this id is refused as head-to-head. Every other answer
-    is ``fetch``'s, unchanged, so a classic league is read exactly as before and nothing is
-    asked of the head-to-head endpoint for it.
+    keeps at a separate endpoint, or no league at all. The head-to-head endpoint is then
+    asked, with ``fetch``'s retries, and a league it serves under this id is refused as
+    head-to-head. Every other answer is ``fetch``'s, unchanged, so a classic league is read
+    exactly as before and nothing is asked of the head-to-head endpoint for it.
     """
 
     try:

@@ -4,6 +4,12 @@ The capture reads classic standings only. These tests run the real ``fetch`` aga
 ``_read`` on synthetic answers, so an HTTP 404 reaches the refusal the way FPL's would. The
 head-to-head answers carry only the ``league`` declaration the classic page reader already
 requires; no other field is read from them, so none is invented here.
+
+The answers encode two FPL behaviours that no capture in this repository records: HTTP 404
+from the classic endpoint for a head-to-head id, and an anonymous read of the head-to-head
+endpoint that declares ``league.id``. The refusal test below pins exactly that pair, so a
+recorded real answer pair can be checked against it; the 401 and 403 cases pin what happens
+if FPL refuses the anonymous read instead.
 """
 
 import json
@@ -57,20 +63,43 @@ def declaration(league_id: int = HEAD_TO_HEAD) -> bytes:
     return json.dumps({"league": {"id": league_id}}).encode()
 
 
-def serve(monkeypatch: pytest.MonkeyPatch, answers: dict[str, bytes | int]) -> list[str]:
-    """Answer each URL with its bytes or HTTP status; anything unnamed is an empty object."""
+Answer = bytes | int
+
+
+def serve(monkeypatch: pytest.MonkeyPatch, answers: dict[str, Answer | list[Answer]]) -> list[str]:
+    """Answer each URL with its bytes or HTTP status; anything unnamed is an empty object.
+
+    A list answers one entry per request, in order, and keeps answering with its last entry.
+    """
 
     calls: list[str] = []
 
     def read(url: str) -> bytes:
         calls.append(url)
-        answer = answers.get(url, b"{}")
+        given = answers.get(url, b"{}")
+        if isinstance(given, list):
+            answer = given.pop(0) if len(given) > 1 else given[0]
+        else:
+            answer = given
         if isinstance(answer, int):
             raise urllib.error.HTTPError(url, answer, "Refused", {}, None)  # type: ignore[arg-type]
         return answer
 
     monkeypatch.setattr(fpl_capture, "_read", read)
     return calls
+
+
+def record_waits(monkeypatch: pytest.MonkeyPatch) -> list[float]:
+    """Run the real ``fetch`` and its retries, recording each pause instead of taking it."""
+
+    slept: list[float] = []
+    real_fetch = fpl_capture.fetch
+
+    def fetch(url: str) -> bytes:
+        return real_fetch(url, sleeper=slept.append)
+
+    monkeypatch.setattr(fpl_capture, "fetch", fetch)
+    return slept
 
 
 def test_a_head_to_head_league_is_refused_with_its_reason(
@@ -85,8 +114,10 @@ def test_a_head_to_head_league_is_refused_with_its_reason(
     reason = str(refused.value)
     assert f"League {HEAD_TO_HEAD} is a head-to-head league" in reason
     assert "publishes classic leagues only" in reason
-    assert f"Remove league {HEAD_TO_HEAD} from the leagues this run names" in reason
-    assert "config/leagues.json or --league" in reason
+    assert reason.endswith(
+        f"Remove league {HEAD_TO_HEAD} from the league list or the --league options this run names."
+    )
+    assert "config/leagues.json" not in reason
     assert calls == [classic_url(HEAD_TO_HEAD), head_to_head_url(HEAD_TO_HEAD)]
 
 
@@ -94,13 +125,24 @@ def test_a_head_to_head_league_is_refused_with_its_reason(
     "answer",
     [
         404,
+        401,
+        403,
         declaration(league_id=99),
         json.dumps({"league": {"id": str(HEAD_TO_HEAD)}}).encode(),
         json.dumps({"league": None}).encode(),
         json.dumps([{"league": {"id": HEAD_TO_HEAD}}]).encode(),
         b"<html>blocked</html>",
     ],
-    ids=["no-league", "another-league", "id-as-text", "no-declaration", "array", "html"],
+    ids=[
+        "no-league",
+        "anonymous-401",
+        "anonymous-403",
+        "another-league",
+        "id-as-text",
+        "no-declaration",
+        "array",
+        "html",
+    ],
 )
 def test_an_id_fpl_does_not_confirm_as_head_to_head_is_refused_without_that_name(
     monkeypatch: pytest.MonkeyPatch, answer: bytes | int
@@ -114,19 +156,44 @@ def test_an_id_fpl_does_not_confirm_as_head_to_head_is_refused_without_that_name
     reason = str(refused.value)
     assert f"League {HEAD_TO_HEAD} has no classic standings" in reason
     assert "did not confirm it as a head-to-head league" in reason
-    assert f"check league {HEAD_TO_HEAD} where this run names it" in reason
+    assert reason.endswith(
+        f"check league {HEAD_TO_HEAD} in the league list or the --league options this run names."
+    )
     assert calls == [classic_url(HEAD_TO_HEAD), head_to_head_url(HEAD_TO_HEAD)]
 
 
-def test_the_head_to_head_question_is_asked_once_and_not_retried(
+@pytest.mark.parametrize("later", [429, 503])
+def test_a_head_to_head_question_that_says_later_is_retried_like_any_other_read(
+    monkeypatch: pytest.MonkeyPatch, later: int
+) -> None:
+    calls = serve(
+        monkeypatch,
+        {
+            classic_url(HEAD_TO_HEAD): 404,
+            head_to_head_url(HEAD_TO_HEAD): [later, declaration()],
+        },
+    )
+    slept = record_waits(monkeypatch)
+    with pytest.raises(fpl_capture.HeadToHeadLeagueError):
+        fpl_capture.classic_standings(HEAD_TO_HEAD, classic_url(HEAD_TO_HEAD))
+    assert calls == [classic_url(HEAD_TO_HEAD)] + [head_to_head_url(HEAD_TO_HEAD)] * 2
+    assert slept == [fpl_capture.RETRY_INITIAL_SECONDS]
+
+
+def test_a_head_to_head_question_refused_after_every_retry_gives_the_general_reason(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     calls = serve(
         monkeypatch, {classic_url(HEAD_TO_HEAD): 404, head_to_head_url(HEAD_TO_HEAD): 503}
     )
-    with pytest.raises(DataSourceError, match="HTTP 503"):
+    slept = record_waits(monkeypatch)
+    with pytest.raises(DataSourceError) as refused:
         fpl_capture.classic_standings(HEAD_TO_HEAD, classic_url(HEAD_TO_HEAD))
-    assert calls == [classic_url(HEAD_TO_HEAD), head_to_head_url(HEAD_TO_HEAD)]
+    assert not isinstance(refused.value, fpl_capture.HeadToHeadLeagueError)
+    attempts = fpl_capture.RETRY_ATTEMPTS
+    assert f"HTTP 503 Refused on all {attempts} attempts." in str(refused.value)
+    assert calls == [classic_url(HEAD_TO_HEAD)] + [head_to_head_url(HEAD_TO_HEAD)] * attempts
+    assert len(slept) == attempts - 1
 
 
 def test_a_classic_league_is_read_as_before_and_the_head_to_head_endpoint_is_not_asked(
