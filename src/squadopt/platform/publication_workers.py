@@ -124,7 +124,7 @@ def league_mapper(request: LeaguePublicationRequest, workers: int = 1) -> Iterat
 
     if workers < 1:
         raise ValueError("--workers must be at least 1")
-    if workers == 1:
+    if workers == 1 or request.menu == "device":
         yield map
         return
     with ProcessPoolExecutor(
