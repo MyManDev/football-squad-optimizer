@@ -15,18 +15,22 @@ counts and the unverifiable citations live only in the attributes of the table t
 builds in memory, never in its manifest (#1006 item 4); the ambiguous count is the one the
 manifest carries, as ``claims_ambiguous``. So the rotation table is rebuilt here from the two
 captures through the exporter's own code, from a clean checkout at the commit the manifest
-names, and the record is printed only when the rebuilt bytes hash to the digest the
-published manifest declares and the manifest rebuilt from the replay equals the published
-one. The digest binds the rows, the manifest binds every attribute it carries, and the
-commit binds the attributes it does not. Anything else refuses rather than count a table
-nobody published.
+names and with ``squadopt`` imported from that checkout's own ``src``, and the record is
+printed only when the rebuilt bytes hash to the digest the published manifest declares and
+the manifest rebuilt from the replay equals the published one. The digest binds the rows,
+the manifest binds every attribute it carries, and the commit binds the attributes it does
+not. Anything else refuses rather than count a table nobody published.
 
 **Every raw claim ends in exactly one place.** The claims each stored response lists are
 followed through the exporter's own reading: a response refused whole, a citation that could
 not be verified (of the response's own club or of another), a claim that reached the
 identity join and then matched one player, none or several, a source of another club, a
-conflict, an identical repeat, or a placed row. The record is printed only when those places
-add up to the raw claims, so a count that went missing refuses instead of reading as zero.
+conflict, an identical repeat, or a placed row. The record is printed only when the places
+before the join add up to the raw claims and the placed rows are the published table's. The
+identical repeats are counted by nothing: they are what remains of the claims that reached
+the join after the placed and unresolved ones, as the protocol defines them, so only a
+negative remainder refuses, and a place of the join that went uncounted would read as
+repeats rather than refuse.
 
 **A club whose model call failed is named, from the receipt.** The capture stores only the
 answers that were kept, so a call that was attempted and whose answer was then refused, or
@@ -45,15 +49,18 @@ from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Final
+from typing import Final, TypeAlias
 
+import pandas as pd
 from scripts._provenance import REPOSITORY_ROOT, _git_revision
 
+import squadopt
 from squadopt.application.manager_words import (
     NOT_CAPTAIN_DISPOSITIONS,
     WORDS_UNRESOLVED,
     WORDS_WITHHELD_FIGURE,
     ManagerWord,
+    _decision_fixture_basis,
     load_manager_words,
 )
 from squadopt.application.rotation_export import (
@@ -72,12 +79,19 @@ from squadopt.data.sources.club_news_claims import parse_claim_response
 from squadopt.data.sources.club_news_coding import locate_claims_reporting
 from squadopt.data.sources.club_news_metadata import publication_metadata
 from squadopt.data.timestamps import as_instant
-from squadopt.features.rotation_evidence import CONTRACT_VERSION, build_rotation_evidence_table
+from squadopt.features.rotation_evidence import (
+    CONTRACT_VERSION,
+    build_rotation_evidence_table,
+    claim_targets_next_fixture,
+)
 from squadopt.features.rotation_evidence_artifact import read_rotation_evidence_artifact
 from squadopt.platform.club_news_fetch import load_club_sources
 
-#: The record's own shape. A field added, removed or recomputed is a new version.
-RECORD_VERSION: Final = "club_news_join_counts_v1"
+#: The record's own shape. A field added, removed or recomputed is a new version. Version 2
+#: is the protocol's amendment of 2026-10-22, made before any GW8 data existed: it adds
+#: ``excluded_from_lost_unapplied`` and leaves ``next_match_before_target`` out of
+#: ``lost_unapplied``. No record of version 1 was printed from GW8 data.
+RECORD_VERSION: Final = "club_news_join_counts_v2"
 PROTOCOL: Final = "docs/research/club_news_join_counts_gw8_prereg.md"
 REPORTER: Final = "scripts/report_club_news_join_counts.py"
 
@@ -91,6 +105,21 @@ PLACEHOLDER_CLUB: Final = "Example FC"
 #: The scope labels whose not-applied absence or doubt statement the record can show was
 #: right: the statement names another competition or a match already played.
 SCOPES_NOT_THE_DECISION: Final = frozenset({"other_competition", "past"})
+
+#: A not-applied absence or doubt statement labelled ``upcoming_premier_league`` on a page
+#: dated to the instant, whose "next match", by the decision capture's own calendar, is a
+#: league match of its club that kicks off before the target-gameweek fixture: like ``past``,
+#: its words name a match that is not the decision's (``next_match_before_target``).
+NEXT_MATCH_BEFORE_TARGET: Final = "next_match_before_target"
+
+#: Why a not-applied absence or doubt statement is left out of ``lost_unapplied``, each
+#: counted by name in ``excluded_from_lost_unapplied``: the two scope labels, then the next
+#: match that is not the decision's.
+NOT_LOST_UNAPPLIED: Final = (*sorted(SCOPES_NOT_THE_DECISION), NEXT_MATCH_BEFORE_TARGET)
+
+#: The decision capture's calendar, its roster by player (club, club code, short name) and
+#: its capture instant, as the manager-word reader reads them (``_decision_fixture_basis``).
+FixtureBasis: TypeAlias = tuple[pd.DataFrame, dict[int, tuple[str, int, str]], str]
 
 #: The reasons the identity join and the club-source check record, named in the record even
 #: when they are zero. Any other reason the table reports is carried and counted as well.
@@ -108,6 +137,8 @@ JOIN_REASONS: Final = (
 #: exporter verifies a next-match scope only from an instant publication time, so a page
 #: without one never verifies scope either; testing publication first keeps
 #: ``scope_unverified`` to statements whose page was dated to the instant.
+#: ``NEXT_MATCH_BEFORE_TARGET`` is tested between the second cause and the third, and a
+#: statement it names is no loss, so these four still add up to ``lost_unapplied``.
 UNAPPLIED_CAUSES: Final = (
     "publication_unverified",
     "publication_day_precision",
@@ -367,21 +398,96 @@ def reading(*, raw: int, unreadable_responses: int, failed_calls: int, lost: int
     return VERDICT_LOST
 
 
-def unapplied_cause(word: ManagerWord) -> str:
-    """The first condition of the rule's role that this statement fails (``UNAPPLIED_CAUSES``).
+def next_match_before_target(
+    word: ManagerWord, basis: FixtureBasis | None, target_gameweek: int
+) -> bool:
+    """Whether the statement's "next match" is a club match before the decision's fixture.
 
-    Called only for an absence or doubt statement the reader gave no role; the last cause is
-    what remains when the page is dated to the instant and the scope is verified, which the
-    rule refuses only for a page with no fetch instant or one published after its fetch.
+    Only for a statement labelled ``upcoming_premier_league`` on a page whose publication the
+    reader verifies to an instant at or before the decision capture. The decision capture's
+    calendar is read as the reader reads it (``basis``), and both answers come from the
+    rule's own binding, ``claim_targets_next_fixture``, which takes the club's first dated
+    fixture after the publication instant: published at the capture instant, the statement
+    would bind to the club's target-gameweek fixture, and published at its own instant it
+    does not. So the club's first dated league fixture after that instant kicks off before
+    the target fixture. An undated, blank or double target week, a target fixture that
+    kicked off by the capture, or another club fixture kicking off after the capture and no
+    later than the target binds nothing at the capture instant, and its statement stays a
+    loss under its own cause, as does one published after the capture.
     """
 
+    if (
+        basis is None
+        or word.fixture_scope != "upcoming_premier_league"
+        or not word.publication_verified
+        or word.published_precision != "instant"
+        or word.published_at_utc is None
+    ):
+        return False
+    calendar, players, captured = basis
+    player = players.get(word.player_id)
+    if player is None or player[0] != word.club:
+        return False
+    try:
+        if as_instant(word.published_at_utc) > as_instant(captured):
+            return False
+    except (TypeError, ValueError):
+        return False
+
+    def binds(published_at_utc: str) -> bool:
+        return claim_targets_next_fixture(
+            calendar,
+            team_code=player[1],
+            target_gameweek=target_gameweek,
+            captured_at_utc=captured,
+            published_at_utc=published_at_utc,
+            published_precision="instant",
+        )
+
+    return binds(captured) and not binds(word.published_at_utc)
+
+
+def not_applied_reading(word: ManagerWord, basis: FixtureBasis | None, target_gameweek: int) -> str:
+    """Where a not-applied absence or doubt statement is counted.
+
+    Called only for an absence or doubt statement the reader gave no role and no
+    double-gameweek reason. It returns one of ``NOT_LOST_UNAPPLIED``, which is no loss, or
+    the first condition of the rule's role that the statement fails (``UNAPPLIED_CAUSES``).
+    The two scope labels leave a statement out whatever else holds. The next match before
+    the target is tested after the two publication causes, because it needs a publication
+    instant, and before ``scope_unverified``, so a statement it leaves out never reaches the
+    cause items 3 and 7 address. The last cause is what remains when the page is dated to
+    the instant and the scope is verified, which the rule refuses only for a page with no
+    fetch instant or one published after its fetch.
+    """
+
+    if word.fixture_scope in SCOPES_NOT_THE_DECISION:
+        return word.fixture_scope
     if not word.publication_verified:
         return UNAPPLIED_CAUSES[0]
     if word.published_precision != "instant":
         return UNAPPLIED_CAUSES[1]
+    if next_match_before_target(word, basis, target_gameweek):
+        return NEXT_MATCH_BEFORE_TARGET
     if not word.scope_verified:
         return UNAPPLIED_CAUSES[2]
     return UNAPPLIED_CAUSES[3]
+
+
+def require_this_checkouts_code() -> None:
+    """Refuse unless ``squadopt`` is imported from the ``src`` of this checkout.
+
+    The commit check reads the checkout ``scripts/`` sits in, and the replay runs whatever
+    ``squadopt`` the interpreter imported. Run from a worktree without its own ``src`` first
+    on the path, it would replay another checkout's code under a passing commit check.
+    """
+
+    package = Path(squadopt.__file__).resolve()
+    if not package.is_relative_to(REPOSITORY_ROOT / "src"):
+        raise JoinCountError(
+            f"squadopt is imported from {package.parent}, not from {REPOSITORY_ROOT / 'src'}: "
+            "put this checkout's src first on PYTHONPATH, as the protocol describes."
+        )
 
 
 def _origin(url: str) -> str:
@@ -594,14 +700,15 @@ def build_record(
     )
     exclusion = words.exclusion()
     acting = [word for word in words.words if word.disposition in NOT_CAPTAIN_DISPOSITIONS]
-    unapplied = [
-        word
+    # The decision capture's calendar as the reader read it for these statements.
+    basis = _decision_fixture_basis(published, snapshot_root)
+    not_applied = [
+        (word, not_applied_reading(word, basis, words.gameweek))
         for word in acting
-        if word.role is None
-        and word.fixture_binding_reason is None
-        and word.fixture_scope not in SCOPES_NOT_THE_DECISION
+        if word.role is None and word.fixture_binding_reason is None
     ]
-    causes = Counter(unapplied_cause(word) for word in unapplied)
+    unapplied = [word for word, place in not_applied if place in UNAPPLIED_CAUSES]
+    causes = Counter(place for _word, place in not_applied)
     lost_before_table = (
         funnel.in_refused_responses
         + funnel.unverifiable_own_club
@@ -733,25 +840,22 @@ def build_record(
             "words_unresolved": sum(word.words_status == WORDS_UNRESOLVED for word in words.words),
             "absence_or_doubt_statements": len(acting),
             "absence_or_doubt_not_applied_by_scope": dict(
-                sorted(
-                    Counter(
-                        word.fixture_scope
-                        for word in acting
-                        if word.role is None and word.fixture_binding_reason is None
-                    ).items()
-                )
+                sorted(Counter(word.fixture_scope for word, _place in not_applied).items())
             ),
         },
         "loss": {
             "lost_before_table": lost_before_table,
             "lost_unapplied": len(unapplied),
             "lost_unapplied_by_cause": {cause: causes[cause] for cause in UNAPPLIED_CAUSES},
+            "excluded_from_lost_unapplied": {
+                reason: causes[reason] for reason in NOT_LOST_UNAPPLIED
+            },
             "lost_unapplied_scope_unverified_by_scope": dict(
                 sorted(
                     Counter(
                         word.fixture_scope
-                        for word in unapplied
-                        if unapplied_cause(word) == "scope_unverified"
+                        for word, place in not_applied
+                        if place == "scope_unverified"
                     ).items()
                 )
             ),
@@ -789,6 +893,7 @@ def _parse_arguments(argv: Sequence[str] | None) -> argparse.Namespace:
 def main(argv: Sequence[str] | None = None) -> int:
     arguments = _parse_arguments(argv)
     try:
+        require_this_checkouts_code()
         log = read_log(arguments.club_news_log)
         table = arguments.rotation_table or find_rotation_table(
             arguments.rotation_dir, log.capture_id

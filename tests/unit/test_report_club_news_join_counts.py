@@ -167,15 +167,21 @@ def _week(
     declared: tuple[str, ...],
     covered: tuple[str, ...],
     table_name: str | None = "table",
+    calendar: bytes | None = None,
 ) -> tuple[Path, str, Path]:
-    """Write a decision capture and a news capture, and export them as the weekly run does."""
+    """Write a decision capture and a news capture, and export them as the weekly run does.
+
+    ``calendar`` replaces the decision capture's fixtures payload (``_calendar``)."""
 
     root = tmp_path / "snapshots"
     decision = write_snapshot(
         root,
         source=DECISION_SOURCE,
         captured_at_utc=CAPTURED_AT,
-        payloads={BOOTSTRAP_PAYLOAD: bootstrap_payload(), FIXTURES_PAYLOAD: fixtures_payload()},
+        payloads={
+            BOOTSTRAP_PAYLOAD: bootstrap_payload(),
+            FIXTURES_PAYLOAD: fixtures_payload() if calendar is None else calendar,
+        },
     ).snapshot_id
     news = write_club_news_capture(
         root,
@@ -371,6 +377,11 @@ def test_every_raw_claim_lands_in_exactly_one_counted_place(tmp_path: Path) -> N
             "scope_unverified": 1,
             "publication_not_before_fetch": 0,
         },
+        "excluded_from_lost_unapplied": {
+            "other_competition": 1,
+            "past": 0,
+            "next_match_before_target": 0,
+        },
         "lost_unapplied_scope_unverified_by_scope": {"ambiguous": 1},
         "lost": 7,
         "responses_without_claims_list": 0,
@@ -431,7 +442,10 @@ def test_an_answer_with_no_claims_reads_as_unanswered(tmp_path: Path) -> None:
 
 
 def test_claims_that_all_reach_their_outcome_read_as_none_lost(tmp_path: Path) -> None:
-    lines = ARSENAL_LINES
+    """An absence named for a cup tie or for a match already played is no loss: each scope
+    label is left out of ``lost_unapplied`` and counted by name."""
+
+    lines = (*ARSENAL_LINES, "Martinelli missed the last Premier League match.")
     root, _news, table = _week(
         tmp_path,
         documents=(_document("Arsenal", ARSENAL, lines),),
@@ -442,17 +456,38 @@ def test_claims_that_all_reach_their_outcome_read_as_none_lost(tmp_path: Path) -
                 [
                     _claim("Saka", "Arsenal", "stated_expected_absent", lines[0], ARSENAL),
                     _claim("Timber", "Arsenal", "stated_expected_to_start", lines[2], ARSENAL),
+                    _claim(
+                        "Odegaard",
+                        "Arsenal",
+                        "stated_expected_absent",
+                        lines[6],
+                        ARSENAL,
+                        "other_competition",
+                    ),
+                    _claim(
+                        "Martinelli", "Arsenal", "stated_expected_absent", lines[8], ARSENAL, "past"
+                    ),
                 ],
             ),
         ),
         declared=("Arsenal",),
         covered=("Arsenal",),
     )
-    record = _record(tmp_path, root, table, raw=2)
+    record = _record(tmp_path, root, table, raw=4)
 
-    assert record["claims"]["joined_to_one_player"] == 2
-    assert record["claims"]["placed"] == 2
+    assert record["claims"]["joined_to_one_player"] == 4
+    assert record["claims"]["placed"] == 4
     assert record["reader"]["constraining_statements"] == 1
+    assert record["reader"]["absence_or_doubt_not_applied_by_scope"] == {
+        "other_competition": 1,
+        "past": 1,
+    }
+    assert record["loss"]["lost_unapplied"] == 0
+    assert record["loss"]["excluded_from_lost_unapplied"] == {
+        "other_competition": 1,
+        "past": 1,
+        "next_match_before_target": 0,
+    }
     assert record["loss"]["lost"] == 0
     assert record["loss"]["verdict"] == "no_statement_lost"
     assert record["loss"]["issue_1006"] == "close"
@@ -681,6 +716,246 @@ def test_statements_not_applied_are_counted_by_the_first_condition_they_fail(
     assert record["loss"]["verdict"] == "statements_lost"
 
 
+#: Man Utd play their previous league match on 2026-09-09 at 19:00 and their target fixture
+#: on 2026-09-12 at 19:00, after the decision capture. A page published on the morning of the
+#: 9th names, as "the next Premier League match", the match of that evening.
+BEFORE_UNITED_MIDWEEK = "2026-09-09T10:00:00Z"
+#: After that match and before the fetch, so the next match is the target fixture.
+AFTER_UNITED_MIDWEEK = "2026-09-12T13:00:00Z"
+DALOT = "Dalot will miss the next Premier League match."
+
+
+def _team(name: str) -> int:
+    teams = json.loads(bootstrap_payload())["teams"]
+    return next(int(team["id"]) for team in teams if team["name"] == name)
+
+
+def _calendar(
+    *, changed: dict[int, dict[str, Any]] | None = None, added: tuple[dict[str, Any], ...] = ()
+) -> bytes:
+    """The synthetic decision calendar with fixtures changed (by id) or added."""
+
+    records = [
+        {**record, **(changed or {}).get(record["id"], {})}
+        for record in json.loads(fixtures_payload())
+    ]
+    template = {"team_h_difficulty": 3, "team_a_difficulty": 3, "provisional_start_time": False}
+    return json.dumps([*records, *({**template, **record} for record in added)]).encode("utf-8")
+
+
+def _league_fixture(
+    fixture_id: int, gameweek: int | None, home: str, away: str, kickoff: str | None
+) -> dict[str, Any]:
+    return {
+        "id": fixture_id,
+        "event": gameweek,
+        "team_h": _team(home),
+        "team_a": _team(away),
+        "kickoff_time": kickoff,
+        "finished": False,
+    }
+
+
+def _united_week(
+    tmp_path: Path,
+    *,
+    published: str | None = BEFORE_UNITED_MIDWEEK,
+    precision: str = "instant",
+    line: str = DALOT,
+    scope: str = "upcoming_premier_league",
+    calendar: bytes | None = None,
+) -> dict[str, Any]:
+    """One Man Utd page and answer: Dalot's absence, quoted as ``DALOT`` from ``line``."""
+
+    quote = DALOT if DALOT in line else line
+    page = {"url": UNITED, "published_at_utc": published, "published_precision": precision}
+    root, _news, table = _week(
+        tmp_path,
+        documents=(_document("Man Utd", UNITED, (line,), published=published),),
+        coded=(
+            _coded(
+                "Man Utd",
+                UNITED,
+                [_claim("Dalot", "Man Utd", "stated_expected_absent", quote, UNITED, scope)],
+                pages=[page],
+            ),
+        ),
+        declared=("Man Utd",),
+        covered=("Man Utd",),
+        calendar=calendar,
+    )
+    return _record(tmp_path, root, table, raw=1)
+
+
+def _assert_accounted(record: dict[str, Any]) -> None:
+    """The identities still hold with the exclusion: every claim in one place, the four
+    causes adding up to ``lost_unapplied``, and every not-applied absence or doubt either a
+    loss or left out by name."""
+
+    loss = record["loss"]
+    assert record["checks"]["claims_accounted"] is True
+    assert sum(loss["lost_unapplied_by_cause"].values()) == loss["lost_unapplied"]
+    assert loss["lost"] == loss["lost_before_table"] + loss["lost_unapplied"]
+    assert sum(record["reader"]["absence_or_doubt_not_applied_by_scope"].values()) == (
+        loss["lost_unapplied"] + sum(loss["excluded_from_lost_unapplied"].values())
+    )
+
+
+def test_a_next_match_statement_made_before_an_intervening_club_match_is_no_loss(
+    tmp_path: Path,
+) -> None:
+    """Its words name the club match of that evening, not the decision's fixture: left out
+    of ``lost_unapplied`` and counted as ``next_match_before_target``, so an otherwise clean
+    week still reads as none lost and routes nothing, as the same page published after that
+    match does."""
+
+    before, after = tmp_path / "before", tmp_path / "after"
+    before.mkdir()
+    after.mkdir()
+    record = _united_week(before)
+    applied = _united_week(after, published=AFTER_UNITED_MIDWEEK)
+
+    assert applied["reader"]["constraining_statements"] == 1
+    assert applied["loss"]["excluded_from_lost_unapplied"]["next_match_before_target"] == 0
+    assert applied["loss"]["verdict"] == "no_statement_lost"
+    _assert_accounted(applied)
+
+    assert record["claims"]["placed"] == 1
+    assert record["reader"]["constraining_statements"] == 0
+    assert record["reader"]["absence_or_doubt_not_applied_by_scope"] == {
+        "upcoming_premier_league": 1
+    }
+    assert record["loss"]["lost_unapplied"] == 0
+    assert record["loss"]["lost_unapplied_by_cause"] == dict.fromkeys(report.UNAPPLIED_CAUSES, 0)
+    assert record["loss"]["excluded_from_lost_unapplied"] == {
+        "other_competition": 0,
+        "past": 0,
+        "next_match_before_target": 1,
+    }
+    assert record["loss"]["lost"] == 0
+    assert record["loss"]["verdict"] == "no_statement_lost"
+    assert record["loss"]["issue_1006"] == "close"
+    _assert_accounted(record)
+
+
+#: A second target-week kickoff, three days after the first, for a double gameweek.
+_LATER = "2026-09-15T19:00:00Z"
+
+
+@pytest.mark.parametrize(
+    ("week", "cause", "scope"),
+    [
+        pytest.param(
+            {"published": "2026-09-09", "precision": "day"},
+            "publication_day_precision",
+            None,
+            id="publication_verified_to_the_day",
+        ),
+        pytest.param(
+            {"published": None, "precision": "unknown"},
+            "publication_unverified",
+            None,
+            id="publication_unstated",
+        ),
+        pytest.param(
+            {"line": "Dalot will miss Saturday's Premier League match.", "scope": "unspecified"},
+            "scope_unverified",
+            "unspecified",
+            id="label_not_upcoming_premier_league",
+        ),
+        pytest.param(
+            # The quote keeps its label from its own words and is not a whole sentence of
+            # the page, so its scope is not verified although the calendar binds it.
+            {"published": AFTER_UNITED_MIDWEEK, "line": "It is not true that " + DALOT},
+            "scope_unverified",
+            "upcoming_premier_league",
+            id="no_intervening_match",
+        ),
+        pytest.param(
+            {"calendar": _calendar(added=(_league_fixture(501, None, "Man Utd", "Fulham", None),))},
+            "scope_unverified",
+            "upcoming_premier_league",
+            id="undated_calendar",
+        ),
+        pytest.param(
+            {"calendar": _calendar(changed={401: {"team_a": _team("Fulham")}})},
+            "scope_unverified",
+            "upcoming_premier_league",
+            id="blank_target_week",
+        ),
+        pytest.param(
+            {
+                "calendar": _calendar(
+                    added=(_league_fixture(403, TARGET_GAMEWEEK, "Man Utd", "Fulham", _LATER),)
+                )
+            },
+            "scope_unverified",
+            "upcoming_premier_league",
+            id="double_target_week",
+        ),
+        pytest.param(
+            {"calendar": _calendar(changed={401: {"kickoff_time": "2026-09-12T14:45:00Z"}})},
+            "scope_unverified",
+            "upcoming_premier_league",
+            id="target_kicked_off_by_the_capture",
+        ),
+        pytest.param(
+            {"published": "2026-09-12T16:00:00Z"},
+            "scope_unverified",
+            "upcoming_premier_league",
+            id="published_after_the_capture",
+        ),
+    ],
+)
+def test_a_statement_outside_that_condition_stays_a_loss_under_its_own_cause(
+    tmp_path: Path, week: dict[str, Any], cause: str, scope: str | None
+) -> None:
+    record = _united_week(tmp_path, **week)
+
+    assert record["reader"]["constraining_statements"] == 0
+    assert record["loss"]["lost_unapplied"] == 1
+    assert record["loss"]["lost_unapplied_by_cause"] == {
+        **dict.fromkeys(report.UNAPPLIED_CAUSES, 0),
+        cause: 1,
+    }
+    assert record["loss"]["excluded_from_lost_unapplied"]["next_match_before_target"] == 0
+    assert record["loss"]["lost_unapplied_scope_unverified_by_scope"] == (
+        {} if scope is None else {scope: 1}
+    )
+    assert record["loss"]["verdict"] == "statements_lost"
+    _assert_accounted(record)
+
+
+def test_a_double_gameweek_statement_is_the_rules_declaration_not_a_loss(
+    tmp_path: Path,
+) -> None:
+    """Arsenal play twice in the target week, so the rule declares the role undecidable and
+    gives the statement ``ambiguous_current_week_fixture`` instead: not counted as lost."""
+
+    calendar = _calendar(
+        added=(_league_fixture(403, TARGET_GAMEWEEK, "Arsenal", "Fulham", _LATER),)
+    )
+    saka = _claim("Saka", "Arsenal", "stated_expected_absent", ARSENAL_LINES[0], ARSENAL)
+    root, _news, table = _week(
+        tmp_path,
+        documents=(_document("Arsenal", ARSENAL, ARSENAL_LINES),),
+        coded=(_coded("Arsenal", ARSENAL, [saka]),),
+        declared=("Arsenal",),
+        covered=("Arsenal",),
+        calendar=calendar,
+    )
+    record = _record(tmp_path, root, table, raw=1)
+
+    assert record["claims"]["placed"] == 1
+    assert record["reader"]["constraining_statements"] == 0
+    assert record["reader"]["double_gameweek_reason"] == 1
+    assert record["reader"]["absence_or_doubt_not_applied_by_scope"] == {}
+    assert record["loss"]["lost_unapplied"] == 0
+    assert record["loss"]["lost"] == 0
+    assert record["loss"]["verdict"] == "no_statement_lost"
+    _assert_accounted(record)
+
+
 def test_a_replay_that_differs_from_the_published_table_refuses(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -779,6 +1054,22 @@ def test_a_receipt_of_another_capture_or_count_refuses(tmp_path: Path) -> None:
         _record(tmp_path, root, table, raw=9)
 
 
+def test_a_receipt_whose_outcome_line_miscounts_its_clubs_refuses(tmp_path: Path) -> None:
+    log = _log(tmp_path, OTHER_CAPTURE, raw=0, call_failed=("Everton",))
+    printed = log.read_bytes()
+    damaged = printed.replace(
+        b"Call attempted and failed: 1 [Everton]", b"Call attempted and failed: 2 [Everton]"
+    )
+    assert damaged != printed
+    log.write_bytes(damaged)
+
+    with pytest.raises(
+        report.JoinCountError,
+        match=r"counts 2 clubs on its line 'Call attempted and failed' and lists 1\.",
+    ):
+        report.read_log(log)
+
+
 def test_the_command_finds_the_table_from_the_receipt_offline_and_writes_once(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -818,6 +1109,36 @@ def test_the_command_finds_the_table_from_the_receipt_offline_and_writes_once(
     assert capsys.readouterr().out.startswith("Refused:")
 
 
+def test_the_command_refuses_squadopt_imported_from_another_checkout(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The commit check reads this checkout; the replay would run the imported code."""
+
+    root, news, _table = _mixed_week(tmp_path, table_name=None)
+    output = tmp_path / "join-counts.json"
+    monkeypatch.setattr(report, "_git_revision", lambda: (COMMIT, False))
+    monkeypatch.setattr(report, "REPOSITORY_ROOT", tmp_path / "another-checkout")
+    arguments = [
+        "--club-news-log",
+        str(_log(tmp_path, news, raw=10)),
+        "--snapshot-root",
+        str(root),
+        "--rotation-dir",
+        str(tmp_path / "rotation"),
+        "--registry",
+        str(_registry(tmp_path)),
+        "--output",
+        str(output),
+    ]
+
+    assert report.main(arguments) == 1
+    printed = capsys.readouterr().out
+    assert printed.startswith("Refused: squadopt is imported from ")
+    assert "another-checkout" in printed
+    assert printed.count("\n") == 1
+    assert not output.exists()
+
+
 def _keys(value: object) -> set[str]:
     if isinstance(value, dict):
         return {str(key) for key in value} | {k for item in value.values() for k in _keys(item)}
@@ -840,6 +1161,7 @@ def test_the_protocol_defines_every_field_the_record_carries(tmp_path: Path) -> 
         report.RECORD_VERSION,
         *report.ISSUE_1006_READING.items(),
         *report.UNAPPLIED_CAUSES,
+        *report.NOT_LOST_UNAPPLIED,
     ):
         for text in value if isinstance(value, tuple) else (value,):
             assert f"`{text}`" in protocol

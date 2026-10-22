@@ -9,7 +9,43 @@ capture, no table, no member page and no contract, and it promotes nothing. Issu
 Amended on the same day, on review and still before any GW8 data existed: a model call that
 was attempted and failed now rules out `no_statement_lost`, the receipt is required, every
 not-applied statement carries its cause, and the replay is held to the whole manifest and to
-the commit the table was exported at.
+the commit the table was exported at. Amended again after it merged, on review of #1213 and
+still before any GW8 data existed: see the next section.
+
+## Amendment, 2026-10-22, before any GW8 data
+
+Made after this protocol merged (#1213), on İbrahim's review there and the owner's decisions
+in reply (comment 6342002217). No GW8 club-news capture, decision capture, model response,
+rotation pair or record existed when it was made, so no GW8 number informed it. It merges
+before the Friday run, so the commit the run's rotation manifest names carries it.
+
+- **A next-match statement made before an intervening club match is not a loss.** A
+  statement labelled `upcoming_premier_league`, on a page whose publication the reader
+  verifies to the instant, whose "next match" the decision capture's calendar shows to be a
+  league match of its club kicking off before the target-gameweek fixture, is left out of
+  `lost_unapplied`, as `other_competition` and `past` are, and counted by name as
+  `next_match_before_target` (defined under the reading below). Before this amendment it was
+  counted under `scope_unverified`, the cause where items 3 and 7 of #1006 act: the scope
+  label comes from the quote's own words, so such a statement keeps
+  `upcoming_premier_league`, and the rule rightly refuses to bind it to the target fixture,
+  because it binds "next match" to the club's first kickoff after publication. İbrahim
+  reproduced it with the reporter's own helpers: one such statement on an otherwise clean
+  week turned `no_statement_lost` into `statements_lost` and routed items 3, 7, 4 and 10,
+  while the same page published after the club's match read `close`. Neither item 3 nor
+  item 7 could change that, because item 7's acceptance already requires no club match
+  between publication and the target kickoff. Selection keeps pages up to seven days old, so
+  the Friday run can code a page published before a club's GW7 match.
+- **The reporter refuses code imported from another checkout.** It refuses unless
+  `squadopt` is imported from the `src` directory of the checkout it runs from, because the
+  commit check reads that checkout and the replay runs whatever code was imported.
+- **Clarified, with nothing counted differently:** why a statement given
+  `ambiguous_current_week_fixture` is not counted in `lost_unapplied`, and how that agrees
+  with the "no single next match in the gameweek" case of `scope_unverified`.
+- **The record's version is now `club_news_join_counts_v2`**, because the record gains
+  `excluded_from_lost_unapplied`, and `lost_unapplied`, with `lost`, no longer counts the
+  statements named `next_match_before_target`. No record of version 1 was printed from GW8
+  data. The inputs, every other count, the identities, the verdict table and the routing
+  rule for #1006 are unchanged.
 
 ## Why this is written
 
@@ -116,6 +152,13 @@ $env:PYTHONPATH = "$PWD\src;$PWD"
 
 This needs the reporter at that commit, which is why it merges before the Friday run.
 
+In both routes the reporter refuses unless `squadopt` is imported from the `src` directory of
+the checkout it runs from. A publishing checkout whose virtual environment was built as
+`docs/rebuild_production.md` describes installs the package from that checkout in editable
+mode, so the first command passes; in a worktree only the `PYTHONPATH` line does. If it
+refuses for this reason, set `$env:PYTHONPATH = "$PWD\src;$PWD"` in the checkout it runs from
+and run it again.
+
 ## What the reporter reads, and when it refuses
 
 It reads the snapshot store, the rotation pair, the registry and the receipt, and nothing
@@ -131,14 +174,21 @@ gameweek and deadline), and holds the replay to what was published in three ways
   attribute the manifest carries (`claims_coded`, `claims_ambiguous`,
   `players_with_conflicting_claims`, `players_not_addressed`, `clubs_covered`,
   `document_sha256s`, `response_sha256s` and the rest);
-- the checkout must be clean and at the manifest's `repository_commit`. The counts the
-  manifest does not carry (`claims_unresolved` apart from its ambiguous entry,
-  `claims_unverifiable_citation`, `players_with_unverifiable_citation`) are read from the
-  replay's attributes, and only this binds them to the published run: the replay then runs
-  the export's own code on the export's own captures.
+- the checkout must be clean and at the manifest's `repository_commit`, and `squadopt` must
+  be imported from that checkout's `src`. The counts the manifest does not carry
+  (`claims_unresolved` apart from its ambiguous entry, `claims_unverifiable_citation`,
+  `players_with_unverifiable_citation`) are read from the replay's attributes, and only this
+  binds them to the published run: the replay then runs the export's own code on the
+  export's own captures.
 
 It refuses, naming the reason, when:
 
+- `squadopt` is not imported from the `src` directory of the checkout the reporter runs from
+  (`Path(squadopt.__file__)`, resolved, is not under it), checked before anything is read.
+  The commit check below reads the checkout `scripts/` sits in; without this guard, a
+  worktree run that skipped its `PYTHONPATH` line would replay the main checkout's code under
+  a passing commit check, and the counts the manifest does not carry would come from that
+  code;
 - the manifest's `club_news_source_kind` is not `capture` (the fixture is not club news);
 - the checkout is not at the manifest's `repository_commit`, or has local changes;
 - the receipt names a different capture from the manifest's `club_news_snapshot_id`, or no
@@ -161,10 +211,11 @@ It refuses, naming the reason, when:
 
 ## Every count, and how it is computed
 
-The record's version is `club_news_join_counts_v1`. Its top level carries `record_version`,
-`protocol` (this file), `reporter` (the script), `repository_commit` and `repository_dirty`
-(the checkout the reporter ran from: the export's commit, and not dirty, in a printed record),
-and the manifest's `season`, `target_gameweek` and `deadline_timestamp_utc`.
+The record's version is `club_news_join_counts_v2` (the amendment above). Its top level
+carries `record_version`, `protocol` (this file), `reporter` (the script), `repository_commit`
+and `repository_dirty` (the checkout the reporter ran from: the export's commit, and not
+dirty, in a printed record), and the manifest's `season`, `target_gameweek` and
+`deadline_timestamp_utc`.
 
 ### `inputs`
 
@@ -329,26 +380,51 @@ A **statement** is one raw claim. A statement is **lost** in one of two ways.
   ambiguous name, another club's page, two statements about one player) is lost: it did not
   reach the decision, and the record names the rule beside it.
 - `lost_unapplied`: it becomes a row with `stated_expected_absent` or `stated_rotation_risk`,
-  the reader gives it no role and no double-gameweek reason, and its scope label is neither
-  `other_competition` nor `past`. The two labels that show the statement names another
-  competition or a past match are not counted. Other dispositions are not counted either: the
-  rule gives them no role by its own declaration.
+  the reader gives it no role and no double-gameweek reason, its scope label is neither
+  `other_competition` nor `past`, and it is not a `next_match_before_target` statement. The
+  two labels that show the statement names another competition or a past match are not
+  counted. Nor is a statement labelled `upcoming_premier_league` on a page whose publication
+  instant the reader verifies, when the decision capture's calendar, read as the reader reads
+  it, shows the club's first dated league fixture after that instant kicking off before its
+  target-gameweek fixture: its words name a match that is not the decision's, as `past` does
+  (`next_match_before_target`, defined exactly below). A statement the reader gives the
+  double-gameweek reason `ambiguous_current_week_fixture` is not counted either: for a club
+  with two fixtures in the gameweek the rule declares the role undecidable, so its absence of
+  role is the rule's own declaration, not a loss, and `double_gameweek_reason` counts it.
+  Other dispositions are not counted either: the rule gives them no role by its own
+  declaration.
 
 A statement on a page whose publication time the rule cannot use, a hedge, a statement naming
 a day ("Saturday's Premier League match") and one naming the player by his full name all end
 in `lost_unapplied`. They stay losses whatever the cause, as a claim set aside under a declared
 rule does above, and the record names the cause beside them. `lost_unapplied_by_cause` counts
 each under the first condition of the rule's role that it fails, tested in this order, so the
-four counts add up to `lost_unapplied`:
+four counts add up to `lost_unapplied`. One test that is not a cause sits between the second
+cause and the third: a statement it names leaves the count there and is no loss.
 
 - `publication_unverified`: the reader does not verify the page's publication time (the page
   states none, as undated listing pages do, or the stated time does not recheck);
 - `publication_day_precision`: the page's publication is verified to the day only;
+- `next_match_before_target`, not a cause: the scope label is `upcoming_premier_league`, the
+  verified publication instant is at or before the decision capture, and the rule's own
+  binding (`claim_targets_next_fixture`, which takes the club's first dated fixture after
+  publication), on the decision capture's calendar read as the reader reads it, binds a
+  next-match statement published at the capture instant to the club's target-gameweek
+  fixture and does not bind this statement at its own publication instant. The club's first
+  dated league fixture after that instant then kicks off before the target fixture. A
+  calendar with an undated club fixture that may come before the target (one in no gameweek
+  or in a gameweek up to the target), no target fixture, two of them, a target fixture that
+  kicked off by the capture, or another club fixture kicking off after the capture and no
+  later than the target binds nothing at the capture instant, so a statement on it is not
+  named here, nor is one published after the capture: each stays a loss under the next
+  cause;
 - `scope_unverified`: the page is dated to the instant and the scope is not verified (a hedge,
-  a day name, a full name, a wording the scope rule does not read, or no single next match in
-  the gameweek). `lost_unapplied_scope_unverified_by_scope` counts these by the table's scope
-  label. Within it the labels `unspecified` and `ambiguous` are each shared by several of
-  those cases and cannot tell them apart, which is what item 3 is about;
+  a day name, a full name, a wording the scope rule does not read, a next match the calendar
+  cannot bind, or no single next match in the gameweek: a blank week, or a double week whose
+  statement the reader does not give `ambiguous_current_week_fixture` because it fails one
+  of that reason's own conditions). `lost_unapplied_scope_unverified_by_scope` counts these
+  by the table's scope label. Within it the labels `unspecified` and `ambiguous` are each
+  shared by several of those cases and cannot tell them apart, which is what item 3 is about;
 - `publication_not_before_fetch`: publication and scope are both verified at instant
   precision and the rule still gives no role, which it does only for a page with no fetch
   instant or one stating a publication instant after its fetch.
@@ -359,7 +435,16 @@ keeps `scope_unverified`, where items 3 and 7 act, to pages dated to the instant
 `publication_unverified` or `publication_day_precision` is one that items 3 and 7 do not
 address; it still counts toward the verdict, because the owner's rule routes the items on any
 loss and does not ask which item would have prevented it, and the record's Markdown says so
-when such a loss is counted.
+when such a loss is counted. `next_match_before_target` is tested after the two publication
+causes because it needs the publication instant, and before `scope_unverified` so that a
+statement whose words name an earlier club match never reaches the cause where items 3 and 7
+act: neither would change it, since item 7's acceptance already requires no club match
+between publication and the target kickoff.
+
+`excluded_from_lost_unapplied` counts the absence or doubt statements given no role and no
+double-gameweek reason that are not in `lost_unapplied`, by reason: `other_competition`,
+`past` and `next_match_before_target`, each named even when it is zero. With `lost_unapplied`
+they add up to the statements `absence_or_doubt_not_applied_by_scope` counts.
 
 `lost` = `lost_before_table` + `lost_unapplied`. Two further counts name answers whose
 statements, if they hold any, cannot be counted at all:
@@ -379,9 +464,9 @@ call, or with no document selected had no call, so no statement of it existed to
 named in `acquisition_log` and does not enter the verdict.
 
 The record's `loss` section carries `lost_before_table`, `lost_unapplied`,
-`lost_unapplied_by_cause`, `lost_unapplied_scope_unverified_by_scope`, `lost`,
-`responses_without_claims_list` and `calls_attempted_and_failed`, with its `verdict` and
-`issue_1006`, which are:
+`lost_unapplied_by_cause`, `excluded_from_lost_unapplied`,
+`lost_unapplied_scope_unverified_by_scope`, `lost`, `responses_without_claims_list` and
+`calls_attempted_and_failed`, with its `verdict` and `issue_1006`, which are:
 
 | `verdict` | When | `issue_1006` | What follows |
 | --- | --- | --- | --- |
@@ -436,3 +521,14 @@ printed by the acquisition's own formatter. They include a failed call beside a 
 and beside an empty one, a club stopped by the budget, statements not applied for each cause,
 and a replay whose counts differ from the manifest while its rows do not. No real capture was
 read: none is on the machine this was written on.
+
+The amendment of 2026-10-22 was checked the same way, on synthetic captures with calendars
+changed where a case needs it: a next-match statement on a page published before its club's
+previous match, left out by name on an otherwise clean week, and the same page published after
+that match, applied; the same statement on a page dated to the day or not at all, with another
+label, with no intervening match, on an undated, blank or double target week, on a target
+fixture that kicked off by the capture, and on a page published after the capture, each still
+lost under its own cause; a double-gameweek statement given `ambiguous_current_week_fixture`;
+an `other_competition` and a `past` statement beside a clean week; a receipt whose outcome
+line miscounts its clubs; and a run whose `squadopt` is imported from another checkout. Still
+no real capture was read.
