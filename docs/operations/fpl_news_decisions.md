@@ -36,9 +36,12 @@ categorical quote. Per-player outcomes explain accepted and withheld statements.
 ## Bounded collection
 
 The existing registry, robots checks, origin restrictions and document bounds
-still apply. Relevant first-team injury and upcoming-match article links have
-priority; youth, women's and commercial links have lower priority. FPL player
-coverage and the much smaller registered coach-news coverage are separate facts.
+still apply. Article links are ranked by `article_priority` before the ten-article
+host cap is spent: explicit availability and match links first (injury, fitness,
+team news, pre-match and the like), unclassified links next, and youth, women's
+and commercial links last. Page order decides only within a rank, as
+[club news sources](../club_news_sources.md) states in full. FPL player coverage
+and the much smaller registered coach-news coverage are separate facts.
 
 `capture_club_news` accepts `--max-model-calls` (default 3, range 0 to 20).
 Configured providers make no automatic transport retries. A failed provider call
