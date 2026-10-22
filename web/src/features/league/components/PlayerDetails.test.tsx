@@ -1,4 +1,5 @@
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { StrictMode } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 import { mockEntryAdviceEnvelope, mockEntrySquadEnvelopes } from "../../../fixtures/league";
@@ -92,8 +93,20 @@ function plan(): EntryAdvice {
     },
   };
 }
+/** The same capture's plan with the chosen player replaced in the eleven. */
+function planWithout(): EntryAdvice {
+  return {
+    ...plan(),
+    moves: [],
+    starting_xi: original.starting_xi!.map((row) =>
+      row.player_id === player.player_id
+        ? { ...row, player_id: row.player_id + 100000, name: "Stand In", short_name: "In" }
+        : row,
+    ),
+  };
+}
 function view(
-  advice = plan(),
+  advice: EntryAdvice | null = plan(),
   fixtures: FixturesPayload | null = calendar(),
   language: "tr" | "en" = "tr",
   news = new Map<number, CoachAbsence>(),
@@ -181,6 +194,49 @@ it("closes a selected player when the capture or member changes", () => {
   open();
   rerender(view({ ...plan(), source_snapshot_id: "next-capture" }));
   expect(screen.queryByRole("dialog")).toBeNull();
+  rerender(view());
+  expect(screen.queryByRole("dialog")).toBeNull();
+});
+
+it("does not reopen a player that a later plan of the same capture dropped", () => {
+  const { rerender } = render(view());
+  open();
+  // A later plan that still draws the player keeps the details open.
+  rerender(view({ ...plan(), moves: [] }));
+  expect(screen.getByRole("dialog", { name: player.name })).toBeVisible();
+  // A device or server plan that drops the player closes them.
+  rerender(view(planWithout()));
+  expect(screen.queryByRole("dialog")).toBeNull();
+  // Drawing the player again, in a plan or in the held squad, does not reopen them.
+  rerender(view());
+  expect(screen.queryByRole("dialog")).toBeNull();
+  rerender(view(null));
+  expect(screen.getByRole("button", { name: `${player.name}: Oyuncu ayrıntıları` })).toBeVisible();
+  expect(screen.queryByRole("dialog")).toBeNull();
+});
+
+it("stays open in StrictMode when the replayed effect's close event arrives late", async () => {
+  // A browser fires close from a queued task, so the close in the replayed effect's cleanup
+  // reaches the dialog only after the replay has opened it again.
+  const close = vi.fn(function (this: HTMLDialogElement) {
+    if (!this.open) return;
+    this.open = false;
+    setTimeout(() => this.dispatchEvent(new Event("close")), 0);
+  });
+  Object.defineProperty(HTMLDialogElement.prototype, "close", { configurable: true, value: close });
+  const settle = () => act(() => new Promise((resolve) => setTimeout(resolve, 0)));
+  render(<StrictMode>{view()}</StrictMode>);
+  const trigger = open();
+  await settle();
+  const dialog = screen.getByRole<HTMLDialogElement>("dialog", { name: player.name });
+  expect(dialog).toBeVisible();
+  // Only the replay's cleanup has closed it, while it stayed mounted.
+  expect(close).toHaveBeenCalledOnce();
+  // Escape closes the dialog the same way: that close event is real and ends the selection.
+  dialog.close();
+  await settle();
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(trigger).toHaveFocus();
 });
 
 it("provides a named button for a bench player's details too", () => {

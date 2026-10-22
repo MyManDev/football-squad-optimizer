@@ -107,7 +107,17 @@ export function PlayerDetails({
     ? messages.positions[player.position as keyof typeof messages.positions]
     : player.position;
   return (
-    <dialog ref={dialog} className={styles.dialog} aria-labelledby={titleId} onClose={onClose}>
+    <dialog
+      ref={dialog}
+      className={styles.dialog}
+      aria-labelledby={titleId}
+      // A browser fires close from a queued task. StrictMode's development replay of the effect
+      // above closes and reopens the dialog, so that close arrives while it is open again: only
+      // a dialog that is really closed ends the selection.
+      onClose={(event) => {
+        if (!event.currentTarget.open) onClose();
+      }}
+    >
       <header className={styles.head}>
         <div>
           <h2 id={titleId}>{player.name}</h2>

@@ -74,6 +74,9 @@ export function MemberSquad({
     selection?.context === context
       ? [...onPitch.eleven, ...onPitch.bench].find((player) => player.playerId === selection?.id)
       : undefined;
+  // A selection ends once its player is no longer drawn or the context changes, so a later
+  // plan or the held squad drawing the player again does not reopen the details by itself.
+  if (selection !== null && selected === undefined) setSelection(null);
   const selectPlayer = (id: number) => setSelection({ context, id });
   const modelChange = planned ? modelChangeOf(plan) : null;
   const changeKey = modelChange?.key ?? null;
