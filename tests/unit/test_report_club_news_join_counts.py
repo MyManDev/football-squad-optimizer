@@ -760,15 +760,24 @@ def _united_week(
     tmp_path: Path,
     *,
     published: str | None = BEFORE_UNITED_MIDWEEK,
+    stated: str | None = None,
     precision: str = "instant",
     line: str = DALOT,
+    player: str = "Dalot",
     scope: str = "upcoming_premier_league",
     calendar: bytes | None = None,
 ) -> dict[str, Any]:
-    """One Man Utd page and answer: Dalot's absence, quoted as ``DALOT`` from ``line``."""
+    """One Man Utd page and answer: Dalot's absence, quoted as ``DALOT`` from ``line``.
 
-    quote = DALOT if DALOT in line else line
-    page = {"url": UNITED, "published_at_utc": published, "published_precision": precision}
+    The page states ``published``; the answer states ``stated`` for it, ``published`` unless
+    given. A ``player`` other than the roster's short name is quoted as the whole ``line``."""
+
+    quote = DALOT if DALOT in line and player == "Dalot" else line
+    page = {
+        "url": UNITED,
+        "published_at_utc": published if stated is None else stated,
+        "published_precision": precision,
+    }
     root, _news, table = _week(
         tmp_path,
         documents=(_document("Man Utd", UNITED, (line,), published=published),),
@@ -776,7 +785,7 @@ def _united_week(
             _coded(
                 "Man Utd",
                 UNITED,
-                [_claim("Dalot", "Man Utd", "stated_expected_absent", quote, UNITED, scope)],
+                [_claim(player, "Man Utd", "stated_expected_absent", quote, UNITED, scope)],
                 pages=[page],
             ),
         ),
@@ -838,6 +847,54 @@ def test_a_next_match_statement_made_before_an_intervening_club_match_is_no_loss
     _assert_accounted(record)
 
 
+#: A rearranged Man Utd league match in no gameweek, kicking off at 16:00 on the decision day:
+#: after the decision capture (15:00) and before the target fixture (19:00).
+AFTER_THE_CAPTURE = "2026-09-12T16:00:00Z"
+_REARRANGED = _calendar(added=(_league_fixture(502, None, "Man Utd", "Fulham", AFTER_THE_CAPTURE),))
+#: Dalot named in full: the exporter verifies the label with the coded name, and the reader,
+#: which reads the roster's short name, does not verify the scope.
+DALOT_IN_FULL = "Diogo Dalot will miss the next Premier League match."
+
+
+@pytest.mark.parametrize(
+    "week",
+    [
+        pytest.param(
+            {"calendar": _REARRANGED},
+            id="club_matches_before_and_after_the_capture",
+        ),
+        pytest.param(
+            {"published": AFTER_UNITED_MIDWEEK, "calendar": _REARRANGED},
+            id="club_match_after_the_capture_only",
+        ),
+        pytest.param(
+            {"line": DALOT_IN_FULL, "player": "Diogo Dalot"},
+            id="player_named_in_full",
+        ),
+    ],
+)
+def test_the_earlier_club_match_may_fall_on_either_side_of_the_capture(
+    tmp_path: Path, week: dict[str, Any]
+) -> None:
+    """The condition is the decision's: the club's first dated league fixture after the
+    publication instant kicks off before the target fixture, wherever it falls against the
+    capture. A full-name statement keeps its label, so it is left out like any other."""
+
+    record = _united_week(tmp_path, **week)
+
+    assert record["claims"]["placed"] == 1
+    assert record["reader"]["constraining_statements"] == 0
+    assert record["reader"]["absence_or_doubt_not_applied_by_scope"] == {
+        "upcoming_premier_league": 1
+    }
+    assert record["loss"]["lost_unapplied"] == 0
+    assert record["loss"]["lost_unapplied_by_cause"] == dict.fromkeys(report.UNAPPLIED_CAUSES, 0)
+    assert record["loss"]["excluded_from_lost_unapplied"]["next_match_before_target"] == 1
+    assert record["loss"]["verdict"] == "no_statement_lost"
+    assert record["loss"]["issue_1006"] == "close"
+    _assert_accounted(record)
+
+
 #: A second target-week kickoff, three days after the first, for a double gameweek.
 _LATER = "2026-09-15T19:00:00Z"
 
@@ -858,6 +915,14 @@ _LATER = "2026-09-15T19:00:00Z"
             id="publication_unstated",
         ),
         pytest.param(
+            # The page states an instant before the club's previous match, and the table
+            # carries it, but the answer stated another, so the reader does not verify it.
+            {"stated": "2026-09-09T10:05:00Z"},
+            "publication_unverified",
+            None,
+            id="publication_does_not_recheck",
+        ),
+        pytest.param(
             {"line": "Dalot will miss Saturday's Premier League match.", "scope": "unspecified"},
             "scope_unverified",
             "unspecified",
@@ -872,10 +937,30 @@ _LATER = "2026-09-15T19:00:00Z"
             id="no_intervening_match",
         ),
         pytest.param(
+            {"published": AFTER_UNITED_MIDWEEK, "line": DALOT_IN_FULL, "player": "Diogo Dalot"},
+            "scope_unverified",
+            "upcoming_premier_league",
+            id="player_named_in_full_with_no_intervening_match",
+        ),
+        pytest.param(
             {"calendar": _calendar(added=(_league_fixture(501, None, "Man Utd", "Fulham", None),))},
             "scope_unverified",
             "upcoming_premier_league",
             id="undated_calendar",
+        ),
+        pytest.param(
+            {
+                "published": AFTER_UNITED_MIDWEEK,
+                "calendar": _calendar(
+                    added=(
+                        _league_fixture(501, None, "Man Utd", "Fulham", None),
+                        _league_fixture(502, None, "Man Utd", "Fulham", AFTER_THE_CAPTURE),
+                    )
+                ),
+            },
+            "scope_unverified",
+            "upcoming_premier_league",
+            id="undated_beside_a_club_match_after_the_capture",
         ),
         pytest.param(
             {"calendar": _calendar(changed={401: {"team_a": _team("Fulham")}})},

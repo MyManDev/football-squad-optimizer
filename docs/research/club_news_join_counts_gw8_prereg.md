@@ -21,10 +21,16 @@ before the Friday run, so the commit the run's rotation manifest names carries i
 
 - **A next-match statement made before an intervening club match is not a loss.** A
   statement labelled `upcoming_premier_league`, on a page whose publication the reader
-  verifies to the instant, whose "next match" the decision capture's calendar shows to be a
-  league match of its club kicking off before the target-gameweek fixture, is left out of
-  `lost_unapplied`, as `other_competition` and `past` are, and counted by name as
-  `next_match_before_target` (defined under the reading below). Before this amendment it was
+  verifies to an instant at or before the decision capture, is left out of
+  `lost_unapplied`, as `other_competition` and `past` are, when the decision capture's
+  calendar, read as the reader reads it, gives the club one dated target-gameweek fixture
+  kicking off after the capture and no undated fixture that may come before it, and shows the
+  club's first dated league fixture after that instant kicking off before the target
+  fixture. It is counted by name as `next_match_before_target` (defined exactly under the
+  reading below). The earlier match may kick off before or after the capture. Undated, blank
+  and double target weeks stay losses under their existing causes, and so do the two cases
+  this protocol reads as after the cutoff: a target fixture that kicked off by the decision
+  capture, and a page published after it. Before this amendment such a statement was
   counted under `scope_unverified`, the cause where items 3 and 7 of #1006 act: the scope
   label comes from the quote's own words, so such a statement keeps
   `upcoming_premier_league`, and the rule rightly refuses to bind it to the target fixture,
@@ -384,9 +390,11 @@ A **statement** is one raw claim. A statement is **lost** in one of two ways.
   `other_competition` nor `past`, and it is not a `next_match_before_target` statement. The
   two labels that show the statement names another competition or a past match are not
   counted. Nor is a statement labelled `upcoming_premier_league` on a page whose publication
-  instant the reader verifies, when the decision capture's calendar, read as the reader reads
-  it, shows the club's first dated league fixture after that instant kicking off before its
-  target-gameweek fixture: its words name a match that is not the decision's, as `past` does
+  the reader verifies to an instant at or before the decision capture, when the decision
+  capture's calendar, read as the reader reads it, gives the club one dated target-gameweek
+  fixture kicking off after the capture and no undated fixture that may come before it, and
+  shows the club's first dated league fixture after that instant kicking off before the
+  target fixture: its words name a match that is not the decision's, as `past` does
   (`next_match_before_target`, defined exactly below). A statement the reader gives the
   double-gameweek reason `ambiguous_current_week_fixture` is not counted either: for a club
   with two fixtures in the gameweek the rule declares the role undecidable, so its absence of
@@ -396,33 +404,39 @@ A **statement** is one raw claim. A statement is **lost** in one of two ways.
 
 A statement on a page whose publication time the rule cannot use, a hedge, a statement naming
 a day ("Saturday's Premier League match") and one naming the player by his full name all end
-in `lost_unapplied`. They stay losses whatever the cause, as a claim set aside under a declared
-rule does above, and the record names the cause beside them. `lost_unapplied_by_cause` counts
-each under the first condition of the rule's role that it fails, tested in this order, so the
-four counts add up to `lost_unapplied`. One test that is not a cause sits between the second
-cause and the third: a statement it names leaves the count there and is no loss.
+in `lost_unapplied`, unless it is a `next_match_before_target` statement. Of these only the
+full-name statement can be one, because it keeps the label `upcoming_premier_league`; the
+others never carry that label on a page dated to a verified instant. They stay losses
+whatever the cause, as a claim set aside under a declared rule does above, and the record
+names the cause beside them. `lost_unapplied_by_cause` counts each under the first condition
+of the rule's role that it fails, tested in this order, so the four counts add up to
+`lost_unapplied`. One test that is not a cause sits between the second cause and the third:
+a statement it names leaves the count there and is no loss.
 
 - `publication_unverified`: the reader does not verify the page's publication time (the page
   states none, as undated listing pages do, or the stated time does not recheck);
 - `publication_day_precision`: the page's publication is verified to the day only;
-- `next_match_before_target`, not a cause: the scope label is `upcoming_premier_league`, the
-  verified publication instant is at or before the decision capture, and the rule's own
-  binding (`claim_targets_next_fixture`, which takes the club's first dated fixture after
-  publication), on the decision capture's calendar read as the reader reads it, binds a
-  next-match statement published at the capture instant to the club's target-gameweek
-  fixture and does not bind this statement at its own publication instant. The club's first
-  dated league fixture after that instant then kicks off before the target fixture. A
-  calendar with an undated club fixture that may come before the target (one in no gameweek
-  or in a gameweek up to the target), no target fixture, two of them, a target fixture that
-  kicked off by the capture, or another club fixture kicking off after the capture and no
-  later than the target binds nothing at the capture instant, so a statement on it is not
-  named here, nor is one published after the capture: each stays a loss under the next
-  cause;
-- `scope_unverified`: the page is dated to the instant and the scope is not verified (a hedge,
-  a day name, a full name, a wording the scope rule does not read, a next match the calendar
-  cannot bind, or no single next match in the gameweek: a blank week, or a double week whose
-  statement the reader does not give `ambiguous_current_week_fixture` because it fails one
-  of that reason's own conditions). `lost_unapplied_scope_unverified_by_scope` counts these
+- `next_match_before_target`, not a cause: the scope label is `upcoming_premier_league`; the
+  verified publication instant is at or before the decision capture; and the decision
+  capture's calendar, read as the reader reads it, gives the club exactly one fixture in the
+  target gameweek, dated and kicking off after the capture, and no undated fixture that may
+  come before it (one in no gameweek or in a gameweek up to the target), and the club's first
+  dated league fixture after the publication instant kicks off before that target fixture.
+  The earlier match may kick off before or after the capture. Both calendar questions are put
+  to the rule's own binding (`claim_targets_next_fixture`, which takes the club's first dated
+  fixture after publication): asked at the last second before the target kickoff, with the
+  cutoff there too, it binds exactly when the calendar has that shape; asked as the reader
+  asked it, at the statement's own instant with the capture as the cutoff, it does not bind
+  the statement. A blank or double target week, an undated club fixture that may come before
+  the target, a target fixture that kicked off by the capture and a page published after the
+  capture do not qualify: a statement on such a calendar or page is not named here and stays
+  a loss under the next cause;
+- `scope_unverified`: the page is dated to the instant, the statement is not a
+  `next_match_before_target` one, and the scope is not verified (a hedge, a day name, a full
+  name, a wording the scope rule does not read, a next match the calendar cannot bind, or no
+  single next match in the gameweek: a blank week, or a double week whose statement the
+  reader does not give `ambiguous_current_week_fixture` because it fails one of that
+  reason's own conditions). `lost_unapplied_scope_unverified_by_scope` counts these
   by the table's scope label. Within it the labels `unspecified` and `ambiguous` are each
   shared by several of those cases and cannot tell them apart, which is what item 3 is about;
 - `publication_not_before_fetch`: publication and scope are both verified at instant
@@ -525,8 +539,12 @@ read: none is on the machine this was written on.
 The amendment of 2026-10-22 was checked the same way, on synthetic captures with calendars
 changed where a case needs it: a next-match statement on a page published before its club's
 previous match, left out by name on an otherwise clean week, and the same page published after
-that match, applied; the same statement on a page dated to the day or not at all, with another
-label, with no intervening match, on an undated, blank or double target week, on a target
+that match, applied; the same statement left out when a rearranged club match kicks off
+between the capture and the target, with the page published before or after the club's
+previous match, and when it names the player in full; the same statement on a page dated to
+the day or not at all, on a page whose stated instant does not recheck, with another label,
+with no intervening match (once naming the player in full), on an undated, blank or double
+target week, beside an undated fixture and a club match after the capture, on a target
 fixture that kicked off by the capture, and on a page published after the capture, each still
 lost under its own cause; a double-gameweek statement given `ambiguous_current_week_fixture`;
 an `other_competition` and a `past` statement beside a clean week; a receipt whose outcome

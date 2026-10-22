@@ -48,6 +48,7 @@ import urllib.parse
 from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from datetime import timedelta
 from pathlib import Path
 from typing import Final, TypeAlias
 
@@ -107,9 +108,12 @@ PLACEHOLDER_CLUB: Final = "Example FC"
 SCOPES_NOT_THE_DECISION: Final = frozenset({"other_competition", "past"})
 
 #: A not-applied absence or doubt statement labelled ``upcoming_premier_league`` on a page
-#: dated to the instant, whose "next match", by the decision capture's own calendar, is a
-#: league match of its club that kicks off before the target-gameweek fixture: like ``past``,
-#: its words name a match that is not the decision's (``next_match_before_target``).
+#: whose publication the reader verifies to an instant at or before the decision capture,
+#: when the decision capture's calendar, read as the reader reads it, gives the club one
+#: dated target-gameweek fixture kicking off after the capture and no undated fixture that
+#: may come before it, and the club's first dated league fixture after that instant kicks
+#: off before the target fixture: like ``past``, its words name a match that is not the
+#: decision's (``next_match_before_target``).
 NEXT_MATCH_BEFORE_TARGET: Final = "next_match_before_target"
 
 #: Why a not-applied absence or doubt statement is left out of ``lost_unapplied``, each
@@ -405,15 +409,23 @@ def next_match_before_target(
 
     Only for a statement labelled ``upcoming_premier_league`` on a page whose publication the
     reader verifies to an instant at or before the decision capture. The decision capture's
-    calendar is read as the reader reads it (``basis``), and both answers come from the
-    rule's own binding, ``claim_targets_next_fixture``, which takes the club's first dated
-    fixture after the publication instant: published at the capture instant, the statement
-    would bind to the club's target-gameweek fixture, and published at its own instant it
-    does not. So the club's first dated league fixture after that instant kicks off before
-    the target fixture. An undated, blank or double target week, a target fixture that
-    kicked off by the capture, or another club fixture kicking off after the capture and no
-    later than the target binds nothing at the capture instant, and its statement stays a
-    loss under its own cause, as does one published after the capture.
+    calendar is read as the reader reads it (``basis``): it must give the club exactly one
+    dated fixture in the target gameweek, kicking off after the capture, and no undated
+    fixture that may come before it (one in no gameweek or in a gameweek up to the target),
+    and the club's first dated league fixture after the publication instant must kick off
+    before that target fixture. The earlier match may kick off before or after the capture.
+
+    Both calendar questions are put to the rule's own binding, ``claim_targets_next_fixture``,
+    which takes the club's first dated fixture after a publication instant. Asked at the last
+    second before the target kickoff, it binds exactly when the calendar has that shape. It is
+    not asked at the capture instant for this, because a club match between the capture and
+    the target makes it bind nothing there, and that calendar qualifies. Asked as the reader
+    asked it, at the statement's own instant with the capture as the cutoff, it does not bind
+    the statement, so the first dated club fixture after publication is an earlier one.
+
+    An undated, blank or double target week, a target fixture that kicked off by the capture
+    and a page published after the capture do not qualify: each stays a loss under its own
+    cause.
     """
 
     if (
@@ -428,23 +440,31 @@ def next_match_before_target(
     player = players.get(word.player_id)
     if player is None or player[0] != word.club:
         return False
+    target = calendar.loc[
+        calendar.team_id.eq(player[1]) & calendar.gameweek.eq(target_gameweek),
+        "kickoff_time_utc",
+    ].dropna()
+    if len(target) != 1:
+        return False
     try:
-        if as_instant(word.published_at_utc) > as_instant(captured):
+        cutoff, kickoff = as_instant(captured), as_instant(str(target.iloc[0]))
+        if as_instant(word.published_at_utc) > cutoff or kickoff <= cutoff:
             return False
     except (TypeError, ValueError):
         return False
 
-    def binds(published_at_utc: str) -> bool:
+    def binds(published_at_utc: str, captured_at_utc: str) -> bool:
         return claim_targets_next_fixture(
             calendar,
             team_code=player[1],
             target_gameweek=target_gameweek,
-            captured_at_utc=captured,
+            captured_at_utc=captured_at_utc,
             published_at_utc=published_at_utc,
             published_precision="instant",
         )
 
-    return binds(captured) and not binds(word.published_at_utc)
+    eve = (kickoff - timedelta(seconds=1)).isoformat()
+    return binds(eve, eve) and not binds(word.published_at_utc, captured)
 
 
 def not_applied_reading(word: ManagerWord, basis: FixtureBasis | None, target_gameweek: int) -> str:
