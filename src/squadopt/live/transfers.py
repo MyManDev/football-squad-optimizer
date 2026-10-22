@@ -797,6 +797,7 @@ def plan_transfers_with_exclusion(
     *,
     optimization: OptimizationConfig | None = None,
     expected_lineups: bool = False,
+    linearization_level: int | None = None,
 ) -> tuple[TransferPlanResult, TransferDecision, TransferPlanningConfig]:
     """``plan_transfers`` with named players kept out of the week's eleven or captaincy.
 
@@ -805,6 +806,8 @@ def plan_transfers_with_exclusion(
     reason ``plan_transfers_with_overlap`` is one: the saf-puan baseline call sites stay
     byte-identical by construction. As there, an unproven plan is returned with its
     status rather than raised on; only no solution at all is an error.
+    ``linearization_level`` is passed through as ``plan_transfers`` passes it, so a plan
+    compared with a member's control can be solved at that control's level.
     """
 
     if not isinstance(expected_lineups, bool):
@@ -825,6 +828,7 @@ def plan_transfers_with_exclusion(
         prepared.transfer_config,
         chips=prepared.availability,
         first_week_exclusion=first_week_exclusion,
+        linearization_level=linearization_level,
     )
     if not plan.has_solution or not plan.weeks:
         raise DataSourceError(

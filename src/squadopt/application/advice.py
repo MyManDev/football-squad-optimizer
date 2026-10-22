@@ -126,14 +126,21 @@ WINDOW_WALL_CEILING_SECONDS = 1800.0
 #: solve as they always did. The tracked member's one-week control has its own constant
 #: below.
 WINDOW_LINEARIZATION_LEVEL = 2
-#: CP-SAT's linearization level for a tracked member's one-week control: the batch that
-#: solves each entry's server baseline before any league renders, and the full-menu page
-#: that solves a member the batch has no control for. Both paths read this one value, so a
-#: member's published plan does not depend on whether the run records advice. At 2 the
-#: complete linear relaxation proves the five-free-transfer baseline of the second-league
-#: rehearsal inside the existing budget; the model and the deterministic ceiling are
-#: unchanged. Every other one-week caller (the on-demand menu, the rival price anchor, the
-#: manager's word and the Top 100 plans) does not pass it and solves at the default.
+#: CP-SAT's linearization level for a member's one-week control, and the default of
+#: ``solve_member_control``. Every path that solves the control reads it: the batch that
+#: solves each tracked entry's server baseline before any league renders, the full-menu
+#: page that solves a member the batch has no control for, and the on-demand menu that
+#: rebuilds the control for one request. So a member's plan does not depend on whether the
+#: run records advice or on which path answered. At 2 the complete linear relaxation proves
+#: the five-free-transfer baseline of the second-league rehearsal inside the existing
+#: budget; the model and the deterministic ceiling are unchanged.
+#:
+#: A plan a document compares with the control is solved at the control's own level
+#: (``MemberControl.linearization_level``): the Top 100 plan, the re-solves under the
+#: manager's word and a chosen chip's plan. Their price, ``changed`` flag and move reasons
+#: then describe the setting, the word or the chip, not two solver settings. The rival
+#: documents compare their banded plans with the price anchor (``solve_pricing_control``),
+#: and both of those still solve at the CP-SAT default.
 TRACKED_MEMBER_LINEARIZATION_LEVEL = 2
 EXPECTED_LINEUP_PLAN_LIMIT = (
     "Complete plans are compared using expected automatic substitutions and vice-captain "
@@ -446,13 +453,16 @@ class MemberControl:
     The batch renders a member against every other member of the league under every
     computable rival strategy; re-solving the same control for each of them would be
     the same bytes at many times the cost. The picks the control was solved from travel
-    with it, so a caller cannot hand one member's control to another's request.
+    with it, so a caller cannot hand one member's control to another's request. So does
+    the CP-SAT linearization level it was solved at: a plan compared with the control is
+    solved at the same level, so a difference between the two is never the solver's.
     """
 
     picks: EntryPicks
     plan: TransferPlanResult
     decision: TransferDecision
     transfer_config: TransferPlanningConfig
+    linearization_level: int | None
 
 
 def solve_member_control(
@@ -462,9 +472,15 @@ def solve_member_control(
     rules: SeasonRules,
     *,
     phase_e_diagnostic: TransferAdviceDiagnostic | None = None,
-    linearization_level: int | None = None,
+    linearization_level: int | None = TRACKED_MEMBER_LINEARIZATION_LEVEL,
 ) -> MemberControl:
-    """Solve the member's one-week pure-points plan from their own squad."""
+    """Solve the member's one-week pure-points plan from their own squad.
+
+    At ``TRACKED_MEMBER_LINEARIZATION_LEVEL`` unless the caller names another level
+    (``None`` is the CP-SAT default). Every control in the package is solved at that
+    constant; the one caller that names a level is the Top 100 plan, which passes its
+    control's.
+    """
 
     prices = {
         int(str(row["player_id"])): int(str(row["price_tenths"]))
@@ -497,7 +513,13 @@ def solve_member_control(
     except Exception:
         # An opt-in internal diagnostic cannot invalidate the already-solved advice.
         logging.getLogger(__name__).warning("Phase E advice diagnostic failed", exc_info=True)
-    return MemberControl(picks=picks, plan=plan, decision=decision, transfer_config=transfer_config)
+    return MemberControl(
+        picks=picks,
+        plan=plan,
+        decision=decision,
+        transfer_config=transfer_config,
+        linearization_level=linearization_level,
+    )
 
 
 def net_expected_points(plan: TransferPlanResult) -> float:
@@ -1348,13 +1370,14 @@ def advise_with_managers_word(
     solved under the same planning policy: if that plan already starts nobody the rule
     benches and captains nobody it bars, it is also the best plan under the rule, so the
     document is the control's plan at a price of zero. Only when the control breaks the
-    rule is a second plan solved under it. **The price** compares two plans solved under
-    one policy, the control and the constrained plan, net of the hits each pays at the
-    game's charge, and is floored at zero. Either way the ceiling is the price when the
-    control is proven and is not published when it is not (``publish_price_ceiling``):
-    the control's bound gap is on the planner's objective and bounds no price. Anchoring
-    on a plan solved at the charge instead (as the rival band does) would put the caution
-    margin's own effect on unrelated transfers into the price of the club's word.
+    rule is a second plan solved under it, at the control's linearization level. **The
+    price** compares two plans solved under one policy and one solver setting, the control
+    and the constrained plan, net of the hits each pays at the game's charge, and is
+    floored at zero. Either way the ceiling is the price when the control is proven and
+    is not published when it is not (``publish_price_ceiling``): the control's bound gap
+    is on the planner's objective and bounds no price. Anchoring on a plan solved at the
+    charge instead (as the rival band does) would put the caution margin's own effect on
+    unrelated transfers into the price of the club's word.
 
     Either way the rows are measured under the rule, and a vice-captain the rule bars from
     the armband is replaced (``_vice_not_barred``). On an expected-lineup control the vice
@@ -1416,6 +1439,7 @@ def advise_with_managers_word(
         rules,
         exclusion,
         expected_lineups=control_week.lineup_expectation is not None,
+        linearization_level=solved.linearization_level,
     )
     # Both plans are solved under the member planning policy, so the tag is what the rule
     # costs under the policy that chose the plan, not the policy's own caution on other
@@ -1552,8 +1576,9 @@ def solve_word_control(
     """The plan a member sees with the manager's word on and no Top 100 setting.
 
     The control itself when the word does not break it; otherwise the control re-solved
-    under the word, as ``advise_with_managers_word`` solves it. Solved once per member and
-    handed to every weight, which each compare their own plan with it.
+    under the word, as ``advise_with_managers_word`` solves it, at the control's
+    linearization level. Solved once per member and handed to every weight, which each
+    compare their own plan with it.
     """
 
     exclusion = words.exclusion()
@@ -1573,8 +1598,15 @@ def solve_word_control(
         rules,
         exclusion,
         expected_lineups=control.plan.weeks[0].lineup_expectation is not None,
+        linearization_level=control.linearization_level,
     )
-    return MemberControl(picks=control.picks, plan=plan, decision=decision, transfer_config=config)
+    return MemberControl(
+        picks=control.picks,
+        plan=plan,
+        decision=decision,
+        transfer_config=config,
+        linearization_level=control.linearization_level,
+    )
 
 
 def advise_with_top100(
@@ -1611,6 +1643,10 @@ def advise_with_top100(
     planner's objective also weighs the bench and its caution margin, which this total
     does not) is floored and named in ``notes``.
 
+    **One solver setting.** The weighted plan, and its re-solve under the word, are solved
+    at the control's linearization level, so ``changed``, the price and each move's reason
+    compare plans that differ by the weight (and the word), not by the search.
+
     **With the manager's word**, the weighted plan is re-solved under the declared rule
     when it breaks it, as ``advise_with_managers_word`` does for the control, and the
     price is the combination's against the same control. ``binding`` is judged against
@@ -1629,7 +1665,9 @@ def advise_with_top100(
     if not solved.plan.has_solution or not solved.plan.weeks:
         raise EntryError("The pure-points control has no solution; nothing can be priced.")
     weighted = weighted_projection(projection, counts.counts, weight)
-    preferred = solve_member_control(picks, inputs, weighted, rules)
+    preferred = solve_member_control(
+        picks, inputs, weighted, rules, linearization_level=solved.linearization_level
+    )
     if not preferred.plan.has_solution or not preferred.plan.weeks:
         raise EntryError(f"The plan at Top 100 influence {weight} has no solution.")
     points = base_points(projection)
@@ -1747,6 +1785,7 @@ def advise_with_top100(
                 rules,
                 exclusion,
                 expected_lineups=preferred_week.lineup_expectation is not None,
+                linearization_level=solved.linearization_level,
             )
         else:
             plan, decision = preferred.plan, preferred.decision

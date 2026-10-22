@@ -13,7 +13,6 @@ from pathlib import Path, PurePosixPath
 
 from squadopt.application.advice import (
     MEMBER_SOLVE_ERRORS,
-    TRACKED_MEMBER_LINEARIZATION_LEVEL,
     AdviseEntryRequest,
     MemberControl,
     advise_entry,
@@ -231,13 +230,8 @@ def prepare_tracked_baselines(
         # and every league still publish.
         try:
             picks = provider.picks(entry_id, season, int(inputs.deadline.gameweek) - 1)
-            control = solve_member_control(
-                picks,
-                inputs,
-                projection,
-                rules,
-                linearization_level=TRACKED_MEMBER_LINEARIZATION_LEVEL,
-            )
+            # At TRACKED_MEMBER_LINEARIZATION_LEVEL, the level every member control uses.
+            control = solve_member_control(picks, inputs, projection, rules)
             payload = advise_entry(
                 AdviseEntryRequest(
                     season, int(inputs.deadline.gameweek), first.league_id, entry_id

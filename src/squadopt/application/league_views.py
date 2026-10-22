@@ -42,7 +42,6 @@ from squadopt.application.advice import (
     MEMBER_SOLVE_ERRORS,
     MEMBER_WINDOWS,
     TOP100_SOLVE_ERRORS,
-    TRACKED_MEMBER_LINEARIZATION_LEVEL,
     AdviseEntryRequest,
     HorizonBuilder,
     MemberControl,
@@ -278,15 +277,10 @@ def render_member(
         if control is not None and control.picks != picks:
             raise EntryError("The baseline control belongs to different member picks.")
         if control is None:
-            # The tracked baseline batch solves at this level too, so the member's plan is
-            # the same whether or not the run records advice.
-            control = solve_member_control(
-                picks,
-                inputs,
-                projection,
-                rules,
-                linearization_level=TRACKED_MEMBER_LINEARIZATION_LEVEL,
-            )
+            # At TRACKED_MEMBER_LINEARIZATION_LEVEL, the level the baseline batch and the
+            # on-demand menu solve at too, so the member's plan is the same whether or not
+            # the run records advice.
+            control = solve_member_control(picks, inputs, projection, rules)
         baseline = advise_entry(
             AdviseEntryRequest(
                 season=task.season,
