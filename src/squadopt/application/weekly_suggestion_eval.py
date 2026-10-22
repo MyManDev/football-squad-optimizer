@@ -230,7 +230,8 @@ class _AnotherLeaguesWeek(Exception):
     """The member-week is another league's: not this league's week.
 
     Either every record in it belongs to another league, or it holds no record and this
-    league records none (:func:`_records_advice`). Not a :class:`DataError`, so
+    league records none (:func:`_records_advice`), and the baseline store holds no directory
+    for it. Not a :class:`DataError`, so
     :func:`_evaluate_week` cannot report it as an unavailable week; the walk that asked for
     it leaves the week out. The public :func:`select_record` and :func:`evaluate_week` never
     raise it.
@@ -353,7 +354,8 @@ def _select_record(
     for both. With ``other_leagues_absent`` a sound record of another league is absent
     rather than refused, and a week whose records are all another league's raises
     :class:`_AnotherLeaguesWeek`, as does a week holding no record for a league that records
-    none. Without it, another league's record is refused as before, unless
+    none; neither applies to a week the baseline store holds a directory for, which stays
+    every league's. Without it, another league's record is refused as before, unless
     ``baseline_record_root`` is given: a legacy record of another league is then absent too.
     Only :func:`review_member_weeks` sets ``other_leagues_absent``, and it is the one caller
     that catches the signal.
@@ -363,18 +365,15 @@ def _select_record(
     stores = [root] if baseline_record_root is None else [baseline_record_root, root]
     listed = [(store, recorded_captures(store, season, gameweek, entry_id)) for store in stores]
     total = sum(len(captures) for _, captures in listed)
-    if (
-        other_leagues_absent
-        and not total
-        and not _records_advice(league_id)
-        and not (
-            baseline_record_root is not None
-            and (baseline_record_root / season / f"gw{gameweek:02d}" / f"entry-{entry_id}").is_dir()
-        )
-    ):
+    # A baseline directory is every league's, so a week it names stays this league's even
+    # when its record never landed and every legacy record beside it is another league's.
+    baseline_week = (
+        baseline_record_root is not None
+        and (baseline_record_root / season / f"gw{gameweek:02d}" / f"entry-{entry_id}").is_dir()
+    )
+    if other_leagues_absent and not total and not _records_advice(league_id) and not baseline_week:
         # A directory a record never landed in, left by the league that records advice.
-        # That league shows it without advice; for this league it is no week at all. A
-        # baseline directory is every league's, so a week it names stays this league's.
+        # That league shows it without advice; for this league it is no week at all.
         raise _AnotherLeaguesWeek
     others = 0
     held: dict[str, tuple[datetime, str, dict[str, Any]] | None] = {}
@@ -426,7 +425,7 @@ def _select_record(
             # a broken baseline; a late legacy publication must not borrow the earlier
             # baseline's clock. Its original digest remains authoritative.
             held[capture.snapshot_id] = candidate
-    if other_leagues_absent and total and others == total:
+    if other_leagues_absent and total and others == total and not baseline_week:
         raise _AnotherLeaguesWeek
     candidates = [candidate for candidate in held.values() if candidate is not None]
     if not candidates:
@@ -791,7 +790,8 @@ def review_member_weeks(
     ``published`` is passed to :func:`select_record` for every week.
 
     A week whose records all belong to another league is not one of this league's weeks and
-    is left out, as is a week holding no record when this league records none.
+    is left out, as is a week holding no record when this league records none. A week the
+    baseline store holds a directory for is every league's and is never left out.
     ``other_league_weeks``, when given, receives each such ``(entry_id, week)``.
     """
     _identifier(league_id)
