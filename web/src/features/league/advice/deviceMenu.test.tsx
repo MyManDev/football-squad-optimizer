@@ -304,3 +304,64 @@ describe("the Top 100 note beside a device weight", () => {
     },
   );
 });
+
+describe("the Top 100 note where the link leaves the device's weight out", () => {
+  // The service with the word and no Top 100 setting of its own.
+  const SERVICE: AdviceCapabilities = {
+    leagueId: DEVICE_INDEX.league_id,
+    captureSnapshotId: "device-menu-capture",
+    season: SQUAD.season,
+    gameweek: SQUAD.gameweek,
+    strategies: { "saf-puan": { windows: [1], requiresRival: false } },
+    top100Weights: [0],
+    managersWord: true,
+  };
+  const PREFERENCES = `preferences=${encodeURIComponent(JSON.stringify({ no_hits: true }))}`;
+
+  it.each([
+    ["llm=on", "no index", null, null],
+    ["llm=on", "the device index", DEVICE_INDEX, null],
+    ["llm=on", "the service with the word", DEVICE_INDEX, SERVICE],
+    ["model=football", "no index", null, null],
+    ["model=football", "the service", DEVICE_INDEX, SERVICE],
+    [PREFERENCES, "no index", null, null],
+    [PREFERENCES, "the service", DEVICE_INDEX, SERVICE],
+  ] as const)("still says only 0 is available with %s and %s", (query, _name, index, service) => {
+    for (const language of ["tr", "en"] as const) {
+      render(
+        <LanguageProvider initialLanguage={language}>
+          <MemoryRouter initialEntries={[`/league/352490/members/${ENTRY}?mode=saf-puan&${query}`]}>
+            <MemberDecisionControls
+              entryId={ENTRY}
+              members={MEMBERS}
+              index={index}
+              capabilities={service}
+              onDevice={DEVICE}
+              part="top100"
+            />
+          </MemoryRouter>
+        </LanguageProvider>,
+      );
+      // Even a link that names the weight does not ask the device for it here.
+      const params = new URLSearchParams(`mode=saf-puan&${query}&top100=20`);
+      const selected = resolvePublishedAdvice(
+        params,
+        index?.league_id ?? 0,
+        ENTRY,
+        MEMBERS,
+        index,
+        undefined,
+        service,
+        DEVICE,
+      );
+      expect(deviceSelection(deviceRequestFor(selected), SQUAD)).not.toEqual({
+        kind: "top100",
+        weight: 20,
+      });
+      const fieldset = document.querySelector("fieldset")!;
+      expect(fieldset).not.toHaveTextContent(COMPUTE_COPY[language].top100Computable);
+      expect(fieldset).toHaveTextContent(TOP100_COPY[language].unavailableReasons.unknown);
+      cleanup();
+    }
+  });
+});

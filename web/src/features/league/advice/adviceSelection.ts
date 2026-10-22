@@ -435,10 +435,7 @@ function withDeviceChoices(
     !isMemberStrategy(published.request.strategy) ||
     !device.strategies.includes(published.request.strategy) ||
     !device.windows.includes(1) ||
-    searchParams.get("model") === "football" ||
-    searchParams.get(EVIDENCE_PARAMETER) === "on" ||
-    !preferencesFromUrl(searchParams).valid ||
-    preferencesFromUrl(searchParams).value
+    !linkKeepsDeviceChoices(searchParams)
   )
     return published;
 
@@ -464,6 +461,20 @@ function withDeviceChoices(
     top100: { ...published.top100, weight, notOffered: false },
     chip: { ...published.chip, chip, notOffered: chip === null && published.chip.notOffered },
   };
+}
+
+/**
+ * Whether a link leaves room for the device's own choices: it asks for no manager's word,
+ * no football model and no decision preferences, none of which the device solves.
+ */
+export function linkKeepsDeviceChoices(searchParams: URLSearchParams): boolean {
+  const preferences = preferencesFromUrl(searchParams);
+  return (
+    searchParams.get("model") !== "football" &&
+    searchParams.get(EVIDENCE_PARAMETER) !== "on" &&
+    preferences.valid &&
+    !preferences.value
+  );
 }
 
 function notComputable(strategies: MemberStrategy[] = []): ComputableAdvice {

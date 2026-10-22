@@ -59,6 +59,7 @@ import type { AdviceCapabilities } from "./adviceCapabilities";
 import {
   type DeviceComputable,
   EVIDENCE_PARAMETER,
+  linkKeepsDeviceChoices,
   resolvePublishedAdvice,
 } from "./adviceSelection";
 import { AUTOMATIC_CHIP_OFFERED, CHIP_PARAMETER } from "./chipChoice";
@@ -235,11 +236,19 @@ export function MemberDecisionControls({
     windowSize === 1 &&
     (onDevice.top100Weights.length ?? 0) > 1;
   const top100Computable = top100Service || top100Device;
-  // A weight the device solves and this publish has no plan for is offered, so its note
-  // says so rather than that only 0 is available.
+  // A weight the device solves and this publish has no plan for gets its own note, but only
+  // where a click on it stands: the link asks for no word, football model or preferences,
+  // and the resolver keeps the weight. Otherwise the note says what is in force.
+  const deviceKeeps = (weight: number) => {
+    const next = new URLSearchParams(searchParams);
+    next.set(TOP100_PARAMETER, String(weight));
+    return linkKeepsDeviceChoices(next) && resolve(next).top100.weight === weight;
+  };
   const top100DeviceUnpublished =
     top100Device &&
-    onDevice?.top100Weights.some((weight) => !top100.weights.includes(weight)) === true;
+    onDevice!.top100Weights.some(
+      (weight) => weight !== 0 && !top100.weights.includes(weight) && deviceKeeps(weight),
+    );
   const weightSelectable = (weight: number) =>
     (top100Applies && top100.weights.some((offered) => offered === weight)) ||
     (top100Service && computable!.top100Weights.some((offered) => offered === weight)) ||
