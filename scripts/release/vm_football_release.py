@@ -993,7 +993,7 @@ def _check_serving(port: int, expected: dict[str, Any], jobs: bool, result: dict
     capabilities = json.loads(raw)
     result["observed"] = observed = {
         "capture": capabilities["capture_snapshot_id"],
-        "models": sorted(capabilities["models"]),
+        "models": sorted(capabilities.get("models") or ["current"]),
         "managers_word": bool(capabilities["managers_word"]["available"]),
     }
     result["decision_information"] = capabilities.get("decision_information")
@@ -1086,8 +1086,8 @@ def command_candidate(args: argparse.Namespace) -> None:
         receipt["jobs_skipped"] = bool(args.no_jobs)
         _check_serving(CANDIDATE_API_PORT, expected, not args.no_jobs, receipt["serving"])
         receipt["passed"] = True
-    except ReleaseError as error:
-        receipt["error"] = str(error)
+    except Exception as error:  # every failure is recorded, then the project stops
+        receipt["error"] = f"{type(error).__name__}: {error}"
     finally:
         logs = subprocess.run(
             ["docker", "compose", "-p", project, "logs", "--no-color", "--tail", "200"],
@@ -1176,8 +1176,8 @@ def command_activate(args: argparse.Namespace) -> None:
         record["serving"] = {}
         _check_serving(8000, expected, not args.no_jobs, record["serving"])
         record["stage"] = "active"
-    except (ReleaseError, subprocess.TimeoutExpired) as error:
-        record["error"] = str(error)
+    except Exception as error:  # any failure after the switch restores the kept release
+        record["error"] = f"{type(error).__name__}: {error}"
         record["stage"] = "rolled_back"
         _restore(release)
         record["after_rollback_ready"] = _wait_ready(8000, 600)
