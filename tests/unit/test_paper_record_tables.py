@@ -11,6 +11,7 @@ labels and records is written out below by path, so a label read from the wrong 
 from __future__ import annotations
 
 import csv
+import hashlib
 import json
 import shutil
 import socket
@@ -489,15 +490,30 @@ def test_the_mae_figure_carries_each_season_beside_the_pooled_value(root: Path) 
     )
 
 
+def _extractor_lf() -> bytes:
+    """The extractor this test imports, with CRLF read as LF, as a checkout commits it."""
+
+    return tables.EXTRACTOR_SOURCE.read_bytes().replace(b"\r\n", b"\n")
+
+
+def _commit_line(output: Path) -> str:
+    """The line below the title of `tables.md`, where the commit is named."""
+
+    return (output / "tables.md").read_text(encoding="utf-8").splitlines()[2]
+
+
 def test_outside_a_git_checkout_the_records_name_no_commit(root: Path) -> None:
     code, output = _run(root)
 
     assert code == 0
     rows = _read_csv(output / "records.csv")
-    assert len(rows) == 11
+    assert len(rows) == 12
+    assert [row["record"] for row in rows] == [*sorted(_records()), tables.EXTRACTOR]
+    assert rows[-1]["sha256_lf"] == hashlib.sha256(_extractor_lf()).hexdigest()
     assert {(row["commit"], row["matches_commit"]) for row in rows} == {("", "")}
     checks = _read_csv(output / "checks.csv")
     assert not [check for check in checks if "committed" in check["check"]]
+    assert _commit_line(output).startswith("Commit: no commit read (")
 
 
 def _git(root: Path, *arguments: str) -> None:
@@ -507,21 +523,36 @@ def _git(root: Path, *arguments: str) -> None:
     subprocess.run(command, check=True, capture_output=True)
 
 
-@pytest.mark.skipif(shutil.which("git") is None, reason="needs git")
-def test_each_record_is_compared_with_the_committed_one_line_endings_aside(root: Path) -> None:
+def _commit(root: Path, extractor: bytes | None) -> str:
+    """Commit the fixture records, and `extractor` at the extractor's path; return HEAD."""
+
     _git(root, "init", "-q")
     _git(root, "add", "docs")
+    if extractor is not None:
+        path = root / tables.EXTRACTOR
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(extractor)
+        _git(root, "add", tables.EXTRACTOR)
     _git(root, "commit", "-q", "-m", "records")
-    head = subprocess.run(
+    return subprocess.run(
         ["git", "-C", str(root), "rev-parse", "HEAD"], check=True, capture_output=True, text=True
     ).stdout.strip()
+
+
+@pytest.mark.skipif(shutil.which("git") is None, reason="needs git")
+def test_each_record_is_compared_with_the_committed_one_line_endings_aside(root: Path) -> None:
+    head = _commit(root, _extractor_lf())
     code, output = _run(root, "first")
     first = {row["record"]: row for row in _read_csv(output / "records.csv")}
 
     assert code == 0
+    assert len(first) == 12
     assert {row["matches_commit"] for row in first.values()} == {"true"}
     assert {row["commit"] for row in first.values()} == {head}
     assert all(row["blob_at_commit"] == row["git_blob_lf"] for row in first.values())
+    assert _commit_line(output) == (
+        f"Commit: `{head}`; the extractor and every record read are the ones committed there."
+    )
 
     # A Windows checkout under core.autocrlf holds the same record with CRLF line endings.
     path = root / tables.REGIME
@@ -542,6 +573,78 @@ def test_each_record_is_compared_with_the_committed_one_line_endings_aside(root:
     assert edited[tables.MIXTURE]["matches_commit"] == "false"
     failed = [check for check in _read_csv(output / "checks.csv") if check["holds"] == "false"]
     assert [check["record"] for check in failed] == [tables.MIXTURE]
+    assert _commit_line(output).startswith(
+        f"Commit: `{head}`; the extractor or a record read is not the one committed there"
+    )
+
+
+@pytest.mark.skipif(shutil.which("git") is None, reason="needs git")
+def test_an_extractor_edited_after_the_commit_fails_like_an_edited_record(
+    root: Path,
+    tmp_path_factory: pytest.TempPathFactory,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    committed = _extractor_lf()
+    head = _commit(root, committed)
+    # The records are the committed ones; the extractor run is the committed one edited locally.
+    edited = tmp_path_factory.mktemp("edited") / "paper_record_tables.py"
+    edited.write_bytes(committed + b"# edited after the commit\n")
+    monkeypatch.setattr(tables, "EXTRACTOR_SOURCE", edited)
+
+    code, output = _run(root)
+
+    assert code == 1
+    rows = _read_csv(output / "records.csv")
+    assert [row["matches_commit"] for row in rows] == ["true"] * 11 + ["false"]
+    extractor = rows[-1]
+    assert extractor["record"] == tables.EXTRACTOR
+    assert extractor["commit"] == head
+    assert extractor["blob_at_commit"] == tables.git_blob_id(committed)
+    assert extractor["git_blob_lf"] == tables.git_blob_id(edited.read_bytes())
+    failed = [check for check in _read_csv(output / "checks.csv") if check["holds"] == "false"]
+    assert [(check["record"], check["pointer"]) for check in failed] == [(tables.EXTRACTOR, "")]
+    message = capsys.readouterr().out
+    assert f"FAILS: {tables.EXTRACTOR}: the extractor run is the one committed" in message
+    assert _commit_line(output).startswith(
+        f"Commit: `{head}`; the extractor or a record read is not the one committed there"
+    )
+
+
+@pytest.mark.skipif(shutil.which("git") is None, reason="needs git")
+def test_a_commit_without_the_extractor_fails_its_check(root: Path) -> None:
+    head = _commit(root, None)
+
+    code, output = _run(root)
+
+    assert code == 1
+    extractor = _read_csv(output / "records.csv")[-1]
+    assert (extractor["record"], extractor["commit"]) == (tables.EXTRACTOR, head)
+    assert (extractor["blob_at_commit"], extractor["matches_commit"]) == ("", "false")
+
+
+@pytest.mark.skipif(shutil.which("git") is None, reason="needs git")
+def test_the_extractor_is_read_with_crlf_as_lf_like_a_record(
+    root: Path, tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    committed = _extractor_lf()
+    _commit(root, committed)
+    # A Windows checkout under core.autocrlf runs the committed extractor with CRLF endings.
+    crlf = tmp_path_factory.mktemp("crlf") / "paper_record_tables.py"
+    crlf.write_bytes(committed.replace(b"\n", b"\r\n"))
+    monkeypatch.setattr(tables, "EXTRACTOR_SOURCE", crlf)
+
+    code, output = _run(root)
+
+    assert code == 0
+    extractor = _read_csv(output / "records.csv")[-1]
+    assert extractor["git_blob_lf"] == tables.git_blob_id(committed)
+    assert extractor["matches_commit"] == "true"
+
+
+def test_the_extractor_source_is_the_file_at_its_checkout_path() -> None:
+    assert tables.EXTRACTOR_SOURCE == tables.REPOSITORY_ROOT / tables.EXTRACTOR
+    assert Path(tables.__file__).resolve() == tables.EXTRACTOR_SOURCE
 
 
 def test_a_missing_key_is_refused_with_its_record_and_pointer(

@@ -14,23 +14,27 @@ record and the JSON pointer (RFC 6901) of each, so any cell can be checked again
 The output directory (default `artifacts/paper_record_tables/`, git-ignored; inside the
 checkout only a folder under `artifacts/` is accepted) receives:
 
-- `records.csv`: every record read, with the SHA-256 and the git blob id of its bytes after
-  CRLF is turned into LF (so a Windows checkout under `core.autocrlf` gives the same digests
-  as any other), the commit checked out and whether the record read is the one committed there;
-- `table_*.csv` and `tables.md`: the tables; Markdown rounds to six significant digits and
-  shows a long statement up to its first semicolon, the CSV files carry the record's value
-  unchanged;
+- `records.csv`: every record read and, on the last row, this extractor itself (the file the
+  run executes, under its path `scripts/paper_record_tables.py`), each with the SHA-256 and the
+  git blob id of its bytes after CRLF is turned into LF (so a Windows checkout under
+  `core.autocrlf` gives the same digests as any other), the commit checked out and whether the
+  file read is the one committed there;
+- `table_*.csv` and `tables.md`: the tables; `tables.md` names below its title the commit
+  checked out (or "no commit read") and whether the extractor and every record read are the
+  ones committed there, so a copy of it alone keeps that tie; Markdown rounds to six
+  significant digits and shows a long statement up to its first semicolon, the CSV files carry
+  the record's value unchanged;
 - `provenance.csv`: one row per table cell read from a record, with its record and pointer;
 - `figure_*.csv`: one row per plotted point, with the record and pointers on the row;
 - `checks.csv`: arithmetic checks of each record against its own detail (a recorded mean
   against the mean of its folds or seeds, a recorded count against the count of its flags, a
   gate flag against its recorded bounds, a pooled error against its seasons) and, in a git
-  checkout, of each record against the one committed at the checked-out commit, with the
-  recomputed value beside the recorded one.
+  checkout, of each record and of the extractor against the one committed at the checked-out
+  commit, with the recomputed value beside the recorded one.
 
-The exit status is 1 when a check fails, so also when a record read differs from the committed
-one, and when a record is missing or lacks a key this file reads (then nothing is written); it
-is 0 otherwise.
+The exit status is 1 when a check fails, so also when a record read or the extractor run
+differs from the one committed, and when a record is missing or lacks a key this file reads
+(then nothing is written); it is 0 otherwise.
 """
 
 from __future__ import annotations
@@ -50,6 +54,10 @@ from pathlib import Path
 from typing import Any
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+#: This extractor's path in a checkout, where the commit read at the root is asked for its blob.
+EXTRACTOR = "scripts/paper_record_tables.py"
+#: The file this run executes, read as a record is read and compared with that blob.
+EXTRACTOR_SOURCE = Path(__file__).resolve()
 OUTPUT_ROOT = "artifacts"
 DEFAULT_OUTPUT = Path(OUTPUT_ROOT) / "paper_record_tables"
 FOLD_TOLERANCE = 1e-9
@@ -1096,15 +1104,35 @@ def _figure_csv(name: str, rows: list[dict[str, Cell]]) -> str:
     return _csv([*columns, "record", *(f"{column}_pointer" for column in sourced)], lines)
 
 
-def _markdown(tables: Sequence[Table]) -> str:
+def _commit_line(commit: str | None, commit_checks: Sequence[Check]) -> str:
+    """The commit the tables are tied to, and whether every file read is the committed one."""
+
+    if commit is None:
+        return (
+            "Commit: no commit read (the root is not the top of a git checkout with a commit); "
+            "`records.csv` gives the digest of the extractor and of every record read."
+        )
+    if all(check.holds for check in commit_checks):
+        return (
+            f"Commit: `{commit}`; the extractor and every record read are the ones committed there."
+        )
+    return (
+        f"Commit: `{commit}`; the extractor or a record read is not the one committed there "
+        "(`records.csv` names which), so these tables are not that commit's."
+    )
+
+
+def _markdown(tables: Sequence[Table], commit_line: str) -> str:
     lines = [
         "# Paper record tables",
+        "",
+        commit_line,
         "",
         "Extracted by `scripts/paper_record_tables.py` from committed JSON records; nothing was "
         "fitted or measured. Numbers are rounded to six significant digits here and a long "
         "statement is shown up to its first semicolon; the CSV files carry each record's value "
         "in full, `provenance.csv` names the record and JSON pointer of every cell, and "
-        "`records.csv` the commit and digest of every record.",
+        "`records.csv` the commit and digest of every record and of the extractor.",
     ]
     for table in tables:
         lines += ["", f"## {table.name}", "", table.title + ".", ""]
@@ -1132,29 +1160,41 @@ def _resolve_output(root: Path, output: Path | None) -> Path:
     return directory
 
 
-def commit_rows(records: Records, commit: str | None) -> tuple[list[list[str]], list[Check]]:
-    """`records.csv` rows, and in a git checkout one check per record that it is committed.
+def extractor_digest() -> Digest:
+    """The bytes of the extractor this run executes, read as a record is read."""
 
-    A record read matches the commit when its blob id, after CRLF to LF or as read, is the one
-    the commit holds at its path; a record edited, regenerated or not committed fails.
+    try:
+        return Digest.of(EXTRACTOR_SOURCE.read_bytes())
+    except OSError as error:
+        raise RecordError(f"{EXTRACTOR}: the extractor run cannot be read ({error})") from error
+
+
+def commit_rows(
+    records: Records, extractor: Digest, commit: str | None
+) -> tuple[list[list[str]], list[Check]]:
+    """`records.csv` rows, and in a git checkout one check per record and one for the extractor.
+
+    A file read matches the commit when its blob id, after CRLF to LF or as read, is the one the
+    commit holds at its path; a record or an extractor edited, regenerated or not committed
+    fails. The extractor's row comes after the records, under its path in the checkout.
     """
 
+    files = [(path, digest, "the record read") for path, digest in sorted(records.digests.items())]
+    files.append((EXTRACTOR, extractor, "the extractor run"))
     rows: list[list[str]] = []
     checks: list[Check] = []
-    for record, digest in sorted(records.digests.items()):
+    for path, digest, subject in files:
         if commit is None:
-            rows.append([record, digest.sha256_lf, digest.blob_lf, "", "", ""])
+            rows.append([path, digest.sha256_lf, digest.blob_lf, "", "", ""])
             continue
-        committed = _git(records.root, "rev-parse", "--verify", "--quiet", f"{commit}:{record}")
+        committed = _git(records.root, "rev-parse", "--verify", "--quiet", f"{commit}:{path}")
         read = digest.blob_raw if committed == digest.blob_raw else digest.blob_lf
         holds = committed == read
-        rows.append(
-            [record, digest.sha256_lf, digest.blob_lf, commit, committed or "", _text(holds)]
-        )
+        rows.append([path, digest.sha256_lf, digest.blob_lf, commit, committed or "", _text(holds)])
         checks.append(
             Check(
-                f"{record}: the record read is the one committed at the checked-out commit",
-                record,
+                f"{path}: {subject} is the one committed at the checked-out commit",
+                path,
                 "",
                 committed or "",
                 read,
@@ -1199,7 +1239,7 @@ def extract(root: Path, output_dir: Path) -> tuple[list[Check], str | None]:
         *pooled_mae_checks(records),
     ]
     commit = checked_out_commit(records.root)
-    digests, commit_checks = commit_rows(records, commit)
+    digests, commit_checks = commit_rows(records, extractor_digest(), commit)
     checks += commit_checks
 
     provenance: list[dict[str, Cell]] = [
@@ -1221,7 +1261,7 @@ def extract(root: Path, output_dir: Path) -> tuple[list[Check], str | None]:
         provenance, ("table", "row", "column", "value", "record", "pointer")
     )
     files |= {f"{name}.csv": _figure_csv(name, rows) for name, rows in figures.items()}
-    files["tables.md"] = _markdown(tables)
+    files["tables.md"] = _markdown(tables, _commit_line(commit, commit_checks))
     files["records.csv"] = _csv(
         ("record", "sha256_lf", "git_blob_lf", "commit", "blob_at_commit", "matches_commit"),
         digests,
@@ -1252,7 +1292,10 @@ def _parse_arguments(argv: Sequence[str] | None) -> argparse.Namespace:
         "--root",
         type=Path,
         default=REPOSITORY_ROOT,
-        help="the checkout whose docs/ records are read (default: this one)",
+        help=(
+            "the checkout whose docs/ records are read and whose HEAD the records and this "
+            "extractor are compared with (default: this one)"
+        ),
     )
     parser.add_argument(
         "--output-dir",
@@ -1277,10 +1320,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     if commit is None:
         print("  no git commit read at the root: records.csv names none to match")
     else:
-        print(f"  records compared with commit {commit}")
+        print(f"  records and the extractor compared with commit {commit}")
     print(f"  {len(checks) - len(failed)} of {len(checks)} record checks hold")
     for check in failed:
-        print(f"  FAILS: {check.name} ({check.record} {check.pointer})")
+        where = " ".join(part for part in (check.record, check.pointer) if part)
+        print(f"  FAILS: {check.name} ({where})")
     return 1 if failed else 0
 
 
