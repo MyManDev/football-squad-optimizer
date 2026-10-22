@@ -593,19 +593,71 @@ def test_publication_is_bounded_by_capture_and_never_mutates_inputs(tmp_path: Pa
     assert before == digests()
 
 
-def test_other_leagues_are_rejected(tmp_path: Path) -> None:
+@pytest.mark.parametrize("league_id", [0, -1, True, "755941"])
+def test_invalid_league_identities_are_rejected(tmp_path: Path, league_id) -> None:
     capture = snapshot(tmp_path / "snapshots")
-    with pytest.raises(review.SuggestionEvaluationError, match="Only league"):
+    with pytest.raises(review.SuggestionEvaluationError, match="positive integer"):
         review.publish_suggestion_histories(
             record_root=tmp_path / "records",
             snapshot_root=tmp_path / "snapshots",
             as_of_snapshot=capture,
             season=SEASON,
-            league_id=123,
+            league_id=league_id,
             entry_ids=[101],
             out_dir=tmp_path / "out",
             published={},
         )
+
+
+def test_second_league_history_uses_its_own_record_identity(tmp_path: Path) -> None:
+    capture = snapshot(tmp_path / "snapshots")
+    record = recorded()
+    record["league_id"] = 755941
+    record_member_advice(tmp_path / "records", record)
+    written = review.publish_suggestion_histories(
+        record_root=tmp_path / "records",
+        snapshot_root=tmp_path / "snapshots",
+        as_of_snapshot=capture,
+        season=SEASON,
+        league_id=755941,
+        entry_ids=[101, 202],
+        out_dir=tmp_path / "out",
+        published={(101, 4): "capture-a"},
+    )
+    first = json.loads(written[0].read_text())
+    assert first["payload"]["league_id"] == 755941
+    assert first["payload"]["weeks"][0]["status"] == "available"
+    assert json.loads(written[1].read_text())["payload"]["weeks"] == []
+    from squadopt.platform.history_documents import history_schema
+
+    for path in written:
+        jsonschema.validate(json.loads(path.read_text()), history_schema())
+    with pytest.raises(review.SuggestionEvaluationError, match="Record identity"):
+        choose(tmp_path / "records")
+
+
+def test_a_rerender_keeps_every_week_or_refuses_before_any_history_changes(tmp_path: Path) -> None:
+    anchor = settled_two_weeks(tmp_path)
+    paths = published(tmp_path, anchor)
+    before = {path: path.read_bytes() for path in paths}
+    assert published(tmp_path, anchor) == paths
+    assert {path: path.read_bytes() for path in paths} == before
+    # A missing record for the last member must not partly replace earlier histories.
+    incomplete = tmp_path / "incomplete-records"
+    publish_for(incomplete, gameweek=3, entry_id=101)
+    publish_for(incomplete, gameweek=4, entry_id=101)
+    with pytest.raises(review.SuggestionEvaluationError, match="Entry 202 history would drop"):
+        review.publish_suggestion_histories(
+            record_root=incomplete,
+            snapshot_root=tmp_path / "snapshots",
+            as_of_snapshot=anchor,
+            season=SEASON,
+            league_id=352490,
+            entry_ids=[101, 202],
+            out_dir=tmp_path / "out",
+            published=shown_everywhere((101, 202), (3, 4)),
+        )
+    assert {path: path.read_bytes() for path in paths} == before
 
 
 def test_later_other_strategy_does_not_displace_the_pure_points_record(tmp_path: Path) -> None:

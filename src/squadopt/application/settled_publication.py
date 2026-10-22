@@ -54,8 +54,8 @@ from squadopt.data.sources import FPL_LIVE_SOURCE
 from squadopt.data.sources.fpl_live import (
     BOOTSTRAP_PAYLOAD,
     EntryGameweekPoints,
+    fpl_captured_league_standings,
     fpl_entry_history_points,
-    fpl_league_standings,
     scored_gameweeks,
 )
 from squadopt.live import infer_season, load_ledger
@@ -212,9 +212,7 @@ def _preflight(
         raise DataError(f"Missing completed capture standings: {standings_name}")
     standings = {
         row.entry_id: row
-        for row in fpl_league_standings(
-            snapshot.payloads[standings_name], league_id=request.league_id
-        )
+        for row in fpl_captured_league_standings(snapshot.payloads, league_id=request.league_id)
     }
     missing, extra = sorted(set(ids) - standings.keys()), sorted(standings.keys() - set(ids))
     if missing or extra:

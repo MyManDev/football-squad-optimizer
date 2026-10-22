@@ -503,7 +503,7 @@ export function useDevicePlan(
             entry,
             chip,
             strategy,
-            top100Weight: selection.kind === "top100" ? selection.weight : 0,
+            top100Weight: "weight" in selection ? (selection.weight ?? 0) : 0,
             ...(chipGains.length > 0 ? { chipGains } : {}),
           });
         } catch {
