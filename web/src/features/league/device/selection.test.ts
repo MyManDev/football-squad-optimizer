@@ -52,7 +52,7 @@ describe("what the device solves", () => {
     expect(deviceSelection({ ...plain, chip: "auto" }, squad)).toBeNull();
   });
 
-  it("takes a weight the entry block names, for the pure-points plan at one week only", () => {
+  it("takes a named weight for the pure-points plan or a named rival at one week", () => {
     const named = {
       ...squad,
       device_plan: {
@@ -74,6 +74,16 @@ describe("what the device solves", () => {
         { ...plain, top100Weight: 20, strategy: "fark-yarat", rivalEntryId: 35249002 },
         named,
       ),
+    ).toEqual({ kind: "rival", strategy: "fark-yarat", rivalEntryId: 35249002, weight: 20 });
+    expect(
+      offeredDeviceSelection(
+        { ...plain, top100Weight: 20, strategy: "fark-yarat", rivalEntryId: 35249002 },
+        named,
+        [],
+      ),
+    ).toBeNull();
+    expect(
+      deviceSelection({ ...plain, top100Weight: 20, strategy: "fark-yarat" }, named),
     ).toBeNull();
     expect(deviceSelection({ ...plain, top100Weight: 20 }, squad)).toBeNull();
   });

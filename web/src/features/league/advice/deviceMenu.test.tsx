@@ -42,6 +42,13 @@ const SQUAD: EntrySquad = {
   },
 };
 const DEVICE = deviceComputable(SQUAD, MEMBERS, NO_DEVICE_RIVALS)!;
+const RIVAL = 35249002;
+const READS = {
+  ...NO_DEVICE_RIVALS,
+  squads: [
+    { ...mockEntrySquadEnvelopes[RIVAL]!.payload, source_snapshot_id: SQUAD.source_snapshot_id },
+  ],
+};
 
 function resolve(query: string, index: EntryAdviceIndex | null = null) {
   return memberSelection({
@@ -104,6 +111,45 @@ describe("the device menu without published chip answers", () => {
       kind: "top100",
       weight: 20,
     });
+  });
+
+  it("retains the rival and its weight when neither has a published answer", () => {
+    const selected = memberSelection({
+      squad: SQUAD,
+      members: MEMBERS,
+      index: null,
+      capabilities: null,
+      deviceRivals: READS,
+    }).resolve(new URLSearchParams(`mode=ortak-koru&rival=${RIVAL}&top100=20`));
+    expect(selected.path).toBeNull();
+    expect(deviceSelection(deviceRequestFor(selected), SQUAD)).toEqual({
+      kind: "rival",
+      strategy: "ortak-koru",
+      rivalEntryId: RIVAL,
+      weight: 20,
+    });
+  });
+
+  it.each(["tr", "en"] as const)("offers the device's weight beside a rival in %s", (language) => {
+    render(
+      <LanguageProvider initialLanguage={language}>
+        <MemoryRouter
+          initialEntries={[`/league/352490/members/${ENTRY}?mode=ortak-koru&rival=${RIVAL}`]}
+        >
+          <MemberDecisionControls
+            entryId={ENTRY}
+            members={MEMBERS}
+            index={null}
+            onDevice={deviceComputable(SQUAD, MEMBERS, READS)}
+            part="top100"
+          />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+    const weight = document.querySelector<HTMLInputElement>('input[name="top100"][value="20"]')!;
+    expect(weight).toBeEnabled();
+    fireEvent.click(weight);
+    expect(weight).toBeChecked();
   });
 
   it("does not offer unknown, played or future chips", () => {

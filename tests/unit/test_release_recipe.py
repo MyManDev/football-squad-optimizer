@@ -17,6 +17,8 @@ from typing import Any
 import pytest
 from scripts.release import verify_live
 
+from squadopt.contracts.league_publication_identity import publication_identity
+
 ROOT = Path(__file__).resolve().parents[2]
 SHELL = shutil.which("sh") or "C:/Program Files/Git/bin/bash.exe"
 
@@ -268,6 +270,8 @@ def _directory_site(
             return 200, _directory(
                 (352490, "leagues/352490"), (7, "leagues/7"), stamp=directory_stamp
             )
+        if path.endswith("/publication-identity.json"):
+            return 404, b""
         if path.startswith("/league/") and path.endswith("/members/0"):
             return 200, b'<div id="root"></div>'
         if path.endswith("/entries/0.json"):
@@ -293,6 +297,78 @@ def _directory_site(
         return served(path)
 
     return fetch
+
+
+@pytest.mark.parametrize(
+    "changed",
+    [
+        None,
+        "history/101.json",
+        "entries/101.json",
+        "expected",
+        "missing-expected",
+        "missing-served",
+    ],
+)
+def test_history_refresh_proves_its_stamp_with_the_complete_identity(
+    monkeypatch: pytest.MonkeyPatch, changed: str | None, tmp_path: Path
+) -> None:
+    accepted = "2026-09-18T18:00:00Z"
+    old = "2026-09-18T17:00:00Z"
+    documents = {
+        "members.json": {
+            "generated_at_utc": old,
+            "payload": {
+                "season": "2026-27",
+                "gameweek": 5,
+                "league_id": 7,
+                "members": [{"entry_id": 101, "member_kind": "human"}],
+            },
+        },
+        "entries/101.json": {
+            "generated_at_utc": old,
+            "payload": {
+                "season": "2026-27",
+                "gameweek": 5,
+                "league_id": 7,
+                "source_snapshot_id": "fpl-live-one",
+                "entry": {"entry_id": 101},
+            },
+        },
+        "history/101.json": {
+            "generated_at_utc": old,
+            "payload": {"entry_id": 101, "weeks": []},
+        },
+    }
+    identity = publication_identity(documents)
+    expected = {**identity}
+    if changed == "expected":
+        expected["source_snapshot_id"] = "different-release"
+    expected_file = tmp_path / "leagues/7/publication-identity.json"
+    expected_file.parent.mkdir(parents=True)
+    if changed != "missing-expected":
+        expected_file.write_text(json.dumps(expected), encoding="utf-8")
+    if changed in documents:
+        documents[changed]["generated_at_utc"] = accepted
+    served = _directory_site()
+
+    def fetch(path: str) -> tuple[int, bytes]:
+        if path == verify_live.DIRECTORY:
+            return 200, _directory((7, "leagues/7"), stamp=accepted)
+        prefix = "/data/leagues/7/"
+        if path.startswith(prefix):
+            name = path.removeprefix(prefix)
+            if name == "publication-identity.json":
+                if changed == "missing-served":
+                    return 404, b""
+                return 200, json.dumps(identity).encode()
+            if name in documents:
+                return 200, json.dumps(documents[name]).encode()
+        return served(path)
+
+    monkeypatch.setattr(verify_live, "fetch", fetch)
+    assert verify_live.main(accepted) == 1
+    assert verify_live.main(accepted, expected_data_root=tmp_path) == (0 if changed is None else 1)
 
 
 @pytest.mark.parametrize(

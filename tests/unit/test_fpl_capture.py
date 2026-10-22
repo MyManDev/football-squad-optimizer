@@ -349,12 +349,36 @@ def test_live_history_reads_nothing_before_the_opening_deadline() -> None:
 # --- capture end to end ---------------------------------------------------------------
 
 
+def _standings() -> bytes:
+    return json.dumps(
+        {
+            "league": {"id": 352490},
+            "last_updated_data": "2026-08-25T09:00:00Z",
+            "standings": {
+                "page": 1,
+                "has_next": False,
+                "results": [
+                    {
+                        "entry": 11,
+                        "entry_name": "Eleven",
+                        "player_name": "Manager",
+                        "rank": 1,
+                        "rank_sort": 1,
+                    }
+                ],
+            },
+        }
+    ).encode()
+
+
 def test_the_extra_payloads_land_in_the_snapshot_and_survive_the_checksum(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(fpl_capture, "_utc_now", lambda: "2026-08-25T09:00:00Z")
 
     def fake_fetch(url: str, **_: Any) -> bytes:
+        if url.endswith("standings/"):
+            return _standings()
         if url.endswith("bootstrap-static/"):
             return _bootstrap()
         if url.endswith("fixtures/"):
@@ -731,6 +755,8 @@ def test_the_recorded_instant_is_taken_after_every_read(
 
     def fake_fetch(url: str, **_: Any) -> bytes:
         events.append("fetch")
+        if url.endswith("standings/"):
+            return _standings()
         if url.endswith("bootstrap-static/"):
             return _bootstrap()
         if url.endswith("fixtures/"):

@@ -61,9 +61,9 @@ from squadopt.data.sources import FPL_LIVE_SOURCE
 from squadopt.data.sources.fpl_live import (
     BOOTSTRAP_PAYLOAD,
     EntryGameweekPoints,
+    fpl_captured_league_standings,
     fpl_entry_history_points,
     fpl_league_name,
-    fpl_league_standings,
     scored_gameweeks,
 )
 from squadopt.data.sources.vaastav import build_panel
@@ -210,10 +210,14 @@ def resolve_live_snapshot_id(root: Path, requested: str | None) -> str:
     return live[-1]
 
 
-def prepare_league_publication(request: LeaguePublicationRequest) -> PreparedLeaguePublication:
+def prepare_league_publication(
+    request: LeaguePublicationRequest,
+    *,
+    read_capture: Callable[[Path, str], CapturedSnapshot] | None = None,
+) -> PreparedLeaguePublication:
     """Read and validate the capture/registry without solving or writing a publication."""
 
-    snapshot = read_snapshot(request.snapshot_root, request.snapshot_id)
+    snapshot = (read_capture or read_snapshot)(request.snapshot_root, request.snapshot_id)
     season = request.season or infer_season(snapshot)
     if request.training_seasons is not None:
         explicit_archive_seasons(request.training_seasons, current_season=season)
@@ -243,7 +247,7 @@ def prepare_league_publication(request: LeaguePublicationRequest) -> PreparedLea
     )
     scores = member_points(payloads, registered, gameweek=scored) if scored is not None else {}
     if standings_name in payloads:
-        rows = fpl_league_standings(payloads[standings_name], league_id=request.league_id)
+        rows = fpl_captured_league_standings(payloads, league_id=request.league_id)
         league_name = fpl_league_name(payloads[standings_name], league_id=request.league_id)
         standings = {
             row.entry_id: MemberStanding(
@@ -282,14 +286,19 @@ def publish_league(
     on_prepared: Callable[[PreparedLeaguePublication], None] | None = None,
     on_mode_paths: Callable[[ModePathsSummary], None] | None = None,
     beside: Sequence[PublishedLeague] = (),
+    read_capture: Callable[[Path, str], CapturedSnapshot] | None = None,
 ) -> LeaguePublicationResult:
     """Publish the existing contracts; callbacks observe progress without owning the work."""
 
-    prepared = prepare_league_publication(request)
+    prepared = prepare_league_publication(request, read_capture=read_capture)
     if on_prepared is not None:
         on_prepared(prepared)
     return publish_prepared_league(
-        prepared, mapper=mapper, on_mode_paths=on_mode_paths, beside=beside
+        prepared,
+        mapper=mapper,
+        on_mode_paths=on_mode_paths,
+        beside=beside,
+        read_capture=read_capture,
     )
 
 
@@ -637,6 +646,7 @@ def publish_prepared_league(
     mapper: MemberMapper = map,
     on_mode_paths: Callable[[ModePathsSummary], None] | None = None,
     beside: Sequence[PublishedLeague] = (),
+    read_capture: Callable[[Path, str], CapturedSnapshot] | None = None,
 ) -> LeaguePublicationResult:
     """Complete a prepared publication without rereading a possibly changing selector.
 
@@ -703,8 +713,6 @@ def publish_prepared_league(
         site_data, request.snapshot_id, table_payload, remedy=BUILDER_TABLE_REMEDY
     )
     history_root = request.history_record_root or request.record_root
-    if request.league_id != SUPPORTED_LEAGUE_ID:
-        history_root = None
     # Read before the build below rewrites the tree: the tree this publication replaces is
     # the only place that says which capture each earlier week showed each member.
     shown = published_advice_captures(out_dir) if history_root is not None else {}
@@ -760,6 +768,7 @@ def publish_prepared_league(
                 entry_ids=[entry.entry_id for entry in prepared.registrations],
                 out_dir=out_dir,
                 published=shown,
+                read_capture=read_capture,
             )
         )
     if request.record_root is not None:
