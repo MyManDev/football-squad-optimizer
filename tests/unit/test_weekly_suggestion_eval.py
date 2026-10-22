@@ -23,6 +23,7 @@ from squadopt.application.advice_record import (
     RECORD_FILE,
     record_member_advice,
 )
+from squadopt.application.league_publication import records_advice_for
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import CapturedSnapshot, read_snapshot, write_snapshot
 from squadopt.evaluation.live_series import (
@@ -761,6 +762,71 @@ def test_a_record_unsound_beyond_its_league_keeps_its_week(
         entry_ids=[101],
     )
     assert [(week.gameweek, week.reason) for week in reviews[101]] == [(4, "invalid_record")]
+
+
+def week_without_a_record(tmp_path: Path, leftover: str | None = None) -> CapturedSnapshot:
+    """League 352490 recorded member 101 in gameweek 4, and its gameweek 3 write never
+    landed: the member-week directory holds no record, only ``leftover`` if one is named."""
+    records = tmp_path / "records"
+    publish_for(records, gameweek=4, entry_id=101)
+    directory = records / SEASON / "gw03" / "entry-101"
+    directory.mkdir(parents=True)
+    if leftover is not None and leftover.endswith("/"):
+        (directory / leftover).mkdir()
+    elif leftover is not None:
+        (directory / leftover).write_bytes(b"")
+    return capture_with(
+        tmp_path / "snapshots", events={3: True, 4: True}, actuals={101: {3: 18, 4: 25}}
+    )
+
+
+@pytest.mark.parametrize(
+    "leftover",
+    [None, ".capture-b.lock", ".capture-b.staging-1-0a1b2c3d/"],
+    ids=["empty", "writer-lock", "writer-staging"],
+)
+@pytest.mark.parametrize("league_id", [352490, 755941])
+def test_a_member_week_holding_no_record_is_the_recording_leagues_week(
+    tmp_path: Path, league_id: int, leftover: str | None
+) -> None:
+    """A record that never landed can leave its member-week directory with no record in it,
+    or only the writer's hidden lock or staging. Only the league that records advice writes
+    there: it shows the week without advice, as before, and a league that records none
+    does not show it at all."""
+    anchor = week_without_a_record(tmp_path, leftover)
+    other_league_weeks: set[tuple[int, int]] = set()
+    reviews = review.review_member_weeks(
+        record_root=tmp_path / "records",
+        snapshot_root=tmp_path / "snapshots",
+        as_of_snapshot=anchor,
+        season=SEASON,
+        league_id=league_id,
+        entry_ids=[101],
+        published=shown_everywhere([101], (3, 4)),
+        other_league_weeks=other_league_weeks,
+    )
+    weeks = [(week.gameweek, week.status, week.reason) for week in reviews[101]]
+    # The publisher's own rule decides which league records, so the two cannot drift apart.
+    if records_advice_for(league_id):
+        assert weeks == [(4, "available", None), (3, "unavailable", "no_pre_deadline_record")]
+        assert other_league_weeks == set()
+    else:
+        assert weeks == [] and other_league_weeks == {(101, 3), (101, 4)}
+
+
+def test_a_rerender_withdraws_a_row_shown_for_a_week_holding_no_record(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A second-league history written before such a week was left out showed it without
+    advice. The next publication withdraws that row rather than refusing to drop it."""
+    anchor = week_without_a_record(tmp_path)
+    with monkeypatch.context() as earlier:  # The walk as it was: the empty week is shown.
+        earlier.setattr(review, "_records_advice", lambda _: True)
+        weeks = second_league(tmp_path, anchor, (101,))
+    assert [(row["gameweek"], row["reason"]) for row in weeks[101]] == [
+        (3, "no_pre_deadline_record")
+    ]
+    assert second_league(tmp_path, anchor, (101,)) == {101: []}
 
 
 def test_a_rerender_withdraws_rows_shown_for_another_leagues_records(

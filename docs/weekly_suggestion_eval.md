@@ -33,9 +33,13 @@ members. Entry/capture baseline recording for additional leagues remains work in
   this league's records. A record counts as another league's only when it is sound for the
   member-week in every other identity; an unreadable record, or one naming no league, is
   refused as before.
+- A record that never landed can leave its member-week directory with no record in it.
+  Only league 352490 records advice (`records_advice_for`), so for any other league such
+  a directory is 352490's and its week is not shown. League 352490 shows it as
+  `no_pre_deadline_record`, as before.
 - Before replacing any history, refuse a same-season publication that would drop a week
   already shown for a member. Restore the missing records before retrying. A row shown
-  without advice for a week whose records are all another league's is withdrawn instead.
+  without advice for a week that is another league's, as above, is withdrawn instead.
 - The archive records publisher output. It does not establish that a member viewed
   the page, followed the suggestion, or obtained a causal benefit from it.
 

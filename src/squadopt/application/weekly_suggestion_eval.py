@@ -224,11 +224,24 @@ def published_advice_captures(league_dir: Path) -> dict[tuple[int, int], str]:
 
 
 class _AnotherLeaguesWeek(Exception):
-    """Every record of the member-week belongs to another league: not this league's week.
+    """The member-week is another league's: not this league's week.
 
-    Not a :class:`DataError`, so :func:`evaluate_week` cannot report it as an unavailable
-    week; the walk that asked for it leaves the week out.
+    Either every record in it belongs to another league, or it holds no record and this
+    league records none (:func:`_records_advice`). Not a :class:`DataError`, so
+    :func:`evaluate_week` cannot report it as an unavailable week; the walk that asked for
+    it leaves the week out.
     """
+
+
+def _records_advice(league_id: int) -> bool:
+    """Whether publications of ``league_id`` write member advice records.
+
+    The rule ``league_publication.records_advice_for`` applies, which this module cannot
+    import. Only a league that records advice can leave one of its own member-week
+    directories without a record, from a write that never landed. For any other league
+    such a directory was left by the league that does record.
+    """
+    return league_id == SUPPORTED_LEAGUE_ID
 
 
 def _check_record_identity(
@@ -293,12 +306,17 @@ def select_record(
     A record's path names no league, so a member of two leagues has one directory per week
     for both. With ``other_leagues_absent`` a sound record of another league is absent
     rather than refused, and a week whose records are all another league's raises
-    :class:`_AnotherLeaguesWeek`. Without it, another league's record is refused as before.
+    :class:`_AnotherLeaguesWeek`, as does a week holding no record for a league that records
+    none. Without it, another league's record is refused as before.
     """
     _identifier(league_id)
     deadline = as_instant(normalize_utc_timestamp(deadline_utc, label="deadline_utc"))
     candidates: list[tuple[datetime, str, dict[str, Any]]] = []
     captures = recorded_captures(root, season, gameweek, entry_id)
+    if other_leagues_absent and not captures and not _records_advice(league_id):
+        # A directory a record never landed in, left by the league that records advice.
+        # That league shows it without advice; for this league it is no week at all.
+        raise _AnotherLeaguesWeek
     others = 0
     for capture in captures:
         record = load_member_advice_record(root, season, gameweek, entry_id, capture.snapshot_id)
@@ -656,7 +674,8 @@ def review_member_weeks(
     ``published`` is passed to :func:`select_record` for every week.
 
     A week whose records all belong to another league is not one of this league's weeks and
-    is left out; ``other_league_weeks``, when given, receives each such ``(entry_id, week)``.
+    is left out, as is a week holding no record when this league records none.
+    ``other_league_weeks``, when given, receives each such ``(entry_id, week)``.
     """
     _identifier(league_id)
     if not re.fullmatch(r"\d{4}-\d{2}", season):
