@@ -1,18 +1,37 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-10-16T07:13:49Z",
+  "generated_at_utc": "2026-10-23T12:40:33Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
-    "gameweek": 7,
+    "gameweek": 8,
     "entry_id": 8548384,
     "league_id": 352490,
     "mode": "saf-puan",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd",
+    "source_snapshot_id": "fpl-live-20261023T111647Z-a2cd55fde426",
     "moves": [
       {
-        "move_id": "gw07-1",
+        "move_id": "gw08-1",
+        "player_out": {
+          "player_id": 67089,
+          "name": "Martin Dubravka",
+          "short_name": "Dubravka",
+          "position": "GK",
+          "team": "Spurs"
+        },
+        "player_in": {
+          "player_id": 489639,
+          "name": "Bart Verbruggen",
+          "short_name": "Verbruggen",
+          "position": "GK",
+          "team": "Brighton"
+        },
+        "expected_points_delta": 3.0117443376031687,
+        "reason_code": "points_gain"
+      },
+      {
+        "move_id": "gw08-2",
         "player_out": {
           "player_id": 108413,
           "name": "Will Hughes",
@@ -21,75 +40,75 @@
           "team": "Crystal Palace"
         },
         "player_in": {
-          "player_id": 60307,
-          "name": "Pascal Gro\u00df",
-          "short_name": "Gro\u00df",
+          "player_id": 56979,
+          "name": "Jordan Henderson",
+          "short_name": "Henderson",
           "position": "MID",
-          "team": "Brighton"
+          "team": "Chelsea"
         },
-        "expected_points_delta": 4.324226587733122,
+        "expected_points_delta": 2.743816593254728,
         "reason_code": "points_gain"
       },
       {
-        "move_id": "gw07-2",
+        "move_id": "gw08-3",
         "player_out": {
-          "player_id": 226597,
-          "name": "Gabriel dos Santos Magalh\u00e3es",
-          "short_name": "Magalh\u00e3es",
+          "player_id": 477424,
+          "name": "Jo\u0161ko Gvardiol",
+          "short_name": "Gvardiol",
           "position": "DEF",
-          "team": "Arsenal"
+          "team": "Man City"
         },
         "player_in": {
-          "player_id": 17761,
-          "name": "James Tarkowski",
-          "short_name": "Tarkowski",
+          "player_id": 244723,
+          "name": "Tyrick Mitchell",
+          "short_name": "Mitchell",
           "position": "DEF",
-          "team": "Everton"
+          "team": "Crystal Palace"
         },
-        "expected_points_delta": 0.18131371983906774,
+        "expected_points_delta": 0.29080772308364544,
         "reason_code": "points_gain"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 4.50554030757219,
+    "expected_gain_vs_hold": 6.046368653941542,
     "expected_points_cost": 0.0,
     "rival_label": null,
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
     "wall_clock_stopped_the_search": false,
-    "expected_own_points": 61.71372774480118,
+    "expected_own_points": 63.94641202389878,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
       "short_name": "Haaland",
       "position": "FWD",
       "team": "Man City",
-      "expected_points": 8.35545188174385
+      "expected_points": 8.11765453618748
     },
     "vice_captain": {
-      "player_id": 60307,
-      "name": "Pascal Gro\u00df",
-      "short_name": "Gro\u00df",
+      "player_id": 446008,
+      "name": "Bryan Mbeumo",
+      "short_name": "Mbeumo",
       "position": "MID",
-      "team": "Brighton",
-      "expected_points": 4.658321948335153
+      "team": "Man Utd",
+      "expected_points": 4.6615011141503295
     },
     "starting_xi": [
       {
-        "player_id": 67089,
-        "name": "Martin Dubravka",
-        "short_name": "Dubravka",
+        "player_id": 154561,
+        "name": "David Raya Mart\u00edn",
+        "short_name": "Mart\u00edn",
         "position": "GK",
-        "team": "Spurs",
-        "expected_points": 0.10027015579447286
+        "team": "Arsenal",
+        "expected_points": 3.8753293988407767
       },
       {
-        "player_id": 17761,
-        "name": "James Tarkowski",
-        "short_name": "Tarkowski",
+        "player_id": 226597,
+        "name": "Gabriel dos Santos Magalh\u00e3es",
+        "short_name": "Magalh\u00e3es",
         "position": "DEF",
-        "team": "Everton",
-        "expected_points": 4.323742971600514
+        "team": "Arsenal",
+        "expected_points": 4.423923916856849
       },
       {
         "player_id": 97032,
@@ -97,15 +116,15 @@
         "short_name": "Dijk",
         "position": "DEF",
         "team": "Liverpool",
-        "expected_points": 3.6124177067591026
+        "expected_points": 3.8899774133084994
       },
       {
-        "player_id": 477424,
-        "name": "Jo\u0161ko Gvardiol",
-        "short_name": "Gvardiol",
+        "player_id": 244723,
+        "name": "Tyrick Mitchell",
+        "short_name": "Mitchell",
         "position": "DEF",
-        "team": "Man City",
-        "expected_points": 3.5709926541899657
+        "team": "Crystal Palace",
+        "expected_points": 3.054926040886713
       },
       {
         "player_id": 445087,
@@ -113,23 +132,7 @@
         "short_name": "Araujo",
         "position": "DEF",
         "team": "Liverpool",
-        "expected_points": 2.837553197806882
-      },
-      {
-        "player_id": 60307,
-        "name": "Pascal Gro\u00df",
-        "short_name": "Gro\u00df",
-        "position": "MID",
-        "team": "Brighton",
-        "expected_points": 4.658321948335153
-      },
-      {
-        "player_id": 244850,
-        "name": "Morgan Rogers",
-        "short_name": "Rogers",
-        "position": "MID",
-        "team": "Chelsea",
-        "expected_points": 4.396159996403696
+        "expected_points": 3.019076323191964
       },
       {
         "player_id": 446008,
@@ -137,7 +140,15 @@
         "short_name": "Mbeumo",
         "position": "MID",
         "team": "Man Utd",
-        "expected_points": 4.380344943521542
+        "expected_points": 4.6615011141503295
+      },
+      {
+        "player_id": 244850,
+        "name": "Morgan Rogers",
+        "short_name": "Rogers",
+        "position": "MID",
+        "team": "Chelsea",
+        "expected_points": 4.588260940007448
       },
       {
         "player_id": 184029,
@@ -145,7 +156,15 @@
         "short_name": "\u00d8degaard",
         "position": "MID",
         "team": "Arsenal",
-        "expected_points": 3.3818815752983595
+        "expected_points": 3.7050117630130073
+      },
+      {
+        "player_id": 56979,
+        "name": "Jordan Henderson",
+        "short_name": "Henderson",
+        "position": "MID",
+        "team": "Chelsea",
+        "expected_points": 3.2061581722293795
       },
       {
         "player_id": 223094,
@@ -153,7 +172,7 @@
         "short_name": "Haaland",
         "position": "FWD",
         "team": "Man City",
-        "expected_points": 8.35545188174385
+        "expected_points": 8.11765453618748
       },
       {
         "player_id": 475168,
@@ -161,17 +180,17 @@
         "short_name": "Jesus",
         "position": "FWD",
         "team": "Chelsea",
-        "expected_points": 3.7922402069442094
+        "expected_points": 3.716556619258811
       }
     ],
     "bench": [
       {
-        "player_id": 154561,
-        "name": "David Raya Mart\u00edn",
-        "short_name": "Mart\u00edn",
+        "player_id": 489639,
+        "name": "Bart Verbruggen",
+        "short_name": "Verbruggen",
         "position": "GK",
-        "team": "Arsenal",
-        "expected_points": 3.568590651677484
+        "team": "Brighton",
+        "expected_points": 3.0938051044078216
       },
       {
         "player_id": 577725,
@@ -179,7 +198,7 @@
         "short_name": "King",
         "position": "MID",
         "team": "Fulham",
-        "expected_points": 3.1261265197771366
+        "expected_points": 2.82782973323688
       },
       {
         "player_id": 572584,
@@ -187,7 +206,7 @@
         "short_name": "Ouattara",
         "position": "DEF",
         "team": "Ipswich Town",
-        "expected_points": 1.818135117880343
+        "expected_points": 2.51360233630195
       },
       {
         "player_id": 631000,
@@ -195,7 +214,7 @@
         "short_name": "Vaz",
         "position": "FWD",
         "team": "Hull City",
-        "expected_points": 1.4360463353246202
+        "expected_points": 1.1351440758333886
       }
     ],
     "chip": "bboost",
@@ -210,7 +229,7 @@
     "control_optimality_gap": 0.0,
     "chip_choice": {
       "chip": "bboost",
-      "gain_vs_no_chip": 5.43145713034324,
+      "gain_vs_no_chip": 7.5168378461389835,
       "basis": "one_week_expected_points_v1",
       "windows_left": {
         "first_half": {

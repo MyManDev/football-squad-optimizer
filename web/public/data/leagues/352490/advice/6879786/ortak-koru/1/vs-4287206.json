@@ -1,59 +1,78 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-10-16T07:13:49Z",
+  "generated_at_utc": "2026-10-23T12:40:33Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
-    "gameweek": 7,
+    "gameweek": 8,
     "entry_id": 6879786,
     "league_id": 352490,
     "mode": "ortak-koru",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd",
+    "source_snapshot_id": "fpl-live-20261023T111647Z-a2cd55fde426",
     "moves": [
       {
-        "move_id": "gw07-1",
+        "move_id": "gw08-1",
         "player_out": {
-          "player_id": 219168,
-          "name": "Alexander Isak",
-          "short_name": "Isak",
-          "position": "FWD",
-          "team": "Liverpool"
+          "player_id": 222531,
+          "name": "Morgan Gibbs-White",
+          "short_name": "Gibbs-White",
+          "position": "MID",
+          "team": "Nott'm Forest"
         },
         "player_in": {
-          "player_id": 177815,
-          "name": "Dominic Calvert-Lewin",
-          "short_name": "Calvert-Lewin",
-          "position": "FWD",
-          "team": "Leeds"
+          "player_id": 244850,
+          "name": "Morgan Rogers",
+          "short_name": "Rogers",
+          "position": "MID",
+          "team": "Chelsea"
         },
-        "expected_points_delta": 0.756585121617654,
+        "expected_points_delta": 1.5042079393422014,
+        "reason_code": "mode_tradeoff"
+      },
+      {
+        "move_id": "gw08-2",
+        "player_out": {
+          "player_id": 437499,
+          "name": "Maxence Lacroix",
+          "short_name": "Lacroix",
+          "position": "DEF",
+          "team": "Chelsea"
+        },
+        "player_in": {
+          "player_id": 487838,
+          "name": "Lewis Hall",
+          "short_name": "Hall",
+          "position": "DEF",
+          "team": "Newcastle"
+        },
+        "expected_points_delta": -0.21116067369945313,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 0.756585121617654,
-    "expected_points_cost": 1.066758276941293,
+    "expected_gain_vs_hold": 1.2930472656427483,
+    "expected_points_cost": 1.0421248843722637,
     "rival_label": "entry-4287206",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
     "wall_clock_stopped_the_search": false,
-    "expected_own_points": 47.92576485302174,
+    "expected_own_points": 48.546205357298966,
     "captain": {
       "player_id": 244851,
       "name": "Cole Palmer",
       "short_name": "Palmer",
       "position": "MID",
       "team": "Chelsea",
-      "expected_points": 4.960279398950454
+      "expected_points": 5.136799837039665
     },
     "vice_captain": {
-      "player_id": 222531,
-      "name": "Morgan Gibbs-White",
-      "short_name": "Gibbs-White",
+      "player_id": 244850,
+      "name": "Morgan Rogers",
+      "short_name": "Rogers",
       "position": "MID",
-      "team": "Nott'm Forest",
-      "expected_points": 4.637008159112412
+      "team": "Chelsea",
+      "expected_points": 4.588260940007448
     },
     "starting_xi": [
       {
@@ -62,7 +81,7 @@
         "short_name": "Mart\u00edn",
         "position": "GK",
         "team": "Arsenal",
-        "expected_points": 3.568590651677484
+        "expected_points": 3.8753293988407767
       },
       {
         "player_id": 226597,
@@ -70,15 +89,7 @@
         "short_name": "Magalh\u00e3es",
         "position": "DEF",
         "team": "Arsenal",
-        "expected_points": 4.142429251761448
-      },
-      {
-        "player_id": 465730,
-        "name": "Maxim De Cuyper",
-        "short_name": "Cuyper",
-        "position": "DEF",
-        "team": "Brighton",
-        "expected_points": 3.7099911306959767
+        "expected_points": 4.423923916856849
       },
       {
         "player_id": 466075,
@@ -86,7 +97,23 @@
         "short_name": "Calafiori",
         "position": "DEF",
         "team": "Arsenal",
-        "expected_points": 3.45141576840743
+        "expected_points": 3.6527262906253877
+      },
+      {
+        "player_id": 465730,
+        "name": "Maxim De Cuyper",
+        "short_name": "Cuyper",
+        "position": "DEF",
+        "team": "Brighton",
+        "expected_points": 3.6085520469470964
+      },
+      {
+        "player_id": 487838,
+        "name": "Lewis Hall",
+        "short_name": "Hall",
+        "position": "DEF",
+        "team": "Newcastle",
+        "expected_points": 3.0597890365552254
       },
       {
         "player_id": 244851,
@@ -94,15 +121,15 @@
         "short_name": "Palmer",
         "position": "MID",
         "team": "Chelsea",
-        "expected_points": 4.960279398950454
+        "expected_points": 5.136799837039665
       },
       {
-        "player_id": 222531,
-        "name": "Morgan Gibbs-White",
-        "short_name": "Gibbs-White",
+        "player_id": 244850,
+        "name": "Morgan Rogers",
+        "short_name": "Rogers",
         "position": "MID",
-        "team": "Nott'm Forest",
-        "expected_points": 4.637008159112412
+        "team": "Chelsea",
+        "expected_points": 4.588260940007448
       },
       {
         "player_id": 466052,
@@ -110,7 +137,7 @@
         "short_name": "Cherki",
         "position": "MID",
         "team": "Man City",
-        "expected_points": 4.6328600123123
+        "expected_points": 3.5051048815473056
       },
       {
         "player_id": 195546,
@@ -118,7 +145,15 @@
         "short_name": "Stati",
         "position": "MID",
         "team": "Aston Villa",
-        "expected_points": 3.131855558339411
+        "expected_points": 3.4676602939945496
+      },
+      {
+        "player_id": 219168,
+        "name": "Alexander Isak",
+        "short_name": "Isak",
+        "position": "FWD",
+        "team": "Liverpool",
+        "expected_points": 4.374702258586186
       },
       {
         "player_id": 475168,
@@ -126,23 +161,7 @@
         "short_name": "Jesus",
         "position": "FWD",
         "team": "Chelsea",
-        "expected_points": 3.7922402069442094
-      },
-      {
-        "player_id": 177815,
-        "name": "Dominic Calvert-Lewin",
-        "short_name": "Calvert-Lewin",
-        "position": "FWD",
-        "team": "Leeds",
-        "expected_points": 3.59156367139386
-      },
-      {
-        "player_id": 216646,
-        "name": "Yoane Wissa",
-        "short_name": "Wissa",
-        "position": "FWD",
-        "team": "Newcastle",
-        "expected_points": 3.347251644476302
+        "expected_points": 3.716556619258811
       }
     ],
     "bench": [
@@ -152,7 +171,15 @@
         "short_name": "Pickford",
         "position": "GK",
         "team": "Everton",
-        "expected_points": 3.358913058715954
+        "expected_points": 3.0008292718991547
+      },
+      {
+        "player_id": 216646,
+        "name": "Yoane Wissa",
+        "short_name": "Wissa",
+        "position": "FWD",
+        "team": "Newcastle",
+        "expected_points": 2.800075748204037
       },
       {
         "player_id": 249231,
@@ -160,15 +187,7 @@
         "short_name": "Lewis-Potter",
         "position": "MID",
         "team": "Brentford",
-        "expected_points": 2.8349785497762054
-      },
-      {
-        "player_id": 437499,
-        "name": "Maxence Lacroix",
-        "short_name": "Lacroix",
-        "position": "DEF",
-        "team": "Chelsea",
-        "expected_points": 2.5191169665441646
+        "expected_points": 2.7781968158823394
       },
       {
         "player_id": 83299,
@@ -176,7 +195,7 @@
         "short_name": "Dunk",
         "position": "DEF",
         "team": "Brighton",
-        "expected_points": 1.825505398975884
+        "expected_points": 1.6077869024069047
       }
     ],
     "chip": null,
@@ -188,21 +207,21 @@
     "missing_fields": [],
     "squad_basis": "captured",
     "rival_entry_id": 4287206,
-    "expected_points_cost_ceiling": 1.066758276941293,
-    "overlap_count": 5,
-    "transfer_cap": 1,
+    "expected_points_cost_ceiling": 1.0421248843722637,
+    "overlap_count": 6,
+    "transfer_cap": 2,
     "overlap_target": 9,
-    "overlap_applied": 5,
+    "overlap_applied": 6,
     "plan_kind": "within_free_transfers",
     "alternative_plan": {
       "kind": "with_hits",
       "overlap_applied": 9,
-      "transfer_hit_points": 16.0,
-      "expected_points_cost": 10.215199426109251,
-      "expected_points_cost_ceiling": 10.215199426109251
+      "transfer_hit_points": 12.0,
+      "expected_points_cost": 8.825415253270407,
+      "expected_points_cost_ceiling": 8.825415253270407
     },
-    "expected_gap_vs_rival": -0.4901306501057121,
-    "captain_agreement": true,
+    "expected_gap_vs_rival": -2.752271512460659,
+    "captain_agreement": false,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0
   }
