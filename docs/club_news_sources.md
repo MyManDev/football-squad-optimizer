@@ -30,20 +30,46 @@ terms. What the code does is narrower:
 - It sends one identity (`squadopt/1.0`) and reads registered paths, in the order the
   registry declares them; a club may have more than one.
 - From a registered HTML page it follows **article links, and no others**: a link on the same
-  origin, under the registered page's own path (`/news` leads to `/news/...`), in the order
-  the page lists them, at most ten per host per run. The path is the registered one even when
-  a same-origin redirect served the page somewhere else, so a page that is served at another
-  path should be registered where it is served. A link whose printed or resolved path has a
-  `.` or `..` segment, written out or percent-encoded, is skipped rather than resolved. Each
-  explicit two-part `listing/<name>` or `category/<name>` route under that path is a news
-  index, so it does not consume the article allowance. The same rule applies to referrals;
-  deeper paths such as `category/men/injury-update` remain eligible articles. Each
-  article is asked of the same `robots.txt`, waits the same interval and meets the same
-  refusals as a registered page, and is stored as its own document with its own readable
-  text. A link to another host is never requested, an article's own links are not followed,
-  and a feed's item links are not followed because the feed already carries the items'
-  words. An article that fails costs that article: the club's coverage rests on its
-  registered page.
+  origin, under the registered page's own path (`/news` leads to `/news/...`), at most ten
+  article requests per host per run. The path is the registered one even when a same-origin
+  redirect served the page somewhere else, so a page that is served at another path should
+  be registered where it is served. A link whose printed or resolved path has a `.` or `..`
+  segment, written out or percent-encoded, is skipped rather than resolved. Each article is
+  asked of the same `robots.txt`, waits the same interval and meets the same refusals as a
+  registered page, and is stored as its own document with its own readable text. A link to
+  another host is never requested, an article's own links are not followed, and a feed's
+  item links are not followed because the feed already carries the items' words. An article
+  that fails costs that article: the club's coverage rests on its registered page.
+- It follows those links **by priority, and in page order only within a priority**. The one
+  statement of the order is `article_priority` in
+  `src/squadopt/data/sources/club_news_selection.py`, read on the link's path below the
+  registered page and on the link's own label. Explicit availability and match links come
+  first: the path or label says injury, fitness, team news, first team, pre-match, match
+  preview, press conference, medical update, fit for or squad update. Unclassified links
+  come next. Links in an academy, youth, women's, ladies', U18, U19, U21, U23, tickets, shop
+  or hospitality category come last, whatever else they say. A link printed twice keeps its
+  first place and the better of its priorities. Each registered page's links are ranked on
+  their own, and registered pages are read in registry order. So the priority decides which
+  of a page's links get the host's remaining slots. On a host with two registered pages, the
+  first page's last-rank links come before the second page's first-rank links. A link that
+  `robots.txt` disallows takes no slot.
+- It never requests a **two-part `listing/<name>` or `category/<name>` route** under the
+  registered path. Such a route is a news index, not an article: it is not asked of
+  `robots.txt`, is recorded nowhere and takes no slot. The match ignores case and reads the
+  percent-decoded path without its query or a trailing slash, so `category%2Fmen`,
+  `Category/Men`, `listing/latest/` and `category/men?page=2` are all excluded. A one-part
+  `category` or `listing`, `category//men` and deeper paths such as
+  `category/men/injury-update` stay eligible articles and take a slot. An index listing
+  `a-story`, `category`, `listing`, `shop/kit`, `b-story`, `c-story`,
+  `team-news-injury-update` and `category/men/injury-update` is therefore read as
+  `team-news-injury-update`, `category/men/injury-update`, `a-story`, `category`, `listing`,
+  `b-story`, `c-story`, `shop/kit`. The registered path, dot-segment and route rules apply
+  to [referrals](operations/official_injury_discovery.md) too: the official injury page's
+  Details links, a route that is disabled today. A referral is ranked differently. Its
+  priority is read on its whole path, the registered part included, with no label. Within
+  a priority it comes after the page's own links, and a referral the page also lists keeps
+  that link's place. Under Palace's `/news/first-team/`, a referral therefore ranks first
+  unless its path names a last-rank category.
 - It asks a host for its `robots.txt` **once per run**, however many registered paths that
   host serves, and decides each path against the one file it read. One club with three pages
   is one question, not three.
