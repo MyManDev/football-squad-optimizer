@@ -45,16 +45,25 @@ def world(
     pages: dict[int, tuple[int, ...]] | None = None,
     seeded_from: tuple[int, ...] | None = None,
     record_advice: bool = False,
+    captured: tuple[int, ...] = (),
 ) -> weekly.WeeklyOperations:
     """The synthetic weekly run; ``pages`` re-captures it with those standings pages (and
-    a handoff for that capture), ``seeded_from`` records the registry's seed leagues."""
+    a handoff for that capture), ``seeded_from`` records the registry's seed leagues and
+    ``captured`` registers further entries, captured with the synthetic member's squad."""
 
     publication = publication_world(tmp_path)
+    if captured and pages is None:
+        raise ValueError("Further captured entries need the standings pages that list them.")
     if pages is not None:
         snapshot = read_snapshot(publication.snapshot_root, publication.snapshot_id)
         payloads = dict(snapshot.payloads)
         for league_id, entries in pages.items():
             payloads[f"league-{league_id}-standings.json"] = _standings_page(league_id, *entries)
+        member = f"entry-{handoff_fixture.ENTRY_ID}-"
+        for entry_id in captured:
+            for name, body in snapshot.payloads.items():
+                if name.startswith(member):
+                    payloads[f"entry-{entry_id}-{name.removeprefix(member)}"] = body
         recaptured = write_snapshot(
             publication.snapshot_root,
             source="fpl-live",
@@ -66,9 +75,13 @@ def world(
             snapshot_id=recaptured,
             handoff_path=handoff_fixture._handoff(tmp_path / "recaptured-handoffs", recaptured),
         )
-    if seeded_from is not None:
+    if seeded_from is not None or captured:
         registry = json.loads(publication.registry_path.read_text(encoding="utf-8"))
-        registry["seeded_from_leagues"] = list(seeded_from)
+        if seeded_from is not None:
+            registry["seeded_from_leagues"] = list(seeded_from)
+        registry["entries"].extend(
+            {"entry_id": entry_id, "label": f"Synthetic member {entry_id}"} for entry_id in captured
+        )
         publication.registry_path.write_text(json.dumps(registry), encoding="utf-8")
     snapshots = tmp_path / "weekly-snapshots"
     shutil.copytree(
@@ -109,7 +122,7 @@ def test_a_run_over_several_leagues_renders_each_tree_and_lists_them_all(
 ) -> None:
     """Every league of the list is rendered from the one capture into its own tree, with
     its own scoreboard; the site's directory names them all and carries the publication
-    stamp; a member of both leagues is recorded once, for the league the record names."""
+    stamp; a member of both leagues has one league-independent baseline."""
 
     operation = world(
         tmp_path,
@@ -125,12 +138,16 @@ def test_a_run_over_several_leagues_renders_each_tree_and_lists_them_all(
     league = stages["league"]
     assert sorted(league["leagues"]) == ["352490", "7"]
     assert league["leagues"]["352490"]["advice_recorded"] is True
-    assert league["leagues"]["7"]["advice_recorded"] is False
+    assert league["leagues"]["7"]["advice_recorded"] is True
     assert league["advice_recorded"] is True
     assert sorted(stages["scoreboard"]["ours_kept_from_published"]) == ["352490", "7"]
     records = sorted(operation.paths.records.rglob("advice.json"))
     assert len(records) == 1
     assert json.loads(records[0].read_bytes())["league_id"] == 352490
+    baselines = list(operation.paths.baselines.rglob("advice.json"))
+    assert len(baselines) == 1
+    assert "league_id" not in json.loads(baselines[0].read_bytes())
+    assert league["baselines"]["entries"] == 1
     data = operation.paths.out / "data"
     directory = json.loads((data / "leagues.json").read_bytes())
     assert [row["league_id"] for row in directory["payload"]["leagues"]] == [7, 352490]
@@ -153,7 +170,7 @@ def test_a_run_over_several_leagues_renders_each_tree_and_lists_them_all(
     assert not (data / "league").exists()
 
 
-def test_a_list_without_the_league_the_record_names_records_nothing_and_says_so(
+def test_a_secondary_league_records_its_baseline_without_a_legacy_menu_archive(
     tmp_path: Path,
 ) -> None:
     operation = world(
@@ -161,12 +178,14 @@ def test_a_list_without_the_league_the_record_names_records_nothing_and_says_so(
     )
     doc = json.loads(operation.execute().read_bytes())
     league = {stage["name"]: stage["value"] for stage in doc["stages"]}["league"]
-    assert league["advice_recorded"] is False
+    assert league["advice_recorded"] is True
     assert list(operation.paths.records.rglob("advice.json")) == []
+    assert len(list(operation.paths.baselines.rglob("advice.json"))) == 1
     log = "".join(
         path.read_text(encoding="utf-8") for path in operation.paths.log_root.rglob("*.jsonl")
     )
-    assert "tick.week.advice_record.skipped" in log
+    assert "tick.week.baselines.prepared" in log
+    assert "tick.week.advice_record.skipped" not in log
 
 
 @pytest.mark.parametrize(
@@ -1115,16 +1134,25 @@ def test_a_reused_capture_recorded_from_another_commit_refuses_before_any_solve(
     # The league stage stamps the commit of the package it runs from, which in a test is
     # not the synthetic checkout, so each run's stamp is stated as the commit it runs on.
     monkeypatch.setattr(league_views, "repository_commit", lambda: recorded)
+    monkeypatch.setattr(
+        "squadopt.application.league_publication.repository_commit", lambda: recorded
+    )
     assert weekly.main([*args, "--record-advice", "--run-id", "recorded"]) == 0
     record = paths.records / "2026-27/gw02/entry-101" / snapshot / "advice.json"
     kept = record.read_bytes()
     assert json.loads(kept)["provenance"]["repository_commit"] == recorded
+    baseline = paths.baselines / "2026-27/gw02/entry-101" / snapshot / "advice.json"
+    baseline_kept = baseline.read_bytes()
+    assert json.loads(baseline_kept)["provenance"]["repository_commit"] == recorded
 
     (checkout / "source.py").write_text("merged after the recording run")
     _git(checkout, "commit", "-qam", "develop moved")
     current = _git(checkout, "rev-parse", "HEAD")
     _origin_develop_at_head(checkout)
     monkeypatch.setattr(league_views, "repository_commit", lambda: current)
+    monkeypatch.setattr(
+        "squadopt.application.league_publication.repository_commit", lambda: current
+    )
 
     solved: list[LeaguePublicationRequest] = []
 
@@ -1148,6 +1176,7 @@ def test_a_reused_capture_recorded_from_another_commit_refuses_before_any_solve(
     assert all(stage["status"] == "pending" for stage in doc["stages"][1:])
     assert not (checkout / ".codex-tmp").exists()
     assert record.read_bytes() == kept
+    assert baseline.read_bytes() == baseline_kept
 
     assert weekly.main([*args, "--publish", "--no-advice-record", "--run-id", "escaped"]) == 0
     assert len(solved) == 1 and solved[0].record_root is None

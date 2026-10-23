@@ -1745,10 +1745,10 @@ def test_one_members_solver_error_stays_that_members(
         real_control = league_views_module.solve_member_control
         kind, detail = BASELINE_ERRORS[stage]
 
-        def control(picks: EntryPicks, *args: Any) -> Any:
+        def control(picks: EntryPicks, *args: Any, **kwargs: Any) -> Any:
             if picks.entry_id == 101:
                 raise errors[kind](detail)
-            return real_control(picks, *args)
+            return real_control(picks, *args, **kwargs)
 
         monkeypatch.setattr(league_views_module, "solve_member_control", control)
 
@@ -2150,7 +2150,7 @@ def test_a_programming_error_in_one_members_solve_still_stops_the_run(
 
     import squadopt.application.league_views as league_views_module
 
-    def control(picks: EntryPicks, *args: Any) -> Any:
+    def control(picks: EntryPicks, *args: Any, **kwargs: Any) -> Any:
         raise KeyError("price_tenths")
 
     monkeypatch.setattr(league_views_module, "solve_member_control", control)

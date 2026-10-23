@@ -307,7 +307,8 @@ def advise_with_chip(
 
     **What stands where a price would** is ``chip_choice.gain_vs_no_chip``: the chip
     week's expected points minus the member's own no-chip control's, both net of the hits
-    each pays at the game's charge. It is this gameweek's only and the document says so
+    each pays at the game's charge, the chip plan solved at the control's linearization
+    level. It is this gameweek's only and the document says so
     (``CHIP_CHOICE_LIMIT``); ``NO_CHIP_LIMIT`` would be false here and is left off. The
     gain is published as measured, never floored: the planner's objective also weighs the
     bench and its caution margin, which this total does not, so a forced plan can come
@@ -350,6 +351,8 @@ def advise_with_chip(
         optimization=CHIP_OPTIMIZATION,
         chip=chip,
         expected_lineups=solved.plan.weeks[0].lineup_expectation is not None,
+        # The gain is measured against the control, so the two are solved at one level.
+        linearization_level=solved.linearization_level,
     )
     if wall_clock_stopped_the_search(plan.solver_status, plan.diagnostics):
         raise SolverExecutionError(
