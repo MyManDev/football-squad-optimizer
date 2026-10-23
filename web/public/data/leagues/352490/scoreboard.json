@@ -1,19 +1,20 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-10-16T07:14:48Z",
+  "generated_at_utc": "2026-10-23T12:41:30Z",
   "payload": {
-    "captured_at_utc": "2026-10-16T06:01:54.275749Z",
-    "cohort_picks_snapshot_id": "fpl-elite-picks-20261016T060136Z-8b4c3667de56",
-    "cohort_snapshot_id": "fpl-top100-20261016T060118Z-ae3db8c93137",
+    "captured_at_utc": "2026-10-23T11:16:47.162538Z",
+    "cohort_picks_snapshot_id": "fpl-elite-picks-20261023T111203Z-2f0c591789cb",
+    "cohort_snapshot_id": "fpl-top100-20261023T110704Z-c9d2e551592b",
     "cumulative": {
-      "average_entry_score": 357.0,
+      "average_entry_score": 416.0,
       "gameweeks": [
         1,
         2,
         3,
         4,
         5,
-        6
+        6,
+        7
       ],
       "members_counted": 15,
       "members_gameweeks": [
@@ -22,9 +23,10 @@
         3,
         4,
         5,
-        6
+        6,
+        7
       ],
-      "members_mean_total_points": 393.53333333333336,
+      "members_mean_total_points": 456.46666666666664,
       "ours_basis": null,
       "ours_excluded_gameweeks": [
         {
@@ -42,7 +44,7 @@
       ],
       "ours_gameweeks": [],
       "ours_net": null,
-      "through_gameweek": 6
+      "through_gameweek": 7
     },
     "gameweeks": [
       {
@@ -106,7 +108,7 @@
             "kind": "league_mean",
             "net": 54.266666666666666,
             "scoring_basis": "net",
-            "source_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd"
+            "source_snapshot_id": "fpl-live-20261023T111647Z-a2cd55fde426"
           },
           {
             "diagnostics": {
@@ -118,7 +120,7 @@
             "kind": "game_mean",
             "net": 50.0,
             "scoring_basis": "source_average",
-            "source_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd"
+            "source_snapshot_id": "fpl-live-20261023T111647Z-a2cd55fde426"
           }
         ],
         "data_checked": true,
@@ -314,7 +316,7 @@
             "kind": "league_mean",
             "net": 86.26666666666667,
             "scoring_basis": "net",
-            "source_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd"
+            "source_snapshot_id": "fpl-live-20261023T111647Z-a2cd55fde426"
           },
           {
             "diagnostics": {
@@ -326,7 +328,7 @@
             "kind": "game_mean",
             "net": 81.0,
             "scoring_basis": "source_average",
-            "source_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd"
+            "source_snapshot_id": "fpl-live-20261023T111647Z-a2cd55fde426"
           }
         ],
         "data_checked": true,
@@ -507,7 +509,7 @@
             "kind": "league_mean",
             "net": 58.666666666666664,
             "scoring_basis": "net",
-            "source_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd"
+            "source_snapshot_id": "fpl-live-20261023T111647Z-a2cd55fde426"
           },
           {
             "diagnostics": {
@@ -519,7 +521,7 @@
             "kind": "game_mean",
             "net": 51.0,
             "scoring_basis": "source_average",
-            "source_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd"
+            "source_snapshot_id": "fpl-live-20261023T111647Z-a2cd55fde426"
           }
         ],
         "data_checked": true,
@@ -704,7 +706,7 @@
             "kind": "league_mean",
             "net": 79.73333333333333,
             "scoring_basis": "net",
-            "source_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd"
+            "source_snapshot_id": "fpl-live-20261023T111647Z-a2cd55fde426"
           },
           {
             "diagnostics": {
@@ -716,7 +718,7 @@
             "kind": "game_mean",
             "net": 69.0,
             "scoring_basis": "source_average",
-            "source_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd"
+            "source_snapshot_id": "fpl-live-20261023T111647Z-a2cd55fde426"
           }
         ],
         "data_checked": true,
@@ -916,7 +918,7 @@
             "kind": "league_mean",
             "net": 46.666666666666664,
             "scoring_basis": "net",
-            "source_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd"
+            "source_snapshot_id": "fpl-live-20261023T111647Z-a2cd55fde426"
           },
           {
             "diagnostics": {
@@ -928,7 +930,7 @@
             "kind": "game_mean",
             "net": 48.0,
             "scoring_basis": "source_average",
-            "source_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd"
+            "source_snapshot_id": "fpl-live-20261023T111647Z-a2cd55fde426"
           }
         ],
         "data_checked": true,
@@ -1124,7 +1126,7 @@
             "kind": "league_mean",
             "net": 67.93333333333334,
             "scoring_basis": "net",
-            "source_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd"
+            "source_snapshot_id": "fpl-live-20261023T111647Z-a2cd55fde426"
           },
           {
             "diagnostics": {
@@ -1136,7 +1138,7 @@
             "kind": "game_mean",
             "net": 58.0,
             "scoring_basis": "source_average",
-            "source_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd"
+            "source_snapshot_id": "fpl-live-20261023T111647Z-a2cd55fde426"
           }
         ],
         "data_checked": true,
@@ -1254,14 +1256,207 @@
         "members_counted": 15,
         "members_mean_net": 67.93333333333334,
         "ours": null,
+        "top100": null
+      },
+      {
+        "average_entry_score": 59.0,
+        "comparisons": [
+          {
+            "diagnostics": {
+              "autosub_recovery": null,
+              "captain_shortfall": null,
+              "minutes_shortfall": null,
+              "zero_minute_starters": null
+            },
+            "kind": "system",
+            "net": null,
+            "scoring_basis": null,
+            "source_snapshot_id": null
+          },
+          {
+            "diagnostics": {
+              "autosub_recovery": null,
+              "captain_shortfall": null,
+              "minutes_shortfall": null,
+              "zero_minute_starters": null
+            },
+            "kind": "base",
+            "net": null,
+            "scoring_basis": null,
+            "source_snapshot_id": null
+          },
+          {
+            "diagnostics": {
+              "autosub_recovery": null,
+              "captain_shortfall": null,
+              "minutes_shortfall": null,
+              "zero_minute_starters": null
+            },
+            "kind": "elite_xi",
+            "net": null,
+            "scoring_basis": null,
+            "source_snapshot_id": null
+          },
+          {
+            "diagnostics": {
+              "autosub_recovery": null,
+              "captain_shortfall": null,
+              "minutes_shortfall": null,
+              "zero_minute_starters": null
+            },
+            "kind": "ownership_template",
+            "net": null,
+            "scoring_basis": null,
+            "source_snapshot_id": null
+          },
+          {
+            "diagnostics": {
+              "autosub_recovery": null,
+              "captain_shortfall": null,
+              "minutes_shortfall": null,
+              "zero_minute_starters": null
+            },
+            "kind": "league_mean",
+            "net": 62.93333333333333,
+            "scoring_basis": "net",
+            "source_snapshot_id": "fpl-live-20261023T111647Z-a2cd55fde426"
+          },
+          {
+            "diagnostics": {
+              "autosub_recovery": null,
+              "captain_shortfall": null,
+              "minutes_shortfall": null,
+              "zero_minute_starters": null
+            },
+            "kind": "game_mean",
+            "net": 59.0,
+            "scoring_basis": "source_average",
+            "source_snapshot_id": "fpl-live-20261023T111647Z-a2cd55fde426"
+          }
+        ],
+        "data_checked": true,
+        "deadline_utc": "2026-10-17T10:00:00Z",
+        "finished": true,
+        "gameweek": 7,
+        "highest_score": 122.0,
+        "members": [
+          {
+            "entry_id": 313686,
+            "hit_cost": 0,
+            "net": 82,
+            "points": 82,
+            "total_points": 493
+          },
+          {
+            "entry_id": 2199732,
+            "hit_cost": 0,
+            "net": 90,
+            "points": 90,
+            "total_points": 546
+          },
+          {
+            "entry_id": 2281624,
+            "hit_cost": 0,
+            "net": 59,
+            "points": 59,
+            "total_points": 469
+          },
+          {
+            "entry_id": 3832237,
+            "hit_cost": 0,
+            "net": 53,
+            "points": 53,
+            "total_points": 364
+          },
+          {
+            "entry_id": 4287206,
+            "hit_cost": 0,
+            "net": 63,
+            "points": 63,
+            "total_points": 468
+          },
+          {
+            "entry_id": 5081114,
+            "hit_cost": 0,
+            "net": 71,
+            "points": 71,
+            "total_points": 392
+          },
+          {
+            "entry_id": 5349883,
+            "hit_cost": 0,
+            "net": 48,
+            "points": 48,
+            "total_points": 471
+          },
+          {
+            "entry_id": 5662073,
+            "hit_cost": 0,
+            "net": 57,
+            "points": 57,
+            "total_points": 463
+          },
+          {
+            "entry_id": 6654210,
+            "hit_cost": 0,
+            "net": 59,
+            "points": 59,
+            "total_points": 456
+          },
+          {
+            "entry_id": 6879786,
+            "hit_cost": 0,
+            "net": 54,
+            "points": 54,
+            "total_points": 474
+          },
+          {
+            "entry_id": 6880255,
+            "hit_cost": 0,
+            "net": 63,
+            "points": 63,
+            "total_points": 385
+          },
+          {
+            "entry_id": 7018833,
+            "hit_cost": 0,
+            "net": 59,
+            "points": 59,
+            "total_points": 444
+          },
+          {
+            "entry_id": 7252721,
+            "hit_cost": 0,
+            "net": 58,
+            "points": 58,
+            "total_points": 508
+          },
+          {
+            "entry_id": 8548384,
+            "hit_cost": 0,
+            "net": 65,
+            "points": 65,
+            "total_points": 451
+          },
+          {
+            "entry_id": 8883467,
+            "hit_cost": 0,
+            "net": 63,
+            "points": 63,
+            "total_points": 463
+          }
+        ],
+        "members_counted": 15,
+        "members_mean_net": 62.93333333333333,
+        "ours": null,
         "top100": {
           "basis": "net",
           "cohort_size": 100,
           "final": true,
-          "gameweek": 6,
-          "hit_points": 8.0,
-          "mean_score": 84.83,
-          "picks_snapshot_id": "fpl-elite-picks-20261016T060136Z-8b4c3667de56"
+          "gameweek": 7,
+          "hit_points": 4.0,
+          "mean_score": 83.76,
+          "picks_snapshot_id": "fpl-elite-picks-20261023T111203Z-2f0c591789cb"
         }
       }
     ],
@@ -1269,7 +1464,7 @@
     "league_id": 352490,
     "registered_members": 15,
     "season": "2026-27",
-    "source_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd"
+    "source_snapshot_id": "fpl-live-20261023T111647Z-a2cd55fde426"
   },
   "source_kind": "live"
 }

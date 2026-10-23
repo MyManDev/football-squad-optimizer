@@ -12,7 +12,11 @@ import { deviceComputable, NO_DEVICE_RIVALS } from "../device/computable";
 import { deviceSelection } from "../device/selection";
 import { deviceRequestFor, memberSelection } from "../pages/memberSelection";
 import type { EntryAdviceIndex, EntrySquad } from "../types";
+import type { AdviceCapabilities } from "./adviceCapabilities";
+import { resolvePublishedAdvice } from "./adviceSelection";
+import { COMPUTE_COPY } from "./computeCopy";
 import { MemberDecisionControls } from "./MemberDecisionControls";
+import { TOP100_COPY } from "./top100Copy";
 
 afterEach(cleanup);
 
@@ -42,6 +46,19 @@ const SQUAD: EntrySquad = {
   },
 };
 const DEVICE = deviceComputable(SQUAD, MEMBERS, NO_DEVICE_RIVALS)!;
+const DEVICE_INDEX: EntryAdviceIndex = {
+  ...mockEntryAdviceIndex(ENTRY).payload,
+  gameweek: 7,
+  menu: "device",
+  source_snapshot_id: "device-menu-capture",
+  windows: { "saf-puan": [], "ortak-koru": [], "fark-yarat": [] },
+  computed: [],
+  unavailable: [],
+  chip_states: SQUAD.chips,
+  chips: { available: false, reason: "on_device" },
+  top100: { available: false, reason: "on_device" },
+  evidence: { available: false, reason: "on_device" },
+};
 const RIVAL = 35249002;
 const READS = {
   ...NO_DEVICE_RIVALS,
@@ -75,7 +92,11 @@ describe("the device menu without published chip answers", () => {
     ).toEqual([]);
   });
 
-  it.each([null, { ...mockEntryAdviceIndex(ENTRY).payload, gameweek: 7, chips: undefined }])(
+  it.each([
+    null,
+    DEVICE_INDEX,
+    { ...mockEntryAdviceIndex(ENTRY).payload, gameweek: 7, chips: undefined },
+  ])(
     "asks the worker for the chosen chip without reading a nonexistent answer file (%j)",
     (index) => {
       const selected = resolve("chip=3xc", index);
@@ -111,6 +132,16 @@ describe("the device menu without published chip answers", () => {
       kind: "top100",
       weight: 20,
     });
+  });
+
+  it("keeps device weights and the default plan available through the device index", () => {
+    for (const query of ["", "top100=20"]) {
+      const selected = resolve(query, DEVICE_INDEX);
+      expect(selected.path).toBeNull();
+      expect(deviceSelection(deviceRequestFor(selected), SQUAD)).toEqual(
+        query ? { kind: "top100", weight: 20 } : { kind: "plain" },
+      );
+    }
   });
 
   it("retains the rival and its weight when neither has a published answer", () => {
@@ -184,5 +215,153 @@ describe("the device menu without published chip answers", () => {
       "3xc",
     );
     expect(triple).toBeChecked();
+  });
+});
+
+describe("a rejected advice index beside the device's choices", () => {
+  const PUBLISHED = { ...mockEntryAdviceIndex(ENTRY).payload, gameweek: 7 };
+  const CAPABILITIES: AdviceCapabilities = {
+    leagueId: SQUAD.league_id,
+    captureSnapshotId: "device-menu-capture",
+    season: SQUAD.season,
+    gameweek: SQUAD.gameweek,
+    strategies: { "saf-puan": { windows: [1], requiresRival: false } },
+    top100Weights: [0],
+    managersWord: false,
+  };
+
+  it.each([
+    ["gameweek", { ...PUBLISHED, gameweek: 8 }],
+    ["league", { ...PUBLISHED, league_id: SQUAD.league_id + 1 }],
+    ["season", { ...PUBLISHED, season: "1999-00" }],
+  ] as const)("stays unreadable for an index from another %s", (_name, index) => {
+    for (const capabilities of [null, CAPABILITIES]) {
+      for (const [query, device] of [
+        ["chip=3xc", { kind: "chip", chip: "3xc" }],
+        ["top100=20", { kind: "top100", weight: 20 }],
+      ] as const) {
+        const params = new URLSearchParams(`mode=saf-puan&${query}`);
+        const selected = memberSelection({
+          squad: SQUAD,
+          members: MEMBERS,
+          index,
+          capabilities,
+          deviceRivals: NO_DEVICE_RIVALS,
+        }).resolve(params);
+        expect(selected.status).toBe("index-error");
+        expect(selected.path).toBeNull();
+        // The controls are given no index while it is rejected; the device is asked for
+        // the same choice they show.
+        const controls = resolvePublishedAdvice(
+          params,
+          0,
+          ENTRY,
+          MEMBERS,
+          null,
+          undefined,
+          capabilities,
+          DEVICE,
+        );
+        expect(deviceSelection(deviceRequestFor(selected), SQUAD)).toEqual(device);
+        expect(deviceSelection(deviceRequestFor(controls), SQUAD)).toEqual(device);
+      }
+    }
+  });
+});
+
+describe("the Top 100 note beside a device weight", () => {
+  it.each([
+    ["tr", "no index", null],
+    ["en", "no index", null],
+    ["tr", "the device index", DEVICE_INDEX],
+    ["en", "the device index", DEVICE_INDEX],
+  ] as const)(
+    "names the checked device weight as computable in %s with %s",
+    (language, _name, index) => {
+      render(
+        <LanguageProvider initialLanguage={language}>
+          <MemoryRouter
+            initialEntries={[`/league/352490/members/${ENTRY}?mode=saf-puan&top100=20`]}
+          >
+            <MemberDecisionControls
+              entryId={ENTRY}
+              members={MEMBERS}
+              index={index}
+              onDevice={DEVICE}
+              part="top100"
+            />
+          </MemoryRouter>
+        </LanguageProvider>,
+      );
+      expect(
+        document.querySelector<HTMLInputElement>('input[name="top100"][value="20"]'),
+      ).toBeChecked();
+      const fieldset = document.querySelector("fieldset")!;
+      expect(fieldset).toHaveTextContent(COMPUTE_COPY[language].top100Computable);
+      for (const sentence of Object.values(TOP100_COPY[language].unavailableReasons)) {
+        expect(fieldset).not.toHaveTextContent(sentence);
+      }
+    },
+  );
+});
+
+describe("the Top 100 note where the link leaves the device's weight out", () => {
+  // The service with the word and no Top 100 setting of its own.
+  const SERVICE: AdviceCapabilities = {
+    leagueId: DEVICE_INDEX.league_id,
+    captureSnapshotId: "device-menu-capture",
+    season: SQUAD.season,
+    gameweek: SQUAD.gameweek,
+    strategies: { "saf-puan": { windows: [1], requiresRival: false } },
+    top100Weights: [0],
+    managersWord: true,
+  };
+  const PREFERENCES = `preferences=${encodeURIComponent(JSON.stringify({ no_hits: true }))}`;
+
+  it.each([
+    ["llm=on", "no index", null, null],
+    ["llm=on", "the device index", DEVICE_INDEX, null],
+    ["llm=on", "the service with the word", DEVICE_INDEX, SERVICE],
+    ["model=football", "no index", null, null],
+    ["model=football", "the service", DEVICE_INDEX, SERVICE],
+    [PREFERENCES, "no index", null, null],
+    [PREFERENCES, "the service", DEVICE_INDEX, SERVICE],
+  ] as const)("still says only 0 is available with %s and %s", (query, _name, index, service) => {
+    for (const language of ["tr", "en"] as const) {
+      render(
+        <LanguageProvider initialLanguage={language}>
+          <MemoryRouter initialEntries={[`/league/352490/members/${ENTRY}?mode=saf-puan&${query}`]}>
+            <MemberDecisionControls
+              entryId={ENTRY}
+              members={MEMBERS}
+              index={index}
+              capabilities={service}
+              onDevice={DEVICE}
+              part="top100"
+            />
+          </MemoryRouter>
+        </LanguageProvider>,
+      );
+      // Even a link that names the weight does not ask the device for it here.
+      const params = new URLSearchParams(`mode=saf-puan&${query}&top100=20`);
+      const selected = resolvePublishedAdvice(
+        params,
+        index?.league_id ?? 0,
+        ENTRY,
+        MEMBERS,
+        index,
+        undefined,
+        service,
+        DEVICE,
+      );
+      expect(deviceSelection(deviceRequestFor(selected), SQUAD)).not.toEqual({
+        kind: "top100",
+        weight: 20,
+      });
+      const fieldset = document.querySelector("fieldset")!;
+      expect(fieldset).not.toHaveTextContent(COMPUTE_COPY[language].top100Computable);
+      expect(fieldset).toHaveTextContent(TOP100_COPY[language].unavailableReasons.unknown);
+      cleanup();
+    }
   });
 });

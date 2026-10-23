@@ -10,6 +10,7 @@ import re
 import secrets
 import shutil
 import sys
+import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass, replace
 from datetime import UTC, datetime
@@ -55,7 +56,7 @@ from squadopt.application.weekly_plan import (
     rotation_pair_is_readable,
     rotation_source_capture,
 )
-from squadopt.contracts.league_list import LEAGUE_LIST_FILE, LeagueListError, read_league_list
+from squadopt.contracts.league_list import LEAGUE_LIST_FILE, LeagueListError, parse_league_menus
 from squadopt.contracts.league_tree import (
     LEGACY_TREE,
     LeagueDirectoryError,
@@ -791,6 +792,7 @@ class WeeklyOperations:
             self.paths.registry,
             self.paths.out,
             league_id,
+            menu="device" if league_id in self.request.device_league_ids else "full",
             season=self.request.season,
             gameweek=self.request.gameweek,
             handoff_path=Path(self.values["handoff"]["path"]),
@@ -875,20 +877,47 @@ class WeeklyOperations:
             # Each league is stamped after its own solves (the stamp is when the advice
             # was published, read against the deadline); the directory the last league
             # writes carries the latest stamp, and the release check reads that one.
-            recorded = record and records_advice_for(league_id)
+            recorded = (
+                record
+                and league_id not in self.request.device_league_ids
+                and records_advice_for(league_id)
+            )
             request = self._league_request(league_id, recorded)
+            started = time.perf_counter()
+            timings: dict[str, float] = {}
+
+            def on_stage(
+                stage: str,
+                *,
+                timings: dict[str, float] = timings,
+                started: float = started,
+                request: LeaguePublicationRequest = request,
+            ) -> None:
+                timings[stage] = round(time.perf_counter() - started, 6)
+                if getattr(self, "log", None) is not None:
+                    self.log.event(
+                        "tick.week.league.substage",
+                        league_id=request.league_id,
+                        menu=request.menu,
+                        stage=stage,
+                        elapsed_seconds=timings[stage],
+                    )
+
             with league_mapper(request, self.request.workers) as mapper:
                 result = publish_league(
                     request,
                     mapper=mapper,
                     beside=beside,
                     read_capture=self._capture_for_publication,
+                    on_stage=on_stage,
                 )
             if result.published is not None:
                 beside.append(result.published)
             gameweek = result.gameweek
             outputs.extend(result.output_paths)
             leagues[str(league_id)] = {
+                "menu": request.menu,
+                "timings": timings,
                 "advice_recorded": recorded,
                 # What the build told the operator about individual members (a name it
                 # changed, a mode or the manager's word it could not solve) and the files
@@ -958,6 +987,8 @@ class WeeklyOperations:
     def _capture_for_publication(self, root: Path, identifier: str) -> CapturedSnapshot:
         """Read immutable capture bytes once across this run's league publications.
 
+        The league, history and scoreboard builders read through it, and so does the
+        manager's word: its club-news capture and the roster capture its evidence names.
         The cache belongs to this operation, never to a request sent to member workers
         or another run. Resolve the root as well as the identifier so two archives cannot
         share a cached capture by name alone.
@@ -1364,6 +1395,17 @@ def _revision(workspace: Path, supplied: str | None) -> str:
     return revision.commit
 
 
+def read_league_menus(path: Path) -> dict[int, str]:
+    """Read the weekly operator configuration at its filesystem boundary."""
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError as error:
+        raise LeagueListError(f"No league list at {path}.") from error
+    except ValueError as error:
+        raise LeagueListError(f"{path} does not parse as JSON.") from error
+    return parse_league_menus(document)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -1385,10 +1427,15 @@ def main(argv: list[str] | None = None) -> int:
             return 0 if result["status"] == "completed" and result["missed"] is not True else 1
         if args.league and args.league_list is not None:
             parser.error("--league and --league-list name the leagues two ways; use one")
+        device_league_ids: tuple[int, ...] = ()
         if args.league_list is not None:
             try:
                 # Relative to the workspace, like --out and --handoff.
-                league_ids = read_league_list(root / args.league_list)
+                menus = read_league_menus(root / args.league_list)
+                league_ids = tuple(menus)
+                device_league_ids = tuple(
+                    league for league, menu in menus.items() if menu == "device"
+                )
             except LeagueListError as error:
                 parser.error(str(error))
         else:
@@ -1416,6 +1463,7 @@ def main(argv: list[str] | None = None) -> int:
             args.workers,
             args.publish,
             args.rotation_capture,
+            device_league_ids,
         )
         print(request.plan().describe())
         for identifier in args.benchmark_picks_freeze:

@@ -44,6 +44,9 @@ def parse_league_list(document: Any) -> tuple[int, ...]:
         raise LeagueListError("A league list names at least one league.")
     if len(set(ids)) != len(ids):
         raise LeagueListError("A league list names a league once.")
+    for record in document["leagues"]:
+        if record.get("menu", "full") not in ("full", "device"):
+            raise LeagueListError("A league menu is full or device.")
     return ids
 
 
@@ -57,3 +60,10 @@ def read_league_list(path: Path) -> tuple[int, ...]:
     except ValueError as error:
         raise LeagueListError(f"{path} does not parse as JSON.") from error
     return parse_league_list(document)
+
+
+def parse_league_menus(document: Any) -> dict[int, str]:
+    """The publication menus; older documents retain the full menu."""
+
+    parse_league_list(document)
+    return {row["league_id"]: row.get("menu", "full") for row in document["leagues"]}

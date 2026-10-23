@@ -1,29 +1,1109 @@
 {
   "contract_version": "weekly_suggestion_history_v1",
-  "generated_at_utc": "2026-10-16T06:01:54.275749Z",
+  "generated_at_utc": "2026-10-23T11:16:47.162538Z",
   "payload": {
     "league_id": 352490,
     "entry_id": 8548384,
     "season": "2026-27",
-    "as_of_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd",
+    "as_of_snapshot_id": "fpl-live-20261023T111647Z-a2cd55fde426",
     "weeks": [
       {
-        "gameweek": 7,
+        "gameweek": 8,
         "status": "unsettled",
         "reason": "not_settled",
-        "deadline_utc": "2026-10-17T10:00:00Z",
-        "advice_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd",
-        "advice_captured_at_utc": "2026-10-16T06:01:54.275749Z",
-        "advice_generated_at_utc": "2026-10-16T07:13:49Z",
-        "advice_sha256": "36ec8d0329ceb0ce7db5fd5f26aba1c19dba19306973eacbe5969ac558561fda",
+        "deadline_utc": "2026-10-23T17:30:00Z",
+        "advice_snapshot_id": "fpl-live-20261023T111647Z-a2cd55fde426",
+        "advice_captured_at_utc": "2026-10-23T11:16:47.162538Z",
+        "advice_generated_at_utc": "2026-10-23T12:40:33Z",
+        "advice_sha256": "5ae71bb3763118dd6d8602aa43923d072c9b200fc6b5ad662017ce52b52e5ec7",
         "outcome_snapshot_id": null,
         "outcome_captured_at_utc": null,
-        "expected_own_points": 56.28227061445796,
+        "expected_own_points": 56.42957417775979,
         "suggested": null,
         "actual": null,
         "actual_reason": null,
         "net_difference": null,
         "players": [],
+        "recorded_plans": [
+          {
+            "published_path": "advice/8548384/saf-puan/1.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ronald Araujo",
+                "player_in": "Maxim De Cuyper"
+              },
+              {
+                "player_out": "Joško Gvardiol",
+                "player_in": "Luka Vušković"
+              },
+              {
+                "player_out": "Josh King",
+                "player_in": "Pascal Groß"
+              }
+            ],
+            "expected_points_cost": 0.0
+          },
+          {
+            "published_path": "advice/8548384/ortak-koru/1/vs-6654210.json",
+            "strategy": "ortak-koru",
+            "window": 1,
+            "rival_entry_id": 6654210,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Will Hughes",
+                "player_in": "Pascal Groß"
+              },
+              {
+                "player_out": "Ronald Araujo",
+                "player_in": "Kristoffer Ajer"
+              },
+              {
+                "player_out": "Joško Gvardiol",
+                "player_in": "Tyrick Mitchell"
+              }
+            ],
+            "expected_points_cost": 1.425771822852198,
+            "expected_points_cost_ceiling": 1.425771822852198
+          },
+          {
+            "published_path": "advice/8548384/fark-yarat/1/vs-6654210.json",
+            "strategy": "fark-yarat",
+            "window": 1,
+            "rival_entry_id": 6654210,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ronald Araujo",
+                "player_in": "Maxim De Cuyper"
+              },
+              {
+                "player_out": "Joško Gvardiol",
+                "player_in": "Luka Vušković"
+              },
+              {
+                "player_out": "Josh King",
+                "player_in": "Pascal Groß"
+              }
+            ],
+            "expected_points_cost": 0.0,
+            "expected_points_cost_ceiling": 0.0
+          },
+          {
+            "published_path": "advice/8548384/saf-puan/1/hoca-sozu.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ronald Araujo",
+                "player_in": "Maxim De Cuyper"
+              },
+              {
+                "player_out": "Joško Gvardiol",
+                "player_in": "Luka Vušković"
+              },
+              {
+                "player_out": "Josh King",
+                "player_in": "Pascal Groß"
+              }
+            ],
+            "expected_points_cost": 0.0,
+            "expected_points_cost_ceiling": 0.0,
+            "managers_word": true
+          },
+          {
+            "published_path": "advice/8548384/saf-puan/1/top100-5.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ronald Araujo",
+                "player_in": "Maxim De Cuyper"
+              },
+              {
+                "player_out": "Joško Gvardiol",
+                "player_in": "Luka Vušković"
+              },
+              {
+                "player_out": "Josh King",
+                "player_in": "Pascal Groß"
+              }
+            ],
+            "expected_points_cost": 0.0,
+            "expected_points_cost_ceiling": 0.0,
+            "top100_weight": 5
+          },
+          {
+            "published_path": "advice/8548384/saf-puan/1/top100-5-hoca-sozu.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ronald Araujo",
+                "player_in": "Maxim De Cuyper"
+              },
+              {
+                "player_out": "Joško Gvardiol",
+                "player_in": "Luka Vušković"
+              },
+              {
+                "player_out": "Josh King",
+                "player_in": "Pascal Groß"
+              }
+            ],
+            "expected_points_cost": 0.0,
+            "expected_points_cost_ceiling": 0.0,
+            "top100_weight": 5,
+            "managers_word": true
+          },
+          {
+            "published_path": "advice/8548384/saf-puan/1/top100-10.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ronald Araujo",
+                "player_in": "Maxim De Cuyper"
+              },
+              {
+                "player_out": "Joško Gvardiol",
+                "player_in": "Luka Vušković"
+              },
+              {
+                "player_out": "Josh King",
+                "player_in": "Pascal Groß"
+              }
+            ],
+            "expected_points_cost": 0.0,
+            "expected_points_cost_ceiling": 0.0,
+            "top100_weight": 10
+          },
+          {
+            "published_path": "advice/8548384/saf-puan/1/top100-10-hoca-sozu.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ronald Araujo",
+                "player_in": "Maxim De Cuyper"
+              },
+              {
+                "player_out": "Joško Gvardiol",
+                "player_in": "Luka Vušković"
+              },
+              {
+                "player_out": "Josh King",
+                "player_in": "Pascal Groß"
+              }
+            ],
+            "expected_points_cost": 0.0,
+            "expected_points_cost_ceiling": 0.0,
+            "top100_weight": 10,
+            "managers_word": true
+          },
+          {
+            "published_path": "advice/8548384/saf-puan/1/top100-20.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ronald Araujo",
+                "player_in": "Maxim De Cuyper"
+              },
+              {
+                "player_out": "Joško Gvardiol",
+                "player_in": "Luka Vušković"
+              },
+              {
+                "player_out": "Josh King",
+                "player_in": "Pascal Groß"
+              }
+            ],
+            "expected_points_cost": 0.0,
+            "expected_points_cost_ceiling": 0.0,
+            "top100_weight": 20
+          },
+          {
+            "published_path": "advice/8548384/saf-puan/1/top100-20-hoca-sozu.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ronald Araujo",
+                "player_in": "Maxim De Cuyper"
+              },
+              {
+                "player_out": "Joško Gvardiol",
+                "player_in": "Luka Vušković"
+              },
+              {
+                "player_out": "Josh King",
+                "player_in": "Pascal Groß"
+              }
+            ],
+            "expected_points_cost": 0.0,
+            "expected_points_cost_ceiling": 0.0,
+            "top100_weight": 20,
+            "managers_word": true
+          },
+          {
+            "published_path": "advice/8548384/saf-puan/1/top100-30.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ronald Araujo",
+                "player_in": "Maxim De Cuyper"
+              },
+              {
+                "player_out": "Joško Gvardiol",
+                "player_in": "Luka Vušković"
+              },
+              {
+                "player_out": "Josh King",
+                "player_in": "Pascal Groß"
+              }
+            ],
+            "expected_points_cost": 0.0,
+            "expected_points_cost_ceiling": 0.0,
+            "top100_weight": 30
+          },
+          {
+            "published_path": "advice/8548384/saf-puan/1/top100-30-hoca-sozu.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ronald Araujo",
+                "player_in": "Maxim De Cuyper"
+              },
+              {
+                "player_out": "Joško Gvardiol",
+                "player_in": "Luka Vušković"
+              },
+              {
+                "player_out": "Josh King",
+                "player_in": "Pascal Groß"
+              }
+            ],
+            "expected_points_cost": 0.0,
+            "expected_points_cost_ceiling": 0.0,
+            "top100_weight": 30,
+            "managers_word": true
+          },
+          {
+            "published_path": "advice/8548384/saf-puan/1/top100-40.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Martin Ødegaard",
+                "player_in": "Pascal Groß"
+              },
+              {
+                "player_out": "Ronald Araujo",
+                "player_in": "Maxim De Cuyper"
+              },
+              {
+                "player_out": "Joško Gvardiol",
+                "player_in": "Riccardo Calafiori"
+              }
+            ],
+            "expected_points_cost": 0.9244312891794308,
+            "expected_points_cost_ceiling": 0.9244312891794308,
+            "top100_weight": 40
+          },
+          {
+            "published_path": "advice/8548384/saf-puan/1/top100-40-hoca-sozu.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Martin Ødegaard",
+                "player_in": "Pascal Groß"
+              },
+              {
+                "player_out": "Ronald Araujo",
+                "player_in": "Maxim De Cuyper"
+              },
+              {
+                "player_out": "Joško Gvardiol",
+                "player_in": "Riccardo Calafiori"
+              }
+            ],
+            "expected_points_cost": 0.9244312891794308,
+            "expected_points_cost_ceiling": 0.9244312891794308,
+            "top100_weight": 40,
+            "managers_word": true
+          },
+          {
+            "published_path": "advice/8548384/saf-puan/1/top100-50.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Martin Ødegaard",
+                "player_in": "Pascal Groß"
+              },
+              {
+                "player_out": "Ronald Araujo",
+                "player_in": "Maxim De Cuyper"
+              },
+              {
+                "player_out": "Joško Gvardiol",
+                "player_in": "Riccardo Calafiori"
+              }
+            ],
+            "expected_points_cost": 0.9244312891794308,
+            "expected_points_cost_ceiling": 0.9244312891794308,
+            "top100_weight": 50
+          },
+          {
+            "published_path": "advice/8548384/saf-puan/1/top100-50-hoca-sozu.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Martin Ødegaard",
+                "player_in": "Pascal Groß"
+              },
+              {
+                "player_out": "Ronald Araujo",
+                "player_in": "Maxim De Cuyper"
+              },
+              {
+                "player_out": "Joško Gvardiol",
+                "player_in": "Riccardo Calafiori"
+              }
+            ],
+            "expected_points_cost": 0.9244312891794308,
+            "expected_points_cost_ceiling": 0.9244312891794308,
+            "top100_weight": 50,
+            "managers_word": true
+          },
+          {
+            "published_path": "advice/8548384/ortak-koru/1/vs-6654210/top100-5.json",
+            "strategy": "ortak-koru",
+            "window": 1,
+            "rival_entry_id": 6654210,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Will Hughes",
+                "player_in": "Pascal Groß"
+              },
+              {
+                "player_out": "Ronald Araujo",
+                "player_in": "Kristoffer Ajer"
+              },
+              {
+                "player_out": "Joško Gvardiol",
+                "player_in": "Tyrick Mitchell"
+              }
+            ],
+            "expected_points_cost": 1.4257718228522052,
+            "expected_points_cost_ceiling": 1.4257718228522052,
+            "top100_weight": 5
+          },
+          {
+            "published_path": "advice/8548384/ortak-koru/1/vs-6654210/top100-10.json",
+            "strategy": "ortak-koru",
+            "window": 1,
+            "rival_entry_id": 6654210,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Will Hughes",
+                "player_in": "Pascal Groß"
+              },
+              {
+                "player_out": "Ronald Araujo",
+                "player_in": "Kristoffer Ajer"
+              },
+              {
+                "player_out": "Joško Gvardiol",
+                "player_in": "Tyrick Mitchell"
+              }
+            ],
+            "expected_points_cost": 1.4257718228522052,
+            "expected_points_cost_ceiling": 1.4257718228522052,
+            "top100_weight": 10
+          },
+          {
+            "published_path": "advice/8548384/ortak-koru/1/vs-6654210/top100-20.json",
+            "strategy": "ortak-koru",
+            "window": 1,
+            "rival_entry_id": 6654210,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Will Hughes",
+                "player_in": "Pascal Groß"
+              },
+              {
+                "player_out": "Ronald Araujo",
+                "player_in": "Kristoffer Ajer"
+              },
+              {
+                "player_out": "Joško Gvardiol",
+                "player_in": "Tyrick Mitchell"
+              }
+            ],
+            "expected_points_cost": 1.4257718228522052,
+            "expected_points_cost_ceiling": 1.4257718228522052,
+            "top100_weight": 20
+          },
+          {
+            "published_path": "advice/8548384/ortak-koru/1/vs-6654210/top100-30.json",
+            "strategy": "ortak-koru",
+            "window": 1,
+            "rival_entry_id": 6654210,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Will Hughes",
+                "player_in": "Pascal Groß"
+              },
+              {
+                "player_out": "Ronald Araujo",
+                "player_in": "Kristoffer Ajer"
+              },
+              {
+                "player_out": "Joško Gvardiol",
+                "player_in": "Tyrick Mitchell"
+              }
+            ],
+            "expected_points_cost": 1.4257718228522052,
+            "expected_points_cost_ceiling": 1.4257718228522052,
+            "top100_weight": 30
+          },
+          {
+            "published_path": "advice/8548384/ortak-koru/1/vs-6654210/top100-40.json",
+            "strategy": "ortak-koru",
+            "window": 1,
+            "rival_entry_id": 6654210,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Will Hughes",
+                "player_in": "Pascal Groß"
+              },
+              {
+                "player_out": "Ronald Araujo",
+                "player_in": "Kristoffer Ajer"
+              },
+              {
+                "player_out": "Joško Gvardiol",
+                "player_in": "Tyrick Mitchell"
+              }
+            ],
+            "expected_points_cost": 1.4257718228522052,
+            "expected_points_cost_ceiling": 1.4257718228522052,
+            "top100_weight": 40
+          },
+          {
+            "published_path": "advice/8548384/ortak-koru/1/vs-6654210/top100-50.json",
+            "strategy": "ortak-koru",
+            "window": 1,
+            "rival_entry_id": 6654210,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Will Hughes",
+                "player_in": "Pascal Groß"
+              },
+              {
+                "player_out": "Ronald Araujo",
+                "player_in": "Kristoffer Ajer"
+              },
+              {
+                "player_out": "Joško Gvardiol",
+                "player_in": "Tyrick Mitchell"
+              }
+            ],
+            "expected_points_cost": 1.4257718228522052,
+            "expected_points_cost_ceiling": 1.4257718228522052,
+            "top100_weight": 50
+          },
+          {
+            "published_path": "advice/8548384/fark-yarat/1/vs-6654210/top100-5.json",
+            "strategy": "fark-yarat",
+            "window": 1,
+            "rival_entry_id": 6654210,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ronald Araujo",
+                "player_in": "Maxim De Cuyper"
+              },
+              {
+                "player_out": "Joško Gvardiol",
+                "player_in": "Luka Vušković"
+              },
+              {
+                "player_out": "Josh King",
+                "player_in": "Pascal Groß"
+              }
+            ],
+            "expected_points_cost": 7.105427357601002e-15,
+            "expected_points_cost_ceiling": 7.105427357601002e-15,
+            "top100_weight": 5
+          },
+          {
+            "published_path": "advice/8548384/fark-yarat/1/vs-6654210/top100-10.json",
+            "strategy": "fark-yarat",
+            "window": 1,
+            "rival_entry_id": 6654210,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ronald Araujo",
+                "player_in": "Maxim De Cuyper"
+              },
+              {
+                "player_out": "Joško Gvardiol",
+                "player_in": "Luka Vušković"
+              },
+              {
+                "player_out": "Josh King",
+                "player_in": "Pascal Groß"
+              }
+            ],
+            "expected_points_cost": 7.105427357601002e-15,
+            "expected_points_cost_ceiling": 7.105427357601002e-15,
+            "top100_weight": 10
+          },
+          {
+            "published_path": "advice/8548384/fark-yarat/1/vs-6654210/top100-20.json",
+            "strategy": "fark-yarat",
+            "window": 1,
+            "rival_entry_id": 6654210,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ronald Araujo",
+                "player_in": "Maxim De Cuyper"
+              },
+              {
+                "player_out": "Joško Gvardiol",
+                "player_in": "Luka Vušković"
+              },
+              {
+                "player_out": "Josh King",
+                "player_in": "Pascal Groß"
+              }
+            ],
+            "expected_points_cost": 7.105427357601002e-15,
+            "expected_points_cost_ceiling": 7.105427357601002e-15,
+            "top100_weight": 20
+          },
+          {
+            "published_path": "advice/8548384/fark-yarat/1/vs-6654210/top100-30.json",
+            "strategy": "fark-yarat",
+            "window": 1,
+            "rival_entry_id": 6654210,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ronald Araujo",
+                "player_in": "Maxim De Cuyper"
+              },
+              {
+                "player_out": "Joško Gvardiol",
+                "player_in": "Luka Vušković"
+              },
+              {
+                "player_out": "Josh King",
+                "player_in": "Pascal Groß"
+              }
+            ],
+            "expected_points_cost": 7.105427357601002e-15,
+            "expected_points_cost_ceiling": 7.105427357601002e-15,
+            "top100_weight": 30
+          },
+          {
+            "published_path": "advice/8548384/fark-yarat/1/vs-6654210/top100-40.json",
+            "strategy": "fark-yarat",
+            "window": 1,
+            "rival_entry_id": 6654210,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Martin Ødegaard",
+                "player_in": "Pascal Groß"
+              },
+              {
+                "player_out": "Ronald Araujo",
+                "player_in": "Maxim De Cuyper"
+              },
+              {
+                "player_out": "Joško Gvardiol",
+                "player_in": "Riccardo Calafiori"
+              }
+            ],
+            "expected_points_cost": 0.924431289179438,
+            "expected_points_cost_ceiling": 0.924431289179438,
+            "top100_weight": 40
+          },
+          {
+            "published_path": "advice/8548384/fark-yarat/1/vs-6654210/top100-50.json",
+            "strategy": "fark-yarat",
+            "window": 1,
+            "rival_entry_id": 6654210,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Martin Ødegaard",
+                "player_in": "Pascal Groß"
+              },
+              {
+                "player_out": "Ronald Araujo",
+                "player_in": "Maxim De Cuyper"
+              },
+              {
+                "player_out": "Joško Gvardiol",
+                "player_in": "Riccardo Calafiori"
+              }
+            ],
+            "expected_points_cost": 0.924431289179438,
+            "expected_points_cost_ceiling": 0.924431289179438,
+            "top100_weight": 50
+          },
+          {
+            "published_path": "advice/8548384/saf-puan/1/chip-wildcard.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": "wildcard",
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Martin Dubravka",
+                "player_in": "Ellery Balcombe"
+              },
+              {
+                "player_out": "Will Hughes",
+                "player_in": "Pascal Groß"
+              },
+              {
+                "player_out": "Martin Ødegaard",
+                "player_in": "Declan Rice"
+              },
+              {
+                "player_out": "Gabriel dos Santos Magalhães",
+                "player_in": "Jay Dasilva"
+              },
+              {
+                "player_out": "Ronald Araujo",
+                "player_in": "Issa Diop"
+              },
+              {
+                "player_out": "João Pedro Junqueira de Jesus",
+                "player_in": "Francisco Evanilson de Lima Barbosa"
+              },
+              {
+                "player_out": "Joško Gvardiol",
+                "player_in": "Maxim De Cuyper"
+              },
+              {
+                "player_out": "Abdoul Ouattara",
+                "player_in": "Luka Vušković"
+              },
+              {
+                "player_out": "Josh King",
+                "player_in": "Cole Palmer"
+              },
+              {
+                "player_out": "Robinio Vaz",
+                "player_in": "Vakhtang Salia"
+              }
+            ],
+            "expected_points_cost": 0.0
+          },
+          {
+            "published_path": "advice/8548384/saf-puan/1/chip-freehit.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": "freehit",
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Martin Dubravka",
+                "player_in": "Ellery Balcombe"
+              },
+              {
+                "player_out": "Will Hughes",
+                "player_in": "Pascal Groß"
+              },
+              {
+                "player_out": "Martin Ødegaard",
+                "player_in": "Declan Rice"
+              },
+              {
+                "player_out": "Gabriel dos Santos Magalhães",
+                "player_in": "Jay Dasilva"
+              },
+              {
+                "player_out": "Ronald Araujo",
+                "player_in": "Issa Diop"
+              },
+              {
+                "player_out": "João Pedro Junqueira de Jesus",
+                "player_in": "Francisco Evanilson de Lima Barbosa"
+              },
+              {
+                "player_out": "Joško Gvardiol",
+                "player_in": "Maxim De Cuyper"
+              },
+              {
+                "player_out": "Abdoul Ouattara",
+                "player_in": "Luka Vušković"
+              },
+              {
+                "player_out": "Josh King",
+                "player_in": "Cole Palmer"
+              },
+              {
+                "player_out": "Robinio Vaz",
+                "player_in": "Vakhtang Salia"
+              }
+            ],
+            "expected_points_cost": 0.0
+          },
+          {
+            "published_path": "advice/8548384/saf-puan/1/chip-bboost.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": "bboost",
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Martin Dubravka",
+                "player_in": "Bart Verbruggen"
+              },
+              {
+                "player_out": "Will Hughes",
+                "player_in": "Jordan Henderson"
+              },
+              {
+                "player_out": "Joško Gvardiol",
+                "player_in": "Tyrick Mitchell"
+              }
+            ],
+            "expected_points_cost": 0.0
+          }
+        ]
+      },
+      {
+        "gameweek": 7,
+        "status": "available",
+        "reason": null,
+        "deadline_utc": "2026-10-17T10:00:00Z",
+        "advice_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd",
+        "advice_captured_at_utc": "2026-10-16T06:01:54.275749Z",
+        "advice_generated_at_utc": "2026-10-16T07:13:49Z",
+        "advice_sha256": "36ec8d0329ceb0ce7db5fd5f26aba1c19dba19306973eacbe5969ac558561fda",
+        "outcome_snapshot_id": "fpl-live-20261023T111647Z-a2cd55fde426",
+        "outcome_captured_at_utc": "2026-10-23T11:16:47.162538Z",
+        "expected_own_points": 56.28227061445796,
+        "suggested": {
+          "gross_points": 66.0,
+          "transfer_hit_points": 0.0,
+          "net_points": 66.0,
+          "captain_bonus_points": 13.0,
+          "autosub_points": 0.0,
+          "chip": null
+        },
+        "actual": {
+          "gross_points": 65.0,
+          "transfer_hit_points": 0.0,
+          "net_points": 65.0,
+          "details": {
+            "source_snapshot_id": "fpl-live-20261023T111647Z-a2cd55fde426",
+            "captain": {
+              "player_id": 223094,
+              "name": "Haaland",
+              "points": 13.0,
+              "multiplier": 2,
+              "counted_points": 26.0
+            },
+            "transfers": []
+          }
+        },
+        "actual_reason": null,
+        "net_difference": 1.0,
+        "players": [
+          {
+            "player_id": 154561,
+            "name": "David Raya Martín",
+            "position": "GK",
+            "role": "starter",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 3.568590651677484,
+            "realized_points": 9.0,
+            "minutes": 90,
+            "multiplier": 1,
+            "counted_points": 9.0,
+            "forecast_error": 5.431409348322516
+          },
+          {
+            "player_id": 17761,
+            "name": "James Tarkowski",
+            "position": "DEF",
+            "role": "starter",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 4.323742971600514,
+            "realized_points": 0.0,
+            "minutes": 90,
+            "multiplier": 1,
+            "counted_points": 0.0,
+            "forecast_error": -4.323742971600514
+          },
+          {
+            "player_id": 226597,
+            "name": "Gabriel dos Santos Magalhães",
+            "position": "DEF",
+            "role": "starter",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 4.142429251761448,
+            "realized_points": 8.0,
+            "minutes": 90,
+            "multiplier": 1,
+            "counted_points": 8.0,
+            "forecast_error": 3.857570748238552
+          },
+          {
+            "player_id": 97032,
+            "name": "Virgil van Dijk",
+            "position": "DEF",
+            "role": "starter",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 3.6124177067591026,
+            "realized_points": 4.0,
+            "minutes": 90,
+            "multiplier": 1,
+            "counted_points": 4.0,
+            "forecast_error": 0.38758229324089744
+          },
+          {
+            "player_id": 477424,
+            "name": "Joško Gvardiol",
+            "position": "DEF",
+            "role": "starter",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 3.5709926541899657,
+            "realized_points": 0.0,
+            "minutes": 29,
+            "multiplier": 1,
+            "counted_points": 0.0,
+            "forecast_error": -3.5709926541899657
+          },
+          {
+            "player_id": 60307,
+            "name": "Pascal Groß",
+            "position": "MID",
+            "role": "starter",
+            "captain": false,
+            "vice_captain": true,
+            "expected_points": 4.658321948335153,
+            "realized_points": 5.0,
+            "minutes": 70,
+            "multiplier": 1,
+            "counted_points": 5.0,
+            "forecast_error": 0.34167805166484744
+          },
+          {
+            "player_id": 244850,
+            "name": "Morgan Rogers",
+            "position": "MID",
+            "role": "starter",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 4.396159996403696,
+            "realized_points": 2.0,
+            "minutes": 90,
+            "multiplier": 1,
+            "counted_points": 2.0,
+            "forecast_error": -2.3961599964036964
+          },
+          {
+            "player_id": 446008,
+            "name": "Bryan Mbeumo",
+            "position": "MID",
+            "role": "starter",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 4.380344943521542,
+            "realized_points": 8.0,
+            "minutes": 90,
+            "multiplier": 1,
+            "counted_points": 8.0,
+            "forecast_error": 3.619655056478458
+          },
+          {
+            "player_id": 577725,
+            "name": "Josh King",
+            "position": "MID",
+            "role": "starter",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 3.1261265197771366,
+            "realized_points": 2.0,
+            "minutes": 77,
+            "multiplier": 1,
+            "counted_points": 2.0,
+            "forecast_error": -1.1261265197771366
+          },
+          {
+            "player_id": 223094,
+            "name": "Erling Haaland",
+            "position": "FWD",
+            "role": "starter",
+            "captain": true,
+            "vice_captain": false,
+            "expected_points": 8.35545188174385,
+            "realized_points": 13.0,
+            "minutes": 90,
+            "multiplier": 2,
+            "counted_points": 26.0,
+            "forecast_error": 4.64454811825615
+          },
+          {
+            "player_id": 475168,
+            "name": "João Pedro Junqueira de Jesus",
+            "position": "FWD",
+            "role": "starter",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 3.7922402069442094,
+            "realized_points": 2.0,
+            "minutes": 90,
+            "multiplier": 1,
+            "counted_points": 2.0,
+            "forecast_error": -1.7922402069442094
+          },
+          {
+            "player_id": 67089,
+            "name": "Martin Dubravka",
+            "position": "GK",
+            "role": "bench",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 0.10027015579447286,
+            "realized_points": 0.0,
+            "minutes": 0,
+            "multiplier": 0,
+            "counted_points": 0.0,
+            "forecast_error": -0.10027015579447286
+          },
+          {
+            "player_id": 572584,
+            "name": "Abdoul Ouattara",
+            "position": "DEF",
+            "role": "bench",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 1.818135117880343,
+            "realized_points": 3.0,
+            "minutes": 90,
+            "multiplier": 0,
+            "counted_points": 0.0,
+            "forecast_error": 1.181864882119657
+          },
+          {
+            "player_id": 631000,
+            "name": "Robinio Vaz",
+            "position": "FWD",
+            "role": "bench",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 1.4360463353246202,
+            "realized_points": 1.0,
+            "minutes": 22,
+            "multiplier": 0,
+            "counted_points": 0.0,
+            "forecast_error": -0.4360463353246202
+          },
+          {
+            "player_id": 108413,
+            "name": "Will Hughes",
+            "position": "MID",
+            "role": "bench",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 0.3340953606020245,
+            "realized_points": 1.0,
+            "minutes": 9,
+            "multiplier": 0,
+            "counted_points": 0.0,
+            "forecast_error": 0.6659046393979755
+          }
+        ],
         "recorded_plans": [
           {
             "published_path": "advice/8548384/saf-puan/1.json",
@@ -779,8 +1859,8 @@
         "advice_captured_at_utc": "2026-10-10T03:57:32.746463Z",
         "advice_generated_at_utc": "2026-10-10T06:07:04Z",
         "advice_sha256": "078d8273ecc3aad2d223ea3ae0fc519dec16028576db4b178a93890ebc9a1b82",
-        "outcome_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd",
-        "outcome_captured_at_utc": "2026-10-16T06:01:54.275749Z",
+        "outcome_snapshot_id": "fpl-live-20261023T111647Z-a2cd55fde426",
+        "outcome_captured_at_utc": "2026-10-23T11:16:47.162538Z",
         "expected_own_points": 55.851408028923146,
         "suggested": {
           "gross_points": 57.0,
@@ -1643,8 +2723,8 @@
         "advice_captured_at_utc": "2026-09-18T12:25:16.241963Z",
         "advice_generated_at_utc": "2026-09-18T14:05:59Z",
         "advice_sha256": "6d9934d94df23350433b8be24db958ab21d087d6775d5b1b9c9dc693cc564728",
-        "outcome_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd",
-        "outcome_captured_at_utc": "2026-10-16T06:01:54.275749Z",
+        "outcome_snapshot_id": "fpl-live-20261023T111647Z-a2cd55fde426",
+        "outcome_captured_at_utc": "2026-10-23T11:16:47.162538Z",
         "expected_own_points": 56.40185326010834,
         "suggested": {
           "gross_points": 62.0,
@@ -1915,8 +2995,8 @@
         "advice_captured_at_utc": "2026-09-12T10:00:00.227050Z",
         "advice_generated_at_utc": "2026-09-12T10:50:08Z",
         "advice_sha256": "93a12668b6b8e292e3716dbc9de407a2244caf5536170225dbf04020f1dfa37f",
-        "outcome_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd",
-        "outcome_captured_at_utc": "2026-10-16T06:01:54.275749Z",
+        "outcome_snapshot_id": "fpl-live-20261023T111647Z-a2cd55fde426",
+        "outcome_captured_at_utc": "2026-10-23T11:16:47.162538Z",
         "expected_own_points": 55.66145744298164,
         "suggested": {
           "gross_points": 90.0,

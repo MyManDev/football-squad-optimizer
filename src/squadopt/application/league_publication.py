@@ -108,8 +108,11 @@ class LeaguePublicationRequest:
     #: Explicit prospective inputs; current-season rows come from the named capture.
     #: None preserves the existing archive policy.
     training_seasons: tuple[str, ...] | None = None
+    menu: str = "full"
 
     def __post_init__(self) -> None:
+        if self.menu not in ("full", "device"):
+            raise ValueError("A league menu is full or device.")
         if self.training_seasons is not None:
             explicit_archive_seasons(self.training_seasons)
 
@@ -287,10 +290,13 @@ def publish_league(
     on_mode_paths: Callable[[ModePathsSummary], None] | None = None,
     beside: Sequence[PublishedLeague] = (),
     read_capture: Callable[[Path, str], CapturedSnapshot] | None = None,
+    on_stage: Callable[[str], None] | None = None,
 ) -> LeaguePublicationResult:
     """Publish the existing contracts; callbacks observe progress without owning the work."""
 
     prepared = prepare_league_publication(request, read_capture=read_capture)
+    if on_stage is not None:
+        on_stage("prepared")
     if on_prepared is not None:
         on_prepared(prepared)
     return publish_prepared_league(
@@ -299,11 +305,20 @@ def publish_league(
         on_mode_paths=on_mode_paths,
         beside=beside,
         read_capture=read_capture,
+        on_stage=on_stage,
     )
 
 
-def load_publication_manager_words(request: LeaguePublicationRequest) -> ManagerWords | None:
-    """The manager's word for this publication, or ``None`` when it names no evidence."""
+def load_publication_manager_words(
+    request: LeaguePublicationRequest,
+    *,
+    read_capture: Callable[[Path, str], CapturedSnapshot] | None = None,
+) -> ManagerWords | None:
+    """The manager's word for this publication, or ``None`` when it names no evidence.
+
+    ``read_capture`` is the publication's capture reader, so a weekly run's leagues read the
+    club-news and roster captures once between them rather than once per league.
+    """
 
     if request.rotation_evidence is None and request.club_news_source is None:
         return None
@@ -316,6 +331,7 @@ def load_publication_manager_words(request: LeaguePublicationRequest) -> Manager
         request.rotation_evidence,
         club_news_source=request.club_news_source,
         snapshot_root=request.snapshot_root,
+        read_capture=read_capture,
     )
 
 
@@ -647,6 +663,7 @@ def publish_prepared_league(
     on_mode_paths: Callable[[ModePathsSummary], None] | None = None,
     beside: Sequence[PublishedLeague] = (),
     read_capture: Callable[[Path, str], CapturedSnapshot] | None = None,
+    on_stage: Callable[[str], None] | None = None,
 ) -> LeaguePublicationResult:
     """Complete a prepared publication without rereading a possibly changing selector.
 
@@ -666,8 +683,10 @@ def publish_prepared_league(
     )
     in_season = read_projection_handoff(request.handoff_path) if request.handoff_path else None
     projection = project(inputs, panel, in_season=in_season)
+    if on_stage is not None:
+        on_stage("projection")
     mode_paths = None
-    if request.mode_residuals:
+    if request.mode_residuals and request.menu == "full":
         history = load_residual_history(request.mode_residuals)
         mode_paths = build_mode_paths(
             projection,
@@ -688,7 +707,7 @@ def publish_prepared_league(
     # or writes the league's path, so its histories carry over.
     legacy = settle_legacy_tree(site_data, (request.league_id,))
     out_dir = league_tree_dir(site_data, request.league_id)
-    manager_words = load_publication_manager_words(request)
+    manager_words = load_publication_manager_words(request, read_capture=read_capture)
     if manager_words is not None and (manager_words.season, manager_words.gameweek) != (
         season,
         int(inputs.deadline.gameweek),
@@ -739,13 +758,16 @@ def publish_prepared_league(
             panel=panel,
             in_season=in_season,
         ),
-        advice_record_root=request.record_root,
+        advice_record_root=request.record_root if request.menu == "full" else None,
         now=request.now,
         manager_words=manager_words,
         top100_counts=top100_counts,
         top100_unavailable_reason=top100_reason,
         chip_forecast_source=forecast_source(snapshot),
+        device_only=request.menu == "device",
     )
+    if on_stage is not None:
+        on_stage("members")
     outputs = [out_dir / name for name in report.files]
     table_file = write_device_plan_table(
         site_data,
@@ -771,7 +793,7 @@ def publish_prepared_league(
                 read_capture=read_capture,
             )
         )
-    if request.record_root is not None:
+    if request.record_root is not None and request.menu == "full":
         for member in report.members:
             if member.rendered:
                 directory = record_directory(
@@ -806,6 +828,8 @@ def publish_prepared_league(
     # Keeping its intermediate bytes among the league outputs would invalidate the
     # completed journal when that later stage updates the retained scoreboard.
     record_tree_identity(out_dir, source_snapshot_id=request.snapshot_id)
+    if on_stage is not None:
+        on_stage("publication")
     return LeaguePublicationResult(
         snapshot_id=request.snapshot_id,
         season=season,

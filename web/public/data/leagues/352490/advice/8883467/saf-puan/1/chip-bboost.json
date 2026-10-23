@@ -1,37 +1,56 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-10-16T07:13:49Z",
+  "generated_at_utc": "2026-10-23T12:40:33Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
-    "gameweek": 7,
+    "gameweek": 8,
     "entry_id": 8883467,
     "league_id": 352490,
     "mode": "saf-puan",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd",
+    "source_snapshot_id": "fpl-live-20261023T111647Z-a2cd55fde426",
     "moves": [
       {
-        "move_id": "gw07-1",
+        "move_id": "gw08-1",
         "player_out": {
-          "player_id": 169432,
-          "name": "Oli McBurnie",
-          "short_name": "McBurnie",
-          "position": "FWD",
-          "team": "Hull City"
+          "player_id": 204580,
+          "name": "Vitaly Janelt",
+          "short_name": "Janelt",
+          "position": "MID",
+          "team": "Brentford"
         },
         "player_in": {
-          "player_id": 444102,
-          "name": "Francisco Evanilson de Lima Barbosa",
-          "short_name": "Barbosa",
-          "position": "FWD",
-          "team": "Bournemouth"
+          "player_id": 209400,
+          "name": "Daichi Kamada",
+          "short_name": "Kamada",
+          "position": "MID",
+          "team": "Crystal Palace"
         },
-        "expected_points_delta": 0.927828857026725,
+        "expected_points_delta": 3.204463919421883,
         "reason_code": "points_gain"
       },
       {
-        "move_id": "gw07-2",
+        "move_id": "gw08-2",
+        "player_out": {
+          "player_id": 448047,
+          "name": "Enzo Fern\u00e1ndez",
+          "short_name": "Fern\u00e1ndez",
+          "position": "MID",
+          "team": "Man City"
+        },
+        "player_in": {
+          "player_id": 247632,
+          "name": "Pedro Lomba Neto",
+          "short_name": "Neto",
+          "position": "MID",
+          "team": "Chelsea"
+        },
+        "expected_points_delta": 0.7197120203335317,
+        "reason_code": "points_gain"
+      },
+      {
+        "move_id": "gw08-3",
         "player_out": {
           "player_id": 491279,
           "name": "Micky van de Ven",
@@ -40,31 +59,31 @@
           "team": "Spurs"
         },
         "player_in": {
-          "player_id": 154043,
-          "name": "Ainsley Maitland-Niles",
-          "short_name": "Maitland-Niles",
+          "player_id": 610799,
+          "name": "Luka Vu\u0161kovi\u0107",
+          "short_name": "Vu\u0161kovi\u0107",
           "position": "DEF",
-          "team": "Everton"
+          "team": "Brighton"
         },
-        "expected_points_delta": 1.0369128229201152,
+        "expected_points_delta": 1.2905234679056008,
         "reason_code": "points_gain"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 1.9647416799468402,
+    "expected_gain_vs_hold": 5.214699407661016,
     "expected_points_cost": 0.0,
     "rival_label": null,
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
     "wall_clock_stopped_the_search": false,
-    "expected_own_points": 68.50262129305506,
+    "expected_own_points": 67.21498919415637,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
       "short_name": "Haaland",
       "position": "FWD",
       "team": "Man City",
-      "expected_points": 8.35545188174385
+      "expected_points": 8.11765453618748
     },
     "vice_captain": {
       "player_id": 244851,
@@ -72,7 +91,7 @@
       "short_name": "Palmer",
       "position": "MID",
       "team": "Chelsea",
-      "expected_points": 4.960279398950454
+      "expected_points": 5.136799837039665
     },
     "starting_xi": [
       {
@@ -81,7 +100,7 @@
         "short_name": "Mart\u00edn",
         "position": "GK",
         "team": "Arsenal",
-        "expected_points": 3.568590651677484
+        "expected_points": 3.8753293988407767
       },
       {
         "player_id": 226597,
@@ -89,7 +108,7 @@
         "short_name": "Magalh\u00e3es",
         "position": "DEF",
         "team": "Arsenal",
-        "expected_points": 4.142429251761448
+        "expected_points": 4.423923916856849
       },
       {
         "player_id": 209036,
@@ -97,15 +116,7 @@
         "short_name": "Gu\u00e9hi",
         "position": "DEF",
         "team": "Man City",
-        "expected_points": 3.7663770866004564
-      },
-      {
-        "player_id": 154043,
-        "name": "Ainsley Maitland-Niles",
-        "short_name": "Maitland-Niles",
-        "position": "DEF",
-        "team": "Everton",
-        "expected_points": 3.7238127105475085
+        "expected_points": 3.393374652690792
       },
       {
         "player_id": 191866,
@@ -113,7 +124,7 @@
         "short_name": "Ajer",
         "position": "DEF",
         "team": "Brentford",
-        "expected_points": 2.921268919302201
+        "expected_points": 2.6612206839517722
       },
       {
         "player_id": 244851,
@@ -121,7 +132,7 @@
         "short_name": "Palmer",
         "position": "MID",
         "team": "Chelsea",
-        "expected_points": 4.960279398950454
+        "expected_points": 5.136799837039665
       },
       {
         "player_id": 60307,
@@ -129,7 +140,15 @@
         "short_name": "Gro\u00df",
         "position": "MID",
         "team": "Brighton",
-        "expected_points": 4.658321948335153
+        "expected_points": 4.02517634297332
+      },
+      {
+        "player_id": 247632,
+        "name": "Pedro Lomba Neto",
+        "short_name": "Neto",
+        "position": "MID",
+        "team": "Chelsea",
+        "expected_points": 3.9829891512725832
       },
       {
         "player_id": 122806,
@@ -137,15 +156,15 @@
         "short_name": "McGinn",
         "position": "MID",
         "team": "Aston Villa",
-        "expected_points": 3.2579034657859856
+        "expected_points": 3.2965376393753685
       },
       {
-        "player_id": 204580,
-        "name": "Vitaly Janelt",
-        "short_name": "Janelt",
+        "player_id": 209400,
+        "name": "Daichi Kamada",
+        "short_name": "Kamada",
         "position": "MID",
-        "team": "Brentford",
-        "expected_points": 3.1589017402323263
+        "team": "Crystal Palace",
+        "expected_points": 3.204463919421886
       },
       {
         "player_id": 223094,
@@ -153,15 +172,15 @@
         "short_name": "Haaland",
         "position": "FWD",
         "team": "Man City",
-        "expected_points": 8.35545188174385
+        "expected_points": 8.11765453618748
       },
       {
-        "player_id": 444102,
-        "name": "Francisco Evanilson de Lima Barbosa",
-        "short_name": "Barbosa",
+        "player_id": 169432,
+        "name": "Oli McBurnie",
+        "short_name": "McBurnie",
         "position": "FWD",
-        "team": "Bournemouth",
-        "expected_points": 3.603362387490448
+        "team": "Hull City",
+        "expected_points": 2.985981352100305
       }
     ],
     "bench": [
@@ -171,7 +190,7 @@
         "short_name": "Tzolakis",
         "position": "GK",
         "team": "Hull City",
-        "expected_points": 2.8518327944307034
+        "expected_points": 2.968799011023501
       },
       {
         "player_id": 475168,
@@ -179,7 +198,15 @@
         "short_name": "Jesus",
         "position": "FWD",
         "team": "Chelsea",
-        "expected_points": 3.7922402069442094
+        "expected_points": 3.716556619258811
+      },
+      {
+        "player_id": 610799,
+        "name": "Luka Vu\u0161kovi\u0107",
+        "short_name": "Vu\u0161kovi\u0107",
+        "position": "DEF",
+        "team": "Brighton",
+        "expected_points": 3.699975550028694
       },
       {
         "player_id": 465730,
@@ -187,15 +214,7 @@
         "short_name": "Cuyper",
         "position": "DEF",
         "team": "Brighton",
-        "expected_points": 3.7099911306959767
-      },
-      {
-        "player_id": 448047,
-        "name": "Enzo Fern\u00e1ndez",
-        "short_name": "Fern\u00e1ndez",
-        "position": "MID",
-        "team": "Man City",
-        "expected_points": 3.676405836813
+        "expected_points": 3.6085520469470964
       }
     ],
     "chip": "bboost",
@@ -210,7 +229,7 @@
     "control_optimality_gap": 0.0,
     "chip_choice": {
       "chip": "bboost",
-      "gain_vs_no_chip": 11.548173110229513,
+      "gain_vs_no_chip": 11.069911796083332,
       "basis": "one_week_expected_points_v1",
       "windows_left": {
         "first_half": {
