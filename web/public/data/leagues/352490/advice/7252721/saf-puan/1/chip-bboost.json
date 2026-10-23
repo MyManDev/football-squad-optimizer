@@ -1,18 +1,18 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-10-16T07:13:49Z",
+  "generated_at_utc": "2026-10-23T12:40:33Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
-    "gameweek": 7,
+    "gameweek": 8,
     "entry_id": 7252721,
     "league_id": 352490,
     "mode": "saf-puan",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd",
+    "source_snapshot_id": "fpl-live-20261023T111647Z-a2cd55fde426",
     "moves": [
       {
-        "move_id": "gw07-1",
+        "move_id": "gw08-1",
         "player_out": {
           "player_id": 67089,
           "name": "Martin Dubravka",
@@ -21,48 +21,67 @@
           "team": "Spurs"
         },
         "player_in": {
-          "player_id": 154561,
-          "name": "David Raya Mart\u00edn",
-          "short_name": "Mart\u00edn",
+          "player_id": 116535,
+          "name": "Alisson Becker",
+          "short_name": "Becker",
           "position": "GK",
-          "team": "Arsenal"
+          "team": "Liverpool"
         },
-        "expected_points_delta": 3.468320495883006,
+        "expected_points_delta": 3.455977176581989,
+        "reason_code": "points_gain"
+      },
+      {
+        "move_id": "gw08-2",
+        "player_out": {
+          "player_id": 437730,
+          "name": "Antoine Semenyo",
+          "short_name": "Semenyo",
+          "position": "MID",
+          "team": "Man City"
+        },
+        "player_in": {
+          "player_id": 244851,
+          "name": "Cole Palmer",
+          "short_name": "Palmer",
+          "position": "MID",
+          "team": "Chelsea"
+        },
+        "expected_points_delta": 5.136799837039661,
         "reason_code": "points_gain"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 3.468320495883006,
+    "expected_gain_vs_hold": 8.59277701362165,
     "expected_points_cost": 0.0,
     "rival_label": null,
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
     "wall_clock_stopped_the_search": false,
-    "expected_own_points": 66.20645352384656,
+    "expected_own_points": 62.73937333400801,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
       "short_name": "Haaland",
       "position": "FWD",
       "team": "Man City",
-      "expected_points": 8.35545188174385
+      "expected_points": 8.11765453618748
     },
     "vice_captain": {
-      "player_id": 437730,
-      "name": "Antoine Semenyo",
-      "short_name": "Semenyo",
+      "player_id": 244851,
+      "name": "Cole Palmer",
+      "short_name": "Palmer",
       "position": "MID",
-      "team": "Man City",
-      "expected_points": 5.047195818515282
+      "team": "Chelsea",
+      "expected_points": 5.136799837039665
     },
     "starting_xi": [
       {
-        "player_id": 154561,
-        "name": "David Raya Mart\u00edn",
-        "short_name": "Mart\u00edn",
+        "player_id": 116535,
+        "name": "Alisson Becker",
+        "short_name": "Becker",
         "position": "GK",
-        "team": "Arsenal",
-        "expected_points": 3.568590651677484
+        "team": "Liverpool",
+        "expected_points": 3.538037943386638
       },
       {
         "player_id": 465730,
@@ -70,7 +89,7 @@
         "short_name": "Cuyper",
         "position": "DEF",
         "team": "Brighton",
-        "expected_points": 3.7099911306959767
+        "expected_points": 3.6085520469470964
       },
       {
         "player_id": 244723,
@@ -78,15 +97,7 @@
         "short_name": "Mitchell",
         "position": "DEF",
         "team": "Crystal Palace",
-        "expected_points": 2.742248299250839
-      },
-      {
-        "player_id": 146426,
-        "name": "Semi Ajayi",
-        "short_name": "Ajayi",
-        "position": "DEF",
-        "team": "Hull City",
-        "expected_points": 2.25764101727074
+        "expected_points": 3.054926040886713
       },
       {
         "player_id": 219924,
@@ -94,39 +105,23 @@
         "short_name": "Diop",
         "position": "DEF",
         "team": "Ipswich Town",
-        "expected_points": 2.1748575911872456
+        "expected_points": 2.4570219766484747
       },
       {
-        "player_id": 437730,
-        "name": "Antoine Semenyo",
-        "short_name": "Semenyo",
-        "position": "MID",
-        "team": "Man City",
-        "expected_points": 5.047195818515282
+        "player_id": 146426,
+        "name": "Semi Ajayi",
+        "short_name": "Ajayi",
+        "position": "DEF",
+        "team": "Hull City",
+        "expected_points": 2.4448758024171586
       },
       {
-        "player_id": 60307,
-        "name": "Pascal Gro\u00df",
-        "short_name": "Gro\u00df",
-        "position": "MID",
-        "team": "Brighton",
-        "expected_points": 4.658321948335153
-      },
-      {
-        "player_id": 222531,
-        "name": "Morgan Gibbs-White",
-        "short_name": "Gibbs-White",
-        "position": "MID",
-        "team": "Nott'm Forest",
-        "expected_points": 4.637008159112412
-      },
-      {
-        "player_id": 244850,
-        "name": "Morgan Rogers",
-        "short_name": "Rogers",
+        "player_id": 244851,
+        "name": "Cole Palmer",
+        "short_name": "Palmer",
         "position": "MID",
         "team": "Chelsea",
-        "expected_points": 4.396159996403696
+        "expected_points": 5.136799837039665
       },
       {
         "player_id": 446008,
@@ -134,7 +129,31 @@
         "short_name": "Mbeumo",
         "position": "MID",
         "team": "Man Utd",
-        "expected_points": 4.380344943521542
+        "expected_points": 4.6615011141503295
+      },
+      {
+        "player_id": 244850,
+        "name": "Morgan Rogers",
+        "short_name": "Rogers",
+        "position": "MID",
+        "team": "Chelsea",
+        "expected_points": 4.588260940007448
+      },
+      {
+        "player_id": 60307,
+        "name": "Pascal Gro\u00df",
+        "short_name": "Gro\u00df",
+        "position": "MID",
+        "team": "Brighton",
+        "expected_points": 4.02517634297332
+      },
+      {
+        "player_id": 222531,
+        "name": "Morgan Gibbs-White",
+        "short_name": "Gibbs-White",
+        "position": "MID",
+        "team": "Nott'm Forest",
+        "expected_points": 3.0840530006652447
       },
       {
         "player_id": 223094,
@@ -142,7 +161,7 @@
         "short_name": "Haaland",
         "position": "FWD",
         "team": "Man City",
-        "expected_points": 8.35545188174385
+        "expected_points": 8.11765453618748
       }
     ],
     "bench": [
@@ -152,7 +171,7 @@
         "short_name": "Verbruggen",
         "position": "GK",
         "team": "Brighton",
-        "expected_points": 3.2480295284625815
+        "expected_points": 3.0938051044078216
       },
       {
         "player_id": 475168,
@@ -160,7 +179,7 @@
         "short_name": "Jesus",
         "position": "FWD",
         "team": "Chelsea",
-        "expected_points": 3.7922402069442094
+        "expected_points": 3.716556619258811
       },
       {
         "player_id": 477424,
@@ -168,7 +187,7 @@
         "short_name": "Gvardiol",
         "position": "DEF",
         "team": "Man City",
-        "expected_points": 3.5709926541899657
+        "expected_points": 2.7641183178030695
       },
       {
         "player_id": 661313,
@@ -176,7 +195,7 @@
         "short_name": "Angulo",
         "position": "FWD",
         "team": "Sunderland",
-        "expected_points": 1.3119278147917366
+        "expected_points": 0.3303791750412521
       }
     ],
     "chip": "bboost",
@@ -191,7 +210,7 @@
     "control_optimality_gap": 0.0,
     "chip_choice": {
       "chip": "bboost",
-      "gain_vs_no_chip": 7.731522402577539,
+      "gain_vs_no_chip": 6.949542385058116,
       "basis": "one_week_expected_points_v1",
       "windows_left": {
         "first_half": {

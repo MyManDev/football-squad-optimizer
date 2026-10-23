@@ -1,18 +1,18 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-10-16T07:13:49Z",
+  "generated_at_utc": "2026-10-23T12:40:33Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
-    "gameweek": 7,
+    "gameweek": 8,
     "entry_id": 6880255,
     "league_id": 352490,
     "mode": "ortak-koru",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd",
+    "source_snapshot_id": "fpl-live-20261023T111647Z-a2cd55fde426",
     "moves": [
       {
-        "move_id": "gw07-1",
+        "move_id": "gw08-1",
         "player_out": {
           "player_id": 106760,
           "name": "Luke Shaw",
@@ -21,17 +21,17 @@
           "team": "Man Utd"
         },
         "player_in": {
-          "player_id": 477424,
-          "name": "Jo\u0161ko Gvardiol",
-          "short_name": "Gvardiol",
+          "player_id": 199798,
+          "name": "Ezri Konsa Ngoyo",
+          "short_name": "Ngoyo",
           "position": "DEF",
-          "team": "Man City"
+          "team": "Arsenal"
         },
-        "expected_points_delta": 2.4473229112251857,
+        "expected_points_delta": 2.7996663995909543,
         "reason_code": "mode_tradeoff"
       },
       {
-        "move_id": "gw07-2",
+        "move_id": "gw08-2",
         "player_out": {
           "player_id": 219168,
           "name": "Alexander Isak",
@@ -46,11 +46,11 @@
           "position": "FWD",
           "team": "Newcastle"
         },
-        "expected_points_delta": 1.1723940532890538,
+        "expected_points_delta": -1.5746265103821528,
         "reason_code": "mode_tradeoff"
       },
       {
-        "move_id": "gw07-3",
+        "move_id": "gw08-3",
         "player_out": {
           "player_id": 449434,
           "name": "Anthony Elanga",
@@ -59,31 +59,50 @@
           "team": "Newcastle"
         },
         "player_in": {
+          "player_id": 60307,
+          "name": "Pascal Gro\u00df",
+          "short_name": "Gro\u00df",
+          "position": "MID",
+          "team": "Brighton"
+        },
+        "expected_points_delta": 1.5681543663248476,
+        "reason_code": "mode_tradeoff"
+      },
+      {
+        "move_id": "gw08-4",
+        "player_out": {
+          "player_id": 508395,
+          "name": "Yehor Yarmoliuk",
+          "short_name": "Yarmoliuk",
+          "position": "MID",
+          "team": "Brentford"
+        },
+        "player_in": {
           "player_id": 244850,
           "name": "Morgan Rogers",
           "short_name": "Rogers",
           "position": "MID",
           "team": "Chelsea"
         },
-        "expected_points_delta": 1.8433508254436077,
+        "expected_points_delta": 1.7881851918034073,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 5.463067789957847,
-    "expected_points_cost": 1.826151351002622,
+    "expected_gain_vs_hold": 4.581379447337056,
+    "expected_points_cost": 1.0536604378914234,
     "rival_label": "entry-2281624",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
     "wall_clock_stopped_the_search": false,
-    "expected_own_points": 54.462734302469514,
+    "expected_own_points": 53.82869891145241,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
       "short_name": "Haaland",
       "position": "FWD",
       "team": "Man City",
-      "expected_points": 8.35545188174385
+      "expected_points": 8.11765453618748
     },
     "vice_captain": {
       "player_id": 141746,
@@ -91,7 +110,7 @@
       "short_name": "Fernandes",
       "position": "MID",
       "team": "Man Utd",
-      "expected_points": 6.012000284303428
+      "expected_points": 5.660179884785022
     },
     "starting_xi": [
       {
@@ -100,7 +119,7 @@
         "short_name": "Verbruggen",
         "position": "GK",
         "team": "Brighton",
-        "expected_points": 3.2480295284625815
+        "expected_points": 3.0938051044078216
       },
       {
         "player_id": 226597,
@@ -108,15 +127,15 @@
         "short_name": "Magalh\u00e3es",
         "position": "DEF",
         "team": "Arsenal",
-        "expected_points": 4.142429251761448
+        "expected_points": 4.423923916856849
       },
       {
-        "player_id": 477424,
-        "name": "Jo\u0161ko Gvardiol",
-        "short_name": "Gvardiol",
+        "player_id": 199798,
+        "name": "Ezri Konsa Ngoyo",
+        "short_name": "Ngoyo",
         "position": "DEF",
-        "team": "Man City",
-        "expected_points": 3.5709926541899657
+        "team": "Arsenal",
+        "expected_points": 3.089966731709672
       },
       {
         "player_id": 469142,
@@ -124,7 +143,7 @@
         "short_name": "Hecke",
         "position": "DEF",
         "team": "Spurs",
-        "expected_points": 3.3062096448282863
+        "expected_points": 3.0499596004453253
       },
       {
         "player_id": 141746,
@@ -132,7 +151,7 @@
         "short_name": "Fernandes",
         "position": "MID",
         "team": "Man Utd",
-        "expected_points": 6.012000284303428
+        "expected_points": 5.660179884785022
       },
       {
         "player_id": 244850,
@@ -140,7 +159,15 @@
         "short_name": "Rogers",
         "position": "MID",
         "team": "Chelsea",
-        "expected_points": 4.396159996403696
+        "expected_points": 4.588260940007448
+      },
+      {
+        "player_id": 60307,
+        "name": "Pascal Gro\u00df",
+        "short_name": "Gro\u00df",
+        "position": "MID",
+        "team": "Brighton",
+        "expected_points": 4.02517634297332
       },
       {
         "player_id": 184029,
@@ -148,7 +175,7 @@
         "short_name": "\u00d8degaard",
         "position": "MID",
         "team": "Arsenal",
-        "expected_points": 3.3818815752983595
+        "expected_points": 3.7050117630130073
       },
       {
         "player_id": 514254,
@@ -156,7 +183,7 @@
         "short_name": "Amarilla",
         "position": "MID",
         "team": "Brighton",
-        "expected_points": 3.195907550097591
+        "expected_points": 3.0669208782006234
       },
       {
         "player_id": 223094,
@@ -164,15 +191,7 @@
         "short_name": "Haaland",
         "position": "FWD",
         "team": "Man City",
-        "expected_points": 8.35545188174385
-      },
-      {
-        "player_id": 216646,
-        "name": "Yoane Wissa",
-        "short_name": "Wissa",
-        "position": "FWD",
-        "team": "Newcastle",
-        "expected_points": 3.347251644476302
+        "expected_points": 8.11765453618748
       },
       {
         "player_id": 551466,
@@ -180,7 +199,7 @@
         "short_name": "Garc\u00eda",
         "position": "FWD",
         "team": "Fulham",
-        "expected_points": 3.15096840916015
+        "expected_points": 2.8901846766783668
       }
     ],
     "bench": [
@@ -190,15 +209,15 @@
         "short_name": "Dubravka",
         "position": "GK",
         "team": "Spurs",
-        "expected_points": 0.10027015579447286
+        "expected_points": 0.08206076680465356
       },
       {
-        "player_id": 508395,
-        "name": "Yehor Yarmoliuk",
-        "short_name": "Yarmoliuk",
-        "position": "MID",
-        "team": "Brentford",
-        "expected_points": 2.552809170960097
+        "player_id": 216646,
+        "name": "Yoane Wissa",
+        "short_name": "Wissa",
+        "position": "FWD",
+        "team": "Newcastle",
+        "expected_points": 2.800075748204037
       },
       {
         "player_id": 219924,
@@ -206,7 +225,7 @@
         "short_name": "Diop",
         "position": "DEF",
         "team": "Ipswich Town",
-        "expected_points": 2.1748575911872456
+        "expected_points": 2.4570219766484747
       },
       {
         "player_id": 167512,
@@ -214,7 +233,7 @@
         "short_name": "O'Nien",
         "position": "DEF",
         "team": "Sunderland",
-        "expected_points": 0.07797659864353394
+        "expected_points": 0.290300332118716
       }
     ],
     "chip": null,
@@ -226,9 +245,8 @@
     "missing_fields": [],
     "squad_basis": "captured",
     "rival_entry_id": 2281624,
-    "expected_points_cost_ceiling": 1.826151351002622,
     "overlap_count": 6,
-    "transfer_cap": 3,
+    "transfer_cap": 4,
     "overlap_target": 9,
     "overlap_applied": 6,
     "plan_kind": "within_free_transfers",
@@ -236,12 +254,11 @@
       "kind": "with_hits",
       "overlap_applied": 9,
       "transfer_hit_points": 12.0,
-      "expected_points_cost": 14.236600438571529,
-      "expected_points_cost_ceiling": 14.236600438571529
+      "expected_points_cost": 13.366736439623132
     },
-    "expected_gap_vs_rival": 6.614946175292516,
-    "captain_agreement": false,
-    "control_solver_status": "OPTIMAL",
-    "control_optimality_gap": 0.0
+    "expected_gap_vs_rival": 1.5731297119685905,
+    "captain_agreement": true,
+    "control_solver_status": "FEASIBLE",
+    "control_optimality_gap": 5.567999999999998
   }
 }

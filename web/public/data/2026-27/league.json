@@ -1,39 +1,38 @@
 {
   "contract_version": "ui_view_v1",
-  "generated_at_utc": "2026-10-16T07:14:31Z",
+  "generated_at_utc": "2026-10-23T12:41:15Z",
   "payload": {
-    "captured_at_utc": "2026-10-16T06:01:54.275749Z",
+    "captured_at_utc": "2026-10-23T11:16:47.162538Z",
     "league_total_average_score": 167.0,
     "our_total_realized_net_score": 168.0,
     "ownership": {
       "differential_threshold_percent": 10.0,
       "differentials": [
         204936,
-        226182,
         494521,
         503139
       ],
-      "effective_ownership": 322.79999999999995,
+      "effective_ownership": 332.6,
       "gameweek": 5,
       "least_owned_starter": 494521,
-      "mean_starter_ownership": 22.48181818181818,
+      "mean_starter_ownership": 23.227272727272727,
       "most_owned_starter": 223094,
       "ownership_percent": {
-        "204936": 7.6,
-        "216616": 2.6,
-        "219168": 13.7,
-        "223094": 75.5,
-        "226182": 9.1,
-        "244723": 5.9,
-        "244850": 45.4,
-        "437730": 13.9,
-        "446008": 19.8,
-        "490145": 1.0,
-        "494521": 2.8,
-        "503139": 3.4,
-        "60307": 40.4,
-        "67089": 16.8,
-        "97032": 15.7
+        "204936": 7.7,
+        "216616": 2.8,
+        "219168": 13.5,
+        "223094": 77.1,
+        "226182": 10.5,
+        "244723": 5.6,
+        "244850": 48.8,
+        "437730": 10.4,
+        "446008": 21.1,
+        "490145": 0.9,
+        "494521": 2.7,
+        "503139": 2.7,
+        "60307": 45.8,
+        "67089": 16.4,
+        "97032": 15.2
       },
       "squad": [
         {
@@ -235,14 +234,14 @@
     },
     "scored_gameweeks": 3,
     "season": "2026-27",
-    "source_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd",
+    "source_snapshot_id": "fpl-live-20261023T111647Z-a2cd55fde426",
     "total_difference_to_average": 1.0,
-    "verdict": "+1 points against the game's average over 3 scored gameweeks — one gameweek is noise, not evidence; the starting eleven averages 22% ownership.",
+    "verdict": "+1 points against the game's average over 3 scored gameweeks — one gameweek is noise, not evidence; the starting eleven averages 23% ownership.",
     "verdict_code": "standing",
     "verdict_params": {
       "caveat": "noise",
       "difference": 1.0,
-      "mean_starter_ownership": 22.5,
+      "mean_starter_ownership": 23.2,
       "scored": 3
     },
     "weeks": [
@@ -313,12 +312,12 @@
         "our_realized_score": null
       },
       {
-        "average_entry_score": null,
+        "average_entry_score": 59.0,
         "deadline_utc": "2026-10-17T10:00:00Z",
         "difference_to_average": null,
-        "finished": false,
+        "finished": true,
         "gameweek": 7,
-        "highest_score": null,
+        "highest_score": 122.0,
         "our_projected_score": null,
         "our_realized_net_score": null,
         "our_realized_score": null
@@ -380,7 +379,7 @@
       },
       {
         "average_entry_score": null,
-        "deadline_utc": "2026-12-02T18:30:00Z",
+        "deadline_utc": "2026-12-01T18:30:00Z",
         "difference_to_average": null,
         "finished": false,
         "gameweek": 13,
@@ -391,7 +390,7 @@
       },
       {
         "average_entry_score": null,
-        "deadline_utc": "2026-12-05T13:30:00Z",
+        "deadline_utc": "2026-12-05T11:00:00Z",
         "difference_to_average": null,
         "finished": false,
         "gameweek": 14,
@@ -413,7 +412,7 @@
       },
       {
         "average_entry_score": null,
-        "deadline_utc": "2026-12-19T13:30:00Z",
+        "deadline_utc": "2026-12-19T11:00:00Z",
         "difference_to_average": null,
         "finished": false,
         "gameweek": 16,
