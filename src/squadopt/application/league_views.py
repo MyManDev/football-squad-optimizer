@@ -121,6 +121,7 @@ from squadopt.live import (
 from squadopt.live.transfers import plan_transfer_menu
 from squadopt.optimization import wall_clock_stopped_the_search
 from squadopt.planning import TransferPlanResult
+from squadopt.planning.native_highs import NativeWindowOutcome, native_window_outcomes
 from squadopt.scenarios import RivalSquad
 from squadopt.scenarios.paths import ScenarioPathSet
 
@@ -240,6 +241,11 @@ class MemberRender:
     #: Empty when the error's text is about the member's own data, which the index carries
     #: as it always has.
     public_refusal: str = ""
+    #: Which backend answered each three- and five-week primary search of this member's
+    #: menu, in solve order, with the HiGHS version the native child reported and the
+    #: reason for any CP-SAT fallback. Empty when no native process port was bound. The
+    #: operator's receipt and run log read it; no published document carries it.
+    native_windows: tuple[NativeWindowOutcome, ...] = ()
 
 
 def render_member(
@@ -253,6 +259,41 @@ def render_member(
     manager_words: ManagerWords | None = None,
     top100_counts: Top100Counts | None = None,
     chip_forecast_source: ForecastSource | None = None,
+    controls: Mapping[int, MemberControl] | None = None,
+) -> MemberRender:
+    """Solve one member's control once, then every (rival strategy, rival) from it, and
+    every saf-puan window and Top 100 weight the task names (``_render_member``), and
+    carry out which backend answered each of its window searches.
+    """
+
+    with native_window_outcomes() as native:
+        render = _render_member(
+            task,
+            provider=provider,
+            inputs=inputs,
+            projection=projection,
+            rules=rules,
+            horizon_builder=horizon_builder,
+            manager_words=manager_words,
+            top100_counts=top100_counts,
+            chip_forecast_source=chip_forecast_source,
+            controls=controls,
+        )
+    return replace(render, native_windows=tuple(native)) if native else render
+
+
+def _render_member(
+    task: MemberRenderTask,
+    *,
+    provider: EntryPicksProvider,
+    inputs: RecommendationInputs,
+    projection: Projection,
+    rules: SeasonRules,
+    horizon_builder: HorizonBuilder | None = None,
+    manager_words: ManagerWords | None = None,
+    top100_counts: Top100Counts | None = None,
+    chip_forecast_source: ForecastSource | None = None,
+    controls: Mapping[int, MemberControl] | None = None,
 ) -> MemberRender:
     """Solve one member's control once, then every (rival strategy, rival) from it, and
     every saf-puan window and Top 100 weight the task names.
@@ -272,7 +313,14 @@ def render_member(
 
     try:
         picks = provider.picks(task.entry_id, task.season, task.gameweek - 1)
-        control = solve_member_control(picks, inputs, projection, rules)
+        control = controls.get(task.entry_id) if controls is not None else None
+        if control is not None and control.picks != picks:
+            raise EntryError("The baseline control belongs to different member picks.")
+        if control is None:
+            # At TRACKED_MEMBER_LINEARIZATION_LEVEL, the level the baseline batch and the
+            # on-demand menu solve at too, so the member's plan is the same whether or not
+            # the run records advice.
+            control = solve_member_control(picks, inputs, projection, rules)
         baseline = advise_entry(
             AdviseEntryRequest(
                 season=task.season,
@@ -732,6 +780,8 @@ class MemberViewResult:
     label: str
     rendered: bool
     reason: str = ""
+    #: The member render's ``native_windows``: for the operator's receipt and run log.
+    native_windows: tuple[NativeWindowOutcome, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -1270,6 +1320,7 @@ def build_league_views(
     top100_counts: Top100Counts | None = None,
     top100_unavailable_reason: str | None = None,
     chip_forecast_source: ForecastSource | None = None,
+    controls: Mapping[int, MemberControl] | None = None,
     device_only: bool = False,
 ) -> LeagueViewsReport:
     """Render every registered member's squad and advice under ``out_dir``.
@@ -1498,6 +1549,7 @@ def build_league_views(
                     manager_words=manager_words,
                     top100_counts=top100_counts,
                     chip_forecast_source=chip_forecast_source,
+                    controls=controls,
                 ),
                 tasks,
             )
@@ -2133,7 +2185,15 @@ def build_league_views(
             )
             if part
         )
-        results.append(MemberViewResult(entry_id, labels[entry_id], True, reason=note))
+        results.append(
+            MemberViewResult(
+                entry_id,
+                labels[entry_id],
+                True,
+                reason=note,
+                native_windows=render.native_windows,
+            )
+        )
         member_rows.append(member_row)
     # The standings order is the league's order; registry order is arbitrary.
     if placings:

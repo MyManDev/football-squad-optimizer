@@ -261,7 +261,10 @@ entries, and they may only shrink (rule 1 above):
    0011 gives the use-case storage ports, import none of the storage and source modules of
    `data`.
 8. `The CP-SAT solver stays in the decision core`: only `optimization`, `planning`,
-   `scenarios`, `evaluation` and `backtest` may import `ortools`.
+   `scenarios`, `evaluation` and `backtest` may import `ortools`. The same boundary holds
+   `highspy`; `planning/native_highs.py` is its only importer, checked by the native-window
+   boundary test. The platform supplies an isolated process to avoid loading both native
+   libraries in one interpreter. One-week solves and the window tie-break retain CP-SAT.
 9. `Use cases and domain records import no process, thread, event-loop or command-line module`:
    `application` and `live` import no process, thread, signal, command-line or event-loop
    module directly.

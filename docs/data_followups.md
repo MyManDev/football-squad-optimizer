@@ -267,12 +267,13 @@ builds it once for each capture taken with the archive at hand, so a run that ca
 then reads the archive builds it again. These build it more than once in one run:
 
 
-- The weekly run (`platform/weekly_operations.py`) builds it up to four times in its own
+- The weekly run (`platform/weekly_operations.py`) builds it up to five times in its own
   process for a one-league list, its stages running one after another: once in the
   capture stage, through `fpl_capture`'s identity check, when the run takes its own
   capture (not with `--snapshot-id`); twice in the handoff stage, through `build` in
   `application/projection_handoff.py` on the component path (below; once when the capture
-  lacks a history week's live payload, and not at all with a prebuilt `--handoff`); and once
+  lacks a history week's live payload, and not at all with a prebuilt `--handoff`); once for
+  the shared baseline batch when recording is enabled; and once
   per league in the league stage's parent (`application/league_publication.py`), whose
   workers build their own on top (below). No other stage builds one: the decide stage hands `decide` the
   handoff, so `decide`'s opening-gameweek build (next) does not run there.
