@@ -479,6 +479,37 @@ def test_the_batch_publishes_the_wider_menu_against_the_default_rival_and_names_
     assert (tmp_path / "menu" / f"advice/{ENTRY}/ortak-koru/3/vs-{RIVAL}.json").is_file()
 
 
+def test_a_later_publish_removes_one_week_rival_files_no_index_names(
+    world: dict[str, Any], tmp_path: Path
+) -> None:
+    out = tmp_path / "site"
+    _publish(world, out, counts=None)
+    member = out / f"advice/{ENTRY}"
+    strategies = ("ortak-koru", "fark-yarat")
+    current = [member / f"{strategy}/1/vs-{RIVAL}.json" for strategy in strategies]
+    assert all(path.is_file() for path in current)
+    # Last week's files: one-week plans against a rival the standings no longer pair with
+    # this member, and the plain copy of a strategy the menu no longer offers.
+    gone = 9_999_999
+    stale = [member / f"{strategy}/1/vs-{gone}.json" for strategy in strategies]
+    for source, target in zip(current, stale, strict=True):
+        target.write_bytes(source.read_bytes())
+    dropped = member / "dropped-strategy/1.json"
+    dropped.parent.mkdir(parents=True)
+    dropped.write_bytes(current[0].read_bytes())
+
+    again = _publish(world, out, counts=None)
+
+    assert not any(path.exists() for path in (*stale, dropped))
+    assert not dropped.parent.exists()
+    assert {path.relative_to(out).as_posix() for path in (*stale, dropped)} <= set(again.removed)
+    assert all(path.is_file() for path in current)
+    assert all((member / f"{strategy}/1.json").is_file() for strategy in strategies)
+    assert (member / "saf-puan/1.json").is_file()
+    index = _read(member / "index.json")
+    assert all(f"vs-{gone}" not in row["path"] for row in index["computed"])
+
+
 def test_a_variant_that_fails_is_recorded_at_its_address(
     world: dict[str, Any], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
