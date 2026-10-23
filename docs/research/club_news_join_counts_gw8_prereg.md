@@ -24,9 +24,10 @@ before the Friday run, so the commit the run's rotation manifest names carries i
   verifies to an instant at or before the decision capture, is left out of
   `lost_unapplied`, as `other_competition` and `past` are, when the decision capture's
   calendar, read as the reader reads it, gives the club one dated target-gameweek fixture
-  kicking off after the capture and no undated fixture that may come before it, and shows the
-  club's first dated league fixture after that instant kicking off before the target
-  fixture. It is counted by name as `next_match_before_target` (defined exactly under the
+  kicking off after the capture, no other club fixture at the same kickoff and no undated
+  fixture that may come before it, and shows the club's first dated league fixture after that
+  instant kicking off before the target fixture. It is counted by name as
+  `next_match_before_target` (defined exactly under the
   reading below). The earlier match may kick off before or after the capture. Undated, blank
   and double target weeks stay losses under their existing causes, and so do the two cases
   this protocol reads as after the cutoff: a target fixture that kicked off by the decision
@@ -48,7 +49,8 @@ before the Friday run, so the commit the run's rotation manifest names carries i
   `ambiguous_current_week_fixture` is not counted in `lost_unapplied`, and how that agrees
   with the "no single next match in the gameweek" case of `scope_unverified`.
 - **The record's version is now `club_news_join_counts_v2`**, because the record gains
-  `excluded_from_lost_unapplied`, and `lost_unapplied`, with `lost`, no longer counts the
+  `excluded_from_lost_unapplied`, and `lost_unapplied`, its `scope_unverified` cause and
+  `lost_unapplied_scope_unverified_by_scope`, and with them `lost`, no longer count the
   statements named `next_match_before_target`. No record of version 1 was printed from GW8
   data. The inputs, every other count, the identities, the verdict table and the routing
   rule for #1006 are unchanged.
@@ -392,9 +394,10 @@ A **statement** is one raw claim. A statement is **lost** in one of two ways.
   counted. Nor is a statement labelled `upcoming_premier_league` on a page whose publication
   the reader verifies to an instant at or before the decision capture, when the decision
   capture's calendar, read as the reader reads it, gives the club one dated target-gameweek
-  fixture kicking off after the capture and no undated fixture that may come before it, and
-  shows the club's first dated league fixture after that instant kicking off before the
-  target fixture: its words name a match that is not the decision's, as `past` does
+  fixture kicking off after the capture, no other club fixture at the same kickoff and no
+  undated fixture that may come before it, and shows the club's first dated league fixture
+  after that instant kicking off before the target fixture: its words name a match that is
+  not the decision's, as `past` does
   (`next_match_before_target`, defined exactly below). A statement the reader gives the
   double-gameweek reason `ambiguous_current_week_fixture` is not counted either: for a club
   with two fixtures in the gameweek the rule declares the role undecidable, so its absence of
@@ -419,18 +422,21 @@ a statement it names leaves the count there and is no loss.
 - `next_match_before_target`, not a cause: the scope label is `upcoming_premier_league`; the
   verified publication instant is at or before the decision capture; and the decision
   capture's calendar, read as the reader reads it, gives the club exactly one fixture in the
-  target gameweek, dated and kicking off after the capture, and no undated fixture that may
-  come before it (one in no gameweek or in a gameweek up to the target), and the club's first
-  dated league fixture after the publication instant kicks off before that target fixture.
-  The earlier match may kick off before or after the capture. Both calendar questions are put
-  to the rule's own binding (`claim_targets_next_fixture`, which takes the club's first dated
-  fixture after publication): asked at the last second before the target kickoff, with the
-  cutoff there too, it binds exactly when the calendar has that shape; asked as the reader
-  asked it, at the statement's own instant with the capture as the cutoff, it does not bind
-  the statement. A blank or double target week, an undated club fixture that may come before
-  the target, a target fixture that kicked off by the capture and a page published after the
-  capture do not qualify: a statement on such a calendar or page is not named here and stays
-  a loss under the next cause;
+  target gameweek, dated and kicking off after the capture, no other club fixture at the same
+  kickoff and no undated fixture that may come before it (one in no gameweek or in a gameweek
+  up to the target), and the club's first dated league fixture after the publication instant
+  kicks off before that target fixture. The earlier match may kick off before or after the
+  capture. Both calendar questions are put to the rule's own binding
+  (`claim_targets_next_fixture`, which takes the club's first dated fixture after
+  publication): asked at the last second before the target kickoff, with the cutoff there
+  too, it binds exactly when the club has one dated target-gameweek fixture, no other club
+  fixture at the same kickoff and no undated fixture that may come before it; the target
+  kickoff and the publication instant are compared with the capture directly; asked as the
+  reader asked it, at the statement's own instant with the capture as the cutoff, it does not
+  bind the statement. A blank or double target week, an undated club fixture that may come
+  before the target, another club fixture at the target kickoff, a target fixture that kicked
+  off by the capture and a page published after the capture do not qualify: a statement on
+  such a calendar or page is not named here and stays a loss under the next cause;
 - `scope_unverified`: the page is dated to the instant, the statement is not a
   `next_match_before_target` one, and the scope is not verified (a hedge, a day name, a full
   name, a wording the scope rule does not read, a next match the calendar cannot bind, or no
@@ -543,10 +549,11 @@ that match, applied; the same statement left out when a rearranged club match ki
 between the capture and the target, with the page published before or after the club's
 previous match, and when it names the player in full; the same statement on a page dated to
 the day or not at all, on a page whose stated instant does not recheck, with another label,
-with no intervening match (once naming the player in full), on an undated, blank or double
-target week, beside an undated fixture and a club match after the capture, on a target
-fixture that kicked off by the capture, and on a page published after the capture, each still
-lost under its own cause; a double-gameweek statement given `ambiguous_current_week_fixture`;
+on an undated, blank or double target week, beside an undated fixture and a club match after
+the capture, on a target fixture that kicked off by the capture, and on a page published
+after the capture, and a statement the scope rule does not verify, with no intervening match
+(once naming the player in full), each still lost under its own cause; a double-gameweek
+statement given `ambiguous_current_week_fixture`;
 an `other_competition` and a `past` statement beside a clean week; a receipt whose outcome
 line miscounts its clubs; and a run whose `squadopt` is imported from another checkout. Still
 no real capture was read.
