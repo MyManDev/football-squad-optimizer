@@ -127,12 +127,17 @@ class WeeklyRequest:
     #: synthetic fixture, which is what every run did before an acquisition command existed,
     #: and is still what ``--rotation`` alone reads even though real hosts are now registered.
     rotation_capture: str | None = None
+    device_league_ids: tuple[int, ...] = ()
 
     def plan(self) -> WeekPlan:
         if self.workers < 1 or not self.league_ids or min(self.league_ids) < 1:
             raise WeekError("At least one positive league id and a positive worker count.")
         if len(set(self.league_ids)) != len(self.league_ids):
             raise WeekError("A league is listed once.")
+        if len(set(self.device_league_ids)) != len(self.device_league_ids) or not set(
+            self.device_league_ids
+        ).issubset(self.league_ids):
+            raise WeekError("Device menus name distinct leagues in this run.")
         if self.projection not in {"component", "component-only"}:
             raise WeekError("Unknown weekly projection selection.")
         if self.rotation_capture is not None and not self.rotation:

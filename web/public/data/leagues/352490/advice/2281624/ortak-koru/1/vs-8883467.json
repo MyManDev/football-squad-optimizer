@@ -1,51 +1,51 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-10-16T07:13:49Z",
+  "generated_at_utc": "2026-10-23T12:40:33Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
-    "gameweek": 7,
+    "gameweek": 8,
     "entry_id": 2281624,
     "league_id": 352490,
     "mode": "ortak-koru",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd",
+    "source_snapshot_id": "fpl-live-20261023T111647Z-a2cd55fde426",
     "moves": [
       {
-        "move_id": "gw07-1",
+        "move_id": "gw08-1",
         "player_out": {
-          "player_id": 199798,
-          "name": "Ezri Konsa Ngoyo",
-          "short_name": "Ngoyo",
-          "position": "DEF",
-          "team": "Arsenal"
-        },
-        "player_in": {
-          "player_id": 209036,
-          "name": "Marc Gu\u00e9hi",
-          "short_name": "Gu\u00e9hi",
+          "player_id": 477424,
+          "name": "Jo\u0161ko Gvardiol",
+          "short_name": "Gvardiol",
           "position": "DEF",
           "team": "Man City"
         },
-        "expected_points_delta": 1.0241287873496105,
+        "player_in": {
+          "player_id": 465730,
+          "name": "Maxim De Cuyper",
+          "short_name": "Cuyper",
+          "position": "DEF",
+          "team": "Brighton"
+        },
+        "expected_points_delta": 0.5536260060603837,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 1.0241287873496105,
-    "expected_points_cost": 0.6411854558673014,
+    "expected_gain_vs_hold": 0.5536260060603837,
+    "expected_points_cost": 0.6027702265426313,
     "rival_label": "entry-8883467",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
     "wall_clock_stopped_the_search": false,
-    "expected_own_points": 55.28385357155631,
+    "expected_own_points": 53.80503206197112,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
       "short_name": "Haaland",
       "position": "FWD",
       "team": "Man City",
-      "expected_points": 8.35545188174385
+      "expected_points": 8.11765453618748
     },
     "vice_captain": {
       "player_id": 244851,
@@ -53,7 +53,7 @@
       "short_name": "Palmer",
       "position": "MID",
       "team": "Chelsea",
-      "expected_points": 4.960279398950454
+      "expected_points": 5.136799837039665
     },
     "starting_xi": [
       {
@@ -62,23 +62,7 @@
         "short_name": "Verbruggen",
         "position": "GK",
         "team": "Brighton",
-        "expected_points": 3.2480295284625815
-      },
-      {
-        "player_id": 209036,
-        "name": "Marc Gu\u00e9hi",
-        "short_name": "Gu\u00e9hi",
-        "position": "DEF",
-        "team": "Man City",
-        "expected_points": 3.7663770866004564
-      },
-      {
-        "player_id": 477424,
-        "name": "Jo\u0161ko Gvardiol",
-        "short_name": "Gvardiol",
-        "position": "DEF",
-        "team": "Man City",
-        "expected_points": 3.5709926541899657
+        "expected_points": 3.0938051044078216
       },
       {
         "player_id": 466075,
@@ -86,7 +70,23 @@
         "short_name": "Calafiori",
         "position": "DEF",
         "team": "Arsenal",
-        "expected_points": 3.45141576840743
+        "expected_points": 3.6527262906253877
+      },
+      {
+        "player_id": 465730,
+        "name": "Maxim De Cuyper",
+        "short_name": "Cuyper",
+        "position": "DEF",
+        "team": "Brighton",
+        "expected_points": 3.6085520469470964
+      },
+      {
+        "player_id": 199798,
+        "name": "Ezri Konsa Ngoyo",
+        "short_name": "Ngoyo",
+        "position": "DEF",
+        "team": "Arsenal",
+        "expected_points": 3.089966731709672
       },
       {
         "player_id": 244851,
@@ -94,15 +94,7 @@
         "short_name": "Palmer",
         "position": "MID",
         "team": "Chelsea",
-        "expected_points": 4.960279398950454
-      },
-      {
-        "player_id": 60307,
-        "name": "Pascal Gro\u00df",
-        "short_name": "Gro\u00df",
-        "position": "MID",
-        "team": "Brighton",
-        "expected_points": 4.658321948335153
+        "expected_points": 5.136799837039665
       },
       {
         "player_id": 244850,
@@ -110,15 +102,31 @@
         "short_name": "Rogers",
         "position": "MID",
         "team": "Chelsea",
-        "expected_points": 4.396159996403696
+        "expected_points": 4.588260940007448
       },
       {
-        "player_id": 184029,
-        "name": "Martin \u00d8degaard",
-        "short_name": "\u00d8degaard",
+        "player_id": 60307,
+        "name": "Pascal Gro\u00df",
+        "short_name": "Gro\u00df",
         "position": "MID",
-        "team": "Arsenal",
-        "expected_points": 3.3818815752983595
+        "team": "Brighton",
+        "expected_points": 4.02517634297332
+      },
+      {
+        "player_id": 466052,
+        "name": "Rayan Cherki",
+        "short_name": "Cherki",
+        "position": "MID",
+        "team": "Man City",
+        "expected_points": 3.5051048815473056
+      },
+      {
+        "player_id": 513418,
+        "name": "Kevin Schade",
+        "short_name": "Schade",
+        "position": "MID",
+        "team": "Brentford",
+        "expected_points": 3.1527741950796333
       },
       {
         "player_id": 223094,
@@ -126,7 +134,7 @@
         "short_name": "Haaland",
         "position": "FWD",
         "team": "Man City",
-        "expected_points": 8.35545188174385
+        "expected_points": 8.11765453618748
       },
       {
         "player_id": 475168,
@@ -134,15 +142,7 @@
         "short_name": "Jesus",
         "position": "FWD",
         "team": "Chelsea",
-        "expected_points": 3.7922402069442094
-      },
-      {
-        "player_id": 216646,
-        "name": "Yoane Wissa",
-        "short_name": "Wissa",
-        "position": "FWD",
-        "team": "Newcastle",
-        "expected_points": 3.347251644476302
+        "expected_points": 3.716556619258811
       }
     ],
     "bench": [
@@ -152,15 +152,7 @@
         "short_name": "Tzolakis",
         "position": "GK",
         "team": "Hull City",
-        "expected_points": 2.8518327944307034
-      },
-      {
-        "player_id": 513418,
-        "name": "Kevin Schade",
-        "short_name": "Schade",
-        "position": "MID",
-        "team": "Brentford",
-        "expected_points": 3.056255148902708
+        "expected_points": 2.968799011023501
       },
       {
         "player_id": 244723,
@@ -168,7 +160,15 @@
         "short_name": "Mitchell",
         "position": "DEF",
         "team": "Crystal Palace",
-        "expected_points": 2.742248299250839
+        "expected_points": 3.054926040886713
+      },
+      {
+        "player_id": 216646,
+        "name": "Yoane Wissa",
+        "short_name": "Wissa",
+        "position": "FWD",
+        "team": "Newcastle",
+        "expected_points": 2.800075748204037
       },
       {
         "player_id": 108416,
@@ -176,7 +176,7 @@
         "short_name": "Egan",
         "position": "DEF",
         "team": "Hull City",
-        "expected_points": 2.29477999569297
+        "expected_points": 2.4709800696449706
       }
     ],
     "chip": null,
@@ -188,7 +188,7 @@
     "missing_fields": [],
     "squad_basis": "captured",
     "rival_entry_id": 8883467,
-    "expected_points_cost_ceiling": 0.6411854558673014,
+    "expected_points_cost_ceiling": 0.6027702265426313,
     "overlap_count": 5,
     "transfer_cap": 1,
     "overlap_target": 9,
@@ -198,11 +198,11 @@
       "kind": "with_hits",
       "overlap_applied": 9,
       "transfer_hit_points": 16.0,
-      "expected_points_cost": 15.622062417115671,
-      "expected_points_cost_ceiling": 15.622062417115671
+      "expected_points_cost": 15.258615548050159,
+      "expected_points_cost_ceiling": 15.258615548050159
     },
-    "expected_gap_vs_rival": 5.445593071421037,
-    "captain_agreement": false,
+    "expected_gap_vs_rival": -0.15578594742587626,
+    "captain_agreement": true,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0
   }

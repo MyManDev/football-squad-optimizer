@@ -397,8 +397,16 @@ export function resolvePublishedAdvice(
     (context &&
       (capabilities.season !== context.season || capabilities.gameweek !== context.gameweek))
   ) {
+    // A rejected index stays rejected beside the model or preferences, so the page still
+    // says it cannot be read and offers the retry.
     return !preferences.valid || preferences.value || searchParams.get("model") === "football"
-      ? { ...published, status: "not-listed", path: null, windows: [], strategies: [] }
+      ? {
+          ...published,
+          status: published.status === "index-error" ? "index-error" : "not-listed",
+          path: null,
+          windows: [],
+          strategies: [],
+        }
       : published;
   }
   const result = withComputable(published, searchParams, entryId, members, index, capabilities);
@@ -411,7 +419,7 @@ export function resolvePublishedAdvice(
       !(preferences.value?.save_chips && searchParams.has("chip"));
     return {
       ...result,
-      status: "not-listed",
+      status: result.status === "index-error" ? "index-error" : "not-listed",
       path: null,
       computable: result.computable && {
         ...result.computable,
@@ -435,10 +443,7 @@ function withDeviceChoices(
     !isMemberStrategy(published.request.strategy) ||
     !device.strategies.includes(published.request.strategy) ||
     !device.windows.includes(1) ||
-    searchParams.get("model") === "football" ||
-    searchParams.get(EVIDENCE_PARAMETER) === "on" ||
-    !preferencesFromUrl(searchParams).valid ||
-    preferencesFromUrl(searchParams).value
+    !linkKeepsDeviceChoices(searchParams)
   )
     return published;
 
@@ -456,11 +461,28 @@ function withDeviceChoices(
   if (weight === published.top100.weight && chip === published.chip.chip) return published;
   return {
     ...published,
-    status: "not-listed",
+    // A rejected index stays rejected, so the page still says it cannot be read and offers
+    // the retry. The device needs no index, so the choice is kept: the controls, which are
+    // given no index then, show the same choice the device is asked for.
+    status: published.status === "index-error" ? "index-error" : "not-listed",
     path: null,
     top100: { ...published.top100, weight, notOffered: false },
     chip: { ...published.chip, chip, notOffered: chip === null && published.chip.notOffered },
   };
+}
+
+/**
+ * Whether a link leaves room for the device's own choices: it asks for no manager's word,
+ * no football model and no decision preferences, none of which the device solves.
+ */
+export function linkKeepsDeviceChoices(searchParams: URLSearchParams): boolean {
+  const preferences = preferencesFromUrl(searchParams);
+  return (
+    searchParams.get("model") !== "football" &&
+    searchParams.get(EVIDENCE_PARAMETER) !== "on" &&
+    preferences.valid &&
+    !preferences.value
+  );
 }
 
 function notComputable(strategies: MemberStrategy[] = []): ComputableAdvice {

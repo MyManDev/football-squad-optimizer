@@ -1,0 +1,274 @@
+{
+  "contract_version": "provisional_league_ui_v1",
+  "generated_at_utc": "2026-10-23T12:40:33Z",
+  "source_kind": "live",
+  "payload": {
+    "season": "2026-27",
+    "gameweek": 8,
+    "entry_id": 6880255,
+    "league_id": 352490,
+    "mode": "ortak-koru",
+    "window": 1,
+    "source_snapshot_id": "fpl-live-20261023T111647Z-a2cd55fde426",
+    "moves": [
+      {
+        "move_id": "gw08-1",
+        "player_out": {
+          "player_id": 106760,
+          "name": "Luke Shaw",
+          "short_name": "Shaw",
+          "position": "DEF",
+          "team": "Man Utd"
+        },
+        "player_in": {
+          "player_id": 199798,
+          "name": "Ezri Konsa Ngoyo",
+          "short_name": "Ngoyo",
+          "position": "DEF",
+          "team": "Arsenal"
+        },
+        "expected_points_delta": 2.7996663995909543,
+        "reason_code": "top100_preference"
+      },
+      {
+        "move_id": "gw08-2",
+        "player_out": {
+          "player_id": 449434,
+          "name": "Anthony Elanga",
+          "short_name": "Elanga",
+          "position": "MID",
+          "team": "Newcastle"
+        },
+        "player_in": {
+          "player_id": 540324,
+          "name": "Mohamed Belloumi",
+          "short_name": "Belloumi",
+          "position": "MID",
+          "team": "Hull City"
+        },
+        "expected_points_delta": 0.6622185358069927,
+        "reason_code": "mode_tradeoff"
+      },
+      {
+        "move_id": "gw08-3",
+        "player_out": {
+          "player_id": 469142,
+          "name": "Jan Paul van Hecke",
+          "short_name": "Hecke",
+          "position": "DEF",
+          "team": "Spurs"
+        },
+        "player_in": {
+          "player_id": 465730,
+          "name": "Maxim De Cuyper",
+          "short_name": "Cuyper",
+          "position": "DEF",
+          "team": "Brighton"
+        },
+        "expected_points_delta": 0.5585924465017698,
+        "reason_code": "top100_preference"
+      },
+      {
+        "move_id": "gw08-4",
+        "player_out": {
+          "player_id": 551466,
+          "name": "Gonzalo Garc\u00eda",
+          "short_name": "Garc\u00eda",
+          "position": "FWD",
+          "team": "Fulham"
+        },
+        "player_in": {
+          "player_id": 177815,
+          "name": "Dominic Calvert-Lewin",
+          "short_name": "Calvert-Lewin",
+          "position": "FWD",
+          "team": "Leeds"
+        },
+        "expected_points_delta": 0.5138455378942055,
+        "reason_code": "mode_tradeoff"
+      }
+    ],
+    "transfer_hit_points": 0.0,
+    "expected_gain_vs_hold": 4.534322919793922,
+    "expected_points_cost": 1.1007169654345574,
+    "rival_label": "entry-5081114",
+    "solver_status": "OPTIMAL",
+    "optimality_gap": null,
+    "wall_clock_stopped_the_search": false,
+    "expected_own_points": 53.78164238390928,
+    "captain": {
+      "player_id": 223094,
+      "name": "Erling Haaland",
+      "short_name": "Haaland",
+      "position": "FWD",
+      "team": "Man City",
+      "expected_points": 8.11765453618748
+    },
+    "vice_captain": {
+      "player_id": 141746,
+      "name": "Bruno Borges Fernandes",
+      "short_name": "Fernandes",
+      "position": "MID",
+      "team": "Man Utd",
+      "expected_points": 5.660179884785022
+    },
+    "starting_xi": [
+      {
+        "player_id": 489639,
+        "name": "Bart Verbruggen",
+        "short_name": "Verbruggen",
+        "position": "GK",
+        "team": "Brighton",
+        "expected_points": 3.0938051044078216
+      },
+      {
+        "player_id": 226597,
+        "name": "Gabriel dos Santos Magalh\u00e3es",
+        "short_name": "Magalh\u00e3es",
+        "position": "DEF",
+        "team": "Arsenal",
+        "expected_points": 4.423923916856849
+      },
+      {
+        "player_id": 465730,
+        "name": "Maxim De Cuyper",
+        "short_name": "Cuyper",
+        "position": "DEF",
+        "team": "Brighton",
+        "expected_points": 3.6085520469470964
+      },
+      {
+        "player_id": 199798,
+        "name": "Ezri Konsa Ngoyo",
+        "short_name": "Ngoyo",
+        "position": "DEF",
+        "team": "Arsenal",
+        "expected_points": 3.089966731709672
+      },
+      {
+        "player_id": 141746,
+        "name": "Bruno Borges Fernandes",
+        "short_name": "Fernandes",
+        "position": "MID",
+        "team": "Man Utd",
+        "expected_points": 5.660179884785022
+      },
+      {
+        "player_id": 184029,
+        "name": "Martin \u00d8degaard",
+        "short_name": "\u00d8degaard",
+        "position": "MID",
+        "team": "Arsenal",
+        "expected_points": 3.7050117630130073
+      },
+      {
+        "player_id": 540324,
+        "name": "Mohamed Belloumi",
+        "short_name": "Belloumi",
+        "position": "MID",
+        "team": "Hull City",
+        "expected_points": 3.1192405124554683
+      },
+      {
+        "player_id": 514254,
+        "name": "Diego G\u00f3mez Amarilla",
+        "short_name": "Amarilla",
+        "position": "MID",
+        "team": "Brighton",
+        "expected_points": 3.0669208782006234
+      },
+      {
+        "player_id": 223094,
+        "name": "Erling Haaland",
+        "short_name": "Haaland",
+        "position": "FWD",
+        "team": "Man City",
+        "expected_points": 8.11765453618748
+      },
+      {
+        "player_id": 219168,
+        "name": "Alexander Isak",
+        "short_name": "Isak",
+        "position": "FWD",
+        "team": "Liverpool",
+        "expected_points": 4.374702258586186
+      },
+      {
+        "player_id": 177815,
+        "name": "Dominic Calvert-Lewin",
+        "short_name": "Calvert-Lewin",
+        "position": "FWD",
+        "team": "Leeds",
+        "expected_points": 3.404030214572572
+      }
+    ],
+    "bench": [
+      {
+        "player_id": 67089,
+        "name": "Martin Dubravka",
+        "short_name": "Dubravka",
+        "position": "GK",
+        "team": "Spurs",
+        "expected_points": 0.08206076680465356
+      },
+      {
+        "player_id": 219924,
+        "name": "Issa Diop",
+        "short_name": "Diop",
+        "position": "DEF",
+        "team": "Ipswich Town",
+        "expected_points": 2.4570219766484747
+      },
+      {
+        "player_id": 167512,
+        "name": "Luke O'Nien",
+        "short_name": "O'Nien",
+        "position": "DEF",
+        "team": "Sunderland",
+        "expected_points": 0.290300332118716
+      },
+      {
+        "player_id": 508395,
+        "name": "Yehor Yarmoliuk",
+        "short_name": "Yarmoliuk",
+        "position": "MID",
+        "team": "Brentford",
+        "expected_points": 0.0
+      }
+    ],
+    "chip": null,
+    "stated_limits": [
+      "No chip is offered inside the window. A finite window counts nothing for holding a chip back, so a planner that could reach one would spend it; chip timing is a season-long decision this window cannot price.",
+      "The current model was trained on seasons that awarded no defensive-contribution (DEFCON) points, so it does not forecast those points.",
+      "The plan was chosen with the Top 100 influence at 10; every expected-points number in this document is the base model's, without it."
+    ],
+    "data_quality": "complete",
+    "missing_fields": [],
+    "squad_basis": "captured",
+    "rival_entry_id": 5081114,
+    "overlap_count": 6,
+    "transfer_cap": 4,
+    "overlap_target": 9,
+    "overlap_applied": 6,
+    "plan_kind": "within_free_transfers",
+    "alternative_plan": {
+      "kind": "with_hits",
+      "overlap_applied": 9,
+      "transfer_hit_points": 12.0,
+      "expected_points_cost": 13.693156987413126
+    },
+    "expected_gap_vs_rival": 3.3301575692760323,
+    "captain_agreement": true,
+    "control_solver_status": "FEASIBLE",
+    "control_optimality_gap": 5.567999999999998,
+    "top100": {
+      "weight": 10,
+      "changed": true,
+      "price_basis": "base_model_pure_points_v1",
+      "cohort_snapshot_id": "fpl-top100-20261023T110704Z-c9d2e551592b",
+      "picks_snapshot_id": "fpl-elite-picks-20261023T111203Z-2f0c591789cb",
+      "table_sha256": "70094f8d88c192ada317b91d2faa32f302a9ec5a849ac64da901e2e2fa166cc2",
+      "picks_gameweek": 7
+    }
+  }
+}

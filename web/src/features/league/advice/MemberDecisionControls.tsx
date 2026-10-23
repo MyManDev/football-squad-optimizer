@@ -59,6 +59,7 @@ import type { AdviceCapabilities } from "./adviceCapabilities";
 import {
   type DeviceComputable,
   EVIDENCE_PARAMETER,
+  linkKeepsDeviceChoices,
   resolvePublishedAdvice,
 } from "./adviceSelection";
 import { AUTOMATIC_CHIP_OFFERED, CHIP_PARAMETER } from "./chipChoice";
@@ -235,6 +236,19 @@ export function MemberDecisionControls({
     windowSize === 1 &&
     (onDevice.top100Weights.length ?? 0) > 1;
   const top100Computable = top100Service || top100Device;
+  // A weight the device solves and this publish has no plan for gets its own note, but only
+  // where a click on it stands: the link asks for no word, football model or preferences,
+  // and the resolver keeps the weight. Otherwise the note says what is in force.
+  const deviceKeeps = (weight: number) => {
+    const next = new URLSearchParams(searchParams);
+    next.set(TOP100_PARAMETER, String(weight));
+    return linkKeepsDeviceChoices(next) && resolve(next).top100.weight === weight;
+  };
+  const top100DeviceUnpublished =
+    top100Device &&
+    onDevice!.top100Weights.some(
+      (weight) => weight !== 0 && !top100.weights.includes(weight) && deviceKeeps(weight),
+    );
   const weightSelectable = (weight: number) =>
     (top100Applies && top100.weights.some((offered) => offered === weight)) ||
     (top100Service && computable!.top100Weights.some((offered) => offered === weight)) ||
@@ -285,15 +299,17 @@ export function MemberDecisionControls({
       ? chipCopy.switchesOff
       : top100Service && TOP100_WEIGHTS.some((weight) => !top100.weights.includes(weight))
         ? computeCopy.top100Computable
-        : !top100.available
-          ? top100Unavailable(top100Copy, top100.reason)
-          : !top100Applies
-            ? top100Copy.notForSelection
-            : top100.notOffered
-              ? top100Copy.notOffered
-              : top100.weights.length < TOP100_WEIGHTS.length
-                ? top100Copy.notSolved
-                : top100Copy.published;
+        : top100DeviceUnpublished
+          ? computeCopy.top100Computable
+          : !top100.available
+            ? top100Unavailable(top100Copy, top100.reason)
+            : !top100Applies
+              ? top100Copy.notForSelection
+              : top100.notOffered
+                ? top100Copy.notOffered
+                : top100.weights.length < TOP100_WEIGHTS.length
+                  ? top100Copy.notSolved
+                  : top100Copy.published;
 
   // The model is offered only where the service computes the football model, or where the
   // link already asks for it (so the choice can be seen and undone).
