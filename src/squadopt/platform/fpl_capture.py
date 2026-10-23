@@ -448,10 +448,10 @@ def capture(
     ``league_ids`` adds every page of each league's standings, so a capture records who was in
     the league when a recommendation was made. A listed league without classic standings, a
     head-to-head league among them, stops the capture with its reason (``classic_standings``)
-    before anything is written. Each entry's transfers list and opening
-    picks follow (``purchase_price_endpoints``); they sharpen a budget rather than make
-    one, so a document the source still refuses after the retries is left out with a line
-    saying so, and that member's budget stays the stated worth.
+    before any member's documents are read and before anything is written. Each entry's
+    transfers list and opening picks follow (``purchase_price_endpoints``); they sharpen a
+    budget rather than make one, so a document the source still refuses after the retries
+    is left out with a line saying so, and that member's budget stays the stated worth.
 
     ``captured_at`` is stamped **after every read**, so no payload in the snapshot was fetched
     later than the instant the snapshot claims. Stamping it earlier would have been wrong in a
@@ -488,7 +488,11 @@ def capture(
     if extra:
         print(f"Reading {len(extra)} registered-entry endpoint(s)")
         listed = {league_standings_payload(league_id): league_id for league_id in league_ids}
-        for name, url in extra.items():
+        # The listed leagues' first pages come first, so a league ``classic_standings``
+        # refuses stops the capture before any member's documents are asked for; each group
+        # keeps name order. Only the order of the reads and their lines follows from this:
+        # the snapshot's checksums and fingerprint are serialised in sorted name order.
+        for name, url in sorted(extra.items(), key=lambda item: (item[0] not in listed, item[0])):
             payloads[name] = classic_standings(listed[name], url) if name in listed else fetch(url)
             print(f"  read     {name}  ({len(payloads[name]):,} bytes)")
         extra.update(complete_league_standings(payloads, league_ids))
