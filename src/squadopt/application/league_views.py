@@ -1810,19 +1810,37 @@ def build_league_views(
                 variant_path(entry_id, strategy, window, rival_id, weight)
                 for strategy, window, rival_id, weight, _payload in render.variant_payloads
             ),
+            # The one-week rival files and the default rival's plain copy are written after
+            # this sweep, so they are named here: a rival this run keeps is not removed.
+            *(
+                f"advice/{entry_id}/{strategy}/{COMPUTED_WINDOW}/vs-{rival_id}.json"
+                for strategy, rival_id, _payload in render.rival_payloads
+            ),
+            *(
+                f"advice/{entry_id}/{strategy}/{COMPUTED_WINDOW}.json"
+                for strategy, rival_id, _payload in render.rival_payloads
+                if rival_id == task.default_rival_id
+            ),
         }
         member_directory = out / f"advice/{entry_id}"
         if member_directory.is_dir():
-            # A setting's document, a chosen chip's, or a rival strategy's window, that an
-            # earlier publish wrote and this one did not would otherwise stay beside an
-            # index that does not name it.
+            # A setting's document, a chosen chip's, or a rival strategy's file at any
+            # window, that an earlier publish wrote and this one did not would otherwise
+            # stay beside an index that does not name it. The standings pair a member with
+            # new rivals as the table moves, so last week's one-week files against a rival
+            # who is no longer listed are among them (GW8 inherited 56 from GW7).
             candidates = {
                 *member_directory.rglob("top100-*.json"),
                 *member_directory.rglob("chip-*.json"),
                 *(
                     path
-                    for path in member_directory.glob("*/[35]/vs-*.json")
+                    for path in member_directory.glob("*/*/vs-*.json")
                     if path.parent.parent.name != COMPUTED_MODE
+                ),
+                *(
+                    path
+                    for path in member_directory.glob(f"*/{COMPUTED_WINDOW}.json")
+                    if path.parent.name != COMPUTED_MODE
                 ),
             }
             for stale_file in sorted(candidates):
