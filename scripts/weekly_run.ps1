@@ -16,6 +16,10 @@ publishes, tags, deploys or restarts anything.
   powershell -ExecutionPolicy Bypass -File scripts\weekly_run.ps1 -Kind tuesday -DryRun
   powershell -ExecutionPolicy Bypass -File scripts\weekly_run.ps1 -Kind friday -Gameweek 8
   powershell -ExecutionPolicy Bypass -File scripts\weekly_run.ps1 -Kind friday -ClubNewsSettings C:\private\club-news.settings.toml
+  powershell -ExecutionPolicy Bypass -File scripts\weekly_run.ps1 -Kind friday -Gameweek 10 -Suffix final-20261106T1430
+
+-Suffix names the site branch's suffix instead of <kind>-<date>, which is one per kind and
+day; weekly_schedule.ps1 passes one per run, so two runs on a deadline day do not collide.
 
 Every Friday run first acquires the week's club news. Use -ClubNewsSettings (or the
 SQUADOPT_CLUB_NEWS_SETTINGS environment variable) for the private settings file.
@@ -43,6 +47,7 @@ param(
     [string]$RepoRoot = '',
     [int]$Workers = 15,
     [int]$Gameweek = 0,
+    [ValidatePattern('^[A-Za-z0-9]+(-[A-Za-z0-9]+)*$')][string]$Suffix = '',
     [string]$ClubNewsSettings = '',
     [switch]$ClubNews,
     [switch]$DryRun
@@ -193,7 +198,7 @@ try {
     exit 2
 }
 $runId = Weekly-RunId $Kind $season $Gameweek $now
-$suffix = Weekly-Suffix $Kind $now
+if (-not $Suffix) { $Suffix = Weekly-Suffix $Kind $now }
 $python = Join-Path $RepoRoot '.venv\Scripts\python.exe'
 $logDirectory = Join-Path $RepoRoot 'data\logs\weekly'
 New-Item -ItemType Directory -Force -Path $logDirectory | Out-Null
