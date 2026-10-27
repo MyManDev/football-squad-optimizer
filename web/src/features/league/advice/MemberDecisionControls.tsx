@@ -36,11 +36,13 @@
  * Selection lives in the URL (`mode`, `rival`, `window`, `llm`, `top100`, `chip`), the same
  * parameters the templates set and the compute panel reads, so the whole state stays shareable.
  *
- * Plan and Top 100 controls are visible together on the member page. Secondary chip
- * and news controls can be folded within the same settings section. Each part renders
+ * The member page shows the plan (strategy, rival, window) with its presets at the top, so
+ * the choice is made in one place; the model, the Top 100 influence, the manager's word and
+ * the chips wait folded under the advanced settings of the same section. Each part renders
  * once and shares the URL selection; changing layout never resets the user's choices.
  */
 
+import type { ReactNode } from "react";
 import { useSearchParams } from "react-router";
 
 import { Badge } from "../../../design/components/Badge";
@@ -72,7 +74,7 @@ import styles from "./MemberDecisionControls.module.css";
 import { RivalEntryInput } from "./RivalEntryInput";
 
 /** Which part of the controls to render; all of them, in turn, when none is named. */
-export type DecisionControlsPart = "plan" | "notes" | "top100" | "advanced";
+export type DecisionControlsPart = "plan" | "model" | "notes" | "top100" | "advanced";
 
 export function MemberDecisionControls({
   entryId,
@@ -81,6 +83,7 @@ export function MemberDecisionControls({
   capabilities = null,
   onDevice,
   part,
+  presets,
 }: {
   entryId: number;
   members: EntryView[];
@@ -89,6 +92,8 @@ export function MemberDecisionControls({
   /** What the member's device computes from this publish's inputs, beside the service. */
   onDevice?: DeviceComputable;
   part?: DecisionControlsPart;
+  /** The page's one-tap selections, a row of their own under the plan's heading. */
+  presets?: ReactNode;
 }) {
   const { language, locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
@@ -324,8 +329,8 @@ export function MemberDecisionControls({
         "asiri-agresif": messages.decision.modes.extreme,
       }[strategy];
   // The plan in force, as D-Bu-Hafta writes it beside the heading: the strategy and the
-  // window. The model is the radio group just under it, and the decision's own heading row
-  // names all three.
+  // window. The model is chosen under the advanced settings, and the decision's own heading
+  // row names all three.
   const now = [strategyName, messages.decision.week(windowSize)].filter(Boolean).join(" · ");
 
   const plan = (
@@ -339,6 +344,7 @@ export function MemberDecisionControls({
           {copy.viewPlan}
         </a>
       </div>
+      {presets ? <div className={styles.presets}>{presets}</div> : null}
       <fieldset className={styles.field}>
         <legend>{copy.strategyLegend}</legend>
         <div className={styles.rows}>
@@ -449,33 +455,35 @@ export function MemberDecisionControls({
           ))}
         </div>
       </fieldset>
-
-      {showModel ? (
-        <fieldset className={styles.field}>
-          <legend>{copy.modelLegend}</legend>
-          <div className={styles.rows}>
-            {(["current", "football"] as const).map((model) => (
-              <label className={styles.row} key={model}>
-                <input
-                  type="radio"
-                  className={styles.radio}
-                  name="prediction-model"
-                  value={model}
-                  checked={chosenModel === model}
-                  disabled={model === "football" && !capabilities?.models?.includes("football")}
-                  onChange={() => update({ model: model === "current" ? null : model })}
-                />
-                <span className={styles.rowName}>{copy.modelNames[model]}</span>
-                {model === "football" ? (
-                  <span className={styles.tag}>{copy.experimentalTag}</span>
-                ) : null}
-              </label>
-            ))}
-          </div>
-        </fieldset>
-      ) : null}
     </div>
   );
+
+  // The experimental model is changed rarely, so the page folds it with the advanced settings
+  // instead of beside the strategy and the window.
+  const modelControls = showModel ? (
+    <fieldset className={styles.fieldset}>
+      <legend>{copy.modelLegend}</legend>
+      <div className={styles.rows}>
+        {(["current", "football"] as const).map((model) => (
+          <label className={styles.row} key={model}>
+            <input
+              type="radio"
+              className={styles.radio}
+              name="prediction-model"
+              value={model}
+              checked={chosenModel === model}
+              disabled={model === "football" && !capabilities?.models?.includes("football")}
+              onChange={() => update({ model: model === "current" ? null : model })}
+            />
+            <span className={styles.rowName}>{copy.modelNames[model]}</span>
+            {model === "football" ? (
+              <span className={styles.tag}>{copy.experimentalTag}</span>
+            ) : null}
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  ) : null;
 
   const notes = (
     <details className={styles.notes}>
@@ -647,12 +655,14 @@ export function MemberDecisionControls({
   );
 
   if (part === "plan") return plan;
+  if (part === "model") return modelControls;
   if (part === "notes") return notes;
   if (part === "top100") return top100Controls;
   if (part === "advanced") return advanced;
   return (
     <>
       {plan}
+      {modelControls}
       {top100Controls}
       {notes}
       {advanced}

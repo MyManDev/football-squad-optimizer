@@ -371,6 +371,8 @@ for (const [window, width, modelVersion] of [
         await expect(detail).toContainText(week.lineup!.bench.join(" → "));
       }
     }
+    // The Top 100 setting waits under the advanced settings; opened, it still reads 20.
+    await page.locator("main details summary", { hasText: "Gelişmiş ayarlar" }).click();
     await expect(page.getByRole("radio", { name: "20", exact: true })).toBeChecked();
     await expect(page.getByRole("radio", { name: new RegExp(`^${window} `) })).toBeChecked();
     await expect(page).toHaveURL(/top100=20/);

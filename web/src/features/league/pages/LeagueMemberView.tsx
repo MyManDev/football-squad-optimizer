@@ -314,6 +314,8 @@ function LeagueMemberContent({
       // The decision's "change settings" link lands here; focus follows it.
       tabIndex={-1}
     >
+      {/* The plan is chosen in one place: the templates head it as presets that set the same
+          strategy and window as the controls under them. */}
       <MemberDecisionControls
         entryId={entryId}
         members={members}
@@ -321,16 +323,38 @@ function LeagueMemberContent({
         capabilities={capabilities}
         onDevice={onDevice}
         part="plan"
+        presets={
+          <TemplatePicker
+            canApply={(params) => {
+              const offered = resolve(params);
+              return (
+                !adviceLoading &&
+                indexReadable &&
+                (offered.status === "ready" || offered.computable?.selection === true)
+              );
+            }}
+          />
+        }
       />
-      <MemberDecisionControls
-        entryId={entryId}
-        members={members}
-        index={selection.status === "index-error" ? null : index}
-        capabilities={capabilities}
-        onDevice={onDevice}
-        part="top100"
-      />
+      {/* What a member changes rarely waits folded: the experimental model and the Top 100
+          influence, beside the manager's word and the chips. */}
       <Tool title={copy.advancedSettings}>
+        <MemberDecisionControls
+          entryId={entryId}
+          members={members}
+          index={selection.status === "index-error" ? null : index}
+          capabilities={capabilities}
+          onDevice={onDevice}
+          part="model"
+        />
+        <MemberDecisionControls
+          entryId={entryId}
+          members={members}
+          index={selection.status === "index-error" ? null : index}
+          capabilities={capabilities}
+          onDevice={onDevice}
+          part="top100"
+        />
         <MemberDecisionControls
           entryId={entryId}
           members={members}
@@ -346,16 +370,6 @@ function LeagueMemberContent({
           fixtures={fixtures}
         />
         <DecisionPreferencesPanel squad={view} available={capabilities?.preferences === true} />
-        <TemplatePicker
-          canApply={(params) => {
-            const offered = resolve(params);
-            return (
-              !adviceLoading &&
-              indexReadable &&
-              (offered.status === "ready" || offered.computable?.selection === true)
-            );
-          }}
-        />
       </Tool>
       <AdviceRequestPanel
         dockClassName={styles.computeDock}
