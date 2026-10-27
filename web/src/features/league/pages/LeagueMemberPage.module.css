@@ -611,6 +611,29 @@ section.notice p {
   transform: rotate(90deg);
 }
 
+/* A tool opens and closes in the card time (#1136): its content box grows from nothing to
+   its own height and back, and stays drawn until it has shut. Only where the browser can
+   size to `auto` and style that box (::details-content); anywhere else the section opens
+   at once, as it always has, and under reduced motion the token is zero. The box clips its
+   height only, so a focus ring at either side is never cut. */
+@supports (interpolate-size: allow-keywords) {
+  .tool {
+    interpolate-size: allow-keywords;
+  }
+
+  .tool::details-content {
+    block-size: 0;
+    overflow-y: clip;
+    transition:
+      block-size var(--motion-ui) var(--motion-ease),
+      content-visibility var(--motion-ui) var(--motion-ease) allow-discrete;
+  }
+
+  .tool[open]::details-content {
+    block-size: auto;
+  }
+}
+
 .toolBody {
   display: flex;
   flex-direction: column;
