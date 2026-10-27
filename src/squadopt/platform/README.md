@@ -47,6 +47,7 @@ optional football inputs it seals.
 | `weekly_journal.py` | Durable sequential stage execution: ownership lock, input and output fingerprints, resume. |
 | `weekly_publish.py` | Publishes one gameweek's site view: worktree, copy, commit, push and pull request in one command. |
 | `publication_workers.py` | Process scheduling for the member publication service. |
+| `native_windows.py` | Isolated native HiGHS process port for three/five-week server plans, its version probe for the weekly preflight, and the operator's per-window solver summary; avoids the OR-Tools library collision on Linux. |
 | `football_bundle.py` | Validates existing football inputs and publishes one immutable ready marker last. |
 | `football_minute_basis.py` | Dispatches composite companions with captured roster, deadline and calendar bindings, while retaining legacy fixture-basis reading (`src/squadopt/platform/football_minute_basis.py:88`). |
 | `football_publication.py` | Validates and publishes capture-bound football documents without fitting a model. |

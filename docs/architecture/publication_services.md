@@ -31,6 +31,59 @@ one worker or a spawn-based pool for multiple workers. Its initializer receives 
 request's capture ID, archive and handoff paths, season and target gameweek. It still
 refuses to substitute `render_member` for an arbitrary callable.
 
+Both mapper modes bind the native window executor for three- and five-week primary
+searches, unless the caller passes `native_windows=False`: then nothing is bound and
+every window search runs on CP-SAT alone, as in a comparison build with
+`scripts.build_league_site --cp-sat-windows`. The API advice worker binds the same
+executor per request. Its pinned HiGHS 1.15.1 driver runs in a separate interpreter
+because the Linux libraries shipped by OR-Tools and highspy cannot be loaded together.
+The planner checks the rounded native solution against every exact integer MILP row and
+then the original CP-SAT model. Only a proved optimum is accepted: the dual bound HiGHS
+reports must lie within half a unit of the witness's exact integer objective, which is
+computed from the rounded witness and never read from HiGHS's floating-point objective.
+The native attempt is a phase of its own, bounded by the primary's per-phase wall
+ceiling, as every phase already is. Unsupported models, failed children and unproved
+answers fall back to CP-SAT with the primary's own unchanged wall ceiling and
+deterministic budget, so a fallback plans what CP-SAT alone would have planned; a window
+whose native attempt and fallback both reach the ceiling can therefore spend two
+ceilings on its primary search. A clock-limited native answer does not seed fallback.
+One-week solves, hold probes and the deterministic tie-break retain CP-SAT. The model,
+strategies and configured ceilings are unchanged.
+
+An accepted native answer still changes the tie-break, so it can change a published plan
+whose value it does not change. The tie-break is hinted with the HiGHS witness instead of
+CP-SAT's own primary solution, and its deterministic budget is almost the window's whole
+limit (60 units at three weeks, 100 at five), less only the certificate's work of at most
+one unit, where under CP-SAT alone it is the limit less the primary search's work. A
+window whose tie-break did not finish under CP-SAT alone can therefore publish another
+plan of the same value, with a different squad, starting XI, captain, bench or first-week
+moves; a window CP-SAT left FEASIBLE ran no tie-break and now runs one. Where the
+tie-break finishes on both backends it reaches the same tie-break value, so the plan
+differs only where two plans share that value too. The #1147 record
+(`docs/research/window_solver_highs_current.json`, league 352490 at gameweek 7) compared
+primary values only, never plans. Of the 23 windows CP-SAT proved there (all 15
+three-week windows and 8 of the 15 five-week ones), each at the value HiGHS proved, the
+CP-SAT tie-break did not finish on 10: it ended FEASIBLE on the three-week windows of
+3832237, 6879786 and 7252721 and the five-week windows of 4287206, 5349883, 5662073,
+8548384 and 8883467, and UNKNOWN on the five-week windows of 6654210 and 7018833, with
+10.0 and 0.2 units left, so CP-SAT published its primary solution there. The record covers
+the 30 pure-points windows only: the Top 100 and rival-strategy windows the league tree
+also publishes, and the windows the on-demand path solves with a chip, preferences or the
+football model, were not measured. A rehearsal compares a tree with a CP-SAT-only build of
+the same capture to see every document that differs (`docs/weekly_runbook.md`).
+
+No published document names the backend: a window document still carries only
+`solver_status` and `optimality_gap` from the search. The operator reads it instead.
+Each member render collects one outcome per window search (the backend that answered,
+the HiGHS version the child reported, and any fallback reason, which includes the tail
+of a failed child's standard error). The weekly league stage writes them per member
+and window length under `leagues.<id>.window_solvers` in its receipt and as one
+`tick.week.league.window_solver` run-log event each; the API worker adds the same rows
+as `window_solvers` on the job's terminal log event. The weekly preflight starts the
+child once and refuses the week, before any capture, unless it loads highspy 1.15.1.
+`scripts.build_league_site` makes the same check before it solves and prints the same rows
+per member after the build.
+
 The offline element-to-code translation and `CapturePicksProvider` now live in
 `application.capture_entries`, and callers import them from there;
 the HTTP context still composes its own backend identity and handoff requirements above

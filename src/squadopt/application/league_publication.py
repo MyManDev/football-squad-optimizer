@@ -8,11 +8,25 @@ import json
 import shutil
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 
-from squadopt.application.advice import member_horizon_builder
-from squadopt.application.advice_record import record_directory
+from squadopt.application.advice import (
+    MEMBER_SOLVE_ERRORS,
+    AdviseEntryRequest,
+    MemberControl,
+    advise_entry,
+    member_horizon_builder,
+    solve_member_control,
+)
+from squadopt.application.advice_record import (
+    AdviceRecordError,
+    RecordCapture,
+    build_member_baseline_record,
+    record_directory,
+    record_member_advice,
+    repository_commit,
+)
 from squadopt.application.capture_entries import CapturePicksProvider
 from squadopt.application.chip_forecast_publication import forecast_source
 from squadopt.application.device_plan import device_plan_capture_table
@@ -95,6 +109,7 @@ class LeaguePublicationRequest:
     rival_menu: bool = True
     now: datetime | None = None
     history_record_root: Path | None = None
+    baseline_record_root: Path | None = None
     #: The week's rotation evidence table (its manifest beside it) and the club-news
     #: source it was coded from: the fixture file, or a capture directory. Both or
     #: neither; one without the other is refused, because words without their evidence
@@ -136,6 +151,112 @@ class ModePathsSummary:
     scenario_count: int
     gameweek: int
     source_id: str
+
+
+#: What one tracked entry's baseline may fail with and still stay that entry's: the member
+#: solve errors a page already refuses a member for, and the record builder's refusal.
+#: ``AdviceRecordError`` is a ``DataError`` today; it is named so the record's refusals
+#: stay covered whatever its base becomes. Anything else is a programming error that would
+#: hit every member alike, and it stops the run, as it does on a page.
+BASELINE_ERRORS: tuple[type[Exception], ...] = (*MEMBER_SOLVE_ERRORS, AdviceRecordError)
+
+
+@dataclass(frozen=True, slots=True)
+class TrackedBaselines:
+    """One server baseline per tracked entry of a capture, solved before any league renders.
+
+    An entry in ``refused`` has neither a control nor a record: its full-menu page solves
+    the member itself, as before the batch, and refuses it there when that solve fails
+    too. No baseline record is written for it.
+    """
+
+    snapshot_id: str
+    controls: Mapping[int, MemberControl]
+    records: Mapping[int, dict[str, object]]
+    refused: Mapping[int, str]
+
+
+def prepare_tracked_baselines(
+    requests: Sequence[LeaguePublicationRequest],
+    *,
+    read_capture: Callable[[Path, str], CapturedSnapshot] | None = None,
+) -> TrackedBaselines:
+    """Solve distinct entries before league rendering; page writers reuse these controls."""
+    if not requests:
+        raise DataError("A baseline batch needs at least one tracked league.")
+    first = requests[0]
+    shared_fields = (
+        "snapshot_root",
+        "snapshot_id",
+        "archive_root",
+        "season",
+        "gameweek",
+        "handoff_path",
+        "training_seasons",
+    )
+    if any(
+        any(getattr(request, field) != getattr(first, field) for field in shared_fields)
+        for request in requests[1:]
+    ):
+        raise DataError("Tracked baselines require one capture, projection and season.")
+    prepared = [
+        prepare_league_publication(request, read_capture=read_capture) for request in requests
+    ]
+    context = prepared[0]
+    snapshot, inputs, season = context.snapshot, context.inputs, context.season
+    panel = (
+        build_panel(
+            first.archive_root,
+            seasons=explicit_archive_seasons(first.training_seasons, current_season=season),
+        )
+        if first.training_seasons is not None
+        else build_panel(first.archive_root)
+    )
+    handoff = read_projection_handoff(first.handoff_path) if first.handoff_path else None
+    projection = project(inputs, panel, in_season=handoff)
+    rules = read_season_rules(snapshot, season=season)
+    provider = CapturePicksProvider(snapshot, first.snapshot_id)
+    entry_ids = sorted({entry.entry_id for league in prepared for entry in league.registrations})
+    controls: dict[int, MemberControl] = {}
+    records: dict[int, dict[str, object]] = {}
+    refused: dict[int, str] = {}
+    capture = RecordCapture(inputs.snapshot_id, inputs.captured_at_utc)
+    commit = repository_commit()
+    for entry_id in entry_ids:
+        # One entry's failure stays that entry's: a squad the capture cannot price, a
+        # planner refusal or a record the builder refuses. The entry keeps no control
+        # and no record, so its full-menu page solves it again as it did before this
+        # batch and refuses it there when that solve fails too, while every other entry
+        # and every league still publish.
+        try:
+            picks = provider.picks(entry_id, season, int(inputs.deadline.gameweek) - 1)
+            # At TRACKED_MEMBER_LINEARIZATION_LEVEL, the level every member control uses.
+            control = solve_member_control(picks, inputs, projection, rules)
+            payload = advise_entry(
+                AdviseEntryRequest(
+                    season, int(inputs.deadline.gameweek), first.league_id, entry_id
+                ),
+                provider=provider,
+                inputs=inputs,
+                projection=projection,
+                rules=rules,
+                control=control,
+            )
+            record = build_member_baseline_record(
+                picks,
+                projection,
+                payload,
+                capture=capture,
+                generated_at_utc=datetime.now(UTC).isoformat(),
+                transfer_config_fingerprint=control.transfer_config.configuration_fingerprint,
+                commit=commit,
+            )
+        except BASELINE_ERRORS as error:
+            refused[entry_id] = str(error)
+            continue
+        controls[entry_id] = control
+        records[entry_id] = record
+    return TrackedBaselines(first.snapshot_id, controls, records, refused)
 
 
 @dataclass(frozen=True, slots=True)
@@ -291,6 +412,7 @@ def publish_league(
     beside: Sequence[PublishedLeague] = (),
     read_capture: Callable[[Path, str], CapturedSnapshot] | None = None,
     on_stage: Callable[[str], None] | None = None,
+    baselines: TrackedBaselines | None = None,
 ) -> LeaguePublicationResult:
     """Publish the existing contracts; callbacks observe progress without owning the work."""
 
@@ -306,6 +428,7 @@ def publish_league(
         beside=beside,
         read_capture=read_capture,
         on_stage=on_stage,
+        baselines=baselines,
     )
 
 
@@ -428,13 +551,11 @@ def adopt_legacy_tree(site_data_root: Path, league_id: int) -> tuple[str, Path] 
 
 
 def records_advice_for(league_id: int) -> bool:
-    """Whether a publication of ``league_id`` may write the advice record.
+    """Whether to retain this league's legacy full-menu archive.
 
-    The record is keyed by season, gameweek, entry and capture, not by league, and the
-    member histories read it for one league (``weekly_suggestion_eval``). A member of two
-    leagues would otherwise be recorded twice for one capture with different documents,
-    which the record refuses. Until the record carries the league, the other leagues are
-    rendered and published without one.
+    New tracked leagues all receive independent baseline records. The first league
+    also keeps its existing published-menu records so prospective measurements and
+    historical advice digests retain their original meaning.
     """
 
     return league_id == SUPPORTED_LEAGUE_ID
@@ -664,6 +785,7 @@ def publish_prepared_league(
     beside: Sequence[PublishedLeague] = (),
     read_capture: Callable[[Path, str], CapturedSnapshot] | None = None,
     on_stage: Callable[[str], None] | None = None,
+    baselines: TrackedBaselines | None = None,
 ) -> LeaguePublicationResult:
     """Complete a prepared publication without rereading a possibly changing selector.
 
@@ -673,6 +795,10 @@ def publish_prepared_league(
 
     request = prepared.request
     snapshot, inputs, season = prepared.snapshot, prepared.inputs, prepared.season
+    if baselines is not None and (
+        baselines.snapshot_id != request.snapshot_id or request.baseline_record_root is None
+    ):
+        raise DataError("The publication needs a matching baseline batch and record root.")
     panel = (
         build_panel(
             request.archive_root,
@@ -764,11 +890,24 @@ def publish_prepared_league(
         top100_counts=top100_counts,
         top100_unavailable_reason=top100_reason,
         chip_forecast_source=forecast_source(snapshot),
+        controls=baselines.controls if baselines is not None else None,
         device_only=request.menu == "device",
     )
     if on_stage is not None:
         on_stage("members")
     outputs = [out_dir / name for name in report.files]
+    if baselines is not None and request.baseline_record_root is not None:
+        for member in report.members:
+            if not member.rendered or member.entry_id not in baselines.records:
+                continue
+            # The decision came from the server batch, before page rendering. Its
+            # first write is dated after the member page has actually been emitted.
+            record = {
+                **baselines.records[member.entry_id],
+                "generated_at_utc": report.generated_at_utc,
+            }
+            directory = record_member_advice(request.baseline_record_root, record)
+            outputs.extend(path for path in directory.iterdir() if path.is_file())
     table_file = write_device_plan_table(
         site_data,
         request.snapshot_id,
@@ -791,6 +930,7 @@ def publish_prepared_league(
                 out_dir=out_dir,
                 published=shown,
                 read_capture=read_capture,
+                baseline_record_root=request.baseline_record_root,
             )
         )
     if request.record_root is not None and request.menu == "full":
