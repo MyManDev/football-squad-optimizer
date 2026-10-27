@@ -117,6 +117,10 @@ function Captured-NewsId([string[]]$lines) {
 }
 
 function Acquire-WeeklyNews([string]$python, [string]$repo, [string]$settings, [string]$newsLog) {
+    # Merged with 2>&1, each line the command writes to stderr is an error record, and the
+    # script's 'Stop' would end the Friday run at the first warning. Here such a line is part
+    # of the receipt; the exit codes below still decide.
+    $ErrorActionPreference = 'Continue'
     $configuration = @('-m', 'scripts.capture_club_news', '--check-config')
     if ($settings) { $configuration += @('--settings-file', $settings) }
     $checkLines = @(& $python @configuration 2>&1 | ForEach-Object { [string]$_ })
