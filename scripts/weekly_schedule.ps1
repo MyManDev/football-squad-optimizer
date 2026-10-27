@@ -16,8 +16,12 @@ Deadlines decide, not weekdays, so a midweek deadline needs no exception. Each s
 marker under data\runtime\weekly-schedule\started (morning-<date>.json or
 final-<season>-gw<NN>.json) before weekly_run.ps1 runs, so a run that fails is not started
 again by the next tick. Each run gets its own site suffix (morning-<stamp> or final-<stamp>),
-so a morning run and a final run on the same day do not collide. The release after the run
-is not part of this script (#1243, step 3).
+so a morning run and a final run on the same day do not collide.
+
+-Release, off by default, releases a run this gate started once it exits 0: the gate reads the
+run id from the run's "log:" line and calls weekly_release.ps1 -RunId <run id> (#1243, step 3).
+It stays off until the owner decides D1, whether a release may run without a person; without
+it the run ends at its site pull request, as before.
 
 The defaults are the proposal on #1243; its decisions D2 (the final run's lead) and D3 (club
 news on every run) set them. A lead shorter than a run is refused: such a final run cannot be
@@ -28,8 +32,9 @@ live before its deadline (GW8: 3 h 34 min from capture to live).
 
 -DryRun prints the decision and the command it would run; it writes nothing under data and
 starts nothing. The exit code is 0 for a decision (starting nothing is one), the weekly run's
-own exit code when one started, 3 when the final run's window was missed, and 2 for a
-refusal: no deadline ahead, an unreadable bootstrap, or a lead shorter than a run.
+own exit code when one started (with -Release, the release's after a run that exited 0), 3 when
+the final run's window was missed, and 2 for a refusal: no deadline ahead, an unreadable
+bootstrap, or a lead shorter than a run.
 #>
 [CmdletBinding()]
 param(
@@ -40,6 +45,7 @@ param(
     [ValidateSet('tuesday', 'friday')][string]$MorningKind = 'friday',
     [string]$BootstrapPath = '',
     [string]$Now = '',
+    [switch]$Release,
     [switch]$DryRun
 )
 Set-StrictMode -Version 2.0
@@ -152,6 +158,27 @@ function Run-Suffix([string]$action, [datetime]$now) {
     return ('{0}-{1}' -f $action, $now.ToString('yyyyMMddTHHmm', [Globalization.CultureInfo]::InvariantCulture))
 }
 
+function Invoke-PowerShell([string[]]$arguments) {
+    # The one door to a child Windows PowerShell, so a test can put a fake in its place.
+    & powershell.exe @arguments
+}
+
+function Start-WeeklyRun([string[]]$arguments, [bool]$release, [string]$releaseScript) {
+    # Prints what the run prints as it prints it, and leaves the exit code in $LASTEXITCODE:
+    # the run's, or with -Release after a run that exited 0, the release's.
+    if (-not $release) { Invoke-PowerShell $arguments; return }
+    $runId = ''
+    Invoke-PowerShell $arguments | ForEach-Object {
+        if ([string]$_ -match '^log: .*\\([^\\]+)\.log$') { $runId = $Matches[1] }
+        $_
+    }
+    if ($LASTEXITCODE -ne 0) { return }
+    if (-not $runId) { Write-Output 'Refused: the run printed no log line, so there is no run id to release.'; $global:LASTEXITCODE = 2; return }
+    $releaseArguments = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $releaseScript, '-RunId', $runId)
+    Write-Output ('releasing: powershell.exe {0}' -f ($releaseArguments -join ' '))
+    Invoke-PowerShell $releaseArguments
+}
+
 if ($MyInvocation.InvocationName -eq '.') { return }
 
 $clock = if ($Now) { Parse-Utc $Now } else { (Get-Date).ToUniversalTime() }
@@ -185,9 +212,11 @@ if ($decision.Action -eq 'none') { exit 0 }
 $kind = Run-Kind $decision.Action $MorningKind
 $suffix = Run-Suffix $decision.Action $clock
 $script = Join-Path $RepoRoot 'scripts\weekly_run.ps1'
+$releaseScript = Join-Path $RepoRoot 'scripts\weekly_release.ps1'
 $arguments = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $script, '-Kind', $kind, '-Gameweek', [string]$decision.Gameweek, '-Suffix', $suffix)
 if ($DryRun) {
     Write-Output ('would run: powershell.exe {0}' -f ($arguments -join ' '))
+    if ($Release) { Write-Output ('would release a run that exits 0: powershell.exe -NoProfile -ExecutionPolicy Bypass -File {0} -RunId <its run id>' -f $releaseScript) }
     exit 0
 }
 New-Item -ItemType Directory -Force -Path $startedDirectory | Out-Null
@@ -196,5 +225,5 @@ New-Item -ItemType Directory -Force -Path $startedDirectory | Out-Null
     kind = $kind; suffix = $suffix; started_at_utc = (Format-Utc $clock)
 } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $startedDirectory ($decision.Marker + '.json')) -Encoding UTF8
 Write-Output ('starting: powershell.exe {0}' -f ($arguments -join ' '))
-& powershell.exe @arguments
+Start-WeeklyRun $arguments ([bool]$Release) $releaseScript
 exit $LASTEXITCODE

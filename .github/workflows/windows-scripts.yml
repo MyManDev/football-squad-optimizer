@@ -16,6 +16,7 @@ on:
       - "tests/unit/test_backend_parentage.py"
       - "tests/unit/test_weekly_run_scripts.py"
       - "tests/unit/test_weekly_schedule_script.py"
+      - "tests/unit/test_weekly_release_script.py"
       - "docs/deployment_runbook.md"
       - ".github/workflows/windows-scripts.yml"
   push:
@@ -33,6 +34,7 @@ on:
       - "tests/unit/test_backend_parentage.py"
       - "tests/unit/test_weekly_run_scripts.py"
       - "tests/unit/test_weekly_schedule_script.py"
+      - "tests/unit/test_weekly_release_script.py"
       - "docs/deployment_runbook.md"
       - ".github/workflows/windows-scripts.yml"
   workflow_dispatch:
@@ -93,7 +95,8 @@ jobs:
             'tests/unit/test_restart_backend_directory.py',
             'tests/unit/test_backend_parentage.py',
             'tests/unit/test_weekly_run_scripts.py',
-            'tests/unit/test_weekly_schedule_script.py'
+            'tests/unit/test_weekly_schedule_script.py',
+            'tests/unit/test_weekly_release_script.py'
           )
           # H1 is a separate PR; include its regressions as soon as that script lands.
           if (Test-Path -LiteralPath 'scripts/backup_data.ps1') {
