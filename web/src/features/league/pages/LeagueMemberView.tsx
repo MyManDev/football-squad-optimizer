@@ -336,8 +336,18 @@ function LeagueMemberContent({
           />
         }
       />
-      {/* What a member changes rarely waits folded: the experimental model and the Top 100
-          influence, beside the manager's word and the chips. */}
+      {/* The Top 100 influence stays in front, just after the plan: its options are useful
+          enough not to fold away (#1248). */}
+      <MemberDecisionControls
+        entryId={entryId}
+        members={members}
+        index={selection.status === "index-error" ? null : index}
+        capabilities={capabilities}
+        onDevice={onDevice}
+        part="top100"
+      />
+      {/* What a member changes rarely waits folded: the experimental model, beside the
+          manager's word and the chips. */}
       <Tool title={copy.advancedSettings}>
         <MemberDecisionControls
           entryId={entryId}
@@ -346,14 +356,6 @@ function LeagueMemberContent({
           capabilities={capabilities}
           onDevice={onDevice}
           part="model"
-        />
-        <MemberDecisionControls
-          entryId={entryId}
-          members={members}
-          index={selection.status === "index-error" ? null : index}
-          capabilities={capabilities}
-          onDevice={onDevice}
-          part="top100"
         />
         <MemberDecisionControls
           entryId={entryId}

@@ -158,9 +158,9 @@ for (const language of ["tr", "en"] as const) {
     const settings = page.getByRole("region", { name: members.planTitle });
     const compute = settings.getByRole("button", { name: members.computeButton, exact: true });
     await expect(settings.getByRole("radio", { name: /^3 / })).toBeChecked();
-    // The presets head the plan; the Top 100 influence waits under the advanced settings.
+    // The presets head the plan, and the Top 100 influence stays in front beside it (#1248).
     await expect(settings.getByRole("group", { name: members.templatesTitle })).toBeVisible();
-    await expect(settings.getByRole("group", { name: /Top 100/ })).toBeHidden();
+    await expect(settings.getByRole("group", { name: /Top 100/ })).toBeVisible();
     await compute.scrollIntoViewIfNeeded();
     await expect(compute).toBeInViewport({ ratio: 1 });
     await expect(page.getByRole("dialog")).toHaveCount(0);
@@ -262,8 +262,6 @@ for (const language of ["tr", "en"] as const) {
     const copy = MESSAGES[language].leagueMembers;
     const settings = page.getByRole("region", { name: copy.planTitle });
     await settings.getByRole("radio", { name: /^5 / }).click();
-    // The Top 100 influence is among the advanced settings, closed until asked for.
-    await settings.locator("summary", { hasText: copy.advancedSettings }).click();
     await settings.getByRole("radio", { name: "20", exact: true }).click();
     await expect(settings.getByRole("radio", { name: /^5 / })).toBeChecked();
     await expect(settings.getByRole("radio", { name: "20", exact: true })).toBeChecked();

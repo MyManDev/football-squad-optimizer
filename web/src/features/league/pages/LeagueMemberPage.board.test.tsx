@@ -546,20 +546,33 @@ describe("honesty and the tools", () => {
       expect(screen.getByText(title).closest("details")).not.toHaveAttribute("open");
     }
     const advanced = screen.getByText(copy.advancedSettings).closest("details")!;
-    // The rarely changed settings: the Top 100 influence, the manager's word and the chips.
-    for (const name of ["top100", "llm", "chip"]) {
+    // The rarely changed settings: the manager's word and the chips.
+    for (const name of ["llm", "chip"]) {
       expect(advanced.querySelectorAll(`input[name="${name}"]`).length).toBeGreaterThan(0);
     }
-    expect(within(advanced).getByRole("group", { name: "Top 100 etkisi" })).not.toBeVisible();
     // The templates are the plan's presets, not a block of their own among these.
     expect(within(advanced).queryByRole("group", { name: copy.templatesTitle })).toBeNull();
     expect(within(advanced).queryByRole("button", { name: copy.templateSave })).toBeNull();
     const settings = screen.getByRole("region", { name: copy.planTitle });
-    expect(within(settings).getByRole("group", { name: "Plan süresi" })).toBeVisible();
+    // The Top 100 influence stays in front, just after the plan and before the folded
+    // settings (#1248).
+    const top100 = within(settings).getByRole("group", { name: "Top 100 etkisi" });
+    const planWindow = within(settings).getByRole("group", { name: "Plan süresi" });
+    expect(top100).toBeVisible();
+    expect(planWindow).toBeVisible();
+    expect(
+      planWindow.compareDocumentPosition(top100) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      top100.compareDocumentPosition(advanced) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     expect(within(settings).getByRole("button", { name: "Hesapla" })).toBeVisible();
     expect(settings).toContainElement(advanced);
-    // The plan's own inputs are not in the advanced section, and each is on the page once.
-    expect(advanced.querySelector('input[name="strategy"], input[name="window"]')).toBeNull();
+    // The plan's own inputs and the Top 100 influence are not in the advanced section, and
+    // each is on the page once.
+    expect(
+      advanced.querySelector('input[name="strategy"], input[name="window"], input[name="top100"]'),
+    ).toBeNull();
     expect(container.querySelectorAll('input[name="window"]')).toHaveLength(3);
     expect(container.querySelectorAll('input[name="top100"]')).toHaveLength(7);
     expect(screen.getAllByRole("button", { name: "Hesapla" })).toHaveLength(1);

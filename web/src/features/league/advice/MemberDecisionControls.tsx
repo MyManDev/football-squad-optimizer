@@ -37,9 +37,10 @@
  * parameters the templates set and the compute panel reads, so the whole state stays shareable.
  *
  * The member page shows the plan (strategy, rival, window) with its presets at the top, so
- * the choice is made in one place; the model, the Top 100 influence, the manager's word and
- * the chips wait folded under the advanced settings of the same section. Each part renders
- * once and shares the URL selection; changing layout never resets the user's choices.
+ * the choice is made in one place, and the Top 100 influence just under it; the model, the
+ * manager's word and the chips wait folded under the advanced settings of the same section
+ * (#1248). Each part renders once and shares the URL selection; changing layout never resets
+ * the user's choices.
  */
 
 import type { ReactNode } from "react";
