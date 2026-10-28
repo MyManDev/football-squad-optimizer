@@ -1,4 +1,4 @@
-import { memberHistoryAddress } from "../../../lib/leagueAddresses";
+import { memberAddress, memberHistoryAddress } from "../../../lib/leagueAddresses";
 import { useLeagueId } from "../useLeague";
 import { NewInformationNotice } from "../advice/OfficialInformationCard";
 import { useMemo, type ReactNode } from "react";
@@ -179,14 +179,19 @@ function LeagueMemberContent({
     },
     searchParams,
   );
+  // Past its deadline the week is closed: nothing is computed for it and none of its plans
+  // can be applied, so the page leaves out what only changes or recomputes the plan.
+  const closed = deadlinePassed !== null;
   // With the service answering, a selection it computes and nobody published is not a
   // dead end: the panel offers the computation and no "not listed" card stands beside it.
-  // The same holds for a selection the member's device solves while the week is open,
-  // until a run ends without a plan: the card then says what is published again.
+  // The same holds for a selection the member's device solves, until a run ends without a
+  // plan: the card then says what is published again. Both hold only while the week is
+  // open; a closed week has no panel, so the card says what is published.
   const computeOnly =
     selection.status === "not-listed" &&
+    !closed &&
     ((computeAvailable && selection.computable !== undefined) ||
-      (device.available && deadlinePassed === null && !deviceEndedWithoutPlan(device.state)));
+      (device.available && !deviceEndedWithoutPlan(device.state)));
   // The what-if mode starts from the plan on screen when it is a solved week without a chip.
   const advised = advisedFifteen(shown?.envelope.payload);
   // The duel (#1133): the other human members, and the one `?duel=` names among them.
@@ -389,7 +394,6 @@ function LeagueMemberContent({
                 : undefined
         }
         chipChosen={selection.chip.chip !== null}
-        deadlinePassed={deadlinePassed !== null}
       />
       <MemberDecisionControls
         entryId={entryId}
@@ -449,10 +453,13 @@ function LeagueMemberContent({
                   {selectionSummary}
                 </p>
                 {/* The settings now sit under the decision, so the way to them is named
-                    where the decision says which settings it was made under. */}
-                <a href="#plan-settings" className={styles.changePlan}>
-                  {copy.changePlan}
-                </a>
+                    where the decision says which settings it was made under. A closed
+                    week has no settings to go to. */}
+                {closed ? null : (
+                  <a href="#plan-settings" className={styles.changePlan}>
+                    {copy.changePlan}
+                  </a>
+                )}
                 <p className={styles.echo} aria-live="polite">
                   {echo}
                 </p>
@@ -486,7 +493,9 @@ function LeagueMemberContent({
                       ? onRetryAdvice
                       : undefined
                 }
-                canCompute={computeAvailable}
+                canCompute={computeAvailable && !closed}
+                // The address the sidebar's own link lands on with no selection.
+                defaultPlan={closed ? memberAddress(leagueId, entryId) : undefined}
               />
             )}
           </div>
@@ -512,7 +521,9 @@ function LeagueMemberContent({
           ) : null}
         </section>
 
-        {planSettings}
+        {/* Every setting in it changes or recomputes a plan the closed week cannot apply;
+            the notice above says so, and when the next week's plan comes. */}
+        {closed ? null : planSettings}
 
         <div className={styles.tools}>
           {onPitch.source === "plan" && view.starting_xi.length > 0 ? (
@@ -532,13 +543,14 @@ function LeagueMemberContent({
               squad={squad}
               loading={adviceLoading}
             />
-            {capabilities?.models?.includes("football") && computeAvailable ? (
+            {/* The comparison's one action computes the other model, which a closed week
+                does not, so it is offered only while the week is open. */}
+            {capabilities?.models?.includes("football") && computeAvailable && !closed ? (
               <ModelComparison
                 request={request}
                 selected={shown?.envelope ?? null}
                 snapshot={view.source_snapshot_id}
                 client={client}
-                deadlinePassed={deadlinePassed !== null}
                 busy={job.state.phase === "waiting" || job.state.phase === "requesting"}
               />
             ) : null}

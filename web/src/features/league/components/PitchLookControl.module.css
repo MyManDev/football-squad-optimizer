@@ -1,13 +1,42 @@
 /*
- * The pitch's look under the bench: two labelled rows of buttons drawn as segmented
- * controls, the same faces as the Saha | Liste toggle. Nothing here moves.
+ * The pitch's look under the bench: one quiet closed menu, drawn as the page's other small
+ * disclosures (a muted line with its chevron, no box), holding two labelled rows of buttons
+ * drawn as segmented controls, the same faces as the Saha | Liste toggle. Only the chevron
+ * moves, as an icon does.
  */
 
 .looks {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1) var(--space-5);
   margin-top: var(--space-2);
+}
+
+.summary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 30px;
+  color: var(--color-text-muted);
+  font-size: var(--step--2);
+  font-weight: 500;
+  line-height: 16px;
+  list-style: none;
+  cursor: pointer;
+}
+
+.summary::-webkit-details-marker {
+  display: none;
+}
+
+.summary:hover {
+  color: var(--color-text);
+}
+
+.icon {
+  flex: none;
+  transition: transform var(--motion-ui-fast) var(--motion-ease);
+}
+
+.looks[open] .icon {
+  transform: rotate(90deg);
 }
 
 .row {
@@ -77,6 +106,10 @@
 
 /* Touch screens: 44 px targets that draw a 32 px face. */
 @media (max-width: 1179.98px) {
+  .summary {
+    min-height: 44px;
+  }
+
   .option {
     height: 44px;
   }
