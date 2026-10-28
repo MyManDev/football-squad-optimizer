@@ -2,6 +2,7 @@ import { Card } from "../../design/components/Card";
 import { EmptyState } from "../../design/components/EmptyState";
 import { useLanguage } from "../../i18n/context";
 import { upcomingFixtureWeeks, useFixtures } from "./data";
+import { DeadlineCalendar } from "./DeadlineCalendar";
 import { FIXTURES_COPY } from "./fixturesCopy";
 import { GameweekFixtures } from "./GameweekFixtures";
 import type { FixtureGameweek } from "./types";
@@ -10,7 +11,8 @@ import styles from "./Fixtures.module.css";
 /**
  * This week and next at the top, sharing the row, then every played gameweek, newest first,
  * side by side where the column has room for more than one, so a wide screen reads the
- * schedule like a fixture board instead of one narrow list down the page.
+ * schedule like a fixture board instead of one narrow list down the page. Under the title the
+ * deadlines still ahead can be taken into a calendar app as a file.
  */
 export function FixturesPage() {
   const { language, locale, messages } = useLanguage();
@@ -40,6 +42,7 @@ export function FixturesPage() {
         <h1 className={styles.pageTitle}>{copy.pageTitle}</h1>
         <p className={styles.lede}>{copy.pageLede}</p>
       </header>
+      <DeadlineCalendar payload={data} copy={copy} />
       {current || next ? (
         <div className={styles.upcoming} data-mark="upcoming-weeks">
           {current ? week(current, copy.thisWeek) : null}
