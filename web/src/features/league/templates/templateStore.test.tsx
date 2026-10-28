@@ -1,6 +1,6 @@
 /** Templates: named selections, applied through the URL, stored where the viewer is. */
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, useSearchParams } from "react-router";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
@@ -68,7 +68,13 @@ describe("the picker", () => {
   it("shows one builtin per member strategy and applies through the URL", () => {
     renderPicker();
 
-    fireEvent.click(screen.getByRole("button", { name: /Farkı koru/ }));
+    // One compact row of chips, named like a field and not a card with a heading of its own.
+    const row = screen.getByRole("group", { name: "Oyun şablonları" });
+    expect(screen.queryByRole("heading")).toBeNull();
+    const keep = within(row).getByRole("button", { name: /Farkı koru/ });
+    // A builtin is named by its strategy, so the chip adds only its window.
+    expect(within(keep).getByText("1 hafta")).toBeInTheDocument();
+    fireEvent.click(keep);
 
     // The standings neighbour is the producer's default: no rival parameter.
     expect(screen.getByTestId("selection").textContent).toBe("ortak-koru/1/-");

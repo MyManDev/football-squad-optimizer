@@ -679,8 +679,6 @@ const en = {
     alternativeWithinFreeAtMost: (applied: number, cost: string) =>
       `Alternative within free transfers: applied overlap bound ${applied}; cost at most ${cost} expected points against pure points.`,
     templatesTitle: "Game templates",
-    templatesBody:
-      "A template is a named strategy-and-window pair. Applying one sets the same shareable selection the controls read; your own templates live in this browser.",
     templateMeta: (strategy: string, window: number, rival: string) =>
       `${strategy} · ${window}w · ${rival}`,
     templateNamePlaceholder: "Name this combination",
@@ -1770,8 +1768,6 @@ const tr: MessageSchema<typeof en> = {
     alternativeWithinFreeAtMost: (applied: number, cost: string) =>
       `Ücretsiz transferler içinde kalan alternatif: uygulanan ortak oyuncu sınırı ${applied}; saf puana göre maliyet en fazla ${cost} beklenen puan.`,
     templatesTitle: "Oyun şablonları",
-    templatesBody:
-      "Şablon, adlandırılmış bir strateji-pencere çiftidir. Uygulamak, kontrollerin okuduğu paylaşılabilir seçimi kurar; kendi şablonların bu tarayıcıda durur.",
     templateMeta: (strategy: string, window: number, rival: string) =>
       `${strategy} · ${window}h · ${rival}`,
     templateNamePlaceholder: "Bu kombinasyonu adlandır",
