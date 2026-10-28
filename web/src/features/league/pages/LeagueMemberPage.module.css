@@ -132,6 +132,24 @@
   display: none;
 }
 
+/* The time left, a state tag beside the date; in the last hour it takes the warning tone
+   (warn on the tag's own surface, as the warn badge). */
+.countdown {
+  padding: 1px 6px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-s);
+  background: var(--color-surface);
+  font-size: var(--step--2);
+  font-weight: 600;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+.countdown[data-urgent] {
+  border-color: currentColor;
+  color: var(--color-warn);
+}
+
 .scoreBug {
   display: flex;
   margin: 0 0 0 auto;
@@ -246,6 +264,12 @@
 
   .deadlineShort {
     display: inline;
+  }
+
+  /* While it counts down, the time left stands in for the label and the date: the first
+     line keeps its width (the tag is about as wide as the two) and the team its room. */
+  .topWeek:has(.countdown) .deadline {
+    display: none;
   }
 
   /* One row, always: when a narrow phone or a wider font runs out of room, a long label
@@ -472,6 +496,48 @@ section.notice p {
   font-size: var(--step--2);
   font-weight: 600;
   line-height: 16px;
+}
+
+/* FPL'de uygula, the primary action that closes the decision, with what the member does
+   there beside it. On a phone it comes after the plan's last sentence (the decision's
+   parts are ordered there by MemberDecision.module.css, which stops at 9). */
+.apply {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.applyLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-s);
+  background: var(--color-primary);
+  color: var(--color-primary-text);
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.applyLink:hover {
+  background: var(--color-text);
+}
+
+.applyHint {
+  flex: 1 1 16ch;
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--step--2);
+  line-height: 16px;
+}
+
+@media (max-width: 599.98px) {
+  .apply {
+    order: 10;
+  }
 }
 
 /* ---- How it was worked out: the disclosure and the history link ---- */

@@ -13,6 +13,7 @@ import { clubCodesFromFixtures } from "../../../lib/clubs";
 import { AdviceRequestPanel } from "../advice/AdviceRequestPanel";
 import { ChipTimingCard } from "../advice/ChipTimingCard";
 import { COMPUTE_COPY } from "../advice/computeCopy";
+import { gameweekDeadline } from "../advice/deadline";
 import { MemberDecisionControls } from "../advice/MemberDecisionControls";
 import { deviceEndedWithoutPlan } from "../device/useDevicePlan";
 import { isDevicePlanEntry } from "../device/types";
@@ -37,6 +38,7 @@ import {
   MissingAdviceCard,
   PlanLineup,
 } from "./MemberAdviceCard";
+import { ApplyOnFpl } from "./ApplyOnFpl";
 import { HeldSquad, MemberSquad } from "./MemberSquad";
 import { hasLineup, squadOnPitch } from "./squadOnPitch";
 import { MemberTopBar } from "./MemberTopBar";
@@ -137,6 +139,7 @@ function LeagueMemberContent({
   duelIssue,
   windowControl = null,
   deadlinePassed = null,
+  now,
   fixtures = null,
   fixturesPending = false,
 }: LeagueMemberViewProps) {
@@ -231,6 +234,10 @@ function LeagueMemberContent({
   const codes = useMemo(() => clubCodesFromFixtures(fixtures), [fixtures]);
   const plan = !adviceLoading && shown ? shown.envelope.payload : null;
   const onPitch = squadOnPitch(plan, view);
+  // The week can still be changed only while the calendar states a deadline that is ahead:
+  // an unknown deadline is not an open week, so nothing is offered to apply then.
+  const weekOpen =
+    deadlinePassed === null && gameweekDeadline(fixtures, view.season, view.gameweek) !== null;
   // One fixture rail: its own column from 1180 px (and on a page rendered without the
   // shell), beside the squad on a tablet, and a sheet over the page on a phone.
   const railPlacement: RailPlacement = !shell
@@ -410,6 +417,7 @@ function LeagueMemberContent({
           members={members}
           fixtures={fixtures}
           deadlinePassed={deadlinePassed}
+          now={now}
         />
 
         {deadlinePassed !== null ? (
@@ -489,6 +497,8 @@ function LeagueMemberContent({
                 canCompute={computeAvailable}
               />
             )}
+            {/* The decision ends with the way to make it: the game's own page, in a new tab. */}
+            {plan && weekOpen ? <ApplyOnFpl plan={plan} squad={view} /> : null}
           </div>
           {/* A phone reads the decision, then what to make of it, then the squad (as
               D-Phone-Bu-Hafta draws it); wider layouts put the squad first. Both are placed
