@@ -104,6 +104,8 @@ describe("the week screen's arrival", () => {
   });
 
   it("brings the plates up in the pitch's order, keeper first, in the data time", () => {
+    // Opacity only: no plate's box, nor a mark inside it, is ever drawn smaller than at rest.
+    expect(APPEAR.flatMap((frame) => Object.keys(frame))).toEqual(["opacity", "opacity"]);
     render(view());
     expect(plates()).toHaveLength(11);
     plates().forEach((plate, index) =>

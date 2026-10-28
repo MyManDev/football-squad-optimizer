@@ -29,11 +29,11 @@ export const RISE: Keyframe[] = [
 /** The bar fills from its start to its value: uncovered, not stretched, so its labels hold. */
 export const FILL: Keyframe[] = [{ clipPath: "inset(0 100% 0 0)" }, { clipPath: "inset(0 0 0 0)" }];
 
-/** A plate appears where it stands: its centre never moves, so the lines hold their places. */
-export const APPEAR: Keyframe[] = [
-  { opacity: 0, transform: "scale(0.94)" },
-  { opacity: 1, transform: "none" },
-];
+/**
+ * A plate appears where it stands, in opacity alone: a scale would shrink its box and the
+ * marks inside it (the coach-news link's 24 px target among them) for as long as it runs.
+ */
+export const APPEAR: Keyframe[] = [{ opacity: 0 }, { opacity: 1 }];
 
 /** Board steps after the card, at most: a Wildcard's fifteen boards do not queue for a second. */
 const BOARD_STEPS = 6;
