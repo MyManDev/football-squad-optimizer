@@ -390,12 +390,15 @@ section.notice p {
   }
 }
 
-/* The decision leads the page as a card of its own, lifted off the page by its surface. */
+/* The decision leads the page as a card of its own, lifted off the page by its surface. Its
+   rhythm is tight (8 px between its parts, 12 px inside its edge above and below), so on a
+   laptop the decision, the pitch and the honesty block still share one screen
+   (member-pitch.spec.ts); a phone sets its own below. */
 .decision {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
-  padding: var(--space-4);
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
   border: 1px solid var(--color-line);
   border-radius: var(--radius-m);
   background: var(--color-surface);

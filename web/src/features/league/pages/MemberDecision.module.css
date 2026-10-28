@@ -335,7 +335,7 @@
   --ppp: 100px;
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-1);
   min-width: 0;
 }
 
@@ -366,9 +366,9 @@
   flex: none;
   color: var(--color-text);
   font-family: var(--font-display);
-  font-size: 36px;
+  font-size: 32px;
   font-weight: 800;
-  line-height: 40px;
+  line-height: 34px;
 }
 
 .moves {
@@ -392,7 +392,7 @@
   font-family: var(--font-display);
   font-size: 17px;
   font-weight: 700;
-  line-height: 20px;
+  line-height: 18px;
 }
 
 /* Green only for a gain; a plan that loses against holding is said in the loss colour. */
@@ -632,7 +632,7 @@
   align-items: center;
   gap: var(--space-2);
   margin: 0;
-  padding: 5px var(--space-3);
+  padding: 3px var(--space-3);
   border: 2px solid var(--color-text);
   border-radius: var(--radius-s);
   font-family: var(--font-display);
@@ -675,6 +675,13 @@
     gap: var(--space-2);
   }
 
+  /* The phone's headline figure and stamp keep the artboard's size; wider screens draw them
+     a little tighter to keep the laptop budget (LeagueMemberPage.module.css). */
+  .gainFigure {
+    font-size: 36px;
+    line-height: 40px;
+  }
+
   /* Keep more space between the two roles than between each role's badge, name and
      figures. Compact inner gaps let the published Magalhães / Gibbs-White pair fit a
      360 px phone without hiding names or reducing the type size. */
@@ -702,6 +709,7 @@
   .stampBox {
     order: 5;
     grid-column: 1;
+    padding-block: 5px;
     justify-self: start;
     align-self: center;
   }
