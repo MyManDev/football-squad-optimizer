@@ -20,9 +20,14 @@ anything runs, so a run that fails is not started again by the next tick, and ea
 publishes under its own site suffix (``morning-<stamp>`` or ``final-<stamp>``). A Friday-kind
 run, which the final run always is, first acquires the week's club news in this process.
 
+``--release``, off by default, releases a run the gate started once its weekly command exits
+0, with ``weekly_release.release_run`` (#1249 in Python): D1 on #1243, decided on 2026-10-28,
+lets that release run with no person. Without it a run ends at its site pull request.
+
 ``--dry-run`` prints the decision and the command it would run, and writes nothing. The exit
-code is 0 for a decision (starting nothing is one), the weekly command's own when one ran, 3
-when the final run's window was missed, and 2 for a refusal before the weekly command ran.
+code is 0 for a decision (starting nothing is one), the weekly command's own when one ran
+(with ``--release``, the release's after a run that exited 0), 3 when the final run's window
+was missed, and 2 for a refusal before the weekly command ran.
 """
 
 from __future__ import annotations
@@ -47,7 +52,7 @@ from squadopt.data.atomic import replace_retrying
 from squadopt.data.errors import DataError
 from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, gameweek_deadlines
 from squadopt.data.timestamps import as_instant
-from squadopt.platform import club_news_acquire
+from squadopt.platform import club_news_acquire, weekly_release
 from squadopt.platform.fpl_capture import ENDPOINTS, fetch
 
 #: The defaults #1243 proposes, its decision D2: a morning run from 02:00 UTC, the final run
@@ -355,8 +360,8 @@ def start_run(
     """Start the decided run: its marker, the checkout, the club news, the weekly command.
 
     `release` is the one place the release chain of #1249 (#1243, step 3) is called, with the
-    run id, after a weekly command that exited 0. It is not ported yet, and stays `None`, so off,
-    until the owner decides D1: whether a release may run without a person.
+    run id, after a weekly command that exited 0: `main` passes `weekly_release.release_run`
+    with ``--release`` and `None`, so no release, without it.
     """
 
     identity = run_id(kind, season, decision.gameweek, now)
@@ -416,6 +421,11 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         help=f"private club-news settings (or ${SETTINGS_VARIABLE})",
     )
+    parser.add_argument(
+        "--release",
+        action="store_true",
+        help="release a run that exits 0, with no person (#1243 D1); off by default",
+    )
     parser.add_argument("--dry-run", action="store_true", help="print the decision, write nothing")
     return parser
 
@@ -426,8 +436,12 @@ def main(
     runner: Runner = run_logged,
     acquire: Acquire = club_news_acquire.main,
     read_bootstrap: Callable[[], bytes] = fpl_bootstrap,
+    release: Release = weekly_release.release_run,
 ) -> int:
-    """Decide this tick and start its run; `runner`, `acquire` and `read_bootstrap` are seams."""
+    """Decide this tick and start its run, and release the run only with ``--release``.
+
+    `runner`, `acquire`, `read_bootstrap` and `release` are seams.
+    """
 
     arguments = build_parser().parse_args(argv)
     workspace = arguments.workspace.resolve()
@@ -465,16 +479,19 @@ def main(
         return 0
     kind = run_kind(decision.action, arguments.morning_kind)
     if arguments.dry_run:
+        identity = run_id(kind, season, decision.gameweek, now)
         preview = weekly_arguments(
             kind,
             season,
             decision.gameweek,
             arguments.workers,
-            run_id(kind, season, decision.gameweek, now),
+            identity,
             run_suffix(decision.action, now),
             "<club-news capture>" if kind == "friday" else "",
         )
         print(f"would run: {sys.executable} {' '.join(preview)}")
+        if arguments.release:
+            print(f"would release {identity} once it exits 0, with {weekly_release.__name__}")
         return 0
     settings = arguments.club_news_settings or os.environ.get(SETTINGS_VARIABLE)
     return start_run(
@@ -487,6 +504,7 @@ def main(
         settings=Path(settings) if settings else None,
         runner=runner,
         acquire=acquire,
+        release=release if arguments.release else None,
     )
 
 
