@@ -220,8 +220,8 @@ describe("the latest finished week's card", () => {
     },
   );
 
-  it("sits above this week's decisions and the decision itself", () => {
-    // A solved plan with its captain, so the week's story has a card to show.
+  it("sits above this week's decision", () => {
+    // A solved plan with its captain, so the decision card has a plan to lead with.
     const base = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1);
     const [captain, vice] = base.payload.starting_xi!;
     const { container } = show("tr", {
@@ -231,9 +231,7 @@ describe("the latest finished week's card", () => {
       },
     });
     const shown = card(container)!;
-    const story = screen.getByRole("navigation", { name: MESSAGES.tr.leagueMembers.storyTitle });
     const decision = screen.getByRole("region", { name: MESSAGES.tr.leagueMembers.decisionTitle });
-    expect(shown.compareDocumentPosition(story) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(shown.compareDocumentPosition(decision) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 

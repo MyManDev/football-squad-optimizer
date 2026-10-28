@@ -1,7 +1,7 @@
-import { memberHistoryAddress } from "../../../lib/leagueAddresses";
+import { memberAddress, memberHistoryAddress } from "../../../lib/leagueAddresses";
 import { useLeagueId } from "../useLeague";
 import { NewInformationNotice } from "../advice/OfficialInformationCard";
-import { useMemo, type ReactNode } from "react";
+import { useMemo, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Link, useSearchParams } from "react-router";
 
@@ -46,9 +46,9 @@ import { rivalCandidates } from "../advice/adviceSelection";
 import { canDuel, duelRivalId } from "./duelSides";
 import { RivalDuel } from "./RivalDuel";
 import { SquadCard } from "../card/SquadCard";
-import { WeekStory } from "./WeekStory";
 import { LastWeekCard } from "./LastWeekCard";
 import { lastWeekResult } from "./lastWeekResult";
+import { useWeekArrival } from "./weekArrival";
 import styles from "./LeagueMemberPage.module.css";
 
 export function LeagueMemberView(props: LeagueMemberViewProps) {
@@ -183,14 +183,19 @@ function LeagueMemberContent({
     },
     searchParams,
   );
+  // Past its deadline the week is closed: nothing is computed for it and none of its plans
+  // can be applied, so the page leaves out what only changes or recomputes the plan.
+  const closed = deadlinePassed !== null;
   // With the service answering, a selection it computes and nobody published is not a
   // dead end: the panel offers the computation and no "not listed" card stands beside it.
-  // The same holds for a selection the member's device solves while the week is open,
-  // until a run ends without a plan: the card then says what is published again.
+  // The same holds for a selection the member's device solves, until a run ends without a
+  // plan: the card then says what is published again. Both hold only while the week is
+  // open; a closed week has no panel, so the card says what is published.
   const computeOnly =
     selection.status === "not-listed" &&
+    !closed &&
     ((computeAvailable && selection.computable !== undefined) ||
-      (device.available && deadlinePassed === null && !deviceEndedWithoutPlan(device.state)));
+      (device.available && !deviceEndedWithoutPlan(device.state)));
   // The what-if mode starts from the plan on screen when it is a solved week without a chip.
   const advised = advisedFifteen(shown?.envelope.payload);
   // The duel (#1133): the other human members, and the one `?duel=` names among them.
@@ -238,6 +243,9 @@ function LeagueMemberContent({
   const lastWeek = lastWeekResult(view, scoreboard, history);
   const plan = !adviceLoading && shown ? shown.envelope.payload : null;
   const onPitch = squadOnPitch(plan, view);
+  // The page arrives once, and its decision once it is drawn (weekArrival.ts).
+  const arrival = useRef<HTMLDivElement>(null);
+  useWeekArrival(arrival, !adviceLoading && !rivalsLoading && shown != null);
   // One fixture rail: its own column from 1180 px (and on a page rendered without the
   // shell), beside the squad on a tablet, and a sheet over the page on a phone.
   const railPlacement: RailPlacement = !shell
@@ -321,6 +329,8 @@ function LeagueMemberContent({
       // The decision's "change settings" link lands here; focus follows it.
       tabIndex={-1}
     >
+      {/* The plan is chosen in one place: the templates head it as presets that set the same
+          strategy and window as the controls under them. */}
       <MemberDecisionControls
         entryId={entryId}
         members={members}
@@ -328,7 +338,21 @@ function LeagueMemberContent({
         capabilities={capabilities}
         onDevice={onDevice}
         part="plan"
+        presets={
+          <TemplatePicker
+            canApply={(params) => {
+              const offered = resolve(params);
+              return (
+                !adviceLoading &&
+                indexReadable &&
+                (offered.status === "ready" || offered.computable?.selection === true)
+              );
+            }}
+          />
+        }
       />
+      {/* The Top 100 influence stays in front, just after the plan: its options are useful
+          enough not to fold away (#1248). */}
       <MemberDecisionControls
         entryId={entryId}
         members={members}
@@ -337,7 +361,17 @@ function LeagueMemberContent({
         onDevice={onDevice}
         part="top100"
       />
+      {/* What a member changes rarely waits folded: the experimental model, beside the
+          manager's word and the chips. */}
       <Tool title={copy.advancedSettings}>
+        <MemberDecisionControls
+          entryId={entryId}
+          members={members}
+          index={selection.status === "index-error" ? null : index}
+          capabilities={capabilities}
+          onDevice={onDevice}
+          part="model"
+        />
         <MemberDecisionControls
           entryId={entryId}
           members={members}
@@ -353,16 +387,6 @@ function LeagueMemberContent({
           fixtures={fixtures}
         />
         <DecisionPreferencesPanel squad={view} available={capabilities?.preferences === true} />
-        <TemplatePicker
-          canApply={(params) => {
-            const offered = resolve(params);
-            return (
-              !adviceLoading &&
-              indexReadable &&
-              (offered.status === "ready" || offered.computable?.selection === true)
-            );
-          }}
-        />
       </Tool>
       <AdviceRequestPanel
         dockClassName={styles.computeDock}
@@ -396,7 +420,6 @@ function LeagueMemberContent({
                 : undefined
         }
         chipChosen={selection.chip.chip !== null}
-        deadlinePassed={deadlinePassed !== null}
       />
       <MemberDecisionControls
         entryId={entryId}
@@ -410,7 +433,7 @@ function LeagueMemberContent({
   );
 
   return (
-    <div className={styles.layout} data-rail={railPlacement}>
+    <div ref={arrival} className={styles.layout} data-rail={railPlacement}>
       <div className={styles.page}>
         <MemberTopBar
           squad={squad}
@@ -455,8 +478,6 @@ function LeagueMemberContent({
           />
         ) : null}
 
-        {plan ? <WeekStory view={plan} /> : null}
-
         <section aria-labelledby="entry-advice-title" className={styles.adviceSection}>
           <div className={styles.decision} data-mark="decision">
             <div className={styles.headingRow}>
@@ -468,10 +489,13 @@ function LeagueMemberContent({
                   {selectionSummary}
                 </p>
                 {/* The settings now sit under the decision, so the way to them is named
-                    where the decision says which settings it was made under. */}
-                <a href="#plan-settings" className={styles.changePlan}>
-                  {copy.changePlan}
-                </a>
+                    where the decision says which settings it was made under. A closed
+                    week has no settings to go to. */}
+                {closed ? null : (
+                  <a href="#plan-settings" className={styles.changePlan}>
+                    {copy.changePlan}
+                  </a>
+                )}
                 <p className={styles.echo} aria-live="polite">
                   {echo}
                 </p>
@@ -505,7 +529,9 @@ function LeagueMemberContent({
                       ? onRetryAdvice
                       : undefined
                 }
-                canCompute={computeAvailable}
+                canCompute={computeAvailable && !closed}
+                // The address the sidebar's own link lands on with no selection.
+                defaultPlan={closed ? memberAddress(leagueId, entryId) : undefined}
               />
             )}
           </div>
@@ -531,7 +557,9 @@ function LeagueMemberContent({
           ) : null}
         </section>
 
-        {planSettings}
+        {/* Every setting in it changes or recomputes a plan the closed week cannot apply;
+            the notice above says so, and when the next week's plan comes. */}
+        {closed ? null : planSettings}
 
         <div className={styles.tools}>
           {onPitch.source === "plan" && view.starting_xi.length > 0 ? (
@@ -551,13 +579,14 @@ function LeagueMemberContent({
               squad={squad}
               loading={adviceLoading}
             />
-            {capabilities?.models?.includes("football") && computeAvailable ? (
+            {/* The comparison's one action computes the other model, which a closed week
+                does not, so it is offered only while the week is open. */}
+            {capabilities?.models?.includes("football") && computeAvailable && !closed ? (
               <ModelComparison
                 request={request}
                 selected={shown?.envelope ?? null}
                 snapshot={view.source_snapshot_id}
                 client={client}
-                deadlinePassed={deadlinePassed !== null}
                 busy={job.state.phase === "waiting" || job.state.phase === "requesting"}
               />
             ) : null}

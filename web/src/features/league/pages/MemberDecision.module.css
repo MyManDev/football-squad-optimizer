@@ -1,11 +1,13 @@
 /*
- * The decision: the fourth official's substitution boards (the one dark object on the
- * page besides the grass), the gain strip, the captain line and the proof stamp.
+ * The decision: the gain strip as its headline, the fourth official's substitution boards
+ * (the one dark object on the page besides the grass), the captain line, the chosen chip
+ * and the proof stamp.
  *
  * Contrast on the board (WCAG formula): white is 5.6:1 on the red panel and 5.3:1 on the
  * green one; lime and board-muted are 13.5:1 and 11.9:1 on the board; ink is 9.8:1 on the
  * second bar segment and white 5.4:1 on the first. Uppercase and letter-spacing are used
- * here only because these are broadcast elements: the board words, DEĞİŞİKLİK and the stamp.
+ * here only because these are broadcast elements: the board words and DEĞİŞİKLİK. The proof
+ * stamp keeps its capitals but is drawn as a tag.
  */
 
 /* ---- Substitution boards ---- */
@@ -334,7 +336,7 @@
   --ppp: 100px;
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-1);
   min-width: 0;
 }
 
@@ -343,6 +345,15 @@
   flex-wrap: wrap;
   align-items: flex-start;
   gap: var(--space-2) var(--space-5);
+}
+
+/* The card's headline: the figure, the largest on the card, and beside it how many changes
+   make it, label over count as the captain line labels its names. */
+.headline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
 }
 
 .gainHead {
@@ -356,9 +367,33 @@
   flex: none;
   color: var(--color-text);
   font-family: var(--font-display);
-  font-size: 30px;
+  font-size: 32px;
   font-weight: 800;
   line-height: 34px;
+}
+
+.moves {
+  display: grid;
+  margin: 0;
+}
+
+.gainHead + .moves {
+  padding-left: var(--space-4);
+  border-left: 1px solid var(--color-line);
+}
+
+.movesLabel,
+.chipWord {
+  color: var(--color-text-muted);
+  font-size: var(--step--2);
+  line-height: 16px;
+}
+
+.movesCount {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 18px;
 }
 
 /* Green only for a gain; a plan that loses against holding is said in the loss colour. */
@@ -528,6 +563,26 @@
   font-weight: 600;
 }
 
+/* ---- The chosen chip, under the armband ---- */
+
+.chipLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--space-2);
+  margin: 0;
+}
+
+/* The link's text is small and its target is not: 44 px for a thumb, with the negative
+   margin keeping the line the height its text needs. */
+.chipMore {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin-block: -14px;
+  font-size: var(--step--1);
+}
+
 /* ---- Proof stamp, beside the decision heading ---- */
 
 .stamp {
@@ -573,24 +628,35 @@
   display: none;
 }
 
+/* The proof is a state of the plan, not something to press: it wears the house tag
+   (Badge.module.css, the good tone) with its tick, small and outlined in its own green, and
+   never the ink box an outlined button draws. */
 .stampBox {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-1);
+  min-height: 20px;
   margin: 0;
-  padding: 5px var(--space-3);
-  border: 2px solid var(--color-text);
+  padding: 1px 6px;
+  border: 1px solid currentColor;
   border-radius: var(--radius-s);
-  font-family: var(--font-display);
-  font-size: 15px;
-  font-weight: 700;
-  line-height: 20px;
-  letter-spacing: 0.04em;
+  background: var(--color-surface);
+  color: var(--color-good);
+  font-size: var(--step--2);
+  font-weight: 600;
+  line-height: 16px;
   white-space: nowrap;
 }
 
-/* On a phone the decision reads as D-Phone-Bu-Hafta draws it: the boards, the captain
-   line, the gain figure and its bar, the proof stamp beside the week's transfer facts,
+.stampBox svg {
+  flex: none;
+  width: 12px;
+  height: 12px;
+}
+
+/* On a phone the decision reads as D-Phone-Bu-Hafta draws it, under its headline (the
+   gain figure with the number of changes, then its bar, in the document's order): the
+   boards, the captain line and the chip, the proof stamp beside the week's transfer facts,
    then the boards' shared reason and the sentences that qualify the plan. LeagueMemberPage.module.css makes the decision a two-column grid there; the
    boards' wrapper, the gain strip and the stamp step aside (display: contents) so each of
    their parts takes its own place in that grid, in the order below. */
@@ -607,7 +673,7 @@
   .noMove,
   .missing,
   .captain,
-  .gainHead,
+  .headline,
   .bar,
   .gainList,
   .facts,
@@ -620,6 +686,13 @@
     gap: var(--space-2);
   }
 
+  /* The phone's headline figure and stamp keep the artboard's size; wider screens draw them
+     a little tighter to keep the laptop budget (LeagueMemberPage.module.css). */
+  .gainFigure {
+    font-size: 36px;
+    line-height: 40px;
+  }
+
   /* Keep more space between the two roles than between each role's badge, name and
      figures. Compact inner gaps let the published Magalhães / Gibbs-White pair fit a
      360 px phone without hiding names or reducing the type size. */
@@ -629,18 +702,12 @@
     column-gap: var(--space-3);
   }
 
+  .chipLine {
+    order: 1;
+  }
+
   .armband {
     gap: var(--space-1);
-  }
-
-  .gainHead {
-    order: 2;
-    margin-top: var(--space-1);
-  }
-
-  .bar,
-  .gainList {
-    order: 3;
   }
 
   .stampTags {
