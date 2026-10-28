@@ -238,6 +238,10 @@ function LeagueMemberContent({
   // an unknown deadline is not an open week, so nothing is offered to apply then.
   const weekOpen =
     deadlinePassed === null && gameweekDeadline(fixtures, view.season, view.gameweek) !== null;
+  // The way to make the decision on the game's own page, in a new tab. It is placed in the
+  // document where it is seen (the heading row, or the end of the decision on a phone), so
+  // the tab order follows the screen.
+  const apply = plan && weekOpen ? <ApplyOnFpl plan={plan} squad={view} /> : null;
   // One fixture rail: its own column from 1180 px (and on a page rendered without the
   // shell), beside the squad on a tablet, and a sheet over the page on a phone.
   const railPlacement: RailPlacement = !shell
@@ -466,6 +470,7 @@ function LeagueMemberContent({
                 </p>
               </div>
               {!adviceLoading && shown ? <AdviceStamp shown={shown} /> : null}
+              {layout === "phone" ? null : apply}
             </div>
             {adviceLoading ? (
               <EmptyState title={copy.loadingAdvice} />
@@ -497,8 +502,7 @@ function LeagueMemberContent({
                 canCompute={computeAvailable}
               />
             )}
-            {/* The decision ends with the way to make it: the game's own page, in a new tab. */}
-            {plan && weekOpen ? <ApplyOnFpl plan={plan} squad={view} /> : null}
+            {layout === "phone" ? apply : null}
           </div>
           {/* A phone reads the decision, then what to make of it, then the squad (as
               D-Phone-Bu-Hafta draws it); wider layouts put the squad first. Both are placed

@@ -75,7 +75,9 @@ function timeLeft(minutes: number, units: CountdownUnits): string {
  * phone; with no stated deadline, the week alone. Given the page's clock, an open deadline
  * also shows the time left, rounded down to the minute: it changes once a minute, so it is
  * not a live region (a reader hears it where they reach it, not every minute), and in the
- * last hour it takes the warning tone. On a phone it stands in for the label and the date.
+ * last hour it takes the warning tone. It takes the label's line, so the week is no wider
+ * and the bar keeps its lines (the label stays for a screen reader); on a phone it stands
+ * in for the date as well.
  */
 export function TopWeek({
   gameweek,
@@ -96,22 +98,22 @@ export function TopWeek({
       <p className={styles.weekLabel}>{copy.weekLabel(gameweek)}</p>
       {deadline ? (
         <p className={styles.deadline}>
-          <span className={styles.deadlineLabel}>
+          <span className={left !== null ? "visually-hidden" : styles.deadlineLabel}>
             {passed ? copy.deadlinePassedLabel : copy.deadlineLabel}
           </span>{" "}
+          {left !== null ? (
+            <time
+              className={styles.countdown}
+              dateTime={deadline}
+              data-urgent={left < 60 ? "" : undefined}
+              data-testid="deadline-countdown"
+            >
+              {copy.deadlineLeft(timeLeft(left, copy.countdownUnits))}
+            </time>
+          ) : null}
           <span className={styles.deadlineLong}>{deadlineLong(deadline, locale)}</span>
           <span className={styles.deadlineShort}>{deadlineShort(deadline, locale)}</span>
         </p>
-      ) : null}
-      {deadline && left !== null ? (
-        <time
-          className={styles.countdown}
-          dateTime={deadline}
-          data-urgent={left < 60 ? "" : undefined}
-          data-testid="deadline-countdown"
-        >
-          {copy.deadlineLeft(timeLeft(left, copy.countdownUnits))}
-        </time>
       ) : null}
     </div>
   );

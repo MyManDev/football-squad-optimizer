@@ -132,16 +132,17 @@
   display: none;
 }
 
-/* The time left, a state tag beside the date; in the last hour it takes the warning tone
-   (warn on the tag's own surface, as the warn badge). */
+/* The time left, a state tag on the label's line, no taller than the label (16 px), so the
+   pinned bar keeps its height and the page's scroll padding still clears it. In the last
+   hour it takes the warning tone (warn on the tag's own surface, as the warn badge). */
 .countdown {
-  padding: 1px 6px;
+  align-self: flex-start;
+  padding: 0 5px;
   border: 1px solid var(--color-line);
   border-radius: var(--radius-s);
   background: var(--color-surface);
-  font-size: var(--step--2);
   font-weight: 600;
-  line-height: 16px;
+  line-height: 14px;
   white-space: nowrap;
 }
 
@@ -266,9 +267,9 @@
     display: inline;
   }
 
-  /* While it counts down, the time left stands in for the label and the date: the first
-     line keeps its width (the tag is about as wide as the two) and the team its room. */
-  .topWeek:has(.countdown) .deadline {
+  /* While it counts down, the time left stands in for the date too: the first line keeps
+     its width (the tag is about as wide as the label and the date) and the team its room. */
+  .deadline:has(.countdown) .deadlineShort {
     display: none;
   }
 
@@ -403,6 +404,7 @@ section.notice p {
 }
 
 .decision {
+  container: decision / inline-size;
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
@@ -498,10 +500,14 @@ section.notice p {
   line-height: 16px;
 }
 
-/* FPL'de uygula, the primary action that closes the decision, with what the member does
-   there beside it. On a phone it comes after the plan's last sentence (the decision's
-   parts are ordered there by MemberDecision.module.css, which stops at 9). */
+/* FPL'de uygula, the primary action, with what the member does there beside it. Where the
+   decision is 760 px wide it closes the heading row beside the proof stamp, button over
+   hint, and the row keeps the two lines its heading takes there, so the decision, the
+   pitch and the honesty block still share a laptop's screen; a narrower decision gives it
+   the row's next line. On a phone LeagueMemberView places it at the end of the decision,
+   after the plan's last sentence (MemberDecision.module.css orders the parts up to 9). */
 .apply {
+  grid-column: 1 / -1;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -532,6 +538,30 @@ section.notice p {
   color: var(--color-text-muted);
   font-size: var(--step--2);
   line-height: 16px;
+}
+
+/* With a pointer beside the sidebar the button is no taller than the stamp's line. */
+@media (min-width: 1180px) {
+  .applyLink {
+    min-height: 32px;
+  }
+}
+
+@container decision (min-width: 760px) {
+  .headingRow:has(> .apply) {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+  }
+
+  .apply {
+    grid-column: auto;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+  }
+
+  .applyHint {
+    flex: none;
+  }
 }
 
 @media (max-width: 599.98px) {
