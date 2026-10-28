@@ -11,3 +11,13 @@
   animation-duration: var(--motion-ui);
   animation-timing-function: var(--motion-ease);
 }
+
+/* The member pages' pinned top bar (LeagueMemberPage.module.css) is captured on its own, so
+   it holds still while the page under it fades; where two pages' bars differ, one fades into
+   the other in place, in the same time. */
+::view-transition-group(member-bar),
+::view-transition-old(member-bar),
+::view-transition-new(member-bar) {
+  animation-duration: var(--motion-ui);
+  animation-timing-function: var(--motion-ease);
+}

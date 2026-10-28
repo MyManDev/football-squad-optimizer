@@ -679,8 +679,6 @@ const en = {
     alternativeWithinFreeAtMost: (applied: number, cost: string) =>
       `Alternative within free transfers: applied overlap bound ${applied}; cost at most ${cost} expected points against pure points.`,
     templatesTitle: "Game templates",
-    templatesBody:
-      "A template is a named strategy-and-window pair. Applying one sets the same shareable selection the controls read; your own templates live in this browser.",
     templateMeta: (strategy: string, window: number, rival: string) =>
       `${strategy} · ${window}w · ${rival}`,
     templateNamePlaceholder: "Name this combination",
@@ -800,9 +798,8 @@ const en = {
     linkLabel: "Open league members →",
     // Direction D's member page: the top bar, the decision board, the plan in the sidebar.
     decisionTitle: "This week's move",
-    // The week as short cards above the decision (#1134): transfers, captain and chip, each
-    // opening into its detail below. Rendered from the advice document only.
-    storyTitle: "This week's decisions",
+    // The week's decisions in the decision card (#1134): the number of changes beside the
+    // gain, and the link from the chosen chip into its detail below.
     storyTransfers: "Transfers",
     storyMoves: (count: number) => (count === 1 ? "1 change" : `${count} changes`),
     storyDetail: "Details",
@@ -1776,8 +1773,6 @@ const tr: MessageSchema<typeof en> = {
     alternativeWithinFreeAtMost: (applied: number, cost: string) =>
       `Ücretsiz transferler içinde kalan alternatif: uygulanan ortak oyuncu sınırı ${applied}; saf puana göre maliyet en fazla ${cost} beklenen puan.`,
     templatesTitle: "Oyun şablonları",
-    templatesBody:
-      "Şablon, adlandırılmış bir strateji-pencere çiftidir. Uygulamak, kontrollerin okuduğu paylaşılabilir seçimi kurar; kendi şablonların bu tarayıcıda durur.",
     templateMeta: (strategy: string, window: number, rival: string) =>
       `${strategy} · ${window}h · ${rival}`,
     templateNamePlaceholder: "Bu kombinasyonu adlandır",
@@ -1891,7 +1886,6 @@ const tr: MessageSchema<typeof en> = {
       "Her üye satırı o üyenin son tarih sonrası public kadrosunu ve o kadrodan önerilen hamleleri açar.",
     linkLabel: "Lig üyelerini aç →",
     decisionTitle: "Bu haftanın hamlesi",
-    storyTitle: "Bu haftanın kararları",
     storyTransfers: "Transferler",
     storyMoves: (count) => `${count} değişiklik`,
     storyDetail: "Ayrıntı",
