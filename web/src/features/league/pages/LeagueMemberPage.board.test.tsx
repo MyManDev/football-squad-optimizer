@@ -5,6 +5,9 @@
  * that wait closed. Every figure is a published one; what is absent is left out.
  */
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -464,6 +467,25 @@ describe("the proof stamp", () => {
     const box = screen.getByText(MESSAGES.tr.leagueMembers.stampOptimal).closest("p")!;
     expect(box).toHaveAttribute("data-stamp");
     expect(box.nextElementSibling).toBeNull();
+  });
+
+  it("reads as the plan's state, a tag with its tick, and never as a control", () => {
+    show("tr");
+    const stamp = screen.getByText(MESSAGES.tr.leagueMembers.stampOptimal);
+    expect(stamp.tagName).toBe("P");
+    expect(stamp.closest("button, a, [role='button'], [tabindex]")).toBeNull();
+    expect(stamp.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+    // Drawn as the house tag in its good tone (Badge.module.css), not the ink box an
+    // outlined button draws.
+    const css = readFileSync(join(__dirname, "MemberDecision.module.css"), "utf-8").replace(
+      /\/\*[\s\S]*?\*\//g,
+      "",
+    );
+    const rule = css.match(/\n\.stampBox \{([^}]*)\}/)?.[1] ?? "";
+    expect(rule).toContain("color: var(--color-good);");
+    expect(rule).toContain("border: 1px solid currentColor;");
+    expect(rule).toContain("font-size: var(--step--2);");
+    expect(rule).not.toMatch(/cursor|--color-text\b|2px solid/);
   });
 
   it("shows neither the stamp nor a proof caveat for a plan found without a proof", () => {

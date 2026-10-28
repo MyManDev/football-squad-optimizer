@@ -1,7 +1,7 @@
 /**
  * The viewer's pitch look (#1136): the grass's pattern and the plates' club colours, chosen
- * under the bench, kept in this browser, shown on the pitch at once, and never moving.
- * Unknown or unreadable values give the default look.
+ * in the closed "Saha görünümü" menu under the bench, kept in this browser, shown on the
+ * pitch at once, and never moving. Unknown or unreadable values give the default look.
  */
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
@@ -67,6 +67,11 @@ const plates = (container: HTMLElement) => [
   ...pitch(container).querySelectorAll<HTMLElement>("[data-plate]"),
 ];
 const group = (name: string) => screen.getByRole("group", { name });
+const menu = (container: HTMLElement) =>
+  container.querySelector<HTMLDetailsElement>('[data-mark="pitch-look"]')!;
+/** Opens the closed menu the two rows wait in. */
+const openMenu = (container: HTMLElement) =>
+  fireEvent.click(within(menu(container)).getByText(COPY.pitchLookMenu));
 
 describe("the stored look", () => {
   it("is the default with nothing stored, an unknown value or unreadable storage", () => {
@@ -94,8 +99,34 @@ describe("the stored look", () => {
 });
 
 describe("the look under the bench", () => {
+  it("waits in one closed Saha görünümü menu that holds both rows and five buttons", () => {
+    const { container } = render(view());
+    const details = menu(container);
+    expect(details.tagName).toBe("DETAILS");
+    expect(details).not.toHaveAttribute("open");
+    expect(details.querySelector("summary")).toHaveTextContent(COPY.pitchLookMenu);
+    const buttons = [...details.querySelectorAll("button")];
+    expect(buttons).toHaveLength(5);
+    for (const button of buttons) expect(button).not.toBeVisible();
+    openMenu(container);
+    expect(details).toHaveAttribute("open");
+    for (const button of buttons) expect(button).toBeVisible();
+    expect(within(group(COPY.pitchLookLabel)).getAllByRole("button")).toHaveLength(3);
+    expect(within(group(COPY.clubColoursLabel)).getAllByRole("button")).toHaveLength(2);
+    // The look is kept; the menu is not, so the next visit finds it closed again.
+    fireEvent.click(
+      within(group(COPY.pitchLookLabel)).getByRole("button", { name: COPY.pitchLookPlain }),
+    );
+    cleanup();
+    forgetPitchLook();
+    const again = render(view());
+    expect(menu(again.container)).not.toHaveAttribute("open");
+    expect(pitch(again.container).getAttribute("data-grass")).toBe("plain");
+  });
+
   it("starts on stripes with white plates", () => {
     const { container } = render(view());
+    openMenu(container);
     expect(pitch(container).getAttribute("data-grass")).toBe("stripes");
     expect(
       within(group(COPY.pitchLookLabel)).getByRole("button", { pressed: true }).textContent,
@@ -114,6 +145,7 @@ describe("the look under the bench", () => {
       value: animate,
     });
     const { container } = render(view());
+    openMenu(container);
     fireEvent.click(
       within(group(COPY.pitchLookLabel)).getByRole("button", { name: COPY.pitchLookPlain }),
     );
@@ -128,6 +160,7 @@ describe("the look under the bench", () => {
 
   it("draws each plate in its club's colours, and the choice outlasts a reload", () => {
     const first = render(view());
+    openMenu(first.container);
     fireEvent.click(
       within(group(COPY.clubColoursLabel)).getByRole("button", { name: COPY.clubColoursOn }),
     );
@@ -155,6 +188,7 @@ describe("the look under the bench", () => {
       throw new Error("full");
     });
     const { container } = render(view());
+    openMenu(container);
     fireEvent.click(
       within(group(COPY.pitchLookLabel)).getByRole("button", { name: COPY.pitchLookChecks }),
     );

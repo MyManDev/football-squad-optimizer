@@ -6,7 +6,8 @@
  * Contrast on the board (WCAG formula): white is 5.6:1 on the red panel and 5.3:1 on the
  * green one; lime and board-muted are 13.5:1 and 11.9:1 on the board; ink is 9.8:1 on the
  * second bar segment and white 5.4:1 on the first. Uppercase and letter-spacing are used
- * here only because these are broadcast elements: the board words, DEĞİŞİKLİK and the stamp.
+ * here only because these are broadcast elements: the board words and DEĞİŞİKLİK. The proof
+ * stamp keeps its capitals but is drawn as a tag.
  */
 
 /* ---- Substitution boards ---- */
@@ -627,20 +628,30 @@
   display: none;
 }
 
+/* The proof is a state of the plan, not something to press: it wears the house tag
+   (Badge.module.css, the good tone) with its tick, small and outlined in its own green, and
+   never the ink box an outlined button draws. */
 .stampBox {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-1);
+  min-height: 20px;
   margin: 0;
-  padding: 3px var(--space-3);
-  border: 2px solid var(--color-text);
+  padding: 1px 6px;
+  border: 1px solid currentColor;
   border-radius: var(--radius-s);
-  font-family: var(--font-display);
-  font-size: 15px;
-  font-weight: 700;
-  line-height: 20px;
-  letter-spacing: 0.04em;
+  background: var(--color-surface);
+  color: var(--color-good);
+  font-size: var(--step--2);
+  font-weight: 600;
+  line-height: 16px;
   white-space: nowrap;
+}
+
+.stampBox svg {
+  flex: none;
+  width: 12px;
+  height: 12px;
 }
 
 /* On a phone the decision reads as D-Phone-Bu-Hafta draws it, under its headline (the
@@ -709,7 +720,6 @@
   .stampBox {
     order: 5;
     grid-column: 1;
-    padding-block: 5px;
     justify-self: start;
     align-self: center;
   }
