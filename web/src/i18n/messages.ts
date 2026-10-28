@@ -494,8 +494,6 @@ const en = {
       "SquadOpt suggests a transfer and a captain for your FPL squad every gameweek. Open your league to see yours.",
     label: "League ID",
     hint: "Type your league ID to continue.",
-    helpTitle: "Where do I find my league ID?",
-    help: "Open your league on the FPL site. The number in the address is the league ID: in fantasy.premierleague.com/leagues/123456/standings/c it is 123456.",
     submit: "Find league",
     invalid: "Enter a positive whole-number league ID.",
     loading: "Reading the published league…",
@@ -505,6 +503,13 @@ const en = {
     directoryUnreadable: "The list of published leagues could not be read. Try again.",
     directoryMissing: "Nothing is published here yet. Try again later.",
     retry: "Try again",
+  },
+  // Where the league ID is read from on the FPL site, folded under the entry page's field.
+  fplIdHelp: {
+    title: "Where is my FPL ID?",
+    league:
+      "Sign in on the FPL site and open your league under Leagues & Cups. Your league ID is the number after /leagues/ in the address:",
+    newTab: "opens in a new tab",
   },
   memberPicker: {
     title: "Who are you?",
@@ -1596,8 +1601,6 @@ const tr: MessageSchema<typeof en> = {
       "SquadOpt, FPL kadron için her hafta transfer ve kaptan önerir. Önerini görmek için ligini aç.",
     label: "Lig numarası",
     hint: "Devam etmek için lig numaranı yaz.",
-    helpTitle: "Lig numaramı nerede bulurum?",
-    help: "FPL sitesinde ligini aç. Adresteki sayı lig numarandır: fantasy.premierleague.com/leagues/123456/standings/c adresinde lig numarası 123456.",
     submit: "Ligi bul",
     invalid: "Pozitif tam sayı olan bir lig numarası gir.",
     loading: "Yayımlanan lig okunuyor…",
@@ -1607,6 +1610,12 @@ const tr: MessageSchema<typeof en> = {
     directoryUnreadable: "Yayımlanan liglerin listesi okunamadı. Yeniden dene.",
     directoryMissing: "Burada henüz yayımlanmış bir şey yok. Daha sonra yeniden dene.",
     retry: "Yeniden dene",
+  },
+  fplIdHelp: {
+    title: "FPL ID'm nerede?",
+    league:
+      "FPL sitesine giriş yap ve Leagues & Cups bölümünden ligini aç. Lig numaran, adreste /leagues/ kısmından sonraki sayıdır:",
+    newTab: "yeni sekmede açılır",
   },
   memberPicker: {
     title: "Sen kimsin?",
