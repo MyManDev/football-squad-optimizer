@@ -1,8 +1,9 @@
 /*
  * The member page in direction D: a top bar pinned at the top of the main column, the
- * decision (heading row, boards, gain strip, captain line), the squad on the pitch, how
- * it was worked out, then the plan settings with Hesapla in one visible card, and the
- * secondary tools as closed sections. The fixture rail is a column of its own from 1180 px.
+ * decision as the page's leading card (heading row, gain strip, boards, captain line), the
+ * squad on the pitch, how it was worked out, then the plan settings with Hesapla in one
+ * visible card, and the secondary tools as closed sections. The fixture rail is a column of
+ * its own from 1180 px.
  */
 
 .page {
@@ -59,6 +60,17 @@
     z-index: 10;
     margin: calc(-1 * var(--space-5)) calc(-1 * var(--space-5)) 0;
     padding: var(--space-2) var(--space-5);
+    /* Pinned, the bar stands in one place on every member page, so a move between them
+       through the navigation's crossfade (PageShell, transitions.css) leaves it still while
+       the page under it fades. A page carries one bar, the member's, the league table's or
+       the skeleton's, so no two elements share the name. */
+    view-transition-name: member-bar;
+  }
+
+  /* Lifted out of the picture under an open drawer, the bar would be drawn over the drawer
+     while it fades; there it fades with the page. */
+  :global([data-drawer="open"]) .topBar {
+    view-transition-name: none;
   }
 
   /* The bar is two lines (about 97 px) wherever the team, the week and the score bug do not
@@ -378,10 +390,16 @@ section.notice p {
   }
 }
 
+/* The decision leads the page as a card of its own, lifted off the page by its surface. */
 .decision {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-surface);
+  box-shadow: 0 1px 3px rgba(16, 38, 26, 0.12);
 }
 
 .headingRow {
@@ -438,18 +456,24 @@ section.notice p {
 
 /* On a phone the proof stamp leaves the heading row for its place after the gain strip,
    as the phone artboard draws it (MemberDecision.module.css orders the parts), and the
-   rhythm tightens so the boards and the captain line come up first. */
+   rhythm tightens so the headline, the boards and the captain line come up first. */
 @media (max-width: 599.98px) {
   .page {
     gap: var(--space-4);
   }
 
   /* Two columns, so the proof stamp can stand beside the transfer facts; everything else
-     takes the whole row (MemberDecision.module.css places and orders the parts). */
+     takes the whole row (MemberDecision.module.css places and orders the parts). The card
+     runs edge to edge, so the boards and the captain line keep the column's whole width
+     (at 360 px the captain line has none to spare). */
   .decision {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr);
     gap: var(--space-2) var(--space-3);
+    margin-inline: calc(-1 * var(--space-4));
+    padding: var(--space-3) var(--space-4);
+    border-inline: 0;
+    border-radius: 0;
   }
 
   .decision > *,

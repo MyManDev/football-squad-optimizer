@@ -1,7 +1,7 @@
 import { memberHistoryAddress } from "../../../lib/leagueAddresses";
 import { useLeagueId } from "../useLeague";
 import { NewInformationNotice } from "../advice/OfficialInformationCard";
-import { useMemo, type ReactNode } from "react";
+import { useMemo, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Link, useSearchParams } from "react-router";
 
@@ -46,7 +46,7 @@ import { rivalCandidates } from "../advice/adviceSelection";
 import { canDuel, duelRivalId } from "./duelSides";
 import { RivalDuel } from "./RivalDuel";
 import { SquadCard } from "../card/SquadCard";
-import { WeekStory } from "./WeekStory";
+import { useWeekArrival } from "./weekArrival";
 import styles from "./LeagueMemberPage.module.css";
 
 export function LeagueMemberView(props: LeagueMemberViewProps) {
@@ -231,6 +231,9 @@ function LeagueMemberContent({
   const codes = useMemo(() => clubCodesFromFixtures(fixtures), [fixtures]);
   const plan = !adviceLoading && shown ? shown.envelope.payload : null;
   const onPitch = squadOnPitch(plan, view);
+  // The page arrives once, and its decision once it is drawn (weekArrival.ts).
+  const arrival = useRef<HTMLDivElement>(null);
+  useWeekArrival(arrival, !adviceLoading && !rivalsLoading && shown != null);
   // One fixture rail: its own column from 1180 px (and on a page rendered without the
   // shell), beside the squad on a tablet, and a sheet over the page on a phone.
   const railPlacement: RailPlacement = !shell
@@ -403,7 +406,7 @@ function LeagueMemberContent({
   );
 
   return (
-    <div className={styles.layout} data-rail={railPlacement}>
+    <div ref={arrival} className={styles.layout} data-rail={railPlacement}>
       <div className={styles.page}>
         <MemberTopBar
           squad={squad}
@@ -435,8 +438,6 @@ function LeagueMemberContent({
             {copy.membersAuxiliaryUnavailable}
           </p>
         ) : null}
-
-        {plan ? <WeekStory view={plan} /> : null}
 
         <section aria-labelledby="entry-advice-title" className={styles.adviceSection}>
           <div className={styles.decision} data-mark="decision">
