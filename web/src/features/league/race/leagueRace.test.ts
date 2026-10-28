@@ -1,7 +1,8 @@
 /**
  * The league race's places (#1135): one timeline with a rank change, ties sharing a place,
- * unsettled weeks left out, and the shipped tree's last settled week matching the league
- * table the tree publishes, place for place.
+ * unsettled weeks left out, each member's points to the neighbours on the latest settled
+ * week's totals, and the shipped tree's last settled week matching the league table the
+ * tree publishes, place for place and gap for gap.
  */
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -16,7 +17,7 @@ import {
   raceWeek,
 } from "../../../testSupport/raceScoreboard";
 import type { LeagueMembers, LeagueViewEnvelope, Scoreboard } from "../types";
-import { leagueRace, placesMoved } from "./leagueRace";
+import { leagueRace, neighbourGaps, placesMoved } from "./leagueRace";
 
 const MEMBERS = [raceMember(11), raceMember(22), raceMember(33), RACE_SYSTEM];
 
@@ -149,6 +150,66 @@ describe("the league race", () => {
   });
 });
 
+describe("the gaps to the neighbours", () => {
+  const gaps = (race: ReturnType<typeof leagueRace>) =>
+    neighbourGaps(race!).map(({ entryId, place, total, ahead, behind }) => [
+      entryId,
+      place,
+      total,
+      ahead,
+      behind,
+    ]);
+
+  it("measures each member against the one just ahead and just behind on the latest settled week", () => {
+    // Week 3 is not settled, so week 2's totals are the ones measured.
+    const race = leagueRace(
+      raceScoreboard([
+        raceWeek(1, { 11: 70, 22: 60, 33: 50 }),
+        raceWeek(2, { 11: 120, 22: 125, 33: 90 }),
+        raceWeek(3, { 11: 200, 22: 130, 33: 100 }, false),
+      ]),
+      MEMBERS,
+    );
+    expect(gaps(race)).toEqual([
+      [22, 1, 125, null, 5],
+      [11, 2, 120, 5, 30],
+      [33, 3, 90, 30, null],
+    ]);
+  });
+
+  it("reads equal totals as a gap of 0, and leaves out a member without a total that week", () => {
+    const race = leagueRace(
+      raceScoreboard([
+        raceWeek(1, { 11: 70, 22: 60, 33: 50, 44: 40 }),
+        raceWeek(2, { 11: 90, 22: 80, 33: 80 }),
+      ]),
+      [...MEMBERS, raceMember(44)],
+    );
+    expect(gaps(race)).toEqual([
+      [11, 1, 90, null, 10],
+      [22, 2, 80, 10, 0],
+      [33, 2, 80, 0, null],
+    ]);
+  });
+
+  it("states no gap where the table's places put a higher total behind", () => {
+    const table = [
+      { ...raceMember(11), rank: 1, movement: "same" as const, movement_places: 0 },
+      { ...raceMember(22), rank: 2, movement: "same" as const, movement_places: 0 },
+      RACE_SYSTEM,
+    ];
+    const race = leagueRace(
+      raceScoreboard([raceWeek(1, { 11: 60, 22: 50 }), raceWeek(2, { 11: 100, 22: 110 })]),
+      table,
+      2,
+    );
+    expect(gaps(race)).toEqual([
+      [11, 1, 100, null, null],
+      [22, 2, 110, null, null],
+    ]);
+  });
+});
+
 describe("the shipped trees", () => {
   for (const { path, root } of shippedTrees()) {
     const scoreboardPath = join(root, "scoreboard.json");
@@ -170,6 +231,14 @@ describe("the shipped trees", () => {
         expect([row.entry_id, line.ranks[line.ranks.length - 1]]).toEqual([row.entry_id, row.rank]);
         expect(line.totals[line.totals.length - 1]).toBe(row.total_points);
       }
+      // Each gap is the difference of the two totals the table publishes for the neighbours.
+      const totals = new Map(table.members.map((row) => [row.entry_id, row.total_points]));
+      const gaps = neighbourGaps(race);
+      gaps.forEach((gap, index) => {
+        expect(gap.total).toBe(totals.get(gap.entryId));
+        const next = gaps[index + 1];
+        if (next) expect(gap.behind).toBe(totals.get(gap.entryId)! - totals.get(next.entryId)!);
+      });
     });
   }
 });

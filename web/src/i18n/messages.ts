@@ -855,6 +855,14 @@ const en = {
     racePlaces: "Place",
     racePoints: "Total",
     raceGameweek: "Gameweek",
+    // Each member's distance in points to the neighbours on the latest settled week's totals.
+    raceGaps: (gameweek: number) => `Point gaps after gameweek ${gameweek}`,
+    raceGapAhead: (points: string) =>
+      `${points} ${points === "1" ? "pt" : "pts"} behind the one ahead`,
+    raceGapBehind: (points: string) =>
+      `${points} ${points === "1" ? "pt" : "pts"} ahead of the one behind`,
+    raceLevelAhead: "Level with the one ahead: 0 pts",
+    raceLevelBehind: "Level with the one behind: 0 pts",
     // The what-if mode (#1132): a fifteen the member tries, read on the device.
     whatIfTitle: "Try your own squad",
     whatIfStart: "Start from the advised squad",
@@ -1936,6 +1944,11 @@ const tr: MessageSchema<typeof en> = {
     racePlaces: "Sıra",
     racePoints: "Toplam",
     raceGameweek: "Hafta",
+    raceGaps: (gameweek) => `${gameweek}. hafta sonunda puan farkları`,
+    raceGapAhead: (points) => `Öndekine ${points} puan`,
+    raceGapBehind: (points) => `Arkadakine ${points} puan`,
+    raceLevelAhead: "Öndekiyle berabere: 0 puan",
+    raceLevelBehind: "Arkadakiyle berabere: 0 puan",
     whatIfTitle: "Kadroyu kendin dene",
     whatIfStart: "Önerilen kadroyla başla",
     whatIfLoading: "Bu haftanın oyuncu listesi okunuyor",
