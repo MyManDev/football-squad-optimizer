@@ -519,9 +519,10 @@ for (const [width, height] of [
     await expect(page.locator("#sidebar").getByRole("button", { name: /^TR/ })).toBeAttached();
   });
 
-// The viewer's pitch look (#1136): checked grass and club-coloured plates, chosen under the
-// bench, kept after a reload, inside the page at a phone's width, and readable by axe's own
-// contrast check over every plate's fill and text, in the upright and the across drawing.
+// The viewer's pitch look (#1136): checked grass and club-coloured plates, chosen in the
+// closed Saha görünümü menu under the bench, kept after a reload (the menu itself closed
+// again), inside the page at a phone's width, and readable by axe's own contrast check over
+// every plate's fill and text, in the upright and the across drawing.
 for (const [width, height, across] of [
   [320, 720, false],
   [1366, 768, true],
@@ -531,6 +532,14 @@ for (const [width, height, across] of [
     const looks = page.locator('[data-mark="pitch-look"]');
     const choose = (group: string, option: string) =>
       looks.getByRole("group", { name: group }).getByRole("button", { name: option });
+    // The rows wait in the closed menu; its summary is the one thing drawn under the bench.
+    const openLooks = async () => {
+      await expect(looks).not.toHaveAttribute("open");
+      await expect(looks.getByRole("button")).toHaveCount(0);
+      await looks.getByText(copy.leagueMembers.pitchLookMenu, { exact: true }).click();
+      await expect(looks).toHaveAttribute("open");
+    };
+    await openLooks();
     await choose(copy.leagueMembers.pitchLookLabel, copy.leagueMembers.pitchLookChecks).click();
     await choose(copy.leagueMembers.clubColoursLabel, copy.leagueMembers.clubColoursOn).click();
     const pitch = page.locator('[data-mark="pitch"]');
@@ -544,6 +553,7 @@ for (const [width, height, across] of [
     await page.reload();
     await expect(pitch).toHaveAttribute("data-grass", "checks");
     expect(await pitch.locator("[data-club]").count()).toBeGreaterThan(0);
+    await openLooks();
     await expect(
       choose(copy.leagueMembers.clubColoursLabel, copy.leagueMembers.clubColoursOn),
     ).toHaveAttribute("aria-pressed", "true");

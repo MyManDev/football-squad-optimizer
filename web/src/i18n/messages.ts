@@ -625,6 +625,12 @@ const en = {
         body: "The publisher marked this selection as having no available plan.",
       },
     },
+    /** The "not listed" card once the week is closed: its settings are gone, so it links. */
+    closedNotListed: {
+      title: "This selection was not published for the closed gameweek.",
+      body: "Its deadline has passed, so no other selection can be chosen or computed here.",
+      link: "Show the default plan",
+    },
     rivalPlayersTitle: "Shared and different players",
     rivalPlayerGroups: {
       shared: "Shared: recommended 15 and rival XI",
@@ -966,6 +972,8 @@ const en = {
     viewLabel: "View",
     viewPitch: "Pitch",
     viewList: "List",
+    /** The closed menu under the bench that holds the grass and club colour rows (#1136). */
+    pitchLookMenu: "Appearance",
     pitchLookLabel: "Grass",
     pitchLookStripes: "Stripes",
     pitchLookPlain: "Plain",
@@ -1710,6 +1718,11 @@ const tr: MessageSchema<typeof en> = {
         body: "Yayıncı, bu seçim için kullanılabilir bir plan olmadığını bildirdi.",
       },
     },
+    closedNotListed: {
+      title: "Bu seçim, son tarihi geçen hafta için yayımlanmadı.",
+      body: "Son tarih geçtiği için burada başka bir seçim yapılamaz ya da hesaplanamaz.",
+      link: "Varsayılan planı göster",
+    },
     rivalPlayersTitle: "Ortak ve farklı oyuncular",
     rivalPlayerGroups: {
       shared: "Ortak: önerilen 15 ve rakibin ilk 11'i",
@@ -2020,6 +2033,7 @@ const tr: MessageSchema<typeof en> = {
     viewLabel: "Görünüm",
     viewPitch: "Saha",
     viewList: "Liste",
+    pitchLookMenu: "Saha görünümü",
     pitchLookLabel: "Çim",
     pitchLookStripes: "Çizgili",
     pitchLookPlain: "Düz",
