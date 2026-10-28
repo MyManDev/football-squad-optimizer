@@ -8,6 +8,7 @@ import { useFixtures } from "../../fixtures/data";
 import { LeagueDataMissing } from "../data";
 import { useDeadlinePassed } from "../advice/deadline";
 import { LeagueMemberView } from "./LeagueMemberView";
+import { MemberPageSkeleton } from "./MemberPageSkeleton";
 import type { AdviceIssue } from "./memberPageTypes";
 import { useLeagueMemberData } from "./useLeagueMemberData";
 
@@ -49,7 +50,9 @@ export function LeagueMemberPage() {
   const fixtures = useFixtures();
 
   if (!validEntryId) return <EmptyState title={copy.invalidEntry} />;
-  if (squad.isPending) return <EmptyState title={copy.loadingEntry} />;
+  // The squad is the page's first read and its longest wait on a cold visit: the page's
+  // shape stands in for it, its words read to a screen reader only.
+  if (squad.isPending) return <MemberPageSkeleton />;
   if (squad.isError) {
     const missing = squad.error instanceof LeagueDataMissing;
     const reasons = missing ? [...new Set(index?.unavailable.map((item) => item.reason))] : [];
