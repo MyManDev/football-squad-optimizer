@@ -24,6 +24,7 @@ import { deadlineLong } from "../../../lib/format";
 import { AS_A_CHANCE } from "../../../testSupport/honesty";
 import type { FixturesPayload } from "../../fixtures/types";
 import { HttpAdviceClient } from "../advice/adviceClient";
+import { CHIP_COPY } from "../advice/chipCopy";
 import type {
   AdviceMove,
   AdvicePlayer,
@@ -659,18 +660,67 @@ describe("a chip strategy the service planned", () => {
   );
 });
 
-describe("the week's story (#1134)", () => {
-  it.each(["tr", "en"] as const)("sits above the decision and links into it (%s)", (language) => {
-    show(language);
-    const copy = MESSAGES[language].leagueMembers;
-    const story = screen.getByRole("navigation", { name: copy.storyTitle });
-    expect(
-      story.compareDocumentPosition(decision(language)) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-    const targets = within(story)
-      .getAllByRole("link")
-      .map((link) => link.getAttribute("href")!.slice(1));
-    for (const target of targets) expect(document.getElementById(target)).not.toBeNull();
-    expect(boards(language)).toHaveLength(2);
+// The week's story that stood above the decision is folded into it (#1134): the card says
+// each transfer and the armband once, with the gain as its headline.
+describe("the decision card", () => {
+  it.each(["tr", "en"] as const)(
+    "leads the page with the gain, then the changes, each said once (%s)",
+    (language) => {
+      const { container } = show(language);
+      const copy = MESSAGES[language].leagueMembers;
+      const bar = container.querySelector("header")!;
+      const card = container.querySelector<HTMLElement>('[data-mark="decision"]')!;
+      // Nothing stands between the top bar and the card on a week without a notice.
+      expect(screen.queryByRole("navigation")).toBeNull();
+      expect(bar.nextElementSibling).toContainElement(card);
+      const figure = within(card).getByText(language === "tr" ? "+3,01" : "+3.01", {
+        selector: "strong",
+      });
+      const count = within(card).getByText(copy.storyMoves(2));
+      expect(count.closest("p")).toHaveTextContent(`${copy.storyTransfers} ${copy.storyMoves(2)}`);
+      const [first, second] = boards(language);
+      expect(
+        figure.compareDocumentPosition(first!) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      // Each swap on its own board, the captain on the armband line, and nowhere else.
+      expect(first).toHaveTextContent(/Palmer.*Fernandes/);
+      expect(second).toHaveTextContent(/Jesus.*Brobbey/);
+      for (const name of ["Palmer", "Jesus", "Brobbey", "Haaland", copy.storyMoves(2)])
+        expect(within(card).getAllByText(name)).toHaveLength(1);
+      expect(within(card).getByText("Haaland").closest("p")).toHaveTextContent(
+        copy.viceCaptainLabel,
+      );
+    },
+  );
+
+  it("names the chip the member chose, once, with the way to what it adds", () => {
+    const copy = MESSAGES.tr.leagueMembers;
+    const chip = copy.chipNames["3xc"]!;
+    const advice = twoMoves({
+      chip: "3xc",
+      chip_choice: { chip: "3xc", gain_vs_no_chip: 6.4, basis: "x" },
+    });
+    const { container } = render(
+      <LanguageProvider initialLanguage="tr">
+        <MemoryRouter>
+          <AdviceCard
+            shown={{ envelope: advice, origin: "published" }}
+            squad={SQUAD}
+            rivalSquad={null}
+          />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+    const line = within(container).getByText(chip, { selector: "strong" }).closest("p")!;
+    expect(line).toHaveTextContent(copy.chipLabel);
+    const link = within(line).getByRole("link", { name: copy.storyDetail });
+    const detail = container.querySelector(link.getAttribute("href")!)!;
+    expect(detail).toHaveTextContent(CHIP_COPY.tr.chosen(chip));
+    expect(detail).toHaveTextContent(CHIP_COPY.tr.gain("+6,4"));
+    cleanup();
+    // A chip the document names without the member choosing it gets no line.
+    const { container: page } = show("tr", { advice: twoMoves({ chip: "bboost" }) });
+    const card = page.querySelector<HTMLElement>('[data-mark="decision"]')!;
+    expect(within(card).queryByText(copy.chipLabel)).toBeNull();
   });
 });
