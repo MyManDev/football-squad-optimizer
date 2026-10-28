@@ -547,7 +547,9 @@ section.notice p {
   }
 }
 
-@container decision (min-width: 760px) {
+/* 720px, not wider: the decision's content box is what the query measures, and a decision
+   drawn as a padded card leaves about 736px of it at 1440px. */
+@container decision (min-width: 720px) {
   .headingRow:has(> .apply) {
     grid-template-columns: minmax(0, 1fr) auto auto;
   }
