@@ -7,6 +7,8 @@ import { useLanguage } from "../../../i18n/context";
 import { useFixtures } from "../../fixtures/data";
 import { LeagueDataMissing } from "../data";
 import { useDeadlinePassed } from "../advice/deadline";
+import { useLeagueScoreboard, useSuggestionHistory } from "../queries";
+import { lastWeekResult } from "./lastWeekResult";
 import { LeagueMemberView } from "./LeagueMemberView";
 import type { AdviceIssue } from "./memberPageTypes";
 import { useLeagueMemberData } from "./useLeagueMemberData";
@@ -47,6 +49,17 @@ export function LeagueMemberPage() {
   );
   // The same calendar the deadline is read from; the query is shared, so nothing more is read.
   const fixtures = useFixtures();
+  // The card of the member's latest finished week reads the league's scoreboard, under the
+  // key /league reads it by, and only once that holds a finished week for this member, the
+  // member's history, under the key their history page reads it by. Neither holds the page
+  // back: missing or unreadable, the card or its line is left out.
+  const ownSquad = squad.data?.payload;
+  const scoreboard = useLeagueScoreboard(ownSquad !== undefined);
+  const scoreboardView = scoreboard.isError ? null : (scoreboard.data?.payload ?? null);
+  const history = useSuggestionHistory(
+    ownSquad?.entry.entry_id ?? 0,
+    ownSquad !== undefined && lastWeekResult(ownSquad, scoreboardView, null) !== null,
+  );
 
   if (!validEntryId) return <EmptyState title={copy.invalidEntry} />;
   if (squad.isPending) return <EmptyState title={copy.loadingEntry} />;
@@ -137,6 +150,8 @@ export function LeagueMemberPage() {
       deadlinePassed={deadlinePassed}
       fixtures={fixtures.data ?? null}
       fixturesPending={fixtures.isPending}
+      scoreboard={scoreboardView}
+      history={history.isError ? null : (history.data ?? null)}
     />
   );
 }

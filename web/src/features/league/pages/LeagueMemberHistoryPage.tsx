@@ -1,6 +1,5 @@
 import { memberAddress } from "../../../lib/leagueAddresses";
 import { useLeague, useLeagueId } from "../useLeague";
-import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useParams } from "react-router";
 
@@ -9,18 +8,14 @@ import { EmptyState } from "../../../design/components/EmptyState";
 import { useLanguage } from "../../../i18n/context";
 import { points, signedPoints, utcShort } from "../../../lib/format";
 import { LeagueDataMissing } from "../dataErrors";
-import {
-  loadSuggestionHistory,
-  type SuggestionHistory,
-  type WeekReview,
-} from "../history/historyData";
+import type { SuggestionHistory, WeekReview } from "../history/historyData";
 import styles from "./LeagueMemberHistoryPage.module.css";
 import { summarizeHistory } from "../history/historySummary";
 import { PersonalSeasonReport } from "../history/PersonalSeasonReport";
 import { EVIDENCE_COPY } from "../advice/evidenceCopy";
 import { TOP100_COPY } from "../advice/top100Copy";
 import { publishedPrice } from "../advice/publishedPrice";
-import { LEAGUE_READ, useLeagueMembers } from "../queries";
+import { useLeagueMembers, useSuggestionHistory } from "../queries";
 import type { EntryView } from "../types";
 
 /** The modes the scenario menu prices (`build_league_site.py --mode-residuals`). */
@@ -28,19 +23,15 @@ const SCENARIO_MODES: ReadonlySet<string> = new Set(["garantici", "agresif", "as
 
 export function LeagueMemberHistoryPage() {
   const { messages } = useLanguage();
-  const { league, tree } = useLeague();
+  const { league } = useLeague();
   const leagueId = league.leagueId;
   const copy = messages.suggestionHistory;
   const parameter = useParams().entryId ?? "";
   const entryId = Number(parameter);
   const valid = /^[1-9]\d*$/.test(parameter) && Number.isSafeInteger(entryId);
   const members = useLeagueMembers(valid);
-  const query = useQuery({
-    queryKey: ["suggestion-history", leagueId, entryId],
-    queryFn: ({ signal }) => loadSuggestionHistory(tree, entryId, { signal }),
-    enabled: valid,
-    ...LEAGUE_READ,
-  });
+  // The member page's latest-week card reads the same document under the same key.
+  const query = useSuggestionHistory(entryId, valid);
   if (!valid) return <EmptyState title={messages.leagueMembers.invalidEntry} />;
   if (query.isPending) return <EmptyState title={messages.common.loading} />;
   if (query.isError) {

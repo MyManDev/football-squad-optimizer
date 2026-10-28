@@ -47,6 +47,8 @@ import { canDuel, duelRivalId } from "./duelSides";
 import { RivalDuel } from "./RivalDuel";
 import { SquadCard } from "../card/SquadCard";
 import { WeekStory } from "./WeekStory";
+import { LastWeekCard } from "./LastWeekCard";
+import { lastWeekResult } from "./lastWeekResult";
 import styles from "./LeagueMemberPage.module.css";
 
 export function LeagueMemberView(props: LeagueMemberViewProps) {
@@ -139,6 +141,8 @@ function LeagueMemberContent({
   deadlinePassed = null,
   fixtures = null,
   fixturesPending = false,
+  scoreboard = null,
+  history = null,
 }: LeagueMemberViewProps) {
   const { language, locale, messages } = useLanguage();
   const leagueId = useLeagueId();
@@ -229,6 +233,9 @@ function LeagueMemberContent({
   const played =
     outcomeFreshness?.scoredGameweek != null && outcomeFreshness.scoredGameweek >= view.gameweek;
   const codes = useMemo(() => clubCodesFromFixtures(fixtures), [fixtures]);
+  // The member's latest finished week, from the scoreboard and their history; null leaves
+  // the page without the card.
+  const lastWeek = lastWeekResult(view, scoreboard, history);
   const plan = !adviceLoading && shown ? shown.envelope.payload : null;
   const onPitch = squadOnPitch(plan, view);
   // One fixture rail: its own column from 1180 px (and on a page rendered without the
@@ -434,6 +441,18 @@ function LeagueMemberContent({
             </strong>{" "}
             {copy.membersAuxiliaryUnavailable}
           </p>
+        ) : null}
+
+        {/* What the member's last finished week came to, before what this week decides. */}
+        {lastWeek ? (
+          <LastWeekCard
+            result={lastWeek}
+            historyHref={
+              lastWeek.suggested !== null && view.league_id === leagueId
+                ? memberHistoryAddress(leagueId, entryId)
+                : null
+            }
+          />
         ) : null}
 
         {plan ? <WeekStory view={plan} /> : null}
