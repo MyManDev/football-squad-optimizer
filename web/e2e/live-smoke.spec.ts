@@ -156,15 +156,32 @@ test("published league and member journey works without submitting a solve", asy
       figure(advice.payload.expected_own_points!, "en-GB"),
     ),
   );
+  // Past the week's deadline the page offers no settings, since nothing is computed for a
+  // closed week. It reads the deadline from the published calendar, and so does this check.
+  const calendarResponse = await page.request.get("/data/fixtures.json");
+  const calendar = calendarResponse.ok()
+    ? ((await calendarResponse.json()) as {
+        payload: { season: string; gameweeks: { gameweek: number; deadline_utc: string }[] };
+      })
+    : null;
+  const deadline =
+    calendar?.payload.season === advice.payload.season
+      ? calendar.payload.gameweeks.find((week) => week.gameweek === advice.payload.gameweek)
+          ?.deadline_utc
+      : undefined;
+  const closed = deadline !== undefined && Date.now() >= Date.parse(deadline);
+  if (closed) await expect(page.getByTestId("deadline-passed")).toBeVisible();
   for (const selector of [
     'input[name="strategy"][value="saf-puan"]',
     'input[name="window"][value="1"]',
     'input[name="chip"][value=""]',
   ])
-    await expect(page.locator(selector)).toBeEnabled();
+    if (closed) await expect(page.locator(selector)).toHaveCount(0);
+    else await expect(page.locator(selector)).toBeEnabled();
   // The Top 100 menu is offered by the compute service; with the PC backend down the page
   // has nothing to offer it from, so it is checked only when the service answered.
-  if (capabilitiesUrl) await expect(page.locator('input[name="top100"][value="0"]')).toBeEnabled();
+  if (capabilitiesUrl && !closed)
+    await expect(page.locator('input[name="top100"][value="0"]')).toBeEnabled();
   await page.screenshot({ path: testInfo.outputPath("member.png"), fullPage: true });
 
   if (process.env.LIVE_SMOKE_COMPUTE === "1") {

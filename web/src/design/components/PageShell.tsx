@@ -6,9 +6,10 @@ import {
   useRef,
   useState,
   useSyncExternalStore,
+  type MouseEvent,
   type ReactNode,
 } from "react";
-import { Link, NavLink, useLocation } from "react-router";
+import { Link, NavLink, useLocation, useNavigate } from "react-router";
 
 import { LanguageToggle } from "../../i18n/LanguageToggle";
 import { useLanguage } from "../../i18n/context";
@@ -28,10 +29,12 @@ import {
   navItems,
   NO_IDENTITY,
   type MemberContext,
+  type NavItem,
   type ShellIdentity,
 } from "../shell/nav";
 import { FIXTURE_SHEET_ID, ShellContext, type ShellContextValue } from "../shell/ShellContext";
 import { readSidebarCollapsed, writeSidebarCollapsed } from "../shell/sidebarPreference";
+import { crossfade } from "../viewTransition";
 import styles from "./PageShell.module.css";
 
 const FOCUSABLE =
@@ -261,6 +264,39 @@ export function PageShell({
   };
   const closeDrawer = () => setDrawerOpen(false);
 
+  // A move between pages from the navigation is one crossfade (#1131), as the step from the
+  // picker to the page is. The router's own `viewTransition` prop works under a data router
+  // only; this app's router hands it to the history, which ignores it. The router also sets
+  // a new address as a React transition, which `crossfade`'s update cannot commit at once,
+  // so the new picture waits until the address has landed, or for the data time at the
+  // latest. The drawer closes inside the update and fades out with the page it stood over.
+  // A link to the page already open, or a click for a new tab, is left to the link.
+  const navigate = useNavigate();
+  const landed = useRef<(() => void) | null>(null);
+  useEffect(() => {
+    landed.current?.();
+    landed.current = null;
+  }, [location.key]);
+  const follow = (event: MouseEvent<HTMLAnchorElement>, item: NavItem) => {
+    const plain =
+      event.button === 0 && !event.metaKey && !event.altKey && !event.ctrlKey && !event.shiftKey;
+    if (item.active || !plain) {
+      closeDrawer();
+      return;
+    }
+    event.preventDefault();
+    const arrival = new Promise<void>((resolve) => {
+      landed.current = resolve;
+    });
+    crossfade(
+      () => {
+        closeDrawer();
+        navigate(item.to, { state: item.state });
+      },
+      () => arrival,
+    );
+  };
+
   const registerSheet = useCallback(() => {
     setSheets((count) => count + 1);
     let withdrawn = false;
@@ -363,6 +399,8 @@ export function PageShell({
         ) : null}
       </>
     );
+  // The phone bar's 'Fikstür' is the sidebar's, one tap closer.
+  const fixturesItem = items.find((item) => item.key === "fixtures")!;
   const fixturesFace = (
     <span className={styles.phoneFixturesFace}>
       <CalendarIcon />
@@ -411,7 +449,11 @@ export function PageShell({
                 {fixturesFace}
               </button>
             ) : (
-              <NavLink to="/fixtures" className={styles.phoneFixtures}>
+              <NavLink
+                to="/fixtures"
+                className={styles.phoneFixtures}
+                onClick={(event) => follow(event, fixturesItem)}
+              >
                 {fixturesFace}
               </NavLink>
             )}
@@ -495,7 +537,7 @@ export function PageShell({
                     state={item.state}
                     className={styles.navItem}
                     aria-current={item.active ? "page" : undefined}
-                    onClick={closeDrawer}
+                    onClick={(event) => follow(event, item)}
                   >
                     <NavIcon name={item.key} className={styles.navIcon} />
                     <span className={rail ? "visually-hidden" : undefined}>{copy[item.key]}</span>

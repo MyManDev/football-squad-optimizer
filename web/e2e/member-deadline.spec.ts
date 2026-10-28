@@ -20,7 +20,9 @@ async function serveTransfer(page: Page) {
 }
 
 for (const language of ["tr", "en"] as const) {
-  test(`a closed gameweek is named and Compute is withheld in ${language}`, async ({ page }) => {
+  test(`a closed gameweek is named and its settings are left out in ${language}`, async ({
+    page,
+  }) => {
     await installLeagueMocks(page);
     await serveTransfer(page);
     const calendar = openCalendar();
@@ -37,12 +39,22 @@ for (const language of ["tr", "en"] as const) {
     const notice = page.getByTestId("deadline-passed");
     await expect(notice).toContainText(String(mockLeagueMembersEnvelope.payload.gameweek));
     await expect(notice).toContainText("2020");
-    await expect(page.getByText(copy.deadlinePassedCompute, { exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: /^(Hesapla|Compute)$/ })).toBeDisabled();
+    // The closed week's plan is still the answer; nothing that changes or recomputes it is
+    // offered: no settings, no link down to them, no Hesapla and no model comparison.
+    const member = MESSAGES[language].leagueMembers;
+    await expect(page.getByRole("heading", { name: member.squadAfterTitle })).toBeVisible();
+    await expect(page.locator("#plan-settings")).toHaveCount(0);
+    await expect(page.getByRole("link", { name: member.changePlan, exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: member.computeButton, exact: true })).toHaveCount(
+      0,
+    );
+    await expect(page.getByText(copy.deadlinePassedCompute, { exact: true })).toHaveCount(0);
+    await expect(page.getByText(/^(Diğer modeli de hesapla|Compute the other model)$/)).toHaveCount(
+      0,
+    );
     // A closed week counts down to nothing and offers nothing to apply.
     await expect(page.getByTestId("deadline-countdown")).toHaveCount(0);
-    const members = MESSAGES[language].leagueMembers;
-    await expect(page.getByRole("link", { name: members.applyOnFpl })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: member.applyOnFpl })).toHaveCount(0);
   });
 }
 
@@ -54,6 +66,7 @@ test("an open gameweek shows no deadline notice, counts down and links to FPL", 
   await page.goto(`/league/352490/members/${ENTRY}`);
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   await expect(page.getByTestId("deadline-passed")).toHaveCount(0);
+  await expect(page.locator("#plan-settings")).toBeVisible();
   await expect(page.getByTestId("deadline-countdown")).toBeVisible();
   const link = page.getByRole("link", { name: MESSAGES.tr.leagueMembers.applyOnFpl });
   await expect(link).toHaveAttribute("href", "https://fantasy.premierleague.com/transfers");

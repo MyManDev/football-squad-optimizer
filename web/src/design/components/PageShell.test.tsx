@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { LanguageProvider } from "../../i18n/LanguageProvider";
 import { MESSAGES, type Language } from "../../i18n/messages";
+import { MOTION_MS, REDUCED_MOTION_QUERY } from "../motion";
 import { DESKTOP_QUERY, PHONE_QUERY, type ShellLayout } from "../shell/layout";
 import { NO_IDENTITY, type ShellIdentity } from "../shell/nav";
 import { FIXTURE_SHEET_ID, useShell, useShellSlot } from "../shell/ShellContext";
@@ -310,6 +311,63 @@ describe("the app shell on a desktop", () => {
     const { user } = renderShell({ path: OWN, identity: CLAIMED, page: <Late /> });
     await user.click(screen.getByRole("link", { name: TR.squad }));
     expect(scrolled).toContain("kadro");
+  });
+});
+
+// A move between pages from the navigation is one crossfade (#1131); jsdom has no View
+// Transitions, so a browser that has them is stood in for, keeping each update it runs.
+describe("moving between pages from the navigation", () => {
+  let started: Array<Promise<void> | void> = [];
+  let startedAt = 0;
+  beforeEach(() => {
+    started = [];
+    Object.defineProperty(document, "startViewTransition", {
+      configurable: true,
+      writable: true,
+      value: vi.fn((update: () => Promise<void> | void) => {
+        startedAt = performance.now();
+        started.push(update());
+        return {};
+      }),
+    });
+  });
+  afterEach(() => {
+    delete (document as { startViewTransition?: unknown }).startViewTransition;
+  });
+
+  it("crossfades into the page a link names once its address has landed", async () => {
+    const { user } = renderShell({ path: OWN, identity: CLAIMED });
+    await user.click(screen.getByRole("link", { name: TR.league }));
+    expect(document.startViewTransition).toHaveBeenCalledOnce();
+    let settledAt = Number.POSITIVE_INFINITY;
+    await act(async () => {
+      await started[0];
+      settledAt = performance.now();
+    });
+    expect(location()).toBe(MEMBERS);
+    expect(screen.getByRole("link", { name: TR.league })).toHaveAttribute("aria-current", "page");
+    // The address landing ends the wait, not the data time that caps it.
+    expect(settledAt - startedAt).toBeLessThan(MOTION_MS.data);
+
+    // The page already open changes nothing, so its link starts no transition.
+    await user.click(screen.getByRole("link", { name: TR.league }));
+    expect(document.startViewTransition).toHaveBeenCalledOnce();
+  });
+
+  it("moves at once under reduced motion", async () => {
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      writable: true,
+      value: (query: string) => ({
+        matches: query === REDUCED_MOTION_QUERY,
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined,
+      }),
+    });
+    const { user } = renderShell({ path: OWN, identity: CLAIMED });
+    await user.click(screen.getByRole("link", { name: TR.fixtures }));
+    expect(document.startViewTransition).not.toHaveBeenCalled();
+    expect(location()).toBe("/fixtures");
   });
 });
 
