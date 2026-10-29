@@ -322,6 +322,132 @@
   }
 }
 
+/* ---- The phone's section strip (MemberSections.tsx) ----
+   Hamle · Kadro · Araçlar, pinned under the shell's 56 px phone bar, and below it in the
+   stacking order too (15 to the bar's 20), over everything the page scrolls under it.
+   Nothing of it is drawn from 600 px, where the top bar itself is pinned. */
+
+.sections {
+  display: none;
+}
+
+@media (max-width: 599.98px) {
+  /* A sticky element of no height, right after the top bar: it takes no room in the page,
+     so the first screen and the decision after 'Planı gör' stay as they were, and the
+     page's gap stands once around it, not twice. Its bar hangs from it, edge to edge as the
+     top bar runs. */
+  .sections {
+    position: sticky;
+    top: 56px;
+    z-index: 15;
+    display: block;
+    height: 0;
+    margin-bottom: calc(-1 * var(--space-4));
+  }
+
+  .sectionsBar {
+    position: absolute;
+    top: 0;
+    right: calc(-1 * var(--space-4));
+    left: calc(-1 * var(--space-4));
+    display: flex;
+    height: 40px;
+    padding: 0 var(--space-2);
+    border-bottom: 1px solid var(--color-line);
+    background: var(--color-bg);
+    /* Away, it is out of sight and out of the tab order, hidden once it has faded. It fades
+       rather than slides: its links keep their place under the phone bar throughout, so one
+       focused mid-motion is still where its scroll margin (below) expects it. */
+    visibility: hidden;
+    opacity: 0;
+    transition:
+      opacity var(--motion-ui-fast) var(--motion-ease),
+      visibility 0s linear var(--motion-ui-fast);
+  }
+
+  .sections[data-shown] .sectionsBar {
+    visibility: visible;
+    opacity: 1;
+    transition: opacity var(--motion-ui-fast) var(--motion-ease);
+  }
+
+  /* The bar is 40 px and each link a 44 px target: its last 4 px hang under the bar's edge,
+     clear of the phone bar over its top, and the name stays centred on the bar. Pinned at
+     56 to 100 px, a link stands inside the page's 104 px scroll padding, which a browser
+     reads as hidden: focusing one (Tab) scrolled the page by 300 px to bring it clear, and
+     the strip went away under the focus. Its scroll margin moves the area a browser brings
+     into view to just under the padding, where it already is in view. */
+  .sectionLink {
+    display: flex;
+    flex: 1 1 0;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    height: 44px;
+    padding-bottom: 4px;
+    scroll-margin-top: -48px;
+    scroll-margin-bottom: 8px;
+    color: var(--color-text-muted);
+    font-family: var(--font-display);
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 20px;
+    text-decoration: none;
+  }
+
+  .sectionLink[aria-current="location"] {
+    color: var(--color-text);
+  }
+
+  /* Drawn inside the link, so the phone bar over the strip never covers the ring. */
+  .sectionLink:focus-visible {
+    outline-offset: -2px;
+  }
+
+  /* The section being read is underlined at the bar's edge, as FotMob marks its tab, as wide
+     as its name: the name's 20 px line is centred on the 40 px bar, so the line's foot is
+     10 px under it. */
+  .sectionName {
+    position: relative;
+  }
+
+  .sectionName::after {
+    content: "";
+    position: absolute;
+    right: 0;
+    bottom: -10px;
+    left: 0;
+    height: 3px;
+    background: var(--color-text);
+    transform: scaleX(0);
+    transition: transform var(--motion-ui-fast) var(--motion-ease);
+  }
+
+  .sectionLink[aria-current="location"] .sectionName::after {
+    transform: none;
+  }
+
+  /* A jump lands under both bars: the shell's 64 px for the phone bar and the strip's 40.
+     The decision's heading takes the strip's 40 back: the strip stands aside while that
+     heading is in view, so 'Planı gör' and 'Hamle' land it under the phone bar alone, where
+     the boards and the captain line still fit the screen under it. */
+  :global(html):has(.sections) {
+    scroll-padding-top: 104px;
+  }
+
+  :global(html):has(.sections) .decisionTitle {
+    scroll-margin-top: -40px;
+  }
+}
+
+/* A jump made from the strip glides to its section while focus is on the link that a tap
+   there gives; every other jump, and any jump under reduced motion, is instant. */
+@media (max-width: 599.98px) and (prefers-reduced-motion: no-preference) {
+  :global(html):has(.sectionLink:focus) {
+    scroll-behavior: smooth;
+  }
+}
+
 /* One visible settings section on phones and desktops, in document/tab order. */
 .planSettings {
   display: flex;
