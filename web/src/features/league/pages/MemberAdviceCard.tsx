@@ -1,5 +1,6 @@
 import { OfficialInformationCard } from "../advice/OfficialInformationCard";
 import { useEffect, useId, useRef, type CSSProperties, type Ref } from "react";
+import { Link } from "react-router";
 
 import { Badge } from "../../../design/components/Badge";
 import { CountingNumber } from "../../../design/CountingNumber";
@@ -35,7 +36,7 @@ import type {
 import type { AdviceIssue, ShownAdvice } from "./memberPageTypes";
 import styles from "./LeagueMemberPage.module.css";
 import board from "./MemberDecision.module.css";
-import { hasPublishedPlan, STORY_ANCHORS } from "./storyPlan";
+import { chosenChip, hasPublishedPlan, STORY_ANCHORS } from "./storyPlan";
 import lineup from "./MemberLineup.module.css";
 
 /**
@@ -50,16 +51,25 @@ export function MissingAdviceCard({
   canCompute,
   reason,
   onRetry,
+  defaultPlan,
 }: {
   issue: AdviceIssue;
   canCompute: boolean;
   reason?: string | null;
   onRetry?: () => void;
+  /**
+   * The member's default plan, given only once the week is closed: its settings are gone,
+   * so a selection nobody published is not met with a choice the page no longer offers,
+   * but with the way to the plan the page shows with no selection.
+   */
+  defaultPlan?: string;
 }) {
   const { messages } = useLanguage();
   const copy = messages.leagueMembers;
-  const issueCopy: [string, string | null] =
-    issue === "not-computed"
+  const closedNotListed = issue === "not-listed" && defaultPlan !== undefined;
+  const issueCopy: [string, string | null] = closedNotListed
+    ? [copy.closedNotListed.title, copy.closedNotListed.body]
+    : issue === "not-computed"
       ? [copy.adviceNotComputed, null]
       : issue === "unavailable"
         ? [copy.adviceUnreadable, copy.adviceUnreadableBody]
@@ -85,6 +95,11 @@ export function MissingAdviceCard({
         </p>
       ) : null}
       {canCompute ? <p className={styles.muted}>{copy.adviceRequestHint}</p> : null}
+      {closedNotListed ? (
+        <p>
+          <Link to={defaultPlan}>{copy.closedNotListed.link}</Link>
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -189,8 +204,12 @@ function shownPrice(view: EntryAdvice): number | undefined {
 }
 
 /**
- * The decision itself: one substitution board per move, the gain strip, the captain line,
- * and the sentences that change how the plan may be read (the price, the rival bounds). The detail sections a switch adds and the lineup follow in `AdviceDetails`.
+ * The decision itself, the card that leads the page: the gain strip as its headline with the
+ * number of changes, one substitution board per move, the captain line, the chip the member
+ * chose, and the sentences that change how the plan may be read (the price, the rival
+ * bounds). Each transfer and the armband are said here once; the week's story that stood
+ * above the decision is folded into it (#1134). The detail sections a switch adds and the
+ * lineup follow in `AdviceDetails`.
  */
 export function AdviceDecision({
   shown,
@@ -255,13 +274,15 @@ export function AdviceDecision({
       {origin === "baseline-while-computing" ? (
         <p className={styles.honesty}>{copy.adviceBaselineWhileComputing}</p>
       ) : null}
+      <GainStrip view={view} squad={squad.payload} measured={rowsAreShares} chipBasis={chipBasis} />
+      <ModelChangeLine view={view} />
       {view.moves.length === 0 ? (
         <p className={board.noMove}>{hasPublishedPlan(view) ? copy.noMove : copy.noPlanInRecord}</p>
       ) : (
         <div className={board.boards}>
           <div className={board.grid}>
             {view.moves.map((move, index) => (
-              <div className={board.cell} key={move.move_id}>
+              <div className={board.cell} key={move.move_id} data-arrival="row">
                 <SubstitutionBoard
                   move={move}
                   slot={boardSlot(view.entry_id, index)}
@@ -284,9 +305,8 @@ export function AdviceDecision({
           ) : null}
         </div>
       )}
-      <GainStrip view={view} squad={squad.payload} measured={rowsAreShares} chipBasis={chipBasis} />
-      <ModelChangeLine view={view} />
       <CaptainLine view={view} codes={codes} />
+      <ChipLine view={view} />
       <div className={board.states}>
         {basisNote ? (
           <p className={styles.honesty}>
@@ -748,7 +768,8 @@ function GainStrip({
       ? copy.hitPointsFact(hits.toLocaleString(locale, { maximumFractionDigits: 1 }))
       : null,
   ].filter((fact): fact is string => fact !== null);
-  if (!finiteNumber(gain) && facts.length === 0) return null;
+  const moves = view.moves.length;
+  if (!finiteNumber(gain) && facts.length === 0 && moves === 0) return null;
   const cost = finiteNumber(hits) && hits > 0 ? points(hits, 1, locale) : null;
   const caption =
     cost !== null
@@ -762,24 +783,36 @@ function GainStrip({
   return (
     <div className={board.gain}>
       <div className={board.gainTop}>
-        {finiteNumber(gain) ? (
-          <p className={board.gainHead}>
-            <strong
-              className={board.gainFigure}
-              data-sign={gain >= 0.005 ? "up" : gain <= -0.005 ? "down" : undefined}
-            >
-              {signedFigure(gain, locale)}
-            </strong>
-            {caption !== null ? (
-              <>
-                {" "}
-                <span className={board.gainCaption}>{caption}</span>
-              </>
-            ) : (
-              // Nothing to read beside the figure, so it is named for a screen reader only.
-              <span className="visually-hidden"> {copy.boardGainLabel}</span>
-            )}
-          </p>
+        {finiteNumber(gain) || moves > 0 ? (
+          <div className={board.headline}>
+            {finiteNumber(gain) ? (
+              <p className={board.gainHead}>
+                <strong
+                  className={board.gainFigure}
+                  data-sign={gain >= 0.005 ? "up" : gain <= -0.005 ? "down" : undefined}
+                  data-arrival="gain"
+                >
+                  {signedFigure(gain, locale)}
+                </strong>
+                {caption !== null ? (
+                  <>
+                    {" "}
+                    <span className={board.gainCaption}>{caption}</span>
+                  </>
+                ) : (
+                  // Nothing to read beside the figure, so it is named for a screen reader only.
+                  <span className="visually-hidden"> {copy.boardGainLabel}</span>
+                )}
+              </p>
+            ) : null}
+            {/* How many changes make the figure, as the boards under it count them. */}
+            {moves > 0 ? (
+              <p className={board.moves}>
+                <span className={board.movesLabel}>{copy.storyTransfers}</span>{" "}
+                <span className={board.movesCount}>{copy.storyMoves(moves)}</span>
+              </p>
+            ) : null}
+          </div>
         ) : null}
         {facts.length > 0 ? (
           <ul className={board.facts}>
@@ -793,6 +826,7 @@ function GainStrip({
         <div className={board.bar} aria-hidden="true">
           <div
             className={board.segments}
+            data-arrival="bar"
             style={
               {
                 "--total": shares.reduce<number>((sum, share) => sum + (share ?? 0), 0),
@@ -835,6 +869,26 @@ function GainStrip({
         </p>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * The chip the member chose for the week, by name, with the way down to what it adds
+ * (`ChipChoiceSection`). Only the member's own choice: a chip the producer's strategy names
+ * is the chip strategy's to say, further down.
+ */
+function ChipLine({ view }: { view: EntryAdvice }) {
+  const copy = useLanguage().messages.leagueMembers;
+  const chip = chosenChip(view);
+  if (!chip) return null;
+  return (
+    <p className={board.chipLine}>
+      <span className={board.chipWord}>{copy.chipLabel}</span>{" "}
+      <strong className={board.armName}>{copy.chipNames[chip] ?? chip}</strong>{" "}
+      <a className={board.chipMore} href={`#${STORY_ANCHORS.chip}`}>
+        {copy.storyDetail}
+      </a>
+    </p>
   );
 }
 

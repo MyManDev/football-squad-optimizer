@@ -9,6 +9,7 @@ import {
   membersAddress,
   PICK_HERE,
 } from "../../../lib/leagueAddresses";
+import { FplIdHelp } from "../components/FplIdHelp";
 import { LeagueDataMissing, lookupPublishedLeague } from "../data";
 import { useLeagueIdentity } from "../identity/useLeagueIdentity";
 import styles from "./LeagueEntryPage.module.css";
@@ -121,6 +122,9 @@ export function LeagueEntryPage({
             aria-invalid={state === "invalid"}
             aria-describedby="league-entry-hint league-entry-status"
           />
+          {/* Where the number is found, folded right under the field that asks for it, so a
+              visitor who does not know it looks no further than the field. */}
+          <FplIdHelp />
           <button type="submit" disabled={state === "loading"}>
             {copy.submit}
           </button>
@@ -133,10 +137,6 @@ export function LeagueEntryPage({
           </p>
         </form>
       </Card>
-      <details className={styles.help}>
-        <summary>{copy.helpTitle}</summary>
-        <p>{copy.help}</p>
-      </details>
     </div>
   );
 }

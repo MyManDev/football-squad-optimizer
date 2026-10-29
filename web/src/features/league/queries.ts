@@ -1,6 +1,7 @@
 import { useQueries, useQuery } from "@tanstack/react-query";
 
 import { LeagueDataMissing } from "./dataErrors";
+import { loadSuggestionHistory } from "./history/historyData";
 import { useLeague } from "./useLeague";
 
 /**
@@ -45,6 +46,8 @@ export const leagueKeys = {
     ["provisional-entry-squad", leagueId, entryId ?? null] as const,
   adviceIndex: (leagueId: number, entryId: number) =>
     ["provisional-entry-advice-index", leagueId, entryId] as const,
+  suggestionHistory: (leagueId: number, entryId: number) =>
+    ["suggestion-history", leagueId, entryId] as const,
 };
 
 export function useLeagueMembers(enabled = true) {
@@ -57,11 +60,27 @@ export function useLeagueMembers(enabled = true) {
   });
 }
 
-export function useLeagueScoreboard() {
+export function useLeagueScoreboard(enabled = true) {
   const { league, tree } = useLeague();
   return useQuery({
     queryKey: leagueKeys.scoreboard(league.leagueId),
     queryFn: () => tree.scoreboard(),
+    enabled,
+    ...LEAGUE_READ,
+  });
+}
+
+/**
+ * One member's weekly suggestion history, as their history page reads it and as the member
+ * page's latest-week card reads it: one key, so opening the one after the other reads the
+ * document once.
+ */
+export function useSuggestionHistory(entryId: number, enabled = true) {
+  const { league, tree } = useLeague();
+  return useQuery({
+    queryKey: leagueKeys.suggestionHistory(league.leagueId, entryId),
+    queryFn: ({ signal }) => loadSuggestionHistory(tree, entryId, { signal }),
+    enabled,
     ...LEAGUE_READ,
   });
 }

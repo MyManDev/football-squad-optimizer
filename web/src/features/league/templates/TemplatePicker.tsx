@@ -5,12 +5,16 @@
  * the whole selection stays shareable — the address bar is the state. Triggering
  * the computation itself is the compute-flow's work; until it lands, applying a
  * template shows exactly what the published site can show for that combination.
+ *
+ * The member page puts the picker at the top of the plan settings, one compact row of chips
+ * over the strategy and window it sets, so the plan is chosen in one place. A built-in chip
+ * is named by its strategy and adds only its window; a member's own chip says the whole
+ * selection it stands for, since its name is the member's.
  */
 
 import { useState } from "react";
 import { useSearchParams } from "react-router";
 
-import { Card } from "../../../design/components/Card";
 import { useLanguage } from "../../../i18n/context";
 import { isPlayMode } from "../../../lib/decisionVocabulary";
 import { isMemberStrategy, type AdviceStrategy } from "../types";
@@ -91,8 +95,8 @@ export function TemplatePicker({
   }
 
   return (
-    <Card tone="muted" title={copy.templatesTitle}>
-      <p className={styles.hint}>{copy.templatesBody}</p>
+    <fieldset className={styles.presets}>
+      <legend className={styles.legend}>{copy.templatesTitle}</legend>
       <div className={styles.list}>
         {[...builtins, ...saved].map((template) => {
           const active =
@@ -109,15 +113,17 @@ export function TemplatePicker({
               >
                 {template.name}
                 <span className={styles.meta}>
-                  {copy.templateMeta(
-                    isMemberStrategy(template.strategy)
-                      ? copy.strategies[template.strategy].name
-                      : template.strategy,
-                    template.window,
-                    template.rival === "nearest_above"
-                      ? copy.computeRivalNearest
-                      : `#${template.rival}`,
-                  )}
+                  {template.builtin
+                    ? messages.decision.week(template.window)
+                    : copy.templateMeta(
+                        isMemberStrategy(template.strategy)
+                          ? copy.strategies[template.strategy].name
+                          : template.strategy,
+                        template.window,
+                        template.rival === "nearest_above"
+                          ? copy.computeRivalNearest
+                          : `#${template.rival}`,
+                      )}
                 </span>
               </button>
               {template.builtin ? null : (
@@ -133,19 +139,20 @@ export function TemplatePicker({
             </span>
           );
         })}
+        {/* Saving the current selection is the row's last chip: a name and one button. */}
+        <span className={styles.saveRow}>
+          <input
+            className={styles.nameInput}
+            value={draftName}
+            onChange={(event) => setDraftName(event.target.value)}
+            placeholder={copy.templateNamePlaceholder}
+            aria-label={copy.templateNamePlaceholder}
+          />
+          <button type="button" className={styles.save} onClick={saveCurrent}>
+            {copy.templateSave}
+          </button>
+        </span>
       </div>
-      <div className={styles.saveRow}>
-        <input
-          className={styles.nameInput}
-          value={draftName}
-          onChange={(event) => setDraftName(event.target.value)}
-          placeholder={copy.templateNamePlaceholder}
-          aria-label={copy.templateNamePlaceholder}
-        />
-        <button type="button" className={styles.save} onClick={saveCurrent}>
-          {copy.templateSave}
-        </button>
-      </div>
-    </Card>
+    </fieldset>
   );
 }

@@ -25,7 +25,9 @@
    No small text sits directly on the grass (white 3.98:1, ink 4.02:1): it goes on the
    white plates (--color-chip, ink2 on them 7.6:1). The one approved exception: with club
    colours on (pitchLook.ts, #1136), a plate takes its club's fill with ink or white at
-   4.5:1 or more, held per club by contrast.test.ts.
+   4.5:1 or more, held per club by contrast.test.ts. A player's shirt is drawn in the same
+   pairing as their club's plate, and every goalkeeper's in --color-keeper, a pink no club
+   wears, so the keepers read at a glance; its ink initials are 5.6:1.
 
    Motion (#1136): every transition and animation takes its duration and easing from the
    tokens below, never a literal of its own, and src/design/motion.ts mirrors them for the
@@ -91,6 +93,7 @@
   --color-in-panel: #1e7b45;
   --color-lime: #c6ff3d;
   --color-seg2: #a8db45;
+  --color-keeper: #f06ba8;
 
   --color-scrim: rgba(16, 38, 26, 0.45);
   --shadow-drawer: 0 12px 32px rgba(16, 38, 26, 0.28);

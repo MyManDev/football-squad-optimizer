@@ -1,14 +1,18 @@
 import { useId } from "react";
 
 import { useLanguage } from "../../../i18n/context";
+import { DisclosureIcon } from "./memberIcons";
 import styles from "./PitchLookControl.module.css";
 import { GRASS_LOOKS, usePitchLook } from "./pitchLook";
 
 /**
  * The pitch's look under the bench (#1136): the grass's pattern and the plates' club
  * colours, each as a row of real buttons drawn as one segmented control, reachable with a
- * thumb and saying everything without a hover. A choice changes the drawing at once and is
- * kept in this browser; it changes no name, figure or plan.
+ * thumb and saying everything without a hover. Both rows wait in one closed "Saha
+ * görünümü" menu, so five buttons a member seldom needs do not stand between the bench and
+ * the rest of the page. A choice changes the drawing at once and is kept in this browser;
+ * it changes no name, figure or plan. The menu opens closed on every visit: the look is
+ * kept, not the menu.
  */
 export function PitchLookControl() {
   const copy = useLanguage().messages.leagueMembers;
@@ -21,7 +25,11 @@ export function PitchLookControl() {
     checks: copy.pitchLookChecks,
   } as const;
   return (
-    <div className={styles.looks} data-mark="pitch-look">
+    <details className={styles.looks} data-mark="pitch-look">
+      <summary className={styles.summary}>
+        <DisclosureIcon className={styles.icon} />
+        {copy.pitchLookMenu}
+      </summary>
       <div className={styles.row}>
         <span className={styles.label} id={grassId}>
           {copy.pitchLookLabel}
@@ -58,6 +66,6 @@ export function PitchLookControl() {
           ))}
         </div>
       </div>
-    </div>
+    </details>
   );
 }
