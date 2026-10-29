@@ -1,0 +1,134 @@
+/* The member's latest finished week (LastWeekCard.tsx): one card above this week's
+   decisions, the member's net in display figures beside its standing against the league's
+   mean, what the published suggestion scored under it, and the other figures as a row of
+   cells labelled as the score bug labels them. It comes in once, when the documents it is
+   read from arrive: a short rise and fade in the motion tokens' data time, run once. Under
+   reduced motion the tokens are zero and the global rule stops every animation, so the card
+   is simply there. */
+
+.enter {
+  margin-block: var(--space-3) var(--space-2);
+  animation: last-week-in var(--motion-data) var(--motion-ease);
+}
+
+@keyframes last-week-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--space-2));
+  }
+}
+
+.aside {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* The gameweek in broadcast capitals, as the top bar writes the advised one. */
+.week {
+  color: var(--color-text);
+  font-family: var(--font-display);
+  font-size: var(--step-0);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.headline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.score {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.figure {
+  font-family: var(--font-display);
+  font-size: var(--step-4);
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* What the published suggestion scored, under the member's own figure and smaller. */
+.suggested {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--step-1);
+  font-weight: 700;
+  line-height: 24px;
+}
+
+.plan {
+  color: var(--color-text-muted);
+  font-family: var(--font-body);
+  font-size: var(--step--1);
+  font-weight: 400;
+}
+
+.unit,
+.fact dt {
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--step--2);
+  font-weight: 500;
+  line-height: 16px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* The cells wrap two to a row on a phone and share one row wider; each keeps a rule on its
+   left, so a wrapped row reads like the first. */
+.facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+  gap: var(--space-3) var(--space-2);
+  margin: 0;
+}
+
+.fact {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding-left: var(--space-2);
+  border-left: 2px solid var(--color-line);
+}
+
+.fact dd {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--step-1);
+  font-weight: 700;
+  line-height: 24px;
+}
+
+.fact .sub {
+  color: var(--color-text-muted);
+  font-family: var(--font-body);
+  font-size: var(--step--2);
+  font-weight: 400;
+  line-height: 16px;
+}
+
+.note {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--step--1);
+}
+
+/* The link's text is small and its target is not: 44 px for a thumb, with the negative
+   margin keeping the card the height its text needs. */
+.more {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  min-height: 44px;
+  margin-block: -12px;
+  font-size: var(--step--1);
+}

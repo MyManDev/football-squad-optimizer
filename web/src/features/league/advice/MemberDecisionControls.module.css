@@ -34,6 +34,11 @@
   text-wrap: pretty;
 }
 
+/* The presets row under the heading, as wide as the plan it sets. */
+.presets {
+  min-width: 0;
+}
+
 .field {
   display: flex;
   flex-direction: column;
@@ -357,7 +362,8 @@
     gap: var(--space-4);
   }
 
-  .planHead {
+  .planHead,
+  .presets {
     grid-column: 1 / -1;
   }
 }
