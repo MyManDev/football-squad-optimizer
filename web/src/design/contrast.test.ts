@@ -62,6 +62,8 @@ const READABLE: readonly (readonly [string, string])[] = [
   ["--color-board-muted", "--color-board"],
   ["--color-text", "--color-seg2"],
   ["--color-text", "--color-lime"],
+  // A goalkeeper's initials on the keepers' shirt.
+  ["--color-text", "--color-keeper"],
 ];
 
 /** Pairings tokens.css says never carry text, held below AA so that sentence stays true. */

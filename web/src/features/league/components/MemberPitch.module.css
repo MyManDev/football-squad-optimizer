@@ -13,6 +13,15 @@
  * default, or the plain or checked look the viewer chose (pitchLook.ts, #1136), all in the
  * two grass tokens. In club colours a player's plate takes its club's fill with one text
  * colour that reads 4.5:1 on it; the direction of attack keeps its white plate.
+ *
+ * Each player wears a shirt in their club's colours whatever the look (ClubShirt.tsx). It
+ * stands above the plate only where the lines are far enough apart for it: the shirt and
+ * the tags above it take 48 px over the plate, which an upright field has from 454 px wide
+ * (see below). A phone's field stands its lines 84 to 86 px apart, 32 to 34 px clear, and
+ * YENİ and the armband already take 18 px of that. Across, a shirt over every plate would
+ * need the lines 76 px apart instead of 50 to 68, which makes a line of four 90 px taller
+ * where a 1440 by 900 laptop has 45 px left under the plan. There the shirt is small and in
+ * the plate, where the club swatch stood.
  */
 
 .wrap {
@@ -249,16 +258,17 @@
   white-space: nowrap;
 }
 
-.swatch {
-  flex: none;
-  width: 10px;
-  height: 10px;
-  outline: 1px solid var(--color-board);
-  outline-offset: -1px;
+.shirtAcross {
+  display: none;
 }
 
-.swatchAcross {
+/* The large shirt, shown only on a tall enough upright pitch: centred over its plate. */
+.shirtAbove {
   display: none;
+  position: absolute;
+  bottom: calc(100% + 2px);
+  left: 50%;
+  transform: translateX(-50%);
 }
 
 .code {
@@ -298,8 +308,11 @@
   gap: 2px;
 }
 
-/* A plate in its club's colours: every line in the one text colour chosen for the fill. */
+/* A plate in its club's colours: every line in the one text colour chosen for the fill, and
+   a shirt in the plate outlined in it too, so a shirt in the plate's own fill keeps its
+   shape. The shirt above the plate stands on the grass and keeps its ink outline. */
 .plate[data-club] {
+  --shirt-line: var(--plate-text);
   background: var(--plate-fill);
   color: var(--plate-text);
 }
@@ -308,9 +321,8 @@
   color: inherit;
 }
 
-/* A plate in its club's first colour is itself the swatch. */
-.plate[data-club="primary"] .swatch {
-  display: none;
+.plate[data-club] .shirtAbove {
+  --shirt-line: var(--color-board);
 }
 
 /* Upright, YENİ and the armband stand centred over their own plate, outside it, so a
@@ -356,6 +368,27 @@
   border: 1.5px solid var(--color-text);
   background: var(--color-chip);
   line-height: 13px;
+}
+
+/* An upright pitch from 454 px wide is at least 508 px tall (112cqw), and its lines stand
+   106 px apart or more: the 52 px plate, the 28 px shirt and the 16 px tags above it with
+   2 px between each, and 6 px clear of the line in front. There the shirt stands above its
+   plate and the tags above the shirt, still centred over the plate. A field is never wider
+   than 540 px upright and never narrower than 640 px across, so the upper bound keeps this
+   to the upright drawing. */
+@container field (min-width: 454px) and (max-width: 639px) {
+  .shirtUpright {
+    display: none;
+  }
+
+  .shirtAbove {
+    display: block;
+  }
+
+  .new,
+  .mark {
+    bottom: calc(100% + 32px);
+  }
 }
 
 /* The direction of attack: under the first defender's plate, left-aligned with it. */
@@ -547,11 +580,11 @@
     left: calc(100% - (16px + var(--pw) / 2 + 50%) / 2);
   }
 
-  .swatchAcross {
+  .shirtAcross {
     display: block;
   }
 
-  .swatchUpright {
+  .shirtUpright {
     display: none;
   }
 

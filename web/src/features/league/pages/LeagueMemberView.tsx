@@ -42,6 +42,7 @@ import { ApplyOnFpl } from "./ApplyOnFpl";
 import { HeldSquad, MemberSquad } from "./MemberSquad";
 import { hasLineup, squadOnPitch } from "./squadOnPitch";
 import { MemberTopBar } from "./MemberTopBar";
+import { MEMBER_TOOLS_ID, MemberSections } from "./MemberSections";
 import type { LeagueMemberViewProps } from "./memberPageTypes";
 import { useMemberAdviceView } from "./useMemberAdviceView";
 import { rivalCandidates } from "../advice/adviceSelection";
@@ -453,6 +454,10 @@ function LeagueMemberContent({
           deadlinePassed={deadlinePassed}
           now={now}
         />
+        {/* A phone's one column is long: the strip keeps its three parts a tap away, pinned
+            under the phone bar once the decision has been read past. Wider layouts pin the
+            top bar instead and show more of the page at once. */}
+        {layout === "phone" ? <MemberSections /> : null}
 
         {deadlinePassed !== null ? (
           <section className={styles.notice} aria-labelledby="deadline-passed-title">
@@ -575,7 +580,8 @@ function LeagueMemberContent({
             the notice above says so, and when the next week's plan comes. */}
         {closed ? null : planSettings}
 
-        <div className={styles.tools}>
+        {/* The phone strip's 'Araçlar' lands here, on an open week and a closed one alike. */}
+        <div id={MEMBER_TOOLS_ID} className={styles.tools}>
           {onPitch.source === "plan" && view.starting_xi.length > 0 ? (
             <Tool title={copy.memberSquad}>
               <HeldSquad squad={view} codes={codes} />

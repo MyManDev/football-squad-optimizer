@@ -1,15 +1,19 @@
 import { useId, type CSSProperties } from "react";
 
 import { useLanguage } from "../../../i18n/context";
-import { clubCode, clubSwatch, type ClubCodes } from "../../../lib/clubs";
+import { clubCode, type ClubCodes } from "../../../lib/clubs";
 import { figure } from "../../../lib/format";
 import type { CoachAbsence } from "../advice/coachAbsences";
 import type { ModelChange } from "../advice/modelSwitch";
+import { ClubShirt } from "./ClubShirt";
 import { CoachNewsMark } from "./CoachNews";
 import styles from "./MemberPitch.module.css";
 import { clubPlate, usePitchLook } from "./pitchLook";
 
-/** One player as the pitch draws them: a name plate on the grass, white or in club colours. */
+/**
+ * One player as the pitch draws them: a name plate on the grass, white or in club colours,
+ * with the player's shirt in their club's colours on it or above it.
+ */
 export interface PitchPlayer {
   playerId: number;
   name: string;
@@ -88,10 +92,14 @@ function Plate({
 }) {
   const { language, locale, messages } = useLanguage();
   const code = clubCode(player.team, codes);
-  const swatch = clubSwatch(code);
+  const keeper = player.position === "GK";
   // In club colours the plate takes its club's fill and one readable text colour (#1136).
   const club = clubColours ? clubPlate(code) : null;
   const shortName = player.shortName.trim() || player.name;
+  // The shirt is drawn three ways and the stylesheet shows the one the pitch has room for:
+  // large above the plate where an upright pitch is tall enough for it, otherwise small in
+  // the plate where the club swatch stood, before the name across and before the code
+  // upright. It is in club colours whatever the plate's look.
   return (
     <div
       className={styles.plate}
@@ -112,13 +120,13 @@ function Plate({
         />
       ) : null}
       <span className={styles.name} title={player.name}>
-        {swatch ? (
-          <span
-            className={`${styles.swatch} ${styles.swatchAcross}`}
-            style={{ background: swatch }}
-            aria-hidden="true"
-          />
-        ) : null}
+        <ClubShirt
+          code={code}
+          name={player.name}
+          keeper={keeper}
+          size="small"
+          className={styles.shirtAcross}
+        />
         <span className={styles.nameText} aria-hidden={shortName !== player.name || undefined}>
           {shortName}
         </span>
@@ -128,13 +136,13 @@ function Plate({
         <span className="visually-hidden"> {messages.leagueMembers.modelChangedMark}</span>
       ) : null}
       <span className={styles.code}>
-        {swatch ? (
-          <span
-            className={`${styles.swatch} ${styles.swatchUpright}`}
-            style={{ background: swatch }}
-            aria-hidden="true"
-          />
-        ) : null}
+        <ClubShirt
+          code={code}
+          name={player.name}
+          keeper={keeper}
+          size="small"
+          className={styles.shirtUpright}
+        />
         <span className={styles.codeText}>{code ?? player.team}</span>
       </span>
       {news || (player.expectedPoints !== null && Number.isFinite(player.expectedPoints)) ? (
@@ -162,6 +170,14 @@ function Plate({
           {messages.leagueMembers.viceMark}
         </span>
       ) : null}
+      {/* Last, so the plate's text still starts with the name. */}
+      <ClubShirt
+        code={code}
+        name={player.name}
+        keeper={keeper}
+        size="large"
+        className={styles.shirtAbove}
+      />
     </div>
   );
 }
@@ -346,7 +362,6 @@ export function MemberBench({
         <ol className={styles.benchList}>
           {players.map((player) => {
             const code = clubCode(player.team, codes);
-            const swatch = clubSwatch(code);
             const shortName = player.shortName.trim() || player.name;
             const changed = modelChange?.changed.has(player.playerId) ?? false;
             return (
@@ -367,13 +382,12 @@ export function MemberBench({
                   ) : null}
                 </strong>
                 <span className={styles.benchMeta}>
-                  {swatch ? (
-                    <span
-                      className={styles.swatch}
-                      style={{ background: swatch }}
-                      aria-hidden="true"
-                    />
-                  ) : null}
+                  <ClubShirt
+                    code={code}
+                    name={player.name}
+                    keeper={player.position === "GK"}
+                    size="small"
+                  />
                   <span className={code ? styles.benchCode : undefined}>{code ?? player.team}</span>
                   {Object.hasOwn(messages.positions, player.position) ? (
                     <span>
