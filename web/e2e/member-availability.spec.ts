@@ -101,10 +101,7 @@ test("an unsupported saved template and direct URL cannot fetch an unlisted pair
   await expect(
     page.getByText(MESSAGES.tr.leagueMembers.publicationStates["not-listed"].title),
   ).toBeVisible();
-  // The templates are among the advanced settings, closed until asked for.
-  await page
-    .locator("main details summary", { hasText: MESSAGES.tr.leagueMembers.advancedSettings })
-    .click();
+  // The templates head the plan settings as presets, on the page without opening anything.
   await expect(
     page.getByRole("button", { name: /^Unavailable saved plan Farkı kapat/ }),
   ).toBeDisabled();

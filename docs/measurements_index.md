@@ -315,6 +315,16 @@ was written.
 | --- | --- | --- |
 | `architecture/advice_capacity_20260909` (+ `architecture/advice_capacity.md`) | **The local advice path completes every one of 18 burst scenarios, and the number that matters is the queue, not the workers.** Six cases (1 and 3 workers × 15, 30, 60 distinct members) on a synthetic 24-player captured world, one burst each, three request shapes per case. Deduplicated bursts return one job and byte-identical answers; cache-hit bursts create no job and complete in **0.048–0.211 s p95**; distinct bursts create exactly one job per request and are the only shape that queues — **60 distinct members on one worker: submit p95 1.940 s, complete p95 6.410 s, sampled queue peak 47**; the same burst on three workers completes at **4.675 s p95 with a sampled peak of 0**, so three workers buy a shorter tail rather than a proportionally faster one, and the record refuses to claim linear scaling. Peak RSS **196–210 MiB** for the API and **177–187 MiB** per worker, measured over each role's whole owned process tree. This is the fourth run: the first exposed a late duplicate admission and a Windows polling/replace race, both reproduced under control and fixed under the existing metadata lock; the second measured launcher processes only and its resource numbers are declared unusable; the third found a worker stopped by a timestamp sampled before lock acquisition, fixed by clocking after the lock. Eight stated limits, chief among them: a shared Windows development host with no CPU quota, one burst per configuration with no interval and no sustained-load claim, a rate limit of 5000 and a 0.05 s idle poll that are measurement settings rather than defaults, and a real roster's solver cost never exercised. **Selects no replica count and sets no latency target**; the same probe against the prepared host with its real limits and a representative roster is what would set one | #456 |
 
+## Data source reach
+
+**Not a model measurement.** One row for the FPL forwarder probe (#979): whether the FPL API
+serves Cloudflare's egress. It measures no projection and no decision; it decides only whether
+the #980 forwarder is built on Cloudflare.
+
+| Artifact | Finding | PR |
+| --- | --- | --- |
+| `research/fpl_forwarder_probe_2026_10` ([record](research/fpl_forwarder_probe_2026_10.json), [readout](research/fpl_forwarder_probe_2026_10.md); rule in [fpl_forwarder_probe.md](fpl_forwarder_probe.md)) | **Served.** In the rule's 72-hour window (2026-10-21T21:30:13Z to 2026-10-24T21:30:13Z), 147 of 147 scheduled standings probes answered 200 JSON, against 95 percent and at least 130 probes. All 145 slots hold a probe; two slots ran twice, and counted once per slot the window is 145 of 145. The window spans the GW8 deadline, and the 24 probes within three hours of it were served. The record is the whole results answer, read 2026-10-26T05:45Z, 424 records; no member's name or score is stored. Decides only where #980 is built | #979 |
+
 ## Measurement precision
 
 | Artifact | Finding | PR |

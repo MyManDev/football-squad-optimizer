@@ -6,12 +6,14 @@ import type { PublishedAdviceStatus } from "../advice/adviceSelection";
 import type { DeviceRivalReads } from "../device/computable";
 import type { DevicePlanDependencies } from "../device/useDevicePlan";
 import type { WhatIfDependencies } from "../device/useWhatIf";
+import type { SuggestionHistory } from "../history/historyData";
 import type {
   EntryAdvice,
   EntryAdviceIndex,
   EntrySquad,
   EntryView,
   LeagueViewEnvelope,
+  Scoreboard,
 } from "../types";
 
 /** Why no published advice is on hand for the selection: never published, or not loadable. */
@@ -64,6 +66,11 @@ export interface LeagueMemberViewProps {
    * calendar; null while it is open or the calendar does not say.
    */
   deadlinePassed?: string | null;
+  /**
+   * The page's minute clock (epoch ms), the one `deadlinePassed` was read at: the top bar
+   * counts down to an open deadline from it. Absent, the bar states the deadline alone.
+   */
+  now?: number;
   rivalSquad?: LeagueViewEnvelope<EntrySquad> | null;
   /** The entry document of the rival `?duel=` names (#1133); null while none is named or read. */
   duelSquad?: LeagueViewEnvelope<EntrySquad> | null;
@@ -80,4 +87,11 @@ export interface LeagueMemberViewProps {
   fixtures?: FixturesPayload | null;
   /** Whether the calendar is still being read, so its absence is not yet a failure. */
   fixturesPending?: boolean;
+  /**
+   * The league's published scoreboard, for the card of the member's latest finished week.
+   * Absent, unread or unreadable, the page shows no such card.
+   */
+  scoreboard?: Scoreboard | null;
+  /** The member's suggestion history, read once the scoreboard has a week for the card. */
+  history?: SuggestionHistory | null;
 }

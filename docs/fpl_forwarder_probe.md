@@ -159,6 +159,9 @@ Cloudflare.**
 The rule is not changed after the data arrives. A different question gets a new probe with its
 rule written down before it runs.
 
+The October 2026 run read **served**: 147 of 147 in the window. The whole results answer is
+committed as a record, with its [readout](research/fpl_forwarder_probe_2026_10.md).
+
 ## The owner's one-time steps
 
 The Pages token stays Pages-only ([deployment runbook](deployment_runbook.md)). The probe uses
