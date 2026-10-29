@@ -144,6 +144,25 @@
   display: none;
 }
 
+/* The time left, a state tag on the label's line, no taller than the label (16 px), so the
+   pinned bar keeps its height and the page's scroll padding still clears it. In the last
+   hour it takes the warning tone (warn on the tag's own surface, as the warn badge). */
+.countdown {
+  align-self: flex-start;
+  padding: 0 5px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-s);
+  background: var(--color-surface);
+  font-weight: 600;
+  line-height: 14px;
+  white-space: nowrap;
+}
+
+.countdown[data-urgent] {
+  border-color: currentColor;
+  color: var(--color-warn);
+}
+
 .scoreBug {
   display: flex;
   margin: 0 0 0 auto;
@@ -258,6 +277,12 @@
 
   .deadlineShort {
     display: inline;
+  }
+
+  /* While it counts down, the time left stands in for the date too: the first line keeps
+     its width (the tag is about as wide as the label and the date) and the team its room. */
+  .deadline:has(.countdown) .deadlineShort {
+    display: none;
   }
 
   /* One row, always: when a narrow phone or a wider font runs out of room, a long label
@@ -395,6 +420,7 @@ section.notice p {
    laptop the decision, the pitch and the honesty block still share one screen
    (member-pitch.spec.ts); a phone sets its own below. */
 .decision {
+  container: decision / inline-size;
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
@@ -499,6 +525,78 @@ section.notice p {
   font-size: var(--step--2);
   font-weight: 600;
   line-height: 16px;
+}
+
+/* FPL'de uygula, the primary action, with what the member does there beside it. Where the
+   decision is 760 px wide it closes the heading row beside the proof stamp, button over
+   hint, and the row keeps the two lines its heading takes there, so the decision, the
+   pitch and the honesty block still share a laptop's screen; a narrower decision gives it
+   the row's next line. On a phone LeagueMemberView places it at the end of the decision,
+   after the plan's last sentence (MemberDecision.module.css orders the parts up to 9). */
+.apply {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.applyLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-s);
+  background: var(--color-primary);
+  color: var(--color-primary-text);
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.applyLink:hover {
+  background: var(--color-text);
+}
+
+.applyHint {
+  flex: 1 1 16ch;
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--step--2);
+  line-height: 16px;
+}
+
+/* With a pointer beside the sidebar the button is no taller than the stamp's line. */
+@media (min-width: 1180px) {
+  .applyLink {
+    min-height: 32px;
+  }
+}
+
+/* 720px, not wider: the decision's content box is what the query measures, and a decision
+   drawn as a padded card leaves about 736px of it at 1440px. */
+@container decision (min-width: 720px) {
+  .headingRow:has(> .apply) {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+  }
+
+  .apply {
+    grid-column: auto;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+  }
+
+  .applyHint {
+    flex: none;
+  }
+}
+
+@media (max-width: 599.98px) {
+  .apply {
+    order: 10;
+  }
 }
 
 /* ---- How it was worked out: the disclosure and the history link ---- */
