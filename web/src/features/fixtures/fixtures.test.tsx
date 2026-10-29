@@ -280,7 +280,17 @@ describe("what the fixtures page leaves out", () => {
       await gameweekRegion(
         `${FIXTURES_COPY[language].thisWeek} · ${MESSAGES[language].common.gameweek(3)}`,
       );
-      const text = screen.getByTestId("surface").textContent ?? "";
+      // The calendar file's button names the deadlines and prints none of them; the rest of
+      // the page does not name them at all.
+      const calendar = screen
+        .getByTestId("surface")
+        .querySelector('[data-mark="deadline-calendar"]')!;
+      expect(calendar).toHaveTextContent(FIXTURES_COPY[language].calendarAction);
+      expect(calendar.textContent).not.toMatch(/\d/);
+      const text = (screen.getByTestId("surface").textContent ?? "").replace(
+        calendar.textContent ?? "",
+        "",
+      );
       expect(text).not.toMatch(/tarihli kayda göre|As recorded on|Son tarih|Deadline/);
       // No week heading carries an aside of its own.
       for (const heading of screen.getAllByRole("heading", { level: 2 }))
