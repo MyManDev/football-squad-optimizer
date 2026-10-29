@@ -146,6 +146,15 @@ def test_selection_policy_versions_invalidate_reuse(monkeypatch):
     assert coding_input_fingerprint(CONFIG, (doc,), ROSTER) != before
 
 
+def test_publication_metadata_versions_invalidate_reuse(monkeypatch):
+    import squadopt.platform.club_news_provider as provider
+
+    doc = document("Fitness update", published="2026-10-02T09:00:00Z")
+    before = coding_input_fingerprint(CONFIG, (doc,), ROSTER)
+    monkeypatch.setattr(provider, "PUBLICATION_METADATA_VERSION", "different_publication_rules")
+    assert coding_input_fingerprint(CONFIG, (doc,), ROSTER) != before
+
+
 def test_empty_model_response_stays_successful_zero_claims():
     doc = document("Fitness update")
     coded, refused = code_week_by_club(_Recorder(), CONFIG, (doc,), ROSTER)
