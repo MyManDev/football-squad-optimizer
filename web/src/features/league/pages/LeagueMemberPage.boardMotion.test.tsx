@@ -75,7 +75,9 @@ beforeEach(() => {
   forgetPairs();
   started = [];
   playState = "running";
-  // jsdom has no Web Animations; this records each start and answers as a running one.
+  // jsdom has no Web Animations; this records each start on a board and answers as a
+  // running one. The page's arrival moves the card, its rows and the plates outside the
+  // boards (LeagueMemberPage.arrival.test.tsx), so those are not this file's to count.
   Object.defineProperty(Element.prototype, "animate", {
     configurable: true,
     writable: true,
@@ -86,7 +88,7 @@ beforeEach(() => {
         },
         cancel: vi.fn(),
       };
-      started.push({ element: this, keyframes, options, animation });
+      if (this.closest("article")) started.push({ element: this, keyframes, options, animation });
       return animation as unknown as Animation;
     },
   });

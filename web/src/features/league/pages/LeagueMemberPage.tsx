@@ -6,7 +6,7 @@ import { EmptyState } from "../../../design/components/EmptyState";
 import { useLanguage } from "../../../i18n/context";
 import { useFixtures } from "../../fixtures/data";
 import { LeagueDataMissing } from "../data";
-import { useDeadlinePassed } from "../advice/deadline";
+import { gameweekDeadline, passedDeadline, useMinuteClock } from "../advice/deadline";
 import { LeagueMemberView } from "./LeagueMemberView";
 import { MemberPageSkeleton } from "./MemberPageSkeleton";
 import type { AdviceIssue } from "./memberPageTypes";
@@ -42,12 +42,14 @@ export function LeagueMemberPage() {
     computeService,
     computePending,
   } = useLeagueMemberData(entryParam, searchParams);
-  const deadlinePassed = useDeadlinePassed(
-    squad.data?.payload.season,
-    squad.data?.payload.gameweek,
-  );
-  // The same calendar the deadline is read from; the query is shared, so nothing more is read.
+  // The published calendar: the deadline, and the clubs' next gameweeks on the boards.
   const fixtures = useFixtures();
+  // One clock for the page: the deadline check and the top bar's countdown read it.
+  const now = useMinuteClock();
+  const deadlinePassed = passedDeadline(
+    gameweekDeadline(fixtures.data, squad.data?.payload.season, squad.data?.payload.gameweek),
+    now,
+  );
 
   if (!validEntryId) return <EmptyState title={copy.invalidEntry} />;
   // The squad is the page's first read and its longest wait on a cold visit: the page's
@@ -138,6 +140,7 @@ export function LeagueMemberPage() {
       computeService={computeService}
       computePending={computePending}
       deadlinePassed={deadlinePassed}
+      now={now}
       fixtures={fixtures.data ?? null}
       fixturesPending={fixtures.isPending}
     />

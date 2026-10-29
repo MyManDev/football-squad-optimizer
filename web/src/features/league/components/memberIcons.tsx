@@ -83,3 +83,20 @@ export function DisclosureIcon({ className }: { className?: string }) {
     </svg>
   );
 }
+
+/** An arrow out of the page, beside a link that opens the game in a new tab. */
+export function ExternalIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 14 14"
+      aria-hidden="true"
+      focusable="false"
+      strokeWidth={1.8}
+      {...STROKE}
+    >
+      <path d="M5.5 2.5h6v6M11.5 2.5L3 11" />
+    </svg>
+  );
+}

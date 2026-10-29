@@ -1,20 +1,33 @@
-.hint {
-  margin: 0 0 0.75rem;
-  font-size: var(--step--1);
+/* One compact row at the top of the plan settings: a chip per template, then the name and
+   the button that save the current selection as one more. */
+.presets {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+/* Named like the plan's other fields under it. */
+.legend {
+  padding: 0;
+  margin-bottom: 2px;
   color: var(--color-text-muted);
+  font-size: var(--step--2);
+  font-weight: 500;
+  line-height: 16px;
 }
 
 .list {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
-  margin-bottom: 0.75rem;
 }
 
 .item {
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
+  max-width: 100%;
 }
 
 .template,
@@ -24,16 +37,23 @@
   background: transparent;
   color: inherit;
   padding: 0.35rem 0.6rem;
+  max-width: 100%;
+  text-align: start;
   cursor: pointer;
   display: inline-flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.1rem;
+  align-items: center;
+  gap: 0.35rem;
 }
 
 .templateActive {
   border-width: 2px;
   font-weight: 600;
+}
+
+.template:disabled,
+.templateActive:disabled {
+  color: var(--color-text-muted);
+  cursor: not-allowed;
 }
 
 .meta {
@@ -52,8 +72,10 @@
 }
 
 .saveRow {
-  display: flex;
+  display: inline-flex;
+  flex: 1 1 14rem;
   gap: 0.5rem;
+  min-width: 0;
 }
 
 .nameInput {
