@@ -1,7 +1,7 @@
 import { memberAddress, memberHistoryAddress } from "../../../lib/leagueAddresses";
 import { useLeagueId } from "../useLeague";
 import { NewInformationNotice } from "../advice/OfficialInformationCard";
-import { useMemo, type ReactNode } from "react";
+import { useMemo, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Link, useSearchParams } from "react-router";
 
@@ -13,6 +13,7 @@ import { clubCodesFromFixtures } from "../../../lib/clubs";
 import { AdviceRequestPanel } from "../advice/AdviceRequestPanel";
 import { ChipTimingCard } from "../advice/ChipTimingCard";
 import { COMPUTE_COPY } from "../advice/computeCopy";
+import { gameweekDeadline } from "../advice/deadline";
 import { MemberDecisionControls } from "../advice/MemberDecisionControls";
 import { deviceEndedWithoutPlan } from "../device/useDevicePlan";
 import { isDevicePlanEntry } from "../device/types";
@@ -37,6 +38,7 @@ import {
   MissingAdviceCard,
   PlanLineup,
 } from "./MemberAdviceCard";
+import { ApplyOnFpl } from "./ApplyOnFpl";
 import { HeldSquad, MemberSquad } from "./MemberSquad";
 import { hasLineup, squadOnPitch } from "./squadOnPitch";
 import { MemberTopBar } from "./MemberTopBar";
@@ -46,7 +48,7 @@ import { rivalCandidates } from "../advice/adviceSelection";
 import { canDuel, duelRivalId } from "./duelSides";
 import { RivalDuel } from "./RivalDuel";
 import { SquadCard } from "../card/SquadCard";
-import { WeekStory } from "./WeekStory";
+import { useWeekArrival } from "./weekArrival";
 import styles from "./LeagueMemberPage.module.css";
 
 export function LeagueMemberView(props: LeagueMemberViewProps) {
@@ -137,6 +139,7 @@ function LeagueMemberContent({
   duelIssue,
   windowControl = null,
   deadlinePassed = null,
+  now,
   fixtures = null,
   fixturesPending = false,
 }: LeagueMemberViewProps) {
@@ -236,6 +239,17 @@ function LeagueMemberContent({
   const codes = useMemo(() => clubCodesFromFixtures(fixtures), [fixtures]);
   const plan = !adviceLoading && shown ? shown.envelope.payload : null;
   const onPitch = squadOnPitch(plan, view);
+  // The week can still be changed only while the calendar states a deadline that is ahead:
+  // an unknown deadline is not an open week, so nothing is offered to apply then.
+  const weekOpen =
+    deadlinePassed === null && gameweekDeadline(fixtures, view.season, view.gameweek) !== null;
+  // The way to make the decision on the game's own page, in a new tab. It is placed in the
+  // document where it is seen (the heading row, or the end of the decision on a phone), so
+  // the tab order follows the screen.
+  const apply = plan && weekOpen ? <ApplyOnFpl plan={plan} squad={view} /> : null;
+  // The page arrives once, and its decision once it is drawn (weekArrival.ts).
+  const arrival = useRef<HTMLDivElement>(null);
+  useWeekArrival(arrival, !adviceLoading && !rivalsLoading && shown != null);
   // One fixture rail: its own column from 1180 px (and on a page rendered without the
   // shell), beside the squad on a tablet, and a sheet over the page on a phone.
   const railPlacement: RailPlacement = !shell
@@ -319,6 +333,8 @@ function LeagueMemberContent({
       // The decision's "change settings" link lands here; focus follows it.
       tabIndex={-1}
     >
+      {/* The plan is chosen in one place: the templates head it as presets that set the same
+          strategy and window as the controls under them. */}
       <MemberDecisionControls
         entryId={entryId}
         members={members}
@@ -326,7 +342,21 @@ function LeagueMemberContent({
         capabilities={capabilities}
         onDevice={onDevice}
         part="plan"
+        presets={
+          <TemplatePicker
+            canApply={(params) => {
+              const offered = resolve(params);
+              return (
+                !adviceLoading &&
+                indexReadable &&
+                (offered.status === "ready" || offered.computable?.selection === true)
+              );
+            }}
+          />
+        }
       />
+      {/* The Top 100 influence stays in front, just after the plan: its options are useful
+          enough not to fold away (#1248). */}
       <MemberDecisionControls
         entryId={entryId}
         members={members}
@@ -335,7 +365,17 @@ function LeagueMemberContent({
         onDevice={onDevice}
         part="top100"
       />
+      {/* What a member changes rarely waits folded: the experimental model, beside the
+          manager's word and the chips. */}
       <Tool title={copy.advancedSettings}>
+        <MemberDecisionControls
+          entryId={entryId}
+          members={members}
+          index={selection.status === "index-error" ? null : index}
+          capabilities={capabilities}
+          onDevice={onDevice}
+          part="model"
+        />
         <MemberDecisionControls
           entryId={entryId}
           members={members}
@@ -351,16 +391,6 @@ function LeagueMemberContent({
           fixtures={fixtures}
         />
         <DecisionPreferencesPanel squad={view} available={capabilities?.preferences === true} />
-        <TemplatePicker
-          canApply={(params) => {
-            const offered = resolve(params);
-            return (
-              !adviceLoading &&
-              indexReadable &&
-              (offered.status === "ready" || offered.computable?.selection === true)
-            );
-          }}
-        />
       </Tool>
       <AdviceRequestPanel
         dockClassName={styles.computeDock}
@@ -407,13 +437,14 @@ function LeagueMemberContent({
   );
 
   return (
-    <div className={styles.layout} data-rail={railPlacement}>
+    <div ref={arrival} className={styles.layout} data-rail={railPlacement}>
       <div className={styles.page}>
         <MemberTopBar
           squad={squad}
           members={members}
           fixtures={fixtures}
           deadlinePassed={deadlinePassed}
+          now={now}
         />
 
         {deadlinePassed !== null ? (
@@ -440,8 +471,6 @@ function LeagueMemberContent({
           </p>
         ) : null}
 
-        {plan ? <WeekStory view={plan} /> : null}
-
         <section aria-labelledby="entry-advice-title" className={styles.adviceSection}>
           <div className={styles.decision} data-mark="decision">
             <div className={styles.headingRow}>
@@ -465,6 +494,7 @@ function LeagueMemberContent({
                 </p>
               </div>
               {!adviceLoading && shown ? <AdviceStamp shown={shown} /> : null}
+              {layout === "phone" ? null : apply}
             </div>
             {adviceLoading ? (
               <EmptyState title={copy.loadingAdvice} />
@@ -498,6 +528,7 @@ function LeagueMemberContent({
                 defaultPlan={closed ? memberAddress(leagueId, entryId) : undefined}
               />
             )}
+            {layout === "phone" ? apply : null}
           </div>
           {/* A phone reads the decision, then what to make of it, then the squad (as
               D-Phone-Bu-Hafta draws it); wider layouts put the squad first. Both are placed

@@ -73,7 +73,9 @@ async function switchModel(browser: Browser, reducedMotion: "reduce" | "no-prefe
   );
   await page.goto(`/league/352490/members/${ENTRY}?mode=saf-puan&window=1`);
   await expect(page.getByRole("heading", { name: COPY.decisionTitle })).toBeVisible();
-  // The radio follows the address, so the click is read back from it.
+  // The model is among the advanced settings, closed until asked for. The radio follows the
+  // address, so the click is read back from it.
+  await page.locator("main details summary", { hasText: COPY.advancedSettings }).click();
   await page.getByRole("radio", { name: COPY.modelNames.football }).click();
   await expect(page).toHaveURL(/model=football/);
   await page.getByRole("button", { name: "Hesapla", exact: true }).click();

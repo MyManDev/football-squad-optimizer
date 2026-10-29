@@ -158,6 +158,8 @@ for (const language of ["tr", "en"] as const) {
     const settings = page.getByRole("region", { name: members.planTitle });
     const compute = settings.getByRole("button", { name: members.computeButton, exact: true });
     await expect(settings.getByRole("radio", { name: /^3 / })).toBeChecked();
+    // The presets head the plan, and the Top 100 influence stays in front beside it (#1248).
+    await expect(settings.getByRole("group", { name: members.templatesTitle })).toBeVisible();
     await expect(settings.getByRole("group", { name: /Top 100/ })).toBeVisible();
     await compute.scrollIntoViewIfNeeded();
     await expect(compute).toBeInViewport({ ratio: 1 });
