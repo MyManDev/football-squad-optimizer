@@ -19,7 +19,9 @@ FULL_MATCH_UNAVAILABLE = "stated_full_match_unavailable"
 
 
 def manager_word_attestation_reason(word: ManagerWord) -> str | None:
-    """Require independently checked publication and upcoming league scope."""
+    """Require one cited document, and independently checked publication and scope."""
+    if word.document_binding_reason is not None:
+        return word.document_binding_reason
     if (
         not word.publication_verified
         or not word.publication_source
@@ -86,6 +88,8 @@ def bind_football_context(
         reason = manager_word_attestation_reason(word)
         if manager_words.source_check != SOURCE_CHECK_CITED_DOCUMENTS_HELD:
             reason = "source_documents_unverified"
+        elif word.document_binding_reason is not None:
+            reason = word.document_binding_reason
         elif word.words_status == WORDS_UNRESOLVED:
             reason = "source_span_unresolved"
         elif (
