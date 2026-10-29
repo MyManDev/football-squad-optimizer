@@ -66,6 +66,11 @@ export interface LeagueMemberViewProps {
    * calendar; null while it is open or the calendar does not say.
    */
   deadlinePassed?: string | null;
+  /**
+   * The page's minute clock (epoch ms), the one `deadlinePassed` was read at: the top bar
+   * counts down to an open deadline from it. Absent, the bar states the deadline alone.
+   */
+  now?: number;
   rivalSquad?: LeagueViewEnvelope<EntrySquad> | null;
   /** The entry document of the rival `?duel=` names (#1133); null while none is named or read. */
   duelSquad?: LeagueViewEnvelope<EntrySquad> | null;

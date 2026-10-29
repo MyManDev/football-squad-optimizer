@@ -13,6 +13,7 @@ import { clubCodesFromFixtures } from "../../../lib/clubs";
 import { AdviceRequestPanel } from "../advice/AdviceRequestPanel";
 import { ChipTimingCard } from "../advice/ChipTimingCard";
 import { COMPUTE_COPY } from "../advice/computeCopy";
+import { gameweekDeadline } from "../advice/deadline";
 import { MemberDecisionControls } from "../advice/MemberDecisionControls";
 import { deviceEndedWithoutPlan } from "../device/useDevicePlan";
 import { isDevicePlanEntry } from "../device/types";
@@ -37,6 +38,7 @@ import {
   MissingAdviceCard,
   PlanLineup,
 } from "./MemberAdviceCard";
+import { ApplyOnFpl } from "./ApplyOnFpl";
 import { HeldSquad, MemberSquad } from "./MemberSquad";
 import { hasLineup, squadOnPitch } from "./squadOnPitch";
 import { MemberTopBar } from "./MemberTopBar";
@@ -139,6 +141,7 @@ function LeagueMemberContent({
   duelIssue,
   windowControl = null,
   deadlinePassed = null,
+  now,
   fixtures = null,
   fixturesPending = false,
   scoreboard = null,
@@ -243,6 +246,14 @@ function LeagueMemberContent({
   const lastWeek = lastWeekResult(view, scoreboard, history);
   const plan = !adviceLoading && shown ? shown.envelope.payload : null;
   const onPitch = squadOnPitch(plan, view);
+  // The week can still be changed only while the calendar states a deadline that is ahead:
+  // an unknown deadline is not an open week, so nothing is offered to apply then.
+  const weekOpen =
+    deadlinePassed === null && gameweekDeadline(fixtures, view.season, view.gameweek) !== null;
+  // The way to make the decision on the game's own page, in a new tab. It is placed in the
+  // document where it is seen (the heading row, or the end of the decision on a phone), so
+  // the tab order follows the screen.
+  const apply = plan && weekOpen ? <ApplyOnFpl plan={plan} squad={view} /> : null;
   // The page arrives once, and its decision once it is drawn (weekArrival.ts).
   const arrival = useRef<HTMLDivElement>(null);
   useWeekArrival(arrival, !adviceLoading && !rivalsLoading && shown != null);
@@ -440,6 +451,7 @@ function LeagueMemberContent({
           members={members}
           fixtures={fixtures}
           deadlinePassed={deadlinePassed}
+          now={now}
         />
 
         {deadlinePassed !== null ? (
@@ -501,6 +513,7 @@ function LeagueMemberContent({
                 </p>
               </div>
               {!adviceLoading && shown ? <AdviceStamp shown={shown} /> : null}
+              {layout === "phone" ? null : apply}
             </div>
             {adviceLoading ? (
               <EmptyState title={copy.loadingAdvice} />
@@ -534,6 +547,7 @@ function LeagueMemberContent({
                 defaultPlan={closed ? memberAddress(leagueId, entryId) : undefined}
               />
             )}
+            {layout === "phone" ? apply : null}
           </div>
           {/* A phone reads the decision, then what to make of it, then the squad (as
               D-Phone-Bu-Hafta draws it); wider layouts put the squad first. Both are placed
