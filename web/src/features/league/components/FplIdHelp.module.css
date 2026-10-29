@@ -1,0 +1,99 @@
+/*
+ * "FPL ID'm nerede?": one quiet line under the field it helps with, closed until asked for.
+ * It is drawn as the members list's "about" disclosure is, a chevron and a muted line rather
+ * than a box, so it never reads as a second action beside the field's own button.
+ */
+
+.help {
+  min-width: 0;
+}
+
+.summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 40px;
+  color: var(--color-text-muted);
+  font-size: var(--step--1);
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+}
+
+.summary::-webkit-details-marker {
+  display: none;
+}
+
+.icon {
+  flex: none;
+  transition: transform var(--motion-ui-fast) var(--motion-ease);
+}
+
+.help[open] .icon {
+  transform: rotate(90deg);
+}
+
+/* It opens and closes in the card time, as the member page's tools do (#1136): the content
+   box grows from nothing to its own height and back, and stays drawn until it has shut.
+   Only where the browser can size to `auto` and style that box (::details-content);
+   anywhere else it opens at once, and under reduced motion the token is zero. The box clips
+   its height only, so the link's focus ring at either side is never cut. */
+@supports (interpolate-size: allow-keywords) {
+  .help {
+    interpolate-size: allow-keywords;
+  }
+
+  .help::details-content {
+    block-size: 0;
+    overflow-y: clip;
+    transition:
+      block-size var(--motion-ui) var(--motion-ease),
+      content-visibility var(--motion-ui) var(--motion-ease) allow-discrete;
+  }
+
+  .help[open]::details-content {
+    block-size: auto;
+  }
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  max-width: var(--measure);
+  padding-bottom: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: var(--step--1);
+}
+
+.body p {
+  margin: 0;
+}
+
+/* The address as the browser shows it, the number in ink so the eye finds it first. In a
+   narrow column it breaks between its parts (FplIdHelp marks where); the host breaks
+   anywhere only where even that is too wide. */
+.address {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.address strong {
+  color: var(--color-text);
+  white-space: nowrap;
+}
+
+.site {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+/* Under 1180 px the site treats every width as touch, so both targets are 44 px tall. */
+@media (max-width: 1179.98px) {
+  .summary,
+  .site {
+    min-height: 44px;
+  }
+}

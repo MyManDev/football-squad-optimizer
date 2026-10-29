@@ -175,6 +175,7 @@ describe("league reads", () => {
       leagueKeys.members(LEAGUE)[0],
       leagueKeys.scoreboard(LEAGUE)[0],
       leagueKeys.entrySquad(LEAGUE, 1)[0],
+      leagueKeys.suggestionHistory(LEAGUE, 1)[0],
     ];
     const offenders: string[] = [];
     let reads = 0;

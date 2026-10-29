@@ -510,9 +510,13 @@ describe("a bundle built with an origin whose service is down", () => {
     expect(calls.filter((url) => url.startsWith(service))).toEqual([
       `${service}/api/v1/leagues/${INDEX.league_id}/capabilities`,
     ]);
-    // The only other read is the site's own published calendar, which says whether the
-    // advised gameweek's deadline has passed. It is a static document, not a service.
-    expect(calls.filter((url) => !url.startsWith(service))).toEqual(["/data/fixtures.json"]);
+    // The only other reads are the site's own published documents: the calendar, which says
+    // whether the advised gameweek's deadline has passed, and the league's scoreboard, for
+    // the card of the member's latest finished week. Neither is a service.
+    expect(calls.filter((url) => !url.startsWith(service)).sort()).toEqual([
+      "/data/fixtures.json",
+      "/data/league/scoreboard.json",
+    ]);
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
       SQUAD.payload.entry.team_name!,
     );
@@ -534,9 +538,11 @@ describe("a bundle built with an origin whose service is down", () => {
     const { container } = open();
     await screen.findByRole("heading", { level: 1 });
     await waitFor(() => expect(container).toHaveTextContent(PLAN_SHOWN));
-    // No service is asked anything. The one read is the site's own published calendar.
-    expect(fetched.mock.calls.map((call) => String((call as unknown[])[0]))).toEqual([
+    // No service is asked anything. The reads are the site's own published calendar and the
+    // league's scoreboard.
+    expect(fetched.mock.calls.map((call) => String((call as unknown[])[0])).sort()).toEqual([
       "/data/fixtures.json",
+      "/data/league/scoreboard.json",
     ]);
     expect(container).not.toHaveTextContent(computeCopy.serviceUnreachable);
     expect(container).not.toHaveTextContent(computeCopy.serviceUnreachablePublished);

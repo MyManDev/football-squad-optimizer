@@ -1,11 +1,10 @@
 import type { AdviceChip, EntryAdvice } from "../types";
 
 /**
- * The in-page targets the week's story cards (#1134) open into: the decision for the
- * transfers, the armband line for the captain, the chip choice for the chip.
+ * The in-page targets of the week's decisions (#1134): the armband line for the captain, and
+ * the chip choice the decision card's chip line opens into.
  */
 export const STORY_ANCHORS = {
-  transfers: "entry-advice-title",
   captain: "hafta-kaptan",
   chip: "hafta-cip",
 } as const;
@@ -23,8 +22,8 @@ export function hasPublishedPlan(view: EntryAdvice): boolean {
 
 /**
  * The chip the member chose for this week, as the document's chip choice names it, or null
- * without one. Only the member's own choice is told at the top of the page: a chip the
- * producer's chip strategy names is left to the decision below, because the page never
+ * without one. Only the member's own choice is told in the decision card: a chip the
+ * producer's chip strategy names is left to the chip strategy below, because the page never
  * says on its own that this is the week to play a chip.
  */
 export function chosenChip(view: EntryAdvice): AdviceChip | null {

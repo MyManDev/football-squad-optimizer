@@ -1,0 +1,62 @@
+/*
+ * A player's shirt: the body, the sleeves and collar over it, and one ink outline round the
+ * whole shape, 1 px at either size, so a white body or white sleeves stay visible on a white
+ * plate as the swatch's outline kept a white half visible. The colours arrive as custom
+ * properties: a club's from the component, a keeper's and the blank shirt's from the tokens.
+ * The rule that places the shirt sets its display; this sheet only draws it.
+ */
+
+.shirt {
+  flex: none;
+  overflow: visible;
+}
+
+.small {
+  width: 14px;
+  height: 12.25px;
+}
+
+/* Drawn on its own 32 by 28 grid, so the initials' 12 px is 12 px on the page. */
+.large {
+  width: 32px;
+  height: 28px;
+}
+
+.body {
+  fill: var(--shirt-body);
+}
+
+.trim {
+  fill: var(--shirt-trim);
+}
+
+/* A plate may set --shirt-line to its own text colour, so the outline reads on its fill. */
+.outline {
+  fill: none;
+  stroke: var(--shirt-line, var(--color-board));
+  stroke-width: 1px;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.initials {
+  fill: var(--shirt-ink);
+  font-family: var(--font-display);
+  font-size: var(--step--2);
+  font-weight: 800;
+  text-anchor: middle;
+}
+
+/* Every goalkeeper: one pink no club wears, with ink sleeves, collar and initials (5.6:1). */
+.shirt[data-shirt="keeper"] {
+  --shirt-body: var(--color-keeper);
+  --shirt-trim: var(--color-text);
+  --shirt-ink: var(--color-text);
+}
+
+/* A club with no colours: a blank white shirt with ink initials, suggesting no club. */
+.shirt[data-shirt="blank"] {
+  --shirt-body: var(--color-chip);
+  --shirt-trim: var(--color-chip);
+  --shirt-ink: var(--color-chip-text);
+}

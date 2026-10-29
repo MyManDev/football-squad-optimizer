@@ -494,8 +494,6 @@ const en = {
       "SquadOpt suggests a transfer and a captain for your FPL squad every gameweek. Open your league to see yours.",
     label: "League ID",
     hint: "Type your league ID to continue.",
-    helpTitle: "Where do I find my league ID?",
-    help: "Open your league on the FPL site. The number in the address is the league ID: in fantasy.premierleague.com/leagues/123456/standings/c it is 123456.",
     submit: "Find league",
     invalid: "Enter a positive whole-number league ID.",
     loading: "Reading the published league…",
@@ -505,6 +503,13 @@ const en = {
     directoryUnreadable: "The list of published leagues could not be read. Try again.",
     directoryMissing: "Nothing is published here yet. Try again later.",
     retry: "Try again",
+  },
+  // Where the league ID is read from on the FPL site, folded under the entry page's field.
+  fplIdHelp: {
+    title: "Where is my FPL ID?",
+    league:
+      "Sign in on the FPL site and open your league under Leagues & Cups. Your league ID is the number after /leagues/ in the address:",
+    newTab: "opens in a new tab",
   },
   memberPicker: {
     title: "Who are you?",
@@ -625,6 +630,12 @@ const en = {
         body: "The publisher marked this selection as having no available plan.",
       },
     },
+    /** The "not listed" card once the week is closed: its settings are gone, so it links. */
+    closedNotListed: {
+      title: "This selection was not published for the closed gameweek.",
+      body: "Its deadline has passed, so no other selection can be chosen or computed here.",
+      link: "Show the default plan",
+    },
     rivalPlayersTitle: "Shared and different players",
     rivalPlayerGroups: {
       shared: "Shared: recommended 15 and rival XI",
@@ -673,8 +684,6 @@ const en = {
     alternativeWithinFreeAtMost: (applied: number, cost: string) =>
       `Alternative within free transfers: applied overlap bound ${applied}; cost at most ${cost} expected points against pure points.`,
     templatesTitle: "Game templates",
-    templatesBody:
-      "A template is a named strategy-and-window pair. Applying one sets the same shareable selection the controls read; your own templates live in this browser.",
     templateMeta: (strategy: string, window: number, rival: string) =>
       `${strategy} · ${window}w · ${rival}`,
     templateNamePlaceholder: "Name this combination",
@@ -794,12 +803,23 @@ const en = {
     linkLabel: "Open league members →",
     // Direction D's member page: the top bar, the decision board, the plan in the sidebar.
     decisionTitle: "This week's move",
-    // The week as short cards above the decision (#1134): transfers, captain and chip, each
-    // opening into its detail below. Rendered from the advice document only.
-    storyTitle: "This week's decisions",
+    // The week's decisions in the decision card (#1134): the number of changes beside the
+    // gain, and the link from the chosen chip into its detail below.
     storyTransfers: "Transfers",
     storyMoves: (count: number) => (count === 1 ? "1 change" : `${count} changes`),
     storyDetail: "Details",
+    // The member's latest finished week as one card above this week's decisions: their net,
+    // what the published suggestion scored, the rank movement, the league's mean and the
+    // game's average, each only where a published file states it.
+    lastWeekTitle: "Last week's result",
+    latestWeekTitle: "Latest finished week",
+    lastWeekNet: "net points",
+    lastWeekAgainstMean: (difference: string) => `${difference} against the league mean`,
+    lastWeekMovement: "Standing",
+    lastWeekLeagueMean: "League mean",
+    lastWeekMembers: (count: number) => `${count} member${count === 1 ? "" : "s"}`,
+    lastWeekSuggested: (points: string) => `Our suggestion scored ${points}`,
+    lastWeekDetails: "Open your weekly history",
     // The duel (#1133): the member's eleven beside one rival's, from the same capture.
     duelTitle: "Head to head",
     duelPick: "Rival",
@@ -849,6 +869,14 @@ const en = {
     racePlaces: "Place",
     racePoints: "Total",
     raceGameweek: "Gameweek",
+    // Each member's distance in points to the neighbours on the latest settled week's totals.
+    raceGaps: (gameweek: number) => `Point gaps after gameweek ${gameweek}`,
+    raceGapAhead: (points: string) =>
+      `${points} ${points === "1" ? "pt" : "pts"} behind the one ahead`,
+    raceGapBehind: (points: string) =>
+      `${points} ${points === "1" ? "pt" : "pts"} ahead of the one behind`,
+    raceLevelAhead: "Level with the one ahead: 0 pts",
+    raceLevelBehind: "Level with the one behind: 0 pts",
     // The what-if mode (#1132): a fifteen the member tries, read on the device.
     whatIfTitle: "Try your own squad",
     whatIfStart: "Start from the advised squad",
@@ -883,6 +911,11 @@ const en = {
     weekLabel: (gameweek: number) => `Gameweek ${gameweek}`,
     deadlineLabel: "Deadline",
     deadlinePassedLabel: "Deadline passed",
+    countdownUnits: { day: "d", hour: "h", minute: "min", underMinute: "under 1 min" },
+    deadlineLeft: (span: string) => `${span} left`,
+    applyOnFpl: "Apply on FPL",
+    applyTransfersHint: "You make the transfers on FPL.",
+    applyCaptainHint: "You set the captain on FPL.",
     rankLabel: "Rank",
     pointsLabel: "Points",
     lastWeekLabel: "Last week",
@@ -968,6 +1001,8 @@ const en = {
     viewLabel: "View",
     viewPitch: "Pitch",
     viewList: "List",
+    /** The closed menu under the bench that holds the grass and club colour rows (#1136). */
+    pitchLookMenu: "Appearance",
     pitchLookLabel: "Grass",
     pitchLookStripes: "Stripes",
     pitchLookPlain: "Plain",
@@ -1591,8 +1626,6 @@ const tr: MessageSchema<typeof en> = {
       "SquadOpt, FPL kadron için her hafta transfer ve kaptan önerir. Önerini görmek için ligini aç.",
     label: "Lig numarası",
     hint: "Devam etmek için lig numaranı yaz.",
-    helpTitle: "Lig numaramı nerede bulurum?",
-    help: "FPL sitesinde ligini aç. Adresteki sayı lig numarandır: fantasy.premierleague.com/leagues/123456/standings/c adresinde lig numarası 123456.",
     submit: "Ligi bul",
     invalid: "Pozitif tam sayı olan bir lig numarası gir.",
     loading: "Yayımlanan lig okunuyor…",
@@ -1602,6 +1635,12 @@ const tr: MessageSchema<typeof en> = {
     directoryUnreadable: "Yayımlanan liglerin listesi okunamadı. Yeniden dene.",
     directoryMissing: "Burada henüz yayımlanmış bir şey yok. Daha sonra yeniden dene.",
     retry: "Yeniden dene",
+  },
+  fplIdHelp: {
+    title: "FPL ID'm nerede?",
+    league:
+      "FPL sitesine giriş yap ve Leagues & Cups bölümünden ligini aç. Lig numaran, adreste /leagues/ kısmından sonraki sayıdır:",
+    newTab: "yeni sekmede açılır",
   },
   memberPicker: {
     title: "Sen kimsin?",
@@ -1712,6 +1751,11 @@ const tr: MessageSchema<typeof en> = {
         body: "Yayıncı, bu seçim için kullanılabilir bir plan olmadığını bildirdi.",
       },
     },
+    closedNotListed: {
+      title: "Bu seçim, son tarihi geçen hafta için yayımlanmadı.",
+      body: "Son tarih geçtiği için burada başka bir seçim yapılamaz ya da hesaplanamaz.",
+      link: "Varsayılan planı göster",
+    },
     rivalPlayersTitle: "Ortak ve farklı oyuncular",
     rivalPlayerGroups: {
       shared: "Ortak: önerilen 15 ve rakibin ilk 11'i",
@@ -1758,8 +1802,6 @@ const tr: MessageSchema<typeof en> = {
     alternativeWithinFreeAtMost: (applied: number, cost: string) =>
       `Ücretsiz transferler içinde kalan alternatif: uygulanan ortak oyuncu sınırı ${applied}; saf puana göre maliyet en fazla ${cost} beklenen puan.`,
     templatesTitle: "Oyun şablonları",
-    templatesBody:
-      "Şablon, adlandırılmış bir strateji-pencere çiftidir. Uygulamak, kontrollerin okuduğu paylaşılabilir seçimi kurar; kendi şablonların bu tarayıcıda durur.",
     templateMeta: (strategy: string, window: number, rival: string) =>
       `${strategy} · ${window}h · ${rival}`,
     templateNamePlaceholder: "Bu kombinasyonu adlandır",
@@ -1873,10 +1915,18 @@ const tr: MessageSchema<typeof en> = {
       "Her üye satırı o üyenin son tarih sonrası public kadrosunu ve o kadrodan önerilen hamleleri açar.",
     linkLabel: "Lig üyelerini aç →",
     decisionTitle: "Bu haftanın hamlesi",
-    storyTitle: "Bu haftanın kararları",
     storyTransfers: "Transferler",
     storyMoves: (count) => `${count} değişiklik`,
     storyDetail: "Ayrıntı",
+    lastWeekTitle: "Geçen haftanın sonucu",
+    latestWeekTitle: "Son biten hafta",
+    lastWeekNet: "net puan",
+    lastWeekAgainstMean: (difference) => `Lig ortalamasına göre ${difference}`,
+    lastWeekMovement: "Sıralama",
+    lastWeekLeagueMean: "Lig ortalaması",
+    lastWeekMembers: (count) => `${count} üye`,
+    lastWeekSuggested: (points) => `Önerimiz ${points} puan getirdi`,
+    lastWeekDetails: "Haftalık geçmişini aç",
     duelTitle: "Rakiple yan yana",
     duelPick: "Rakip",
     duelLoading: "Rakibin kadrosu okunuyor",
@@ -1923,6 +1973,11 @@ const tr: MessageSchema<typeof en> = {
     racePlaces: "Sıra",
     racePoints: "Toplam",
     raceGameweek: "Hafta",
+    raceGaps: (gameweek) => `${gameweek}. hafta sonunda puan farkları`,
+    raceGapAhead: (points) => `Öndekine ${points} puan`,
+    raceGapBehind: (points) => `Arkadakine ${points} puan`,
+    raceLevelAhead: "Öndekiyle berabere: 0 puan",
+    raceLevelBehind: "Arkadakiyle berabere: 0 puan",
     whatIfTitle: "Kadroyu kendin dene",
     whatIfStart: "Önerilen kadroyla başla",
     whatIfLoading: "Bu haftanın oyuncu listesi okunuyor",
@@ -1955,6 +2010,11 @@ const tr: MessageSchema<typeof en> = {
     weekLabel: (gameweek) => `${gameweek}. hafta`,
     deadlineLabel: "Son karar",
     deadlinePassedLabel: "Son karar geçti",
+    countdownUnits: { day: "gün", hour: "sa", minute: "dk", underMinute: "1 dk'dan az" },
+    deadlineLeft: (span) => `${span} kaldı`,
+    applyOnFpl: "FPL'de uygula",
+    applyTransfersHint: "Transferleri FPL'de sen yaparsın.",
+    applyCaptainHint: "Kaptanı FPL'de sen seçersin.",
     rankLabel: "Sıra",
     pointsLabel: "Puan",
     lastWeekLabel: "Son hafta",
@@ -2024,6 +2084,7 @@ const tr: MessageSchema<typeof en> = {
     viewLabel: "Görünüm",
     viewPitch: "Saha",
     viewList: "Liste",
+    pitchLookMenu: "Saha görünümü",
     pitchLookLabel: "Çim",
     pitchLookStripes: "Çizgili",
     pitchLookPlain: "Düz",
