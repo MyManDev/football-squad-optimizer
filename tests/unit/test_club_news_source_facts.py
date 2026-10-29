@@ -50,6 +50,25 @@ def test_jsonld_page_identity_uses_only_explicit_same_page_references(address, v
     assert publication_metadata(raw, "text/html", URL).verified is verified
 
 
+@pytest.mark.parametrize(
+    "fields,verified",
+    [
+        ({"url": "https://other.example/story", "mainEntityOfPage": URL}, False),
+        ({"url": "https://other.example/story", "@id": URL}, False),
+        ({"mainEntityOfPage": {"@id": URL}, "@id": "https://other.example/story"}, True),
+        ({"mainEntityOfPage": {"@id": "https://other.example/story"}, "@id": URL}, False),
+        ({"url": None, "@id": "https://other.example/story"}, True),
+        ({"mainEntityOfPage": {"@type": "WebPage"}, "@id": "https://other.example/story"}, True),
+    ],
+)
+def test_the_first_address_field_present_decides_and_an_empty_one_is_no_address(fields, verified):
+    metadata = json.dumps(
+        {"@type": "NewsArticle", **fields, "datePublished": "2026-09-12T13:00:00Z"}
+    )
+    raw = f'<script type="application/ld+json">{metadata}</script>'.encode()
+    assert publication_metadata(raw, "text/html", URL).verified is verified
+
+
 @pytest.mark.parametrize("canonical", ["/en/arsenal/news", "https://club.example/en/arsenal/news"])
 @pytest.mark.parametrize("link_first", [True, False])
 def test_jsonld_can_name_the_pages_explicit_same_origin_canonical(canonical, link_first):
@@ -75,6 +94,32 @@ def test_jsonld_can_name_the_pages_explicit_same_origin_canonical(canonical, lin
 
 
 @pytest.mark.parametrize(
+    "fetched,links,address",
+    [
+        (
+            URL,
+            '<link rel="canonical" href="/en/arsenal/news">'
+            '<link rel="canonical" href="https://CLUB.EXAMPLE/en/arsenal/news#top">',
+            "https://club.example/en/arsenal/news",
+        ),
+        (URL, '<link rel="canonical" href="/">', "https://club.example/"),
+        (URL + "?page=2", f'<link rel="canonical" href="{URL}">', URL),
+        (URL + "/", f'<link rel="canonical" href="{URL}">', URL),
+    ],
+)
+def test_one_canonical_identity_at_any_path_on_the_fetched_origin_dates_the_page(
+    fetched, links, address
+):
+    schema = json.dumps(
+        {"@type": "NewsArticle", "url": address, "datePublished": "2026-09-12T13:00:00Z"}
+    )
+    raw = f'<head>{links}<script type="application/ld+json">{schema}</script></head>'.encode()
+    result = publication_metadata(raw, "text/html", fetched)
+    assert result.verified
+    assert result.published_at_utc == "2026-09-12T13:00:00Z"
+
+
+@pytest.mark.parametrize(
     "links,address",
     [
         ("", "https://club.example/en/arsenal/news"),
@@ -85,6 +130,10 @@ def test_jsonld_can_name_the_pages_explicit_same_origin_canonical(canonical, lin
         (
             '<head><link rel="canonical" href="http://club.example/news"></head>',
             "http://club.example/news",
+        ),
+        (
+            '<head><link rel="canonical" href="https://club.example:8443/en/arsenal/news"></head>',
+            "https://club.example:8443/en/arsenal/news",
         ),
         (
             '<head><link rel="canonical" href="//club.example/en/arsenal/news"></head>',
@@ -157,6 +206,30 @@ def test_language_alias_needs_page_language_canonical_and_same_article_hreflang(
     result = publication_metadata(raw, "text/html", URL)
     assert result.verified is verified
     assert result.source_sha256 == hashlib.sha256(raw).hexdigest()
+
+
+@pytest.mark.parametrize(
+    "language,hreflang,canonical,address,verified",
+    [
+        ("en-GB", "en-gb", URL, "/en-gb/arsenal/news", True),
+        ("en-GB", "en-gb", URL, "/en-GB/arsenal/news", False),
+        ("en-gb-x", "en-gb-x", URL, "/en-gb-x/arsenal/news", False),
+        ("fr", "en", URL, "/fr/arsenal/news", False),
+        ("en", "en", "/other", "/en/other", False),
+    ],
+)
+def test_language_alias_reads_a_lower_case_region_and_only_the_fetched_pages_language(
+    language, hreflang, canonical, address, verified
+):
+    schema = json.dumps(
+        {"@type": "NewsArticle", "url": address, "datePublished": "2026-09-12T13:00:00Z"}
+    )
+    raw = (
+        f'<html lang="{language}"><head><link rel="canonical" href="{canonical}">'
+        f'<link rel="alternate" hreflang="{hreflang}" href="{canonical}"></head>'
+        f'<body><script type="application/ld+json">{schema}</script></body></html>'
+    ).encode()
+    assert publication_metadata(raw, "text/html", URL).verified is verified
 
 
 @pytest.mark.parametrize(

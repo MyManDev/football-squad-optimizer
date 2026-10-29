@@ -32,10 +32,14 @@ origin and sit under the registered page's own path (``/news`` leads to ``/news/
 when a same-origin redirect served the page at another path). Explicit team-news, injury
 and pre-match links are preferred within the same host budget, with the page's order
 retained within each priority, at most :data:`MAXIMUM_ARTICLES_PER_HOST` per host per run.
-A link whose printed or
-resolved path has a ``.`` or ``..`` segment is skipped rather than resolved. Each article is
-asked of the same ``robots.txt``, waited for under the same interval and judged by the same
-refusals as a registered page, and is stored as its own document with its own readable text.
+A link whose printed or resolved path has a ``.`` or ``..`` segment is skipped rather than
+resolved, and a two-part ``listing/<name>`` or ``category/<name>`` route under the
+registered path is a news index that is never requested. Referred addresses, the official
+injury page's Details links, pass the same checks. A referral the page does not list is
+ranked on its whole path with no label, and within a priority it follows the page's own
+links. Each article is asked of the same ``robots.txt``, waited for under the same interval
+and judged by the same refusals as a registered page, and is stored as its own document
+with its own readable text.
 A link to any other host is never requested, whatever it says.
 
 **A redirect is followed only within the origin that was asked.** :func:`default_opener`
@@ -869,6 +873,12 @@ def _ranked_article_links(source: ClubSource, index: RawDocument) -> dict[str, i
       served at ``/en`` follows nothing under ``/en``, because a shallower served path would
       make the shop and the ticket office articles. A page served somewhere else is
       registered where it is served;
+    - its path below the registered one is not a two-part ``listing/<name>`` or
+      ``category/<name>`` route, matched without case on the percent-decoded path, without
+      its query or a trailing slash. Such a route is a news index, so it is never requested,
+      never asked of ``robots.txt`` and recorded nowhere. A one-part ``category`` or
+      ``listing``, ``category//men`` and deeper paths such as ``category/men/injury-update``
+      stay articles;
     - it is printable ASCII, which is what a request line carries. A link that would need
       re-encoding is skipped rather than rewritten into an address the page did not print.
 
@@ -934,7 +944,14 @@ def article_links(source: ClubSource, index: RawDocument) -> tuple[str, ...]:
 
 
 def registered_article_url(source: ClubSource, url: str) -> str | None:
-    """Validate an externally discovered referral under the same registered path boundary."""
+    """Validate an externally discovered referral by the rules a page's own links meet.
+
+    The referral must be an absolute address on the registered scheme and host. It must sit
+    strictly under the source's registered path, and that path must not be the host's root.
+    It has no ``.`` or ``..`` segment, is not a two-part ``listing/<name>`` or
+    ``category/<name>`` route and is printable ASCII. It is returned in the registered
+    origin's spelling, without its fragment.
+    """
     try:
         registered = urllib.parse.urlsplit(source.url)
         target = urllib.parse.urlsplit(url)
