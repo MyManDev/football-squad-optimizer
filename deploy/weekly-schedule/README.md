@@ -1,7 +1,9 @@
 # The weekly schedule on a Linux host
 
-These files run the weekly schedule of #1243 under systemd on a Linux host, the Azure VM that
-already runs the advice backend. Every 15 minutes the deadline gate,
+These files run the weekly schedule of #1243 under systemd on a Linux host: an Azure VM of its
+own, not the one that runs the advice backend: on that VM's 2 vCPUs a GW7 run was still in the
+league stage after 2.5 hours, against 77 minutes on the PC (#1010). Every 15 minutes the
+deadline gate,
 `python -m squadopt.platform.weekly_schedule`, decides whether a weekly run starts (a morning
 run once a UTC day, the final run a lead before each deadline), starts at most one, and with
 `--release` releases a run that exited 0 (`src/squadopt/platform/weekly_release.py`). Nothing
@@ -13,9 +15,9 @@ here is installed or run by committing it.
 | `weekly-schedule.timer` | A tick every 15 minutes (`OnCalendar=*:0/15`), and once after the host was off through one (`Persistent=true`) |
 | `dry-run.conf` | A drop-in for the first week: the same tick with `--dry-run` in place of `--release` |
 
-The paths assume the VM's layout of [`scripts/vm_sync.sh`](../../scripts/vm_sync.sh): user
-`squadopt`, everything under `/home/squadopt/squadopt`. Replace them in all three files where
-the host differs. A tick that starts a run lasts hours, the run and then its release; systemd
+The paths follow the backend VM's layout of [`scripts/vm_sync.sh`](../../scripts/vm_sync.sh):
+user `squadopt`, everything under `/home/squadopt/squadopt`. Set the new host up the same way,
+or replace them in all three files where it differs. A tick that starts a run lasts hours, the run and then its release; systemd
 starts no second tick while one runs, so the timer's ticks in between do nothing.
 
 ## What the host needs
