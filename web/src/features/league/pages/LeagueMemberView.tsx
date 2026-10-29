@@ -48,6 +48,8 @@ import { rivalCandidates } from "../advice/adviceSelection";
 import { canDuel, duelRivalId } from "./duelSides";
 import { RivalDuel } from "./RivalDuel";
 import { SquadCard } from "../card/SquadCard";
+import { LastWeekCard } from "./LastWeekCard";
+import { lastWeekResult } from "./lastWeekResult";
 import { useWeekArrival } from "./weekArrival";
 import styles from "./LeagueMemberPage.module.css";
 
@@ -142,6 +144,8 @@ function LeagueMemberContent({
   now,
   fixtures = null,
   fixturesPending = false,
+  scoreboard = null,
+  history = null,
 }: LeagueMemberViewProps) {
   const { language, locale, messages } = useLanguage();
   const leagueId = useLeagueId();
@@ -237,6 +241,9 @@ function LeagueMemberContent({
   const played =
     outcomeFreshness?.scoredGameweek != null && outcomeFreshness.scoredGameweek >= view.gameweek;
   const codes = useMemo(() => clubCodesFromFixtures(fixtures), [fixtures]);
+  // The member's latest finished week, from the scoreboard and their history; null leaves
+  // the page without the card.
+  const lastWeek = lastWeekResult(view, scoreboard, history);
   const plan = !adviceLoading && shown ? shown.envelope.payload : null;
   const onPitch = squadOnPitch(plan, view);
   // The week can still be changed only while the calendar states a deadline that is ahead:
@@ -469,6 +476,18 @@ function LeagueMemberContent({
             </strong>{" "}
             {copy.membersAuxiliaryUnavailable}
           </p>
+        ) : null}
+
+        {/* What the member's last finished week came to, before what this week decides. */}
+        {lastWeek ? (
+          <LastWeekCard
+            result={lastWeek}
+            historyHref={
+              lastWeek.suggested !== null && view.league_id === leagueId
+                ? memberHistoryAddress(leagueId, entryId)
+                : null
+            }
+          />
         ) : null}
 
         <section aria-labelledby="entry-advice-title" className={styles.adviceSection}>

@@ -7,6 +7,8 @@ import { useLanguage } from "../../../i18n/context";
 import { useFixtures } from "../../fixtures/data";
 import { LeagueDataMissing } from "../data";
 import { gameweekDeadline, passedDeadline, useMinuteClock } from "../advice/deadline";
+import { useLeagueScoreboard, useSuggestionHistory } from "../queries";
+import { lastWeekResult } from "./lastWeekResult";
 import { LeagueMemberView } from "./LeagueMemberView";
 import { MemberPageSkeleton } from "./MemberPageSkeleton";
 import type { AdviceIssue } from "./memberPageTypes";
@@ -49,6 +51,17 @@ export function LeagueMemberPage() {
   const deadlinePassed = passedDeadline(
     gameweekDeadline(fixtures.data, squad.data?.payload.season, squad.data?.payload.gameweek),
     now,
+  );
+  // The card of the member's latest finished week reads the league's scoreboard, under the
+  // key /league reads it by, and only once that holds a finished week for this member, the
+  // member's history, under the key their history page reads it by. Neither holds the page
+  // back: missing or unreadable, the card or its line is left out.
+  const ownSquad = squad.data?.payload;
+  const scoreboard = useLeagueScoreboard(ownSquad !== undefined);
+  const scoreboardView = scoreboard.isError ? null : (scoreboard.data?.payload ?? null);
+  const history = useSuggestionHistory(
+    ownSquad?.entry.entry_id ?? 0,
+    ownSquad !== undefined && lastWeekResult(ownSquad, scoreboardView, null) !== null,
   );
 
   if (!validEntryId) return <EmptyState title={copy.invalidEntry} />;
@@ -143,6 +156,8 @@ export function LeagueMemberPage() {
       now={now}
       fixtures={fixtures.data ?? null}
       fixturesPending={fixtures.isPending}
+      scoreboard={scoreboardView}
+      history={history.isError ? null : (history.data ?? null)}
     />
   );
 }

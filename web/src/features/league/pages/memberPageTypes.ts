@@ -6,12 +6,14 @@ import type { PublishedAdviceStatus } from "../advice/adviceSelection";
 import type { DeviceRivalReads } from "../device/computable";
 import type { DevicePlanDependencies } from "../device/useDevicePlan";
 import type { WhatIfDependencies } from "../device/useWhatIf";
+import type { SuggestionHistory } from "../history/historyData";
 import type {
   EntryAdvice,
   EntryAdviceIndex,
   EntrySquad,
   EntryView,
   LeagueViewEnvelope,
+  Scoreboard,
 } from "../types";
 
 /** Why no published advice is on hand for the selection: never published, or not loadable. */
@@ -85,4 +87,11 @@ export interface LeagueMemberViewProps {
   fixtures?: FixturesPayload | null;
   /** Whether the calendar is still being read, so its absence is not yet a failure. */
   fixturesPending?: boolean;
+  /**
+   * The league's published scoreboard, for the card of the member's latest finished week.
+   * Absent, unread or unreadable, the page shows no such card.
+   */
+  scoreboard?: Scoreboard | null;
+  /** The member's suggestion history, read once the scoreboard has a week for the card. */
+  history?: SuggestionHistory | null;
 }
