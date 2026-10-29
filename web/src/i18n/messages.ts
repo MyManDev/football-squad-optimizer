@@ -494,8 +494,6 @@ const en = {
       "SquadOpt suggests a transfer and a captain for your FPL squad every gameweek. Open your league to see yours.",
     label: "League ID",
     hint: "Type your league ID to continue.",
-    helpTitle: "Where do I find my league ID?",
-    help: "Open your league on the FPL site. The number in the address is the league ID: in fantasy.premierleague.com/leagues/123456/standings/c it is 123456.",
     submit: "Find league",
     invalid: "Enter a positive whole-number league ID.",
     loading: "Reading the published league…",
@@ -505,6 +503,13 @@ const en = {
     directoryUnreadable: "The list of published leagues could not be read. Try again.",
     directoryMissing: "Nothing is published here yet. Try again later.",
     retry: "Try again",
+  },
+  // Where the league ID is read from on the FPL site, folded under the entry page's field.
+  fplIdHelp: {
+    title: "Where is my FPL ID?",
+    league:
+      "Sign in on the FPL site and open your league under Leagues & Cups. Your league ID is the number after /leagues/ in the address:",
+    newTab: "opens in a new tab",
   },
   memberPicker: {
     title: "Who are you?",
@@ -815,6 +820,11 @@ const en = {
     lastWeekMembers: (count: number) => `${count} member${count === 1 ? "" : "s"}`,
     lastWeekSuggested: (points: string) => `Our suggestion scored ${points}`,
     lastWeekDetails: "Open your weekly history",
+    // The phone's strip under the phone bar: one jump to each of the page's three parts.
+    sectionsLabel: "Page sections",
+    sectionMove: "Move",
+    sectionSquad: "Squad",
+    sectionTools: "Tools",
     // The duel (#1133): the member's eleven beside one rival's, from the same capture.
     duelTitle: "Head to head",
     duelPick: "Rival",
@@ -864,6 +874,14 @@ const en = {
     racePlaces: "Place",
     racePoints: "Total",
     raceGameweek: "Gameweek",
+    // Each member's distance in points to the neighbours on the latest settled week's totals.
+    raceGaps: (gameweek: number) => `Point gaps after gameweek ${gameweek}`,
+    raceGapAhead: (points: string) =>
+      `${points} ${points === "1" ? "pt" : "pts"} behind the one ahead`,
+    raceGapBehind: (points: string) =>
+      `${points} ${points === "1" ? "pt" : "pts"} ahead of the one behind`,
+    raceLevelAhead: "Level with the one ahead: 0 pts",
+    raceLevelBehind: "Level with the one behind: 0 pts",
     // The what-if mode (#1132): a fifteen the member tries, read on the device.
     whatIfTitle: "Try your own squad",
     whatIfStart: "Start from the advised squad",
@@ -1613,8 +1631,6 @@ const tr: MessageSchema<typeof en> = {
       "SquadOpt, FPL kadron için her hafta transfer ve kaptan önerir. Önerini görmek için ligini aç.",
     label: "Lig numarası",
     hint: "Devam etmek için lig numaranı yaz.",
-    helpTitle: "Lig numaramı nerede bulurum?",
-    help: "FPL sitesinde ligini aç. Adresteki sayı lig numarandır: fantasy.premierleague.com/leagues/123456/standings/c adresinde lig numarası 123456.",
     submit: "Ligi bul",
     invalid: "Pozitif tam sayı olan bir lig numarası gir.",
     loading: "Yayımlanan lig okunuyor…",
@@ -1624,6 +1640,12 @@ const tr: MessageSchema<typeof en> = {
     directoryUnreadable: "Yayımlanan liglerin listesi okunamadı. Yeniden dene.",
     directoryMissing: "Burada henüz yayımlanmış bir şey yok. Daha sonra yeniden dene.",
     retry: "Yeniden dene",
+  },
+  fplIdHelp: {
+    title: "FPL ID'm nerede?",
+    league:
+      "FPL sitesine giriş yap ve Leagues & Cups bölümünden ligini aç. Lig numaran, adreste /leagues/ kısmından sonraki sayıdır:",
+    newTab: "yeni sekmede açılır",
   },
   memberPicker: {
     title: "Sen kimsin?",
@@ -1910,6 +1932,10 @@ const tr: MessageSchema<typeof en> = {
     lastWeekMembers: (count) => `${count} üye`,
     lastWeekSuggested: (points) => `Önerimiz ${points} puan getirdi`,
     lastWeekDetails: "Haftalık geçmişini aç",
+    sectionsLabel: "Sayfanın bölümleri",
+    sectionMove: "Hamle",
+    sectionSquad: "Kadro",
+    sectionTools: "Araçlar",
     duelTitle: "Rakiple yan yana",
     duelPick: "Rakip",
     duelLoading: "Rakibin kadrosu okunuyor",
@@ -1956,6 +1982,11 @@ const tr: MessageSchema<typeof en> = {
     racePlaces: "Sıra",
     racePoints: "Toplam",
     raceGameweek: "Hafta",
+    raceGaps: (gameweek) => `${gameweek}. hafta sonunda puan farkları`,
+    raceGapAhead: (points) => `Öndekine ${points} puan`,
+    raceGapBehind: (points) => `Arkadakine ${points} puan`,
+    raceLevelAhead: "Öndekiyle berabere: 0 puan",
+    raceLevelBehind: "Arkadakiyle berabere: 0 puan",
     whatIfTitle: "Kadroyu kendin dene",
     whatIfStart: "Önerilen kadroyla başla",
     whatIfLoading: "Bu haftanın oyuncu listesi okunuyor",
