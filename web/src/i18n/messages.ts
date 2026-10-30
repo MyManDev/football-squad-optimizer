@@ -820,6 +820,11 @@ const en = {
     lastWeekMembers: (count: number) => `${count} member${count === 1 ? "" : "s"}`,
     lastWeekSuggested: (points: string) => `Our suggestion scored ${points}`,
     lastWeekDetails: "Open your weekly history",
+    // The phone's strip under the phone bar: one jump to each of the page's three parts.
+    sectionsLabel: "Page sections",
+    sectionMove: "Move",
+    sectionSquad: "Squad",
+    sectionTools: "Tools",
     // The duel (#1133): the member's eleven beside one rival's, from the same capture.
     duelTitle: "Head to head",
     duelPick: "Rival",
@@ -1927,6 +1932,10 @@ const tr: MessageSchema<typeof en> = {
     lastWeekMembers: (count) => `${count} üye`,
     lastWeekSuggested: (points) => `Önerimiz ${points} puan getirdi`,
     lastWeekDetails: "Haftalık geçmişini aç",
+    sectionsLabel: "Sayfanın bölümleri",
+    sectionMove: "Hamle",
+    sectionSquad: "Kadro",
+    sectionTools: "Araçlar",
     duelTitle: "Rakiple yan yana",
     duelPick: "Rakip",
     duelLoading: "Rakibin kadrosu okunuyor",
