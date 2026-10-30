@@ -1,59 +1,59 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-10-23T12:40:33Z",
+  "generated_at_utc": "2026-10-30T08:03:14Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
-    "gameweek": 8,
+    "gameweek": 9,
     "entry_id": 3832237,
     "league_id": 352490,
     "mode": "saf-puan",
     "window": 5,
-    "source_snapshot_id": "fpl-live-20261023T111647Z-a2cd55fde426",
+    "source_snapshot_id": "fpl-live-20261030T070058Z-8b2a93c0babe",
     "moves": [
       {
-        "move_id": "gw08-1",
+        "move_id": "gw09-1",
         "player_out": {
-          "player_id": 502500,
-          "name": "Igor Thiago Nascimento Rodrigues",
-          "short_name": "Rodrigues",
+          "player_id": 178301,
+          "name": "Ollie Watkins",
+          "short_name": "Watkins",
           "position": "FWD",
-          "team": "Brentford"
+          "team": "Aston Villa"
         },
         "player_in": {
-          "player_id": 444102,
-          "name": "Francisco Evanilson de Lima Barbosa",
-          "short_name": "Barbosa",
+          "player_id": 517052,
+          "name": "Nicolas Jackson",
+          "short_name": "Jackson",
           "position": "FWD",
-          "team": "Bournemouth"
+          "team": "Aston Villa"
         },
-        "expected_points_delta": -0.373789253275568,
+        "expected_points_delta": 3.770614540788138,
         "reason_code": "top100_preference"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": -0.373789253275568,
-    "expected_points_cost": 16.876998450055396,
+    "expected_gain_vs_hold": 3.770614540788138,
+    "expected_points_cost": 0.0,
     "rival_label": null,
     "solver_status": "FEASIBLE",
     "optimality_gap": null,
     "wall_clock_stopped_the_search": false,
-    "expected_own_points": 36.461561601235935,
+    "expected_own_points": 40.06301912188655,
     "captain": {
-      "player_id": 446008,
-      "name": "Bryan Mbeumo",
-      "short_name": "Mbeumo",
-      "position": "MID",
-      "team": "Man Utd",
-      "expected_points": 4.6615011141503295
-    },
-    "vice_captain": {
       "player_id": 226597,
       "name": "Gabriel dos Santos Magalh\u00e3es",
       "short_name": "Magalh\u00e3es",
       "position": "DEF",
       "team": "Arsenal",
-      "expected_points": 4.423923916856849
+      "expected_points": 4.6969696175412
+    },
+    "vice_captain": {
+      "player_id": 502500,
+      "name": "Igor Thiago Nascimento Rodrigues",
+      "short_name": "Rodrigues",
+      "position": "FWD",
+      "team": "Brentford",
+      "expected_points": 4.324234137754055
     },
     "starting_xi": [
       {
@@ -62,7 +62,7 @@
         "short_name": "Mart\u00edn",
         "position": "GK",
         "team": "Arsenal",
-        "expected_points": 3.8753293988407767
+        "expected_points": 3.806267242511375
       },
       {
         "player_id": 226597,
@@ -70,15 +70,7 @@
         "short_name": "Magalh\u00e3es",
         "position": "DEF",
         "team": "Arsenal",
-        "expected_points": 4.423923916856849
-      },
-      {
-        "player_id": 231416,
-        "name": "Ferdi Kad\u0131o\u011flu",
-        "short_name": "Kad\u0131o\u011flu",
-        "position": "DEF",
-        "team": "Brighton",
-        "expected_points": 2.819532847858138
+        "expected_points": 4.6969696175412
       },
       {
         "player_id": 472769,
@@ -86,7 +78,81 @@
         "short_name": "O'Reilly",
         "position": "DEF",
         "team": "Man City",
-        "expected_points": 1.7694369231196556
+        "expected_points": 2.1787407308749347
+      },
+      {
+        "player_id": 231416,
+        "name": "Ferdi Kad\u0131o\u011flu",
+        "short_name": "Kad\u0131o\u011flu",
+        "position": "DEF",
+        "team": "Brighton",
+        "expected_points": 1.8384898290912515
+      },
+      {
+        "player_id": 441164,
+        "name": "Pedro Porro Sauceda",
+        "short_name": "Sauceda",
+        "position": "DEF",
+        "team": "Spurs",
+        "expected_points": 0.5897759420105608
+      },
+      {
+        "player_id": 446008,
+        "name": "Bryan Mbeumo",
+        "short_name": "Mbeumo",
+        "position": "MID",
+        "team": "Man Utd",
+        "expected_points": 4.204415455048864
+      },
+      {
+        "player_id": 430871,
+        "name": "Matheus Santos Carneiro da Cunha",
+        "short_name": "Cunha",
+        "position": "MID",
+        "team": "Man Utd",
+        "expected_points": 3.5966813234393613
+      },
+      {
+        "player_id": 84450,
+        "name": "Granit Xhaka",
+        "short_name": "Xhaka",
+        "position": "MID",
+        "team": "Sunderland",
+        "expected_points": 2.708204350200814
+      },
+      {
+        "player_id": 502500,
+        "name": "Igor Thiago Nascimento Rodrigues",
+        "short_name": "Rodrigues",
+        "position": "FWD",
+        "team": "Brentford",
+        "expected_points": 4.324234137754055
+      },
+      {
+        "player_id": 517052,
+        "name": "Nicolas Jackson",
+        "short_name": "Jackson",
+        "position": "FWD",
+        "team": "Aston Villa",
+        "expected_points": 4.218087301093523
+      },
+      {
+        "player_id": 169432,
+        "name": "Oli McBurnie",
+        "short_name": "McBurnie",
+        "position": "FWD",
+        "team": "Hull City",
+        "expected_points": 3.2041835747794076
+      }
+    ],
+    "bench": [
+      {
+        "player_id": 204936,
+        "name": "Gianluigi Donnarumma",
+        "short_name": "Donnarumma",
+        "position": "GK",
+        "team": "Man City",
+        "expected_points": 3.3358307499975615
       },
       {
         "player_id": 106611,
@@ -97,69 +163,11 @@
         "expected_points": 0.447472760305387
       },
       {
-        "player_id": 446008,
-        "name": "Bryan Mbeumo",
-        "short_name": "Mbeumo",
-        "position": "MID",
-        "team": "Man Utd",
-        "expected_points": 4.6615011141503295
-      },
-      {
-        "player_id": 430871,
-        "name": "Matheus Santos Carneiro da Cunha",
-        "short_name": "Cunha",
-        "position": "MID",
-        "team": "Man Utd",
-        "expected_points": 4.262828918077229
-      },
-      {
-        "player_id": 84450,
-        "name": "Granit Xhaka",
-        "short_name": "Xhaka",
-        "position": "MID",
-        "team": "Sunderland",
-        "expected_points": 2.9772999797493505
-      },
-      {
         "player_id": 424876,
         "name": "Dominik Szoboszlai",
         "short_name": "Szoboszlai",
         "position": "MID",
         "team": "Liverpool",
-        "expected_points": 0.0
-      },
-      {
-        "player_id": 444102,
-        "name": "Francisco Evanilson de Lima Barbosa",
-        "short_name": "Barbosa",
-        "position": "FWD",
-        "team": "Bournemouth",
-        "expected_points": 3.5767532760275857
-      },
-      {
-        "player_id": 169432,
-        "name": "Oli McBurnie",
-        "short_name": "McBurnie",
-        "position": "FWD",
-        "team": "Hull City",
-        "expected_points": 2.985981352100305
-      }
-    ],
-    "bench": [
-      {
-        "player_id": 204936,
-        "name": "Gianluigi Donnarumma",
-        "short_name": "Donnarumma",
-        "position": "GK",
-        "team": "Man City",
-        "expected_points": 3.217287838288144
-      },
-      {
-        "player_id": 178301,
-        "name": "Ollie Watkins",
-        "short_name": "Watkins",
-        "position": "FWD",
-        "team": "Aston Villa",
         "expected_points": 0.0
       },
       {
@@ -169,79 +177,45 @@
         "position": "MID",
         "team": "Man City",
         "expected_points": 0.0
-      },
-      {
-        "player_id": 441164,
-        "name": "Pedro Porro Sauceda",
-        "short_name": "Sauceda",
-        "position": "DEF",
-        "team": "Spurs",
-        "expected_points": 0.0
       }
     ],
     "chip": null,
     "plan_weeks": [
       {
-        "gameweek": 8,
-        "transfers_in": [
-          {
-            "player_id": 444102,
-            "name": "Francisco Evanilson de Lima Barbosa",
-            "short_name": "Barbosa",
-            "position": "FWD",
-            "team": "Bournemouth"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 502500,
-            "name": "Igor Thiago Nascimento Rodrigues",
-            "short_name": "Rodrigues",
-            "position": "FWD",
-            "team": "Brentford"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 5,
-        "free_transfers_after": 5,
-        "expected_points": 36.461561601235935
-      },
-      {
         "gameweek": 9,
         "transfers_in": [
           {
-            "player_id": 60307,
-            "name": "Pascal Gro\u00df",
-            "short_name": "Gro\u00df",
-            "position": "MID",
-            "team": "Brighton"
+            "player_id": 517052,
+            "name": "Nicolas Jackson",
+            "short_name": "Jackson",
+            "position": "FWD",
+            "team": "Aston Villa"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 437730,
-            "name": "Antoine Semenyo",
-            "short_name": "Semenyo",
-            "position": "MID",
-            "team": "Man City"
+            "player_id": 178301,
+            "name": "Ollie Watkins",
+            "short_name": "Watkins",
+            "position": "FWD",
+            "team": "Aston Villa"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 5,
         "free_transfers_after": 5,
-        "expected_points": 40.48673794420925
+        "expected_points": 40.06301912188655
       },
       {
         "gameweek": 10,
         "transfers_in": [
           {
-            "player_id": 244851,
-            "name": "Cole Palmer",
-            "short_name": "Palmer",
+            "player_id": 201658,
+            "name": "Marcus Tavernier",
+            "short_name": "Tavernier",
             "position": "MID",
-            "team": "Chelsea"
+            "team": "Bournemouth"
           }
         ],
         "transfers_out": [
@@ -257,36 +231,62 @@
         "chip": null,
         "free_transfers_before": 5,
         "free_transfers_after": 5,
-        "expected_points": 45.65136374383287
+        "expected_points": 43.43182315504453
       },
       {
         "gameweek": 11,
         "transfers_in": [
           {
-            "player_id": 114283,
-            "name": "Jack Grealish",
-            "short_name": "Grealish",
+            "player_id": 244851,
+            "name": "Cole Palmer",
+            "short_name": "Palmer",
             "position": "MID",
-            "team": "Everton"
+            "team": "Chelsea"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 84450,
-            "name": "Granit Xhaka",
-            "short_name": "Xhaka",
+            "player_id": 437730,
+            "name": "Antoine Semenyo",
+            "short_name": "Semenyo",
             "position": "MID",
-            "team": "Sunderland"
+            "team": "Man City"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 5,
         "free_transfers_after": 5,
-        "expected_points": 45.59729108837448
+        "expected_points": 46.03679635678528
       },
       {
         "gameweek": 12,
+        "transfers_in": [
+          {
+            "player_id": 465730,
+            "name": "Maxim De Cuyper",
+            "short_name": "Cuyper",
+            "position": "DEF",
+            "team": "Brighton"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 441164,
+            "name": "Pedro Porro Sauceda",
+            "short_name": "Sauceda",
+            "position": "DEF",
+            "team": "Spurs"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 5,
+        "free_transfers_after": 5,
+        "expected_points": 47.6855322339037
+      },
+      {
+        "gameweek": 13,
         "transfers_in": [
           {
             "player_id": 97032,
@@ -309,7 +309,7 @@
         "chip": null,
         "free_transfers_before": 5,
         "free_transfers_after": 5,
-        "expected_points": 47.71783157856333
+        "expected_points": 49.48664714472539
       }
     ],
     "stated_limits": [
@@ -326,15 +326,15 @@
     "missing_fields": [],
     "squad_basis": "captured",
     "control_solver_status": "FEASIBLE",
-    "control_optimality_gap": 10.060000000000002,
+    "control_optimality_gap": 44.63199999999998,
     "top100": {
       "weight": 5,
       "changed": true,
       "price_basis": "base_model_pure_points_v1",
-      "cohort_snapshot_id": "fpl-top100-20261023T110704Z-c9d2e551592b",
-      "picks_snapshot_id": "fpl-elite-picks-20261023T111203Z-2f0c591789cb",
-      "table_sha256": "70094f8d88c192ada317b91d2faa32f302a9ec5a849ac64da901e2e2fa166cc2",
-      "picks_gameweek": 7
+      "cohort_snapshot_id": "fpl-top100-20261030T070023Z-59306b9ebd52",
+      "picks_snapshot_id": "fpl-elite-picks-20261030T070040Z-b114c859f532",
+      "table_sha256": "dd0d5e4175ca161a4307f295e955ec1491019b97067267bcace1fc40a063e195",
+      "picks_gameweek": 8
     }
   }
 }
