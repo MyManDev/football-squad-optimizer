@@ -1,18 +1,18 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-10-23T12:40:33Z",
+  "generated_at_utc": "2026-10-30T08:03:14Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
-    "gameweek": 8,
+    "gameweek": 9,
     "entry_id": 6879786,
     "league_id": 352490,
     "mode": "saf-puan",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20261023T111647Z-a2cd55fde426",
+    "source_snapshot_id": "fpl-live-20261030T070058Z-8b2a93c0babe",
     "moves": [
       {
-        "move_id": "gw08-1",
+        "move_id": "gw09-1",
         "player_out": {
           "player_id": 219168,
           "name": "Alexander Isak",
@@ -27,30 +27,11 @@
           "position": "FWD",
           "team": "Man City"
         },
-        "expected_points_delta": 6.72380697674911,
+        "expected_points_delta": 7.556571545917734,
         "reason_code": "top100_preference"
       },
       {
-        "move_id": "gw08-2",
-        "player_out": {
-          "player_id": 222531,
-          "name": "Morgan Gibbs-White",
-          "short_name": "Gibbs-White",
-          "position": "MID",
-          "team": "Nott'm Forest"
-        },
-        "player_in": {
-          "player_id": 209400,
-          "name": "Daichi Kamada",
-          "short_name": "Kamada",
-          "position": "MID",
-          "team": "Crystal Palace"
-        },
-        "expected_points_delta": 0.12041091875664023,
-        "reason_code": "top100_preference"
-      },
-      {
-        "move_id": "gw08-3",
+        "move_id": "gw09-2",
         "player_out": {
           "player_id": 226597,
           "name": "Gabriel dos Santos Magalh\u00e3es",
@@ -65,25 +46,44 @@
           "position": "DEF",
           "team": "Arsenal"
         },
-        "expected_points_delta": -1.3339571851471774,
+        "expected_points_delta": -1.4439192421489437,
+        "reason_code": "top100_preference"
+      },
+      {
+        "move_id": "gw09-3",
+        "player_out": {
+          "player_id": 475168,
+          "name": "Jo\u00e3o Pedro Junqueira de Jesus",
+          "short_name": "Jesus",
+          "position": "FWD",
+          "team": "Chelsea"
+        },
+        "player_in": {
+          "player_id": 601767,
+          "name": "Vakhtang Salia",
+          "short_name": "Salia",
+          "position": "FWD",
+          "team": "Newcastle"
+        },
+        "expected_points_delta": 0.0,
         "reason_code": "top100_preference"
       }
     ],
-    "transfer_hit_points": 4.0,
-    "expected_gain_vs_hold": 5.510260710358573,
-    "expected_points_cost": 0.8249114396564323,
+    "transfer_hit_points": 0.0,
+    "expected_gain_vs_hold": 6.11265230376879,
+    "expected_points_cost": 1.479523944493458,
     "rival_label": null,
     "solver_status": "OPTIMAL",
     "optimality_gap": null,
     "wall_clock_stopped_the_search": false,
-    "expected_own_points": 52.76341880201479,
+    "expected_own_points": 49.84129633866489,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
       "short_name": "Haaland",
       "position": "FWD",
       "team": "Man City",
-      "expected_points": 8.11765453618748
+      "expected_points": 8.453362463981913
     },
     "vice_captain": {
       "player_id": 244851,
@@ -91,7 +91,7 @@
       "short_name": "Palmer",
       "position": "MID",
       "team": "Chelsea",
-      "expected_points": 5.136799837039665
+      "expected_points": 5.005073584741382
     },
     "starting_xi": [
       {
@@ -100,15 +100,7 @@
         "short_name": "Mart\u00edn",
         "position": "GK",
         "team": "Arsenal",
-        "expected_points": 3.8753293988407767
-      },
-      {
-        "player_id": 466075,
-        "name": "Riccardo Calafiori",
-        "short_name": "Calafiori",
-        "position": "DEF",
-        "team": "Arsenal",
-        "expected_points": 3.6527262906253877
+        "expected_points": 3.806267242511375
       },
       {
         "player_id": 465730,
@@ -116,15 +108,7 @@
         "short_name": "Cuyper",
         "position": "DEF",
         "team": "Brighton",
-        "expected_points": 3.6085520469470964
-      },
-      {
-        "player_id": 437499,
-        "name": "Maxence Lacroix",
-        "short_name": "Lacroix",
-        "position": "DEF",
-        "team": "Chelsea",
-        "expected_points": 3.2709497102546776
+        "expected_points": 3.487225706209676
       },
       {
         "player_id": 199798,
@@ -132,7 +116,15 @@
         "short_name": "Ngoyo",
         "position": "DEF",
         "team": "Arsenal",
-        "expected_points": 3.089966731709672
+        "expected_points": 3.2530503753922586
+      },
+      {
+        "player_id": 466075,
+        "name": "Riccardo Calafiori",
+        "short_name": "Calafiori",
+        "position": "DEF",
+        "team": "Arsenal",
+        "expected_points": 2.2733504759159526
       },
       {
         "player_id": 244851,
@@ -140,7 +132,7 @@
         "short_name": "Palmer",
         "position": "MID",
         "team": "Chelsea",
-        "expected_points": 5.136799837039665
+        "expected_points": 5.005073584741382
       },
       {
         "player_id": 466052,
@@ -148,7 +140,23 @@
         "short_name": "Cherki",
         "position": "MID",
         "team": "Man City",
-        "expected_points": 3.5051048815473056
+        "expected_points": 3.3378672710007953
+      },
+      {
+        "player_id": 222531,
+        "name": "Morgan Gibbs-White",
+        "short_name": "Gibbs-White",
+        "position": "MID",
+        "team": "Nott'm Forest",
+        "expected_points": 3.063907246689206
+      },
+      {
+        "player_id": 249231,
+        "name": "Keane Lewis-Potter",
+        "short_name": "Lewis-Potter",
+        "position": "MID",
+        "team": "Brentford",
+        "expected_points": 3.0275342324150776
       },
       {
         "player_id": 195546,
@@ -156,15 +164,7 @@
         "short_name": "Stati",
         "position": "MID",
         "team": "Aston Villa",
-        "expected_points": 3.4676602939945496
-      },
-      {
-        "player_id": 209400,
-        "name": "Daichi Kamada",
-        "short_name": "Kamada",
-        "position": "MID",
-        "team": "Crystal Palace",
-        "expected_points": 3.204463919421886
+        "expected_points": 2.9613968587465336
       },
       {
         "player_id": 223094,
@@ -172,15 +172,15 @@
         "short_name": "Haaland",
         "position": "FWD",
         "team": "Man City",
-        "expected_points": 8.11765453618748
+        "expected_points": 8.453362463981913
       },
       {
-        "player_id": 475168,
-        "name": "Jo\u00e3o Pedro Junqueira de Jesus",
-        "short_name": "Jesus",
+        "player_id": 216646,
+        "name": "Yoane Wissa",
+        "short_name": "Wissa",
         "position": "FWD",
-        "team": "Chelsea",
-        "expected_points": 3.716556619258811
+        "team": "Newcastle",
+        "expected_points": 2.718898417078811
       }
     ],
     "bench": [
@@ -190,23 +190,7 @@
         "short_name": "Pickford",
         "position": "GK",
         "team": "Everton",
-        "expected_points": 3.0008292718991547
-      },
-      {
-        "player_id": 216646,
-        "name": "Yoane Wissa",
-        "short_name": "Wissa",
-        "position": "FWD",
-        "team": "Newcastle",
-        "expected_points": 2.800075748204037
-      },
-      {
-        "player_id": 249231,
-        "name": "Keane Lewis-Potter",
-        "short_name": "Lewis-Potter",
-        "position": "MID",
-        "team": "Brentford",
-        "expected_points": 2.7781968158823394
+        "expected_points": 2.9148447935393604
       },
       {
         "player_id": 83299,
@@ -214,7 +198,23 @@
         "short_name": "Dunk",
         "position": "DEF",
         "team": "Brighton",
-        "expected_points": 1.6077869024069047
+        "expected_points": 2.2720467487693923
+      },
+      {
+        "player_id": 437499,
+        "name": "Maxence Lacroix",
+        "short_name": "Lacroix",
+        "position": "DEF",
+        "team": "Chelsea",
+        "expected_points": 1.6484368061967163
+      },
+      {
+        "player_id": 601767,
+        "name": "Vakhtang Salia",
+        "short_name": "Salia",
+        "position": "FWD",
+        "team": "Newcastle",
+        "expected_points": 1.3473254086181279
       }
     ],
     "chip": null,
@@ -226,27 +226,25 @@
     "data_quality": "complete",
     "missing_fields": [],
     "squad_basis": "captured",
-    "expected_points_cost_ceiling": 0.8249114396564323,
+    "expected_points_cost_ceiling": 1.479523944493458,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0,
     "top100": {
       "weight": 50,
       "changed": true,
       "price_basis": "base_model_pure_points_v1",
-      "cohort_snapshot_id": "fpl-top100-20261023T110704Z-c9d2e551592b",
-      "picks_snapshot_id": "fpl-elite-picks-20261023T111203Z-2f0c591789cb",
-      "table_sha256": "70094f8d88c192ada317b91d2faa32f302a9ec5a849ac64da901e2e2fa166cc2",
-      "picks_gameweek": 7
+      "cohort_snapshot_id": "fpl-top100-20261030T070023Z-59306b9ebd52",
+      "picks_snapshot_id": "fpl-elite-picks-20261030T070040Z-b114c859f532",
+      "table_sha256": "dd0d5e4175ca161a4307f295e955ec1491019b97067267bcace1fc40a063e195",
+      "picks_gameweek": 8
     },
     "evidence": {
       "kind": "managers_word",
       "rule_version": "managers_word_rule_v3",
       "source_kind": "club_news_capture",
-      "source_label": "club-news-20261023T110354Z-dd37130a1a4a",
-      "evidence_table": "rotation_evidence_v4_2026-27_gw08_dd37130a1a4a_decision_a2cd55fde426.csv",
+      "source_label": "club-news-20261030T070011Z-cb49583067b6",
+      "evidence_table": "rotation_evidence_v4_2026-27_gw09_cb49583067b6_decision_8b2a93c0babe.csv",
       "clubs_covered": [
-        "Crystal Palace",
-        "Liverpool",
         "Newcastle"
       ],
       "binding": false,
