@@ -7,7 +7,7 @@ with `squadopt.api`, that may import web frameworks, network clients, model SDKs
 (the contract "Frameworks, network and databases stay in api and platform"). No package below
 it in the layer order imports it, and it imports no laboratory module.
 
-Its 65 Python files serve several deployment units: 49 implementation modules and 4
+Its 66 Python files serve several deployment units: 50 implementation modules and 4
 aliases at old paths in the flat folder, the package file, and the seven subpackages of ADR
 0011, of which `storage/` holds the four shared durable-state modules and the six others their
 package file only.
@@ -25,6 +25,7 @@ Review: either owner approves a change here; the `club_news_*` modules are İbra
 | Process | Entry point | Families it uses |
 | --- | --- | --- |
 | Weekly run | `python -m squadopt.platform.weekly_operations` | Weekly run, captures, run records |
+| Weekly schedule | `python -m squadopt.platform.weekly_schedule`, every 15 minutes from the host's scheduler | Weekly run (it starts the weekly run), `fpl_capture`, club news |
 | Advice API | `uvicorn --factory squadopt.api.runtime:build_app` | Advice API services, built by `backend_runtime` |
 | Advice worker | `python -m squadopt.platform.advice_worker` | Advice queue and workers, with the services `backend_runtime` builds |
 | Installed CLI | the `squadopt` console script (`squadopt.platform.cli:main`) | Installed CLI, run records, `fpl_capture` |
@@ -33,17 +34,19 @@ Review: either owner approves a change here; the `club_news_*` modules are İbra
 Before the moves, `tests/architecture/test_platform_entry_points.py` pins the operator surface
 ADR 0011 keeps: the `--help` usage lines and `main` of the seven `python -m` commands (`cli`,
 `weekly_operations`, `advice_worker`, `advice_load`, `backup_recovery`, `benchmark_capture`,
-`capture_measurement`), the console script's target, the backend restart's import smoke,
+`capture_measurement`) and of the scheduled gate of #1243, `weekly_schedule`, the console
+script's target, the backend restart's import smoke,
 `build_app` as a factory with no arguments, and the tree `package_fingerprint()` hashes.
 
 ## Weekly run
 
-The installed weekly entry point, its durable journal, the member publication service and the
-optional football inputs it seals.
+The installed weekly entry point, the gate that starts it on a schedule, its durable journal,
+the member publication service and the optional football inputs it seals.
 
 | Module | What it does |
 | --- | --- |
 | `weekly_operations.py` | The installed weekly entry point: typed application services run as stages of a durable journal. |
+| `weekly_schedule.py` | The scheduled gate (#1243): a morning run once a UTC day and a final run a lead before each deadline, each started at most once, with its club news, on any host. |
 | `weekly_journal.py` | Durable sequential stage execution: ownership lock, input and output fingerprints, resume. |
 | `weekly_publish.py` | Publishes one gameweek's site view: worktree, copy, commit, push and pull request in one command. |
 | `publication_workers.py` | Process scheduling for the member publication service. |
