@@ -8,12 +8,20 @@
 # store, site, snapshots, handoffs, artifacts}, ~/squadopt/.env (no secret in it) and
 # ~/squadopt/compose.artifacts.yaml, the override that mounts the artifact root and the
 # club-news fixture the base compose file does not mount yet.
+# Before the checkout and again after it, against the target release's Compose file, it runs
+# the read-only layout preflight ~/vm_check_layout.py, which vm_push.sh copies there from
+# scripts/release/check_vm_layout.py. A refusal, or a missing preflight file, stops the script
+# before it copies site data, builds or restarts anything. The preflight resolves Compose with
+# the same arguments and directory as the restart below; keep the two in step.
 set -euo pipefail
 TAG="${1:?release tag}"
 BASE="$HOME/squadopt"
+python3 "$HOME/vm_check_layout.py"
 git -C "$BASE/repo" fetch -q --tags origin
 git -C "$BASE/repo" checkout -q "$TAG"
 COMMIT="$(git -C "$BASE/repo" rev-parse HEAD)"
+# The target release may change Compose. Refuse before copying site data or restarting.
+python3 "$HOME/vm_check_layout.py"
 rsync -a --delete "$BASE/repo/web/public/data/" "$BASE/site/"
 docker build -q --build-arg "SQUADOPT_REPOSITORY_COMMIT=$COMMIT" -t "squadopt-backend:$TAG" "$BASE/repo" >/dev/null
 sed -i "s#^SQUADOPT_BACKEND_IMAGE=.*#SQUADOPT_BACKEND_IMAGE=squadopt-backend:$TAG#" "$BASE/.env"
