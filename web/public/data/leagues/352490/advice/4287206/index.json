@@ -1,11 +1,11 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-10-23T12:40:33Z",
+  "generated_at_utc": "2026-10-30T08:03:14Z",
   "source_kind": "live",
   "payload": {
     "league_id": 352490,
     "season": "2026-27",
-    "gameweek": 8,
+    "gameweek": 9,
     "entry_id": 4287206,
     "window": 1,
     "evidence": {
@@ -13,10 +13,8 @@
       "path": "advice/4287206/saf-puan/1/hoca-sozu.json",
       "applied_count": 0,
       "source_kind": "club_news_capture",
-      "source_label": "club-news-20261023T110354Z-dd37130a1a4a",
+      "source_label": "club-news-20261030T070011Z-cb49583067b6",
       "clubs_covered": [
-        "Crystal Palace",
-        "Liverpool",
         "Newcastle"
       ],
       "rule_version": "managers_word_rule_v3",
@@ -390,10 +388,10 @@
         }
       ],
       "source": {
-        "cohort_snapshot_id": "fpl-top100-20261023T110704Z-c9d2e551592b",
-        "picks_snapshot_id": "fpl-elite-picks-20261023T111203Z-2f0c591789cb",
-        "table_sha256": "70094f8d88c192ada317b91d2faa32f302a9ec5a849ac64da901e2e2fa166cc2",
-        "picks_gameweek": 7
+        "cohort_snapshot_id": "fpl-top100-20261030T070023Z-59306b9ebd52",
+        "picks_snapshot_id": "fpl-elite-picks-20261030T070040Z-b114c859f532",
+        "table_sha256": "dd0d5e4175ca161a4307f295e955ec1491019b97067267bcace1fc40a063e195",
+        "picks_gameweek": 8
       }
     },
     "chips": {
@@ -419,36 +417,36 @@
       "season": "2026-27",
       "league_id": 352490,
       "entry_id": 4287206,
-      "gameweek": 8,
-      "source_snapshot_id": "fpl-live-20261023T111647Z-a2cd55fde426",
+      "gameweek": 9,
+      "source_snapshot_id": "fpl-live-20261030T070058Z-8b2a93c0babe",
       "squad_player_ids": [
-        485055,
+        457569,
         465730,
         466075,
         487838,
-        451284,
+        455084,
         244851,
         244850,
         184029,
-        475168,
+        466052,
         223094,
         177815,
-        457569,
-        466052,
-        455084,
-        513545
+        485055,
+        475168,
+        513545,
+        451284
       ],
       "bench_player_ids": [
-        457569,
-        466052,
-        455084,
-        513545
+        485055,
+        475168,
+        513545,
+        451284
       ],
       "status": "available",
       "reason": null,
       "forecast": {
         "contract_version": "chip_forecast_v1",
-        "decision_gameweek": 8,
+        "decision_gameweek": 9,
         "threshold_policy": "decaying",
         "reserve": false,
         "later_week_basis": "this_week_projection_scaled_by_relative_fixture_count_v1",
@@ -463,8 +461,8 @@
             "holding_value": 12.0,
             "verdict": "hold",
             "hold_reason": "gain_not_above_threshold",
-            "gain_this_week": 3.3047614515139756,
-            "threshold_this_week": 7.764705882352941,
+            "gain_this_week": 3.700518664817686,
+            "threshold_this_week": 7.0588235294117645,
             "reservation_allows_this_week": true,
             "points_at_gameweek": null,
             "structured_gameweeks": null
@@ -478,17 +476,17 @@
             "holding_value": 20.0,
             "verdict": "hold",
             "hold_reason": "gain_not_above_threshold",
-            "gain_this_week": 8.848680604346718,
-            "threshold_this_week": 12.222222222222221,
+            "gain_this_week": 9.93603904666768,
+            "threshold_this_week": 11.11111111111111,
             "reservation_allows_this_week": true,
             "points_at_gameweek": {
-              "gameweek": 10,
-              "estimated_gain": 10.244827759292278,
-              "threshold": 10.0,
+              "gameweek": 12,
+              "estimated_gain": 7.787316466682054,
+              "threshold": 7.777777777777778,
               "player_ids": [
-                455084,
-                457569,
-                466052,
+                451284,
+                475168,
+                485055,
                 513545
               ]
             },
@@ -503,12 +501,12 @@
             "holding_value": 18.0,
             "verdict": "hold",
             "hold_reason": "gain_not_above_threshold",
-            "gain_this_week": 8.11765453618748,
-            "threshold_this_week": 11.0,
+            "gain_this_week": 8.453362463981911,
+            "threshold_this_week": 10.0,
             "reservation_allows_this_week": true,
             "points_at_gameweek": {
               "gameweek": 11,
-              "estimated_gain": 8.11765453618748,
+              "estimated_gain": 8.453362463981913,
               "threshold": 8.0,
               "player_ids": [
                 223094
@@ -527,7 +525,7 @@
       },
       "calendar_has_structure": false,
       "calendar_range": {
-        "first_gameweek": 9,
+        "first_gameweek": 10,
         "last_gameweek": 19
       }
     },
@@ -559,8 +557,9 @@
       2281624,
       3832237,
       5081114,
-      5349883,
+      5662073,
       6654210,
+      6879786,
       6880255,
       7018833,
       7252721,
@@ -573,10 +572,10 @@
       "rule_id": "gap_and_weeks_strategy_rule_v1",
       "band": "level",
       "rival_entry_id": 2281624,
-      "points_ahead_of_rival": -1,
-      "scored_gameweek": 7,
-      "gameweeks_remaining": 31,
-      "band_edge_points": 118.0
+      "points_ahead_of_rival": -2,
+      "scored_gameweek": 8,
+      "gameweeks_remaining": 30,
+      "band_edge_points": 116.1
     },
     "computed": [
       {
@@ -606,13 +605,18 @@
       },
       {
         "strategy": "ortak-koru",
-        "rival_entry_id": 5349883,
-        "path": "advice/4287206/ortak-koru/1/vs-5349883.json"
+        "rival_entry_id": 5662073,
+        "path": "advice/4287206/ortak-koru/1/vs-5662073.json"
       },
       {
         "strategy": "ortak-koru",
         "rival_entry_id": 6654210,
         "path": "advice/4287206/ortak-koru/1/vs-6654210.json"
+      },
+      {
+        "strategy": "ortak-koru",
+        "rival_entry_id": 6879786,
+        "path": "advice/4287206/ortak-koru/1/vs-6879786.json"
       },
       {
         "strategy": "ortak-koru",
@@ -666,13 +670,18 @@
       },
       {
         "strategy": "fark-yarat",
-        "rival_entry_id": 5349883,
-        "path": "advice/4287206/fark-yarat/1/vs-5349883.json"
+        "rival_entry_id": 5662073,
+        "path": "advice/4287206/fark-yarat/1/vs-5662073.json"
       },
       {
         "strategy": "fark-yarat",
         "rival_entry_id": 6654210,
         "path": "advice/4287206/fark-yarat/1/vs-6654210.json"
+      },
+      {
+        "strategy": "fark-yarat",
+        "rival_entry_id": 6879786,
+        "path": "advice/4287206/fark-yarat/1/vs-6879786.json"
       },
       {
         "strategy": "fark-yarat",

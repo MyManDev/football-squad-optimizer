@@ -1,29 +1,904 @@
 {
   "contract_version": "weekly_suggestion_history_v1",
-  "generated_at_utc": "2026-10-23T11:16:47.162538Z",
+  "generated_at_utc": "2026-10-30T07:00:58.818398Z",
   "payload": {
     "league_id": 352490,
     "entry_id": 6654210,
     "season": "2026-27",
-    "as_of_snapshot_id": "fpl-live-20261023T111647Z-a2cd55fde426",
+    "as_of_snapshot_id": "fpl-live-20261030T070058Z-8b2a93c0babe",
     "weeks": [
       {
-        "gameweek": 8,
+        "gameweek": 9,
         "status": "unsettled",
         "reason": "not_settled",
-        "deadline_utc": "2026-10-23T17:30:00Z",
-        "advice_snapshot_id": "fpl-live-20261023T111647Z-a2cd55fde426",
-        "advice_captured_at_utc": "2026-10-23T11:16:47.162538Z",
-        "advice_generated_at_utc": "2026-10-23T12:40:33Z",
-        "advice_sha256": "c3c36ae6947346ed5254aca7ec47364718a5417d9b7708f936ec18a999ce5947",
+        "deadline_utc": "2026-10-31T11:00:00Z",
+        "advice_snapshot_id": "fpl-live-20261030T070058Z-8b2a93c0babe",
+        "advice_captured_at_utc": "2026-10-30T07:00:58.818398Z",
+        "advice_generated_at_utc": "2026-10-30T08:03:14Z",
+        "advice_sha256": "15f6e82d12c9c404637c7550322b873c4d3e772b01ccac64de7e07100a701ffd",
         "outcome_snapshot_id": null,
         "outcome_captured_at_utc": null,
-        "expected_own_points": 53.82521910180709,
+        "expected_own_points": 52.107079345813894,
         "suggested": null,
         "actual": null,
         "actual_reason": null,
         "net_difference": null,
         "players": [],
+        "recorded_plans": [
+          {
+            "published_path": "advice/6654210/saf-puan/1.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "João Pedro Junqueira de Jesus",
+                "player_in": "Igor Thiago Nascimento Rodrigues"
+              }
+            ],
+            "expected_points_cost": 0.0
+          },
+          {
+            "published_path": "advice/6654210/ortak-koru/1/vs-5662073.json",
+            "strategy": "ortak-koru",
+            "window": 1,
+            "rival_entry_id": 5662073,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ainsley Maitland-Niles",
+                "player_in": "Ezri Konsa Ngoyo"
+              }
+            ],
+            "expected_points_cost": 1.0711837623617981,
+            "expected_points_cost_ceiling": 1.0711837623617981
+          },
+          {
+            "published_path": "advice/6654210/fark-yarat/1/vs-5662073.json",
+            "strategy": "fark-yarat",
+            "window": 1,
+            "rival_entry_id": 5662073,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "João Pedro Junqueira de Jesus",
+                "player_in": "Igor Thiago Nascimento Rodrigues"
+              }
+            ],
+            "expected_points_cost": 0.0,
+            "expected_points_cost_ceiling": 0.0
+          },
+          {
+            "published_path": "advice/6654210/saf-puan/1/hoca-sozu.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "João Pedro Junqueira de Jesus",
+                "player_in": "Igor Thiago Nascimento Rodrigues"
+              }
+            ],
+            "expected_points_cost": 0.0,
+            "expected_points_cost_ceiling": 0.0,
+            "managers_word": true
+          },
+          {
+            "published_path": "advice/6654210/saf-puan/1/top100-5.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "João Pedro Junqueira de Jesus",
+                "player_in": "Igor Thiago Nascimento Rodrigues"
+              }
+            ],
+            "expected_points_cost": 0.0,
+            "expected_points_cost_ceiling": 0.0,
+            "top100_weight": 5
+          },
+          {
+            "published_path": "advice/6654210/saf-puan/1/top100-5-hoca-sozu.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "João Pedro Junqueira de Jesus",
+                "player_in": "Igor Thiago Nascimento Rodrigues"
+              }
+            ],
+            "expected_points_cost": 0.0,
+            "expected_points_cost_ceiling": 0.0,
+            "top100_weight": 5,
+            "managers_word": true
+          },
+          {
+            "published_path": "advice/6654210/saf-puan/1/top100-10.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "João Pedro Junqueira de Jesus",
+                "player_in": "Igor Thiago Nascimento Rodrigues"
+              }
+            ],
+            "expected_points_cost": 0.0,
+            "expected_points_cost_ceiling": 0.0,
+            "top100_weight": 10
+          },
+          {
+            "published_path": "advice/6654210/saf-puan/1/top100-10-hoca-sozu.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "João Pedro Junqueira de Jesus",
+                "player_in": "Igor Thiago Nascimento Rodrigues"
+              }
+            ],
+            "expected_points_cost": 0.0,
+            "expected_points_cost_ceiling": 0.0,
+            "top100_weight": 10,
+            "managers_word": true
+          },
+          {
+            "published_path": "advice/6654210/saf-puan/1/top100-20.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "João Pedro Junqueira de Jesus",
+                "player_in": "Igor Thiago Nascimento Rodrigues"
+              }
+            ],
+            "expected_points_cost": 0.0,
+            "expected_points_cost_ceiling": 0.0,
+            "top100_weight": 20
+          },
+          {
+            "published_path": "advice/6654210/saf-puan/1/top100-20-hoca-sozu.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "João Pedro Junqueira de Jesus",
+                "player_in": "Igor Thiago Nascimento Rodrigues"
+              }
+            ],
+            "expected_points_cost": 0.0,
+            "expected_points_cost_ceiling": 0.0,
+            "top100_weight": 20,
+            "managers_word": true
+          },
+          {
+            "published_path": "advice/6654210/saf-puan/1/top100-30.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "João Pedro Junqueira de Jesus",
+                "player_in": "Igor Thiago Nascimento Rodrigues"
+              }
+            ],
+            "expected_points_cost": 0.0,
+            "expected_points_cost_ceiling": 0.0,
+            "top100_weight": 30
+          },
+          {
+            "published_path": "advice/6654210/saf-puan/1/top100-30-hoca-sozu.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "João Pedro Junqueira de Jesus",
+                "player_in": "Igor Thiago Nascimento Rodrigues"
+              }
+            ],
+            "expected_points_cost": 0.0,
+            "expected_points_cost_ceiling": 0.0,
+            "top100_weight": 30,
+            "managers_word": true
+          },
+          {
+            "published_path": "advice/6654210/saf-puan/1/top100-40.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "João Pedro Junqueira de Jesus",
+                "player_in": "Igor Thiago Nascimento Rodrigues"
+              }
+            ],
+            "expected_points_cost": 0.0,
+            "expected_points_cost_ceiling": 0.0,
+            "top100_weight": 40
+          },
+          {
+            "published_path": "advice/6654210/saf-puan/1/top100-40-hoca-sozu.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "João Pedro Junqueira de Jesus",
+                "player_in": "Igor Thiago Nascimento Rodrigues"
+              }
+            ],
+            "expected_points_cost": 0.0,
+            "expected_points_cost_ceiling": 0.0,
+            "top100_weight": 40,
+            "managers_word": true
+          },
+          {
+            "published_path": "advice/6654210/saf-puan/1/top100-50.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ainsley Maitland-Niles",
+                "player_in": "Ezri Konsa Ngoyo"
+              }
+            ],
+            "expected_points_cost": 1.0711837623617981,
+            "expected_points_cost_ceiling": 1.0711837623617981,
+            "top100_weight": 50
+          },
+          {
+            "published_path": "advice/6654210/saf-puan/1/top100-50-hoca-sozu.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ainsley Maitland-Niles",
+                "player_in": "Ezri Konsa Ngoyo"
+              }
+            ],
+            "expected_points_cost": 1.0711837623617981,
+            "expected_points_cost_ceiling": 1.0711837623617981,
+            "top100_weight": 50,
+            "managers_word": true
+          },
+          {
+            "published_path": "advice/6654210/ortak-koru/1/vs-5662073/top100-5.json",
+            "strategy": "ortak-koru",
+            "window": 1,
+            "rival_entry_id": 5662073,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ainsley Maitland-Niles",
+                "player_in": "Ezri Konsa Ngoyo"
+              }
+            ],
+            "expected_points_cost": 1.0711837623618052,
+            "expected_points_cost_ceiling": 1.0711837623618052,
+            "top100_weight": 5
+          },
+          {
+            "published_path": "advice/6654210/ortak-koru/1/vs-5662073/top100-10.json",
+            "strategy": "ortak-koru",
+            "window": 1,
+            "rival_entry_id": 5662073,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ainsley Maitland-Niles",
+                "player_in": "Ezri Konsa Ngoyo"
+              }
+            ],
+            "expected_points_cost": 1.0711837623618052,
+            "expected_points_cost_ceiling": 1.0711837623618052,
+            "top100_weight": 10
+          },
+          {
+            "published_path": "advice/6654210/ortak-koru/1/vs-5662073/top100-20.json",
+            "strategy": "ortak-koru",
+            "window": 1,
+            "rival_entry_id": 5662073,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ainsley Maitland-Niles",
+                "player_in": "Ezri Konsa Ngoyo"
+              }
+            ],
+            "expected_points_cost": 1.0711837623618052,
+            "expected_points_cost_ceiling": 1.0711837623618052,
+            "top100_weight": 20
+          },
+          {
+            "published_path": "advice/6654210/ortak-koru/1/vs-5662073/top100-30.json",
+            "strategy": "ortak-koru",
+            "window": 1,
+            "rival_entry_id": 5662073,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ainsley Maitland-Niles",
+                "player_in": "Ezri Konsa Ngoyo"
+              }
+            ],
+            "expected_points_cost": 1.0711837623618052,
+            "expected_points_cost_ceiling": 1.0711837623618052,
+            "top100_weight": 30
+          },
+          {
+            "published_path": "advice/6654210/ortak-koru/1/vs-5662073/top100-40.json",
+            "strategy": "ortak-koru",
+            "window": 1,
+            "rival_entry_id": 5662073,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ainsley Maitland-Niles",
+                "player_in": "Ezri Konsa Ngoyo"
+              }
+            ],
+            "expected_points_cost": 1.0711837623618052,
+            "expected_points_cost_ceiling": 1.0711837623618052,
+            "top100_weight": 40
+          },
+          {
+            "published_path": "advice/6654210/ortak-koru/1/vs-5662073/top100-50.json",
+            "strategy": "ortak-koru",
+            "window": 1,
+            "rival_entry_id": 5662073,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ainsley Maitland-Niles",
+                "player_in": "Ezri Konsa Ngoyo"
+              }
+            ],
+            "expected_points_cost": 1.0711837623618052,
+            "expected_points_cost_ceiling": 1.0711837623618052,
+            "top100_weight": 50
+          },
+          {
+            "published_path": "advice/6654210/fark-yarat/1/vs-5662073/top100-5.json",
+            "strategy": "fark-yarat",
+            "window": 1,
+            "rival_entry_id": 5662073,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "João Pedro Junqueira de Jesus",
+                "player_in": "Igor Thiago Nascimento Rodrigues"
+              }
+            ],
+            "expected_points_cost": 7.105427357601002e-15,
+            "expected_points_cost_ceiling": 7.105427357601002e-15,
+            "top100_weight": 5
+          },
+          {
+            "published_path": "advice/6654210/fark-yarat/1/vs-5662073/top100-10.json",
+            "strategy": "fark-yarat",
+            "window": 1,
+            "rival_entry_id": 5662073,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "João Pedro Junqueira de Jesus",
+                "player_in": "Igor Thiago Nascimento Rodrigues"
+              }
+            ],
+            "expected_points_cost": 7.105427357601002e-15,
+            "expected_points_cost_ceiling": 7.105427357601002e-15,
+            "top100_weight": 10
+          },
+          {
+            "published_path": "advice/6654210/fark-yarat/1/vs-5662073/top100-20.json",
+            "strategy": "fark-yarat",
+            "window": 1,
+            "rival_entry_id": 5662073,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "João Pedro Junqueira de Jesus",
+                "player_in": "Igor Thiago Nascimento Rodrigues"
+              }
+            ],
+            "expected_points_cost": 7.105427357601002e-15,
+            "expected_points_cost_ceiling": 7.105427357601002e-15,
+            "top100_weight": 20
+          },
+          {
+            "published_path": "advice/6654210/fark-yarat/1/vs-5662073/top100-30.json",
+            "strategy": "fark-yarat",
+            "window": 1,
+            "rival_entry_id": 5662073,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "João Pedro Junqueira de Jesus",
+                "player_in": "Igor Thiago Nascimento Rodrigues"
+              }
+            ],
+            "expected_points_cost": 7.105427357601002e-15,
+            "expected_points_cost_ceiling": 7.105427357601002e-15,
+            "top100_weight": 30
+          },
+          {
+            "published_path": "advice/6654210/fark-yarat/1/vs-5662073/top100-40.json",
+            "strategy": "fark-yarat",
+            "window": 1,
+            "rival_entry_id": 5662073,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "João Pedro Junqueira de Jesus",
+                "player_in": "Igor Thiago Nascimento Rodrigues"
+              }
+            ],
+            "expected_points_cost": 7.105427357601002e-15,
+            "expected_points_cost_ceiling": 7.105427357601002e-15,
+            "top100_weight": 40
+          },
+          {
+            "published_path": "advice/6654210/fark-yarat/1/vs-5662073/top100-50.json",
+            "strategy": "fark-yarat",
+            "window": 1,
+            "rival_entry_id": 5662073,
+            "chip": null,
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Ainsley Maitland-Niles",
+                "player_in": "Ezri Konsa Ngoyo"
+              }
+            ],
+            "expected_points_cost": 1.0711837623618052,
+            "expected_points_cost_ceiling": 1.0711837623618052,
+            "top100_weight": 50
+          },
+          {
+            "published_path": "advice/6654210/saf-puan/1/chip-wildcard.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": "wildcard",
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Martin Dubravka",
+                "player_in": "Antonín Kinský"
+              },
+              {
+                "player_out": "Bruno Borges Fernandes",
+                "player_in": "Marcus Tavernier"
+              },
+              {
+                "player_out": "Ainsley Maitland-Niles",
+                "player_in": "Virgil van Dijk"
+              },
+              {
+                "player_out": "Kristoffer Ajer",
+                "player_in": "Jay Dasilva"
+              },
+              {
+                "player_out": "Sven Botman",
+                "player_in": "Ezri Konsa Ngoyo"
+              },
+              {
+                "player_out": "Tyrick Mitchell",
+                "player_in": "Dara O'Shea"
+              },
+              {
+                "player_out": "Morgan Rogers",
+                "player_in": "Regan Slater"
+              },
+              {
+                "player_out": "Bryan Mbeumo",
+                "player_in": "Cole Palmer"
+              },
+              {
+                "player_out": "Jacob Greaves",
+                "player_in": "Gabriel dos Santos Magalhães"
+              },
+              {
+                "player_out": "João Pedro Junqueira de Jesus",
+                "player_in": "Francisco Evanilson de Lima Barbosa"
+              },
+              {
+                "player_out": "Mamadou Sangaré",
+                "player_in": "Pedro Lomba Neto"
+              },
+              {
+                "player_out": "Jonah Kusi-Asare",
+                "player_in": "Nicolas Jackson"
+              }
+            ],
+            "expected_points_cost": 0.0
+          },
+          {
+            "published_path": "advice/6654210/saf-puan/1/chip-freehit.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": "freehit",
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "Martin Dubravka",
+                "player_in": "Antonín Kinský"
+              },
+              {
+                "player_out": "Bruno Borges Fernandes",
+                "player_in": "Marcus Tavernier"
+              },
+              {
+                "player_out": "Ainsley Maitland-Niles",
+                "player_in": "Virgil van Dijk"
+              },
+              {
+                "player_out": "Kristoffer Ajer",
+                "player_in": "Jay Dasilva"
+              },
+              {
+                "player_out": "Sven Botman",
+                "player_in": "Ezri Konsa Ngoyo"
+              },
+              {
+                "player_out": "Tyrick Mitchell",
+                "player_in": "Dara O'Shea"
+              },
+              {
+                "player_out": "Morgan Rogers",
+                "player_in": "Regan Slater"
+              },
+              {
+                "player_out": "Bryan Mbeumo",
+                "player_in": "Cole Palmer"
+              },
+              {
+                "player_out": "Jacob Greaves",
+                "player_in": "Gabriel dos Santos Magalhães"
+              },
+              {
+                "player_out": "João Pedro Junqueira de Jesus",
+                "player_in": "Francisco Evanilson de Lima Barbosa"
+              },
+              {
+                "player_out": "Mamadou Sangaré",
+                "player_in": "Pedro Lomba Neto"
+              },
+              {
+                "player_out": "Jonah Kusi-Asare",
+                "player_in": "Nicolas Jackson"
+              }
+            ],
+            "expected_points_cost": 0.0
+          },
+          {
+            "published_path": "advice/6654210/saf-puan/1/chip-bboost.json",
+            "strategy": "saf-puan",
+            "window": 1,
+            "rival_entry_id": null,
+            "chip": "bboost",
+            "captain": "Erling Haaland",
+            "moves": [
+              {
+                "player_out": "João Pedro Junqueira de Jesus",
+                "player_in": "Igor Thiago Nascimento Rodrigues"
+              }
+            ],
+            "expected_points_cost": 0.0
+          }
+        ]
+      },
+      {
+        "gameweek": 8,
+        "status": "available",
+        "reason": null,
+        "deadline_utc": "2026-10-23T17:30:00Z",
+        "advice_snapshot_id": "fpl-live-20261023T111647Z-a2cd55fde426",
+        "advice_captured_at_utc": "2026-10-23T11:16:47.162538Z",
+        "advice_generated_at_utc": "2026-10-23T12:40:33Z",
+        "advice_sha256": "c3c36ae6947346ed5254aca7ec47364718a5417d9b7708f936ec18a999ce5947",
+        "outcome_snapshot_id": "fpl-live-20261030T070058Z-8b2a93c0babe",
+        "outcome_captured_at_utc": "2026-10-30T07:00:58.818398Z",
+        "expected_own_points": 53.82521910180709,
+        "suggested": {
+          "gross_points": 33.0,
+          "transfer_hit_points": 0.0,
+          "net_points": 33.0,
+          "captain_bonus_points": 8.0,
+          "autosub_points": 4.0,
+          "chip": null
+        },
+        "actual": {
+          "gross_points": 33.0,
+          "transfer_hit_points": 0.0,
+          "net_points": 33.0,
+          "details": {
+            "source_snapshot_id": "fpl-live-20261030T070058Z-8b2a93c0babe",
+            "captain": {
+              "player_id": 223094,
+              "name": "Haaland",
+              "points": 8.0,
+              "multiplier": 2,
+              "counted_points": 16.0
+            },
+            "transfers": [
+              {
+                "player_out": "Semenyo",
+                "player_in": {
+                  "player_id": 244850,
+                  "name": "Rogers",
+                  "points": 1.0,
+                  "multiplier": 1,
+                  "counted_points": 1.0
+                }
+              }
+            ]
+          }
+        },
+        "actual_reason": null,
+        "net_difference": 0.0,
+        "players": [
+          {
+            "player_id": 154561,
+            "name": "David Raya Martín",
+            "position": "GK",
+            "role": "starter",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 3.8753293988407767,
+            "realized_points": 7.0,
+            "minutes": 90,
+            "multiplier": 1,
+            "counted_points": 7.0,
+            "forecast_error": 3.1246706011592233
+          },
+          {
+            "player_id": 244723,
+            "name": "Tyrick Mitchell",
+            "position": "DEF",
+            "role": "starter",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 3.054926040886713,
+            "realized_points": 1.0,
+            "minutes": 90,
+            "multiplier": 1,
+            "counted_points": 1.0,
+            "forecast_error": -2.054926040886713
+          },
+          {
+            "player_id": 220237,
+            "name": "Sven Botman",
+            "position": "DEF",
+            "role": "starter",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 2.8346350021203977,
+            "realized_points": 0.0,
+            "minutes": 0,
+            "multiplier": 0,
+            "counted_points": 0.0,
+            "forecast_error": -2.8346350021203977
+          },
+          {
+            "player_id": 191866,
+            "name": "Kristoffer Ajer",
+            "position": "DEF",
+            "role": "starter",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 2.6612206839517722,
+            "realized_points": 2.0,
+            "minutes": 90,
+            "multiplier": 1,
+            "counted_points": 2.0,
+            "forecast_error": -0.6612206839517722
+          },
+          {
+            "player_id": 154043,
+            "name": "Ainsley Maitland-Niles",
+            "position": "DEF",
+            "role": "starter",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 2.512124002457543,
+            "realized_points": 0.0,
+            "minutes": 0,
+            "multiplier": 0,
+            "counted_points": 0.0,
+            "forecast_error": -2.512124002457543
+          },
+          {
+            "player_id": 141746,
+            "name": "Bruno Borges Fernandes",
+            "position": "MID",
+            "role": "starter",
+            "captain": false,
+            "vice_captain": true,
+            "expected_points": 5.660179884785022,
+            "realized_points": 0.0,
+            "minutes": 0,
+            "multiplier": 0,
+            "counted_points": 0.0,
+            "forecast_error": -5.660179884785022
+          },
+          {
+            "player_id": 446008,
+            "name": "Bryan Mbeumo",
+            "position": "MID",
+            "role": "starter",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 4.6615011141503295,
+            "realized_points": 2.0,
+            "minutes": 90,
+            "multiplier": 1,
+            "counted_points": 2.0,
+            "forecast_error": -2.6615011141503295
+          },
+          {
+            "player_id": 244850,
+            "name": "Morgan Rogers",
+            "position": "MID",
+            "role": "starter",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 4.588260940007448,
+            "realized_points": 1.0,
+            "minutes": 90,
+            "multiplier": 1,
+            "counted_points": 1.0,
+            "forecast_error": -3.588260940007448
+          },
+          {
+            "player_id": 60307,
+            "name": "Pascal Groß",
+            "position": "MID",
+            "role": "starter",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 4.02517634297332,
+            "realized_points": 0.0,
+            "minutes": 90,
+            "multiplier": 1,
+            "counted_points": 0.0,
+            "forecast_error": -4.02517634297332
+          },
+          {
+            "player_id": 223094,
+            "name": "Erling Haaland",
+            "position": "FWD",
+            "role": "starter",
+            "captain": true,
+            "vice_captain": false,
+            "expected_points": 8.11765453618748,
+            "realized_points": 8.0,
+            "minutes": 90,
+            "multiplier": 2,
+            "counted_points": 16.0,
+            "forecast_error": -0.11765453618748012
+          },
+          {
+            "player_id": 475168,
+            "name": "João Pedro Junqueira de Jesus",
+            "position": "FWD",
+            "role": "starter",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 3.716556619258811,
+            "realized_points": 0.0,
+            "minutes": 0,
+            "multiplier": 0,
+            "counted_points": 0.0,
+            "forecast_error": -3.716556619258811
+          },
+          {
+            "player_id": 67089,
+            "name": "Martin Dubravka",
+            "position": "GK",
+            "role": "bench",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 0.08206076680465356,
+            "realized_points": 0.0,
+            "minutes": 0,
+            "multiplier": 0,
+            "counted_points": 0.0,
+            "forecast_error": -0.08206076680465356
+          },
+          {
+            "player_id": 513545,
+            "name": "Mamadou Sangaré",
+            "position": "MID",
+            "role": "bench",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 1.8574318660548816,
+            "realized_points": 4.0,
+            "minutes": 90,
+            "multiplier": 1,
+            "counted_points": 4.0,
+            "forecast_error": 2.1425681339451184
+          },
+          {
+            "player_id": 449429,
+            "name": "Jacob Greaves",
+            "position": "DEF",
+            "role": "bench",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 0.5939906085334707,
+            "realized_points": 0.0,
+            "minutes": 0,
+            "multiplier": 0,
+            "counted_points": 0.0,
+            "forecast_error": -0.5939906085334707
+          },
+          {
+            "player_id": 631786,
+            "name": "Jonah Kusi-Asare",
+            "position": "FWD",
+            "role": "bench",
+            "captain": false,
+            "vice_captain": false,
+            "expected_points": 0.09962495391226733,
+            "realized_points": 0.0,
+            "minutes": 0,
+            "multiplier": 0,
+            "counted_points": 0.0,
+            "forecast_error": -0.09962495391226733
+          }
+        ],
         "recorded_plans": [
           {
             "published_path": "advice/6654210/saf-puan/1.json",
@@ -639,8 +1514,8 @@
         "advice_captured_at_utc": "2026-10-16T06:01:54.275749Z",
         "advice_generated_at_utc": "2026-10-16T07:13:49Z",
         "advice_sha256": "ab4ac386945c4697e27818a531424f25485a58bddbb1f48f1cb8c70e69a7f2df",
-        "outcome_snapshot_id": "fpl-live-20261023T111647Z-a2cd55fde426",
-        "outcome_captured_at_utc": "2026-10-23T11:16:47.162538Z",
+        "outcome_snapshot_id": "fpl-live-20261030T070058Z-8b2a93c0babe",
+        "outcome_captured_at_utc": "2026-10-30T07:00:58.818398Z",
         "expected_own_points": 56.7161534182527,
         "suggested": {
           "gross_points": 59.0,
@@ -1640,8 +2515,8 @@
         "advice_captured_at_utc": "2026-10-10T03:57:32.746463Z",
         "advice_generated_at_utc": "2026-10-10T06:07:04Z",
         "advice_sha256": "3bef9dd6ef7b70d92f886b335b7844236cad3d8f8dacdc6a9b14cf4fe62990cf",
-        "outcome_snapshot_id": "fpl-live-20261023T111647Z-a2cd55fde426",
-        "outcome_captured_at_utc": "2026-10-23T11:16:47.162538Z",
+        "outcome_snapshot_id": "fpl-live-20261030T070058Z-8b2a93c0babe",
+        "outcome_captured_at_utc": "2026-10-30T07:00:58.818398Z",
         "expected_own_points": 56.090116225065955,
         "suggested": {
           "gross_points": 59.0,
@@ -2631,8 +3506,8 @@
         "advice_captured_at_utc": "2026-09-18T12:25:16.241963Z",
         "advice_generated_at_utc": "2026-09-18T14:05:59Z",
         "advice_sha256": "134cc434c0388a0115b945bcfdd200b406af728491708d1a5473cc1123750c8f",
-        "outcome_snapshot_id": "fpl-live-20261023T111647Z-a2cd55fde426",
-        "outcome_captured_at_utc": "2026-10-23T11:16:47.162538Z",
+        "outcome_snapshot_id": "fpl-live-20261030T070058Z-8b2a93c0babe",
+        "outcome_captured_at_utc": "2026-10-30T07:00:58.818398Z",
         "expected_own_points": 56.736976855319185,
         "suggested": {
           "gross_points": 67.0,
@@ -2893,8 +3768,8 @@
         "advice_captured_at_utc": "2026-09-12T10:00:00.227050Z",
         "advice_generated_at_utc": "2026-09-12T10:50:08Z",
         "advice_sha256": "a084c31250ec69270b50f69f59829efb4f2a75fc43672c51536334bb821e8e61",
-        "outcome_snapshot_id": "fpl-live-20261023T111647Z-a2cd55fde426",
-        "outcome_captured_at_utc": "2026-10-23T11:16:47.162538Z",
+        "outcome_snapshot_id": "fpl-live-20261030T070058Z-8b2a93c0babe",
+        "outcome_captured_at_utc": "2026-10-30T07:00:58.818398Z",
         "expected_own_points": 57.31589811723791,
         "suggested": {
           "gross_points": 83.0,
