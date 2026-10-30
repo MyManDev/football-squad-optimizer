@@ -81,6 +81,7 @@ The static JSON trees the website reads: the per-member league trees and the sea
 | --- | --- |
 | `league_publication.py` | Assembles a member publication from an explicit capture. |
 | `league_views.py` | Renders the per-member league views: the JSON tree the league pages read. |
+| `player_names.py` | The short name a published player record shows: the game's own `web_name`, matched on the player's code. |
 | `league.py` | The league view: our season against everyone else playing the same game. |
 | `league_tree_identity.py` | Records the complete protected league set after a normal writer finishes. |
 | `publication_history.py` | Explicit historical inputs for prospective current-season publication. |
