@@ -24,6 +24,7 @@ import tests.unit.test_live_transfers as world_module
 
 import squadopt.application.advice_record as advice_records
 import squadopt.application.league_views as league_views
+from squadopt.application.advice import AdviseEntryRequest, advise_entry, solve_member_control
 from squadopt.application.advice_record import (
     MEMBER_ADVICE_RECORD_CONTRACT_VERSION,
     RECORD_FILE,
@@ -183,6 +184,48 @@ def _digests(root: Path) -> dict[str, str]:
         path.relative_to(root).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
         for path in sorted(root.rglob("*.json"))
     }
+
+
+def test_server_baseline_has_one_league_independent_scoring_record(
+    world: dict[str, Any], tmp_path: Path
+) -> None:
+    inputs, projection, rules = _world_context(world)
+    picks = _member_picks(world, 101, _legal_squad())
+    provider = _Provider({101: picks})
+    control = solve_member_control(picks, inputs, projection, rules)
+    capture = advice_records.RecordCapture(inputs.snapshot_id, inputs.captured_at_utc)
+    records = []
+    for league in (352490, 755941):
+        payload = advise_entry(
+            AdviseEntryRequest(SEASON, 2, league, 101),
+            provider=provider,
+            inputs=inputs,
+            projection=projection,
+            rules=rules,
+            control=control,
+        )
+        record = advice_records.build_member_baseline_record(
+            picks,
+            projection,
+            payload,
+            capture=capture,
+            generated_at_utc=WHEN.isoformat(),
+            transfer_config_fingerprint=control.transfer_config.configuration_fingerprint,
+        )
+        records.append(record)
+        assert record["contract_version"] == advice_records.MEMBER_BASELINE_RECORD_CONTRACT_VERSION
+        assert "league" not in advice_records.encode_record(record).decode()
+        assert "published_path" not in record["advice"][0]
+        assert "published_sha256" not in record["advice"][0]
+        assert record["advice"][0]["starting_xi"] == [
+            p["player_id"] for p in payload["starting_xi"]
+        ]
+        assert record["advice"][0]["captain"] == payload["captain"]["player_id"]
+        assert record["advice"][0]["transfer_hit_points"] == payload["transfer_hit_points"]
+        advice_records.record_member_advice(tmp_path, record)
+    assert advice_records.encode_record(records[0]) == advice_records.encode_record(records[1])
+    loaded = advice_records.load_member_advice_record(tmp_path, SEASON, 2, 101, inputs.snapshot_id)
+    assert loaded == records[0]
 
 
 def test_every_published_switch_is_recorded_with_its_bytes_and_replays(

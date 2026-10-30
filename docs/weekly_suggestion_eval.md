@@ -2,8 +2,11 @@
 
 The publisher compares a member's recorded one-week pure-points suggestion with their
 actual weekly result. Histories accept any positive league id and validate each legacy
-record against that league. A new league with no records gets empty histories for its
-members. Entry/capture baseline recording for additional leagues remains work in #982.
+record against that league. Tracked leagues share one server-computed baseline per
+entry and capture in `data/member_baselines`; the weekly run computes it before page
+rendering. The retained `data/advice_records` archive keeps the original league's full
+menus and published digests. History reads both stores, preferring the original archive
+for its league at the same capture. A new league with no records gets empty histories.
 
 ## Evidence and selection
 
@@ -35,12 +38,16 @@ members. Entry/capture baseline recording for additional leagues remains work in
   refused as before.
 - A record that never landed can leave its member-week directory with no record in it.
   Only league 352490 records advice (`records_advice_for`), so for any other league such
-  a directory is 352490's and its week is not shown. League 352490 shows it as
-  `no_pre_deadline_record`, as before.
+  a directory in the legacy archive is 352490's and its week is not shown. League 352490
+  shows it as `no_pre_deadline_record`, as before.
+- A baseline record names no league and is every league's. A week the baseline store
+  holds a directory for is shown for each league the member is in, even when its record
+  never landed, and another league's legacy record beside it is absent.
 - Before replacing any history, refuse a same-season publication that would drop a week
   already shown for a member. Restore the missing records before retrying. A row shown
   without advice for a week that is another league's, as above, is withdrawn instead.
-- The archive records publisher output. It does not establish that a member viewed
+- The legacy archive records publisher output; the baseline store records the server's
+  independent one-week answer. Neither establishes that a member viewed
   the page, followed the suggestion, or obtained a causal benefit from it.
 
 ## Scoring and interpretation
