@@ -2,12 +2,14 @@
 
 The decision table, the missed window, the refusals, the markers and the suffixes of the
 PowerShell gate's tests (#1244), run on the Python gate with no PowerShell. `main` runs on a
-synthetic workspace and bootstrap with a fake runner and a fake club-news entry, so nothing here
-reads the network, runs git or starts a weekly run.
+synthetic workspace and bootstrap with a fake runner, a fake club-news entry and a fake release,
+so nothing here reads the network, runs git, starts a weekly run or releases one. The systemd
+units that tick the gate on a Linux host (`deploy/weekly-schedule/`) are read as text.
 """
 
 from __future__ import annotations
 
+import inspect
 import json
 from collections.abc import Sequence
 from datetime import datetime
@@ -15,10 +17,12 @@ from pathlib import Path
 
 import pytest
 
+from squadopt.platform import weekly_release
 from squadopt.platform import weekly_schedule as gate
 from squadopt.platform.weekly_publish import PublishNames
 
 DEADLINES = {9: "2026-10-31T11:00:00Z", 10: "2026-11-06T18:30:00Z"}
+HOST_FILES = Path(__file__).resolve().parents[2] / "deploy" / "weekly-schedule"
 
 
 def _bootstrap(deadlines: dict[int, str]) -> bytes:
@@ -166,14 +170,20 @@ def test_the_weekly_arguments_are_weekly_run_s_and_friday_refuses_the_fixture() 
 class _Host:
     """The runner and the club-news entry, recorded: nothing runs."""
 
-    def __init__(self, news_exit: int = 0) -> None:
+    def __init__(self, news_exit: int = 0, weekly_exit: int = 0) -> None:
         self.commands: list[list[str]] = []
         self.news: list[list[str]] = []
+        self.released: list[str] = []
         self.news_exit = news_exit
+        self.weekly_exit = weekly_exit
 
     def runner(self, arguments: Sequence[str], cwd: Path, log: Path) -> int:
         self.commands.append(list(arguments))
-        return 0
+        return self.weekly_exit if "squadopt.platform.weekly_operations" in arguments else 0
+
+    def release(self, workspace: Path, run_id: str) -> int:
+        self.released.append(run_id)
+        return 7
 
     def acquire(self, arguments: list[str]) -> int:
         self.news.append(arguments)
@@ -199,6 +209,7 @@ def _main(workspace: Path, now: str, host: _Host, *extra: str) -> int:
         runner=host.runner,
         acquire=host.acquire,
         read_bootstrap=lambda: pytest.fail("the network was read"),
+        release=host.release,
     )
 
 
@@ -274,3 +285,82 @@ def test_a_failed_acquisition_refuses_before_the_weekly_command(tmp_path: Path) 
     host = _Host(news_exit=1)
     assert _main(workspace, "2026-10-31T07:05:00Z", host) == 2
     assert host.commands == [["git", "pull", "-q", "--ff-only"]]
+
+
+@pytest.mark.parametrize(
+    "switch,run_exit,released,exit_code",
+    [(False, 0, False, 0), (False, 1, False, 1), (True, 1, False, 1), (True, 0, True, 7)],
+)
+def test_the_gate_releases_only_with_the_switch_and_only_a_run_that_exited_0(
+    tmp_path: Path, switch: bool, run_exit: int, released: bool, exit_code: int
+) -> None:
+    workspace = _workspace(tmp_path)
+    (workspace / "data" / "snapshots" / "fpl-live-20261031").mkdir(parents=True)
+    host = _Host(weekly_exit=run_exit)
+    extra = ["--release"] if switch else []
+    assert _main(workspace, "2026-10-31T07:05:00Z", host, *extra) == exit_code
+    assert len(host.commands) == 2
+    assert host.released == (["2026-27-gw09-friday-20261031T0705Z"] if released else [])
+
+
+def test_the_switch_passes_the_ported_chain_and_is_off_by_default() -> None:
+    seam = inspect.signature(gate.main).parameters["release"]
+    assert seam.default is weekly_release.release_run
+    assert gate.build_parser().parse_args([]).release is False
+
+
+def test_a_dry_run_names_the_release_only_with_the_switch(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    workspace = _workspace(tmp_path)
+    assert _main(workspace, "2026-10-31T07:05:00Z", _Host(), "--dry-run") == 0
+    plain = capsys.readouterr().out.splitlines()
+    host = _Host()
+    assert _main(workspace, "2026-10-31T07:05:00Z", host, "--dry-run", "--release") == 0
+    switched = capsys.readouterr().out.splitlines()
+    assert (switched[:3], len(plain), host.released) == (plain, 3, [])
+    assert switched[3:] == [
+        "would release 2026-27-gw09-friday-20261031T0705Z once it exits 0, with "
+        "squadopt.platform.weekly_release"
+    ]
+    assert not (tmp_path / "data").exists()
+
+
+def _directives(path: Path) -> list[tuple[str, str]]:
+    lines = path.read_text(encoding="utf-8").splitlines()
+    pairs = [line.split("=", 1) for line in lines if "=" in line and not line.startswith("#")]
+    return [(key.strip(), value.strip()) for key, value in pairs]
+
+
+def test_the_host_units_tick_the_gate_by_its_module_on_a_workspace() -> None:
+    service = _directives(HOST_FILES / "weekly-schedule.service")
+    timer = _directives(HOST_FILES / "weekly-schedule.timer")
+    dry_run = _directives(HOST_FILES / "dry-run.conf")
+    workspaces = set()
+    for unit, switch, other in (
+        (service, "--release", "--dry-run"),
+        (dry_run, "--dry-run", "--release"),
+    ):
+        (command,) = [value for key, value in unit if key == "ExecStart" and value]
+        arguments = command.split()
+        assert arguments[1:3] == ["-m", "squadopt.platform.weekly_schedule"], command
+        workspace = arguments[arguments.index("--workspace") + 1]
+        assert (arguments[0], arguments[-1], other in arguments) == (
+            f"{workspace}/.venv/bin/python",
+            switch,
+            False,
+        )
+        workspaces.add(workspace)
+    (workspace,) = workspaces
+    # The drop-in clears the unit's command before it gives its own.
+    assert [key for key, _ in dry_run] == ["ExecStart", "ExecStart"]
+    assert {("Type", "oneshot"), ("TimeoutStartSec", "infinity")} <= set(service)
+    assert ("WorkingDirectory", workspace) in service
+    environment = [value for key, value in service if key == "Environment"]
+    assert [key for key, _ in service].count("EnvironmentFile") == 1
+    # The club-news settings and any key come from the private file, never from the unit.
+    assert all(
+        value.split("=", 1)[0] in {"PYTHONPATH", "PYTHONUNBUFFERED"} for value in environment
+    )
+    assert {("OnCalendar", "*:0/15"), ("Persistent", "true")} <= set(timer)
+    assert ("Unit", "weekly-schedule.service") in timer

@@ -7,7 +7,7 @@ with `squadopt.api`, that may import web frameworks, network clients, model SDKs
 (the contract "Frameworks, network and databases stay in api and platform"). No package below
 it in the layer order imports it, and it imports no laboratory module.
 
-Its 66 Python files serve several deployment units: 50 implementation modules and 4
+Its 67 Python files serve several deployment units: 51 implementation modules and 4
 aliases at old paths in the flat folder, the package file, and the seven subpackages of ADR
 0011, of which `storage/` holds the four shared durable-state modules and the six others their
 package file only.
@@ -25,7 +25,7 @@ Review: either owner approves a change here; the `club_news_*` modules are İbra
 | Process | Entry point | Families it uses |
 | --- | --- | --- |
 | Weekly run | `python -m squadopt.platform.weekly_operations` | Weekly run, captures, run records |
-| Weekly schedule | `python -m squadopt.platform.weekly_schedule`, every 15 minutes from the host's scheduler | Weekly run (it starts the weekly run), `fpl_capture`, club news |
+| Weekly schedule | `python -m squadopt.platform.weekly_schedule`, every 15 minutes from the host's scheduler (`deploy/weekly-schedule/` on Linux) | Weekly run (it starts the weekly run and, with `--release`, releases it), `fpl_capture`, club news |
 | Advice API | `uvicorn --factory squadopt.api.runtime:build_app` | Advice API services, built by `backend_runtime` |
 | Advice worker | `python -m squadopt.platform.advice_worker` | Advice queue and workers, with the services `backend_runtime` builds |
 | Installed CLI | the `squadopt` console script (`squadopt.platform.cli:main`) | Installed CLI, run records, `fpl_capture` |
@@ -40,13 +40,15 @@ script's target, the backend restart's import smoke,
 
 ## Weekly run
 
-The installed weekly entry point, the gate that starts it on a schedule, its durable journal,
-the member publication service and the optional football inputs it seals.
+The installed weekly entry point, the gate that starts it on a schedule and the chain that
+releases it, its durable journal, the member publication service and the optional football
+inputs it seals.
 
 | Module | What it does |
 | --- | --- |
 | `weekly_operations.py` | The installed weekly entry point: typed application services run as stages of a durable journal. |
 | `weekly_schedule.py` | The scheduled gate (#1243): a morning run once a UTC day and a final run a lead before each deadline, each started at most once, with its club news, on any host. |
+| `weekly_release.py` | Releases a run the gate started, once, with no person (`--release`, #1249 in Python): league tree check, the site PR's checks, its enqueue and merge, `ship.sh`, a backend move left to its operator, and the club-news bundle seal. |
 | `weekly_journal.py` | Durable sequential stage execution: ownership lock, input and output fingerprints, resume. |
 | `weekly_publish.py` | Publishes one gameweek's site view: worktree, copy, commit, push and pull request in one command. |
 | `publication_workers.py` | Process scheduling for the member publication service. |
