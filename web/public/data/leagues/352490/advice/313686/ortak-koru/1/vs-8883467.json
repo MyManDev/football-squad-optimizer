@@ -1,76 +1,68 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-10-23T12:40:33Z",
+  "generated_at_utc": "2026-10-30T08:03:14Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
-    "gameweek": 8,
+    "gameweek": 9,
     "entry_id": 313686,
     "league_id": 352490,
     "mode": "ortak-koru",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20261023T111647Z-a2cd55fde426",
+    "source_snapshot_id": "fpl-live-20261030T070058Z-8b2a93c0babe",
     "moves": [
       {
-        "move_id": "gw08-1",
+        "move_id": "gw09-1",
         "player_out": {
-          "player_id": 489639,
-          "name": "Bart Verbruggen",
-          "short_name": "Verbruggen",
-          "position": "GK",
-          "team": "Brighton"
+          "player_id": 577725,
+          "name": "Josh King",
+          "short_name": "King",
+          "position": "MID",
+          "team": "Fulham"
         },
         "player_in": {
-          "player_id": 154561,
-          "name": "David Raya Mart\u00edn",
-          "short_name": "Mart\u00edn",
-          "position": "GK",
-          "team": "Arsenal"
+          "player_id": 201658,
+          "name": "Marcus Tavernier",
+          "short_name": "Tavernier",
+          "position": "MID",
+          "team": "Bournemouth"
         },
-        "expected_points_delta": 0.7815242944329484,
+        "expected_points_delta": 1.187491134768635,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 0.7815242944329484,
-    "expected_points_cost": 0.772091437685468,
+    "expected_gain_vs_hold": 1.187491134768635,
+    "expected_points_cost": 0.12826052425630508,
     "rival_label": "entry-8883467",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
     "wall_clock_stopped_the_search": false,
-    "expected_own_points": 54.715437673167564,
+    "expected_own_points": 53.9978135842666,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
       "short_name": "Haaland",
       "position": "FWD",
       "team": "Man City",
-      "expected_points": 8.11765453618748
+      "expected_points": 8.453362463981913
     },
     "vice_captain": {
-      "player_id": 141746,
-      "name": "Bruno Borges Fernandes",
-      "short_name": "Fernandes",
+      "player_id": 244851,
+      "name": "Cole Palmer",
+      "short_name": "Palmer",
       "position": "MID",
-      "team": "Man Utd",
-      "expected_points": 5.660179884785022
+      "team": "Chelsea",
+      "expected_points": 5.005073584741382
     },
     "starting_xi": [
       {
-        "player_id": 154561,
-        "name": "David Raya Mart\u00edn",
-        "short_name": "Mart\u00edn",
+        "player_id": 489639,
+        "name": "Bart Verbruggen",
+        "short_name": "Verbruggen",
         "position": "GK",
-        "team": "Arsenal",
-        "expected_points": 3.8753293988407767
-      },
-      {
-        "player_id": 466075,
-        "name": "Riccardo Calafiori",
-        "short_name": "Calafiori",
-        "position": "DEF",
-        "team": "Arsenal",
-        "expected_points": 3.6527262906253877
+        "team": "Brighton",
+        "expected_points": 3.021871909660416
       },
       {
         "player_id": 465730,
@@ -78,7 +70,7 @@
         "short_name": "Cuyper",
         "position": "DEF",
         "team": "Brighton",
-        "expected_points": 3.6085520469470964
+        "expected_points": 3.487225706209676
       },
       {
         "player_id": 199798,
@@ -86,15 +78,15 @@
         "short_name": "Ngoyo",
         "position": "DEF",
         "team": "Arsenal",
-        "expected_points": 3.089966731709672
+        "expected_points": 3.2530503753922586
       },
       {
-        "player_id": 141746,
-        "name": "Bruno Borges Fernandes",
-        "short_name": "Fernandes",
-        "position": "MID",
-        "team": "Man Utd",
-        "expected_points": 5.660179884785022
+        "player_id": 108416,
+        "name": "John Egan",
+        "short_name": "Egan",
+        "position": "DEF",
+        "team": "Hull City",
+        "expected_points": 2.504226906337987
       },
       {
         "player_id": 244851,
@@ -102,7 +94,31 @@
         "short_name": "Palmer",
         "position": "MID",
         "team": "Chelsea",
-        "expected_points": 5.136799837039665
+        "expected_points": 5.005073584741382
+      },
+      {
+        "player_id": 141746,
+        "name": "Bruno Borges Fernandes",
+        "short_name": "Fernandes",
+        "position": "MID",
+        "team": "Man Utd",
+        "expected_points": 4.578163641507459
+      },
+      {
+        "player_id": 244850,
+        "name": "Morgan Rogers",
+        "short_name": "Rogers",
+        "position": "MID",
+        "team": "Chelsea",
+        "expected_points": 4.448732989223336
+      },
+      {
+        "player_id": 201658,
+        "name": "Marcus Tavernier",
+        "short_name": "Tavernier",
+        "position": "MID",
+        "team": "Bournemouth",
+        "expected_points": 3.9585799751685413
       },
       {
         "player_id": 60307,
@@ -110,23 +126,7 @@
         "short_name": "Gro\u00df",
         "position": "MID",
         "team": "Brighton",
-        "expected_points": 4.02517634297332
-      },
-      {
-        "player_id": 466052,
-        "name": "Rayan Cherki",
-        "short_name": "Cherki",
-        "position": "MID",
-        "team": "Man City",
-        "expected_points": 3.5051048815473056
-      },
-      {
-        "player_id": 577725,
-        "name": "Josh King",
-        "short_name": "King",
-        "position": "MID",
-        "team": "Fulham",
-        "expected_points": 2.82782973323688
+        "expected_points": 3.823770606998293
       },
       {
         "player_id": 223094,
@@ -134,7 +134,7 @@
         "short_name": "Haaland",
         "position": "FWD",
         "team": "Man City",
-        "expected_points": 8.11765453618748
+        "expected_points": 8.453362463981913
       },
       {
         "player_id": 586309,
@@ -142,7 +142,7 @@
         "short_name": "Barry",
         "position": "FWD",
         "team": "Everton",
-        "expected_points": 3.0984634530874815
+        "expected_points": 3.0103929610634266
       }
     ],
     "bench": [
@@ -152,15 +152,15 @@
         "short_name": "Palmer",
         "position": "GK",
         "team": "Ipswich Town",
-        "expected_points": 0.10027015579447286
+        "expected_points": 0.08206076680465356
       },
       {
-        "player_id": 108416,
-        "name": "John Egan",
-        "short_name": "Egan",
+        "player_id": 466075,
+        "name": "Riccardo Calafiori",
+        "short_name": "Calafiori",
         "position": "DEF",
-        "team": "Hull City",
-        "expected_points": 2.4709800696449706
+        "team": "Arsenal",
+        "expected_points": 2.2733504759159526
       },
       {
         "player_id": 551210,
@@ -168,7 +168,7 @@
         "short_name": "Hato",
         "position": "DEF",
         "team": "Chelsea",
-        "expected_points": 1.0075687666505877
+        "expected_points": 1.427022316494937
       },
       {
         "player_id": 631786,
@@ -188,7 +188,7 @@
     "missing_fields": [],
     "squad_basis": "captured",
     "rival_entry_id": 8883467,
-    "expected_points_cost_ceiling": 0.772091437685468,
+    "expected_points_cost_ceiling": 0.12826052425630508,
     "overlap_count": 5,
     "transfer_cap": 1,
     "overlap_target": 9,
@@ -198,10 +198,10 @@
       "kind": "with_hits",
       "overlap_applied": 9,
       "transfer_hit_points": 16.0,
-      "expected_points_cost": 16.250300082551924,
-      "expected_points_cost_ceiling": 16.250300082551924
+      "expected_points_cost": 14.364054375315384,
+      "expected_points_cost_ceiling": 14.364054375315384
     },
-    "expected_gap_vs_rival": 0.7546196637705691,
+    "expected_gap_vs_rival": 0.1866175442502751,
     "captain_agreement": true,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0
