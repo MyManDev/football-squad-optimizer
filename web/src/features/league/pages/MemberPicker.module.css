@@ -24,12 +24,6 @@
   outline: none;
 }
 
-.league {
-  margin: 0;
-  color: var(--color-text-muted);
-  overflow-wrap: anywhere;
-}
-
 .form {
   display: flex;
   flex-direction: column;

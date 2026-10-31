@@ -135,7 +135,6 @@ describe.each(["tr", "en"] as const)("the member step in %s", (language) => {
     open({ language });
     const group = await picker(language);
     expect(screen.getByRole("heading", { level: 1, name: copy.title })).toBeInTheDocument();
-    expect(screen.getByText(copy.league(LEAGUE_NAME))).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "League page" })).toBeNull();
 
     const radios = within(group).getAllByRole("radio");
@@ -563,9 +562,7 @@ describe("the step's words", () => {
     (language) => {
       const copy = MESSAGES[language];
       const words = [
-        ...Object.values(copy.memberPicker).map((value) =>
-          typeof value === "function" ? value(LEAGUE_NAME) : value,
-        ),
+        ...Object.values(copy.memberPicker),
         copy.shell.findLeague,
         copy.shell.changeMember,
       ];

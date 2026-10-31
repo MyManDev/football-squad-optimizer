@@ -513,7 +513,6 @@ const en = {
   },
   memberPicker: {
     title: "Who are you?",
-    league: (leagueName: string) => `League: ${leagueName}`,
     legend: "Pick your name",
     confirm: "Confirm",
     otherLeague: "Enter a different league number",
@@ -992,7 +991,7 @@ const en = {
     chipsAndTransfers: "Chips and free transfers",
     // The squad the plan fields, drawn on the pitch, and the fixture rail beside it.
     squadAfterTitle: "Squad after the transfers",
-    squadOwnPoints: (points: string) => `captain doubled: ${points} xP`,
+    squadOwnPoints: (points: string) => `${points} xP`,
     /**
      * The printed unit on the tight lines (the decision's captain line, the plan's list rows,
      * the held squad's rows), in both languages: shown, but not read out.
@@ -1649,7 +1648,6 @@ const tr: MessageSchema<typeof en> = {
   },
   memberPicker: {
     title: "Sen kimsin?",
-    league: (leagueName) => `Lig: ${leagueName}`,
     legend: "Adını seç",
     confirm: "Onayla",
     otherLeague: "Başka bir lig numarası gir",
@@ -2084,7 +2082,7 @@ const tr: MessageSchema<typeof en> = {
     decisionTools: "Karar araçları",
     chipsAndTransfers: "Çipler ve transfer hakkı",
     squadAfterTitle: "Kadro, transferlerden sonra",
-    squadOwnPoints: (pointsValue) => `kaptan iki kat: ${pointsValue} beklenen puan`,
+    squadOwnPoints: (pointsValue) => `${pointsValue} beklenen puan`,
     pointsUnitAbbreviation: "xP",
     pointsUnitSpoken: "beklenen puan",
     attackDirection: "Hücum yönü",

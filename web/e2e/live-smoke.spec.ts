@@ -216,7 +216,9 @@ test("published league and member journey works without submitting a solve", asy
       console.log(`backend cache hit matches published capture: ${cacheRead}`);
     }
   }
-  await page.locator(`a[href="/league/${league}/members/${entryId}/history"]`).click();
+  // The member's history can be linked twice on the page: beside the honesty block, and by
+  // the last finished week's card when the member has one. Either lands on the same page.
+  await page.locator(`a[href="/league/${league}/members/${entryId}/history"]`).first().click();
   await expect(page).toHaveURL(new RegExp(`/league/${league}/members/${entryId}/history$`));
   await expect(page.locator("main h1")).toBeVisible();
   await page.waitForLoadState("networkidle");
