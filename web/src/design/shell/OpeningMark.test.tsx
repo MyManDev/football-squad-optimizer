@@ -1,7 +1,7 @@
 import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { OPENING_MS, OPENING_STORAGE_KEY, OpeningMark } from "./OpeningMark";
+import { OPENING_LEAVE_MS, OPENING_MS, OPENING_STORAGE_KEY, OpeningMark } from "./OpeningMark";
 
 const cover = () => document.querySelector("[data-opening-mark]");
 
@@ -32,6 +32,8 @@ describe("the brand's opening", () => {
     expect(cover()).toHaveTextContent("SquadOpt");
     expect(window.sessionStorage.getItem(OPENING_STORAGE_KEY)).toBe("1");
     act(() => vi.advanceTimersByTime(OPENING_MS));
+    expect(cover()).not.toBeNull();
+    act(() => vi.advanceTimersByTime(OPENING_LEAVE_MS - OPENING_MS));
     expect(cover()).toBeNull();
 
     cleanup();

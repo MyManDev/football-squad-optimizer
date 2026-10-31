@@ -9,6 +9,12 @@ export const OPENING_STORAGE_KEY = "squadopt.openingShown";
 /** The opening's one clock: five data-motion lengths, as `--opening-length` in the stylesheet. */
 export const OPENING_MS = MOTION_MS.data * 5;
 
+/**
+ * When the clock takes the cover off: a beat after its animations end, so they finish rather
+ * than being cancelled by the removal (a cancelled animation rejects its `finished` promise).
+ */
+export const OPENING_LEAVE_MS = OPENING_MS + MOTION_MS.ui;
+
 function shouldOpen(): boolean {
   if (prefersReducedMotion()) return false;
   try {
@@ -38,7 +44,7 @@ export function OpeningMark() {
     }
     // The cover leaves when its fade ends; a page that draws no frames (a hidden tab) sends
     // no animationend, so the clock takes it off as well.
-    const timer = window.setTimeout(() => setOpen(false), OPENING_MS);
+    const timer = window.setTimeout(() => setOpen(false), OPENING_LEAVE_MS);
     return () => window.clearTimeout(timer);
   }, []);
   if (!open) return null;
