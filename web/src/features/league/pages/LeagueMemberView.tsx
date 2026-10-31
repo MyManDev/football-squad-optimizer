@@ -460,13 +460,14 @@ function LeagueMemberContent({
         {layout === "phone" ? <MemberSections /> : null}
 
         {deadlinePassed !== null ? (
-          <section className={styles.notice} aria-labelledby="deadline-passed-title">
+          <section
+            className={styles.notice}
+            aria-labelledby="deadline-passed-title"
+            data-testid="deadline-passed"
+          >
             <h2 className={styles.noticeTitle} id="deadline-passed-title">
               {COMPUTE_COPY[language].deadlinePassedTitle}
             </h2>
-            <p data-testid="deadline-passed">
-              {COMPUTE_COPY[language].deadlinePassedBody(view.gameweek, dateTime(deadlinePassed))}
-            </p>
           </section>
         ) : null}
         {played ? (

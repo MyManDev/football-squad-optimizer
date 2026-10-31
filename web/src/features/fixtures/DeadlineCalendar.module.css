@@ -17,9 +17,3 @@
   font-weight: 600;
   cursor: pointer;
 }
-
-.note {
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: var(--step--1);
-}

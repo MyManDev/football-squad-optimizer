@@ -45,7 +45,6 @@ afterEach(() => {
 it("downloads the deadlines ahead as squadopt-deadlines.ics, in the page's language", async () => {
   render(<DeadlineCalendar payload={payload} copy={FIXTURES_COPY.tr} />);
   const button = screen.getByRole("button", { name: FIXTURES_COPY.tr.calendarAction });
-  expect(button).toHaveAccessibleDescription(FIXTURES_COPY.tr.calendarNote);
   expect(createObjectURL).not.toHaveBeenCalled();
 
   fireEvent.click(button);
