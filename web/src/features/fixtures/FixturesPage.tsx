@@ -40,7 +40,6 @@ export function FixturesPage() {
       <header>
         <div className={styles.kicker}>{data.season}</div>
         <h1 className={styles.pageTitle}>{copy.pageTitle}</h1>
-        <p className={styles.lede}>{copy.pageLede}</p>
       </header>
       <DeadlineCalendar payload={data} copy={copy} />
       {current || next ? (

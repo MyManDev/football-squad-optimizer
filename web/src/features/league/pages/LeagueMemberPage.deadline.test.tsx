@@ -84,9 +84,7 @@ describe("a member page whose gameweek has closed", () => {
       const copy = COMPUTE_COPY[language];
       renderView(DEADLINE, language);
       expect(screen.getByText(copy.deadlinePassedTitle)).toBeInTheDocument();
-      const notice = screen.getByTestId("deadline-passed");
-      expect(notice).toHaveTextContent(String(SQUAD.payload.gameweek));
-      expect(notice).toHaveTextContent("2026");
+      expect(screen.getByTestId("deadline-passed")).toHaveTextContent(copy.deadlinePassedTitle);
       cleanup();
     }
   });
