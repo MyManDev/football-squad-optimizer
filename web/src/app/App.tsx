@@ -3,6 +3,7 @@ import { lazy, Suspense } from "react";
 import { BrowserRouter, Route, Routes } from "react-router";
 
 import { EmptyState } from "../design/components/EmptyState";
+import { OpeningMark } from "../design/shell/OpeningMark";
 import { useLanguage } from "../i18n/context";
 import { LanguageProvider } from "../i18n/LanguageProvider";
 import { IdentifiedShell } from "./IdentifiedShell";
@@ -63,6 +64,7 @@ export function App() {
   return (
     <LanguageProvider>
       <LocalizedApp basename={import.meta.env.BASE_URL} />
+      <OpeningMark />
     </LanguageProvider>
   );
 }

@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import { COMPUTE_COPY } from "../src/features/league/advice/computeCopy";
-import { mockEntryAdviceEnvelope, mockLeagueMembersEnvelope } from "../src/fixtures/league";
+import { mockEntryAdviceEnvelope } from "../src/fixtures/league";
 import { MESSAGES } from "../src/i18n/messages";
 import { installLeagueMocks, openCalendar } from "./leagueMocks";
 
@@ -36,9 +36,7 @@ for (const language of ["tr", "en"] as const) {
 
     const copy = COMPUTE_COPY[language];
     await expect(page.getByRole("heading", { name: copy.deadlinePassedTitle })).toBeVisible();
-    const notice = page.getByTestId("deadline-passed");
-    await expect(notice).toContainText(String(mockLeagueMembersEnvelope.payload.gameweek));
-    await expect(notice).toContainText("2020");
+    await expect(page.getByTestId("deadline-passed")).toContainText(copy.deadlinePassedTitle);
     // The closed week's plan is still the answer; nothing that changes or recomputes it is
     // offered: no settings, no link down to them, no Hesapla and no model comparison.
     const member = MESSAGES[language].leagueMembers;

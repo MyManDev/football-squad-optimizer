@@ -1,5 +1,3 @@
-import { useId } from "react";
-
 import { deadlineIcs, futureDeadlines } from "./deadlineIcs";
 import type { FixturesCopy } from "./fixturesCopy";
 import type { FixturesPayload } from "./types";
@@ -19,7 +17,6 @@ export function DeadlineCalendar({
   payload: FixturesPayload;
   copy: FixturesCopy;
 }) {
-  const note = useId();
   if (futureDeadlines(payload.gameweeks).length === 0) return null;
 
   const download = () => {
@@ -42,12 +39,9 @@ export function DeadlineCalendar({
 
   return (
     <div className={styles.calendar} data-mark="deadline-calendar">
-      <button type="button" className={styles.action} aria-describedby={note} onClick={download}>
+      <button type="button" className={styles.action} onClick={download}>
         {copy.calendarAction}
       </button>
-      <p id={note} className={styles.note}>
-        {copy.calendarNote}
-      </p>
     </div>
   );
 }
