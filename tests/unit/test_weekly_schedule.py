@@ -13,6 +13,7 @@ import inspect
 import itertools
 import json
 import subprocess
+import sys
 from collections.abc import Collection, Sequence
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -26,6 +27,10 @@ from squadopt.platform.weekly_journal import WeeklyRun, WeeklyStageResult
 from squadopt.platform.weekly_publish import WEEKLY_RUNS, PublishNames
 
 DEADLINES = {9: "2026-10-31T11:00:00Z", 10: "2026-11-06T18:30:00Z"}
+#: A run's peaks as the host reads them: 5.3 GiB for the whole unit, no swap, 1.2 GiB at most
+#: in one process.
+PEAKS = gate.MemoryPeaks(unit=5_690_000_000, swap=0, largest=1_288_490_189)
+MEMORY = "peak memory 5.3 GiB and 0 MiB of swap for the whole run, 1.2 GiB in its largest process"
 HOST_FILES = Path(__file__).resolve().parents[2] / "deploy" / "weekly-schedule"
 
 
@@ -352,6 +357,9 @@ class _Host:
     def clock(self) -> float:
         return next(self.ticks)
 
+    def peaks(self) -> gate.MemoryPeaks:
+        return PEAKS
+
     def release(self, workspace: Path, run_id: str) -> int:
         self.released.append(run_id)
         return self.release_exit
@@ -383,6 +391,7 @@ def _main(workspace: Path, now: str, host: _Host, *extra: str) -> int:
         release=host.release,
         notify=host.notify,
         clock=host.clock,
+        peaks=host.peaks,
     )
 
 
@@ -610,7 +619,7 @@ def test_a_run_posts_its_start_and_end_on_the_slot_issue(tmp_path: Path) -> None
         f"Weekly run `{FINAL_RUN}` started at 2026-10-31T07:05Z on the scheduled host: the final "
         f"run for gameweek 9, with club news, deadline 2026-10-31T11:00Z. {HOLD}",
         f"Weekly run `{FINAL_RUN}` ended at 2026-10-31T08:49Z with exit 0: {WAITS}. It took "
-        f"1 h 44 min. {LIFTED}",
+        f"1 h 44 min; {MEMORY}. {LIFTED}",
     ]
 
 
@@ -624,7 +633,7 @@ def test_the_settled_view_in_a_gap_says_so_in_its_start_line(tmp_path: Path) -> 
         "scheduled host: the morning run for gameweek 6 that publishes the settled view of "
         f"gameweek 5 in a fixture gap, deadline 2026-10-10T10:00Z. {HOLD}"
     )
-    assert host.posted[1].endswith(f"It took 50 min. {LIFTED}")
+    assert host.posted[1].endswith(f"It took 50 min; {MEMORY}. {LIFTED}")
 
 
 @pytest.mark.parametrize(
@@ -650,7 +659,7 @@ def test_a_refused_or_failed_run_posts_an_alarm_naming_its_id_and_stage(
     assert start.startswith(f"Weekly run `{FINAL_RUN}` started at 2026-10-31T07:05Z")
     assert end == (
         f"Weekly run `{FINAL_RUN}` ended at 2026-10-31T08:49Z with exit {code}: it stopped at "
-        f"stage `{stage}`, and the alarm follows. It took 1 h 44 min. {LIFTED}"
+        f"stage `{stage}`, and the alarm follows. It took 1 h 44 min; {MEMORY}. {LIFTED}"
     )
     assert alarm == (
         f"Alarm: weekly run `{FINAL_RUN}` {verb} at stage `{stage}`. Read "
@@ -672,7 +681,7 @@ def test_a_release_that_stops_posts_its_alarm_and_one_that_completes_says_live(
     assert _started(tmp_path / "live", live, "2026-10-31T07:05:00Z", "--release") == 0
     assert live.posted[1] == (
         f"Weekly run `{FINAL_RUN}` ended at 2026-10-31T10:25Z with exit 0: its release is "
-        f"live. It took 3 h 20 min. {LIFTED}"
+        f"live. It took 3 h 20 min; {MEMORY}. {LIFTED}"
     )
     assert len(live.posted) == 2
 
@@ -820,3 +829,72 @@ def test_a_bootstrap_the_game_does_not_answer_is_decided_on_the_held_copy(
     assert said.startswith("bootstrap: the read failed (bootstrap-static returned HTTP 503")
     assert gate.cached_bootstrap(cache, now, lambda: b"fresh") == b"fresh"
     assert cache.read_bytes() == b"fresh"
+
+
+def test_each_run_records_its_duration_and_peak_memory_in_one_json_line(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    host = _Host(minutes=131)
+    assert _started(tmp_path, host) == 0
+    assert _main(tmp_path, "2026-11-01T02:00:00Z", _Host(pull_exit=1, minutes=2)) == 2
+    lines = (tmp_path / gate.MEASUREMENTS).read_text(encoding="utf-8").splitlines()
+    first, second = (json.loads(line) for line in lines)
+    assert {key: value for key, value in first.items() if key != "cores"} == {
+        "run_id": FINAL_RUN,
+        "action": "final",
+        "kind": "friday",
+        "gameweek": 9,
+        "deadline_utc": "2026-10-31T11:00Z",
+        "workers": 15,
+        "started_at_utc": "2026-10-31T07:05Z",
+        "ended_at_utc": "2026-10-31T09:16Z",
+        "duration_seconds": 7860,
+        "exit_code": 0,
+        "stage": "",
+        "late": True,
+        "memory_peak_bytes": 5_690_000_000,
+        "swap_peak_bytes": 0,
+        "largest_process_bytes": 1_288_490_189,
+    }
+    assert (second["run_id"], second["exit_code"], second["stage"], second["late"]) == (
+        "2026-27-gw10-tuesday-20261101T0200Z",
+        2,
+        "checkout",
+        False,
+    )
+    # The same line is in the tick's journal.
+    assert f"measured: {lines[0]}" in capsys.readouterr().out.splitlines()
+
+
+def _cgroup(tmp_path: Path, group: str, **files: str) -> tuple[Path, Path]:
+    tmp_path.mkdir(parents=True)
+    proc = tmp_path / "cgroup"
+    proc.write_text(f"0::{group}\n", encoding="utf-8")
+    directory = tmp_path / "sys" / group.lstrip("/")
+    directory.mkdir(parents=True)
+    for name, value in files.items():
+        (directory / name.replace("_", ".")).write_text(f"{value}\n", encoding="ascii")
+    return proc, tmp_path / "sys"
+
+
+def test_the_peaks_are_the_service_unit_s_and_a_shell_s_scope_is_not_read(tmp_path: Path) -> None:
+    unit = "/system.slice/weekly-schedule.service"
+    proc, root = _cgroup(tmp_path / "a", unit, memory_peak="5690000000", memory_swap_peak="0")
+    assert gate.unit_peaks(proc, root) == (5_690_000_000, 0)
+    proc, root = _cgroup(tmp_path / "b", unit, memory_peak="812000000")
+    assert gate.unit_peaks(proc, root) == (812_000_000, None)
+    proc, root = _cgroup(tmp_path / "c", "/user.slice/user-1000.slice/session-3.scope")
+    assert gate.unit_peaks(proc, root) == (None, None)
+    assert gate.unit_peaks(tmp_path / "none", root) == (None, None)
+    assert gate.memory_text(gate.MemoryPeaks()) == "peak memory not measured on this host"
+    assert gate.memory_text(gate.MemoryPeaks(largest=812 * 2**20)) == (
+        "812 MiB in its largest process"
+    )
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="getrusage is POSIX")
+def test_the_largest_process_is_read_in_bytes_once_a_child_has_ended() -> None:
+    subprocess.run([sys.executable, "-c", "bytearray(64 * 2**20)"], check=True)
+    largest = gate.largest_process()
+    assert largest is not None and largest >= 64 * 2**20
+    assert inspect.signature(gate.main).parameters["peaks"].default is gate.memory_peaks

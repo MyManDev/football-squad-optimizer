@@ -38,6 +38,13 @@ that cannot decide (once a UTC day) post an alarm there naming the run and the s
 #1243). Every comment goes through one seam, `Notify`, and a post that fails is printed and
 never stops the gate.
 
+Each run the gate starts records its wall duration and peak memory, the figures of the first
+week that decide whether the host moves to a Contabo Cloud VPS 8 (#1243, 6559768575): one JSON
+line in ``data/logs/weekly/measurements.jsonl``, the same line in the tick's journal, and both
+figures on its end line on #1093. Under systemd the peak is the tick's whole unit, read from
+its cgroup (``memory.peak``, the number systemd reports as ``MemoryPeak``, and
+``memory.swap.peak``); on any POSIX host the largest single process is read as well.
+
 ``--dry-run`` prints the decision and the command it would run, and writes and posts nothing.
 The exit code is 0 for a decision (starting nothing is one), the weekly command's own when one
 ran (with ``--release``, the release's after a run that exited 0), 3 when the final run's
@@ -102,10 +109,15 @@ LEAD_WINDOW_DAYS: Final = 9.0
 RELEASE_HOURS: Final = 1.75
 #: The heavy-run slot, where a weekly run posts its start, its end and its alarms (D6).
 SLOT_ISSUE: Final = "1093"
+#: Where a Linux host mounts its cgroup v2 tree.
+CGROUP_ROOT: Final = Path("/sys/fs/cgroup")
+PROC_CGROUP: Final = Path("/proc/self/cgroup")
 
 SCHEDULE_STATE: Final = Path("data/runtime/weekly-schedule")
 WEEKLY_LOGS: Final = LOG_ROOT_NAME / "weekly"
 FIXTURES: Final = Path("web/public/data/fixtures.json")
+#: One JSON line per run the gate started: its duration and its memory peaks.
+MEASUREMENTS: Final = WEEKLY_LOGS / "measurements.jsonl"
 BOOTSTRAP_MAX_AGE: Final = timedelta(hours=1)
 SETTINGS_VARIABLE: Final = "SQUADOPT_CLUB_NEWS_SETTINGS"
 
@@ -139,6 +151,23 @@ class Outcome:
     verb: str = ""
     log: str = ""
     released: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class MemoryPeaks:
+    """A run's memory peaks in bytes, `None` where the host exposes none.
+
+    `unit` and `swap` cover every process of the systemd unit the tick runs in, the run's
+    workers together; `largest` is the largest single process the gate waited for.
+    """
+
+    unit: int | None = None
+    swap: int | None = None
+    largest: int | None = None
+
+
+#: Reads the memory peaks of the run that just ended.
+Peaks = Callable[[], MemoryPeaks]
 
 
 @dataclass(frozen=True, slots=True)
@@ -453,6 +482,78 @@ def write_marker(
     return path
 
 
+def _counter(path: Path) -> int | None:
+    try:
+        return int(path.read_text(encoding="ascii").strip())
+    except (OSError, ValueError):
+        return None
+
+
+def unit_peaks(proc: Path = PROC_CGROUP, root: Path = CGROUP_ROOT) -> tuple[int | None, int | None]:
+    """The memory and swap peaks of the systemd service this process runs in, if it is one.
+
+    cgroup v2 names one group, ``0::/system.slice/weekly-schedule.service``, and each systemd
+    start of a service makes its group anew, so its peak is the tick's. A shell's session
+    scope holds more than the run, so only a service's group is read.
+    """
+
+    try:
+        lines = proc.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return None, None
+    group = next((line[3:] for line in lines if line.startswith("0::")), "")
+    if not group.endswith(".service"):
+        return None, None
+    directory = root / group.lstrip("/")
+    return _counter(directory / "memory.peak"), _counter(directory / "memory.swap.peak")
+
+
+def largest_process() -> int | None:
+    """The peak resident memory of the largest process the gate waited for, on POSIX."""
+
+    if sys.platform == "win32":
+        return None
+    import resource
+
+    peak = resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss
+    # Linux counts kibibytes, macOS bytes.
+    return int(peak) * (1 if sys.platform == "darwin" else 1024) if peak else None
+
+
+def memory_peaks() -> MemoryPeaks:
+    unit, swap = unit_peaks()
+    return MemoryPeaks(unit, swap, largest_process())
+
+
+def size_text(size: int) -> str:
+    gibibytes = size / 2**30
+    return f"{gibibytes:.1f} GiB" if gibibytes >= 1 else f"{round(size / 2**20)} MiB"
+
+
+def memory_text(peaks: MemoryPeaks) -> str:
+    parts = []
+    if peaks.unit is not None:
+        swap = "" if peaks.swap is None else f" and {size_text(peaks.swap)} of swap"
+        parts.append(f"peak memory {size_text(peaks.unit)}{swap} for the whole run")
+    if peaks.largest is not None:
+        parts.append(f"{size_text(peaks.largest)} in its largest process")
+    return ", ".join(parts) if parts else "peak memory not measured on this host"
+
+
+def record_measurement(workspace: Path, document: dict[str, object]) -> None:
+    """Append the run's measurement to `MEASUREMENTS` and print it into the tick's journal."""
+
+    line = json.dumps(document)
+    print(f"measured: {line}")
+    path = workspace / MEASUREMENTS
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write(f"{line}\n")
+    except OSError as error:
+        print(f"measured: not written to {MEASUREMENTS.as_posix()} ({error})")
+
+
 def comment_on_slot_issue(workspace: Path, text: str) -> None:
     """Post `text` as a comment on #1093 with `gh` from the checkout; a failure is printed."""
 
@@ -535,7 +636,9 @@ def start_text(identity: str, decision: Decision, now: datetime) -> str:
     )
 
 
-def end_text(identity: str, outcome: Outcome, ended: datetime, seconds: float) -> str:
+def end_text(
+    identity: str, outcome: Outcome, ended: datetime, seconds: float, peaks: MemoryPeaks
+) -> str:
     if outcome.code != 0:
         result = f"it stopped at stage `{outcome.stage}`, and the alarm follows"
     elif outcome.released:
@@ -546,8 +649,8 @@ def end_text(identity: str, outcome: Outcome, ended: datetime, seconds: float) -
         )
     return (
         f"Weekly run `{identity}` ended at {utc_text(ended)} with exit {outcome.code}: "
-        f"{result}. It took {duration_text(seconds)}. The hold on develop and heavy runs "
-        "is lifted."
+        f"{result}. It took {duration_text(seconds)}; {memory_text(peaks)}. The hold on "
+        "develop and heavy runs is lifted."
     )
 
 
@@ -657,8 +760,9 @@ def start_run(
     release: Release | None = None,
     run_hours: float = RUN_HOURS,
     clock: Clock = time.monotonic,
+    peaks: Peaks = memory_peaks,
 ) -> int:
-    """Start the decided run: its marker, its start line, the run, its end line and any alarm.
+    """Start the decided run, measure it, and post its start line, end line and any alarm.
 
     The marker is written before anything else, so a tick that dies leaves no run to start
     again; the start line follows, so the slot is held before the checkout moves.
@@ -684,10 +788,35 @@ def start_run(
     )
     seconds = clock() - began
     ended = now + timedelta(seconds=seconds)
-    notify(workspace, end_text(identity, outcome, ended, seconds))
+    measured = peaks()
+    late = (
+        late_alarm(identity, decision, outcome, now, ended, run_hours) if outcome.code == 0 else ""
+    )
+    record_measurement(
+        workspace,
+        {
+            "run_id": identity,
+            "action": decision.action,
+            "kind": kind,
+            "gameweek": decision.gameweek,
+            "deadline_utc": utc_text(decision.deadline),
+            "workers": workers,
+            "cores": os.cpu_count(),
+            "started_at_utc": utc_text(now),
+            "ended_at_utc": utc_text(ended),
+            "duration_seconds": round(seconds),
+            "exit_code": outcome.code,
+            "stage": outcome.stage,
+            "late": bool(late),
+            "memory_peak_bytes": measured.unit,
+            "swap_peak_bytes": measured.swap,
+            "largest_process_bytes": measured.largest,
+        },
+    )
+    notify(workspace, end_text(identity, outcome, ended, seconds, measured))
     if outcome.code != 0:
         notify(workspace, outcome_alarm(identity, outcome))
-    elif late := late_alarm(identity, decision, outcome, now, ended, run_hours):
+    elif late:
         notify(workspace, late)
     return outcome.code
 
@@ -802,10 +931,11 @@ def main(
     release: Release = weekly_release.release_run,
     notify: Notify = comment_on_slot_issue,
     clock: Clock = time.monotonic,
+    peaks: Peaks = memory_peaks,
 ) -> int:
     """Decide this tick and start its run, and release the run only with ``--release``.
 
-    `runner`, `acquire`, `read_bootstrap`, `release`, `notify` and `clock` are seams.
+    `runner`, `acquire`, `read_bootstrap`, `release`, `notify`, `clock` and `peaks` are seams.
     """
 
     arguments = build_parser().parse_args(argv)
@@ -881,6 +1011,7 @@ def main(
         release=release if arguments.release else None,
         run_hours=arguments.run_hours,
         clock=clock,
+        peaks=peaks,
     )
 
 
