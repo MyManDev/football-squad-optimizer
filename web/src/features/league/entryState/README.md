@@ -1,7 +1,8 @@
 # Entry state readers
 
-These functions read synthetic FPL-shaped documents offline. They are not imported by
-the member page or a network client yet (#983 steps 1 and 2).
+These functions read synthetic FPL-shaped documents offline (#983 steps 1 and 2). The
+member page does not import them yet. The forwarder's entry bundle reads through them
+unchanged in `../forwarder/entryState.ts` (#983 step 3).
 
 | Function                | Python reference                                                                                      |
 | ----------------------- | ----------------------------------------------------------------------------------------------------- |
@@ -31,7 +32,9 @@ purchase price. Only a buy at the exact same microsecond can price a checked sal
 preserves the server's explicit `purchase_prices_known: false` fallback: current prices
 for each player, capped by the aggregate value from the held picks. It does not label
 that fallback as a proved budget. Nothing here constructs or submits a device plan.
-The forwarder client and its capture/week identity checks remain step 3.
+The forwarder client and the identity rule that binds a bundle to a device table (the
+picks gameweek is the table gameweek minus 1, and the history covers it) are in
+`../forwarder/` and `docs/contracts/league_device_plan_v1.md`.
 
 Regenerate the synthetic reference with `python -m scripts.export_entry_state_vectors`.
 The Python drift test compares it with current production functions; `state.test.ts` runs
