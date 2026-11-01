@@ -21,6 +21,9 @@ export const BUNDLE_EXAMPLES = bundleExamples as unknown as Record<
 
 export type LiveExample = keyof typeof liveExamples;
 
+/** The `week_live_v1` examples as the contract states them: positions, clubs and a member. */
+export const LIVE_EXAMPLES = liveExamples as unknown as Record<LiveExample, WeekLive>;
+
 const clone = <T>(value: T): T => structuredClone(value);
 
 /**

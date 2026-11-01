@@ -11,7 +11,9 @@
  * visitor has said who they are: each page is opened as that member), the real loaders, the real
  * validators, the shell and the route's error boundary, with each request answered from
  * `public/` on disk. Nothing leaves the process, and a request outside `data/` fails the
- * test.
+ * test, except the FPL forwarder's routes (#983 step 3, #1008): they are answered as the site
+ * answers them while no forwarder is deployed, with its HTML shell at 200, which the page
+ * reads as no forwarder and shows nothing for.
  *
  * The loaders serve examples to tests unconditionally, so the build's environment is
  * stubbed to production for these tests: they read the published path, and an example
@@ -110,6 +112,11 @@ beforeEach(() => {
       const address = input instanceof Request ? input.url : String(input);
       const base = import.meta.env.BASE_URL;
       const relative = address.startsWith(base) ? address.slice(base.length) : null;
+      if (relative?.startsWith("api/v1/fpl/")) {
+        return new Response("<!doctype html><html><body><div id=root></div></body></html>", {
+          headers: { "Content-Type": "text/html" },
+        });
+      }
       if (
         relative === null ||
         !relative.startsWith("data/") ||
