@@ -1,8 +1,9 @@
 /**
- * The device solve at work, in the middle of the screen: the share of the run done and its
- * stages, each ticked as the run passes it (the inputs read, the solver loaded, the plan
- * solved, then each held chip tried). The share counts those stages, never elapsed time,
- * so it moves in steps: one solve reports nothing until it ends.
+ * The device solve at work, in the middle of the screen: how many of the run's stages are done
+ * and the stages themselves, each ticked as the run passes it (the inputs read, the solver
+ * loaded, the plan solved, then each held chip tried). The count is of those stages, never of
+ * elapsed time, so it moves in steps: one solve reports nothing until it ends. It is written
+ * as a count ("2/7"), never as a percentage, because member pages carry no percentages.
  *
  * It covers the whole screen with the page's background, so nothing of the page shows
  * while the run counts. It is drawn into the document's body, so a closed drawer or a
@@ -20,13 +21,14 @@ type Stage = "inputs" | "solver" | "plan" | "chips";
 const ORDER: readonly Stage[] = ["inputs", "solver", "plan", "chips"];
 
 export function DeviceProgressPanel({ state }: { state: DevicePlanPhase }) {
-  const { locale, messages } = useLanguage();
+  const { messages } = useLanguage();
   const copy = messages.leagueMembers;
   const progress = countingProgress(state);
   if (progress === null || typeof document === "undefined") return null;
 
   const share = progressShare(progress);
-  const percent = new Intl.NumberFormat(locale, { style: "percent", maximumFractionDigits: 0 });
+  // Before the inputs say how many stages there are, there is nothing to count yet.
+  const count = progress.total === null ? null : `${progress.done}/${progress.total}`;
   const chipTotal = progress.chips?.total ?? null;
   // The chips are a stage only where the run tries some; before the inputs say, they wait.
   const stages = ORDER.filter((stage) => stage !== "chips" || (chipTotal ?? 0) > 0);
@@ -42,9 +44,11 @@ export function DeviceProgressPanel({ state }: { state: DevicePlanPhase }) {
         <h2 id="device-progress-title" className={styles.title}>
           {copy.deviceSolving}
         </h2>
-        <p className={styles.share} aria-hidden="true">
-          {percent.format(share)}
-        </p>
+        {count === null ? null : (
+          <p className={styles.share} aria-hidden="true">
+            {count}
+          </p>
+        )}
         <div
           className={styles.track}
           role="progressbar"
@@ -52,7 +56,9 @@ export function DeviceProgressPanel({ state }: { state: DevicePlanPhase }) {
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuenow={Math.round(share * 100)}
-          aria-valuetext={`${percent.format(share)}, ${label(progress.step)}`}
+          aria-valuetext={
+            count === null ? label(progress.step) : `${count}, ${label(progress.step)}`
+          }
         >
           <span className={styles.bar} style={{ inlineSize: `${share * 100}%` }} />
         </div>

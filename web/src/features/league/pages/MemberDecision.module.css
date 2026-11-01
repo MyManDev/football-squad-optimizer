@@ -87,6 +87,8 @@
   padding: var(--space-2) var(--space-3) var(--space-2) var(--space-2);
   border-radius: var(--radius-s);
   color: #ffffff;
+  /* The board's motion turns each panel about its top edge (boardMotion.ts). */
+  transform-origin: 50% 0;
 }
 
 .out {
