@@ -8,7 +8,7 @@ import { useLanguage } from "../../../i18n/context";
 import { clubCodesFromFixtures, type ClubCodes } from "../../../lib/clubs";
 import { figure, points, signedFigure, signedPoints, utcShort } from "../../../lib/format";
 import type { FixturesPayload } from "../../fixtures/types";
-import { CHIP_COPY, chipRescores, type ChipCopy } from "../advice/chipCopy";
+import { CHIP_COPY, chipRescores } from "../advice/chipCopy";
 import { EVIDENCE_COPY, QUOTE_WITHHELD } from "../advice/evidenceCopy";
 import { comparedRivalPlayers } from "../advice/rivalPlayers";
 import { modelChangeOf } from "../advice/modelSwitch";
@@ -134,14 +134,14 @@ function squadBasisNote(entryBasis?: string, adviceBasis?: string): SquadBasisNo
  * publishes that gain carries shares of it. A document from before the producer did carries
  * a different quantity on those rows, the raw difference between the two players' own
  * projections, so its numbers are not printed under this label. A Triple Captain or Bench
- * Boost week scores on its own basis, and the producer states the rows, the gain and the
- * lineup total on it; the sentences name that basis.
+ * Boost week scores on its own basis, and its gain is read against holding with the same
+ * chip played.
  */
-function adviceBasis(view: EntryAdvice, chipCopy: ChipCopy) {
+function adviceBasis(view: EntryAdvice) {
   const rowsAreShares = view.expected_gain_vs_hold !== undefined;
   const scoredChip = view.chip_strategy?.selected_chip ?? view.chip_choice?.chip;
-  const chipBasis = scoredChip && chipRescores(scoredChip) ? chipCopy.basis[scoredChip] : null;
-  return { rowsAreShares, chipBasis };
+  const chipRescored = Boolean(scoredChip && chipRescores(scoredChip));
+  return { rowsAreShares, chipRescored };
 }
 
 /**
@@ -254,8 +254,7 @@ export function AdviceDecision({
     : unproven
       ? alternative?.expected_points_cost_ceiling
       : (alternative?.expected_points_cost_ceiling ?? alternative?.expected_points_cost);
-  const chipCopy = CHIP_COPY[language];
-  const { rowsAreShares, chipBasis } = adviceBasis(view, chipCopy);
+  const { rowsAreShares, chipRescored } = adviceBasis(view);
   const codes = clubCodesFromFixtures(fixtures);
   const reasons = view.moves.map((move) => reasonFor(language, move.reason_code));
   // Boards that share a caption say it once, under them; a caption that differs stays with
@@ -274,7 +273,12 @@ export function AdviceDecision({
       {origin === "baseline-while-computing" ? (
         <p className={styles.honesty}>{copy.adviceBaselineWhileComputing}</p>
       ) : null}
-      <GainStrip view={view} squad={squad.payload} measured={rowsAreShares} chipBasis={chipBasis} />
+      <GainStrip
+        view={view}
+        squad={squad.payload}
+        measured={rowsAreShares}
+        chipRescored={chipRescored}
+      />
       <ModelChangeLine view={view} />
       {view.moves.length === 0 ? (
         <p className={board.noMove}>{hasPublishedPlan(view) ? copy.noMove : copy.noPlanInRecord}</p>
@@ -419,7 +423,7 @@ export function AdviceDetails({
   );
 }
 
-/** The week's lineup as a list, on the basis the chip scores it: the pitch's list view. */
+/** The week's lineup as a list: the pitch's list view. */
 export function PlanLineup({
   view,
   codes = null,
@@ -427,9 +431,7 @@ export function PlanLineup({
   view: EntryAdvice;
   codes?: ClubCodes | null;
 }) {
-  const { language } = useLanguage();
-  const { chipBasis } = adviceBasis(view, CHIP_COPY[language]);
-  return <LineupSection view={view} chipBasis={chipBasis} codes={codes} />;
+  return <LineupSection view={view} codes={codes} />;
 }
 
 /** The decision and its details together, as one plan reads when shown on its own. */
@@ -463,23 +465,16 @@ export function AdviceCard({
 
 /**
  * The sentences about how this plan's numbers are built, for the page's "How was this
- * worked out?" disclosure: the lineup rule, how the boards add up, and the week's hit
- * charge, said once because the game charges the week and not any one move.
+ * worked out?" disclosure: the lineup rule and the week's hit charge, said once because
+ * the game charges the week and not any one move.
  */
 export function AdviceMethodNotes({ view }: { view: EntryAdvice }) {
-  const { language, locale, messages } = useLanguage();
+  const { locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
-  const chipCopy = CHIP_COPY[language];
-  const { rowsAreShares, chipBasis } = adviceBasis(view, chipCopy);
   const lineup = view.captain && view.vice_captain && view.starting_xi && view.bench;
   return (
     <>
       {lineup ? <p>{copy.lineupRule}</p> : null}
-      {/* Each board is conditional on the boards before it, which is what makes them add
-          up. Said only where there is more than one to read in order. */}
-      {rowsAreShares && view.moves.length > 1 ? (
-        <p>{chipBasis !== null ? chipCopy.moveRowsBasis(chipBasis) : copy.moveRowsBasis}</p>
-      ) : null}
       {/* Absent on documents published before the producer stated the week's charge. */}
       {view.moves.length > 0 && view.transfer_hit_points != null ? (
         <p>{copy.weekTransferCost(points(view.transfer_hit_points, 1, locale))}</p>
@@ -727,12 +722,12 @@ function GainStrip({
   view,
   squad,
   measured,
-  chipBasis,
+  chipRescored,
 }: {
   view: EntryAdvice;
   squad: EntrySquad;
   measured: boolean;
-  chipBasis: string | null;
+  chipRescored: boolean;
 }) {
   const { language, locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
@@ -773,11 +768,11 @@ function GainStrip({
   const cost = finiteNumber(hits) && hits > 0 ? points(hits, 1, locale) : null;
   const caption =
     cost !== null
-      ? chipBasis !== null
-        ? chipCopy.gainCaptionBeforeCost(cost, chipBasis)
+      ? chipRescored
+        ? chipCopy.gainCaptionBeforeCost(cost)
         : copy.gainCaptionBeforeCost(cost)
-      : chipBasis !== null
-        ? chipCopy.gainCaption(chipBasis)
+      : chipRescored
+        ? chipCopy.gainCaption
         : null;
   const shortName = (move: AdviceMove) => move.player_in?.short_name || move.player_in?.name || "";
   return (
@@ -1260,15 +1255,7 @@ function ChipChoiceSection({ view }: { view: EntryAdvice }) {
  * document from before the producer carried the plan week shows the moves alone. How the
  * lineup is chosen is said in the page's "How was this worked out?".
  */
-function LineupSection({
-  view,
-  chipBasis,
-  codes,
-}: {
-  view: EntryAdvice;
-  chipBasis: string | null;
-  codes: ClubCodes | null;
-}) {
+function LineupSection({ view, codes }: { view: EntryAdvice; codes: ClubCodes | null }) {
   const { language, locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
   const { captain, vice_captain: vice, starting_xi: eleven, bench } = view;
@@ -1301,12 +1288,7 @@ function LineupSection({
         <p className={lineup.own}>
           {view.lineup_expectation
             ? expectedLineupLabel(figure(view.expected_own_points, locale), language)
-            : chipBasis !== null
-              ? CHIP_COPY[language].expectedOwnPoints(
-                  figure(view.expected_own_points, locale),
-                  chipBasis,
-                )
-              : copy.expectedOwnPoints(figure(view.expected_own_points, locale))}
+            : copy.expectedOwnPoints(figure(view.expected_own_points, locale))}
         </p>
       ) : null}
       <dl className={lineup.armband}>
