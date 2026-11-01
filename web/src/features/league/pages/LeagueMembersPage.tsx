@@ -9,7 +9,6 @@ import { useFixtures } from "../../fixtures/data";
 import type { FixturesPayload } from "../../fixtures/types";
 import { gameweekDeadline, useDeadlinePassed } from "../advice/deadline";
 import { ExampleDataBadge } from "../components/ExampleDataBadge";
-import { DisclosureIcon } from "../components/memberIcons";
 import { ViewerChips } from "../components/ViewerChips";
 import { leagueRace } from "../race/leagueRace";
 import { LeagueRaceCard } from "../race/LeagueRaceCard";
@@ -218,21 +217,6 @@ export function LeagueMembersView({
           {view.scored_gameweek === null ? (
             <p className={styles.note}>{copy.noScoredWeek}</p>
           ) : null}
-
-          <details className={styles.about}>
-            <summary className={styles.aboutSummary}>
-              <DisclosureIcon className={styles.aboutIcon} />
-              <span>{copy.aboutTable}</span>
-            </summary>
-            <div className={styles.aboutBody}>
-              <h2 className={styles.aboutTitle}>{copy.publicDataTitle}</h2>
-              <p>{copy.publicDataBody}</p>
-              <p>{copy.movementNote}</p>
-              {/* The column is netted for every row, so the basis belongs to the column, and
-                  it differs from what the FPL site shows a manager. */}
-              {view.scored_gameweek !== null ? <p>{copy.gameweekNetNote}</p> : null}
-            </div>
-          </details>
         </section>
 
         {squad || chaser ? (

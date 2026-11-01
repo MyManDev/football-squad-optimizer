@@ -73,12 +73,7 @@ describe("the member's published squad", () => {
 
       // The member page is the squad and the plan. The notices left it; the record keeps
       // the fields, and a raw field name never reaches the page.
-      expect(
-        screen.queryByRole("heading", {
-          level: 2,
-          name: MESSAGES[language].leagueMembers.publicDataTitle,
-        }),
-      ).toBeNull();
+      expect(container).not.toHaveTextContent(/herkese açık FPL verisidir|public FPL data/);
       for (const field of raw) expect(container).not.toHaveTextContent(field);
       expect(squad.payload.missing_fields).toEqual(raw);
     },
