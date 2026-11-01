@@ -66,8 +66,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\backup_data.ps1 -Des
 
 The example selects the newest manifest; select an older named recovery point if needed
 and pass that same name to verification. Stop here if verification is nonzero. The five
-required trees are created first; the optional private `benchmark_v2_captures` tree is
-restored by the same record loop when the manifest holds it. Do not restore runtime queues, caches, PID files
+required trees are created first; the optional private `benchmark_v2_captures` and `member_baselines` trees are
+restored by the same record loop when the manifest holds them. Do not restore runtime queues, caches, PID files
 or jobs. The new backend creates its own runtime store. Do not treat a clone as a data
 backup: Git does not contain these trees. First real backup and real restore are
 **never exercised**; only disposable fixture restores have passed. Registering a daily

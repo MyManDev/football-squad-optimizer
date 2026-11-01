@@ -50,7 +50,8 @@ STRATEGY_RULE_ID: Final = "gap_and_weeks_strategy_rule_v1"
 #: the week-to-week score difference between two members of this league.
 #:
 #: Provenance: entry histories in the real capture
-#: ``fpl-live-20260907T131414Z-db9314d00961`` (league 352490, the 2026-27 season through
+#: ``fpl-live-20260907T131414Z-db9314d00961`` (the first league the site published, the one
+#: ``config/leagues.json`` marks with ``legacy_advice_records``; the 2026-27 season through
 #: gameweek 3). For every gameweek and every unordered pair of the fifteen members, the
 #: difference of their gameweek scores net of transfer hits — 105 pairs x 3 gameweeks =
 #: 315 pair-weeks, taken with both signs so the mean is zero by construction. The

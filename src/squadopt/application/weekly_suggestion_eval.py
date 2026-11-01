@@ -22,10 +22,16 @@ import pandas as pd
 
 from squadopt.application.advice_record import (
     MEMBER_ADVICE_RECORD_CONTRACT_VERSION,
+    MEMBER_BASELINE_RECORD_CONTRACT_VERSION,
     load_member_advice_record,
     recorded_captures,
 )
 from squadopt.application.settled_member import ActualMemberDetails, settled_member_details
+from squadopt.contracts.league_list import (
+    LEAGUE_LIST_FILE,
+    LeagueListError,
+    parse_legacy_record_league,
+)
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import CapturedSnapshot, list_snapshot_ids, read_snapshot
 from squadopt.data.sources.fpl_live import (
@@ -64,7 +70,6 @@ from squadopt.evaluation.scoring import score_frozen_squad_decision
 from squadopt.live.recommendation import infer_season
 
 CONTRACT_VERSION = "weekly_suggestion_history_v1"
-SUPPORTED_LEAGUE_ID = 352490
 
 # The horizon handoff, specified in docs/contracts/member_week_horizon_v1.md. The reader
 # rejects the whole document when any one of these disagrees with the scoreboard it is shown
@@ -85,6 +90,39 @@ _SHA256_HEX = re.compile(r"[0-9a-f]{64}")
 
 class SuggestionEvaluationError(DataError):
     """A historical result cannot be supported by its recorded inputs."""
+
+
+def legacy_record_league(league_list: Path = LEAGUE_LIST_FILE) -> int | None:
+    """The league that keeps the legacy advice records, as ``config/leagues.json`` marks it.
+
+    It is the first league the site published (``legacy_advice_records`` on its line). On
+    every recorded run its publications still write ``member_advice_record_v2`` under
+    ``data/advice_records`` (``league_publication.records_advice_for``), and its history
+    reads those records first and reads a member-week directory holding no record as its
+    own week (:func:`_records_advice`). Every other league reads only the baseline records.
+    None when the list marks no league. The default path is relative to the working
+    directory, as the weekly run and the scripts are run from the checkout. It is read on
+    every call, never at import, so a process that never asks needs no list.
+    """
+    try:
+        document = json.loads(Path(league_list).read_text(encoding="utf-8"))
+    except FileNotFoundError as error:
+        raise LeagueListError(f"No league list at {league_list}.") from error
+    except ValueError as error:
+        raise LeagueListError(f"{league_list} does not parse as JSON.") from error
+    return parse_legacy_record_league(document)
+
+
+def _named_or_legacy(league_id: int | None) -> int:
+    """``league_id``, or the league that keeps the legacy records when it is None."""
+    if league_id is not None:
+        return league_id
+    legacy = legacy_record_league()
+    if legacy is None:
+        raise SuggestionEvaluationError(
+            "The league list marks no league that keeps legacy advice records; name the league."
+        )
+    return legacy
 
 
 @dataclass(frozen=True, slots=True)
@@ -227,7 +265,8 @@ class _AnotherLeaguesWeek(Exception):
     """The member-week is another league's: not this league's week.
 
     Either every record in it belongs to another league, or it holds no record and this
-    league records none (:func:`_records_advice`). Not a :class:`DataError`, so
+    league records none (:func:`_records_advice`), and the baseline store holds no directory
+    for it. Not a :class:`DataError`, so
     :func:`_evaluate_week` cannot report it as an unavailable week; the walk that asked for
     it leaves the week out. The public :func:`select_record` and :func:`evaluate_week` never
     raise it.
@@ -235,14 +274,14 @@ class _AnotherLeaguesWeek(Exception):
 
 
 def _records_advice(league_id: int) -> bool:
-    """Whether publications of ``league_id`` write member advice records.
+    """Whether publications of ``league_id`` write legacy member advice records.
 
-    The rule ``league_publication.records_advice_for`` applies, which this module cannot
-    import. Only a league that records advice can leave one of its own member-week
-    directories without a record, from a write that never landed. For any other league
-    such a directory was left by the league that does record.
+    The rule ``league_publication.records_advice_for`` applies, and both read
+    :func:`legacy_record_league`. Only a league that records advice can leave one of its own
+    member-week directories without a record, from a write that never landed. For any other
+    league such a directory was left by the league that does record.
     """
-    return league_id == SUPPORTED_LEAGUE_ID
+    return league_id == legacy_record_league()
 
 
 def _check_record_identity(
@@ -254,6 +293,21 @@ def _check_record_identity(
         or _identifier(record.get("gameweek")) != gameweek
         or _identifier(record.get("entry_id")) != entry_id
         or _identifier(record.get("league_id")) != league_id
+        or record.get("player_id_space") != "fpl_element_code"
+    ):
+        raise SuggestionEvaluationError("Record identity does not match the requested member.")
+
+
+def _check_baseline_identity(
+    record: Mapping[str, Any], *, season: str, gameweek: int, entry_id: int
+) -> None:
+    if (
+        record.get("contract_version") != MEMBER_BASELINE_RECORD_CONTRACT_VERSION
+        or record.get("season") != season
+        or _identifier(record.get("gameweek")) != gameweek
+        or _identifier(record.get("entry_id")) != entry_id
+        or "league_id" in record
+        or record.get("source") != "server_one_week_baseline"
         or record.get("player_id_space") != "fpl_element_code"
     ):
         raise SuggestionEvaluationError("Record identity does not match the requested member.")
@@ -285,7 +339,8 @@ def select_record(
     entry_id: int,
     deadline_utc: str,
     published: PublishedCaptures | None = None,
-    league_id: int = SUPPORTED_LEAGUE_ID,
+    league_id: int | None = None,
+    baseline_record_root: Path | None = None,
 ) -> dict[str, Any] | None:
     """Select the recorded advice for one member-week, checking both clocks and all identities.
 
@@ -302,6 +357,8 @@ def select_record(
     :func:`publish_suggestion_histories` requires the map.
 
     An unreadable candidate is refused instead of silently falling back to an older one.
+    Without ``league_id`` the league is the one that keeps the legacy records
+    (:func:`legacy_record_league`).
     """
     return _select_record(
         root,
@@ -310,8 +367,9 @@ def select_record(
         entry_id=entry_id,
         deadline_utc=deadline_utc,
         published=published,
-        league_id=league_id,
+        league_id=_named_or_legacy(league_id),
         other_leagues_absent=False,
+        baseline_record_root=baseline_record_root,
     )
 
 
@@ -325,6 +383,7 @@ def _select_record(
     published: PublishedCaptures | None,
     league_id: int,
     other_leagues_absent: bool,
+    baseline_record_root: Path | None = None,
 ) -> dict[str, Any] | None:
     """:func:`select_record`, and for the history walk the weeks that are another league's.
 
@@ -332,44 +391,80 @@ def _select_record(
     for both. With ``other_leagues_absent`` a sound record of another league is absent
     rather than refused, and a week whose records are all another league's raises
     :class:`_AnotherLeaguesWeek`, as does a week holding no record for a league that records
-    none. Without it, another league's record is refused as before. Only
-    :func:`review_member_weeks` sets it, and it is the one caller that catches the signal.
+    none; neither applies to a week the baseline store holds a directory for, which stays
+    every league's. Without it, another league's record is refused as before, unless
+    ``baseline_record_root`` is given: a legacy record of another league is then absent too.
+    Only :func:`review_member_weeks` sets ``other_leagues_absent``, and it is the one caller
+    that catches the signal.
     """
     _identifier(league_id)
     deadline = as_instant(normalize_utc_timestamp(deadline_utc, label="deadline_utc"))
-    candidates: list[tuple[datetime, str, dict[str, Any]]] = []
-    captures = recorded_captures(root, season, gameweek, entry_id)
-    if other_leagues_absent and not captures and not _records_advice(league_id):
+    stores = [root] if baseline_record_root is None else [baseline_record_root, root]
+    listed = [(store, recorded_captures(store, season, gameweek, entry_id)) for store in stores]
+    total = sum(len(captures) for _, captures in listed)
+    # A baseline directory is every league's, so a week it names stays this league's even
+    # when its record never landed and every legacy record beside it is another league's.
+    baseline_week = (
+        baseline_record_root is not None
+        and (baseline_record_root / season / f"gw{gameweek:02d}" / f"entry-{entry_id}").is_dir()
+    )
+    if other_leagues_absent and not total and not _records_advice(league_id) and not baseline_week:
         # A directory a record never landed in, left by the league that records advice.
         # That league shows it without advice; for this league it is no week at all.
         raise _AnotherLeaguesWeek
     others = 0
-    for capture in captures:
-        record = load_member_advice_record(root, season, gameweek, entry_id, capture.snapshot_id)
-        if other_leagues_absent and _another_leagues_record(
-            record, season=season, gameweek=gameweek, entry_id=entry_id, league_id=league_id
-        ):
-            others += 1
-            continue
-        _check_record_identity(
-            record, season=season, gameweek=gameweek, entry_id=entry_id, league_id=league_id
-        )
-        stamp = record.get("generated_at_utc")
-        if not isinstance(stamp, str):
-            raise SuggestionEvaluationError("Recorded publication time is missing.")
-        stamped = as_instant(normalize_utc_timestamp(stamp, label="generated_at_utc"))
-        if stamped < capture.instant:
-            raise SuggestionEvaluationError("Recorded publication precedes its capture.")
-        if capture.instant < deadline and stamped < deadline:
-            try:
-                _advice(record)
-            except SuggestionEvaluationError as error:
-                if str(error) == "missing_advice":
-                    continue
-                raise
-            candidates.append((stamped, capture.snapshot_id, record))
-    if captures and others == len(captures):
+    held: dict[str, tuple[datetime, str, dict[str, Any]] | None] = {}
+    for store, captures in listed:
+        for capture in captures:
+            record = load_member_advice_record(
+                store, season, gameweek, entry_id, capture.snapshot_id
+            )
+            # A legacy record names its league; a baseline record names none and is every
+            # league's. With the baseline store, as in the history walk, a sound legacy
+            # record of another league is absent rather than refused.
+            if (
+                store == root
+                and (other_leagues_absent or baseline_record_root is not None)
+                and _another_leagues_record(
+                    record,
+                    season=season,
+                    gameweek=gameweek,
+                    entry_id=entry_id,
+                    league_id=league_id,
+                )
+            ):
+                others += 1
+                continue
+            if record.get("contract_version") == MEMBER_BASELINE_RECORD_CONTRACT_VERSION:
+                _check_baseline_identity(
+                    record, season=season, gameweek=gameweek, entry_id=entry_id
+                )
+            else:
+                _check_record_identity(
+                    record, season=season, gameweek=gameweek, entry_id=entry_id, league_id=league_id
+                )
+            stamp = record.get("generated_at_utc")
+            if not isinstance(stamp, str):
+                raise SuggestionEvaluationError("Recorded publication time is missing.")
+            stamped = as_instant(normalize_utc_timestamp(stamp, label="generated_at_utc"))
+            if stamped < capture.instant:
+                raise SuggestionEvaluationError("Recorded publication precedes its capture.")
+            candidate = None
+            if capture.instant < deadline and stamped < deadline:
+                try:
+                    _advice(record)
+                except SuggestionEvaluationError as error:
+                    if str(error) != "missing_advice":
+                        raise
+                else:
+                    candidate = (stamped, capture.snapshot_id, record)
+            # Check every input before merging stores. A valid legacy record must not hide
+            # a broken baseline; a late legacy publication must not borrow the earlier
+            # baseline's clock. Its original digest remains authoritative.
+            held[capture.snapshot_id] = candidate
+    if other_leagues_absent and total and others == total and not baseline_week:
         raise _AnotherLeaguesWeek
+    candidates = [candidate for candidate in held.values() if candidate is not None]
     if not candidates:
         return None
     if published is not None:
@@ -556,8 +651,10 @@ def evaluate_week(
     captures: Sequence[CapturedSnapshot],
     selected_records: dict[tuple[int, int], dict[str, Any]] | None = None,
     published: PublishedCaptures | None = None,
-    league_id: int = SUPPORTED_LEAGUE_ID,
+    league_id: int | None = None,
+    baseline_record_root: Path | None = None,
 ) -> WeekReview:
+    """Review one member-week; without ``league_id``, for :func:`legacy_record_league`."""
     return _evaluate_week(
         root,
         season=season,
@@ -567,8 +664,9 @@ def evaluate_week(
         captures=captures,
         selected_records=selected_records,
         published=published,
-        league_id=league_id,
+        league_id=_named_or_legacy(league_id),
         other_leagues_absent=False,
+        baseline_record_root=baseline_record_root,
     )
 
 
@@ -584,6 +682,7 @@ def _evaluate_week(
     published: PublishedCaptures | None,
     league_id: int,
     other_leagues_absent: bool,
+    baseline_record_root: Path | None = None,
 ) -> WeekReview:
     """:func:`evaluate_week`; ``other_leagues_absent`` as :func:`_select_record` takes it."""
     base: dict[str, Any] = {"gameweek": gameweek, "deadline_utc": deadline_utc}
@@ -597,6 +696,7 @@ def _evaluate_week(
             deadline_utc=deadline_utc,
             published=published,
             other_leagues_absent=other_leagues_absent,
+            baseline_record_root=baseline_record_root,
         )
         if record is None:
             return WeekReview(**base, status="unavailable", reason="no_pre_deadline_record")
@@ -718,6 +818,7 @@ def review_member_weeks(
     selected_records: dict[tuple[int, int], dict[str, Any]] | None = None,
     published: PublishedCaptures | None = None,
     read_capture: Callable[[Path, str], CapturedSnapshot] | None = None,
+    baseline_record_root: Path | None = None,
     other_league_weeks: set[tuple[int, int]] | None = None,
 ) -> dict[int, tuple[WeekReview, ...]]:
     """Review every recorded week of every member, newest gameweek first, from evidence only.
@@ -727,7 +828,8 @@ def review_member_weeks(
     ``published`` is passed to :func:`select_record` for every week.
 
     A week whose records all belong to another league is not one of this league's weeks and
-    is left out, as is a week holding no record when this league records none.
+    is left out, as is a week holding no record when this league records none. A week the
+    baseline store holds a directory for is every league's and is never left out.
     ``other_league_weeks``, when given, receives each such ``(entry_id, week)``.
     """
     _identifier(league_id)
@@ -754,10 +856,16 @@ def review_member_weeks(
         if entry_id in reviews:
             continue
         weeks = []
-        for directory in sorted((record_root / season).glob("gw[0-9][0-9]"), reverse=True):
-            if not (directory / f"entry-{entry_id}").is_dir():
-                continue
-            week = int(directory.name[2:])
+        stores = (
+            [record_root] if baseline_record_root is None else [record_root, baseline_record_root]
+        )
+        recorded_weeks = {
+            int(directory.name[2:])
+            for store in stores
+            for directory in (store / season).glob("gw[0-9][0-9]")
+            if (directory / f"entry-{entry_id}").is_dir()
+        }
+        for week in sorted(recorded_weeks, reverse=True):
             if week not in deadlines:
                 weeks.append(WeekReview(week, "unavailable", "missing_deadline"))
                 continue
@@ -773,6 +881,7 @@ def review_member_weeks(
                     selected_records=selected_records,
                     published=published,
                     other_leagues_absent=True,
+                    baseline_record_root=baseline_record_root,
                 )
             except _AnotherLeaguesWeek:
                 if other_league_weeks is not None:
@@ -1041,6 +1150,7 @@ def publish_suggestion_histories(
     published: PublishedCaptures,
     policy: DetectionPolicy = DEFAULT_DETECTION_POLICY,
     read_capture: Callable[[Path, str], CapturedSnapshot] | None = None,
+    baseline_record_root: Path | None = None,
 ) -> tuple[Path, ...]:
     """Publish member-safe derived documents from existing verified, bounded captures.
 
@@ -1066,6 +1176,7 @@ def publish_suggestion_histories(
         selected_records=selected_records,
         published=published,
         read_capture=read_capture,
+        baseline_record_root=baseline_record_root,
         other_league_weeks=other_league_weeks,
     )
     # Validate the whole replacement before writing the first member. An incomplete

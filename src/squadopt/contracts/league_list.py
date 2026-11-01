@@ -5,6 +5,12 @@ each league's standings, the weekly run renders each league's tree and writes th
 league directory (``squadopt.contracts.league_tree``) with every league it rendered. The
 list is the one place the operator says which leagues there are, so no command needs the
 number typed twice and no stage can render one league and forget another.
+
+At most one line sets ``legacy_advice_records``: the first league the site published, whose
+publications still write the legacy member advice record (``member_advice_record_v2``) and
+whose history reads those records first. Every other league reads only the
+league-independent baseline records. So the code names no league id, and a list that sets
+the flag on no line keeps no legacy records at all.
 """
 
 from __future__ import annotations
@@ -15,6 +21,8 @@ from typing import Any, Final
 
 LEAGUE_LIST_CONTRACT_VERSION: Final = "league_list_v1"
 LEAGUE_LIST_FILE: Final = Path("config") / "leagues.json"
+#: The line flag naming the league that keeps the legacy member advice records.
+LEGACY_ADVICE_RECORDS_FIELD: Final = "legacy_advice_records"
 
 
 class LeagueListError(ValueError):
@@ -47,6 +55,10 @@ def parse_league_list(document: Any) -> tuple[int, ...]:
     for record in document["leagues"]:
         if record.get("menu", "full") not in ("full", "device"):
             raise LeagueListError("A league menu is full or device.")
+        if not isinstance(record.get(LEGACY_ADVICE_RECORDS_FIELD, False), bool):
+            raise LeagueListError(f"{LEGACY_ADVICE_RECORDS_FIELD} is true or false.")
+    if sum(record.get(LEGACY_ADVICE_RECORDS_FIELD) is True for record in document["leagues"]) > 1:
+        raise LeagueListError("At most one league keeps the legacy advice records.")
     return ids
 
 
@@ -67,3 +79,13 @@ def parse_league_menus(document: Any) -> dict[int, str]:
 
     parse_league_list(document)
     return {row["league_id"]: row.get("menu", "full") for row in document["leagues"]}
+
+
+def parse_legacy_record_league(document: Any) -> int | None:
+    """The league whose line sets ``legacy_advice_records``, or None when no line does."""
+
+    parse_league_list(document)
+    for row in document["leagues"]:
+        if row.get(LEGACY_ADVICE_RECORDS_FIELD) is True:
+            return int(row["league_id"])
+    return None

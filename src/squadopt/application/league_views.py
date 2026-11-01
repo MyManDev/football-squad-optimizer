@@ -254,6 +254,7 @@ def render_member(
     manager_words: ManagerWords | None = None,
     top100_counts: Top100Counts | None = None,
     chip_forecast_source: ForecastSource | None = None,
+    controls: Mapping[int, MemberControl] | None = None,
 ) -> MemberRender:
     """Solve one member's control once, then every (rival strategy, rival) from it, and
     every saf-puan window and Top 100 weight the task names.
@@ -273,7 +274,14 @@ def render_member(
 
     try:
         picks = provider.picks(task.entry_id, task.season, task.gameweek - 1)
-        control = solve_member_control(picks, inputs, projection, rules)
+        control = controls.get(task.entry_id) if controls is not None else None
+        if control is not None and control.picks != picks:
+            raise EntryError("The baseline control belongs to different member picks.")
+        if control is None:
+            # At TRACKED_MEMBER_LINEARIZATION_LEVEL, the level the baseline batch and the
+            # on-demand menu solve at too, so the member's plan is the same whether or not
+            # the run records advice.
+            control = solve_member_control(picks, inputs, projection, rules)
         baseline = advise_entry(
             AdviseEntryRequest(
                 season=task.season,
@@ -1271,6 +1279,7 @@ def build_league_views(
     top100_counts: Top100Counts | None = None,
     top100_unavailable_reason: str | None = None,
     chip_forecast_source: ForecastSource | None = None,
+    controls: Mapping[int, MemberControl] | None = None,
     device_only: bool = False,
     short_names: Mapping[int, GameName] | None = None,
 ) -> LeagueViewsReport:
@@ -1504,6 +1513,7 @@ def build_league_views(
                     manager_words=manager_words,
                     top100_counts=top100_counts,
                     chip_forecast_source=chip_forecast_source,
+                    controls=controls,
                 ),
                 tasks,
             )

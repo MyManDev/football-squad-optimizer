@@ -16,6 +16,13 @@ moves, eleven, bench, chip and the plan's weekly transfers. ``--published-record
 compares the control's solves with the advice records of that capture, which is what makes
 the control a reproduction of what members were told rather than an assumption about it.
 
+That reproduction holds only for a capture published at the solver level this code uses.
+The one-week plan and each chip plan are solved at ``TRACKED_MEMBER_LINEARIZATION_LEVEL``
+(``application/advice.py``); captures published before that constant was introduced were
+solved at CP-SAT's default level. On such a capture a member whose default search did not
+prove its plan can read as not reproduced because of the solver level alone, so a fall in
+``reproduced_by_the_control`` there is not by itself a failure of the control handoff.
+
 Nothing under the snapshot, handoff or record roots is written. The candidate handoff and
 both solved trees go to ``--work-dir`` only; keep it short on Windows, where a solved tree
 sits about seventy characters below it.
