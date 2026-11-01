@@ -7,14 +7,14 @@ shows it (last checked 26 September 2026).
 
 | Read-only inspection | Finding |
 | --- | --- |
-| GitHub repository environments | Only `cloudflare-pages` returned. |
+| GitHub repository environments | Only `cloudflare-pages` returned on 9 September. Since 21 October also `cloudflare-workers` (`gh api repos/MyManDev/football-squad-optimizer/environments`, read on 1 November), the environment of the two Worker deployments, `.github/workflows/deploy-fpl-probe.yml` and `.github/workflows/deploy-fpl-proxy.yml`, whose secrets they name as `CLOUDFLARE_WORKERS_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. |
 | Repository variables | `CLOUDFLARE_PAGES_PROJECT=football-squad-optimizer` on 9 September. Since 18 September also `ADVICE_API_ORIGIN=https://squadopt-api.mymandev.com` (`gh variable list`), which the site build in `.github/workflows/ci.yml` has passed as `VITE_ADVICE_API_ORIGIN` since #615 ([backend free hosting](../backend_free_hosting.md#3-tell-the-site-build-where-the-api-is)). Optional `BACKEND_ALERT_ASSIGNEE`, read by `.github/workflows/backend-uptime.yml`: the login a new `backend-down` issue is assigned to (`gh variable set BACKEND_ALERT_ASSIGNEE --body <login>`, a login with push access; unset assigns nobody). |
 | Repository secret names (values not read) | Cloudflare account ID and API token; no backend or backup credential name returned. |
 | Recent GitHub scheduled runs | None on 9 September. Since #676 the `Backend uptime` workflow is scheduled (`*/15` in `.github/workflows/backend-uptime.yml`); `gh run list --event schedule` lists its runs, which land hours apart rather than every fifteen minutes (measured in [backend free hosting](../backend_free_hosting.md#recommendation)). |
 | Windows scheduled task names/actions matching squad, football or FPL | No matching task returned. This does not exclude an unrelatedly named task or another machine. |
 | Azure CLI / Wrangler on this host | Not installed. No Azure subscription inventory was obtained. |
 | Docker | Available; existing unrelated containers were left untouched. |
-| Tracked deployment | Cloudflare publishes the static site. Azure Container Apps/NFS is a placeholder template. Since #602 the live backend runs on the owner's Windows PC behind the `squadopt-api` Cloudflare Tunnel ([backend free hosting](../backend_free_hosting.md)), not on this template or on Compose; a shared mount on another host and an external backup remain unverified. |
+| Tracked deployment | Cloudflare publishes the static site. Azure Container Apps/NFS is a placeholder template. Since #602 the live backend runs on the owner's Windows PC behind the `squadopt-api` Cloudflare Tunnel ([backend free hosting](../backend_free_hosting.md)), not on this template or on Compose; a shared mount on another host and an external backup remain unverified. The FPL forwarder Worker ([ADR 0012](decisions/0012-fpl-forwarder.md)) is tracked in `workers/fpl-proxy` and deployed only by `.github/workflows/deploy-fpl-proxy.yml`; it had not been deployed on 1 November. |
 | Weekly timing | Existing weekly runbook targets capture 2–3 hours before the deadline. No new age policy is introduced. |
 
 On 9 September the evidence did not establish an independent backup, backend server, alert

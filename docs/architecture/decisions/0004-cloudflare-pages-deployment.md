@@ -125,6 +125,8 @@ Functions path if a future browser integration needs a same-origin proxy. That i
 option: this decision introduces no server-side function. Before an FPL forwarder is built that
 way, a separate low-rate Worker measures whether FPL answers requests from Cloudflare's network
 at all, with the Pages site left static ([FPL forwarder probe](../../fpl_forwarder_probe.md)).
+The probe's verdict was served, and the forwarder is now a separate Worker at `/api/v1/fpl/*`,
+with the Pages site still static: [ADR 0012](0012-fpl-forwarder.md).
 
 The FastAPI service under `src/squadopt/api` cannot run on Cloudflare Pages and requires a
 separate backend-hosting decision before it is exposed publicly.
