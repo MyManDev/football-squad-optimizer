@@ -83,6 +83,34 @@ def test_mixed_capture_batch_is_refused_before_solving(tmp_path, monkeypatch):
         )
 
 
+@pytest.mark.parametrize("fault", ["another-capture", "no-record-root"])
+def test_a_batch_the_publication_cannot_bind_is_refused_before_any_solve(
+    tmp_path, monkeypatch, fault
+):
+    """A batch is bound to its capture and to a store to write its records in: a batch from
+    another capture, or one handed to a publication with no baseline root (which would then
+    write no record without a word), is refused before the panel is built."""
+
+    operation = world(tmp_path)
+    operation.values["capture"] = {"snapshot_id": operation.request.snapshot_id}
+    operation.values["handoff"] = {"path": str(operation.supplied_handoff)}
+    request = operation._league_request(352490, False)
+    batch = league_publication.TrackedBaselines(request.snapshot_id, {}, {}, {})
+    if fault == "another-capture":
+        batch = replace(batch, snapshot_id="fpl-live-20260820T120000Z-another")
+    else:
+        request = replace(request, baseline_record_root=None)
+
+    def unexpected(*args, **kwargs):
+        pytest.fail("A batch the publication cannot bind reached the panel")
+
+    monkeypatch.setattr(league_publication, "build_panel", unexpected)
+    with pytest.raises(DataError, match="matching baseline batch and record root"):
+        league_publication.publish_league(request, baselines=batch)
+    assert not list(operation.paths.out.rglob("members.json"))
+    assert not operation.paths.baselines.exists()
+
+
 def _register(operation, entry_id):
     """Register ``entry_id`` without capturing it: the standings list it, the capture does not."""
 
