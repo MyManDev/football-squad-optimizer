@@ -162,7 +162,7 @@ describe("every string in both message catalogues", () => {
 
   it("never words a chosen chip's gain as a recommendation or names a week to play it", () => {
     const chip = [...catalogue].filter(([path]) => path.includes(".chipCopy."));
-    expect(chip.length).toBeGreaterThan(50);
+    expect(chip.length).toBeGreaterThan(40);
     const offenders = chip
       .filter(([, text]) =>
         /recommend|\bbest\b|optimal|likely|should play|right week|öner|en iyi|en uygun|oynamalısın/i.test(

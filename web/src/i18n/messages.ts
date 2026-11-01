@@ -201,7 +201,7 @@ const en = {
     provedOptimal: "Proved Optimal, Single Thread",
     notProved: "Not Proved: Reported, Not Recommended",
     startingXi: "Starting XI",
-    starterCount: (count: number) => `${count} Starters · Captain Counted Twice`,
+    starterCount: (count: number) => `${count} Starters`,
     captain: "Captain",
     noCaptain: "Captain not in the starting eleven.",
     bench: "Bench",
@@ -767,8 +767,6 @@ const en = {
     out: "Out",
     in: "In",
     projectedGainUnknown: "This move's share of the plan's gain was not published.",
-    moveRowsBasis:
-      "Each change is what the eleven with the captain doubled moves by once that swap is added to the changes before it, so the changes add up to the whole plan's gain.",
     weekTransferCost: (points: string) =>
       `~${points} expected-point cost for this week's transfers in total: the game charges the week, not each move.`,
     planCost: (points: string) =>
@@ -782,8 +780,7 @@ const en = {
     lineupTitle: "Your gameweek",
     lineupRule:
       "Captain, vice-captain, eleven and bench order follow the same projection as the moves; the bench is listed in the order the game's automatic substitutions walk it.",
-    expectedOwnPoints: (points: string) =>
-      `${points} expected points for the eleven with the captain doubled`,
+    expectedOwnPoints: (points: string) => `${points} expected points`,
     captainLabel: "Captain",
     viceCaptainLabel: "Vice-captain",
     startingXiLabel: "Starting eleven",
@@ -970,7 +967,7 @@ const en = {
     fixtureNone: "no match",
     fixtureStrip: (first: number, last: number) => `Fixtures, gameweeks ${first} to ${last}`,
     gainCaptionBeforeCost: (cost: string) =>
-      `expected points gained over making no transfer (the eleven, captain doubled), before this week's transfer cost of ${cost}`,
+      `expected points gained over making no transfer, before this week's transfer cost of ${cost}`,
     freeTransfersUsed: (used: number, free: number) => `${used}/${free} free transfers`,
     freeTransfersKeptUnderChip: (chip: string, free: number) =>
       `${chip}: none of the ${free} free transfers held is used`,
@@ -1338,7 +1335,7 @@ const tr: MessageSchema<typeof en> = {
     provedOptimal: "Optimal Olduğu Kanıtlandı, Tek İş Parçacığı",
     notProved: "Kanıtlanmadı: Raporlandı, Öneri Değil",
     startingXi: "İlk 11",
-    starterCount: (count) => `${count} İlk 11 Oyuncusu · Kaptan İki Kez Sayılır`,
+    starterCount: (count) => `${count} İlk 11 Oyuncusu`,
     captain: "Kaptan",
     noCaptain: "Kaptan ilk 11 içinde değil.",
     bench: "Yedekler",
@@ -1888,8 +1885,6 @@ const tr: MessageSchema<typeof en> = {
     out: "Çıkan",
     in: "Giren",
     projectedGainUnknown: "Bu hamlenin plandaki kazanç payı yayımlanmamış.",
-    moveRowsBasis:
-      "Her değişiklik, kendinden önceki değişikliklere eklendiğinde ilk on birin (kaptan iki kat) ne kadar değiştiğini gösterir; bu yüzden değişiklikler planın toplam kazancını verir.",
     weekTransferCost: (pointsValue) =>
       `Bu haftanın transferlerinin toplam beklenen puan maliyeti ~${pointsValue}: oyun haftayı ücretlendirir, her hamleyi ayrı ayrı değil.`,
     planCost: (pointsValue) =>
@@ -1900,7 +1895,7 @@ const tr: MessageSchema<typeof en> = {
     lineupTitle: "Bu haftaki kadron",
     lineupRule:
       "Kaptan, yedek kaptan, ilk on bir ve yedek sırası hamlelerle aynı projeksiyondan gelir; yedekler oyunun otomatik değişikliklerinin izlediği sırayla listelenir.",
-    expectedOwnPoints: (pointsValue) => `${pointsValue} beklenen puan (ilk on bir, kaptan iki kat)`,
+    expectedOwnPoints: (pointsValue) => `${pointsValue} beklenen puan`,
     captainLabel: "Kaptan",
     viceCaptainLabel: "Yedek kaptan",
     startingXiLabel: "İlk on bir",
@@ -2063,7 +2058,7 @@ const tr: MessageSchema<typeof en> = {
     fixtureNone: "maç yok",
     fixtureStrip: (first, last) => `${first}-${last}. hafta fikstürü`,
     gainCaptionBeforeCost: (cost) =>
-      `beklenen puan kazancı, hiç transfer yapmamana göre (ilk on bir, kaptan iki kat); bu haftanın ${cost} transfer maliyeti düşülmeden önce`,
+      `beklenen puan kazancı, hiç transfer yapmamana göre; bu haftanın ${cost} transfer maliyeti düşülmeden önce`,
     freeTransfersUsed: (used, free) => `${used}/${free} ücretsiz transfer`,
     freeTransfersKeptUnderChip: (chip, free) =>
       `${chip}: eldeki ${free} ücretsiz transfer kullanılmaz`,
