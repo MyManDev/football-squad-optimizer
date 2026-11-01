@@ -118,6 +118,77 @@ test("a member's plan is solved on the device and drawn as a computation result"
   expect(foreign).toEqual([]);
 });
 
+test("a device menu member's plan is solved when the page opens, with no press", async ({
+  page,
+}) => {
+  // A league on the device menu (#981 step 4): the index publishes the member's inputs and
+  // no plan, so opening the page in an open week is the request.
+  await installLeagueMocks(page);
+  const squad = mockEntrySquadEnvelopes[ENTRY]!;
+  const index = mockEntryAdviceIndex(ENTRY);
+  const capture = fixture.document.source_snapshot_id;
+  await page.route(/\/data\/league\/entries\/35249001\.json(?:\?.*)?$/, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        ...squad,
+        payload: { ...squad.payload, source_snapshot_id: capture, device_plan: member.entry },
+      }),
+    }),
+  );
+  await page.route(/\/data\/league\/advice\/35249001\/index\.json(?:\?.*)?$/, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        ...index,
+        payload: {
+          ...index.payload,
+          menu: "device",
+          source_snapshot_id: capture,
+          windows: { "saf-puan": [], "ortak-koru": [], "fark-yarat": [] },
+          computed: [],
+          unavailable: [],
+          chip_states: { known: false, gameweek: index.payload.gameweek, states: {} },
+          chips: { available: false, reason: "on_device" },
+          top100: { available: false, reason: "on_device" },
+          evidence: { available: false, reason: "on_device" },
+        },
+      }),
+    }),
+  );
+  await page.route(/\/data\/league\/device-plan\.json(?:\?.*)?$/, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        contract_version: "provisional_league_ui_v1",
+        generated_at_utc: "2026-10-03T00:00:00Z",
+        source_kind: "live",
+        payload: { ...fixture.document, league_id: squad.payload.league_id },
+      }),
+    }),
+  );
+  const wasm: string[] = [];
+  page.on("response", (response) => {
+    if (response.url().endsWith(".wasm")) wasm.push(`${response.status()} ${response.url()}`);
+  });
+
+  await page.goto(`/league/352490/members/${ENTRY}`);
+  // Nothing is pressed: the plan is the device's answer to the page opening.
+  await expect(page.locator("[data-device-state='done']")).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByText("Hesap sonucu")).toBeVisible();
+  await expect(page.locator("main")).toContainText("Hesap: bu cihazda hesaplandı");
+  const names = new Map(fixture.document.players.map((p) => [p.id, p.name]));
+  for (const move of member.reference.moves) {
+    await expect(page.getByText(names.get(move.in!)!).first()).toBeVisible();
+  }
+  expect(wasm.some((line) => line.startsWith("200 ") && line.includes("/assets/"))).toBe(true);
+  // The button stays, to solve again.
+  await expect(page.getByRole("button", { name: "Bu cihazda hesapla" })).toBeEnabled();
+});
+
 for (const publishedChip of [true, false]) {
   test(`a held chip is solved on the device with ${publishedChip ? "a published answer" : "no advice index"}`, async ({
     page,
