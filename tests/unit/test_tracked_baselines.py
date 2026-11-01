@@ -1,9 +1,12 @@
 """Tracked entries are solved once before either league emits its member pages."""
 
 import json
+import shutil
+import sys
 from dataclasses import replace
 
 import pytest
+import scripts.build_league_site as build_league_site
 from tests.unit.test_weekly_operations import TWO, world
 
 from squadopt.application import advice, league_publication, league_views
@@ -205,3 +208,72 @@ def test_a_run_that_records_nothing_solves_pages_at_the_tracked_level(tmp_path, 
     monkeypatch.setattr(league_views, "solve_member_control", solve)
     operation._league()
     assert levels == [TRACKED_MEMBER_LINEARIZATION_LEVEL]
+
+
+def _recorded_two_leagues(tmp_path):
+    """The weekly run over both leagues with recording on: member 101 is in both."""
+
+    operation = world(
+        tmp_path,
+        league_ids=TWO,
+        pages={352490: (101,), 7: (101,)},
+        seeded_from=TWO,
+        record_advice=True,
+    )
+    operation.values["capture"] = {"snapshot_id": operation.request.snapshot_id}
+    operation.values["handoff"] = {"path": str(operation.supplied_handoff)}
+    operation._league()
+    return operation
+
+
+@pytest.mark.parametrize("moved", [False, True], ids=["beside-the-records", "named"])
+def test_a_by_hand_rebuild_of_a_second_league_reads_the_baselines_and_writes_none(
+    tmp_path, monkeypatch, capsys, moved
+):
+    """``scripts.build_league_site`` rebuilds league 7 from the run's capture: its member's
+    history keeps the week only the baseline store holds, and no baseline is written."""
+
+    operation = _recorded_two_leagues(tmp_path)
+    history = operation.paths.out / "data/leagues/7/history/101.json"
+    weeks = json.loads(history.read_bytes())["payload"]["weeks"]
+    assert [week["gameweek"] for week in weeks] == [2]
+    store, named = operation.paths.baselines, []
+    if moved:
+        # Moved away from the records, the store is found only by the option.
+        store = tmp_path / "elsewhere" / "member_baselines"
+        shutil.move(operation.paths.baselines, store)
+        named = ["--baseline-record-root", str(store)]
+    held = sorted(path.relative_to(store) for path in store.rglob("*"))
+    capsys.readouterr()
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "build_league_site",
+            "--league",
+            "7",
+            "--snapshot-id",
+            operation.request.snapshot_id,
+            "--snapshot-root",
+            str(operation.paths.snapshots),
+            "--out",
+            str(operation.paths.out),
+            "--archive-root",
+            str(operation.paths.archive),
+            "--registry",
+            str(operation.paths.registry),
+            "--in-season-projection",
+            str(operation.supplied_handoff),
+            "--season",
+            operation.request.season,
+            "--advice-record-root",
+            str(operation.paths.records),
+            *named,
+        ],
+    )
+    assert build_league_site.main() == 0
+    assert json.loads(history.read_bytes())["payload"]["weeks"] == weeks
+    assert sorted(path.relative_to(store) for path in store.rglob("*")) == held
+    printed = capsys.readouterr().out
+    assert "League 7 writes no legacy advice record" in printed
+    assert f"baseline records under {store}; a by-hand build writes none" in printed

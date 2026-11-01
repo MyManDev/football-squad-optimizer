@@ -20,6 +20,10 @@ under ``--advice-record-root``, one per member, gameweek and capture; without it
 that has been published can never afterwards be reviewed. A week is published more than
 once — mid-week, then again with fresh availability before the deadline — and each of those
 captures records its own, so the advice that stood at the deadline is on disk too.
+Only the league ``config/leagues.json`` marks with ``legacy_advice_records`` writes that
+record. Every league's member histories also read the league-independent baseline records
+under ``--baseline-record-root`` (by default ``member_baselines`` beside the advice record
+root, where the weekly run writes them); a by-hand build reads them and writes none.
 
 Nothing personal is committed. The registry, the captures and the advice records stay
 local (``.gitignore`` excludes ``data/entries/``, ``data/snapshots/`` and
@@ -151,6 +155,13 @@ def main() -> int:
         "week",
     )
     parser.add_argument(
+        "--baseline-record-root",
+        type=Path,
+        help="where the weekly run wrote the league-independent member baseline records, "
+        "which every league's member histories read; read only, never written here "
+        "(default: member_baselines beside --advice-record-root)",
+    )
+    parser.add_argument(
         "--no-advice-record",
         action="store_true",
         help="publish without recording what was published; a week built this way can "
@@ -182,14 +193,25 @@ def main() -> int:
     if arguments.workers < 1:
         parser.error("--workers must be at least 1")
 
-    # The advice record names one league; another league is published without one.
-    recorded = not arguments.no_advice_record and records_advice_for(arguments.league)
-    if not arguments.no_advice_record and not recorded:
-        print(
-            f"League {arguments.league} is published without an advice record: the record "
-            "names one league until it carries the league."
-        )
+    # The weekly run's rule (WeeklyPaths.baselines): the baseline store sits beside the
+    # advice record root.
+    baseline_root = (
+        Path(arguments.baseline_record_root)
+        if arguments.baseline_record_root is not None
+        else Path(arguments.advice_record_root).parent / "member_baselines"
+    )
     try:
+        # Only the league the league list marks keeps the legacy advice record.
+        recorded = not arguments.no_advice_record and records_advice_for(arguments.league)
+        if not arguments.no_advice_record and not recorded:
+            print(
+                f"League {arguments.league} writes no legacy advice record: only the league "
+                "config/leagues.json marks with legacy_advice_records keeps one."
+            )
+        print(
+            f"Member histories read the baseline records under {baseline_root}; a by-hand "
+            "build writes none (the weekly run's --record-advice or --publish does)."
+        )
         snapshot_root = Path(arguments.snapshot_root)
         snapshot_id = resolve_live_snapshot_id(snapshot_root, arguments.snapshot_id)
         request = LeaguePublicationRequest(
@@ -204,6 +226,7 @@ def main() -> int:
             mode_residuals=arguments.mode_residuals,
             record_root=Path(arguments.advice_record_root) if recorded else None,
             history_record_root=Path(arguments.advice_record_root),
+            baseline_record_root=baseline_root,
             rival_menu=not arguments.no_rival_menu,
             rotation_evidence=arguments.rotation_evidence,
             club_news_source=arguments.club_news_source,
