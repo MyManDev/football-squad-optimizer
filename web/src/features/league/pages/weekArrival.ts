@@ -7,8 +7,7 @@ import { MOTION_EASE, motionDuration } from "../../../design/motion";
  * into place and the pitch's plates appear one after another from the keeper forward. When
  * the decision is first drawn (at once, or once its plan has been read), its boards follow
  * the card a step apart, and the gain's bar fills from nothing to its value while the figure
- * comes up beside it, its final value from the first frame: it never counts, so no number on
- * the way is read. Each part moves once for the page; a later plan has the boards' own motion
+ * beside it counts up from nothing to the same value in the same time (`countUp`). Each part moves once for the page; a later plan has the boards' own motion
  * and the pitch's movement, and the list and back, a new language or a resize move nothing.
  * Only opacity, transform and the bar's clip move, in the motion tokens' times; under the
  * reduced-motion preference nothing runs.
@@ -34,6 +33,41 @@ export const FILL: Keyframe[] = [{ clipPath: "inset(0 100% 0 0)" }, { clipPath: 
  * marks inside it (the coach-news link's 24 px target among them) for as long as it runs.
  */
 export const APPEAR: Keyframe[] = [{ opacity: 0 }, { opacity: 1 }];
+
+/**
+ * The gain's figure counts up from nothing to its value in `duration`, in the figure's own
+ * sign, decimal separator and decimals. Only the text on screen moves: the figure is not a
+ * live region, so a screen reader is told none of the numbers on the way. The first painted
+ * frame already shows the start, as this runs in a layout effect; a figure the page redraws
+ * meanwhile (a new plan, a new language) is left as the page drew it.
+ */
+export function countUp(element: Element, duration: number): void {
+  const node = element.firstChild;
+  if (!(node instanceof Text) || typeof requestAnimationFrame !== "function") return;
+  const final = node.data;
+  const match = /^([+−-]?)(\d+)(?:([.,])(\d+))?$/.exec(final);
+  if (!match) return;
+  const [, sign = "", whole = "0", separator = "", fraction = ""] = match;
+  const target = Number(`${whole}.${fraction || "0"}`);
+  if (!(target > 0)) return;
+  const shown = (value: number) => {
+    const digits = value.toFixed(fraction.length);
+    return `${sign}${separator ? digits.replace(".", separator) : digits}`;
+  };
+  const start = performance.now();
+  let written = shown(0);
+  node.data = written;
+  // Each frame reads the same clock the start did, not the frame's own timestamp, whose
+  // origin a browser or a test environment may set apart.
+  const frame = () => {
+    if (node.data !== written) return;
+    const progress = Math.min(1, (performance.now() - start) / duration);
+    written = progress < 1 ? shown(target * (1 - (1 - progress) ** 3)) : final;
+    node.data = written;
+    if (progress < 1) requestAnimationFrame(frame);
+  };
+  requestAnimationFrame(frame);
+}
 
 /** Board steps after the card, at most: a Wildcard's fifteen boards do not queue for a second. */
 const BOARD_STEPS = 6;
@@ -69,6 +103,8 @@ export function playDecision(root: ParentNode, source?: MediaSource): Animation[
   const step = motionDuration("uiFast", source) / 3;
   const rows = [...card.querySelectorAll('[data-arrival="row"]')];
   const gain = [...card.querySelectorAll('[data-arrival="gain"], [data-arrival="bar"]')];
+  const figure = card.querySelector('[data-arrival="gain"]');
+  if (figure && typeof figure.animate === "function") countUp(figure, data);
   return [
     ...rows.flatMap((row, index) => play(row, RISE, ui, Math.min(index + 1, BOARD_STEPS) * step)),
     ...gain.flatMap((part) =>
