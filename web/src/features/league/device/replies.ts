@@ -1,10 +1,11 @@
 /**
  * What the worker posts for one request once its solver has loaded: the answer, or why
- * there is none. A request for chip gains is answered twice, so the plan is not held back
- * by the chips: the plain plan as soon as it is solved (`plan`), with its own solving
- * time, then each held chip's gain against it (`gains`). Both come from the one run, so
- * the plain plan is solved once and every solve shares the run's one ceiling. A failure
- * after the plan was posted loses the gains, never the plan.
+ * there is none. A request for chip gains is answered in steps, so the plan is not held
+ * back by the chips: the plain plan as soon as it is solved (`plan`), with its own solving
+ * time, a count as each chip is tried (`chip`), then each held chip's gain against it
+ * (`gains`). All come from the one run, so the plain plan is solved once and every solve
+ * shares the run's one ceiling. A failure after the plan was posted loses the gains, never
+ * the plan.
  */
 
 import type { LpSolver } from "./lp/problem";
@@ -16,6 +17,8 @@ export type DevicePlanReply =
   | { id: number; kind: "ready" }
   | { id: number; kind: "answer"; answer: DevicePlanAnswer }
   | { id: number; kind: "plan"; answer: DevicePlanAnswer }
+  /** After the plan, each chip tried: `done` of the run's `total` held chips. */
+  | { id: number; kind: "chip"; done: number; total: number }
   | {
       id: number;
       kind: "gains";
@@ -42,7 +45,9 @@ export function replyTo(
   };
   let reply: DevicePlanReply;
   try {
-    const answer = solveRequest(solver, request, now, onPlan);
+    const answer = solveRequest(solver, request, now, onPlan, (done, total) =>
+      post({ id, kind: "chip", done, total }),
+    );
     reply = planned
       ? { id, kind: "gains", gains: answer.chip_gains ?? {}, seconds: answer.seconds }
       : { id, kind: "answer", answer };
