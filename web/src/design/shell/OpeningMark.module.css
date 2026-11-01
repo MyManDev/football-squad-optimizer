@@ -27,6 +27,7 @@
   font-weight: 800;
   line-height: 1;
   letter-spacing: 0.01em;
+  text-transform: uppercase;
   color: var(--color-text);
   animation: word-in var(--opening-length) var(--motion-ease) both;
 }
