@@ -26,6 +26,7 @@ from squadopt.application.league_views import (
 )
 from squadopt.application.manager_words import ManagerWords, load_manager_words
 from squadopt.application.mode_selection import build_mode_paths
+from squadopt.application.player_names import game_names, with_game_short_names
 from squadopt.application.publication_history import explicit_archive_seasons
 from squadopt.application.top100_weight import (
     Top100Counts,
@@ -721,12 +722,17 @@ def publish_prepared_league(
     # The capture's own table, shared by every league of the run and written once: checked
     # against any table already on disk before a member is solved, written after the tree,
     # which keeps its own copy for pages from before the per-capture table.
-    table_payload = device_plan_capture_table(
-        inputs,
-        projection,
-        read_season_rules(snapshot, season=season),
-        bootstrap=snapshot.payloads[BOOTSTRAP_PAYLOAD],
-        top100=top100_counts,
+    # Every page names a player as the game does, and the device table beside them too.
+    short_names = game_names(snapshot.payloads[BOOTSTRAP_PAYLOAD], inputs.players)
+    table_payload = with_game_short_names(
+        device_plan_capture_table(
+            inputs,
+            projection,
+            read_season_rules(snapshot, season=season),
+            bootstrap=snapshot.payloads[BOOTSTRAP_PAYLOAD],
+            top100=top100_counts,
+        ),
+        short_names,
     )
     check_device_plan_table(
         site_data, request.snapshot_id, table_payload, remedy=BUILDER_TABLE_REMEDY
@@ -765,6 +771,7 @@ def publish_prepared_league(
         top100_unavailable_reason=top100_reason,
         chip_forecast_source=forecast_source(snapshot),
         device_only=request.menu == "device",
+        short_names=short_names,
     )
     if on_stage is not None:
         on_stage("members")
