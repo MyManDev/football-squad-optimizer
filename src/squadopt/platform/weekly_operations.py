@@ -23,6 +23,7 @@ from squadopt.application.entries import EntryRegistry
 from squadopt.application.evidence_io import write_json
 from squadopt.application.league_publication import (
     LeaguePublicationRequest,
+    prepare_tracked_baselines,
     publish_league,
     records_advice_for,
     remove_device_tables,
@@ -70,8 +71,10 @@ from squadopt.data.source_revision import source_revision
 from squadopt.features.evidence_artifact import read_player_evidence_artifact
 from squadopt.features.rotation_evidence_artifact import read_rotation_evidence_artifact
 from squadopt.live import handoff_path_for, load_entry, read_projection_handoff, read_season_rules
+from squadopt.planning.native_highs import NATIVE_VERSION
 from squadopt.platform import benchmark_capture, cohort_capture, elite_capture
 from squadopt.platform.fpl_capture import capture
+from squadopt.platform.native_windows import native_window_version, summarize_native_windows
 from squadopt.platform.publication_workers import league_mapper
 from squadopt.platform.runlog import RunLog, configure_run_logging
 from squadopt.platform.storage._queue_lock import QueueFileLock
@@ -112,6 +115,10 @@ class WeeklyPaths:
     """Root above every component's log directory, never qualified with a component."""
     records: Path
     club_news_fixture: Path
+
+    @property
+    def baselines(self) -> Path:
+        return self.records.parent / "member_baselines"
 
     @classmethod
     def under(cls, workspace: Path, *, out: Path | None = None) -> WeeklyPaths:
@@ -252,7 +259,10 @@ class WeeklyOperations:
             self.stages.append("publish")
         self.rule_snapshot = request.snapshot_id or latest_live_snapshot(paths.snapshots)
         self.ledger_inputs = sorted((paths.ledger / request.season).glob("gw*"))
-        self.record_inputs = recorded_capture_directories(paths.records, request.season)
+        self.record_inputs = [
+            *recorded_capture_directories(paths.records, request.season),
+            *recorded_capture_directories(paths.baselines, request.season),
+        ]
         if resume:
             prior = read_run_request(paths.journal, run_id)
             # Derived reads belong to the original preflight, even after this run captures
@@ -355,8 +365,34 @@ class WeeklyOperations:
                 "decide": prepared.decide,
                 "decide_skip_reason": prepared.decide_skip_reason,
                 "mode_rule": MODE_RULE,
+                "native_window_solver": self._native_window_solver(),
             },
         )
+
+    def _native_window_solver(self) -> str:
+        """Ask the isolated child which HiGHS it loads, before anything is spent.
+
+        The league stage's three- and five-week searches run on that child. Without the
+        pinned highspy every one of them would fall back to CP-SAT, which publishes, but
+        not the plans this commit is meant to publish; so the week stops here instead.
+        """
+
+        remedy = (
+            f"Install the pin into this environment (python -m pip install "
+            f"highspy=={NATIVE_VERSION}) and run again."
+        )
+        try:
+            version = native_window_version()
+        except (OSError, RuntimeError, ValueError) as error:
+            raise WeekError(
+                f"The native window solver cannot start in this environment: {error} {remedy}"
+            ) from error
+        if version != NATIVE_VERSION:
+            raise WeekError(
+                f"The native window solver loads HiGHS {version}; this commit pins "
+                f"{NATIVE_VERSION}. {remedy}"
+            )
+        return f"highspy {version}"
 
     def _refuse_a_record_from_another_commit(self) -> None:
         """Stop a reused capture that already holds advice records from another commit.
@@ -373,13 +409,14 @@ class WeeklyOperations:
         capture = self.request.snapshot_id
         if capture is None or not self.records_advice:
             return
-        recorded = recorded_commits(
-            self.paths.records, self.request.season, self.request.gameweek, capture
-        )
         by_commit: dict[str, list[int]] = {}
-        for entry_id, commit in sorted(recorded.items()):
-            if commit is not None and commit != self.repository_commit:
-                by_commit.setdefault(str(commit), []).append(entry_id)
+        for root in (self.paths.records, self.paths.baselines):
+            recorded = recorded_commits(root, self.request.season, self.request.gameweek, capture)
+            for entry_id, commit in sorted(recorded.items()):
+                if commit is not None and commit != self.repository_commit:
+                    entries = by_commit.setdefault(str(commit), [])
+                    if entry_id not in entries:
+                        entries.append(entry_id)
         if not by_commit:
             return
         named = "; ".join(
@@ -798,6 +835,7 @@ class WeeklyOperations:
             handoff_path=Path(self.values["handoff"]["path"]),
             record_root=self.paths.records if record else None,
             history_record_root=self.paths.records,
+            baseline_record_root=self.paths.baselines,
             # The manager's word rides on the rotation stage: when it ran, its table and
             # the source the claims came from reach every member's menu as a switchable,
             # priced constraint; when it did not, the index says there is none.
@@ -861,6 +899,22 @@ class WeeklyOperations:
         leagues: dict[str, dict[str, object]] = {}
         beside: list[PublishedLeague] = []
         gameweek: int | None = None
+        baselines = None
+        baseline_seconds = 0.0
+        if record:
+            baseline_started = time.perf_counter()
+            baselines = prepare_tracked_baselines(
+                tuple(self._league_request(league, False) for league in self.request.league_ids),
+                read_capture=self._capture_for_publication,
+            )
+            baseline_seconds = round(time.perf_counter() - baseline_started, 6)
+            if getattr(self, "log", None) is not None:
+                self.log.event(
+                    "tick.week.baselines.prepared",
+                    entries=len(baselines.records),
+                    refused=dict(baselines.refused),
+                    elapsed_seconds=baseline_seconds,
+                )
         # A tree from before the league directory is settled before any league renders,
         # whatever the order of the list: adopted by the league it names, or removed as a
         # leftover beside a directory; one that names a league the list does not have is
@@ -910,15 +964,41 @@ class WeeklyOperations:
                     beside=beside,
                     read_capture=self._capture_for_publication,
                     on_stage=on_stage,
+                    baselines=baselines,
                 )
             if result.published is not None:
                 beside.append(result.published)
             gameweek = result.gameweek
             outputs.extend(result.output_paths)
+            # Which backend answered each member's three- and five-week searches, and why
+            # any fell back to CP-SAT: in the receipt, and one run-log line per member and
+            # window length beside the league's substage lines. No member page carries it.
+            window_solvers = {
+                str(member.entry_id): summarize_native_windows(member.native_windows)
+                for member in result.report.members
+                if getattr(member, "native_windows", ())
+            }
+            if getattr(self, "log", None) is not None:
+                for entry_id, rows in window_solvers.items():
+                    for row in rows:
+                        self.log.event(
+                            "tick.week.league.window_solver",
+                            league_id=request.league_id,
+                            entry_id=int(entry_id),
+                            **row,
+                        )
             leagues[str(league_id)] = {
                 "menu": request.menu,
                 "timings": timings,
-                "advice_recorded": recorded,
+                "advice_recorded": recorded
+                or (
+                    baselines is not None
+                    and any(
+                        member.entry_id in baselines.records
+                        for member in result.report.members
+                        if member.rendered
+                    )
+                ),
                 # What the build told the operator about individual members (a name it
                 # changed, a mode or the manager's word it could not solve) and the files
                 # it removed from the tree, so a run is not "completed" in silence.
@@ -933,15 +1013,17 @@ class WeeklyOperations:
                 # Whose purchase prices were rebuilt from the transfers list, and why not
                 # the rest; empty when the capture held no member's picks.
                 "purchase_prices_note": result.purchase_prices_note,
+                # Per member, per window length: searches answered by native HiGHS and by
+                # the CP-SAT fallback, the HiGHS version the child reported, and each
+                # fallback reason with its count. Empty for a device menu.
+                "window_solvers": window_solvers,
             }
-        # Whether this run recorded advice at all, which the publish stage requires: a run
-        # asked to record whose leagues the record does not name recorded nothing, and
-        # says so where the status page reads.
+        # The publication receipt names whether any rendered member was recorded.
         recorded_any = any(bool(row["advice_recorded"]) for row in leagues.values())
         if record and not recorded_any and getattr(self, "log", None) is not None:
             self.log.event(
                 "tick.week.advice_record.skipped",
-                reason="no league of the list is the one the advice record names",
+                reason="no rendered member has a complete server baseline",
                 leagues=list(self.request.league_ids),
                 capture=self._capture_id(),
             )
@@ -951,6 +1033,11 @@ class WeeklyOperations:
                 "snapshot_id": self._capture_id(),
                 "gameweek": gameweek,
                 "advice_recorded": recorded_any,
+                "baselines": {
+                    "entries": 0 if baselines is None else len(baselines.records),
+                    "refused": {} if baselines is None else dict(baselines.refused),
+                    "elapsed_seconds": baseline_seconds,
+                },
                 # A tree from before the league directory, and what became of it.
                 "legacy_tree": (
                     None if legacy is None else {"outcome": legacy[0], "league_id": legacy[1]}

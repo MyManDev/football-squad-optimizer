@@ -85,8 +85,9 @@ longer. A window-5 solve that took 208.5 s on the PC would pass the page's 600 s
 core up to about 2.9 times slower, before any queueing. How fast a given host's vCPU is on
 this workload has not been measured anywhere.
 
-**The ortools wheels are not the obstacle on Arm.** Read from PyPI on 2026-09-26 at 01:37Z.
-Eight pins in `constraints.txt` ship compiled code and are installed in the image, whose
+**The ortools wheels are not the obstacle on Arm.** Read from PyPI on 2026-09-26 at 01:37Z;
+the native window solver's additional pin was checked on 2026-10-22.
+Nine pins in `constraints.txt` ship compiled code and are installed in the image, whose
 `Dockerfile` installs `.[api]`. Each one publishes a Linux wheel for `x86_64` and one for
 `aarch64` that CPython 3.13 installs, but not all with the same tags:
 
@@ -94,6 +95,8 @@ Eight pins in `constraints.txt` ship compiled code and are installed in the imag
   `manylinux_2_28`.
 - `pydantic-core` and `rpds-py`: `cp313` wheels tagged `manylinux2014` (`manylinux_2_17`),
   with no `manylinux_2_28` tag.
+- `highspy==1.15.1`: `cp313` wheels tagged `manylinux_2_24` and `manylinux_2_28` for
+  both architectures ([release files](https://pypi.org/project/highspy/1.15.1/#files)).
 - `protobuf`, which `ortools` requires: a `cp39-abi3` wheel tagged `manylinux2014`. It is
   built against the stable ABI, so it is not a `cp313` wheel, and CPython 3.13 installs it.
 

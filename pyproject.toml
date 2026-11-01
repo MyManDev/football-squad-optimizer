@@ -13,6 +13,7 @@ authors = [{ name = "SquadOpt" }]
 dependencies = [
     "numpy>=2.0.2,<3",
     "ortools>=9.15.6755,<9.16",
+    "highspy==1.15.1",
     "pandas>=2.2.3,<3.1",
     "scikit-learn>=1.6,<2",
     # Already present transitively through scikit-learn, and now imported directly by the
@@ -346,7 +347,9 @@ allow_indirect_imports = true
 # `evaluation`) and by `backtest`, which reads only its version string to record the
 # environment of a judging run (`backtest/production_reporting.py`).
 # Every other package reaches the solver through the decision core. The graph holds an external
-# package by its top-level name, so `ortools` is forbidden whole.
+# package by its top-level name, so `ortools` is forbidden whole. The same boundary
+# holds `highspy`, whose sole importer is planning/native_highs.py. Its driver runs
+# in an isolated process supplied by the platform, never beside OR-Tools on Linux.
 [[tool.importlinter.contracts]]
 name = "The CP-SAT solver stays in the decision core"
 type = "forbidden"
@@ -365,7 +368,7 @@ source_modules = [
     "squadopt.recalibration",
     "squadopt.preflight",
 ]
-forbidden_modules = ["ortools"]
+forbidden_modules = ["ortools", "highspy"]
 allow_indirect_imports = true
 
 # Processes, threads, signals and the command line belong to the composition roots in `platform`,
@@ -601,6 +604,7 @@ exhaustive_ignores = [
     "history_documents",
     "jobs_contract",
     "manifest",
+    "native_windows",
     "official_injury_capture",
     "projection_retention",
     "publication_workers",
