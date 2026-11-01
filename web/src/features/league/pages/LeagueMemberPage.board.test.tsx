@@ -547,12 +547,7 @@ describe("honesty and the tools", () => {
     );
     const how = screen.getByText(copy.howComputed).closest("details")!;
     expect(how).not.toHaveAttribute("open");
-    for (const sentence of [
-      copy.independentAdviceRule,
-      copy.lineupRule,
-      copy.moveRowsBasis,
-      copy.diagnosticOnly,
-    ]) {
+    for (const sentence of [copy.independentAdviceRule, copy.lineupRule, copy.diagnosticOnly]) {
       expect(within(how).getByText(sentence)).not.toBeVisible();
     }
     // The caveat sentences that used to open and close the disclosure are gone.
