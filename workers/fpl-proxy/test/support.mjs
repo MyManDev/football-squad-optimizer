@@ -307,8 +307,8 @@ export function bundleWorld({ week9Fixtures = WEEK9_FIXTURES } = {}) {
       named: opening,
       captain: 110,
       vice: 111,
-      bank: 0,
-      value: 1000,
+      bank: 5,
+      value: 995,
     }),
     [fpl(upstreamPaths.picks(OPENER, 8))]: picksAnswer(OPENER, 8, {
       named: held,
