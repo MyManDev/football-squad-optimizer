@@ -330,6 +330,35 @@ describe("again after a failure", () => {
   });
 });
 
+describe("choosing the replacement", () => {
+  it("narrows the add list to the removed player's position, and widens it on request", async () => {
+    await started();
+    const list = () => screen.getByLabelText(COPY.whatIfAdd);
+    const groups = () =>
+      [...list().querySelectorAll("optgroup")].map((group) => group.getAttribute("label"));
+    const positions = MESSAGES.tr.positions;
+    expect(groups()).toEqual([positions.GK, positions.DEF, positions.MID, positions.FWD]);
+
+    const forwards = screen
+      .getAllByRole("list")
+      .find((group) => group.getAttribute("aria-label") === positions.FWD)!;
+    fireEvent.click(within(forwards).getAllByRole("button")[0]!);
+    await settled();
+    expect(screen.getByLabelText(COPY.whatIfPosition)).toHaveValue("FWD");
+    expect(groups()).toEqual([positions.FWD]);
+
+    fireEvent.change(screen.getByLabelText(COPY.whatIfPosition), { target: { value: "" } });
+    expect(groups()).toHaveLength(4);
+    fireEvent.change(screen.getByLabelText(COPY.whatIfPosition), { target: { value: "GK" } });
+    expect(groups()).toEqual([positions.GK]);
+
+    fireEvent.click(screen.getByRole("button", { name: COPY.whatIfReset }));
+    await settled();
+    expect(screen.getByLabelText(COPY.whatIfPosition)).toHaveValue("");
+    expect(groups()).toHaveLength(4);
+  });
+});
+
 describe("with the keyboard and a screen reader", () => {
   it("adds nothing while the member moves through the list; only the add button adds", async () => {
     await started();

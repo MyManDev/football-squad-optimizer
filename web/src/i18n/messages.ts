@@ -101,10 +101,8 @@ const en = {
     primary: "Primary",
     findLeague: "Find your league",
     thisWeek: "This week",
-    squad: "Squad",
     league: "League",
     currentSquad: "Current squad",
-    decisionTools: "Decision tools",
     whatIf: "Try your own squad",
     duel: "Head to head",
     chips: "Chips and transfers",
@@ -739,27 +737,19 @@ const en = {
     team: "Team",
     gameweekNetPoints: "GW net points",
     gameweekNetPointsFor: (gameweek: number) => `GW${gameweek} net points`,
-    gameweekNetNote:
-      "The gameweek column is net for every row: the week's score after the transfer hits taken that week, which is the amount the season total moved by. The FPL site shows the week before hits, so a member who took a four-point hit reads four points lower here than there. A row whose hit is not in the published data shows a dash rather than a number on the other basis.",
     noScoredWeek: "No gameweek has been finalised yet.",
     total: "Total",
     movement: "Movement",
     leaderGap: "Gap to leader",
     leaderMark: "leader",
     noPreviousRank: "Previous rank unavailable",
-    movementNote:
-      "Movement compares the game's current and previous weekly ranks in this capture; the points beside it are from the last completed and checked gameweek.",
     newMember: "new",
     movementLabel: (movement: "up" | "down" | "same", places: number) =>
       movement === "same"
         ? "unchanged"
         : `${movement === "up" ? "up" : "down"} ${places} place${places === 1 ? "" : "s"}`,
-    aboutTable: "About this table",
     unknownMember: "Unknown member",
     unknownTeam: "Unnamed team",
-    publicDataTitle: "Public after the deadline",
-    publicDataBody:
-      "These records are public FPL data after the gameweek deadline. SquadOpt never asks for an FPL password, session or private account access.",
     backToMembers: "← League members",
     memberSquad: "Your current squad",
     toolEmpty: "Nothing here for this week.",
@@ -906,6 +896,8 @@ const en = {
     whatIfRemove: "Remove",
     whatIfRemoveLabel: (name: string) => `Remove ${name}`,
     whatIfAdd: "Add a player",
+    whatIfPosition: "Position",
+    whatIfAllPositions: "All positions",
     whatIfReset: "Back to the advised squad",
     whatIfBreaks: {
       size: (count: number, size: number) => `The squad has ${count} players; it needs ${size}.`,
@@ -990,7 +982,6 @@ const en = {
     freshnessNoScored: "no record",
     freshnessPlayed: "This decision week has been played. The next decision capture is pending.",
     advancedSettings: "Advanced settings",
-    decisionTools: "Decision tools",
     chipsAndTransfers: "Chips and free transfers",
     // The squad the plan fields, drawn on the pitch, and the fixture rail beside it.
     squadAfterTitle: "Squad after the transfers",
@@ -1239,10 +1230,8 @@ const tr: MessageSchema<typeof en> = {
     primary: "Ana navigasyon",
     findLeague: "Ligini bul",
     thisWeek: "Bu hafta",
-    squad: "Kadro",
     league: "Lig",
     currentSquad: "Şu anki kadron",
-    decisionTools: "Karar araçları",
     whatIf: "Kadroyu kendin dene",
     duel: "Rakiple yan yana",
     chips: "Çipler ve transferler",
@@ -1855,27 +1844,19 @@ const tr: MessageSchema<typeof en> = {
     team: "Takım",
     gameweekNetPoints: "OH net puanı",
     gameweekNetPointsFor: (gameweek) => `OH${gameweek} net puanı`,
-    gameweekNetNote:
-      "Oyun haftası sütunu her satır için nettir: o haftaki transfer cezaları düşüldükten sonraki puan, yani sezon toplamının arttığı miktarın ta kendisi. FPL sitesi haftayı cezalardan önce gösterir; bu yüzden 4 puan ceza alan bir üye burada oradakinden 4 puan düşük görünür. Cezası yayınlanan veride bulunmayan bir satırda, yanlış temeldeki bir sayı yerine tire gösterilir.",
     noScoredWeek: "Henüz kesinleşmiş oyun haftası yok.",
     total: "Toplam",
     movement: "Hareket",
     leaderGap: "Lidere fark",
     leaderMark: "lider",
     noPreviousRank: "Önceki sıra bilinmiyor",
-    movementNote:
-      "Hareket, oyunun bu veri çekiminde bildirdiği mevcut ve önceki haftalık sıraları karşılaştırır; yanındaki puanlar son tamamlanmış ve kontrol edilmiş haftadandır.",
     newMember: "yeni",
     movementLabel: (movement, places) =>
       movement === "same"
         ? "yerinde kaldı"
         : `${places} sıra ${movement === "up" ? "yükseldi" : "düştü"}`,
-    aboutTable: "Tablo hakkında",
     unknownMember: "Bilinmeyen üye",
     unknownTeam: "İsimsiz takım",
-    publicDataTitle: "Son tarihten sonra herkese açık",
-    publicDataBody:
-      "Bu kayıtlar oyun haftası son tarihinden sonra herkese açık FPL verisidir. SquadOpt hiçbir zaman FPL şifresi, oturumu veya özel hesap erişimi istemez.",
     backToMembers: "← Lig üyeleri",
     memberSquad: "Şu anki kadron",
     toolEmpty: "Bu hafta için burada bir şey yok.",
@@ -2005,6 +1986,8 @@ const tr: MessageSchema<typeof en> = {
     whatIfRemove: "Çıkar",
     whatIfRemoveLabel: (name) => `Kadrodan çıkar: ${name}`,
     whatIfAdd: "Oyuncu ekle",
+    whatIfPosition: "Mevki",
+    whatIfAllPositions: "Tüm mevkiler",
     whatIfReset: "Önerilen kadroya dön",
     whatIfBreaks: {
       size: (count, size) => `Kadroda ${count} oyuncu var; ${size} olmalı.`,
@@ -2078,7 +2061,6 @@ const tr: MessageSchema<typeof en> = {
     freshnessNoScored: "kayıt yok",
     freshnessPlayed: "Bu karar haftası artık oynandı. Yeni haftanın karar verisi bekleniyor.",
     advancedSettings: "Gelişmiş ayarlar",
-    decisionTools: "Karar araçları",
     chipsAndTransfers: "Çipler ve transfer hakkı",
     squadAfterTitle: "Kadro, transferlerden sonra",
     squadOwnPoints: (pointsValue) => `${pointsValue} beklenen puan`,

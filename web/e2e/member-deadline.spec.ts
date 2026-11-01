@@ -38,7 +38,7 @@ for (const language of ["tr", "en"] as const) {
     await expect(page.getByRole("heading", { name: copy.deadlinePassedTitle })).toBeVisible();
     await expect(page.getByTestId("deadline-passed")).toContainText(copy.deadlinePassedTitle);
     // The closed week's plan is still the answer; nothing that changes or recomputes it is
-    // offered: no settings, no link down to them, no Hesapla and no model comparison.
+    // offered: no settings, no link down to them and no Hesapla.
     const member = MESSAGES[language].leagueMembers;
     await expect(page.getByRole("heading", { name: member.squadAfterTitle })).toBeVisible();
     await expect(page.locator("#plan-settings")).toHaveCount(0);
@@ -47,9 +47,6 @@ for (const language of ["tr", "en"] as const) {
       0,
     );
     await expect(page.getByText(copy.deadlinePassedCompute, { exact: true })).toHaveCount(0);
-    await expect(page.getByText(/^(Diğer modeli de hesapla|Compute the other model)$/)).toHaveCount(
-      0,
-    );
     // A closed week counts down to nothing and offers nothing to apply.
     await expect(page.getByTestId("deadline-countdown")).toHaveCount(0);
     await expect(page.getByRole("link", { name: member.applyOnFpl })).toHaveCount(0);

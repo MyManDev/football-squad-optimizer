@@ -88,10 +88,8 @@ describe("league member points", () => {
         "3",
       ]);
       expect(cells[2]!.querySelector("svg path")).not.toBeNull();
-      expect(screen.getByText(copy.movementNote)).toBeInTheDocument();
       for (const text of [
         copy.noPreviousRank,
-        copy.movementNote,
         copy.movementLabel("same", 0),
         copy.movementLabel("up", 2),
         copy.movementLabel("down", 3),
@@ -289,31 +287,6 @@ describe("league member surfaces", () => {
     },
   );
 
-  it.each(["tr", "en"] as const)(
-    "names the column's basis, because it is not the one the FPL site shows, in %s",
-    (language) => {
-      const copy = MESSAGES[language];
-      renderPage(<LeagueMembersView envelope={mockLeagueMembersEnvelope} />, undefined, language);
-
-      expect(screen.getByText(copy.leagueMembers.gameweekNetNote)).toBeInTheDocument();
-    },
-  );
-
-  it("keeps the basis note when no row of ours is in the column", () => {
-    // The basis belongs to the column, not to our presence in it: a member reading only
-    // other members still sees numbers that differ from the ones on the FPL site.
-    renderPage(
-      <LeagueMembersView
-        envelope={membersWith({
-          members: mockLeagueMembersEnvelope.payload.members.filter(
-            (member) => member.member_kind !== "system",
-          ),
-        })}
-      />,
-    );
-    expect(screen.getByText(MESSAGES.tr.leagueMembers.gameweekNetNote)).toBeInTheDocument();
-  });
-
   it("excludes a published virtual system row from both the visitor list and its count", () => {
     renderPage(<LeagueMembersView envelope={mockLeagueMembersEnvelope} />);
 
@@ -324,14 +297,15 @@ describe("league member surfaces", () => {
     expect(screen.queryByText(/SquadOpt · /)).not.toBeInTheDocument();
   });
 
-  it("renders member standings, the public-data notice and an example badge", () => {
+  it("renders member standings and an example badge, and no notice under the table", () => {
     renderPage(<LeagueMembersView envelope={mockLeagueMembersEnvelope} />);
 
     expect(
       screen.getByRole("heading", { level: 1, name: "SquadOpt Classic League" }),
     ).toBeInTheDocument();
     expect(screen.getByText("örnek veri")).toBeInTheDocument();
-    expect(screen.getByText(/son tarihinden sonra herkese açık FPL verisidir/)).toBeInTheDocument();
+    expect(screen.queryByText(/herkese açık FPL verisidir/)).toBeNull();
+    expect(screen.queryByText("Tablo hakkında")).toBeNull();
     expect(screen.getAllByRole("row")).toHaveLength(11);
     expect(screen.getByRole("link", { name: "Deniz Aral" })).toHaveAttribute(
       "href",

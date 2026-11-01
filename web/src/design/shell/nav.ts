@@ -4,11 +4,11 @@
  * The league part of the sidebar opens only after both steps, for the same league: a
  * league number, then the member the visitor said they are in it. Until then the first
  * item is 'Ligini bul': the league-number form with no league, or the "Sen kimsin?" step
- * of the league entered; 'Bu hafta', 'Kadro' and 'Lig' are not there at all. Once both
- * steps are taken, 'Bu hafta' and 'Kadro' always mean the claimed member's own page (on a
- * rival's page too), 'Lig' is the league's member list, and each of the member's tools
- * (the squad held now, the decision tools, the what-if squad, the duel, the chips and the
- * squad card) is a page of its own under their page. The rule holds per league, so
+ * of the league entered; 'Bu hafta' and 'Lig' are not there at all. Once both steps are
+ * taken, 'Bu hafta' always means the claimed member's own page (on a rival's page too),
+ * 'Lig' is the league's member list, and each of the member's tools (the squad held now,
+ * the what-if squad, the duel, the chips and the squad card) is a page of its own under
+ * their page. The rule holds per league, so
  * it stands unchanged with many leagues published.
  *
  * Nothing here reads or writes browser storage; the identity is handed in.
@@ -28,7 +28,6 @@ import {
 /** The sidebar item of each of the member's tool pages, in the sidebar's order. */
 export const TOOL_NAV = {
   "current-squad": "currentSquad",
-  "decision-tools": "decisionTools",
   "what-if": "whatIf",
   duel: "duel",
   chips: "chips",
@@ -37,8 +36,7 @@ export const TOOL_NAV = {
 
 type ToolNavKey = (typeof TOOL_NAV)[MemberTool];
 
-export type NavKey =
-  "findLeague" | "thisWeek" | "squad" | "league" | ToolNavKey | "fixtures" | "contribute";
+export type NavKey = "findLeague" | "thisWeek" | "league" | ToolNavKey | "fixtures" | "contribute";
 
 export interface NavItem {
   key: NavKey;
@@ -80,8 +78,6 @@ export interface Place {
   hash: string;
 }
 
-export const SQUAD_HASH = "#kadro";
-
 const MEMBER_PAGE = /^\/league\/(\d+)\/members\/(\d+)$/;
 const MEMBER_HISTORY = /^\/league\/(\d+)\/members\/(\d+)\/history$/;
 const MEMBER_TOOL = /^\/league\/(\d+)\/members\/(\d+)\/([a-z-]+)$/;
@@ -109,7 +105,7 @@ export function memberAt(
 
 /**
  * The sidebar's items. `lastSeen` is the claimed member's own page as last opened in this
- * visit: 'Bu hafta' and 'Kadro' keep its plan, and only for that member in that league.
+ * visit: 'Bu hafta' and the tool pages keep its plan, only for that member in that league.
  */
 export function navItems(
   place: Place,
@@ -136,12 +132,9 @@ export function navItems(
         ? lastSeen.search
         : "";
     const own = memberAddress(leagueId, entryId);
-    const onOwnPage = pathname === own;
-    const onSquad = onOwnPage && place.hash === SQUAD_HASH;
     const league = membersAddress(leagueId);
     items.push(
-      { key: "thisWeek", to: `${own}${plan}`, active: onOwnPage && !onSquad },
-      { key: "squad", to: `${own}${plan}${SQUAD_HASH}`, active: onSquad },
+      { key: "thisWeek", to: `${own}${plan}`, active: pathname === own },
       { key: "league", to: league, active: pathname === league },
       ...MEMBER_TOOLS.map((tool) => {
         const page = memberToolAddress(leagueId, entryId, tool);
