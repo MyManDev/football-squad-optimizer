@@ -22,7 +22,7 @@ import { LanguageToggle } from "../../../i18n/LanguageToggle";
 import { MESSAGES } from "../../../i18n/messages";
 import { withLeague } from "../../../testSupport/league";
 import type { AdviceMove, AdvicePlayer, EntryAdvice, LeagueViewEnvelope } from "../types";
-import { BOARD_EASE, forgetPairs, GAIN, INCOMING, OUTGOING } from "./boardMotion";
+import { BOARD_EASE, forgetPairs, GAIN, INCOMING, INCOMING_LAG, OUTGOING } from "./boardMotion";
 import { LeagueMemberView } from "./LeagueMemberPage";
 
 const ENTRY = 35249001;
@@ -140,7 +140,7 @@ const boards = () => screen.getAllByRole("article", { name: /^Değişiklik \d+\/
 const ANIMATED = new Set(["opacity", "transform", "offset"]);
 
 describe("the substitution board's motion", () => {
-  it("moves each board's players in the data time and brings the gain up after them", () => {
+  it("turns each board's panels in the data time, one after the other, and brings the gain up after them", () => {
     const advice = BASE;
     render(view(advice));
     const count = advice.payload.moves.length;
@@ -157,7 +157,10 @@ describe("the substitution board's motion", () => {
       expect(gain!.keyframes).toBe(GAIN);
       expect(gain!.element.tagName).toBe("P");
       expect(out!.options).toEqual({ duration: MOTION_MS.data, easing: BOARD_EASE });
-      expect(gain!.options.delay).toBe(MOTION_MS.data);
+      // The incoming panel turns a beat after the outgoing one, and the gain after both.
+      const lag = Math.round(MOTION_MS.data * INCOMING_LAG);
+      expect(into!.options.delay).toBe(lag);
+      expect(gain!.options.delay).toBe(MOTION_MS.data + lag);
       expect(gain!.options.duration).toBe(MOTION_MS.ui);
     }
   });
