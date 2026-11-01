@@ -308,8 +308,8 @@ while members are waiting, so a league with fewer members than workers starts fe
 worker there is no pool, and the parent cleans it once. The season workers of the chip Bayesian
 search were the second caller until that runner was removed on 2026-10-12.
 
-That is still about a second of cleaning per build, and a weekly run makes at most four in
-its own process and one in each league worker, against a league stage the runbook
+That is still about a second of cleaning per build, and a weekly run makes at most five in
+its own process (four without advice recording) and one in each league worker, against a league stage the runbook
 measured at about thirty-six minutes for fifteen members with eight workers (GW4 rehearsal,
 [`weekly_runbook.md`](weekly_runbook.md)) and plans in hours once the Top-100 menu is on, so
 the answer below does not change. The other entry point, `build_canonical_dataset`, is

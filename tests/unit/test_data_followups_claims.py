@@ -610,6 +610,11 @@ def test_the_weekly_run_builds_the_panel_in_the_stages_item_7_names() -> None:
         "No other stage builds one",
     ):
         assert phrase in item, f"Item 7 must say how the weekly run builds the panel: {phrase!r}."
+    # The item's conclusion counts the same builds.
+    conclusion = (
+        "a weekly run makes at most five in its own process (four without advice recording)"
+    )
+    assert conclusion in item, f"Item 7's conclusion must count the builds: {conclusion!r}."
 
 
 def test_the_scan_counts_a_method_and_follows_self_within_its_class() -> None:
