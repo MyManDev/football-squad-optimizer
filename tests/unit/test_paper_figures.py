@@ -494,3 +494,49 @@ def test_the_check_passes_on_matching_digests_and_names_each_difference(
     manifest.write_text(text.replace("b" * 40, "d" * 40), encoding="utf-8")
     assert figures.main(["--root", str(tmp_path), "--check", str(manifest)]) == 1
     assert f"  DIFFERS   {REC_1}" in capsys.readouterr().out
+
+
+def test_the_committed_manifest_names_every_output_and_input_once() -> None:
+    text = (figures.REPOSITORY_ROOT / "docs" / "paper" / "README.md").read_text(encoding="utf-8")
+
+    manifest = figures.read_manifest(text)
+
+    written = {
+        *(
+            f"tables/table_{name}.csv"
+            for name in (
+                "candidates_player_level",
+                "candidates_decision_level",
+                "candidates_reading_status",
+                "sampler_calibration",
+                "joint_sampler_seeds",
+                "joint_sampler_seed_summary",
+                "mixture_distribution",
+                "mixture_log_score_folds",
+                "planning_measurements",
+            )
+        ),
+        *(f"tables/{table}" for figure in figures.FIGURES for table in figure.tables),
+        "tables/provenance.csv",
+        "tables/records.csv",
+        "tables/checks.csv",
+        "tables/tables.md",
+        *(f"figures/{figure.file}" for figure in figures.FIGURES),
+    }
+    assert set(manifest.outputs) == written
+    unpinned = {name for name, digest in manifest.outputs.items() if digest is None}
+    assert unpinned == {"tables/records.csv", "tables/tables.md"}
+    records = {
+        tables.GBM,
+        tables.FEATURES_V2,
+        tables.GBM_POINTS,
+        tables.REGIME,
+        tables.MIXTURE,
+        tables.FROZEN_EVALUATION,
+        tables.FOUNDATION,
+        tables.BLOCK,
+        tables.JOINT,
+        tables.RANK_SHRINKAGE,
+        tables.MEAN_REVERSION,
+    }
+    assert set(manifest.inputs) == records | {tables.EXTRACTOR, figures.SCRIPT}

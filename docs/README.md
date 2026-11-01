@@ -29,6 +29,7 @@ shape of the system, start with the [architecture overview](../ARCHITECTURE.md);
 | [research/](research/README.md) | The research guide, newer protocols and explanations, and their records; older records stay at the root |
 | [specs/](specs/README.md) | The specifications guide: new specifications, and an index of the older ones at the root |
 | [images/](images/) | Screenshots that merged pull requests refer to |
+| [paper/](paper/README.md) | The walk-forward paper (#1152): commands, input and output digests |
 
 Most documents and all older records sit at the root of `docs/`. Their paths are cited by code,
 tests, records and merged pull requests, so they stay where they are. No new living document is
