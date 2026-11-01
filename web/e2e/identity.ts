@@ -123,8 +123,8 @@ export function publishedMember(membersPath: string, entryId: number): PickedMem
 const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /**
- * Says who you are through the picker: the member's radio, found by the name a screen
- * reader hears (the entry number is not in the markup), then Onayla.
+ * Says who you are through the picker: the member's button, found by the name a screen
+ * reader hears (the entry number is not in the markup), which enters at once.
  */
 export async function pickMember(
   page: Page,
@@ -136,9 +136,6 @@ export async function pickMember(
   const team = escapeRegExp(member.teamName ?? list.unknownTeam);
   await page
     .locator("[data-member-picker]")
-    .getByRole("radio", { name: new RegExp(`^${manager}\\s*,\\s*${team}$`) })
-    .check();
-  await page
-    .getByRole("button", { name: MESSAGES[language].memberPicker.confirm, exact: true })
+    .getByRole("button", { name: new RegExp(`^${manager}\\s*,\\s*${team}$`) })
     .click();
 }

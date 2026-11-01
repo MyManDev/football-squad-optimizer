@@ -9,11 +9,12 @@ token.
 | Worker | Purpose | Deployed by | Tested by | Document |
 | --- | --- | --- | --- | --- |
 | [`fpl-probe/`](fpl-probe/README.md) | Measures whether the FPL API answers requests that leave Cloudflare's network | `.github/workflows/deploy-fpl-probe.yml`, dispatched by hand from the default branch | The `FPL probe worker tests` step of the CI web job | [FPL forwarder probe](../docs/fpl_forwarder_probe.md) |
+| [`fpl-proxy/`](fpl-proxy/README.md) | The FPL forwarder: reads FPL on a visitor's request and answers at `/api/v1/fpl/*` with trimmed, versioned documents | `.github/workflows/deploy-fpl-proxy.yml`, dispatched by hand from the default branch | The `FPL forwarder worker tests` step of the CI web job | [ADR 0012](../docs/architecture/decisions/0012-fpl-forwarder.md) |
 
-The probe is the prerequisite for an FPL forwarder Worker at `/api/v1/fpl/*` on the site's host,
-which would let a member's browser read FPL through the site's own origin. Issue #979 tracks the
-probe's token, environment and measurement run; issue #980 tracks the forwarder, which is built
-only after the probe returns a served verdict.
+The probe was the prerequisite for the FPL forwarder Worker at `/api/v1/fpl/*` on the site's
+host, which lets a member's browser read FPL through the site's own origin. Issue #979 tracked
+the probe's token, environment and measurement run, and its verdict was served; issue #980 tracks
+the forwarder, `fpl-proxy/`.
 
 A new Worker gets its own folder here with a README, its own deployment workflow and its own
 tests in the CI web job, and a row in this table and in the deployment units of the

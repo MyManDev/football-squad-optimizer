@@ -369,7 +369,10 @@ Cloudflare answers 502 and the site serves the static tree.
   expression may use only Path and Verified Bot, requests are counted per IP, the period is
   10 s and the mitigation lasts 10 s
   (<https://developers.cloudflare.com/waf/rate-limiting-rules/>). Host is not available,
-  so the rule is written on the path, and no other hostname in the zone serves `/api/v1/`.
+  so the rule is written on the path. The site's host serves `/api/v1/` too: the FPL forwarder
+  at `/api/v1/fpl/*` ([ADR 0012](architecture/decisions/0012-fpl-forwarder.md)) and, while it
+  is deployed, the probe at `/api/v1/fpl-probe`. The rule counts their requests with the API's,
+  so a visitor address has one budget across both hosts.
   Security, WAF, Rate limiting rules:
 
   ```text

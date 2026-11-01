@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "FPL league standings v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "league",
+    "page",
+    "has_next",
+    "last_updated_data",
+    "source_time",
+    "results"
+  ],
+  "properties": {
+    "contract_version": {"const": "fpl_league_standings_v1"},
+    "league": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "scoring"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "name": {"type": ["string", "null"]},
+        "scoring": {"const": "classic"}
+      }
+    },
+    "page": {"type": "integer", "minimum": 1, "maximum": 20},
+    "has_next": {"type": "boolean"},
+    "last_updated_data": {"type": ["string", "null"]},
+    "source_time": {"$ref": "#/$defs/sourceTime"},
+    "results": {"type": "array", "items": {"$ref": "#/$defs/standing"}}
+  },
+  "$defs": {
+    "id": {"type": "integer", "minimum": 1, "maximum": 9007199254740991},
+    "sourceTime": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.[0-9]+)?Z$"
+    },
+    "standing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "entry",
+        "entry_name",
+        "player_name",
+        "rank",
+        "rank_sort",
+        "last_rank",
+        "total",
+        "event_total"
+      ],
+      "properties": {
+        "entry": {"$ref": "#/$defs/id"},
+        "entry_name": {"type": "string"},
+        "player_name": {"type": "string"},
+        "rank": {"type": "integer", "minimum": 0},
+        "rank_sort": {"type": "integer", "minimum": 1},
+        "last_rank": {"type": ["integer", "null"], "minimum": 0},
+        "total": {"type": "integer"},
+        "event_total": {"type": "integer"}
+      }
+    }
+  }
+}

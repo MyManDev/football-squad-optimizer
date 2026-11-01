@@ -8,7 +8,7 @@
  * taken, 'Bu hafta' always means the claimed member's own page (on a rival's page too),
  * 'Lig' is the league's member list, and each of the member's tools (the squad held now,
  * the what-if squad, the duel, the chips and the squad card) is a page of its own under
- * their page. The rule holds per league, so
+ * their page, and so is their weekly suggestion history. The rule holds per league, so
  * it stands unchanged with many leagues published.
  *
  * Nothing here reads or writes browser storage; the identity is handed in.
@@ -18,6 +18,7 @@ import {
   isMemberTool,
   leagueIdInAddress,
   memberAddress,
+  memberHistoryAddress,
   membersAddress,
   memberToolAddress,
   MEMBER_TOOLS,
@@ -36,7 +37,8 @@ export const TOOL_NAV = {
 
 type ToolNavKey = (typeof TOOL_NAV)[MemberTool];
 
-export type NavKey = "findLeague" | "thisWeek" | "league" | ToolNavKey | "fixtures" | "contribute";
+export type NavKey =
+  "findLeague" | "thisWeek" | "league" | ToolNavKey | "history" | "fixtures" | "contribute";
 
 export interface NavItem {
   key: NavKey;
@@ -133,6 +135,7 @@ export function navItems(
         : "";
     const own = memberAddress(leagueId, entryId);
     const league = membersAddress(leagueId);
+    const history = memberHistoryAddress(leagueId, entryId);
     items.push(
       { key: "thisWeek", to: `${own}${plan}`, active: pathname === own },
       { key: "league", to: league, active: pathname === league },
@@ -140,6 +143,7 @@ export function navItems(
         const page = memberToolAddress(leagueId, entryId, tool);
         return { key: TOOL_NAV[tool], to: `${page}${plan}`, active: pathname === page };
       }),
+      { key: "history", to: history, active: pathname === history },
     );
   }
 
