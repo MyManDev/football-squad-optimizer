@@ -1105,6 +1105,43 @@ def test_the_preflight_compares_a_reused_captures_records_with_this_runs_commit(
     assert "--no-advice-record" in message and "drop --snapshot-id" in message
 
 
+def test_the_preflight_reads_the_baseline_store_too(tmp_path: Path) -> None:
+    """A league that keeps no legacy record (any league but the one the league list marks,
+    or a device menu) leaves only its baseline record, so a reused capture recorded from
+    another commit has to be found there."""
+    base = world(tmp_path)
+    capture = base.request.snapshot_id or ""
+    _stored_record(base.paths.baselines, capture, 101, "a" * 40)
+    operation = weekly.WeeklyOperations(
+        base.request,
+        base.paths,
+        run_id="recording",
+        repository_commit="b" * 40,
+        handoff=base.supplied_handoff,
+        record_advice=True,
+    )
+    operation.run.directory.mkdir(parents=True)
+    with pytest.raises(WeekError) as refusal:
+        operation._preflight()
+    assert "a" * 40 + " (entry 101)" in str(refusal.value)
+
+
+def test_the_league_stage_declares_the_baseline_records_among_its_inputs(tmp_path: Path) -> None:
+    """Histories read the baseline store, so a resume compares its records as it compares
+    the legacy ones: a week whose baselines moved between two runs shows in the journal."""
+    base = world(tmp_path)
+    capture = base.request.snapshot_id or ""
+    stored = _stored_record(base.paths.baselines, capture, 101, "b" * 40)
+    operation = weekly.WeeklyOperations(
+        base.request,
+        base.paths,
+        run_id="inputs",
+        repository_commit="b" * 40,
+        handoff=base.supplied_handoff,
+    )
+    assert stored in operation.record_inputs
+
+
 def test_a_reused_capture_recorded_from_another_commit_refuses_before_any_solve(
     tmp_path_factory: pytest.TempPathFactory,
     monkeypatch: pytest.MonkeyPatch,

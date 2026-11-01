@@ -1,20 +1,26 @@
 """Tracked entries are solved once before either league emits its member pages."""
 
+import functools
 import json
 import shutil
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
+from types import SimpleNamespace
 
 import pytest
 import scripts.build_league_site as build_league_site
 from tests.unit.test_weekly_operations import TWO, world
 
 from squadopt.application import advice, league_publication, league_views
-from squadopt.application.advice import TRACKED_MEMBER_LINEARIZATION_LEVEL
-from squadopt.application.advice_record import AdviceRecordError
+from squadopt.application.advice import TRACKED_MEMBER_LINEARIZATION_LEVEL, MemberControl
+from squadopt.application.advice_record import (
+    MEMBER_BASELINE_RECORD_CONTRACT_VERSION,
+    AdviceRecordError,
+)
 from squadopt.application.entries import EntryError
 from squadopt.data.errors import DataError, DataSourceError
-from squadopt.platform import weekly_operations
+from squadopt.platform import publication_workers, weekly_operations
 
 
 @pytest.mark.parametrize("device", [False, True])
@@ -60,10 +66,22 @@ def test_shared_member_has_one_server_solve_and_one_record(tmp_path, monkeypatch
     assert all(row["advice_recorded"] for row in result.value["leagues"].values())
     if device:
         assert not list(operation.paths.records.rglob("advice.json"))
+    manifest = json.loads((records[0].parent / "manifest.json").read_bytes())
+    assert manifest["contract_version"] == MEMBER_BASELINE_RECORD_CONTRACT_VERSION
+    stamps = []
     for league in TWO:
         tree = operation.paths.out / "data/leagues" / str(league)
         assert (tree / "entries/101.json").is_file()
-        assert (tree / "history/101.json").is_file()
+        # Each league's history shows the week, league 7's from the baseline store alone
+        # (under this clock the deadline has passed, so the row holds no advice).
+        weeks = json.loads((tree / "history/101.json").read_bytes())["payload"]["weeks"]
+        assert [(row["gameweek"], row["reason"]) for row in weeks] == [
+            (2, "no_pre_deadline_record")
+        ]
+        stamps.append(json.loads((tree / "members.json").read_bytes())["generated_at_utc"])
+    # The record is dated by the first page that showed the member, not by the batch's clock:
+    # the stamp is what history reads against the deadline.
+    assert record["generated_at_utc"] == stamps[0]
     assert records[0] in result.output_paths
 
 
@@ -210,6 +228,73 @@ def test_one_failed_member_baseline_does_not_stop_the_publication(tmp_path, monk
         else:
             # The page's own solve succeeds; the member is shown without a baseline record.
             assert (tree / "advice/102/saf-puan/1.json").is_file()
+
+
+def test_no_baseline_record_lands_for_a_member_whose_page_did_not_render(tmp_path, monkeypatch):
+    """The batch solved both members, but member 102's page fails: the record says what a
+    member was shown, so only member 101's lands."""
+
+    operation = world(
+        tmp_path,
+        league_ids=TWO,
+        pages={352490: (101, 102), 7: (101, 102)},
+        seeded_from=TWO,
+        record_advice=True,
+        captured=(102,),
+    )
+    operation.values["capture"] = {"snapshot_id": operation.request.snapshot_id}
+    operation.values["handoff"] = {"path": str(operation.supplied_handoff)}
+    original = league_views.advise_entry
+
+    def advise(request, **kwargs):
+        if request.entry_id == 102:
+            raise DataSourceError("The page could not advise this member.")
+        return original(request, **kwargs)
+
+    # Only the page's advice fails; the batch reads league_publication's own reference.
+    monkeypatch.setattr(league_views, "advise_entry", advise)
+    result = operation._league()
+    assert result.value["baselines"]["entries"] == 2
+    assert result.value["baselines"]["refused"] == {}
+    records = operation.paths.baselines.rglob("advice.json")
+    assert [json.loads(path.read_bytes())["entry_id"] for path in records] == [101]
+    for league in TWO:
+        assert "could not advise" in result.value["leagues"][str(league)]["member_notes"]["102"]
+
+
+def test_a_pool_worker_receives_its_members_batch_control(tmp_path, monkeypatch):
+    """With workers, each member's batch control crosses to the worker process as bytes and
+    reaches its page as the same control; a member the batch refused gets none."""
+
+    operation = world(tmp_path)
+    operation.values["capture"] = {"snapshot_id": operation.request.snapshot_id}
+    operation.values["handoff"] = {"path": str(operation.supplied_handoff)}
+    batch = league_publication.prepare_tracked_baselines([operation._league_request(352490, False)])
+    control = batch.controls[101]
+    received = {}
+
+    def render(task, **kwargs):
+        received[task.entry_id] = kwargs["controls"]
+        return task.entry_id
+
+    monkeypatch.setattr(publication_workers, "render_member", render)
+    monkeypatch.setattr(publication_workers, "_WORKER_CONTEXT", {})
+    tasks = [SimpleNamespace(entry_id=101), SimpleNamespace(entry_id=102)]
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        mapper = publication_workers.pool_mapper(executor)
+        bound = functools.partial(render, controls={101: control})
+        assert list(mapper(bound, tasks)) == [101, 102]
+    assert received[102] is None
+    assert list(received[101]) == [101]
+    sent = received[101][101]
+    assert isinstance(sent, MemberControl) and sent is not control
+    assert sent.picks == control.picks
+    assert sent.linearization_level == control.linearization_level == 2
+    assert sent.plan.diagnostics == control.plan.diagnostics
+    assert (
+        sent.transfer_config.configuration_fingerprint
+        == control.transfer_config.configuration_fingerprint
+    )
 
 
 def test_a_run_that_records_nothing_solves_pages_at_the_tracked_level(tmp_path, monkeypatch):
