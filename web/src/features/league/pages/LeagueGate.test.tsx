@@ -73,6 +73,7 @@ function open(language: Language, address = `/league/members/${ENTRY}`) {
             <Route path="/league/members/:entryId" element={page} />
             <Route path="/league/:leagueId/members/:entryId" element={page} />
             <Route path="/league/:leagueId/members" element={<h1>Members list</h1>} />
+            <Route path="/league/:leagueId" element={<LeagueGate>{null}</LeagueGate>} />
           </Routes>
           <LocationProbe />
         </MemoryRouter>
@@ -191,16 +192,18 @@ describe.each(["tr", "en"] as const)("league gate in %s", (language) => {
   });
 
   it("asks again, in place, when the address names a league the site does not publish", async () => {
+    // No forwarder answers here: the site's static host has nothing at its routes.
     const fetcher = legacySite();
     writeChosenLeague(LEAGUE);
     open(language, memberAddress(OTHER, ENTRY));
     expect(await screen.findByRole("heading", { name: copy.title })).toBeInTheDocument();
     expect(screen.getByLabelText(copy.label)).toHaveValue(String(OTHER));
-    expect(screen.getByRole("status")).toHaveTextContent(copy.unsupported(OTHER));
+    expect(screen.getByRole("status")).toHaveTextContent(copy.cannotOpen(OTHER));
     expect(readChosenLeague()).toBe(LEAGUE);
     expect(screen.queryByRole("heading", { name: "Member page" })).toBeNull();
     expect(location()).toBe(memberAddress(OTHER, ENTRY));
-    expect(asked(fetcher)).toEqual(DIRECTORY_READS);
+    // The directory, then page 1 of the league's standings from the forwarder.
+    expect(asked(fetcher)).toEqual([...DIRECTORY_READS, `/api/v1/fpl/standings/${OTHER}?page=1`]);
 
     // The published league, given here, opens its members list: the address named
     // another league's member, who is not in this one.
@@ -249,20 +252,21 @@ describe.each(["tr", "en"] as const)("league gate in %s", (language) => {
     expect(screen.queryByRole("heading", { name: copy.title })).toBeNull();
   });
 
-  it("keeps an unsupported number out of the gate", async () => {
+  it("keeps an unpublished number out of the published gate, and never chooses it", async () => {
     const fetcher = legacySite();
     open(language);
     const user = userEvent.setup();
     await user.type(screen.getByLabelText(copy.label), "123");
     await user.click(screen.getByRole("button", { name: copy.submit }));
-    expect(screen.getByRole("status")).toHaveTextContent(copy.unsupported(123));
+    // Its own address, where the gate reads it from the forwarder: none answers here.
+    expect(await screen.findByText(copy.cannotOpen(123))).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Member page" })).toBeNull();
-    expect(location()).toBe(`/league/members/${ENTRY}`);
+    expect(location()).toBe("/league/123");
     expect(readChosenLeague()).toBeNull();
-    // Only the directory was read (by the gate, then by the form); nothing of league 123
-    // was asked for.
-    expect(asked(fetcher).every((url) => DIRECTORY_READS.includes(url))).toBe(true);
-    expect(asked(fetcher)).toContain("data/league/members.json");
+    // Nothing published of league 123 was asked for.
+    expect(asked(fetcher).filter((url) => !DIRECTORY_READS.includes(url))).toEqual([
+      "/api/v1/fpl/standings/123?page=1",
+    ]);
   });
 });
 

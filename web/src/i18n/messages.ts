@@ -507,6 +507,19 @@ const en = {
     directoryUnreadable: "The list of published leagues could not be read. Try again.",
     directoryMissing: "Nothing is published here yet. Try again later.",
     retry: "Try again",
+    headToHead: (leagueId: number) =>
+      `League ${leagueId} is a head-to-head league. Enter a classic league ID.`,
+    unknownLeague: (leagueId: number) => `There is no FPL league with ID ${leagueId}.`,
+    cannotOpen: (leagueId: number) => `League ${leagueId} cannot be opened right now.`,
+    listedLeagues: "Leagues on this site",
+  },
+  // A classic league or a team the site does not publish, read through the FPL forwarder.
+  forwarded: {
+    leagueTitle: (leagueId: number) => `League ${leagueId}`,
+    loading: "Reading the league…",
+    more: "Show more",
+    moreFailed: "The next page of the table could not be read.",
+    retry: "Try again",
   },
   // Where the league ID is read from on the FPL site, folded under the entry page's field.
   fplIdHelp: {
@@ -1628,6 +1641,18 @@ const tr: MessageSchema<typeof en> = {
     failed: "Yayımlanan lig verisi okunamadı. Yeniden dene.",
     directoryUnreadable: "Yayımlanan liglerin listesi okunamadı. Yeniden dene.",
     directoryMissing: "Burada henüz yayımlanmış bir şey yok. Daha sonra yeniden dene.",
+    retry: "Yeniden dene",
+    headToHead: (leagueId) =>
+      `${leagueId} numaralı lig karşılıklı (head-to-head) bir lig. Klasik bir lig numarası gir.`,
+    unknownLeague: (leagueId) => `${leagueId} numaralı bir FPL ligi bulunamadı.`,
+    cannotOpen: (leagueId) => `${leagueId} numaralı lig şu anda açılamıyor.`,
+    listedLeagues: "Bu sitedeki ligler",
+  },
+  forwarded: {
+    leagueTitle: (leagueId) => `${leagueId} numaralı lig`,
+    loading: "Lig okunuyor…",
+    more: "Daha fazla göster",
+    moreFailed: "Tablonun sonraki sayfası okunamadı.",
     retry: "Yeniden dene",
   },
   fplIdHelp: {

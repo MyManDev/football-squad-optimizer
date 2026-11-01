@@ -55,6 +55,7 @@ function open(language: Language) {
         <Routes>
           <Route path="/" element={<LeagueEntryPage />} />
           <Route path="/league/:leagueId/members" element={<h1>Member destination</h1>} />
+          <Route path="/league/:leagueId" element={<h1>League destination</h1>} />
         </Routes>
         <LocationProbe />
       </MemoryRouter>
@@ -148,38 +149,34 @@ describe.each(["tr", "en"] as const)("league entry in %s", (language) => {
     expect(fetcher).not.toHaveBeenCalled();
   });
 
-  it.each(["unsupported", "missing", "failed"] as const)(
-    "states %s without changing routes",
-    async (state) => {
-      // The directory is read first; a site with none is one league, a 404 everywhere is
-      // nothing published, and a 503 is a site that could not answer.
-      const fetcher =
-        state === "unsupported"
-          ? legacySite()
-          : stubFetchByUrl([
-              [/./, () => new Response("", { status: state === "missing" ? 404 : 503 })],
-            ]);
-      open(language);
-      const user = userEvent.setup();
-      await user.type(
-        screen.getByLabelText(copy.label),
-        state === "unsupported" ? "123" : "352490",
-      );
-      await user.click(screen.getByRole("button", { name: copy.submit }));
-      expect(
-        await screen.findByText(state === "unsupported" ? copy.unsupported(123) : copy[state]),
-      ).toBeInTheDocument();
-      expect(screen.getByRole("heading", { name: copy.title })).toBeInTheDocument();
-      expect(screen.getByTestId("location")).toHaveTextContent("/");
-      if (state === "unsupported") {
-        // Only the directory was read; nothing of league 123 was asked for.
-        expect(fetcher.mock.calls.map(([url]) => url)).toEqual([
-          "/data/leagues.json",
-          "/data/league/members.json",
-        ]);
-      }
-    },
-  );
+  it.each(["missing", "failed"] as const)("states %s without changing routes", async (state) => {
+    // The directory is read first; a 404 everywhere is nothing published, and a 503 is a
+    // site that could not answer.
+    stubFetchByUrl([[/./, () => new Response("", { status: state === "missing" ? 404 : 503 })]]);
+    open(language);
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText(copy.label), "352490");
+    await user.click(screen.getByRole("button", { name: copy.submit }));
+    expect(await screen.findByText(copy[state])).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: copy.title })).toBeInTheDocument();
+    expect(screen.getByTestId("location")).toHaveTextContent("/");
+  });
+
+  it("opens a league the site does not publish at its own address, for the gate there", async () => {
+    const fetcher = legacySite();
+    open(language);
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText(copy.label), "123");
+    await user.click(screen.getByRole("button", { name: copy.submit }));
+    expect(await screen.findByRole("heading", { name: "League destination" })).toBeInTheDocument();
+    expect(screen.getByTestId("location")).toHaveTextContent("/league/123");
+    // Only the directory was read here; the gate at the address asks the forwarder.
+    expect(fetcher.mock.calls.map(([url]) => url)).toEqual([
+      "/data/leagues.json",
+      "/data/league/members.json",
+    ]);
+    expect(readChosenLeague()).toBeNull();
+  });
 
   it("keeps the submitted ID fixed while its result is pending", async () => {
     // The directory read hangs until the test lets it answer; the league's record follows.
@@ -239,6 +236,17 @@ describe("the form in place", () => {
     // The gate at the new address chooses the league; a choice made here first would let
     // the gate rewrite the old address itself, dropping the step state.
     expect(readChosenLeague()).toBeNull();
+  });
+
+  it("names an unpublished league with `stay`, since the system pages need a published one", async () => {
+    legacySite();
+    openInPlace("/moves", true);
+    const copy = MESSAGES.tr.leagueEntry;
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText(copy.label), "123");
+    await user.click(screen.getByRole("button", { name: copy.submit }));
+    expect(await screen.findByText(copy.unsupported(123))).toBeInTheDocument();
+    expect(screen.getByTestId("location")).toHaveTextContent("/moves");
   });
 
   it("keeps a system page's address with `stay`, asking the member step there", async () => {

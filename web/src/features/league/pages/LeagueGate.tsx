@@ -7,6 +7,7 @@ import { useLanguage } from "../../../i18n/context";
 import { leagueIdInAddress, legacyLeagueAddress } from "../../../lib/leagueAddresses";
 import { LeagueDataMissing } from "../data";
 import { findLeague, loadLeagueDirectory } from "../directory";
+import { ForwardedLeagueGate } from "../forwarded/ForwardedLeagueGate";
 import { useLeagueIdentity } from "../identity/useLeagueIdentity";
 import { LeagueProvider } from "../LeagueProvider";
 import { LEAGUE_READ, leagueKeys } from "../queries";
@@ -32,13 +33,22 @@ import { MemberGate } from "./MemberGate";
  * a gameweek's squad, the moves, the rivals) behind the same two steps. The league is the
  * visitor's current one; the form asks for it in place, and once it connects the address
  * is kept and the member step follows there.
+ *
+ * A league address the directory does not list is read from the FPL forwarder instead
+ * (#983 step 4, `ForwardedLeagueGate`): a classic league that answers draws `forwarded`, the
+ * forwarded page for that address, and is never chosen as the visitor's league. A listed
+ * league never asks the forwarder anything, so it opens from the published tree whether
+ * the forwarder answers or not.
  */
 export function LeagueGate({
   children,
   source = "address",
+  forwarded,
 }: {
   children: ReactNode;
   source?: "address" | "visitor";
+  /** The page an unlisted classic league draws at this address; none, a not-found page. */
+  forwarded?: ReactNode;
 }) {
   const { messages } = useLanguage();
   const { leagueId: parameter } = useParams();
@@ -90,14 +100,13 @@ export function LeagueGate({
       </EmptyState>
     );
   }
+  if (league === null && source === "visitor")
+    return <LeagueEntryPage key={named} inPlace stay unpublishedLeagueId={named} />;
   if (league === null)
     return (
-      <LeagueEntryPage
-        key={named}
-        inPlace
-        stay={source === "visitor"}
-        unpublishedLeagueId={named}
-      />
+      <ForwardedLeagueGate key={named} leagueId={named} listed={directory.data.leagues}>
+        {forwarded}
+      </ForwardedLeagueGate>
     );
   return (
     <LeagueProvider league={league}>

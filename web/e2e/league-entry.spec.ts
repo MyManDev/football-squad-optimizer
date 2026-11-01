@@ -10,7 +10,7 @@ import { NO_LEAGUE } from "./leagueState";
 test.use({ storageState: NO_LEAGUE });
 
 for (const language of ["tr", "en"] as const) {
-  test(`a number the site does not publish is refused after the directory alone in ${language}`, async ({
+  test(`a number the site does not publish goes to its own address, read from the forwarder, in ${language}`, async ({
     page,
   }) => {
     await page.addInitScript((value) => localStorage.setItem("squadopt.language", value), language);
@@ -42,16 +42,19 @@ for (const language of ["tr", "en"] as const) {
     });
     await field.fill("123");
     await submit.click();
+    // Not published: its own address, where the gate asks the forwarder, which this preview
+    // does not run, so the league cannot be opened now.
+    await expect(page).toHaveURL("/league/123");
     await expect(page.getByRole("status")).toHaveText(
       language === "tr"
-        ? "Bu site 123 numaralı ligi yayımlamıyor."
-        : "This site does not publish league 123.",
+        ? "123 numaralı lig şu anda açılamıyor."
+        : "League 123 cannot be opened right now.",
     );
-    await expect(page).toHaveURL("/");
-    // Only the directory was read (the absent list, then the legacy tree's record); no
-    // document of league 123 was asked for.
+    // The directory (the absent list, then the legacy tree's record), read by the form and
+    // again by the gate, then page 1 of league 123's standings; no published document of it.
     const directory = ["/data/leagues.json", "/data/league/members.json"];
-    expect(requests).toEqual(directory);
+    const opened = [...directory, ...directory, "/api/v1/fpl/standings/123"];
+    expect(requests).toEqual(opened);
     await field.fill("352490");
     response = "missing";
     await submit.click();
@@ -67,7 +70,7 @@ for (const language of ["tr", "en"] as const) {
         ? "Yayımlanan lig verisi okunamadı. Yeniden dene."
         : "The published league data could not be read. Try again.",
     );
-    expect(requests).toEqual([...directory, ...directory, ...directory]);
+    expect(requests).toEqual([...opened, ...directory, ...directory]);
   });
 }
 

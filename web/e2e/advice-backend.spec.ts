@@ -83,12 +83,20 @@ test("member selections compute, reload uses cache, and a stopped backend leaves
   const findLeague = page.getByRole("button", { name: "Ligi bul", exact: true });
   await leagueField.fill("123");
   await findLeague.click();
-  await expect(page.getByRole("status")).toHaveText("Bu site 123 numaralı ligi yayımlamıyor.");
-  // Only the directory was read (the absent list, then the legacy tree's record); nothing
-  // of league 123, and nothing of the backend, was asked for.
-  expect(leagueRequests).toEqual([
+  // Not published: its own address, where the gate asks the FPL forwarder (not the advice
+  // backend), which this preview does not run.
+  await expect(page).toHaveURL("/league/123");
+  await expect(page.getByRole("status")).toHaveText("123 numaralı lig şu anda açılamıyor.");
+  // The directory (the absent list, then the legacy tree's record), read by the form and
+  // again by the gate, then page 1 of league 123's standings; nothing of the backend.
+  const directory = [
     `${context.webOrigin}/data/leagues.json`,
     `${context.webOrigin}/data/league/members.json`,
+  ];
+  expect(leagueRequests).toEqual([
+    ...directory,
+    ...directory,
+    `${context.webOrigin}/api/v1/fpl/standings/123?page=1`,
   ]);
   await leagueField.fill(String(context.leagueId));
   await findLeague.click();

@@ -37,6 +37,11 @@ const LeagueMemberPage = lazy(() =>
     default: m.LeagueMemberPage,
   })),
 );
+const ForwardedLeaguePage = lazy(() =>
+  import("../features/league/forwarded/ForwardedLeaguePage").then((m) => ({
+    default: m.ForwardedLeaguePage,
+  })),
+);
 const StatusPage = lazy(() =>
   import("../features/status/pages/StatusPage").then((m) => ({ default: m.StatusPage })),
 );
@@ -114,13 +119,15 @@ function LocalizedApp({ basename }: { basename: string }) {
                 ))}
                 {/* Every league address names its league; the old shape without the
                     number goes through the gate, which rewrites it to the current league.
-                    The gate then asks who the visitor is before the page is drawn. */}
+                    The gate then asks who the visitor is before the page is drawn. A
+                    classic league the site does not publish opens from the FPL forwarder
+                    instead, as its standings (#983 step 4). */}
                 {["/league", "/league/:leagueId"].map((root) => (
                   <Route
                     key={root}
                     path={root}
                     element={
-                      <LeagueGate>
+                      <LeagueGate forwarded={<ForwardedLeaguePage />}>
                         <LeaguePage />
                       </LeagueGate>
                     }
@@ -131,7 +138,7 @@ function LocalizedApp({ basename }: { basename: string }) {
                     key={root}
                     path={root}
                     element={
-                      <LeagueGate>
+                      <LeagueGate forwarded={<ForwardedLeaguePage />}>
                         <LeagueMembersPage />
                       </LeagueGate>
                     }
