@@ -154,6 +154,43 @@ the member's. A document from another capture than the member's page is still re
 the device solve. Because the address carries the digest, `web/public/_headers` lets a
 browser keep `/data/device/*` for a year.
 
+## Live entry inputs through the forwarder
+
+Since #983 step 3 the page has a client of the FPL forwarder
+([ADR 0012](../architecture/decisions/0012-fpl-forwarder.md)),
+`web/src/features/league/forwarder/client.ts`, so an entry's inputs can come from its bundle,
+`GET /api/v1/fpl/entry/{entry}/bundle?gw={table gameweek}`
+([`fpl_entry_bundle_v1`](fpl_entry_bundle_v1.md)), as well as from the entry document. The
+client takes an answer only when it is JSON marked `x-squadopt-fpl: 1`, with the bundle's
+`contract_version` and the entry and table gameweek it asked for. The site's HTML shell (which
+a path the Worker does not answer falls through to with status 200), another version, one of
+the Worker's JSON refusals and no answer at all are each a typed refusal, never an exception,
+and the page then reads the published tree as before.
+
+A bundle is combined with a table (the per-capture table above, or the tree's copy) only when
+it holds the squad that table plans from. The table plans gameweek N from the picks frozen at
+deadline N - 1, so the rule is that the picks gameweek equals the table gameweek minus 1 and
+the history covers it (`bundleMatchesTable` in `web/src/features/league/forwarder/identity.ts`):
+
+| Check | Refusal |
+| --- | --- |
+| The bundle's `entry_id` and its `entry.id` are the member's. | `entry_mismatch` |
+| The bundle's `gameweek` is the table's `gameweek`. | `table_gameweek_mismatch` |
+| The picks gameweek, the week of the newest document in `picks`, is the table gameweek minus 1, and no document is later. | `picks_gameweek_mismatch` |
+| The history covers that week: `history.current` has a row for it. | `history_missing_week` |
+
+A history with later weeks still covers it: FPL lists a week in the history once its deadline
+has passed, so the bundle for a table whose deadline has passed carries the week after too.
+The earlier documents in `picks` are the Free Hit walk-back and the gameweek 1 picks, which
+the bundle's contract names.
+
+A bundle that passes is read through the entry-state readers unchanged (`bundleEntryState` in
+`web/src/features/league/forwarder/entryState.ts`): `readEntry`, `readHistory`,
+`readTransfers`, `readPicks` for each week it holds, and the held squad from `heldSquadBasis`
+over those weeks, so a Free Hit week's basis is the week before it. A part a reader refuses
+makes the whole bundle unreadable. Building the member block from it is #983 step 4's; until
+then nothing the device solves comes from a forwarded bundle.
+
 ## What the device answers
 
 Window one only, for a member whose entry document carries the block, on the capture the

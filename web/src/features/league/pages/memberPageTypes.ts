@@ -8,6 +8,7 @@ import type { DeviceRivalReads } from "../device/computable";
 import type { DevicePlanDependencies } from "../device/useDevicePlan";
 import type { WhatIfDependencies } from "../device/useWhatIf";
 import type { SuggestionHistory } from "../history/historyData";
+import type { MemberLiveDependencies } from "../live/useMemberLiveScore";
 import type {
   EntryAdvice,
   EntryAdviceIndex,
@@ -56,6 +57,8 @@ export interface LeagueMemberViewProps {
   deviceDependencies?: DevicePlanDependencies;
   /** The what-if mode's table loader and worker; the page's own unless a test injects them. */
   whatIfDependencies?: WhatIfDependencies;
+  /** The live week's forwarder reads and table loader; the page's own unless a test injects them. */
+  liveDependencies?: MemberLiveDependencies;
   /**
    * What the page has read of the other members' entry documents. The device offers a
    * rival strategy only against a rival among them it can use; none given, it offers no rival.
