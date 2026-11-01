@@ -228,6 +228,65 @@ def test_server_baseline_has_one_league_independent_scoring_record(
     assert loaded == records[0]
 
 
+#: A key the fault removes from the payload rather than sets.
+_ABSENT = object()
+
+
+def test_every_baseline_refusal_fires_on_its_own_fault(world: dict[str, Any]) -> None:
+    """Each check of the baseline builder, alone: a payload sound but for one fault is refused
+    with that check's reason, and the sound payload is recorded. The capture binding is one of
+    them: a payload from another capture, or naming none, is refused."""
+
+    inputs, projection, rules = _world_context(world)
+    picks = _member_picks(world, 101, _legal_squad())
+    control = solve_member_control(picks, inputs, projection, rules)
+    payload = advise_entry(
+        AdviseEntryRequest(SEASON, 2, 352490, 101),
+        provider=_Provider({101: picks}),
+        inputs=inputs,
+        projection=projection,
+        rules=rules,
+        control=control,
+    )
+    capture = advice_records.RecordCapture(inputs.snapshot_id, inputs.captured_at_utc)
+
+    def build(document: dict[str, Any]) -> dict[str, object]:
+        return advice_records.build_member_baseline_record(
+            picks, projection, document, capture=capture, generated_at_utc=WHEN.isoformat()
+        )
+
+    assert build(dict(payload))["source"] == "server_one_week_baseline"
+    identity = "does not identify the recorded member and week"
+    one_week = "must identify one week and the recorded capture"
+    unweighted = "must be the unweighted one-week server answer"
+    faults: dict[str, tuple[dict[str, object], str]] = {
+        "entry": ({"entry_id": 102}, identity),
+        "season": ({"season": "2025-26"}, identity),
+        "gameweek": ({"gameweek": 3}, identity),
+        "mode": ({"mode": "yakala"}, one_week),
+        "window": ({"window": 3}, one_week),
+        "window-not-an-integer": ({"window": True}, one_week),
+        "another-capture": ({"source_snapshot_id": "fpl-live-another"}, one_week),
+        "no-capture": ({"source_snapshot_id": _ABSENT}, one_week),
+        "evidence": ({"evidence": {}}, unweighted),
+        "top100": ({"top100": {}}, unweighted),
+        "preferences": ({"preferences": {}}, unweighted),
+        "plan-weeks": ({"plan_weeks": 3}, unweighted),
+        "no-captain": ({"captain": None}, "complete starting side and bench"),
+    }
+    met: dict[str, str] = {}
+    for name, (change, said) in faults.items():
+        faulted = {key: value for key, value in payload.items() if change.get(key) is not _ABSENT}
+        faulted.update({key: value for key, value in change.items() if value is not _ABSENT})
+        try:
+            build(faulted)
+        except AdviceRecordError as error:
+            met[name] = said if said in str(error) else str(error)
+        else:
+            met[name] = "recorded"
+    assert met == {name: said for name, (_, said) in faults.items()}
+
+
 def test_every_published_switch_is_recorded_with_its_bytes_and_replays(
     world: dict[str, Any], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

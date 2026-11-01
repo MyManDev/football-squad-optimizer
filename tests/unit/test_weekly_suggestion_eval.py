@@ -139,14 +139,6 @@ def test_one_baseline_is_read_by_both_leagues(tmp_path: Path) -> None:
         )
 
 
-def test_baseline_cannot_carry_a_league_identity(tmp_path: Path) -> None:
-    record = recorded()
-    record["contract_version"] = MEMBER_BASELINE_RECORD_CONTRACT_VERSION
-    record_member_advice(tmp_path, record)
-    with pytest.raises(review.SuggestionEvaluationError, match="identity"):
-        choose(tmp_path)
-
-
 def _baseline(**kwargs: Any) -> dict[str, Any]:
     record = recorded(**kwargs)
     del record["league_id"]
@@ -155,6 +147,32 @@ def _baseline(**kwargs: Any) -> dict[str, Any]:
         source="server_one_week_baseline",
     )
     return record
+
+
+@pytest.mark.parametrize(
+    "fault",
+    [
+        pytest.param({"league_id": 352490}, id="league"),
+        pytest.param({"season": "2025-26"}, id="season"),
+        pytest.param({"gameweek": 5}, id="gameweek"),
+        pytest.param({"entry_id": 102}, id="entry"),
+        pytest.param({"player_id_space": "fpl_element_id"}, id="player-id-space"),
+        pytest.param({"source": "published_menu"}, id="source"),
+    ],
+)
+def test_a_baseline_wrong_in_one_identity_is_refused(tmp_path: Path, fault: dict[str, Any]) -> None:
+    """A record that is a sound baseline but for one identity, filed where member 101's
+    gameweek 4 is read, is refused rather than read as that member-week's baseline."""
+    record = {**_baseline(), **fault}
+    # Filed by its own fields, then moved to the requested member-week: the reader, not the
+    # path, has to see the fault.
+    record_member_advice(tmp_path / "filed", record)
+    filed = next((tmp_path / "filed").glob("*/gw*/entry-*/capture-a"))
+    requested = tmp_path / "records" / SEASON / "gw04" / "entry-101" / "capture-a"
+    requested.parent.mkdir(parents=True)
+    filed.rename(requested)
+    with pytest.raises(review.SuggestionEvaluationError, match="Record identity"):
+        choose(tmp_path / "records")
 
 
 def test_dual_stores_keep_the_original_digest_and_serve_the_second_league(tmp_path):
