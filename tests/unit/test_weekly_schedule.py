@@ -583,6 +583,8 @@ def test_the_host_units_tick_the_gate_by_its_module_on_a_workspace() -> None:
         assert arguments[0] == f"{workspace}/.venv/bin/python"
         # D1 on #1243: no tick releases; a run is released by hand after its preview.
         assert ("--release" in arguments, "--dry-run" in arguments) == (False, dry), command
+        # One solver worker per core, from the unit or provision.sh's workers.conf.
+        assert " --workers ${WEEKLY_WORKERS}" in command
         workspaces.add(workspace)
     (workspace,) = workspaces
     # The drop-in clears the unit's command before it gives its own.
@@ -593,8 +595,13 @@ def test_the_host_units_tick_the_gate_by_its_module_on_a_workspace() -> None:
     assert [key for key, _ in service].count("EnvironmentFile") == 1
     # The club-news settings and any key come from the private file, never from the unit.
     assert all(
-        value.split("=", 1)[0] in {"PYTHONPATH", "PYTHONUNBUFFERED"} for value in environment
+        value.split("=", 1)[0] in {"PYTHONPATH", "PYTHONUNBUFFERED", "WEEKLY_WORKERS"}
+        for value in environment
     )
+    assert "WEEKLY_WORKERS=4" in environment
+    # The gate reads the unit's memory peak, and a worker killed for memory fails the run
+    # rather than stopping the tick before its end line.
+    assert {("MemoryAccounting", "yes"), ("OOMPolicy", "continue")} <= set(service)
     assert {("OnCalendar", "*:0/15"), ("Persistent", "true")} <= set(timer)
     assert ("Unit", "weekly-schedule.service") in timer
 
