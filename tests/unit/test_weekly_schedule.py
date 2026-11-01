@@ -10,16 +10,20 @@ units that tick the gate on a Linux host (`deploy/weekly-schedule/`) are read as
 from __future__ import annotations
 
 import inspect
+import itertools
 import json
+import subprocess
 from collections.abc import Collection, Sequence
 from datetime import datetime, timedelta
 from pathlib import Path
 
 import pytest
 
+from squadopt.data.errors import DataSourceError
 from squadopt.platform import weekly_release
 from squadopt.platform import weekly_schedule as gate
-from squadopt.platform.weekly_publish import PublishNames
+from squadopt.platform.weekly_journal import WeeklyRun, WeeklyStageResult
+from squadopt.platform.weekly_publish import WEEKLY_RUNS, PublishNames
 
 DEADLINES = {9: "2026-10-31T11:00:00Z", 10: "2026-11-06T18:30:00Z"}
 HOST_FILES = Path(__file__).resolve().parents[2] / "deploy" / "weekly-schedule"
@@ -308,22 +312,49 @@ def test_the_weekly_arguments_are_weekly_run_s_and_friday_refuses_the_fixture() 
 
 
 class _Host:
-    """The runner and the club-news entry, recorded: nothing runs."""
+    """The runner, the club-news entry and the #1093 comments, recorded: nothing runs.
 
-    def __init__(self, news_exit: int = 0, weekly_exit: int = 0) -> None:
+    The clock answers 0 when a run starts and `minutes` later when it ends.
+    """
+
+    def __init__(
+        self,
+        news_exit: int = 0,
+        weekly_exit: int = 0,
+        *,
+        pull_exit: int = 0,
+        release_exit: int = 7,
+        minutes: float = 104,
+        journal: bool = False,
+    ) -> None:
         self.commands: list[list[str]] = []
         self.news: list[list[str]] = []
         self.released: list[str] = []
+        self.posted: list[str] = []
         self.news_exit = news_exit
         self.weekly_exit = weekly_exit
+        self.pull_exit = pull_exit
+        self.release_exit = release_exit
+        self.journal = journal
+        self.ticks = itertools.cycle([0.0, minutes * 60])
 
     def runner(self, arguments: Sequence[str], cwd: Path, log: Path) -> int:
         self.commands.append(list(arguments))
-        return self.weekly_exit if "squadopt.platform.weekly_operations" in arguments else 0
+        if "squadopt.platform.weekly_operations" not in arguments:
+            return self.pull_exit
+        if self.journal:
+            _failed_journal(cwd, arguments[arguments.index("--run-id") + 1])
+        return self.weekly_exit
+
+    def notify(self, workspace: Path, text: str) -> None:
+        self.posted.append(text)
+
+    def clock(self) -> float:
+        return next(self.ticks)
 
     def release(self, workspace: Path, run_id: str) -> int:
         self.released.append(run_id)
-        return 7
+        return self.release_exit
 
     def acquire(self, arguments: list[str]) -> int:
         self.news.append(arguments)
@@ -350,7 +381,25 @@ def _main(workspace: Path, now: str, host: _Host, *extra: str) -> int:
         acquire=host.acquire,
         read_bootstrap=lambda: pytest.fail("the network was read"),
         release=host.release,
+        notify=host.notify,
+        clock=host.clock,
     )
+
+
+def _failed_journal(workspace: Path, run_id: str) -> None:
+    """What a weekly command leaves when its league stage fails: a journal that says so."""
+
+    run = WeeklyRun(workspace / WEEKLY_RUNS, run_id, {"request": {}}, ["capture", "league"])
+    captured = workspace / "captured.txt"
+    captured.write_text("capture", encoding="utf-8")
+
+    def fails() -> WeeklyStageResult:
+        raise RuntimeError("the solver stopped")
+
+    with run.hold():
+        run.stage("capture", inputs=[], operation=lambda: WeeklyStageResult((captured,)))
+        with pytest.raises(RuntimeError):
+            run.stage("league", inputs=[], operation=fails)
 
 
 def test_a_dry_run_prints_the_run_it_would_start_and_writes_nothing(
@@ -379,12 +428,19 @@ def test_a_dry_run_exits_three_for_a_missed_window_and_two_for_a_short_lead(
     workspace = _workspace(tmp_path)
     assert _main(workspace, "2026-10-31T08:00:00Z", _Host(), "--dry-run") == 3
     assert "decision: missed (the final run for gameweek 9 did not start" in capsys.readouterr().out
-    assert _main(workspace, "2026-10-30T02:00:00Z", _Host(), "--final-lead-hours", "3") == 2
+    assert not (tmp_path / "data").exists()
+    host = _Host()
+    assert _main(workspace, "2026-10-30T02:00:00Z", host, "--final-lead-hours", "3") == 2
     assert capsys.readouterr().out.strip() == (
         "Refused: A final run 3 h before the deadline cannot be live before it: "
         "a run takes about 3.5 h."
     )
-    assert not (tmp_path / "data").exists()
+    # A refusal writes nothing but the marker of its one alarm that day.
+    alarms = workspace / gate.SCHEDULE_STATE / "alarms"
+    assert [path.name for path in (tmp_path / "data").rglob("*") if path.is_file()] == [
+        "refused-2026-10-30.json"
+    ]
+    assert alarms.is_dir() and len(host.posted) == 1
 
 
 def test_a_start_leaves_its_marker_acquires_news_and_runs_the_weekly_command_once(
@@ -532,3 +588,235 @@ def test_the_host_units_tick_the_gate_by_its_module_on_a_workspace() -> None:
     )
     assert {("OnCalendar", "*:0/15"), ("Persistent", "true")} <= set(timer)
     assert ("Unit", "weekly-schedule.service") in timer
+
+
+FINAL_RUN = "2026-27-gw09-friday-20261031T0705Z"
+HOLD = "Until its end line here, please merge nothing into develop and start no heavy run."
+LIFTED = "The hold on develop and heavy runs is lifted."
+STAYS = "The last accepted publication stays live."
+WAITS = "its site pull request waits for a preview and a yes before its release (D1 on #1243)"
+
+
+def _started(tmp_path: Path, host: _Host, now: str = "2026-10-31T07:05:00Z", *extra: str) -> int:
+    workspace = _workspace(tmp_path)
+    (workspace / "data" / "snapshots" / "fpl-live-20261031").mkdir(parents=True, exist_ok=True)
+    return _main(workspace, now, host, *extra)
+
+
+def test_a_run_posts_its_start_and_end_on_the_slot_issue(tmp_path: Path) -> None:
+    host = _Host()
+    assert _started(tmp_path, host) == 0
+    assert host.posted == [
+        f"Weekly run `{FINAL_RUN}` started at 2026-10-31T07:05Z on the scheduled host: the final "
+        f"run for gameweek 9, with club news, deadline 2026-10-31T11:00Z. {HOLD}",
+        f"Weekly run `{FINAL_RUN}` ended at 2026-10-31T08:49Z with exit 0: {WAITS}. It took "
+        f"1 h 44 min. {LIFTED}",
+    ]
+
+
+def test_the_settled_view_in_a_gap_says_so_in_its_start_line(tmp_path: Path) -> None:
+    workspace = _workspace(tmp_path)
+    (workspace / "bootstrap.json").write_bytes(_bootstrap(GAP, settled={5}))
+    host = _Host(minutes=50)
+    assert _main(workspace, "2026-09-22T09:00:00Z", host) == 0
+    assert host.posted[0] == (
+        "Weekly run `2026-27-gw06-tuesday-20260922T0900Z` started at 2026-09-22T09:00Z on the "
+        "scheduled host: the morning run for gameweek 6 that publishes the settled view of "
+        f"gameweek 5 in a fixture gap, deadline 2026-10-10T10:00Z. {HOLD}"
+    )
+    assert host.posted[1].endswith(f"It took 50 min. {LIFTED}")
+
+
+@pytest.mark.parametrize(
+    "host,stage,verb,log",
+    [
+        (_Host(pull_exit=1), "checkout", "was refused (exit 2)", f"{FINAL_RUN}.log"),
+        (_Host(news_exit=1), "club news", "was refused (exit 2)", f"{FINAL_RUN}.club-news.log"),
+        (_Host(weekly_exit=1), "weekly run", "failed (exit 1)", f"{FINAL_RUN}.log"),
+        (
+            _Host(weekly_exit=1, journal=True),
+            "weekly run: league",
+            "failed (exit 1)",
+            f"{FINAL_RUN}.log",
+        ),
+    ],
+)
+def test_a_refused_or_failed_run_posts_an_alarm_naming_its_id_and_stage(
+    tmp_path: Path, host: _Host, stage: str, verb: str, log: str
+) -> None:
+    code = 2 if verb.startswith("was refused") else 1
+    assert _started(tmp_path, host) == code
+    start, end, alarm = host.posted
+    assert start.startswith(f"Weekly run `{FINAL_RUN}` started at 2026-10-31T07:05Z")
+    assert end == (
+        f"Weekly run `{FINAL_RUN}` ended at 2026-10-31T08:49Z with exit {code}: it stopped at "
+        f"stage `{stage}`, and the alarm follows. It took 1 h 44 min. {LIFTED}"
+    )
+    assert alarm == (
+        f"Alarm: weekly run `{FINAL_RUN}` {verb} at stage `{stage}`. Read "
+        f"`data/logs/weekly/{log}` on the scheduled host before anything is run again. {STAYS}"
+    )
+
+
+def test_a_release_that_stops_posts_its_alarm_and_one_that_completes_says_live(
+    tmp_path: Path,
+) -> None:
+    host = _Host(release_exit=1)
+    assert _started(tmp_path / "stopped", host, "2026-10-31T07:05:00Z", "--release") == 1
+    assert host.posted[2] == (
+        f"Alarm: weekly run `{FINAL_RUN}` stopped (exit 1) at stage `release`. Read "
+        f"`data/logs/weekly/{FINAL_RUN}.release.log` on the scheduled host: a release that "
+        f"stopped after the enqueue is reconciled by hand, never run again. {STAYS}"
+    )
+    live = _Host(release_exit=0, minutes=200)
+    assert _started(tmp_path / "live", live, "2026-10-31T07:05:00Z", "--release") == 0
+    assert live.posted[1] == (
+        f"Weekly run `{FINAL_RUN}` ended at 2026-10-31T10:25Z with exit 0: its release is "
+        f"live. It took 3 h 20 min. {LIFTED}"
+    )
+    assert len(live.posted) == 2
+
+
+@pytest.mark.parametrize(
+    "now,minutes,extra,alarm",
+    [
+        (
+            "2026-10-31T07:05:00Z",
+            131,
+            (),
+            f"Alarm: weekly run `{FINAL_RUN}` is late at stage `weekly run`. It ended at "
+            "2026-10-31T09:16Z, after 2026-10-31T09:15Z, the last end that leaves its release "
+            f"by hand 1.75 h before the deadline 2026-10-31T11:00Z. {STAYS}",
+        ),
+        (
+            "2026-10-31T07:05:00Z",
+            236,
+            ("--release",),
+            f"Alarm: weekly run `{FINAL_RUN}` is late at stage `release`. It ended at "
+            f"2026-10-31T11:01Z, after 2026-10-31T11:00Z, the deadline. {STAYS}",
+        ),
+        (
+            "2026-10-30T02:00:00Z",
+            211,
+            (),
+            "Alarm: weekly run `2026-27-gw09-tuesday-20261030T0200Z` is late at stage `weekly "
+            "run`. It ended at 2026-10-30T05:31Z, after 2026-10-30T05:30Z, 3.5 h after its "
+            f"start, the time the gate leaves a morning run before a final run. {STAYS}",
+        ),
+    ],
+)
+def test_a_run_that_ends_too_late_for_its_budget_posts_an_alarm(
+    tmp_path: Path, now: str, minutes: int, extra: tuple[str, ...], alarm: str
+) -> None:
+    host = _Host(release_exit=0, minutes=minutes)
+    assert _started(tmp_path, host, now, *extra) == 0
+    assert host.posted[2:] == [alarm]
+    # A minute less is in time.
+    early = _Host(release_exit=0, minutes=minutes - 1)
+    assert _started(tmp_path / "early", early, now, *extra) == 0
+    assert len(early.posted) == 2
+
+
+def test_a_missed_final_run_posts_one_alarm_and_a_dry_run_none(tmp_path: Path) -> None:
+    workspace = _workspace(tmp_path)
+    host = _Host()
+    assert _main(workspace, "2026-10-31T08:00:00Z", host, "--dry-run") == 3
+    assert host.posted == []
+    assert _main(workspace, "2026-10-31T08:00:00Z", host) == 3
+    assert _main(workspace, "2026-10-31T08:15:00Z", host) == 3
+    assert host.posted == [
+        "Alarm: the final run for gameweek 9 (`final-2026-27-gw09`) was missed at stage `gate`. "
+        "At 2026-10-31T08:00Z the deadline 2026-10-31T11:00Z was 180 min away and a run takes "
+        f"about 3.5 h, so no run was started. {STAYS}"
+    ]
+    assert host.commands == []
+
+
+def test_a_gate_that_cannot_decide_posts_one_alarm_a_day_without_its_paths(
+    tmp_path: Path,
+) -> None:
+    workspace = _workspace(tmp_path)
+    (workspace / gate.FIXTURES).write_text("{}", encoding="utf-8")
+    host = _Host()
+    for now in ("2026-10-30T02:00:00Z", "2026-10-30T02:15:00Z", "2026-10-31T02:00:00Z"):
+        assert _main(workspace, now, host) == 2
+    assert host.posted == [
+        f"Alarm: the weekly schedule gate refused at stage `gate`. At {day}T02:00Z it could not "
+        "decide, so no run could start: web/public/data/fixtures.json names no "
+        "payload.season. This alarm is posted once a UTC day while the refusal lasts. "
+        f"{STAYS}"
+        for day in ("2026-10-30", "2026-10-31")
+    ]
+    assert not any(str(tmp_path) in text for text in host.posted)
+
+
+def test_every_comment_is_plain_english_with_no_dash_a_secret_or_a_home_path(
+    tmp_path: Path,
+) -> None:
+    posted: list[str] = []
+    for index, host in enumerate(
+        (_Host(), _Host(news_exit=1), _Host(weekly_exit=1, journal=True), _Host(minutes=300))
+    ):
+        _started(tmp_path / str(index), host)
+        posted += host.posted
+    assert len(posted) == 11
+    for text in posted:
+        assert not {"\u2013", "\u2014"} & set(text), text
+        assert str(Path.home()) not in text and str(tmp_path) not in text, text
+        assert "KEY" not in text and "token" not in text.lower(), text
+
+
+def test_the_slot_issue_comment_goes_through_gh_and_a_failure_never_stops_the_gate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    calls: list[tuple[list[str], dict[str, object]]] = []
+    answers = [
+        subprocess.CompletedProcess([], 0, "https://github.com/o/r/issues/1093#c1\n"),
+        subprocess.CompletedProcess([], 4, "gh: To use GitHub CLI, run gh auth login\n"),
+    ]
+
+    def run(arguments: list[str], **options: object) -> subprocess.CompletedProcess[str]:
+        calls.append((arguments, options))
+        return answers.pop(0)
+
+    monkeypatch.setattr(subprocess, "run", run)
+    gate.comment_on_slot_issue(tmp_path, "Weekly run `x` started.")
+    gate.comment_on_slot_issue(tmp_path, "Weekly run `x` ended.")
+    assert [arguments for arguments, _ in calls] == [
+        ["gh", "issue", "comment", "1093", "--body-file", "-"]
+    ] * 2
+    assert [(options["cwd"], options["input"]) for _, options in calls] == [
+        (tmp_path, "Weekly run `x` started."),
+        (tmp_path, "Weekly run `x` ended."),
+    ]
+    assert capsys.readouterr().out.splitlines() == [
+        "#1093: https://github.com/o/r/issues/1093#c1",
+        "#1093: the comment was not posted (gh exited 4): gh: To use GitHub CLI, run gh auth login",
+    ]
+
+    def missing(arguments: list[str], **options: object) -> None:
+        raise FileNotFoundError("gh")
+
+    monkeypatch.setattr(subprocess, "run", missing)
+    gate.comment_on_slot_issue(tmp_path, "Alarm")
+    assert "the comment was not posted (gh exited 127)" in capsys.readouterr().out
+    assert inspect.signature(gate.main).parameters["notify"].default is gate.comment_on_slot_issue
+
+
+def test_a_bootstrap_the_game_does_not_answer_is_decided_on_the_held_copy(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    cache = tmp_path / "bootstrap.json"
+    now = datetime.fromisoformat("2030-01-01T00:00:00Z")
+
+    def unavailable() -> bytes:
+        raise DataSourceError("bootstrap-static returned HTTP 503 Service Unavailable.")
+
+    with pytest.raises(DataSourceError):
+        gate.cached_bootstrap(cache, now, unavailable)
+    cache.write_bytes(b"held")
+    assert gate.cached_bootstrap(cache, now, unavailable) == b"held"
+    said = capsys.readouterr().out
+    assert said.startswith("bootstrap: the read failed (bootstrap-static returned HTTP 503")
+    assert gate.cached_bootstrap(cache, now, lambda: b"fresh") == b"fresh"
+    assert cache.read_bytes() == b"fresh"

@@ -31,10 +31,17 @@ seen its preview and said yes, by ``python -m squadopt.platform.weekly_release -
 exited 0, with ``weekly_release.release_run`` (#1249 in Python); it stays off, and switching it
 on is a new decision, recorded on #1243 first.
 
-``--dry-run`` prints the decision and the command it would run, and writes nothing. The exit
-code is 0 for a decision (starting nothing is one), the weekly command's own when one ran
-(with ``--release``, the release's after a run that exited 0), 3 when the final run's window
-was missed, and 2 for a refusal before the weekly command ran.
+A run the gate starts posts a start line and an end line on #1093, the heavy-run slot, which a
+weekly run outranks (6461334333), so that nobody merges into develop or starts a heavy run
+under it. A run that is refused, fails or ends late, a final run the gate missed, and a gate
+that cannot decide (once a UTC day) post an alarm there naming the run and the stage (D6 on
+#1243). Every comment goes through one seam, `Notify`, and a post that fails is printed and
+never stops the gate.
+
+``--dry-run`` prints the decision and the command it would run, and writes and posts nothing.
+The exit code is 0 for a decision (starting nothing is one), the weekly command's own when one
+ran (with ``--release``, the release's after a run that exited 0), 3 when the final run's
+window was missed, and 2 for a refusal before the weekly command ran.
 """
 
 from __future__ import annotations
@@ -48,6 +55,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 from collections.abc import Callable, Collection, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -65,6 +73,8 @@ from squadopt.data.sources.fpl_live import (
 from squadopt.data.timestamps import as_instant
 from squadopt.platform import club_news_acquire, weekly_release
 from squadopt.platform.fpl_capture import ENDPOINTS, fetch
+from squadopt.platform.weekly_journal import WeeklyJournalError, inspect_run
+from squadopt.platform.weekly_publish import WEEKLY_RUNS
 
 #: The defaults #1243 proposes, its decision D2: a morning run from 02:00 UTC, the final run
 #: 4 h before the deadline, and 3.5 h for a run from capture to live (GW8 took 3 h 34 min).
@@ -86,6 +96,13 @@ WORKERS: Final = 15
 #: to GW31) and the weekends after three midweek rounds (GW20, GW25 and GW28).
 LEAD_WINDOW_DAYS: Final = 9.0
 
+#: GW8's release from its site pull request to live: four CI rounds and the deploy, 102 min,
+#: with a few minutes between them (#1243). A final run that ends later than this before its
+#: deadline cannot be live in time once its release waits for a person (D1).
+RELEASE_HOURS: Final = 1.75
+#: The heavy-run slot, where a weekly run posts its start, its end and its alarms (D6).
+SLOT_ISSUE: Final = "1093"
+
 SCHEDULE_STATE: Final = Path("data/runtime/weekly-schedule")
 WEEKLY_LOGS: Final = LOG_ROOT_NAME / "weekly"
 FIXTURES: Final = Path("web/public/data/fixtures.json")
@@ -99,10 +116,29 @@ Runner = Callable[[Sequence[str], Path, Path], int]
 Acquire = Callable[[list[str]], int]
 #: Releases a completed run by its id (#1249), answering the release's exit code.
 Release = Callable[[Path, str], int]
+#: Posts one comment on the slot issue from the checkout (D6); never raises.
+Notify = Callable[[Path, str], None]
+#: A monotonic clock in seconds, for a run's duration.
+Clock = Callable[[], float]
 
 
 class ScheduleError(ValueError):
     """A refusal: the gate starts nothing further and exits 2."""
+
+
+@dataclass(frozen=True, slots=True)
+class Outcome:
+    """What a started run came to: its exit code, where it stopped and what a person reads.
+
+    `stage` and `log` are empty for a run that completed; `log` is relative to the checkout,
+    so a comment names no path of the host.
+    """
+
+    code: int
+    stage: str = ""
+    verb: str = ""
+    log: str = ""
+    released: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -306,13 +342,22 @@ def fpl_bootstrap() -> bytes:
 
 
 def cached_bootstrap(cache: Path, now: datetime, read: Callable[[], bytes]) -> bytes:
-    """The bootstrap, read again once the held copy is an hour old: deadlines move rarely."""
+    """The bootstrap, read again once the held copy is an hour old: deadlines move rarely.
 
-    if cache.is_file():
-        held = datetime.fromtimestamp(cache.stat().st_mtime, UTC)
-        if now - held < BOOTSTRAP_MAX_AGE:
-            return cache.read_bytes()
-    payload = read()
+    A read that fails while a copy is held decides on that copy: the game answers nothing
+    while it updates after each deadline, and that is no reason to refuse or raise an alarm.
+    """
+
+    held = datetime.fromtimestamp(cache.stat().st_mtime, UTC) if cache.is_file() else None
+    if held is not None and now - held < BOOTSTRAP_MAX_AGE:
+        return cache.read_bytes()
+    try:
+        payload = read()
+    except DataError as error:
+        if held is None:
+            raise
+        print(f"bootstrap: the read failed ({error}); deciding on the copy of {utc_text(held)}")
+        return cache.read_bytes()
     cache.parent.mkdir(parents=True, exist_ok=True)
     partial = cache.with_name(f"{cache.name}.partial")
     partial.write_bytes(payload)
@@ -408,6 +453,195 @@ def write_marker(
     return path
 
 
+def comment_on_slot_issue(workspace: Path, text: str) -> None:
+    """Post `text` as a comment on #1093 with `gh` from the checkout; a failure is printed."""
+
+    try:
+        completed = subprocess.run(
+            ["gh", "issue", "comment", SLOT_ISSUE, "--body-file", "-"],
+            cwd=workspace,
+            input=text,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            check=False,
+            timeout=120,
+        )
+        code, said = completed.returncode, completed.stdout.strip()
+    except (OSError, subprocess.SubprocessError) as error:
+        code, said = 127, str(error)
+    if code == 0:
+        print(f"#{SLOT_ISSUE}: {said or 'posted'}")
+    else:
+        print(f"#{SLOT_ISSUE}: the comment was not posted (gh exited {code}): {said}")
+
+
+def post_once(workspace: Path, name: str, text: str, notify: Notify) -> None:
+    """Post the alarm `name` once: its marker is written first, and a held one posts nothing."""
+
+    directory = workspace / SCHEDULE_STATE / "alarms"
+    marker = directory / f"{name}.json"
+    if marker.exists() or not workspace.is_dir():
+        return
+    try:
+        directory.mkdir(parents=True, exist_ok=True)
+        marker.write_text(json.dumps({"text": text}, indent=2) + "\n", encoding="utf-8")
+    except OSError as error:
+        print(f"alarm {name}: not posted, its marker could not be written ({error})")
+        return
+    notify(workspace, text)
+
+
+def public(text: str, workspace: Path) -> str:
+    """`text` with the checkout's path and the home folder's taken out, for a public comment.
+
+    A path in the checkout becomes relative to it, as the logs are named in every comment.
+    """
+
+    swaps = (
+        (f"{workspace}{os.sep}", ""),
+        (str(workspace), "the checkout"),
+        (str(Path.home()), "~"),
+    )
+    for path, name in swaps:
+        if len(path) > 1:
+            text = text.replace(path, name)
+    return text
+
+
+def run_title(decision: Decision) -> str:
+    if decision.action == "final":
+        return f"the final run for gameweek {decision.gameweek}, with club news"
+    if decision.marker.startswith("settled-"):
+        return (
+            f"the morning run for gameweek {decision.gameweek} that publishes the settled view "
+            f"of gameweek {decision.gameweek - 1} in a fixture gap"
+        )
+    return f"the morning run for gameweek {decision.gameweek}"
+
+
+def duration_text(seconds: float) -> str:
+    hours, minutes = divmod(round(seconds / 60), 60)
+    return f"{hours} h {minutes} min" if hours else f"{minutes} min"
+
+
+def start_text(identity: str, decision: Decision, now: datetime) -> str:
+    return (
+        f"Weekly run `{identity}` started at {utc_text(now)} on the scheduled host: "
+        f"{run_title(decision)}, deadline {utc_text(decision.deadline)}. Until its end line "
+        "here, please merge nothing into develop and start no heavy run."
+    )
+
+
+def end_text(identity: str, outcome: Outcome, ended: datetime, seconds: float) -> str:
+    if outcome.code != 0:
+        result = f"it stopped at stage `{outcome.stage}`, and the alarm follows"
+    elif outcome.released:
+        result = "its release is live"
+    else:
+        result = (
+            "its site pull request waits for a preview and a yes before its release (D1 on #1243)"
+        )
+    return (
+        f"Weekly run `{identity}` ended at {utc_text(ended)} with exit {outcome.code}: "
+        f"{result}. It took {duration_text(seconds)}. The hold on develop and heavy runs "
+        "is lifted."
+    )
+
+
+def alarm_text(subject: str, verb: str, stage: str, detail: str) -> str:
+    return (
+        f"Alarm: {subject} {verb} at stage `{stage}`. {detail} The last accepted publication "
+        "stays live."
+    )
+
+
+def missed_alarm(decision: Decision, season: str, now: datetime, run_hours: float) -> str:
+    minutes = math.floor((decision.deadline - now).total_seconds() / 60 + 0.5)
+    return alarm_text(
+        f"the final run for gameweek {decision.gameweek} "
+        f"(`final-{season}-gw{decision.gameweek:02d}`)",
+        "was missed",
+        "gate",
+        f"At {utc_text(now)} the deadline {utc_text(decision.deadline)} was {minutes} min "
+        f"away and a run takes about {_hours(run_hours)} h, so no run was started.",
+    )
+
+
+def refused_alarm(now: datetime, reason: str) -> str:
+    return alarm_text(
+        "the weekly schedule gate",
+        "refused",
+        "gate",
+        f"At {utc_text(now)} it could not decide, so no run could start: {reason} This alarm "
+        "is posted once a UTC day while the refusal lasts.",
+    )
+
+
+def outcome_alarm(identity: str, outcome: Outcome) -> str:
+    detail = f"Read `{outcome.log}` on the scheduled host before anything is run again."
+    if outcome.stage == "release":
+        detail = (
+            f"Read `{outcome.log}` on the scheduled host: a release that stopped after the "
+            "enqueue is reconciled by hand, never run again."
+        )
+    return alarm_text(f"weekly run `{identity}`", outcome.verb, outcome.stage, detail)
+
+
+def late_alarm(
+    identity: str,
+    decision: Decision,
+    outcome: Outcome,
+    now: datetime,
+    ended: datetime,
+    run_hours: float,
+) -> str:
+    """The alarm of a run that ended too late for its budget, or "" for one in time.
+
+    A final run must leave its release by hand its `RELEASE_HOURS` before the deadline, or,
+    released in the same tick, be live by it; a morning run must end within `run_hours`, the
+    time the gate leaves it before a final run.
+    """
+
+    if decision.action == "final" and outcome.released:
+        limit, why = decision.deadline, "the deadline"
+    elif decision.action == "final":
+        limit = decision.deadline - timedelta(hours=RELEASE_HOURS)
+        why = (
+            f"the last end that leaves its release by hand {_hours(RELEASE_HOURS)} h before "
+            f"the deadline {utc_text(decision.deadline)}"
+        )
+    else:
+        limit = now + timedelta(hours=run_hours)
+        why = (
+            f"{_hours(run_hours)} h after its start, the time the gate leaves a morning run "
+            "before a final run"
+        )
+    if ended <= limit:
+        return ""
+    return alarm_text(
+        f"weekly run `{identity}`",
+        "is late",
+        "release" if outcome.released else "weekly run",
+        f"It ended at {utc_text(ended)}, after {utc_text(limit)}, {why}.",
+    )
+
+
+def stopped_stage(workspace: Path, identity: str) -> str:
+    """The first stage the run's journal did not complete, or `weekly run` without a journal."""
+
+    try:
+        stages = inspect_run(workspace / WEEKLY_RUNS, identity).get("stages", ())
+    except (OSError, WeeklyJournalError):
+        return "weekly run"
+    for stage in stages:
+        if stage.get("status") not in {"completed", "skipped"}:
+            return f"weekly run: {stage.get('name')}"
+    return "weekly run"
+
+
 def start_run(
     workspace: Path,
     decision: Decision,
@@ -419,25 +653,74 @@ def start_run(
     settings: Path | None,
     runner: Runner,
     acquire: Acquire,
+    notify: Notify,
     release: Release | None = None,
+    run_hours: float = RUN_HOURS,
+    clock: Clock = time.monotonic,
 ) -> int:
-    """Start the decided run: its marker, the checkout, the club news, the weekly command.
+    """Start the decided run: its marker, its start line, the run, its end line and any alarm.
 
-    `release` is the one place the release chain of #1249 (#1243, step 3) is called, with the
-    run id, after a weekly command that exited 0: `main` passes `weekly_release.release_run`
-    with ``--release`` and `None`, so no release, without it.
+    The marker is written before anything else, so a tick that dies leaves no run to start
+    again; the start line follows, so the slot is held before the checkout moves.
     """
 
     identity = run_id(kind, season, decision.gameweek, now)
     suffix = run_suffix(decision.action, now)
+    write_marker(workspace / SCHEDULE_STATE / "started", decision, kind, suffix, now)
+    notify(workspace, start_text(identity, decision, now))
+    began = clock()
+    outcome = run_and_release(
+        workspace,
+        decision,
+        season,
+        identity,
+        suffix,
+        kind=kind,
+        workers=workers,
+        settings=settings,
+        runner=runner,
+        acquire=acquire,
+        release=release,
+    )
+    seconds = clock() - began
+    ended = now + timedelta(seconds=seconds)
+    notify(workspace, end_text(identity, outcome, ended, seconds))
+    if outcome.code != 0:
+        notify(workspace, outcome_alarm(identity, outcome))
+    elif late := late_alarm(identity, decision, outcome, now, ended, run_hours):
+        notify(workspace, late)
+    return outcome.code
+
+
+def run_and_release(
+    workspace: Path,
+    decision: Decision,
+    season: str,
+    identity: str,
+    suffix: str,
+    *,
+    kind: str,
+    workers: int,
+    settings: Path | None,
+    runner: Runner,
+    acquire: Acquire,
+    release: Release | None,
+) -> Outcome:
+    """The checkout, the club news, the weekly command and, with a `release`, its release.
+
+    `release` is the one place the release chain of #1249 (#1243, step 3) is called, with the
+    run id, after a weekly command that exited 0: `main` passes `weekly_release.release_run`
+    with ``--release`` and `None`, so no release, without it (D1).
+    """
+
     log = workspace / WEEKLY_LOGS / f"{identity}.log"
     news_log = log.with_name(f"{identity}.club-news.log")
-    write_marker(workspace / SCHEDULE_STATE / "started", decision, kind, suffix, now)
+    relative = (WEEKLY_LOGS / log.name).as_posix()
     # The weekly command refuses a revision that is not the fresh origin/develop, so a
     # checkout left behind would never publish: weekly_run.ps1 fast-forwards it first too.
     if runner(["git", "pull", "-q", "--ff-only"], workspace, log) != 0:
         print(f"Refused: the checkout did not fast-forward; read {log}")
-        return 2
+        return Outcome(2, "checkout", "was refused (exit 2)", relative)
     try:
         capture = (
             acquire_club_news(workspace, settings, news_log, acquire) if kind == "friday" else ""
@@ -448,7 +731,8 @@ def start_run(
     except ScheduleError as error:
         print(f"Refused: {error}")
         print(f"club-news log: {news_log}")
-        return 2
+        news = (WEEKLY_LOGS / news_log.name).as_posix()
+        return Outcome(2, "club news", "was refused (exit 2)", news)
     if capture:
         print(f"club news: capture {capture}")
         print(f"club-news log: {news_log}")
@@ -456,9 +740,15 @@ def start_run(
     print(f"starting: {' '.join(command)}")
     print(f"log: {log}")
     code = runner(command, workspace, log)
-    if code != 0 or release is None:
-        return code
-    return release(workspace, identity)
+    if code != 0:
+        return Outcome(code, stopped_stage(workspace, identity), f"failed (exit {code})", relative)
+    if release is None:
+        return Outcome(0)
+    code = release(workspace, identity)
+    if code != 0:
+        released_log = (WEEKLY_LOGS / f"{identity}.release.log").as_posix()
+        return Outcome(code, "release", f"stopped (exit {code})", released_log, released=True)
+    return Outcome(0, released=True)
 
 
 def _instant(text: str) -> datetime:
@@ -510,10 +800,12 @@ def main(
     acquire: Acquire = club_news_acquire.main,
     read_bootstrap: Callable[[], bytes] = fpl_bootstrap,
     release: Release = weekly_release.release_run,
+    notify: Notify = comment_on_slot_issue,
+    clock: Clock = time.monotonic,
 ) -> int:
     """Decide this tick and start its run, and release the run only with ``--release``.
 
-    `runner`, `acquire`, `read_bootstrap` and `release` are seams.
+    `runner`, `acquire`, `read_bootstrap`, `release`, `notify` and `clock` are seams.
     """
 
     arguments = build_parser().parse_args(argv)
@@ -541,6 +833,9 @@ def main(
         )
     except (DataError, OSError, ValueError) as error:
         print(f"Refused: {error}")
+        if not arguments.dry_run:
+            reason = public(str(error), workspace)
+            post_once(workspace, f"refused-{now:%Y-%m-%d}", refused_alarm(now, reason), notify)
         return 2
 
     print(
@@ -549,6 +844,9 @@ def main(
     )
     print(f"decision: {decision.action} ({decision.reason})")
     if decision.action == "missed":
+        if not arguments.dry_run:
+            alarm = missed_alarm(decision, season, now, arguments.run_hours)
+            post_once(workspace, f"missed-{season}-gw{decision.gameweek:02d}", alarm, notify)
         return 3
     if decision.action == "none":
         return 0
@@ -579,7 +877,10 @@ def main(
         settings=Path(settings) if settings else None,
         runner=runner,
         acquire=acquire,
+        notify=notify,
         release=release if arguments.release else None,
+        run_hours=arguments.run_hours,
+        clock=clock,
     )
 
 
