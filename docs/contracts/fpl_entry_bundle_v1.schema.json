@@ -1,0 +1,160 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "FPL entry bundle v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "entry_id",
+    "gameweek",
+    "source_time",
+    "entry",
+    "history",
+    "transfers",
+    "picks",
+    "current_week"
+  ],
+  "properties": {
+    "contract_version": {"const": "fpl_entry_bundle_v1"},
+    "entry_id": {"$ref": "#/$defs/id"},
+    "gameweek": {"type": "integer", "minimum": 2, "maximum": 38},
+    "source_time": {"$ref": "#/$defs/sourceTime"},
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "started_event"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "name": {"type": "string"},
+        "started_event": {"$ref": "#/$defs/gameweek"}
+      }
+    },
+    "history": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["current", "chips"],
+      "properties": {
+        "current": {"type": "array", "items": {"$ref": "#/$defs/historyWeek"}},
+        "chips": {"type": "array", "items": {"$ref": "#/$defs/chipPlayed"}}
+      }
+    },
+    "transfers": {"type": "array", "items": {"$ref": "#/$defs/transfer"}},
+    "picks": {"type": "array", "items": {"$ref": "#/$defs/picks"}},
+    "current_week": {"anyOf": [{"$ref": "#/$defs/memberWeek"}, {"type": "null"}]}
+  },
+  "$defs": {
+    "id": {"type": "integer", "minimum": 1, "maximum": 9007199254740991},
+    "gameweek": {"type": "integer", "minimum": 1, "maximum": 38},
+    "count": {"type": "integer", "minimum": 0},
+    "sourceTime": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.[0-9]+)?Z$"
+    },
+    "historyWeek": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["event", "event_transfers", "event_transfers_cost", "bank"],
+      "properties": {
+        "event": {"$ref": "#/$defs/gameweek"},
+        "event_transfers": {"$ref": "#/$defs/count"},
+        "event_transfers_cost": {"$ref": "#/$defs/count"},
+        "bank": {"type": ["integer", "null"]}
+      }
+    },
+    "chipPlayed": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "event"],
+      "properties": {
+        "name": {"type": "string"},
+        "event": {"$ref": "#/$defs/gameweek"}
+      }
+    },
+    "transfer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "entry",
+        "event",
+        "time",
+        "element_in",
+        "element_in_cost",
+        "element_out",
+        "element_out_cost"
+      ],
+      "properties": {
+        "entry": {"$ref": "#/$defs/id"},
+        "event": {"$ref": "#/$defs/gameweek"},
+        "time": {"type": "string"},
+        "element_in": {"$ref": "#/$defs/id"},
+        "element_in_cost": {"$ref": "#/$defs/count"},
+        "element_out": {"$ref": "#/$defs/id"},
+        "element_out_cost": {"$ref": "#/$defs/count"}
+      }
+    },
+    "picks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["active_chip", "automatic_subs", "entry_history", "picks"],
+      "properties": {
+        "active_chip": {"type": ["string", "null"]},
+        "automatic_subs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["entry", "event", "element_in", "element_out"],
+            "properties": {
+              "entry": {"$ref": "#/$defs/id"},
+              "event": {"$ref": "#/$defs/gameweek"},
+              "element_in": {"$ref": "#/$defs/id"},
+              "element_out": {"$ref": "#/$defs/id"}
+            }
+          }
+        },
+        "entry_history": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["event", "bank", "value"],
+          "properties": {
+            "event": {"$ref": "#/$defs/gameweek"},
+            "bank": {"$ref": "#/$defs/count"},
+            "value": {"$ref": "#/$defs/count"}
+          }
+        },
+        "picks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["element", "position", "multiplier", "is_captain", "is_vice_captain"],
+            "properties": {
+              "element": {"$ref": "#/$defs/id"},
+              "position": {"type": "integer", "minimum": 1},
+              "multiplier": {"$ref": "#/$defs/count"},
+              "is_captain": {"type": "boolean"},
+              "is_vice_captain": {"type": "boolean"}
+            }
+          }
+        }
+      }
+    },
+    "memberWeek": {
+      "type": "object", "additionalProperties": false,
+      "required": ["entry_id", "gameweek", "pick_order", "captain", "vice", "active_chip", "transfer_cost"],
+      "properties": {
+        "entry_id": {"$ref": "#/$defs/id"},
+        "gameweek": {"$ref": "#/$defs/gameweek"},
+        "pick_order": {
+          "type": "array", "minItems": 15, "maxItems": 15, "uniqueItems": true,
+          "items": {"$ref": "#/$defs/id"}
+        },
+        "captain": {"$ref": "#/$defs/id"},
+        "vice": {"$ref": "#/$defs/id"},
+        "active_chip": {"enum": [null, "3xc", "bboost", "freehit", "wildcard"]},
+        "transfer_cost": {"type": "integer", "minimum": 0},
+        "entry_history_points": {"type": "integer"}
+      }
+    }
+  }
+}
