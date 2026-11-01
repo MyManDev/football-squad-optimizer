@@ -3,9 +3,11 @@
 # host needs and in which order to enable it. The paths assume the VM's layout (user squadopt,
 # ~/squadopt); replace them where the host differs.
 #
-# A tick decides; at most once a UTC morning and once a gameweek it starts a weekly run and,
-# with --release, releases a run that exits 0. That can take hours, so the tick has no start
-# timeout, and while it runs the timer starts no second one.
+# A tick decides; at most once a UTC morning and once a gameweek it starts a weekly run, which
+# ends at its site pull request. That can take hours, so the tick has no start timeout, and
+# while it runs the timer starts no second one. The gate runs without --release: D1 on #1243
+# releases a run only after its preview and a yes, by
+# `python -m squadopt.platform.weekly_release --run-id <id>`.
 [Unit]
 Description=SquadOpt weekly schedule: one tick of the deadline gate
 Wants=network-online.target
@@ -21,5 +23,5 @@ WorkingDirectory=/home/squadopt/squadopt/weekly
 EnvironmentFile=/etc/squadopt/weekly-schedule.env
 Environment=PYTHONPATH=/home/squadopt/squadopt/weekly/src:/home/squadopt/squadopt/weekly
 Environment=PYTHONUNBUFFERED=1
-ExecStart=/home/squadopt/squadopt/weekly/.venv/bin/python -m squadopt.platform.weekly_schedule --workspace /home/squadopt/squadopt/weekly --release
+ExecStart=/home/squadopt/squadopt/weekly/.venv/bin/python -m squadopt.platform.weekly_schedule --workspace /home/squadopt/squadopt/weekly
 TimeoutStartSec=infinity

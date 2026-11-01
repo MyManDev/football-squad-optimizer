@@ -1,4 +1,4 @@
-"""`squadopt.platform.weekly_release` releases one completed weekly run with no person (#1243).
+"""`squadopt.platform.weekly_release` releases one completed weekly run by its id (#1243).
 
 The decision table of the PowerShell chain's tests (`scripts/weekly_release.ps1`, #1249), run on
 the Python chain with no PowerShell: the step order, the stop at each failure, the tag and stamp
@@ -14,6 +14,8 @@ completed publishing run records, so the chain reads it as it reads a real one.
 
 from __future__ import annotations
 
+import functools
+import inspect
 import json
 import subprocess
 import sys
@@ -336,3 +338,32 @@ def test_the_real_runner_appends_each_command_and_its_output_and_a_missing_one_f
     text = log.read_text(encoding="utf-8").splitlines()
     assert text[:2] == [f"$ {sys.executable} -c print('checked')", "checked"]
     assert text[2] == "$ squadopt-no-such-command"
+
+
+def test_the_release_is_a_command_of_its_own_that_takes_one_run_id(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    repo = _repository(tmp_path)
+    host = _Host()
+    chained = functools.partial(
+        chain.release_run, runner=host.runner, pause=lambda seconds: None, wait_minutes=2
+    )
+    assert chain.main(["--workspace", str(repo), "--run-id", FRIDAY], release=chained) == 0
+    assert host.calls[-1].startswith("python -m scripts.prepare_football_bundle")
+    assert capsys.readouterr().out.splitlines()[-1] == (
+        f"release: bundle: sealed for {CAPTURE} with club news {NEWS}"
+    )
+
+    asked: list[tuple[Path, str]] = []
+
+    def release(workspace: Path, run_id: str) -> int:
+        asked.append((workspace, run_id))
+        return 2
+
+    assert chain.main(["--workspace", str(repo), "--run-id", TUESDAY], release=release) == 2
+    assert asked == [(repo.resolve(), TUESDAY)]
+    with pytest.raises(SystemExit) as missing:
+        chain.main(["--workspace", str(repo)], release=release)
+    assert missing.value.code == 2
+    assert "the following arguments are required: --run-id" in capsys.readouterr().err
+    assert inspect.signature(chain.main).parameters["release"].default is chain.release_run

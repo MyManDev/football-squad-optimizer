@@ -1,8 +1,12 @@
 """The release of a scheduled weekly run, from its site pull request to the live site (#1243).
 
-The gate, ``python -m squadopt.platform.weekly_schedule --release``, calls `release_run` with
-the run id of a run it started once the weekly command exited 0. D1 on #1243, decided on
-2026-10-28, lets that release run with no person in the loop. It is
+    python -m squadopt.platform.weekly_release --run-id 2026-27-gw10-friday-20261106T1430Z
+
+D1 on #1243 (6559389043, 2026-11-01): a scheduled run opens its site pull request with no
+person, and its release runs only after İbo has seen that run's preview and said yes. So the
+release is a command of its own, run by hand for one completed run by its id. The gate's
+``--release``, which would call `release_run` in the same tick once the weekly command exited
+0, stays off; switching it on is a new decision, recorded on #1243 first. The chain is
 ``scripts/weekly_release.ps1`` (#1249) in Python, so a Linux host releases too: what
 ``weekly_run.ps1`` prints for a person, in order, stopping at the first step that fails:
 
@@ -35,6 +39,7 @@ person reconciles from the two logs.
 
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import re
@@ -475,3 +480,30 @@ def seal_bundle(
         return 1
     say(f"bundle: sealed for {release.capture} with club news {release.news}")
     return 0
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--workspace", type=Path, default=Path.cwd())
+    parser.add_argument(
+        "--run-id",
+        required=True,
+        help="the completed run to release, as the gate's start line on #1093 names it",
+    )
+    return parser
+
+
+def main(
+    argv: list[str] | None = None, *, release: Callable[[Path, str], int] = release_run
+) -> int:
+    """Release one completed run by its id, after its preview and a yes (D1 on #1243).
+
+    `release` is the seam: the chain's own `release_run` unless a test passes another.
+    """
+
+    arguments = build_parser().parse_args(argv)
+    return release(arguments.workspace.resolve(), arguments.run_id)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

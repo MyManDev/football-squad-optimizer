@@ -5,20 +5,22 @@ own, not the one that runs the advice backend: on that VM's 2 vCPUs a GW7 run wa
 league stage after 2.5 hours, against 77 minutes on the PC (#1010). Every 15 minutes the
 deadline gate,
 `python -m squadopt.platform.weekly_schedule`, decides whether a weekly run starts (a morning
-run once a UTC day, the final run a lead before each deadline), starts at most one, and with
-`--release` releases a run that exited 0 (`src/squadopt/platform/weekly_release.py`). Nothing
-here is installed or run by committing it.
+run once a UTC day, the final run a lead before each deadline) and starts at most one, which
+ends at its site pull request. D1 on #1243 releases a run only after İbo has seen its preview
+and said yes, by `python -m squadopt.platform.weekly_release --run-id <id>`
+(`src/squadopt/platform/weekly_release.py`); the gate's `--release` stays off. Nothing here is
+installed or run by committing it.
 
 | File | What it is |
 | --- | --- |
-| `weekly-schedule.service` | One tick: the checkout's venv runs the gate with `--release`, the club-news settings come from a private `EnvironmentFile`, and the tick has no start timeout |
+| `weekly-schedule.service` | One tick: the checkout's venv runs the gate, without `--release` (D1), the club-news settings come from a private `EnvironmentFile`, and the tick has no start timeout |
 | `weekly-schedule.timer` | A tick every 15 minutes (`OnCalendar=*:0/15`), and once after the host was off through one (`Persistent=true`) |
-| `dry-run.conf` | A drop-in for the first week: the same tick with `--dry-run` in place of `--release` |
+| `dry-run.conf` | A drop-in for the first week: the same tick with `--dry-run` |
 
 The paths follow the backend VM's layout of [`scripts/vm_sync.sh`](../../scripts/vm_sync.sh):
 user `squadopt`, everything under `/home/squadopt/squadopt`. Set the new host up the same way,
-or replace them in all three files where it differs. A tick that starts a run lasts hours, the run and then its release; systemd
-starts no second tick while one runs, so the timer's ticks in between do nothing.
+or replace them in all three files where it differs. A tick that starts a run lasts hours;
+systemd starts no second tick while one runs, so the timer's ticks in between do nothing.
 
 ## What the host needs
 
@@ -85,7 +87,7 @@ starts no second tick while one runs, so the timer's ticks in between do nothing
    `journalctl -u weekly-schedule.service --since today`. A dry run leaves no marker, so from
    the morning time on every tick says it would start that morning's run; check the times and
    the gameweek against the deadlines.
-4. Then remove the drop-in; the next tick runs for real, with `--release`:
+4. Then remove the drop-in; the next tick runs for real, up to its site pull request:
 
    ```sh
    sudo rm /etc/systemd/system/weekly-schedule.service.d/dry-run.conf

@@ -337,19 +337,14 @@ def test_the_host_units_tick_the_gate_by_its_module_on_a_workspace() -> None:
     timer = _directives(HOST_FILES / "weekly-schedule.timer")
     dry_run = _directives(HOST_FILES / "dry-run.conf")
     workspaces = set()
-    for unit, switch, other in (
-        (service, "--release", "--dry-run"),
-        (dry_run, "--dry-run", "--release"),
-    ):
+    for unit, dry in ((service, False), (dry_run, True)):
         (command,) = [value for key, value in unit if key == "ExecStart" and value]
         arguments = command.split()
         assert arguments[1:3] == ["-m", "squadopt.platform.weekly_schedule"], command
         workspace = arguments[arguments.index("--workspace") + 1]
-        assert (arguments[0], arguments[-1], other in arguments) == (
-            f"{workspace}/.venv/bin/python",
-            switch,
-            False,
-        )
+        assert arguments[0] == f"{workspace}/.venv/bin/python"
+        # D1 on #1243: no tick releases; a run is released by hand after its preview.
+        assert ("--release" in arguments, "--dry-run" in arguments) == (False, dry), command
         workspaces.add(workspace)
     (workspace,) = workspaces
     # The drop-in clears the unit's command before it gives its own.

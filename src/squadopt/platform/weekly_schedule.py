@@ -20,9 +20,11 @@ anything runs, so a run that fails is not started again by the next tick, and ea
 publishes under its own site suffix (``morning-<stamp>`` or ``final-<stamp>``). A Friday-kind
 run, which the final run always is, first acquires the week's club news in this process.
 
-``--release``, off by default, releases a run the gate started once its weekly command exits
-0, with ``weekly_release.release_run`` (#1249 in Python): D1 on #1243, decided on 2026-10-28,
-lets that release run with no person. Without it a run ends at its site pull request.
+A run ends at its site pull request. D1 on #1243 (6559389043) releases it only after İbo has
+seen its preview and said yes, by ``python -m squadopt.platform.weekly_release --run-id <id>``.
+``--release`` would release a run the gate started in the same tick, once its weekly command
+exited 0, with ``weekly_release.release_run`` (#1249 in Python); it stays off, and switching it
+on is a new decision, recorded on #1243 first.
 
 ``--dry-run`` prints the decision and the command it would run, and writes nothing. The exit
 code is 0 for a decision (starting nothing is one), the weekly command's own when one ran
@@ -424,7 +426,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--release",
         action="store_true",
-        help="release a run that exits 0, with no person (#1243 D1); off by default",
+        help=(
+            "release a run that exits 0 in the same tick, with no person; off, as D1 on #1243 "
+            "keeps it: a run is released after its preview and a yes, by weekly_release"
+        ),
     )
     parser.add_argument("--dry-run", action="store_true", help="print the decision, write nothing")
     return parser
