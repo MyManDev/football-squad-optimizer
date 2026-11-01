@@ -3,6 +3,7 @@
 // as the forwarder gone, and what the workflow file says are pinned here instead.
 
 import assert from "node:assert/strict";
+import { readFile, readdir } from "node:fs/promises";
 import { describe, it } from "node:test";
 
 import {
@@ -14,6 +15,9 @@ import {
 } from "../scripts/deploy-steps.mjs";
 import { MARKER_HEADER, MARKER_VALUE, routeFor } from "../src/proxy.js";
 import { createWorker } from "../src/worker.js";
+
+const REPOSITORY = new URL("../../../", import.meta.url);
+const WORKFLOWS = new URL(".github/workflows/", REPOSITORY);
 
 const quiet = { sleep: async () => {}, log: () => {} };
 
@@ -37,6 +41,11 @@ const shell = () =>
   new Response("<!doctype html><title>SquadOpt</title>", {
     headers: { "content-type": "text/html" },
   });
+
+/** A file's text with LF line ends, whatever the checkout wrote. */
+async function text(url) {
+  return (await readFile(url, "utf8")).replace(/\r\n/g, "\n");
+}
 
 describe("the smoke after a deploy", () => {
   it("asks a path under the route that is none of the routes, so FPL is asked nothing", () => {
@@ -116,5 +125,90 @@ describe("the check after a delete", () => {
     assert.equal(showsGone({ status: null, marked: false }), false);
     assert.equal(showsGone({ status: 429, marked: false }), false);
     assert.equal(showsGone({ status: 503, marked: false }), false);
+  });
+});
+
+describe("the workflows", () => {
+  const TEST_FILE = /workers\/fpl-proxy\/test\/[\w.-]+\.test\.mjs/g;
+  const workflowText = (name) => text(new URL(name, WORKFLOWS));
+
+  it("run every forwarder test file, in CI, before a deploy, and in the web guide's list", async () => {
+    const onDisk = (await readdir(new URL("./", import.meta.url)))
+      .filter((name) => name.endsWith(".test.mjs"))
+      .map((name) => `workers/fpl-proxy/test/${name}`)
+      .sort();
+    for (const file of [
+      new URL("ci.yml", WORKFLOWS),
+      new URL("deploy-fpl-proxy.yml", WORKFLOWS),
+      new URL("web/README.md", REPOSITORY),
+    ]) {
+      const named = [...new Set((await text(file)).match(TEST_FILE))].sort();
+      assert.deepEqual(named, onDisk, file.pathname);
+    }
+  });
+
+  it("is dispatched by hand only, from the default branch, into the Workers environment", async () => {
+    const workflow = await workflowText("deploy-fpl-proxy.yml");
+    const on = /^on:\n((?: {2}.*\n)+)/m.exec(workflow);
+    assert.ok(on, "the workflow names its triggers");
+    assert.deepEqual(
+      [...on[1].matchAll(/^ {2}(\w+):/gm)].map((match) => match[1]),
+      ["workflow_dispatch"],
+    );
+    assert.match(
+      workflow,
+      /if: github\.ref != format\('refs\/heads\/\{0\}', github\.event\.repository\.default_branch\)/,
+    );
+    assert.match(
+      workflow,
+      /if: github\.ref == format\('refs\/heads\/\{0\}', github\.event\.repository\.default_branch\)/,
+    );
+    assert.deepEqual(
+      [...workflow.matchAll(/^\s*environment: (.+)$/gm)].map((match) => match[1]),
+      ["cloudflare-workers"],
+    );
+    assert.deepEqual(
+      [...new Set([...workflow.matchAll(/secrets\.([A-Z_]+)/g)].map((match) => match[1]))].sort(),
+      ["CLOUDFLARE_ACCOUNT_ID", "CLOUDFLARE_WORKERS_API_TOKEN"],
+    );
+    const code = workflow.replace(/^\s*#.*$/gm, "");
+    assert.doesNotMatch(code, /cloudflare-pages|CLOUDFLARE_API_TOKEN\b/);
+  });
+
+  it("uses the probe's pinned actions and wrangler version, and nothing else", async () => {
+    const proxy = await workflowText("deploy-fpl-proxy.yml");
+    const probe = await workflowText("deploy-fpl-probe.yml");
+    const uses = (workflow) => new Set([...workflow.matchAll(/uses: (\S+)/g)].map((m) => m[1]));
+    for (const action of uses(proxy)) {
+      assert.match(action, /@[0-9a-f]{40}$/, action);
+      assert.ok(uses(probe).has(action), `${action} is not the probe's pin`);
+    }
+    const versions = (workflow) =>
+      new Set([...workflow.matchAll(/wranglerVersion: "([^"]+)"/g)].map((m) => m[1]));
+    assert.deepEqual([...versions(proxy)], [...versions(probe)]);
+    assert.equal(versions(proxy).size, 1);
+  });
+
+  it("delete the Worker before checking it is gone, deploy from its folder, then smoke", async () => {
+    const workflow = await workflowText("deploy-fpl-proxy.yml");
+    const step = (name) => {
+      const at = workflow.indexOf(`- name: ${name}\n`);
+      assert.notEqual(at, -1, name);
+      return at;
+    };
+    assert.ok(
+      step("Delete the forwarder Worker") < step("Confirm the forwarder no longer answers"),
+    );
+    assert.ok(step("Test the forwarder before it ships") < step("Deploy the forwarder Worker"));
+    assert.ok(step("Deploy the forwarder Worker") < step("Smoke the forwarder"));
+    assert.match(workflow, /command: delete --name squadopt-fpl-proxy --force\n/);
+    assert.match(workflow, /workingDirectory: workers\/fpl-proxy\n\s+command: deploy\n/);
+    assert.match(workflow, /run: node workers\/fpl-proxy\/scripts\/deploy-steps\.mjs smoke\n/);
+    assert.match(
+      workflow,
+      /run: node workers\/fpl-proxy\/scripts\/deploy-steps\.mjs confirm-gone\n/,
+    );
+    const config = await text(new URL("../wrangler.toml", import.meta.url));
+    assert.match(config, /^name = "squadopt-fpl-proxy"$/m);
   });
 });

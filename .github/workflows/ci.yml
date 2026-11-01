@@ -263,6 +263,17 @@ jobs:
             workers/fpl-probe/test/probe.test.mjs \
             workers/fpl-probe/test/deploy-steps.test.mjs
 
+      # The FPL forwarder Worker (ADR 0012), tested the same way: a fake FPL, a fake site and an
+      # in-memory cache, no credentials and no network. Its deploy-steps.test.mjs checks this
+      # list, and the one in deploy-fpl-proxy.yml, against its test directory.
+      - name: FPL forwarder worker tests
+        working-directory: .
+        run: |
+          node --test \
+            workers/fpl-proxy/test/proxy.test.mjs \
+            workers/fpl-proxy/test/worker.test.mjs \
+            workers/fpl-proxy/test/deploy-steps.test.mjs
+
       - name: Build
         env:
           # Unset or empty is the static site, byte for byte (ADR 0006). A repository
