@@ -41,9 +41,6 @@ for (const language of ["en", "tr"] as const) {
     );
     await page.goto("/league/352490/members");
     const copy = MESSAGES[language].leagueMembers;
-    // How the table reads is one click away, in its closed "About this table".
-    await page.locator("main details summary", { hasText: copy.aboutTable }).click();
-    await expect(page.getByText(copy.movementNote)).toBeVisible();
     for (const [index, [words, mark]] of [
       [copy.movementLabel("up", 1), "1"],
       [copy.movementLabel("down", 3), "3"],

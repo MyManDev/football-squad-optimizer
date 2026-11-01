@@ -306,14 +306,13 @@ for (const [width, height] of [
   [1280, 720],
   [820, 1180],
 ] as const) {
-  test(`the sidebar's 'Kadro' lands the squad's heading and toggle below the pinned top bar at ${width}x${height}`, async ({
+  test(`a link to the squad lands its heading and toggle below the pinned top bar at ${width}x${height}`, async ({
     page,
   }) => {
     await open(page, width, height, twoMoves());
-    const squadLink = page
-      .locator("#sidebar nav")
-      .getByRole("link", { name: copy.shell.squad, exact: true });
-    await squadLink.click();
+    const url = new URL(page.url());
+    url.hash = "kadro";
+    await page.goto(url.toString());
     await expect(page).toHaveURL(/#kadro$/);
     const heading = page.getByRole("heading", { name: copy.leagueMembers.squadAfterTitle });
     const toggle = page.getByRole("group", { name: copy.leagueMembers.viewLabel });

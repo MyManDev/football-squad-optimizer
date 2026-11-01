@@ -45,7 +45,7 @@ test.describe("the sidebar before and after the two steps", () => {
       await expect(page.getByRole("heading", { level: 1 })).toHaveText(TR.leagueEntry.title);
       expect(await sidebarLinks(page)).toEqual(["/", "/fixtures", ...CONTRIBUTE]);
       const sidebar = page.locator("#sidebar");
-      for (const name of [TR.shell.thisWeek, TR.shell.squad, TR.shell.league]) {
+      for (const name of [TR.shell.thisWeek, TR.shell.league]) {
         await expect(sidebar.getByRole("link", { name, exact: true })).toHaveCount(0);
       }
       await expect(sidebar.getByRole("button", { name: TR.shell.changeMember })).toHaveCount(0);
@@ -72,7 +72,7 @@ test.describe("the sidebar before and after the two steps", () => {
       });
       if (path === MEMBERS) await expect(find).toHaveAttribute("aria-current", "page");
       else await expect(find).not.toHaveAttribute("aria-current");
-      for (const name of [TR.shell.squad, TR.shell.league]) {
+      for (const name of [TR.shell.thisWeek, TR.shell.league]) {
         await expect(page.locator("#sidebar").getByRole("link", { name, exact: true })).toHaveCount(
           0,
         );
@@ -92,10 +92,8 @@ test.describe("the sidebar before and after the two steps", () => {
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     expect(await sidebarLinks(page)).toEqual([
       own(EXAMPLE_CLAIM.entryId),
-      `${own(EXAMPLE_CLAIM.entryId)}#kadro`,
       MEMBERS,
       `${own(EXAMPLE_CLAIM.entryId)}/current-squad`,
-      `${own(EXAMPLE_CLAIM.entryId)}/decision-tools`,
       `${own(EXAMPLE_CLAIM.entryId)}/what-if`,
       `${own(EXAMPLE_CLAIM.entryId)}/duel`,
       `${own(EXAMPLE_CLAIM.entryId)}/chips`,

@@ -20,8 +20,6 @@ import { isDevicePlanEntry } from "../device/types";
 import { advisedFifteen } from "../device/whatIf";
 import { WhatIfPanel } from "../device/WhatIfPanel";
 import { DecisionPreferencesPanel } from "../advice/DecisionPreferencesPanel";
-import { ModelComparison } from "../advice/ModelComparison";
-import { DecisionWorkbench } from "../advice/DecisionWorkbench";
 import { EVIDENCE_COPY } from "../advice/evidenceCopy";
 import { coachAbsences } from "../advice/coachAbsences";
 import type { AdviceJob } from "../advice/useAdviceJob";
@@ -451,35 +449,6 @@ function LeagueMemberContent({
     "current-squad": {
       title: copy.memberSquad,
       body: view.starting_xi.length > 0 ? <HeldSquad squad={view} codes={codes} /> : null,
-    },
-    "decision-tools": {
-      title: copy.decisionTools,
-      body: (
-        <>
-          <DecisionWorkbench
-            request={{
-              ...request,
-              top100Weight: selection.top100.weight,
-              managersWord: selection.evidence.on,
-              chip: selection.chip.chip,
-            }}
-            selected={shown?.envelope ?? null}
-            squad={squad}
-            loading={adviceLoading}
-          />
-          {/* The comparison's one action computes the other model, which a closed week
-              does not, so it is offered only while the week is open. */}
-          {capabilities?.models?.includes("football") && computeAvailable && !closed ? (
-            <ModelComparison
-              request={request}
-              selected={shown?.envelope ?? null}
-              snapshot={view.source_snapshot_id}
-              client={client}
-              busy={job.state.phase === "waiting" || job.state.phase === "requesting"}
-            />
-          ) : null}
-        </>
-      ),
     },
     "what-if": {
       title: copy.whatIfTitle,

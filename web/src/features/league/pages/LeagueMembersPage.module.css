@@ -238,56 +238,6 @@ td.total {
   font-size: var(--step--1);
 }
 
-/* ---- About the table, closed ---- */
-
-.about {
-  border-top: 1px solid var(--color-line);
-}
-
-.aboutSummary {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: 40px;
-  font-size: var(--step--1);
-  font-weight: 600;
-  cursor: pointer;
-  list-style: none;
-}
-
-.aboutSummary::-webkit-details-marker {
-  display: none;
-}
-
-.aboutIcon {
-  flex: none;
-  transition: transform var(--motion-ui-fast) var(--motion-ease);
-}
-
-.about[open] .aboutIcon {
-  transform: rotate(90deg);
-}
-
-.aboutBody {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  max-width: var(--measure);
-  padding-bottom: var(--space-4);
-  color: var(--color-text-muted);
-  font-size: var(--step--1);
-}
-
-.aboutBody p {
-  margin: 0;
-}
-
-.aboutTitle {
-  margin: var(--space-2) 0 0;
-  color: var(--color-text);
-  font-size: var(--step-0);
-}
-
 /* ---- Beside the table ---- */
 
 .side {
@@ -311,10 +261,6 @@ td.total {
 /* ---- Touch: every control is at least 44 px under 1180 px ---- */
 
 @media (max-width: 1179.98px) {
-  .aboutSummary {
-    min-height: 44px;
-  }
-
   .table tbody td {
     height: 52px;
   }

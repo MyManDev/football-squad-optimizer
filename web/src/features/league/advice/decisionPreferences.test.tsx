@@ -12,7 +12,6 @@ import { DecisionPreferencesPanel } from "./DecisionPreferencesPanel";
 import { checkedPreferences, preferencesFromUrl, preferencesKey } from "./decisionPreferences";
 import { adviceRequestKey } from "./adviceJobStore";
 import { checkedAdvice } from "./adviceResponse";
-import { decisionParams } from "./decisionBoard";
 import { sameAdviceRequest } from "./useAdviceJob";
 import { resolvePublishedAdvice } from "./adviceSelection";
 import { HttpAdviceClient, StaticOnlyAdviceClient, type AdviceRequest } from "./adviceClient";
@@ -30,9 +29,8 @@ it("keeps request, waiting job and board identities distinct and reopens the exa
   const request = { ...base, preferences: p };
   expect(adviceRequestKey(request)).not.toBe(adviceRequestKey(base));
   expect(sameAdviceRequest(request, base)).toBe(false);
-  const url = decisionParams(new URLSearchParams(), request);
+  const url = new URLSearchParams({ preferences: preferencesKey(p) });
   expect(preferencesFromUrl(url).value).toEqual(p);
-  expect(decisionParams(url, base).has("preferences")).toBe(false);
   expect(preferencesKey(checkedPreferences({ keep_players: [3, 1] }))).toBe(
     preferencesKey(checkedPreferences({ keep_players: [1, 3] })),
   );

@@ -246,8 +246,10 @@ describe("every string a production component writes inline", () => {
   it("was actually read: literals, template text and JSX text, in both languages", () => {
     expect(INLINE.length).toBeGreaterThan(1000);
     const texts = new Set(INLINE.map(({ text }) => text));
-    expect(texts.has("İki modelin karşılaştırması")).toBe(true);
-    expect(texts.has("Aynı kadro, bütçe,")).toBe(true);
+    // A literal in each language, the head of a template, and JSX text.
+    expect(texts.has("Katkıda bulun")).toBe(true);
+    expect(texts.has("Contribute")).toBe(true);
+    expect(texts.has("Your gameweek")).toBe(true);
     expect(texts.has("SquadOpt")).toBe(true);
   });
 

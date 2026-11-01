@@ -103,7 +103,7 @@ for (const language of ["tr", "en"] as const) {
     // What explains the plan and the advanced settings wait closed, on a phone as on a
     // desktop, and neither widens the page when opened. The tools are pages of their own.
     const closedSections = [members.howComputed, members.advancedSettings];
-    for (const title of [members.memberSquad, members.decisionTools, members.chipsAndTransfers]) {
+    for (const title of [members.memberSquad, members.chipsAndTransfers]) {
       await expect(page.locator("main summary", { hasText: title })).toHaveCount(0);
     }
     for (const title of closedSections) {
@@ -186,7 +186,6 @@ for (const language of ["tr", "en"] as const) {
     const members = MESSAGES[language].leagueMembers;
     const titles = {
       "current-squad": members.memberSquad,
-      "decision-tools": members.decisionTools,
       "what-if": members.whatIfTitle,
       duel: members.duelTitle,
       chips: members.chipsAndTransfers,
