@@ -12,14 +12,18 @@ the first gameweek whose deadline is still ahead:
 
 - the final run, once per gameweek, from the deadline minus the lead;
 - a morning run, once per UTC day, from the morning time, unless the final run would start
-  before a morning run could finish.
+  before a morning run could finish;
+- inside a fixture gap, where that deadline is more than the lead-time window away at the
+  morning time, one morning run only, the first once the gameweek before has settled, which
+  publishes its settled view; the other mornings start nothing until the window (D4 on #1243).
 
 Deadlines decide, not weekdays, so a midweek deadline needs no exception. A start leaves its
-marker (``started/morning-<date>.json`` or ``started/final-<season>-gw<NN>.json``) before
-anything runs, so a run that fails is not started again by the next tick, and each run
-publishes under its own site suffix (``morning-<stamp>`` or ``final-<stamp>``). A Friday-kind
-run, which the final run always is, first acquires the week's club news in this process; a
-morning run is a Tuesday-kind run with no club news (D3 on #1243).
+marker (``started/morning-<date>.json``, ``started/settled-<season>-gw<NN>.json`` for the
+settled view in a gap, or ``started/final-<season>-gw<NN>.json``) before anything runs, so a
+run that fails is not started again by the next tick, and each run publishes under its own
+site suffix (``morning-<stamp>`` or ``final-<stamp>``). A Friday-kind run, which the final run
+always is, first acquires the week's club news in this process; a morning run is a
+Tuesday-kind run with no club news (D3 on #1243).
 
 A run ends at its site pull request. D1 on #1243 (6559389043) releases it only after İbo has
 seen its preview and said yes, by ``python -m squadopt.platform.weekly_release --run-id <id>``.
@@ -53,7 +57,11 @@ from typing import Final, Literal
 from squadopt.contracts.run_logs import LOG_ROOT_NAME
 from squadopt.data.atomic import replace_retrying
 from squadopt.data.errors import DataError
-from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, gameweek_deadlines
+from squadopt.data.sources.fpl_live import (
+    BOOTSTRAP_PAYLOAD,
+    gameweek_deadlines,
+    scored_gameweeks,
+)
 from squadopt.data.timestamps import as_instant
 from squadopt.platform import club_news_acquire, weekly_release
 from squadopt.platform.fpl_capture import ENDPOINTS, fetch
@@ -68,6 +76,15 @@ RUN_HOURS: Final = 3.5
 MORNING_KIND: Final = "tuesday"
 #: `weekly_run.ps1`'s default.
 WORKERS: Final = 15
+#: D4 on #1243: inside a fixture gap the settled view is published once, and morning runs stop
+#: until the next deadline is inside the lead-time window (``docs/deployment_runbook.md``, "A
+#: run inside a fixture gap is not automatically safe"), which names no number of days. The
+#: longest gap between consecutive deadlines of a normal week in 2026-27 is 8 days (GW36
+#: 2027-05-15T12:30Z to GW37 2027-05-23T12:30Z), and one day more is the margin, so a normal
+#: week keeps every morning run. The six longer gaps, 9.8 to 21.7 days, each hold a weekend
+#: with no Premier League round: three international breaks (GW5 to GW6, GW10 to GW11, GW30
+#: to GW31) and the weekends after three midweek rounds (GW20, GW25 and GW28).
+LEAD_WINDOW_DAYS: Final = 9.0
 
 SCHEDULE_STATE: Final = Path("data/runtime/weekly-schedule")
 WEEKLY_LOGS: Final = LOG_ROOT_NAME / "weekly"
@@ -133,23 +150,38 @@ def morning_start(now: datetime, morning_utc: str) -> datetime:
     return day + timedelta(hours=int(match[1]), minutes=int(match[2]))
 
 
+def first_morning(instant: datetime, morning_utc: str) -> datetime:
+    """The first morning time at or after `instant`."""
+
+    start = morning_start(instant, morning_utc)
+    return start if start >= instant else start + timedelta(days=1)
+
+
 def decide(
     events: Sequence[tuple[int, datetime]],
     now: datetime,
     season: str,
     markers: Collection[str],
     *,
+    settled: Collection[int] = frozenset(),
     morning_utc: str = MORNING_UTC,
     lead_hours: float = FINAL_LEAD_HOURS,
     run_hours: float = RUN_HOURS,
+    window_days: float = LEAD_WINDOW_DAYS,
 ) -> Decision:
-    """Pure: the action of this tick, from the deadlines, the clock and the runs started."""
+    """Pure: the action of this tick, from the deadlines, the clock and the runs started.
+
+    `settled` holds the gameweeks the bootstrap says are finished and checked; only a fixture
+    gap reads it.
+    """
 
     if lead_hours < run_hours:
         raise ScheduleError(
             f"A final run {_hours(lead_hours)} h before the deadline cannot be live before it: "
             f"a run takes about {_hours(run_hours)} h."
         )
+    if window_days <= 0:
+        raise ScheduleError(f"--lead-window-days must be above 0, not {_hours(window_days)}.")
     ahead = [(gameweek, deadline) for gameweek, deadline in events if deadline > now]
     if not ahead:
         raise ScheduleError(f"No gameweek deadline lies ahead of {utc_text(now)} in the bootstrap.")
@@ -177,6 +209,34 @@ def decide(
         return chosen("final", f"the final run for gameweek {gameweek}", final)
     if now < morning_from:
         return chosen("none", f"today's morning run starts at {utc_text(morning_from)}")
+    window = timedelta(days=window_days)
+    if deadline - morning_from > window:
+        # A fixture gap (D4), judged at the morning time so that every tick of a day agrees.
+        previous = gameweek - 1
+        settled_view = f"settled-{season}-gw{previous:02d}"
+        resume = f"morning runs resume at {utc_text(first_morning(deadline - window, morning_utc))}"
+        gap = (
+            f"a fixture gap: gameweek {gameweek}'s deadline is more than "
+            f"{_hours(window_days)} days away"
+        )
+        if previous < 1:
+            return chosen("none", f"{gap}; {resume}")
+        if previous not in settled:
+            return chosen(
+                "none",
+                f"{gap}; gameweek {previous}'s settled view waits for it to settle, and {resume}",
+            )
+        if settled_view in markers:
+            return chosen(
+                "none",
+                f"{gap}; gameweek {previous}'s settled view has already started, and {resume}",
+            )
+        return chosen(
+            "morning",
+            f"the settled view of gameweek {previous}, once in the fixture gap before gameweek "
+            f"{gameweek}",
+            settled_view,
+        )
     if morning in markers:
         return chosen("none", "today's morning run has already started")
     if final_start - now < run:
@@ -418,6 +478,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--morning-utc", default=MORNING_UTC)
     parser.add_argument("--final-lead-hours", type=float, default=FINAL_LEAD_HOURS)
     parser.add_argument("--run-hours", type=float, default=RUN_HOURS)
+    parser.add_argument(
+        "--lead-window-days",
+        type=float,
+        default=LEAD_WINDOW_DAYS,
+        help="inside a fixture gap, morning runs wait until the deadline is this close (D4)",
+    )
     parser.add_argument("--morning-kind", choices=("tuesday", "friday"), default=MORNING_KIND)
     parser.add_argument("--workers", type=int, default=WORKERS)
     parser.add_argument(
@@ -467,9 +533,11 @@ def main(
             now,
             season,
             started_markers(state / "started"),
+            settled=scored_gameweeks(bootstrap),
             morning_utc=arguments.morning_utc,
             lead_hours=arguments.final_lead_hours,
             run_hours=arguments.run_hours,
+            window_days=arguments.lead_window_days,
         )
     except (DataError, OSError, ValueError) as error:
         print(f"Refused: {error}")

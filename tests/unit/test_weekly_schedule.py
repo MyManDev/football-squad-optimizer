@@ -11,8 +11,8 @@ from __future__ import annotations
 
 import inspect
 import json
-from collections.abc import Sequence
-from datetime import datetime
+from collections.abc import Collection, Sequence
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -25,10 +25,15 @@ DEADLINES = {9: "2026-10-31T11:00:00Z", 10: "2026-11-06T18:30:00Z"}
 HOST_FILES = Path(__file__).resolve().parents[2] / "deploy" / "weekly-schedule"
 
 
-def _bootstrap(deadlines: dict[int, str]) -> bytes:
+def _bootstrap(deadlines: dict[int, str], settled: Collection[int] = ()) -> bytes:
     # The bootstrap's shape, with fields the gate does not read beside the ones it does.
     events = [
-        {"id": week, "deadline_time": deadline, "finished": False, "data_checked": False}
+        {
+            "id": week,
+            "deadline_time": deadline,
+            "finished": week in settled,
+            "data_checked": week in settled,
+        }
         for week, deadline in sorted(deadlines.items(), reverse=True)
     ]
     return json.dumps({"events": events, "teams": []}).encode()
@@ -88,6 +93,141 @@ def test_the_gate_chooses_one_run_per_morning_and_one_final_run_per_gameweek(
 ) -> None:
     action, gameweek, marker, said = _decide(now, markers)
     assert (" ".join((action, gameweek, marker)).strip(), said) == (expected, reason)
+
+
+#: The real fixture gap of 2026-27: GW5 closed on Friday 18 September, GW6 on Saturday 10
+#: October, 22 days later.
+GAP = {5: "2026-09-18T17:30:00Z", 6: "2026-10-10T10:00:00Z", 7: "2026-10-17T10:00:00Z"}
+SETTLED_5, MORNING_18 = "settled-2026-27-gw05", "morning-2026-09-18"
+IN_GAP = "a fixture gap: gameweek 6's deadline is more than 9 days away; gameweek 5's settled view"
+RESUME = "morning runs resume at 2026-10-02T02:00Z"
+
+
+@pytest.mark.parametrize(
+    "now,settled,markers,expected,reason",
+    [
+        (
+            "2026-09-18T02:00Z",
+            False,
+            [],
+            f"morning 5 {MORNING_18}",
+            "today's morning run for gameweek 5",
+        ),
+        (
+            "2026-09-19T02:00Z",
+            False,
+            [MORNING_18],
+            "none 6",
+            f"{IN_GAP} waits for it to settle, and {RESUME}",
+        ),
+        (
+            "2026-09-22T02:00Z",
+            False,
+            [MORNING_18],
+            "none 6",
+            f"{IN_GAP} waits for it to settle, and {RESUME}",
+        ),
+        (
+            "2026-09-22T09:00Z",
+            True,
+            [MORNING_18],
+            f"morning 6 {SETTLED_5}",
+            "the settled view of gameweek 5, once in the fixture gap before gameweek 6",
+        ),
+        (
+            "2026-09-22T09:15Z",
+            True,
+            [MORNING_18, SETTLED_5],
+            "none 6",
+            f"{IN_GAP} has already started, and {RESUME}",
+        ),
+        # Judged at the morning time: at 23:59 the deadline is 8.4 days away, at 02:00 9.3.
+        (
+            "2026-10-01T23:59Z",
+            True,
+            [SETTLED_5],
+            "none 6",
+            f"{IN_GAP} has already started, and {RESUME}",
+        ),
+        (
+            "2026-10-02T02:00Z",
+            True,
+            [SETTLED_5],
+            "morning 6 morning-2026-10-02",
+            "today's morning run for gameweek 6",
+        ),
+        # Once the window holds the deadline the flags no longer matter.
+        (
+            "2026-10-03T02:00Z",
+            False,
+            [],
+            "morning 6 morning-2026-10-03",
+            "today's morning run for gameweek 6",
+        ),
+        (
+            "2026-10-10T06:00Z",
+            True,
+            [SETTLED_5],
+            "final 6 final-2026-27-gw06",
+            "the final run for gameweek 6",
+        ),
+    ],
+)
+def test_inside_a_fixture_gap_the_settled_view_is_published_once_and_mornings_wait(
+    now: str, settled: bool, markers: list[str], expected: str, reason: str
+) -> None:
+    events = gate.schedule_events(_bootstrap(GAP))
+    decision = gate.decide(
+        events, datetime.fromisoformat(now), "2026-27", markers, settled={5} if settled else set()
+    )
+    assert gate.LEAD_WINDOW_DAYS == 9
+    assert (
+        " ".join((decision.action, str(decision.gameweek), decision.marker)).strip(),
+        decision.reason,
+    ) == (expected, reason)
+
+
+def test_every_tick_across_the_gw5_to_gw6_gap_starts_one_settled_view_and_then_the_week() -> None:
+    """Every 15 minutes from GW5's deadline to GW6's, with GW5 settled on 22 September."""
+
+    events = gate.schedule_events(_bootstrap(GAP))
+    settled_at = datetime.fromisoformat("2026-09-22T08:00:00Z")
+    now, end = datetime.fromisoformat("2026-09-18T17:45:00Z"), datetime.fromisoformat(GAP[6])
+    markers: list[str] = []
+    started: list[str] = []
+    while now < end:
+        decision = gate.decide(
+            events, now, "2026-27", markers, settled={5} if now >= settled_at else set()
+        )
+        if decision.action in {"morning", "final"}:
+            markers.append(decision.marker)
+            started.append(f"{gate.utc_text(now)} {decision.marker}")
+        now += timedelta(minutes=15)
+    mornings = [f"2026-10-{day:02d}T02:00Z morning-2026-10-{day:02d}" for day in range(2, 11)]
+    assert started == [
+        f"2026-09-22T08:00Z {SETTLED_5}",
+        *mornings,
+        "2026-10-10T06:00Z final-2026-27-gw06",
+    ]
+
+
+def test_a_gap_before_the_first_gameweek_waits_and_the_window_is_an_option() -> None:
+    events = gate.schedule_events(_bootstrap({1: "2026-08-21T17:30:00Z"}))
+    decision = gate.decide(events, datetime.fromisoformat("2026-08-01T02:00:00Z"), "2026-27", [])
+    assert (decision.action, decision.reason) == (
+        "none",
+        "a fixture gap: gameweek 1's deadline is more than 9 days away; morning runs resume at "
+        "2026-08-13T02:00Z",
+    )
+    events = gate.schedule_events(_bootstrap(GAP))
+    wide = gate.decide(
+        events, datetime.fromisoformat("2026-09-25T02:00:00Z"), "2026-27", [], window_days=22
+    )
+    assert (wide.action, wide.marker) == ("morning", "morning-2026-09-25")
+    assert gate.build_parser().parse_args([]).lead_window_days == gate.LEAD_WINDOW_DAYS
+    with pytest.raises(gate.ScheduleError) as refused:
+        gate.decide(events, datetime.fromisoformat(GAP[5]), "2026-27", [], window_days=0)
+    assert str(refused.value) == "--lead-window-days must be above 0, not 0."
 
 
 def test_a_final_window_the_gate_missed_is_reported_not_started() -> None:
@@ -295,6 +435,21 @@ def test_a_morning_run_takes_no_club_news_and_only_the_final_run_does(tmp_path: 
     assert weekly[-2:] == ["--run-id", "2026-27-gw09-tuesday-20261030T0200Z"]
     assert _main(workspace, "2026-10-31T07:05:00Z", host) == 0
     assert [arguments[0] for arguments in host.news] == ["--check-config", "--roster-snapshot"]
+
+
+def test_the_gate_reads_the_settled_week_from_the_bootstrap_and_starts_its_view_once(
+    tmp_path: Path,
+) -> None:
+    workspace = _workspace(tmp_path)
+    (workspace / "bootstrap.json").write_bytes(_bootstrap(GAP, settled={4, 5}))
+    host = _Host()
+    assert _main(workspace, "2026-09-22T09:00:00Z", host) == 0
+    marker = workspace / gate.SCHEDULE_STATE / "started" / f"{SETTLED_5}.json"
+    assert json.loads(marker.read_text(encoding="utf-8"))["kind"] == "tuesday"
+    (_, weekly), news = host.commands, host.news
+    assert (weekly[weekly.index("--gameweek") + 1], news) == ("6", [])
+    assert _main(workspace, "2026-09-23T02:00:00Z", host) == 0
+    assert len(host.commands) == 2
 
 
 def test_a_failed_acquisition_refuses_before_the_weekly_command(tmp_path: Path) -> None:
