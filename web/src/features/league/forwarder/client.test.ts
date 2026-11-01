@@ -11,6 +11,7 @@ import {
   createForwarderClient,
   entryBundle,
   FORWARDER_ROOT,
+  isForwarderRefusal,
   type ForwarderClientOptions,
 } from "./client";
 
@@ -340,5 +341,27 @@ describe("a standings page's rows", () => {
     expect(
       await read({ ...page, league: { ...page.league, name: null }, last_updated_data: null }),
     ).toMatchObject({ ok: true });
+  });
+});
+
+describe("the forwarder's own refusals, as a release check reads them", () => {
+  it.each([
+    ["/api/v1/fpl/entry/101/bundle", 404],
+    ["/api/v1/fpl/live/9", 503],
+    ["/api/v1/fpl/standings/314", 404],
+  ])("leaves out a marked answer at %s with %i", (pathname, status) => {
+    expect(isForwarderRefusal(pathname, status, "1")).toBe(true);
+  });
+
+  it.each([
+    ["an unmarked 404, such as a page that is not published", "/api/v1/fpl/live/9", 404, null],
+    ["a marked answer with another mark", "/api/v1/fpl/live/9", 503, "0"],
+    ["the forwarder's own failure", "/api/v1/fpl/live/9", 500, "1"],
+    ["a method refusal", "/api/v1/fpl/live/9", 405, "1"],
+    ["a marked 404 outside its routes", "/api/v1/leagues/1/capabilities", 404, "1"],
+    ["a path that only begins like its root", "/api/v1/fplx/live/9", 404, "1"],
+    ["a 404 of a published document", "/data/league/members.json", 404, undefined],
+  ])("counts %s", (_, pathname, status, marker) => {
+    expect(isForwarderRefusal(pathname, status, marker)).toBe(false);
   });
 });

@@ -27,6 +27,24 @@ export const MARKER_HEADER = "x-squadopt-fpl";
 export const COPY_HEADER = "x-squadopt-fpl-cache";
 
 /**
+ * Whether a same-origin answer is one of the forwarder's own refusals that a page reads as
+ * "no document": a 404 or a 503 on a path under its routes, carrying its mark. A release
+ * check that counts failed answers leaves exactly these out, and counts every other one,
+ * an unmarked 404 or a marked 500 included. `marker` is the answer's `x-squadopt-fpl`.
+ */
+export function isForwarderRefusal(
+  pathname: string,
+  status: number,
+  marker: string | null | undefined,
+): boolean {
+  return (
+    pathname.startsWith(`${FORWARDER_ROOT}/`) &&
+    marker === "1" &&
+    (status === 404 || status === 503)
+  );
+}
+
+/**
  * Why a read gave no document:
  *
  * - `not_found`: the forwarder's 404 for an id, page or gameweek it does not serve now;

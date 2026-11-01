@@ -1,5 +1,6 @@
 import { expect, test, type Response } from "@playwright/test";
 import type { EntryAdvice, LeagueViewEnvelope } from "../src/features/league/types";
+import { isForwarderRefusal, MARKER_HEADER } from "../src/features/league/forwarder/client";
 import { MESSAGES } from "../src/i18n/messages";
 import { pickMember } from "./identity";
 import { figure } from "../src/lib/format";
@@ -19,6 +20,9 @@ test("published league and member journey works without submitting a solve", asy
   const errors: string[] = [];
   const consoleErrors: { text: string; url: string }[] = [];
   const absentDocuments = new Set<string>();
+  // The FPL forwarder's own 404s and 503s, marked as its answers: a page reads each as no
+  // document and shows nothing for it (#983 step 3, #1008), so they are not failures.
+  const forwarderRefusals = new Set<string>();
   const cacheMissUrls = new Set<string>();
   const adviceMisses: Response[] = [];
   const failures: string[] = [];
@@ -45,9 +49,15 @@ test("published league and member journey works without submitting a solve", asy
     )
       capabilitiesUrl = response.url();
     if (new URL(response.url()).origin === origin && response.status() >= 400) {
-      if (response.status() === 404 && OPTIONAL_DOCUMENTS.has(new URL(response.url()).pathname)) {
+      const { pathname } = new URL(response.url());
+      if (response.status() === 404 && OPTIONAL_DOCUMENTS.has(pathname)) {
         absentDocuments.add(response.url());
         console.log(`optional document absent: ${response.url()}`);
+      } else if (
+        isForwarderRefusal(pathname, response.status(), response.headers()[MARKER_HEADER])
+      ) {
+        forwarderRefusals.add(response.url());
+        console.log(`forwarder refusal ${response.status()}: ${response.url()}`);
       } else failures.push(`${response.status()} ${response.url()}`);
     }
   });
@@ -259,11 +269,12 @@ test("published league and member journey works without submitting a solve", asy
     consoleErrors.filter(
       ({ text, url }) =>
         !(
-          (absentDocuments.has(url) || cacheMissUrls.has(url)) &&
-          /Failed to load resource:.*404/.test(text)
+          ((absentDocuments.has(url) || cacheMissUrls.has(url)) &&
+            /Failed to load resource:.*404/.test(text)) ||
+          (forwarderRefusals.has(url) && /Failed to load resource:.*\b(?:404|503)\b/.test(text))
         ),
     ),
-    "no console error apart from the reported optional document or validated cache miss",
+    "no console error apart from the reported optional document, validated cache miss or forwarder refusal",
   ).toEqual([]);
   expect(errors, "no browser or console error").toEqual([]);
 });
