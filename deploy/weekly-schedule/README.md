@@ -43,7 +43,7 @@ timer's ticks in between do nothing.
 | What | Where |
 | --- | --- |
 | Service user | `squadopt`, home `/srv/squadopt` (mode 0750) |
-| Checkout | `/srv/squadopt/weekly`, a clone of `develop`; the gate fast-forwards it before each run, because the weekly command refuses a revision that is not the fresh `origin/develop` |
+| Checkout | `/srv/squadopt/weekly`, a clone of `develop` (of #1262's branch until it merges, `SQUADOPT_REF`); the gate fast-forwards it before each run, because the weekly command refuses a revision that is not the fresh `origin/develop` |
 | venv | `/srv/squadopt/weekly/.venv`, Python 3.13, `pip install -c constraints.txt -e ".[llm]"` |
 | Private settings | `/srv/squadopt/private/club-news.settings.toml` (squadopt, 0600) and `/etc/squadopt/weekly-schedule.env` (root, 0600), the file the unit's `EnvironmentFile` names |
 | Units | `/etc/systemd/system/weekly-schedule.{service,timer}`, drop-ins in `weekly-schedule.service.d/`: `dry-run.conf` (the first week) and `workers.conf` (`WEEKLY_WORKERS`, the host's cores) |
@@ -70,23 +70,38 @@ journal refuses a path through a symbolic link.
 2. **Give root your SSH key** from your own machine, so that step 3 turns password login off:
    `ssh-copy-id root@<ip>`. Without a key the script leaves passwords on and says so; add the
    key later and run it again.
-3. **Provision**, as root on the host, once #1262 is on `develop`:
+3. **Provision**, as root on the host. Until #1262 is on `develop`, from #1262's branch:
+   `SQUADOPT_REF` names the branch the checkout is cloned on (`develop` when it is not set),
+   and the script prints the one in use.
 
    ```sh
    ssh root@<ip>
-   curl -fsSLO https://raw.githubusercontent.com/MyManDev/football-squad-optimizer/develop/deploy/weekly-schedule/provision.sh
-   bash provision.sh
+   curl -fsSLO https://raw.githubusercontent.com/MyManDev/football-squad-optimizer/refs/heads/feature/the-scheduled-run-releases-itself-on-any-host/deploy/weekly-schedule/provision.sh
+   SQUADOPT_REF=feature/the-scheduled-run-releases-itself-on-any-host bash provision.sh
    ```
 
-   It refuses any OS but Ubuntu 24.04, and a checkout without these units. In order it installs
+   Once #1262 is merged, run it once more with `develop`. It moves the existing checkout over
+   (fetch, check out `develop` tracking `origin/develop`, `pull --ff-only`), refuses a
+   checkout with local changes or a tick that is running, and reinstalls the venv and the
+   units from `develop`:
+
+   ```sh
+   curl -fsSLO https://raw.githubusercontent.com/MyManDev/football-squad-optimizer/develop/deploy/weekly-schedule/provision.sh
+   SQUADOPT_REF=develop bash provision.sh
+   ```
+
+   The dry-run week can start on the branch, since a dry run only decides; real runs need
+   `develop`, because the weekly command refuses a revision that is not the fresh
+   `origin/develop`. The script refuses any OS but Ubuntu 24.04, a branch origin does not
+   have, and a branch without these units. In order it installs
    `git`, `curl`, `time`, `ufw` and `unattended-upgrades`; `gh` from GitHub's apt repository;
    `python3.13` and `python3.13-venv` from deadsnakes; the user `squadopt`; the clone of
    `develop` and its venv (a compiler only if a pinned package has no wheel); 4 GB of swap; a
    firewall that lets only OpenSSH in; unattended security updates with no automatic reboot;
    the journald cap; SSH with `PasswordAuthentication no` and
    `PermitRootLogin prohibit-password`, only when `/root/.ssh/authorized_keys` holds a key;
-   and the units, with the dry-run drop-in on this first provisioning, and the timer enabled.
-   It ends by printing steps 4 to 6.
+   and the units, with the dry-run drop-in on the first provisioning, and the timer enabled.
+   It ends by printing steps 4 to 6. Steps 4 to 8 do not wait for the run with `develop`.
 4. **GitHub, as `squadopt`.** Log in with the account the release acts as: it pushes branches
    and tags, opens pull requests, enqueues into `develop`'s merge queue, merges the release
    pull request into `main`, dispatches `deploy-pages.yml` and comments on #1093. Then let git
@@ -144,7 +159,8 @@ journal refuses a path through a symbolic link.
    the morning time on every tick says it would start that morning's run; check the times and
    the gameweek against the deadlines, and in a fixture gap the reason each tick waits. The
    week's choices are posted on #1243.
-9. **Real runs.** Remove the drop-in; the next tick runs for real, up to its site pull request:
+9. **Real runs**, once the checkout is on `develop` (step 3's second run). Remove the drop-in;
+   the next tick runs for real, up to its site pull request:
 
    ```sh
    sudo rm /etc/systemd/system/weekly-schedule.service.d/dry-run.conf

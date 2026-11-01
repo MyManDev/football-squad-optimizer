@@ -6,8 +6,11 @@ be held without the host: both parse under `bash -n`; the provisioning refuses a
 Ubuntu 24.04, and a user who is not root, before it changes anything (run for real, with a
 fixture in place of `/etc/os-release`); each step that changes the host checks first, so a
 second run changes nothing; it writes no secret; it installs the dry-run drop-in on a first
-provisioning only and enables the timer; and its paths are the units' paths. The readiness
-report writes nothing and prints no token.
+provisioning only and enables the timer; and its paths are the units' paths. Its checkout
+runs for real on local repositories, with the script sourced and its main not run: cloned from
+#1262's branch (`SQUADOPT_REF`), then moved to `develop` once the units are there, refusing
+local changes, an unknown branch, a branch without the units and a fast-forward git cannot
+make. The readiness report writes nothing and prints no token.
 """
 
 from __future__ import annotations
@@ -66,12 +69,17 @@ def test_both_scripts_parse_and_say_how_they_fail(script: Path) -> None:
     assert expected in lines
 
 
-def _provision(tmp_path: Path, os_release: str) -> subprocess.CompletedProcess[str]:
+def _provision(
+    tmp_path: Path, os_release: str, ref: str | None = None
+) -> subprocess.CompletedProcess[str]:
     fixture = tmp_path / "os-release"
     fixture.write_text(os_release, encoding="utf-8")
+    environment = {"PATH": os.environ.get("PATH", ""), "SQUADOPT_OS_RELEASE": str(fixture)}
+    if ref is not None:
+        environment["SQUADOPT_REF"] = ref
     return subprocess.run(
         [BASH or "bash", str(PROVISION)],
-        env={"PATH": os.environ.get("PATH", ""), "SQUADOPT_OS_RELEASE": str(fixture)},
+        env=environment,
         capture_output=True,
         text=True,
         timeout=30,
@@ -113,6 +121,21 @@ def test_on_ubuntu_24_04_it_still_refuses_a_user_who_is_not_root(tmp_path: Path)
     )
 
 
+@needs_bash
+@pytest.mark.parametrize("ref", ["feature/x;rm -rf /", "../develop", "-develop", "feature/", ""])
+def test_a_ref_that_names_no_branch_is_refused_before_anything_else(
+    tmp_path: Path, ref: str
+) -> None:
+    refused = _provision(tmp_path, 'ID=ubuntu\nVERSION_ID="24.04"\n', ref)
+    expected = f"Refused: SQUADOPT_REF must name a branch, not '{ref}'"
+    if ref == "":
+        # An empty SQUADOPT_REF is no SQUADOPT_REF: develop, and the root check after it.
+        expected = "Refused: run as root: bash provision.sh"
+    if ref == "" and os.geteuid() == 0:
+        pytest.skip("as root it would provision this machine")
+    assert (refused.returncode, refused.stderr.strip(), refused.stdout) == (1, expected, "")
+
+
 def test_preflight_comes_before_the_first_step_that_changes_the_host() -> None:
     main = _text(PROVISION).split("main() {", 1)[1].split("}", 1)[0].split()
     assert main[:3] == ["preflight", "cd", "/"]
@@ -139,7 +162,7 @@ GUARDED = [
     ('if [ ! -s "$keyring" ]; then', "curl -fsSL https://cli.github.com/packages/"),
     ("if ! compgen -G '/etc/apt/sources.list.d/deadsnakes-ubuntu-ppa-*'", "add-apt-repository"),
     ('if ! getent passwd "$SERVICE_USER"', "useradd --system"),
-    ('if [ ! -d "$CHECKOUT/.git" ]; then', "git clone --branch"),
+    ('if [ ! -d "$target/.git" ]; then', 'git clone -q --branch "$ref"'),
     ('if [ ! -x "$CHECKOUT/.venv/bin/python" ]; then', "-m venv"),
     ('if [ -z "$(swapon --show --noheadings)" ]; then', "fallocate"),
     ('! grep -qE "^$SWAP_FILE[[:space:]]" /etc/fstab', ">>/etc/fstab"),
@@ -248,3 +271,178 @@ def test_the_readiness_report_changes_nothing_and_prints_no_token() -> None:
 def test_the_scripts_and_the_guide_hold_no_long_dash() -> None:
     for path in (PROVISION, CHECK, HOST_FILES / "README.md", *HOST_FILES.glob("*.conf")):
         assert not {chr(0x2013), chr(0x2014)} & set(_text(path)), path
+
+
+FEATURE = "feature/the-scheduled-run-releases-itself-on-any-host"
+UNITS = "deploy/weekly-schedule/weekly-schedule.service"
+
+
+def _git(cwd: Path, *arguments: str) -> str:
+    environment = {
+        "PATH": os.environ.get("PATH", ""),
+        "HOME": str(cwd),
+        "GIT_CONFIG_NOSYSTEM": "1",
+        **{
+            f"GIT_{who}_{what}": value
+            for who in ("AUTHOR", "COMMITTER")
+            for what, value in (("NAME", "Host Test"), ("EMAIL", "host@example.invalid"))
+        },
+    }
+    done = subprocess.run(
+        ["git", *arguments], cwd=cwd, env=environment, capture_output=True, text=True, check=True
+    )
+    return done.stdout.strip()
+
+
+def _commit(work: Path, path: str, text: str) -> str:
+    (work / path).parent.mkdir(parents=True, exist_ok=True)
+    (work / path).write_text(text, encoding="utf-8")
+    _git(work, "add", "-A")
+    _git(work, "commit", "-q", "-m", f"add {path}")
+    return _git(work, "rev-parse", "HEAD")
+
+
+@pytest.fixture
+def origin(tmp_path: Path) -> tuple[Path, Path]:
+    """`develop` without the units, #1262's branch with them, and a bare origin of both."""
+
+    work = tmp_path / "work"
+    work.mkdir()
+    _git(work, "init", "-q", "-b", "develop")
+    _commit(work, "README.md", "develop\n")
+    _git(work, "checkout", "-q", "-b", FEATURE)
+    _commit(work, UNITS, "[Service]\n")
+    bare = tmp_path / "origin.git"
+    _git(tmp_path, "clone", "-q", "--bare", str(work), str(bare))
+    _git(work, "remote", "add", "origin", str(bare))
+    return work, bare
+
+
+def _checkout_ref(tmp_path: Path, bare: Path, ref: str) -> subprocess.CompletedProcess[str]:
+    """`checkout_ref` alone, the script sourced with its main not run and git run as this user.
+
+    The os-release fixture is Debian, so that even a main that ran would refuse at once.
+    """
+
+    fixture = tmp_path / "debian"
+    fixture.write_text("ID=debian\n", encoding="utf-8")
+    run = 'source "$1"; as_user() { "$@"; }; checkout_ref "$2" "$3" "$4"'
+    return subprocess.run(
+        [
+            BASH or "bash",
+            "-c",
+            run,
+            "sourced",
+            str(PROVISION),
+            str(bare),
+            str(tmp_path / "weekly"),
+            ref,
+        ],
+        env={
+            "PATH": os.environ.get("PATH", ""),
+            "HOME": str(tmp_path),
+            "GIT_CONFIG_NOSYSTEM": "1",
+            "SQUADOPT_OS_RELEASE": str(fixture),
+        },
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+    )
+
+
+@needs_bash
+def test_the_host_is_provisioned_from_the_branch_then_moved_to_develop(
+    tmp_path: Path, origin: tuple[Path, Path]
+) -> None:
+    work, bare = origin
+    weekly = tmp_path / "weekly"
+    first = _checkout_ref(tmp_path, bare, FEATURE)
+    assert first.returncode == 0, first.stderr
+    head = _git(weekly, "rev-parse", "--short", "HEAD")
+    assert first.stdout == f"checkout on {FEATURE} at {head} add {UNITS}\n"
+    assert _git(weekly, "rev-parse", "--abbrev-ref", "HEAD") == FEATURE
+
+    # Before the merge, develop has no units: the switch refuses and leaves the branch.
+    early = _checkout_ref(tmp_path, bare, "develop")
+    assert early.returncode == 1
+    assert early.stderr.strip() == (
+        "Refused: origin's develop has no deploy/weekly-schedule/ units; the checkout was left "
+        "on its branch"
+    )
+    assert _git(weekly, "rev-parse", "--abbrev-ref", "HEAD") == FEATURE
+
+    # #1262 merges, develop moves on, and the host moves to it.
+    _git(work, "checkout", "-q", "develop")
+    _git(work, "merge", "-q", "--no-ff", "-m", "merge #1262", FEATURE)
+    merged = _commit(work, "CHANGELOG.md", "after the merge\n")
+    _git(work, "push", "-q", "origin", "develop")
+    moved = _checkout_ref(tmp_path, bare, "develop")
+    assert moved.returncode == 0, moved.stderr
+    assert _git(weekly, "rev-parse", "HEAD") == merged
+    assert _git(weekly, "rev-parse", "--abbrev-ref", "develop@{upstream}") == "origin/develop"
+    assert moved.stdout.startswith(f"checkout on develop at {merged[:7]}")
+
+    # Run again: develop fast-forwards to what origin has now.
+    later = _commit(work, "NEWS.md", "later\n")
+    _git(work, "push", "-q", "origin", "develop")
+    assert _checkout_ref(tmp_path, bare, "develop").returncode == 0
+    assert _git(weekly, "rev-parse", "HEAD") == later
+
+
+@needs_bash
+def test_a_checkout_with_local_changes_or_an_unknown_branch_is_left_where_it_is(
+    tmp_path: Path, origin: tuple[Path, Path]
+) -> None:
+    work, bare = origin
+    weekly = tmp_path / "weekly"
+    assert _checkout_ref(tmp_path, bare, FEATURE).returncode == 0
+    head = _git(weekly, "rev-parse", "HEAD")
+
+    unknown = _checkout_ref(tmp_path, bare, "no-such-branch")
+    assert unknown.returncode == 1
+    assert unknown.stderr.strip() == (
+        "Refused: origin has no branch no-such-branch; the checkout was left on its branch"
+    )
+
+    (weekly / UNITS).write_text("[Service]\nchanged\n", encoding="utf-8")
+    dirty = _checkout_ref(tmp_path, bare, FEATURE)
+    assert dirty.returncode == 1
+    assert dirty.stderr.strip() == (
+        f"Refused: the checkout at {weekly} has local changes; it was left on its branch"
+    )
+    (weekly / UNITS).write_text("[Service]\n", encoding="utf-8")
+
+    # A local commit origin does not have cannot be fast-forwarded: git refuses, nothing moves.
+    _commit(weekly, "local.txt", "only here\n")
+    _commit(work, "remote.txt", "only there\n")
+    _git(work, "push", "-q", "origin", FEATURE)
+    local = _git(weekly, "rev-parse", "HEAD")
+    diverged = _checkout_ref(tmp_path, bare, FEATURE)
+    assert diverged.returncode != 0
+    assert (_git(weekly, "rev-parse", "HEAD"), local != head) == (local, True)
+    assert _git(weekly, "rev-parse", "--abbrev-ref", "HEAD") == FEATURE
+
+
+def test_the_ref_in_use_is_printed_and_develop_is_the_default() -> None:
+    code = "\n".join(_code(PROVISION))
+    assert _readonly(PROVISION)["REF"] == "${SQUADOPT_REF:-$DEVELOP}"
+    assert _readonly(PROVISION)["DEVELOP"] == "develop"
+    assert 'say "Checkout of $REF at $CHECKOUT"' in code
+    assert "== Provisioned from $REF." in code
+    assert 'checkout_ref "$REPOSITORY" "$CHECKOUT" "$REF"' in code
+    # The checkout never moves under a running tick.
+    guard = code.index("systemctl is-active --quiet weekly-schedule.service")
+    assert guard < code.index('checkout_ref "$REPOSITORY" "$CHECKOUT" "$REF"')
+
+
+@needs_bash
+def test_a_first_clone_of_a_branch_without_the_units_is_refused(
+    tmp_path: Path, origin: tuple[Path, Path]
+) -> None:
+    _, bare = origin
+    refused = _checkout_ref(tmp_path, bare, "develop")
+    assert refused.returncode == 1
+    assert refused.stderr.strip() == (
+        "Refused: the checkout of develop has no deploy/weekly-schedule/ units"
+    )

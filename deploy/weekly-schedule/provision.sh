@@ -5,12 +5,17 @@
 #   curl -fsSLO https://raw.githubusercontent.com/MyManDev/football-squad-optimizer/develop/deploy/weekly-schedule/provision.sh
 #   bash provision.sh
 #
+# SQUADOPT_REF names the branch the checkout is on, develop unless it is set. Before #1262 is
+# on develop the host is provisioned from #1262's branch, then once more with develop, which
+# moves the existing checkout over: fetch, check out, fast-forward, refusing local changes.
+# Real runs need develop: the weekly command refuses a revision that is not origin/develop.
+#
 # It installs the packages, the GitHub CLI from GitHub's apt repository, Python 3.13 from the
-# deadsnakes PPA, the service user squadopt (home /srv/squadopt), the checkout of develop and
-# its venv, a 4 GB swap file when the host has no swap, a firewall that lets only SSH in,
-# unattended security updates, a journald size cap, SSH without passwords once root has a key,
-# and the systemd units of deploy/weekly-schedule/ with the timer on, on the dry-run drop-in
-# on a first provisioning. It writes no secret and logs nothing in: it prints the steps left
+# deadsnakes PPA, the service user squadopt (home /srv/squadopt), the checkout and its venv, a
+# 4 GB swap file when the host has no swap, a firewall that lets only SSH in, unattended
+# security updates, a journald size cap, SSH without passwords once root has a key, and the
+# systemd units of deploy/weekly-schedule/ with the timer on, on the dry-run drop-in on a
+# first provisioning. It writes no secret and logs nothing in: it prints the steps left
 # for a person at its end (deploy/weekly-schedule/README.md has them in order).
 set -euo pipefail
 
@@ -19,7 +24,8 @@ readonly SERVICE_HOME=/srv/squadopt
 readonly CHECKOUT=/srv/squadopt/weekly
 readonly PRIVATE=/srv/squadopt/private
 readonly REPOSITORY=https://github.com/MyManDev/football-squad-optimizer.git
-readonly BRANCH=develop
+readonly DEVELOP=develop
+readonly REF="${SQUADOPT_REF:-$DEVELOP}"
 readonly SETTINGS_DIR=/etc/squadopt
 readonly ENVIRONMENT_FILE=/etc/squadopt/weekly-schedule.env
 readonly UNITS=/etc/systemd/system
@@ -60,6 +66,9 @@ preflight() {
   if [ "$os_id" != ubuntu ] || [ "$version" != 24.04 ]; then
     refuse "this provisions Ubuntu 24.04 only, and this host is ${os_id:-unknown} ${version:-unknown}"
   fi
+  case "$REF" in
+    "" | -* | */ | *..* | *[!A-Za-z0-9._/-]*) refuse "SQUADOPT_REF must name a branch, not '$REF'" ;;
+  esac
   [ "$(id -u)" -eq 0 ] || refuse "run as root: bash provision.sh"
 }
 
@@ -111,16 +120,48 @@ service_user() {
   install -d -m 0700 -o "$SERVICE_USER" -g "$SERVICE_USER" "$PRIVATE"
 }
 
-checkout() {
-  say "Checkout of $BRANCH at $CHECKOUT"
-  if [ ! -d "$CHECKOUT/.git" ]; then
-    as_user git clone --branch "$BRANCH" "$REPOSITORY" "$CHECKOUT"
+# Put the clone of $1 at $2 on branch $3: clone it there, or move an existing clone over by
+# fetching, checking the branch out to track origin's and fast-forwarding it. It refuses a
+# clone with local changes, a branch origin does not have, and a branch without the units.
+checkout_ref() {
+  local repository="$1" target="$2" ref="$3" branch
+  if [ ! -d "$target/.git" ]; then
+    as_user git clone -q --branch "$ref" "$repository" "$target"
+  else
+    [ -z "$(as_user git -C "$target" status --porcelain)" ] ||
+      refuse "the checkout at $target has local changes; it was left on its branch"
+    as_user git -C "$target" fetch -q --prune origin
+    as_user git -C "$target" show-ref --verify --quiet "refs/remotes/origin/$ref" ||
+      refuse "origin has no branch $ref; the checkout was left on its branch"
+    as_user git -C "$target" cat-file -e "origin/$ref:deploy/weekly-schedule/weekly-schedule.service" 2>/dev/null ||
+      refuse "origin's $ref has no deploy/weekly-schedule/ units; the checkout was left on its branch"
+    if as_user git -C "$target" show-ref --verify --quiet "refs/heads/$ref"; then
+      as_user git -C "$target" checkout -q "$ref"
+      as_user git -C "$target" branch -q --set-upstream-to "origin/$ref" "$ref"
+    else
+      as_user git -C "$target" checkout -q --track "origin/$ref"
+    fi
+    as_user git -C "$target" pull -q --ff-only
   fi
-  local branch
-  branch="$(as_user git -C "$CHECKOUT" rev-parse --abbrev-ref HEAD)"
-  [ "$branch" = "$BRANCH" ] || warn "the checkout is on $branch, not $BRANCH; the gate needs $BRANCH"
-  [ -f "$CHECKOUT/deploy/weekly-schedule/weekly-schedule.service" ] ||
-    refuse "the checkout has no deploy/weekly-schedule/ units yet: #1262 is not on $BRANCH"
+  branch="$(as_user git -C "$target" rev-parse --abbrev-ref HEAD)"
+  [ "$branch" = "$ref" ] || refuse "the checkout is on $branch, not $ref"
+  [ -f "$target/deploy/weekly-schedule/weekly-schedule.service" ] ||
+    refuse "the checkout of $ref has no deploy/weekly-schedule/ units"
+  printf 'checkout on %s at %s\n' "$ref" "$(as_user git -C "$target" log -1 --format='%h %s')"
+}
+
+checkout() {
+  say "Checkout of $REF at $CHECKOUT"
+  # The gate fast-forwards this checkout and runs from it: never move it under a tick.
+  if [ -d "$CHECKOUT/.git" ] && systemctl is-active --quiet weekly-schedule.service; then
+    refuse "a tick of weekly-schedule.service is running; run this again once it has ended"
+  fi
+  checkout_ref "$REPOSITORY" "$CHECKOUT" "$REF"
+  if [ "$REF" != "$DEVELOP" ]; then
+    warn "the checkout is on $REF, not $DEVELOP: keep the dry-run drop-in, since a real run" \
+      "refuses a revision that is not origin/$DEVELOP. Run this again with" \
+      "SQUADOPT_REF=$DEVELOP once #1262 is on $DEVELOP."
+  fi
 }
 
 venv() {
@@ -247,6 +288,8 @@ CONF
   systemctl enable --now weekly-schedule.timer
   if [ -e "$DROP_INS/dry-run.conf" ]; then
     echo "The timer ticks on the dry-run drop-in: every tick decides and runs nothing."
+  elif [ "$REF" != "$DEVELOP" ]; then
+    warn "no dry-run drop-in on a checkout of $REF: every real run will refuse until it is on $DEVELOP"
   else
     warn "no dry-run drop-in: the timer starts real runs"
   fi
@@ -256,7 +299,7 @@ CONF
 steps_left() {
   cat <<STEPS
 
-== Provisioned. What is left, by hand, in this order (deploy/weekly-schedule/README.md):
+== Provisioned from $REF. What is left, by hand, in this order (deploy/weekly-schedule/README.md):
 
 1. GitHub, as $SERVICE_USER: log in with the account that pushes, opens and enqueues the site
    pull requests and posts on #1093, then let git use it and give its commits that identity:
@@ -284,7 +327,8 @@ steps_left() {
    data/runtime and data/logs are this host's own and are not copied.
 
 4. Check the host: bash $CHECKOUT/deploy/weekly-schedule/check_host.sh
-5. Read a week of dry-run ticks, then remove the drop-in (README, "Enable it").
+5. Read a week of dry-run ticks, then remove the drop-in (README, step 9), once the
+   checkout is on $DEVELOP (SQUADOPT_REF=$DEVELOP bash provision.sh after #1262 is merged).
 STEPS
 }
 
@@ -306,4 +350,7 @@ main() {
   steps_left
 }
 
-main "$@"
+# Sourced, as the tests source it, it defines its functions and runs nothing.
+if [ "${BASH_SOURCE[0]}" = "$0" ]; then
+  main "$@"
+fi

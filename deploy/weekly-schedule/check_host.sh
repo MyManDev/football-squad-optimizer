@@ -63,7 +63,11 @@ if command -v python3.13 >/dev/null; then ok "$(python3.13 --version)"; else abs
 if [ -d "$CHECKOUT/.git" ]; then
   branch="$(as_user git -C "$CHECKOUT" rev-parse --abbrev-ref HEAD 2>/dev/null)"
   head="$(as_user git -C "$CHECKOUT" log -1 --format='%h %cs %s' 2>/dev/null)"
-  if [ "$branch" = develop ]; then ok "checkout on develop at $head"; else note "checkout on $branch"; fi
+  if [ "$branch" = develop ]; then
+    ok "checkout on develop at $head"
+  else
+    note "checkout on $branch at $head: real runs need develop (SQUADOPT_REF=develop bash provision.sh)"
+  fi
   if [ -z "$(as_user git -C "$CHECKOUT" status --porcelain 2>/dev/null)" ]; then
     ok "checkout clean"
   else
