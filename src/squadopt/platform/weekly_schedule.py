@@ -22,8 +22,9 @@ marker (``started/morning-<date>.json``, ``started/settled-<season>-gw<NN>.json`
 settled view in a gap, or ``started/final-<season>-gw<NN>.json``) before anything runs, so a
 run that fails is not started again by the next tick, and each run publishes under its own
 site suffix (``morning-<stamp>`` or ``final-<stamp>``). A Friday-kind run, which the final run
-always is, first acquires the week's club news in this process; a morning run is a
-Tuesday-kind run with no club news (D3 on #1243).
+always is, first acquires the week's club news in this process and passes it to the run's
+manager's word; a morning run is a Tuesday-kind run with no club news (D3 on #1243) and no
+manager's word, so its pages offer none.
 
 A run ends at its site pull request. D1 on #1243 (6559389043) releases it only after İbo has
 seen its preview and said yes, by ``python -m squadopt.platform.weekly_release --run-id <id>``.
@@ -89,7 +90,7 @@ MORNING_UTC: Final = "02:00"
 FINAL_LEAD_HOURS: Final = 4.0
 RUN_HOURS: Final = 3.5
 #: D3 on #1243 (6559389043): club news on the final run only. A morning run is a Tuesday-kind
-#: run, which acquires no club news and so makes no model call.
+#: run, which acquires no club news, so makes no model call, and passes no ``--rotation``.
 MORNING_KIND: Final = "tuesday"
 #: `weekly_run.ps1`'s default.
 WORKERS: Final = 15
@@ -337,7 +338,14 @@ def weekly_arguments(
     suffix: str,
     rotation_capture: str = "",
 ) -> list[str]:
-    """The weekly command's arguments, as `Build-WeeklyArguments` in `weekly_run.ps1`."""
+    """The weekly command's arguments, as `Build-WeeklyArguments` in `weekly_run.ps1` but one.
+
+    The manager's word rides on the run's own club news alone: a run with a club-news capture
+    passes ``--rotation --rotation-capture <capture>``, and a run without one, a morning run
+    (D3 on #1243), passes no ``--rotation`` at all. Its index then says
+    ``no_evidence_this_run`` and its pages offer no word, where `weekly_run.ps1`'s Tuesday
+    run read the committed example fixture and published its example-data label.
+    """
 
     if kind == "friday" and not rotation_capture:
         raise ScheduleError(
@@ -347,10 +355,10 @@ def weekly_arguments(
     arguments = [
         *("-m", "squadopt.platform.weekly_operations", "--season", season),
         *("--gameweek", str(gameweek), "--league-list", "config/leagues.json"),
-        *("--workers", str(workers), "--projection", "component-only", "--rotation"),
+        *("--workers", str(workers), "--projection", "component-only"),
     ]
     if rotation_capture:
-        arguments += ["--rotation-capture", rotation_capture]
+        arguments += ["--rotation", "--rotation-capture", rotation_capture]
     arguments += ["--record-advice", "--publish", "--publish-suffix", suffix, "--run-id", identity]
     return arguments
 

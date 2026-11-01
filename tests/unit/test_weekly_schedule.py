@@ -311,7 +311,12 @@ def test_the_weekly_arguments_are_weekly_run_s_and_friday_refuses_the_fixture() 
         "--rotation --rotation-capture news --record-advice --publish "
         "--publish-suffix s --run-id rid"
     )
-    assert "--rotation-capture" not in gate.weekly_arguments("tuesday", "2026-27", 7, 15, "r", "s")
+    # A morning run takes no manager's word: no --rotation, so no example fixture either.
+    assert " ".join(gate.weekly_arguments("tuesday", "2026-27", 7, 4, "rid", "s")) == (
+        "-m squadopt.platform.weekly_operations --season 2026-27 --gameweek 7 "
+        "--league-list config/leagues.json --workers 4 --projection component-only "
+        "--record-advice --publish --publish-suffix s --run-id rid"
+    )
     with pytest.raises(gate.ScheduleError, match="requires a real club-news capture"):
         gate.weekly_arguments("friday", "2026-27", 7, 15, "rid", "s")
 
@@ -431,6 +436,20 @@ def test_a_dry_run_prints_the_run_it_would_start_and_writes_nothing(
     assert not (tmp_path / "data").exists()
 
 
+def test_a_dry_run_of_a_morning_run_shows_a_command_with_no_manager_s_word(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    host = _Host()
+    assert _main(_workspace(tmp_path), "2026-10-30T02:00:00Z", host, "--dry-run") == 0
+    would = capsys.readouterr().out.splitlines()[-1]
+    assert would.endswith(
+        "--workers 15 --projection component-only --record-advice --publish "
+        "--publish-suffix morning-20261030T0200 --run-id 2026-27-gw09-tuesday-20261030T0200Z"
+    )
+    assert "--rotation" not in would
+    assert (host.commands, host.news) == ([], [])
+
+
 def test_a_dry_run_exits_three_for_a_missed_window_and_two_for_a_short_lead(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -496,10 +515,15 @@ def test_a_morning_run_takes_no_club_news_and_only_the_final_run_does(tmp_path: 
     assert _main(workspace, "2026-10-30T02:00:00Z", host) == 0
     assert host.news == []
     _, weekly = host.commands
-    assert "--rotation-capture" not in weekly
+    assert [argument for argument in weekly if argument.startswith("--rotation")] == []
     assert weekly[-2:] == ["--run-id", "2026-27-gw09-tuesday-20261030T0200Z"]
     assert _main(workspace, "2026-10-31T07:05:00Z", host) == 0
     assert [arguments[0] for arguments in host.news] == ["--check-config", "--roster-snapshot"]
+    # The final run's word reads its own club-news capture, never the example fixture.
+    final = host.commands[-1]
+    at = final.index("--rotation")
+    assert final[at : at + 3] == ["--rotation", "--rotation-capture", "club-news-held"]
+    assert final.count("--rotation") == 1
 
 
 def test_the_gate_reads_the_settled_week_from_the_bootstrap_and_starts_its_view_once(
