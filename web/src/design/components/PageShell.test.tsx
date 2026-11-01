@@ -250,6 +250,12 @@ describe("the app shell on a desktop", () => {
       TR.thisWeek,
       TR.squad,
       TR.league,
+      TR.currentSquad,
+      TR.decisionTools,
+      TR.whatIf,
+      TR.duel,
+      TR.chips,
+      TR.squadCard,
       TR.fixtures,
       TR.contribute,
     ]);

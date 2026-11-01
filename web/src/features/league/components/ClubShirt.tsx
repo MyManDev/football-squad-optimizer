@@ -3,7 +3,7 @@ import type { CSSProperties } from "react";
 import { useLanguage } from "../../../i18n/context";
 import { clubColours } from "../../../lib/clubs";
 import styles from "./ClubShirt.module.css";
-import { clubPlate } from "./pitchLook";
+import { clubPlate } from "./clubPlate";
 
 /*
  * Our own flat shirt on a 32 by 28 grid, symmetric about x = 16: a scooped neck, short
@@ -34,7 +34,7 @@ function initials(name: string, locale: string): string {
 /**
  * A player's shirt, drawn in their club's colours: the body in the colour the
  * club's plate is filled with, which is its first colour wherever ink or white reads on it
- * at 4.5:1 (clubPlate in pitchLook.ts, the same rule the club-coloured plates follow), and
+ * at 4.5:1 (clubPlate.ts), and
  * the sleeves and collar in the club's other colour. Every goalkeeper wears one shared
  * colour no club wears (--color-keeper), so the keepers read at a glance, and a club with
  * no colours wears a blank white shirt. The large shirt carries the player's initials in the

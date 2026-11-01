@@ -28,6 +28,39 @@ const NAV_PATHS: Record<NavKey, ReactNode> = {
     <path d="M6.5 2.5L2.5 4.5 4 8l2-.8v8.3h6V7.2l2 .8 1.5-3.5-4-2c-.4 1.2-1.4 2-2.5 2s-2.1-.8-2.5-2z" />
   ),
   league: <path d="M2 15.5h14M3 15.5v-5h4v5M7 15.5v-9h4v9M11 15.5V12h4v3.5" />,
+  currentSquad: (
+    <>
+      <rect x="3.5" y="3" width="11" height="13" rx="1.5" />
+      <path d="M6.5 7h5M6.5 10h5M6.5 13h3" />
+    </>
+  ),
+  decisionTools: (
+    <>
+      <path d="M2.5 5h13M2.5 9h13M2.5 13h13" />
+      <circle cx="6" cy="5" r="1.6" />
+      <circle cx="12" cy="9" r="1.6" />
+      <circle cx="8" cy="13" r="1.6" />
+    </>
+  ),
+  whatIf: <path d="M3 6h11.5l-3-3M15 12H3.5l3 3" />,
+  duel: (
+    <>
+      <circle cx="5.5" cy="9" r="3" />
+      <circle cx="12.5" cy="9" r="3" />
+    </>
+  ),
+  chips: (
+    <>
+      <circle cx="9" cy="9" r="6.5" />
+      <circle cx="9" cy="9" r="2.5" />
+    </>
+  ),
+  squadCard: (
+    <>
+      <rect x="2.5" y="4" width="13" height="10" rx="1.5" />
+      <path d="M5.5 11h4M5.5 8.5h7" />
+    </>
+  ),
   fixtures: (
     <>
       <rect x="2.5" y="3.5" width="13" height="12" rx="1.5" />

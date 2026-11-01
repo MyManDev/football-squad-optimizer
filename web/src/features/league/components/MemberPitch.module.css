@@ -8,13 +8,10 @@
  * Every plate is centred on its point, so a line is symmetric about the pitch's axis.
  *
  * Nothing small is written on the grass: names, codes, figures and the direction of
- * attack sit on plates, white by default (ink 16.3:1, ink2 7.6:1 on white). The grass's
- * pattern is the one pattern the page allows, and it is only on the grass: stripes by
- * default, or the plain or checked look the viewer chose (pitchLook.ts, #1136), all in the
- * two grass tokens. In club colours a player's plate takes its club's fill with one text
- * colour that reads 4.5:1 on it; the direction of attack keeps its white plate.
+ * attack sit on white plates (ink 16.3:1, ink2 7.6:1 on white). The grass's stripes are
+ * the one pattern the page allows, and they are only on the grass, in the two grass tokens.
  *
- * Each player wears a shirt in their club's colours whatever the look (ClubShirt.tsx). It
+ * Each player wears a shirt in their club's colours (ClubShirt.tsx). It
  * stands above the plate only where the lines are far enough apart for it: the shirt and
  * the tags above it take 48 px over the plate, which an upright field has from 454 px wide
  * (see below). A phone's field stands its lines 84 to 86 px apart, 32 to 34 px clear, and
@@ -40,17 +37,6 @@
     var(--color-pitch) 0 9.0909%,
     var(--color-pitch-2) 9.0909% 18.1818%
   );
-}
-
-/* The viewer's grass looks, in both orientations: one colour, or a checked mowing pattern
-   whose cells keep the stripes' depth (a tile is two cells each way). */
-.wrap[data-grass="plain"] .field {
-  background: var(--color-pitch);
-}
-
-.wrap[data-grass="checks"] .field {
-  background: repeating-conic-gradient(var(--color-pitch) 0 25%, var(--color-pitch-2) 0 50%) 0 0 /
-    40% 18.1818%;
 }
 
 .descAcross {
@@ -306,23 +292,6 @@
   align-items: center;
   justify-content: center;
   gap: 2px;
-}
-
-/* A plate in its club's colours: every line in the one text colour chosen for the fill, and
-   a shirt in the plate outlined in it too, so a shirt in the plate's own fill keeps its
-   shape. The shirt above the plate stands on the grass and keeps its ink outline. */
-.plate[data-club] {
-  --shirt-line: var(--plate-text);
-  background: var(--plate-fill);
-  color: var(--plate-text);
-}
-
-.plate[data-club] .code {
-  color: inherit;
-}
-
-.plate[data-club] .shirtAbove {
-  --shirt-line: var(--color-board);
 }
 
 /* Upright, YENİ and the armband stand centred over their own plate, outside it, so a

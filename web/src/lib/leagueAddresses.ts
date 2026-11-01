@@ -22,6 +22,36 @@ export function memberHistoryAddress(leagueId: number, entryId: number | string)
   return `${memberAddress(leagueId, entryId)}/history`;
 }
 
+/**
+ * The member's tools, each a page of its own under the member's page that the sidebar
+ * links once the visitor has said who they are: the squad held now, the decision tools,
+ * the what-if squad, the duel, the chips and free transfers, and the squad card.
+ */
+export const MEMBER_TOOLS = [
+  "current-squad",
+  "decision-tools",
+  "what-if",
+  "duel",
+  "chips",
+  "card",
+] as const;
+
+export type MemberTool = (typeof MEMBER_TOOLS)[number];
+
+export function isMemberTool(value: string | undefined): value is MemberTool {
+  return (MEMBER_TOOLS as readonly (string | undefined)[]).includes(value);
+}
+
+/** A member's tool page; `search` carries the plan, as on the decision page. */
+export function memberToolAddress(
+  leagueId: number,
+  entryId: number | string,
+  tool: MemberTool,
+  search = "",
+): string {
+  return `${memberAddress(leagueId, entryId)}/${tool}${search}`;
+}
+
 /** The league number an address under /league names, or null where it names none. */
 export function leagueIdInAddress(pathname: string): number | null {
   const match = /^\/league\/(\d+)(?:\/|$)/.exec(pathname);

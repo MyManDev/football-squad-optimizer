@@ -1,6 +1,6 @@
 /**
- * The duel on the member page (#1133): a closed tool until an address names a rival with
- * `?duel=`, which opens it; the page reads that rival's entry document of the same capture
+ * The duel (#1133), a page of its own under the member's page: no rival is set beside the
+ * member until an address names one with `?duel=`; the page reads that rival's entry document of the same capture
  * and nothing else, an id outside the league's human members reads nothing, a rival not in
  * the publication is told apart from a failed read, and a tap on another rival changes the
  * address in place.
@@ -32,13 +32,14 @@ function view(
 ) {
   return render(
     <LanguageProvider initialLanguage="tr">
-      <MemoryRouter initialEntries={[`/league/352490/members/${ENTRY}${search}`]}>
+      <MemoryRouter initialEntries={[`/league/352490/members/${ENTRY}/duel${search}`]}>
         {withLeague(
           <LeagueMemberView
             squad={mockEntrySquadEnvelopes[ENTRY]!}
             advice={null}
             members={mockLeagueMembersEnvelope.payload.members}
             duelSquad={duelSquad}
+            tool="duel"
           />,
         )}
       </MemoryRouter>
@@ -46,23 +47,21 @@ function view(
   );
 }
 
-const tool = () =>
-  screen.getByText(COPY.duelTitle, { selector: "summary span" }).closest("details")!;
+const tool = () => screen.getByRole("region", { name: COPY.duelTitle });
 const pressed = () =>
   within(tool())
     .getAllByRole("button", { pressed: true })
     .map((button) => button.textContent);
 
-describe("the duel tool on the member page", () => {
-  it("waits closed until an address names a rival", () => {
+describe("the duel's page", () => {
+  it("sets no rival beside the member until an address names one", () => {
     const { container } = view("", null);
-    expect(tool()).not.toHaveAttribute("open");
+    expect(within(tool()).queryAllByRole("button", { pressed: true })).toHaveLength(0);
     expect(container.querySelector("[data-duel]")).toBeNull();
   });
 
   it("opens on an address that names a rival and sets the two elevens side by side", () => {
     const { container } = view("?duel=35249002");
-    expect(tool()).toHaveAttribute("open");
     expect(pressed()).toEqual(["Half Space"]);
     expect(container.querySelector("[data-duel]")).toHaveAttribute("data-duel", "35249002");
   });
@@ -77,7 +76,6 @@ describe("the duel tool on the member page", () => {
 
   it("ignores an id that is not one of the league's other human members", () => {
     const { container } = view(`?duel=${ENTRY}`);
-    expect(tool()).not.toHaveAttribute("open");
     expect(within(tool()).queryAllByRole("button", { pressed: true })).toHaveLength(0);
     expect(container.querySelector("[data-duel]")).toBeNull();
   });
@@ -99,10 +97,13 @@ describe("the duel's read", () => {
     const rendered = render(
       <QueryClientProvider client={client}>
         <LanguageProvider initialLanguage="tr">
-          <MemoryRouter initialEntries={[`/league/352490/members/${ENTRY}${search}`]}>
+          <MemoryRouter initialEntries={[`/league/352490/members/${ENTRY}/duel${search}`]}>
             {withLeague(
               <Routes>
-                <Route path="/league/:leagueId/members/:entryId" element={<LeagueMemberPage />} />
+                <Route
+                  path="/league/:leagueId/members/:entryId/:tool"
+                  element={<LeagueMemberPage />}
+                />
               </Routes>,
             )}
           </MemoryRouter>
@@ -137,7 +138,7 @@ describe("the duel's read", () => {
 
   it("reads no document for an id outside the league's human members", async () => {
     const { entrySquad } = page("?duel=99");
-    await screen.findByText(COPY.duelTitle, { selector: "summary span" });
+    await screen.findByRole("heading", { name: COPY.duelTitle });
     expect(entrySquad.mock.calls.map(([id]) => id)).not.toContain(99);
   });
 });

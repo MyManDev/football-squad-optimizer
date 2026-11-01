@@ -94,6 +94,12 @@ test.describe("the sidebar before and after the two steps", () => {
       own(EXAMPLE_CLAIM.entryId),
       `${own(EXAMPLE_CLAIM.entryId)}#kadro`,
       MEMBERS,
+      `${own(EXAMPLE_CLAIM.entryId)}/current-squad`,
+      `${own(EXAMPLE_CLAIM.entryId)}/decision-tools`,
+      `${own(EXAMPLE_CLAIM.entryId)}/what-if`,
+      `${own(EXAMPLE_CLAIM.entryId)}/duel`,
+      `${own(EXAMPLE_CLAIM.entryId)}/chips`,
+      `${own(EXAMPLE_CLAIM.entryId)}/card`,
       "/fixtures",
       ...CONTRIBUTE,
     ]);

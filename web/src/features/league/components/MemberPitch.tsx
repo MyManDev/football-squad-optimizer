@@ -8,7 +8,6 @@ import type { ModelChange } from "../advice/modelSwitch";
 import { ClubShirt } from "./ClubShirt";
 import { CoachNewsMark } from "./CoachNews";
 import styles from "./MemberPitch.module.css";
-import { clubPlate, usePitchLook } from "./pitchLook";
 
 /**
  * One player as the pitch draws them: a name plate on the grass, white or in club colours,
@@ -78,7 +77,6 @@ function Plate({
   player,
   codes,
   changed,
-  clubColours,
   news,
   onSelectPlayer,
 }: {
@@ -86,31 +84,19 @@ function Plate({
   codes: ClubCodes;
   /** Brought in by a switch of prediction model: said in the plate's text, as 'New' is. */
   changed: boolean;
-  clubColours: boolean;
   news?: CoachAbsence;
   onSelectPlayer?: (id: number) => void;
 }) {
   const { language, locale, messages } = useLanguage();
   const code = clubCode(player.team, codes);
   const keeper = player.position === "GK";
-  // In club colours the plate takes its club's fill and one readable text colour (#1136).
-  const club = clubColours ? clubPlate(code) : null;
   const shortName = player.shortName.trim() || player.name;
   // The shirt is drawn three ways and the stylesheet shows the one the pitch has room for:
   // large above the plate where an upright pitch is tall enough for it, otherwise small in
   // the plate where the club swatch stood, before the name across and before the code
-  // upright. It is in club colours whatever the plate's look.
+  // upright. It is in club colours on the white plate.
   return (
-    <div
-      className={styles.plate}
-      data-plate=""
-      data-club={club?.colour}
-      style={
-        club
-          ? ({ "--plate-fill": club.fill, "--plate-text": club.text } as CSSProperties)
-          : undefined
-      }
-    >
+    <div className={styles.plate} data-plate="">
       {onSelectPlayer ? (
         <button
           type="button"
@@ -226,7 +212,6 @@ export function MemberPitch({
   const { messages } = useLanguage();
   const copy = messages.leagueMembers;
   const describedBy = useId();
-  const [look] = usePitchLook();
   const lines = LINES.map((position) => ({
     position,
     players: players.filter((player) => player.position === position),
@@ -242,7 +227,6 @@ export function MemberPitch({
     <div
       className={styles.wrap}
       data-mark="pitch"
-      data-grass={look.grass}
       data-def-crowded={defenders >= 4 ? "true" : undefined}
       style={{ "--hh": `${height}px` } as CSSProperties}
     >
@@ -298,7 +282,6 @@ export function MemberPitch({
                       <Plate
                         player={player}
                         codes={codes}
-                        clubColours={look.clubColours}
                         news={news?.get(player.playerId)}
                         changed={modelChange?.changed.has(player.playerId) ?? false}
                         onSelectPlayer={onSelectPlayer}

@@ -1,8 +1,9 @@
 /**
- * The phone's section strip: 'Hamle · Kadro · Araçlar' under the phone bar, three in-page
- * links (not tabs: the page is one document) that land on the decision's heading, the squad
- * and the closed tools. Only a phone draws it. A link whose section is not in the page is
- * left out, and a closed week, which drops the plan settings, keeps all three. The section
+ * The phone's section strip: 'Hamle · Kadro' under the phone bar, two in-page links (not
+ * tabs: the page is one document) that land on the decision's heading and the squad; the
+ * tools are pages of their own in the sidebar. Only a phone draws it. A link whose section
+ * is not in the page is left out, and a closed week, which drops the plan settings, keeps
+ * both. The section
  * being read is the current location, as the page's IntersectionObservers report it; the
  * strip is drawn once the decision's heading has gone up behind the phone bar.
  */
@@ -22,7 +23,7 @@ import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { MESSAGES, type Language } from "../../../i18n/messages";
 import { withLeague } from "../../../testSupport/league";
 import { LeagueMemberView } from "./LeagueMemberPage";
-import { MEMBER_TOOLS_ID, MemberSections } from "./MemberSections";
+import { MemberSections } from "./MemberSections";
 import type { LeagueMemberViewProps } from "./memberPageTypes";
 
 const ENTRY = 35249001;
@@ -154,7 +155,7 @@ const strip = (language: Language) =>
   screen.getByRole("navigation", { name: MESSAGES[language].leagueMembers.sectionsLabel });
 const names = (language: Language) => {
   const copy = MESSAGES[language].leagueMembers;
-  return [copy.sectionMove, copy.sectionSquad, copy.sectionTools];
+  return [copy.sectionMove, copy.sectionSquad];
 };
 const link = (language: Language, name: string) =>
   within(strip(language)).getByRole("link", { name });
@@ -165,7 +166,7 @@ const target = (anchor: HTMLElement) =>
 describe.each(["tr", "en"] as const)("the phone's section strip (%s)", (language) => {
   const copy = MESSAGES[language].leagueMembers;
 
-  it("links the decision, the squad and the tools, in the page's order", () => {
+  it("links the decision and the squad, in the page's order", () => {
     phone();
     show(language);
     const links = within(strip(language)).getAllByRole("link");
@@ -173,19 +174,18 @@ describe.each(["tr", "en"] as const)("the phone's section strip (%s)", (language
     expect(links.map((anchor) => anchor.getAttribute("href"))).toEqual([
       "#entry-advice-title",
       "#kadro",
-      `#${MEMBER_TOOLS_ID}`,
     ]);
     // One page, not tab panels: plain links, with no tab roles anywhere in the strip.
     expect(within(strip(language)).queryByRole("tablist")).toBeNull();
     expect(within(strip(language)).queryByRole("tab")).toBeNull();
-    const [move, squad, tools] = links.map((anchor) => target(anchor)!);
+    const [move, squad] = links.map((anchor) => target(anchor)!);
     expect(move).toBe(screen.getByRole("heading", { name: copy.decisionTitle, level: 2 }));
     expect(squad).toBe(screen.getByRole("region", { name: copy.squadAfterTitle }));
-    // The closed tools: each section's summary is in it.
-    expect(within(tools).getByText(copy.decisionTools)).toBeInTheDocument();
-    expect(within(tools).getByText(copy.chipsAndTransfers)).toBeInTheDocument();
-    // In the order the page reads: the strip, the decision, the squad, the tools.
-    const order = [strip(language), move, squad, tools];
+    // The tools are no longer at the foot of the page.
+    expect(screen.queryByText(copy.decisionTools)).toBeNull();
+    expect(screen.queryByText(copy.chipsAndTransfers)).toBeNull();
+    // In the order the page reads: the strip, the decision, the squad.
+    const order = [strip(language), move, squad];
     for (let index = 1; index < order.length; index += 1)
       expect(
         order[index - 1]!.compareDocumentPosition(order[index]!) & Node.DOCUMENT_POSITION_FOLLOWING,
@@ -198,18 +198,15 @@ describe.each(["tr", "en"] as const)("the phone's section strip (%s)", (language
   it("is drawn on a phone only", () => {
     show(language);
     expect(screen.queryByRole("navigation", { name: copy.sectionsLabel, hidden: true })).toBeNull();
-    expect(document.getElementById(MEMBER_TOOLS_ID)).not.toBeNull();
+    expect(document.getElementById("kadro")).not.toBeNull();
   });
 
-  it("keeps all three on a closed week, the tools' link landing on the tools", () => {
+  it("keeps both on a closed week", () => {
     phone();
     show(language, { deadlinePassed: "2026-09-18T17:30:00Z" });
     expect(document.getElementById("plan-settings")).toBeNull();
     const links = within(strip(language)).getAllByRole("link");
     expect(links.map((anchor) => anchor.textContent)).toEqual(names(language));
-    const tools = target(link(language, copy.sectionTools))!;
-    expect(tools.id).toBe(MEMBER_TOOLS_ID);
-    expect(within(tools).getByText(copy.decisionTools)).toBeInTheDocument();
   });
 
   it("marks the section being read as the current location as the page scrolls", () => {
@@ -217,7 +214,6 @@ describe.each(["tr", "en"] as const)("the phone's section strip (%s)", (language
     const { unmount } = show(language);
     const heading = screen.getByRole("heading", { name: copy.decisionTitle, level: 2 });
     const squad = document.getElementById("kadro")!;
-    const tools = document.getElementById(MEMBER_TOOLS_ID)!;
     const holder = strip(language).parentElement!;
     const current = () =>
       within(strip(language))
@@ -234,17 +230,6 @@ describe.each(["tr", "en"] as const)("the phone's section strip (%s)", (language
     // The squad's top goes up past the reading line under the strip: 'Kadro' is current.
     const line = observerOf(squad);
     line.report(squad, line.edge - 8, { intersecting: true, ratio: 0.9 });
-    expect(current()).toEqual([copy.sectionSquad]);
-    // Then the tools' top: 'Araçlar'. Back above them, 'Kadro' again.
-    line.report(tools, line.edge - 8, { intersecting: true, ratio: 0.9 });
-    expect(current()).toEqual([copy.sectionTools]);
-    line.report(tools, line.edge + 300, { intersecting: true, ratio: 1 });
-    expect(current()).toEqual([copy.sectionSquad]);
-    // At the end of the page the tools rise no higher, but wholly in view they are current.
-    const end = observerOf(tools, 1);
-    end.report(tools, 420, { intersecting: true, ratio: 1 });
-    expect(current()).toEqual([copy.sectionTools]);
-    end.report(tools, 700, { intersecting: true, ratio: 0.4 });
     expect(current()).toEqual([copy.sectionSquad]);
     // Back at the top of the page, the decision.
     line.report(squad, line.edge + 400, { intersecting: true, ratio: 1 });
@@ -273,20 +258,11 @@ describe("the strip on its own", () => {
   };
 
   it("leaves out a link whose section is not in the page", () => {
-    alone(
-      <>
-        <h2 id="entry-advice-title">{copy.decisionTitle}</h2>
-        <section id="kadro" aria-label={copy.memberSquad} />
-      </>,
-    );
+    alone(<h2 id="entry-advice-title">{copy.decisionTitle}</h2>);
     const links = within(screen.getByRole("navigation", { name: copy.sectionsLabel })).getAllByRole(
       "link",
     );
-    expect(links.map((anchor) => anchor.textContent)).toEqual([
-      copy.sectionMove,
-      copy.sectionSquad,
-    ]);
-    expect(screen.queryByRole("link", { name: copy.sectionTools })).toBeNull();
+    expect(links.map((anchor) => anchor.textContent)).toEqual([copy.sectionMove]);
   });
 
   it("reads where the sections are from its observers, never from a scroll listener", () => {
@@ -296,7 +272,6 @@ describe("the strip on its own", () => {
       <>
         <h2 id="entry-advice-title">{copy.decisionTitle}</h2>
         <section id="kadro" aria-label={copy.memberSquad} />
-        <div id={MEMBER_TOOLS_ID} />
       </>,
     );
     const events = [...listen.mock.calls, ...listenDocument.mock.calls].map(([type]) => type);
