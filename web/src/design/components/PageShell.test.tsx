@@ -2,7 +2,7 @@ import userEvent from "@testing-library/user-event";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { useEffect, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { MemoryRouter, useLocation } from "react-router";
+import { Link, MemoryRouter, useLocation } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { LanguageProvider } from "../../i18n/LanguageProvider";
@@ -154,7 +154,7 @@ describe("the app shell on a desktop", () => {
         "aria-current",
         "page",
       );
-      for (const name of [copy.league, copy.squad, copy.thisWeek]) {
+      for (const name of [copy.league, copy.thisWeek]) {
         expect(screen.queryByRole("link", { name })).toBeNull();
       }
       expect(screen.queryByRole("button", { name: copy.changeMember })).toBeNull();
@@ -172,7 +172,7 @@ describe("the app shell on a desktop", () => {
     const find = screen.getByRole("link", { name: TR.findLeague });
     expect(find).toHaveAttribute("href", MEMBERS);
     expect(find).not.toHaveAttribute("aria-current");
-    for (const name of [TR.league, TR.squad, TR.thisWeek]) {
+    for (const name of [TR.league, TR.thisWeek]) {
       expect(screen.queryByRole("link", { name })).toBeNull();
     }
     expect(screen.queryByRole("button", { name: TR.changeMember })).toBeNull();
@@ -180,23 +180,18 @@ describe("the app shell on a desktop", () => {
     expect(location()).toBe(MEMBERS);
   });
 
-  it("opens the claimed member as 'Bu hafta' and 'Kadro', and the league as 'Lig'", async () => {
+  it("opens the claimed member as 'Bu hafta', and the league as 'Lig'", () => {
     const path = `${OWN}?mode=fark-yarat&window=3`;
-    const { user } = renderShell({ path, identity: CLAIMED });
+    renderShell({ path, identity: CLAIMED });
 
     const thisWeek = screen.getByRole("link", { name: TR.thisWeek });
-    const squad = screen.getByRole("link", { name: TR.squad });
     expect(thisWeek).toHaveAttribute("href", path);
     expect(thisWeek).toHaveAttribute("aria-current", "page");
-    expect(squad).toHaveAttribute("href", `${path}#kadro`);
-    expect(squad).not.toHaveAttribute("aria-current");
+    // 'Bu hafta' is the squad's page too; the sidebar has no second link to it.
+    expect(screen.queryByRole("link", { name: "Kadro" })).toBeNull();
+    expect(document.querySelector('aside a[href*="#kadro"]')).toBeNull();
     expect(screen.getByRole("link", { name: TR.league })).toHaveAttribute("href", MEMBERS);
     expect(screen.queryByRole("link", { name: TR.findLeague })).toBeNull();
-
-    await user.click(squad);
-    expect(location()).toBe(`${path}#kadro`);
-    expect(screen.getByRole("link", { name: TR.squad })).toHaveAttribute("aria-current", "page");
-    expect(screen.getByRole("link", { name: TR.thisWeek })).not.toHaveAttribute("aria-current");
   });
 
   it("keeps the plan of the own page in reach for the rest of the visit, in memory only", async () => {
@@ -207,7 +202,10 @@ describe("the app shell on a desktop", () => {
     expect(location()).toBe("/fixtures");
     expect(screen.getByRole("link", { name: TR.fixtures })).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("link", { name: TR.thisWeek })).toHaveAttribute("href", path);
-    expect(screen.getByRole("link", { name: TR.squad })).toHaveAttribute("href", `${path}#kadro`);
+    expect(screen.getByRole("link", { name: TR.whatIf })).toHaveAttribute(
+      "href",
+      `${OWN}/what-if?mode=ortak-koru`,
+    );
     expect(window.localStorage.getItem("squadopt.viewer")).toBeNull();
     expect(Object.keys(window.localStorage)).not.toContain("squadopt.member");
   });
@@ -217,7 +215,6 @@ describe("the app shell on a desktop", () => {
     const thisWeek = screen.getByRole("link", { name: TR.thisWeek });
     expect(thisWeek).toHaveAttribute("href", OWN);
     expect(thisWeek).not.toHaveAttribute("aria-current");
-    expect(screen.getByRole("link", { name: TR.squad })).toHaveAttribute("href", `${OWN}#kadro`);
   });
 
   it("collapses to the icon rail and remembers that in this browser", async () => {
@@ -248,8 +245,12 @@ describe("the app shell on a desktop", () => {
     const second = renderShell({ identity: CLAIMED });
     expect(navLinks().map((link) => link.textContent)).toEqual([
       TR.thisWeek,
-      TR.squad,
       TR.league,
+      TR.currentSquad,
+      TR.whatIf,
+      TR.duel,
+      TR.chips,
+      TR.squadCard,
       TR.fixtures,
       TR.contribute,
     ]);
@@ -308,8 +309,14 @@ describe("the app shell on a desktop", () => {
       const { hash } = useLocation();
       return hash ? <section id="kadro">squad</section> : null;
     }
-    const { user } = renderShell({ path: OWN, identity: CLAIMED, page: <Late /> });
-    await user.click(screen.getByRole("link", { name: TR.squad }));
+    const page = (
+      <>
+        <Link to="#kadro">kadro</Link>
+        <Late />
+      </>
+    );
+    const { user } = renderShell({ path: OWN, identity: CLAIMED, page });
+    await user.click(screen.getByRole("link", { name: "kadro" }));
     expect(scrolled).toContain("kadro");
   });
 });

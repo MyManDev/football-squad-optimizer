@@ -101,8 +101,12 @@ const en = {
     primary: "Primary",
     findLeague: "Find your league",
     thisWeek: "This week",
-    squad: "Squad",
     league: "League",
+    currentSquad: "Current squad",
+    whatIf: "Try your own squad",
+    duel: "Head to head",
+    chips: "Chips and transfers",
+    squadCard: "Squad card",
     fixtures: "Fixtures",
     contribute: "Contribute",
     collapseSidebar: "Collapse sidebar",
@@ -201,7 +205,7 @@ const en = {
     provedOptimal: "Proved Optimal, Single Thread",
     notProved: "Not Proved: Reported, Not Recommended",
     startingXi: "Starting XI",
-    starterCount: (count: number) => `${count} Starters · Captain Counted Twice`,
+    starterCount: (count: number) => `${count} Starters`,
     captain: "Captain",
     noCaptain: "Captain not in the starting eleven.",
     bench: "Bench",
@@ -513,7 +517,6 @@ const en = {
   },
   memberPicker: {
     title: "Who are you?",
-    league: (leagueName: string) => `League: ${leagueName}`,
     legend: "Pick your name",
     confirm: "Confirm",
     otherLeague: "Enter a different league number",
@@ -734,29 +737,22 @@ const en = {
     team: "Team",
     gameweekNetPoints: "GW net points",
     gameweekNetPointsFor: (gameweek: number) => `GW${gameweek} net points`,
-    gameweekNetNote:
-      "The gameweek column is net for every row: the week's score after the transfer hits taken that week, which is the amount the season total moved by. The FPL site shows the week before hits, so a member who took a four-point hit reads four points lower here than there. A row whose hit is not in the published data shows a dash rather than a number on the other basis.",
     noScoredWeek: "No gameweek has been finalised yet.",
     total: "Total",
     movement: "Movement",
     leaderGap: "Gap to leader",
     leaderMark: "leader",
     noPreviousRank: "Previous rank unavailable",
-    movementNote:
-      "Movement compares the game's current and previous weekly ranks in this capture; the points beside it are from the last completed and checked gameweek.",
     newMember: "new",
     movementLabel: (movement: "up" | "down" | "same", places: number) =>
       movement === "same"
         ? "unchanged"
         : `${movement === "up" ? "up" : "down"} ${places} place${places === 1 ? "" : "s"}`,
-    aboutTable: "About this table",
     unknownMember: "Unknown member",
     unknownTeam: "Unnamed team",
-    publicDataTitle: "Public after the deadline",
-    publicDataBody:
-      "These records are public FPL data after the gameweek deadline. SquadOpt never asks for an FPL password, session or private account access.",
     backToMembers: "← League members",
     memberSquad: "Your current squad",
+    toolEmpty: "Nothing here for this week.",
     bench: "Bench",
     emptySquad: "No squad is available for this member.",
     emptySquadBody: "The published member record does not contain squad data.",
@@ -768,8 +764,6 @@ const en = {
     out: "Out",
     in: "In",
     projectedGainUnknown: "This move's share of the plan's gain was not published.",
-    moveRowsBasis:
-      "Each change is what the eleven with the captain doubled moves by once that swap is added to the changes before it, so the changes add up to the whole plan's gain.",
     weekTransferCost: (points: string) =>
       `~${points} expected-point cost for this week's transfers in total: the game charges the week, not each move.`,
     planCost: (points: string) =>
@@ -783,8 +777,7 @@ const en = {
     lineupTitle: "Your gameweek",
     lineupRule:
       "Captain, vice-captain, eleven and bench order follow the same projection as the moves; the bench is listed in the order the game's automatic substitutions walk it.",
-    expectedOwnPoints: (points: string) =>
-      `${points} expected points for the eleven with the captain doubled`,
+    expectedOwnPoints: (points: string) => `${points} expected points`,
     captainLabel: "Captain",
     viceCaptainLabel: "Vice-captain",
     startingXiLabel: "Starting eleven",
@@ -824,7 +817,6 @@ const en = {
     sectionsLabel: "Page sections",
     sectionMove: "Move",
     sectionSquad: "Squad",
-    sectionTools: "Tools",
     // The duel (#1133): the member's eleven beside one rival's, from the same capture.
     duelTitle: "Head to head",
     duelPick: "Rival",
@@ -904,6 +896,8 @@ const en = {
     whatIfRemove: "Remove",
     whatIfRemoveLabel: (name: string) => `Remove ${name}`,
     whatIfAdd: "Add a player",
+    whatIfPosition: "Position",
+    whatIfAllPositions: "All positions",
     whatIfReset: "Back to the advised squad",
     whatIfBreaks: {
       size: (count: number, size: number) => `The squad has ${count} players; it needs ${size}.`,
@@ -971,7 +965,7 @@ const en = {
     fixtureNone: "no match",
     fixtureStrip: (first: number, last: number) => `Fixtures, gameweeks ${first} to ${last}`,
     gainCaptionBeforeCost: (cost: string) =>
-      `expected points gained over making no transfer (the eleven, captain doubled), before this week's transfer cost of ${cost}`,
+      `expected points gained over making no transfer, before this week's transfer cost of ${cost}`,
     freeTransfersUsed: (used: number, free: number) => `${used}/${free} free transfers`,
     freeTransfersKeptUnderChip: (chip: string, free: number) =>
       `${chip}: none of the ${free} free transfers held is used`,
@@ -988,11 +982,10 @@ const en = {
     freshnessNoScored: "no record",
     freshnessPlayed: "This decision week has been played. The next decision capture is pending.",
     advancedSettings: "Advanced settings",
-    decisionTools: "Decision tools",
     chipsAndTransfers: "Chips and free transfers",
     // The squad the plan fields, drawn on the pitch, and the fixture rail beside it.
     squadAfterTitle: "Squad after the transfers",
-    squadOwnPoints: (points: string) => `captain doubled: ${points} xP`,
+    squadOwnPoints: (points: string) => `${points} xP`,
     /**
      * The printed unit on the tight lines (the decision's captain line, the plan's list rows,
      * the held squad's rows), in both languages: shown, but not read out.
@@ -1007,14 +1000,6 @@ const en = {
     viewPitch: "Pitch",
     viewList: "List",
     /** The closed menu under the bench that holds the grass and club colour rows (#1136). */
-    pitchLookMenu: "Appearance",
-    pitchLookLabel: "Grass",
-    pitchLookStripes: "Stripes",
-    pitchLookPlain: "Plain",
-    pitchLookChecks: "Checks",
-    clubColoursLabel: "Club colours",
-    clubColoursOff: "Off",
-    clubColoursOn: "On",
     railWeeks: (weeks: readonly number[]) =>
       weeks.length === 1
         ? `Gameweek ${weeks[0]}`
@@ -1245,8 +1230,12 @@ const tr: MessageSchema<typeof en> = {
     primary: "Ana navigasyon",
     findLeague: "Ligini bul",
     thisWeek: "Bu hafta",
-    squad: "Kadro",
     league: "Lig",
+    currentSquad: "Şu anki kadron",
+    whatIf: "Kadroyu kendin dene",
+    duel: "Rakiple yan yana",
+    chips: "Çipler ve transferler",
+    squadCard: "Kadro kartı",
     fixtures: "Fikstür",
     contribute: "Katkıda bulun",
     collapseSidebar: "Kenar çubuğunu kapat",
@@ -1339,7 +1328,7 @@ const tr: MessageSchema<typeof en> = {
     provedOptimal: "Optimal Olduğu Kanıtlandı, Tek İş Parçacığı",
     notProved: "Kanıtlanmadı: Raporlandı, Öneri Değil",
     startingXi: "İlk 11",
-    starterCount: (count) => `${count} İlk 11 Oyuncusu · Kaptan İki Kez Sayılır`,
+    starterCount: (count) => `${count} İlk 11 Oyuncusu`,
     captain: "Kaptan",
     noCaptain: "Kaptan ilk 11 içinde değil.",
     bench: "Yedekler",
@@ -1649,7 +1638,6 @@ const tr: MessageSchema<typeof en> = {
   },
   memberPicker: {
     title: "Sen kimsin?",
-    league: (leagueName) => `Lig: ${leagueName}`,
     legend: "Adını seç",
     confirm: "Onayla",
     otherLeague: "Başka bir lig numarası gir",
@@ -1856,29 +1844,22 @@ const tr: MessageSchema<typeof en> = {
     team: "Takım",
     gameweekNetPoints: "OH net puanı",
     gameweekNetPointsFor: (gameweek) => `OH${gameweek} net puanı`,
-    gameweekNetNote:
-      "Oyun haftası sütunu her satır için nettir: o haftaki transfer cezaları düşüldükten sonraki puan, yani sezon toplamının arttığı miktarın ta kendisi. FPL sitesi haftayı cezalardan önce gösterir; bu yüzden 4 puan ceza alan bir üye burada oradakinden 4 puan düşük görünür. Cezası yayınlanan veride bulunmayan bir satırda, yanlış temeldeki bir sayı yerine tire gösterilir.",
     noScoredWeek: "Henüz kesinleşmiş oyun haftası yok.",
     total: "Toplam",
     movement: "Hareket",
     leaderGap: "Lidere fark",
     leaderMark: "lider",
     noPreviousRank: "Önceki sıra bilinmiyor",
-    movementNote:
-      "Hareket, oyunun bu veri çekiminde bildirdiği mevcut ve önceki haftalık sıraları karşılaştırır; yanındaki puanlar son tamamlanmış ve kontrol edilmiş haftadandır.",
     newMember: "yeni",
     movementLabel: (movement, places) =>
       movement === "same"
         ? "yerinde kaldı"
         : `${places} sıra ${movement === "up" ? "yükseldi" : "düştü"}`,
-    aboutTable: "Tablo hakkında",
     unknownMember: "Bilinmeyen üye",
     unknownTeam: "İsimsiz takım",
-    publicDataTitle: "Son tarihten sonra herkese açık",
-    publicDataBody:
-      "Bu kayıtlar oyun haftası son tarihinden sonra herkese açık FPL verisidir. SquadOpt hiçbir zaman FPL şifresi, oturumu veya özel hesap erişimi istemez.",
     backToMembers: "← Lig üyeleri",
     memberSquad: "Şu anki kadron",
+    toolEmpty: "Bu hafta için burada bir şey yok.",
     bench: "Yedekler",
     emptySquad: "Bu üye için kadro bulunmuyor.",
     emptySquadBody: "Yayımlanan üye kaydında kadro bilgisi bulunmuyor.",
@@ -1890,8 +1871,6 @@ const tr: MessageSchema<typeof en> = {
     out: "Çıkan",
     in: "Giren",
     projectedGainUnknown: "Bu hamlenin plandaki kazanç payı yayımlanmamış.",
-    moveRowsBasis:
-      "Her değişiklik, kendinden önceki değişikliklere eklendiğinde ilk on birin (kaptan iki kat) ne kadar değiştiğini gösterir; bu yüzden değişiklikler planın toplam kazancını verir.",
     weekTransferCost: (pointsValue) =>
       `Bu haftanın transferlerinin toplam beklenen puan maliyeti ~${pointsValue}: oyun haftayı ücretlendirir, her hamleyi ayrı ayrı değil.`,
     planCost: (pointsValue) =>
@@ -1902,7 +1881,7 @@ const tr: MessageSchema<typeof en> = {
     lineupTitle: "Bu haftaki kadron",
     lineupRule:
       "Kaptan, yedek kaptan, ilk on bir ve yedek sırası hamlelerle aynı projeksiyondan gelir; yedekler oyunun otomatik değişikliklerinin izlediği sırayla listelenir.",
-    expectedOwnPoints: (pointsValue) => `${pointsValue} beklenen puan (ilk on bir, kaptan iki kat)`,
+    expectedOwnPoints: (pointsValue) => `${pointsValue} beklenen puan`,
     captainLabel: "Kaptan",
     viceCaptainLabel: "Yedek kaptan",
     startingXiLabel: "İlk on bir",
@@ -1935,7 +1914,6 @@ const tr: MessageSchema<typeof en> = {
     sectionsLabel: "Sayfanın bölümleri",
     sectionMove: "Hamle",
     sectionSquad: "Kadro",
-    sectionTools: "Araçlar",
     duelTitle: "Rakiple yan yana",
     duelPick: "Rakip",
     duelLoading: "Rakibin kadrosu okunuyor",
@@ -2008,6 +1986,8 @@ const tr: MessageSchema<typeof en> = {
     whatIfRemove: "Çıkar",
     whatIfRemoveLabel: (name) => `Kadrodan çıkar: ${name}`,
     whatIfAdd: "Oyuncu ekle",
+    whatIfPosition: "Mevki",
+    whatIfAllPositions: "Tüm mevkiler",
     whatIfReset: "Önerilen kadroya dön",
     whatIfBreaks: {
       size: (count, size) => `Kadroda ${count} oyuncu var; ${size} olmalı.`,
@@ -2065,7 +2045,7 @@ const tr: MessageSchema<typeof en> = {
     fixtureNone: "maç yok",
     fixtureStrip: (first, last) => `${first}-${last}. hafta fikstürü`,
     gainCaptionBeforeCost: (cost) =>
-      `beklenen puan kazancı, hiç transfer yapmamana göre (ilk on bir, kaptan iki kat); bu haftanın ${cost} transfer maliyeti düşülmeden önce`,
+      `beklenen puan kazancı, hiç transfer yapmamana göre; bu haftanın ${cost} transfer maliyeti düşülmeden önce`,
     freeTransfersUsed: (used, free) => `${used}/${free} ücretsiz transfer`,
     freeTransfersKeptUnderChip: (chip, free) =>
       `${chip}: eldeki ${free} ücretsiz transfer kullanılmaz`,
@@ -2081,10 +2061,9 @@ const tr: MessageSchema<typeof en> = {
     freshnessNoScored: "kayıt yok",
     freshnessPlayed: "Bu karar haftası artık oynandı. Yeni haftanın karar verisi bekleniyor.",
     advancedSettings: "Gelişmiş ayarlar",
-    decisionTools: "Karar araçları",
     chipsAndTransfers: "Çipler ve transfer hakkı",
     squadAfterTitle: "Kadro, transferlerden sonra",
-    squadOwnPoints: (pointsValue) => `kaptan iki kat: ${pointsValue} beklenen puan`,
+    squadOwnPoints: (pointsValue) => `${pointsValue} beklenen puan`,
     pointsUnitAbbreviation: "xP",
     pointsUnitSpoken: "beklenen puan",
     attackDirection: "Hücum yönü",
@@ -2093,14 +2072,6 @@ const tr: MessageSchema<typeof en> = {
     viewLabel: "Görünüm",
     viewPitch: "Saha",
     viewList: "Liste",
-    pitchLookMenu: "Saha görünümü",
-    pitchLookLabel: "Çim",
-    pitchLookStripes: "Çizgili",
-    pitchLookPlain: "Düz",
-    pitchLookChecks: "Kareli",
-    clubColoursLabel: "Kulüp renkleri",
-    clubColoursOff: "Kapalı",
-    clubColoursOn: "Açık",
     railWeeks: (weeks) =>
       weeks.length === 1
         ? `${weeks[0]}. hafta`

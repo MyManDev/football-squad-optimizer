@@ -823,11 +823,6 @@ section.notice p {
 
 /* ---- Secondary tools, each closed until asked for ---- */
 
-.tools {
-  display: flex;
-  flex-direction: column;
-}
-
 .tool {
   border-top: 1px solid var(--color-line);
 }

@@ -1,0 +1,98 @@
+/* The brand's opening (OpeningMark.tsx). One clock for every part: each animation runs the
+   same five data-motion lengths, and the keyframe stops stage the parts on it. The bars
+   open along their length while the mark is still turned a quarter back, so they stand
+   upright with red on the left and green on the right; the mark then turns into place,
+   the word comes in over it, and the cover fades off the page. The global reduced-motion
+   rule stops all of it, and the component does not render under that preference. */
+
+.cover {
+  --opening-length: calc(var(--motion-data) * 5);
+
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  background: var(--color-bg);
+  pointer-events: none;
+  animation: cover-off var(--opening-length) var(--motion-ease) both;
+}
+
+.word {
+  font-family: var(--font-display);
+  font-size: 40px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  color: var(--color-text);
+  animation: word-in var(--opening-length) var(--motion-ease) both;
+}
+
+.mark {
+  overflow: visible;
+  animation: mark-turn var(--opening-length) var(--motion-ease) both;
+}
+
+.mark rect {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: bar-open var(--opening-length) var(--motion-ease) both;
+}
+
+.mark [data-bar="out"] {
+  fill: var(--color-out-panel);
+}
+
+.mark [data-bar="in"] {
+  fill: var(--color-in-panel);
+}
+
+/* Turned a quarter back, the mark's top bar is on the left and its bottom bar on the right. */
+@keyframes mark-turn {
+  0%,
+  30% {
+    transform: rotate(-90deg);
+  }
+  60%,
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+/* Along the bar's length, which stands upright while the mark is turned back. */
+@keyframes bar-open {
+  0% {
+    transform: scaleX(0);
+  }
+  22%,
+  100% {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes word-in {
+  0%,
+  45% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  65%,
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes cover-off {
+  0%,
+  82% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}

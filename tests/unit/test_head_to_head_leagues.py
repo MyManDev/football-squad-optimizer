@@ -10,22 +10,43 @@ from the classic endpoint for a head-to-head id, and an anonymous read of the he
 endpoint that declares ``league.id``. The refusal test below pins exactly that pair, so a
 recorded real answer pair can be checked against it; the 401 and 403 cases pin what happens
 if FPL refuses the anonymous read instead.
+
+The last two tests count a whole capture's requests. The listed leagues' first pages are read
+before the registered members' documents, so a refused league costs no member request, and a
+classic league's snapshot is the same bytes whichever order its documents were read in.
 """
 
 import json
 import urllib.error
+from collections.abc import Sequence
 from pathlib import Path
 
 import pytest
 
+from squadopt.application.entries import ENTRY_REGISTRY_CONTRACT_VERSION
 from squadopt.data.errors import DataSourceError
-from squadopt.data.snapshots import read_snapshot
-from squadopt.data.sources.fpl_live import league_standings_payload
+from squadopt.data.snapshots import read_snapshot, write_snapshot
+from squadopt.data.sources.fpl_live import FPL_LIVE_SOURCE, league_standings_payload
 from squadopt.platform import fpl_capture
 
 CLASSIC = 77
 HEAD_TO_HEAD = 4242
 BASE = fpl_capture.BASE_URL
+
+#: The league the site serves today, and five registered members of it.
+LEAGUE = 352490
+MEMBERS = (1001, 1002, 1003, 1004, 1005)
+
+#: A capture open for gameweek 2, so every member's gameweek 1 picks are read.
+OPEN_FOR_SECOND_WEEK = json.dumps(
+    {
+        "events": [
+            {"id": 1, "deadline_time": "2026-08-21T17:30:00Z", "finished": True},
+            {"id": 2, "deadline_time": "2026-08-28T17:30:00Z", "finished": False},
+        ]
+    }
+).encode()
+CAPTURED_AT = "2026-08-25T09:00:00Z"
 
 
 def classic_url(league_id: int) -> str:
@@ -36,7 +57,7 @@ def head_to_head_url(league_id: int) -> str:
     return f"{BASE}/leagues-h2h/{league_id}/standings/"
 
 
-def classic_page(league_id: int = CLASSIC) -> bytes:
+def classic_page(league_id: int = CLASSIC, members: Sequence[int] = (1001,)) -> bytes:
     return json.dumps(
         {
             "league": {"id": league_id, "name": "Synthetic Classic"},
@@ -46,13 +67,14 @@ def classic_page(league_id: int = CLASSIC) -> bytes:
                 "has_next": False,
                 "results": [
                     {
-                        "entry": 1001,
-                        "entry_name": "Team 1",
-                        "player_name": "Manager 1",
-                        "rank": 1,
-                        "rank_sort": 1,
-                        "last_rank": 1,
+                        "entry": entry,
+                        "entry_name": f"Team {rank}",
+                        "player_name": f"Manager {rank}",
+                        "rank": rank,
+                        "rank_sort": rank,
+                        "last_rank": rank,
                     }
+                    for rank, entry in enumerate(members, start=1)
                 ],
             },
         }
@@ -262,3 +284,127 @@ def test_a_capture_of_classic_leagues_asks_nothing_of_the_head_to_head_endpoint(
     assert not any("leagues-h2h" in url for url in calls)
     snapshot = read_snapshot(tmp_path / "snapshots", written.snapshot_id)
     assert snapshot.payloads[league_standings_payload(CLASSIC)] == classic_page()
+
+
+def registry(path: Path, members: Sequence[int] = MEMBERS) -> Path:
+    document = {
+        "contract_version": ENTRY_REGISTRY_CONTRACT_VERSION,
+        "entries": [
+            {"entry_id": entry, "label": f"Team {entry}", "registered_at_utc": CAPTURED_AT}
+            for entry in members
+        ],
+    }
+    path.write_text(json.dumps(document), encoding="utf-8")
+    return path
+
+
+def member_documents(members: Sequence[int] = MEMBERS) -> dict[str, bytes]:
+    """Every document a gameweek 2 capture reads for each member, each with its own bytes.
+
+    No history here is one the purchase-price rebuild can read, so it adds only the transfers
+    lists; the gameweek 1 picks are the captured picks of a gameweek 2 capture anyway.
+    """
+
+    urls = [
+        f"{BASE}/entry/{entry}/{path}"
+        for entry in members
+        for path in ("", "history/", "event/1/picks/", "transfers/")
+    ]
+    return {url: json.dumps({"served": url}).encode() for url in urls}
+
+
+def stored_files(directory: Path) -> dict[str, bytes]:
+    return {
+        path.relative_to(directory).as_posix(): path.read_bytes()
+        for path in sorted(directory.rglob("*"))
+        if path.is_file()
+    }
+
+
+def test_a_listed_head_to_head_league_is_refused_before_any_member_is_read(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Ibo's review of #1220: by name, every member's documents sort before the leagues."""
+
+    members = registry(tmp_path / "registry.json")
+    named = fpl_capture.registered_endpoints(
+        OPEN_FOR_SECOND_WEEK,
+        as_of_utc=CAPTURED_AT,
+        entry_registry=members,
+        league_ids=[HEAD_TO_HEAD, LEAGUE],
+    )
+    # In name order the fifteen member documents come first, and this capture reads them all.
+    assert [name.split("-")[0] for name in named] == ["entry"] * 15 + ["league"] * 2
+    calls = serve(
+        monkeypatch,
+        {
+            f"{BASE}/bootstrap-static/": OPEN_FOR_SECOND_WEEK,
+            f"{BASE}/fixtures/": b"[]",
+            classic_url(LEAGUE): classic_page(LEAGUE, MEMBERS),
+            classic_url(HEAD_TO_HEAD): 404,
+            head_to_head_url(HEAD_TO_HEAD): declaration(),
+        },
+    )
+    monkeypatch.setattr(fpl_capture, "_utc_now", lambda: CAPTURED_AT)
+    snapshots = tmp_path / "snapshots"
+    with pytest.raises(fpl_capture.HeadToHeadLeagueError, match="head-to-head league"):
+        fpl_capture.capture(snapshots, entry_registry=members, league_ids=[HEAD_TO_HEAD, LEAGUE])
+    assert not snapshots.exists()
+    assert sum("/entry/" in url for url in calls) == 0
+    # The leagues keep name order among themselves, not the order they were listed in.
+    assert calls == [
+        f"{BASE}/bootstrap-static/",
+        f"{BASE}/fixtures/",
+        f"{BASE}/event/1/live/",
+        classic_url(LEAGUE),
+        classic_url(HEAD_TO_HEAD),
+        head_to_head_url(HEAD_TO_HEAD),
+    ]
+
+
+def test_a_classic_capture_is_the_same_bytes_whichever_order_it_was_read_in(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Reading the leagues first changes the order of the requests and nothing stored.
+
+    The snapshot keeps exactly the bytes served, and writing those payloads again in name
+    order and in reverse name order gives the same snapshot id, fingerprint and checksums,
+    and the same metadata file and payload files byte for byte: the store serialises the
+    checksums and the fingerprint in sorted order, so no read order reaches the disk.
+    """
+
+    answers = {
+        f"{BASE}/bootstrap-static/": OPEN_FOR_SECOND_WEEK,
+        f"{BASE}/fixtures/": b"[]",
+        f"{BASE}/event/1/live/": b'{"elements": []}',
+        classic_url(LEAGUE): classic_page(LEAGUE, MEMBERS),
+        **member_documents(),
+    }
+    calls = serve(monkeypatch, answers)
+    monkeypatch.setattr(fpl_capture, "_utc_now", lambda: CAPTURED_AT)
+    monkeypatch.setattr(fpl_capture, "summarise", lambda *_a, **_k: None)
+    written = fpl_capture.capture(
+        tmp_path / "captured",
+        entry_registry=registry(tmp_path / "registry.json"),
+        league_ids=[LEAGUE],
+    )
+    assert written is not None
+    assert not any("leagues-h2h" in url for url in calls)
+    assert sorted(calls) == sorted(answers)
+    first_member = min(index for index, url in enumerate(calls) if "/entry/" in url)
+    assert calls.index(classic_url(LEAGUE)) < first_member
+
+    captured = read_snapshot(tmp_path / "captured", written.snapshot_id)
+    assert sorted(captured.payloads.values()) == sorted(answers.values())
+    files = stored_files(tmp_path / "captured" / written.snapshot_id)
+    for label, reverse in (("name-order", False), ("reverse-name-order", True)):
+        names = sorted(captured.payloads, reverse=reverse)
+        again = write_snapshot(
+            tmp_path / label,
+            source=FPL_LIVE_SOURCE,
+            captured_at_utc=CAPTURED_AT,
+            payloads={name: captured.payloads[name] for name in names},
+        )
+        assert (again.snapshot_id, again.fingerprint) == (written.snapshot_id, written.fingerprint)
+        assert dict(again.checksums) == dict(written.checksums)
+        assert stored_files(tmp_path / label / again.snapshot_id) == files

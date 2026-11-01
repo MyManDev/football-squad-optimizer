@@ -271,8 +271,14 @@ test("once the visitor has said who they are, Değiştir comes before the league
     sidebar.getByRole("button", { name: "Kenar çubuğunu kapat" }),
     sidebar.getByRole("button", { name: "Değiştir" }),
     navigation.getByRole("link", { name: "Bu hafta", exact: true }),
-    navigation.getByRole("link", { name: "Kadro", exact: true }),
     navigation.getByRole("link", { name: "Lig", exact: true }),
+    ...[
+      "Şu anki kadron",
+      "Kadroyu kendin dene",
+      "Rakiple yan yana",
+      "Çipler ve transferler",
+      "Kadro kartı",
+    ].map((name) => navigation.getByRole("link", { name, exact: true })),
     navigation.getByRole("link", { name: "Fikstür", exact: true }),
     ...(process.env.VITE_ADVICE_API_ORIGIN
       ? [navigation.getByRole("link", { name: "Katkıda bulun", exact: true })]

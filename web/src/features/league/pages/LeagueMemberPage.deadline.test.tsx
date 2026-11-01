@@ -76,17 +76,13 @@ function renderView(
   );
 }
 
-const otherModel = { tr: "Diğer modeli de hesapla", en: "Compute the other model" } as const;
-
 describe("a member page whose gameweek has closed", () => {
   it("says the deadline passed and names the gameweek", () => {
     for (const language of ["tr", "en"] as const) {
       const copy = COMPUTE_COPY[language];
       renderView(DEADLINE, language);
       expect(screen.getByText(copy.deadlinePassedTitle)).toBeInTheDocument();
-      const notice = screen.getByTestId("deadline-passed");
-      expect(notice).toHaveTextContent(String(SQUAD.payload.gameweek));
-      expect(notice).toHaveTextContent("2026");
+      expect(screen.getByTestId("deadline-passed")).toHaveTextContent(copy.deadlinePassedTitle);
       cleanup();
     }
   });
@@ -99,7 +95,6 @@ describe("a member page whose gameweek has closed", () => {
       expect(open.container.querySelector("#plan-settings")).not.toBeNull();
       expect(screen.getByRole("link", { name: copy.changePlan })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: copy.computeButton })).toBeInTheDocument();
-      expect(screen.getByText(otherModel[language])).toBeInTheDocument();
       cleanup();
 
       const closed = renderView(DEADLINE, language);
@@ -109,9 +104,6 @@ describe("a member page whose gameweek has closed", () => {
       expect(screen.queryByRole("link", { name: copy.changePlan })).toBeNull();
       expect(screen.queryByRole("button", { name: copy.computeButton })).toBeNull();
       expect(screen.queryByText(COMPUTE_COPY[language].deadlinePassedCompute)).toBeNull();
-      expect(screen.queryByText(otherModel[language])).toBeNull();
-      // The tools that only read the closed week stay.
-      expect(screen.getByText(copy.decisionTools)).toBeInTheDocument();
     },
   );
 

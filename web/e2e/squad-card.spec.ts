@@ -11,12 +11,9 @@ for (const includePoints of [true, false]) {
   }, testInfo) => {
     await page.setViewportSize({ width: 360, height: 780 });
     await installLeagueMocks(page);
-    await page.goto("/league/352490/members/35249001");
+    await page.goto("/league/352490/members/35249001/card");
 
-    const tool = page.locator("main details").filter({
-      has: page.locator("summary", { hasText: "Kadro kartı" }),
-    });
-    await tool.locator(":scope > summary").click();
+    const tool = page.getByRole("region", { name: "Kadro kartı" });
     await tool.getByRole("checkbox", { name: "Beklenen puan" }).setChecked(includePoints);
     await tool.getByRole("checkbox", { name: "Takım ve menajer" }).setChecked(!includePoints);
     await page.evaluate(() => document.fonts.ready);

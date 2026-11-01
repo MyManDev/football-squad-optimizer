@@ -29,11 +29,8 @@ export interface ChipCopy {
   chosen: (name: string) => string;
   gain: (points: string) => string;
   freeHit: string;
-  basis: Record<MemberChip, string>;
-  expectedOwnPoints: (points: string, basis: string) => string;
-  moveRowsBasis: (basis: string) => string;
-  gainCaption: (basis: string) => string;
-  gainCaptionBeforeCost: (cost: string, basis: string) => string;
+  gainCaption: string;
+  gainCaptionBeforeCost: (cost: string) => string;
 }
 
 const en: ChipCopy = {
@@ -69,19 +66,9 @@ const en: ChipCopy = {
     `~${points} expected points this gameweek against your own plan without the chip, hits included.`,
   freeHit:
     "A Free Hit squad is for this gameweek only; the squad you hold now returns at the next deadline.",
-  basis: {
-    wildcard: "the eleven with the captain doubled",
-    freehit: "the eleven with the captain doubled",
-    "3xc": "the eleven with the captain tripled",
-    bboost: "all fifteen players with the captain doubled",
-  },
-  expectedOwnPoints: (points, basis) => `${points} expected points for ${basis}`,
-  moveRowsBasis: (basis) =>
-    `Each change is what the total for ${basis} moves by once that swap is added to the changes before it, so the changes add up to the whole plan's gain. Keeping your squad is counted with the same chip played.`,
-  gainCaption: (basis) =>
-    `expected points against keeping the squad you hold and playing the same chip, for ${basis}`,
-  gainCaptionBeforeCost: (cost, basis) =>
-    `expected points against keeping the squad you hold and playing the same chip, for ${basis}, before this week's transfer cost of ${cost}`,
+  gainCaption: "expected points against keeping the squad you hold and playing the same chip",
+  gainCaptionBeforeCost: (cost) =>
+    `expected points against keeping the squad you hold and playing the same chip, before this week's transfer cost of ${cost}`,
 };
 
 const tr: ChipCopy = {
@@ -115,19 +102,9 @@ const tr: ChipCopy = {
   gain: (points) => `Çipsiz kendi planına göre bu hafta ~${points} beklenen puan, cezalar dahil.`,
   freeHit:
     "Free Hit kadrosu yalnız bu hafta içindir; bir sonraki haftada şimdiki kadron geri gelir.",
-  basis: {
-    wildcard: "ilk on bir, kaptan iki kat",
-    freehit: "ilk on bir, kaptan iki kat",
-    "3xc": "ilk on bir, kaptan üç kat",
-    bboost: "on beş oyuncunun tamamı, kaptan iki kat",
-  },
-  expectedOwnPoints: (points, basis) => `${points} beklenen puan (${basis})`,
-  moveRowsBasis: (basis) =>
-    `Her değişiklik, kendinden önceki değişikliklere eklendiğinde toplamın (${basis}) ne kadar değiştiğini gösterir; bu yüzden değişiklikler planın toplam kazancını verir. Mevcut kadroyu korumak da aynı çip oynanmış sayılarak hesaplanır.`,
-  gainCaption: (basis) =>
-    `beklenen puan, mevcut kadronu koruyup aynı çipi oynamaya göre (${basis})`,
-  gainCaptionBeforeCost: (cost, basis) =>
-    `beklenen puan, mevcut kadronu koruyup aynı çipi oynamaya göre (${basis}); bu haftanın ${cost} transfer maliyeti düşülmeden önce`,
+  gainCaption: "beklenen puan, mevcut kadronu koruyup aynı çipi oynamaya göre",
+  gainCaptionBeforeCost: (cost) =>
+    `beklenen puan, mevcut kadronu koruyup aynı çipi oynamaya göre; bu haftanın ${cost} transfer maliyeti düşülmeden önce`,
 };
 
 export const CHIP_COPY: Record<Language, ChipCopy> = { tr, en };
