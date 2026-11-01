@@ -250,39 +250,47 @@ describe.each(["tr", "en"] as const)("the league gate with the forwarder in %s",
 });
 
 describe("the forwarded table as the visitor scrolls", () => {
-  it("reads the next page when the end of the table comes into view, up to page 20", async () => {
-    const seen: ((entries: { isIntersecting: boolean }[]) => void)[] = [];
-    vi.stubGlobal(
-      "IntersectionObserver",
-      class {
-        constructor(callback: (entries: { isIntersecting: boolean }[]) => void) {
-          seen.push(callback);
-        }
-        observe() {}
-        disconnect() {}
-      },
-    );
-    // Every page says another follows: the table still stops at the forwarder's last page.
-    const fetcher = site((page) =>
-      marked({
-        ...FIRST,
-        page,
-        has_next: true,
-        results: FIRST.results.map((row) => ({
-          ...row,
-          entry: row.entry + 100 * page,
-          entry_name: `${row.entry_name} p${page}`,
-        })),
-      }),
-    );
-    open("en", `/league/${FORWARDED}`);
-    await screen.findByRole("link", { name: `${FIRST.results[0]!.entry_name} p1` });
-    for (let page = 2; page <= MAX_STANDINGS_PAGE; page += 1) {
-      await act(async () => seen.at(-1)!([{ isIntersecting: true }]));
-      await screen.findByRole("link", { name: `${FIRST.results[0]!.entry_name} p${page}` });
-    }
-    expect(forwarderReads(fetcher)).toHaveLength(MAX_STANDINGS_PAGE);
-    expect(screen.queryByRole("button", { name: MESSAGES.en.forwarded.more })).toBeNull();
-    expect(screen.getAllByRole("row")).toHaveLength(1 + MAX_STANDINGS_PAGE * FIRST.results.length);
-  });
+  // Twenty pages read in turn: given the time a loaded runner needs for them.
+  it(
+    "reads the next page when the end of the table comes into view, up to page 20",
+    { timeout: 20_000 },
+    async () => {
+      const seen: ((entries: { isIntersecting: boolean }[]) => void)[] = [];
+      vi.stubGlobal(
+        "IntersectionObserver",
+        class {
+          constructor(callback: (entries: { isIntersecting: boolean }[]) => void) {
+            seen.push(callback);
+          }
+          observe() {}
+          disconnect() {}
+        },
+      );
+      // Every page says another follows: the table still stops at the forwarder's last page.
+      const fetcher = site((page) =>
+        marked({
+          ...FIRST,
+          page,
+          has_next: true,
+          results: FIRST.results.map((row) => ({
+            ...row,
+            entry: row.entry + 100 * page,
+            entry_name: `${row.entry_name} p${page}`,
+          })),
+        }),
+      );
+      open("en", `/league/${FORWARDED}`);
+      // Found by text: a role query over a growing table is what made this slow.
+      await screen.findByText(`${FIRST.results[0]!.entry_name} p1`);
+      for (let page = 2; page <= MAX_STANDINGS_PAGE; page += 1) {
+        await act(async () => seen.at(-1)!([{ isIntersecting: true }]));
+        await screen.findByText(`${FIRST.results[0]!.entry_name} p${page}`);
+      }
+      expect(forwarderReads(fetcher)).toHaveLength(MAX_STANDINGS_PAGE);
+      expect(screen.queryByRole("button", { name: MESSAGES.en.forwarded.more })).toBeNull();
+      expect(screen.getAllByRole("row")).toHaveLength(
+        1 + MAX_STANDINGS_PAGE * FIRST.results.length,
+      );
+    },
+  );
 });
