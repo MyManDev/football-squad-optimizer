@@ -1,6 +1,6 @@
 /**
- * The device solve at work in the middle of the screen: the share counts the run's stages,
- * each stage is ticked as the run passes it, and the card goes once nothing is counting.
+ * The device solve at work in the middle of the screen: it counts the run's stages done of all,
+ * never as a percentage, ticks each stage as the run passes it, and goes once nothing counts.
  */
 
 import { cleanup, render, screen, within } from "@testing-library/react";
@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { MESSAGES } from "../../../i18n/messages";
+import { AS_A_CHANCE } from "../../../testSupport/honesty";
 import { DeviceProgressPanel } from "./DeviceProgressPanel";
 import { progressShare } from "./progress";
 import type { DevicePlanPhase } from "./useDevicePlan";
@@ -49,7 +50,11 @@ describe("the progress card", () => {
     expect(card.closest("[data-device-progress]")?.parentElement).toBe(document.body);
     const bar = within(card).getByRole("progressbar", { name: copy.deviceSolving });
     expect(bar).toHaveAttribute("aria-valuenow", "29");
-    expect(card).toHaveTextContent(new Intl.NumberFormat("tr", { style: "percent" }).format(2 / 7));
+    expect(card).toHaveTextContent("2/7");
+    expect(bar.getAttribute("aria-valuetext")).toBe(`2/7, ${copy.deviceSteps.plan}`);
+    // The card is drawn into the body, so the member-page rule is read over the whole body.
+    expect(document.body.textContent).not.toMatch(AS_A_CHANCE);
+    expect(bar.getAttribute("aria-valuetext")).not.toMatch(AS_A_CHANCE);
     const stages = within(card).getAllByRole("listitem");
     expect(stages.map((stage) => [stage.textContent, stage.dataset.stage])).toEqual([
       [copy.deviceSteps.inputs, "done"],
@@ -69,6 +74,8 @@ describe("the progress card", () => {
       "en",
     );
     expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "71");
+    expect(document.body.textContent).not.toMatch(AS_A_CHANCE);
+    expect(screen.getByRole("progressbar").getAttribute("aria-valuetext")).not.toMatch(AS_A_CHANCE);
     expect(screen.getByText(copy.deviceSteps.chips(2, 4))).toHaveAttribute("aria-current", "step");
     view.unmount();
 
@@ -78,6 +85,15 @@ describe("the progress card", () => {
       copy.deviceSteps.solver,
       copy.deviceSteps.plan,
     ]);
+  });
+
+  it("draws no count before the inputs say how many stages there are", () => {
+    const copy = MESSAGES.tr.leagueMembers;
+    show({ phase: "loading", progress: { step: "inputs", done: 0, total: null } });
+    const bar = screen.getByRole("progressbar");
+    expect(bar).toHaveAttribute("aria-valuenow", "0");
+    expect(bar.getAttribute("aria-valuetext")).toBe(copy.deviceSteps.inputs);
+    expect(document.querySelector("[data-device-progress]")?.textContent).not.toMatch(/\d+\/\d+/);
   });
 
   it("is gone once nothing is counting", () => {

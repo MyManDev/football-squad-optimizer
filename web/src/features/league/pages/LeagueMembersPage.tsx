@@ -1,6 +1,7 @@
 import { memberAddress } from "../../../lib/leagueAddresses";
 import { useLeagueId } from "../useLeague";
 import { Link } from "react-router";
+import type { CSSProperties } from "react";
 
 import { EmptyState } from "../../../design/components/EmptyState";
 import { useLanguage } from "../../../i18n/context";
@@ -164,7 +165,7 @@ export function LeagueMembersView({
               </tr>
             </thead>
             <tbody>
-              {rows.map((member) => {
+              {rows.map((member, index) => {
                 const isViewer = member === viewerRow;
                 const net = netWeekPoints(member);
                 const gap = gapToLeader(lead, member);
@@ -172,6 +173,7 @@ export function LeagueMembersView({
                   <tr
                     key={member.entry_id}
                     className={isViewer ? styles.viewerRow : undefined}
+                    style={{ "--row": index } as CSSProperties}
                     aria-current={isViewer ? "true" : undefined}
                   >
                     <td className={styles.rank}>{member.rank > 0 ? member.rank : "—"}</td>
