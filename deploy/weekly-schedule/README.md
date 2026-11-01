@@ -60,8 +60,8 @@ systemd starts no second tick while one runs, so the timer's ticks in between do
   OPENAI_API_KEY=<the key>
   ```
 
-  The unit files hold no secret. Every run reads club news (D3 on #1243), so without the
-  settings every tick that would start a run refuses before it starts.
+  The unit files hold no secret. Only the final run reads club news (D3 on #1243), so
+  without the settings a morning run still runs and the final run refuses before it starts.
 - **A machine the run fits.** A worker is one CP-SAT solve on one core, and `--workers`
   defaults to 15, the owner's PC. Pass the number of cores the backend's own processes leave
   (`--workers N` on `ExecStart`) and time one run there. The defaults allow 3.5 h from

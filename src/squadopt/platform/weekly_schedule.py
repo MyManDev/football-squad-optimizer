@@ -18,7 +18,8 @@ Deadlines decide, not weekdays, so a midweek deadline needs no exception. A star
 marker (``started/morning-<date>.json`` or ``started/final-<season>-gw<NN>.json``) before
 anything runs, so a run that fails is not started again by the next tick, and each run
 publishes under its own site suffix (``morning-<stamp>`` or ``final-<stamp>``). A Friday-kind
-run, which the final run always is, first acquires the week's club news in this process.
+run, which the final run always is, first acquires the week's club news in this process; a
+morning run is a Tuesday-kind run with no club news (D3 on #1243).
 
 A run ends at its site pull request. D1 on #1243 (6559389043) releases it only after İbo has
 seen its preview and said yes, by ``python -m squadopt.platform.weekly_release --run-id <id>``.
@@ -62,8 +63,9 @@ from squadopt.platform.fpl_capture import ENDPOINTS, fetch
 MORNING_UTC: Final = "02:00"
 FINAL_LEAD_HOURS: Final = 4.0
 RUN_HOURS: Final = 3.5
-#: D3 on #1243: club news on every run, so a morning run is a Friday-kind run as well.
-MORNING_KIND: Final = "friday"
+#: D3 on #1243 (6559389043): club news on the final run only. A morning run is a Tuesday-kind
+#: run, which acquires no club news and so makes no model call.
+MORNING_KIND: Final = "tuesday"
 #: `weekly_run.ps1`'s default.
 WORKERS: Final = 15
 
@@ -186,7 +188,7 @@ def decide(
 
 
 def run_kind(action: Action, morning_kind: str = MORNING_KIND) -> str:
-    """The final run is the decision run with real club news; D3 on #1243 sets the morning's."""
+    """The final run is the decision run with real club news; a morning run takes none (D3)."""
 
     return "friday" if action == "final" else morning_kind
 

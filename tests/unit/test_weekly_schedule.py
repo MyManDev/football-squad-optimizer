@@ -279,6 +279,24 @@ def test_a_start_leaves_its_marker_acquires_news_and_runs_the_weekly_command_onc
     assert len(host.commands) == 2
 
 
+def test_a_morning_run_takes_no_club_news_and_only_the_final_run_does(tmp_path: Path) -> None:
+    # D3 on #1243: the gate's morning kind is tuesday, so a morning run makes no model call.
+    assert (gate.MORNING_KIND, gate.build_parser().parse_args([]).morning_kind) == (
+        "tuesday",
+        "tuesday",
+    )
+    workspace = _workspace(tmp_path)
+    (workspace / "data" / "snapshots" / "fpl-live-20261030").mkdir(parents=True)
+    host = _Host()
+    assert _main(workspace, "2026-10-30T02:00:00Z", host) == 0
+    assert host.news == []
+    _, weekly = host.commands
+    assert "--rotation-capture" not in weekly
+    assert weekly[-2:] == ["--run-id", "2026-27-gw09-tuesday-20261030T0200Z"]
+    assert _main(workspace, "2026-10-31T07:05:00Z", host) == 0
+    assert [arguments[0] for arguments in host.news] == ["--check-config", "--roster-snapshot"]
+
+
 def test_a_failed_acquisition_refuses_before_the_weekly_command(tmp_path: Path) -> None:
     workspace = _workspace(tmp_path)
     (workspace / "data" / "snapshots" / "fpl-live-20261031").mkdir(parents=True)
