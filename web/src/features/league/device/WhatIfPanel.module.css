@@ -136,9 +136,15 @@
 
 .add {
   display: grid;
-  gap: var(--space-1);
+  gap: var(--space-3);
   min-width: 0;
   font-weight: 600;
+}
+
+.field {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
 }
 
 .addRow {

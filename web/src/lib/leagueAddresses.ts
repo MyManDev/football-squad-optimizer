@@ -24,17 +24,9 @@ export function memberHistoryAddress(leagueId: number, entryId: number | string)
 
 /**
  * The member's tools, each a page of its own under the member's page that the sidebar
- * links once the visitor has said who they are: the squad held now, the decision tools,
- * the what-if squad, the duel, the chips and free transfers, and the squad card.
+ * links once the visitor has said who they are: the squad held now, the what-if squad, the duel, the chips and free transfers, and the squad card.
  */
-export const MEMBER_TOOLS = [
-  "current-squad",
-  "decision-tools",
-  "what-if",
-  "duel",
-  "chips",
-  "card",
-] as const;
+export const MEMBER_TOOLS = ["current-squad", "what-if", "duel", "chips", "card"] as const;
 
 export type MemberTool = (typeof MEMBER_TOOLS)[number];
 

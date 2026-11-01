@@ -562,8 +562,8 @@ describe("honesty and the tools", () => {
     const copy = MESSAGES.tr.leagueMembers;
     expect(screen.getByText(copy.advancedSettings).closest("details")).not.toHaveAttribute("open");
     // The tools are pages of their own in the sidebar, not sections at the page's foot.
-    expect(screen.queryByText(copy.decisionTools)).toBeNull();
     expect(screen.queryByText(copy.chipsAndTransfers)).toBeNull();
+    expect(screen.queryByText("Karar masam")).toBeNull();
     const advanced = screen.getByText(copy.advancedSettings).closest("details")!;
     // The rarely changed settings: the manager's word and the chips.
     for (const name of ["llm", "chip"]) {
@@ -599,16 +599,11 @@ describe("honesty and the tools", () => {
 
   it("draws a tool the address names as its own page, open, in place of the decision", () => {
     const copy = MESSAGES.tr.leagueMembers;
-    show("tr", { tool: "decision-tools" });
-    const page = screen.getByRole("region", { name: copy.decisionTools });
-    expect(within(page).getByText("Karar masam")).toBeVisible();
-    expect(screen.queryByRole("region", { name: copy.decisionTitle })).toBeNull();
-    expect(screen.queryByRole("region", { name: copy.planTitle })).toBeNull();
-    cleanup();
-
     show("tr", { tool: "chips" });
     const chips = screen.getByRole("region", { name: copy.chipsAndTransfers });
     expect(within(chips).getByText(MESSAGES.tr.memberResources.transfersTitle)).toBeVisible();
+    expect(screen.queryByRole("region", { name: copy.decisionTitle })).toBeNull();
+    expect(screen.queryByRole("region", { name: copy.planTitle })).toBeNull();
   });
 
   it("heads the plan with its presets, which set the strategy and window the controls read", () => {

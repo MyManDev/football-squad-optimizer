@@ -76,8 +76,6 @@ function renderView(
   );
 }
 
-const otherModel = { tr: "Diğer modeli de hesapla", en: "Compute the other model" } as const;
-
 describe("a member page whose gameweek has closed", () => {
   it("says the deadline passed and names the gameweek", () => {
     for (const language of ["tr", "en"] as const) {
@@ -98,10 +96,6 @@ describe("a member page whose gameweek has closed", () => {
       expect(screen.getByRole("link", { name: copy.changePlan })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: copy.computeButton })).toBeInTheDocument();
       cleanup();
-      // The model comparison is on the decision tools' page.
-      renderView(null, language, "", { tool: "decision-tools" });
-      expect(screen.getByText(otherModel[language])).toBeInTheDocument();
-      cleanup();
 
       const closed = renderView(DEADLINE, language);
       // The closed week's plan is still the page's answer.
@@ -110,12 +104,6 @@ describe("a member page whose gameweek has closed", () => {
       expect(screen.queryByRole("link", { name: copy.changePlan })).toBeNull();
       expect(screen.queryByRole("button", { name: copy.computeButton })).toBeNull();
       expect(screen.queryByText(COMPUTE_COPY[language].deadlinePassedCompute)).toBeNull();
-      cleanup();
-      // The decision tools only read the closed week, so their page stays, without the
-      // comparison's computation.
-      renderView(DEADLINE, language, "", { tool: "decision-tools" });
-      expect(screen.getByRole("region", { name: copy.decisionTools })).toBeInTheDocument();
-      expect(screen.queryByText(otherModel[language])).toBeNull();
     },
   );
 

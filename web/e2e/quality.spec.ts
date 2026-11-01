@@ -97,10 +97,8 @@ test.describe("a visitor who has said who they are", () => {
         .evaluateAll((links) => links.map((link) => link.getAttribute("href"))),
     ).toEqual([
       "/league/352490/members/35249001",
-      "/league/352490/members/35249001#kadro",
       "/league/352490/members",
       "/league/352490/members/35249001/current-squad",
-      "/league/352490/members/35249001/decision-tools",
       "/league/352490/members/35249001/what-if",
       "/league/352490/members/35249001/duel",
       "/league/352490/members/35249001/chips",
