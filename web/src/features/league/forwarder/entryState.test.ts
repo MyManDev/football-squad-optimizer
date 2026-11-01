@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { BUNDLE_EXAMPLES } from "../../../fixtures/forwarder";
 import vectors from "../entryState/vectors.json";
+import { rebuildPurchasePrices, sellingInputs } from "../entryState/prices";
 import { bankedFreeTransfers, chipStates, type ChipWindow } from "../entryState/rules";
 import { bundleEntryState } from "./entryState";
 
@@ -35,6 +36,57 @@ describe("a forwarded bundle read through the entry-state readers", () => {
     expect(chips.wildcard.first_half).toMatchObject({ state: "used", gameweek: 4 });
     expect(chips.freehit.first_half).toMatchObject({ state: "used", gameweek: 9 });
     expect(chips.bboost.first_half).toMatchObject({ state: "available" });
+  });
+
+  it("replays the Free Hit entry's purchase prices from what the bundle holds", () => {
+    const state = read(freeHit, 101);
+    // What the bundle does not carry: the season's budget and fee, each opening player's
+    // start price (the capture's table states them) and the deadlines (the calendar).
+    const opening = state.opening!;
+    const start = Object.fromEntries(
+      opening.squad.map((id, index) => [id, index < 5 ? 67 : 66] as const),
+    );
+    const deadlines = Object.fromEntries(
+      Array.from({ length: 10 }, (_, index) => [
+        index + 1,
+        new Date(Date.UTC(2026, 7, 21, 17, 30) + index * 7 * 86_400_000).toISOString(),
+      ]),
+    );
+    const rebuilt = rebuildPurchasePrices({
+      transfers: state.transfers,
+      history: state.history,
+      opening,
+      held: state.held,
+      budget_tenths: 1000,
+      start_prices: start,
+      deadlines,
+      // As the capture's provider asks it: through the captured week, with its chip, and
+      // the held squad the Free Hit walk-back gives.
+      through_gameweek: state.captured.gameweek,
+      active_chip: state.captured.active_chip,
+      sell_on_fee: 0.5,
+    });
+    // The opening players still held keep their start price; 120 and 121 were bought for
+    // 55 in weeks 2 and 5; the Free Hit's transfer in week 9 is replayed on a copy.
+    const paid: Record<number, number> = { 120: 55, 121: 55 };
+    for (let id = 101; id <= 113; id++) paid[id] = id <= 105 ? 67 : 66;
+    expect(rebuilt).toEqual({
+      known: true,
+      prices: paid,
+      applied: 2,
+      free_hit_skipped: 1,
+      pending: 0,
+      sales_checked: 0,
+    });
+    // Each held player two tenths above what was paid sells for one tenth more.
+    const current = Object.fromEntries(
+      state.held.squad.map((id) => [id, rebuilt.prices[id]! + 2] as const),
+    );
+    const selling = sellingInputs(state.held, current, rebuilt, 0.5);
+    expect(selling.purchase_prices_known).toBe(true);
+    expect(selling.squad_sell_value_tenths).toBe(
+      state.held.squad.reduce((total, id) => total + rebuilt.prices[id]! + 1, 0),
+    );
   });
 
   it("reads a late joiner's picks in FPL's positions, with no opening fifteen", () => {
