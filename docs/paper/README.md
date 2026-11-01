@@ -4,6 +4,7 @@
 | --- | --- |
 | Issue | #1152 |
 | Records | [measurements index](../measurements_index.md) |
+| Related work | [verbatim quotes](related_work.md) |
 | Requirements | Python 3.11 or later (standard library only), git on `PATH`, no network; the tests: the development install of [contributing](../../CONTRIBUTING.md) |
 | Outputs in git | none; written under `artifacts/` (git-ignored) or outside the checkout |
 | Records read at | `144e3f7be824115b64ec8321d8b60c6831092973` (develop) |
@@ -17,7 +18,7 @@
 | 3 | `python -m scripts.paper_record_tables --output-dir artifacts/paper/tables` |
 | 4 | `python -m scripts.paper_figures --tables artifacts/paper/tables --output-dir artifacts/paper/figures` |
 | Check | `python -m scripts.paper_figures --check docs/paper/README.md` |
-| Tests | `python -m pytest tests/unit/test_paper_record_tables.py tests/unit/test_paper_figures.py` |
+| Tests | `python -m pytest tests/unit/test_paper_record_tables.py tests/unit/test_paper_figures.py tests/unit/test_paper_related_work.py` |
 
 | Command | Prints | Exit |
 | --- | --- | --- |
