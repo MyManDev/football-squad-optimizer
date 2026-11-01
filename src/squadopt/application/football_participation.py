@@ -492,6 +492,8 @@ def bind_football_participation(
                 reason = "source_documents_unverified"
             elif (manager_words.season, manager_words.gameweek) != (inputs.season, first):
                 reason = "decision_week_mismatch"
+            elif word.document_binding_reason is not None:
+                reason = word.document_binding_reason
             elif word.words_status == WORDS_UNRESOLVED:
                 reason = "source_span_unresolved"
             elif (
