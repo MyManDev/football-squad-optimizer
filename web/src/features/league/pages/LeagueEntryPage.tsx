@@ -99,9 +99,6 @@ export function LeagueEntryPage({
   return (
     <div className={styles.page}>
       <h1 className={styles.title}>{copy.title}</h1>
-      {/* A first visitor lands here with nothing to go on, so the page says what the site
-          does before it asks for a number. */}
-      <p className={styles.intro}>{copy.intro}</p>
       <Card>
         <form onSubmit={submit} className={styles.form} aria-busy={state === "loading"}>
           <label htmlFor="league-id">{copy.label}</label>

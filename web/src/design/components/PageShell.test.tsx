@@ -251,6 +251,7 @@ describe("the app shell on a desktop", () => {
       TR.duel,
       TR.chips,
       TR.squadCard,
+      TR.history,
       TR.fixtures,
       TR.contribute,
     ]);
