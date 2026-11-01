@@ -1,6 +1,6 @@
 # ADR 0012: The FPL forwarder, a separate Worker at /api/v1/fpl/*
 
-- **Status:** accepted by İbo on 2026-11-01, under the owner's handover of the program to him
+- **Status:** accepted by İbo on 2026-11-01, under the owner's handover of the program to İbo
   (issue #978, comment 6548175771). It takes up the same-origin Worker that
   [ADR 0004](0004-cloudflare-pages-deployment.md) left as an option, and leaves ADR 0004's
   decision, a static Pages site, standing.
