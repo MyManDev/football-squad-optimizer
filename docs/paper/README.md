@@ -42,7 +42,7 @@
 | R10 | `docs/research/rank_conditional_shrinkage.json` | `bddfcb03976c73cf53bf2c7706f5386bbc9c315a` | `31d487322ef15a713751f1577c83242c09f5bd5186ff2ab2909e2a052a6272d7` |
 | R11 | `docs/research/team_match_block_sampler.json` | `f70dc6a4061297870541a9a484364799b603e26e` | `797264048f2a14658a8ecac89d5c82fae466e504392da4231159d10848cf1173` |
 | C1 | `scripts/paper_record_tables.py` | `4b550890a40ca801ba4b15d1cbf1e99480173f71` | `f5e3c5608c8e991d147ac992cf6c173ccb48e1f101e2c5548eedbd09c5cc19b9` |
-| C2 | `scripts/paper_figures.py` | `bc9e0a4d0bc1b1850df82474d7f9d1560156c0b6` | `9199748ed35db3c7464f7b541662da3d3367de8736ecadc3f49ab7d89d6e68c8` |
+| C2 | `scripts/paper_figures.py` | `86070cde648d9658b748b484ca14ff461df3c2b3` | `2a0f98dcafcfa101d01f970d3b0318100e24a61aa55e0c3147898f5f999fbc11` |
 
 ## Tables (step 3)
 
@@ -73,6 +73,6 @@
 | --- | --- | --- | --- |
 | `figures/fig1_decision_fold_differences.svg` | 4 | `tables/figure_decision_fold_differences.csv`, C2 | `99e8bc75c1d5d88af3223c4b2a1695a6d2ec599dbd9e75e7db9d70d0203171a7` |
 | `figures/fig2_decision_by_season.svg` | 4 | `tables/figure_decision_by_season.csv`, C2 | `fd06c34b2584ddd60ec4fa38329eb62de0de7b776cb9113abc2d7fbcdd726b0c` |
-| `figures/fig3_points_mae_against_squad_points.svg` | 4 | `tables/figure_points_mae_against_squad_points.csv`, `tables/figure_decision_by_season.csv`, C2 | `8dba6d7ebeeeece7152b4160d2fa76daf8061ae95898bce0a3eb6d023925d2c2` |
+| `figures/fig3_points_mae_against_squad_points.svg` | 4 | `tables/figure_points_mae_against_squad_points.csv`, `tables/figure_decision_by_season.csv`, C2 | `74dedb0327be994a9df988ccbeff91abbee342d1995129262928a20337f3e2b4` |
 | `figures/fig4_sampler_pit.svg` | 4 | `tables/figure_sampler_pit.csv`, C2 | `ec8182a7261ef2f5d3f5a642b44f0fd1d8b703451e1ae4259731022704e3a1f2` |
 | `figures/fig5_s2_counts.svg` | 4 | `tables/figure_s2_counts.csv`, `tables/table_sampler_calibration.csv`, C2 | `a4e4fd7a6cd3b87d43c462412f759bf448441840419a205ef9c2d99a63c26b6c` |

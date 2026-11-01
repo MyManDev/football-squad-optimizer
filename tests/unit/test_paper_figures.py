@@ -210,9 +210,7 @@ def test_every_figure_renders_from_a_small_fixture_table(tmp_path: Path) -> None
     assert sorted(folds) == sorted(f"{c}, {f}" for c, f, _, _ in FOLDS)
     assert sum("mean of" in key for key in marks[FIG1]) == 4
     assert sorted(marks[FIG2]) == sorted(f"{c}, {s}" for c, s, _ in SEASON_MEANS)
-    assert sorted(marks[FIG3]) == sorted(
-        f"{arm}, {kind}" for arm, *_ in MAE_ROWS for kind in ("pooled", "matched")
-    )
+    assert sorted(marks[FIG3]) == sorted(arm for arm, *_ in MAE_ROWS)
     assert len(marks[FIG4]) == 2 * figures.PIT_BINS
     assert sorted(marks[FIG5]) == [
         "S2 bounds of moe_sampler /candidate_arm",
@@ -240,21 +238,25 @@ def test_the_histogram_counts_every_fold_once_and_a_pit_on_an_edge_in_the_upper_
         figures._bin("x", 1.01, 10)
 
 
-def test_the_matched_mae_is_the_observation_weighted_mean_of_the_decision_seasons(
+def test_the_mae_figure_plots_each_arm_at_its_recorded_pooled_mae_and_squad_points(
     tmp_path: Path,
 ) -> None:
     output = _draw(tmp_path, "base")
 
-    titles = [title for _, _, title in _elements(output / FIG3) if title]
-    # Linear components: (1.2 * 10 + 1.0 * 30) / 40 over 2021-22 and 2022-23; 2025-26 is left out.
-    assert "Linear components, matched: points MAE 1.050000, squad points 60.000000" in titles
-    assert "Linear components, pooled: points MAE 1.066667, squad points 60.000000" in titles
-    label = [
-        element.text
-        for element in _parse(output / FIG3).iter(f"{SVG}text")
-        if element.text and "observation-weighted" in element.text
-    ]
-    assert label == ["points MAE over 2021-22 to 2022-23, observation-weighted"]
+    titles = sorted(title for _, _, title in _elements(output / FIG3) if title)
+    # The values as the table holds them, one point per arm; nothing is computed from seasons.
+    assert titles == sorted(
+        f"{arm}: points MAE {pooled}, squad points {squad}" for arm, squad, pooled, *_ in MAE_ROWS
+    )
+    marks = _marks(output / FIG3)
+    x = {arm: float(marks[arm]["cx"]) for arm, *_ in MAE_ROWS}
+    # Linear components sits between Arm A and Arm B where its pooled MAE does.
+    position = (x["Linear components"] - x["Arm A"]) / (x["Arm B, with a comma"] - x["Arm A"])
+    assert position == pytest.approx((1.066667 - 1.03) / (1.08 - 1.03), abs=0.005)
+    labels = [element.text or "" for element in _parse(output / FIG3).iter(f"{SVG}text")]
+    assert "points MAE pooled over 2021-22 to 2025-26, as recorded" in labels
+    assert "decision folds 2021-22 to 2022-23" in labels
+    assert not [label for label in labels if "weighted" in label]
 
 
 def test_the_output_is_byte_stable_across_two_runs(tmp_path: Path) -> None:
@@ -304,7 +306,7 @@ def _set_count(rows: dict[str, list[list[Any]]]) -> None:
         (
             FIG3,
             _set_squad_points,
-            {"Linear components, pooled", "Linear components, matched"},
+            {"Linear components"},
             {"text", "line"},
         ),
         (

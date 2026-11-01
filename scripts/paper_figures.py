@@ -21,9 +21,8 @@ The figures, each with the table files it reads:
 - `fig2_decision_by_season.svg` (`figure_decision_by_season.csv`): each candidate's recorded
   mean difference by season;
 - `fig3_points_mae_against_squad_points.svg` (`figure_points_mae_against_squad_points.csv` and
-  the seasons of `figure_decision_by_season.csv`): a point per arm, against its pooled points
-  MAE as recorded and against the observation-weighted mean of its season MAEs over the
-  decision seasons;
+  the seasons of `figure_decision_by_season.csv`, which only label an axis): a point per arm,
+  its squad points on the decision folds against its pooled points MAE, both as recorded;
 - `fig4_sampler_pit.svg` (`figure_sampler_pit.csv`): a PIT histogram per record and arm, with
   the count a uniform PIT puts in each bin;
 - `fig5_s2_counts.svg` (`figure_s2_counts.csv` and `table_sampler_calibration.csv`): each
@@ -548,23 +547,6 @@ def decision_by_season(rows: Rows) -> str:
 MAE_COLUMN = re.compile(r"points_mae_(\d{4}-\d{2})")
 
 
-def matched_mae(name: str, row: dict[str, str], seasons: Sequence[str]) -> float:
-    """The observation-weighted mean of an arm's season points MAE over `seasons`."""
-
-    total = 0.0
-    observations = 0.0
-    for season in seasons:
-        for column in (f"points_mae_{season}", f"points_observations_{season}"):
-            if column not in row:
-                raise FigureError(f"{name}: no column {column}")
-        count = _float(name, row, f"points_observations_{season}")
-        total += _float(name, row, f"points_mae_{season}") * count
-        observations += count
-    if observations <= 0:
-        raise FigureError(f"{name}: no observations in {', '.join(seasons)}")
-    return total / observations
-
-
 def _labelled_points(
     svg: Svg,
     points: Sequence[tuple[float, float, str, str]],
@@ -606,7 +588,11 @@ def _labelled_points(
 
 
 def points_mae_against_squad_points(rows: Rows, decision_seasons: Sequence[str]) -> str:
-    """Squad points on the decision folds against points MAE, pooled and season-matched."""
+    """Squad points on the decision folds against the pooled points MAE, both as recorded.
+
+    The seasons of the pooled MAE are read from the per-season columns, and those of the
+    decision folds from `figure_decision_by_season.csv`; both are axis labels only.
+    """
 
     name = "figure_points_mae_against_squad_points.csv"
     _require(name, rows, ("arm", "squad_points_decision_folds", "points_mae_pooled_all_seasons"))
@@ -617,48 +603,41 @@ def points_mae_against_squad_points(rows: Rows, decision_seasons: Sequence[str])
     )
     if not pooled_seasons:
         raise FigureError(f"{name}: no points_mae_<season> column")
-    arms = [row["arm"] for row in rows]
     squad = [_float(name, row, "squad_points_decision_folds") for row in rows]
     pooled = [_float(name, row, "points_mae_pooled_all_seasons") for row in rows]
-    matched = [matched_mae(name, row, decision_seasons) for row in rows]
-    x_axis = ticks(min(*pooled, *matched), max(*pooled, *matched), 4)
+    x_axis = ticks(min(pooled), max(pooled), 4)
     y_axis = ticks(min(squad), max(squad), 5)
-    left, width, height, gap, top = 74.0, 320.0, 300.0, 72.0, 44.0
+    left, width, height, top = 74.0, 400.0, 300.0, 24.0
     bottom = top + height
     svg = Svg(
-        left + 2 * width + gap + 24,
+        left + width + 24,
         bottom + 62,
         "Points MAE against realized squad points",
         f"Drawn from {name} and the seasons of figure_decision_by_season.csv by "
         "scripts/paper_figures.py.",
     )
     y_scale = Scale(y_axis.low, y_axis.high, bottom, top)
-    panels = (
-        (f"points MAE pooled over {_span(pooled_seasons)}, as recorded", pooled, "pooled"),
-        (
-            f"points MAE over {_span(decision_seasons)}, observation-weighted",
-            matched,
-            "matched",
-        ),
+    x_scale = Scale(x_axis.low, x_axis.high, left, left + width)
+    _y_grid(svg, y_scale, y_axis, left, left + width, labels=True)
+    _x_grid(svg, x_scale, x_axis, top, bottom)
+    svg.text(
+        (left + width / 2, bottom + 36),
+        f"points MAE pooled over {_span(pooled_seasons)}, as recorded",
+        11,
+        "middle",
     )
-    for panel, (label, xs, kind) in enumerate(panels):
-        start = left + panel * (width + gap)
-        x_scale = Scale(x_axis.low, x_axis.high, start, start + width)
-        _y_grid(svg, y_scale, y_axis, start, start + width, labels=True)
-        _x_grid(svg, x_scale, x_axis, top, bottom)
-        svg.text((start + width / 2, bottom + 36), label, 11, "middle")
-        svg.text((start, top - 14), f"{kind} MAE", 11, bold=True)
-        points = [
-            (
-                x_scale(x),
-                y_scale(y),
-                arm,
-                f"{arm}, {kind}: points MAE {x:.6f}, squad points {y:.6f}",
-            )
-            for arm, x, y in zip(arms, xs, squad, strict=True)
-        ]
-        reach = _labelled_points(svg, points, start, width, top, bottom)
-        svg.width = max(svg.width, reach + 16)
+    points = [
+        (
+            x_scale(x),
+            y_scale(y),
+            row["arm"],
+            f"{row['arm']}: points MAE {row['points_mae_pooled_all_seasons']}, "
+            f"squad points {row['squad_points_decision_folds']}",
+        )
+        for row, x, y in zip(rows, pooled, squad, strict=True)
+    ]
+    reach = _labelled_points(svg, points, left, width, top, bottom)
+    svg.width = max(svg.width, reach + 16)
     centre = (top + bottom) / 2
     svg.text((18, centre), "mean realized squad points a gameweek", 11, "middle", rotate=True)
     svg.text((32, centre), f"decision folds {_span(decision_seasons)}", 11, "middle", rotate=True)
