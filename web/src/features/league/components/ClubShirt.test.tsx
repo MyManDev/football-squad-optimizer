@@ -15,7 +15,7 @@ import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import type { Language } from "../../../i18n/messages";
 import { CLUB_COLOURS } from "../../../lib/clubs";
 import { ClubShirt } from "./ClubShirt";
-import { clubPlate, PLATE_INK, PLATE_WHITE } from "./pitchLook";
+import { clubPlate, PLATE_INK, PLATE_WHITE } from "./clubPlate";
 
 /** The twenty clubs of the 2026-27 season, by the code the fixture list prints. */
 const SEASON_CODES = [

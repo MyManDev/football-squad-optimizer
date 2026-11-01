@@ -1,3 +1,4 @@
+import type { MemberTool } from "../../../lib/leagueAddresses";
 import type { FixturesPayload } from "../../fixtures/types";
 import type { ComputeService } from "../advice/AdviceRequestPanel";
 import type { AdviceCapabilities } from "../advice/adviceCapabilities";
@@ -94,4 +95,6 @@ export interface LeagueMemberViewProps {
   scoreboard?: Scoreboard | null;
   /** The member's suggestion history, read once the scoreboard has a week for the card. */
   history?: SuggestionHistory | null;
+  /** The one tool the address names, drawn as its own page in place of the decision. */
+  tool?: MemberTool;
 }
