@@ -1,8 +1,9 @@
 # Entry state readers
 
 These functions read synthetic FPL-shaped documents offline (#983 steps 1 and 2). The
-member page does not import them yet. The forwarder's entry bundle reads through them
-unchanged in `../forwarder/entryState.ts` (#983 step 3).
+forwarder's entry bundle reads through them unchanged in `../forwarder/entryState.ts` (#983
+step 3), and a forwarded team's entry document is built through them in
+`../forwarded/memberSquad.ts` (#983 step 4).
 
 | Function                | Python reference                                                                                      |
 | ----------------------- | ----------------------------------------------------------------------------------------------------- |

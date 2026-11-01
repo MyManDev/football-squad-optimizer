@@ -8,6 +8,7 @@
 import standingsExamples from "../../../docs/contracts/fpl_league_standings_v1.examples.json" with { type: "json" };
 import bundleExamples from "../../../docs/contracts/fpl_entry_bundle_v1.examples.json" with { type: "json" };
 import liveExamples from "../../../docs/contracts/week_live_v1.examples.json" with { type: "json" };
+import deviceInstances from "./device-plan/instances.json" with { type: "json" };
 import type { FixturesPayload } from "../features/fixtures/types";
 import type { FplEntryBundle } from "../features/league/forwarder/documents";
 import type { DevicePlanDocument } from "../features/league/device/types";
@@ -190,5 +191,77 @@ export function exampleBundle(
       })),
     })),
     current_week: current,
+  };
+}
+
+/**
+ * The device-plan parity fixture's table as a capture's own table (`league_device_plan_v2`):
+ * no league, each player's element id his persistent id and his start price his price now,
+ * no chip windows and no weekly transfer cap.
+ */
+export function fixtureCaptureTable(capture: string): DevicePlanDocument {
+  const { league_id: _league, ...shared } = clone(
+    deviceInstances.document,
+  ) as unknown as DevicePlanDocument & { league_id: number };
+  return {
+    ...shared,
+    contract_version: "league_device_plan_v2",
+    source_snapshot_id: capture,
+    rules: { ...shared.rules, chips: [], transfers_cap: null },
+    players: shared.players.map((player) => ({
+      ...player,
+      element_id: player.id,
+      start_tenths: player.buy_tenths,
+    })),
+  };
+}
+
+/**
+ * A bundle at table gameweek `gameweek` for an entry from gameweek 1 that has made no
+ * transfer and holds `fifteen` (element ids, the first eleven starting) with `bank` in the
+ * bank and the picks' stated worth `value`, `captain` and `vice` wearing the armbands.
+ */
+export function bundleHolding(
+  entryId: number,
+  gameweek: number,
+  fifteen: readonly number[],
+  {
+    bank,
+    value,
+    captain,
+    vice,
+    name = "Synthetic XI",
+  }: { bank: number; value: number; captain: number; vice: number; name?: string },
+): FplEntryBundle {
+  const weeks = Array.from({ length: gameweek - 1 }, (_, index) => index + 1);
+  return {
+    contract_version: "fpl_entry_bundle_v1",
+    entry_id: entryId,
+    gameweek,
+    source_time: "2026-10-10T20:00:00Z",
+    entry: { id: entryId, name, started_event: 1 },
+    history: {
+      current: weeks.map((event) => ({
+        event,
+        event_transfers: 0,
+        event_transfers_cost: 0,
+        bank,
+      })),
+      chips: [],
+    },
+    transfers: [],
+    picks: [...new Set([1, gameweek - 1])].map((event) => ({
+      active_chip: null,
+      automatic_subs: [],
+      entry_history: { event, bank, value },
+      picks: fifteen.map((element, index) => ({
+        element,
+        position: index + 1,
+        multiplier: element === captain ? 2 : index < 11 ? 1 : 0,
+        is_captain: element === captain,
+        is_vice_captain: element === vice,
+      })),
+    })),
+    current_week: null,
   };
 }
