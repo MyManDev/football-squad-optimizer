@@ -22,6 +22,7 @@ import {
 } from "../../../fixtures/league";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { MESSAGES } from "../../../i18n/messages";
+import { AS_A_CHANCE } from "../../../testSupport/honesty";
 import { withLeague } from "../../../testSupport/league";
 import type { MemberTool } from "../../../lib/leagueAddresses";
 import type { FixturesPayload } from "../../fixtures/types";
@@ -297,7 +298,8 @@ describe("the member page with no published one-week plan", () => {
     expect(posted).toHaveLength(1);
     // The button stays, to solve again.
     expect(deviceButton()).toBeEnabled();
-    expect(container).not.toHaveTextContent("%");
+    // The device's progress card is drawn into the body, so the rule is read over the body.
+    expect(window.document.body.textContent).not.toMatch(AS_A_CHANCE);
   });
 
   it("says beside the heading that it is solving while the run it started goes on", async () => {
@@ -307,6 +309,9 @@ describe("the member page with no published one-week plan", () => {
     const decision = screen.getByRole("region", { name: copy.decisionTitle });
     expect(decision).toHaveTextContent(copy.deviceSolving);
     expect(deviceButton()).toBeDisabled();
+    // The progress card stands over the page while the run goes on; it counts, never a percentage.
+    expect(window.document.querySelector("[data-device-progress]")).not.toBeNull();
+    expect(window.document.body.textContent).not.toMatch(AS_A_CHANCE);
   });
 
   it("solves nothing once the deadline has passed", async () => {
