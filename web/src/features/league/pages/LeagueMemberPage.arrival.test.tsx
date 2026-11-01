@@ -5,7 +5,7 @@
  * once for the page, in the motion tokens' times, and not at all under reduced motion. Between
  * member pages the pinned top bar holds still under the crossfade, and no page names it twice.
  */
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { MemoryRouter } from "react-router";
@@ -88,7 +88,7 @@ const rows = () => [...card().querySelectorAll('[data-arrival="row"]')];
 const plates = () => [...document.querySelectorAll('[data-mark="pitch"] [data-plate]')];
 
 describe("the week screen's arrival", () => {
-  it("raises the card, each board a step after it, and fills the bar beside the figure", () => {
+  it("raises the card, each board a step after it, and fills the bar beside the figure", async () => {
     render(view());
     expect(of(card())).toEqual([
       { element: card(), keyframes: RISE, options: timed(MOTION_MS.ui) },
@@ -98,9 +98,10 @@ describe("the week screen's arrival", () => {
     expect(of(part("bar"))).toEqual([
       { element: part("bar"), keyframes: FILL, options: timed(MOTION_MS.data) },
     ]);
-    // Its final value from the first frame: it comes up with the bar and never counts.
-    expect(part("gain")).toHaveTextContent("+3,0");
+    // The figure counts up from nothing with the bar, and lands on its value.
+    expect(part("gain")).toHaveTextContent("+0,0");
     expect(of(part("gain"))).toEqual([expect.objectContaining({ options: timed(MOTION_MS.data) })]);
+    await waitFor(() => expect(part("gain")).toHaveTextContent("+3,0"), { timeout: 2000 });
   });
 
   it("brings the plates up in the pitch's order, keeper first, in the data time", () => {
@@ -174,13 +175,22 @@ describe("the top bar between member pages", () => {
     expect(pinned).toMatch(/\[data-drawer="open"\]\) \.topBar\s*\{\s*view-transition-name: none;/);
   });
 
-  it("is the one name any stylesheet gives, timed as the crossfade", () => {
+  it("is one of the three names the stylesheets give, each timed as the page step", () => {
     const named = readdirSync(SRC, { recursive: true, encoding: "utf-8" })
       .filter((file) => file.endsWith(".css"))
-      .flatMap((file) => css(join(SRC, file)).match(/view-transition-name: (?!none)[\w-]+/g) ?? []);
-    expect(named).toEqual(["view-transition-name: member-bar"]);
-    expect(css(join(SRC, "design/transitions.css"))).toMatch(
+      .flatMap((file) => css(join(SRC, file)).match(/view-transition-name: (?!none)[\w-]+/g) ?? [])
+      .sort();
+    expect(named).toEqual([
+      "view-transition-name: member-bar",
+      "view-transition-name: shell-bar",
+      "view-transition-name: shell-sidebar",
+    ]);
+    const steps = css(join(SRC, "design/transitions.css"));
+    expect(steps).toMatch(
       /::view-transition-group\(member-bar\),\s*::view-transition-old\(member-bar\),\s*::view-transition-new\(member-bar\)\s*\{[^}]*animation-duration: var\(--motion-ui\);/,
     );
+    for (const name of ["shell-sidebar", "shell-bar"]) {
+      expect(steps).toContain(`::view-transition-group(${name})`);
+    }
   });
 });

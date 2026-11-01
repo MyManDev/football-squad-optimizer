@@ -111,9 +111,17 @@
   box-sizing: border-box;
 }
 
+/* The page is mown grass seen from the touchline: 112 px bands, every other one 4 % pitch.
+   At 4 % the faintest text still reads (ink3 4.58:1 and --color-good 4.55:1 on the darker
+   band); panels, cards and the bars keep their own fills, so only bare page shows them. */
 body {
   margin: 0;
-  background: var(--color-bg);
+  background-color: var(--color-bg);
+  background-image: repeating-linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--color-pitch) 4%, transparent) 0 56px,
+    transparent 56px 112px
+  );
   color: var(--color-text);
   font-family: var(--font-body);
   font-size: var(--step-0);

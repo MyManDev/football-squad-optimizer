@@ -1,13 +1,46 @@
 /* A page change the View Transitions API runs (design/viewTransition.ts, #1131), from the
    member picker to the page or between pages from the navigation (PageShell): the old
-   picture fades into the new one in the card time of the motion tokens. Opacity only, as
-   the browser's own crossfade is; under reduced motion the token is zero and the script
-   does not start one. The group that holds the two pictures is timed with them, or it
-   keeps the browser's own quarter second and the step ends later than its fade. */
+   picture fades out in the fast card time while the new one rises 12 px into place in the
+   card time, so the step reads as one direction whichever item was chosen. Only opacity
+   and transform move; under reduced motion the token is zero and the script does not start
+   one. The group that holds the two pictures is timed with them, or it keeps the browser's
+   own quarter second and the step ends later than its motion. */
 
-::view-transition-group(root),
-::view-transition-old(root),
+::view-transition-group(root) {
+  animation-duration: var(--motion-ui);
+  animation-timing-function: var(--motion-ease);
+}
+
+::view-transition-old(root) {
+  animation: page-leave var(--motion-ui-fast) var(--motion-ease) both;
+}
+
 ::view-transition-new(root) {
+  animation: page-rise var(--motion-ui) var(--motion-ease) both;
+}
+
+@keyframes page-leave {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes page-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.985);
+  }
+}
+
+/* The sidebar and the phone's top bar are captured on their own (PageShell.module.css), so
+   they hold still while the page beside or under them rises; a drawer that closes in the
+   step slides to where it now stands in the same time. */
+::view-transition-group(shell-sidebar),
+::view-transition-old(shell-sidebar),
+::view-transition-new(shell-sidebar),
+::view-transition-group(shell-bar),
+::view-transition-old(shell-bar),
+::view-transition-new(shell-bar) {
   animation-duration: var(--motion-ui);
   animation-timing-function: var(--motion-ease);
 }

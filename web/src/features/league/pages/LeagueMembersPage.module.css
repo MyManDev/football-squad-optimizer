@@ -88,6 +88,17 @@
 
 .table tbody tr {
   border-bottom: 1px solid var(--color-line);
+  /* The rows come in one after another when the table is drawn, at most twelve steps apart,
+     each in the card time; under reduced motion every token is zero and they stand at once. */
+  animation: row-in var(--motion-ui) var(--motion-ease) backwards;
+  animation-delay: calc(min(var(--row, 0), 12) * var(--motion-ui-fast) / 6);
+}
+
+@keyframes row-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
 }
 
 .table tbody td {
