@@ -19,7 +19,7 @@ The repository baseline inspected for this change is
 
 | Evidence | Consequence for a recovery set |
 | --- | --- |
-| `.gitignore` excludes `data/snapshots`, `data/ledger`, `data/handoffs`, `data/entries`, `data/advice_records`, `data/logs` and `data/runtime` | Git alone cannot recover these private operational bytes. |
+| `.gitignore` excludes `data/snapshots`, `data/ledger`, `data/handoffs`, `data/entries`, `data/advice_records`, `data/member_baselines`, `data/logs` and `data/runtime` | Git alone cannot recover these private operational bytes. |
 | `data.snapshots` binds payload checksums to capture metadata; `live.ledger` and `application.advice_record` verify their own immutable records | Keep the whole selected roots together; retain domain manifests as well as this backup manifest. |
 | `deploy/containerapp.yaml` separates the store and read-only inputs mounts; `docs/backend_runbook.md` configures four backend roots | Source paths must be supplied explicitly. The command does not guess that a local `data` folder is the deployed store. Include the configured runtime store if its jobs/cache/provenance are required. |
 | The checked workflows contain seven-day **CI artifact** retention, but no private backup job; the deploy template contains no backup resource | CI site artifacts are not a private-data backup. No repository evidence establishes an external backup account, recovery objective or deletion schedule. |
@@ -60,6 +60,7 @@ python -B -m squadopt.platform.backup_recovery create `
   --root handoffs=C:/private/handoffs `
   --root entries=C:/private/entries `
   --root advice_records=C:/private/advice_records `
+  --root member_baselines=C:/private/member_baselines `
   --root store=C:/private/backend-store `
   --destination E:/restricted-backups/recovery-20260909 `
   --writers-stopped
