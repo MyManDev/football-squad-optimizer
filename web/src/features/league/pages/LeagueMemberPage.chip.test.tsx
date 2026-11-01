@@ -184,15 +184,13 @@ describe("a chosen chip on the advice card", () => {
     }
   });
 
-  it("names the basis a Triple Captain and a Bench Boost week score on", () => {
+  it("prints a chip week's total as bare expected points, with no basis sentence", () => {
     const triple = renderPage("en", chosen("3xc", 6.4), "mode=saf-puan&window=1&chip=3xc");
     const own = chosen("3xc", 6.4).payload.expected_own_points!;
     expect(triple.container.textContent).toContain(
-      CHIP_COPY.en.expectedOwnPoints(figure(own), CHIP_COPY.en.basis["3xc"]),
-    );
-    expect(triple.container.textContent).not.toContain(
       MESSAGES.en.leagueMembers.expectedOwnPoints(figure(own)),
     );
+    expect(triple.container.textContent).not.toMatch(/captain (doubled|tripled)/);
     cleanup();
 
     const wildcard = renderPage(
