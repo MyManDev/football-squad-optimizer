@@ -1,0 +1,118 @@
+/*
+ * The device solve at work: one card in the middle of the viewport, over the drawer, with
+ * the share in display type, a bar under it and the stages as a ticked list. The layer is
+ * the page's own background, opaque, so nothing of the page shows while the card is up.
+ */
+
+.layer {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: var(--space-4);
+  background: var(--color-bg);
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  inline-size: min(100%, 320px);
+  padding: var(--space-5);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-drawer);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--step-0);
+  font-weight: 600;
+  line-height: 20px;
+}
+
+.share {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--step-4);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.track {
+  block-size: 8px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--color-surface-2);
+}
+
+.bar {
+  display: block;
+  block-size: 100%;
+  background: var(--color-primary);
+  transition: inline-size var(--motion-ui) var(--motion-ease);
+}
+
+.stages {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stage {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: var(--step--1);
+  line-height: 18px;
+}
+
+.stage[data-stage="current"] {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.stage[data-stage="done"] {
+  color: var(--color-text);
+}
+
+/* Waiting: an empty ring. Under way: a filled dot. Done: a tick on lime. */
+.tick {
+  flex: none;
+  inline-size: 16px;
+  block-size: 16px;
+  border: 2px solid var(--color-line);
+  border-radius: 50%;
+}
+
+.stage[data-stage="current"] .tick {
+  border-color: var(--color-primary);
+  background: radial-gradient(circle, var(--color-primary) 0 3px, transparent 4px);
+}
+
+.stage[data-stage="done"] .tick {
+  border-color: var(--color-text);
+  background: var(--color-lime);
+  position: relative;
+}
+
+.stage[data-stage="done"] .tick::after {
+  content: "";
+  position: absolute;
+  inset: 2px 4px 4px 3px;
+  border: solid var(--color-text);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bar {
+    transition: none;
+  }
+}
