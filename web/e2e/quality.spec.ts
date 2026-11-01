@@ -90,7 +90,7 @@ test.describe("a visitor who has said who they are", () => {
     await page.goto("/league/352490/members/35249001");
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("North Stand Notes");
     // The identity block carries Değiştir, a button; the links are the member's week, squad
-    // and league, the member's tools, then the open pages.
+    // and league, the member's tools and history, then the open pages.
     expect(
       await page
         .locator("#sidebar a")
@@ -103,6 +103,7 @@ test.describe("a visitor who has said who they are", () => {
       "/league/352490/members/35249001/duel",
       "/league/352490/members/35249001/chips",
       "/league/352490/members/35249001/card",
+      "/league/352490/members/35249001/history",
       "/fixtures",
       ...CONTRIBUTE,
     ]);
@@ -249,7 +250,7 @@ test.describe("a visitor who has not said who they are", () => {
       await expect(page.getByRole("heading", { level: 1 })).toHaveText(
         language === "tr" ? "Sen kimsin?" : "Who are you?",
       );
-      await expect(page.getByRole("radio", { name: /Deniz Aral/ })).toBeVisible();
+      await expect(page.getByRole("button", { name: /Deniz Aral/ })).toBeVisible();
       await expect(page.locator("#league-member-list")).toHaveCount(0);
       await expect(page.locator("html")).toHaveAttribute("lang", language);
       expect(await page.evaluate(() => localStorage.getItem("squadopt.viewer"))).toBeNull();

@@ -76,7 +76,7 @@ describe("the sidebar's navigation with a league and nobody claimed", () => {
 });
 
 describe("the sidebar's navigation with the member claimed", () => {
-  it("opens the claimed member's page as 'Bu hafta', the league and the tools", () => {
+  it("opens the claimed member's page as 'Bu hafta', the league, the tools and the history", () => {
     expect(hrefs(at("/fixtures"), CLAIMED)).toEqual([
       ["thisWeek", OWN, false],
       ["league", MEMBERS, false],
@@ -85,6 +85,7 @@ describe("the sidebar's navigation with the member claimed", () => {
       ["duel", `${OWN}/duel`, false],
       ["chips", `${OWN}/chips`, false],
       ["squadCard", `${OWN}/card`, false],
+      ["history", `${OWN}/history`, false],
       ["fixtures", "/fixtures", true],
       ["contribute", "/contribute", false],
     ]);
@@ -99,6 +100,7 @@ describe("the sidebar's navigation with the member claimed", () => {
     expect(active(at(OWN))).toEqual(["thisWeek"]);
     expect(active(at(OWN, "?mode=fark-yarat", "#kadro"))).toEqual(["thisWeek"]);
     expect(active(at(`${OWN}/`))).toEqual(["thisWeek"]);
+    expect(active(at(`${OWN}/history`))).toEqual(["history"]);
   });
 
   it("keeps 'Bu hafta' on the visitor's own page while they read a rival's", () => {
