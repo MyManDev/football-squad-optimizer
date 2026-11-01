@@ -109,8 +109,7 @@ describe.each(["tr", "en"] as const)("league gate in %s", (language) => {
 
     // Once the visitor says who they are, the page opens where it was asked for.
     const group = await screen.findByRole("group", { name: picker.legend });
-    await user.click(within(group).getByRole("radio", { name: /Deniz Aral/ }));
-    await user.click(screen.getByRole("button", { name: picker.confirm }));
+    await user.click(within(group).getByRole("button", { name: /Deniz Aral/ }));
     expect(await screen.findByRole("heading", { name: "Member page" })).toBeInTheDocument();
     expect(location()).toBe(memberAddress(LEAGUE, ENTRY));
     expect(screen.queryByRole("heading", { name: "Members list" })).toBeNull();
@@ -330,8 +329,7 @@ describe.each(["tr", "en"] as const)("the system pages behind the two steps in %
     expect(readChosenLeague()).toBe(LEAGUE);
 
     const group = await screen.findByRole("group", { name: picker.legend });
-    await user.click(within(group).getByRole("radio", { name: /Deniz Aral/ }));
-    await user.click(screen.getByRole("button", { name: picker.confirm }));
+    await user.click(within(group).getByRole("button", { name: /Deniz Aral/ }));
     expect(await screen.findByRole("heading", { name: "Moves page" })).toBeInTheDocument();
     expect(screen.getByTestId("visitor-location")).toHaveTextContent("/moves?mode=garantici");
   });

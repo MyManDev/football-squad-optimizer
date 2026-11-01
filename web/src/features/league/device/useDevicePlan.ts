@@ -14,6 +14,8 @@
  * solve's ceiling, and a grace beyond it, is ended too and the run fails. That watchdog counts only the time the
  * page is visible, not the time a hidden tab spends suspended. Each run leaves User Timing
  * marks and measures of its stages (`DeviceTimeline`); the device spec prints the measures.
+ * While it runs, the state says how far it has come (`DeviceProgress`), counted in the
+ * stages the run really passes, never in elapsed time.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -41,10 +43,28 @@ import {
 
 export { deviceChip, deviceSelection } from "./selection";
 
+/**
+ * How far a run has come, in the stages it passes: its inputs read, the solver loaded, the
+ * plan solved, then each held chip tried. `total` is null until the inputs say how many
+ * chips there are, so the share never goes back when they do.
+ */
+export interface DeviceProgress {
+  /** The stage under way. */
+  step: "inputs" | "solver" | "plan" | "chips";
+  /** Stages finished, of `total`. */
+  done: number;
+  total: number | null;
+  /** With the plain plan: the held chips tried so far, of how many. */
+  chips?: { done: number; total: number };
+}
+
+/** The stages before the chips: inputs, solver and plan. */
+const STAGES_BEFORE_CHIPS = 3;
+
 export type DevicePlanPhase =
   | { phase: "idle" }
-  | { phase: "loading" }
-  | { phase: "solving" }
+  | { phase: "loading"; progress?: DeviceProgress }
+  | { phase: "solving"; progress?: DeviceProgress }
   | {
       phase: "done";
       envelope: LeagueViewEnvelope<EntryAdvice>;
@@ -54,6 +74,8 @@ export type DevicePlanPhase =
        * plan. Null until the gains arrive, and where none were asked for or none came.
        */
       chipTiming?: DeviceChipTiming | null;
+      /** While the plan is shown and its chips are still being tried. */
+      progress?: DeviceProgress;
     }
   | { phase: "refused"; status: string }
   | { phase: "other-capture" }
@@ -61,6 +83,16 @@ export type DevicePlanPhase =
   | { phase: "failed" };
 
 type DevicePlanDone = Extract<DevicePlanPhase, { phase: "done" }>;
+
+/** A finished plan with no count still running beside it. */
+function withoutProgress(state: DevicePlanDone): DevicePlanDone {
+  return {
+    phase: "done",
+    envelope: state.envelope,
+    seconds: state.seconds,
+    ...(state.chipTiming !== undefined ? { chipTiming: state.chipTiming } : {}),
+  };
+}
 
 /**
  * The table the plain plan was solved from and each held chip's gain this week against
@@ -358,7 +390,9 @@ export function useDevicePlan(
       setHeld((last) =>
         last.state.phase === "loading" || last.state.phase === "solving"
           ? { key: last.key, state: { phase: "idle" } }
-          : last,
+          : last.state.phase === "done" && last.state.progress
+            ? { key: last.key, state: withoutProgress(last.state) }
+            : last,
       );
     },
     [requestKey],
@@ -382,7 +416,7 @@ export function useDevicePlan(
     const alive = () => generation.current === run;
     const timing = runTimeline(timeline);
     timing.mark("press");
-    setState({ phase: "loading" });
+    setState({ phase: "loading", progress: { step: "inputs", done: 0, total: null } });
     void (async () => {
       let document: DevicePlanDocument;
       let strategy: DevicePlanRequest["strategy"] = null;
@@ -430,6 +464,11 @@ export function useDevicePlan(
       // the chip timing (#1003): 1 + n solves in the one request, under its one ceiling.
       const chipGains =
         selection.kind === "plain" ? (heldChips(squad.chips, document.gameweek) ?? []) : [];
+      const total = STAGES_BEFORE_CHIPS + chipGains.length;
+      // The chips the run will try, known from here, so the count names them from the start.
+      const tried = (done: number) =>
+        chipGains.length > 0 ? { chips: { done, total: chipGains.length } } : {};
+      setState({ phase: "loading", progress: { step: "solver", done: 1, total, ...tried(0) } });
       // A worker that cannot be created, load or evaluate answers as a failure, and the
       // next press creates a fresh one rather than reusing a dead worker.
       let worker: DeviceSolver;
@@ -477,7 +516,12 @@ export function useDevicePlan(
             timing.mark("ready");
             timing.measure("load", "posted", "ready");
             if (pending.current?.settle === settle) watch(DEVICE_SOLVE_CEILING_SECONDS);
-            if (alive()) setState({ phase: "solving" });
+            if (alive()) {
+              setState({
+                phase: "solving",
+                progress: { step: "plan", done: 2, total, ...tried(0) },
+              });
+            }
             return;
           }
           if (event.data.kind === "plan") {
@@ -485,7 +529,27 @@ export function useDevicePlan(
             timing.mark("answer");
             if (ready) timing.measure("solve", "ready", "answer");
             early.shown = planDone(event.data.answer);
-            if (alive()) setState(early.shown);
+            if (alive()) {
+              setState({
+                ...early.shown,
+                progress: { step: "chips", done: STAGES_BEFORE_CHIPS, total, ...tried(0) },
+              });
+            }
+            return;
+          }
+          if (event.data.kind === "chip") {
+            const { done } = event.data;
+            if (alive() && early.shown !== null) {
+              setState({
+                ...early.shown,
+                progress: {
+                  step: "chips",
+                  done: STAGES_BEFORE_CHIPS + done,
+                  total,
+                  ...tried(done),
+                },
+              });
+            }
             return;
           }
           settle(event.data);
@@ -521,12 +585,19 @@ export function useDevicePlan(
           timing.measure("gains", "answer", "gains");
           if (reply.gains !== null) {
             setState({ ...shown, chipTiming: { table: document, gains: reply.gains } });
+            return;
           }
         }
+        // The run ended without its gains: the plan stays, and nothing is still counting.
+        setState(shown);
         return;
       }
       const ending =
-        reply === null || reply.kind === "ready" || reply.kind === "plan" || reply.kind === "gains"
+        reply === null ||
+        reply.kind === "ready" ||
+        reply.kind === "plan" ||
+        reply.kind === "chip" ||
+        reply.kind === "gains"
           ? "failed"
           : reply.kind;
       timing.mark(ending);

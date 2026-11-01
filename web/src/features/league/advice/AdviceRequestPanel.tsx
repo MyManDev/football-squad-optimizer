@@ -12,7 +12,8 @@
  *
  * Beside it, where the publisher wrote the member's inputs, a second button asks the
  * member's own device for the plain one-week plan (`device`); its states are the same
- * kind of sentence, and the two buttons wait for each other, one answer at a time.
+ * kind of sentence, its run's progress stands in the middle of the screen while it counts,
+ * and the two buttons wait for each other, one answer at a time.
  *
  * A build with no compute service renders exactly what it always has. With one, the page
  * passes `service`: what may be computed is then the capabilities' word (`computable`),
@@ -34,6 +35,7 @@ import { useLeagueIdentity } from "../identity/useLeagueIdentity";
 import type { AdviceRequest } from "./adviceClient";
 import { canComputeAdvice } from "./adviceSelection";
 import { COMPUTE_COPY, failureSentence } from "./computeCopy";
+import { DeviceProgressPanel } from "../device/DeviceProgressPanel";
 import { deviceEndedWithoutPlan, type DevicePlan } from "../device/useDevicePlan";
 import type { AdviceJob, EarlierAnswer } from "./useAdviceJob";
 import styles from "./AdviceRequestPanel.module.css";
@@ -183,6 +185,7 @@ export function AdviceRequestPanel({
           </button>
         ) : null}
         {device?.available ? <DeviceState state={device.state} /> : null}
+        {device?.available ? <DeviceProgressPanel state={device.state} /> : null}
 
         {state.phase === "requesting" ? (
           <p className={styles.state}>{copy.computeRequesting}</p>

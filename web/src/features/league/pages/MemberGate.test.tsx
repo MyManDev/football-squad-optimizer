@@ -1,8 +1,8 @@
 /**
  * "Sen kimsin?": the member step in front of every league page. Until the visitor says who
  * they are, the page is not drawn and the picker stands in its place; the picker shows
- * names only; Onayla opens the page asked for, or the visitor's own page when they came to
- * find themselves.
+ * names only; a click on a name opens the page asked for, or the visitor's own page when
+ * they came to find themselves.
  */
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -137,25 +137,25 @@ describe.each(["tr", "en"] as const)("the member step in %s", (language) => {
     expect(screen.getByRole("heading", { level: 1, name: copy.title })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "League page" })).toBeNull();
 
-    const radios = within(group).getAllByRole("radio");
-    expect(radios).toHaveLength(humans.length);
+    const buttons = within(group).getAllByRole("button");
+    expect(buttons).toHaveLength(humans.length);
     // Sorted by name, never in the file's order (the standings): Arda Demir first, the
     // member without a published name last.
-    const names = radios.map((radio) => radio.closest("label")!.textContent);
+    const names = buttons.map((button) => button.textContent);
     expect(names[0]).toBe("Arda Demir, Expected Threat");
     expect(names.at(-1)).toBe(`${list.unknownMember}, Awaiting Picks`);
-    expect(within(group).queryByRole("radio", { name: /SquadOpt/ })).toBeNull();
+    expect(within(group).queryByRole("button", { name: /SquadOpt/ })).toBeNull();
     expect(group).not.toHaveTextContent("SquadOpt");
   });
 
-  it("enables Onayla only once a name is picked", async () => {
+  it("enters at a click on a name, with no button to confirm it", async () => {
     const user = userEvent.setup();
     open({ language });
     const group = await picker(language);
-    const confirm = screen.getByRole("button", { name: copy.confirm });
-    expect(confirm).toBeDisabled();
-    await user.click(within(group).getByRole("radio", { name: /Mert Işık/ }));
-    expect(confirm).toBeEnabled();
+    expect(screen.queryByRole("button", { name: /^(Onayla|Confirm)$/ })).toBeNull();
+    await user.click(within(group).getByRole("button", { name: /Mert Işık/ }));
+    expect(await screen.findByRole("heading", { name: "League page" })).toBeInTheDocument();
+    expect(readMemberClaim()?.managerName).toBe("Mert Işık");
   });
 
   it("offers a different league number in every state", async () => {
@@ -226,8 +226,8 @@ describe("what the picker shows of a member", () => {
     open();
     const group = await picker("tr");
     const labels = within(group)
-      .getAllByRole("radio")
-      .map((radio) => radio.closest("label")!.textContent);
+      .getAllByRole("button")
+      .map((button) => button.textContent);
     expect(labels).toEqual(["Ali Can, Pressing Trap", "Zeynep Ok, Clubv2 99"]);
     const text = group.textContent ?? "";
     const tokens = text.split(/[^\p{L}\p{N}]+/u);
@@ -243,49 +243,13 @@ describe("what the picker shows of a member", () => {
         expect(tokens).not.toContain(String(value));
       }
     }
-    // Nor in the markup: no attribute (a radio's value among them) carries an entry number.
+    // Nor in the markup: no attribute (a button's value among them) carries an entry number.
     const markup = group.closest("[data-member-picker]")!.outerHTML;
     for (const row of rows) expect(markup).not.toContain(String(row.entry_id));
   });
-
-  it("starts a new league's list with nothing picked", async () => {
-    const user = userEvent.setup();
-    const view = open();
-    const group = await picker("tr");
-    await user.click(within(group).getByRole("radio", { name: /Mert Işık/ }));
-    expect(screen.getByRole("button", { name: "Onayla" })).toBeEnabled();
-
-    const other: PublishedLeague = { ...EXAMPLE_LEAGUE, leagueId: 352491 };
-    view.rerender(
-      <QueryClientProvider client={client()}>
-        <LanguageProvider initialLanguage="tr">
-          <MemoryRouter initialEntries={[membersAddress(other.leagueId)]}>
-            <Routes>
-              <Route
-                path="/league/:leagueId/members"
-                element={withLeague(
-                  <MemberGate>
-                    <h1>League page</h1>
-                  </MemberGate>,
-                  other,
-                )}
-              />
-            </Routes>
-          </MemoryRouter>
-        </LanguageProvider>
-      </QueryClientProvider>,
-    );
-    const next = await picker("tr");
-    expect(
-      within(next)
-        .getAllByRole("radio")
-        .some((radio) => (radio as HTMLInputElement).checked),
-    ).toBe(false);
-    expect(screen.getByRole("button", { name: "Onayla" })).toBeDisabled();
-  });
 });
 
-describe("after Onayla", () => {
+describe("after a name is chosen", () => {
   it("opens the page asked for at the same address, with a new history key", async () => {
     const user = userEvent.setup();
     open({
@@ -293,8 +257,7 @@ describe("after Onayla", () => {
     });
     const group = await picker("tr");
     const before = probe().dataset.key;
-    await user.click(within(group).getByRole("radio", { name: /Mert Işık/ }));
-    await user.click(screen.getByRole("button", { name: "Onayla" }));
+    await user.click(within(group).getByRole("button", { name: /Mert Işık/ }));
 
     expect(await screen.findByRole("heading", { name: "League page" })).toBeInTheDocument();
     expect(where()).toBe(`${memberAddress(LEAGUE, 35249003)}?mode=agresif#kadro`);
@@ -353,8 +316,7 @@ describe("after Onayla", () => {
       </QueryClientProvider>,
     );
     const group = await picker("tr");
-    await user.click(within(group).getByRole("radio", { name: /Seda Kaya/ }));
-    await user.click(screen.getByRole("button", { name: "Onayla" }));
+    await user.click(within(group).getByRole("button", { name: /Seda Kaya/ }));
     expect(screen.queryByRole("heading", { name: "Members table" })).toBeNull();
     expect(await screen.findByRole("heading", { name: "Own page" })).toBeInTheDocument();
     expect(tableMounts).toBe(0);
@@ -405,8 +367,7 @@ describe("after Onayla", () => {
       </QueryClientProvider>,
     );
     const group = await picker("tr");
-    await user.click(within(group).getByRole("radio", { name: /Seda Kaya/ }));
-    await user.click(screen.getByRole("button", { name: "Onayla" }));
+    await user.click(within(group).getByRole("button", { name: /Seda Kaya/ }));
     expect(screen.getByText(MESSAGES.tr.common.loading)).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Members table" })).toBeNull();
     await act(async () => {
@@ -466,19 +427,15 @@ describe("a visitor who has already said who they are", () => {
 });
 
 describe("the picker with a keyboard and a screen reader", () => {
-  it("is used with Tab, the arrow keys, Space and Enter", async () => {
+  it("is used with Tab and Enter", async () => {
     const user = userEvent.setup();
     open();
     const group = await picker("tr");
     await user.tab();
-    const radios = within(group).getAllByRole("radio");
-    expect(radios[0]).toHaveFocus();
-    await user.keyboard("{ArrowDown}");
-    expect(radios[1]).toHaveFocus();
-    await user.keyboard(" ");
-    expect(radios[1]).toBeChecked();
+    const buttons = within(group).getAllByRole("button");
+    expect(buttons[0]).toHaveFocus();
     await user.tab();
-    expect(screen.getByRole("button", { name: "Onayla" })).toHaveFocus();
+    expect(buttons[1]).toHaveFocus();
     await user.keyboard("{Enter}");
     expect(await screen.findByRole("heading", { name: "League page" })).toBeInTheDocument();
     const picked = humans
@@ -516,8 +473,7 @@ describe("the picker with a keyboard and a screen reader", () => {
     }
     open({ shell: true, page: <LatePage /> });
     const group = await picker("tr");
-    await user.click(within(group).getByRole("radio", { name: /Mert Işık/ }));
-    await user.click(screen.getByRole("button", { name: "Onayla" }));
+    await user.click(within(group).getByRole("button", { name: /Mert Işık/ }));
     expect(screen.getByRole("main")).toHaveFocus();
     act(() => arrive());
     const heading = await screen.findByRole("heading", { level: 1, name: "Members table" });
@@ -550,8 +506,7 @@ describe("the picker with a keyboard and a screen reader", () => {
       vi.advanceTimersByTime(6000);
     });
     expect(scrolled).toEqual([]);
-    await user.click(within(group).getByRole("radio", { name: /Deniz Aral/ }));
-    await user.click(screen.getByRole("button", { name: "Onayla" }));
+    await user.click(within(group).getByRole("button", { name: /Deniz Aral/ }));
     await waitFor(() => expect(scrolled).toContain("kadro"));
   });
 });
@@ -600,8 +555,7 @@ describe("the step from the picker to the page (#1131)", () => {
   async function pickAndConfirm(name = /Seda Kaya/) {
     const user = userEvent.setup();
     const group = await picker("tr");
-    await user.click(within(group).getByRole("radio", { name }));
-    await user.click(screen.getByRole("button", { name: "Onayla" }));
+    await user.click(within(group).getByRole("button", { name }));
   }
 
   function reduceMotion() {
@@ -640,7 +594,7 @@ describe("the step from the picker to the page (#1131)", () => {
     expect(settledAt - startedAt[0]).toBeLessThan(MOTION_MS.data);
   });
 
-  it("takes one step for two confirms made before the first one's update runs", async () => {
+  it("takes one step for two clicks made before the first one's update runs", async () => {
     const waiting: Array<() => Promise<void> | void> = [];
     Object.defineProperty(document, "startViewTransition", {
       configurable: true,
@@ -663,8 +617,7 @@ describe("the step from the picker to the page (#1131)", () => {
     const user = userEvent.setup();
     const group = await picker("tr");
     const before = probe().dataset.key;
-    await user.click(within(group).getByRole("radio", { name: /Seda Kaya/ }));
-    const button = screen.getByRole("button", { name: "Onayla" });
+    const button = within(group).getByRole("button", { name: /Seda Kaya/ });
     await user.click(button);
     await user.click(button);
     expect(document.startViewTransition).toHaveBeenCalledOnce();
@@ -700,7 +653,7 @@ describe("the step from the picker to the page (#1131)", () => {
         await Promise.all(started);
       });
       expect(readMemberClaim()?.entryId).toBe(35249003);
-      // The first step's update has run, so the second Onayla is not taken for a repeat.
+      // The first step's update has run, so the second choice is not taken for a repeat.
       act(() => writeMemberClaim(null));
       await pickAndConfirm(/Mert Işık/);
       await act(async () => {
