@@ -112,8 +112,8 @@
         "automatic_subs": [],
         "entry_history": {
           "event": 1,
-          "bank": 0,
-          "value": 1000
+          "bank": 5,
+          "value": 995
         },
         "picks": [
           {
