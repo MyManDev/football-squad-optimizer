@@ -8,7 +8,7 @@ import { NO_LEAGUE, rememberedLeague } from "./leagueState";
 
 /**
  * "Ligini bul", then "Sen kimsin?": nothing of a league opens before both steps, the
- * picker shows names only, Onayla opens the page asked for or the visitor's own page, and
+ * picker shows names only, a click on a name opens the page asked for or the visitor's own page, and
  * the sidebar's Değiştir is the one way to be someone else.
  */
 
@@ -98,6 +98,7 @@ test.describe("the sidebar before and after the two steps", () => {
       `${own(EXAMPLE_CLAIM.entryId)}/duel`,
       `${own(EXAMPLE_CLAIM.entryId)}/chips`,
       `${own(EXAMPLE_CLAIM.entryId)}/card`,
+      `${own(EXAMPLE_CLAIM.entryId)}/history`,
       "/fixtures",
       ...CONTRIBUTE,
     ]);
@@ -131,7 +132,7 @@ test.describe("before the visitor says who they are", () => {
       await expect(page).toHaveURL(shown);
       await expect(page.locator("main table")).toHaveCount(0);
       await expect(page.locator('[data-mark="decision"]')).toHaveCount(0);
-      const options = page.locator("[data-member-picker] label");
+      const options = page.locator("[data-member-picker] li button");
       await expect(options).toHaveCount(humans.length);
       const texts = await options.allTextContents();
       expect(new Set(texts)).toEqual(
@@ -179,30 +180,22 @@ test.describe("before the visitor says who they are", () => {
     await page.goto(MEMBERS);
     const group = page.getByRole("group", { name: TR.memberPicker.legend });
     await expect(group).toBeVisible();
-    const radios = group.getByRole("radio");
-    await expect(radios).toHaveCount(humans.length);
-    await expect(group.getByRole("radio", { name: /SquadOpt/ })).toHaveCount(0);
-    const names = (await page.locator("[data-member-picker] label").allTextContents()).map(
-      (text) => text.split(", ")[0]!,
-    );
+    const buttons = group.getByRole("button");
+    await expect(buttons).toHaveCount(humans.length);
+    await expect(group.getByRole("button", { name: /SquadOpt/ })).toHaveCount(0);
+    const names = (await buttons.allTextContents()).map((text) => text.split(", ")[0]!);
     const named = names.filter((name) => name !== TR.leagueMembers.unknownMember);
     expect(named).toEqual(
       [...named].sort(new Intl.Collator("tr", { sensitivity: "base" }).compare),
     );
     expect(names.at(-1)).toBe(TR.leagueMembers.unknownMember);
 
-    const confirm = page.getByRole("button", { name: TR.memberPicker.confirm, exact: true });
-    await expect(confirm).toBeDisabled();
+    await expect(page.getByRole("button", { name: /^(Onayla|Confirm)$/ })).toHaveCount(0);
     await pickerHeading(page).focus();
     await page.keyboard.press("Tab");
-    await expect(radios.nth(0)).toBeFocused();
-    await page.keyboard.press("ArrowDown");
-    await expect(radios.nth(1)).toBeFocused();
-    await page.keyboard.press("Space");
-    await expect(radios.nth(1)).toBeChecked();
-    await expect(confirm).toBeEnabled();
+    await expect(buttons.nth(0)).toBeFocused();
     await page.keyboard.press("Tab");
-    await expect(confirm).toBeFocused();
+    await expect(buttons.nth(1)).toBeFocused();
     await page.keyboard.press("Enter");
     await expect(page.locator("#league-member-list")).toBeVisible();
     await expect(page).toHaveURL(MEMBERS);
@@ -381,8 +374,7 @@ test.describe("Değiştir", () => {
       await expect(pickerHeading(page)).toBeFocused();
 
       for (const control of [
-        ...(await page.locator("[data-member-picker] label").all()),
-        page.getByRole("button", { name: TR.memberPicker.confirm, exact: true }),
+        ...(await page.locator("[data-member-picker] li button").all()),
         page.getByRole("link", { name: TR.memberPicker.otherLeague }),
       ]) {
         const box = (await control.boundingBox())!;
@@ -465,11 +457,7 @@ test("with reduced motion the picker and the drawer do not move", async ({ page 
         const style = getComputedStyle(element);
         return { animation: style.animationDuration, transition: style.transitionDuration };
       });
-  for (const selector of [
-    "[data-member-picker]",
-    "[data-member-picker] label",
-    "[data-member-picker] button[type=submit]",
-  ]) {
+  for (const selector of ["[data-member-picker]", "[data-member-picker] li button"]) {
     expect(await durations(selector), selector).toEqual({ animation: "0s", transition: "0s" });
   }
   await page.getByRole("banner").getByRole("button", { name: TR.shell.openMenu }).click();
