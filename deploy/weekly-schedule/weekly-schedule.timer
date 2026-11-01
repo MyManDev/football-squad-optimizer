@@ -1,0 +1,12 @@
+# Every 15 minutes, one tick of weekly-schedule.service (#1243). Persistent: a tick missed
+# while the host was off runs once when it is back. deploy/weekly-schedule/README.md.
+[Unit]
+Description=SquadOpt weekly schedule: the deadline gate every 15 minutes
+
+[Timer]
+OnCalendar=*:0/15
+Persistent=true
+Unit=weekly-schedule.service
+
+[Install]
+WantedBy=timers.target
