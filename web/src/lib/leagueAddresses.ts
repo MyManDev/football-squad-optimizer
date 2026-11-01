@@ -18,6 +18,14 @@ export function memberAddress(leagueId: number, entryId: number | string, search
   return `${membersAddress(leagueId)}/${entryId}${search}`;
 }
 
+/**
+ * One FPL team's page on its own, read through the forwarder (#983 step 4): no league
+ * number, since the team is not opened from a league.
+ */
+export function entryAddress(entryId: number | string): string {
+  return `/entry/${entryId}`;
+}
+
 export function memberHistoryAddress(leagueId: number, entryId: number | string): string {
   return `${memberAddress(leagueId, entryId)}/history`;
 }

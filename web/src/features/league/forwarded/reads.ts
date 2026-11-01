@@ -1,21 +1,33 @@
 /**
  * The forwarded pages' reads (#983 step 4): a classic league's standings, page by page from
- * the FPL forwarder. Each spreads the league feature's read policy.
+ * the FPL forwarder, the capture's own table the directory names newest, and one entry's
+ * bundle for that table's gameweek. Each spreads the league feature's read policy.
  */
 
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 
-import { standings, type ForwarderReason, type StandingsReason } from "../forwarder/client";
+import { loadDevicePlanTable } from "../data";
+import { loadLeagueDirectory, type DevicePlanTableRef, type LeagueDirectory } from "../directory";
+import {
+  entryBundle,
+  standings,
+  type ForwarderReason,
+  type StandingsReason,
+} from "../forwarder/client";
 import {
   MAX_STANDINGS_PAGE,
   type FplLeagueStandings,
   type FplStandingRow,
 } from "../forwarder/documents";
-import { LEAGUE_READ } from "../queries";
+import { LEAGUE_READ, leagueKeys } from "../queries";
 
-/** The forwarded reads' cache keys, each naming its league. */
+/** The forwarded reads' cache keys, each naming its league, entry or table. */
 export const forwardedKeys = {
   standings: (leagueId: number) => ["fpl-standings", leagueId] as const,
+  table: (table: DevicePlanTableRef | null) =>
+    ["device-capture-table", table?.path ?? null, table?.sha256 ?? null] as const,
+  bundle: (entryId: number, gameweek: number | null) =>
+    ["fpl-entry-bundle", entryId, gameweek] as const,
 };
 
 /** A forwarder read that gave no document, carried as the read's error. */
@@ -82,4 +94,60 @@ export function standingRows(pages: readonly FplLeagueStandings[] | undefined): 
     }
   }
   return rows;
+}
+
+/**
+ * The capture's own table the directory names newest: the line of the latest season and
+ * gameweek, the later capture on a tie (a capture id carries its UTC time). Null where no
+ * line names one.
+ */
+export function newestDeviceTable(directory: LeagueDirectory): DevicePlanTableRef | null {
+  const capture = (table: DevicePlanTableRef) => table.path.split("/")[1] ?? "";
+  let newest: { season: string; gameweek: number; table: DevicePlanTableRef } | null = null;
+  for (const { season, gameweek, devicePlan: table } of directory.leagues) {
+    if (table === undefined) continue;
+    const later =
+      newest === null ||
+      season > newest.season ||
+      (season === newest.season &&
+        (gameweek > newest.gameweek ||
+          (gameweek === newest.gameweek && capture(table) > capture(newest.table))));
+    if (later) newest = { season, gameweek, table };
+  }
+  return newest?.table ?? null;
+}
+
+/** The published directory, under the key the league gate reads it by. */
+export function useDirectory(enabled = true) {
+  return useQuery({
+    queryKey: leagueKeys.directory(),
+    queryFn: () => loadLeagueDirectory(),
+    enabled,
+    ...LEAGUE_READ,
+  });
+}
+
+/** The capture's own table a directory line names: null where it cannot be read as one. */
+export function useCaptureTable(table: DevicePlanTableRef | null) {
+  return useQuery({
+    queryKey: forwardedKeys.table(table),
+    queryFn: ({ signal }) => loadDevicePlanTable(table!, { signal }),
+    enabled: table !== null,
+    ...LEAGUE_READ,
+  });
+}
+
+/** One entry's bundle for the table's gameweek, as the forwarder answers it. */
+export function useEntryBundle(entryId: number, gameweek: number | null) {
+  return useQuery({
+    queryKey: forwardedKeys.bundle(entryId, gameweek),
+    queryFn: async ({ signal }) => {
+      const read = await entryBundle(entryId, gameweek!, { signal });
+      // A read the page stopped is no answer to keep.
+      if (!read.ok && read.reason === "aborted") throw new ForwarderRefused(read.reason);
+      return read;
+    },
+    enabled: gameweek !== null && Number.isSafeInteger(entryId) && entryId > 0,
+    ...LEAGUE_READ,
+  });
 }

@@ -56,11 +56,17 @@
   cursor: wait;
 }
 
-/* The quieter action: reading a league again. */
+/* The quieter actions: reading a league again, and opening one team on its own. */
 .form button.secondary {
   border-color: var(--color-line);
   background: var(--color-surface);
   color: inherit;
+}
+
+.entryForm {
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-line);
 }
 
 .listed {

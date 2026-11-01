@@ -1,6 +1,12 @@
 import { isTimeoutError, type RequestOptions } from "../../data/request";
 import { LeagueDataError, LeagueDataMissing } from "./dataErrors";
-import { findLeague, loadLeagueDirectory, type LeagueRef, type PublishedLeague } from "./directory";
+import {
+  findLeague,
+  loadLeagueDirectory,
+  type DevicePlanTableRef,
+  type LeagueRef,
+  type PublishedLeague,
+} from "./directory";
 import { fetchPublishedBytes, fetchPublishedJson } from "./publishedJson";
 import { assertAdviceIndex, assertEnvelope, assertMembers, assertSquad } from "./publicationShape";
 import { chipPath, isMemberChip } from "./advice/chipChoice";
@@ -109,6 +115,41 @@ async function sha256Hex(bytes: ArrayBuffer): Promise<string | null> {
   return Array.from(digest, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
+/**
+ * A capture's own table (`league_device_plan_v2`) as a directory line names it: read at its
+ * digest as the version, held to that digest byte for byte, and to the table's contract.
+ * Anything else (a missing or changed file, a browser without a digest, another shape)
+ * reads as null, and a league's tree reads its own copy instead. An abort is not a
+ * fallback, and neither is a read that ran out of time: the copy is on the same site, and a
+ * second full deadline would double the member's wait.
+ */
+export async function loadDevicePlanTable(
+  table: DevicePlanTableRef,
+  options?: RequestOptions,
+): Promise<LeagueViewEnvelope<DevicePlanDocument> | null> {
+  try {
+    const bytes = await fetchPublishedBytes(
+      `${import.meta.env.BASE_URL}data/`,
+      `${table.path}?v=${table.sha256}`,
+      options,
+    );
+    if ((await sha256Hex(bytes)) !== table.sha256) return null;
+    const envelope = assertEnvelope<unknown>(JSON.parse(new TextDecoder().decode(bytes)));
+    const payload = envelope.payload;
+    if (
+      !isDevicePlanDocument(payload) ||
+      payload.contract_version !== DEVICE_PLAN_TABLE_CONTRACT_VERSION
+    ) {
+      return null;
+    }
+    return envelope as LeagueViewEnvelope<DevicePlanDocument>;
+  } catch (error) {
+    options?.signal?.throwIfAborted();
+    if (isTimeoutError(error)) throw error;
+    return null;
+  }
+}
+
 export function createLeagueTree(league: LeagueRef): LeagueTree {
   const base = `${import.meta.env.BASE_URL}data/${league.path}/`;
   async function read<T>(
@@ -151,14 +192,10 @@ export function createLeagueTree(league: LeagueRef): LeagueTree {
   }
 
   /**
-   * The capture's own table, where the directory line names one: read at its digest as the
-   * version, held to that digest byte for byte, and to the table's contract. Anything else
-   * (no table named, a missing or changed file, a browser without a digest, another
-   * shape) reads as null, and the tree's own copy is read instead. So does a table of
-   * another capture than the member's page: the directory was read before a later publish,
-   * and a browser may still keep that table, while the copy is read as the tree is now. An
-   * abort is not a fallback, and neither is a read that ran out of time: the copy is on the
-   * same site, and a second full deadline would double the member's wait.
+   * The capture's own table, where the directory line names one for the member's capture
+   * (`loadDevicePlanTable`). A table of another capture than the member's page reads as
+   * null too: the directory was read before a later publish, and a browser may still keep
+   * that table, while the copy is read as the tree is now.
    */
   async function loadCaptureTable(
     capture: string | null,
@@ -166,27 +203,7 @@ export function createLeagueTree(league: LeagueRef): LeagueTree {
   ): Promise<LeagueViewEnvelope<DevicePlanDocument> | null> {
     const table = league.devicePlan;
     if (table === undefined || table.path.split("/")[1] !== capture) return null;
-    try {
-      const bytes = await fetchPublishedBytes(
-        `${import.meta.env.BASE_URL}data/`,
-        `${table.path}?v=${table.sha256}`,
-        options,
-      );
-      if ((await sha256Hex(bytes)) !== table.sha256) return null;
-      const envelope = assertEnvelope<unknown>(JSON.parse(new TextDecoder().decode(bytes)));
-      const payload = envelope.payload;
-      if (
-        !isDevicePlanDocument(payload) ||
-        payload.contract_version !== DEVICE_PLAN_TABLE_CONTRACT_VERSION
-      ) {
-        return null;
-      }
-      return envelope as LeagueViewEnvelope<DevicePlanDocument>;
-    } catch (error) {
-      options?.signal?.throwIfAborted();
-      if (isTimeoutError(error)) throw error;
-      return null;
-    }
+    return loadDevicePlanTable(table, options);
   }
 
   /**

@@ -1,0 +1,55 @@
+/*
+ * A forwarded team's page: its name and manager, then its week (the plan, the squad and the
+ * chip timing card, or the live score once the deadline has passed), in one column.
+ */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: 0;
+  max-width: 960px;
+}
+
+.heading {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 28px;
+  overflow-wrap: anywhere;
+}
+
+.manager,
+.back {
+  margin: 0;
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.back a {
+  color: var(--color-text);
+}
+
+.state {
+  margin: 0;
+  max-width: var(--measure);
+}
+
+.retry {
+  justify-self: start;
+  align-self: flex-start;
+  min-height: 44px;
+  padding: var(--space-2) var(--space-5);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-s);
+  color: inherit;
+  background: var(--color-surface);
+  font: inherit;
+  cursor: pointer;
+}

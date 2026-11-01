@@ -56,6 +56,7 @@ function open(language: Language) {
           <Route path="/" element={<LeagueEntryPage />} />
           <Route path="/league/:leagueId/members" element={<h1>Member destination</h1>} />
           <Route path="/league/:leagueId" element={<h1>League destination</h1>} />
+          <Route path="/entry/:entryId" element={<h1>Team destination</h1>} />
         </Routes>
         <LocationProbe />
       </MemoryRouter>
@@ -178,6 +179,29 @@ describe.each(["tr", "en"] as const)("league entry in %s", (language) => {
     expect(readChosenLeague()).toBeNull();
   });
 
+  it("opens one team on its own by its number", async () => {
+    const fetcher = legacySite();
+    open(language);
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText(copy.entryLabel), "4012");
+    await user.click(screen.getByRole("button", { name: copy.entrySubmit }));
+    expect(await screen.findByRole("heading", { name: "Team destination" })).toBeInTheDocument();
+    expect(screen.getByTestId("location")).toHaveTextContent("/entry/4012");
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it("validates a team number before opening anything", async () => {
+    const fetcher = legacySite();
+    open(language);
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText(copy.entryLabel), "40.12");
+    await user.click(screen.getByRole("button", { name: copy.entrySubmit }));
+    expect(await screen.findByText(copy.entryInvalid)).toBeInTheDocument();
+    expect(screen.getByLabelText(copy.entryLabel)).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByTestId("location")).toHaveTextContent("/");
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
   it("keeps the submitted ID fixed while its result is pending", async () => {
     // The directory read hangs until the test lets it answer; the league's record follows.
     let finish!: (response: Response) => void;
@@ -247,6 +271,8 @@ describe("the form in place", () => {
     await user.click(screen.getByRole("button", { name: copy.submit }));
     expect(await screen.findByText(copy.unsupported(123))).toBeInTheDocument();
     expect(screen.getByTestId("location")).toHaveTextContent("/moves");
+    // A page that needs a league asks for one only.
+    expect(screen.queryByLabelText(copy.entryLabel)).toBeNull();
   });
 
   it("keeps a system page's address with `stay`, asking the member step there", async () => {

@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate } from "react-router";
 import { Card } from "../../../design/components/Card";
 import { useLanguage } from "../../../i18n/context";
 import {
+  entryAddress,
   FIND_YOURSELF,
   leagueAddress,
   leagueIdInAddress,
@@ -46,7 +47,8 @@ function idIn(value: string): number | null {
  * The league number, the first of the two steps in front of every league page. A
  * connected league opens its members list, where the second step asks who the visitor is
  * and then opens their own page. A league the site does not publish opens at its own
- * address, where the league gate reads it from the FPL forwarder (#983 step 4).
+ * address, where the league gate reads it from the FPL forwarder (#983 step 4). Under it,
+ * a team number opens that one team's page on its own.
  *
  * `inPlace`: the gate rendered this form at a league address. A connected league then
  * opens the page the address named under that league (an address from before the number
@@ -91,6 +93,8 @@ export function LeagueEntryPage({
   );
   // The number the last lookup asked for, named in the answer about it.
   const [asked, setAsked] = useState(unopened?.leagueId ?? unpublishedLeagueId ?? 0);
+  const [entry, setEntry] = useState("");
+  const [entryInvalid, setEntryInvalid] = useState(false);
   const active = useRef(true);
   useEffect(() => {
     active.current = true;
@@ -146,6 +150,16 @@ export function LeagueEntryPage({
     } catch (error) {
       if (active.current) setState(error instanceof LeagueDataMissing ? "missing" : "failed");
     }
+  }
+
+  function submitEntry(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const entryId = idIn(entry);
+    if (entryId === null) {
+      setEntryInvalid(true);
+      return;
+    }
+    navigate(entryAddress(entryId));
   }
 
   const status =
@@ -218,6 +232,34 @@ export function LeagueEntryPage({
             </nav>
           ) : null}
         </form>
+        {/* One team on its own, by its number. A page that needs a league asks for one only. */}
+        {stay ? null : (
+          <form onSubmit={submitEntry} className={`${styles.form} ${styles.entryForm}`}>
+            <label htmlFor="entry-id">{copy.entryLabel}</label>
+            <p id="entry-id-hint" className={styles.hint}>
+              {copy.entryHint}
+            </p>
+            <input
+              id="entry-id"
+              name="entryId"
+              inputMode="numeric"
+              autoComplete="off"
+              value={entry}
+              onChange={(event) => {
+                setEntry(event.target.value);
+                setEntryInvalid(false);
+              }}
+              aria-invalid={entryInvalid}
+              aria-describedby="entry-id-hint entry-id-status"
+            />
+            <button type="submit" className={styles.secondary}>
+              {copy.entrySubmit}
+            </button>
+            <p id="entry-id-status" aria-live="polite">
+              {entryInvalid ? copy.entryInvalid : ""}
+            </p>
+          </form>
+        )}
       </Card>
     </div>
   );

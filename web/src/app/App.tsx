@@ -42,6 +42,11 @@ const ForwardedLeaguePage = lazy(() =>
     default: m.ForwardedLeaguePage,
   })),
 );
+const ForwardedMemberPage = lazy(() =>
+  import("../features/league/forwarded/ForwardedMemberPage").then((m) => ({
+    default: m.ForwardedMemberPage,
+  })),
+);
 const StatusPage = lazy(() =>
   import("../features/status/pages/StatusPage").then((m) => ({ default: m.StatusPage })),
 );
@@ -156,7 +161,7 @@ function LocalizedApp({ basename }: { basename: string }) {
                     key={root}
                     path={root}
                     element={
-                      <LeagueGate>
+                      <LeagueGate forwarded={<ForwardedMemberPage />}>
                         <LeagueMemberPage />
                       </LeagueGate>
                     }
@@ -176,6 +181,9 @@ function LocalizedApp({ basename }: { basename: string }) {
                     }
                   />
                 ))}
+                {/* One FPL team on its own, from the forwarder's bundle: no league, so no
+                    gate and no member step. */}
+                <Route path="/entry/:entryId" element={<ForwardedMemberPage />} />
                 <Route path="/fixtures" element={<FixturesPage />} />
                 {import.meta.env.VITE_ADVICE_API_ORIGIN && (
                   <Route path="/contribute" element={<ContributePage />} />
