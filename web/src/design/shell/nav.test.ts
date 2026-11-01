@@ -76,11 +76,17 @@ describe("the sidebar's navigation with a league and nobody claimed", () => {
 });
 
 describe("the sidebar's navigation with the member claimed", () => {
-  it("opens the claimed member's page as 'Bu hafta', its squad as 'Kadro', and the league", () => {
+  it("opens the claimed member's page as 'Bu hafta', its squad as 'Kadro', the league and the tools", () => {
     expect(hrefs(at("/fixtures"), CLAIMED)).toEqual([
       ["thisWeek", OWN, false],
       ["squad", `${OWN}#kadro`, false],
       ["league", MEMBERS, false],
+      ["currentSquad", `${OWN}/current-squad`, false],
+      ["decisionTools", `${OWN}/decision-tools`, false],
+      ["whatIf", `${OWN}/what-if`, false],
+      ["duel", `${OWN}/duel`, false],
+      ["chips", `${OWN}/chips`, false],
+      ["squadCard", `${OWN}/card`, false],
       ["fixtures", "/fixtures", true],
       ["contribute", "/contribute", false],
     ]);
@@ -106,6 +112,23 @@ describe("the sidebar's navigation with the member claimed", () => {
     });
     expect(items.find((item) => item.key === "squad")?.to).toBe(`${OWN}#kadro`);
     expect(items.some((item) => item.active)).toBe(false);
+  });
+
+  it("marks a tool on its own page only, and keeps the plan in its link", () => {
+    const plan = "?mode=fark-yarat&window=3";
+    const items = navItems(at(`${OWN}/duel`, plan), CLAIMED, {
+      leagueId: LEAGUE,
+      entryId: "35249001",
+      search: plan,
+    });
+    expect(items.filter((item) => item.active).map((item) => item.key)).toEqual(["duel"]);
+    expect(items.find((item) => item.key === "whatIf")?.to).toBe(`${OWN}/what-if${plan}`);
+    expect(memberAt(at(`${OWN}/what-if`, plan))).toEqual({
+      leagueId: LEAGUE,
+      entryId: "35249001",
+      search: plan,
+    });
+    expect(memberAt(at(`${OWN}/nothing-here`))).toBeNull();
   });
 
   it("marks 'Lig' on the member list only", () => {

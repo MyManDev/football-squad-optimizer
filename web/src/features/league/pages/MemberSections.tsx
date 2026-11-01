@@ -3,22 +3,18 @@ import { useEffect, useState } from "react";
 import { useLanguage } from "../../../i18n/context";
 import styles from "./LeagueMemberPage.module.css";
 
-/** The id of the page's closed tools, the strip's last section. */
-export const MEMBER_TOOLS_ID = "member-tools";
+type SectionKey = "move" | "squad";
 
-type SectionKey = "move" | "squad" | "tools";
-
-const KEYS: readonly SectionKey[] = ["move", "squad", "tools"];
+const KEYS: readonly SectionKey[] = ["move", "squad"];
 
 /**
  * Where each link lands: the decision's heading (the plan settings' 'Planı gör' lands there
- * too), the squad the sidebar's 'Kadro' opens, and the closed tools. A closed week leaves
- * out the plan settings, not the tools, so the last link still has its section.
+ * too) and the squad the sidebar's 'Kadro' opens. The tools are pages of their own in the
+ * sidebar.
  */
 const TARGETS: Record<SectionKey, string> = {
   move: "entry-advice-title",
   squad: "kadro",
-  tools: MEMBER_TOOLS_ID,
 };
 
 /** The height of the shell's phone bar (PageShell.module.css) and of the strip, in px. */
@@ -35,7 +31,7 @@ const READING_LINE = PHONE_BAR + STRIP + 16;
 const BEYOND = 100_000;
 
 /**
- * The phone's section strip, 'Hamle · Kadro · Araçlar', pinned under the phone bar as
+ * The phone's section strip, 'Hamle · Kadro', pinned under the phone bar as
  * FotMob and Sofascore pin a long page's sections under a slim header: one tap lands each
  * part of the page under both bars, and the part being read is marked as the current
  * location. LeagueMemberView draws it on a phone only, right under the top bar.
@@ -64,7 +60,7 @@ export function MemberSections() {
   useEffect(() => {
     if (typeof IntersectionObserver === "undefined") return undefined;
     const elements = KEYS.map((key) => document.getElementById(TARGETS[key]));
-    const [move, squad, tools] = elements;
+    const [move, squad] = elements;
     // One array for the strip's lifetime, so a report that finds nothing new renders nothing.
     const present = KEYS.filter((_, index) => elements[index] !== null);
     const observers: IntersectionObserver[] = [];
@@ -85,42 +81,21 @@ export function MemberSections() {
       observers.push(passed);
     }
 
-    // Which sections have their top above the reading line, from a band that starts at the
-    // line and has no lower end: a section is wholly inside it until its top goes up past
-    // the line, so even a jump over the whole screen changes what the band holds and is
-    // reported. The last of the page's tools cannot rise that far, so they are the current
-    // section also once they are wholly in view under both bars.
-    const above = { squad: false, tools: false };
-    let toolsInView = false;
-    const settle = () => {
-      setFound(present);
-      setCurrent(above.tools || toolsInView ? "tools" : above.squad ? "squad" : "move");
-    };
-    if (squad || tools) {
+    // Whether the squad's top is above the reading line, from a band that starts at the line
+    // and has no lower end: the squad is wholly inside it until its top goes up past the
+    // line, so even a jump over the whole screen changes what the band holds and is reported.
+    if (squad) {
       const reached = new IntersectionObserver(
         (entries) => {
-          for (const entry of entries) {
-            const line = entry.rootBounds?.top ?? READING_LINE;
-            above[entry.target === tools ? "tools" : "squad"] = entry.boundingClientRect.top < line;
-          }
-          settle();
+          const entry = entries[entries.length - 1]!;
+          const line = entry.rootBounds?.top ?? READING_LINE;
+          setFound(present);
+          setCurrent(entry.boundingClientRect.top < line ? "squad" : "move");
         },
         { rootMargin: `-${READING_LINE}px 0px ${BEYOND}px 0px`, threshold: [0, 1] },
       );
-      for (const element of [squad, tools]) if (element) reached.observe(element);
+      reached.observe(squad);
       observers.push(reached);
-    }
-    if (tools) {
-      const end = new IntersectionObserver(
-        (entries) => {
-          const entry = entries[entries.length - 1]!;
-          toolsInView = entry.isIntersecting && entry.intersectionRatio >= 1;
-          settle();
-        },
-        { rootMargin: `-${PHONE_BAR + STRIP}px 0px 0px 0px`, threshold: 1 },
-      );
-      end.observe(tools);
-      observers.push(end);
     }
     return () => observers.forEach((observer) => observer.disconnect());
   }, []);
@@ -128,7 +103,6 @@ export function MemberSections() {
   const names: Record<SectionKey, string> = {
     move: copy.sectionMove,
     squad: copy.sectionSquad,
-    tools: copy.sectionTools,
   };
   // The holder stays when nothing is linked: the page's scroll padding counts the strip.
   return (

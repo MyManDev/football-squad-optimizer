@@ -97,6 +97,9 @@ describe("a member page whose gameweek has closed", () => {
       expect(open.container.querySelector("#plan-settings")).not.toBeNull();
       expect(screen.getByRole("link", { name: copy.changePlan })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: copy.computeButton })).toBeInTheDocument();
+      cleanup();
+      // The model comparison is on the decision tools' page.
+      renderView(null, language, "", { tool: "decision-tools" });
       expect(screen.getByText(otherModel[language])).toBeInTheDocument();
       cleanup();
 
@@ -107,9 +110,12 @@ describe("a member page whose gameweek has closed", () => {
       expect(screen.queryByRole("link", { name: copy.changePlan })).toBeNull();
       expect(screen.queryByRole("button", { name: copy.computeButton })).toBeNull();
       expect(screen.queryByText(COMPUTE_COPY[language].deadlinePassedCompute)).toBeNull();
+      cleanup();
+      // The decision tools only read the closed week, so their page stays, without the
+      // comparison's computation.
+      renderView(DEADLINE, language, "", { tool: "decision-tools" });
+      expect(screen.getByRole("region", { name: copy.decisionTools })).toBeInTheDocument();
       expect(screen.queryByText(otherModel[language])).toBeNull();
-      // The tools that only read the closed week stay.
-      expect(screen.getByText(copy.decisionTools)).toBeInTheDocument();
     },
   );
 

@@ -1,4 +1,4 @@
-import { membersAddress } from "../../../lib/leagueAddresses";
+import { isMemberTool, membersAddress } from "../../../lib/leagueAddresses";
 import { useLeagueId } from "../useLeague";
 import { Link, useParams, useSearchParams } from "react-router";
 
@@ -21,7 +21,10 @@ export function LeagueMemberPage() {
   const { messages } = useLanguage();
   const leagueId = useLeagueId();
   const copy = messages.leagueMembers;
-  const entryParam = useParams().entryId;
+  const params = useParams();
+  const entryParam = params.entryId;
+  const toolParam = params.tool;
+  const tool = isMemberTool(toolParam) ? toolParam : undefined;
   const [searchParams] = useSearchParams();
   const {
     validEntryId,
@@ -64,6 +67,9 @@ export function LeagueMemberPage() {
     ownSquad !== undefined && lastWeekResult(ownSquad, scoreboardView, null) !== null,
   );
 
+  if (toolParam !== undefined && tool === undefined) {
+    return <EmptyState title={messages.shell.notFound} />;
+  }
   if (!validEntryId) return <EmptyState title={copy.invalidEntry} />;
   // The squad is the page's first read and its longest wait on a cold visit: the page's
   // shape stands in for it, its words read to a screen reader only.
@@ -158,6 +164,7 @@ export function LeagueMemberPage() {
       fixturesPending={fixtures.isPending}
       scoreboard={scoreboardView}
       history={history.isError ? null : (history.data ?? null)}
+      tool={tool}
     />
   );
 }
