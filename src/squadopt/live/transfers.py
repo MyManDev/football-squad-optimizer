@@ -20,7 +20,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from types import MappingProxyType
-from typing import Final, TypedDict
+from typing import Any, Final, TypedDict
 
 import pandas as pd
 
@@ -30,7 +30,12 @@ from squadopt.live.errors import LedgerError
 from squadopt.live.football_observations import availability_observations
 from squadopt.live.recommendation import Projection, RecommendationInputs
 from squadopt.live.rules import TRANSFER_HIT_POINTS, SeasonRules, chip_availability_for
-from squadopt.optimization import OptimizationConfig, SolverStatus
+from squadopt.optimization import (
+    OptimizationConfig,
+    SolverExecutionError,
+    SolverStatus,
+    wall_clock_stopped_the_search,
+)
 from squadopt.planning import (
     CHIP_NAMES,
     ChipAvailability,
@@ -883,6 +888,211 @@ class HorizonNoSolutionError(DataSourceError):
         self.relative_optimality_gap = relative_optimality_gap
 
 
+NAMED_CHIP_SEED_VERSION: Final = "named_chip_window_seed_v1"
+#: Every seed below fixes the squad of every week, which leaves only the lineups, the
+#: captain, the chip and the resource accounting to settle. One deterministic unit and
+#: thirty seconds are the planner's own hold probe allowance for the same kind of solve.
+NAMED_CHIP_SEED_UNITS: Final = 1.0
+NAMED_CHIP_SEED_WALL_SECONDS: Final = 30.0
+
+
+def _refuse_clock_stopped_seed(plan: TransferPlanResult, label: str) -> None:
+    """A seed the clock cut is a function of the machine, and so is the plan it starts."""
+
+    stopped = wall_clock_stopped_the_search(plan.solver_status, plan.diagnostics)
+    probe = plan.diagnostics.get("hold_protection")
+    if isinstance(probe, dict):
+        used = float(probe.get("deterministic_time") or 0.0)
+        limit = float(probe["deterministic_time_limit"])
+        unfinished = probe.get("status") in {"FEASIBLE", "UNKNOWN"}
+        stopped = stopped or (unfinished and used < limit - 1e-9)
+    if stopped:
+        raise SolverExecutionError(
+            f"The named chip window's {label} seed reached its wall-clock safety limit."
+        )
+
+
+def _plan_named_chip_window(
+    horizon: PlanningHorizon,
+    state: InitialSquadState,
+    settings: OptimizationConfig,
+    policy: TransferPlanningConfig,
+    chips: ChipAvailability,
+    *,
+    first_week_overlap: FirstWeekOverlap | None,
+    first_week_transfer_cap: int | None,
+    first_week_exclusion: FirstWeekExclusion | None,
+    linearization_level: int | None,
+    preferences: DecisionPreferences | None,
+) -> TransferPlanResult:
+    """A window with a named chip, searched from the better of certified seeds.
+
+    A named chip can make the moves the plan without it makes, so its window should not
+    be served below that plan. The search alone did not ensure it. On the GW9 capture a
+    five-week Wildcard search stopped at its deterministic budget on an incumbent sixteen
+    points below the plan without the chip, and was served as FEASIBLE.
+
+    The plan without the chip is solved first, by exactly the call the member's chip-less
+    window makes (budget and hold probe included), so it is the plan the member is shown
+    beside this one. Its weekly squads are then replayed under the chip's rights. A
+    Wildcard, a Bench Boost or a Triple Captain keeps those squads as they are. A Free Hit
+    squad reverts the next week, so its replay is tried twice: the same squads, which the
+    week after the Free Hit admits only when its cap allows both weeks' moves at once, and
+    the same moves made one week late after each Free Hit, which keeps every replayed
+    week's free transfers and cap because the Free Hit keeps the free transfers it found.
+    The other seed is holding the squad with the chip played, which is what the hold
+    probe gave this window before.
+
+    A replay is scored under the chip's own rules. It can fall short of the plan without
+    the chip only where the rules make it: a Wildcard keeps the free transfers it found
+    instead of adding one, so a plan that banks a free transfer in the chip's week may pay
+    for it later. That is the game's accounting, not a search that stopped early.
+
+    Each seed is a solve with every week's squad fixed, at the hold probe's allowance.
+    The best of them by its objective starts the chip search as a certified, protected
+    incumbent, and the chip search keeps the caller's budget unchanged. The certificate
+    values a Bench Boost or Triple Captain seed without its boost, because the boost is a
+    variable only the objective pushes up, so a stopped search that ends between that
+    value and the seed's own is set aside for the seed as well. If no seed has a solution
+    the chip search runs exactly as before, with the hold probe.
+    """
+
+    restrictions: dict[str, Any] = {
+        "first_week_overlap": first_week_overlap,
+        "first_week_transfer_cap": first_week_transfer_cap,
+        "first_week_exclusion": first_week_exclusion,
+        "linearization_level": linearization_level,
+        "preferences": preferences,
+    }
+    without_chip = optimize_transfer_plan(
+        horizon,
+        state,
+        settings,
+        policy,
+        chips=ChipAvailability(),
+        protect_hold=True,
+        **restrictions,
+    )
+    _refuse_clock_stopped_seed(without_chip, "without_chip")
+    gameweeks = horizon.gameweeks
+    paths: dict[str, dict[int, tuple[object, ...]]] = {
+        "hold": {week: tuple(state.squad_player_ids) for week in gameweeks}
+    }
+    if without_chip.has_solution:
+        squads = [tuple(week.selected_squad.player_id.tolist()) for week in without_chip.weeks]
+        paths["without_chip"] = dict(zip(gameweeks, squads, strict=True))
+        late: dict[int, tuple[object, ...]] = {}
+        delay = 0
+        for index, week in enumerate(gameweeks):
+            late[week] = squads[index - delay]
+            if chips.forced.get(week) == "freehit":
+                delay += 1
+        if late != paths["without_chip"]:
+            paths["without_chip_after_free_hit"] = late
+    seed_settings = replace(
+        settings,
+        solver_deterministic_time_limit=NAMED_CHIP_SEED_UNITS,
+        solver_time_limit_seconds=min(
+            settings.solver_time_limit_seconds, NAMED_CHIP_SEED_WALL_SECONDS
+        ),
+    )
+    candidates: list[dict[str, object]] = []
+    best: tuple[str, TransferPlanResult, float] | None = None
+    for label, path in paths.items():
+        seed = optimize_transfer_plan(
+            horizon,
+            state,
+            seed_settings,
+            policy,
+            chips=chips,
+            fixed_week_squads=path,
+            **restrictions,
+        )
+        _refuse_clock_stopped_seed(seed, label)
+        value = None if seed.objective_value is None else float(seed.objective_value)
+        candidates.append(
+            {
+                "seed": label,
+                "status": seed.solver_status.name,
+                "objective_value": value,
+                "deterministic_time_used": seed.diagnostics.get("deterministic_time_used"),
+            }
+        )
+        # Only a strictly better seed displaces an earlier one, so a tie keeps the hold.
+        if value is not None and (best is None or value > best[2]):
+            best = (label, seed, value)
+    plan = optimize_transfer_plan(
+        horizon,
+        state,
+        settings,
+        policy,
+        chips=chips,
+        protect_hold=best is None,
+        incumbent_plan=None if best is None else best[1],
+        protect_incumbent=best is not None,
+        **restrictions,
+    )
+    # A proved optimum stands: it is at least the seed on the solver's own scale, and the
+    # unrounded totals compared here may differ from it by rounding alone.
+    retained = (
+        best is not None
+        and plan.solver_status is not SolverStatus.OPTIMAL
+        and plan.objective_value is not None
+        and float(plan.objective_value) < best[2] - 1e-9
+    )
+    if retained:
+        assert best is not None
+        seed_plan = best[1]
+        plan = replace(
+            seed_plan,
+            solver_status=SolverStatus.FEASIBLE,
+            diagnostics={
+                **plan.diagnostics,
+                **{
+                    key: seed_plan.diagnostics[key]
+                    for key in (
+                        "chips_played",
+                        "scaled_model_objective_value",
+                        "terminal_banked_transfer_value",
+                        "terminal_chip_holding_value",
+                    )
+                    if key in seed_plan.diagnostics
+                },
+                "solver_status_name": "FEASIBLE",
+                "primary_search_status": plan.diagnostics.get(
+                    "primary_search_status", plan.solver_status.name
+                ),
+                "best_objective_bound": None,
+                "absolute_optimality_gap": None,
+                "relative_optimality_gap": None,
+            },
+        )
+    probe = without_chip.diagnostics.get("hold_protection")
+    return replace(
+        plan,
+        diagnostics={
+            **plan.diagnostics,
+            "named_chip_seed": {
+                "version": NAMED_CHIP_SEED_VERSION,
+                "selected": None if best is None else best[0],
+                "seed_retained": retained,
+                "without_chip": {
+                    "status": without_chip.solver_status.name,
+                    "objective_value": without_chip.objective_value,
+                    "deterministic_time_used": without_chip.diagnostics.get(
+                        "deterministic_time_used"
+                    ),
+                    "hold_probe_deterministic_time": (
+                        probe.get("deterministic_time") if isinstance(probe, dict) else None
+                    ),
+                },
+                "candidates": candidates,
+                "seed_deterministic_time_limit": NAMED_CHIP_SEED_UNITS,
+            },
+        },
+    )
+
+
 def plan_transfer_horizon(
     inputs: RecommendationInputs,
     projection_horizon: ProjectionHorizon,
@@ -921,6 +1131,11 @@ def plan_transfer_horizon(
     values a chip inside the horizon only — its option value after the last week is
     unknown to the planner — so a caller who offers chips takes on stating that limit,
     as the member window path does; the system's own horizon path offers none.
+
+    A chip forced into a week of this horizon without the automatic strategy is a named
+    chip: its search starts from the better of the plan without the chip, replayed under
+    the chip, and holding the squad (``_plan_named_chip_window``). Every other call plans
+    exactly as before.
 
     ``first_week_overlap`` and ``first_week_transfer_cap`` are handed straight to
     ``optimize_transfer_plan``: an overlap band against a rival's known players in the
@@ -1093,6 +1308,13 @@ def plan_transfer_horizon(
             captured_at_utc=inputs.captured_at_utc,
             deadline_utc=inputs.deadline.deadline_utc,
         )
+    # A forced week outside the horizon pins nothing in it, so it names no chip here.
+    named_chips = (
+        chips
+        if chips is not None
+        and any(week in projection_horizon.target_gameweeks for week in chips.forced)
+        else None
+    )
     plan = (
         optimize_observed_window(
             PlanningHorizon(planning_table),
@@ -1136,6 +1358,19 @@ def plan_transfer_horizon(
             tail_forecast=chip_tail_forecast,
         )
         if chip_strategy
+        else _plan_named_chip_window(
+            PlanningHorizon(planning_table),
+            state,
+            settings,
+            planning_policy,
+            named_chips,
+            first_week_overlap=first_week_overlap,
+            first_week_transfer_cap=first_week_transfer_cap,
+            first_week_exclusion=first_week_exclusion,
+            linearization_level=linearization_level,
+            preferences=preferences,
+        )
+        if named_chips is not None
         else optimize_transfer_plan(
             PlanningHorizon(planning_table),
             state,
