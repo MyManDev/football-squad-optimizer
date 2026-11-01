@@ -45,7 +45,8 @@ member's plan is the same whether or not the run records advice and whichever pa
 The Top 100 plan, the re-solves under the manager's word and a chosen chip's plan are solved
 at the level of the control they are compared with.
 
-The original league keeps its immutable `data/advice_records` archive. Its history prefers
+The original league, the one `config/leagues.json` marks with `legacy_advice_records`, keeps
+its immutable `data/advice_records` archive. Its history prefers
 those original records; other leagues read the independent baselines. A shared entry is
 recorded once per capture, while each league keeps its own standings and scoreboard.
 The league receipt reports recording per league (`leagues.<id>.advice_recorded`), and its
