@@ -266,6 +266,12 @@ export function forwardedMemberSquad({
       };
     };
     const fifteen = held.squad.map(player);
+    // As the weekly run's entry view words it: a fact the sources could not prove is named.
+    const missing = [
+      ...(banked.known ? [] : ["free_transfers"]),
+      ...(selling.known ? [] : ["purchase_prices"]),
+    ];
+    const quality = missing.length === 0 ? "complete" : "partial";
     const entry: HumanEntryView = {
       member_kind: "human",
       entry_id: entryId,
@@ -277,7 +283,7 @@ export function forwardedMemberSquad({
       total_points: standing?.total ?? null,
       movement: "unknown",
       movement_places: null,
-      data_quality: "complete",
+      data_quality: quality,
     };
     const squad: EntrySquad = {
       league_id: leagueId,
@@ -300,8 +306,8 @@ export function forwardedMemberSquad({
       spendable_budget_tenths: selling.worth + held.bank_tenths,
       source_snapshot_id: table.source_snapshot_id,
       squadopt_comparison: null,
-      data_quality: "complete",
-      missing_fields: [],
+      data_quality: quality,
+      missing_fields: missing,
       squad_basis:
         held.gameweek === captured.gameweek
           ? "captured"

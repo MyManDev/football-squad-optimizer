@@ -116,8 +116,14 @@ describe("a forwarded member's document from the parity fixture", () => {
       spendable_budget_tenths: worth + bank,
       squad_basis: "captured",
       active_chip: null,
+      data_quality: "partial",
+      missing_fields: ["purchase_prices"],
     });
-    expect(squad.entry).toMatchObject({ entry_id: member.entry_id, team_name: "Synthetic XI" });
+    expect(squad.entry).toMatchObject({
+      entry_id: member.entry_id,
+      team_name: "Synthetic XI",
+      data_quality: "partial",
+    });
     expect(squad.starting_xi.map((player) => player.player_id)).toEqual(fifteen.slice(0, 11));
     expect(squad.bench.map((player) => player.bench_order)).toEqual([1, 2, 3, 4]);
     expect(squad.starting_xi.find((player) => player.is_captain)?.player_id).toBe(132);
@@ -243,6 +249,9 @@ describe("a Free Hit walked back, with the purchase prices replayed", () => {
     expect(squad.purchase_prices_known).toBe(true);
     expect(squad.free_transfers).toBe(5);
     expect(squad.free_transfers_known).toBe(true);
+    expect(squad.data_quality).toBe("complete");
+    expect(squad.missing_fields).toEqual([]);
+    expect(squad.entry.data_quality).toBe("complete");
     const sell = Object.fromEntries(
       held.map((element) => {
         const { buy } = players.find((player) => player.element === element)!;
@@ -317,5 +326,8 @@ describe("a late joiner, priced at the current prices capped by the stated worth
     expect(squad.free_transfers).toBe(1);
     expect(squad.free_transfers_known).toBe(false);
     expect(squad.device_plan?.free_transfers).toBe(1);
+    // The weekly run names both facts it could not prove, in this order.
+    expect(squad.missing_fields).toEqual(["free_transfers", "purchase_prices"]);
+    expect(squad.data_quality).toBe("partial");
   });
 });
