@@ -90,7 +90,7 @@ test("at 390x844 the strip takes no room, then sticks under the phone bar once t
       .toEqual([PHONE_BAR, 40]);
   }
   // Each link is a 44 px target.
-  for (const name of [member.sectionMove, member.sectionSquad, member.sectionTools]) {
+  for (const name of [member.sectionMove, member.sectionSquad]) {
     const box = (await link(page, name).boundingBox())!;
     expect(box.height, name).toBeGreaterThanOrEqual(44);
     expect(box.width, name).toBeGreaterThanOrEqual(44);
@@ -118,16 +118,6 @@ test("at 390x844 each link lands its section under both bars and marks it as cur
   await expect(strip(page).locator('[aria-current="location"]')).toHaveCount(1);
   expect(await blocking(page)).toEqual([]);
 
-  await link(page, member.sectionTools).click();
-  await expect(page).toHaveURL(/#member-tools$/);
-  await settled(page);
-  // The tools have no heading of their own: the first section's summary heads them.
-  const tools = page.locator("#member-tools > details > summary").first();
-  const atTools = await landing(tools);
-  expect(atTools.top).toBeGreaterThanOrEqual(BOTH_BARS);
-  expect(atTools.seen).toBe(true);
-  await expect(link(page, member.sectionTools)).toHaveAttribute("aria-current", "location");
-
   // Back at the decision the strip stands aside, so its heading is under the phone bar alone.
   await link(page, member.sectionMove).click();
   await expect(page).toHaveURL(/#entry-advice-title$/);
@@ -152,16 +142,16 @@ test("at 390x844 a jump from the strip glides only where motion is allowed", asy
   // Reached by the keyboard, the strip holds still: a link in it, pinned inside the page's
   // scroll padding, is not scrolled clear of it.
   const at = await page.evaluate(() => scrollY);
-  await link(page, member.sectionSquad).focus();
+  await link(page, member.sectionMove).focus();
   await page.keyboard.press("Tab");
-  await expect(link(page, member.sectionTools)).toBeFocused();
+  await expect(link(page, member.sectionSquad)).toBeFocused();
   await settled(page);
   expect(await page.evaluate(() => scrollY)).toBe(at);
   await expect(strip(page)).toBeVisible();
   expect(await behaviour()).toBe("smooth");
   await page.emulateMedia({ reducedMotion: "reduce" });
   expect(await behaviour()).toBe("auto");
-  await link(page, member.sectionTools).click();
+  await link(page, member.sectionSquad).click();
   // Under reduced motion the jump has landed by the time the click returns.
   const before = await page.evaluate(() => scrollY);
   await settled(page);
@@ -175,5 +165,5 @@ for (const [width, height] of [
   test(`the strip is not in the page at ${width}x${height}`, async ({ page }) => {
     await open(page, width, height);
     await expect(strip(page)).toHaveCount(0);
-    await expect(page.locator("#member-tools")).toHaveCount(1);
+    await expect(page.locator("#kadro")).toHaveCount(1);
   });

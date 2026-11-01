@@ -9,7 +9,6 @@ import type { ClubCodes } from "../../../lib/clubs";
 import { figure } from "../../../lib/format";
 import { ClubMark } from "../components/ClubMark";
 import { MemberBench, MemberPitch, type PitchPlayer } from "../components/MemberPitch";
-import { PitchLookControl } from "../components/PitchLookControl";
 import { PlayerDetails } from "../components/PlayerDetails";
 import { PointsUnit } from "../components/PointsUnit";
 import { expectedLineupLabel } from "../advice/expectedLineupLabel";
@@ -164,7 +163,6 @@ export function MemberSquad({
           news={news}
           onSelectPlayer={selectPlayer}
         />
-        <PitchLookControl />
       </div>
       {hasList ? (
         <div className={styles.listView} hidden={view !== "list"}>

@@ -6,20 +6,39 @@
  * item is 'Ligini bul': the league-number form with no league, or the "Sen kimsin?" step
  * of the league entered; 'Bu hafta', 'Kadro' and 'Lig' are not there at all. Once both
  * steps are taken, 'Bu hafta' and 'Kadro' always mean the claimed member's own page (on a
- * rival's page too) and 'Lig' is the league's member list. The rule holds per league, so
+ * rival's page too), 'Lig' is the league's member list, and each of the member's tools
+ * (the squad held now, the decision tools, the what-if squad, the duel, the chips and the
+ * squad card) is a page of its own under their page. The rule holds per league, so
  * it stands unchanged with many leagues published.
  *
  * Nothing here reads or writes browser storage; the identity is handed in.
  */
 import {
   FIND_YOURSELF,
+  isMemberTool,
   leagueIdInAddress,
   memberAddress,
   membersAddress,
+  memberToolAddress,
+  MEMBER_TOOLS,
   type IdentityStep,
+  type MemberTool,
 } from "../../lib/leagueAddresses";
 
-export type NavKey = "findLeague" | "thisWeek" | "squad" | "league" | "fixtures" | "contribute";
+/** The sidebar item of each of the member's tool pages, in the sidebar's order. */
+export const TOOL_NAV = {
+  "current-squad": "currentSquad",
+  "decision-tools": "decisionTools",
+  "what-if": "whatIf",
+  duel: "duel",
+  chips: "chips",
+  card: "squadCard",
+} as const satisfies Record<MemberTool, string>;
+
+type ToolNavKey = (typeof TOOL_NAV)[MemberTool];
+
+export type NavKey =
+  "findLeague" | "thisWeek" | "squad" | "league" | ToolNavKey | "fixtures" | "contribute";
 
 export interface NavItem {
   key: NavKey;
@@ -65,6 +84,7 @@ export const SQUAD_HASH = "#kadro";
 
 const MEMBER_PAGE = /^\/league\/(\d+)\/members\/(\d+)$/;
 const MEMBER_HISTORY = /^\/league\/(\d+)\/members\/(\d+)\/history$/;
+const MEMBER_TOOL = /^\/league\/(\d+)\/members\/(\d+)\/([a-z-]+)$/;
 
 function path(pathname: string): string {
   return pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
@@ -79,6 +99,11 @@ export function memberAt(
   if (page) return { leagueId: Number(page[1]), entryId: page[2]!, search: place.search };
   const history = MEMBER_HISTORY.exec(pathname);
   if (history) return { leagueId: Number(history[1]), entryId: history[2]!, search: null };
+  // A tool page carries the plan in its address as the decision page does.
+  const tool = MEMBER_TOOL.exec(pathname);
+  if (tool && isMemberTool(tool[3])) {
+    return { leagueId: Number(tool[1]), entryId: tool[2]!, search: place.search };
+  }
   return null;
 }
 
@@ -118,6 +143,10 @@ export function navItems(
       { key: "thisWeek", to: `${own}${plan}`, active: onOwnPage && !onSquad },
       { key: "squad", to: `${own}${plan}${SQUAD_HASH}`, active: onSquad },
       { key: "league", to: league, active: pathname === league },
+      ...MEMBER_TOOLS.map((tool) => {
+        const page = memberToolAddress(leagueId, entryId, tool);
+        return { key: TOOL_NAV[tool], to: `${page}${plan}`, active: pathname === page };
+      }),
     );
   }
 

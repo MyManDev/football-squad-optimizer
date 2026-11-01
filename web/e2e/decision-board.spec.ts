@@ -25,22 +25,23 @@ for (const language of ["tr", "en"] as const) {
     page.on("request", (r) => {
       if (r.method() === "POST") posts.push(r.url());
     });
-    await page.goto("/league/352490/members/35249001?window=3");
-    // The decision board is one of the page's tools, closed until it is asked for.
-    const tools = page.locator("main details").filter({
-      has: page.locator("summary", { hasText: MESSAGES[language].leagueMembers.decisionTools }),
-    });
-    await expect(tools).not.toHaveAttribute("open");
-    await tools.locator(":scope > summary").click();
+    // The decision board is on the decision tools' page of its own.
+    const tools = "/league/352490/members/35249001/decision-tools";
+    await page.goto(`${tools}?window=3`);
+    await expect(
+      page.getByRole("heading", { name: MESSAGES[language].leagueMembers.decisionTools }),
+    ).toBeVisible();
     const pin = page.getByRole("button", {
       name: tr ? "Bu planı karşılaştırmaya ekle" : "Pin this plan",
     });
     await expect(pin).toBeEnabled();
     await pin.click();
-    // Plan settings stay on the page, without opening the navigation drawer.
+    // Plan settings stay on the member's page, without opening the navigation drawer.
+    await page.goto("/league/352490/members/35249001?window=3");
     await page.getByRole("radio", { name: /^5 / }).click();
     await expect(page).toHaveURL(/window=5/);
     await expect(page.getByRole("dialog")).toHaveCount(0);
+    await page.goto(`${tools}?window=5`);
     await expect(pin).toBeEnabled();
     await pin.click();
     const first = page.getByRole("region", { name: "Plan A", exact: true });
@@ -86,7 +87,6 @@ for (const language of ["tr", "en"] as const) {
     });
     await note.fill("Wait for the press conference; keep a transfer.");
     await page.reload();
-    await tools.locator(":scope > summary").click();
     await expect(first.getByRole("radio")).toBeChecked();
     await expect(note).toHaveValue("Wait for the press conference; keep a transfer.");
     await expect(page.getByRole("region", { name: "Plan B", exact: true })).toBeVisible();

@@ -49,8 +49,13 @@ test("the open what-if panel fits its card at 320 px", async ({ page }) => {
   await page.getByRole("button", { name: "Bu cihazda hesapla" }).click();
   await expect(page.locator("[data-device-state='done']")).toBeVisible({ timeout: 60_000 });
 
-  const tool = page.locator("details").filter({ hasText: COPY.whatIfTitle });
-  await tool.locator("summary").click();
+  // The what-if is a page of its own; the sidebar's link keeps the plan the device solved.
+  await page.getByRole("button", { name: MESSAGES.tr.shell.openMenu }).click();
+  await page
+    .locator("#sidebar nav")
+    .getByRole("link", { name: MESSAGES.tr.shell.whatIf, exact: true })
+    .click();
+  const tool = page.getByRole("region", { name: COPY.whatIfTitle });
   await tool.getByRole("button", { name: COPY.whatIfStart }).click();
   const points = tool.locator("dt", { hasText: COPY.whatIfPoints }).locator("xpath=../dd");
   await expect(points).not.toHaveText(/^-/, { timeout: 30_000 });

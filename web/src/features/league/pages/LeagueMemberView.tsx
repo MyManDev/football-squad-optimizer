@@ -1,4 +1,4 @@
-import { memberAddress, memberHistoryAddress } from "../../../lib/leagueAddresses";
+import { memberAddress, memberHistoryAddress, type MemberTool } from "../../../lib/leagueAddresses";
 import { useLeagueId } from "../useLeague";
 import { NewInformationNotice } from "../advice/OfficialInformationCard";
 import { useMemo, useRef, type ReactNode } from "react";
@@ -42,7 +42,7 @@ import { ApplyOnFpl } from "./ApplyOnFpl";
 import { HeldSquad, MemberSquad } from "./MemberSquad";
 import { hasLineup, squadOnPitch } from "./squadOnPitch";
 import { MemberTopBar } from "./MemberTopBar";
-import { MEMBER_TOOLS_ID, MemberSections } from "./MemberSections";
+import { MemberSections } from "./MemberSections";
 import type { LeagueMemberViewProps } from "./memberPageTypes";
 import { useMemberAdviceView } from "./useMemberAdviceView";
 import { rivalCandidates } from "../advice/adviceSelection";
@@ -147,6 +147,7 @@ function LeagueMemberContent({
   fixturesPending = false,
   scoreboard = null,
   history = null,
+  tool,
 }: LeagueMemberViewProps) {
   const { language, locale, messages } = useLanguage();
   const leagueId = useLeagueId();
@@ -444,6 +445,103 @@ function LeagueMemberContent({
     </section>
   );
 
+  // The member's tools, each its own page that the sidebar links (lib/leagueAddresses.ts);
+  // a tool this member's week has nothing for is null and its page says so.
+  const tools: Record<MemberTool, { title: string; body: ReactNode | null }> = {
+    "current-squad": {
+      title: copy.memberSquad,
+      body: view.starting_xi.length > 0 ? <HeldSquad squad={view} codes={codes} /> : null,
+    },
+    "decision-tools": {
+      title: copy.decisionTools,
+      body: (
+        <>
+          <DecisionWorkbench
+            request={{
+              ...request,
+              top100Weight: selection.top100.weight,
+              managersWord: selection.evidence.on,
+              chip: selection.chip.chip,
+            }}
+            selected={shown?.envelope ?? null}
+            squad={squad}
+            loading={adviceLoading}
+          />
+          {/* The comparison's one action computes the other model, which a closed week
+              does not, so it is offered only while the week is open. */}
+          {capabilities?.models?.includes("football") && computeAvailable && !closed ? (
+            <ModelComparison
+              request={request}
+              selected={shown?.envelope ?? null}
+              snapshot={view.source_snapshot_id}
+              client={client}
+              busy={job.state.phase === "waiting" || job.state.phase === "requesting"}
+            />
+          ) : null}
+        </>
+      ),
+    },
+    "what-if": {
+      title: copy.whatIfTitle,
+      body:
+        advised !== null && isDevicePlanEntry(view.device_plan) ? (
+          <WhatIfPanel squad={view} advised={advised} dependencies={whatIfDependencies} />
+        ) : null,
+    },
+    duel: {
+      title: copy.duelTitle,
+      body:
+        canDuel(squad) && duelCandidates.length > 0 ? (
+          <RivalDuel
+            squad={squad}
+            candidates={duelCandidates}
+            selected={duelId}
+            rival={duelSquad?.payload.entry.entry_id === duelId ? duelSquad : null}
+            issue={duelIssue}
+            onSelect={(rivalId) =>
+              setSearchParams(
+                (current) => {
+                  const next = new URLSearchParams(current);
+                  next.set("duel", String(rivalId));
+                  return next;
+                },
+                { replace: true },
+              )
+            }
+          />
+        ) : null,
+    },
+    chips: { title: copy.chipsAndTransfers, body: <MemberResourceCards squad={view} /> },
+    card: {
+      title: copy.cardTitle,
+      body:
+        !adviceLoading && shown ? <SquadCard view={shown.envelope.payload} squad={view} /> : null,
+    },
+  };
+
+  if (tool !== undefined) {
+    const page = tools[tool];
+    return (
+      <div className={styles.layout}>
+        <div className={styles.page}>
+          <MemberTopBar
+            squad={squad}
+            members={members}
+            fixtures={fixtures}
+            deadlinePassed={deadlinePassed}
+            now={now}
+          />
+          <section aria-labelledby="member-tool-title" className={styles.toolBody}>
+            <h2 className={styles.decisionTitle} id="member-tool-title">
+              {page.title}
+            </h2>
+            {page.body ?? <EmptyState title={copy.toolEmpty} />}
+          </section>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div ref={arrival} className={styles.layout} data-rail={railPlacement}>
       <div className={styles.page}>
@@ -454,7 +552,7 @@ function LeagueMemberContent({
           deadlinePassed={deadlinePassed}
           now={now}
         />
-        {/* A phone's one column is long: the strip keeps its three parts a tap away, pinned
+        {/* A phone's one column is long: the strip keeps its two parts a tap away, pinned
             under the phone bar once the decision has been read past. Wider layouts pin the
             top bar instead and show more of the page at once. */}
         {layout === "phone" ? <MemberSections /> : null}
@@ -580,73 +678,6 @@ function LeagueMemberContent({
         {/* Every setting in it changes or recomputes a plan the closed week cannot apply;
             the notice above says so, and when the next week's plan comes. */}
         {closed ? null : planSettings}
-
-        {/* The phone strip's 'Araçlar' lands here, on an open week and a closed one alike. */}
-        <div id={MEMBER_TOOLS_ID} className={styles.tools}>
-          {onPitch.source === "plan" && view.starting_xi.length > 0 ? (
-            <Tool title={copy.memberSquad}>
-              <HeldSquad squad={view} codes={codes} />
-            </Tool>
-          ) : null}
-          <Tool title={copy.decisionTools}>
-            <DecisionWorkbench
-              request={{
-                ...request,
-                top100Weight: selection.top100.weight,
-                managersWord: selection.evidence.on,
-                chip: selection.chip.chip,
-              }}
-              selected={shown?.envelope ?? null}
-              squad={squad}
-              loading={adviceLoading}
-            />
-            {/* The comparison's one action computes the other model, which a closed week
-                does not, so it is offered only while the week is open. */}
-            {capabilities?.models?.includes("football") && computeAvailable && !closed ? (
-              <ModelComparison
-                request={request}
-                selected={shown?.envelope ?? null}
-                snapshot={view.source_snapshot_id}
-                client={client}
-                busy={job.state.phase === "waiting" || job.state.phase === "requesting"}
-              />
-            ) : null}
-          </Tool>
-          {advised !== null && isDevicePlanEntry(view.device_plan) ? (
-            <Tool title={copy.whatIfTitle}>
-              <WhatIfPanel squad={view} advised={advised} dependencies={whatIfDependencies} />
-            </Tool>
-          ) : null}
-          {canDuel(squad) && duelCandidates.length > 0 ? (
-            <Tool title={copy.duelTitle} open={duelId !== null}>
-              <RivalDuel
-                squad={squad}
-                candidates={duelCandidates}
-                selected={duelId}
-                rival={duelSquad?.payload.entry.entry_id === duelId ? duelSquad : null}
-                issue={duelIssue}
-                onSelect={(rivalId) =>
-                  setSearchParams(
-                    (current) => {
-                      const next = new URLSearchParams(current);
-                      next.set("duel", String(rivalId));
-                      return next;
-                    },
-                    { replace: true },
-                  )
-                }
-              />
-            </Tool>
-          ) : null}
-          <Tool title={copy.chipsAndTransfers}>
-            <MemberResourceCards squad={view} />
-          </Tool>
-          {!adviceLoading && shown ? (
-            <Tool title={copy.cardTitle}>
-              <SquadCard view={shown.envelope.payload} squad={view} />
-            </Tool>
-          ) : null}
-        </div>
       </div>
       {railPlacement === "column" ? rail : null}
       {railPlacement === "sheet" ? createPortal(rail, document.body) : null}

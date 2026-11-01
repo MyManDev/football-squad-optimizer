@@ -357,15 +357,28 @@ describe("league member surfaces", () => {
     expect(screen.getByRole("radio", { name: /1 hafta/ })).toBeChecked();
     expect(screen.getAllByText(/beklenen puan maliyeti/).length).toBeGreaterThan(0);
     expect(screen.getByText(/Önerin senin kadrondan/)).toBeInTheDocument();
+    // The member page carries the squad and the plan; the public-data notices left it.
+    expect(screen.queryByText(/Satın alma fiyatları/)).toBeNull();
+    expect(screen.queryByText(/herkese açık FPL verisidir/)).toBeNull();
+    expect(container.textContent).not.toContain("%");
+    cleanup();
+
+    // The free transfers are on the chips page of their own.
+    const chips = renderPage(
+      <LeagueMemberView
+        index={mockEntryAdviceIndex(entryId).payload}
+        squad={mockEntrySquadEnvelopes[entryId]!}
+        advice={advice}
+        tool="chips"
+      />,
+      `/league/352490/members/${entryId}/chips?mode=ortak-koru&window=1`,
+    );
     const transferCard = screen
       .getByRole("heading", { name: "Ücretsiz transfer hakkı" })
       .closest("section");
     expect(transferCard).toHaveTextContent("Bilinmiyor");
     expect(transferCard).not.toHaveTextContent("banka edilmiş ikinci transfer");
-    // The member page carries the squad and the plan; the public-data notices left it.
-    expect(screen.queryByText(/Satın alma fiyatları/)).toBeNull();
-    expect(screen.queryByText(/herkese açık FPL verisidir/)).toBeNull();
-    expect(container.textContent).not.toContain("%");
+    expect(chips.container.textContent).not.toContain("%");
   });
 
   it("prices the competitive plan against a real rival, and saf-puan carries no price line", () => {

@@ -14,6 +14,7 @@ import { MESSAGES, type Language } from "../../../i18n/messages";
 import * as leagueData from "../data";
 import type { EntryAdvice, EntrySquad, LeagueViewEnvelope } from "../types";
 import { LeagueMemberPage, LeagueMemberView } from "./LeagueMemberPage";
+import type { LeagueMemberViewProps } from "./memberPageTypes";
 import { stubTree, withLeague } from "../../../testSupport/league";
 
 const ENTRY = 35249001;
@@ -28,6 +29,7 @@ function memberSurface(
   squad: LeagueViewEnvelope<EntrySquad>,
   language: Language = "en",
   advice: LeagueViewEnvelope<EntryAdvice> | null = null,
+  tool?: LeagueMemberViewProps["tool"],
 ) {
   const entryId = squad.payload.entry.entry_id;
   return (
@@ -39,6 +41,7 @@ function memberSurface(
             advice={advice}
             members={mockLeagueMembersEnvelope.payload.members}
             index={mockEntryAdviceIndex(entryId).payload}
+            tool={tool}
           />,
         )}
       </MemoryRouter>
@@ -52,14 +55,9 @@ function benchItems(language: Language = "en"): HTMLElement[] {
   return within(bench).getAllByRole("listitem");
 }
 
-/** The closed section holding the squad the member holds before the plan's transfers. */
+/** The page of its own holding the squad the member holds before the plan's transfers. */
 function heldSection(language: Language): HTMLElement {
-  const summary = screen.getByText(MESSAGES[language].leagueMembers.memberSquad, {
-    selector: "summary span",
-  });
-  const details = summary.closest("details");
-  if (!details) throw new Error("No held squad section");
-  return details;
+  return screen.getByRole("region", { name: MESSAGES[language].leagueMembers.memberSquad });
 }
 
 describe("the member's published squad", () => {
@@ -172,7 +170,7 @@ describe("the member's published squad", () => {
       proposedVice.short_name = "Proposed Vice Only";
       render(memberSurface(squad, language, advice));
 
-      // The pitch draws the plan, with its vice-captain; the held squad waits, closed.
+      // The pitch draws the plan, with its vice-captain; the held squad is its own page.
       const copy = MESSAGES[language];
       const pitch = screen.getByRole("list", { name: copy.squad.pitchLabel });
       const vice = within(pitch).getByLabelText(copy.squad.viceCaptainLabel).parentElement!;
@@ -180,8 +178,10 @@ describe("the member's published squad", () => {
         (player) => player.player_id === proposedVice.player_id,
       )!;
       expect(within(vice).getByTitle(viceInEleven.name)).toBeInTheDocument();
+      expect(screen.getAllByText("Proposed Vice Only").length).toBeGreaterThan(0);
+      cleanup();
+      render(memberSurface(squad, language, advice, "current-squad"));
       const held = heldSection(language);
-      expect(held).not.toHaveAttribute("open");
       expect(held).not.toHaveTextContent("Proposed Vice Only");
       // It lists the fifteen the member holds, the eleven and the bench.
       expect(within(held).getAllByRole("listitem")).toHaveLength(
@@ -209,7 +209,6 @@ describe("the member's published squad", () => {
         for (const unit of spoken) expect(unit).toHaveClass("visually-hidden");
         expect(held).not.toHaveTextContent(/\d puan/);
       }
-      expect(screen.getAllByText("Proposed Vice Only").length).toBeGreaterThan(0);
     },
   );
 

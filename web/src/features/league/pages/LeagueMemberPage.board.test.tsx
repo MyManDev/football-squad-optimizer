@@ -562,12 +562,13 @@ describe("honesty and the tools", () => {
     expect(within(how).getAllByText(/beklenen puan maliyeti/)).toHaveLength(1);
   });
 
-  it("keeps the secondary tools closed, each with its own controls inside", () => {
+  it("keeps the advanced settings closed, with their own controls inside", () => {
     const { container } = show("tr");
     const copy = MESSAGES.tr.leagueMembers;
-    for (const title of [copy.advancedSettings, copy.decisionTools, copy.chipsAndTransfers]) {
-      expect(screen.getByText(title).closest("details")).not.toHaveAttribute("open");
-    }
+    expect(screen.getByText(copy.advancedSettings).closest("details")).not.toHaveAttribute("open");
+    // The tools are pages of their own in the sidebar, not sections at the page's foot.
+    expect(screen.queryByText(copy.decisionTools)).toBeNull();
+    expect(screen.queryByText(copy.chipsAndTransfers)).toBeNull();
     const advanced = screen.getByText(copy.advancedSettings).closest("details")!;
     // The rarely changed settings: the manager's word and the chips.
     for (const name of ["llm", "chip"]) {
@@ -599,10 +600,20 @@ describe("honesty and the tools", () => {
     expect(container.querySelectorAll('input[name="window"]')).toHaveLength(3);
     expect(container.querySelectorAll('input[name="top100"]')).toHaveLength(7);
     expect(screen.getAllByRole("button", { name: "Hesapla" })).toHaveLength(1);
-    const tools = screen.getByText(copy.decisionTools).closest("details")!;
-    expect(within(tools).getByText("Karar masam")).toBeInTheDocument();
-    const chips = screen.getByText(copy.chipsAndTransfers).closest("details")!;
-    expect(within(chips).getByText(MESSAGES.tr.memberResources.transfersTitle)).toBeInTheDocument();
+  });
+
+  it("draws a tool the address names as its own page, open, in place of the decision", () => {
+    const copy = MESSAGES.tr.leagueMembers;
+    show("tr", { tool: "decision-tools" });
+    const page = screen.getByRole("region", { name: copy.decisionTools });
+    expect(within(page).getByText("Karar masam")).toBeVisible();
+    expect(screen.queryByRole("region", { name: copy.decisionTitle })).toBeNull();
+    expect(screen.queryByRole("region", { name: copy.planTitle })).toBeNull();
+    cleanup();
+
+    show("tr", { tool: "chips" });
+    const chips = screen.getByRole("region", { name: copy.chipsAndTransfers });
+    expect(within(chips).getByText(MESSAGES.tr.memberResources.transfersTitle)).toBeVisible();
   });
 
   it("heads the plan with its presets, which set the strategy and window the controls read", () => {
