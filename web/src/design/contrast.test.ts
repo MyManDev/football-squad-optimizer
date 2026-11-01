@@ -7,17 +7,16 @@
  * here too: ink3 and the good green stay off the sidebar (--color-surface-2), and no small
  * text sits directly on the grass, so both stay below 4.5:1 there and the header stays true.
  *
- * The viewer's pitch looks join it: every club plate's fill and text colour reach 4.5:1
- * (the header's one exception to the white plates), and every grass look is drawn in the
- * two grass tokens only. Of those two, only the darker (--color-pitch) is held below 4.5:1
- * for white and ink above; --color-pitch-2 is not held.
+ * The club pairings join it: every club's fill and text colour reach 4.5:1, as each
+ * player's shirt is drawn in them. Of the two grass tokens, only the darker
+ * (--color-pitch) is held below 4.5:1 for white and ink above; --color-pitch-2 is not held.
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { clubPlate, PLATE_INK, PLATE_WHITE } from "../features/league/components/pitchLook";
+import { clubPlate, PLATE_INK, PLATE_WHITE } from "../features/league/components/clubPlate";
 import { CLUB_COLOURS } from "../lib/clubs";
 import { AA, contrastRatio } from "./contrastRatio";
 
@@ -62,6 +61,8 @@ const READABLE: readonly (readonly [string, string])[] = [
   ["--color-board-muted", "--color-board"],
   ["--color-text", "--color-seg2"],
   ["--color-text", "--color-lime"],
+  // A goalkeeper's initials on the keepers' shirt.
+  ["--color-text", "--color-keeper"],
 ];
 
 /** Pairings tokens.css says never carry text, held below AA so that sentence stays true. */
@@ -113,24 +114,5 @@ describe("the club plates", () => {
     expect(clubPlate("ARS")).toEqual({ colour: "secondary", fill: "#FFFFFF", text: PLATE_INK });
     expect(clubPlate("XYZ")).toBeNull();
     expect(clubPlate(null)).toBeNull();
-  });
-});
-
-describe("the grass looks", () => {
-  const css = readFileSync(
-    join(__dirname, "../features/league/components/MemberPitch.module.css"),
-    "utf-8",
-  ).replace(/\/\*[\s\S]*?\*\//g, "");
-
-  it.each(["plain", "checks"])("%s is drawn in the grass tokens only", (look) => {
-    const rules = [
-      ...css.matchAll(new RegExp(`\\[data-grass="${look}"\\] \\.field \\{([^}]*)\\}`, "g")),
-    ];
-    expect(rules.length).toBeGreaterThan(0);
-    for (const [, body] of rules) {
-      expect(body).not.toMatch(/#[0-9a-f]{3,8}\b|rgb|hsl/i);
-      for (const token of body!.match(/--color-[a-z0-9-]+/g) ?? [])
-        expect(["--color-pitch", "--color-pitch-2"]).toContain(token);
-    }
   });
 });

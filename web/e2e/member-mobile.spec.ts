@@ -100,15 +100,12 @@ for (const language of ["tr", "en"] as const) {
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({ path: testInfo.outputPath(`member-top-${language}.png`) });
 
-    // What explains the plan, the squad held before the transfers and the secondary tools
-    // wait closed, on a phone as on a desktop, and none of them widens the page when opened.
-    const closedSections = [
-      members.howComputed,
-      members.memberSquad,
-      members.advancedSettings,
-      members.decisionTools,
-      members.chipsAndTransfers,
-    ];
+    // What explains the plan and the advanced settings wait closed, on a phone as on a
+    // desktop, and neither widens the page when opened. The tools are pages of their own.
+    const closedSections = [members.howComputed, members.advancedSettings];
+    for (const title of [members.memberSquad, members.decisionTools, members.chipsAndTransfers]) {
+      await expect(page.locator("main summary", { hasText: title })).toHaveCount(0);
+    }
     for (const title of closedSections) {
       const detail = page
         .locator("main details")
@@ -158,6 +155,8 @@ for (const language of ["tr", "en"] as const) {
     const settings = page.getByRole("region", { name: members.planTitle });
     const compute = settings.getByRole("button", { name: members.computeButton, exact: true });
     await expect(settings.getByRole("radio", { name: /^3 / })).toBeChecked();
+    // The presets head the plan, and the Top 100 influence stays in front beside it (#1248).
+    await expect(settings.getByRole("group", { name: members.templatesTitle })).toBeVisible();
     await expect(settings.getByRole("group", { name: /Top 100/ })).toBeVisible();
     await compute.scrollIntoViewIfNeeded();
     await expect(compute).toBeInViewport({ ratio: 1 });
@@ -176,6 +175,27 @@ for (const language of ["tr", "en"] as const) {
       await expect(
         page.locator("main details").filter({ has: page.locator("summary", { hasText: title }) }),
       ).not.toHaveAttribute("open");
+    }
+  });
+
+  test(`each of the member's tool pages fits a phone, in ${language}`, async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await installLeagueMocks(page);
+    await page.route("**/api/v1/**", (route) => route.abort("connectionrefused"));
+    await page.addInitScript((lang) => localStorage.setItem("squadopt.language", lang), language);
+    const members = MESSAGES[language].leagueMembers;
+    const titles = {
+      "current-squad": members.memberSquad,
+      "decision-tools": members.decisionTools,
+      "what-if": members.whatIfTitle,
+      duel: members.duelTitle,
+      chips: members.chipsAndTransfers,
+      card: members.cardTitle,
+    };
+    for (const [tool, title] of Object.entries(titles)) {
+      await page.goto(`/league/352490/members/35249001/${tool}?mode=saf-puan&window=1`);
+      await expect(page.getByRole("heading", { level: 2, name: title })).toBeVisible();
+      expect(await noSidewaysScroll(page)).toBe(true);
     }
   });
 

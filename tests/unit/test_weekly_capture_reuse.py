@@ -7,6 +7,7 @@ from collections.abc import Mapping
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 import pytest
 import tests.unit.test_backend_runtime as handoff_fixture
@@ -15,6 +16,11 @@ from tests.unit.test_weekly_operations import TWO, world
 from tests.unit.test_weekly_suggestion_eval import SEASON, recorded, snapshot
 
 from squadopt.application.advice_record import record_member_advice
+from squadopt.application.league_publication import (
+    LeaguePublicationRequest,
+    LeaguePublicationResult,
+    publish_league,
+)
 from squadopt.application.scoreboard import publish_scoreboard
 from squadopt.application.weekly_suggestion_eval import publish_suggestion_histories
 from squadopt.data import snapshots as snapshot_store
@@ -202,7 +208,20 @@ def test_leagues_histories_and_scoreboards_share_one_capture_read(
 def test_reused_club_news_capture_preserves_league_bytes(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Both leagues publish the same bytes whether each read goes to disk or to the cache."""
+    """Both leagues publish the same bytes whether each read goes to disk or to the cache.
+
+    The disk arm publishes each league without a reader, as ``build_league_site`` does, so
+    the manager's word takes its default reads. Handing that arm ``read_snapshot`` as the
+    reader would run the same reader path as the cached arm, and a break in that path
+    alone would leave both arms equal. The disk arm must also show the quote, or two
+    equally broken arms would still compare equal.
+    """
+
+    def without_reader(
+        request: LeaguePublicationRequest, **options: Any
+    ) -> LeaguePublicationResult:
+        options.pop("read_capture", None)
+        return publish_league(request, **options)
 
     published = []
     for name in ("disk", "cached"):
@@ -213,12 +232,24 @@ def test_reused_club_news_capture_preserves_league_bytes(
             "_league_request",
             lambda league, record, request=request: replace(request(league, record), now=BUILT_AT),
         )
-        if name == "disk":
-            monkeypatch.setattr(operation, "_capture_for_publication", read_snapshot)
-        operation._league()
+        with monkeypatch.context() as patch:
+            if name == "disk":
+                patch.setattr(weekly, "publish_league", without_reader)
+            operation._league()
+        # The disk arm's patch decides only what publish_league reads, and there only the
+        # manager's word reads the club-news capture. So that capture is in the run's
+        # cache after the cached arm and absent after the disk arm. Other reads of the
+        # stage, such as the decision capture, may use the cache in either arm.
+        news = (operation.paths.snapshots.resolve(), str(operation.request.rotation_capture))
+        assert (news in operation._publication_captures) is (name == "cached")
         published.append(_published(operation))
-    assert published[0] == published[1]
-    assert sum(path.endswith("/hoca-sozu.json") for path in published[1]) == len(TWO)
+    disk, cached = published
+    for league in TWO:
+        page = f"site/data/leagues/{league}/advice/101/saf-puan/1/hoca-sozu.json"
+        words = json.loads(disk[page])
+        assert [word["words"] for word in words["payload"]["evidence"]["applied"]] == [QUOTE]
+    assert cached == disk
+    assert sum(path.endswith("/hoca-sozu.json") for path in cached) == len(TWO)
 
 
 def test_reused_capture_preserves_scoreboard_and_history_bytes(tmp_path: Path) -> None:

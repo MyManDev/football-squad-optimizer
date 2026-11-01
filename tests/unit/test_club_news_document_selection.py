@@ -114,6 +114,29 @@ def test_index_bytes_remain_in_selection_audit_but_only_article_goes_to_coding()
     assert len(selection.decisions) == 2
 
 
+@pytest.mark.parametrize(
+    "path", ["news/first-team/team-news-eze/", "news/first-team/team-news-eze"]
+)
+def test_an_article_is_selected_whether_or_not_its_address_ends_in_a_slash(path):
+    # Crystal Palace's article addresses end in "/". Compared with itself, such a page used
+    # to read as an index over its own address and was never sent to coding.
+    doc = document("Team news: Eze available", path)
+    selection = select_coding_documents((doc,))
+    assert selection.documents == (doc,)
+    assert selection.decisions[0].reason == "availability_or_upcoming_match"
+
+
+def test_an_index_whose_address_ends_in_a_slash_still_gives_way_to_its_article():
+    index = document("Updates", "news/first-team/")
+    article = document("Team news: Eze available", "news/first-team/team-news-eze/")
+    selection = select_coding_documents((index, article))
+    assert selection.documents == (article,)
+    assert [d.reason for d in selection.decisions] == [
+        "discovery_index_with_selected_articles",
+        "availability_or_upcoming_match",
+    ]
+
+
 def test_selection_policy_versions_invalidate_reuse(monkeypatch):
     import squadopt.platform.club_news_provider as provider
 

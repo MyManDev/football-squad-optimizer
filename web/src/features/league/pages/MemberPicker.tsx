@@ -7,7 +7,6 @@ import { arrivedToPick } from "../../../lib/leagueAddresses";
 import { LeagueDataMissing } from "../data";
 import type { RosterEntry } from "../identity/useLeagueIdentity";
 import type { useLeagueMembers } from "../queries";
-import { useLeague } from "../useLeague";
 import styles from "./MemberPicker.module.css";
 
 /**
@@ -31,7 +30,6 @@ export function MemberPicker({
   const { locale, messages } = useLanguage();
   const copy = messages.memberPicker;
   const listCopy = messages.leagueMembers;
-  const { league } = useLeague();
   const location = useLocation();
   const heading = useRef<HTMLHeadingElement>(null);
   const [selected, setSelected] = useState<number | null>(null);
@@ -113,7 +111,6 @@ export function MemberPicker({
       <h1 id="member-picker-title" ref={heading} tabIndex={-1} className={styles.title}>
         {copy.title}
       </h1>
-      <p className={styles.league}>{copy.league(league.leagueName)}</p>
       {body}
       <Link className={styles.other} to="/">
         {copy.otherLeague}

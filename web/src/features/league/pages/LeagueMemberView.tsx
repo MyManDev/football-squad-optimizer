@@ -1,7 +1,7 @@
-import { memberHistoryAddress } from "../../../lib/leagueAddresses";
+import { memberAddress, memberHistoryAddress, type MemberTool } from "../../../lib/leagueAddresses";
 import { useLeagueId } from "../useLeague";
 import { NewInformationNotice } from "../advice/OfficialInformationCard";
-import { useMemo, type ReactNode } from "react";
+import { useMemo, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Link, useSearchParams } from "react-router";
 
@@ -13,6 +13,7 @@ import { clubCodesFromFixtures } from "../../../lib/clubs";
 import { AdviceRequestPanel } from "../advice/AdviceRequestPanel";
 import { ChipTimingCard } from "../advice/ChipTimingCard";
 import { COMPUTE_COPY } from "../advice/computeCopy";
+import { gameweekDeadline } from "../advice/deadline";
 import { MemberDecisionControls } from "../advice/MemberDecisionControls";
 import { deviceEndedWithoutPlan } from "../device/useDevicePlan";
 import { isDevicePlanEntry } from "../device/types";
@@ -37,16 +38,20 @@ import {
   MissingAdviceCard,
   PlanLineup,
 } from "./MemberAdviceCard";
+import { ApplyOnFpl } from "./ApplyOnFpl";
 import { HeldSquad, MemberSquad } from "./MemberSquad";
 import { hasLineup, squadOnPitch } from "./squadOnPitch";
 import { MemberTopBar } from "./MemberTopBar";
+import { MemberSections } from "./MemberSections";
 import type { LeagueMemberViewProps } from "./memberPageTypes";
 import { useMemberAdviceView } from "./useMemberAdviceView";
 import { rivalCandidates } from "../advice/adviceSelection";
 import { canDuel, duelRivalId } from "./duelSides";
 import { RivalDuel } from "./RivalDuel";
 import { SquadCard } from "../card/SquadCard";
-import { WeekStory } from "./WeekStory";
+import { LastWeekCard } from "./LastWeekCard";
+import { lastWeekResult } from "./lastWeekResult";
+import { useWeekArrival } from "./weekArrival";
 import styles from "./LeagueMemberPage.module.css";
 
 export function LeagueMemberView(props: LeagueMemberViewProps) {
@@ -137,8 +142,12 @@ function LeagueMemberContent({
   duelIssue,
   windowControl = null,
   deadlinePassed = null,
+  now,
   fixtures = null,
   fixturesPending = false,
+  scoreboard = null,
+  history = null,
+  tool,
 }: LeagueMemberViewProps) {
   const { language, locale, messages } = useLanguage();
   const leagueId = useLeagueId();
@@ -179,14 +188,19 @@ function LeagueMemberContent({
     },
     searchParams,
   );
+  // Past its deadline the week is closed: nothing is computed for it and none of its plans
+  // can be applied, so the page leaves out what only changes or recomputes the plan.
+  const closed = deadlinePassed !== null;
   // With the service answering, a selection it computes and nobody published is not a
   // dead end: the panel offers the computation and no "not listed" card stands beside it.
-  // The same holds for a selection the member's device solves while the week is open,
-  // until a run ends without a plan: the card then says what is published again.
+  // The same holds for a selection the member's device solves, until a run ends without a
+  // plan: the card then says what is published again. Both hold only while the week is
+  // open; a closed week has no panel, so the card says what is published.
   const computeOnly =
     selection.status === "not-listed" &&
+    !closed &&
     ((computeAvailable && selection.computable !== undefined) ||
-      (device.available && deadlinePassed === null && !deviceEndedWithoutPlan(device.state)));
+      (device.available && !deviceEndedWithoutPlan(device.state)));
   // The what-if mode starts from the plan on screen when it is a solved week without a chip.
   const advised = advisedFifteen(shown?.envelope.payload);
   // The duel (#1133): the other human members, and the one `?duel=` names among them.
@@ -229,8 +243,22 @@ function LeagueMemberContent({
   const played =
     outcomeFreshness?.scoredGameweek != null && outcomeFreshness.scoredGameweek >= view.gameweek;
   const codes = useMemo(() => clubCodesFromFixtures(fixtures), [fixtures]);
+  // The member's latest finished week, from the scoreboard and their history; null leaves
+  // the page without the card.
+  const lastWeek = lastWeekResult(view, scoreboard, history);
   const plan = !adviceLoading && shown ? shown.envelope.payload : null;
   const onPitch = squadOnPitch(plan, view);
+  // The week can still be changed only while the calendar states a deadline that is ahead:
+  // an unknown deadline is not an open week, so nothing is offered to apply then.
+  const weekOpen =
+    deadlinePassed === null && gameweekDeadline(fixtures, view.season, view.gameweek) !== null;
+  // The way to make the decision on the game's own page, in a new tab. It is placed in the
+  // document where it is seen (the heading row, or the end of the decision on a phone), so
+  // the tab order follows the screen.
+  const apply = plan && weekOpen ? <ApplyOnFpl plan={plan} squad={view} /> : null;
+  // The page arrives once, and its decision once it is drawn (weekArrival.ts).
+  const arrival = useRef<HTMLDivElement>(null);
+  useWeekArrival(arrival, !adviceLoading && !rivalsLoading && shown != null);
   // One fixture rail: its own column from 1180 px (and on a page rendered without the
   // shell), beside the squad on a tablet, and a sheet over the page on a phone.
   const railPlacement: RailPlacement = !shell
@@ -314,6 +342,8 @@ function LeagueMemberContent({
       // The decision's "change settings" link lands here; focus follows it.
       tabIndex={-1}
     >
+      {/* The plan is chosen in one place: the templates head it as presets that set the same
+          strategy and window as the controls under them. */}
       <MemberDecisionControls
         entryId={entryId}
         members={members}
@@ -321,7 +351,21 @@ function LeagueMemberContent({
         capabilities={capabilities}
         onDevice={onDevice}
         part="plan"
+        presets={
+          <TemplatePicker
+            canApply={(params) => {
+              const offered = resolve(params);
+              return (
+                !adviceLoading &&
+                indexReadable &&
+                (offered.status === "ready" || offered.computable?.selection === true)
+              );
+            }}
+          />
+        }
       />
+      {/* The Top 100 influence stays in front, just after the plan: its options are useful
+          enough not to fold away (#1248). */}
       <MemberDecisionControls
         entryId={entryId}
         members={members}
@@ -330,7 +374,17 @@ function LeagueMemberContent({
         onDevice={onDevice}
         part="top100"
       />
+      {/* What a member changes rarely waits folded: the experimental model, beside the
+          manager's word and the chips. */}
       <Tool title={copy.advancedSettings}>
+        <MemberDecisionControls
+          entryId={entryId}
+          members={members}
+          index={selection.status === "index-error" ? null : index}
+          capabilities={capabilities}
+          onDevice={onDevice}
+          part="model"
+        />
         <MemberDecisionControls
           entryId={entryId}
           members={members}
@@ -346,16 +400,6 @@ function LeagueMemberContent({
           fixtures={fixtures}
         />
         <DecisionPreferencesPanel squad={view} available={capabilities?.preferences === true} />
-        <TemplatePicker
-          canApply={(params) => {
-            const offered = resolve(params);
-            return (
-              !adviceLoading &&
-              indexReadable &&
-              (offered.status === "ready" || offered.computable?.selection === true)
-            );
-          }}
-        />
       </Tool>
       <AdviceRequestPanel
         dockClassName={styles.computeDock}
@@ -389,7 +433,6 @@ function LeagueMemberContent({
                 : undefined
         }
         chipChosen={selection.chip.chip !== null}
-        deadlinePassed={deadlinePassed !== null}
       />
       <MemberDecisionControls
         entryId={entryId}
@@ -402,24 +445,127 @@ function LeagueMemberContent({
     </section>
   );
 
+  // The member's tools, each its own page that the sidebar links (lib/leagueAddresses.ts);
+  // a tool this member's week has nothing for is null and its page says so.
+  const tools: Record<MemberTool, { title: string; body: ReactNode | null }> = {
+    "current-squad": {
+      title: copy.memberSquad,
+      body: view.starting_xi.length > 0 ? <HeldSquad squad={view} codes={codes} /> : null,
+    },
+    "decision-tools": {
+      title: copy.decisionTools,
+      body: (
+        <>
+          <DecisionWorkbench
+            request={{
+              ...request,
+              top100Weight: selection.top100.weight,
+              managersWord: selection.evidence.on,
+              chip: selection.chip.chip,
+            }}
+            selected={shown?.envelope ?? null}
+            squad={squad}
+            loading={adviceLoading}
+          />
+          {/* The comparison's one action computes the other model, which a closed week
+              does not, so it is offered only while the week is open. */}
+          {capabilities?.models?.includes("football") && computeAvailable && !closed ? (
+            <ModelComparison
+              request={request}
+              selected={shown?.envelope ?? null}
+              snapshot={view.source_snapshot_id}
+              client={client}
+              busy={job.state.phase === "waiting" || job.state.phase === "requesting"}
+            />
+          ) : null}
+        </>
+      ),
+    },
+    "what-if": {
+      title: copy.whatIfTitle,
+      body:
+        advised !== null && isDevicePlanEntry(view.device_plan) ? (
+          <WhatIfPanel squad={view} advised={advised} dependencies={whatIfDependencies} />
+        ) : null,
+    },
+    duel: {
+      title: copy.duelTitle,
+      body:
+        canDuel(squad) && duelCandidates.length > 0 ? (
+          <RivalDuel
+            squad={squad}
+            candidates={duelCandidates}
+            selected={duelId}
+            rival={duelSquad?.payload.entry.entry_id === duelId ? duelSquad : null}
+            issue={duelIssue}
+            onSelect={(rivalId) =>
+              setSearchParams(
+                (current) => {
+                  const next = new URLSearchParams(current);
+                  next.set("duel", String(rivalId));
+                  return next;
+                },
+                { replace: true },
+              )
+            }
+          />
+        ) : null,
+    },
+    chips: { title: copy.chipsAndTransfers, body: <MemberResourceCards squad={view} /> },
+    card: {
+      title: copy.cardTitle,
+      body:
+        !adviceLoading && shown ? <SquadCard view={shown.envelope.payload} squad={view} /> : null,
+    },
+  };
+
+  if (tool !== undefined) {
+    const page = tools[tool];
+    return (
+      <div className={styles.layout}>
+        <div className={styles.page}>
+          <MemberTopBar
+            squad={squad}
+            members={members}
+            fixtures={fixtures}
+            deadlinePassed={deadlinePassed}
+            now={now}
+          />
+          <section aria-labelledby="member-tool-title" className={styles.toolBody}>
+            <h2 className={styles.decisionTitle} id="member-tool-title">
+              {page.title}
+            </h2>
+            {page.body ?? <EmptyState title={copy.toolEmpty} />}
+          </section>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className={styles.layout} data-rail={railPlacement}>
+    <div ref={arrival} className={styles.layout} data-rail={railPlacement}>
       <div className={styles.page}>
         <MemberTopBar
           squad={squad}
           members={members}
           fixtures={fixtures}
           deadlinePassed={deadlinePassed}
+          now={now}
         />
+        {/* A phone's one column is long: the strip keeps its two parts a tap away, pinned
+            under the phone bar once the decision has been read past. Wider layouts pin the
+            top bar instead and show more of the page at once. */}
+        {layout === "phone" ? <MemberSections /> : null}
 
         {deadlinePassed !== null ? (
-          <section className={styles.notice} aria-labelledby="deadline-passed-title">
+          <section
+            className={styles.notice}
+            aria-labelledby="deadline-passed-title"
+            data-testid="deadline-passed"
+          >
             <h2 className={styles.noticeTitle} id="deadline-passed-title">
               {COMPUTE_COPY[language].deadlinePassedTitle}
             </h2>
-            <p data-testid="deadline-passed">
-              {COMPUTE_COPY[language].deadlinePassedBody(view.gameweek, dateTime(deadlinePassed))}
-            </p>
           </section>
         ) : null}
         {played ? (
@@ -436,7 +582,17 @@ function LeagueMemberContent({
           </p>
         ) : null}
 
-        {plan ? <WeekStory view={plan} /> : null}
+        {/* What the member's last finished week came to, before what this week decides. */}
+        {lastWeek ? (
+          <LastWeekCard
+            result={lastWeek}
+            historyHref={
+              lastWeek.suggested !== null && view.league_id === leagueId
+                ? memberHistoryAddress(leagueId, entryId)
+                : null
+            }
+          />
+        ) : null}
 
         <section aria-labelledby="entry-advice-title" className={styles.adviceSection}>
           <div className={styles.decision} data-mark="decision">
@@ -449,15 +605,19 @@ function LeagueMemberContent({
                   {selectionSummary}
                 </p>
                 {/* The settings now sit under the decision, so the way to them is named
-                    where the decision says which settings it was made under. */}
-                <a href="#plan-settings" className={styles.changePlan}>
-                  {copy.changePlan}
-                </a>
+                    where the decision says which settings it was made under. A closed
+                    week has no settings to go to. */}
+                {closed ? null : (
+                  <a href="#plan-settings" className={styles.changePlan}>
+                    {copy.changePlan}
+                  </a>
+                )}
                 <p className={styles.echo} aria-live="polite">
                   {echo}
                 </p>
               </div>
               {!adviceLoading && shown ? <AdviceStamp shown={shown} /> : null}
+              {layout === "phone" ? null : apply}
             </div>
             {adviceLoading ? (
               <EmptyState title={copy.loadingAdvice} />
@@ -486,9 +646,12 @@ function LeagueMemberContent({
                       ? onRetryAdvice
                       : undefined
                 }
-                canCompute={computeAvailable}
+                canCompute={computeAvailable && !closed}
+                // The address the sidebar's own link lands on with no selection.
+                defaultPlan={closed ? memberAddress(leagueId, entryId) : undefined}
               />
             )}
+            {layout === "phone" ? apply : null}
           </div>
           {/* A phone reads the decision, then what to make of it, then the squad (as
               D-Phone-Bu-Hafta draws it); wider layouts put the squad first. Both are placed
@@ -512,72 +675,9 @@ function LeagueMemberContent({
           ) : null}
         </section>
 
-        {planSettings}
-
-        <div className={styles.tools}>
-          {onPitch.source === "plan" && view.starting_xi.length > 0 ? (
-            <Tool title={copy.memberSquad}>
-              <HeldSquad squad={view} codes={codes} />
-            </Tool>
-          ) : null}
-          <Tool title={copy.decisionTools}>
-            <DecisionWorkbench
-              request={{
-                ...request,
-                top100Weight: selection.top100.weight,
-                managersWord: selection.evidence.on,
-                chip: selection.chip.chip,
-              }}
-              selected={shown?.envelope ?? null}
-              squad={squad}
-              loading={adviceLoading}
-            />
-            {capabilities?.models?.includes("football") && computeAvailable ? (
-              <ModelComparison
-                request={request}
-                selected={shown?.envelope ?? null}
-                snapshot={view.source_snapshot_id}
-                client={client}
-                deadlinePassed={deadlinePassed !== null}
-                busy={job.state.phase === "waiting" || job.state.phase === "requesting"}
-              />
-            ) : null}
-          </Tool>
-          {advised !== null && isDevicePlanEntry(view.device_plan) ? (
-            <Tool title={copy.whatIfTitle}>
-              <WhatIfPanel squad={view} advised={advised} dependencies={whatIfDependencies} />
-            </Tool>
-          ) : null}
-          {canDuel(squad) && duelCandidates.length > 0 ? (
-            <Tool title={copy.duelTitle} open={duelId !== null}>
-              <RivalDuel
-                squad={squad}
-                candidates={duelCandidates}
-                selected={duelId}
-                rival={duelSquad?.payload.entry.entry_id === duelId ? duelSquad : null}
-                issue={duelIssue}
-                onSelect={(rivalId) =>
-                  setSearchParams(
-                    (current) => {
-                      const next = new URLSearchParams(current);
-                      next.set("duel", String(rivalId));
-                      return next;
-                    },
-                    { replace: true },
-                  )
-                }
-              />
-            </Tool>
-          ) : null}
-          <Tool title={copy.chipsAndTransfers}>
-            <MemberResourceCards squad={view} />
-          </Tool>
-          {!adviceLoading && shown ? (
-            <Tool title={copy.cardTitle}>
-              <SquadCard view={shown.envelope.payload} squad={view} />
-            </Tool>
-          ) : null}
-        </div>
+        {/* Every setting in it changes or recomputes a plan the closed week cannot apply;
+            the notice above says so, and when the next week's plan comes. */}
+        {closed ? null : planSettings}
       </div>
       {railPlacement === "column" ? rail : null}
       {railPlacement === "sheet" ? createPortal(rail, document.body) : null}

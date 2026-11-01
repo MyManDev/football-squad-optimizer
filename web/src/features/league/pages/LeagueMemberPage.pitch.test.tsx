@@ -341,20 +341,16 @@ describe("the squad after the transfers, on the pitch", () => {
     expect(screen.queryByRole("region", { name: copy.lineupTitle })).toBeNull();
   });
 
-  it("keeps the squad held before the transfers in a closed section of its own", () => {
+  it("keeps the squad held before the transfers on a page of its own", () => {
     show("tr");
     const copy = MESSAGES.tr.leagueMembers;
-    const held = screen
-      .getByText(copy.memberSquad, { selector: "summary span" })
-      .closest("details")!;
-    expect(held).not.toHaveAttribute("open");
+    expect(screen.queryByRole("region", { name: copy.memberSquad })).toBeNull();
+    cleanup();
+    show("tr", { tool: "current-squad" });
+    const held = screen.getByRole("region", { name: copy.memberSquad });
     expect(within(held).getAllByRole("listitem")).toHaveLength(
       SQUAD.payload.starting_xi.length + SQUAD.payload.bench.length,
     );
-    // The pitch's list label stays unique on the page.
-    expect(
-      screen.getAllByRole("list", { name: MESSAGES.tr.squad.pitchLabel, hidden: true }),
-    ).toHaveLength(1);
   });
 
   it("draws a partial squad as far as it goes, with no formation made up", () => {

@@ -1,15 +1,18 @@
 import { useId, type CSSProperties } from "react";
 
 import { useLanguage } from "../../../i18n/context";
-import { clubCode, clubSwatch, type ClubCodes } from "../../../lib/clubs";
+import { clubCode, type ClubCodes } from "../../../lib/clubs";
 import { figure } from "../../../lib/format";
 import type { CoachAbsence } from "../advice/coachAbsences";
 import type { ModelChange } from "../advice/modelSwitch";
+import { ClubShirt } from "./ClubShirt";
 import { CoachNewsMark } from "./CoachNews";
 import styles from "./MemberPitch.module.css";
-import { clubPlate, usePitchLook } from "./pitchLook";
 
-/** One player as the pitch draws them: a name plate on the grass, white or in club colours. */
+/**
+ * One player as the pitch draws them: a name plate on the grass, white or in club colours,
+ * with the player's shirt in their club's colours on it or above it.
+ */
 export interface PitchPlayer {
   playerId: number;
   name: string;
@@ -74,7 +77,6 @@ function Plate({
   player,
   codes,
   changed,
-  clubColours,
   news,
   onSelectPlayer,
 }: {
@@ -82,27 +84,19 @@ function Plate({
   codes: ClubCodes;
   /** Brought in by a switch of prediction model: said in the plate's text, as 'New' is. */
   changed: boolean;
-  clubColours: boolean;
   news?: CoachAbsence;
   onSelectPlayer?: (id: number) => void;
 }) {
   const { language, locale, messages } = useLanguage();
   const code = clubCode(player.team, codes);
-  const swatch = clubSwatch(code);
-  // In club colours the plate takes its club's fill and one readable text colour (#1136).
-  const club = clubColours ? clubPlate(code) : null;
+  const keeper = player.position === "GK";
   const shortName = player.shortName.trim() || player.name;
+  // The shirt is drawn three ways and the stylesheet shows the one the pitch has room for:
+  // large above the plate where an upright pitch is tall enough for it, otherwise small in
+  // the plate where the club swatch stood, before the name across and before the code
+  // upright. It is in club colours on the white plate.
   return (
-    <div
-      className={styles.plate}
-      data-plate=""
-      data-club={club?.colour}
-      style={
-        club
-          ? ({ "--plate-fill": club.fill, "--plate-text": club.text } as CSSProperties)
-          : undefined
-      }
-    >
+    <div className={styles.plate} data-plate="">
       {onSelectPlayer ? (
         <button
           type="button"
@@ -112,13 +106,13 @@ function Plate({
         />
       ) : null}
       <span className={styles.name} title={player.name}>
-        {swatch ? (
-          <span
-            className={`${styles.swatch} ${styles.swatchAcross}`}
-            style={{ background: swatch }}
-            aria-hidden="true"
-          />
-        ) : null}
+        <ClubShirt
+          code={code}
+          name={player.name}
+          keeper={keeper}
+          size="small"
+          className={styles.shirtAcross}
+        />
         <span className={styles.nameText} aria-hidden={shortName !== player.name || undefined}>
           {shortName}
         </span>
@@ -128,13 +122,13 @@ function Plate({
         <span className="visually-hidden"> {messages.leagueMembers.modelChangedMark}</span>
       ) : null}
       <span className={styles.code}>
-        {swatch ? (
-          <span
-            className={`${styles.swatch} ${styles.swatchUpright}`}
-            style={{ background: swatch }}
-            aria-hidden="true"
-          />
-        ) : null}
+        <ClubShirt
+          code={code}
+          name={player.name}
+          keeper={keeper}
+          size="small"
+          className={styles.shirtUpright}
+        />
         <span className={styles.codeText}>{code ?? player.team}</span>
       </span>
       {news || (player.expectedPoints !== null && Number.isFinite(player.expectedPoints)) ? (
@@ -162,6 +156,14 @@ function Plate({
           {messages.leagueMembers.viceMark}
         </span>
       ) : null}
+      {/* Last, so the plate's text still starts with the name. */}
+      <ClubShirt
+        code={code}
+        name={player.name}
+        keeper={keeper}
+        size="large"
+        className={styles.shirtAbove}
+      />
     </div>
   );
 }
@@ -210,7 +212,6 @@ export function MemberPitch({
   const { messages } = useLanguage();
   const copy = messages.leagueMembers;
   const describedBy = useId();
-  const [look] = usePitchLook();
   const lines = LINES.map((position) => ({
     position,
     players: players.filter((player) => player.position === position),
@@ -226,7 +227,6 @@ export function MemberPitch({
     <div
       className={styles.wrap}
       data-mark="pitch"
-      data-grass={look.grass}
       data-def-crowded={defenders >= 4 ? "true" : undefined}
       style={{ "--hh": `${height}px` } as CSSProperties}
     >
@@ -282,7 +282,6 @@ export function MemberPitch({
                       <Plate
                         player={player}
                         codes={codes}
-                        clubColours={look.clubColours}
                         news={news?.get(player.playerId)}
                         changed={modelChange?.changed.has(player.playerId) ?? false}
                         onSelectPlayer={onSelectPlayer}
@@ -346,7 +345,6 @@ export function MemberBench({
         <ol className={styles.benchList}>
           {players.map((player) => {
             const code = clubCode(player.team, codes);
-            const swatch = clubSwatch(code);
             const shortName = player.shortName.trim() || player.name;
             const changed = modelChange?.changed.has(player.playerId) ?? false;
             return (
@@ -367,13 +365,12 @@ export function MemberBench({
                   ) : null}
                 </strong>
                 <span className={styles.benchMeta}>
-                  {swatch ? (
-                    <span
-                      className={styles.swatch}
-                      style={{ background: swatch }}
-                      aria-hidden="true"
-                    />
-                  ) : null}
+                  <ClubShirt
+                    code={code}
+                    name={player.name}
+                    keeper={player.position === "GK"}
+                    size="small"
+                  />
                   <span className={code ? styles.benchCode : undefined}>{code ?? player.team}</span>
                   {Object.hasOwn(messages.positions, player.position) ? (
                     <span>

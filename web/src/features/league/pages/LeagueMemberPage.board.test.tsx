@@ -5,7 +5,10 @@
  * that wait closed. Every figure is a published one; what is absent is left out.
  */
 
-import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
@@ -21,6 +24,7 @@ import { deadlineLong } from "../../../lib/format";
 import { AS_A_CHANCE } from "../../../testSupport/honesty";
 import type { FixturesPayload } from "../../fixtures/types";
 import { HttpAdviceClient } from "../advice/adviceClient";
+import { CHIP_COPY } from "../advice/chipCopy";
 import type {
   AdviceMove,
   AdvicePlayer,
@@ -465,6 +469,25 @@ describe("the proof stamp", () => {
     expect(box.nextElementSibling).toBeNull();
   });
 
+  it("reads as the plan's state, a tag with its tick, and never as a control", () => {
+    show("tr");
+    const stamp = screen.getByText(MESSAGES.tr.leagueMembers.stampOptimal);
+    expect(stamp.tagName).toBe("P");
+    expect(stamp.closest("button, a, [role='button'], [tabindex]")).toBeNull();
+    expect(stamp.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+    // Drawn as the house tag in its good tone (Badge.module.css), not the ink box an
+    // outlined button draws.
+    const css = readFileSync(join(__dirname, "MemberDecision.module.css"), "utf-8").replace(
+      /\/\*[\s\S]*?\*\//g,
+      "",
+    );
+    const rule = css.match(/\n\.stampBox \{([^}]*)\}/)?.[1] ?? "";
+    expect(rule).toContain("color: var(--color-good);");
+    expect(rule).toContain("border: 1px solid currentColor;");
+    expect(rule).toContain("font-size: var(--step--2);");
+    expect(rule).not.toMatch(/cursor|--color-text\b|2px solid/);
+  });
+
   it("shows neither the stamp nor a proof caveat for a plan found without a proof", () => {
     const { container } = show("tr", {
       advice: twoMoves({ solver_status: "FEASIBLE", optimality_gap: 1.3 }),
@@ -524,12 +547,7 @@ describe("honesty and the tools", () => {
     );
     const how = screen.getByText(copy.howComputed).closest("details")!;
     expect(how).not.toHaveAttribute("open");
-    for (const sentence of [
-      copy.independentAdviceRule,
-      copy.lineupRule,
-      copy.moveRowsBasis,
-      copy.diagnosticOnly,
-    ]) {
+    for (const sentence of [copy.independentAdviceRule, copy.lineupRule, copy.diagnosticOnly]) {
       expect(within(how).getByText(sentence)).not.toBeVisible();
     }
     // The caveat sentences that used to open and close the disclosure are gone.
@@ -539,31 +557,91 @@ describe("honesty and the tools", () => {
     expect(within(how).getAllByText(/beklenen puan maliyeti/)).toHaveLength(1);
   });
 
-  it("keeps the secondary tools closed, each with its own controls inside", () => {
+  it("keeps the advanced settings closed, with their own controls inside", () => {
     const { container } = show("tr");
     const copy = MESSAGES.tr.leagueMembers;
-    for (const title of [copy.advancedSettings, copy.decisionTools, copy.chipsAndTransfers]) {
-      expect(screen.getByText(title).closest("details")).not.toHaveAttribute("open");
-    }
+    expect(screen.getByText(copy.advancedSettings).closest("details")).not.toHaveAttribute("open");
+    // The tools are pages of their own in the sidebar, not sections at the page's foot.
+    expect(screen.queryByText(copy.decisionTools)).toBeNull();
+    expect(screen.queryByText(copy.chipsAndTransfers)).toBeNull();
     const advanced = screen.getByText(copy.advancedSettings).closest("details")!;
+    // The rarely changed settings: the manager's word and the chips.
     for (const name of ["llm", "chip"]) {
       expect(advanced.querySelectorAll(`input[name="${name}"]`).length).toBeGreaterThan(0);
     }
-    expect(within(advanced).getByText(copy.templatesTitle)).toBeInTheDocument();
+    // The templates are the plan's presets, not a block of their own among these.
+    expect(within(advanced).queryByRole("group", { name: copy.templatesTitle })).toBeNull();
+    expect(within(advanced).queryByRole("button", { name: copy.templateSave })).toBeNull();
     const settings = screen.getByRole("region", { name: copy.planTitle });
-    expect(within(settings).getByRole("group", { name: "Top 100 etkisi" })).toBeVisible();
-    expect(within(settings).getByRole("group", { name: "Plan süresi" })).toBeVisible();
+    // The Top 100 influence stays in front, just after the plan and before the folded
+    // settings (#1248).
+    const top100 = within(settings).getByRole("group", { name: "Top 100 etkisi" });
+    const planWindow = within(settings).getByRole("group", { name: "Plan süresi" });
+    expect(top100).toBeVisible();
+    expect(planWindow).toBeVisible();
+    expect(
+      planWindow.compareDocumentPosition(top100) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      top100.compareDocumentPosition(advanced) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     expect(within(settings).getByRole("button", { name: "Hesapla" })).toBeVisible();
     expect(settings).toContainElement(advanced);
-    expect(advanced.querySelector('input[name="top100"]')).toBeNull();
-    // The plan's own inputs are not in the advanced section, and each is on the page once.
-    expect(advanced.querySelector('input[name="strategy"], input[name="window"]')).toBeNull();
+    // The plan's own inputs and the Top 100 influence are not in the advanced section, and
+    // each is on the page once.
+    expect(
+      advanced.querySelector('input[name="strategy"], input[name="window"], input[name="top100"]'),
+    ).toBeNull();
     expect(container.querySelectorAll('input[name="window"]')).toHaveLength(3);
+    expect(container.querySelectorAll('input[name="top100"]')).toHaveLength(7);
     expect(screen.getAllByRole("button", { name: "Hesapla" })).toHaveLength(1);
-    const tools = screen.getByText(copy.decisionTools).closest("details")!;
-    expect(within(tools).getByText("Karar masam")).toBeInTheDocument();
-    const chips = screen.getByText(copy.chipsAndTransfers).closest("details")!;
-    expect(within(chips).getByText(MESSAGES.tr.memberResources.transfersTitle)).toBeInTheDocument();
+  });
+
+  it("draws a tool the address names as its own page, open, in place of the decision", () => {
+    const copy = MESSAGES.tr.leagueMembers;
+    show("tr", { tool: "decision-tools" });
+    const page = screen.getByRole("region", { name: copy.decisionTools });
+    expect(within(page).getByText("Karar masam")).toBeVisible();
+    expect(screen.queryByRole("region", { name: copy.decisionTitle })).toBeNull();
+    expect(screen.queryByRole("region", { name: copy.planTitle })).toBeNull();
+    cleanup();
+
+    show("tr", { tool: "chips" });
+    const chips = screen.getByRole("region", { name: copy.chipsAndTransfers });
+    expect(within(chips).getByText(MESSAGES.tr.memberResources.transfersTitle)).toBeVisible();
+  });
+
+  it("heads the plan with its presets, which set the strategy and window the controls read", () => {
+    show("tr", {}, `/league/352490/members/${ENTRY}?mode=saf-puan&window=3`);
+    const copy = MESSAGES.tr.leagueMembers;
+    const settings = screen.getByRole("region", { name: copy.planTitle });
+    const presets = within(settings).getByRole("group", { name: copy.templatesTitle });
+    expect(presets).toBeVisible();
+    // Under the plan's heading, before the strategy they set.
+    const heading = within(settings).getByRole("heading", { name: copy.planTitle });
+    const strategy = within(settings).getByRole("group", { name: copy.strategyLegend });
+    expect(
+      heading.compareDocumentPosition(presets) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      presets.compareDocumentPosition(strategy) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(within(settings).getByRole("button", { name: copy.templateSave })).toBeVisible();
+    fireEvent.click(within(presets).getByRole("button", { name: /^Farkı koru/ }));
+    expect(within(settings).getByRole("radio", { name: /^Farkı koru/ })).toBeChecked();
+    expect(within(settings).getByRole("radio", { name: "1 hafta" })).toBeChecked();
+  });
+
+  it("keeps the experimental model with the advanced settings, not beside the plan", () => {
+    // A link that asks for the football model shows the choice, so it can be undone.
+    const { container } = show("tr", {}, `/league/352490/members/${ENTRY}?model=football`);
+    const copy = MESSAGES.tr.leagueMembers;
+    const advanced = screen.getByText(copy.advancedSettings).closest("details")!;
+    expect(container.querySelectorAll('input[name="prediction-model"]')).toHaveLength(2);
+    expect(advanced.querySelectorAll('input[name="prediction-model"]')).toHaveLength(2);
+    expect(
+      within(advanced).getByRole("radio", { name: new RegExp(copy.modelNames.football) }),
+    ).toBeChecked();
   });
 
   it.each(["tr", "en"] as const)("prints no probability or percent in %s", (language) => {
@@ -637,18 +715,67 @@ describe("a chip strategy the service planned", () => {
   );
 });
 
-describe("the week's story (#1134)", () => {
-  it.each(["tr", "en"] as const)("sits above the decision and links into it (%s)", (language) => {
-    show(language);
-    const copy = MESSAGES[language].leagueMembers;
-    const story = screen.getByRole("navigation", { name: copy.storyTitle });
-    expect(
-      story.compareDocumentPosition(decision(language)) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-    const targets = within(story)
-      .getAllByRole("link")
-      .map((link) => link.getAttribute("href")!.slice(1));
-    for (const target of targets) expect(document.getElementById(target)).not.toBeNull();
-    expect(boards(language)).toHaveLength(2);
+// The week's story that stood above the decision is folded into it (#1134): the card says
+// each transfer and the armband once, with the gain as its headline.
+describe("the decision card", () => {
+  it.each(["tr", "en"] as const)(
+    "leads the page with the gain, then the changes, each said once (%s)",
+    (language) => {
+      const { container } = show(language);
+      const copy = MESSAGES[language].leagueMembers;
+      const bar = container.querySelector("header")!;
+      const card = container.querySelector<HTMLElement>('[data-mark="decision"]')!;
+      // Nothing stands between the top bar and the card on a week without a notice.
+      expect(screen.queryByRole("navigation")).toBeNull();
+      expect(bar.nextElementSibling).toContainElement(card);
+      const figure = within(card).getByText(language === "tr" ? "+3,01" : "+3.01", {
+        selector: "strong",
+      });
+      const count = within(card).getByText(copy.storyMoves(2));
+      expect(count.closest("p")).toHaveTextContent(`${copy.storyTransfers} ${copy.storyMoves(2)}`);
+      const [first, second] = boards(language);
+      expect(
+        figure.compareDocumentPosition(first!) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      // Each swap on its own board, the captain on the armband line, and nowhere else.
+      expect(first).toHaveTextContent(/Palmer.*Fernandes/);
+      expect(second).toHaveTextContent(/Jesus.*Brobbey/);
+      for (const name of ["Palmer", "Jesus", "Brobbey", "Haaland", copy.storyMoves(2)])
+        expect(within(card).getAllByText(name)).toHaveLength(1);
+      expect(within(card).getByText("Haaland").closest("p")).toHaveTextContent(
+        copy.viceCaptainLabel,
+      );
+    },
+  );
+
+  it("names the chip the member chose, once, with the way to what it adds", () => {
+    const copy = MESSAGES.tr.leagueMembers;
+    const chip = copy.chipNames["3xc"]!;
+    const advice = twoMoves({
+      chip: "3xc",
+      chip_choice: { chip: "3xc", gain_vs_no_chip: 6.4, basis: "x" },
+    });
+    const { container } = render(
+      <LanguageProvider initialLanguage="tr">
+        <MemoryRouter>
+          <AdviceCard
+            shown={{ envelope: advice, origin: "published" }}
+            squad={SQUAD}
+            rivalSquad={null}
+          />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+    const line = within(container).getByText(chip, { selector: "strong" }).closest("p")!;
+    expect(line).toHaveTextContent(copy.chipLabel);
+    const link = within(line).getByRole("link", { name: copy.storyDetail });
+    const detail = container.querySelector(link.getAttribute("href")!)!;
+    expect(detail).toHaveTextContent(CHIP_COPY.tr.chosen(chip));
+    expect(detail).toHaveTextContent(CHIP_COPY.tr.gain("+6,4"));
+    cleanup();
+    // A chip the document names without the member choosing it gets no line.
+    const { container: page } = show("tr", { advice: twoMoves({ chip: "bboost" }) });
+    const card = page.querySelector<HTMLElement>('[data-mark="decision"]')!;
+    expect(within(card).queryByText(copy.chipLabel)).toBeNull();
   });
 });

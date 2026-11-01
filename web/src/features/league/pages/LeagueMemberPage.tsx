@@ -1,4 +1,4 @@
-import { membersAddress } from "../../../lib/leagueAddresses";
+import { isMemberTool, membersAddress } from "../../../lib/leagueAddresses";
 import { useLeagueId } from "../useLeague";
 import { Link, useParams, useSearchParams } from "react-router";
 
@@ -6,8 +6,11 @@ import { EmptyState } from "../../../design/components/EmptyState";
 import { useLanguage } from "../../../i18n/context";
 import { useFixtures } from "../../fixtures/data";
 import { LeagueDataMissing } from "../data";
-import { useDeadlinePassed } from "../advice/deadline";
+import { gameweekDeadline, passedDeadline, useMinuteClock } from "../advice/deadline";
+import { useLeagueScoreboard, useSuggestionHistory } from "../queries";
+import { lastWeekResult } from "./lastWeekResult";
 import { LeagueMemberView } from "./LeagueMemberView";
+import { MemberPageSkeleton } from "./MemberPageSkeleton";
 import type { AdviceIssue } from "./memberPageTypes";
 import { useLeagueMemberData } from "./useLeagueMemberData";
 
@@ -18,7 +21,10 @@ export function LeagueMemberPage() {
   const { messages } = useLanguage();
   const leagueId = useLeagueId();
   const copy = messages.leagueMembers;
-  const entryParam = useParams().entryId;
+  const params = useParams();
+  const entryParam = params.entryId;
+  const toolParam = params.tool;
+  const tool = isMemberTool(toolParam) ? toolParam : undefined;
   const [searchParams] = useSearchParams();
   const {
     validEntryId,
@@ -41,15 +47,33 @@ export function LeagueMemberPage() {
     computeService,
     computePending,
   } = useLeagueMemberData(entryParam, searchParams);
-  const deadlinePassed = useDeadlinePassed(
-    squad.data?.payload.season,
-    squad.data?.payload.gameweek,
-  );
-  // The same calendar the deadline is read from; the query is shared, so nothing more is read.
+  // The published calendar: the deadline, and the clubs' next gameweeks on the boards.
   const fixtures = useFixtures();
+  // One clock for the page: the deadline check and the top bar's countdown read it.
+  const now = useMinuteClock();
+  const deadlinePassed = passedDeadline(
+    gameweekDeadline(fixtures.data, squad.data?.payload.season, squad.data?.payload.gameweek),
+    now,
+  );
+  // The card of the member's latest finished week reads the league's scoreboard, under the
+  // key /league reads it by, and only once that holds a finished week for this member, the
+  // member's history, under the key their history page reads it by. Neither holds the page
+  // back: missing or unreadable, the card or its line is left out.
+  const ownSquad = squad.data?.payload;
+  const scoreboard = useLeagueScoreboard(ownSquad !== undefined);
+  const scoreboardView = scoreboard.isError ? null : (scoreboard.data?.payload ?? null);
+  const history = useSuggestionHistory(
+    ownSquad?.entry.entry_id ?? 0,
+    ownSquad !== undefined && lastWeekResult(ownSquad, scoreboardView, null) !== null,
+  );
 
+  if (toolParam !== undefined && tool === undefined) {
+    return <EmptyState title={messages.shell.notFound} />;
+  }
   if (!validEntryId) return <EmptyState title={copy.invalidEntry} />;
-  if (squad.isPending) return <EmptyState title={copy.loadingEntry} />;
+  // The squad is the page's first read and its longest wait on a cold visit: the page's
+  // shape stands in for it, its words read to a screen reader only.
+  if (squad.isPending) return <MemberPageSkeleton />;
   if (squad.isError) {
     const missing = squad.error instanceof LeagueDataMissing;
     const reasons = missing ? [...new Set(index?.unavailable.map((item) => item.reason))] : [];
@@ -135,8 +159,12 @@ export function LeagueMemberPage() {
       computeService={computeService}
       computePending={computePending}
       deadlinePassed={deadlinePassed}
+      now={now}
       fixtures={fixtures.data ?? null}
       fixturesPending={fixtures.isPending}
+      scoreboard={scoreboardView}
+      history={history.isError ? null : (history.data ?? null)}
+      tool={tool}
     />
   );
 }

@@ -1,8 +1,8 @@
 /**
- * The what-if mode's place on the member page (#1132): a closed tool beside the decision
- * tools, offered where the plan on screen is a solved week without a chip and the
- * member's entry document carries the device block; the panel inside reads the capture's
- * table through the page's loader only when the member starts.
+ * The what-if mode's page under the member's page (#1132): offered where the plan on
+ * screen is a solved week without a chip and the member's entry document carries the
+ * device block, and otherwise saying there is nothing for the week; the panel reads the
+ * capture's table through the page's loader only when the member starts.
  */
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
@@ -45,7 +45,7 @@ function show(
 ) {
   render(
     <LanguageProvider initialLanguage="tr">
-      <MemoryRouter initialEntries={[`/league/352490/members/${ENTRY}`]}>
+      <MemoryRouter initialEntries={[`/league/352490/members/${ENTRY}/what-if`]}>
         {withLeague(
           <LeagueMemberView
             squad={squad}
@@ -53,6 +53,7 @@ function show(
             members={mockLeagueMembersEnvelope.payload.members}
             index={mockEntryAdviceIndex(ENTRY).payload}
             whatIfDependencies={{ loadDocument }}
+            tool="what-if"
           />,
         )}
       </MemoryRouter>
@@ -61,14 +62,18 @@ function show(
   return loadDocument;
 }
 
-const tool = () =>
-  screen.queryByText(COPY.whatIfTitle, { selector: "summary span" })?.closest("details") ?? null;
+/** The panel's start button, or null where the page has nothing for the week. */
+const tool = () => {
+  const start = screen.queryByRole("button", { name: COPY.whatIfStart });
+  if (start === null) expect(screen.getByText(COPY.toolEmpty)).toBeInTheDocument();
+  return start;
+};
 
-describe("the what-if tool", () => {
-  it("waits closed beside the decision tools and reads nothing until the member starts", () => {
+describe("the what-if page", () => {
+  it("is headed by its title and reads nothing until the member starts", () => {
     const loadDocument = show(WITH_BLOCK, ADVICE);
+    expect(screen.getByRole("heading", { name: COPY.whatIfTitle })).toBeInTheDocument();
     expect(tool()).not.toBeNull();
-    expect(tool()).not.toHaveAttribute("open");
     expect(loadDocument).not.toHaveBeenCalled();
   });
 

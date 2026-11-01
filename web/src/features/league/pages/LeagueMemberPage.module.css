@@ -1,8 +1,9 @@
 /*
  * The member page in direction D: a top bar pinned at the top of the main column, the
- * decision (heading row, boards, gain strip, captain line), the squad on the pitch, how
- * it was worked out, then the plan settings with Hesapla in one visible card, and the
- * secondary tools as closed sections. The fixture rail is a column of its own from 1180 px.
+ * decision as the page's leading card (heading row, gain strip, boards, captain line), the
+ * squad on the pitch, how it was worked out, then the plan settings with Hesapla in one
+ * visible card, and the secondary tools as closed sections. The fixture rail is a column of
+ * its own from 1180 px.
  */
 
 .page {
@@ -59,6 +60,17 @@
     z-index: 10;
     margin: calc(-1 * var(--space-5)) calc(-1 * var(--space-5)) 0;
     padding: var(--space-2) var(--space-5);
+    /* Pinned, the bar stands in one place on every member page, so a move between them
+       through the navigation's crossfade (PageShell, transitions.css) leaves it still while
+       the page under it fades. A page carries one bar, the member's, the league table's or
+       the skeleton's, so no two elements share the name. */
+    view-transition-name: member-bar;
+  }
+
+  /* Lifted out of the picture under an open drawer, the bar would be drawn over the drawer
+     while it fades; there it fades with the page. */
+  :global([data-drawer="open"]) .topBar {
+    view-transition-name: none;
   }
 
   /* The bar is two lines (about 97 px) wherever the team, the week and the score bug do not
@@ -130,6 +142,25 @@
 
 .deadlineShort {
   display: none;
+}
+
+/* The time left, a state tag on the label's line, no taller than the label (16 px), so the
+   pinned bar keeps its height and the page's scroll padding still clears it. In the last
+   hour it takes the warning tone (warn on the tag's own surface, as the warn badge). */
+.countdown {
+  align-self: flex-start;
+  padding: 0 5px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-s);
+  background: var(--color-surface);
+  font-weight: 600;
+  line-height: 14px;
+  white-space: nowrap;
+}
+
+.countdown[data-urgent] {
+  border-color: currentColor;
+  color: var(--color-warn);
 }
 
 .scoreBug {
@@ -248,6 +279,12 @@
     display: inline;
   }
 
+  /* While it counts down, the time left stands in for the date too: the first line keeps
+     its width (the tag is about as wide as the label and the date) and the team its room. */
+  .deadline:has(.countdown) .deadlineShort {
+    display: none;
+  }
+
   /* One row, always: when a narrow phone or a wider font runs out of room, a long label
      breaks inside its own cell (one extra 14 px line) instead of a whole cell falling to a
      second row (a 25 px jump that pushed the week's gain below the first screen). */
@@ -282,6 +319,132 @@
   .scoreCell dd {
     font-size: 16px;
     line-height: 18px;
+  }
+}
+
+/* ---- The phone's section strip (MemberSections.tsx) ----
+   Hamle · Kadro · Araçlar, pinned under the shell's 56 px phone bar, and below it in the
+   stacking order too (15 to the bar's 20), over everything the page scrolls under it.
+   Nothing of it is drawn from 600 px, where the top bar itself is pinned. */
+
+.sections {
+  display: none;
+}
+
+@media (max-width: 599.98px) {
+  /* A sticky element of no height, right after the top bar: it takes no room in the page,
+     so the first screen and the decision after 'Planı gör' stay as they were, and the
+     page's gap stands once around it, not twice. Its bar hangs from it, edge to edge as the
+     top bar runs. */
+  .sections {
+    position: sticky;
+    top: 56px;
+    z-index: 15;
+    display: block;
+    height: 0;
+    margin-bottom: calc(-1 * var(--space-4));
+  }
+
+  .sectionsBar {
+    position: absolute;
+    top: 0;
+    right: calc(-1 * var(--space-4));
+    left: calc(-1 * var(--space-4));
+    display: flex;
+    height: 40px;
+    padding: 0 var(--space-2);
+    border-bottom: 1px solid var(--color-line);
+    background: var(--color-bg);
+    /* Away, it is out of sight and out of the tab order, hidden once it has faded. It fades
+       rather than slides: its links keep their place under the phone bar throughout, so one
+       focused mid-motion is still where its scroll margin (below) expects it. */
+    visibility: hidden;
+    opacity: 0;
+    transition:
+      opacity var(--motion-ui-fast) var(--motion-ease),
+      visibility 0s linear var(--motion-ui-fast);
+  }
+
+  .sections[data-shown] .sectionsBar {
+    visibility: visible;
+    opacity: 1;
+    transition: opacity var(--motion-ui-fast) var(--motion-ease);
+  }
+
+  /* The bar is 40 px and each link a 44 px target: its last 4 px hang under the bar's edge,
+     clear of the phone bar over its top, and the name stays centred on the bar. Pinned at
+     56 to 100 px, a link stands inside the page's 104 px scroll padding, which a browser
+     reads as hidden: focusing one (Tab) scrolled the page by 300 px to bring it clear, and
+     the strip went away under the focus. Its scroll margin moves the area a browser brings
+     into view to just under the padding, where it already is in view. */
+  .sectionLink {
+    display: flex;
+    flex: 1 1 0;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    height: 44px;
+    padding-bottom: 4px;
+    scroll-margin-top: -48px;
+    scroll-margin-bottom: 8px;
+    color: var(--color-text-muted);
+    font-family: var(--font-display);
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 20px;
+    text-decoration: none;
+  }
+
+  .sectionLink[aria-current="location"] {
+    color: var(--color-text);
+  }
+
+  /* Drawn inside the link, so the phone bar over the strip never covers the ring. */
+  .sectionLink:focus-visible {
+    outline-offset: -2px;
+  }
+
+  /* The section being read is underlined at the bar's edge, as FotMob marks its tab, as wide
+     as its name: the name's 20 px line is centred on the 40 px bar, so the line's foot is
+     10 px under it. */
+  .sectionName {
+    position: relative;
+  }
+
+  .sectionName::after {
+    content: "";
+    position: absolute;
+    right: 0;
+    bottom: -10px;
+    left: 0;
+    height: 3px;
+    background: var(--color-text);
+    transform: scaleX(0);
+    transition: transform var(--motion-ui-fast) var(--motion-ease);
+  }
+
+  .sectionLink[aria-current="location"] .sectionName::after {
+    transform: none;
+  }
+
+  /* A jump lands under both bars: the shell's 64 px for the phone bar and the strip's 40.
+     The decision's heading takes the strip's 40 back: the strip stands aside while that
+     heading is in view, so 'Planı gör' and 'Hamle' land it under the phone bar alone, where
+     the boards and the captain line still fit the screen under it. */
+  :global(html):has(.sections) {
+    scroll-padding-top: 104px;
+  }
+
+  :global(html):has(.sections) .decisionTitle {
+    scroll-margin-top: -40px;
+  }
+}
+
+/* A jump made from the strip glides to its section while focus is on the link that a tap
+   there gives; every other jump, and any jump under reduced motion, is instant. */
+@media (max-width: 599.98px) and (prefers-reduced-motion: no-preference) {
+  :global(html):has(.sectionLink:focus) {
+    scroll-behavior: smooth;
   }
 }
 
@@ -378,10 +541,20 @@ section.notice p {
   }
 }
 
+/* The decision leads the page as a card of its own, lifted off the page by its surface. Its
+   rhythm is tight (8 px between its parts, 12 px inside its edge above and below), so on a
+   laptop the decision, the pitch and the honesty block still share one screen
+   (member-pitch.spec.ts); a phone sets its own below. */
 .decision {
+  container: decision / inline-size;
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-surface);
+  box-shadow: 0 1px 3px rgba(16, 38, 26, 0.12);
 }
 
 .headingRow {
@@ -438,18 +611,24 @@ section.notice p {
 
 /* On a phone the proof stamp leaves the heading row for its place after the gain strip,
    as the phone artboard draws it (MemberDecision.module.css orders the parts), and the
-   rhythm tightens so the boards and the captain line come up first. */
+   rhythm tightens so the headline, the boards and the captain line come up first. */
 @media (max-width: 599.98px) {
   .page {
     gap: var(--space-4);
   }
 
   /* Two columns, so the proof stamp can stand beside the transfer facts; everything else
-     takes the whole row (MemberDecision.module.css places and orders the parts). */
+     takes the whole row (MemberDecision.module.css places and orders the parts). The card
+     runs edge to edge, so the boards and the captain line keep the column's whole width
+     (at 360 px the captain line has none to spare). */
   .decision {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr);
     gap: var(--space-2) var(--space-3);
+    margin-inline: calc(-1 * var(--space-4));
+    padding: var(--space-3) var(--space-4);
+    border-inline: 0;
+    border-radius: 0;
   }
 
   .decision > *,
@@ -472,6 +651,78 @@ section.notice p {
   font-size: var(--step--2);
   font-weight: 600;
   line-height: 16px;
+}
+
+/* FPL'de uygula, the primary action, with what the member does there beside it. Where the
+   decision is 760 px wide it closes the heading row beside the proof stamp, button over
+   hint, and the row keeps the two lines its heading takes there, so the decision, the
+   pitch and the honesty block still share a laptop's screen; a narrower decision gives it
+   the row's next line. On a phone LeagueMemberView places it at the end of the decision,
+   after the plan's last sentence (MemberDecision.module.css orders the parts up to 9). */
+.apply {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.applyLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-s);
+  background: var(--color-primary);
+  color: var(--color-primary-text);
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.applyLink:hover {
+  background: var(--color-text);
+}
+
+.applyHint {
+  flex: 1 1 16ch;
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--step--2);
+  line-height: 16px;
+}
+
+/* With a pointer beside the sidebar the button is no taller than the stamp's line. */
+@media (min-width: 1180px) {
+  .applyLink {
+    min-height: 32px;
+  }
+}
+
+/* 720px, not wider: the decision's content box is what the query measures, and a decision
+   drawn as a padded card leaves about 736px of it at 1440px. */
+@container decision (min-width: 720px) {
+  .headingRow:has(> .apply) {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+  }
+
+  .apply {
+    grid-column: auto;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+  }
+
+  .applyHint {
+    flex: none;
+  }
+}
+
+@media (max-width: 599.98px) {
+  .apply {
+    order: 10;
+  }
 }
 
 /* ---- How it was worked out: the disclosure and the history link ---- */
@@ -572,11 +823,6 @@ section.notice p {
 
 /* ---- Secondary tools, each closed until asked for ---- */
 
-.tools {
-  display: flex;
-  flex-direction: column;
-}
-
 .tool {
   border-top: 1px solid var(--color-line);
 }
@@ -609,6 +855,29 @@ section.notice p {
 
 .tool[open] .toolIcon {
   transform: rotate(90deg);
+}
+
+/* A tool opens and closes in the card time (#1136): its content box grows from nothing to
+   its own height and back, and stays drawn until it has shut. Only where the browser can
+   size to `auto` and style that box (::details-content); anywhere else the section opens
+   at once, as it always has, and under reduced motion the token is zero. The box clips its
+   height only, so a focus ring at either side is never cut. */
+@supports (interpolate-size: allow-keywords) {
+  .tool {
+    interpolate-size: allow-keywords;
+  }
+
+  .tool::details-content {
+    block-size: 0;
+    overflow-y: clip;
+    transition:
+      block-size var(--motion-ui) var(--motion-ease),
+      content-visibility var(--motion-ui) var(--motion-ease) allow-discrete;
+  }
+
+  .tool[open]::details-content {
+    block-size: auto;
+  }
 }
 
 .toolBody {

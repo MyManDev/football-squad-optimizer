@@ -3,6 +3,7 @@ import { lazy, Suspense } from "react";
 import { BrowserRouter, Route, Routes } from "react-router";
 
 import { EmptyState } from "../design/components/EmptyState";
+import { OpeningMark } from "../design/shell/OpeningMark";
 import { useLanguage } from "../i18n/context";
 import { LanguageProvider } from "../i18n/LanguageProvider";
 import { IdentifiedShell } from "./IdentifiedShell";
@@ -63,6 +64,7 @@ export function App() {
   return (
     <LanguageProvider>
       <LocalizedApp basename={import.meta.env.BASE_URL} />
+      <OpeningMark />
     </LanguageProvider>
   );
 }
@@ -135,7 +137,14 @@ function LocalizedApp({ basename }: { basename: string }) {
                     }
                   />
                 ))}
-                {["/league/members/:entryId", "/league/:leagueId/members/:entryId"].map((root) => (
+                {/* A member's page and each of their tools: one route with the tool as an
+                    optional last segment, so moving between them keeps the page mounted and
+                    a plan the device computed stays. The history's own address ranks above
+                    it, as a fixed segment does over a parameter. */}
+                {[
+                  "/league/members/:entryId/:tool?",
+                  "/league/:leagueId/members/:entryId/:tool?",
+                ].map((root) => (
                   <Route
                     key={root}
                     path={root}

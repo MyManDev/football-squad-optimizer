@@ -310,7 +310,9 @@ for (const [width, height] of [
     page,
   }) => {
     await open(page, width, height, twoMoves());
-    const squadLink = page.locator("#sidebar nav").getByRole("link", { name: copy.shell.squad });
+    const squadLink = page
+      .locator("#sidebar nav")
+      .getByRole("link", { name: copy.shell.squad, exact: true });
     await squadLink.click();
     await expect(page).toHaveURL(/#kadro$/);
     const heading = page.getByRole("heading", { name: copy.leagueMembers.squadAfterTitle });
@@ -517,42 +519,4 @@ for (const [width, height] of [
     ).toBe(true);
     // The language switch stays reachable in the sidebar.
     await expect(page.locator("#sidebar").getByRole("button", { name: /^TR/ })).toBeAttached();
-  });
-
-// The viewer's pitch look (#1136): checked grass and club-coloured plates, chosen under the
-// bench, kept after a reload, inside the page at a phone's width, and readable by axe's own
-// contrast check over every plate's fill and text, in the upright and the across drawing.
-for (const [width, height, across] of [
-  [320, 720, false],
-  [1366, 768, true],
-] as const)
-  test(`the pitch look is kept, fits and reads at ${width} px`, async ({ page }) => {
-    await open(page, width, height, PLAN, false, codedCalendar(Object.keys(CLUB_COLOURS)));
-    const looks = page.locator('[data-mark="pitch-look"]');
-    const choose = (group: string, option: string) =>
-      looks.getByRole("group", { name: group }).getByRole("button", { name: option });
-    await choose(copy.leagueMembers.pitchLookLabel, copy.leagueMembers.pitchLookChecks).click();
-    await choose(copy.leagueMembers.clubColoursLabel, copy.leagueMembers.clubColoursOn).click();
-    const pitch = page.locator('[data-mark="pitch"]');
-    await expect(
-      page.getByRole("list", { name: copy.squad.pitchLabel }),
-    ).toHaveAccessibleDescription(
-      across ? copy.leagueMembers.pitchHorizontal : copy.leagueMembers.pitchVertical,
-    );
-    await expect(pitch).toHaveAttribute("data-grass", "checks");
-    expect(await pitch.locator("[data-club]").count()).toBeGreaterThan(0);
-    await page.reload();
-    await expect(pitch).toHaveAttribute("data-grass", "checks");
-    expect(await pitch.locator("[data-club]").count()).toBeGreaterThan(0);
-    await expect(
-      choose(copy.leagueMembers.clubColoursLabel, copy.leagueMembers.clubColoursOn),
-    ).toHaveAttribute("aria-pressed", "true");
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
-      true,
-    );
-    await atRest(page);
-    const blocking = (await new AxeBuilder({ page }).analyze()).violations.filter((violation) =>
-      ["serious", "critical"].includes(violation.impact ?? ""),
-    );
-    expect(blocking).toEqual([]);
   });

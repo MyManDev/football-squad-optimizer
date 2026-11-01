@@ -1,6 +1,6 @@
 {
   "contract_version": "league_directory_v1",
-  "generated_at_utc": "2026-10-21T20:32:36Z",
+  "generated_at_utc": "2026-10-30T08:03:14Z",
   "source_kind": "live",
   "payload": {
     "leagues": [
@@ -8,10 +8,10 @@
         "league_id": 352490,
         "league_name": "iyi olan kazans\u0131n v4",
         "season": "2026-27",
-        "gameweek": 7,
+        "gameweek": 9,
         "path": "leagues/352490",
-        "device_plan": "device/fpl-live-20261016T060154Z-b1702d00c8cd/device-plan.json",
-        "device_plan_sha256": "e246ffcc9b017b005bec2db88b7729c2ed913c39118e6558de399fd5ceaac374"
+        "device_plan": "device/fpl-live-20261030T070058Z-8b2a93c0babe/device-plan.json",
+        "device_plan_sha256": "1193ed3ef2f8df7ed7a41dfcd1dffffba85347c1786dc5fba4e607fc41388311"
       }
     ]
   }

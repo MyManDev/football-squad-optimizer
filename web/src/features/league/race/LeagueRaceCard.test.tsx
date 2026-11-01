@@ -1,8 +1,9 @@
 /**
  * The league race card (#1135): one timeline with a rank change, the line brought forward
  * by a tap or by the member list with its gained and lost weeks marked, the gameweeks
- * stepped through with whose place changed, fifty members on fixed rows that never meet,
- * and the stylesheet's motion tokens and thumb-sized controls.
+ * stepped through with whose place changed, each member's points to the neighbours with
+ * the viewer's own row emphasised, fifty members on fixed rows that never meet, and the
+ * stylesheet's motion tokens and thumb-sized controls.
  */
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { readFileSync } from "node:fs";
@@ -128,6 +129,69 @@ describe("bringing a line forward", () => {
     fireEvent.change(screen.getByLabelText(COPY.raceMember), { target: { value: "33" } });
     expect(highlightedEntry(container)).toBe(33);
     expect(container.querySelector("svg g:last-of-type")).toHaveAttribute("data-entry", "33");
+  });
+});
+
+describe("the gaps to the neighbours", () => {
+  function gapsShown(race: typeof RACE, viewer: number | null, language: Language) {
+    render(
+      <LanguageProvider initialLanguage={language}>
+        <LeagueRaceCard race={race} members={MEMBERS} viewer={viewer} />
+      </LanguageProvider>,
+    );
+    const week = race.gameweeks[race.gameweeks.length - 1]!;
+    const list = screen.getByRole("list", {
+      name: MESSAGES[language].leagueMembers.raceGaps(week),
+    });
+    return within(list)
+      .getAllByRole("listitem")
+      .map((row) => [
+        row.getAttribute("aria-current"),
+        row.querySelector('[data-gap="ahead"]')?.textContent ?? null,
+        row.querySelector('[data-gap="behind"]')?.textContent ?? null,
+      ]);
+  }
+
+  it.each(["tr", "en"] as const)(
+    "gives each member the points to the one ahead and behind, the viewer's own row current (%s)",
+    (language) => {
+      const copy = MESSAGES[language].leagueMembers;
+      // Gameweek 3: 22 on 185, 11 on 180, 33 on 140.
+      expect(gapsShown(RACE, 11, language)).toEqual([
+        [null, null, copy.raceGapBehind("5")],
+        ["true", copy.raceGapAhead("5"), copy.raceGapBehind("40")],
+        [null, copy.raceGapAhead("40"), null],
+      ]);
+      const own = screen.getByRole("listitem", { current: true });
+      expect(own).toHaveTextContent(`M11 · ${copy.viewerYouBadge}`);
+      expect(document.body.textContent).not.toMatch(AS_A_CHANCE);
+      expect(document.body.textContent).not.toMatch(AS_A_CAVEAT);
+    },
+  );
+
+  it.each(["tr", "en"] as const)("reads equal totals as level on 0 (%s)", (language) => {
+    const copy = MESSAGES[language].leagueMembers;
+    const level = leagueRace(
+      raceScoreboard([
+        raceWeek(1, { 11: 70, 22: 60, 33: 50 }),
+        raceWeek(2, { 11: 120, 22: 120, 33: 119 }),
+      ]),
+      MEMBERS,
+    )!;
+    expect(gapsShown(level, null, language)).toEqual([
+      [null, null, copy.raceLevelBehind],
+      [null, copy.raceLevelAhead, copy.raceGapBehind("1")],
+      [null, copy.raceGapAhead("1"), null],
+    ]);
+    expect(copy.raceLevelAhead).toMatch(/\b0\b/);
+    expect(copy.raceLevelBehind).toMatch(/\b0\b/);
+  });
+
+  it("keeps the latest settled week's gaps while the stepper is on an earlier week", () => {
+    gapsShown(RACE, null, "tr");
+    step(COPY.racePrevious);
+    expect(screen.getByRole("list", { name: COPY.raceGaps(3) })).toBeInTheDocument();
+    expect(screen.queryByRole("listitem", { current: true })).toBeNull();
   });
 });
 

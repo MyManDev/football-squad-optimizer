@@ -1,0 +1,19 @@
+/* The deadlines as a calendar file, under the page's title: one quiet button and the sentence
+   on what the calendar app does with it. */
+.calendar {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-2);
+}
+
+.action {
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-text);
+  border-radius: var(--radius-s);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}

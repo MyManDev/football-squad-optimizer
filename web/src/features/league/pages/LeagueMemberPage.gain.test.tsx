@@ -89,8 +89,8 @@ function withPayload(patch: Partial<EntryAdvice>): LeagueViewEnvelope<EntryAdvic
 }
 
 describe("the card states one basis for the rows, the total and the gain", () => {
-  it("prints each board's share and the plan's gain as the eleven with the captain doubled", () => {
-    const text = renderAdvice(
+  it("prints each board's share and the plan's gain", () => {
+    renderAdvice(
       withPayload({
         moves: [move("m1", 1.2), move("m2", 0.5)],
         expected_gain_vs_hold: 1.7,
@@ -104,9 +104,7 @@ describe("the card states one basis for the rows, the total and the gain", () =>
     for (const board of [first!, second!]) {
       expect(within(board).getByText(COPY.boardGainLabel)).toBeInTheDocument();
     }
-    // The boards are read in order, which is what makes them add up, and the total they
-    // add up to is on the page beside them as a bare figure.
-    expect(text).toContain(COPY.moveRowsBasis);
+    // The total the boards add up to is on the page beside them as a bare figure.
     const figure = screen.getByText("+1.7", { selector: "strong" });
     expect(figure.nextElementSibling).toHaveClass("visually-hidden");
     expect(figure.closest("p")?.textContent).toBe(`+1.7 ${COPY.boardGainLabel}`);

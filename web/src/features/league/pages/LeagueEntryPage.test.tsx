@@ -104,13 +104,37 @@ describe.each(["tr", "en"] as const)("league entry in %s", (language) => {
   });
 
   it("says what the site does before the field, and keeps the ID help folded", () => {
+    const helpCopy = MESSAGES[language].fplIdHelp;
     open(language);
     const intro = screen.getByText(copy.intro);
     const field = screen.getByLabelText(copy.label);
     expect(intro.compareDocumentPosition(field) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    const help = screen.getByText(copy.helpTitle).closest("details")!;
+    const help = screen.getByText(helpCopy.title).closest("details")!;
     expect(help.open).toBe(false);
-    expect(help).toHaveTextContent(copy.help);
+    expect(help).toHaveTextContent(helpCopy.league);
+  });
+
+  it("folds where the league ID is found between the field and its button", async () => {
+    const helpCopy = MESSAGES[language].fplIdHelp;
+    open(language);
+    const field = screen.getByLabelText(copy.label);
+    const help = screen.getByText(helpCopy.title).closest("details")!;
+    const submit = screen.getByRole("button", { name: copy.submit });
+    // Right under the field, inside its form, and before the form's one action.
+    expect(help.parentElement).toBe(field.closest("form"));
+    expect(help.previousElementSibling).toBe(field);
+    expect(help.nextElementSibling).toBe(submit);
+    // The field keeps its own label and description; the help is the next stop, not read
+    // out with the field.
+    expect(field).toHaveAccessibleName(copy.label);
+    expect(field).toHaveAccessibleDescription(expect.stringContaining(copy.hint));
+    expect(field).not.toHaveAccessibleDescription(expect.stringContaining(helpCopy.league));
+    expect(help.querySelector("summary")).toHaveTextContent(helpCopy.title);
+    expect(help.querySelector("code")).toHaveTextContent(
+      "fantasy.premierleague.com/leagues/123456/standings/c",
+    );
+    await userEvent.setup().click(screen.getByText(helpCopy.title));
+    expect(help.open).toBe(true);
   });
 
   it("validates decimal IDs before requesting any publication", async () => {

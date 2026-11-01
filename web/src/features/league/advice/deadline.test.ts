@@ -42,16 +42,10 @@ describe("the deadline of the advised gameweek", () => {
 
   it("is told to the member without any wording of chance", () => {
     for (const copy of Object.values(COMPUTE_COPY)) {
-      for (const sentence of [
-        copy.deadlinePassedTitle,
-        copy.deadlinePassedBody(5, "18 Sep 2026, 20:30"),
-        copy.deadlinePassedCompute,
-      ]) {
+      for (const sentence of [copy.deadlinePassedTitle, copy.deadlinePassedCompute]) {
         expect(sentence).not.toMatch(AS_A_CHANCE);
         expect(sentence).not.toContain(String.fromCharCode(0x2014));
       }
-      expect(copy.deadlinePassedBody(5, "WHEN")).toContain("WHEN");
-      expect(copy.deadlinePassedBody(5, "WHEN")).toContain("5");
     }
   });
 });
