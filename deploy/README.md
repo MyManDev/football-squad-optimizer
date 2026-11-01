@@ -28,7 +28,7 @@ writes the answer. Workers scale by adding processes.
 | `containerapp.yaml` | ADR 0006's initial topology as one Azure Container Apps definition; applying it creates paid resources | [Backend runbook, Azure Container Apps](../docs/backend_runbook.md#azure-container-apps) |
 | `cloudflared/config.example.yml` | A Cloudflare Tunnel that exposes only the API at `squadopt-api.mymandev.com`, from a Windows machine | [Backend free hosting, the tunnel](../docs/backend_free_hosting.md#2-the-tunnel) |
 | `club-news.settings.example.toml` | The private model settings of the club-news acquisition command; the browser and the advice API never read it | [Club news configuration](../docs/club_news_configuration.md) |
-| `weekly-schedule/` | The weekly schedule of #1243 on a Linux host: a systemd timer that ticks the deadline gate every 15 minutes, the service of one tick (a run ends at its site pull request; D1 releases it by hand after the preview), and a drop-in that keeps the first week to dry runs | [The weekly schedule on a Linux host](weekly-schedule/README.md) |
+| `weekly-schedule/` | The weekly schedule of #1243 on a Linux host: a systemd timer that ticks the deadline gate every 15 minutes, the service of one tick (a run ends at its site pull request; D1 releases it by hand after the preview), a drop-in that keeps the first week to dry runs, and the provisioning and read-only readiness scripts of its Contabo Ubuntu 24.04 host | [The weekly schedule on a Linux host](weekly-schedule/README.md) |
 
 Copy an example outside Git, replace its placeholders, and keep the copy private.
 
@@ -42,5 +42,6 @@ are reachable only through the `squadopt-api` Cloudflare Tunnel
 hosts and is proposed, not decided, and issue #988 decides whether the backend moves off the PC
 or is retired in favour of the device solver.
 
-The weekly runs start on the PC. `weekly-schedule/` is installed on no host yet; its guide
-says what a host needs first and in which order to enable it.
+The weekly runs start on the PC. `weekly-schedule/` is installed on no host yet: its host is a
+Contabo Cloud VPS 4 on Ubuntu 24.04 (#1243), and its guide gives the steps in order, from
+ordering the VPS to the first real tick.
