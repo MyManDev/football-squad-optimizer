@@ -67,3 +67,15 @@ export function deviceRequestFor(selection: PublishedAdviceSelection): AdviceReq
     managersWord: (request.managersWord ?? false) || selection.evidence.on,
   };
 }
+
+/**
+ * Whether opening the member page asks the device for the plan (#981 step 4, decision 4 of
+ * #978 as answered in 6165942058): only where the member's index says no one-week plan is
+ * published, which a device menu states (`menu: "device"`; the publication's shape holds
+ * such an index to no plan file and no unavailable row), and only while the week's
+ * deadline is known and ahead. Where a plan is published the member presses the device's
+ * button, as before.
+ */
+export function solvesOnOpen(index: EntryAdviceIndex | null, weekOpen: boolean): boolean {
+  return weekOpen && index?.menu === "device";
+}

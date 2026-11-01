@@ -157,6 +157,11 @@ function LeagueMemberContent({
   const view = squad.payload;
   const news = useMemo(() => coachAbsences(coachNews ?? advice, squad), [coachNews, advice, squad]);
   const [searchParams, setSearchParams] = useSearchParams();
+  // The week can still be changed only while the calendar states a deadline that is ahead:
+  // an unknown deadline is not an open week, so nothing is offered to apply then, and the
+  // device is not asked for a plan on opening.
+  const weekOpen =
+    deadlinePassed === null && gameweekDeadline(fixtures, view.season, view.gameweek) !== null;
   const {
     entryId,
     resolve,
@@ -172,6 +177,7 @@ function LeagueMemberContent({
     shown,
     rejectedContext,
     rejectedUnreadable,
+    openRun,
   } = useMemberAdviceView(
     {
       squad,
@@ -187,6 +193,7 @@ function LeagueMemberContent({
       deviceRivals,
     },
     searchParams,
+    weekOpen,
   );
   // Past its deadline the week is closed: nothing is computed for it and none of its plans
   // can be applied, so the page leaves out what only changes or recomputes the plan.
@@ -232,10 +239,18 @@ function LeagueMemberContent({
   ]
     .filter(Boolean)
     .join(" · ");
+  // A run the page started on opening says where it stands beside the heading, as the
+  // device's own sentence does under its button.
+  const openRunLine =
+    openRun && device.state.phase === "loading"
+      ? copy.deviceLoading
+      : openRun && device.state.phase === "solving"
+        ? copy.deviceSolving
+        : null;
   const echo =
     shown?.source === "device"
       ? copy.computeEcho(copy.computeEchoStates.device)
-      : computeEcho(copy, job.state);
+      : (openRunLine ?? computeEcho(copy, job.state));
   const dateTime = (iso: string) =>
     new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(
       new Date(iso),
@@ -248,10 +263,6 @@ function LeagueMemberContent({
   const lastWeek = lastWeekResult(view, scoreboard, history);
   const plan = !adviceLoading && shown ? shown.envelope.payload : null;
   const onPitch = squadOnPitch(plan, view);
-  // The week can still be changed only while the calendar states a deadline that is ahead:
-  // an unknown deadline is not an open week, so nothing is offered to apply then.
-  const weekOpen =
-    deadlinePassed === null && gameweekDeadline(fixtures, view.season, view.gameweek) !== null;
   // The way to make the decision on the game's own page, in a new tab. It is placed in the
   // document where it is seen (the heading row, or the end of the decision on a phone), so
   // the tab order follows the screen.
@@ -506,7 +517,15 @@ function LeagueMemberContent({
             <h2 className={styles.decisionTitle} id="member-tool-title">
               {page.title}
             </h2>
-            {page.body ?? <EmptyState title={copy.toolEmpty} />}
+            {/* The what-if squad and the card start from the plan: while the run the page
+                started on opening is solving it, they say so rather than that there is nothing. */}
+            {page.body ?? (
+              <EmptyState
+                title={
+                  (tool === "what-if" || tool === "card" ? openRunLine : null) ?? copy.toolEmpty
+                }
+              />
+            )}
           </section>
         </div>
       </div>

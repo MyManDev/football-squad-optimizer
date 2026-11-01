@@ -14,7 +14,7 @@ import {
 } from "../advice/useAdviceJob";
 import { NO_DEVICE_RIVALS } from "../device/computable";
 import { useDevicePlan, type DevicePlan } from "../device/useDevicePlan";
-import { deviceRequestFor, memberSelection } from "./memberSelection";
+import { deviceRequestFor, memberSelection, solvesOnOpen } from "./memberSelection";
 
 /** The same attempt, without the earlier answer it carried. */
 function withoutEarlier(state: ComputePhase): ComputePhase {
@@ -24,7 +24,11 @@ function withoutEarlier(state: ComputePhase): ComputePhase {
 import { strategyNeedsRival, type EntryAdvice, type LeagueViewEnvelope } from "../types";
 import type { LeagueMemberViewProps, ShownAdvice } from "./memberPageTypes";
 
-/** Select/reset advice for the current URL while rejecting stale publication context. */
+/**
+ * Select/reset advice for the current URL while rejecting stale publication context.
+ * `weekOpen` says the week's deadline is known and ahead: only then does opening a page
+ * with no published one-week plan ask the device for it (`solvesOnOpen`).
+ */
 export function useMemberAdviceView(
   {
     squad,
@@ -40,6 +44,7 @@ export function useMemberAdviceView(
     deviceRivals = NO_DEVICE_RIVALS,
   }: LeagueMemberViewProps,
   searchParams: URLSearchParams,
+  weekOpen = false,
 ) {
   const view = squad.payload;
   const { tree } = useLeague();
@@ -95,12 +100,8 @@ export function useMemberAdviceView(
   // The chip the page shows is the selection's; without the service's capabilities the
   // request carries none, so the device is asked for the selection, chip included. A rival
   // strategy is offered only against a rival the device's statement names.
-  const deviceJob = useDevicePlan(
-    view,
-    deviceRequestFor(selection),
-    deviceDependencies,
-    onDevice?.rivals ?? [],
-  );
+  const deviceRequest = deviceRequestFor(selection);
+  const deviceJob = useDevicePlan(view, deviceRequest, deviceDependencies, onDevice?.rivals ?? []);
   // What the member asked for, chip and Top 100 weight included.
   const selectionKey = [
     adviceRequestKey(request),
@@ -118,9 +119,11 @@ export function useMemberAdviceView(
   const readOnOpen = computeService === "ready" && computeAvailable && advice == null;
   const resumable = useRef(request);
   const endDeviceRun = useRef(resetDevice);
+  const startDeviceRun = useRef(runOnDevice);
   useEffect(() => {
     resumable.current = request;
     endDeviceRun.current = resetDevice;
+    startDeviceRun.current = runOnDevice;
   });
   useEffect(() => {
     reset();
@@ -133,6 +136,17 @@ export function useMemberAdviceView(
   useEffect(() => {
     endDeviceRun.current();
   }, [selectionKey]);
+  // Where no one-week plan is published, opening the page is the request: the device
+  // solves the selection once, after the reset above, and again for each new selection it
+  // can solve. It follows the selection and the week only, through a ref as the reset
+  // does, so a late read, a baseline the service may now offer or a member who asks the
+  // service instead starts no second run; the device's own guard refuses a start while
+  // this selection's run is loading or solving. A passed deadline starts nothing.
+  const openRun = solvesOnOpen(index, weekOpen) && deviceJob.available;
+  const deviceKey = adviceRequestKey(deviceRequest);
+  useEffect(() => {
+    if (openRun) startDeviceRun.current();
+  }, [openRun, deviceKey]);
   useEffect(() => {
     if (readOnOpen) readCached?.(resumable.current);
   }, [requestKey, readOnOpen, readCached]);
@@ -280,5 +294,6 @@ export function useMemberAdviceView(
     shown,
     rejectedContext,
     rejectedUnreadable,
+    openRun,
   };
 }
