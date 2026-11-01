@@ -1,0 +1,80 @@
+{
+  "first_page": {
+    "contract_version": "fpl_league_standings_v1",
+    "league": {
+      "id": 314,
+      "name": "Synthetic League",
+      "scoring": "classic"
+    },
+    "page": 1,
+    "has_next": true,
+    "last_updated_data": "2026-10-19T09:00:00Z",
+    "source_time": "2026-10-19T17:30:00.000Z",
+    "results": [
+      {
+        "entry": 5001,
+        "entry_name": "Example Team 1",
+        "player_name": "Example Manager 1",
+        "rank": 1,
+        "rank_sort": 1,
+        "last_rank": null,
+        "total": 600,
+        "event_total": 40
+      },
+      {
+        "entry": 5002,
+        "entry_name": "Example Team 2",
+        "player_name": "Example Manager 2",
+        "rank": 2,
+        "rank_sort": 2,
+        "last_rank": 3,
+        "total": 593,
+        "event_total": 41
+      },
+      {
+        "entry": 5003,
+        "entry_name": "Example Team 3",
+        "player_name": "Example Manager 3",
+        "rank": 3,
+        "rank_sort": 3,
+        "last_rank": 4,
+        "total": 586,
+        "event_total": 42
+      }
+    ]
+  },
+  "last_page": {
+    "contract_version": "fpl_league_standings_v1",
+    "league": {
+      "id": 314,
+      "name": "Synthetic League",
+      "scoring": "classic"
+    },
+    "page": 2,
+    "has_next": false,
+    "last_updated_data": "2026-10-19T09:00:00Z",
+    "source_time": "2026-10-19T17:30:00.000Z",
+    "results": [
+      {
+        "entry": 5051,
+        "entry_name": "Example Team 51",
+        "player_name": "Example Manager 51",
+        "rank": 51,
+        "rank_sort": 51,
+        "last_rank": null,
+        "total": 600,
+        "event_total": 40
+      },
+      {
+        "entry": 5052,
+        "entry_name": "Example Team 52",
+        "player_name": "Example Manager 52",
+        "rank": 52,
+        "rank_sort": 52,
+        "last_rank": 53,
+        "total": 593,
+        "event_total": 41
+      }
+    ]
+  }
+}
