@@ -67,9 +67,16 @@ python -m scripts.capture_club_news --settings-file <private-settings> --snapsho
 
 Only Details links for the exact selected club, on its already registered origin
 and below its registered news path, are eligible. Other club hosts are not fetched
-merely because the league links to them. The existing robots, terms, ten-article
-host budget, source timestamp and claim validation rules remain in force. Central
-injury descriptions themselves neither authorize an absence nor change minutes.
+merely because the league links to them. A Details link must be an absolute address
+with no `.` or `..` segment, in printable ASCII. A two-part `listing/<name>` or
+`category/<name>` route below the registered path is dropped by the club reader's
+own rule in [club news sources](../club_news_sources.md), so it is never requested.
+The eligible links join that reader's priority order. For a Details link,
+`article_priority` reads the whole path, the registered part included, and no
+label, and the link follows the index's own links within a priority. The existing
+robots, terms, ten-article host budget, source timestamp and claim validation
+rules remain in force. Central injury descriptions themselves neither authorize an
+absence nor change minutes.
 
 Before coding, explicit women's, youth, commercial, international-roundup and
 match-report pages are withheld. A selected article takes precedence over its
