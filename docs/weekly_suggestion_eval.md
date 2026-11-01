@@ -37,9 +37,10 @@ for its league at the same capture. A new league with no records gets empty hist
   member-week in every other identity; an unreadable record, or one naming no league, is
   refused as before.
 - A record that never landed can leave its member-week directory with no record in it.
-  Only league 352490 records advice (`records_advice_for`), so for any other league such
-  a directory in the legacy archive is 352490's and its week is not shown. League 352490
-  shows it as `no_pre_deadline_record`, as before.
+  Only the league `config/leagues.json` marks with `legacy_advice_records` (league 352490)
+  records advice (`records_advice_for`), so for any other league such a directory in the
+  legacy archive is 352490's and its week is not shown. League 352490 shows it as
+  `no_pre_deadline_record`, as before.
 - A baseline record names no league and is every league's. A week the baseline store
   holds a directory for is shown for each league the member is in, even when its record
   never landed, and another league's legacy record beside it is absent.

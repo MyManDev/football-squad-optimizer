@@ -27,7 +27,11 @@ from squadopt.application.advice_record import (
     recorded_captures,
 )
 from squadopt.application.settled_member import ActualMemberDetails, settled_member_details
-from squadopt.contracts.legacy_publication_config import LEGACY_ADVICE_LEAGUE_ID
+from squadopt.contracts.league_list import (
+    LEAGUE_LIST_FILE,
+    LeagueListError,
+    parse_legacy_record_league,
+)
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import CapturedSnapshot, list_snapshot_ids, read_snapshot
 from squadopt.data.sources.fpl_live import (
@@ -66,8 +70,6 @@ from squadopt.evaluation.scoring import score_frozen_squad_decision
 from squadopt.live.recommendation import infer_season
 
 CONTRACT_VERSION = "weekly_suggestion_history_v1"
-# Kept for older measurement entry points; every reader accepts an explicit league.
-SUPPORTED_LEAGUE_ID = LEGACY_ADVICE_LEAGUE_ID
 
 # The horizon handoff, specified in docs/contracts/member_week_horizon_v1.md. The reader
 # rejects the whole document when any one of these disagrees with the scoreboard it is shown
@@ -88,6 +90,39 @@ _SHA256_HEX = re.compile(r"[0-9a-f]{64}")
 
 class SuggestionEvaluationError(DataError):
     """A historical result cannot be supported by its recorded inputs."""
+
+
+def legacy_record_league(league_list: Path = LEAGUE_LIST_FILE) -> int | None:
+    """The league that keeps the legacy advice records, as ``config/leagues.json`` marks it.
+
+    It is the first league the site published (``legacy_advice_records`` on its line). On
+    every recorded run its publications still write ``member_advice_record_v2`` under
+    ``data/advice_records`` (``league_publication.records_advice_for``), and its history
+    reads those records first and reads a member-week directory holding no record as its
+    own week (:func:`_records_advice`). Every other league reads only the baseline records.
+    None when the list marks no league. The default path is relative to the working
+    directory, as the weekly run and the scripts are run from the checkout. It is read on
+    every call, never at import, so a process that never asks needs no list.
+    """
+    try:
+        document = json.loads(Path(league_list).read_text(encoding="utf-8"))
+    except FileNotFoundError as error:
+        raise LeagueListError(f"No league list at {league_list}.") from error
+    except ValueError as error:
+        raise LeagueListError(f"{league_list} does not parse as JSON.") from error
+    return parse_legacy_record_league(document)
+
+
+def _named_or_legacy(league_id: int | None) -> int:
+    """``league_id``, or the league that keeps the legacy records when it is None."""
+    if league_id is not None:
+        return league_id
+    legacy = legacy_record_league()
+    if legacy is None:
+        raise SuggestionEvaluationError(
+            "The league list marks no league that keeps legacy advice records; name the league."
+        )
+    return legacy
 
 
 @dataclass(frozen=True, slots=True)
@@ -239,14 +274,14 @@ class _AnotherLeaguesWeek(Exception):
 
 
 def _records_advice(league_id: int) -> bool:
-    """Whether publications of ``league_id`` write member advice records.
+    """Whether publications of ``league_id`` write legacy member advice records.
 
-    The rule ``league_publication.records_advice_for`` applies, which this module cannot
-    import. Only a league that records advice can leave one of its own member-week
-    directories without a record, from a write that never landed. For any other league
-    such a directory was left by the league that does record.
+    The rule ``league_publication.records_advice_for`` applies, and both read
+    :func:`legacy_record_league`. Only a league that records advice can leave one of its own
+    member-week directories without a record, from a write that never landed. For any other
+    league such a directory was left by the league that does record.
     """
-    return league_id == SUPPORTED_LEAGUE_ID
+    return league_id == legacy_record_league()
 
 
 def _check_record_identity(
@@ -304,7 +339,7 @@ def select_record(
     entry_id: int,
     deadline_utc: str,
     published: PublishedCaptures | None = None,
-    league_id: int = SUPPORTED_LEAGUE_ID,
+    league_id: int | None = None,
     baseline_record_root: Path | None = None,
 ) -> dict[str, Any] | None:
     """Select the recorded advice for one member-week, checking both clocks and all identities.
@@ -322,6 +357,8 @@ def select_record(
     :func:`publish_suggestion_histories` requires the map.
 
     An unreadable candidate is refused instead of silently falling back to an older one.
+    Without ``league_id`` the league is the one that keeps the legacy records
+    (:func:`legacy_record_league`).
     """
     return _select_record(
         root,
@@ -330,7 +367,7 @@ def select_record(
         entry_id=entry_id,
         deadline_utc=deadline_utc,
         published=published,
-        league_id=league_id,
+        league_id=_named_or_legacy(league_id),
         other_leagues_absent=False,
         baseline_record_root=baseline_record_root,
     )
@@ -614,9 +651,10 @@ def evaluate_week(
     captures: Sequence[CapturedSnapshot],
     selected_records: dict[tuple[int, int], dict[str, Any]] | None = None,
     published: PublishedCaptures | None = None,
-    league_id: int = SUPPORTED_LEAGUE_ID,
+    league_id: int | None = None,
     baseline_record_root: Path | None = None,
 ) -> WeekReview:
+    """Review one member-week; without ``league_id``, for :func:`legacy_record_league`."""
     return _evaluate_week(
         root,
         season=season,
@@ -626,7 +664,7 @@ def evaluate_week(
         captures=captures,
         selected_records=selected_records,
         published=published,
-        league_id=league_id,
+        league_id=_named_or_legacy(league_id),
         other_leagues_absent=False,
         baseline_record_root=baseline_record_root,
     )

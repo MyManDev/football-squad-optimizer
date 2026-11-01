@@ -1053,6 +1053,49 @@ def test_a_member_week_holding_no_record_is_the_recording_leagues_week(
         assert weeks == [] and other_league_weeks == {(101, 3), (101, 4)}
 
 
+def test_the_recording_league_and_the_readers_default_come_from_the_league_list(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """No league id is written into the code: marking another league in the list moves the
+    empty week and the readers' default league with it."""
+    anchor = week_without_a_record(tmp_path)
+    listed = {
+        "contract_version": "league_list_v1",
+        "leagues": [{"league_id": 352490}, {"league_id": 755941, "legacy_advice_records": True}],
+    }
+    (tmp_path / "config").mkdir()
+    (tmp_path / "config" / "leagues.json").write_text(json.dumps(listed), encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    walked = {
+        league_id: [
+            (week.gameweek, week.reason)
+            for week in review.review_member_weeks(
+                record_root=tmp_path / "records",
+                snapshot_root=tmp_path / "snapshots",
+                as_of_snapshot=anchor,
+                season=SEASON,
+                league_id=league_id,
+                entry_ids=[101],
+                published=shown_everywhere([101], (3, 4)),
+            )[101]
+        ]
+        for league_id in (352490, 755941)
+    }
+    # League 352490 keeps the week its record names; the week holding none is now 755941's.
+    assert walked == {352490: [(4, None)], 755941: [(3, "no_pre_deadline_record")]}
+    # Unnamed, a reader's league is the marked one, so 352490's record is another league's.
+    with pytest.raises(review.SuggestionEvaluationError, match="Record identity"):
+        review.select_record(
+            tmp_path / "records", season=SEASON, gameweek=4, entry_id=101, deadline_utc=DEADLINE
+        )
+    del listed["leagues"][1]["legacy_advice_records"]
+    (tmp_path / "config" / "leagues.json").write_text(json.dumps(listed), encoding="utf-8")
+    with pytest.raises(review.SuggestionEvaluationError, match="name the league"):
+        review.select_record(
+            tmp_path / "records", season=SEASON, gameweek=4, entry_id=101, deadline_utc=DEADLINE
+        )
+
+
 def test_the_public_readers_still_refuse_another_leagues_record(tmp_path: Path) -> None:
     """Only the history walk leaves another league's weeks out. A direct reader, such as a
     measurement script, refuses another league's record and reads a week holding no record

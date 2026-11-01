@@ -47,7 +47,7 @@ from squadopt.application.top100_weight import (
     load_top100_counts,
 )
 from squadopt.application.weekly_suggestion_eval import (
-    SUPPORTED_LEAGUE_ID,
+    legacy_record_league,
     publish_suggestion_histories,
     published_advice_captures,
     published_page_captures,
@@ -553,12 +553,13 @@ def adopt_legacy_tree(site_data_root: Path, league_id: int) -> tuple[str, Path] 
 def records_advice_for(league_id: int) -> bool:
     """Whether to retain this league's legacy full-menu archive.
 
-    New tracked leagues all receive independent baseline records. The first league
-    also keeps its existing published-menu records so prospective measurements and
-    historical advice digests retain their original meaning.
+    New tracked leagues all receive independent baseline records. The league
+    ``config/leagues.json`` marks with ``legacy_advice_records`` (the first league the site
+    published, :func:`legacy_record_league`) also keeps its existing published-menu records,
+    so prospective measurements and historical advice digests retain their original meaning.
     """
 
-    return league_id == SUPPORTED_LEAGUE_ID
+    return league_id == legacy_record_league()
 
 
 def settle_legacy_tree(
