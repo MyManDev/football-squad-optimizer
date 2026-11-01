@@ -41,7 +41,8 @@ export interface DevicePlanRequest {
  * With a rival strategy: the banded plan with its price and labels, optionally chosen on
  * a Top 100 weight. Chips combine with neither. With chip gains: the plain plan, and each held chip's gain
  * against it, or null where its solve was refused; they too combine with nothing. The
- * plain plan is handed to `onPlan` as soon as it is solved, before any chip.
+ * plain plan is handed to `onPlan` as soon as it is solved, before any chip, and each chip
+ * tried after it to `onChip`.
  */
 export function solveRequest(
   solver: LpSolver,
@@ -55,12 +56,13 @@ export function solveRequest(
   }: Omit<DevicePlanRequest, "id">,
   now: () => number = () => performance.now(),
   onPlan?: (plan: DevicePlanAnswer) => void,
+  onChip?: (done: number, total: number) => void,
 ): DevicePlanAnswer {
   if (chipGains.length > 0) {
     if (chip !== null || strategy !== null || top100Weight !== 0) {
       throw new DevicePlanRefused("chip gains with a chip, a rival strategy or a weight", "plan");
     }
-    return solveChipGains(solver, document, entry, chipGains, now, onPlan);
+    return solveChipGains(solver, document, entry, chipGains, now, onPlan, onChip);
   }
   if (top100Weight !== 0) {
     if (chip !== null) throw new DevicePlanRefused("a weight with a chip", "plan");
