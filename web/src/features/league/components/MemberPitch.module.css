@@ -319,6 +319,8 @@
   color: var(--color-mark-text);
   letter-spacing: 0.04em;
   text-transform: uppercase;
+  /* Placed from the plate's centre, it may only use half the plate: the word stays whole. */
+  white-space: nowrap;
 }
 
 .mark {

@@ -415,6 +415,13 @@ describe("the panel's stylesheet", () => {
     for (const selector of [".action", ".remove"])
       expect(css).toMatch(new RegExp(`\\${selector} \\{[^}]*min-height: 44px`));
   });
+
+  it("draws what names its own colour in the mark's ink on a changed row", () => {
+    expect(css).toMatch(
+      /\.player\[data-changed\] \.meta,\s+\.player\[data-changed\] \.remove \{\s+border-color: var\(--color-mark-text\);\s+color: var\(--color-mark-text\);/,
+    );
+    expect(css).toMatch(/\.player\[data-changed\] \{\s+--color-focus: var\(--color-mark-text\);/);
+  });
 });
 
 it("lists the fifteen by position, each row with its own remove button", async () => {

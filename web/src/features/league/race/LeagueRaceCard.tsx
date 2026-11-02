@@ -142,7 +142,13 @@ export function LeagueRaceCard({
         </div>
       </div>
 
-      <div className={styles.chart} ref={chart}>
+      <div
+        className={styles.chart}
+        ref={chart}
+        tabIndex={0}
+        role="region"
+        aria-label={copy.raceChart(name(highlighted.entryId))}
+      >
         <svg
           width={width}
           height={height}
@@ -224,7 +230,12 @@ export function LeagueRaceCard({
         )}
       </div>
 
-      <div className={styles.table}>
+      <div
+        className={styles.table}
+        tabIndex={0}
+        role="region"
+        aria-label={name(highlighted.entryId)}
+      >
         <table>
           <caption>{name(highlighted.entryId)}</caption>
           <thead>

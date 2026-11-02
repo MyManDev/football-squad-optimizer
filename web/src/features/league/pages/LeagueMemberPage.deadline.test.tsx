@@ -87,6 +87,14 @@ describe("a member page whose gameweek has closed", () => {
     }
   });
 
+  it("says it as one statement, not as a region and a heading with nothing under them", () => {
+    const copy = COMPUTE_COPY.tr;
+    renderView(DEADLINE, "tr");
+    expect(screen.getByTestId("deadline-passed")).toHaveAttribute("role", "status");
+    expect(screen.queryByRole("region", { name: copy.deadlinePassedTitle })).toBeNull();
+    expect(screen.queryByRole("heading", { name: copy.deadlinePassedTitle })).toBeNull();
+  });
+
   it.each(["tr", "en"] as const)(
     "leaves out the settings, the link down to them and the model comparison (%s)",
     (language) => {

@@ -165,7 +165,7 @@ function HistoryOverview({
                     type="button"
                     className={styles.weekLink}
                     onClick={() => onSelect(week.gameweek)}
-                    aria-label={copy.gameweek(week.gameweek)}
+                    aria-label={`${messages.common.gameweekShort(week.gameweek)}, ${copy.gameweek(week.gameweek)}`}
                   >
                     {messages.common.gameweekShort(week.gameweek)}
                   </button>

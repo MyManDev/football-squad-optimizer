@@ -102,6 +102,16 @@ describe("one timeline with a rank change", () => {
     expect(band()).not.toBe(last);
     expect(band()).toBe(`translateX(${32 + RACE_COLUMN}px)`);
   });
+
+  it("names what scrolls sideways and lets the keyboard reach it: the chart and its table", () => {
+    show(22);
+    const scrolling = screen.getByRole("region", { name: COPY.raceChart("M22") });
+    expect(scrolling).toContainElement(chart());
+    expect(scrolling).toHaveAttribute("tabindex", "0");
+    const table = screen.getByRole("region", { name: "M22" });
+    expect(table).toContainElement(screen.getByRole("table", { name: "M22" }));
+    expect(table).toHaveAttribute("tabindex", "0");
+  });
 });
 
 describe("bringing a line forward", () => {

@@ -159,15 +159,22 @@ test("overview accumulates weeks, preserves totals while scrolling and opens wee
   await expect(overview.getByRole("row", { name: /^Toplam/ })).toContainText("624,0");
   await expect(overview.getByRole("row", { name: /^Toplam/ })).toContainText("610,0");
   await expect(overview.getByRole("row", { name: /^Toplam/ })).toContainText("+14,0");
+  // The week buttons print a short word, and their names start with it (WCAG 2.5.3). The rule
+  // is experimental, so axe runs it only when asked.
+  await atRest(page);
+  expect(
+    (await new AxeBuilder({ page }).withRules(["label-content-name-mismatch"]).analyze())
+      .violations,
+  ).toEqual([]);
   await expect(
     overview
       .getByRole("row")
-      .filter({ has: page.getByRole("button", { name: "Oyun haftası 4", exact: true }) }),
+      .filter({ has: page.getByRole("button", { name: "OH4, Oyun haftası 4", exact: true }) }),
   ).toContainText("−2,0");
   await expect(
     overview
       .getByRole("row")
-      .filter({ has: page.getByRole("button", { name: "Oyun haftası 5", exact: true }) }),
+      .filter({ has: page.getByRole("button", { name: "OH5, Oyun haftası 5", exact: true }) }),
   ).toContainText("+4,0");
   expect(await overview.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(
     true,

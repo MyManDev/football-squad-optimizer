@@ -302,7 +302,7 @@ jobs:
         run: npx playwright install chromium
 
       - name: Playwright smoke
-        timeout-minutes: 8
+        timeout-minutes: 10
         env:
           VITE_ADVICE_API_ORIGIN: ${{ vars.ADVICE_API_ORIGIN }}
         run: npm run e2e

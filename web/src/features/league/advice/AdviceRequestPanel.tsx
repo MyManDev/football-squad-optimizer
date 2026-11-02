@@ -28,6 +28,8 @@
  * block is the button and what happened to the request, never a paragraph of caveats.
  */
 
+import { useId, useRef } from "react";
+
 import { Badge } from "../../../design/components/Badge";
 import { useLanguage } from "../../../i18n/context";
 import { local } from "../../../lib/format";
@@ -53,7 +55,7 @@ function kept(earlier: EarlierAnswer | null | undefined): "published" | "earlier
 }
 
 /** Where the device solve stands; nothing while nothing was asked of it. */
-function DeviceState({ state }: { state: DevicePlan["state"] }) {
+function DeviceState({ id, state }: { id: string; state: DevicePlan["state"] }) {
   const { locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
   if (state.phase === "idle") return null;
@@ -74,7 +76,7 @@ function DeviceState({ state }: { state: DevicePlan["state"] }) {
                 ? copy.deviceUnpublished
                 : copy.deviceFailed;
   return (
-    <p className={styles.state} data-device-state={state.phase}>
+    <p id={id} className={styles.state} role="status" data-device-state={state.phase}>
       {state.phase === "done" ? <Badge tone="good">{copy.computeDone}</Badge> : null}
       {state.phase === "done" ? " " : null}
       {text}
@@ -127,6 +129,8 @@ export function AdviceRequestPanel({
   const computeCopy = COMPUTE_COPY[language];
   const { member } = useLeagueIdentity(request.leagueId);
   const { state, compute } = job;
+  const deviceButton = useRef<HTMLButtonElement>(null);
+  const deviceStateId = useId();
   const isSelf = member?.entryId === request.entryId;
   const supported =
     !deadlinePassed &&
@@ -170,9 +174,13 @@ export function AdviceRequestPanel({
 
         {device?.available && !deadlinePassed ? (
           <button
+            ref={deviceButton}
             type="button"
             className={styles.compute}
             data-device-compute
+            // The page behind the run's cover is inert, so its state line changes unheard: the
+            // button says how the run ended as it takes focus back.
+            aria-describedby={device.state.phase === "idle" ? undefined : deviceStateId}
             disabled={
               device.state.phase === "loading" ||
               device.state.phase === "solving" ||
@@ -184,8 +192,10 @@ export function AdviceRequestPanel({
             {copy.deviceButton}
           </button>
         ) : null}
-        {device?.available ? <DeviceState state={device.state} /> : null}
-        {device?.available ? <DeviceProgressPanel state={device.state} /> : null}
+        {device?.available ? <DeviceState id={deviceStateId} state={device.state} /> : null}
+        {device?.available ? (
+          <DeviceProgressPanel state={device.state} returnFocus={deviceButton} />
+        ) : null}
 
         {state.phase === "requesting" ? (
           <p className={styles.state}>{copy.computeRequesting}</p>

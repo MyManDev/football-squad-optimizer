@@ -29,10 +29,13 @@ const PLAN = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1);
  * The same plan shaped like a published week with two moves (GW6 carried two): the first
  * two outfield players of the eleven come in for two who leave, each move a share of the
  * gain. Only the moves change; the eleven, the armband and the bench are the mock's.
+ * With `line`, they come in on that line of the eleven.
  */
-function twoMoves(): typeof PLAN {
+function twoMoves(line?: AdvicePlayer["position"]): typeof PLAN {
   const eleven = PLAN.payload.starting_xi!;
-  const incoming = eleven.filter((player) => player.position !== "GK").slice(0, 2);
+  const incoming = eleven
+    .filter((player) => (line ? player.position === line : player.position !== "GK"))
+    .slice(0, 2);
   const leaving = (player: AdvicePlayer, index: number): AdvicePlayer => ({
     ...player,
     player_id: 900_000 + index,
@@ -300,6 +303,22 @@ test("a line of five on the smallest phone keeps every club code whole and every
     ),
   ).toBe(true);
   await pitch.screenshot({ path: testInfo.outputPath("pitch-375-five.png") });
+});
+
+test("YENİ stays one word on a four-man line of the narrowest phone", async ({ page }) => {
+  await open(page, 320, 700, twoMoves("MID"));
+  const pitch = page.getByRole("list", { name: copy.squad.pitchLabel });
+  await pitch.scrollIntoViewIfNeeded();
+  await expect(pitch.locator('[role="listitem"][data-line="mid"] [title]')).toHaveCount(4);
+  const tags = pitch.getByText(copy.leagueMembers.boardNew, { exact: true });
+  await expect(tags).toHaveCount(2);
+  for (const tag of await tags.all()) {
+    // Broken inside the word, a tag has two lines in its one-line box.
+    expect(await tag.evaluate((element) => element.scrollHeight <= element.clientHeight)).toBe(
+      true,
+    );
+  }
+  expect(await plateFaults(pitch, false)).toEqual([]);
 });
 
 for (const [width, height] of [

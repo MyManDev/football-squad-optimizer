@@ -82,7 +82,7 @@
   color: var(--color-text);
 }
 
-/* Waiting: an empty ring. Under way: a filled dot. Done: a tick on lime. */
+/* Waiting: an empty ring. Under way: a filled dot. Done: a tick on the mark. */
 .tick {
   flex: none;
   inline-size: 16px;
@@ -107,7 +107,7 @@
   content: "";
   position: absolute;
   inset: 2px 4px 4px 3px;
-  border: solid var(--color-text);
+  border: solid var(--color-mark-text);
   border-width: 0 2px 2px 0;
   transform: rotate(45deg);
 }

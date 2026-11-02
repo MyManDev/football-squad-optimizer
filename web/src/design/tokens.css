@@ -37,7 +37,8 @@
    Night, same formula: ink 15.7:1 on the page and 14.2:1 on panels, ink2 7.6:1 and ink3
    5.7:1 at their lowest, and every status colour above 6.6:1 on all three surfaces. Ink3 is
    4.56:1 on a player. Yellow links are 11.1:1 on
-   the page and mark text 11.3:1 on the mark. contrast.test.ts holds both palettes.
+   the page and mark text 11.3:1 on the mark; ink is 1.4:1 there, so only mark text stands
+   on it. contrast.test.ts holds both palettes.
 
    Motion (#1136): every transition and animation takes its duration and easing from the
    tokens below, never a literal of its own, and src/design/motion.ts mirrors them for the

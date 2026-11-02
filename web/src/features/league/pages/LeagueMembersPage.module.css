@@ -221,8 +221,11 @@ td.total {
   text-decoration: underline;
 }
 
-/* The viewer's own row: a lime fill with ink on it (13.5:1), nothing else changes. */
+/* The viewer's own row: the mark with its own ink on it (13.5:1 by day, 11.3:1 at night),
+   nothing else changes. The focus colour is the mark's at night, so a ring here takes the
+   ink. */
 .viewerRow td {
+  --color-focus: var(--color-mark-text);
   background: var(--color-mark);
   color: var(--color-mark-text);
 }
@@ -239,7 +242,7 @@ td.total {
 .viewerRow .manager,
 .viewerRow td.week,
 .viewerRow td.gap {
-  color: var(--color-text);
+  color: var(--color-mark-text);
 }
 
 .note {

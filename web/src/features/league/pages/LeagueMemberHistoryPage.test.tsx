@@ -259,7 +259,12 @@ it("opens all recorded weeks by default, shows totals, and returns from a select
       .map((cell) => cell.textContent),
   ).toEqual(["624,0", "610,0", "+14,0", "+14,0"]);
   expect(screen.getByText("Karşılaştırılan hafta: 9/11")).toBeInTheDocument();
-  await userEvent.click(within(overview).getByRole("button", { name: "Oyun haftası 5" }));
+  // A week's name starts with what the button prints, so a voice command for it finds it.
+  for (const button of within(overview).getAllByRole("button")) {
+    expect(button).toHaveAccessibleName(expect.stringMatching(/^OH\d+, Oyun haftası \d+$/));
+    expect(button.getAttribute("aria-label")!.startsWith(button.textContent!)).toBe(true);
+  }
+  await userEvent.click(within(overview).getByRole("button", { name: "OH5, Oyun haftası 5" }));
   expect(screen.getByRole("combobox")).toHaveValue("5");
   expect(screen.queryByRole("region", { name: "Genel bakış" })).not.toBeInTheDocument();
   expect(screen.getByText("Önerinin neti − üyenin neti:")).toHaveTextContent("+6,0");

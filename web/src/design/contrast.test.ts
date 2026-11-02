@@ -9,12 +9,16 @@
  * there and the header stays true. The night palette is held to every day pairing, and its
  * two blocks (the system's preference, the viewer's choice) to the same values.
  *
+ * Every stylesheet is read for the mark: a rule that paints it names --color-mark-text, and so
+ * does every rule for what stands on that fill, since at night the page's own inks all but
+ * vanish on it.
+ *
  * The club pairings join it: every club's fill and text colour reach 4.5:1, as each
  * player's shirt is drawn in them. Of the two grass tokens, only the darker
  * (--color-pitch) is held below 4.5:1 for white and ink above; --color-pitch-2 is not held.
  */
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { join, relative } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
@@ -107,8 +111,73 @@ const KEPT_APART: readonly (readonly [string, string])[] = [
   ["--color-text", "--color-pitch"],
 ];
 
+/** At night the page's inks are as light as the mark, so only --color-mark-text reads on it. */
+const NIGHT_KEPT_APART: readonly (readonly [string, string])[] = [
+  ["--color-text", "--color-mark"],
+  ["--color-text-muted", "--color-mark"],
+  ["--color-text-faint", "--color-mark"],
+  ["--color-focus", "--color-mark"],
+];
+
 const colour = (token: string, block = ROOT) =>
   token.startsWith("#") ? token : tokenHex(block, token);
+
+const SRC = join(__dirname, "..");
+
+function stylesheets(directory: string): string[] {
+  return readdirSync(directory).flatMap((name) => {
+    const path = join(directory, name);
+    if (statSync(path).isDirectory()) return stylesheets(path);
+    return path.endsWith(".css") ? [path] : [];
+  });
+}
+
+/** A stylesheet's rules, one per selector of a list, the ones inside an at-rule among them. */
+function rulesOf(css: string) {
+  const plain = css.replace(/\/\*[\s\S]*?\*\//g, "");
+  return [...plain.matchAll(/([^{}]+)\{([^{}]*)\}/g)].flatMap(([, selectors, body]) =>
+    selectors!.split(",").map((selector) => ({ selector: selector.trim(), body: body! })),
+  );
+}
+
+const PAINTS_THE_MARK = /(?:^|[;\s])background(?:-color)?:\s*var\(--color-mark\);/;
+const PAINTS_ANOTHER_FILL = /(?:^|[;\s])background(?:-color)?:/;
+const INK_ON_THE_MARK = /(?:^|[;\s])color:\s*var\(--color-mark-text\);/;
+
+/**
+ * Whether a selector reaches what stands on a fill. `.viewerRow td` fills the row's cells, so
+ * what is in them is named from the row: `.viewerRow .manager`.
+ */
+function standsOn(selector: string, fill: string): boolean {
+  const holder = fill.replace(/ [a-z]+$/, "");
+  return (
+    selector !== fill &&
+    selector.startsWith(holder) &&
+    /^[\s.:[]/.test(selector.slice(holder.length))
+  );
+}
+
+/** What a rule draws in other than the mark's own ink: its text, its borders, its marks. */
+function otherInks(body: string): string[] {
+  return [...body.matchAll(/(?:^|[;\s])((?:color|fill|stroke|border[a-z-]*):\s*[^;]+);/g)]
+    .map(([, declaration]) => declaration!)
+    .filter((declaration) => /var\(--color-(?!mark-text\))/.test(declaration));
+}
+
+/** Every rule that paints the mark, and what the rules for the things standing on it draw with. */
+const MARK_FILLS = stylesheets(SRC).flatMap((path) => {
+  const rules = rulesOf(readFileSync(path, "utf-8"));
+  const sheet = relative(SRC, path).replaceAll("\\", "/");
+  return rules
+    .filter(({ body }) => PAINTS_THE_MARK.test(body))
+    .map(({ selector, body }) => ({
+      fill: `${sheet} ${selector}`,
+      ink: body,
+      onIt: rules
+        .filter((rule) => standsOn(rule.selector, selector) && !PAINTS_ANOTHER_FILL.test(rule.body))
+        .flatMap((rule) => otherInks(rule.body).map((ink) => `${rule.selector} ${ink}`)),
+    }));
+});
 
 describe("the colour tokens", () => {
   it.each(READABLE)("%s on %s reaches 4.5:1", (foreground, background) => {
@@ -151,11 +220,44 @@ describe("the night palette", () => {
     expect(ratio).toBeGreaterThanOrEqual(AA);
   });
 
+  it.each(NIGHT_KEPT_APART)(
+    "%s on %s stays below 4.5:1, so nothing but the mark's ink stands on it",
+    (foreground, background) => {
+      const ratio = contrast(
+        colour(foreground, NIGHT_BY_CHOICE),
+        colour(background, NIGHT_BY_CHOICE),
+      );
+      expect(ratio).toBeLessThan(AA);
+    },
+  );
+
   it("computes the ratios the header quotes", () => {
     expect(contrast(night("--color-text"), night("--color-bg"))).toBeCloseTo(15.7, 1);
     expect(contrast(night("--color-text-faint"), night("--color-surface"))).toBeCloseTo(5.7, 1);
     expect(contrast(night("--color-mark-text"), night("--color-mark"))).toBeCloseTo(11.3, 1);
+    expect(contrast(night("--color-text"), night("--color-mark"))).toBeCloseTo(1.4, 1);
   });
+});
+
+describe("the mark's fill", () => {
+  it("is read wherever the viewer's own rows, a focused name and a changed row draw it", () => {
+    expect(MARK_FILLS.map(({ fill }) => fill)).toEqual(
+      expect.arrayContaining([
+        "features/league/pages/LeagueMembersPage.module.css .viewerRow td",
+        "features/league/race/LeagueRaceCard.module.css .gaps li[aria-current]",
+        "features/league/pages/MemberPicker.module.css .option:focus-visible",
+        "features/league/device/WhatIfPanel.module.css .player[data-changed]",
+      ]),
+    );
+  });
+
+  it.each(MARK_FILLS.map((mark) => [mark.fill, mark] as const))(
+    "%s has its own ink, on it and on what stands on it",
+    (_fill, mark) => {
+      expect(mark.ink).toMatch(INK_ON_THE_MARK);
+      expect(mark.onIt).toEqual([]);
+    },
+  );
 });
 
 describe("the club plates", () => {

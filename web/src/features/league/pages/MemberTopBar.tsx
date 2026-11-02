@@ -40,7 +40,7 @@ export function MemberTopBar({
   const humans = members.filter((member) => member.member_kind === "human").length;
   const cells = scoreBugCells(entry, humans, view, locale, copy);
   return (
-    <header className={styles.topBar}>
+    <header className={styles.topBar} data-closed={deadlinePassed !== null ? "" : undefined}>
       <div className={styles.topIdentity}>
         <h1 className={styles.teamName}>{entry.team_name ?? copy.unknownTeam}</h1>
         <ExampleDataBadge sourceKind={squad.source_kind} />

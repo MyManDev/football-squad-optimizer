@@ -35,7 +35,12 @@ for (const language of ["tr", "en"] as const) {
     await page.goto(`/league/352490/members/${ENTRY}`);
 
     const copy = COMPUTE_COPY[language];
-    await expect(page.getByRole("heading", { name: copy.deadlinePassedTitle })).toBeVisible();
+    // One statement: no region and no heading of its own, both saying the same sentence.
+    await expect(
+      page.getByRole("status").filter({ hasText: copy.deadlinePassedTitle }),
+    ).toBeVisible();
+    await expect(page.getByRole("region", { name: copy.deadlinePassedTitle })).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: copy.deadlinePassedTitle })).toHaveCount(0);
     await expect(page.getByTestId("deadline-passed")).toContainText(copy.deadlinePassedTitle);
     // The closed week's plan is still the answer; nothing that changes or recomputes it is
     // offered: no settings, no link down to them and no Hesapla.
@@ -50,6 +55,28 @@ for (const language of ["tr", "en"] as const) {
     // A closed week counts down to nothing and offers nothing to apply.
     await expect(page.getByTestId("deadline-countdown")).toHaveCount(0);
     await expect(page.getByRole("link", { name: member.applyOnFpl })).toHaveCount(0);
+  });
+
+  // On a rival's page the phone's top bar is the only place the team is named.
+  test(`a closed gameweek prints the team's name whole on a phone in ${language}`, async ({
+    page,
+  }) => {
+    await installLeagueMocks(page);
+    const calendar = openCalendar();
+    calendar.payload.gameweeks[0]!.deadline_utc = "2020-01-01T00:00:00Z";
+    await page.route("**/data/fixtures.json", (route) =>
+      route.fulfill({ contentType: "application/json", body: JSON.stringify(calendar) }),
+    );
+    await page.addInitScript((lang) => localStorage.setItem("squadopt.language", lang), language);
+    await page.goto(`/league/352490/members/${ENTRY}`);
+
+    const name = page.getByRole("heading", { level: 1 });
+    await expect(name).toBeVisible();
+    for (const width of [320, 340, 360, 390, 430]) {
+      await page.setViewportSize({ width, height: 800 });
+      const whole = await name.evaluate((element) => element.scrollWidth <= element.clientWidth);
+      expect(whole, `the name at ${width} px`).toBe(true);
+    }
   });
 }
 

@@ -169,6 +169,20 @@
   color: var(--color-good);
 }
 
+/* Beside the three week columns of a sheet under 390 px wide, a row with the tag and the club
+   code would cut a name: the tag takes a line of its own over them. */
+@media (max-width: 389.98px) {
+  .transfers .player {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 2px var(--space-2);
+  }
+
+  .transfers .tag {
+    grid-column: 1 / -1;
+  }
+}
+
 .captain {
   flex: none;
   display: inline-grid;
