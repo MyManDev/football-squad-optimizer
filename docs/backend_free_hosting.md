@@ -1,12 +1,16 @@
 # Hosting the advice backend for nothing
 
-**Since 2026-10-15 the advice backend runs on a VM, not on the PC.** The two Compose
-services of the [backend runbook](backend_runbook.md) run on an Azure for Students virtual
-machine as the only connector of the `squadopt-api` tunnel; the PC runs no backend, watcher
-or connector, only the weekly runs (`scripts\weekly_run_friday.ps1`,
-`scripts\weekly_run_tuesday.ps1`), and after each release `bash scripts/vm_push.sh <tag>`
-moves the VM to the release. The sections below describe the PC route as it ran from
-18 September to 15 October 2026 and stay as the fallback.
+**Since 2026-11-02 the advice backend runs on the weekly schedule's Contabo host.** The two
+Compose services of the [backend runbook](backend_runbook.md) serve the release packages of
+`vm_football_release.py` (draft #1211) there, behind the tunnel `squadopt-api-contabo`, at
+the same address, `squadopt-api.mymandev.com`
+([the host's guide](../deploy/weekly-schedule/README.md#the-advice-backend)). From 2026-10-15
+until then they ran the same way on an Azure for Students virtual machine as the only
+connector of the `squadopt-api` tunnel, which stays connected for a week as the way back.
+The PC runs no backend, watcher or connector, only the weekly runs
+(`scripts\weekly_run_friday.ps1`, `scripts\weekly_run_tuesday.ps1`). The sections below
+describe the PC route as it ran from 18 September to 15 October 2026 and stay as the
+fallback.
 
 The advice backend ran on the owner's Windows PC behind a Cloudflare Tunnel
 ([backend runbook](backend_runbook.md), [ADR 0006](architecture/decisions/0006-backend-hosting.md)).
