@@ -216,8 +216,8 @@
 }
 
 /* The phone's compact strip, as D-Phone-Bu-Hafta draws it: a sidebar-green band right
-   under the phone bar. The team, the week and the short deadline share the first line,
-   always: the week and the deadline keep their width and a team name that does not fit in
+   under the phone bar. In an open week the team, the week and the short deadline share the
+   first line: the week and the deadline keep their width and a team name that does not fit in
    what is left ends in an ellipsis (the sidebar's member block prints it whole). A 390 px
    phone has under a pixel to spare for a 17-letter name, so a wrap here would depend on
    how each system draws the fonts, and it cost 26 px of the first screen. The score bug
@@ -242,6 +242,13 @@
   .topIdentity {
     flex: 1 1 0;
     max-width: max-content;
+  }
+
+  /* A closed week's label and date leave a name too little, and on a rival's page this is
+     the only place the team is named: there the name keeps its width and the week follows
+     it, on the next line where they do not fit together. */
+  .topBar[data-closed] .topIdentity {
+    flex: 0 1 auto;
   }
 
   .teamName {
@@ -484,20 +491,13 @@
   color: var(--color-text-muted);
 }
 
-section.notice {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  color: var(--color-text);
-}
-
-section.notice p {
+.deadlineNotice {
   margin: 0;
-}
-
-.noticeTitle {
-  margin: 0;
+  max-width: var(--measure);
+  font-family: var(--font-display);
   font-size: var(--step-1);
+  font-weight: 700;
+  line-height: 1.2;
 }
 
 .notice a {

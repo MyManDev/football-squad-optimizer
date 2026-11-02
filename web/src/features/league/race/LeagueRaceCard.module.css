@@ -243,6 +243,6 @@
 }
 
 .gaps li[aria-current] .gapFigures {
-  color: var(--color-text);
+  color: var(--color-mark-text);
   font-weight: 600;
 }

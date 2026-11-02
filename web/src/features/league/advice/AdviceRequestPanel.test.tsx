@@ -14,6 +14,7 @@ import { MESSAGES, type Language } from "../../../i18n/messages";
 import { AdviceRequestPanel, type ComputeService } from "./AdviceRequestPanel";
 import type { AdviceRequest } from "./adviceClient";
 import { COMPUTE_COPY } from "./computeCopy";
+import type { DevicePlan } from "../device/useDevicePlan";
 import type { AdviceJob, ComputePhase, EarlierAnswer } from "./useAdviceJob";
 
 afterEach(cleanup);
@@ -62,6 +63,32 @@ function renderPanel(
 
 const tr = COMPUTE_COPY.tr;
 const messages = MESSAGES.tr.leagueMembers;
+
+describe("with a solve on the member's device", () => {
+  const panel = (state: DevicePlan["state"]) => (
+    <LanguageProvider initialLanguage="tr">
+      <AdviceRequestPanel
+        request={REQUEST}
+        job={{ state: { phase: "idle" }, compute: vi.fn(), reset: vi.fn() }}
+        device={{ available: true, state, run: vi.fn(), reset: vi.fn() }}
+      />
+    </LanguageProvider>
+  );
+
+  it("gives focus back to its button when the cover goes, and the button says how it ended", () => {
+    const view = render(panel({ phase: "idle" }));
+    const button = screen.getByRole("button", { name: messages.deviceButton });
+    expect(button).not.toHaveAttribute("aria-describedby");
+
+    view.rerender(panel({ phase: "loading", progress: { step: "inputs", done: 0, total: null } }));
+    expect(screen.getByRole("region", { name: messages.deviceSolving })).toHaveFocus();
+
+    view.rerender(panel({ phase: "failed" }));
+    expect(button).toHaveFocus();
+    expect(screen.getByRole("status")).toHaveTextContent(messages.deviceFailed);
+    expect(button).toHaveAccessibleDescription(messages.deviceFailed);
+  });
+});
 
 describe("with no compute service", () => {
   it("keeps the old sentence back while a configured service has not answered yet", () => {

@@ -96,6 +96,53 @@ describe("the progress card", () => {
     expect(document.querySelector("[data-device-progress]")?.textContent).not.toMatch(/\d+\/\d+/);
   });
 
+  it("makes the page behind inert with focus on the card, and gives both back when it goes", () => {
+    const copy = MESSAGES.tr.leagueMembers;
+    const button = document.body.appendChild(document.createElement("button"));
+    const closed = document.body.appendChild(document.createElement("div"));
+    closed.setAttribute("inert", "");
+    const returnFocus = { current: button };
+    const card = (state: DevicePlanPhase) => (
+      <LanguageProvider initialLanguage="tr">
+        <DeviceProgressPanel state={state} returnFocus={returnFocus} />
+      </LanguageProvider>
+    );
+    const { container, rerender, unmount } = render(
+      card({ phase: "loading", progress: { step: "inputs", done: 0, total: null } }),
+    );
+    expect(screen.getByRole("region", { name: copy.deviceSolving })).toHaveFocus();
+    expect(container).toHaveAttribute("inert");
+    expect(button).toHaveAttribute("inert");
+    // The card itself stays reachable.
+    expect(document.querySelector("[data-device-progress]")).not.toHaveAttribute("inert");
+
+    // The run moves on under the same cover: focus stays where it is.
+    rerender(card({ phase: "solving", progress: { step: "plan", done: 2, total: 3 } }));
+    expect(screen.getByRole("region", { name: copy.deviceSolving })).toHaveFocus();
+    expect(container).toHaveAttribute("inert");
+
+    rerender(card(DONE));
+    expect(container).not.toHaveAttribute("inert");
+    expect(button).not.toHaveAttribute("inert");
+    expect(button).toHaveFocus();
+    // What was inert before the cover stays so: it was not the cover's to give back.
+    expect(closed).toHaveAttribute("inert");
+
+    unmount();
+    button.remove();
+    closed.remove();
+  });
+
+  it("gives the page back if it is taken away while counting", () => {
+    const { container, unmount } = show({
+      phase: "loading",
+      progress: { step: "inputs", done: 0, total: null },
+    });
+    expect(container).toHaveAttribute("inert");
+    unmount();
+    expect(container).not.toHaveAttribute("inert");
+  });
+
   it("is gone once nothing is counting", () => {
     for (const state of [
       { phase: "idle" },

@@ -7,9 +7,12 @@
  *
  * It covers the whole screen with the page's background, so nothing of the page shows
  * while the run counts. It is drawn into the document's body, so a closed drawer or a
- * sticky sidebar does not hide it, and it goes as soon as nothing is counting.
+ * sticky sidebar does not hide it, and it goes as soon as nothing is counting. While it stands
+ * the page behind is inert and focus is on the card; when it goes, focus returns to the
+ * control the page names.
  */
 
+import { useEffect, useRef, type RefObject } from "react";
 import { createPortal } from "react-dom";
 
 import { useLanguage } from "../../../i18n/context";
@@ -20,10 +23,35 @@ import styles from "./DeviceProgressPanel.module.css";
 type Stage = "inputs" | "solver" | "plan" | "chips";
 const ORDER: readonly Stage[] = ["inputs", "solver", "plan", "chips"];
 
-export function DeviceProgressPanel({ state }: { state: DevicePlanPhase }) {
+export function DeviceProgressPanel({
+  state,
+  returnFocus,
+}: {
+  state: DevicePlanPhase;
+  /** The control that started the run, which takes focus back when the cover goes. */
+  returnFocus?: RefObject<HTMLElement | null>;
+}) {
   const { messages } = useLanguage();
   const copy = messages.leagueMembers;
   const progress = countingProgress(state);
+  const counting = progress !== null;
+  const panel = useRef<HTMLElement>(null);
+
+  // A cover hides the page, not its controls: everything else in the body goes inert with it.
+  useEffect(() => {
+    if (!counting) return;
+    const control = returnFocus?.current;
+    const behind = [...document.body.children].filter(
+      (element) => !element.contains(panel.current) && !element.hasAttribute("inert"),
+    );
+    for (const element of behind) element.setAttribute("inert", "");
+    panel.current?.focus();
+    return () => {
+      for (const element of behind) element.removeAttribute("inert");
+      control?.focus();
+    };
+  }, [counting, returnFocus]);
+
   if (progress === null || typeof document === "undefined") return null;
 
   const share = progressShare(progress);
@@ -40,7 +68,12 @@ export function DeviceProgressPanel({ state }: { state: DevicePlanPhase }) {
 
   return createPortal(
     <div className={styles.layer} data-device-progress={progress.step}>
-      <section className={styles.panel} aria-labelledby="device-progress-title">
+      <section
+        ref={panel}
+        className={styles.panel}
+        aria-labelledby="device-progress-title"
+        tabIndex={-1}
+      >
         <h2 id="device-progress-title" className={styles.title}>
           {copy.deviceSolving}
         </h2>

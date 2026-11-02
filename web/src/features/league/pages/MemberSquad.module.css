@@ -184,6 +184,7 @@
   min-width: 0;
   overflow: hidden;
   color: var(--color-text-muted);
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
