@@ -3,9 +3,22 @@
 A worker whose loop has stopped cannot report that itself, and the api kept answering 202
 to jobs nobody would claim while ``/ready`` said nothing about workers (audit M13). So
 every worker keeps a small document under the store's ``workers/`` directory, rewritten on
-every round of its loop with its process id and the time, and readiness counts a worker as
-alive while that document is recent. The queue and cache documents are not touched: a
-heartbeat is a statement about now, and they are records.
+every round of its loop with its host name, its process id, the job it holds (or none) and
+the time, and readiness counts a worker as alive while that document is recent. The queue
+and cache documents are not touched: a heartbeat is a statement about now, and they are
+records.
+
+A document is named by host name and process id, ``worker-<host>-<pid>.json``. It was named
+by process id alone, and under Docker every worker container gives its worker the same pid,
+so three workers on one host wrote one document and counted as one. Documents with the old
+name, ``worker-<pid>.json``, are still read, pruned and counted, so a worker from before the
+change still counts while it runs; it does not say which job it holds, so it never counts as
+busy.
+
+The same look that answers ``/ready`` also answers the job view: how many workers are alive
+and how many hold a job, and where each queued job stands in line. It is held for
+``READINESS_RECHECK_SECONDS``, because the queue scan holds the queue's lock and the job
+view is polled by every waiting member.
 
 Both bounds are stated here, so the worker, the endpoint and the runbook cannot drift.
 
@@ -28,21 +41,24 @@ recovery starts waiting again then, and the question is whether the queue moves 
 
 from __future__ import annotations
 
+import bisect
 import contextlib
 import json
 import os
 import re
 import secrets
+import socket
 import threading
 import time
 from collections.abc import Callable, Iterable
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final
 
 from squadopt.data.atomic import replace_retrying
 from squadopt.platform.jobs_contract import AdviceJob
-from squadopt.platform.queue_contracts import DEFAULT_LEASE_SECONDS, JobQueue
+from squadopt.platform.queue_contracts import DEFAULT_LEASE_SECONDS, JobQueue, claim_order
 
 __all__ = [
     "HEARTBEAT_CONTRACT_VERSION",
@@ -53,11 +69,15 @@ __all__ = [
     "READINESS_RECHECK_SECONDS",
     "WORKER_DIRECTORY",
     "WORKER_STALE_AFTER_SECONDS",
+    "LivenessLook",
+    "WorkerCounts",
     "WorkerHeartbeat",
     "WorkerLiveness",
     "freshest_heartbeat_age",
+    "host_label",
     "oldest_queued_wait",
     "prune_stale_heartbeats",
+    "worker_counts",
 ]
 
 HEARTBEAT_CONTRACT_VERSION: Final = "advice_worker_heartbeat_v1"
@@ -78,8 +98,12 @@ PRUNE_AFTER_SECONDS: Final = 24 * 60 * 60.0
 that stops a worker by ending its process leaves the document behind, so each worker clears
 these out when it starts."""
 
-_HEARTBEAT_NAME: Final = re.compile(r"^worker-([0-9]{1,10})\.json$")
-_STAGING_NAME: Final = re.compile(r"^\.worker-[0-9]{1,10}\.json\.[0-9a-f]{16}\.tmp$")
+#: ``worker-<host>-<pid>.json``, or the older ``worker-<pid>.json``. A label never ends in
+#: ``-`` and a pid has no ``-``, so the last ``-`` always separates the two.
+_WORKER_NAME: Final = r"worker-(?:[A-Za-z0-9](?:[A-Za-z0-9.-]{0,61}[A-Za-z0-9])?-)?[0-9]{1,10}"
+_HEARTBEAT_NAME: Final = re.compile(rf"^{_WORKER_NAME}\.json$")
+_STAGING_NAME: Final = re.compile(rf"^\.{_WORKER_NAME}\.json\.[0-9a-f]{{16}}\.tmp$")
+_HOST_LABEL_LIMIT: Final = 63
 
 
 def _utc_now() -> datetime:
@@ -97,26 +121,46 @@ def _instant(value: str) -> datetime:
     return parsed
 
 
+def host_label(host: str) -> str:
+    """The host name as it stands in a heartbeat's file name.
+
+    Letters, digits, dots and dashes, at most 63 of them, starting and ending with a letter
+    or a digit; anything else becomes a dash. A name with nothing usable in it is ``host``.
+    Under Docker the host name is the container's own, so two workers on one host differ.
+    """
+
+    label = re.sub(r"[^A-Za-z0-9.-]+", "-", host)[:_HOST_LABEL_LIMIT].strip(".-")
+    return label or "host"
+
+
 class WorkerHeartbeat:
-    """One worker's document: ``workers/worker-<pid>.json``, replaced whole on each beat."""
+    """One worker's document: ``workers/worker-<host>-<pid>.json``, replaced whole each beat."""
 
     def __init__(
         self,
         root: Path,
         *,
         pid: int | None = None,
+        host: str | None = None,
         clock: Callable[[], datetime] = _utc_now,
     ) -> None:
         self._root = root
         self._pid = os.getpid() if pid is None else pid
+        self._host = host_label(socket.gethostname() if host is None else host)
         self._clock = clock
+        self._job: str | None = None
 
     @property
     def path(self) -> Path:
-        return self._root / f"worker-{self._pid}.json"
+        return self._root / f"worker-{self._host}-{self._pid}.json"
+
+    def hold(self, job_id: str | None) -> None:
+        """Name the job this worker holds in its next beats, or ``None`` once it holds none."""
+
+        self._job = job_id
 
     def beat(self) -> None:
-        """Write this worker's pid and the time, so a reader sees the old document or the new.
+        """Write this worker's name, its job and the time, so a reader sees the old or the new.
 
         The bytes are staged in a sibling and moved into place by the repository's one
         publishing rename, which rides out a reader's handle on Windows. They are not
@@ -131,6 +175,8 @@ class WorkerHeartbeat:
         document = {
             "at_utc": _stamp(self._clock()),
             "contract_version": HEARTBEAT_CONTRACT_VERSION,
+            "host": self._host,
+            "job_id": self._job,
             "pid": self._pid,
         }
         self._root.mkdir(exist_ok=True)
@@ -176,22 +222,23 @@ def prune_stale_heartbeats(
     return removed
 
 
-def freshest_heartbeat_age(root: Path, *, now: datetime) -> float | None:
-    """Seconds since the most recent readable heartbeat, or ``None`` when there is none.
+def _documents(root: Path, *, now: datetime) -> list[tuple[float, bool]]:
+    """``(age, holds a job)`` for each readable heartbeat document under ``root``.
 
     An unreadable or malformed document is skipped: it is not evidence of a live worker.
     The age is taken as a magnitude. A document stamped ahead of ``now`` means the clock
     moved back after it was written. A live worker rewrites its document on its next
     round, so a document that stays far ahead belongs to a worker that stopped before the
-    clock moved, and must not read as fresh.
+    clock moved, and must not read as fresh. A document holds a job when it names one; one
+    written before workers named their job names none.
 
-    A directory that cannot be listed raises ``OSError``; ``WorkerLiveness`` reads that
-    as no worker seen.
+    A directory that does not exist holds no document. One that cannot be listed raises
+    ``OSError``.
     """
 
     if not root.is_dir():
-        return None
-    ages: list[float] = []
+        return []
+    found: list[tuple[float, bool]] = []
     for path in root.iterdir():
         if not _HEARTBEAT_NAME.match(path.name):
             continue
@@ -205,10 +252,47 @@ def freshest_heartbeat_age(root: Path, *, now: datetime) -> float | None:
                 or not isinstance(document.get("at_utc"), str)
             ):
                 continue
-            ages.append(abs((now - _instant(document["at_utc"])).total_seconds()))
+            age = abs((now - _instant(document["at_utc"])).total_seconds())
         except (OSError, ValueError, TypeError):
             continue
+        job = document.get("job_id")
+        found.append((age, isinstance(job, str) and bool(job)))
+    return found
+
+
+def freshest_heartbeat_age(root: Path, *, now: datetime) -> float | None:
+    """Seconds since the most recent readable heartbeat, or ``None`` when there is none.
+
+    Read as ``_documents`` reads. A directory that cannot be listed raises ``OSError``;
+    ``WorkerLiveness`` reads that as no worker seen.
+    """
+
+    ages = [age for age, _holds in _documents(root, now=now)]
     return min(ages) if ages else None
+
+
+@dataclass(frozen=True, slots=True)
+class WorkerCounts:
+    """The workers alive now (``total``) and how many of them hold a job (``busy``)."""
+
+    busy: int
+    total: int
+
+    def as_view(self) -> dict[str, int]:
+        return {"busy": self.busy, "total": self.total}
+
+
+def worker_counts(
+    root: Path, *, now: datetime, stale_after_seconds: float = WORKER_STALE_AFTER_SECONDS
+) -> WorkerCounts:
+    """Count the documents at most ``stale_after_seconds`` old, and those naming a job.
+
+    A worker is alive by the same rule ``/ready`` uses. A directory that cannot be listed
+    raises ``OSError``.
+    """
+
+    alive = [holds for age, holds in _documents(root, now=now) if age <= stale_after_seconds]
+    return WorkerCounts(busy=sum(alive), total=len(alive))
 
 
 def oldest_queued_wait(jobs: Iterable[AdviceJob], *, now: datetime) -> float | None:
@@ -223,6 +307,30 @@ def oldest_queued_wait(jobs: Iterable[AdviceJob], *, now: datetime) -> float | N
         if job.status == "queued"
     ]
     return max(waits) if waits else None
+
+
+@dataclass(frozen=True, slots=True)
+class LivenessLook:
+    """One look at the heartbeats and the queue: what ``/ready`` and the job view serve."""
+
+    worker_heartbeat: bool
+    queue_wait: bool
+    workers: WorkerCounts | None
+    """``None`` when the heartbeat directory could not be listed."""
+    queued: tuple[tuple[str, str], ...] | None
+    """The queued jobs' places in the claim order, sorted; ``None`` when the queue could
+    not be read."""
+
+    def queue_position(self, job: AdviceJob) -> int | None:
+        """How many queued jobs will be claimed before ``job``; ``None`` unless it is queued.
+
+        Counted on the claim order, so a job that arrived after this look still gets the
+        number of jobs this look saw ahead of it.
+        """
+
+        if job.status != "queued" or self.queued is None:
+            return None
+        return bisect.bisect_left(self.queued, claim_order(job))
 
 
 class WorkerLiveness:
@@ -247,7 +355,7 @@ class WorkerLiveness:
         self._stale_after = stale_after_seconds
         self._queued_limit = queued_limit_seconds
         self._lock = threading.Lock()
-        self._held: tuple[bool, bool] | None = None
+        self._held: LivenessLook | None = None
         self._held_at = 0.0
 
     def checks(self) -> tuple[bool, bool]:
@@ -266,26 +374,46 @@ class WorkerLiveness:
         time) and skips it, so it is neither a waiting job nor a failed look.
         """
 
+        look = self.look()
+        return look.worker_heartbeat, look.queue_wait
+
+    def look(self) -> LivenessLook:
+        """The checks, the worker counts and the queue's order, from one look.
+
+        Held for ``recheck_seconds``, so ``/ready`` and every job view polled in that time
+        share one listing of the heartbeats and one scan of the queue. A count or a
+        position can be that much older than the job record it is served beside.
+        """
+
         with self._lock:
             if self._held is not None and self._monotonic() - self._held_at < self._recheck:
                 return self._held
             now = self._clock()
+            workers: WorkerCounts | None
             try:
-                age = freshest_heartbeat_age(self._root, now=now)
+                workers = worker_counts(self._root, now=now, stale_after_seconds=self._stale_after)
             except OSError:
                 # The directory could not be listed (or checked), so no worker was seen.
-                age = None
-            worker_alive = age is not None and age <= self._stale_after
+                workers = None
+            queued: tuple[tuple[str, str], ...] | None
             try:
-                wait = oldest_queued_wait(self._queue.jobs(), now=now)
+                jobs = self._queue.jobs()
             except (OSError, ValueError):
                 # A lock that stayed busy (QueueLockTimeout is an OSError) or a file
                 # operation in the scan that failed. A damaged record does not land here:
                 # the scan sets it aside under the queue's integrity directory and does not
                 # count it. ValueError is the queue contract's own error (AdviceQueueError).
                 queue_moving = False
+                queued = None
             else:
+                wait = oldest_queued_wait(jobs, now=now)
                 queue_moving = wait is None or wait <= self._queued_limit
-            self._held = (worker_alive, queue_moving)
+                queued = tuple(sorted(claim_order(job) for job in jobs if job.status == "queued"))
+            self._held = LivenessLook(
+                worker_heartbeat=workers is not None and workers.total > 0,
+                queue_wait=queue_moving,
+                workers=workers,
+                queued=queued,
+            )
             self._held_at = self._monotonic()
             return self._held

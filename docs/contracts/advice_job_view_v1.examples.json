@@ -1,0 +1,50 @@
+{
+  "queued": {
+    "contract_version": "advice_job_view_v1",
+    "job_id": "advice-0123456789abcdef-1",
+    "status": "queued",
+    "created_at_utc": "2026-11-02T08:00:00Z",
+    "updated_at_utc": "2026-11-02T08:00:00Z",
+    "attempt": 1,
+    "error_code": null,
+    "queue_position": 2,
+    "progress": null,
+    "workers": { "busy": 1, "total": 1 }
+  },
+  "running": {
+    "contract_version": "advice_job_view_v1",
+    "job_id": "advice-0123456789abcdef-1",
+    "status": "running",
+    "created_at_utc": "2026-11-02T08:00:00Z",
+    "updated_at_utc": "2026-11-02T08:00:41Z",
+    "attempt": 1,
+    "error_code": null,
+    "queue_position": null,
+    "progress": { "done": 1, "total": 3 },
+    "workers": { "busy": 1, "total": 1 }
+  },
+  "completed": {
+    "contract_version": "advice_job_view_v1",
+    "job_id": "advice-0123456789abcdef-1",
+    "status": "completed",
+    "created_at_utc": "2026-11-02T08:00:00Z",
+    "updated_at_utc": "2026-11-02T08:03:12Z",
+    "attempt": 1,
+    "error_code": null,
+    "queue_position": null,
+    "progress": null,
+    "workers": { "busy": 0, "total": 1 }
+  },
+  "failed": {
+    "contract_version": "advice_job_view_v1",
+    "job_id": "advice-fedcba9876543210-1",
+    "status": "failed",
+    "created_at_utc": "2026-11-02T08:05:00Z",
+    "updated_at_utc": "2026-11-02T08:05:30Z",
+    "attempt": 1,
+    "error_code": "ADVICE_FAILED",
+    "queue_position": null,
+    "progress": null,
+    "workers": null
+  }
+}

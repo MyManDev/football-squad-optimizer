@@ -249,7 +249,7 @@ newest live capture and log the reason. See [capture selection](backend_runbook.
 | `league_tree` | `web\public\data\league\members.json` is readable | `advice_read.py`, `FileLeagueDirectory.readable` |
 | `cache_store` | the store root exists and passes the probe | `store_probe.py` |
 | `league_tree_matches_capture` | the published tree's season and gameweek agree with the selected context | `advice_read.py`, `FileLeagueDirectory.matches` |
-| `worker_heartbeat` | some worker rewrote `workers\worker-<pid>.json` under the store in the last 120 s | `worker_heartbeat.py`, `WorkerLiveness.checks` |
+| `worker_heartbeat` | some worker rewrote `workers\worker-<host>-<pid>.json` (or the older `worker-<pid>.json`) under the store in the last 120 s | `worker_heartbeat.py`, `WorkerLiveness.checks` |
 | `queue_wait` | no job has waited in the queue for more than 300 s | `worker_heartbeat.py`, `WorkerLiveness.checks` |
 
 `league_tree_matches_capture` compares season and gameweek, not capture IDs. Republishing
