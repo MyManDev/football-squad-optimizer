@@ -118,9 +118,9 @@
 
 /* On /fixtures itself the button reads as the current place, like the active nav item. */
 .phoneFixtures[aria-current="page"] .phoneFixturesFace {
-  border-color: var(--color-text);
-  background: var(--color-text);
-  color: var(--color-lime);
+  border-color: var(--color-board);
+  background: var(--color-board);
+  color: var(--color-mark);
 }
 
 /* A jump to an id (the skip link, the squad) lands under the sticky phone bar, not behind it. */
@@ -346,8 +346,8 @@
 
 /* The active item: ink with a lime label, the one place lime marks where you are. */
 .navItem[aria-current="page"] {
-  background: var(--color-text);
-  color: var(--color-lime);
+  background: var(--color-board);
+  color: var(--color-mark);
   font-weight: 600;
 }
 

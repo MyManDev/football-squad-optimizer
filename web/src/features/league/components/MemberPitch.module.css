@@ -315,14 +315,16 @@
 
 .new {
   padding: 0 4px;
-  background: var(--color-lime);
+  background: var(--color-mark);
+  color: var(--color-mark-text);
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
 .mark {
   width: 16px;
-  background: var(--color-lime);
+  background: var(--color-mark);
+  color: var(--color-mark-text);
   /* The armband lands on its plate a beat after the plate appears (weekArrival.ts): it grows
      from the plate's edge in the data time, whenever a plate takes the captaincy. */
   transform-origin: 50% 100%;
@@ -798,7 +800,7 @@
    data time; the ring itself never moves. The bench item carries the same ring. */
 .token[data-model-changed] .plate,
 .benchItem[data-model-changed] .benchName {
-  outline: 2px solid var(--color-lime);
+  outline: 2px solid var(--color-mark);
   outline-offset: 1px;
   box-shadow:
     0 0 0 1px var(--color-text),

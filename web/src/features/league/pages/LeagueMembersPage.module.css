@@ -223,8 +223,8 @@ td.total {
 
 /* The viewer's own row: a lime fill with ink on it (13.5:1), nothing else changes. */
 .viewerRow td {
-  background: var(--color-lime);
-  color: var(--color-text);
+  background: var(--color-mark);
+  color: var(--color-mark-text);
 }
 
 .viewerRow td:first-child {
