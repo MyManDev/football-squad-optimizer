@@ -124,13 +124,14 @@ function ScenePlayer({ player, distant = false }: { player: Player; distant?: bo
  * The page's background: one passing move played across the bare page, in two colours close
  * to the page's own (tokens.css), so every text colour that sits on the page still reads over
  * a player. It stays where it is while the page scrolls over it. The ball runs the move once
- * each time a page arrives (`arrival` changes) and rests in the keeper's gloves.
+ * each time a page arrives (`arrival` changes) and rests in the keeper's gloves. A page
+ * that is one question opts out with `data-no-match-scene` (MatchScene.module.css).
  */
 export function MatchScene({ tall, arrival }: { tall: boolean; arrival: string }) {
   const scene = tall ? TALL : WIDE;
   const path = ballPath(scene);
   return (
-    <div className={styles.scene} aria-hidden="true">
+    <div className={styles.scene} aria-hidden="true" data-match-scene="">
       <svg
         className={styles.picture}
         viewBox={`0 0 ${scene.width} ${scene.height}`}

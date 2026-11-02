@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useLocation, useNavigate } from "react-router";
 
-import { Card } from "../../../design/components/Card";
 import { useLanguage } from "../../../i18n/context";
 import {
   FIND_YOURSELF,
@@ -27,6 +26,9 @@ type State = "idle" | "invalid" | "loading" | "unsupported" | "missing" | "faile
  *
  * `stay` (with `inPlace`): the gate rendered this form in front of a page whose address
  * names no league. A connected league keeps the address, and the member step follows there.
+ *
+ * It is the one thing to do here, so it stands alone in the middle of the screen in large
+ * type, and the match scene behind the other pages stays away (`data-no-match-scene`).
  */
 export function LeagueEntryPage({
   inPlace = false,
@@ -97,43 +99,37 @@ export function LeagueEntryPage({
   }
 
   return (
-    <div className={styles.page}>
+    <div className={styles.page} data-no-match-scene="">
       <h1 className={styles.title}>{copy.title}</h1>
-      <Card>
-        <form onSubmit={submit} className={styles.form} aria-busy={state === "loading"}>
-          <label htmlFor="league-id">{copy.label}</label>
-          <p id="league-entry-hint" className={styles.hint}>
-            {copy.hint}
-          </p>
-          <input
-            id="league-id"
-            name="leagueId"
-            inputMode="numeric"
-            autoComplete="off"
-            value={value}
-            onChange={(event) => {
-              setValue(event.target.value);
-              setState("idle");
-            }}
-            disabled={state === "loading"}
-            aria-invalid={state === "invalid"}
-            aria-describedby="league-entry-hint league-entry-status"
-          />
-          {/* Where the number is found, folded right under the field that asks for it, so a
-              visitor who does not know it looks no further than the field. */}
-          <FplIdHelp />
-          <button type="submit" disabled={state === "loading"}>
-            {copy.submit}
-          </button>
-          <p id="league-entry-status" role="status">
-            {state === "idle"
-              ? ""
-              : state === "unsupported"
-                ? copy.unsupported(asked)
-                : copy[state]}
-          </p>
-        </form>
-      </Card>
+      <form onSubmit={submit} className={styles.form} aria-busy={state === "loading"}>
+        <label htmlFor="league-id">{copy.label}</label>
+        <p id="league-entry-hint" className={styles.hint}>
+          {copy.hint}
+        </p>
+        <input
+          id="league-id"
+          name="leagueId"
+          inputMode="numeric"
+          autoComplete="off"
+          value={value}
+          onChange={(event) => {
+            setValue(event.target.value);
+            setState("idle");
+          }}
+          disabled={state === "loading"}
+          aria-invalid={state === "invalid"}
+          aria-describedby="league-entry-hint league-entry-status"
+        />
+        {/* Where the number is found, folded right under the field that asks for it, so a
+            visitor who does not know it looks no further than the field. */}
+        <FplIdHelp />
+        <button type="submit" disabled={state === "loading"}>
+          {copy.submit}
+        </button>
+        <p id="league-entry-status" className={styles.status} role="status">
+          {state === "idle" ? "" : state === "unsupported" ? copy.unsupported(asked) : copy[state]}
+        </p>
+      </form>
     </div>
   );
 }
