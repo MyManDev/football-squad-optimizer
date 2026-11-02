@@ -45,6 +45,7 @@
   padding: 0 16px 0 4px;
   border-bottom: 1px solid var(--color-line);
   background: var(--color-bg);
+  view-transition-name: shell-bar;
 }
 
 .menuButton,
@@ -117,9 +118,9 @@
 
 /* On /fixtures itself the button reads as the current place, like the active nav item. */
 .phoneFixtures[aria-current="page"] .phoneFixturesFace {
-  border-color: var(--color-text);
-  background: var(--color-text);
-  color: var(--color-lime);
+  border-color: var(--color-board);
+  background: var(--color-board);
+  color: var(--color-mark);
 }
 
 /* A jump to an id (the skip link, the squad) lands under the sticky phone bar, not behind it. */
@@ -141,6 +142,7 @@
   flex-direction: column;
   border-right: 1px solid var(--color-line);
   background: var(--color-surface-2);
+  view-transition-name: shell-sidebar;
 }
 
 .shell[data-layout="phone"] .sidebar {
@@ -344,8 +346,8 @@
 
 /* The active item: ink with a lime label, the one place lime marks where you are. */
 .navItem[aria-current="page"] {
-  background: var(--color-text);
-  color: var(--color-lime);
+  background: var(--color-board);
+  color: var(--color-mark);
   font-weight: 600;
 }
 
@@ -479,20 +481,14 @@
   padding: var(--space-2) var(--space-4) 0;
 }
 
+/* One column, as the open sidebar: two columns left a long label such as "Kadroyu kendin
+   dene" wider than its half of a phone's drawer. */
 .sidebar[data-mode="drawer"] .nav {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-auto-rows: 44px;
-  column-gap: var(--space-2);
   margin-top: var(--space-2);
 }
 
 .sidebar[data-mode="drawer"] .navItem {
   height: 44px;
-}
-
-.sidebar[data-mode="drawer"] .navItem:last-child:nth-child(odd) {
-  grid-column: span 2;
 }
 
 .sidebar[data-mode="drawer"] .footer {

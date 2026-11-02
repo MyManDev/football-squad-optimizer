@@ -143,20 +143,30 @@ describe("the crossfade", () => {
   });
 });
 
-describe("the crossfade's stylesheet", () => {
-  it("times the browser's crossfade with the card time and the motion easing", () => {
+describe("the page step's stylesheet", () => {
+  it("fades the old picture in the fast card time and raises the new one in the card time", () => {
     const css = readFileSync(join(__dirname, "transitions.css"), "utf-8");
     expect(css).toMatch(
-      /::view-transition-old\(root\),\s*::view-transition-new\(root\)\s*\{[^}]*animation-duration: var\(--motion-ui\);[^}]*animation-timing-function: var\(--motion-ease\)/,
+      /::view-transition-old\(root\)\s*\{\s*animation: page-leave var\(--motion-ui-fast\) var\(--motion-ease\) both;/,
     );
+    expect(css).toMatch(
+      /::view-transition-new\(root\)\s*\{\s*animation: page-rise var\(--motion-ui\) var\(--motion-ease\) both;/,
+    );
+    // Only opacity and transform move.
+    const frames = css.match(/@keyframes page-(?:leave|rise)\s*\{[\s\S]*?\n\}/g) ?? [];
+    expect(frames).toHaveLength(2);
+    for (const block of frames) {
+      const properties = [...block.matchAll(/^\s*([a-z-]+):/gm)].map((match) => match[1]);
+      for (const property of properties) expect(["opacity", "transform"]).toContain(property);
+    }
   });
 
-  it("times the group that holds the two pictures in the same rule", () => {
+  it("times the group that holds the two pictures with them", () => {
     // Left out, the group keeps the browser's own quarter second and the step ends later
-    // than its fade.
+    // than its motion.
     const css = readFileSync(join(__dirname, "transitions.css"), "utf-8");
     expect(css).toMatch(
-      /::view-transition-group\(root\),\s*::view-transition-old\(root\),\s*::view-transition-new\(root\)\s*\{[^}]*animation-duration: var\(--motion-ui\);/,
+      /::view-transition-group\(root\)\s*\{[^}]*animation-duration: var\(--motion-ui\);[^}]*animation-timing-function: var\(--motion-ease\)/,
     );
   });
 

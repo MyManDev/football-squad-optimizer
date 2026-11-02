@@ -155,8 +155,8 @@ for (const language of ["tr", "en"] as const) {
       page.getByRole("group", { name: MESSAGES[language].memberPicker.legend }),
     ).toBeVisible();
     expect(await blockingSummary(page), `${language} picker`).toEqual([]);
-    await page.locator('input[name="member"]').first().check();
-    expect(await blockingSummary(page), `${language} picker with a name picked`).toEqual([]);
+    await page.locator("[data-member-picker] li button").first().focus();
+    expect(await blockingSummary(page), `${language} picker with a name in focus`).toEqual([]);
   });
 
   test(`axe has no critical or serious violations on /fixtures in ${language}`, async ({
@@ -278,6 +278,7 @@ test("once the visitor has said who they are, Değiştir comes before the league
       "Rakiple yan yana",
       "Çipler ve transferler",
       "Kadro kartı",
+      "Haftalık geçmiş",
     ].map((name) => navigation.getByRole("link", { name, exact: true })),
     navigation.getByRole("link", { name: "Fikstür", exact: true }),
     ...(process.env.VITE_ADVICE_API_ORIGIN

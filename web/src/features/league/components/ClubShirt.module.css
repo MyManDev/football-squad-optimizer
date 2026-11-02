@@ -50,8 +50,8 @@
 /* Every goalkeeper: one pink no club wears, with ink sleeves, collar and initials (5.6:1). */
 .shirt[data-shirt="keeper"] {
   --shirt-body: var(--color-keeper);
-  --shirt-trim: var(--color-text);
-  --shirt-ink: var(--color-text);
+  --shirt-trim: var(--color-mark-text);
+  --shirt-ink: var(--color-mark-text);
 }
 
 /* A club with no colours: a blank white shirt with ink initials, suggesting no club. */

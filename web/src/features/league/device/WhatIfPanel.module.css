@@ -59,7 +59,7 @@
 }
 
 .headline dd {
-  color: var(--color-lime);
+  color: var(--color-mark);
 }
 
 .breaks {
@@ -94,7 +94,8 @@
 }
 
 .player[data-changed] {
-  background: var(--color-lime);
+  background: var(--color-mark);
+  color: var(--color-mark-text);
 }
 
 .position {

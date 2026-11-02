@@ -31,7 +31,8 @@
 }
 
 .compute:hover:not(:disabled) {
-  background: var(--color-text);
+  background: var(--color-board);
+  color: var(--color-board-text);
 }
 
 .compute:focus-visible {

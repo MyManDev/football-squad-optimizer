@@ -251,6 +251,7 @@ describe("the app shell on a desktop", () => {
       TR.duel,
       TR.chips,
       TR.squadCard,
+      TR.history,
       TR.fixtures,
       TR.contribute,
     ]);
@@ -275,6 +276,8 @@ describe("the app shell on a desktop", () => {
       ...navLinks(),
       screen.getByRole("button", { name: /^TR/ }),
       screen.getByRole("button", { name: /^EN/ }),
+      screen.getByRole("button", { name: "Gündüz" }),
+      screen.getByRole("button", { name: "Gece" }),
       screen.getByRole("button", { name: "page action" }),
     ];
     for (const element of expected) {

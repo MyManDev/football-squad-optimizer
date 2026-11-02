@@ -1,57 +1,81 @@
+/* The one thing to do here, in the middle of the screen: the column fills the height the page
+   frame leaves (its padding, and on a phone its 56 px bar) and the form stands centred in it. */
 .page {
   display: grid;
-  gap: var(--space-4);
-  max-width: var(--measure);
+  align-content: center;
+  gap: var(--space-5);
+  width: min(100%, 560px);
+  min-height: calc(100dvh - var(--space-5) - var(--space-7));
+  margin-inline: auto;
+  text-align: center;
+}
+
+@media (max-width: 599.98px) {
+  .page {
+    min-height: calc(100dvh - 56px - var(--space-4) - var(--space-6));
+  }
 }
 
 .title {
   margin: 0;
   font-family: var(--font-display);
-  font-size: var(--step-3);
-  line-height: 1.1;
-}
-
-.intro {
-  margin: 0;
-  font-size: var(--step-0);
+  font-size: clamp(3rem, 2rem + 4vw, 4.5rem);
+  font-weight: 800;
+  line-height: 1.05;
 }
 
 .form {
   display: grid;
-  gap: var(--space-3);
+  gap: var(--space-4);
+}
+
+.form label {
+  font-size: var(--step-2);
+  font-weight: 600;
 }
 
 .hint {
-  margin: 0;
+  margin: calc(-1 * var(--space-2)) 0 0;
   color: var(--color-text-muted);
+  font-size: var(--step-1);
 }
 
 .form input,
 .form button {
   min-width: 0;
-  min-height: 44px;
-  padding: var(--space-2) var(--space-3);
+  min-height: 64px;
+  padding: var(--space-2) var(--space-4);
   border: 1px solid var(--color-line);
-  border-radius: var(--radius-s);
+  border-radius: var(--radius-m);
   color: inherit;
   background: var(--color-surface);
-  font: inherit;
 }
 
-.form label {
-  font-weight: 600;
+.form input {
+  font-family: var(--font-mono);
+  font-size: var(--step-3);
+  font-weight: 500;
+  text-align: center;
 }
 
-/* The page's one action: the primary button, sized to its word. */
+/* The page's one action, as wide as the field it answers. */
 .form button {
-  justify-self: start;
-  padding-inline: var(--space-5);
   border-color: var(--color-primary);
   background: var(--color-primary);
   color: var(--color-primary-text);
+  font-family: var(--font-body);
+  font-size: var(--step-2);
   font-weight: 600;
   cursor: pointer;
 }
+
 .form :disabled {
   cursor: wait;
+}
+
+/* Holds its line, so an answer does not move the form. */
+.status {
+  min-height: 1.5em;
+  margin: 0;
+  font-size: var(--step-1);
 }

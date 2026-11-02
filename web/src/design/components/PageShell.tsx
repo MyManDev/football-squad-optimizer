@@ -35,7 +35,9 @@ import {
 import { FIXTURE_SHEET_ID, ShellContext, type ShellContextValue } from "../shell/ShellContext";
 import { readSidebarCollapsed, writeSidebarCollapsed } from "../shell/sidebarPreference";
 import { crossfade } from "../viewTransition";
+import { MatchScene } from "./MatchScene";
 import styles from "./PageShell.module.css";
+import { ThemeToggle } from "./ThemeToggle";
 
 const FOCUSABLE =
   'input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])';
@@ -416,6 +418,7 @@ export function PageShell({
         data-collapsed={layout === "desktop" && collapsed ? "true" : undefined}
         data-drawer={drawerOpen ? "open" : undefined}
       >
+        <MatchScene tall={layout === "phone"} arrival={location.pathname} />
         <a className="visually-hidden" href="#main" inert={overlay}>
           {copy.skip}
         </a>
@@ -562,6 +565,7 @@ export function PageShell({
               ) : null}
               <div className={styles.footer}>
                 <LanguageToggle vertical={rail} />
+                <ThemeToggle vertical={rail} />
               </div>
             </div>
           </div>

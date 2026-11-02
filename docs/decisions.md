@@ -138,3 +138,27 @@ the work that is closed and the conditions for later development.
 Source: [Issue #1005](https://github.com/MyManDev/football-squad-optimizer/issues/1005),
 [the owner's names](https://github.com/MyManDev/football-squad-optimizer/issues/1005#issuecomment-6044633550)
 and [the program](https://github.com/MyManDev/football-squad-optimizer/issues/1012).
+
+## 2026-11-01: The second league goes live at GW11, and 352490 follows at GW12
+
+Decision:
+
+1. League 755941 (77 members, rehearsed on #981 in comment 6327708004) is the second
+   league. It goes live with `menu: device` in the GW11 run. This replaces the 20 to 50
+   members of decision 4 of 2026-10-07.
+2. League 352490 moves to the device menu in the GW12 run, one week after 755941. This
+   replaces decision 2 of 2026-10-07, and #981 step 8 lands with it. The server keeps
+   one baseline record per entry (#982).
+3. The readings that read 352490's full-menu advice records keep their dates and lose
+   the weeks from GW12 on. The price honesty reading at GW9 is unchanged, and the one at
+   GW15 pools GW4 to GW11 and lists GW12 to GW15 as not read. The Top 100 readings at
+   GW12 and GW20 read the player level as registered, and their plan level ends at GW11.
+   The protocols stay as written; each record states its shortened input.
+
+Reason: the owner handed the program to İbo on 31 October, and İbo brought step 8 forward
+on 1 November so that 352490 stops being solved on the server once a second league has
+run a live week on the device.
+
+Source: [the handover](https://github.com/MyManDev/football-squad-optimizer/issues/978#issuecomment-6548175771),
+[the decisions on #981](https://github.com/MyManDev/football-squad-optimizer/issues/981#issuecomment-6559338892)
+and [the readings calendar](https://github.com/MyManDev/football-squad-optimizer/issues/1122).

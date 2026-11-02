@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 import { installLeagueMocks } from "./leagueMocks";
 import { mockLeagueMembersEnvelope } from "../src/fixtures/league";
@@ -90,7 +90,7 @@ test.describe("a visitor who has said who they are", () => {
     await page.goto("/league/352490/members/35249001");
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("North Stand Notes");
     // The identity block carries Değiştir, a button; the links are the member's week, squad
-    // and league, the member's tools, then the open pages.
+    // and league, the member's tools and history, then the open pages.
     expect(
       await page
         .locator("#sidebar a")
@@ -103,6 +103,7 @@ test.describe("a visitor who has said who they are", () => {
       "/league/352490/members/35249001/duel",
       "/league/352490/members/35249001/chips",
       "/league/352490/members/35249001/card",
+      "/league/352490/members/35249001/history",
       "/fixtures",
       ...CONTRIBUTE,
     ]);
@@ -114,42 +115,64 @@ test.describe("a visitor who has said who they are", () => {
     expect(await page.evaluate(() => localStorage.getItem("squadopt.viewer"))).toBeNull();
   });
 
-  test("the page applies its one light palette", async ({ page }) => {
-    await page.goto("/");
-
-    const palette = await page.locator("body").evaluate((body) => {
+  // Day: page #FFFFFF, ink #10261A. Night: page #0D1320, ink #E7ECF5.
+  const DAY = { background: "rgb(255, 255, 255)", color: "rgb(16, 38, 26)", scheme: "light" };
+  const NIGHT = { background: "rgb(13, 19, 32)", color: "rgb(231, 236, 245)", scheme: "dark" };
+  const palette = (page: Page) =>
+    page.locator("body").evaluate((body) => {
       const style = getComputedStyle(body);
-      return { background: style.backgroundColor, color: style.color };
+      return {
+        background: style.backgroundColor,
+        color: style.color,
+        scheme: getComputedStyle(document.documentElement).colorScheme,
+      };
     });
-    // Page #ECF3E6, ink #10261A.
-    expect(palette).toEqual({ background: "rgb(236, 243, 230)", color: "rgb(16, 38, 26)" });
-    expect(await page.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe(
-      "light",
-    );
-  });
 
-  for (const scheme of ["dark", "light"] as const) {
-    test(`a stored theme and a ${scheme} system preference leave the light palette in place`, async ({
+  for (const [system, expected] of [
+    ["light", DAY],
+    ["dark", NIGHT],
+  ] as const) {
+    test(`a ${system} system preference opens the ${expected.scheme === "dark" ? "night" : "day"} palette`, async ({
       page,
     }) => {
-      // An older visit may have stored a dark choice; the site has no dark theme any more.
-      await page.emulateMedia({ colorScheme: scheme });
+      // An older visit may have stored a choice under the retired key; it means nothing now.
+      await page.emulateMedia({ colorScheme: system });
       await page.addInitScript(() => localStorage.setItem("squadopt.theme", "dark"));
       await page.goto("/");
       await expect(page.getByRole("heading", { level: 1 })).toHaveText("Ligini bul");
 
       await expect(page.locator("html")).not.toHaveAttribute("data-theme");
-      const palette = await page.locator("body").evaluate((body) => {
-        const style = getComputedStyle(body);
-        return { background: style.backgroundColor, color: style.color };
-      });
-      expect(palette).toEqual({ background: "rgb(236, 243, 230)", color: "rgb(16, 38, 26)" });
-      // The stale value is removed on load, so nothing reads it later, and no control
-      // offers a theme.
+      expect(await palette(page)).toEqual(expected);
       expect(await page.evaluate(() => localStorage.getItem("squadopt.theme"))).toBeNull();
-      await expect(page.getByRole("button", { name: /temaya geç|theme/i })).toHaveCount(0);
+      expect(await page.evaluate(() => localStorage.getItem("squadopt.scheme"))).toBeNull();
     });
   }
+
+  test("the viewer's choice holds against the system and across a reload", async ({ page }) => {
+    await page.emulateMedia({ colorScheme: "dark" });
+    await page.goto("/");
+    const colours = page.getByRole("group", { name: "Renkler" });
+    await expect(colours.getByRole("button", { name: "Gece" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+
+    await colours.getByRole("button", { name: "Gündüz" }).click();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+    expect(await palette(page)).toEqual(DAY);
+
+    await page.reload();
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Ligini bul");
+    expect(await palette(page)).toEqual(DAY);
+
+    await page.emulateMedia({ colorScheme: "light" });
+    await page
+      .getByRole("group", { name: "Renkler" })
+      .getByRole("button", { name: "Gece" })
+      .click();
+    expect(await palette(page)).toEqual(NIGHT);
+    expect(await page.evaluate(() => localStorage.getItem("squadopt.scheme"))).toBe("dark");
+  });
 
   test("reduced-motion preference disables animation and transitions", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
@@ -249,7 +272,7 @@ test.describe("a visitor who has not said who they are", () => {
       await expect(page.getByRole("heading", { level: 1 })).toHaveText(
         language === "tr" ? "Sen kimsin?" : "Who are you?",
       );
-      await expect(page.getByRole("radio", { name: /Deniz Aral/ })).toBeVisible();
+      await expect(page.getByRole("button", { name: /Deniz Aral/ })).toBeVisible();
       await expect(page.locator("#league-member-list")).toHaveCount(0);
       await expect(page.locator("html")).toHaveAttribute("lang", language);
       expect(await page.evaluate(() => localStorage.getItem("squadopt.viewer"))).toBeNull();

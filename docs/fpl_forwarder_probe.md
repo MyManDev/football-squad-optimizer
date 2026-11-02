@@ -1,10 +1,11 @@
 # FPL forwarder probe
 
-The owner approved a separate Cloudflare Worker as the future FPL forwarder at
+The owner approved a separate Cloudflare Worker as the FPL forwarder at
 `https://squadopt.mymandev.com/api/v1/fpl/*`. A browser cannot read FPL itself: FPL sends no
 CORS header and sets `Cross-Origin-Resource-Policy: same-origin`, so a page on the site's origin
 gets nothing back from `fantasy.premierleague.com`. A forwarder on the site's own host would
-fetch FPL and answer the page.
+fetch FPL and answer the page. The probe's verdict was served, and the forwarder is now
+`workers/fpl-proxy/`, decided in [ADR 0012](architecture/decisions/0012-fpl-forwarder.md).
 
 Building it on Cloudflare only makes sense if FPL answers requests that leave from Cloudflare's
 network. Many services challenge or refuse data-centre traffic, and nothing in this repository

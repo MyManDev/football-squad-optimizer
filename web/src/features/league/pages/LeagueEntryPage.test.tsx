@@ -103,12 +103,9 @@ describe.each(["tr", "en"] as const)("league entry in %s", (language) => {
     expect(readMemberClaim()).toBeNull();
   });
 
-  it("says what the site does before the field, and keeps the ID help folded", () => {
+  it("keeps the ID help folded", () => {
     const helpCopy = MESSAGES[language].fplIdHelp;
     open(language);
-    const intro = screen.getByText(copy.intro);
-    const field = screen.getByLabelText(copy.label);
-    expect(intro.compareDocumentPosition(field) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     const help = screen.getByText(helpCopy.title).closest("details")!;
     expect(help.open).toBe(false);
     expect(help).toHaveTextContent(helpCopy.league);

@@ -106,6 +106,8 @@ test("a member's plan is solved on the device and drawn as a computation result"
   await button.click();
   await expect(page.locator("[data-device-state='done']")).toBeVisible({ timeout: 60_000 });
   await expect(page.getByText("Hesap sonucu")).toBeVisible();
+  // The progress card stood over the page while the run counted, and is gone now it is done.
+  await expect(page.locator("[data-device-progress]")).toHaveCount(0, { timeout: 30_000 });
   // The transfers the server's reference names, by the names the document gives them.
   const names = new Map(fixture.document.players.map((p) => [p.id, p.name]));
   for (const move of member.reference.moves) {

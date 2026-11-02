@@ -1648,6 +1648,12 @@ describe("the chip timing's gains", () => {
         data: { id: request.id, kind: "plan", answer: plan },
       } as MessageEvent<DevicePlanReply>);
     }
+    /** A chip of the request posted `index`th tried: `done` of `total`. */
+    count(index: number, done: number, total: number): void {
+      this.onmessage?.({
+        data: { id: this.posted[index]!.id, kind: "chip", done, total },
+      } as MessageEvent<DevicePlanReply>);
+    }
     /** The gains of the request posted `index`th, or a run that failed after its plan. */
     release(index: number, gains: Record<string, number | null> | null = { wildcard: 9 }): void {
       this.onmessage?.({
@@ -1815,5 +1821,64 @@ describe("the chip timing's gains", () => {
       expect(seen.latest.phase === "done" && seen.latest.chipTiming).toBeNull();
       cleanup();
     }
+  });
+
+  const progressOf = (state: DevicePlanPhase) =>
+    "progress" in state ? (state.progress ?? null) : null;
+
+  it("count the run's stages: inputs, solver and plan, then each chip, never elapsed time", async () => {
+    const timers = new HandTimers();
+    const solver = new SilentSolver();
+    const { seen } = mount(squadWith(entry), REQUEST, solver, timers);
+    await act(async () => screen.getByText("run").click());
+    await waitFor(() => expect(screen.getByTestId("phase")).toHaveTextContent("solving"));
+    // The member holds all four chips: three stages before them, then one for each.
+    expect(progressOf(seen.latest)).toEqual({
+      step: "plan",
+      done: 2,
+      total: 7,
+      chips: { done: 0, total: 4 },
+    });
+  });
+
+  it("count each chip after the plan is shown, and stop counting when the gains arrive", async () => {
+    const solver = new HeldGainsSolver();
+    const seen = await runOnce(squadWith(entry), REQUEST, solver);
+    expect(progressOf(seen.latest)).toEqual({
+      step: "chips",
+      done: 3,
+      total: 7,
+      chips: { done: 0, total: 4 },
+    });
+    act(() => solver.count(0, 1, 4));
+    expect(progressOf(seen.latest)).toEqual({
+      step: "chips",
+      done: 4,
+      total: 7,
+      chips: { done: 1, total: 4 },
+    });
+    // The plan shown does not change while the chips are counted.
+    expect(seen.latest.phase === "done" && seen.latest.chipTiming).toBeNull();
+    await act(async () => solver.release(0));
+    await waitFor(() => expect(progressOf(seen.latest)).toBeNull());
+    expect(seen.latest.phase === "done" && seen.latest.chipTiming).toBeTruthy();
+  });
+
+  it("stop counting when the run fails after its plan, and keep the plan", async () => {
+    const solver = new HeldGainsSolver();
+    const seen = await runOnce(squadWith(entry), REQUEST, solver);
+    await act(async () => solver.release(0, null));
+    await waitFor(() => expect(progressOf(seen.latest)).toBeNull());
+    expect(seen.latest.phase).toBe("done");
+  });
+
+  it("stop counting when the member leaves the selection while its chips are tried", async () => {
+    const solver = new HeldGainsSolver();
+    const { seen, rerender } = mount(squadWith(entry), REQUEST, solver);
+    await act(async () => screen.getByText("run").click());
+    await waitFor(() => expect(progressOf(seen.latest)?.step).toBe("chips"));
+    rerender({ ...REQUEST, strategy: "saf-puan", window: 3 });
+    rerender(REQUEST);
+    expect(progressOf(seen.latest)).toBeNull();
   });
 });

@@ -107,6 +107,7 @@ const en = {
     duel: "Head to head",
     chips: "Chips and transfers",
     squadCard: "Squad card",
+    history: "Weekly history",
     fixtures: "Fixtures",
     contribute: "Contribute",
     collapseSidebar: "Collapse sidebar",
@@ -129,6 +130,11 @@ const en = {
     label: "Language",
     tr: "Türkçe",
     en: "English",
+  },
+  colourScheme: {
+    label: "Colours",
+    light: "Day",
+    dark: "Night",
   },
   /** The position word for a published position code, lower case to sit inside a line. */
   positions: {
@@ -494,8 +500,6 @@ const en = {
   },
   leagueEntry: {
     title: "Find your league",
-    intro:
-      "SquadOpt suggests a transfer and a captain for your FPL squad every gameweek. Open your league to see yours.",
     label: "League ID",
     hint: "Type your league ID to continue.",
     submit: "Find league",
@@ -518,7 +522,6 @@ const en = {
   memberPicker: {
     title: "Who are you?",
     legend: "Pick your name",
-    confirm: "Confirm",
     otherLeague: "Enter a different league number",
     empty: "This league's member list is empty.",
   },
@@ -546,6 +549,12 @@ const en = {
     deviceButton: "Compute on this device",
     deviceLoading: "Loading the solver on this device…",
     deviceSolving: "Computing on this device…",
+    deviceSteps: {
+      inputs: "Reading the data",
+      solver: "Loading the solver",
+      plan: "Solving the plan",
+      chips: (done: number, total: number) => `Trying the chips ${done}/${total}`,
+    },
     deviceDone: (seconds: string) => `Computed on this device in ${seconds} s.`,
     deviceRefused: "This device did not prove a plan for this selection.",
     deviceFailed: "The computation on this device did not run.",
@@ -1236,6 +1245,7 @@ const tr: MessageSchema<typeof en> = {
     duel: "Rakiple yan yana",
     chips: "Çipler ve transferler",
     squadCard: "Kadro kartı",
+    history: "Haftalık geçmiş",
     fixtures: "Fikstür",
     contribute: "Katkıda bulun",
     collapseSidebar: "Kenar çubuğunu kapat",
@@ -1256,6 +1266,7 @@ const tr: MessageSchema<typeof en> = {
     decisions: "Karar kaydı (GitHub)",
   },
   language: { label: "Dil", tr: "Türkçe", en: "English" },
+  colourScheme: { label: "Renkler", light: "Gündüz", dark: "Gece" },
   positions: {
     GK: "kaleci",
     DEF: "defans",
@@ -1616,8 +1627,6 @@ const tr: MessageSchema<typeof en> = {
   },
   leagueEntry: {
     title: "Ligini bul",
-    intro:
-      "SquadOpt, FPL kadron için her hafta transfer ve kaptan önerir. Önerini görmek için ligini aç.",
     label: "Lig numarası",
     hint: "Devam etmek için lig numaranı yaz.",
     submit: "Ligi bul",
@@ -1639,7 +1648,6 @@ const tr: MessageSchema<typeof en> = {
   memberPicker: {
     title: "Sen kimsin?",
     legend: "Adını seç",
-    confirm: "Onayla",
     otherLeague: "Başka bir lig numarası gir",
     empty: "Bu ligin üye listesi boş.",
   },
@@ -1666,6 +1674,12 @@ const tr: MessageSchema<typeof en> = {
     deviceButton: "Bu cihazda hesapla",
     deviceLoading: "Çözücü bu cihaza yükleniyor…",
     deviceSolving: "Bu cihazda hesaplanıyor…",
+    deviceSteps: {
+      inputs: "Veriler okunuyor",
+      solver: "Çözücü yükleniyor",
+      plan: "Plan çözülüyor",
+      chips: (done, total) => `Çipler deneniyor ${done}/${total}`,
+    },
     deviceDone: (seconds: string) => `Bu cihazda ${seconds} sn içinde hesaplandı.`,
     deviceRefused: "Bu cihaz bu seçim için bir plan kanıtlayamadı.",
     deviceFailed: "Bu cihazdaki hesap çalışmadı.",
