@@ -93,7 +93,7 @@ export function cardData(view: EntryAdvice, squad: EntrySquad): SquadCardData | 
  */
 export const CARD_COLOURS = {
   "--color-board": "#10261a",
-  "--color-board-muted": "#cfe3d3",
+  "--color-board-muted": "#ebe4d3",
   "--color-pitch": "#3f8f58",
   "--color-pitch-2": "#48995f",
   "--color-chip": "#ffffff",
