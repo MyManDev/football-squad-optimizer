@@ -35,6 +35,7 @@ import {
 import { FIXTURE_SHEET_ID, ShellContext, type ShellContextValue } from "../shell/ShellContext";
 import { readSidebarCollapsed, writeSidebarCollapsed } from "../shell/sidebarPreference";
 import { crossfade } from "../viewTransition";
+import { MatchScene } from "./MatchScene";
 import styles from "./PageShell.module.css";
 import { ThemeToggle } from "./ThemeToggle";
 
@@ -417,6 +418,7 @@ export function PageShell({
         data-collapsed={layout === "desktop" && collapsed ? "true" : undefined}
         data-drawer={drawerOpen ? "open" : undefined}
       >
+        <MatchScene tall={layout === "phone"} arrival={location.pathname} />
         <a className="visually-hidden" href="#main" inert={overlay}>
           {copy.skip}
         </a>

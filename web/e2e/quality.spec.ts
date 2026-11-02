@@ -115,8 +115,8 @@ test.describe("a visitor who has said who they are", () => {
     expect(await page.evaluate(() => localStorage.getItem("squadopt.viewer"))).toBeNull();
   });
 
-  // Day: page #ECF3E6, ink #10261A. Night: page #0D1320, ink #E7ECF5.
-  const DAY = { background: "rgb(236, 243, 230)", color: "rgb(16, 38, 26)", scheme: "light" };
+  // Day: page #FFFFFF, ink #10261A. Night: page #0D1320, ink #E7ECF5.
+  const DAY = { background: "rgb(255, 255, 255)", color: "rgb(16, 38, 26)", scheme: "light" };
   const NIGHT = { background: "rgb(13, 19, 32)", color: "rgb(231, 236, 245)", scheme: "dark" };
   const palette = (page: Page) =>
     page.locator("body").evaluate((body) => {

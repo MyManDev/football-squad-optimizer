@@ -3,11 +3,11 @@
  * body text) on every surface tokens.css lets it sit on, computed with the WCAG formula from
  * the token values, so changing a colour cannot quietly break a pairing the header promises.
  *
- * The pairs come from the header of tokens.css. Two of its stated limits are held as limits
- * here too: by day ink3 and the good green stay off the sidebar (--color-surface-2), and no
- * small text sits directly on the grass, so both stay below 4.5:1 there and the header stays
- * true. The night palette is held to every day pairing and to those two on the sidebar, and
- * its two blocks (the system's preference, the viewer's choice) to the same values.
+ * The pairs come from the header of tokens.css, and they include the players of the page's
+ * background scene, since page text passes over them. One of its stated limits is held as a
+ * limit here too: no small text sits directly on the grass, so both inks stay below 4.5:1
+ * there and the header stays true. The night palette is held to every day pairing, and its
+ * two blocks (the system's preference, the viewer's choice) to the same values.
  *
  * The club pairings join it: every club's fill and text colour reach 4.5:1, as each
  * player's shirt is drawn in them. Of the two grass tokens, only the darker
@@ -59,12 +59,14 @@ const READABLE: readonly (readonly [string, string])[] = [
   ["--color-text-muted", "--color-surface-2"],
   ["--color-text-faint", "--color-bg"],
   ["--color-text-faint", "--color-surface"],
+  ["--color-text-faint", "--color-surface-2"],
   ["--color-accent", "--color-bg"],
   ["--color-accent-text", "--color-accent"],
   ["--color-primary-text", "--color-primary"],
   ["--color-warn", "--color-surface-2"],
   ["--color-good", "--color-bg"],
   ["--color-good", "--color-surface"],
+  ["--color-good", "--color-surface-2"],
   ["--color-bad", "--color-bg"],
   ["--color-bad", "--color-surface"],
   ["--color-bad", "--color-surface-2"],
@@ -79,20 +81,28 @@ const READABLE: readonly (readonly [string, string])[] = [
   ["--color-mark-text", "--color-mark"],
   // A goalkeeper's initials on the keepers' shirt.
   ["--color-mark-text", "--color-keeper"],
+  // Page text over the background scene's players.
+  ...["--color-scene", "--color-scene-far"].flatMap((player) =>
+    [
+      "--color-text",
+      "--color-text-muted",
+      "--color-text-faint",
+      "--color-accent",
+      "--color-good",
+      "--color-bad",
+      "--color-warn",
+    ].map((text) => [text, player] as const),
+  ),
 ];
 
-/** At night ink3 and the good green read on the sidebar too, as the header says. */
+/** At night links sit on panels too, in yellow. */
 const NIGHT_READABLE: readonly (readonly [string, string])[] = [
   ...READABLE,
-  ["--color-text-faint", "--color-surface-2"],
-  ["--color-good", "--color-surface-2"],
   ["--color-accent", "--color-surface"],
 ];
 
 /** Pairings tokens.css says never carry text, held below AA so that sentence stays true. */
 const KEPT_APART: readonly (readonly [string, string])[] = [
-  ["--color-text-faint", "--color-surface-2"],
-  ["--color-good", "--color-surface-2"],
   ["#ffffff", "--color-pitch"],
   ["--color-text", "--color-pitch"],
 ];
@@ -114,8 +124,8 @@ describe("the colour tokens", () => {
 
   it("computes the WCAG ratio the header quotes", () => {
     expect(contrast("#000000", "#ffffff")).toBeCloseTo(21, 5);
-    expect(contrast(hex("--color-text"), hex("--color-bg"))).toBeCloseTo(14.1, 1);
-    expect(contrast(hex("--color-text-faint"), hex("--color-bg"))).toBeCloseTo(4.78, 2);
+    expect(contrast(hex("--color-text"), hex("--color-bg"))).toBeCloseTo(16, 0);
+    expect(contrast(hex("--color-text-faint"), hex("--color-bg"))).toBeCloseTo(6, 0);
   });
 });
 
