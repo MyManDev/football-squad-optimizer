@@ -42,18 +42,11 @@ function board(weeks: ScoreboardGameweek[]): Scoreboard {
     captured_at_utc: "2026-08-22T04:00:00Z",
     cohort_snapshot_id: null,
     cohort_picks_snapshot_id: null,
-    registered_members: 10,
-    histories_held: 10,
     gameweeks: weeks,
     cumulative: {
       through_gameweek: null,
       gameweeks: [],
-      ours_net: null,
-      ours_gameweeks: [],
-      ours_basis: null,
-      ours_excluded_gameweeks: [],
       members_mean_total_points: null,
-      members_gameweeks: [],
       members_counted: 0,
       average_entry_score: null,
     },
@@ -83,14 +76,7 @@ describe("the latest finished week", () => {
       board([week(3), week(1), week(4, { finished: false }), week(2)]),
       null,
     );
-    expect(result).toMatchObject({ gameweek: 3, net: 63, provisional: false });
-  });
-
-  it("is said provisional when it is finished and not checked", () => {
-    expect(lastWeekResult(SQUAD, board([week(1, { data_checked: false })]), null)).toMatchObject({
-      gameweek: 1,
-      provisional: true,
-    });
+    expect(result).toMatchObject({ gameweek: 3, net: 63 });
   });
 
   it.each<[RankMovement, number | null, number, unknown]>([

@@ -6,20 +6,13 @@ import { Link, useParams } from "react-router";
 import { Card } from "../../../design/components/Card";
 import { EmptyState } from "../../../design/components/EmptyState";
 import { useLanguage } from "../../../i18n/context";
-import { points, signedPoints, utcShort } from "../../../lib/format";
+import { points, signedPoints } from "../../../lib/format";
 import { LeagueDataMissing } from "../dataErrors";
 import type { SuggestionHistory, WeekReview } from "../history/historyData";
 import styles from "./LeagueMemberHistoryPage.module.css";
 import { summarizeHistory } from "../history/historySummary";
 import { PersonalSeasonReport } from "../history/PersonalSeasonReport";
-import { EVIDENCE_COPY } from "../advice/evidenceCopy";
-import { TOP100_COPY } from "../advice/top100Copy";
-import { publishedPrice } from "../advice/publishedPrice";
-import { useLeagueMembers, useSuggestionHistory } from "../queries";
-import type { EntryView } from "../types";
-
-/** The modes the scenario menu prices (`build_league_site.py --mode-residuals`). */
-const SCENARIO_MODES: ReadonlySet<string> = new Set(["garantici", "agresif", "asiri-agresif"]);
+import { useSuggestionHistory } from "../queries";
 
 export function LeagueMemberHistoryPage() {
   const { messages } = useLanguage();
@@ -29,15 +22,14 @@ export function LeagueMemberHistoryPage() {
   const parameter = useParams().entryId ?? "";
   const entryId = Number(parameter);
   const valid = /^[1-9]\d*$/.test(parameter) && Number.isSafeInteger(entryId);
-  const members = useLeagueMembers(valid);
   // The member page's latest-week card reads the same document under the same key.
   const query = useSuggestionHistory(entryId, valid);
-  if (!valid) return <EmptyState title={messages.leagueMembers.invalidEntry} />;
+  if (!valid) return <EmptyState page title={messages.leagueMembers.invalidEntry} />;
   if (query.isPending) return <EmptyState title={messages.common.loading} />;
   if (query.isError) {
     const missing = query.error instanceof LeagueDataMissing;
     return (
-      <EmptyState title={missing ? copy.empty : copy.unreadable}>
+      <EmptyState page title={missing ? copy.empty : copy.unreadable}>
         {missing ? (
           <p>{copy.emptyBody}</p>
         ) : (
@@ -51,26 +43,14 @@ export function LeagueMemberHistoryPage() {
       </EmptyState>
     );
   }
-  return (
-    <LeagueMemberHistoryView
-      key={entryId}
-      history={query.data}
-      members={members.data?.payload.members}
-    />
-  );
+  return <LeagueMemberHistoryView key={entryId} history={query.data} />;
 }
 
-export function LeagueMemberHistoryView({
-  history,
-  members = [],
-}: {
-  history: SuggestionHistory;
-  members?: EntryView[];
-}) {
-  const { messages, locale } = useLanguage();
+export function LeagueMemberHistoryView({ history }: { history: SuggestionHistory }) {
+  const { messages } = useLanguage();
   const leagueId = useLeagueId();
   const copy = messages.suggestionHistory;
-  const { entry_id: entryId, weeks, season } = history.payload;
+  const { entry_id: entryId, weeks } = history.payload;
   const [selected, setSelected] = useState<number | null>(null);
   const ordered = [...weeks].sort((a, b) => b.gameweek - a.gameweek);
   const week = ordered.find((item) => item.gameweek === selected);
@@ -78,14 +58,7 @@ export function LeagueMemberHistoryView({
     <div className={styles.page}>
       <header>
         <Link to={memberAddress(leagueId, entryId)}>{copy.back}</Link>
-        <p className={styles.muted}>
-          {season} · #{entryId}
-        </p>
         <h1>{copy.title}</h1>
-        <p>{copy.scope(leagueId)}</p>
-        <p className={styles.muted}>
-          {copy.outcomeAsOf}: {utcShort(history.generated_at_utc, locale)}
-        </p>
       </header>
       <PersonalSeasonReport history={history} />
       {weeks.length === 0 ? (
@@ -111,15 +84,12 @@ export function LeagueMemberHistoryView({
             </select>
           </label>
           {week ? (
-            <WeekResult week={week} members={members} />
+            <WeekResult week={week} />
           ) : (
             <HistoryOverview weeks={weeks} onSelect={setSelected} />
           )}
         </>
       )}
-      <Card tone="muted">
-        <p className={styles.muted}>{copy.method}</p>
-      </Card>
     </div>
   );
 }
@@ -138,8 +108,7 @@ function HistoryOverview({
     value == null ? "—" : points(value, 1, locale);
   const signed = (value: number | null) => (value === null ? "—" : signedPoints(value, 1, locale));
   return (
-    <Card title={copy.overview} aside={copy.comparedWeeks(summary.compared, weeks.length)}>
-      <p className={styles.muted}>{copy.overviewNote}</p>
+    <Card title={copy.overview}>
       <div className={styles.overviewScroll} tabIndex={0} role="region" aria-label={copy.overview}>
         <table className={styles.overviewTable}>
           <thead>
@@ -169,13 +138,8 @@ function HistoryOverview({
                   >
                     {messages.common.gameweekShort(week.gameweek)}
                   </button>
-                  {week.status !== "available" && (
-                    <span className={styles.rowStatus}>
-                      {week.status === "unsettled" ? copy.unsettled : copy.unavailable}
-                    </span>
-                  )}
-                  {week.status === "available" && !week.actual && (
-                    <span className={styles.rowStatus}>{copy.actualNotRecorded}</span>
+                  {week.status === "unsettled" && (
+                    <span className={styles.rowStatus}>{copy.unsettled}</span>
                   )}
                 </th>
                 <td>{format(week.status === "available" ? week.suggested?.net_points : null)}</td>
@@ -196,34 +160,23 @@ function HistoryOverview({
           </tfoot>
         </table>
       </div>
-      <p className={styles.muted}>{copy.totalNote}</p>
     </Card>
   );
 }
 
-function WeekResult({ week, members }: { week: WeekReview; members: EntryView[] }) {
+function WeekResult({ week }: { week: WeekReview }) {
   const { messages, locale } = useLanguage();
   const copy = messages.suggestionHistory;
   const format = (value: number | null | undefined) =>
     value == null ? "—" : points(value, 1, locale);
   const { suggested, actual } = week;
-  const reason =
-    week.reason === "no_pre_deadline_record" || week.reason === "missing_advice"
-      ? copy.noEligible
-      : week.reason === "not_published"
-        ? copy.notPublished
-        : week.reason === "missing_outcomes"
-          ? copy.missingOutcomes
-          : copy.invalid;
   const chip =
     suggested?.chip === "3xc" ? copy.triple : suggested?.chip ? copy[suggested.chip] : copy.noChip;
   return (
     <>
       <Card title={copy.gameweek(week.gameweek)}>
         {week.status !== "available" || !suggested ? (
-          <EmptyState title={week.status === "unsettled" ? copy.unsettled : copy.unavailable}>
-            <p>{week.status === "unsettled" ? copy.pending : reason}</p>
-          </EmptyState>
+          <EmptyState title={week.status === "unsettled" ? copy.unsettled : copy.unavailable} />
         ) : (
           <>
             <div className={styles.tableWrap} tabIndex={0} role="region" aria-label={copy.title}>
@@ -264,12 +217,7 @@ function WeekResult({ week, members }: { week: WeekReview; members: EntryView[] 
                 {week.net_difference === null ? "—" : signedPoints(week.net_difference, 1, locale)}
               </strong>
             </p>
-            {!actual && <p role="status">{copy.actualMissing}</p>}
             <dl className={styles.facts}>
-              <div>
-                <dt>{copy.expectation}</dt>
-                <dd>{format(week.expected_own_points)}</dd>
-              </div>
               <div>
                 <dt>{copy.captainBonus}</dt>
                 <dd>{format(suggested.captain_bonus_points)}</dd>
@@ -283,25 +231,21 @@ function WeekResult({ week, members }: { week: WeekReview; members: EntryView[] 
                 <dd>{chip}</dd>
               </div>
             </dl>
-            <p className={styles.muted}>{copy.expectationNote}</p>
           </>
         )}
       </Card>
-      <RecordedPlans week={week} members={members} />
+      <SuggestedMove week={week} />
       {week.status === "available" && (
         <Card title={copy.players}>
-          <p className={styles.muted}>{copy.playerNote}</p>
           <div className={styles.tableWrap} tabIndex={0} role="region" aria-label={copy.players}>
             <table className={styles.players}>
               <thead>
                 <tr>
-                  {[copy.player, copy.role, copy.forecast, copy.realized, copy.error].map(
-                    (label) => (
-                      <th scope="col" key={label}>
-                        {label}
-                      </th>
-                    ),
-                  )}
+                  {[copy.player, copy.role, copy.realized].map((label) => (
+                    <th scope="col" key={label}>
+                      {label}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
@@ -322,13 +266,7 @@ function WeekResult({ week, members }: { week: WeekReview; members: EntryView[] 
                         ? ` (x${player.multiplier})`
                         : ""}
                     </td>
-                    <td>{format(player.expected_points)}</td>
                     <td>{format(player.realized_points)}</td>
-                    <td>
-                      {player.forecast_error === null
-                        ? "—"
-                        : signedPoints(player.forecast_error, 1, locale)}
-                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -336,135 +274,49 @@ function WeekResult({ week, members }: { week: WeekReview; members: EntryView[] 
           </div>
         </Card>
       )}
-      <details className={styles.evidence}>
-        <summary>{copy.evidence}</summary>
-        <dl className={styles.facts}>
-          {(
-            [
-              [copy.generated, week.advice_generated_at_utc],
-              [copy.deadline, week.deadline_utc],
-              [copy.captured, week.advice_captured_at_utc],
-              [copy.settledAt, week.outcome_captured_at_utc],
-            ] as const
-          ).map(([label, value]) => (
-            <div key={label}>
-              <dt>{label}</dt>
-              <dd>{value ? utcShort(value, locale) : "—"}</dd>
-            </div>
-          ))}
-          {(
-            [
-              [copy.adviceId, week.advice_snapshot_id],
-              [copy.outcomeId, week.outcome_snapshot_id],
-              [copy.digest, week.advice_sha256],
-            ] as const
-          ).map(([label, value]) => (
-            <div key={label}>
-              <dt>{label}</dt>
-              <dd>
-                <code>{value ?? "—"}</code>
-              </dd>
-            </div>
-          ))}
-        </dl>
-      </details>
     </>
   );
 }
 
-function RecordedPlans({ week, members }: { week: WeekReview; members: EntryView[] }) {
-  const { messages, language, locale } = useLanguage();
+/** The week's plain one-week plan: no rival, no Top 100 setting, no manager's word, no chip. */
+function SuggestedMove({ week }: { week: WeekReview }) {
+  const { messages } = useLanguage();
   const copy = messages.suggestionHistory;
-  if (!week.recorded_plans?.length) return null;
-  const labels: Record<string, string> = {
-    ...Object.fromEntries(
-      Object.entries(messages.leagueMembers.strategies).map(([key, value]) => [key, value.name]),
-    ),
-    garantici: messages.decision.modes.safe,
-    agresif: messages.decision.modes.aggressive,
-    "asiri-agresif": messages.decision.modes.extreme,
-  };
+  const plan = week.recorded_plans?.find(
+    (row) =>
+      row.strategy === "saf-puan" &&
+      row.rival_entry_id === null &&
+      row.top100_weight === undefined &&
+      row.managers_word === undefined &&
+      row.chip === null,
+  );
+  if (!plan) return null;
+  const moves = plan.moves.filter((move) => move.player_out !== null && move.player_in !== null);
   return (
-    <details className={styles.evidence}>
+    <details className={styles.plan}>
       <summary>{copy.recordedPlans}</summary>
-      <p>{copy.recordedPlansNote}</p>
-      <ul>
-        {week.recorded_plans.map((plan) => {
-          // A scenario-menu mode is priced as the difference between two scenario means,
-          // not against a solved plan, and never carries a ceiling; its recorded cost is
-          // printed as it was. Every other record keeps the price and its ceiling, not the
-          // proofs behind them. A ceiling is published only where the plan the price is
-          // measured against was proven, and it is then the price itself. Such a record
-          // with no ceiling, or (from before that rule) one that differs from its price,
-          // does not show that its price was measured against a proven plan, so no price
-          // is printed for it.
-          const price =
-            SCENARIO_MODES.has(plan.strategy) ||
-            (plan.expected_points_cost_ceiling !== undefined &&
-              plan.expected_points_cost_ceiling === plan.expected_points_cost)
-              ? publishedPrice({
-                  ...plan,
-                  word: plan.managers_word === true,
-                  top100: plan.top100_weight !== undefined,
-                })
-              : undefined;
-          const top100Copy = TOP100_COPY[language];
-          const evidenceCopy = EVIDENCE_COPY[language];
-          const priceText =
-            plan.top100_weight !== undefined
-              ? plan.strategy !== "saf-puan"
-                ? top100Copy.strategyCost
-                : plan.managers_word
-                  ? top100Copy.combinedCost
-                  : top100Copy.cost
-              : plan.managers_word
-                ? evidenceCopy.cost
-                : messages.leagueMembers.planCost;
-          const rival = members.find(
-            (member) => member.member_kind === "human" && member.entry_id === plan.rival_entry_id,
-          );
-          return (
-            <li key={plan.published_path}>
-              <p>
-                <strong>
-                  {[
-                    labels[plan.strategy],
-                    messages.decision.week(plan.window),
-                    plan.rival_entry_id === null
-                      ? null
-                      : `${messages.leagueMembers.rivalLabel}: ${rival?.team_name ?? rival?.manager_name ?? `#${plan.rival_entry_id}`}`,
-                    plan.top100_weight === undefined
-                      ? null
-                      : `${TOP100_COPY[language].legend} ${plan.top100_weight}`,
-                    plan.managers_word === true ? EVIDENCE_COPY[language].legend : null,
-                    plan.chip ? messages.leagueMembers.chipNames[plan.chip] : null,
-                  ]
-                    .filter(Boolean)
-                    .join(", ")}
-                </strong>
-              </p>
-              {plan.captain !== null && (
-                <p>
-                  {copy.captain}: {plan.captain}
-                </p>
-              )}
-              {price !== undefined && <p>{priceText(points(price, 1, locale))}</p>}
-              {plan.moves.length ? (
-                <ul>
-                  {plan.moves.map((move, index) => (
-                    <li key={index}>
-                      {messages.leagueMembers.out}: {move.player_out ?? copy.unknownPlayer};{" "}
-                      {messages.leagueMembers.in}: {move.player_in ?? copy.unknownPlayer}
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p>{copy.noRecordedMoves}</p>
-              )}
+      <p>
+        <strong>
+          {messages.leagueMembers.strategies["saf-puan"].name},{" "}
+          {messages.decision.week(plan.window)}
+        </strong>
+      </p>
+      {plan.captain !== null && (
+        <p>
+          {copy.captain}: {plan.captain}
+        </p>
+      )}
+      {plan.moves.length === 0 && <p>{copy.noRecordedMoves}</p>}
+      {moves.length > 0 && (
+        <ul>
+          {moves.map((move, index) => (
+            <li key={index}>
+              {messages.leagueMembers.out}: {move.player_out}; {messages.leagueMembers.in}:{" "}
+              {move.player_in}
             </li>
-          );
-        })}
-      </ul>
+          ))}
+        </ul>
+      )}
     </details>
   );
 }

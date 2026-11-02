@@ -241,30 +241,28 @@ describe("on the device", () => {
 
 describe("what the mode says before it can start", () => {
   it.each([
-    [
-      "an unpublished table",
-      () => Promise.reject(new LeagueDataMissing("device-plan.json")),
-      COPY.whatIfUnpublished,
-    ],
-    ["an unreadable table", () => Promise.reject(new Error("broken")), COPY.whatIfFailed],
+    ["an unpublished table", () => Promise.reject(new LeagueDataMissing("device-plan.json"))],
+    ["an unreadable table", () => Promise.reject(new Error("broken"))],
     [
       "a table of another capture",
       async () => envelope({ ...document, source_snapshot_id: "another" }),
-      COPY.whatIfOtherCapture,
     ],
     [
       "a table without one of the advised players",
       async () =>
         envelope({ ...document, players: document.players.filter((player) => player.id !== 160) }),
-      COPY.whatIfOtherCapture,
     ],
-  ])("says so for %s", async (_, loadDocument, said) => {
-    show({ loadDocument });
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: COPY.whatIfStart }));
-    });
-    expect(await screen.findByText(said)).toBeInTheDocument();
-  });
+  ])(
+    "says the list could not be read for %s, and offers the start again",
+    async (_, loadDocument) => {
+      show({ loadDocument });
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: COPY.whatIfStart }));
+      });
+      expect(await screen.findByText(COPY.whatIfFailed)).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: COPY.whatIfRetry })).toBeInTheDocument();
+    },
+  );
 });
 
 describe("again after a failure", () => {

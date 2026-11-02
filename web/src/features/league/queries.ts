@@ -13,18 +13,10 @@ import { useLeague } from "./useLeague";
  * says at once. A failed read is not retried: the page offers a read-again control, shows a
  * notice, or goes on without it, and the read runs again when a page that holds it is next
  * opened, or on reload. A read that succeeded in the last minute is served from the cache.
- * The member gate reads members.json in front of every league page and every system page
- * (/gw, /moves, /rivals), through `useLeagueMembers`, so the pages that read it too share
- * that one read.
+ * The member gate reads members.json in front of every league page, through
+ * `useLeagueMembers`, so the pages that read it too share that one read.
  * Capabilities also refresh on focus once stale, to expose changed decision information.
  * This is a read, never a compute request, and introduces no polling interval.
- *
- * Outside this rule: /league (pages/LeaguePage.tsx) reads the site index, the ledger and the
- * season's league.json through data/queries.ts, which the score pages share, so those reads
- * keep the client default of one retry. queries.test.tsx counts the useQuery calls written
- * out in each module, so it cannot see a read made through a hook imported from elsewhere. It
- * does find the league modules that import data/queries.ts, and fails when one of them is not
- * named here.
  */
 export const LEAGUE_READ = { retry: false, staleTime: 60_000 } as const;
 
@@ -50,12 +42,11 @@ export const leagueKeys = {
     ["suggestion-history", leagueId, entryId] as const,
 };
 
-export function useLeagueMembers(enabled = true) {
+export function useLeagueMembers() {
   const { league, tree } = useLeague();
   return useQuery({
     queryKey: leagueKeys.members(league.leagueId),
     queryFn: () => tree.members(),
-    enabled,
     ...LEAGUE_READ,
   });
 }

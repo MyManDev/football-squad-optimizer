@@ -2,7 +2,7 @@
 
 Refs #1008. Contract: `week_live_v1`. The schema is
 `week_live_v1.schema.json`. This contract defines inputs and a display calculation;
-it does not connect a reader, write a weekly stage or change the system squad card.
+it does not connect a reader or write a weekly stage.
 
 ## Inputs and identities
 
@@ -112,7 +112,7 @@ languages carry the values and states without explanatory sentences.
 
 This calculation never writes to the ledger, outcomes, scoreboard, records or
 measurements. The release and the first finished-week equality check remain the
-gates in #1008. The system squad's `/gw` card and `live_score_v1` stay as they are.
+gates in #1008. `live_score_v1` stays as it is.
 
 ## Synthetic schema examples
 

@@ -74,7 +74,7 @@ describe("one timeline with a rank change", () => {
     },
   );
 
-  it("lists whose place changed in the week stepped to, and says the first week has none before it", () => {
+  it("lists whose place changed in the week stepped to, and has no such list for the first week", () => {
     const { container } = show(22);
     expect(screen.getByText(COPY.raceWeek(3))).toBeInTheDocument();
     expect(screen.getByText(COPY.raceNoMoves)).toBeInTheDocument();
@@ -90,7 +90,9 @@ describe("one timeline with a rank change", () => {
       ["lost", `${COPY.raceMove("M11", 1, 2)}−1`],
     ]);
     step(COPY.racePrevious);
-    expect(screen.getByText(COPY.raceFirstWeek)).toBeInTheDocument();
+    expect(screen.getByText(COPY.raceWeek(1))).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: COPY.raceMoved })).toBeNull();
+    expect(screen.queryByText(COPY.raceNoMoves)).toBeNull();
     expect(screen.getByRole("button", { name: COPY.racePrevious })).toBeDisabled();
   });
 
@@ -131,6 +133,20 @@ describe("bringing a line forward", () => {
         .getAllByRole("cell")
         .map((cell) => cell.textContent),
     ).toEqual(["1", "2", "2", "70", "120", "180"]);
+  });
+
+  it("calls a member with neither a manager nor a team an unknown member, never a number", () => {
+    const members = MEMBERS.map((member) =>
+      member.entry_id === 33 ? { ...member, manager_name: null, team_name: null } : member,
+    );
+    render(
+      <LanguageProvider initialLanguage="tr">
+        <LeagueRaceCard race={RACE} members={members} />
+      </LanguageProvider>,
+    );
+    const list = screen.getByLabelText(COPY.raceMember);
+    expect(within(list).getByRole("option", { name: COPY.unknownMember })).toHaveValue("33");
+    expect(screen.queryByText("#33", { exact: false })).toBeNull();
   });
 
   it("takes the member chosen from the list, and opens on the first place without one", () => {

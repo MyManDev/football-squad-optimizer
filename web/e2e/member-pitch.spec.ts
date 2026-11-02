@@ -24,6 +24,8 @@ const FACES = [
 
 /** The mocked member's one-week plan, as the page receives it. */
 const PLAN = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1);
+/** The mocked member's squad, as the page receives it. */
+const SQUAD = mockEntrySquadEnvelopes[ENTRY]!;
 
 /**
  * The same plan shaped like a published week with two moves (GW6 carried two): the first
@@ -56,6 +58,12 @@ function twoMoves(line?: AdvicePlayer["position"]): typeof PLAN {
     solver_status: "OPTIMAL",
   };
   return { ...PLAN, payload };
+}
+
+/** The same two moves under a Wildcard, which makes them without spending a free transfer. */
+function wildcardWeek(): typeof PLAN {
+  const week = twoMoves();
+  return { ...week, payload: { ...week.payload, chip: "wildcard" } };
 }
 
 /**
@@ -93,35 +101,26 @@ function codedCalendar(codes: readonly string[] = []) {
   return { ...calendar, payload: { ...calendar.payload, gameweeks: [{ ...week!, fixtures }] } };
 }
 
-/**
- * Opens the member page on the mocked week. `live` serves the squad and the plan as a live
- * capture rather than example data, as the real GW6 week is, so no example-data tag takes
- * a line of its own where the fold is measured.
- */
+/** Opens the member page on the mocked week. */
 async function open(
   page: Page,
   width: number,
   height: number,
   plan = PLAN,
-  live = false,
   calendar = codedCalendar(),
+  squad = SQUAD,
 ) {
   await page.setViewportSize({ width, height });
   await installLeagueMocks(page);
+  await page.route(`**/data/league/entries/${ENTRY}.json`, (route) =>
+    route.fulfill({ contentType: "application/json", body: JSON.stringify(squad) }),
+  );
   await page.route("**/data/fixtures.json", (route) =>
     route.fulfill({ contentType: "application/json", body: JSON.stringify(calendar) }),
   );
-  const served = live ? { ...plan, source_kind: "live" as const } : plan;
   await page.route(`**/data/league/advice/${ENTRY}/saf-puan/1.json`, (route) =>
-    route.fulfill({ contentType: "application/json", body: JSON.stringify(served) }),
+    route.fulfill({ contentType: "application/json", body: JSON.stringify(plan) }),
   );
-  if (live)
-    await page.route(`**/data/league/entries/${ENTRY}.json`, (route) =>
-      route.fulfill({
-        contentType: "application/json",
-        body: JSON.stringify({ ...mockEntrySquadEnvelopes[ENTRY]!, source_kind: "live" }),
-      }),
-    );
   await page.route("**/api/v1/**", (route) => route.abort("connectionrefused"));
   await page.addInitScript(() => localStorage.setItem("squadopt.language", "tr"));
   await page.goto(`/league/352490/members/${ENTRY}`);
@@ -208,7 +207,7 @@ for (const [width, height, across] of [
   [820, 1180, false],
   [390, 844, false],
 ] as const) {
-  test(`the midfield stands on the halfway line and the attack is named under the first defender at ${width}x${height}`, async ({
+  test(`the midfield stands on the halfway line with the defence and the attack mirrored about it at ${width}x${height}`, async ({
     page,
   }, testInfo) => {
     await open(page, width, height);
@@ -243,28 +242,6 @@ for (const [width, height, across] of [
     for (const line of [defence!, midfield!, attack!])
       expect(Math.abs(mean(line.map(across2)) - other)).toBeLessThanOrEqual(1);
 
-    // 'Hücum yönü' sits directly under the first defender in the published order (or under
-    // the whole defence where four or more crowd it across the pitch).
-    const label = page.getByText(copy.leagueMembers.attackDirection, { exact: true });
-    await expect(label).toHaveCount(defence!.length >= 4 ? 2 : 1);
-    const shown = label.locator("visible=true");
-    await expect(shown).toHaveCount(1);
-    const under = across && defence!.length >= 4 ? defence!.at(-1)! : defence![0]!;
-    const box = (await shown.boundingBox())!;
-    expect(box.y - (under.y + under.height)).toBeGreaterThanOrEqual(0);
-    expect(box.y - (under.y + under.height)).toBeLessThanOrEqual(8);
-    expect(box.x < under.x + under.width && box.x + box.width > under.x).toBe(true);
-    // It is on a white plate inside the pitch, not over another player.
-    expect(box.x).toBeGreaterThanOrEqual(field.x);
-    expect(box.x + box.width).toBeLessThanOrEqual(field.x + field.width);
-    for (const plate of [...keeper!, ...defence!, ...midfield!, ...attack!]) {
-      const overlaps =
-        box.x < plate.x + plate.width &&
-        box.x + box.width > plate.x &&
-        box.y < plate.y + plate.height &&
-        box.y + box.height > plate.y;
-      expect(overlaps).toBe(false);
-    }
     // The armband and YENİ belong visibly to their own plate: inside it across the pitch,
     // centred over it upright, so neither reads as the next plate's. Every club code is
     // printed whole, however many share a line.
@@ -363,7 +340,7 @@ for (const [width, height] of [
   test(`the rail's week cells hold each opponent's two colours, code and venue at ${width}x${height}`, async ({
     page,
   }) => {
-    await open(page, width, height, twoMoves(), false, codedCalendar(Object.keys(CLUB_COLOURS)));
+    await open(page, width, height, twoMoves(), codedCalendar(Object.keys(CLUB_COLOURS)));
     const cells = await page.locator('[data-mark="rail"]').evaluate((rail) =>
       [...rail.querySelectorAll<HTMLElement>('[data-venue="home"], [data-venue="away"]')].map(
         (cell) => {
@@ -398,7 +375,34 @@ for (const [width, height] of [
   });
 }
 
-test("the plan link reveals the decision, pitch and honesty together on a laptop", async ({
+// A plan solved with the lineup's expectation publishes no share per move (adviceShape.ts).
+for (const width of [390, 768, 1180]) {
+  test(`at ${width} a board with no published share gives its panels the whole width`, async ({
+    page,
+  }) => {
+    const plan = twoMoves();
+    plan.payload.moves = plan.payload.moves.map((move) => ({
+      ...move,
+      expected_points_delta: null,
+    }));
+    await open(page, width, 900, plan);
+    const boards = page.locator('[data-mark="decision"]').getByRole("article");
+    await expect(boards).toHaveCount(2);
+    for (const board of await boards.all()) {
+      const fit = await board.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return {
+          inside:
+            element.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight),
+          panels: element.querySelector(":scope > div")!.getBoundingClientRect().width,
+        };
+      });
+      expect(fit.panels).toBeCloseTo(fit.inside, 0);
+    }
+  });
+}
+
+test("the plan link reveals the decision and the pitch together on a laptop", async ({
   page,
 }, testInfo) => {
   await open(page, 1440, 900, twoMoves());
@@ -411,8 +415,12 @@ test("the plan link reveals the decision, pitch and honesty together on a laptop
   await page.getByRole("link", { name: copy.leagueMembers.viewPlan, exact: true }).click();
   await expect(page).toHaveURL(/#entry-advice-title$/);
   expect(await bottom(decision)).toBeLessThanOrEqual(640);
-  for (const mark of ["pitch", "bench", "honesty"])
+  for (const mark of ["pitch", "bench"])
     expect(await bottom(page.locator(`[data-mark="${mark}"]`)), mark).toBeLessThanOrEqual(900);
+  expect(
+    await bottom(page.getByRole("link", { name: copy.suggestionHistory.title, exact: true })),
+    "history link",
+  ).toBeLessThanOrEqual(900);
   // The fixtures are a column of their own at the window's right edge, as tall as it.
   const rail = (await page
     .getByRole("complementary", { name: copy.shell.fixtures })
@@ -434,10 +442,10 @@ test("the plan link reveals the decision, pitch and honesty together on a laptop
   await expect.poll(async () => bottom(decision)).toBeLessThanOrEqual(640);
 });
 
-test("the plan link reveals a compact phone decision with its stamp beside the transfer facts", async ({
+test("the plan link reveals a compact phone decision with the transfer facts under the captain line", async ({
   page,
 }, testInfo) => {
-  await open(page, 390, 844, twoMoves(), true);
+  await open(page, 390, 844, twoMoves());
   const decision = page.locator('[data-mark="decision"]');
   const boards = decision.getByRole("article");
   await expect(boards).toHaveCount(2);
@@ -450,15 +458,15 @@ test("the plan link reveals a compact phone decision with its stamp beside the t
   await expect(page).toHaveURL(/#entry-advice-title$/);
   // After the explicit jump, the boards and the transfer facts still fit one phone viewport.
   expect(await bottom(boards.nth(1))).toBeLessThanOrEqual(548);
-  // The captain line is the paragraph that names the vice-captain too (a gain sentence
-  // can also say 'kaptan').
+  // The captain line is the paragraph that names the vice-captain too (the rival line can
+  // also say 'kaptan').
   const captain = decision.locator("p").filter({
     has: page.getByText(copy.leagueMembers.viceCaptainLabel, { exact: true }),
   });
   expect(await bottom(captain)).toBeLessThanOrEqual(548);
-  const stamp = decision.getByText(copy.leagueMembers.stampOptimal, { exact: true });
+  const facts = decision.locator("ul").filter({ hasText: copy.leagueMembers.hitPointsFact("0") });
   // When a runner draws the page taller than this machine does, say where: the bottom of
-  // every block above the stamp, so a failure names the block that grew.
+  // every block above the facts, so a failure names the block that grew.
   const layout = await page.evaluate(() => {
     const at = (selector: string) => {
       const element = document.querySelector(selector);
@@ -473,42 +481,41 @@ test("the plan link reveals a compact phone decision with its stamp beside the t
       : [];
     return { phoneBar: at("body header"), topBar: at("main header"), blocks };
   });
-  expect(await bottom(stamp), JSON.stringify(layout)).toBeLessThanOrEqual(664);
-  expect(await bottom(page.locator('[data-mark="honesty"]'))).toBeLessThanOrEqual(844);
-  // The stamp stands beside the week's transfer facts, as the artboard draws it, after the
-  // captain line and the gain figure.
-  const facts = decision.locator("ul").filter({ hasText: copy.leagueMembers.hitPointsFact("0") });
-  const [stampBox, factsBox, captainBox] = await Promise.all([
-    box(stamp),
-    box(facts),
-    box(captain),
-  ]);
-  expect(factsBox.x).toBeGreaterThan(stampBox.x + stampBox.width);
-  expect(Math.abs(centre(factsBox).y - centre(stampBox).y)).toBeLessThanOrEqual(8);
-  expect(stampBox.y).toBeGreaterThan(captainBox.y + captainBox.height);
+  expect(await bottom(facts), JSON.stringify(layout)).toBeLessThanOrEqual(664);
+  // The week's transfer facts follow the captain line and the gain figure, as the artboard
+  // draws them.
+  const [factsBox, captainBox] = await Promise.all([box(facts), box(captain)]);
+  expect(factsBox.y).toBeGreaterThan(captainBox.y + captainBox.height);
+  // The link to the weekly history follows the squad and its bench.
+  const history = page.getByRole("link", { name: copy.suggestionHistory.title, exact: true });
+  expect((await box(history)).y).toBeGreaterThan(await bottom(page.locator('[data-mark="bench"]')));
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: testInfo.outputPath("member-390.png") });
 });
 
 for (const width of [320, 360, 375]) {
-  test(`under 390 px the transfer facts take the row under the stamp at ${width}`, async ({
+  test(`under 390 px each transfer fact keeps one line and the page does not scroll sideways at ${width}`, async ({
     page,
   }) => {
-    await open(page, width, 800, twoMoves(), true);
+    await open(page, width, 800, wildcardWeek(), codedCalendar(), {
+      ...SQUAD,
+      payload: { ...SQUAD.payload, free_transfers_known: true, free_transfers: 2 },
+    });
     const decision = page.locator('[data-mark="decision"]');
-    const stamp = decision.locator("p[data-stamp]");
     const facts = decision.locator("ul").filter({ hasText: copy.leagueMembers.hitPointsFact("0") });
-    const stampBox = (await stamp.boundingBox())!;
-    const factsBox = (await facts.boundingBox())!;
-    // Beside the stamp there is no room for a fact on one line, so the facts sit under it.
-    expect(factsBox.y).toBeGreaterThanOrEqual(stampBox.y + stampBox.height);
     const items = facts.locator("li");
-    await expect(items).not.toHaveCount(0);
+    // The list holds its longest fact, the free transfers kept under the chip.
+    await expect(items).toHaveText([
+      copy.leagueMembers.freeTransfersKeptUnderChip(copy.leagueMembers.chipNames.wildcard!, 2),
+      copy.leagueMembers.hitPointsFact("0"),
+    ]);
     for (const item of await items.all()) {
-      // One 16 px line each: nothing wraps inside a fact.
-      expect((await item.boundingBox())!.height).toBeLessThanOrEqual(17);
+      // One 16 px line each, inside the screen: nothing wraps in a fact or runs out of its box.
+      const fact = (await item.boundingBox())!;
+      expect(fact.height).toBeLessThanOrEqual(17);
+      expect(fact.x + fact.width).toBeLessThanOrEqual(width);
+      expect(await item.evaluate((li) => li.scrollWidth <= li.clientWidth)).toBe(true);
     }
-    expect(stampBox.x + stampBox.width).toBeLessThanOrEqual(width);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
     );

@@ -40,9 +40,9 @@ checks a candidate against the copies the accepted site carries.
 | `fixtures_v1.schema.json` | `fixtures_schema()` in `src/squadopt/application/fixtures_view.py` | The fixture list page, `web/src/features/fixtures/types.ts` | `tests/unit/test_application_fixtures_view.py` |
 | `league_capabilities_v1.schema.json` | `league_capabilities_schema()` in `src/squadopt/platform/advice_documents.py` | The capabilities validator in the same module; `web/src/features/league/advice/adviceCapabilities.test.ts` | `tests/unit/test_api_advice_switches.py` |
 | `league_state_v1.schema.json` | `league_state_schema()` in `src/squadopt/platform/advice_documents.py` | The league state validator in the same module | `tests/unit/test_api_advice_routes.py` |
-| `live_score_v1.schema.json` | `live_score_schema()` in `src/squadopt/application/live_score.py` | The live score view, `web/src/data/liveScore.ts` | `tests/unit/test_application_live_score.py` |
+| `live_score_v1.schema.json` | `live_score_schema()` in `src/squadopt/application/live_score.py` | Published; no page reads it | `tests/unit/test_application_live_score.py` |
 | `run_manifest_v1.schema.json` | `run_manifest_schema()` in `src/squadopt/platform/manifest.py` | The run manifests of the installed CLI | `tests/unit/test_platform_run_context.py` |
-| `ui_view_v1.schema.json` | `ui_view_schema()` in `src/squadopt/application/contract.py` | The season site's views; `npm run gen:types` generates `web/src/data/schema.ts` from it | `tests/unit/test_application_views.py` |
+| `ui_view_v1.schema.json` | `ui_view_schema()` in `src/squadopt/application/contract.py` | The season site's views. Published; no page reads them. `npm run gen:types` generates `web/src/data/schema.ts` from it | `tests/unit/test_application_views.py` |
 | `weekly_suggestion_history_v1.schema.json` | `history_schema()` in `src/squadopt/platform/history_documents.py` | The recorded weekly history that `src/squadopt/application/weekly_suggestion_eval.py` produces | `tests/unit/test_recorded_plan_history.py` |
 
 ## Hand-written schemas and contract notes
@@ -53,7 +53,7 @@ it.
 | File | Contract | Producer or subject | Tests |
 | --- | --- | --- | --- |
 | `league_member_movement_v1.schema.json` | A member's captured rank movement in the league views | `src/squadopt/application/league_views.py` | `tests/unit/test_league_views.py` |
-| `member_week_horizon_v1.md`, `member_week_horizon_v1.schema.json` | The optional `series-horizon.json` beside a league's scoreboard | `src/squadopt/application/weekly_suggestion_eval.py`; read by `web/src/features/league/history/liveSeries.ts` | `tests/unit/test_member_week_horizon_contract.py`, `tests/unit/test_weekly_suggestion_eval.py` |
+| `member_week_horizon_v1.md`, `member_week_horizon_v1.schema.json` | The optional `series-horizon.json` beside a league's scoreboard; published, no page reads it | `src/squadopt/application/weekly_suggestion_eval.py` | `tests/unit/test_member_week_horizon_contract.py`, `tests/unit/test_weekly_suggestion_eval.py` |
 | `scoreboard_comparisons_v1.md`, `scoreboard_comparisons_v1.schema.json` | The `comparisons` extension of each scoreboard gameweek | `src/squadopt/application/scoreboard.py` | `tests/unit/test_build_scoreboard.py`, `tests/unit/test_scoreboard_basis.py` |
 | [`advice_job_view_v1.md`](advice_job_view_v1.md), `advice_job_view_v1.examples.json` | An advice job as the page reads it while a member waits, with its place in line, its progress and the workers (#978) | `AdviceSubmitService.public_job_view` in `src/squadopt/platform/advice_submit.py` | `tests/unit/test_api_advice_post.py` |
 | [`week_live_v1.md`](week_live_v1.md), `week_live_v1.schema.json`, `week_live_v1.examples.json` | A member's gameweek live inputs and their display calculation (#1008) | The committed examples; `scripts/export_official_scoring_vectors.py` writes its synthetic weeks in this shape; the FPL forwarder's live route serves it without member blocks (#980) | `tests/unit/test_week_live_contract.py`, `workers/fpl-proxy/test/worker.test.mjs` |

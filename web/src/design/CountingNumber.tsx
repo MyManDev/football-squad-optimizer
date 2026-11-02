@@ -7,7 +7,6 @@ type Props = {
   countKey: string;
   value: number;
   format: (value: number) => string;
-  className?: string;
 };
 
 /**
@@ -18,7 +17,7 @@ type Props = {
  * and React never write the same text node. The figure is not a live region, so the values in
  * between are not announced; the final value is the element's text once the count ends.
  */
-export function CountingNumber({ countKey, value, format, className }: Props) {
+export function CountingNumber({ countKey, value, format }: Props) {
   const element = useRef<HTMLSpanElement>(null);
   // The latest format, read by a running count; a new function each render must not restart it.
   const formatRef = useRef(format);
@@ -55,5 +54,5 @@ export function CountingNumber({ countKey, value, format, className }: Props) {
     if (element.current !== null) element.current.textContent = text;
   }, [text]);
 
-  return <span ref={element} className={className} data-counting-number="" />;
+  return <span ref={element} data-counting-number="" />;
 }

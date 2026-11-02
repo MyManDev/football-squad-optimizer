@@ -1232,10 +1232,10 @@ def check_contract(document: dict[str, Any]) -> None:
 def reader_keys(histories: Sequence[Path]) -> list[str]:
     """Rebuild the reader's record keys from the published bytes, the way it spells them.
 
-    ``web/src/features/league/history/liveSeries.ts`` keeps an available week that has a
-    suggestion, an actual score and a difference, and names it entry, gameweek, advice digest,
-    outcome capture. This walks the published documents rather than the reviews behind them,
-    so the comparison covers what a browser would actually receive.
+    A reader keeps an available week that has a suggestion, an actual score and a difference,
+    and names it entry, gameweek, advice digest, outcome capture. This walks the published
+    documents rather than the reviews behind them, so the comparison covers what a browser
+    would actually receive.
     """
     keys = []
     for path in histories:

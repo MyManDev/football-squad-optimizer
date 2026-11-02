@@ -5,7 +5,6 @@ import {
   useMemo,
   useRef,
   useState,
-  useSyncExternalStore,
   type MouseEvent,
   type ReactNode,
 } from "react";
@@ -21,7 +20,6 @@ import {
   MenuIcon,
   NavIcon,
   PersonIcon,
-  PlanIcon,
 } from "../shell/icons";
 import { useShellLayout } from "../shell/layout";
 import {
@@ -38,27 +36,6 @@ import { crossfade } from "../viewTransition";
 import { MatchScene } from "./MatchScene";
 import styles from "./PageShell.module.css";
 import { ThemeToggle } from "./ThemeToggle";
-
-const FOCUSABLE =
-  'input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])';
-
-/** Whether a slot holds anything, kept current as a page renders into it and leaves it. */
-function useSlotFilled(slot: HTMLElement | null): boolean {
-  const subscribe = useCallback(
-    (onChange: () => void) => {
-      if (!slot) return () => undefined;
-      const observer = new MutationObserver(onChange);
-      observer.observe(slot, { childList: true });
-      return () => observer.disconnect();
-    },
-    [slot],
-  );
-  return useSyncExternalStore(
-    subscribe,
-    () => (slot?.childElementCount ?? 0) > 0,
-    () => false,
-  );
-}
 
 /** A link to an id inside the page (the squad's '#kadro') scrolls there once it has rendered. */
 function useScrollToHash(hash: string, key: string) {
@@ -100,16 +77,15 @@ function useScrollToHash(hash: string, key: string) {
  * open at 264 px or collapsed to the rail (the choice is kept in this browser). The phone
  * bar exists only in the phone layout; everything else is rendered once in every layout.
  *
- * The sidebar holds the brand, the identity block, the navigation, the PLAN slot and a
- * footer with the language switch. A page fills the PLAN slot through `ShellPortal`; the
- * shell reads no document of its own.
+ * The sidebar holds the brand, the identity block, the navigation and a footer with the
+ * language switch. The shell reads no document of its own.
  *
  * `identity` is the league the visitor entered and the member they said they are in it,
  * handed in by the app (design/ reads nothing of the league feature). It decides the
  * navigation, and with a member it draws the identity block: the league, the member and
  * Değiştir, which calls `onChangeMember`, the one way to say you are someone else. The
- * rail, too narrow for the block, shows it as one icon (as it shows the plan) that opens
- * the sidebar with focus on Değiştir.
+ * rail, too narrow for the block, shows it as one icon that opens the sidebar with focus
+ * on Değiştir.
  */
 export function PageShell({
   children,
@@ -129,10 +105,8 @@ export function PageShell({
   const [sheetState, setSheetOpen] = useState(false);
   const [sheets, setSheets] = useState(0);
   const [collapsed, setCollapsed] = useState(readSidebarCollapsed);
-  const [planSlot, setPlanSlot] = useState<HTMLElement | null>(null);
   const [lastSeen, setLastSeen] = useState<MemberContext | null>(null);
   const [shown, setShown] = useState({ layout, pathname: location.pathname });
-  const planFilled = useSlotFilled(planSlot);
 
   // A resize past a breakpoint, or a new page, closes whatever was open over the page.
   if (shown.layout !== layout || shown.pathname !== location.pathname) {
@@ -180,8 +154,7 @@ export function PageShell({
   useEffect(() => {
     if (!overlay) return;
     const onKey = (event: KeyboardEvent) => {
-      // A control inside that already answered Escape (a list it closed) keeps the overlay.
-      if (event.key === "Escape" && !event.defaultPrevented) closeOverlays();
+      if (event.key === "Escape") closeOverlays();
     };
     document.addEventListener("keydown", onKey);
     const root = document.documentElement;
@@ -226,20 +199,13 @@ export function PageShell({
     wasOverlay.current = overlay;
   }, [overlay, drawerOpen, layout]);
 
-  // A rail button opens the sidebar on a desktop and puts focus in what it stands for:
-  // the plan's chosen setting, or Değiştir.
-  const focusAfterExpand = useRef<"plan" | "who" | null>(null);
+  // The rail's identity icon opens the sidebar on a desktop and puts focus on Değiştir.
+  const focusAfterExpand = useRef(false);
   useEffect(() => {
-    const goal = focusAfterExpand.current;
-    if (goal === null || collapsed) return;
-    focusAfterExpand.current = null;
-    const target =
-      goal === "who"
-        ? whoChangeRef.current
-        : (planSlot?.querySelector<HTMLElement>("input:checked:not([disabled])") ??
-          planSlot?.querySelector<HTMLElement>(FOCUSABLE));
-    (target ?? toggleRef.current)?.focus();
-  }, [collapsed, planSlot]);
+    if (!focusAfterExpand.current || collapsed) return;
+    focusAfterExpand.current = false;
+    (whoChangeRef.current ?? toggleRef.current)?.focus();
+  }, [collapsed]);
 
   const setDesktopCollapsed = (next: boolean) => {
     setCollapsed(next);
@@ -249,15 +215,9 @@ export function PageShell({
     if (layout === "desktop") setDesktopCollapsed(!collapsed);
     else setDrawerOpen(!drawerOpen);
   };
-  const openPlan = () => {
-    if (layout === "desktop") {
-      focusAfterExpand.current = "plan";
-      setDesktopCollapsed(false);
-    } else setDrawerOpen(true);
-  };
   const openWho = () => {
     if (layout === "desktop") {
-      focusAfterExpand.current = "who";
+      focusAfterExpand.current = true;
       setDesktopCollapsed(false);
     } else {
       openedFromWho.current = true;
@@ -357,16 +317,12 @@ export function PageShell({
 
   const shell = useMemo<ShellContextValue>(
     () => ({
-      drawerOpen,
-      setDrawerOpen,
       sheetOpen,
       setSheetOpen,
-      sheetAvailable: sheets > 0,
       registerSheet,
-      planSlot,
       focusPage,
     }),
-    [drawerOpen, sheetOpen, sheets, registerSheet, planSlot, focusPage],
+    [sheetOpen, registerSheet, focusPage],
   );
 
   useScrollToHash(location.hash, location.key);
@@ -547,22 +503,6 @@ export function PageShell({
                   </Link>
                 ))}
               </nav>
-              <div ref={setPlanSlot} className={styles.plan} />
-              {rail && planFilled ? (
-                <div className={styles.planRail}>
-                  <button
-                    type="button"
-                    className={styles.railButton}
-                    aria-label={copy.changePlan}
-                    aria-controls="sidebar"
-                    aria-expanded={false}
-                    aria-haspopup={layout === "desktop" ? undefined : "dialog"}
-                    onClick={openPlan}
-                  >
-                    <PlanIcon />
-                  </button>
-                </div>
-              ) : null}
               <div className={styles.footer}>
                 <LanguageToggle vertical={rail} />
                 <ThemeToggle vertical={rail} />

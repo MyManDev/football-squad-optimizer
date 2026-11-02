@@ -1,9 +1,9 @@
 /**
  * The device solve on the member page: offered where the publisher wrote the member's
- * inputs, the plan it proves shown as a computation result, one answer at a time with
- * the service, a solve still running or a plan it finished ended by a new selection and by
- * no read that lands, and nothing offered where the inputs are absent or the manager's word
- * is on.
+ * inputs, the plan it proves shown with its ready mark and its transfers, one answer at a
+ * time with the service, a solve still running or a plan it finished ended by a new selection
+ * and by no read that lands, and nothing offered where the inputs are absent or the manager's
+ * word is on.
  */
 
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
@@ -59,6 +59,10 @@ const PLAN_SHOWN = copy.squadAfterTitle;
 const document = fixture.document as unknown as DevicePlanDocument;
 const member = fixture.members[2]!;
 const entryBlock = member.entry as unknown as DevicePlanEntry;
+/** The players the device's plan brings in, by the names the document gives them. */
+const TRANSFERS_IN = member.reference.moves.map(
+  (move) => document.players.find((player) => player.id === move.in)!.name,
+);
 
 function squadWith(block: DevicePlanEntry | null): LeagueViewEnvelope<EntrySquad> {
   const base = mockEntrySquadEnvelopes[ENTRY]!;
@@ -226,6 +230,9 @@ function renderView(
 }
 
 const deviceButton = () => screen.queryByRole("button", { name: copy.deviceButton });
+/** The panel's line for a run that finished; it holds the plan's ready mark. */
+const deviceDone = (container: HTMLElement) =>
+  container.querySelector("[data-device-state='done']");
 
 describe("the device solve on the member page", () => {
   it("is offered where the publisher wrote the member's inputs, and nowhere else", () => {
@@ -255,63 +262,61 @@ describe("the device solve on the member page", () => {
       WORD_INDEX,
     );
     await act(async () => deviceButton()!.click());
-    await waitFor(() => expect(container).toHaveTextContent(copy.deviceDone("0,4")));
+    await waitFor(() => expect(deviceDone(container)).not.toBeNull());
     await act(async () => screen.getByText("word-on").click());
-    expect(container).not.toHaveTextContent(copy.deviceDone("0,4"));
-    expect(container).not.toHaveTextContent(copy.computeEcho(copy.computeEchoStates.device));
+    expect(deviceDone(container)).toBeNull();
     expect(screen.queryByText(PLAN_SHOWN)).toBeNull();
     expect(deviceButton()).toBeNull();
   });
 
-  it("shows the plan the device proved as a computation result, with its time", async () => {
+  it("shows the plan the device proved, with its ready mark and its transfers", async () => {
     const { container } = renderView(squadWith(entryBlock));
     expect(screen.queryByText(PLAN_SHOWN)).toBeNull();
     await act(async () => deviceButton()!.click());
     await waitFor(() => expect(screen.getByText(PLAN_SHOWN)).toBeVisible());
-    expect(container).toHaveTextContent(copy.deviceDone("0,4"));
-    expect(container).toHaveTextContent(copy.adviceComputedBadge);
-    expect(container).toHaveTextContent(copy.computeEcho(copy.computeEchoStates.device));
-    expect(container).toHaveTextContent(copy.stampOptimal);
-    // The transfers the reference names, by the names the document gives them.
-    const names = new Map(document.players.map((p) => [p.id, p.name]));
-    for (const move of member.reference.moves) {
-      expect(container).toHaveTextContent(names.get(move.in!)!);
-    }
+    expect(deviceDone(container)).toHaveTextContent(copy.computeDone);
+    for (const name of TRANSFERS_IN) expect(container).toHaveTextContent(name);
     expect(container).not.toHaveTextContent("%");
   });
 
   it("is dropped by a new selection and does not come back with the old one", async () => {
     const { container } = renderView(squadWith(entryBlock));
     await act(async () => deviceButton()!.click());
-    await waitFor(() => expect(container).toHaveTextContent(copy.deviceDone("0,4")));
+    await waitFor(() => expect(deviceDone(container)).not.toBeNull());
     await act(async () => screen.getByText("to-3").click());
-    expect(container).not.toHaveTextContent(copy.deviceDone("0,4"));
+    expect(deviceDone(container)).toBeNull();
     expect(deviceButton()).toBeNull();
     await act(async () => screen.getByText("to-1").click());
-    expect(container).not.toHaveTextContent(copy.deviceDone("0,4"));
-    expect(container).not.toHaveTextContent(copy.computeEcho(copy.computeEchoStates.device));
+    expect(deviceDone(container)).toBeNull();
+    expect(screen.queryByText(PLAN_SHOWN)).toBeNull();
     expect(deviceButton()).not.toBeNull();
   });
 
   it("gives way to the service's answer, and takes the page back when asked again", async () => {
     const { container } = renderView(squadWith(entryBlock));
     await act(async () => deviceButton()!.click());
-    await waitFor(() => expect(container).toHaveTextContent(copy.deviceDone("0,4")));
+    await waitFor(() => expect(deviceDone(container)).not.toBeNull());
 
     await act(async () => screen.getByRole("button", { name: "Hesapla" }).click());
-    await waitFor(() => expect(container).toHaveTextContent(copy.computeDone));
-    expect(container).not.toHaveTextContent(copy.deviceDone("0,4"));
-    expect(container).toHaveTextContent(copy.computeEcho(copy.computeEchoStates.done));
+    await waitFor(() =>
+      expect(container).toHaveTextContent(copy.computeEcho(copy.computeEchoStates.done)),
+    );
+    expect(container).toHaveTextContent(copy.computeDone);
+    expect(deviceDone(container)).toBeNull();
+    // The service's plan is on the page, and it makes none of the device's transfers.
+    expect(screen.getByText(PLAN_SHOWN)).toBeVisible();
+    for (const name of TRANSFERS_IN) expect(container).not.toHaveTextContent(name);
 
     await act(async () => deviceButton()!.click());
-    await waitFor(() => expect(container).toHaveTextContent(copy.deviceDone("0,4")));
-    expect(container).toHaveTextContent(copy.computeEcho(copy.computeEchoStates.device));
+    await waitFor(() => expect(deviceDone(container)).not.toBeNull());
+    expect(container).not.toHaveTextContent(copy.computeEcho(copy.computeEchoStates.done));
+    for (const name of TRANSFERS_IN) expect(container).toHaveTextContent(name);
   });
 
   it("says a device plan that holds the fifteen makes no transfer, without calling it published", async () => {
     const { container } = renderView(squadWith(entryBlock), "mode=saf-puan&window=1", true);
     await act(async () => deviceButton()!.click());
-    await waitFor(() => expect(container).toHaveTextContent(copy.deviceDone("0,4")));
+    await waitFor(() => expect(deviceDone(container)).not.toBeNull());
     const decision = screen.getByRole("region", { name: copy.decisionTitle });
     expect(decision).toHaveTextContent(copy.noMove);
     expect(decision).not.toHaveTextContent(/yayımlanan plan|yayınlanan plan/i);
@@ -433,10 +438,11 @@ describe("a device solve on the member page as the page's reads land", () => {
     const page = memberPage(() => new CannedSolver());
     const { container, rerender } = render(page(READING_INDEX));
     await act(async () => deviceButton()!.click());
-    await waitFor(() => expect(container).toHaveTextContent(copy.deviceDone("0,4")));
+    await waitFor(() => expect(deviceDone(container)).not.toBeNull());
     rerender(page(PUBLISHED_READ));
     await act(async () => {});
-    expect(container).toHaveTextContent(copy.deviceDone("0,4"));
-    expect(container).toHaveTextContent(copy.computeEcho(copy.computeEchoStates.device));
+    expect(deviceDone(container)).not.toBeNull();
+    // The published plan makes no transfer, so the device's transfers say whose plan is shown.
+    for (const name of TRANSFERS_IN) expect(container).toHaveTextContent(name);
   });
 });

@@ -16,13 +16,6 @@ export const MOTION_MS = {
 
 export type MotionKind = keyof typeof MOTION_MS;
 
-/** The ranges #1136 sets: buttons and cards, then pitch and data transitions. */
-export const MOTION_RANGES: Record<MotionKind, readonly [number, number]> = {
-  uiFast: [150, 250],
-  ui: [150, 250],
-  data: [300, 500],
-};
-
 /** `--motion-ease`, as the four control points of its cubic Bézier. */
 export const MOTION_EASE = [0.2, 0, 0, 1] as const;
 

@@ -76,6 +76,8 @@ for (const [language, width] of [
     );
     expect((await new AxeBuilder({ page }).include("dialog").analyze()).violations).toEqual([]);
     expect(await dialog.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
+    // The site's opening covers the page for its first seconds, so the picture waits it out.
+    await atRest(page);
     await page.screenshot({ path: testInfo.outputPath(`player-${language}.png`) });
     await page.keyboard.press("Escape");
     await expect(dialog).toHaveCount(0);

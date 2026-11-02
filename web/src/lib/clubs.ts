@@ -97,11 +97,6 @@ export const CLUB_COLOURS: Readonly<Record<string, ClubColours>> = {
   TOT: { primary: "#132257", secondary: "#FFFFFF" },
 };
 
-/** One swatch per club code: its primary colour, read from CLUB_COLOURS. */
-export const CLUB_SWATCHES: Readonly<Record<string, string>> = Object.fromEntries(
-  Object.entries(CLUB_COLOURS).map(([code, colours]) => [code, colours.primary]),
-);
-
 const key = (name: string) => name.trim().toLocaleLowerCase("en-GB");
 
 const FALLBACK = new Map(Object.entries(FALLBACK_CODES).map(([name, code]) => [key(name), code]));
@@ -134,9 +129,4 @@ export function clubCode(team: string, fromFixtures?: ClubCodes | null): string 
 export function clubColours(code: string | null | undefined): ClubColours | null {
   if (!code) return null;
   return CLUB_COLOURS[code.toUpperCase()] ?? null;
-}
-
-/** The swatch colour for a club code (its primary), or `null` when the code has none. */
-export function clubSwatch(code: string | null | undefined): string | null {
-  return clubColours(code)?.primary ?? null;
 }

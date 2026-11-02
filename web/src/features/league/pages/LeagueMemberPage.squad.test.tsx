@@ -212,7 +212,6 @@ describe("the member's published squad", () => {
     render(memberSurface(mockEntrySquadEnvelopes[35249010]!, language));
 
     expect(screen.getByText(copy.leagueMembers.emptySquad)).toBeInTheDocument();
-    expect(screen.getByText(copy.leagueMembers.emptySquadBody)).toBeInTheDocument();
     expect(screen.queryByRole("list", { name: copy.squad.pitchLabel })).not.toBeInTheDocument();
     expect(screen.queryByRole("region", { name: copy.leagueMembers.bench })).toBeNull();
   });

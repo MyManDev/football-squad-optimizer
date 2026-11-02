@@ -115,7 +115,10 @@ describe("the duel of two elevens", () => {
     const picker = screen.getByRole("group", { name: MESSAGES.tr.leagueMembers.duelPick });
     const buttons = within(picker).getAllByRole("button");
     expect(buttons.map((button) => button.textContent)).toEqual(
-      CANDIDATES.map((member) => member.team_name ?? member.manager_name ?? `#${member.entry_id}`),
+      CANDIDATES.map(
+        (member) =>
+          member.team_name ?? member.manager_name ?? MESSAGES.tr.leagueMembers.unknownTeam,
+      ),
     );
     expect(within(picker).getByRole("button", { name: "Half Space" })).toHaveAttribute(
       "aria-pressed",
@@ -125,7 +128,15 @@ describe("the duel of two elevens", () => {
     expect(onSelect).toHaveBeenCalledWith(35249003);
   });
 
-  it("says when the rival is being read, cannot be read, is not published or is from another capture", () => {
+  it("names a rival with neither a team nor a manager as an unnamed team, never by number", () => {
+    const copy = MESSAGES.tr.leagueMembers;
+    const unnamed = { ...SECOND.payload.entry, team_name: null, manager_name: null };
+    show({ candidates: [unnamed], selected: null, rival: null });
+    expect(screen.getByRole("button", { name: copy.unknownTeam })).toBeInTheDocument();
+    expect(screen.queryByText(/#\d/)).toBeNull();
+  });
+
+  it("says when the rival is being read, cannot be read or is from another capture", () => {
     const copy = MESSAGES.tr.leagueMembers;
     show({ rival: null, issue: "loading" });
     expect(screen.getByText(copy.duelLoading)).toBeInTheDocument();
@@ -133,16 +144,13 @@ describe("the duel of two elevens", () => {
     show({ rival: null, issue: "unreadable" });
     expect(screen.getByText(copy.duelUnreadable)).toBeInTheDocument();
     cleanup();
-    show({ rival: null, issue: "missing" });
-    expect(screen.getByText(copy.duelMissing)).toBeInTheDocument();
-    cleanup();
     const { container } = show({
       rival: {
         ...SECOND,
         payload: { ...SECOND.payload, source_snapshot_id: "example-post-deadline-gw03" },
       },
     });
-    expect(screen.getByText(copy.duelMissing)).toBeInTheDocument();
+    expect(screen.getByText(copy.duelUnreadable)).toBeInTheDocument();
     expect(container.querySelector("[data-duel]")).toBeNull();
   });
 

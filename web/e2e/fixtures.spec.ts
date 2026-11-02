@@ -1,23 +1,29 @@
 import { expect, test } from "@playwright/test";
 
 import fixtures from "../public/data/fixtures.json" with { type: "json" };
-import indexFixture from "../public/data/index.json" with { type: "json" };
 import { claimMember, shippedClaim } from "./identity";
 import { CLUB_COLOURS } from "../src/lib/clubs";
 
-// The gameweek page stands behind the league number and "Sen kimsin?"; this visitor has
+// The league's page stands behind the league number and "Sen kimsin?"; this visitor has
 // taken both, as the published league's first member.
 test.beforeEach(async ({ page }) => {
   await claimMember(page, shippedClaim());
 });
 
+const LEAGUE_PAGE = `/league/${shippedClaim().leagueId}`;
+
 // The fixtures page reads whatever week the shipped fixture list names, which moves with every
 // publish.
 const current = Number(fixtures.payload.current_gameweek);
-const season = indexFixture.payload.latest.season;
 
-const scrollsSideways = () =>
-  document.documentElement.scrollWidth > document.documentElement.clientWidth;
+/** The shell clips what overflows it, so the main column is read as well as the document. */
+const scrollsSideways = () => {
+  const main = document.querySelector("main")!;
+  return (
+    document.documentElement.scrollWidth > document.documentElement.clientWidth ||
+    main.scrollWidth > main.clientWidth
+  );
+};
 
 /** The upcoming pair's two weeks against the main column's content box. */
 const upcomingEdges = () => {
@@ -74,8 +80,8 @@ for (const width of [1280, 1600])
   }) => {
     await page.setViewportSize({ width, height: 900 });
     await page.clock.setFixedTime(new Date("2026-09-18T10:00:00Z"));
-    await page.goto(`/gw/${season}/1`);
-    await expect(page.getByRole("heading", { level: 1 })).toContainText(/Oyun haftası/);
+    await page.goto(LEAGUE_PAGE);
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Lig Analizi");
 
     // The two margin rails and the closed list under the page are gone: a member's page
     // carries its own fixtures, and /fixtures carries the whole list.
@@ -140,8 +146,8 @@ test("a phone reaches the fixture list from its bar and never scrolls sideways",
 }) => {
   await page.setViewportSize({ width: 400, height: 800 });
   await page.clock.setFixedTime(new Date("2026-09-18T10:00:00Z"));
-  await page.goto(`/gw/${season}/1`);
-  await expect(page.getByRole("heading", { level: 1 })).toContainText(/Oyun haftası/);
+  await page.goto(LEAGUE_PAGE);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Lig Analizi");
   await expect(page.getByRole("complementary", { name: "Oynanacak hafta" })).toHaveCount(0);
   await expect(
     page.locator("details", { hasText: "Fikstür: bu hafta ve gelecek hafta" }),

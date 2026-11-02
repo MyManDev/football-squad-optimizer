@@ -51,7 +51,6 @@ for (const language of ["tr", "en"] as const) {
     await expect(page.getByRole("button", { name: member.computeButton, exact: true })).toHaveCount(
       0,
     );
-    await expect(page.getByText(copy.deadlinePassedCompute, { exact: true })).toHaveCount(0);
     // A closed week counts down to nothing and offers nothing to apply.
     await expect(page.getByTestId("deadline-countdown")).toHaveCount(0);
     await expect(page.getByRole("link", { name: member.applyOnFpl })).toHaveCount(0);

@@ -157,6 +157,40 @@ describe.each(["tr", "en"] as const)("the league table in %s", (language) => {
     expect(chaser.textContent).toBe(`${copy.followerLabel} ${second.manager_name}.`);
   });
 
+  it("calls a chaser with neither a manager nor a team an unknown member, never a number", () => {
+    claimIn(leader.entry_id);
+    const envelope = structuredClone(mockLeagueMembersEnvelope);
+    const chaser = envelope.payload.members.find((member) => member.entry_id === second.entry_id)!;
+    chaser.manager_name = null;
+    chaser.team_name = null;
+    show({ envelope }, language);
+    expect(screen.getByText(copy.followerLabel, { exact: false })).toHaveTextContent(
+      `${copy.followerLabel} ${copy.unknownMember}`,
+    );
+    expect(screen.queryByText(`#${second.entry_id}`, { exact: false })).toBeNull();
+  });
+
+  it("draws no chips and nothing beside the table when the document does not know the chips", () => {
+    const last = humans.at(-1)!;
+    claimIn(last.entry_id);
+    const squad = structuredClone(mockEntrySquadEnvelopes[leader.entry_id!]!);
+    squad.payload.entry = { ...squad.payload.entry, entry_id: last.entry_id! };
+    squad.payload.chips!.known = false;
+    show({ viewerSquad: squad }, language);
+    const resources = MESSAGES[language].memberResources;
+    expect(screen.queryByRole("heading", { name: resources.chipsTitle })).toBeNull();
+    expect(screen.queryByText(copy.chipsHalfNote)).toBeNull();
+    // The last member has no chaser, so the column has nothing to hold and is not drawn.
+    expect(screen.queryByText(copy.followerLabel)).toBeNull();
+    expect(screen.getByRole("table").closest("section")!.nextElementSibling).toBeNull();
+  });
+
+  it("holds the column beside the table, empty, while the last member's squad is read", () => {
+    claimIn(humans.at(-1)!.entry_id);
+    show({ viewerSquadPending: true }, language);
+    expect(screen.getByRole("table").closest("section")!.nextElementSibling).toBeEmptyDOMElement();
+  });
+
   it("ignores a squad document that belongs to someone else", () => {
     claimIn(leader.entry_id);
     show({ viewerSquad: mockEntrySquadEnvelopes[second.entry_id!]! }, language);

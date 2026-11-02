@@ -172,7 +172,7 @@ The API version and a document's contract version are different:
 
 - route version `v1` controls HTTP compatibility;
 - `backend_api_v1` controls command/run/error document fields;
-- `ui_view_v1` controls read payloads rendered by the web application.
+- `ui_view_v1` controls the published read payloads; no page reads them.
 
 Breaking a document shape requires a new contract. Breaking route semantics requires a new
 route version. Adding an optional endpoint without changing existing documents does neither.
@@ -197,9 +197,7 @@ The query adapter reads validated application views or their checked artifacts. 
 raw ledger files, snapshot payloads, arbitrary filesystem content, pandas records, NaN, or
 provider credentials. A missing season/gameweek/view is `404`, not an empty success document.
 
-The initial frontend may continue using committed `/data` JSON while these endpoints stabilize.
-Pages migrate one at a time; static JSON and HTTP must validate against the same `ui_view_v1`
-schema during that transition.
+Static JSON and HTTP must validate against the same `ui_view_v1` schema.
 
 ## Implemented advice commands and jobs
 
@@ -317,7 +315,7 @@ says which of them each strategy computes. Strategy registration differs from ex
 support; only wired constraints can produce a plan. The current public advice envelope
 contains expected-point trade-offs, not member-facing probability claims.
 
-The frontend's general pages still use `StaticDataClient`. The member advice client optionally
+The frontend's pages read the published static files. The member advice client optionally
 uses `VITE_ADVICE_API_ORIGIN` and can fall back to the published static answer. The member page
 renders returned advice and retains compute controls when published advice is absent.
 
@@ -338,17 +336,21 @@ Which selections may request a computation is decided in one place, the selectio
   setting wherever the plan may be asked, the word on the one-week pure-points plan only.
 
 Capabilities that fail to load, fail validation, or name another league, season, gameweek or
-`capture_snapshot_id` than the squad on screen are no capabilities: the page is the static
-page with one notice in the compute panel. The client sends an `Idempotency-Key` per click,
-keeps the job id in `sessionStorage` so a reload resumes the wait, waits 3, 6 and 10 minutes
-for windows 1, 3 and 5, and turns the error codes below into sentences; a code it does not
-know gets a general sentence, and the service's `message` is never shown. The legacy play
-modes are displayed from the published tree only and are not aliases for the member strategies.
+`capture_snapshot_id` than the squad on screen are no capabilities: the page keeps to the
+published tree and says nothing about a mismatch, and on another capture the compute button is
+disabled. To see a mismatch, compare `capture_snapshot_id` in the capabilities document with
+`source_snapshot_id` in a member's squad document. `/ready` cannot show it: its
+`league_tree_matches_capture` compares season and gameweek only. The client sends an
+`Idempotency-Key` per click, keeps the job id in `sessionStorage` so a reload resumes the wait,
+waits 3, 6 and 10 minutes for windows 1, 3 and 5, and turns the error codes below into
+sentences; a code it does not know gets a general sentence, and the service's `message` is never
+shown. The legacy play modes are displayed from the published tree only and are not aliases for
+the member strategies.
 
 Advice responses must match the selected league, member, mode, window and displayed season/week.
-A refreshed squad invalidates earlier jobs and results. Static answers are labelled published
-plans, and request rejections are not turned into successful static computations. Enabling an
-origin still requires a deployment of the worker and capture-context assembly described above.
+A refreshed squad invalidates earlier jobs and results. Request rejections are not turned into
+successful static computations. Enabling an origin still requires a deployment of the worker
+and capture-context assembly described above.
 
 ## Planned operator HTTP commands
 
