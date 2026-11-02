@@ -14,7 +14,7 @@ shows it (last checked 26 September 2026).
 | Windows scheduled task names/actions matching squad, football or FPL | No matching task returned. This does not exclude an unrelatedly named task or another machine. |
 | Azure CLI / Wrangler on this host | Not installed. No Azure subscription inventory was obtained. |
 | Docker | Available; existing unrelated containers were left untouched. |
-| Tracked deployment | Cloudflare publishes the static site. Azure Container Apps/NFS is a placeholder template. Since #602 the live backend runs on the owner's Windows PC behind the `squadopt-api` Cloudflare Tunnel ([backend free hosting](../backend_free_hosting.md)), not on this template or on Compose; a shared mount on another host and an external backup remain unverified. |
+| Tracked deployment | Cloudflare publishes the static site. Azure Container Apps/NFS is a placeholder template. Since 2026-11-02 the live backend runs under `deploy/compose.yaml` on the weekly schedule's Contabo host behind the `squadopt-api-contabo` Cloudflare Tunnel ([the host's guide](../../deploy/weekly-schedule/README.md#the-advice-backend)); before that on an Azure VM from 2026-10-15, and on the owner's Windows PC since #602 ([backend free hosting](../backend_free_hosting.md)). It is not on the Container Apps template; a shared mount on another host and an external backup remain unverified. |
 | Weekly timing | Existing weekly runbook targets capture 2–3 hours before the deadline. No new age policy is introduced. |
 
 On 9 September the evidence did not establish an independent backup, backend server, alert

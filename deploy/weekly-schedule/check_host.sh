@@ -14,6 +14,10 @@ readonly CHECKOUT=/srv/squadopt/weekly
 readonly SETTINGS=/srv/squadopt/private/club-news.settings.toml
 readonly ENVIRONMENT_FILE=/etc/squadopt/weekly-schedule.env
 readonly DROP_INS=/etc/systemd/system/weekly-schedule.service.d
+readonly BACKEND=/root/squadopt
+readonly TUNNEL_CONFIG=/etc/cloudflared/config.yml
+readonly TUNNEL_UNIT=cloudflared-squadopt.service
+readonly RECEIVE=/usr/local/sbin/squadopt-receive
 readonly STORES=(
   data/snapshots data/entries data/ledger data/handoffs data/advice_records data/raw/vaastav-fpl
   artifacts/phase_b artifacts/rotation artifacts/football
@@ -154,6 +158,44 @@ ok "workers ${workers:-unset}, cores $cores"
 systemctl list-timers weekly-schedule.timer --no-pager | sed -n '1,2p'
 last="$(systemctl show weekly-schedule.service -p Result -p ExecMainStatus -p ExecMainExitTimestamp)"
 printf 'last tick: %s\n' "$(printf '%s' "$last" | tr '\n' ' ')"
+
+section "Advice backend (backend.sh, then a release's activate)"
+if systemctl is-active --quiet docker 2>/dev/null; then
+  ok "$(docker --version)"
+  for container in squadopt-api-1 squadopt-worker-1; do
+    health="$(docker inspect -f '{{.State.Health.Status}}' "$container" 2>/dev/null)"
+    if [ "$health" = healthy ]; then
+      ok "$container healthy"
+    else
+      absent "$container healthy (${health:-not running})"
+    fi
+  done
+else
+  absent "docker active (bash backend.sh)"
+fi
+ready="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 http://127.0.0.1:8000/ready)"
+if [ "$ready" = 200 ]; then
+  ok "api ready on 127.0.0.1:8000"
+else
+  absent "api ready on 127.0.0.1:8000 (/ready answered ${ready:-nothing})"
+fi
+capture="$(curl -s --max-time 60 http://127.0.0.1:8000/api/v1/leagues/352490/capabilities |
+  python3 -c 'import json, sys; print(json.load(sys.stdin).get("capture_snapshot_id", ""))' 2>/dev/null)"
+if [ -n "$capture" ]; then ok "serving capture $capture"; else note "no capture named by the capabilities"; fi
+# Behind cloudflared and docker-proxy the api's peer is the Compose network's gateway; the
+# allowlist is compared with it here and never printed.
+gateway="$(docker network inspect squadopt_default --format '{{range .IPAM.Config}}{{.Gateway}}{{end}}' 2>/dev/null)"
+if [ -n "$gateway" ] && grep -qx "FORWARDED_ALLOW_IPS=$gateway" "$BACKEND/.env" 2>/dev/null; then
+  ok "forwarded addresses trusted from the Compose network's gateway only"
+else
+  note "FORWARDED_ALLOW_IPS is not the Compose network's gateway: every member shares one rate limit"
+fi
+if [ -s "$TUNNEL_CONFIG" ] && systemctl is-active --quiet "$TUNNEL_UNIT"; then
+  ok "$TUNNEL_UNIT active"
+else
+  absent "$TUNNEL_UNIT active with $TUNNEL_CONFIG"
+fi
+if [ -x "$RECEIVE" ]; then ok "$RECEIVE"; else absent "$RECEIVE (bash backend.sh)"; fi
 
 section "Access"
 if ufw status 2>/dev/null | grep -q '^Status: active'; then

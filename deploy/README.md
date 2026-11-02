@@ -34,13 +34,15 @@ Copy an example outside Git, replace its placeholders, and keep the copy private
 
 ## What runs today
 
-The API and its workers run natively on the owner's Windows PC, started by
-`scripts/run_backend_local.ps1` and kept up by the `SquadOptBackendWatch` scheduled task, and
-are reachable only through the `squadopt-api` Cloudflare Tunnel
+Since 2026-11-02 the API and one worker run under `compose.yaml` on the weekly schedule's
+Contabo host, beside the weekly run, and are reachable only through the
+`squadopt-api-contabo` Cloudflare Tunnel at `squadopt-api.mymandev.com`
+([the host's guide](weekly-schedule/README.md#the-advice-backend)). They ran the same way on
+an Azure VM from 2026-10-15, and natively on the owner's Windows PC before that
 ([backend free hosting](../docs/backend_free_hosting.md)).
 [ADR 0009](../docs/architecture/decisions/0009-advice-backend-hosting-options.md) compares other
-hosts and is proposed, not decided, and issue #988 decides whether the backend moves off the PC
-or is retired in favour of the device solver.
+hosts and is proposed, not decided, and issue #988 decides whether the backend stays or is
+retired in favour of the device solver.
 
 The weekly runs start on the PC. `weekly-schedule/` is installed on no host yet: its host is a
 Contabo Cloud VPS 4 on Ubuntu 24.04 (#1243), and its guide gives the steps in order, from

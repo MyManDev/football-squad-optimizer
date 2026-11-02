@@ -315,14 +315,10 @@ steps_left() {
    SQUADOPT_CLUB_NEWS_SETTINGS=$PRIVATE/club-news.settings.toml and the variable the
    settings' api_key_env names.
 
-3. The data stores, copied once from the PC by the owner. From the PC's checkout root:
-     tar -czf squadopt-data.tgz data/snapshots data/entries data/ledger data/handoffs data/advice_records data/raw/vaastav-fpl artifacts/phase_b artifacts/rotation artifacts/football
-     scp squadopt-data.tgz root@<host>:/root/
-   then on this host, as root:
-     tar -xzf /root/squadopt-data.tgz -C $CHECKOUT
-     chown -R $SERVICE_USER:$SERVICE_USER $CHECKOUT/data $CHECKOUT/artifacts
-     chmod -R go-rwx $CHECKOUT/data $CHECKOUT/artifacts
-     rm /root/squadopt-data.tgz
+3. The advice backend's side and squadopt-receive: bash $CHECKOUT/deploy/weekly-schedule/backend.sh
+   Then the data stores, copied once from the PC by the owner, from the PC's checkout root:
+     tar -czf - data/snapshots data/entries data/ledger data/handoffs data/advice_records data/raw/vaastav-fpl artifacts/phase_b artifacts/rotation artifacts/football |
+       ssh root@<host> /usr/local/sbin/squadopt-receive
    Add artifacts/backend-artifact-root.json only if its artifact_root is a relative path.
    data/runtime and data/logs are this host's own and are not copied.
 

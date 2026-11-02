@@ -2,13 +2,18 @@
 
 These files run the weekly schedule of #1243 under systemd on a host of its own: a Contabo Cloud
 VPS 4 (4 shared vCPU, 8 GB memory, 100 GB SSD) on Ubuntu 24.04 in an EU region, billed monthly,
-which the owner approved on 2026-11-01 (6559768575). It is not the backend's host, and nothing
-here touches the backend. Nothing here is installed or run by committing it.
+which the owner approved on 2026-11-01 (6559768575). Since 2026-11-02 it is the advice
+backend's host as well ("The advice backend" below); the weekly units never start, restart or
+stop the backend. Nothing here is installed or run by committing it.
 
 | File | What it is |
 | --- | --- |
 | `provision.sh` | Sets a fresh Ubuntu 24.04 host up as root, and can run again at any time: packages, `gh`, Python 3.13, the user `squadopt`, the checkout and its venv, swap, firewall, security updates, a journald cap, SSH hardening once root has a key, and the units below with the timer on |
-| `check_host.sh` | A read-only readiness report, run as root: each line OK, WARN or MISSING |
+| `backend.sh` | Sets the advice backend's side up as root after `provision.sh`, and can run again at any time: Docker and `cloudflared` from their own apt repositories, the release layout under `/root/squadopt`, the tunnel's unit and `squadopt-receive`. It starts no backend and writes no secret |
+| `check_host.sh` | A read-only readiness report, run as root: each line OK, WARN or MISSING, the backend included |
+| `squadopt-receive` | Takes the data stores from the PC as a tar on stdin and puts them in the checkout as `squadopt`'s (step 6); installed in `/usr/local/sbin` |
+| `cloudflared-squadopt.service` | The tunnel from Cloudflare to the api on `127.0.0.1:8000`, started once `/etc/cloudflared/config.yml` exists |
+| `cloudflared.example.yml` | That configuration with a placeholder for the tunnel's id: the api and nothing else, `/metrics` and the generated api pages refused |
 | `weekly-schedule.service` | One tick: the checkout's venv runs the gate without `--release` (D1), one solver worker per core, the club-news settings from a private `EnvironmentFile`, no start timeout |
 | `weekly-schedule.timer` | A tick every 15 minutes (`OnCalendar=*:0/15`), and once after the host was off through one (`Persistent=true`) |
 | `dry-run.conf` | A drop-in for the first week: the same tick with `--dry-run`, which writes, starts and posts nothing |
@@ -135,24 +140,19 @@ journal refuses a path through a symbolic link.
    ```
 
    Without them a morning run still runs, and the final run refuses before it starts.
-6. **The data stores, copied once by the owner.** On the PC, from the checkout's root
-   (PowerShell or Git Bash):
+6. **The data stores, copied once by the owner.** On the host, as root, `bash
+   /srv/squadopt/weekly/deploy/weekly-schedule/backend.sh` installs `squadopt-receive` (and the
+   backend's side, below). The owner's key is in root's `authorized_keys`. Then on the PC,
+   from the checkout's root, in Git Bash:
 
    ```sh
-   tar -czf squadopt-data.tgz data/snapshots data/entries data/ledger data/handoffs data/advice_records data/raw/vaastav-fpl artifacts/phase_b artifacts/rotation artifacts/football
-   scp squadopt-data.tgz root@<ip>:/root/
+   tar -czf - data/snapshots data/entries data/ledger data/handoffs data/advice_records data/raw/vaastav-fpl artifacts/phase_b artifacts/rotation artifacts/football |
+     ssh root@<ip> /usr/local/sbin/squadopt-receive
    ```
 
-   then on the host, as root:
-
-   ```sh
-   tar -xzf /root/squadopt-data.tgz -C /srv/squadopt/weekly
-   chown -R squadopt:squadopt /srv/squadopt/weekly/data /srv/squadopt/weekly/artifacts
-   chmod -R go-rwx /srv/squadopt/weekly/data /srv/squadopt/weekly/artifacts
-   rm /root/squadopt-data.tgz
-   ```
-
-   Copy `artifacts/backend-artifact-root.json` as well only if its `artifact_root` is a
+   It unpacks into a staging directory beside the checkout, refuses an archive that holds
+   anything but `data/` and `artifacts/`, copies those into the checkout, gives them to
+   `squadopt` with mode `go-rwx`, and prints their sizes. Copy `artifacts/backend-artifact-root.json` as well only if its `artifact_root` is a
    relative path: a Windows path does not resolve here. `data/runtime` and `data/logs` are the
    host's own and are not copied.
 7. **Check the host:** `bash /srv/squadopt/weekly/deploy/weekly-schedule/check_host.sh`. Every
@@ -193,6 +193,96 @@ line per step to `data/logs/weekly/<run id>.release.log` and the commands' outpu
 `<run id>.release-commands.log`. A run is released once: one that stopped after the enqueue
 (exit 1) is reconciled by hand from those two logs and never run again.
 
+## The advice backend
+
+Since 2026-11-02 12:57Z `squadopt-api.mymandev.com` is served from this host. It ran on an
+Azure for Students VM (2 vCPU) from 2026-10-15 until then. It runs as it ran there:
+
+- the api and one worker under Docker Compose (`deploy/compose.yaml`), the worker limited to
+  1 CPU and 2 GB, the api to 0.5 CPU and 1 GB;
+- serving one immutable release package at a time, made by `vm_football_release.py`, the
+  release tool of draft #1211, under `/root/squadopt`, the `~/squadopt` of the user that
+  tool reaches over SSH;
+- reachable only through the tunnel. The api listens on `127.0.0.1:8000`, and the firewall
+  still lets only SSH in.
+
+The weekly run's data stores (step 6) and the backend's release packages are separate
+copies. A release is packed on the PC from the stores there.
+
+### Set it up
+
+1. As root: `bash /srv/squadopt/weekly/deploy/weekly-schedule/backend.sh`. It is the same
+   script for a first setup and for a check that changes nothing.
+2. **The tunnel, by a person, once.** The two commands make the account's certificate and
+   the tunnel's credential, so a person runs them:
+
+   ```sh
+   cloudflared tunnel login                 # opens Cloudflare's page: approve mymandev.com
+   cloudflared tunnel create squadopt-api-contabo
+   ```
+
+   Then copy `cloudflared.example.yml` to `/etc/cloudflared/config.yml`, put the printed id
+   in its two places, run the three checks at its top, and run `backend.sh` again. That
+   starts `cloudflared-squadopt.service`. No hostname routes to the new tunnel yet, so it
+   carries nothing.
+3. **The first release**, from the PC as for every new gameweek (below), then the cutover.
+
+### A release
+
+Each gameweek the owner moves the backend with `vm_football_release.py`'s five steps, as on
+the VM, with `SQUADOPT_VM_HOST=root@<ip>`:
+
+1. `pack`;
+2. `push`;
+3. `remote prepare`;
+4. `remote candidate`;
+5. `remote activate`.
+
+`activate` keeps the live `.env` and override as the release's rollback. A release that
+changes only the web front end needs nothing here.
+
+A `candidate` after the gameweek's deadline is refused its advice job (`DEADLINE_PASSED`),
+since the backend computes nothing new for a closed gameweek. `--no-jobs` is then the only
+candidate there is, as for GW9 on 2026-11-02.
+
+### Members' addresses
+
+Behind `cloudflared` and Docker's port proxy, the api's TCP peer is the gateway of the
+Compose network `squadopt_default` (172.18.0.1 when it was checked), never 127.0.0.1. With
+`FORWARDED_ALLOW_IPS` unset, uvicorn trusts no forwarded address, so the rate limits treat
+every member as one client: 30 requests a minute and 4 open jobs. The Azure VM ran so as
+well.
+
+Once a release is active:
+
+1. Read the peer in `docker logs squadopt-api-1`.
+2. Add `FORWARDED_ALLOW_IPS=<that gateway>` to `/root/squadopt/.env`. Every release keeps the
+   line: the tool replaces only the image and the paths.
+3. Recreate the api:
+
+   ```sh
+   cd /root/squadopt && docker compose -p squadopt --env-file .env -f repo/deploy/compose.yaml -f compose.artifacts.yaml up -d
+   ```
+
+`check_host.sh` compares the line with the network's gateway.
+
+### The cutover, and the way back
+
+```sh
+cloudflared tunnel route dns --overwrite-dns squadopt-api-contabo squadopt-api.mymandev.com
+```
+
+It points the hostname at this host's tunnel; the browser and the site build keep the same
+address. The Azure VM's tunnel, `squadopt-api`, stays connected with its backend on GW9 for
+a week as the way back:
+
+```sh
+cloudflared tunnel route dns --overwrite-dns squadopt-api squadopt-api.mymandev.com
+```
+
+After that week, delete `/root/.cloudflared/cert.pem`. It can manage every tunnel of the
+account, and only the route commands need it.
+
 ## Measurements, and the move to a Cloud VPS 8
 
 Each run's line in `data/logs/weekly/measurements.jsonl` holds its id, kind, gameweek,
@@ -220,6 +310,7 @@ of cores.
   new decision, recorded on #1243 first.
 - **The backend.** The release never runs `scripts/vm_push.sh`, and no agent or automation
   starts, restarts or stops the backend: once `ship.sh` reports the site live the release
-  writes `backend: left to its operator ...` and runs nothing.
+  writes `backend: left to its operator ...` and runs nothing. A backend release, the five
+  steps of "A release" above, is run by a person, and so are the cutover and the way back.
 - **A release that stopped**, as above, and a final run the gate reports missed (an alarm on
   #1093, exit 3).
