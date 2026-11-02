@@ -50,10 +50,12 @@ test.describe("the sidebar before and after the two steps", () => {
       }
       await expect(sidebar.getByRole("button", { name: TR.shell.changeMember })).toHaveCount(0);
       const buttons = sidebar.getByRole("button");
-      await expect(buttons).toHaveCount(3);
+      await expect(buttons).toHaveCount(5);
       await expect(buttons.nth(0)).toHaveAccessibleName(TR.shell.collapseSidebar);
       await expect(buttons.nth(1)).toHaveAccessibleName(/^TR/);
       await expect(buttons.nth(2)).toHaveAccessibleName(/^EN/);
+      await expect(buttons.nth(3)).toHaveAccessibleName(TR.colourScheme.light);
+      await expect(buttons.nth(4)).toHaveAccessibleName(TR.colourScheme.dark);
     });
   });
 

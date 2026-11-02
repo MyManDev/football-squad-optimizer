@@ -41,7 +41,7 @@
 
 /* Lime is a fill, never a text colour, and always carries ink. */
 .lime {
-  border-color: var(--color-lime);
-  background: var(--color-lime);
-  color: var(--color-text);
+  border-color: var(--color-mark);
+  background: var(--color-mark);
+  color: var(--color-mark-text);
 }

@@ -176,8 +176,8 @@
   width: 16px;
   height: 16px;
   border-radius: var(--radius-s);
-  background: var(--color-lime);
-  color: var(--color-text);
+  background: var(--color-mark);
+  color: var(--color-mark-text);
   font-family: var(--font-display);
   font-weight: 800;
   line-height: 16px;
