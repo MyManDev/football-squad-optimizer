@@ -8,6 +8,11 @@
   pointer-events: none;
 }
 
+/* A page that is one question stands alone: it says so with this attribute. */
+body:has([data-no-match-scene]) .scene {
+  display: none;
+}
+
 .picture {
   display: block;
   width: 100%;
