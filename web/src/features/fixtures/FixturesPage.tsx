@@ -19,7 +19,7 @@ export function FixturesPage() {
   const copy = FIXTURES_COPY[language];
   const { data, isPending } = useFixtures();
   if (isPending) return <EmptyState title={messages.common.loading} />;
-  if (!data) return <EmptyState title={copy.notPublished} />;
+  if (!data) return <EmptyState page title={copy.notPublished} />;
   const { current, next, past } = upcomingFixtureWeeks(data);
 
   const week = (entry: FixtureGameweek, label?: string) => (

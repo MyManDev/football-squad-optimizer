@@ -254,13 +254,12 @@ export function useMemberAdviceView(
     shown = {
       envelope: computed.envelope,
       origin: computed.source === "api-cache" ? "computed" : "published",
-      source: computed.source,
     };
   } else if (deviceJob.state.phase === "done") {
     // The device's state is keyed by the selection it answered, chip included.
-    shown = { envelope: deviceJob.state.envelope, origin: "computed", source: "device" };
+    shown = { envelope: deviceJob.state.envelope, origin: "computed" };
   } else if (published) {
-    shown = { envelope: published, origin: waiting ? "published-while-computing" : "published" };
+    shown = { envelope: published, origin: "published" };
   } else if (waiting?.fallback) {
     shown = { envelope: waiting.fallback, origin: "baseline-while-computing" };
   }

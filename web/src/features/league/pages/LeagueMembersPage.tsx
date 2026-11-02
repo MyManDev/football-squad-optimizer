@@ -9,7 +9,7 @@ import { points } from "../../../lib/format";
 import { useFixtures } from "../../fixtures/data";
 import type { FixturesPayload } from "../../fixtures/types";
 import { gameweekDeadline, useDeadlinePassed } from "../advice/deadline";
-import { ExampleDataBadge } from "../components/ExampleDataBadge";
+import { viewerChipLines } from "../chipShape";
 import { ViewerChips } from "../components/ViewerChips";
 import { leagueRace } from "../race/leagueRace";
 import { LeagueRaceCard } from "../race/LeagueRaceCard";
@@ -50,8 +50,7 @@ export function LeagueMembersPage() {
   if (query.isError) {
     const missing = query.error instanceof LeagueDataMissing;
     return (
-      <EmptyState title={missing ? copy.notAvailable : copy.membersUnreadable}>
-        <p>{missing ? copy.notAvailableBody : copy.membersUnreadableBody}</p>
+      <EmptyState page title={missing ? copy.notAvailable : copy.membersUnreadable}>
         {!missing ? (
           <button type="button" onClick={() => void query.refetch()}>
             {copy.retryPublishedRead}
@@ -64,6 +63,7 @@ export function LeagueMembersPage() {
     <LeagueMembersView
       envelope={query.data}
       viewerSquad={viewer !== null ? (viewerSquad.data ?? null) : null}
+      viewerSquadPending={viewer !== null && viewerSquad.isPending}
       fixtures={fixtures.data ?? null}
       deadlinePassed={deadlinePassed !== null}
       scoreboard={scoreboard.isError ? null : (scoreboard.data?.payload ?? null)}
@@ -83,6 +83,7 @@ export function LeagueMembersPage() {
 export function LeagueMembersView({
   envelope,
   viewerSquad = null,
+  viewerSquadPending = false,
   fixtures = null,
   deadlinePassed = false,
   scoreboard = null,
@@ -92,6 +93,8 @@ export function LeagueMembersView({
   scoreboard?: Scoreboard | null;
   /** The viewer's own squad document, for the bank, the free transfers and the chips. */
   viewerSquad?: LeagueViewEnvelope<EntrySquad> | null;
+  /** That document is still being read, so its chips may yet land beside the table. */
+  viewerSquadPending?: boolean;
   fixtures?: FixturesPayload | null;
   /** The calendar's deadline for this gameweek has passed. */
   deadlinePassed?: boolean;
@@ -113,6 +116,7 @@ export function LeagueMembersView({
     viewerRow && viewerSquad?.payload.entry.entry_id === viewerRow.entry_id
       ? viewerSquad.payload
       : null;
+  const chips = squad ? viewerChipLines(squad) : null;
   const deadline = gameweekDeadline(fixtures, view.season, view.gameweek);
   const cells = viewerRow ? scoreBugCells(viewerRow, rows.length, squad, locale, copy) : [];
   const count = (value: number) => points(value, 0, locale);
@@ -123,7 +127,6 @@ export function LeagueMembersView({
     <div className={styles.page}>
       <header className={barStyles.topBar}>
         <TopWeek gameweek={view.gameweek} deadline={deadline} passed={deadlinePassed} />
-        <ExampleDataBadge sourceKind={envelope.source_kind} />
         <ScoreBug cells={cells} />
       </header>
 
@@ -143,9 +146,7 @@ export function LeagueMembersView({
                 <th scope="col" className={styles.move}>
                   <span className="visually-hidden">{copy.movement}</span>
                 </th>
-                <th scope="col" className={styles.team}>
-                  {copy.team}
-                </th>
+                <th scope="col">{copy.team}</th>
                 <th scope="col" className={styles.week}>
                   <span aria-hidden="true">{copy.lastWeekLabel}</span>
                   {/* The view is labelled with the coming gameweek; the scores are an earlier
@@ -180,7 +181,7 @@ export function LeagueMembersView({
                     <td className={styles.move}>
                       <Movement movement={member.movement} places={member.movement_places} />
                     </td>
-                    <td className={styles.team}>
+                    <td>
                       <div className={styles.teamCell}>
                         <span className={styles.teamName}>
                           {member.team_name ?? copy.unknownTeam}
@@ -214,23 +215,17 @@ export function LeagueMembersView({
               })}
             </tbody>
           </table>
-
-          {/* Without a finished week the columns are dashes, and the page says why. */}
-          {view.scored_gameweek === null ? (
-            <p className={styles.note}>{copy.noScoredWeek}</p>
-          ) : null}
         </section>
 
-        {squad || chaser ? (
+        {/* It stands empty during the read, so the table does not narrow when the chips land. */}
+        {chips || chaser || viewerSquadPending ? (
           <div className={styles.side}>
-            {squad ? <ViewerChips squad={squad} /> : null}
+            {chips ? <ViewerChips chips={chips} /> : null}
             {chaser ? (
               <p className={styles.chaser}>
                 {copy.followerLabel}{" "}
                 <strong>
-                  {chaser.member.manager_name ??
-                    chaser.member.team_name ??
-                    `#${chaser.member.entry_id}`}
+                  {chaser.member.manager_name ?? chaser.member.team_name ?? copy.unknownMember}
                 </strong>
                 {/* Without both totals there is no distance to state, only the name. */}
                 {chaser.behind === null ? (
@@ -265,9 +260,9 @@ export function LeagueMembersView({
 }
 
 /**
- * The movement cell: an arrow and the places moved, '=' for no change, the words for
- * anything else. The glyphs are for the eye; a screen reader hears the words, which also
- * keep an unknown previous rank apart from an unchanged one.
+ * The movement cell: an arrow and the places moved, '=' for no change, the word for a new
+ * member, a dash for anything else. The glyphs are for the eye and a screen reader hears
+ * the words; the dash it hears as it is, like the table's other unknown figures.
  */
 function Movement({ movement, places }: { movement: RankMovement; places: number | null }) {
   const { messages } = useLanguage();
@@ -287,10 +282,14 @@ function Movement({ movement, places }: { movement: RankMovement; places: number
         ? copy.movementLabel("same", 0)
         : counted
           ? copy.movementLabel(counted.direction, counted.places)
-          : copy.noPreviousRank;
+          : null;
   return (
     <>
-      <span className={styles.moveMark} aria-hidden="true" data-movement={movement}>
+      <span
+        className={styles.moveMark}
+        aria-hidden={words === null ? undefined : "true"}
+        data-movement={movement}
+      >
         {counted ? (
           <>
             <MoveArrow direction={counted.direction} />
@@ -304,7 +303,7 @@ function Movement({ movement, places }: { movement: RankMovement; places: number
           "—"
         )}
       </span>
-      <span className="visually-hidden">{words}</span>
+      {words === null ? null : <span className="visually-hidden">{words}</span>}
     </>
   );
 }

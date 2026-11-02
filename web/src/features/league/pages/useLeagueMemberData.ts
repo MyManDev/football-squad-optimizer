@@ -61,7 +61,7 @@ export function useLeagueMemberData(entryParam: string | undefined, searchParams
   // A build with no compute service has a client that cannot be asked, and this query
   // never runs: the page is the static site. With one, what it computes right now is read
   // on entry and again on focus once stale. A service that is down, slow or answering
-  // for another capture leaves the page on the published tree with a notice, never an error.
+  // for another capture leaves the page on the published tree, never an error.
   const client = useMemo(() => createAdviceClient(tree.entryAdvice), [tree]);
   const leagueId = squad.data?.payload.league_id;
   const canAsk = client.readCapabilities !== undefined;
@@ -231,7 +231,6 @@ export function useLeagueMemberData(entryParam: string | undefined, searchParams
   return {
     validEntryId,
     squad,
-    membersQuery,
     indexQuery,
     members,
     index,

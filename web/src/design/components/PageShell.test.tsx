@@ -10,8 +10,7 @@ import { MESSAGES, type Language } from "../../i18n/messages";
 import { MOTION_MS, REDUCED_MOTION_QUERY } from "../motion";
 import { DESKTOP_QUERY, PHONE_QUERY, type ShellLayout } from "../shell/layout";
 import { NO_IDENTITY, type ShellIdentity } from "../shell/nav";
-import { FIXTURE_SHEET_ID, useShell, useShellSlot } from "../shell/ShellContext";
-import { ShellPortal } from "../shell/ShellPortal";
+import { FIXTURE_SHEET_ID, useShell } from "../shell/ShellContext";
 import { SIDEBAR_STORAGE_KEY } from "../shell/sidebarPreference";
 import { PageShell } from "./PageShell";
 
@@ -158,12 +157,7 @@ describe("the app shell on a desktop", () => {
         expect(screen.queryByRole("link", { name })).toBeNull();
       }
       expect(screen.queryByRole("button", { name: copy.changeMember })).toBeNull();
-      // The operations, analysis and admin surfaces are reachable by address only.
-      expect(
-        document.querySelector(
-          'a[href="/status"], a[href="/league"], a[href="/admin"], a[href^="/gw/"]',
-        ),
-      ).toBeNull();
+      expect(document.querySelector('a[href="/league"]')).toBeNull();
     },
   );
 
@@ -500,67 +494,6 @@ describe("focusing the page after a step in front of it", () => {
   });
 });
 
-function Slots({ planFirst = true }: { planFirst?: boolean }) {
-  const plan = useShellSlot("plan");
-  return (
-    <>
-      <ShellPortal slot="plan">
-        <fieldset>
-          <legend>Strateji</legend>
-          <label>
-            <input type="radio" name="strategy" value="a" defaultChecked={!planFirst} />A
-          </label>
-          <label>
-            <input type="radio" name="strategy" value="b" defaultChecked={planFirst} />B
-          </label>
-        </fieldset>
-      </ShellPortal>
-      <p>main content</p>
-      <output data-testid="plan-slot">{plan ? plan.tagName : "none"}</output>
-    </>
-  );
-}
-
-describe("the shell's plan slot", () => {
-  it("renders a page's PLAN part once, inside the sidebar after the navigation", () => {
-    const { container } = renderShell({ path: OWN, identity: CLAIMED, page: <Slots /> });
-
-    expect(within(sidebar()).getByRole("group", { name: "Strateji" })).toBeInTheDocument();
-    expect(within(screen.getByRole("main")).getByText("main content")).toBeInTheDocument();
-    expect(container.querySelectorAll('input[name="strategy"]')).toHaveLength(2);
-    expect(screen.getByTestId("plan-slot")).toHaveTextContent("DIV");
-    const order = [...sidebar().querySelectorAll("nav, fieldset")].map((node) => node.tagName);
-    expect(order).toEqual(["NAV", "FIELDSET"]);
-  });
-
-  it("renders it inline where the page stands when there is no shell", () => {
-    const { container } = render(
-      <MemoryRouter>
-        <Slots />
-      </MemoryRouter>,
-    );
-    expect(container.querySelectorAll('input[name="strategy"]')).toHaveLength(2);
-    expect(screen.getByTestId("plan-slot")).toHaveTextContent("none");
-    expect(screen.queryByRole("complementary")).toBeNull();
-  });
-
-  it("offers the rail's plan button only while a page fills the plan, and opens the plan", async () => {
-    window.localStorage.setItem(SIDEBAR_STORAGE_KEY, "collapsed");
-    const empty = renderShell();
-    expect(screen.queryByRole("button", { name: TR.changePlan })).toBeNull();
-    empty.unmount();
-
-    const { user } = renderShell({ path: OWN, identity: CLAIMED, page: <Slots /> });
-    const plan = await screen.findByRole("button", { name: TR.changePlan });
-    expect(plan).toHaveAttribute("aria-controls", "sidebar");
-    expect(plan).toHaveAttribute("aria-expanded", "false");
-    await user.click(plan);
-    expect(sidebar()).toHaveAttribute("data-mode", "open");
-    expect(screen.getByRole("radio", { name: "B" })).toHaveFocus();
-    expect(screen.queryByRole("button", { name: TR.changePlan })).toBeNull();
-  });
-});
-
 describe("the app shell on a phone", () => {
   it("opens the sidebar from the phone bar as a modal drawer and closes it with Escape", async () => {
     stubLayout("phone");
@@ -588,34 +521,6 @@ describe("the app shell on a phone", () => {
     expect(menu).toHaveFocus();
     expect(screen.getByRole("main")).not.toHaveAttribute("inert");
     expect(document.documentElement.style.overflow).toBe("");
-  });
-
-  it("leaves the drawer open when a control inside it already answered Escape", async () => {
-    stubLayout("phone");
-    // A control that closes something of its own on Escape and says so.
-    function Answering() {
-      return (
-        <ShellPortal slot="plan">
-          <input
-            aria-label="answers escape"
-            onKeyDown={(event) => {
-              if (event.key === "Escape") event.preventDefault();
-            }}
-          />
-        </ShellPortal>
-      );
-    }
-    const { user } = renderShell({ path: `${MEMBERS}/7`, page: <Answering /> });
-    await user.click(screen.getByRole("button", { name: TR.openMenu }));
-    await user.click(screen.getByRole("textbox", { name: "answers escape" }));
-    await user.keyboard("{Escape}");
-    expect(screen.getByRole("dialog", { name: TR.menu })).toBeInTheDocument();
-    // Escape anywhere else still closes it.
-    await user.click(screen.getByRole("button", { name: TR.closeMenu }));
-    expect(screen.queryByRole("dialog")).toBeNull();
-    await user.click(screen.getByRole("button", { name: TR.openMenu }));
-    await user.keyboard("{Escape}");
-    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
   it("closes the drawer from the scrim, the close button and a navigation", async () => {

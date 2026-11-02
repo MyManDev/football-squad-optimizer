@@ -49,6 +49,43 @@ it("checks exactly the payload keys the served schema declares", () => {
   );
 });
 
+it("keeps participation evidence optional and refuses audit internals and invalid counts", () => {
+  const payload = mockEntryAdviceEnvelope(101, "saf-puan", 3).payload;
+  const evidence = {
+    version: "football_participation_evidence_v1",
+    as_of: "2026-09-01T00:00:00Z",
+    gameweek: 6,
+    applied_player_count: 2,
+    unapplied_statement_count: 1,
+    captured_percentage_count: 5,
+    manager_statement_count: 3,
+    assumptions: ["source_eligibility_only", "no_start_or_minutes_reestimate"],
+  };
+  const outcome = {
+    player_id: 1,
+    disposition: "stated_expected_absent",
+    applied: true,
+    reason: "explicit_evidence",
+    source_url: "https://www.liverpoolfc.com/news/team-update",
+    source_published_at: evidence.as_of,
+  };
+  expect(isAdvicePayload(payload)).toBe(true);
+  expect(isAdvicePayload({ ...payload, participation_evidence: evidence })).toBe(true);
+  expect(
+    isAdvicePayload({
+      ...payload,
+      participation_evidence: { ...evidence, statement_outcomes: [outcome] },
+    }),
+  ).toBe(true);
+  for (const participation_evidence of [
+    { ...evidence, applied_player_count: -1 },
+    { ...evidence, base_revision: "internal" },
+    { ...evidence, statement_outcomes: [{ ...outcome, raw_quote: "private" }] },
+  ]) {
+    expect(isAdvicePayload({ ...payload, participation_evidence })).toBe(false);
+  }
+});
+
 it("refuses malformed preference metadata instead of accepting an unverified plan", () => {
   const payload = mockEntryAdviceEnvelope(101, "saf-puan", 3).payload;
   expect(isAdvicePayload({ ...payload, preferences: { keep_players: [101], no_hits: true } })).toBe(

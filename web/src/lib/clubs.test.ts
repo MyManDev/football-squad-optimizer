@@ -3,14 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import {
-  CLUB_COLOURS,
-  CLUB_SWATCHES,
-  clubCode,
-  clubCodesFromFixtures,
-  clubColours,
-  clubSwatch,
-} from "./clubs";
+import { CLUB_COLOURS, clubCode, clubCodesFromFixtures, clubColours } from "./clubs";
 import type { ClubFixtureList } from "./clubs";
 
 const published = JSON.parse(
@@ -55,11 +48,9 @@ describe("club codes", () => {
     // The example league's fictional clubs are shown by name.
     expect(clubCode("Northport")).toBeNull();
     expect(clubCode("")).toBeNull();
-    expect(clubSwatch(null)).toBeNull();
-    expect(clubSwatch("XYZ")).toBeNull();
   });
 
-  it("covers every club the published calendar names, with a swatch for each", () => {
+  it("covers every club the published calendar names, with colours for each", () => {
     const pairs = new Map<string, string>();
     for (const week of published.payload.gameweeks)
       for (const match of week.fixtures)
@@ -69,12 +60,12 @@ describe("club codes", () => {
     for (const [name, code] of pairs) {
       // The static map agrees with the calendar, so a missing document changes nothing.
       expect(clubCode(name), name).toBe(code);
-      expect(clubSwatch(code), code).toMatch(/^#[0-9A-F]{6}$/);
+      expect(clubColours(code)?.primary, code).toMatch(/^#[0-9A-F]{6}$/);
     }
-    expect(Object.keys(CLUB_SWATCHES).sort()).toEqual([...pairs.values()].sort());
+    expect(Object.keys(CLUB_COLOURS).sort()).toEqual([...pairs.values()].sort());
   });
 
-  it("gives every club the calendar names two distinct colours, the primary its swatch", () => {
+  it("gives every club the calendar names two distinct colours", () => {
     const codes = new Set<string>();
     for (const week of published.payload.gameweeks)
       for (const match of week.fixtures)
@@ -86,8 +77,6 @@ describe("club codes", () => {
       expect(colours.primary, code).toMatch(/^#[0-9A-F]{6}$/);
       expect(colours.secondary, code).toMatch(/^#[0-9A-F]{6}$/);
       expect(colours.secondary, code).not.toBe(colours.primary);
-      expect(clubSwatch(code), code).toBe(colours.primary);
-      expect(CLUB_SWATCHES[code], code).toBe(colours.primary);
     }
     expect(clubColours("ars")).toEqual({ primary: "#EF0107", secondary: "#FFFFFF" });
     expect(clubColours(null)).toBeNull();
@@ -131,12 +120,12 @@ describe("club codes", () => {
       SUN: "#EB172B",
       TOT: "#132257",
     };
-    expect(CLUB_SWATCHES).toEqual(DIRECTION_D);
+    expect(Object.keys(CLUB_COLOURS).sort()).toEqual(Object.keys(DIRECTION_D).sort());
     for (const [code, colour] of Object.entries(DIRECTION_D)) {
-      expect(clubSwatch(code), code).toBe(colour);
-      expect(clubSwatch(code.toLowerCase()), code).toBe(colour);
+      expect(clubColours(code)?.primary, code).toBe(colour);
+      expect(clubColours(code.toLowerCase())?.primary, code).toBe(colour);
     }
     // None is plain white, which would vanish on a white pitch plate.
-    expect(Object.values(CLUB_SWATCHES)).not.toContain("#FFFFFF");
+    expect(Object.values(CLUB_COLOURS).map(({ primary }) => primary)).not.toContain("#FFFFFF");
   });
 });

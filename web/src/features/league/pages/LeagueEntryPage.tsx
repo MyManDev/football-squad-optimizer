@@ -24,19 +24,14 @@ type State = "idle" | "invalid" | "loading" | "unsupported" | "missing" | "faile
  * opens the page the address named under that league (an address from before the number
  * is rewritten with it), or the members list where the address named another league.
  *
- * `stay` (with `inPlace`): the gate rendered this form in front of a page whose address
- * names no league. A connected league keeps the address, and the member step follows there.
- *
  * It is the one thing to do here, so it stands alone in the middle of the screen in large
  * type, and the match scene behind the other pages stays away (`data-no-match-scene`).
  */
 export function LeagueEntryPage({
   inPlace = false,
-  stay = false,
   unpublishedLeagueId = null,
 }: {
   inPlace?: boolean;
-  stay?: boolean;
   unpublishedLeagueId?: number | null;
 }) {
   const { messages } = useLanguage();
@@ -72,10 +67,10 @@ export function LeagueEntryPage({
       const result = await lookupPublishedLeague(leagueId);
       if (!active.current) return;
       if (result.status === "connected") {
-        const here = inPlace && !stay ? legacyLeagueAddress(location.pathname, leagueId) : null;
+        const here = inPlace ? legacyLeagueAddress(location.pathname, leagueId) : null;
         if (here !== null) {
           // An address from before the number, rewritten with it: the member step is asked
-          // there, and its state puts focus on the picker as on the other two paths. The
+          // there, and its state puts focus on the picker as on the other path. The
           // gate at the new address chooses the league it names, as it does for any league
           // reached by its address. Choosing it here first would let the gate rewrite the
           // old address on its own before this navigation lands, without the step state.
@@ -86,12 +81,7 @@ export function LeagueEntryPage({
           return;
         }
         chooseLeague(leagueId);
-        if (inPlace && stay)
-          navigate(
-            { pathname: location.pathname, search: location.search, hash: location.hash },
-            { replace: true, state: PICK_HERE },
-          );
-        else navigate(membersAddress(leagueId), { replace: inPlace, state: FIND_YOURSELF });
+        navigate(membersAddress(leagueId), { replace: inPlace, state: FIND_YOURSELF });
       } else setState("unsupported");
     } catch (error) {
       if (active.current) setState(error instanceof LeagueDataMissing ? "missing" : "failed");

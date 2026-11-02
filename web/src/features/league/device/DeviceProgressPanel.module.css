@@ -1,7 +1,7 @@
 /*
  * The device solve at work: one card in the middle of the viewport, over the drawer, with
- * the share in display type, a bar under it and the stages as a ticked list. The layer is
- * the page's own background, opaque, so nothing of the page shows while the card is up.
+ * the count in display type and a bar under it. The layer is the page's own background,
+ * opaque, so nothing of the page shows while the card is up.
  */
 
 .layer {
@@ -53,63 +53,6 @@
   block-size: 100%;
   background: var(--color-primary);
   transition: inline-size var(--motion-ui) var(--motion-ease);
-}
-
-.stages {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.stage {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  color: var(--color-text-muted);
-  font-size: var(--step--1);
-  line-height: 18px;
-}
-
-.stage[data-stage="current"] {
-  color: var(--color-text);
-  font-weight: 600;
-}
-
-.stage[data-stage="done"] {
-  color: var(--color-text);
-}
-
-/* Waiting: an empty ring. Under way: a filled dot. Done: a tick on the mark. */
-.tick {
-  flex: none;
-  inline-size: 16px;
-  block-size: 16px;
-  border: 2px solid var(--color-line);
-  border-radius: 50%;
-}
-
-.stage[data-stage="current"] .tick {
-  border-color: var(--color-primary);
-  background: radial-gradient(circle, var(--color-primary) 0 3px, transparent 4px);
-}
-
-.stage[data-stage="done"] .tick {
-  border-color: var(--color-text);
-  background: var(--color-mark);
-  color: var(--color-mark-text);
-  position: relative;
-}
-
-.stage[data-stage="done"] .tick::after {
-  content: "";
-  position: absolute;
-  inset: 2px 4px 4px 3px;
-  border: solid var(--color-mark-text);
-  border-width: 0 2px 2px 0;
-  transform: rotate(45deg);
 }
 
 @media (prefers-reduced-motion: reduce) {

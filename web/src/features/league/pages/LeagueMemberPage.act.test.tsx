@@ -150,7 +150,6 @@ describe("the way to apply the decision on FPL", () => {
       expect(link).toHaveAttribute("href", "https://fantasy.premierleague.com/transfers");
       expect(link).toHaveAttribute("target", "_blank");
       expect(link).toHaveAttribute("rel", "noopener noreferrer");
-      expect(link).toHaveAccessibleDescription(copy.applyTransfersHint);
     },
   );
 
@@ -170,7 +169,6 @@ describe("the way to apply the decision on FPL", () => {
   );
 
   it("sends a week without a transfer to the team page when the plan moves the armband", () => {
-    const copy = MESSAGES.en.leagueMembers;
     const armband = plan((payload) => ({
       captain: payload.vice_captain,
       vice_captain: payload.captain,
@@ -178,7 +176,6 @@ describe("the way to apply the decision on FPL", () => {
     render(page("en", { advice: armband }));
     const link = fplLink("en")!;
     expect(link).toHaveAttribute("href", "https://fantasy.premierleague.com/my-team");
-    expect(link).toHaveAccessibleDescription(copy.applyCaptainHint);
     cleanup();
     // Holding the team with the captain who already wears the armband leaves nothing to apply.
     render(page("en", { advice: plan() }));

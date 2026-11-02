@@ -42,9 +42,9 @@ function ShortName({ name, shortName }: { name: string; shortName: string }) {
  */
 function WeekCell({ week }: { week: ClubWeek | null }) {
   const copy = useLanguage().messages.leagueMembers;
-  if (!week) return <td className={styles.cell} />;
+  if (!week) return <td />;
   return (
-    <td className={styles.cell}>
+    <td>
       {week.matches.length === 0 ? (
         <span className={styles.fixture} data-venue="none">
           {copy.fixtureNone}
@@ -99,8 +99,8 @@ function WeekHead({ weeks }: { weeks: readonly number[] }) {
  * club. A home match is a filled cell and an away match an outlined one, and that is the
  * only encoding: no difficulty is rated or coloured. Each club's two colours beside its
  * code are decoration, as in every fixture list. A week the calendar does not list is
- * left out; a blank week says so; with no calendar the rail says that and nothing else,
- * and while the calendar is still being read it says only that.
+ * left out; a blank week says so; while the calendar is still being read the rail says only
+ * that, and with no calendar, or one that lists none of these weeks, there is no rail.
  *
  * On a phone it is a sheet over the page, opened from the phone bar through the shell: it
  * is a modal dialog while open, takes focus to its close button, and the shell locks and
@@ -137,9 +137,11 @@ export function MemberFixtureRail({
   const setSheetOpen = shell?.setSheetOpen;
   const sheet = placement === "sheet";
   const open = sheet && shell?.sheetOpen === true;
+  const weeks = listedWeeks(fixtures, season, nextThree(gameweek));
+  const drawn = fixtures ? weeks.length > 0 : pending;
 
   // The phone bar's 'Fikstür' opens this page's sheet for as long as the page shows one.
-  useEffect(() => register?.(), [register]);
+  useEffect(() => (drawn ? register?.() : undefined), [drawn, register]);
 
   // Focus moves to the close button once the shell has noted where it came from.
   useEffect(() => {
@@ -148,7 +150,10 @@ export function MemberFixtureRail({
     return () => window.cancelAnimationFrame(frame);
   }, [open]);
 
-  const weeks = listedWeeks(fixtures, season, nextThree(gameweek));
+  if (!drawn) return null;
+
+  // A move the plan names no player for has no row to draw.
+  const listedMoves = moves.filter((move) => move.player_out || move.player_in);
   const weeksOf = (team: string) => clubWeeks(fixtures, season, team, weeks, codes);
   const pairs = weeks.includes(gameweek) ? meetings(fixtures, season, gameweek, eleven, codes) : [];
   const names = (players: readonly RailPlayer[]) =>
@@ -188,54 +193,38 @@ export function MemberFixtureRail({
       </div>
       <div className={styles.body}>
         {!fixtures ? (
-          <p className={styles.quiet}>{pending ? copy.railLoading : copy.railNoCalendar}</p>
-        ) : weeks.length === 0 ? (
-          <p className={styles.quiet}>{copy.railNoWeeks}</p>
+          <p className={styles.quiet}>{copy.railLoading}</p>
         ) : (
           <>
-            {moves.length > 0 ? (
-              <section
-                className={styles.block}
-                aria-labelledby={transfersId}
-                data-mark="rail-transfers"
-              >
+            {listedMoves.length > 0 ? (
+              <section aria-labelledby={transfersId} data-mark="rail-transfers">
                 <h3 className={styles.blockTitle} id={transfersId}>
                   {copy.railTransfers}
                 </h3>
                 <table className={`${styles.grid} ${styles.transfers}`}>
                   <WeekHead weeks={weeks} />
-                  {moves.map((move) => (
+                  {listedMoves.map((move) => (
                     <tbody key={move.move_id} className={styles.pair}>
                       {(["out", "in"] as const).map((kind) => {
                         const player = kind === "out" ? move.player_out : move.player_in;
-                        return (
+                        return player ? (
                           <tr key={kind}>
                             <th scope="row">
                               <span className={styles.player}>
                                 <span className={styles.tag} data-kind={kind}>
                                   {kind === "out" ? copy.out : copy.in}
                                 </span>
-                                {player ? (
-                                  <>
-                                    <ShortName name={player.name} shortName={player.short_name} />
-                                    <span className={styles.club}>
-                                      {clubCode(player.team, codes) ?? player.team}
-                                    </span>
-                                  </>
-                                ) : (
-                                  <span className={styles.name}>
-                                    {messages.suggestionHistory.unknownPlayer}
-                                  </span>
-                                )}
+                                <ShortName name={player.name} shortName={player.short_name} />
+                                <span className={styles.club}>
+                                  {clubCode(player.team, codes) ?? player.team}
+                                </span>
                               </span>
                             </th>
-                            {player
-                              ? weeksOf(player.team).map((week, index) => (
-                                  <WeekCell key={weeks[index]} week={week} />
-                                ))
-                              : weeks.map((week) => <td key={week} className={styles.cell} />)}
+                            {weeksOf(player.team).map((week, index) => (
+                              <WeekCell key={weeks[index]} week={week} />
+                            ))}
                           </tr>
-                        );
+                        ) : null;
                       })}
                     </tbody>
                   ))}
@@ -243,7 +232,7 @@ export function MemberFixtureRail({
               </section>
             ) : null}
             {eleven.length > 0 ? (
-              <section className={styles.block} aria-labelledby={elevenId} data-mark="rail-xi">
+              <section aria-labelledby={elevenId} data-mark="rail-xi">
                 <h3 className={styles.blockTitle} id={elevenId}>
                   {copy.railXi}
                 </h3>
@@ -280,7 +269,7 @@ export function MemberFixtureRail({
               </section>
             ) : null}
             {eleven.length > 0 && weeks.includes(gameweek) ? (
-              <section className={styles.block} aria-labelledby={meetId}>
+              <section aria-labelledby={meetId}>
                 <h3 className={styles.blockTitle} id={meetId}>
                   {copy.railMeet(gameweek)}
                 </h3>

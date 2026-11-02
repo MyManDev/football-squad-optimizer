@@ -5,7 +5,8 @@
  * instead of ending in "not listed", the request carries the member's switches, the
  * computed plan is held to the squad's capture, and a wait survives a reload. A published
  * selection is still shown at once with no request. And a bundle built with an origin
- * whose service is down is the static site with one calm notice, never an error page.
+ * whose service is down is the static site, silent about the service until Hesapla is
+ * pressed, never an error page.
  */
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -33,6 +34,7 @@ import type {
 } from "../advice/adviceClient";
 import { rememberJob } from "../advice/adviceJobStore";
 import { AdviceApiError, StaticOnlyAdviceClient } from "../advice/adviceClient";
+import { CHIP_COPY } from "../advice/chipCopy";
 import { COMPUTE_COPY } from "../advice/computeCopy";
 import { TOP100_WEIGHTS } from "../advice/top100";
 import type * as data from "../data";
@@ -264,7 +266,7 @@ describe("a selection nobody published, with the service answering", () => {
     expect(container).toHaveTextContent(computeCopy.notPrecomputed);
     expect(container).toHaveTextContent(computeCopy.duration[3]);
     expect(container).not.toHaveTextContent(copy.publicationStates["not-listed"].title);
-    expect(container).not.toHaveTextContent(copy.computeUnsupportedSelection);
+    expect(container).not.toHaveTextContent(computeCopy.notComputable);
   });
 
   it("stays the dead end it was on a static build", () => {
@@ -327,12 +329,8 @@ describe("a selection nobody published, with the service answering", () => {
       throw new AdviceApiError(503, "ADVICE_BACKEND_DISABLED");
     };
     await pressCompute();
-    await waitFor(() =>
-      expect(container).toHaveTextContent(computeCopy.failures.ADVICE_BACKEND_DISABLED!),
-    );
+    await waitFor(() => expect(container).toHaveTextContent(computeCopy.failures.unknown));
     expect(screen.getByText(PLAN_SHOWN)).toBeVisible();
-    expect(container).toHaveTextContent(computeCopy.earlierRemains);
-    expect(container).not.toHaveTextContent(computeCopy.publishedRemains);
     expect(container).not.toHaveTextContent(copy.computeDone);
   });
 
@@ -352,11 +350,7 @@ describe("a selection nobody published, with the service answering", () => {
       throw new AdviceApiError(503, "ADVICE_BACKEND_DISABLED");
     };
     await pressCompute();
-    await waitFor(() =>
-      expect(container).toHaveTextContent(computeCopy.failures.ADVICE_BACKEND_DISABLED!),
-    );
-    expect(container).toHaveTextContent(computeCopy.publishedRemains);
-    expect(container).not.toHaveTextContent(computeCopy.earlierRemains);
+    await waitFor(() => expect(container).toHaveTextContent(computeCopy.failures.unknown));
     expect(container).not.toHaveTextContent(computeCopy.failures.ANSWER_OTHER_CAPTURE!);
     expect(screen.queryByText(PLAN_SHOWN)).toBeNull();
   });
@@ -418,7 +412,10 @@ describe("a published selection, with the service answering", () => {
     await waitFor(() =>
       expect(screen.getByRole("heading", { name: PLAN_SHOWN })).toBeInTheDocument(),
     );
-    expect(screen.getByTestId("chip-choice")).toHaveTextContent(copy.chipNames.bboost);
+    // The decision names the chip the computed plan plays, and its section what that adds.
+    const line = screen.getByText(copy.chipNames.bboost, { selector: "strong" }).closest("p")!;
+    expect(line).toHaveTextContent(copy.chipLabel);
+    expect(screen.getByTestId("chip-choice")).toHaveTextContent(CHIP_COPY.tr.gain("+17,6"));
   });
   it("is shown at once with no request, and Hesapla can still recompute it", async () => {
     const client = new RecordingClient(() => ({ kind: "unavailable" }));
@@ -447,22 +444,16 @@ describe("a published selection, with the service answering", () => {
         held: ["wildcard" as const],
       },
     };
-    const { container } = renderView(
-      "chip=wildcard",
-      new RecordingClient(() => ({ kind: "unavailable" })),
-      {
-        index,
-      },
-    );
+    renderView("chip=wildcard", new RecordingClient(() => ({ kind: "unavailable" })), { index });
     expect(screen.getByRole("button", { name: "Hesapla" })).toBeDisabled();
-    expect(container).toHaveTextContent(computeCopy.chipUnavailable);
+    expect(screen.queryByRole("note")).toBeNull();
   });
 });
 
 describe("a bundle built with an origin whose service is down", () => {
   function open(search = "") {
     const queries = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
-    return render(
+    const rendered = render(
       <QueryClientProvider client={queries}>
         <LanguageProvider initialLanguage="tr">
           <MemoryRouter initialEntries={[`/league/352490/members/${ENTRY}?${search}`]}>
@@ -475,6 +466,7 @@ describe("a bundle built with an origin whose service is down", () => {
         </LanguageProvider>
       </QueryClientProvider>,
     );
+    return { ...rendered, queries };
   }
 
   function stubStaticTree() {
@@ -494,7 +486,7 @@ describe("a bundle built with an origin whose service is down", () => {
     });
   }
 
-  it("is the static page with one calm notice, and Hesapla lands on the published plan", async () => {
+  it("is the static page, silent about the service, and Hesapla lands on the published plan", async () => {
     vi.stubEnv("VITE_ADVICE_API_ORIGIN", "https://squadopt-api.example");
     const calls: string[] = [];
     vi.stubGlobal("fetch", async (input: string) => {
@@ -502,10 +494,14 @@ describe("a bundle built with an origin whose service is down", () => {
       throw new TypeError("Failed to fetch");
     });
     stubStaticTree();
-    const { container } = open();
-    expect(await screen.findByText(computeCopy.serviceUnreachablePublished)).toBeInTheDocument();
-    expect(container).not.toHaveTextContent(computeCopy.serviceUnreachable);
-    expect(container).not.toHaveTextContent(computeCopy.serviceUnreachableAbsent);
+    const { container, queries } = open();
+    // The plan is drawn and every read has settled, the service's refused one among them.
+    await waitFor(() => {
+      expect(container).toHaveTextContent(PLAN_SHOWN);
+      expect(queries.isFetching()).toBe(0);
+    });
+    expect(screen.queryByRole("note")).toBeNull();
+    expect(container).not.toHaveTextContent(copy.computeStaticFallback);
     const service = "https://squadopt-api.example";
     expect(calls.filter((url) => url.startsWith(service))).toEqual([
       `${service}/api/v1/leagues/${INDEX.league_id}/capabilities`,
@@ -527,6 +523,10 @@ describe("a bundle built with an origin whose service is down", () => {
 
     await pressCompute();
     await waitFor(() => expect(container).toHaveTextContent(copy.computeStaticFallback));
+    // A failed attempt prints the same sentence with its echo beside it; a landing prints no echo.
+    expect(container).not.toHaveTextContent(copy.computeEcho(copy.computeEchoStates.unavailable));
+    expect(container).not.toHaveTextContent(copy.computeEcho(copy.computeEchoStates.failed));
+    expect(container).toHaveTextContent(PLAN_SHOWN);
   });
 
   it("asks nothing at all when no origin is configured", async () => {
@@ -544,9 +544,8 @@ describe("a bundle built with an origin whose service is down", () => {
       "/data/fixtures.json",
       "/data/league/scoreboard.json",
     ]);
-    expect(container).not.toHaveTextContent(computeCopy.serviceUnreachable);
-    expect(container).not.toHaveTextContent(computeCopy.serviceUnreachablePublished);
-    expect(container).not.toHaveTextContent(computeCopy.serviceUnreachableAbsent);
+    expect(screen.queryByRole("note")).toBeNull();
+    expect(container).not.toHaveTextContent(copy.computeStaticFallback);
   });
 
   it("offers the unpublished selection once the service answers", async () => {
@@ -578,7 +577,7 @@ describe("a bundle built with an origin whose service is down", () => {
     expect(container).toHaveTextContent(computeCopy.duration[5]);
   });
 
-  it("says so, and computes nothing, when the service works from another capture", async () => {
+  it("computes nothing, and keeps the published plan, when the service works from another capture", async () => {
     vi.stubEnv("VITE_ADVICE_API_ORIGIN", "https://squadopt-api.example");
     vi.stubGlobal(
       "fetch",
@@ -599,8 +598,10 @@ describe("a bundle built with an origin whose service is down", () => {
     );
     stubStaticTree();
     const { container } = open();
-    expect(await screen.findByText(computeCopy.otherCapture)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Hesapla" })).toBeDisabled();
+    // A published plan on the page leaves Hesapla off only for a service on another capture.
+    await waitFor(() => expect(container).toHaveTextContent(PLAN_SHOWN));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Hesapla" })).toBeDisabled());
     expect(container).toHaveTextContent(PLAN_SHOWN);
+    expect(screen.queryByRole("note")).toBeNull();
   });
 });

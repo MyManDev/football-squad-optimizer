@@ -85,7 +85,6 @@
   --color-text-muted: #4f4a3e;
   --color-text-faint: #6a6250;
   --color-accent: #17402a;
-  --color-accent-text: #ffffff;
   --color-primary: #17402a;
   --color-primary-text: #ffffff;
   --color-good: #1c7a3e;
@@ -138,7 +137,6 @@
     --color-text-muted: #a3afc4;
     --color-text-faint: #8b97ad;
     --color-accent: #f2c230;
-    --color-accent-text: #14100a;
     --color-primary: #f2c230;
     --color-primary-text: #14100a;
     --color-good: #4cc38a;
@@ -181,7 +179,6 @@
   --color-text-muted: #a3afc4;
   --color-text-faint: #8b97ad;
   --color-accent: #f2c230;
-  --color-accent-text: #14100a;
   --color-primary: #f2c230;
   --color-primary-text: #14100a;
   --color-good: #4cc38a;
@@ -236,7 +233,6 @@ h4 {
 }
 
 /* Emphasis in running text is Plex Sans 600, the heaviest weight the page loads for it. */
-b,
 strong,
 th {
   font-weight: 600;
@@ -248,9 +244,7 @@ small {
 }
 
 /* Codes read in Plex Mono like every other code and figure, not the system monospace. */
-code,
-kbd,
-samp {
+code {
   font-family: var(--font-mono);
 }
 
@@ -283,10 +277,6 @@ a:hover {
 
 .num {
   font-variant-numeric: tabular-nums;
-}
-
-.mono {
-  font-family: var(--font-mono);
 }
 
 .visually-hidden {

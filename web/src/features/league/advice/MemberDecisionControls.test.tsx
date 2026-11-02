@@ -2,9 +2,8 @@ import { AS_A_CHANCE } from "../../../testSupport/honesty";
 /**
  * The member's controls name only what the producer computed: the catalogue's
  * strategies, the league's rivals with the producer's default marked, and the windows
- * the index lists — pure points at three and five weeks where this publish solved them,
- * one week for a rival strategy. Everything else is shown disabled with its reason,
- * never hidden.
+ * the index lists: pure points at three and five weeks where this publish solved them,
+ * one week for a rival strategy. Everything else is shown disabled, never hidden.
  */
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
@@ -48,37 +47,27 @@ function renderControls(
 
 describe("member decision controls", () => {
   it.each(["tr", "en"] as const)(
-    "describes requested minimum and maximum overlap bounds in %s",
+    "states the requested minimum and maximum overlap beside the chosen strategy in %s",
     (language) => {
-      renderControls(
-        `/league/352490/members/${ENTRY}`,
+      const { unmount } = renderControls(
+        `/league/352490/members/${ENTRY}?mode=ortak-koru`,
         mockEntryAdviceIndex(ENTRY).payload,
         language,
       );
       const shared = screen.getByText(
-        MESSAGES[language].leagueMembers.strategies["ortak-koru"].description,
-      );
-      const different = screen.getByText(
-        MESSAGES[language].leagueMembers.strategies["fark-yarat"].description,
+        MESSAGES[language].leagueMembers.strategies["ortak-koru"].short,
       );
       expect(shared).toHaveTextContent(language === "tr" ? /en az 9/ : /at least 9/);
+      unmount();
+      renderControls(
+        `/league/352490/members/${ENTRY}?mode=fark-yarat`,
+        mockEntryAdviceIndex(ENTRY).payload,
+        language,
+      );
+      const different = screen.getByText(
+        MESSAGES[language].leagueMembers.strategies["fark-yarat"].short,
+      );
       expect(different).toHaveTextContent(language === "tr" ? /en fazla 5/ : /at most 5/);
-      expect(shared).toHaveTextContent(
-        language === "tr" ? /alt sınır düşürülebilir/ : /minimum may be lowered/,
-      );
-      expect(different).toHaveTextContent(
-        language === "tr" ? /üst sınır yükseltilebilir/ : /maximum may be raised/,
-      );
-      for (const description of [shared, different]) {
-        expect(description).toHaveTextContent(
-          language === "tr" ? /plan uygulanan sınırı/ : /the plan states the applied bound/,
-        );
-        // The plan may be one the member's device solved; nothing calls it published.
-        expect(description).not.toHaveTextContent(/published|yayımlanan/i);
-        expect(description).not.toHaveTextContent(
-          /up to nine|down to five|en çok dokuz|en az beş|\bhit\b|reached|ulaştı/i,
-        );
-      }
     },
   );
   it("offers the three member strategies and writes the choice to the URL", () => {
@@ -108,13 +97,15 @@ describe("member decision controls", () => {
     expect(screen.getByTestId("selection").textContent).toBe("fark-yarat/-/-");
   });
 
-  it("labels a pair the producer could not compute", () => {
+  it("keeps a pair the producer could not compute off, under the rival's name alone", () => {
     const index = mockEntryAdviceIndex(ENTRY).payload;
     const missing = index.unavailable[0]!;
     renderControls(`/league/352490/members/${ENTRY}?mode=${missing.strategy}`);
-    const option = screen.getByRole("option", { name: /\(hesaplanamadı\)/ });
-    expect(option).toHaveValue(String(missing.rival_entry_id));
+    const option = screen
+      .getAllByRole<HTMLOptionElement>("option")
+      .find((candidate) => candidate.value === String(missing.rival_entry_id))!;
     expect(option).toBeDisabled();
+    expect(option).not.toHaveTextContent("hesaplanamadı");
   });
 
   it("enables the windows the index lists for pure points, without a limits sentence", () => {
@@ -171,7 +162,6 @@ describe("member decision controls", () => {
     const select = screen.getByRole("combobox", { name: "Karşısında oynadığın üye" });
     expect(select).toHaveValue("");
     expect(screen.getByRole("option", { name: "Bir rakip seç" })).toBeDisabled();
-    expect(screen.getByText(/sıralamada bir komşu belirlemedi/)).toBeInTheDocument();
 
     fireEvent.change(select, { target: { value: String(index.rival_entry_ids[0]) } });
     expect(screen.getByTestId("selection").textContent).toBe(
@@ -220,68 +210,16 @@ describe("member decision controls", () => {
     };
     renderControls(`/league/352490/members/${ENTRY}`, index, "en");
 
-    const marked = screen.getByRole("radio", { name: /Close the gap.*The rule's pick/s });
+    const marked = screen.getByRole("radio", { name: /Close the gap.*Recommended/s });
     expect(marked).not.toBeChecked();
     // The rule marks; the URL still chooses. Nothing was selected on the member's behalf.
     expect(screen.getByDisplayValue("saf-puan")).toBeChecked();
-    expect(screen.getByText(/A declared rule marks one option/)).toBeInTheDocument();
-    // The two inputs the rule read are on the page, so the member can check it. The gap
-    // is printed like every other signed figure on the site: one decimal and a real minus.
-    expect(screen.getByText(/\(−140\.0\)/)).toBeInTheDocument();
-    expect(screen.getByText(/37 gameweeks still to play/)).toBeInTheDocument();
-  });
-
-  it.each([
-    ["tr", 1.5, "+1,5"],
-    ["tr", -1.54, "−1,5"],
-    ["tr", 0.04, "0,0"],
-    ["en", 1.5, "+1.5"],
-  ] as const)(
-    "prints the gap to the rival in the page's language (%s, %s)",
-    (language, gap, shown) => {
-      const base = mockEntryAdviceIndex(ENTRY).payload;
-      const index: EntryAdviceIndex = {
-        ...base,
-        suggested_strategy: { ...base.suggested_strategy!, points_ahead_of_rival: gap },
-      };
-      const { container } = renderControls(`/league/352490/members/${ENTRY}`, index, language);
-      const note = [...container.querySelectorAll("p")].find((line) =>
-        line.textContent?.startsWith(language === "tr" ? "Tanımlı bir kural" : "A declared rule"),
-      );
-      expect(note?.textContent).toContain(`(${shown})`);
-    },
-  );
-
-  it("names the rule's two inputs without a measurement caveat, in both languages", () => {
-    const claims = [
-      [/A declared rule marks one option from two numbers/],
-      [/Tanımlı bir kural, iki sayıya bakarak/],
-    ] as const;
-    const caveats = [
-      [/written down, not measured/, /nothing has tested whether following it does better/],
-      [/Kural yazılı, ölçülmüş değil/, /uymanın uymamaktan daha iyi olduğu test edilmedi/],
-    ] as const;
-    for (const [language, patterns, absent] of [
-      ["en", claims[0], caveats[0]],
-      ["tr", claims[1], caveats[1]],
-    ] as const) {
-      const { container, unmount } = renderControls(
-        `/league/352490/members/${ENTRY}`,
-        undefined,
-        language,
-      );
-      const text = container.textContent ?? "";
-      for (const pattern of patterns) expect(text).toMatch(pattern);
-      for (const pattern of absent) expect(text).not.toMatch(pattern);
-      unmount();
-    }
   });
 
   it("shows no rule label when the producer could not state one", () => {
     const base = mockEntryAdviceIndex(ENTRY).payload;
     renderControls(`/league/352490/members/${ENTRY}`, { ...base, suggested_strategy: null }, "en");
-    expect(screen.queryByText(/A declared rule marks one option/)).toBeNull();
-    expect(screen.queryByText("The rule's pick")).toBeNull();
+    expect(screen.queryByText("Recommended")).toBeNull();
   });
 
   it("never shows a probability or a chance, in either language", () => {
@@ -294,7 +232,7 @@ describe("member decision controls", () => {
         );
         const text = container.textContent ?? "";
         // The rule's label is on the page for this sweep, not merely available to it.
-        expect(text).toMatch(/rule's pick|Kuralın seçimi/i);
+        expect(text).toMatch(/Recommended|Önerilen/);
         expect(text).not.toMatch(AS_A_CHANCE);
         expect(text).not.toMatch(/chance of falling behind|geride kalma ihtimalini/i);
         unmount();
@@ -303,16 +241,16 @@ describe("member decision controls", () => {
   });
 
   it("uses the approved plan aim without ranking the published expected-points figure", () => {
-    // The approved name states an aim. The description must not rank the published
-    // figure: the solve also values the bench, while expected_own_points counts eleven
-    // plus captain. On 2026-27 GW4, entry 3832237's plan publishes 46.5454 with a
-    // 7.1846 bench and its ortak-koru plan publishes 46.7016 with a 4.3379 bench, both
-    // OPTIMAL and free of hits. The description guard preserves that distinction.
+    // The approved name states an aim. Its line must not rank the published figure: the
+    // solve also values the bench, while expected_own_points counts eleven plus captain.
+    // On 2026-27 GW4, entry 3832237's plan publishes 46.5454 with a 7.1846 bench and its
+    // ortak-koru plan publishes 46.7016 with a 4.3379 bench, both OPTIMAL and free of
+    // hits. This guard preserves that distinction.
     const SUPERLATIVE = /highest|most expected|en yüksek|en iyi puan/i;
     for (const language of ["tr", "en"] as const) {
-      const { description } = MESSAGES[language].leagueMembers.strategies["saf-puan"];
-      expect(description.length).toBeGreaterThan(0);
-      expect(description).not.toMatch(SUPERLATIVE);
+      const { short } = MESSAGES[language].leagueMembers.strategies["saf-puan"];
+      expect(short.length).toBeGreaterThan(0);
+      expect(short).not.toMatch(SUPERLATIVE);
       const { container, unmount } = renderControls(
         `/league/352490/members/${ENTRY}?mode=saf-puan`,
         undefined,
@@ -320,7 +258,7 @@ describe("member decision controls", () => {
       );
       const text = container.textContent ?? "";
       // The sweep has a subject: this is the copy the control actually renders.
-      expect(text).toContain(description);
+      expect(text).toContain(short);
       expect(text).not.toMatch(SUPERLATIVE);
       unmount();
     }
@@ -385,29 +323,7 @@ describe("member decision controls", () => {
     expect(
       screen.getByText(MESSAGES.tr.leagueMembers.strategies["fark-yarat"].short),
     ).toBeInTheDocument();
-    // The notes that explain the options are a part of their own, which the sidebar puts
-    // under Hesapla: the plan part does not carry them.
-    expect(screen.queryByText(MESSAGES.tr.leagueMembers.optionNotes)).toBeNull();
     plan.unmount();
-
-    const notesPart = render(
-      <LanguageProvider initialLanguage="tr">
-        <MemoryRouter initialEntries={[`/league/352490/members/${ENTRY}?mode=fark-yarat`]}>
-          <MemberDecisionControls
-            entryId={ENTRY}
-            members={MEMBERS}
-            index={mockEntryAdviceIndex(ENTRY).payload}
-            part="notes"
-          />
-        </MemoryRouter>
-      </LanguageProvider>,
-    );
-    // They wait behind a closed disclosure, and hold no input of their own.
-    const notes = screen.getByText(MESSAGES.tr.leagueMembers.optionNotes).closest("details")!;
-    expect(notes).not.toHaveAttribute("open");
-    expect(notes).toHaveTextContent(MESSAGES.tr.leagueMembers.strategies["fark-yarat"].name);
-    expect(notesPart.container.querySelectorAll("input, select")).toHaveLength(0);
-    notesPart.unmount();
 
     const advanced = render(
       <LanguageProvider initialLanguage="tr">
@@ -428,14 +344,14 @@ describe("member decision controls", () => {
     expect(screen.queryByRole("combobox")).toBeNull();
   });
 
-  it("phrases the rule as a band on the gap, never as a chance of catching up", () => {
-    // Check the declared rule separately as well as the full rendered controls.
+  it("words the rule's label without a chance of catching up", () => {
+    // Check the declared rule's label separately as well as the full rendered controls.
     //
     // This is the same rule as the producer's `FORBIDDEN_TEXT_PATTERN`
     // (`squadopt/application/strategies/catalog.py`), and the two are deliberately not
     // the same width. This one may match any of its words anywhere, because its only
-    // subjects are the two copy strings below — strings this repository wrote — so it
-    // never meets a member-typed name and the site's own "bu yüzden" never reaches it.
+    // subject is the copy string below, a string this repository wrote, so it never meets
+    // a member-typed name and the site's own "bu yüzden" never reaches it.
     // The producer's does meet names, so there `şans` and `yüzde` are bounded on both
     // sides (Şanslı, Şansal and "Bu Yüzden" are legitimate names it must publish) while
     // `ihtimal` and `olasıl` stay stems (ihtimali, olasılığı are the forbidden word
@@ -447,11 +363,9 @@ describe("member decision controls", () => {
       expect(word).toMatch(AS_A_CHANCE);
     }
     for (const language of ["tr", "en"] as const) {
-      const copy = MESSAGES[language].leagueMembers;
-      for (const line of [copy.rulePickBadge, copy.rulePickNote("Half Space", "-140", 37)]) {
-        expect(line.length).toBeGreaterThan(0);
-        expect(line).not.toMatch(AS_A_CHANCE);
-      }
+      const line = MESSAGES[language].leagueMembers.rulePickBadge;
+      expect(line.length).toBeGreaterThan(0);
+      expect(line).not.toMatch(AS_A_CHANCE);
     }
   });
 });

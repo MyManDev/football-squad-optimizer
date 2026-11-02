@@ -123,23 +123,20 @@ for (const language of ["tr", "en"] as const) {
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({ path: testInfo.outputPath(`member-top-${language}.png`) });
 
-    // What explains the plan and the advanced settings wait closed, on a phone as on a
-    // desktop, and neither widens the page when opened. The tools are pages of their own.
-    const closedSections = [members.howComputed, members.advancedSettings];
+    // The advanced settings wait closed, on a phone as on a desktop, and do not widen the
+    // page when opened. The tools are pages of their own.
     for (const title of [members.memberSquad, members.chipsAndTransfers]) {
       await expect(page.locator("main summary", { hasText: title })).toHaveCount(0);
     }
-    for (const title of closedSections) {
-      const detail = page
-        .locator("main details")
-        .filter({ has: page.locator("summary", { hasText: title }) });
-      await expect(detail).toHaveCount(1);
-      await expect(detail).not.toHaveAttribute("open");
-      await detail.locator(":scope > summary").click();
-      await expect(detail).toHaveAttribute("open", "");
-      expect(await noSidewaysScroll(page)).toBe(true);
-      await detail.locator(":scope > summary").click();
-    }
+    const advanced = page
+      .locator("main details")
+      .filter({ has: page.locator("summary", { hasText: members.advancedSettings }) });
+    await expect(advanced).toHaveCount(1);
+    await expect(advanced).not.toHaveAttribute("open");
+    await advanced.locator(":scope > summary").click();
+    await expect(advanced).toHaveAttribute("open", "");
+    expect(await noSidewaysScroll(page)).toBe(true);
+    await advanced.locator(":scope > summary").click();
     // The squad section draws the plan's eleven upright on a phone, with the bench under it.
     const pitch = page.getByRole("list", { name: copy.squad.pitchLabel });
     await pitch.scrollIntoViewIfNeeded();
@@ -194,11 +191,7 @@ for (const language of ["tr", "en"] as const) {
     await expect(
       page.getByRole("button", { name: members.computeButton, exact: true }),
     ).toHaveCount(1);
-    for (const title of closedSections) {
-      await expect(
-        page.locator("main details").filter({ has: page.locator("summary", { hasText: title }) }),
-      ).not.toHaveAttribute("open");
-    }
+    await expect(advanced).not.toHaveAttribute("open");
   });
 
   test(`each of the member's tool pages fits a phone, in ${language}`, async ({ page }) => {
@@ -351,7 +344,13 @@ for (const language of ["tr", "en"] as const) {
     await settings.getByRole("button", { name: copy.computeButton, exact: true }).click();
     const dock = page.locator("[data-compute-dock]");
     await expect(dock.getByText(copy.computeRunning, { exact: true })).toBeVisible();
-    await expect(dock.getByText(copy.computeWaitingWithFallback, { exact: false })).toBeVisible();
+    await expect(dock.getByText(copy.computeWaiting, { exact: false })).toBeVisible();
+    // The published plan stays on the page during the wait, and says that it is the baseline.
+    await expect(
+      page
+        .locator('[data-mark="decision"]')
+        .getByText(copy.adviceBaselineWhileComputing, { exact: true }),
+    ).toBeVisible();
     expect(submissions).toEqual([expect.objectContaining({ window: 5, top100_weight: 20 })]);
     await settings.screenshot({
       path: testInfo.outputPath(`member-selected-settings-${language}.png`),

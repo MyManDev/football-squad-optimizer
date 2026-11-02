@@ -29,7 +29,6 @@ export function LeagueMemberPage() {
   const {
     validEntryId,
     squad,
-    membersQuery,
     indexQuery,
     members,
     index,
@@ -68,27 +67,17 @@ export function LeagueMemberPage() {
   );
 
   if (toolParam !== undefined && tool === undefined) {
-    return <EmptyState title={messages.shell.notFound} />;
+    return <EmptyState page title={messages.shell.notFound} />;
   }
-  if (!validEntryId) return <EmptyState title={copy.invalidEntry} />;
+  if (!validEntryId) return <EmptyState page title={copy.invalidEntry} />;
   // The squad is the page's first read and its longest wait on a cold visit: the page's
   // shape stands in for it, its words read to a screen reader only.
   if (squad.isPending) return <MemberPageSkeleton />;
   if (squad.isError) {
     const missing = squad.error instanceof LeagueDataMissing;
-    const reasons = missing ? [...new Set(index?.unavailable.map((item) => item.reason))] : [];
     return (
-      <EmptyState title={missing ? copy.entryNotAvailable : copy.entryUnreadable}>
-        <p>{missing ? copy.entryNotAvailableBody : copy.entryUnreadableBody}</p>
-        {/* A code or sentence the copy knows is shown in the reader's language: a plan the
-            planner could not solve is published as a code, never as the solver's words. */}
-        {reasons.filter(Boolean).map((reason) => (
-          <p key={reason}>
-            {Object.hasOwn(copy.publicationReasons, reason)
-              ? copy.publicationReasons[reason]
-              : reason}
-          </p>
-        ))}
+      <EmptyState page title={missing ? copy.entryNotAvailable : copy.entryUnreadable}>
+        {missing ? <p>{copy.entryNotAvailableBody}</p> : null}
         <Link to={membersAddress(leagueId)}>{copy.backToMembers}</Link>{" "}
         {!missing ? (
           <button type="button" onClick={() => void squad.refetch()}>
@@ -124,9 +113,7 @@ export function LeagueMemberPage() {
         duelId === null
           ? undefined
           : duel.isError
-            ? duel.error instanceof LeagueDataMissing
-              ? "missing"
-              : "unreadable"
+            ? "unreadable"
             : duel.isPending
               ? "loading"
               : undefined
@@ -135,24 +122,9 @@ export function LeagueMemberPage() {
       windowControl={windowControl.isError ? null : (windowControl.data ?? null)}
       adviceIssue={adviceIssue}
       adviceLoading={indexQuery.isPending || (adviceEnabled && advice.isPending)}
-      membersIssue={
-        membersQuery.isError
-          ? membersQuery.error instanceof LeagueDataMissing
-            ? "missing"
-            : "unavailable"
-          : undefined
-      }
       onRetryAdvice={() => void advice.refetch()}
       onRetryIndex={() => void indexQuery.refetch()}
       members={members}
-      outcomeFreshness={
-        membersQuery.data
-          ? {
-              publishedAt: membersQuery.data.generated_at_utc,
-              scoredGameweek: membersQuery.data.payload.scored_gameweek,
-            }
-          : undefined
-      }
       index={index}
       client={client}
       capabilities={capabilities}

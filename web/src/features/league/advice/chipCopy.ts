@@ -1,5 +1,4 @@
 import type { Language } from "../../../i18n/messages";
-import type { MemberChip } from "./chipChoice";
 
 /**
  * The chip choice copy, in both languages.
@@ -8,126 +7,82 @@ import type { MemberChip } from "./chipChoice";
  * so it loads with the member page and not with every first visit. The honesty sweep
  * (`i18n/messagesNoProbability.test.ts`) walks it entry by entry, functions called.
  *
- * What it may say: the chip is there because the member chose it, what the chip week is
- * expected to score above the member's own plan without it, and that this is one
- * gameweek's difference. It never says this is the week to play the chip, because what the
- * chip would be worth in a later gameweek is not measured anywhere.
+ * What it may say: what the chip week is expected to score above the member's own plan
+ * without it, why the game keeps a chip off, and what to change to reach one. It never says
+ * this is the week to play the chip, because what the chip would be worth in a later
+ * gameweek is not measured anywhere.
  */
 export interface ChipCopy {
   legend: string;
   none: string;
-  help: string;
-  plain: string;
   onlyBaseline: string;
   blockedBySwitches: string;
   switchesOff: string;
-  notOffered: string;
-  unavailableReasons: Record<string, string> & { unknown: string };
-  chipReasons: Record<string, string> & { unknown: string };
+  unavailableReasons: Record<string, string>;
+  chipReasons: Record<string, string>;
   chipReasonLine: (name: string, reason: string) => string;
   title: string;
-  chosen: (name: string) => string;
   gain: (points: string) => string;
   freeHit: string;
-  gainCaption: string;
-  gainCaptionBeforeCost: (cost: string) => string;
 }
 
 const en: ChipCopy = {
   legend: "Chip",
   none: "None",
-  help: "Choosing a chip shows your one-week plan with that chip played this gameweek, and what that week is expected to score above your own plan without it.",
-  plain: "No chip is selected; the plan plays none.",
-  onlyBaseline: "One-week pure-points plan only.",
+  onlyBaseline: "Switch to the one-week Most points plan for this.",
   blockedBySwitches:
-    "A chip plan is solved on the plain one-week plan only. Switch the manager's word off and set the Top 100 influence to 0 to choose a chip.",
-  switchesOff:
-    "A chip is selected, and a chip plan is solved without the manager's word and without a Top 100 setting. Choose None under Chip to use them.",
-  notOffered:
-    "The chip in the link cannot be shown for this member in this publish; the plan without a chip is shown.",
+    "Switch the manager's word off and set the Top 100 influence to 0 to choose a chip.",
+  switchesOff: "Choose None under Chip to use them.",
   unavailableReasons: {
-    chip_history_unknown: "This member's chip history was not captured, so no chip is offered.",
     no_chip_left: "This member has no chip that can be played this gameweek.",
-    not_solved_for_member: "No chip plan was solved for this member in this publish.",
-    unknown: "No chip plan can be shown for this member from this publish.",
   },
   chipReasons: {
     already_played: "already played",
     window_not_open: "its window is not open this gameweek",
     free_hit_played_last_gameweek:
       "a Free Hit was played last gameweek, and the game does not allow two in a row",
-    not_solved_for_member: "no plan was solved in this publish",
-    unknown: "not offered in this publish",
   },
   chipReasonLine: (name, reason) => `${name}: ${reason}.`,
   title: "Chip choice",
-  chosen: (name) => `${name} is played this gameweek because you chose it.`,
-  gain: (points) =>
-    `~${points} expected points this gameweek against your own plan without the chip, hits included.`,
+  gain: (points) => `~${points} expected points this gameweek.`,
   freeHit:
     "A Free Hit squad is for this gameweek only; the squad you hold now returns at the next deadline.",
-  gainCaption: "expected points against keeping the squad you hold and playing the same chip",
-  gainCaptionBeforeCost: (cost) =>
-    `expected points against keeping the squad you hold and playing the same chip, before this week's transfer cost of ${cost}`,
 };
 
 const tr: ChipCopy = {
   legend: "Çip",
   none: "Yok",
-  help: "Bir çip seçersen bir haftalık planın, o çip bu hafta oynanmış haliyle gösterilir; yanında da o haftanın çipsiz kendi planına göre beklenen puan farkı yazar.",
-  plain: "Çip seçili değil; plan çip oynamaz.",
-  onlyBaseline: "Yalnız bir haftalık saf puan planında.",
-  blockedBySwitches:
-    "Çipli plan yalnız sade bir haftalık plan üzerinde çözülür. Çip seçmek için hocanın sözünü kapat ve Top 100 etkisini 0 yap.",
-  switchesOff:
-    "Bir çip seçili; çipli plan hocanın sözü ve Top 100 ayarı olmadan çözülür. Bunları kullanmak için Çip bölümünde Yok'u seç.",
-  notOffered: "Bağlantıdaki çip bu yayında bu üye için gösterilemiyor; çipsiz plan gösteriliyor.",
+  onlyBaseline: "Bunun için bir haftalık En çok puan planına geç.",
+  blockedBySwitches: "Çip seçmek için hocanın sözünü kapat ve Top 100 etkisini 0 yap.",
+  switchesOff: "Bunları kullanmak için Çip bölümünde Yok'u seç.",
   unavailableReasons: {
-    chip_history_unknown: "Bu üyenin çip geçmişi okunamadı; bu yüzden çip sunulmuyor.",
     no_chip_left: "Bu üyenin bu hafta oynayabileceği çip yok.",
-    not_solved_for_member: "Bu yayında bu üye için çipli plan çözülmedi.",
-    unknown: "Bu yayından bu üye için çipli plan gösterilemiyor.",
   },
   chipReasons: {
     already_played: "daha önce oynandı",
     window_not_open: "bu hafta oynanabileceği dönem açık değil",
     free_hit_played_last_gameweek:
       "geçen hafta Free Hit oynandı, oyun üst üste iki hafta oynatmıyor",
-    not_solved_for_member: "bu yayında planı çözülmedi",
-    unknown: "bu yayında sunulmuyor",
   },
   chipReasonLine: (name, reason) => `${name}: ${reason}.`,
   title: "Çip seçimi",
-  chosen: (name) => `${name} bu hafta oynanıyor, çünkü sen seçtin.`,
-  gain: (points) => `Çipsiz kendi planına göre bu hafta ~${points} beklenen puan, cezalar dahil.`,
+  gain: (points) => `Bu hafta ~${points} beklenen puan.`,
   freeHit:
     "Free Hit kadrosu yalnız bu hafta içindir; bir sonraki haftada şimdiki kadron geri gelir.",
-  gainCaption: "beklenen puan, mevcut kadronu koruyup aynı çipi oynamaya göre",
-  gainCaptionBeforeCost: (cost) =>
-    `beklenen puan, mevcut kadronu koruyup aynı çipi oynamaya göre; bu haftanın ${cost} transfer maliyeti düşülmeden önce`,
 };
 
 export const CHIP_COPY: Record<Language, ChipCopy> = { tr, en };
 
-/** The sentence for an index reason; a reason this page does not know claims nothing. */
-export function chipsUnavailable(copy: ChipCopy, reason: string | null): string {
-  return (
-    (reason !== null && Object.hasOwn(copy.unavailableReasons, reason)
-      ? copy.unavailableReasons[reason]
-      : undefined) ?? copy.unavailableReasons.unknown
-  );
+/** The sentence for an index reason; a reason this page has no sentence for says nothing. */
+export function chipsUnavailable(copy: ChipCopy, reason: string | null): string | null {
+  return reason !== null && Object.hasOwn(copy.unavailableReasons, reason)
+    ? (copy.unavailableReasons[reason] ?? null)
+    : null;
 }
 
-/** Why one chip has no plan, in the member's language; an unknown code claims nothing. */
-export function chipReason(copy: ChipCopy, reason: string | undefined): string {
-  return (
-    (reason !== undefined && Object.hasOwn(copy.chipReasons, reason)
-      ? copy.chipReasons[reason]
-      : undefined) ?? copy.chipReasons.unknown
-  );
-}
-
-/** Whether a chip week scores on another basis than the eleven with the captain doubled. */
-export function chipRescores(chip: MemberChip): boolean {
-  return chip === "3xc" || chip === "bboost";
+/** Why the game keeps one chip off, in the member's language; any other code says nothing. */
+export function chipReason(copy: ChipCopy, reason: string | undefined): string | null {
+  return reason !== undefined && Object.hasOwn(copy.chipReasons, reason)
+    ? (copy.chipReasons[reason] ?? null)
+    : null;
 }

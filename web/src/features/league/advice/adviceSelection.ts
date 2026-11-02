@@ -357,7 +357,7 @@ function top100For(
   const weights = top100Weights(index, entryId, word, target);
   const weight = weights.includes(asked) ? asked : 0;
   // "Not offered" is about the menu itself; a weight solved without the word but not with
-  // it is offered, and the controls say which settings the switches leave off.
+  // it is offered.
   const offered = top100Weights(index, entryId, false, target);
   return {
     ...base,
@@ -475,7 +475,7 @@ function withDeviceChoices(
  * Whether a link leaves room for the device's own choices: it asks for no manager's word,
  * no football model and no decision preferences, none of which the device solves.
  */
-export function linkKeepsDeviceChoices(searchParams: URLSearchParams): boolean {
+function linkKeepsDeviceChoices(searchParams: URLSearchParams): boolean {
   const preferences = preferencesFromUrl(searchParams);
   return (
     searchParams.get("model") !== "football" &&
@@ -818,10 +818,10 @@ function resolveFromIndex(
   if (!result.windows.includes(window)) return result;
   if (strategy === "saf-puan") {
     // The word is solved for the one-week pure-points plan only; asked for anywhere
-    // else, the switch stays off and the controls say why.
+    // else, the switch stays off and the controls name that plan.
     const switched = evidenceAsked && evidencePath !== null && window === 1;
     // The Top 100 menu is the same plan at another setting. A setting whose file this
-    // selection cannot read shows the plan at 0, and the controls say so.
+    // selection cannot read shows the plan at 0.
     const { path: weightedPath, ...published100 } = top100For(
       result.top100,
       index,
@@ -846,7 +846,7 @@ function resolveFromIndex(
     }
     // A chosen chip is the plain one-week plan with that chip forced, and combines with
     // nothing: with the word on or a setting above 0 the chip is left out and the
-    // controls say so.
+    // controls say what to change.
     const chip =
       window === 1 &&
       !switched &&

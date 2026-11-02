@@ -4,7 +4,7 @@ import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { mockEntryAdviceEnvelope } from "../../../fixtures/league";
 import { AS_A_CHANCE } from "../../../testSupport/honesty";
 import type { AdviceRolePointComponents, EntryAdvice } from "../types";
-import { ParticipationEvidence } from "./ParticipationEvidence";
+import { RoleForecast } from "./RoleForecast";
 import { isAdvicePayload } from "./adviceShape";
 
 afterEach(cleanup);
@@ -34,13 +34,13 @@ function example(): EntryAdvice {
 }
 
 it.each(["tr", "en"] as const)(
-  "shows expected minutes and role limits without modeled probabilities in %s",
+  "shows expected minutes alone, without modeled probabilities or how they were read, in %s",
   (language) => {
     const view = example();
     expect(isAdvicePayload(view)).toBe(true);
     render(
       <LanguageProvider initialLanguage={language}>
-        <ParticipationEvidence view={view} />
+        <RoleForecast view={view} />
       </LanguageProvider>,
     );
     const section = screen.getByTestId("role-forecast");
@@ -48,7 +48,7 @@ it.each(["tr", "en"] as const)(
       language === "tr" ? "Beklenen dakika: 34,0" : "Expected minutes: 34.0",
     );
     expect(section.textContent).not.toMatch(AS_A_CHANCE);
-    expect(section).toHaveTextContent(
+    expect(section).not.toHaveTextContent(
       language === "tr" ? "geçmiş maçlardaki ilk 11" : "past records of starts",
     );
     expect(section).not.toHaveTextContent(
@@ -57,7 +57,7 @@ it.each(["tr", "en"] as const)(
     expect(section).not.toHaveTextContent(
       language === "tr" ? "Bağımsız doğruluk ölçümü" : "Independent accuracy validation",
     );
-    expect(section).toHaveTextContent(
+    expect(section).not.toHaveTextContent(
       language === "tr" ? "Kaynaklı oynama veya süre" : "A sourced availability or minutes",
     );
     expect(section).not.toHaveTextContent("9999");
@@ -65,19 +65,19 @@ it.each(["tr", "en"] as const)(
   },
 );
 
-it("keeps unknown starting roles distinct from zero and refuses out-of-range or extra fields", () => {
+it("says nothing more for an unknown starting role, and refuses out-of-range or extra fields", () => {
   const view = example();
   const row = view.role_forecast!.rows[0]!;
   row.status = "unavailable_no_known_start_labels";
   expect(isAdvicePayload(view)).toBe(true);
   render(
     <LanguageProvider initialLanguage="en">
-      <ParticipationEvidence view={view} />
+      <RoleForecast view={view} />
     </LanguageProvider>,
   );
   expect(screen.getByTestId("role-forecast")).toHaveTextContent("Expected minutes: 34.0");
   expect(screen.getByTestId("role-forecast").textContent).not.toMatch(AS_A_CHANCE);
-  expect(screen.getByTestId("role-forecast")).toHaveTextContent(
+  expect(screen.getByTestId("role-forecast")).not.toHaveTextContent(
     "Insufficient recorded starting-role evidence",
   );
   row.captured_eligibility_multiplier = 1.1;
@@ -127,7 +127,7 @@ it.each(["tr", "en"] as const)(
     expect(isAdvicePayload(view)).toBe(true);
     render(
       <LanguageProvider initialLanguage={language}>
-        <ParticipationEvidence view={view} />
+        <RoleForecast view={view} />
       </LanguageProvider>,
     );
     const role = screen.getByTestId("role-forecast");
@@ -140,7 +140,7 @@ it.each(["tr", "en"] as const)(
       language === "tr" ? "Süre puanı: 0,70" : "Appearance points: 0.70",
     );
     expect(detail).toHaveTextContent(
-      language === "tr" ? "modelin kalan tahmini): -0,10" : "remaining model estimate): -0.10",
+      language === "tr" ? "Diğer katkılar: -0,10" : "Other contributions: -0.10",
     );
     expect(detail).toHaveTextContent(
       language === "tr" ? "Savunma katkısı: 0,20" : "Defensive contributions: 0.20",
@@ -151,7 +151,7 @@ it.each(["tr", "en"] as const)(
     expect(detail).not.toHaveTextContent(
       language === "tr" ? "yalnızca bu maç" : "this fixture only",
     );
-    expect(detail).toHaveTextContent(
+    expect(detail).not.toHaveTextContent(
       language === "tr"
         ? "Kaptan çarpanı ve Top100 ağırlığı öncesidir"
         : "Before the captain multiplier and the Top100 weight",
@@ -162,7 +162,7 @@ it.each(["tr", "en"] as const)(
   },
 );
 
-it("shows a floor adjustment as a separate term without concealing the negative residual", () => {
+it("counts the floor at zero under the other term, so the rows add up to the total", () => {
   const view = example();
   view.role_forecast!.rows[0]!.point_components = {
     appearance: 0.1,
@@ -177,13 +177,18 @@ it("shows a floor adjustment as a separate term without concealing the negative 
   expect(isAdvicePayload(view)).toBe(true);
   render(
     <LanguageProvider initialLanguage="en">
-      <ParticipationEvidence view={view} />
+      <RoleForecast view={view} />
     </LanguageProvider>,
   );
   const detail = screen.getByTestId("role-point-components");
-  expect(detail).toHaveTextContent("Other contributions (remaining model estimate): -0.40");
-  expect(detail).toHaveTextContent("Zero-floor adjustment: 0.30");
+  expect(detail).toHaveTextContent("Other contributions: -0.10");
+  expect(detail).not.toHaveTextContent("Zero-floor adjustment");
   expect(detail).toHaveTextContent("Total player points: 0.00");
+  const rows = [...detail.querySelectorAll(":scope > ul .num")].map((cell) =>
+    Number(cell.textContent),
+  );
+  expect(rows).toHaveLength(6);
+  expect(rows.reduce((sum, row) => sum + row, 0)).toBeCloseTo(0, 2);
 });
 
 it.each([
@@ -219,7 +224,7 @@ it.each([
   expect(isAdvicePayload(view)).toBe(true);
   render(
     <LanguageProvider initialLanguage="en">
-      <ParticipationEvidence view={view} />
+      <RoleForecast view={view} />
     </LanguageProvider>,
   );
   expect(screen.getByTestId("role-forecast")).toHaveTextContent("Expected minutes: 34.0");

@@ -181,7 +181,7 @@ describe.each(["tr", "en"] as const)("the phone's section strip (%s)", (language
     const [move, squad] = links.map((anchor) => target(anchor)!);
     expect(move).toBe(screen.getByRole("heading", { name: copy.decisionTitle, level: 2 }));
     expect(squad).toBe(screen.getByRole("region", { name: copy.squadAfterTitle }));
-    // The tools are no longer at the foot of the page.
+    // The tools are pages of their own, not at the foot of this one.
     expect(screen.queryByText(copy.chipsAndTransfers)).toBeNull();
     // In the order the page reads: the strip, the decision, the squad.
     const order = [strip(language), move, squad];

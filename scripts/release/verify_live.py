@@ -45,13 +45,10 @@ UA = {"User-Agent": "squadopt-verify/1.0"}
 #: which is the drift the test now refuses.
 ROUTES = [
     "/",
-    "/moves",
-    "/rivals",
     "/league",
     # A nested client-side route is the first thing a path-scoped not-found rule would
     # break; the address from before the league number is served on every site.
     "/league/members/0",
-    "/status",
     "/fixtures",
 ]
 DOCUMENTS = ["/data/index.json"]

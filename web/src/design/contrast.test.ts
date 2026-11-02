@@ -65,7 +65,6 @@ const READABLE: readonly (readonly [string, string])[] = [
   ["--color-text-faint", "--color-surface"],
   ["--color-text-faint", "--color-surface-2"],
   ["--color-accent", "--color-bg"],
-  ["--color-accent-text", "--color-accent"],
   ["--color-primary-text", "--color-primary"],
   ["--color-warn", "--color-surface-2"],
   ["--color-good", "--color-bg"],

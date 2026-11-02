@@ -251,6 +251,14 @@ function offeredRivals(): number[] {
   return select ? [...select.options].map((option) => Number(option.value)) : [];
 }
 
+/** A rival's option in the plan controls, by the team name the league lists them under. */
+function rivalOption(entryId: number) {
+  const listed = mockLeagueMembersEnvelope.payload.members.find(
+    (member) => member.entry_id === entryId,
+  );
+  return screen.getByRole("option", { name: listed!.team_name! });
+}
+
 describe("a rival strategy solved on the member's device", () => {
   it("compares the plan with the rival's squad by name", async () => {
     const { container } = renderPage(`mode=ortak-koru&window=1&rival=${RIVAL}`);
@@ -261,7 +269,6 @@ describe("a rival strategy solved on the member's device", () => {
       { timeout: 30_000 },
     );
     const section = await screen.findByRole("region", { name: copy.rivalPlayersTitle });
-    expect(section).not.toHaveTextContent(copy.rivalPlayersUnavailable);
     expect(within(section).getByText(copy.rivalPlayerGroups.shared)).toBeVisible();
     expect(within(section).getByText(copy.rivalPlayerGroups.rivalOnly)).toBeVisible();
   }, 60_000);
@@ -278,8 +285,6 @@ describe("a rival strategy solved on the member's device", () => {
       const contradictions = [
         copy.publicationStates["not-listed"].title,
         copy.publicationStates["not-listed"].body,
-        copy.computeUnsupportedSelection,
-        computeCopy.serviceUnreachableAbsent,
         computeCopy.notComputable,
       ];
       for (const sentence of contradictions) expect(container).not.toHaveTextContent(sentence);
@@ -325,9 +330,7 @@ describe("a rival strategy solved on the member's device", () => {
         expect(container.querySelector(`[data-device-state='${ending}']`)).not.toBeNull(),
       );
       expect(container).not.toHaveTextContent(computeCopy.serviceUnreachableDevice);
-      if (service === "unreachable")
-        expect(container).toHaveTextContent(computeCopy.serviceUnreachableAbsent);
-      // The decision area says what is published for this selection; it is not left empty.
+      // The decision area says this selection has no plan; it is not left empty.
       const decision = screen.getByRole("region", { name: copy.decisionTitle });
       expect(decision).toHaveTextContent(copy.publicationStates["not-listed"].title);
     },
@@ -341,16 +344,14 @@ describe("a rival strategy solved on the member's device", () => {
     expect(offeredRivals()).not.toContain(BENCHED_CAPTAIN);
     cleanup();
 
-    // The named member remains visible with the exact refusal, never silently dropped.
+    // The named member stays in the list, switched off, never silently dropped.
     const { container } = renderPage(`mode=ortak-koru&window=1&rival=${BENCHED_CAPTAIN}`);
     await waitFor(() => {
       expect(offeredRivals()).toContain(RIVAL);
       expect(offeredRivals()).toContain(BENCHED_CAPTAIN);
-      expect(
-        screen.getByRole("option", { name: new RegExp(copy.rivalCaptainMissing) }),
-      ).toBeDisabled();
+      expect(rivalOption(BENCHED_CAPTAIN)).toBeDisabled();
     });
-    expect(screen.getByText(copy.rivalCaptainMissing, { exact: true })).toBeVisible();
+    expect(rivalOption(RIVAL)).toBeEnabled();
     expect(deviceButton()).toBeNull();
     expect(container).not.toHaveTextContent(copy.deviceRefused);
   }, 60_000);
@@ -372,14 +373,10 @@ describe("a rival strategy solved on the member's device", () => {
     const summary = screen.getByTestId("member-selection-summary");
     expect(summary).toHaveTextContent(copy.rivalLabel);
     expect(offeredRivals()).toContain(RIVAL);
-    const whileReading = [
-      copy.publicationStates["not-listed"].title,
-      copy.computeUnsupportedSelection,
-      computeCopy.serviceUnreachableAbsent,
-      computeCopy.serviceUnreachable,
-      copy.rivalNone,
-    ];
+    const whileReading = [copy.publicationStates["not-listed"].title, copy.rivalNone];
     for (const sentence of whileReading) expect(container).not.toHaveTextContent(sentence);
+    // Nothing is said yet about the service being down and what can be computed instead.
+    expect(container).not.toHaveTextContent(computeCopy.serviceUnreachableDevice);
     expect(deviceButton()).toBeNull();
 
     await act(async () => release());
@@ -387,6 +384,7 @@ describe("a rival strategy solved on the member's device", () => {
     expect(screen.queryByText(copy.loadingRivals)).toBeNull();
     expect(summary).toHaveTextContent(copy.rivalLabel);
     for (const sentence of whileReading) expect(container).not.toHaveTextContent(sentence);
+    expect(container).toHaveTextContent(computeCopy.serviceUnreachableDevice);
   }, 60_000);
 
   it("never calls the squads unpublished when their reads failed", async () => {

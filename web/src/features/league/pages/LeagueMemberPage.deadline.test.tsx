@@ -111,7 +111,6 @@ describe("a member page whose gameweek has closed", () => {
       expect(closed.container.querySelector("#plan-settings")).toBeNull();
       expect(screen.queryByRole("link", { name: copy.changePlan })).toBeNull();
       expect(screen.queryByRole("button", { name: copy.computeButton })).toBeNull();
-      expect(screen.queryByText(COMPUTE_COPY[language].deadlinePassedCompute)).toBeNull();
     },
   );
 
@@ -154,7 +153,6 @@ describe("a member page whose gameweek has closed", () => {
 
       renderView(DEADLINE, language, search, props);
       expect(screen.getByText(copy.closedNotListed.title)).toBeInTheDocument();
-      expect(screen.getByText(copy.closedNotListed.body)).toBeInTheDocument();
       expect(screen.queryByText(notListed.body)).toBeNull();
       // The same page with no selection, as the sidebar's own link lands on it.
       expect(screen.getByRole("link", { name: copy.closedNotListed.link })).toHaveAttribute(
@@ -167,6 +165,55 @@ describe("a member page whose gameweek has closed", () => {
   it("says nothing while the deadline is open or unknown", () => {
     renderView(null, "en");
     expect(screen.queryByTestId("deadline-passed")).toBeNull();
-    expect(screen.queryByText(COMPUTE_COPY.en.deadlinePassedCompute)).toBeNull();
+  });
+
+  it("sends the member to Hesapla for newer information only while the page has it", async () => {
+    const plan = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1);
+    const snapshot = SQUAD.payload.source_snapshot_id!;
+    const props: Partial<LeagueMemberViewProps> = {
+      advice: null,
+      computeService: "ready",
+      capabilities: {
+        ...CAPABILITIES,
+        decisionInformation: {
+          version: "football_decision_information_v1",
+          revision: "d".repeat(64),
+          source_snapshot_id: snapshot,
+          observed_at: "2026-09-18T12:00:00Z",
+          coach_news_bound: false,
+          minute_components_bound: true,
+        },
+      },
+      client: {
+        ...QUIET,
+        readAdvice: async () => ({
+          kind: "advice",
+          source: "api-cache",
+          envelope: {
+            ...plan,
+            payload: {
+              ...plan.payload,
+              source_snapshot_id: snapshot,
+              prediction_model: {
+                id: "football",
+                version: "football_team_share_v1",
+                experimental: true,
+                fingerprint: "c".repeat(64),
+              },
+            },
+          },
+        }),
+      },
+    };
+    const copy = MESSAGES.tr.leagueMembers;
+    renderView(null, "tr", "?model=football", props);
+    await screen.findByText(copy.squadAfterTitle);
+    expect(screen.getByTestId("new-information-notice")).toBeInTheDocument();
+    cleanup();
+
+    renderView(DEADLINE, "tr", "?model=football", props);
+    await screen.findByText(copy.squadAfterTitle);
+    expect(screen.queryByTestId("new-information-notice")).toBeNull();
+    expect(screen.queryByRole("button", { name: copy.computeButton })).toBeNull();
   });
 });

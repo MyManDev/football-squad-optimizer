@@ -1,7 +1,7 @@
 # Product and operations decisions
 
 This file is maintained by hand and versioned in Git. Record each decision with its date,
-reason and issue or PR. The website links here; it does not write to this file.
+reason and issue or PR. The website does not write to this file.
 
 ## 2026-09-14 — An unlisted admin entry point
 
@@ -162,3 +162,15 @@ run a live week on the device.
 Source: [the handover](https://github.com/MyManDev/football-squad-optimizer/issues/978#issuecomment-6548175771),
 [the decisions on #981](https://github.com/MyManDev/football-squad-optimizer/issues/981#issuecomment-6559338892)
 and [the readings calendar](https://github.com/MyManDev/football-squad-optimizer/issues/1122).
+
+## 2026-11-02: The /gw, /moves, /status, /admin and /rivals pages are removed
+
+Decision: `/gw/:season/:gameweek`, `/moves`, `/status`, `/admin` and `/rivals` (with
+`/rivals/:season/:gameweek`) are not routes, and their pages and copy are deleted. This replaces
+what the 2026-09-14 and 2026-09-26 entries say about `/admin` and `/status`. The documents those
+pages read stay published.
+
+Reason: the owner went through the site's words row by row and took these pages off the site.
+`/rivals` had no link anywhere and still showed week 5.
+
+Source: the owner's review of 2 November, on the branch `feature/no-clutter-on-any-page`.

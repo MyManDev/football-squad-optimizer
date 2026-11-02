@@ -36,14 +36,9 @@ function test(
 
 const ROUTES = [
   "/",
-  "/gw/2026-27/1",
-  "/moves",
-  "/rivals",
   "/league/352490",
   "/league/352490/members",
   "/league/352490/members/35249001?mode=saf-puan&window=3",
-  "/admin",
-  "/status",
 ] as const;
 const BLOCKING_IMPACTS = new Set(["critical", "serious"]);
 
@@ -368,6 +363,38 @@ for (const width of [390, 1440]) {
     // The state line is a live region, and the button that takes focus back says how it ended.
     await expect(page.getByRole("status").filter({ hasText: COPY.computeDone })).toBeVisible();
     await expect(button).toHaveAccessibleDescription(new RegExp(COPY.computeDone));
+  });
+}
+
+// A page that holds only a state still has a heading, the state's title. axe rates its absence
+// below the impacts the checks above fail on, so this asks for that one rule by name.
+const STATE_PAGES: { path: string; unpublished?: string }[] = [
+  { path: "/moves" },
+  { path: "/status" },
+  { path: "/admin" },
+  { path: "/gw/2026-27/5" },
+  { path: "/rivals" },
+  { path: "/rivals/2026-27/38" },
+  { path: "/league/352490/members/not-a-member" },
+  { path: "/league/352490/members/35249001/not-a-tool" },
+  { path: "/league/352490/members/not-a-member/history" },
+  { path: "/league/352490/members/1" },
+  { path: "/league/352490/members/1/history" },
+  { path: "/fixtures", unpublished: "**/data/fixtures.json" },
+];
+
+for (const { path, unpublished } of STATE_PAGES) {
+  base(`${path} has its heading when it holds only a state`, async ({ page }) => {
+    await installLeagueMocks(page);
+    if (unpublished)
+      await page.route(unpublished, (route) =>
+        route.fulfill({ status: 404, contentType: "application/json", body: "{}" }),
+      );
+    await page.goto(path);
+    const state = page.getByRole("main").getByRole("status");
+    await expect(state.getByRole("heading", { level: 1 })).toBeVisible();
+    const results = await new AxeBuilder({ page }).withRules(["page-has-heading-one"]).analyze();
+    expect(results.violations.map((violation) => violation.id)).toEqual([]);
   });
 }
 

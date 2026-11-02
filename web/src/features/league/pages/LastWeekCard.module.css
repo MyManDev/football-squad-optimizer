@@ -18,12 +18,6 @@
   }
 }
 
-.aside {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
 /* The gameweek in broadcast capitals, as the top bar writes the advised one. */
 .week {
   color: var(--color-text);
@@ -65,13 +59,6 @@
   line-height: 24px;
 }
 
-.plan {
-  color: var(--color-text-muted);
-  font-family: var(--font-body);
-  font-size: var(--step--1);
-  font-weight: 400;
-}
-
 .unit,
 .fact dt {
   color: var(--color-text-muted);
@@ -106,20 +93,6 @@
   font-size: var(--step-1);
   font-weight: 700;
   line-height: 24px;
-}
-
-.fact .sub {
-  color: var(--color-text-muted);
-  font-family: var(--font-body);
-  font-size: var(--step--2);
-  font-weight: 400;
-  line-height: 16px;
-}
-
-.note {
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: var(--step--1);
 }
 
 /* The link's text is small and its target is not: 44 px for a thumb, with the negative
