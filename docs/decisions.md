@@ -173,4 +173,4 @@ pages read stay published.
 Reason: the owner went through the site's words row by row and took these pages off the site.
 `/rivals` had no link anywhere and still showed week 5.
 
-Source: the owner's review of 2 November, on the branch `feature/no-clutter-on-any-page`.
+Source: the owner's review of 2 November, #1298.
