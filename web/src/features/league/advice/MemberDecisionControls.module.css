@@ -197,8 +197,8 @@
 }
 
 .segment:has(input:checked) {
-  background: var(--color-text);
-  color: #ffffff;
+  background: var(--color-board);
+  color: var(--color-board-text);
   font-weight: 600;
 }
 
@@ -218,7 +218,7 @@
 }
 
 .segment:has(input:checked:focus-visible) {
-  outline-color: var(--color-lime);
+  outline-color: var(--color-mark);
 }
 
 /* Under Hesapla in the sidebar, a step apart from the button's own lines. */

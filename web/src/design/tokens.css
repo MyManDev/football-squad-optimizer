@@ -1,13 +1,18 @@
-/* SquadOpt design tokens: direction D, "Saha Kenarı".
+/* SquadOpt design tokens: direction D, "Saha Kenarı" by day and "Gece Maçı" by night.
 
-   The page is pale green paper, and it has one palette. There is no dark theme and no
-   theme switch: the colours below sit on bare :root, and the operating system's colour
-   preference is not followed (color-scheme: light).
+   By day the page is pale green paper; by night it is navy under floodlights, with stadium
+   yellow where the day has lime. The day palette sits on bare :root. The night palette
+   follows the operating system's dark preference unless the viewer chose the day, and
+   applies wherever the viewer chose the night (data-theme on <html>, colourScheme.ts).
+   Only colours change between the two; type, spacing, radii and motion are shared.
 
    Ink and the page greens carry the page. The only dark objects on the paper are the
    substitution boards and the grass. Red and green belong to the boards and their
-   ÇIKAN / GİREN tags; lime is a small fill only (YENİ, the captain badge, the active nav
-   item, the viewer's own row, LED digits), always with ink text on it. The one shadow is
+   ÇIKAN / GİREN tags; the mark (--color-mark, lime by day, yellow by night) is a small fill
+   only (YENİ, the captain badge, the active nav item, the viewer's own row, LED digits),
+   always with --color-mark-text on it. A fill that is dark in both palettes, such as a
+   pressed control or the active nav item, is --color-board with --color-board-text, never
+   the text colour, which turns light at night. The one shadow is
    the drawer and sheet shadow. Radii are 4 px on controls, chips and tags, 6 px on
    boards and panels; there are no pills.
 
@@ -27,6 +32,11 @@
    club's fill with ink or white at 4.5:1 or more (clubPlate.ts), held per club by
    contrast.test.ts, and every goalkeeper's in --color-keeper, a pink no club
    wears, so the keepers read at a glance; its ink initials are 5.6:1.
+
+   Night, same formula: ink 15.7:1 on the page and 14.2:1 on panels, ink2 7.6:1 and ink3
+   5.7:1 at their lowest, and every status colour above 6.6:1 on all three surfaces, so at
+   night ink3 and the good green may sit on --color-surface-2. Yellow links are 11.1:1 on
+   the page and mark text 11.3:1 on the mark. contrast.test.ts holds both palettes.
 
    Motion (#1136): every transition and animation takes its duration and easing from the
    tokens below, never a literal of its own, and src/design/motion.ts mirrors them for the
@@ -88,9 +98,11 @@
 
   --color-board: #10261a;
   --color-board-muted: #cfe3d3;
+  --color-board-text: #ffffff;
   --color-out-panel: #c62828;
   --color-in-panel: #1e7b45;
-  --color-lime: #c6ff3d;
+  --color-mark: #c6ff3d;
+  --color-mark-text: #10261a;
   --color-seg2: #a8db45;
   --color-keeper: #f06ba8;
 
@@ -103,6 +115,91 @@
   --motion-ease: cubic-bezier(0.2, 0, 0, 1);
 
   font-variant-numeric: tabular-nums;
+}
+
+/* Gece Maçı. The two blocks below carry the same values (contrast.test.ts holds them
+   equal): the first is the system's dark preference where the viewer has not chosen the
+   day, the second the viewer's own choice of the night. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
+    --color-bg: #0d1320;
+    --color-surface: #151d2d;
+    --color-surface-2: #111827;
+    --color-line: #27324a;
+    --color-text: #e7ecf5;
+    --color-text-muted: #a3afc4;
+    --color-text-faint: #8b97ad;
+    --color-accent: #f2c230;
+    --color-accent-text: #14100a;
+    --color-primary: #f2c230;
+    --color-primary-text: #14100a;
+    --color-good: #4cc38a;
+    --color-bad: #ff7a6e;
+    --color-warn: #e9b04f;
+    --color-focus: #f2c230;
+
+    --color-pitch: #1d5a39;
+    --color-pitch-2: #226441;
+    --color-pitch-line: rgba(255, 255, 255, 0.7);
+    --color-chip: #e3e9f2;
+    --color-chip-text: #0d1320;
+    --color-chip-muted: #3b4660;
+
+    --color-board: #060a12;
+    --color-board-muted: #c3cddc;
+    --color-board-text: #ffffff;
+    --color-out-panel: #c62828;
+    --color-in-panel: #1e7b45;
+    --color-mark: #f2c230;
+    --color-mark-text: #14100a;
+    --color-seg2: #c79a1e;
+    --color-keeper: #f06ba8;
+
+    --color-scrim: rgba(0, 0, 0, 0.6);
+    --shadow-drawer: 0 12px 32px rgba(0, 0, 0, 0.55);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --color-bg: #0d1320;
+  --color-surface: #151d2d;
+  --color-surface-2: #111827;
+  --color-line: #27324a;
+  --color-text: #e7ecf5;
+  --color-text-muted: #a3afc4;
+  --color-text-faint: #8b97ad;
+  --color-accent: #f2c230;
+  --color-accent-text: #14100a;
+  --color-primary: #f2c230;
+  --color-primary-text: #14100a;
+  --color-good: #4cc38a;
+  --color-bad: #ff7a6e;
+  --color-warn: #e9b04f;
+  --color-focus: #f2c230;
+
+  --color-pitch: #1d5a39;
+  --color-pitch-2: #226441;
+  --color-pitch-line: rgba(255, 255, 255, 0.7);
+  --color-chip: #e3e9f2;
+  --color-chip-text: #0d1320;
+  --color-chip-muted: #3b4660;
+
+  --color-board: #060a12;
+  --color-board-muted: #c3cddc;
+  --color-board-text: #ffffff;
+  --color-out-panel: #c62828;
+  --color-in-panel: #1e7b45;
+  --color-mark: #f2c230;
+  --color-mark-text: #14100a;
+  --color-seg2: #c79a1e;
+  --color-keeper: #f06ba8;
+
+  --color-scrim: rgba(0, 0, 0, 0.6);
+  --shadow-drawer: 0 12px 32px rgba(0, 0, 0, 0.55);
 }
 
 *,

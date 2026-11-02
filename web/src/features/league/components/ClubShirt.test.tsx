@@ -129,7 +129,7 @@ describe("a goalkeeper's shirt", () => {
 
   it("is a colour no club wears, with ink initials at 4.5:1", () => {
     expect(rule('.shirt[data-shirt="keeper"]')).toBe(
-      "--shirt-body: var(--color-keeper); --shirt-trim: var(--color-text); --shirt-ink: var(--color-text);",
+      "--shirt-body: var(--color-keeper); --shirt-trim: var(--color-mark-text); --shirt-ink: var(--color-mark-text);",
     );
     const keeper = token("--color-keeper").toLowerCase();
     const worn = Object.values(CLUB_COLOURS).flatMap(({ primary, secondary }) => [
@@ -137,10 +137,10 @@ describe("a goalkeeper's shirt", () => {
       secondary.toLowerCase(),
     ]);
     expect(worn).not.toContain(keeper);
-    // Nor the page's lime, which marks YENİ and the armband, nor either grass.
-    for (const other of ["--color-lime", "--color-pitch", "--color-pitch-2"])
+    // Nor the page's mark, which marks YENİ and the armband, nor either grass.
+    for (const other of ["--color-mark", "--color-pitch", "--color-pitch-2"])
       expect(token(other).toLowerCase()).not.toBe(keeper);
-    expect(contrastRatio(token("--color-text"), keeper)).toBeGreaterThanOrEqual(AA);
+    expect(contrastRatio(token("--color-mark-text"), keeper)).toBeGreaterThanOrEqual(AA);
   });
 });
 

@@ -81,9 +81,9 @@
 }
 
 .option[aria-pressed="true"] .face {
-  border-color: var(--color-text);
-  background: var(--color-text);
-  color: var(--color-primary-text);
+  border-color: var(--color-board);
+  background: var(--color-board);
+  color: var(--color-board-text);
   font-weight: 600;
 }
 
@@ -172,7 +172,8 @@
   width: 16px;
   height: 16px;
   border-radius: var(--radius-s);
-  background: var(--color-lime);
+  background: var(--color-mark);
+  color: var(--color-mark-text);
   font-family: var(--font-display);
   font-weight: 800;
   line-height: 16px;

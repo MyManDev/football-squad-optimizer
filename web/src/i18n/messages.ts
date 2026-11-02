@@ -131,6 +131,11 @@ const en = {
     tr: "Türkçe",
     en: "English",
   },
+  colourScheme: {
+    label: "Colours",
+    light: "Day",
+    dark: "Night",
+  },
   /** The position word for a published position code, lower case to sit inside a line. */
   positions: {
     GK: "goalkeeper",
@@ -1261,6 +1266,7 @@ const tr: MessageSchema<typeof en> = {
     decisions: "Karar kaydı (GitHub)",
   },
   language: { label: "Dil", tr: "Türkçe", en: "English" },
+  colourScheme: { label: "Renkler", light: "Gündüz", dark: "Gece" },
   positions: {
     GK: "kaleci",
     DEF: "defans",

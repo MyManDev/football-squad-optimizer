@@ -238,8 +238,8 @@
 }
 
 .gaps li[aria-current] {
-  background: var(--color-lime);
-  color: var(--color-text);
+  background: var(--color-mark);
+  color: var(--color-mark-text);
 }
 
 .gaps li[aria-current] .gapFigures {

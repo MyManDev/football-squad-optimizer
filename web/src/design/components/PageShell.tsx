@@ -36,6 +36,7 @@ import { FIXTURE_SHEET_ID, ShellContext, type ShellContextValue } from "../shell
 import { readSidebarCollapsed, writeSidebarCollapsed } from "../shell/sidebarPreference";
 import { crossfade } from "../viewTransition";
 import styles from "./PageShell.module.css";
+import { ThemeToggle } from "./ThemeToggle";
 
 const FOCUSABLE =
   'input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])';
@@ -562,6 +563,7 @@ export function PageShell({
               ) : null}
               <div className={styles.footer}>
                 <LanguageToggle vertical={rail} />
+                <ThemeToggle vertical={rail} />
               </div>
             </div>
           </div>
