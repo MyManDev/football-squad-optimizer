@@ -19,10 +19,16 @@ function Side({
   const { locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
   const titleId = useId();
-  const position = (code: string) =>
-    Object.hasOwn(messages.positions, code)
-      ? messages.positions[code as keyof typeof messages.positions]
-      : code;
+  // The row leads with the short code, as the week's list does: the full word does not fit
+  // the code's column. The word stays for a screen reader.
+  const code = (position: string) =>
+    Object.hasOwn(messages.positionCodes, position)
+      ? messages.positionCodes[position as keyof typeof messages.positionCodes]
+      : position;
+  const word = (position: string) =>
+    Object.hasOwn(messages.positions, position)
+      ? messages.positions[position as keyof typeof messages.positions]
+      : position;
   return (
     <section className={styles.side} aria-labelledby={titleId}>
       <h3 className={styles.sideTitle} id={titleId}>
@@ -40,7 +46,10 @@ function Side({
               className={styles.player}
               data-shared={both ? "" : undefined}
             >
-              <span className={styles.position}>{position(player.position)}</span>
+              <span className={styles.position}>
+                <span aria-hidden="true">{code(player.position)}</span>
+                <span className="visually-hidden">{word(player.position)}</span>
+              </span>
               <span className={styles.name}>{player.short_name || player.name}</span>
               {player.is_captain ? (
                 <>
