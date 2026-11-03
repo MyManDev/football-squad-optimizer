@@ -85,7 +85,7 @@ describe("the club swatch", () => {
     const swatch = rule("swatch");
     expect(swatch).toContain("width: 10px;");
     expect(swatch).toContain("height: 10px;");
-    expect(swatch).toContain("outline: 1px solid var(--color-board);");
+    expect(swatch).toContain("outline: 1px solid var(--color-text);");
     // No other rule in the sheet sets a background that could paint over the split.
     expect(stylesheet().match(/background/g)).toHaveLength(1);
   });
