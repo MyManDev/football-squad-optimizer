@@ -154,6 +154,30 @@ describe("the duel of two elevens", () => {
     expect(container.querySelector("[data-duel]")).toBeNull();
   });
 
+  it.each(["tr", "en"] as const)(
+    "leads each row with the position's short code and gives a screen reader the word (%s)",
+    (language) => {
+      show({}, language);
+      const codes = MESSAGES[language].positionCodes;
+      const words = MESSAGES[language].positions;
+      for (const team of ["North Stand Notes", "Half Space"]) {
+        for (const row of rows(team)) {
+          const lead = row.children[0]!;
+          const [shown, spoken] = [...lead.children];
+          // The code's column is 2.5rem: a word such as "goalkeeper" ran into the name.
+          expect(Object.values(codes)).toContain(shown!.textContent);
+          expect(shown!.getAttribute("aria-hidden")).toBe("true");
+          expect(Object.values(words)).toContain(spoken!.textContent);
+          expect(spoken!.className).toBe("visually-hidden");
+          const position = Object.keys(codes).find(
+            (key) => codes[key as keyof typeof codes] === shown!.textContent,
+          ) as keyof typeof words;
+          expect(spoken!.textContent).toBe(words[position]);
+        }
+      }
+    },
+  );
+
   it("shows only the picker until a rival is named", () => {
     const { container } = show({ selected: null, rival: null });
     expect(screen.getAllByRole("button")).toHaveLength(CANDIDATES.length);
