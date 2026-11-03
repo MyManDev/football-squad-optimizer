@@ -8,7 +8,7 @@ import { useLanguage } from "../../../i18n/context";
 import { clubCodesFromFixtures, type ClubCodes } from "../../../lib/clubs";
 import { figure, points, signedFigure, signedPoints, utcShort } from "../../../lib/format";
 import type { FixturesPayload } from "../../fixtures/types";
-import { CHIP_COPY, chipRescores } from "../advice/chipCopy";
+import { CHIP_COPY } from "../advice/chipCopy";
 import { EVIDENCE_COPY, QUOTE_WITHHELD } from "../advice/evidenceCopy";
 import { comparedRivalPlayers } from "../advice/rivalPlayers";
 import { modelChangeOf } from "../advice/modelSwitch";
@@ -16,21 +16,18 @@ import { boardSlot, claimPair, playBoard, releasePair, releaseSlotsFrom } from "
 import { publishedPrice } from "../advice/publishedPrice";
 import { InformationReview } from "../advice/InformationReview";
 import { ExpectedLineup } from "../advice/ExpectedLineup";
-import { expectedLineupLabel } from "../advice/expectedLineupLabel";
-import { ParticipationEvidence } from "../advice/ParticipationEvidence";
+import { RoleForecast } from "../advice/RoleForecast";
 import { WeekLineup } from "../advice/WeekLineup";
 import { TOP100_COPY } from "../advice/top100Copy";
 import { clubWeeks, nextThree } from "../clubFixtures";
 import { ClubMark } from "../components/ClubMark";
 import { PointsUnit } from "../components/PointsUnit";
-import { ExampleDataBadge } from "../components/ExampleDataBadge";
-import { BoardArrow, CheckIcon } from "../components/memberIcons";
+import { BoardArrow } from "../components/memberIcons";
 import type {
   AdviceMove,
   AdvicePlayer,
   EntryAdvice,
   EntrySquad,
-  EntryView,
   LeagueViewEnvelope,
 } from "../types";
 import type { AdviceIssue, ShownAdvice } from "./memberPageTypes";
@@ -49,13 +46,11 @@ import lineup from "./MemberLineup.module.css";
 export function MissingAdviceCard({
   issue,
   canCompute,
-  reason,
   onRetry,
   defaultPlan,
 }: {
   issue: AdviceIssue;
   canCompute: boolean;
-  reason?: string | null;
   onRetry?: () => void;
   /**
    * The member's default plan, given only once the week is closed: its settings are gone,
@@ -68,25 +63,20 @@ export function MissingAdviceCard({
   const copy = messages.leagueMembers;
   const closedNotListed = issue === "not-listed" && defaultPlan !== undefined;
   const issueCopy: [string, string | null] = closedNotListed
-    ? [copy.closedNotListed.title, copy.closedNotListed.body]
+    ? [copy.closedNotListed.title, null]
     : issue === "not-computed"
       ? [copy.adviceNotComputed, null]
       : issue === "unavailable"
         ? [copy.adviceUnreadable, copy.adviceUnreadableBody]
-        : [copy.publicationStates[issue].title, copy.publicationStates[issue].body];
+        : issue === "not-listed"
+          ? [copy.publicationStates[issue].title, copy.publicationStates[issue].body]
+          : [copy.publicationStates[issue].title, null];
   return (
     <div className={board.missing}>
       <p className={board.missingTitle}>
         <strong>{issueCopy[0]}</strong>
       </p>
       {issueCopy[1] ? <p className={styles.muted}>{issueCopy[1]}</p> : null}
-      {reason ? (
-        <p className={styles.muted}>
-          {Object.hasOwn(copy.publicationReasons, reason)
-            ? copy.publicationReasons[reason]
-            : copy.publicationReasonUnknown}
-        </p>
-      ) : null}
       {onRetry ? (
         <p>
           <button type="button" className={board.retry} onClick={onRetry}>
@@ -108,63 +98,26 @@ function finiteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }
 
-/** Which squad the card says this advice stands on, in the three states it can tell apart. */
-type SquadBasisNote = { kind: "week"; week: number } | { kind: "unconfirmed" } | null;
-
 /**
- * A squad document carrying no basis is the genuinely empty case: it claims nothing, every
- * document published before the field is in it, and so the card says nothing. Two documents
- * naming different bases are not that case. Something was claimed and this page cannot
- * confirm it, and the rotation evidence contract keeps exactly that apart from silence with
- * its own `rotation_claim_unresolved` column, because folding it into "nothing was said"
- * asserts a silence that never happened. So the disagreement gets its own sentence here,
- * and that sentence names no week: a wrong week is worse than no week.
+ * The week whose squad this advice stands on, where the member's Free Hit makes that another
+ * week than the last. Null where the squad document names no such basis, and where the advice
+ * document names a different one: a wrong week is worse than no week.
  */
-function squadBasisNote(entryBasis?: string, adviceBasis?: string): SquadBasisNote {
+function freeHitBasisWeek(entryBasis?: string, adviceBasis?: string): number | null {
   if (entryBasis === undefined) return null;
-  if (adviceBasis !== undefined && adviceBasis !== entryBasis) return { kind: "unconfirmed" };
+  if (adviceBasis !== undefined && adviceBasis !== entryBasis) return null;
   const week = /^pre_free_hit_gw(\d{2})$/.exec(entryBasis)?.[1];
-  return week === undefined ? null : { kind: "week", week: Number(week) };
+  return week === undefined ? null : Number(week);
 }
 
 /**
- * The basis every number on the board is stated on.
- *
- * A move's figure is a share of the plan's gain against holding, and only a document that
- * publishes that gain carries shares of it. A document from before the producer did carries
- * a different quantity on those rows, the raw difference between the two players' own
- * projections, so its numbers are not printed under this label. A Triple Captain or Bench
- * Boost week scores on its own basis, and its gain is read against holding with the same
- * chip played.
+ * Whether the board's numbers are shares of the plan's gain against holding. Only a document
+ * that publishes that gain carries shares of it. A document from before the producer did
+ * carries a different quantity on those rows, the raw difference between the two players' own
+ * projections, so its numbers are not printed under this label.
  */
-function adviceBasis(view: EntryAdvice) {
-  const rowsAreShares = view.expected_gain_vs_hold !== undefined;
-  const scoredChip = view.chip_strategy?.selected_chip ?? view.chip_choice?.chip;
-  const chipRescored = Boolean(scoredChip && chipRescores(scoredChip));
-  return { rowsAreShares, chipRescored };
-}
-
-/**
- * The proof stamp beside the decision heading. EN İYİ PLAN · KANITLANDI only for a plan the
- * solver proved (OPTIMAL). Any other status claims nothing.
- */
-export function AdviceStamp({ shown }: { shown: ShownAdvice }) {
-  const copy = useLanguage().messages.leagueMembers;
-  const view = shown.envelope.payload;
-  return (
-    <div className={board.stamp}>
-      <p className={board.stampTags}>
-        {shown.origin === "computed" ? <Badge tone="good">{copy.adviceComputedBadge}</Badge> : null}
-        <ExampleDataBadge sourceKind={shown.envelope.source_kind} />
-      </p>
-      {view.solver_status === "OPTIMAL" ? (
-        <p className={board.stampBox} data-stamp="">
-          <CheckIcon />
-          {copy.stampOptimal}
-        </p>
-      ) : null}
-    </div>
-  );
+function rowsAreShares(view: EntryAdvice): boolean {
+  return view.expected_gain_vs_hold !== undefined;
 }
 
 /**
@@ -206,19 +159,17 @@ function shownPrice(view: EntryAdvice): number | undefined {
 /**
  * The decision itself, the card that leads the page: the gain strip as its headline with the
  * number of changes, one substitution board per move, the captain line, the chip the member
- * chose, and the sentences that change how the plan may be read (the price, the rival
- * bounds). Each transfer and the armband are said here once; the week's story that stood
+ * chose, and the sentences that change how the plan may be read (the price, the overlap with
+ * the rival). Each transfer and the armband are said here once; the week's story that stood
  * above the decision is folded into it (#1134). The detail sections a switch adds and the
  * lineup follow in `AdviceDetails`.
  */
 export function AdviceDecision({
   shown,
-  members = [],
   squad,
   fixtures = null,
 }: {
   shown: ShownAdvice;
-  members?: EntryView[];
   squad: LeagueViewEnvelope<EntrySquad>;
   fixtures?: FixturesPayload | null;
 }) {
@@ -226,18 +177,10 @@ export function AdviceDecision({
   const copy = messages.leagueMembers;
   const { envelope, origin } = shown;
   const view = envelope.payload;
-  const basisNote = squadBasisNote(squad.payload.squad_basis, view.squad_basis);
-  const rival =
-    view.rival_entry_id === undefined
-      ? null
-      : (members.find(
-          (member) => member.member_kind === "human" && member.entry_id === view.rival_entry_id,
-        ) ?? null);
-  const rivalName = rival ? (rival.team_name ?? rival.manager_name ?? null) : null;
-  // What a price may be printed as is `shownPrice`'s rule; these name its parts for the
-  // sentences around it.
+  const basisWeek = freeHitBasisWeek(squad.payload.squad_basis, view.squad_basis);
+  // What a price may be printed as is `shownPrice`'s rule; this names its part for the
+  // sentence around it.
   const unproven = view.solver_status === "FEASIBLE" || view.control_solver_status === "FEASIBLE";
-  const anchorUnproven = anchorIsUnproven(view);
   // The pure-points plan has no price of its own; switched on, the manager's word does,
   // and it is priced against the same pure-points control a rival band is.
   const wordPriced = view.mode === "saf-puan" && view.evidence !== undefined;
@@ -248,13 +191,7 @@ export function AdviceDecision({
   const price = shownPrice(view);
   const evidenceCopy = EVIDENCE_COPY[language];
   const top100Copy = TOP100_COPY[language];
-  const alternative = view.alternative_plan;
-  const alternativePrice = anchorUnproven
-    ? undefined
-    : unproven
-      ? alternative?.expected_points_cost_ceiling
-      : (alternative?.expected_points_cost_ceiling ?? alternative?.expected_points_cost);
-  const { rowsAreShares, chipRescored } = adviceBasis(view);
+  const measured = rowsAreShares(view);
   const codes = clubCodesFromFixtures(fixtures);
   const reasons = view.moves.map((move) => reasonFor(language, move.reason_code));
   // Boards that share a caption say it once, under them; a caption that differs stays with
@@ -267,21 +204,15 @@ export function AdviceDecision({
   }, [view.entry_id, view.moves.length]);
   return (
     <>
-      {origin === "published-while-computing" ? (
-        <p className={styles.honesty}>{copy.advicePublishedWhileComputing}</p>
-      ) : null}
       {origin === "baseline-while-computing" ? (
         <p className={styles.honesty}>{copy.adviceBaselineWhileComputing}</p>
       ) : null}
-      <GainStrip
-        view={view}
-        squad={squad.payload}
-        measured={rowsAreShares}
-        chipRescored={chipRescored}
-      />
+      <GainStrip view={view} squad={squad.payload} measured={measured} />
       <ModelChangeLine view={view} />
       {view.moves.length === 0 ? (
-        <p className={board.noMove}>{hasPublishedPlan(view) ? copy.noMove : copy.noPlanInRecord}</p>
+        hasPublishedPlan(view) ? (
+          <p className={board.noMove}>{copy.noMove}</p>
+        ) : null
       ) : (
         <div className={board.boards}>
           <div className={board.grid}>
@@ -292,7 +223,7 @@ export function AdviceDecision({
                   slot={boardSlot(view.entry_id, index)}
                   index={index}
                   count={view.moves.length}
-                  measured={rowsAreShares}
+                  measured={measured}
                   codes={codes}
                   fixtures={fixtures}
                   season={view.season}
@@ -312,12 +243,8 @@ export function AdviceDecision({
       <CaptainLine view={view} codes={codes} />
       <ChipLine view={view} />
       <div className={board.states}>
-        {basisNote ? (
-          <p className={styles.honesty}>
-            {basisNote.kind === "week"
-              ? copy.freeHitSquadBasis(basisNote.week)
-              : copy.squadBasisUnconfirmed}
-          </p>
+        {basisWeek !== null ? (
+          <p className={styles.honesty}>{copy.freeHitSquadBasis(basisWeek)}</p>
         ) : null}
         {price != null ? (
           <p className={styles.planCost}>
@@ -342,9 +269,6 @@ export function AdviceDecision({
                       ? copy.planCostAtMost(points(price, 1, locale))
                       : copy.planCost(points(price, 1, locale))}
             </strong>
-            {(rivalName ?? view.rival_label) ? (
-              <span> · {copy.planRival(rivalName ?? String(view.rival_label))}</span>
-            ) : null}
           </p>
         ) : null}
         {finiteNumber(view.overlap_count) && finiteNumber(view.expected_gap_vs_rival) ? (
@@ -352,34 +276,6 @@ export function AdviceDecision({
             {copy.overlapLine(view.overlap_count)} ·{" "}
             {copy.gapLine(signedPoints(view.expected_gap_vs_rival, 1, locale))}
             {view.captain_agreement ? ` · ${copy.captainShared}` : ""}
-          </p>
-        ) : null}
-        {view.plan_kind && finiteNumber(view.transfer_cap) && finiteNumber(view.overlap_target) ? (
-          <p className={styles.muted}>
-            {view.plan_kind === "within_free_transfers"
-              ? finiteNumber(view.overlap_applied)
-                ? copy.planWithinFree(view.transfer_cap, view.overlap_target, view.overlap_applied)
-                : copy.planWithinFreeUnknown(view.transfer_cap, view.overlap_target)
-              : copy.planWithHits(view.transfer_cap, view.overlap_target)}
-            {alternative &&
-            finiteNumber(alternative.overlap_applied) &&
-            finiteNumber(alternativePrice) &&
-            alternativePrice >= 0
-              ? ` ${
-                  alternative.kind === "with_hits"
-                    ? (unproven ? copy.alternativeWithHitsAtMost : copy.alternativeWithHits)(
-                        alternative.overlap_applied,
-                        finiteNumber(alternative.transfer_hit_points)
-                          ? points(alternative.transfer_hit_points, 0, locale)
-                          : copy.hitPointsNotPublished,
-                        points(alternativePrice, 1, locale),
-                      )
-                    : (unproven ? copy.alternativeWithinFreeAtMost : copy.alternativeWithinFree)(
-                        alternative.overlap_applied,
-                        points(alternativePrice, 1, locale),
-                      )
-                }`
-              : ""}
           </p>
         ) : null}
       </div>
@@ -404,15 +300,13 @@ export function AdviceDetails({
 }) {
   const { envelope } = shown;
   const view = envelope.payload;
-  // The "changed" sentences point at the price above; where none is printed they do not.
-  const priced = shownPrice(view) !== undefined;
   return (
     <div className={board.details}>
       <RivalPlayers advice={envelope} squad={squad} rivalSquad={rivalSquad} />
-      <EvidenceSection view={view} priced={priced} />
-      <Top100Section view={view} priced={priced} />
+      <EvidenceSection view={view} />
+      <Top100Section view={view} />
       <ExpectedLineup view={view} />
-      <ParticipationEvidence view={view} />
+      <RoleForecast view={view} />
       <OfficialInformationCard view={view} />
       <InformationReview view={view} />
       <ChipChoiceSection view={view} />
@@ -434,55 +328,6 @@ export function PlanLineup({
   return <LineupSection view={view} codes={codes} />;
 }
 
-/** The decision and its details together, as one plan reads when shown on its own. */
-export function AdviceCard({
-  shown,
-  members = [],
-  squad,
-  rivalSquad,
-  windowControl = null,
-  fixtures = null,
-}: {
-  shown: ShownAdvice;
-  windowControl?: LeagueViewEnvelope<EntryAdvice> | null;
-  members?: EntryView[];
-  squad: LeagueViewEnvelope<EntrySquad>;
-  rivalSquad: LeagueViewEnvelope<EntrySquad> | null;
-  fixtures?: FixturesPayload | null;
-}) {
-  return (
-    <>
-      <AdviceDecision shown={shown} members={members} squad={squad} fixtures={fixtures} />
-      <AdviceDetails
-        shown={shown}
-        squad={squad}
-        rivalSquad={rivalSquad}
-        windowControl={windowControl}
-      />
-    </>
-  );
-}
-
-/**
- * The sentences about how this plan's numbers are built, for the page's "How was this
- * worked out?" disclosure: the lineup rule and the week's hit charge, said once because
- * the game charges the week and not any one move.
- */
-export function AdviceMethodNotes({ view }: { view: EntryAdvice }) {
-  const { locale, messages } = useLanguage();
-  const copy = messages.leagueMembers;
-  const lineup = view.captain && view.vice_captain && view.starting_xi && view.bench;
-  return (
-    <>
-      {lineup ? <p>{copy.lineupRule}</p> : null}
-      {/* Absent on documents published before the producer stated the week's charge. */}
-      {view.moves.length > 0 && view.transfer_hit_points != null ? (
-        <p>{copy.weekTransferCost(points(view.transfer_hit_points, 1, locale))}</p>
-      ) : null}
-    </>
-  );
-}
-
 /**
  * The caption under a move, for the two reasons that name something the member switched
  * on (the manager's word, the Top 100 influence). Any other move carries none: the board's
@@ -500,8 +345,7 @@ function reasonFor(language: "tr" | "en", code: AdviceMove["reason_code"]): stri
  * what the eye reads.
  */
 function PlayerName({ player }: { player: AdvicePlayer | null }) {
-  const { messages } = useLanguage();
-  if (!player) return <span>{messages.suggestionHistory.unknownPlayer}</span>;
+  if (!player) return null;
   if (player.short_name === player.name || player.short_name.trim() === "")
     return <span>{player.name}</span>;
   return (
@@ -702,9 +546,7 @@ function SubstitutionBoard({
             <span className={board.ledValue}>{value}</span>
             <span className={board.ledLabel}>{copy.boardGainLabel}</span>
           </>
-        ) : (
-          <span className={board.ledUnknown}>{copy.projectedGainUnknown}</span>
-        )}
+        ) : null}
       </p>
     </article>
   );
@@ -713,7 +555,7 @@ function SubstitutionBoard({
 /**
  * What the plan is worth against doing nothing, on the same basis as the boards and the
  * lineup total: the figure, and beside it a sentence only where the figure needs one (a
- * transfer cost not yet deducted, a chip's own basis). Where every board's share is published and none is below zero they are drawn
+ * transfer cost not yet deducted). Where every board's share is published and none is below zero they are drawn
  * as one stacked bar at a fixed scale; otherwise the shares are listed with their signs.
  * A document without the gain gets no figure, not a zero. Under it, the transfers this
  * week uses of the free ones held and the week's hit charge, each only where published.
@@ -722,16 +564,13 @@ function GainStrip({
   view,
   squad,
   measured,
-  chipRescored,
 }: {
   view: EntryAdvice;
   squad: EntrySquad;
   measured: boolean;
-  chipRescored: boolean;
 }) {
-  const { language, locale, messages } = useLanguage();
+  const { locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
-  const chipCopy = CHIP_COPY[language];
   const gain = view.expected_gain_vs_hold;
   const hits = view.transfer_hit_points;
   const shares = view.moves.map((move) => move.expected_points_delta);
@@ -765,15 +604,8 @@ function GainStrip({
   ].filter((fact): fact is string => fact !== null);
   const moves = view.moves.length;
   if (!finiteNumber(gain) && facts.length === 0 && moves === 0) return null;
-  const cost = finiteNumber(hits) && hits > 0 ? points(hits, 1, locale) : null;
   const caption =
-    cost !== null
-      ? chipRescored
-        ? chipCopy.gainCaptionBeforeCost(cost)
-        : copy.gainCaptionBeforeCost(cost)
-      : chipRescored
-        ? chipCopy.gainCaption
-        : null;
+    finiteNumber(hits) && hits > 0 ? copy.gainCaptionBeforeCost(points(hits, 1, locale)) : null;
   const shortName = (move: AdviceMove) => move.player_in?.short_name || move.player_in?.name || "";
   return (
     <div className={board.gain}>
@@ -934,23 +766,20 @@ function RivalPlayers({
   const copy = useLanguage().messages.leagueMembers;
   if (advice.payload.rival_entry_id == null) return null;
   const comparison = comparedRivalPlayers(advice, squad, rivalSquad);
+  if (!comparison) return null;
   return (
     <section className={styles.lineup} aria-label={copy.rivalPlayersTitle}>
       <h3 className={styles.lineupTitle}>{copy.rivalPlayersTitle}</h3>
-      {comparison ? (
-        <dl>
-          {(["shared", "recommendedOnly", "rivalOnly"] as const).map((kind) => (
-            <div key={kind}>
-              <dt>{copy.rivalPlayerGroups[kind]}</dt>
-              <dd>
-                {comparison[kind].map((player) => player.name).join(", ") || copy.rivalPlayersNone}
-              </dd>
-            </div>
-          ))}
-        </dl>
-      ) : (
-        <p className={styles.muted}>{copy.rivalPlayersUnavailable}</p>
-      )}
+      <dl>
+        {(["shared", "recommendedOnly", "rivalOnly"] as const).map((kind) => (
+          <div key={kind}>
+            <dt>{copy.rivalPlayerGroups[kind]}</dt>
+            <dd>
+              {comparison[kind].map((player) => player.name).join(", ") || copy.rivalPlayersNone}
+            </dd>
+          </div>
+        ))}
+      </dl>
     </section>
   );
 }
@@ -974,7 +803,6 @@ function WindowSection({ view }: { view: EntryAdvice }) {
   return (
     <section className={styles.window} aria-label={title}>
       <h3 className={styles.lineupTitle}>{title}</h3>
-      <p className={styles.honesty}>{copy.windowRule}</p>
       {/* The roles are stated because a phone lays each week out as a block, and a table
           whose parts change their display must still read as a table. */}
       <table className={styles.windowTable} role="table">
@@ -1071,25 +899,16 @@ function dateline(iso: string | null, precision: string | null, locale: string):
 /**
  * What the club's own page said, as the producer applied it. The words are the source's,
  * cut from the captured bytes; the category is the model's; the role is the declared
- * rule's. Example data says so on the section itself, not only in a badge elsewhere.
+ * rule's. A quote that was withheld or could not be resolved leaves the name and the role.
  */
-function EvidenceSection({ view, priced }: { view: EntryAdvice; priced: boolean }) {
-  const { language, locale, messages } = useLanguage();
+function EvidenceSection({ view }: { view: EntryAdvice }) {
+  const { language, locale } = useLanguage();
   const copy = EVIDENCE_COPY[language];
   const evidence = view.evidence;
   if (!evidence) return null;
-  const real = evidence.source_kind === "club_news_capture";
   return (
     <section className={styles.adviceSection} data-testid="managers-word">
       <h3 className={styles.lineupTitle}>{copy.title}</h3>
-      {real ? (
-        <p className={styles.honesty}>{copy.sourceCapture}</p>
-      ) : (
-        <p className={styles.honesty}>
-          <Badge tone="warn">{messages.leagueMembers.exampleData}</Badge> {copy.sourceExample}
-        </p>
-      )}
-      <p className={styles.muted}>{copy.intro(evidence.clubs_covered.length)}</p>
       {evidence.clubs_covered.length > 0 ? (
         <div>
           <p className={styles.muted}>{copy.coveredClubs}</p>
@@ -1099,22 +918,19 @@ function EvidenceSection({ view, priced }: { view: EntryAdvice; priced: boolean 
             ))}
           </ul>
         </div>
-      ) : (
-        <p className={styles.muted}>{copy.noCoveredClubs}</p>
-      )}
+      ) : null}
       {evidence.binding === undefined ? null : (
-        <p className={styles.muted}>
-          {evidence.binding ? (priced ? copy.changed : copy.changedNoPrice) : copy.unchanged}
-        </p>
+        <p className={styles.muted}>{evidence.binding ? copy.changed : copy.unchanged}</p>
       )}
       {evidence.applied.length > 0 ? (
         <ul className={styles.assumptionList}>
           {evidence.applied.map((item) => {
-            const declared = item.words_status ?? (item.words ? "shown" : "unresolved");
-            const status =
-              declared === "shown" && item.words && QUOTE_WITHHELD.test(item.words)
-                ? "withheld_figure"
-                : declared;
+            const words =
+              (item.words_status ?? "shown") === "shown" &&
+              item.words &&
+              !QUOTE_WITHHELD.test(item.words)
+                ? item.words
+                : null;
             const href = webAddress(item.source_url);
             const speaker = item.speaker
               ? (copy.speakers[item.speaker] ?? copy.speakerUnknown)
@@ -1125,13 +941,7 @@ function EvidenceSection({ view, priced }: { view: EntryAdvice; priced: boolean 
                 {item.role && copy.roles[item.role] ? (
                   <Badge tone="neutral">{copy.roles[item.role]}</Badge>
                 ) : null}
-                {status === "shown" && item.words ? (
-                  <blockquote>{item.words}</blockquote>
-                ) : (
-                  <p className={styles.muted}>
-                    {status === "withheld_figure" ? copy.wordsWithheld : copy.wordsUnresolved}
-                  </p>
-                )}
+                {words ? <blockquote>{words}</blockquote> : null}
                 <p className={styles.muted}>
                   {copy.said(
                     speaker,
@@ -1152,11 +962,8 @@ function EvidenceSection({ view, priced }: { view: EntryAdvice; priced: boolean 
   );
 }
 
-/**
- * A Top 100 weighted plan: the setting the member chose, whether it moved their plan, and
- * what it is and is not. Rendered only on a weighted document.
- */
-function Top100Section({ view, priced }: { view: EntryAdvice; priced: boolean }) {
+/** A Top 100 weighted plan: whether the setting moved it. Rendered only on a weighted document. */
+function Top100Section({ view }: { view: EntryAdvice }) {
   const { language } = useLanguage();
   const copy = TOP100_COPY[language];
   const top100 = view.top100;
@@ -1164,18 +971,14 @@ function Top100Section({ view, priced }: { view: EntryAdvice; priced: boolean })
   return (
     <section className={styles.adviceSection} data-testid="top100-influence">
       <h3 className={styles.lineupTitle}>{copy.title}</h3>
-      <p className={styles.muted}>
-        {copy.weightLine(top100.weight)}{" "}
-        {top100.changed ? (priced ? copy.changed : copy.changedNoPrice) : copy.unchanged}
-      </p>
+      <p className={styles.muted}>{top100.changed ? copy.changed : copy.unchanged}</p>
     </section>
   );
 }
 
 /**
  * A chip strategy the service planned: the chip this week (or hold), the plan week by
- * week, and for the automatic strategy its holding values. The Top 100 setting is named
- * as the weight it is, never as a share.
+ * week, and for the automatic strategy its holding values.
  */
 function ChipStrategySection({ view }: { view: EntryAdvice }) {
   const { locale, messages } = useLanguage();
@@ -1203,28 +1006,24 @@ function ChipStrategySection({ view }: { view: EntryAdvice }) {
               {name(reservation.chip)} · {copy.expiry}{" "}
               {messages.common.gameweekShort(reservation.last_gameweek)} · {copy.holdingValue}{" "}
               {points(reservation.holding_value, 1, locale)}
-              {" · "}
-              {reservation.remaining_opportunities} {copy.opportunities}
             </li>
           ))}
         </ul>
       )}
-      <p className={styles.muted}>{copy.utilityNote(strategy.top100_weight)}</p>
     </section>
   );
 }
 
 /**
- * A chip the member chose: which chip, what the chip week is expected to score above the
- * member's own plan without it. A gain, so it is never worded as something given up.
- * Rendered only on a chip document.
+ * A chip the member chose: what the chip week is expected to score above the member's own
+ * plan without it. A gain, so it is never worded as something given up. Rendered only on a
+ * chip document.
  */
 function ChipChoiceSection({ view }: { view: EntryAdvice }) {
-  const { language, locale, messages } = useLanguage();
+  const { language, locale } = useLanguage();
   const copy = CHIP_COPY[language];
   const choice = view.chip_choice;
   if (!choice) return null;
-  const name = messages.leagueMembers.chipNames[choice.chip] ?? choice.chip;
   return (
     <section
       className={styles.adviceSection}
@@ -1233,7 +1032,6 @@ function ChipChoiceSection({ view }: { view: EntryAdvice }) {
       tabIndex={-1}
     >
       <h3 className={styles.lineupTitle}>{copy.title}</h3>
-      <p className={styles.muted}>{copy.chosen(name)}</p>
       {finiteNumber(choice.gain_vs_no_chip) ? (
         <p className={styles.planCost}>
           <strong className="num">
@@ -1252,11 +1050,10 @@ function ChipChoiceSection({ view }: { view: EntryAdvice }) {
  * order, one row a player with the position (or the bench place), the name, the club, the
  * C, V and YENİ marks the pitch carries, and the expected points as a bar at a fixed scale
  * beside the figure. Rendered only when the producer published the whole lineup: a
- * document from before the producer carried the plan week shows the moves alone. How the
- * lineup is chosen is said in the page's "How was this worked out?".
+ * document from before the producer carried the plan week shows the moves alone.
  */
 function LineupSection({ view, codes }: { view: EntryAdvice; codes: ClubCodes | null }) {
-  const { language, locale, messages } = useLanguage();
+  const { locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
   const { captain, vice_captain: vice, starting_xi: eleven, bench } = view;
   if (!captain || !vice || !eleven || !bench) return null;
@@ -1286,9 +1083,7 @@ function LineupSection({ view, codes }: { view: EntryAdvice; codes: ClubCodes | 
       {/* The total as the pitch's heading prints it, so switching views keeps the figure. */}
       {finiteNumber(view.expected_own_points) ? (
         <p className={lineup.own}>
-          {view.lineup_expectation
-            ? expectedLineupLabel(figure(view.expected_own_points, locale), language)
-            : copy.expectedOwnPoints(figure(view.expected_own_points, locale))}
+          {copy.expectedOwnPoints(figure(view.expected_own_points, locale))}
         </p>
       ) : null}
       <dl className={lineup.armband}>

@@ -47,7 +47,6 @@ export interface AdviceRequest {
   gameweek?: number;
 }
 
-/** Where an answer came from; the page shows capture identity, not a "cached" badge. */
 /** Where a shown answer came from; `device` is a plan the member's own device solved. */
 export type AdviceSource = "static" | "api-cache" | "static-fallback" | "device";
 

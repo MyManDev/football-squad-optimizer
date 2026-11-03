@@ -21,9 +21,6 @@ const COPY = {
     home: "Ev",
     away: "Deplasman",
     reason: "Bu transfer neden?",
-    points_gain: "Bu haftanın beklenen puanına göre önerildi.",
-    window_value: "Seçilen haftaların toplam puanı için önerildi.",
-    mode_tradeoff: "Seçtiğin rakip ve oyun tarzına göre önerildi.",
     blank: "Bu hafta maç yok.",
   },
   en: {
@@ -34,9 +31,6 @@ const COPY = {
     home: "Home",
     away: "Away",
     reason: "Why this transfer?",
-    points_gain: "Recommended for this week's expected points.",
-    window_value: "Recommended for the total points across your selected weeks.",
-    mode_tradeoff: "Recommended for your selected rival and playing style.",
     blank: "No fixture this week.",
   },
 };
@@ -86,13 +80,13 @@ export function PlayerDetails({
     (teamCode !== null && team.short_name === teamCode);
   const matches = week?.fixtures.filter((match) => sameTeam(match.home) || sameTeam(match.away));
   const move = plan?.moves.find((row) => row.player_in?.player_id === player.playerId);
-  const reason = !move
-    ? null
-    : move.reason_code === "manager_word"
+  // Said only of a move the club's page or the Top 100 setting put in the plan.
+  const reason =
+    move?.reason_code === "manager_word"
       ? EVIDENCE_COPY[language].moveReason
-      : move.reason_code === "top100_preference"
+      : move?.reason_code === "top100_preference"
         ? TOP100_COPY[language].moveReason
-        : copy[move.reason_code];
+        : null;
   const roleRows =
     plan?.role_forecast?.rows.filter(
       (row) =>

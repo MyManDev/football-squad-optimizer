@@ -80,10 +80,10 @@ export function LeagueRaceCard({
   const names = new Map(
     members.map((member) => [
       member.entry_id,
-      member.manager_name ?? member.team_name ?? `#${member.entry_id}`,
+      member.manager_name ?? member.team_name ?? copy.unknownMember,
     ]),
   );
-  const name = (entryId: number) => names.get(entryId) ?? `#${entryId}`;
+  const name = (entryId: number) => names.get(entryId) ?? copy.unknownMember;
   const width = LEFT + (race.gameweeks.length - 1) * RACE_COLUMN + RIGHT;
   const height = TOP + (race.places - 1) * RACE_ROW + BOTTOM;
   const moves = race.lines
@@ -142,7 +142,13 @@ export function LeagueRaceCard({
         </div>
       </div>
 
-      <div className={styles.chart} ref={chart}>
+      <div
+        className={styles.chart}
+        ref={chart}
+        tabIndex={0}
+        role="region"
+        aria-label={copy.raceChart(name(highlighted.entryId))}
+      >
         <svg
           width={width}
           height={height}
@@ -204,27 +210,33 @@ export function LeagueRaceCard({
         </svg>
       </div>
 
-      <div className={styles.week}>
-        <h3 className={styles.weekTitle}>{copy.raceMoved}</h3>
-        {week === 0 ? (
-          <p className={styles.quiet}>{copy.raceFirstWeek}</p>
-        ) : moves.length === 0 ? (
-          <p className={styles.quiet}>{copy.raceNoMoves}</p>
-        ) : (
-          <ul className={styles.moves}>
-            {moves.map(({ line, moved }) => (
-              <li key={line.entryId} data-move={moved > 0 ? "gained" : "lost"}>
-                <span>
-                  {copy.raceMove(name(line.entryId), line.ranks[week - 1]!, line.ranks[week]!)}
-                </span>
-                <span className={`${styles.moved} num`}>{signed(moved)}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+      {/* The first settled week has no week before it for a place to change from. */}
+      {week === 0 ? null : (
+        <div className={styles.week}>
+          <h3 className={styles.weekTitle}>{copy.raceMoved}</h3>
+          {moves.length === 0 ? (
+            <p className={styles.quiet}>{copy.raceNoMoves}</p>
+          ) : (
+            <ul className={styles.moves}>
+              {moves.map(({ line, moved }) => (
+                <li key={line.entryId} data-move={moved > 0 ? "gained" : "lost"}>
+                  <span>
+                    {copy.raceMove(name(line.entryId), line.ranks[week - 1]!, line.ranks[week]!)}
+                  </span>
+                  <span className={`${styles.moved} num`}>{signed(moved)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
-      <div className={styles.table}>
+      <div
+        className={styles.table}
+        tabIndex={0}
+        role="region"
+        aria-label={name(highlighted.entryId)}
+      >
         <table>
           <caption>{name(highlighted.entryId)}</caption>
           <thead>

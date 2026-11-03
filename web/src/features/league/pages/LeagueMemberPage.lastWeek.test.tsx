@@ -3,8 +3,7 @@
  * the member's net and how it stands against the league's mean, what the published
  * suggestion scored, the rank movement, the league's mean and the game's average, each from
  * the published scoreboard, the member's squad document or their suggestion history. A
- * finished week nobody has data-checked is marked provisional, as the scoreboard marks it; a
- * figure no file states has no line; and with no week of the member's there is no card. The
+ * figure no file states has no line, and with no week of the member's there is no card. The
  * page reads the scoreboard, and the history only once the scoreboard holds such a week.
  */
 
@@ -88,18 +87,11 @@ function scoreboard(
     captured_at_utc: "2026-08-22T04:00:00Z",
     cohort_snapshot_id: null,
     cohort_picks_snapshot_id: null,
-    registered_members: 12,
-    histories_held: 12,
     gameweeks: weeks,
     cumulative: {
       through_gameweek: SCORED,
       gameweeks: [SCORED],
-      ours_net: null,
-      ours_gameweeks: [],
-      ours_basis: null,
-      ours_excluded_gameweeks: [],
       members_mean_total_points: 61.4,
-      members_gameweeks: [SCORED],
       members_counted: 12,
       average_entry_score: 57,
     },
@@ -174,7 +166,6 @@ describe("the latest finished week's card", () => {
       "Lig ortalamasına göre +12,6",
       "2 sıra yükseldi",
       "Önerimiz 20 puan getirdi",
-      "En çok puan · 1 hafta",
     ],
     [
       "en",
@@ -183,11 +174,10 @@ describe("the latest finished week's card", () => {
       "+12.6 against the league mean",
       "up 2 places",
       "Our suggestion scored 20",
-      "Most points · 1 week",
     ],
   ] as const)(
     "says the member's last week with every figure the files state (%s)",
-    (language, title, gameweek, against, moved, scored, plan) => {
+    (language, title, gameweek, against, moved, scored) => {
       const { container } = show(language);
       const copy = MESSAGES[language];
       const shown = card(container)!;
@@ -199,19 +189,13 @@ describe("the latest finished week's card", () => {
       expect(within(shown).getByText(copy.leagueMembers.lastWeekNet)).toBeInTheDocument();
       // 74 against the mean as printed, 61.4: the two figures on the card add up.
       expect(within(shown).getByText(against)).toBeInTheDocument();
-      // What the published one-week pure-points suggestion scored that week, named as such.
-      expect(within(suggestion(container)!).getByText(scored)).toBeInTheDocument();
-      expect(suggestion(container)).toHaveTextContent(plan);
+      // What the published one-week pure-points suggestion scored that week, and only that.
+      expect(suggestion(container)!.textContent).toBe(scored);
       expect(facts(container)).toEqual(["movement", "mean", "average"]);
       expect(fact(container, "movement")).toHaveTextContent(moved);
       expect(fact(container, "mean")).toHaveTextContent(language === "tr" ? "61,4" : "61.4");
-      expect(fact(container, "mean")).toHaveTextContent(copy.leagueMembers.lastWeekMembers(12));
       expect(fact(container, "average")).toHaveTextContent(copy.leagueScoreboard.average);
       expect(fact(container, "average")).toHaveTextContent("57");
-      // The recorded expectation stays on the history page, not beside the settled score.
-      expect(shown).not.toHaveTextContent(copy.suggestionHistory.expectation);
-      // A checked week carries no provisional mark.
-      expect(shown).not.toHaveTextContent(copy.leagueScoreboard.provisional);
       expect(
         within(shown).getByRole("link", { name: copy.leagueMembers.lastWeekDetails }),
       ).toHaveAttribute("href", memberHistoryAddress(352490, ENTRY));
@@ -236,7 +220,7 @@ describe("the latest finished week's card", () => {
   });
 
   it.each(["tr", "en"] as const)(
-    "marks a finished week nobody has checked yet as provisional (%s)",
+    "draws a finished week nobody has checked yet without another week's movement (%s)",
     (language) => {
       const copy = MESSAGES[language];
       // The squad document scores only a checked week, so its movement is not this week's.
@@ -245,12 +229,9 @@ describe("the latest finished week's card", () => {
         scoreboard: scoreboard([week(SCORED, { data_checked: false })]),
       });
       const shown = card(container)!;
-      expect(within(shown).getByText(copy.leagueScoreboard.provisional)).toBeInTheDocument();
-      expect(within(shown).getByText(copy.leagueScoreboard.provisionalNote)).toBeInTheDocument();
       expect(facts(container)).not.toContain("movement");
       expect(within(shown).getByText("74")).toBeInTheDocument();
-      // A history from a later capture may have settled the week already; its score sits
-      // under the same provisional mark as the rest of the card.
+      // A history from a later capture may have settled the week already; its score is said.
       expect(suggestion(container)).toHaveTextContent(copy.leagueMembers.lastWeekSuggested("20"));
       cleanup();
       // As the publisher writes it, a week not yet checked is unsettled: no score, no line.
@@ -259,9 +240,7 @@ describe("the latest finished week's card", () => {
         scoreboard: scoreboard([week(SCORED, { data_checked: false })]),
         history: unsettledHistory(),
       });
-      expect(
-        within(card(again.container)!).getByText(copy.leagueScoreboard.provisional),
-      ).toBeInTheDocument();
+      expect(within(card(again.container)!).getByText("74")).toBeInTheDocument();
       expect(suggestion(again.container)).toBeNull();
     },
   );

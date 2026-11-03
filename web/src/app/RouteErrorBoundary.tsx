@@ -53,7 +53,7 @@ class Boundary extends Component<BoundaryProps, BoundaryState> {
   render() {
     if (!this.state.failed) return this.props.children;
     return (
-      <EmptyState title={this.props.title}>
+      <EmptyState page title={this.props.title}>
         <p>{this.props.body}</p>
         <button type="button" onClick={() => window.location.reload()}>
           {this.props.action}

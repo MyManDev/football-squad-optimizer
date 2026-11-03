@@ -3,6 +3,8 @@
 web/** text eol=lf
 workers/** text eol=lf
 scripts/release/*.sh text eol=lf
+# Copied as they are onto a Linux host, whose systemd reads a carriage return as part of a value.
+deploy/weekly-schedule/** text eol=lf
 
 # Read by digest, so their bytes have to be the same on every checkout. Under
 # core.autocrlf a Windows tree holds CRLF while the object database holds LF, and a

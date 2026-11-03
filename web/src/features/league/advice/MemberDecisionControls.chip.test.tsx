@@ -1,7 +1,7 @@
 /**
  * The chip row is the member's own declaration: "none" and the game's four chips in one
  * row, a chip enabled where the producer solved its plan, the URL carrying the choice, and
- * the reason beside every chip that is off. A chip combines with nothing, so it and the
+ * the reason beside a chip the game keeps off. A chip combines with nothing, so it and the
  * other two switches turn each other off, and the plain plan is always one click away.
  */
 
@@ -86,6 +86,9 @@ function inputs(name: string): HTMLInputElement[] {
 
 const chips = () => inputs("chip");
 const chipNamed = (value: string) => chips().find((input) => input.value === value)!;
+/** The notes under the chip row: its fieldset's paragraphs. */
+const chipNotes = () =>
+  Array.from(chips()[0]!.closest("fieldset")!.querySelectorAll("p")).map((p) => p.textContent);
 
 describe("the chip control", () => {
   it("offers none and the four chips in one row, and the URL follows the choice", () => {
@@ -104,13 +107,10 @@ describe("the chip control", () => {
     for (const name of Object.values(MESSAGES.tr.leagueMembers.chipNames)) {
       expect(row!.textContent).toContain(name);
     }
-    expect(document.body.textContent).toContain(CHIP_COPY.tr.plain);
-    expect(document.body.textContent).toContain(CHIP_COPY.tr.help);
 
     fireEvent.click(chipNamed("bboost"));
     expect(query().get("chip")).toBe("bboost");
     expect(chipNamed("bboost").checked).toBe(true);
-    expect(document.body.textContent).toContain(CHIP_COPY.tr.chosen("Bench Boost"));
     fireEvent.click(chipNamed("3xc"));
     expect(query().get("chip")).toBe("3xc");
     fireEvent.click(chips()[0]!);
@@ -122,9 +122,9 @@ describe("the chip control", () => {
     renderControls(`/league/352490/members/${ENTRY}?mode=saf-puan&window=1`, SOLVED, "en");
     expect(chipNamed("freehit").disabled).toBe(true);
     expect(chipNamed("wildcard").disabled).toBe(false);
-    expect(document.body.textContent).toContain(
+    expect(chipNotes()).toEqual([
       CHIP_COPY.en.chipReasonLine("Free Hit", CHIP_COPY.en.chipReasons.already_played!),
-    );
+    ]);
   });
 
   it("turns the manager's word and the settings above 0 off while a chip is chosen", () => {
@@ -188,45 +188,71 @@ describe("the chip control", () => {
     expect(document.body.textContent).toContain(CHIP_COPY.en.onlyBaseline);
   });
 
-  it("says a chip in the link that cannot be shown is not shown", () => {
+  it("shows none as checked for a chip in the link that cannot be shown", () => {
     renderControls(
       `/league/352490/members/${ENTRY}?mode=saf-puan&window=1&chip=freehit`,
       SOLVED,
       "en",
     );
     expect(chips()[0]!.checked).toBe(true);
-    expect(document.body.textContent).toContain(CHIP_COPY.en.notOffered);
   });
 
-  it.each([
-    ["chip_history_unknown", undefined],
-    ["no_chip_left", [{ chip: "wildcard", reason: "already_played" }]],
-    ["not_solved_for_member", undefined],
-    ["a_reason_this_page_does_not_know", undefined],
-  ] as const)("gives the producer's reason %s in both languages", (reason, unavailable) => {
+  it("says when the member has no chip left to play, in both languages", () => {
     for (const language of ["tr", "en"] as const) {
       renderControls(
         `/league/352490/members/${ENTRY}?mode=saf-puan&window=1`,
-        { available: false, reason, ...(unavailable ? { unavailable: [...unavailable] } : {}) },
+        {
+          available: false,
+          reason: "no_chip_left",
+          unavailable: [{ chip: "wildcard", reason: "already_played" }],
+        },
         language,
       );
       const copy = CHIP_COPY[language];
-      const expected = Object.hasOwn(copy.unavailableReasons, reason)
-        ? copy.unavailableReasons[reason]!
-        : copy.unavailableReasons.unknown;
-      expect(document.body.textContent).toContain(expected);
+      expect(chipNotes()).toEqual([
+        copy.unavailableReasons.no_chip_left,
+        copy.chipReasonLine(
+          MESSAGES[language].leagueMembers.chipNames.wildcard!,
+          copy.chipReasons.already_played!,
+        ),
+      ]);
       expect(
         chips()
           .slice(1)
           .every((input) => input.disabled),
       ).toBe(true);
-      if (unavailable) {
-        expect(document.body.textContent).toContain(
-          copy.chipReasonLine("Wildcard", copy.chipReasons.already_played!),
-        );
-      }
       cleanup();
     }
+  });
+
+  it.each(["chip_history_unknown", "not_solved_for_member", "a_reason_this_page_does_not_know"])(
+    "keeps every chip off and says nothing for the reason %s",
+    (reason) => {
+      for (const language of ["tr", "en"] as const) {
+        renderControls(
+          `/league/352490/members/${ENTRY}?mode=saf-puan&window=1`,
+          { available: false, reason },
+          language,
+        );
+        expect(chipNotes()).toEqual([]);
+        expect(document.body.textContent).not.toContain(reason);
+        expect(
+          chips()
+            .slice(1)
+            .every((input) => input.disabled),
+        ).toBe(true);
+        cleanup();
+      }
+    },
+  );
+
+  it("says nothing for a chip whose only reason is that no plan was solved", () => {
+    renderControls(`/league/352490/members/${ENTRY}?mode=saf-puan&window=1`, {
+      ...SOLVED!,
+      unavailable: [{ chip: "freehit", reason: "not_solved_for_member" }],
+    } as EntryAdviceIndex["chips"]);
+    expect(chipNamed("freehit").disabled).toBe(true);
+    expect(chipNotes()).toEqual([]);
   });
 
   it("shows the row without a chips block at all, every chip off", () => {
@@ -237,7 +263,7 @@ describe("the chip control", () => {
         .slice(1)
         .every((input) => input.disabled),
     ).toBe(true);
-    expect(document.body.textContent).toContain(CHIP_COPY.en.unavailableReasons.unknown);
+    expect(chipNotes()).toEqual([]);
   });
 
   it("never words the control as a chance, in either language", () => {

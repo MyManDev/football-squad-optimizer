@@ -20,7 +20,7 @@ windows still come from the advice backend. The weekly run takes its leagues fro
 | What was measured for strategy behavior? | [Strategy bench record](../strategy_bench.md) and [declaration](../strategy_bench_prereg.md) |
 | What does a projection horizon promise? | [Projection horizon contract](../projection_horizon_contract.md) |
 | Which API and published-view schemas exist? | [Contract directory](../contracts/) |
-| How does the live member record consume a measured week target? | [Member series](../member_week_series.md) and [horizon contract](../contracts/member_week_horizon_v1.md) |
+| What is the member-week record, and what does `series-horizon.json` hold? | [Member series](../member_week_series.md) and [horizon contract](../contracts/member_week_horizon_v1.md) |
 | How do pages receive a new publication? | [Weekly runbook](../weekly_runbook.md) |
 | What does the member's device solve, and from which inputs? | [Device-plan contract](../contracts/league_device_plan_v1.md) |
 | Which leagues does the site serve, and how is one added? | [Configuration guide](../../config/README.md) |

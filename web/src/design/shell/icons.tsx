@@ -166,25 +166,7 @@ export function PersonIcon() {
   );
 }
 
-/** Two sliders: the plan's settings. */
-export function PlanIcon() {
-  return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 18 18"
-      aria-hidden="true"
-      focusable="false"
-      {...STROKE}
-    >
-      <path d="M2.5 5h7M13.5 5h2M2.5 13h2M8.5 13h7" />
-      <circle cx="11.5" cy="5" r="2" />
-      <circle cx="6.5" cy="13" r="2" />
-    </svg>
-  );
-}
-
-/** A pulse line: the service's operating state. */
+/** A calendar page: the phone bar's way to the fixtures. */
 export function CalendarIcon() {
   return (
     <svg

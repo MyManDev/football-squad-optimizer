@@ -1,7 +1,7 @@
 /**
  * The Top 100 setting in the URL, and what the selection makes of it: a weight is read
  * only where the index names its file for this member, on the one-week pure-points plan,
- * with the manager's word as the URL has it. Anything else shows the plan at 0 and says so.
+ * with the manager's word as the URL has it. Anything else shows the plan at 0.
  */
 
 import { describe, expect, it } from "vitest";
@@ -126,7 +126,7 @@ describe("the Top 100 selection", () => {
     const word = resolve("mode=saf-puan&window=1&top100=5&llm=on", partial);
     expect(word.top100.weights).toEqual([0]);
     expect(word.top100.weight).toBe(0);
-    // Solved without the word, so offered; the controls name the switches instead.
+    // Solved without the word, so offered.
     expect(word.top100.notOffered).toBe(false);
     expect(word.path).toBe(`advice/${ENTRY}/saf-puan/1/hoca-sozu.json`);
   });
@@ -233,7 +233,7 @@ describe("the Top 100 selection", () => {
     expect(selection.status).toBe("ready");
     expect(selection.path).toBe(path);
     expect(selection.windows).toEqual([1, 3]);
-    // Against another rival the window was not computed, and the page says so.
+    // Against another rival the window was not computed.
     const other = base.rival_entry_ids.find((id) => id !== rival)!;
     const against = resolvePublishedAdvice(
       new URLSearchParams(`mode=ortak-koru&window=3&rival=${other}`),

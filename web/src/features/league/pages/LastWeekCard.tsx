@@ -9,7 +9,6 @@ import styles from "./LastWeekCard.module.css";
 
 /**
  * The member's latest finished week, one card above this week's decisions: the gameweek,
- * marked provisional as the scoreboard marks a finished week nobody has data-checked yet,
  * the member's net that week and how it stands against the league's mean, what the
  * published suggestion scored beside it, then a row of the other figures the published
  * files state for it (the rank movement, the league's mean and the game's average). A
@@ -33,7 +32,7 @@ export function LastWeekCard({
   const against =
     result.leagueMean === null
       ? null
-      : Math.round((result.net - Math.round(result.leagueMean.mean * 10) / 10) * 10) / 10;
+      : Math.round((result.net - Math.round(result.leagueMean * 10) / 10) * 10) / 10;
   const tone: BadgeTone =
     against === null || against === 0 ? "neutral" : against > 0 ? "good" : "bad";
   const movement = result.movement;
@@ -44,15 +43,13 @@ export function LastWeekCard({
           key: "movement",
           label: copy.lastWeekMovement,
           value: copy.movementLabel(movement.movement, movement.places),
-          sub: null,
         },
     result.leagueMean === null
       ? null
       : {
           key: "mean",
           label: copy.lastWeekLeagueMean,
-          value: points(result.leagueMean.mean, 1, locale),
-          sub: copy.lastWeekMembers(result.leagueMean.counted),
+          value: points(result.leagueMean, 1, locale),
         },
     result.gameAverage === null
       ? null
@@ -60,7 +57,6 @@ export function LastWeekCard({
           key: "average",
           label: scoreboard.average,
           value: figure(result.gameAverage),
-          sub: null,
         },
   ].filter((cell) => cell !== null);
 
@@ -69,10 +65,7 @@ export function LastWeekCard({
       <Card
         title={result.previous ? copy.lastWeekTitle : copy.latestWeekTitle}
         aside={
-          <span className={styles.aside}>
-            <span className={styles.week}>{messages.common.gameweekShort(result.gameweek)}</span>
-            {result.provisional ? <Badge tone="warn">{scoreboard.provisional}</Badge> : null}
-          </span>
+          <span className={styles.week}>{messages.common.gameweekShort(result.gameweek)}</span>
         }
       >
         <div className={styles.headline}>
@@ -84,14 +77,9 @@ export function LastWeekCard({
             <Badge tone={tone}>{copy.lastWeekAgainstMean(signedPoints(against, 1, locale))}</Badge>
           )}
         </div>
-        {/* The suggestion the history scores is the one-week pure-points plan the site
-            published before the deadline, so the line names it. */}
         {result.suggested === null ? null : (
           <p className={styles.suggested} data-line="suggested">
-            <span>{copy.lastWeekSuggested(figure(result.suggested))}</span>{" "}
-            <span className={styles.plan}>
-              {copy.strategies["saf-puan"].name} · {messages.decision.week(1)}
-            </span>
+            {copy.lastWeekSuggested(figure(result.suggested))}
           </p>
         )}
         {cells.length > 0 ? (
@@ -100,12 +88,10 @@ export function LastWeekCard({
               <div key={cell.key} className={styles.fact} data-fact={cell.key}>
                 <dt>{cell.label}</dt>
                 <dd className="num">{cell.value}</dd>
-                {cell.sub ? <dd className={styles.sub}>{cell.sub}</dd> : null}
               </div>
             ))}
           </dl>
         ) : null}
-        {result.provisional ? <p className={styles.note}>{scoreboard.provisionalNote}</p> : null}
         {historyHref ? (
           <Link className={styles.more} to={historyHref}>
             {copy.lastWeekDetails}

@@ -69,6 +69,12 @@ function servedInstead(path, response) {
 }
 
 describe("deployment smoke", () => {
+  it("asks for the routes the site has and none it removed", () => {
+    expect(
+      SMOKE_CHECKS.filter((check) => check.kind === "html").map((check) => check.path),
+    ).toEqual(["/", "/league", "/league/members/0", "/fixtures"]);
+  });
+
   it("checks every SPA route, the published documents and one absent document", async () => {
     const paths = [];
     await smokeDeployment(BASE, {

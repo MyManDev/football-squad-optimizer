@@ -565,14 +565,14 @@ After `verify_live.py`, run `cd web && LIVE_BASE_URL=https://squadopt.mymandev.c
 In PowerShell, run from `web`: `$env:LIVE_BASE_URL='https://squadopt.mymandev.com'; npx playwright test --config playwright.live.config.ts`.
 For the backend mode, set `$env:LIVE_SMOKE_COMPUTE='1'` before that command.
 
-The trusted smoke test makes **ten** fixed checks, the absent asset and the asset walk, and they are not all "must return 200". The list
+The trusted smoke test makes **seven** fixed checks, the absent asset and the asset walk, and they are not all "must return 200". The list
 lives in `SMOKE_CHECKS` in `web/scripts/smoke-deployment.mjs` and is the authority; this
 paragraph is a reading of it, not a second copy to keep in step.
 
-Seven are routes that must return HTTP 200 carrying the SPA document: `/`, `/moves`, `/rivals`,
-`/league`, `/league/members/0`, `/status`, `/fixtures`. The nested member path is there
-deliberately, because a path-scoped not-found rule would break a nested client-side route first
-and nothing else on the list would notice.
+Four are routes that must return HTTP 200 carrying the SPA document: `/`, `/league`,
+`/league/members/0`, `/fixtures`. The nested member path is there deliberately, because a
+path-scoped not-found rule would break a nested client-side route first and nothing else on the
+list would notice.
 
 Two are published documents that must return 200, parse as JSON, and carry the short-lived
 revalidation policy: `/data/index.json` and the league's `members.json`. The site's league
@@ -582,10 +582,10 @@ numbered member page (`/league/<id>/members/0`), its members document and its ab
 0. A site from before the directory answers 404 there and publishes the one tree under
 `/data/league/`, which is then checked in the same way.
 
-**The tenth is the opposite check, and reading it as a 200 inverts it.**
+**The seventh is the opposite check, and reading it as a 200 inverts it.**
 The tree's `entries/0.json` must be **absent**. Entry 0 does not exist, so a deployment that
 answers anything but a not-found there has lost the rule that an absent document answers 404
-rather than the application shell. A green smoke is seven route 200s, two JSON 200s and two 404s (entry 0 and the absent asset), then every asset the shell reaches answered as itself.
+rather than the application shell. A green smoke is four route 200s, two JSON 200s and two 404s (entry 0 and the absent asset), then every asset the shell reaches answered as itself.
 
 **Assets.** `/assets/smoke-absent-<random>.js`, a name no build produces and new on every
 run (so a run against a deployment from before this rule poisons nothing anyone asks for
@@ -610,9 +610,6 @@ URL in Cloudflare (Caching, Purge by URL) before members are told, and do not re
 
 Transient edge and propagation failures are retried for roughly one minute, the league
 directory read included.
-
-Two routes are **not** in the gate and their absence is worth knowing before someone assumes
-otherwise: `/gw/:season/:gameweek`, and `/admin`, which was added later. Neither is covered.
 
 Production runs it twice: once against the `pages.dev` alias, then against
 `https://squadopt.mymandev.com`. Both must pass. The second run is what makes a publication

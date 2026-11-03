@@ -1,7 +1,6 @@
 /*
- * Hesapla, compact: the primary button (40 px on a desktop, 48 px below 1180 px where the
- * sidebar is a drawer) with the request's state under it, then quiet 12 px notes. The page
- * pins the first block to the bottom of the phone drawer; the notes stay in its flow.
+ * Hesapla, compact: the primary button (40 px on a desktop, 48 px below 1180 px) with the
+ * request's state under it, then quiet 12 px notes.
  */
 
 .panel,

@@ -60,10 +60,8 @@ export function WhatIfPanel({
     const said = {
       idle: null,
       loading: copy.whatIfLoading,
-      unpublished: copy.whatIfUnpublished,
       failed: copy.whatIfFailed,
       "solver-failed": copy.whatIfSolverFailed,
-      "other-capture": copy.whatIfOtherCapture,
       ready: null,
     }[phase];
     return (

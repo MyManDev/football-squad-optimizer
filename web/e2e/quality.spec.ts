@@ -9,11 +9,7 @@ const CONTRIBUTE = process.env.VITE_ADVICE_API_ORIGIN ? ["/contribute"] : [];
 const PAGES = [
   { heading: "Ligini bul", path: "/" },
   { heading: LEAGUE_NAME, path: "/league/352490/members" },
-  { heading: /Oyun haftası/, path: "/gw/2026-27/1" },
-  { heading: "Önerilen Hamleler", path: "/moves" },
-  { heading: "Rakip Analizi", path: "/rivals" },
   { heading: "Lig Analizi", path: "/league/352490" },
-  { heading: "Yönetim", path: "/admin" },
 ] as const;
 
 test.describe("a visitor who has said who they are", () => {
@@ -48,43 +44,6 @@ test.describe("a visitor who has said who they are", () => {
     await expect(page).toHaveURL("/league/352490/members/35249001");
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("North Stand Notes");
   });
-
-  for (const language of ["tr", "en"] as const) {
-    test(`the unlisted ${language} admin page does not link to the archive or fetch system data`, async ({
-      page,
-    }) => {
-      await page.addInitScript(
-        (value) => localStorage.setItem("squadopt.language", value),
-        language,
-      );
-      const systemDataRequests: string[] = [];
-      page.on("request", (request) => {
-        // The shell's fixture list is the game's schedule, not a view of the system squad.
-        const path = new URL(request.url()).pathname;
-        if (path.startsWith("/data/") && path !== "/data/fixtures.json") {
-          systemDataRequests.push(request.url());
-        }
-      });
-
-      await page.goto("/admin");
-      await expect(page.getByRole("heading", { level: 1 })).toHaveText(
-        language === "tr" ? "Yönetim" : "Admin",
-      );
-      await expect(page.locator('#sidebar a[href="/admin"], header a[href="/admin"]')).toHaveCount(
-        0,
-      );
-      await expect(page.locator('a[href="/league/352490"]')).toHaveCount(0);
-      expect(systemDataRequests).toEqual([]);
-
-      // The measurement archive is not served from the member origin: its documents are the
-      // laboratory's record, in the laboratory's vocabulary, and they were reachable here.
-      await expect(
-        page.getByRole("link", {
-          name: language === "tr" ? "Ölçüm arşivi" : "Measurement archive",
-        }),
-      ).toHaveCount(0);
-    });
-  }
 
   test("a member page's sidebar opens the league part for the claimed member", async ({ page }) => {
     await page.goto("/league/352490/members/35249001");
@@ -197,12 +156,16 @@ test.describe("a visitor who has said who they are", () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.addInitScript(() => localStorage.setItem("squadopt.language", "tr"));
 
+    // The shell clips what overflows it, so the main column is read as well as the document.
     for (const destination of PAGES) {
       await page.goto(destination.path);
       await expect(page.getByRole("heading", { level: 1 })).toHaveText(destination.heading);
       const dimensions = await page.evaluate(() => ({
         clientWidth: document.documentElement.clientWidth,
-        scrollWidth: document.documentElement.scrollWidth,
+        scrollWidth: Math.max(
+          document.documentElement.scrollWidth,
+          document.querySelector("main")!.scrollWidth,
+        ),
       }));
       expect(dimensions.scrollWidth, `${destination.path} overflows at 390px`).toBeLessThanOrEqual(
         dimensions.clientWidth,
@@ -220,7 +183,10 @@ test.describe("a visitor who has said who they are", () => {
       await expect(page.getByRole("heading", { level: 1 })).toHaveText(destination.heading);
       const dimensions = await page.evaluate(() => ({
         clientWidth: document.documentElement.clientWidth,
-        scrollWidth: document.documentElement.scrollWidth,
+        scrollWidth: Math.max(
+          document.documentElement.scrollWidth,
+          document.querySelector("main")!.scrollWidth,
+        ),
       }));
       expect(dimensions.scrollWidth, `${destination.path} overflows at 390px`).toBeLessThanOrEqual(
         dimensions.clientWidth,

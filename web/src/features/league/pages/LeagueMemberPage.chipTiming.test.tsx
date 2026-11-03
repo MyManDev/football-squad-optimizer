@@ -173,6 +173,9 @@ function renderView(solver: DeviceSolver, fixtures: FixturesPayload | null = cal
 }
 
 const deviceButton = () => screen.getByRole("button", { name: copy.deviceButton });
+/** The panel's line for a run that finished. */
+const deviceDone = (container: HTMLElement) =>
+  container.querySelector("[data-device-state='done']");
 
 describe("the chip timing card on the member page", () => {
   it("appears beside the chip control once the device has solved the plain plan", async () => {
@@ -180,7 +183,7 @@ describe("the chip timing card on the member page", () => {
     const { container } = renderView(solver);
     expect(container.querySelector("[data-chip-timing]")).toBeNull();
     await act(async () => deviceButton().click());
-    await waitFor(() => expect(container).toHaveTextContent(copy.deviceDone("0,4")));
+    await waitFor(() => expect(deviceDone(container)).not.toBeNull());
     // The held chips, in the game's order, each solved once beside the plain plan.
     expect(solver.posted.map((request) => request.chipGains)).toEqual([
       ["wildcard", "freehit", "bboost", "3xc"],
@@ -188,8 +191,8 @@ describe("the chip timing card on the member page", () => {
     // The plan is on the page before the gains; the card waits for them.
     expect(container.querySelector("[data-chip-timing]")).toBeNull();
     await act(async () => solver.release());
-    // The timing line still counts the plain plan's solve only.
-    expect(container).toHaveTextContent(copy.deviceDone("0,4"));
+    // The gains leave the finished run as it stood.
+    expect(deviceDone(container)).not.toBeNull();
     const card = container.querySelector<HTMLElement>("[data-chip-timing]")!;
     expect(card).not.toBeNull();
     // In the same settings tool as the chip control, right after it.
@@ -210,7 +213,7 @@ describe("the chip timing card on the member page", () => {
     const solver = new ChipGainsSolver();
     const { container } = renderView(solver, null);
     await act(async () => deviceButton().click());
-    await waitFor(() => expect(container).toHaveTextContent(copy.deviceDone("0,4")));
+    await waitFor(() => expect(deviceDone(container)).not.toBeNull());
     await act(async () => solver.release());
     expect(container.querySelector("[data-chip-timing]")).toBeNull();
     expect(container).not.toHaveTextContent("Çip zamanı");

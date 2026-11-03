@@ -23,19 +23,17 @@ it("sums the same final weeks on both sides and keeps chronological running diff
     14,
     null,
   ]);
-  expect(summary).toMatchObject({ compared: 9, suggested: 624, actual: 610, difference: 14 });
+  expect(summary).toMatchObject({ suggested: 624, actual: 610, difference: 14 });
   expect(history).toEqual(before);
 });
 
 it("does not turn an empty or unfinished history into zero totals", () => {
   expect(summarizeHistory([])).toMatchObject({
-    compared: 0,
     suggested: null,
     actual: null,
     difference: null,
   });
   expect(summarizeHistory(mockSuggestionOverview().payload.weeks.slice(-1))).toMatchObject({
-    compared: 0,
     suggested: null,
     actual: null,
     difference: null,
@@ -44,9 +42,8 @@ it("does not turn an empty or unfinished history into zero totals", () => {
 
 it("adds a newly published week once, even when the view is re-rendered", () => {
   const weeks = mockSuggestionOverview().payload.weeks.slice(0, 4);
-  expect(summarizeHistory(weeks.slice(0, 3))).toMatchObject({ compared: 3, difference: 8 });
+  expect(summarizeHistory(weeks.slice(0, 3))).toMatchObject({ difference: 8 });
   expect(summarizeHistory(weeks)).toMatchObject({
-    compared: 4,
     suggested: 152,
     actual: 140,
     difference: 12,

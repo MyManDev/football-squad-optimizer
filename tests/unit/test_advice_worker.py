@@ -37,7 +37,7 @@ from squadopt.application.advice import (
     advise_entry,
     advise_with_top100,
 )
-from squadopt.application.advice_menu import ManagersWordNotSolved
+from squadopt.application.advice_menu import ManagersWordNotSolved, MenuRequest
 from squadopt.application.manager_words import MANAGERS_WORD_RULE_VERSION
 from squadopt.application.weekly_plan import rotation_artifact
 from squadopt.data.snapshots import write_snapshot
@@ -61,7 +61,7 @@ from squadopt.platform.advice_read import AdviceRequestContext
 from squadopt.platform.advice_worker import build_advice_compute, run_advice_worker
 from squadopt.platform.backend_runtime import BackendConfig, build_backend
 from squadopt.platform.jobs_contract import AdviceJob
-from squadopt.platform.queue_contracts import QueueLockTimeout
+from squadopt.platform.queue_contracts import AdviceLeaseLostError, QueueLockTimeout
 
 SEASON = deployment_module.SEASON
 LEAGUE_ID = deployment_module.LEAGUE_ID
@@ -87,7 +87,7 @@ def _entry_payloads(entry_id: int, gameweek: int) -> dict[str, bytes]:
     }
 
 
-def _capture_with_entries(snapshot_root: Path) -> str:
+def _capture_with_entries(snapshot_root: Path, entries: tuple[int, ...] = (ENTRY_ID,)) -> str:
     gw1_finished = [dict(world_module.EVENTS[0], finished=True), *world_module.EVENTS[1:]]
     written = write_snapshot(
         snapshot_root,
@@ -98,7 +98,7 @@ def _capture_with_entries(snapshot_root: Path) -> str:
                 events=gw1_finished, elements=world_module._elements(event_points=2)
             ),
             FIXTURES_PAYLOAD: _calendar(gameweeks=(1, 2, 3)),
-            **_entry_payloads(ENTRY_ID, 1),
+            **{name: raw for entry in entries for name, raw in _entry_payloads(entry, 1).items()},
         },
     )
     return written.snapshot_id
@@ -112,13 +112,16 @@ def _running(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
 
 
 def _deployment(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, **configured: Any
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    entries: tuple[int, ...] = (ENTRY_ID,),
+    **configured: Any,
 ) -> dict[str, Any]:
     monkeypatch.setenv("SQUADOPT_REPOSITORY_COMMIT", "c" * 40)
     snapshot_root = tmp_path / "snapshots"
     handoff_root = tmp_path / "handoffs"
     site_root = tmp_path / "site"
-    snapshot_id = _capture_with_entries(snapshot_root)
+    snapshot_id = _capture_with_entries(snapshot_root, entries)
     deployment_module._handoff(handoff_root, snapshot_id)
     deployment_module._publish_members(site_root, RIVAL_ID)
     store_root = tmp_path / "store"
@@ -1839,6 +1842,100 @@ def _export_top100(
         capture.projection,
         top100_tests._favoured(capture.projection, list(SQUAD_CODES)),
     )
+
+
+def _menu_address(**fields: Any) -> MenuRequest:
+    return MenuRequest(season=SEASON, gameweek=2, league_id=LEAGUE_ID, entry_id=ENTRY_ID, **fields)
+
+
+def test_the_count_starts_at_zero_and_counts_each_document_once() -> None:
+    """Only the documents it was started with, each once; a lost write never stops the job."""
+
+    plain = _menu_address(strategy="ortak-koru", rival_entry_id=RIVAL_ID)
+    asked = replace(plain, top100_weight=20)
+    written: list[tuple[int, int]] = []
+    refusals: dict[int, Exception] = {
+        0: QueueLockTimeout("busy"),
+        1: AdviceLeaseLostError("gone"),
+    }
+
+    def record(job: AdviceJob, *, done: int, total: int) -> None:
+        assert job.job_id == "advice-0123456789abcdef-1"
+        if done in refusals:
+            raise refusals.pop(done)
+        written.append((done, total))
+
+    count = worker_module._DocumentCount(_job("e" * 64), (plain, asked), record)
+    count.solved(_menu_address())  # not one it has to solve
+    count.solved(plain)
+    count.solved(plain)  # solved again by a nested call: still one document
+    count.solved(asked)
+    assert refusals == {}  # both lost writes were tried, and neither stopped the count
+    assert written == [(2, 2)]
+
+
+def test_a_job_counts_the_documents_it_solves_and_the_view_serves_the_count(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A rival week under a setting is priced against the rival week at 0: two documents,
+    or one once the plain rival week is in the cache."""
+
+    artifact_root = tmp_path / "artifacts"
+    running = _deployment(
+        tmp_path, monkeypatch, entries=(ENTRY_ID, RIVAL_ID), artifact_root=artifact_root
+    )
+    _export_top100(running, artifact_root, monkeypatch)
+    backend = running["backend"]
+    client = TestClient(app_for_capture(backend, world_module.GW2_CAPTURED_AT))
+    route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
+    plain = {"strategy": "ortak-koru", "window": COMPUTED_WINDOW, "rival_entry_id": RIVAL_ID}
+
+    def ask_and_work(body: dict[str, Any]) -> list[tuple[str, object, object]]:
+        accepted = client.post(route, json=body)
+        assert accepted.status_code == 202, accepted.text
+        view_route = f"/api/v1/advice-jobs/{accepted.json()['job_id']}"
+        queued = client.get(view_route).json()
+        assert (queued["status"], queued["queue_position"], queued["progress"]) == (
+            "queued",
+            0,
+            None,
+        )
+        seen: list[tuple[str, object, object]] = []
+
+        def record(job: AdviceJob, *, done: int, total: int) -> None:
+            backend.queue.record_progress(job, done=done, total=total)
+            view = client.get(view_route).json()
+            seen.append((view["status"], view["progress"], view["queue_position"]))
+
+        compute = build_advice_compute(
+            backend.contexts, backend.job_specs, cache=backend.cache, progress=record
+        )
+        done = run_advice_worker_once(backend.queue, backend.cache, compute, at_utc=_now_stamp())
+        assert done is not None and done.status == "completed", done
+        finished = client.get(view_route).json()
+        assert (finished["status"], finished["progress"], finished["queue_position"]) == (
+            "completed",
+            None,
+            None,
+        )
+        assert not (backend.config.queue_root / f"{done.job_id}.progress").exists()
+        return seen
+
+    # Nothing held: the rival week at 0 first, then the asked one.
+    assert ask_and_work({**plain, "top100_weight": 20}) == [
+        ("running", {"done": 0, "total": 2}, None),
+        ("running", {"done": 1, "total": 2}, None),
+        ("running", {"done": 2, "total": 2}, None),
+    ]
+    # The plain rival week is asked for and cached; a second setting now has one to solve.
+    assert ask_and_work(plain) == [
+        ("running", {"done": 0, "total": 1}, None),
+        ("running", {"done": 1, "total": 1}, None),
+    ]
+    assert ask_and_work({**plain, "top100_weight": 50}) == [
+        ("running", {"done": 0, "total": 1}, None),
+        ("running", {"done": 1, "total": 1}, None),
+    ]
 
 
 def test_a_member_asks_for_a_top100_setting_and_gets_it(

@@ -10,7 +10,7 @@ const OWN = `${MEMBERS}/35249001`;
 beforeEach(() => vi.stubEnv("VITE_ADVICE_API_ORIGIN", "https://squadopt-api.example"));
 afterEach(() => vi.unstubAllEnvs());
 
-const at = (pathname: string, search = "", hash = ""): Place => ({ pathname, search, hash });
+const at = (pathname: string, search = ""): Place => ({ pathname, search });
 
 const CHOSEN: ShellIdentity = { leagueId: LEAGUE, member: null };
 const CLAIMED: ShellIdentity = {
@@ -98,7 +98,7 @@ describe("the sidebar's navigation with the member claimed", () => {
         .filter((item) => item.active)
         .map((item) => item.key);
     expect(active(at(OWN))).toEqual(["thisWeek"]);
-    expect(active(at(OWN, "?mode=fark-yarat", "#kadro"))).toEqual(["thisWeek"]);
+    expect(active(at(OWN, "?mode=fark-yarat"))).toEqual(["thisWeek"]);
     expect(active(at(`${OWN}/`))).toEqual(["thisWeek"]);
     expect(active(at(`${OWN}/history`))).toEqual(["history"]);
   });
@@ -170,6 +170,6 @@ describe("the member an address is about", () => {
     expect(navItems(at("/contribute/"), NO_IDENTITY).find((item) => item.active)?.key).toBe(
       "contribute",
     );
-    expect(navItems(at("/status"), NO_IDENTITY).some((item) => item.active)).toBe(false);
+    expect(navItems(at(`/league/${LEAGUE}`), NO_IDENTITY).some((item) => item.active)).toBe(false);
   });
 });

@@ -9,7 +9,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { LeagueDataMissing } from "../dataErrors";
 import type { EntrySquad, LeagueViewEnvelope } from "../types";
 import { useLeague } from "../useLeague";
 import { isDevicePlanEntry, type DevicePlanDocument, type DevicePlanEntry } from "./types";
@@ -31,12 +30,11 @@ export interface WhatIfDependencies {
 }
 
 /**
- * Where the mode stands: `failed` is a table that could not be read, `solver-failed` a
- * solver that could not read a fifteen. From any phase but `loading` and `ready` the member
- * can start again.
+ * Where the mode stands: `failed` is a table that could not be read or does not fit the
+ * capture on screen, `solver-failed` a solver that could not read a fifteen. From any phase
+ * but `loading` and `ready` the member can start again.
  */
-export type WhatIfPhase =
-  "idle" | "loading" | "ready" | "other-capture" | "unpublished" | "failed" | "solver-failed";
+export type WhatIfPhase = "idle" | "loading" | "ready" | "failed" | "solver-failed";
 
 export interface WhatIf {
   phase: WhatIfPhase;
@@ -126,7 +124,7 @@ export function useWhatIf(
           table.source_snapshot_id !== squad.source_snapshot_id ||
           !advisedIds.every((id) => known.has(id))
         ) {
-          setPhase("other-capture");
+          setPhase("failed");
           return;
         }
         // A worker that cannot be created answers as a failure, as the device's does.
@@ -140,9 +138,9 @@ export function useWhatIf(
         setDocument(table);
         setPhase("ready");
       },
-      (error: unknown) => {
+      () => {
         if (read.signal.aborted) return;
-        setPhase(error instanceof LeagueDataMissing ? "unpublished" : "failed");
+        setPhase("failed");
       },
     );
   }, [
@@ -210,7 +208,7 @@ export function useWhatIf(
   const reset = useCallback(() => setTried(null), []);
 
   return {
-    phase: entry === null ? "unpublished" : phase,
+    phase: entry === null ? "failed" : phase,
     document,
     squad: current,
     account,

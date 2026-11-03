@@ -612,6 +612,7 @@ exhaustive_ignores = [
     "weekly_journal",
     "weekly_operations",
     "weekly_publish",
+    "weekly_release",
     "weekly_schedule",
     "worker_heartbeat",
     "worker_metrics",

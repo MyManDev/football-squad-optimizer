@@ -37,7 +37,8 @@
    Night, same formula: ink 15.7:1 on the page and 14.2:1 on panels, ink2 7.6:1 and ink3
    5.7:1 at their lowest, and every status colour above 6.6:1 on all three surfaces. Ink3 is
    4.56:1 on a player. Yellow links are 11.1:1 on
-   the page and mark text 11.3:1 on the mark. contrast.test.ts holds both palettes.
+   the page and mark text 11.3:1 on the mark; ink is 1.4:1 there, so only mark text stands
+   on it. contrast.test.ts holds both palettes.
 
    Motion (#1136): every transition and animation takes its duration and easing from the
    tokens below, never a literal of its own, and src/design/motion.ts mirrors them for the
@@ -84,7 +85,6 @@
   --color-text-muted: #4f4a3e;
   --color-text-faint: #6a6250;
   --color-accent: #17402a;
-  --color-accent-text: #ffffff;
   --color-primary: #17402a;
   --color-primary-text: #ffffff;
   --color-good: #1c7a3e;
@@ -137,7 +137,6 @@
     --color-text-muted: #a3afc4;
     --color-text-faint: #8b97ad;
     --color-accent: #f2c230;
-    --color-accent-text: #14100a;
     --color-primary: #f2c230;
     --color-primary-text: #14100a;
     --color-good: #4cc38a;
@@ -180,7 +179,6 @@
   --color-text-muted: #a3afc4;
   --color-text-faint: #8b97ad;
   --color-accent: #f2c230;
-  --color-accent-text: #14100a;
   --color-primary: #f2c230;
   --color-primary-text: #14100a;
   --color-good: #4cc38a;
@@ -235,7 +233,6 @@ h4 {
 }
 
 /* Emphasis in running text is Plex Sans 600, the heaviest weight the page loads for it. */
-b,
 strong,
 th {
   font-weight: 600;
@@ -247,9 +244,7 @@ small {
 }
 
 /* Codes read in Plex Mono like every other code and figure, not the system monospace. */
-code,
-kbd,
-samp {
+code {
   font-family: var(--font-mono);
 }
 
@@ -282,10 +277,6 @@ a:hover {
 
 .num {
   font-variant-numeric: tabular-nums;
-}
-
-.mono {
-  font-family: var(--font-mono);
 }
 
 .visually-hidden {

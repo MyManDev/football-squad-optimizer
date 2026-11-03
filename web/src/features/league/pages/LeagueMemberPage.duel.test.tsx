@@ -1,9 +1,9 @@
 /**
  * The duel (#1133), a page of its own under the member's page: no rival is set beside the
  * member until an address names one with `?duel=`; the page reads that rival's entry document of the same capture
- * and nothing else, an id outside the league's human members reads nothing, a rival not in
- * the publication is told apart from a failed read, and a tap on another rival changes the
- * address in place.
+ * and nothing else, an id outside the league's human members reads nothing, a rival whose
+ * document is missing or broken says it could not be read, and a tap on another rival changes
+ * the address in place.
  */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
@@ -121,19 +121,19 @@ describe("the duel's read", () => {
     expect(entrySquad).toHaveBeenCalledWith(35249003);
   });
 
-  it("says a rival whose document is not in the week's publication is not there", async () => {
-    page(
+  it("says a rival whose document is not in the week's publication could not be read", async () => {
+    const { container } = page(
       "?duel=35249003",
       new Map([[35249003, new leagueData.LeagueDataMissing("entries/35249003.json")]]),
     );
-    expect(await screen.findByText(COPY.duelMissing)).toBeInTheDocument();
-    expect(screen.queryByText(COPY.duelUnreadable)).toBeNull();
+    expect(await screen.findByText(COPY.duelUnreadable)).toBeInTheDocument();
+    expect(container.querySelector("[data-duel]")).toBeNull();
   });
 
   it("says a rival whose document could not be read could not be read", async () => {
-    page("?duel=35249003", new Map([[35249003, new Error("broken")]]));
+    const { container } = page("?duel=35249003", new Map([[35249003, new Error("broken")]]));
     expect(await screen.findByText(COPY.duelUnreadable)).toBeInTheDocument();
-    expect(screen.queryByText(COPY.duelMissing)).toBeNull();
+    expect(container.querySelector("[data-duel]")).toBeNull();
   });
 
   it("reads no document for an id outside the league's human members", async () => {

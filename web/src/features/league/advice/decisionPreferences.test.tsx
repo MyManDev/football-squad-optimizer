@@ -170,3 +170,21 @@ it.each([
     expect(screen.getByRole("alert")).toHaveTextContent(instruction);
   },
 );
+
+it("draws no card without the service's preferences, unless the link has some to clear", () => {
+  const panel = (search: string) =>
+    render(
+      <LanguageProvider initialLanguage="tr">
+        <MemoryRouter initialEntries={[`/${search}`]}>
+          <DecisionPreferencesPanel squad={squad} available={false} />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+  expect(panel("").container).toBeEmptyDOMElement();
+  cleanup();
+  for (const raw of [preferencesKey(p), "{"]) {
+    panel(`?${new URLSearchParams({ preferences: raw }).toString()}`);
+    expect(screen.getByRole("button", { name: "Tercihleri temizle" })).toBeEnabled();
+    cleanup();
+  }
+});
