@@ -81,13 +81,18 @@ function JobState({ state }: { state: WaitingPhase }) {
   const { language, messages } = useLanguage();
   const copy = messages.leagueMembers;
   const computeCopy = COMPUTE_COPY[language];
+  // A wait picked up after a reload names no word until the service has said one.
+  if (state.status === null) return null;
   const running = state.status === "running";
   const word = running ? copy.computeRunning : copy.computeQueued;
+  const standing = jobStanding(computeCopy, state);
   const workers = jobWorkersLine(computeCopy, state);
   return (
     <>
       <p className={styles.state}>
-        <Badge tone="accent">{word}</Badge> {jobStanding(computeCopy, state)}
+        <Badge tone="accent">{word}</Badge>{" "}
+        {/* While it runs the bar says the count to a screen reader, as on the device card. */}
+        {standing === null ? null : <span aria-hidden={running || undefined}>{standing}</span>}
       </p>
       {running ? <JobStages state={state} label={word} /> : null}
       {workers === null ? null : <p className={styles.note}>{workers}</p>}

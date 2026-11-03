@@ -234,13 +234,56 @@ describe("useAdviceJob", () => {
     });
     expect(screen.getByTestId("phase").textContent).toBe("waiting:running:with-fallback");
 
-    // What the service stops saying is not kept: the state is what it last said.
+    // What the service stops saying is not kept, but for the count of the attempt running.
     await nextAnswer();
-    expect(standing()).toEqual({ answers: 4 });
+    expect(standing()).toEqual({ progress: { done: 1, total: 3 }, answers: 4 });
 
     await nextAnswer();
     expect(screen.getByTestId("phase").textContent).toBe("done:api-cache");
     expect(screen.getByTestId("standing").textContent).toBe("");
+  });
+
+  it("keeps the count through a poll that could not read it, for the same attempt", async () => {
+    const client = new ScriptedClient();
+    const views: Omit<AdviceJobStatus, "jobId">[] = [
+      { status: "running", attempt: 1, progress: { done: 2, total: 3 } },
+      { status: "running", attempt: 1 },
+      { status: "running", attempt: 2 },
+      { status: "running", attempt: 2, progress: { done: 0, total: 3 } },
+      { status: "queued", attempt: 2 },
+      { status: "running", attempt: 2 },
+    ];
+    client.readJob = async (jobId) => ({ jobId, ...views.shift()! });
+    render(<Harness client={client} />);
+    await act(async () => {
+      screen.getByRole("button", { name: "go" }).click();
+      await Promise.resolve();
+    });
+    const said = async () => {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2100);
+      });
+      return standing().progress;
+    };
+    expect(await said()).toEqual({ done: 2, total: 3 });
+    expect(await said()).toEqual({ done: 2, total: 3 });
+    // A new attempt starts again, and a job back in the queue has no count.
+    expect(await said()).toBeUndefined();
+    expect(await said()).toEqual({ done: 0, total: 3 });
+    expect(await said()).toBeUndefined();
+    expect(await said()).toBeUndefined();
+  });
+
+  it("takes a job's first word from the answer that accepted it", async () => {
+    const client = new ScriptedClient();
+    client.requestAdvice = async () => ({ kind: "job", jobId: "job-1", status: "running" });
+    client.statuses = ["running"];
+    render(<Harness client={client} />);
+    await act(async () => {
+      screen.getByRole("button", { name: "go" }).click();
+      await Promise.resolve();
+    });
+    expect(screen.getByTestId("phase").textContent).toBe("waiting:running:with-fallback");
   });
 
   it("a poll with no answer changes nothing about the wait", async () => {

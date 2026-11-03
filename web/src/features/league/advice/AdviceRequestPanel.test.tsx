@@ -109,6 +109,8 @@ describe("a job at the service", () => {
   const show = (said: Partial<WaitingPhase>, language: Language = "tr") =>
     renderPanel({ service: "ready", computable: true, state: waiting(said) }, language);
   const bar = () => screen.getByRole("progressbar", { name: messages.computeRunning });
+  const workersLabel = tr.workersBusy(0, 0).split(":")[0]!;
+  const stateLine = (container: HTMLElement) => container.querySelector("[data-compute-dock] p");
   const stageInHand = (container: HTMLElement) => container.querySelector("[data-stage-now]");
 
   it("says its place in line and the workers at work, with no bar, while queued", () => {
@@ -162,21 +164,42 @@ describe("a job at the service", () => {
   it("leaves the word alone with a service that says nothing, and the bar while it runs", () => {
     const queued = show({});
     expect(queued.container).toHaveTextContent(messages.computeQueued);
-    expect(queued.container).not.toHaveTextContent(tr.workersBusy(0, 0).split(":")[0]!);
+    expect(queued.container).not.toHaveTextContent(workersLabel);
     expect(screen.queryByRole("progressbar")).toBeNull();
     queued.unmount();
 
     const { container } = show({ status: "running" });
     expect(container).toHaveTextContent(messages.computeRunning);
-    expect(container).not.toHaveTextContent(tr.workersBusy(0, 0).split(":")[0]!);
+    expect(container).not.toHaveTextContent(workersLabel);
     expect(container).not.toHaveTextContent("/");
     expect(bar()).not.toHaveAttribute("aria-valuenow");
     expect(stageInHand(container)).not.toBeNull();
   });
 
-  it("leaves out the workers when the service counts none alive", () => {
-    const { container } = show({ status: "running", workers: { busy: 0, total: 0 } });
-    expect(container).not.toHaveTextContent(tr.workersBusy(0, 0));
+  it.each([
+    ["none alive", { status: "running", workers: { busy: 0, total: 0 } }],
+    ["none alive while queued", { status: "queued", workers: { busy: 0, total: 0 } }],
+    ["none busy on a running job", { status: "running", workers: { busy: 0, total: 1 } }],
+  ] as const)("leaves out the workers with %s", (_name, said) => {
+    const { container } = show(said);
+    expect(container).not.toHaveTextContent(workersLabel);
+  });
+
+  it("names no word and draws no bar until the service has said where the job stands", () => {
+    const { container, button } = show({ status: null });
+    expect(container).not.toHaveTextContent(messages.computeQueued);
+    expect(container).not.toHaveTextContent(messages.computeRunning);
+    expect(screen.queryByRole("progressbar")).toBeNull();
+    expect(button).toBeDisabled();
+    expect(container).toHaveTextContent(tr.leaveOpen);
+  });
+
+  it("has the bar say the count to a screen reader, and the line say a place in line", () => {
+    const running = show({ status: "running", progress: { done: 1, total: 3 } });
+    expect(screen.getByText("1/3")).toHaveAttribute("aria-hidden", "true");
+    running.unmount();
+    show({ queuePosition: 2 });
+    expect(screen.getByText(tr.queueAhead(2))).not.toHaveAttribute("aria-hidden");
   });
 
   it("starts the stage in hand over at each answer from the service, and only then", () => {
@@ -203,14 +226,14 @@ describe("a job at the service", () => {
     expect(stageInHand(view.container)).not.toBe(first);
   });
 
-  it("prints no percentage and no longer repeats that the plan will come", () => {
+  it("says only its word and its count on the state line, and no percentage", () => {
     const { container } = show({
       status: "running",
       progress: { done: 2, total: 3 },
       workers: { busy: 2, total: 3 },
     });
     expect(container).not.toHaveTextContent("%");
-    expect(container.querySelector("[data-compute-dock]")).not.toHaveTextContent(tr.leaveOpen);
+    expect(stateLine(container)).toHaveTextContent(new RegExp(`^${messages.computeRunning} 2/3$`));
     expect(container).toHaveTextContent(tr.leaveOpen);
   });
 
@@ -300,6 +323,9 @@ describe("with the selection's earlier answer kept on the page", () => {
       },
     });
     expect(container).toHaveTextContent(tr.leaveOpen);
+    expect(container.querySelector("[data-compute-dock] p")).toHaveTextContent(
+      new RegExp(`^${messages.computeRunning}$`),
+    );
   });
 
   it.each(["SERVICE_UNREACHABLE", "CHIP_NOT_HELD", null] as const)(

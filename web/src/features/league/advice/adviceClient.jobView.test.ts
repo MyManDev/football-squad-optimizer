@@ -41,6 +41,7 @@ describe("the contract's examples", () => {
     expect(await readView(example, example.job_id)).toStrictEqual({
       jobId: example.job_id,
       status,
+      attempt: 1,
       ...said,
     });
   });
@@ -108,7 +109,27 @@ describe("a value outside the contract's rules is not said, and the job answers"
     ["workers as one number", { status: "running", workers: 3 }],
     ["a negative worker count", { status: "queued", workers: { busy: -1, total: 1 } }],
     ["a fractional worker count", { status: "queued", workers: { busy: 0.5, total: 1 } }],
+    ["an attempt in words", { status: "running", attempt: "1" }],
   ])("%s", async (_name, view) => {
     expect(await readView(view)).toStrictEqual({ jobId: JOB, status: view.status });
   });
+});
+
+describe("the answer that accepts a press", () => {
+  const accept = (body: object) =>
+    new HttpAdviceClient(
+      "https://api.example",
+      async () => new Response(JSON.stringify({ job_id: JOB, ...body }), { status: 202 }),
+    ).requestAdvice({ leagueId: 352490, entryId: 35249001, strategy: "saf-puan", window: 1 });
+
+  it.each(["queued", "running"])("carries the job's word when it says %s", async (status) => {
+    expect(await accept({ status })).toStrictEqual({ kind: "job", jobId: JOB, status });
+  });
+
+  it.each([{}, { status: "completed" }, { status: 1 }, { status: null }])(
+    "says no word for %j",
+    async (body) => {
+      expect(await accept(body)).toStrictEqual({ kind: "job", jobId: JOB });
+    },
+  );
 });

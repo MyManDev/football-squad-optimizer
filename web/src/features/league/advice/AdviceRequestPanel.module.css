@@ -96,6 +96,25 @@
   }
 }
 
+/* A contrast theme paints every background alike: the bar keeps an outline and its own ink. */
+@media (forced-colors: active) {
+  .stages {
+    border: 1px solid CanvasText;
+  }
+
+  .stagesDone,
+  .stageNow::after {
+    background: Highlight;
+  }
+}
+
+/* With no pulse to run, a job with nothing to count has nothing to draw. */
+@media (prefers-reduced-motion: reduce) {
+  .stages:not([aria-valuenow]) {
+    display: none;
+  }
+}
+
 @media (max-width: 1179.98px) {
   .compute {
     min-height: 48px;

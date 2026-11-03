@@ -77,9 +77,9 @@ function computeEcho(
     state.phase === "requesting"
       ? states.requesting
       : state.phase === "waiting"
-        ? state.status === "queued"
-          ? states.queued
-          : states.running
+        ? state.status === null
+          ? null
+          : states[state.status]
         : state.phase === "done" && state.source !== "static-fallback"
           ? states.done
           : state.phase === "failed"

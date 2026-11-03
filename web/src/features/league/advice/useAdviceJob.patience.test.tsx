@@ -223,12 +223,46 @@ describe("a reload", () => {
     render(<Harness client={client} />);
     expect(phase()).toBe("idle");
     await click("resume");
-    expect(phase()).toBe("waiting:queued:advice-feedfacefeedface-2");
+    expect(phase()).toBe("waiting:running:advice-feedfacefeedface-2");
     client.job = "completed";
     await act(async () => vi.advanceTimersByTimeAsync(2100));
     expect(phase()).toBe("done");
     expect(client.keys).toEqual([]); // no POST
     expect(recallJob(REQUEST)).toBeNull();
+  });
+
+  it("names no word for a remembered job until the service has, and asks at once", async () => {
+    // Past its first minute, when the polls are five seconds apart.
+    rememberJob(REQUEST, { jobId: "advice-feedfacefeedface-2", startedAt: Date.now() - 120_000 });
+    const client = new SlowClient();
+    let answer: (view: AdviceJobStatus) => void = () => {};
+    const read = vi.fn(
+      () =>
+        new Promise<AdviceJobStatus>((resolve) => {
+          answer = resolve;
+        }),
+    );
+    client.readJob = read;
+    render(<Harness client={client} />);
+    await click("resume");
+    expect(phase()).toBe("waiting:null:advice-feedfacefeedface-2");
+    expect(read).toHaveBeenCalledTimes(1);
+    await act(async () => answer({ jobId: "advice-feedfacefeedface-2", status: "running" }));
+    expect(phase()).toBe("waiting:running:advice-feedfacefeedface-2");
+    expect(client.keys).toEqual([]); // no POST
+  });
+
+  it("stays silent about a remembered job while the service does not answer", async () => {
+    rememberJob(REQUEST, { jobId: "advice-feedfacefeedface-2", startedAt: Date.now() - 30_000 });
+    const client = new SlowClient();
+    client.job = new TypeError("Failed to fetch");
+    render(<Harness client={client} />);
+    await click("resume");
+    await act(async () => vi.advanceTimersByTimeAsync(4100));
+    expect(phase()).toBe("waiting:null:advice-feedfacefeedface-2");
+    client.job = "queued";
+    await act(async () => vi.advanceTimersByTimeAsync(2100));
+    expect(phase()).toBe("waiting:queued:advice-feedfacefeedface-2");
   });
 
   it("counts patience from when the wait began, not from the reload", async () => {

@@ -228,13 +228,13 @@ failure text, and which does not change.
 | `job_id`, `status`, `created_at_utc`, `updated_at_utc`, `attempt` | As the job record has them; `status` is `queued`, `running`, `completed` or `failed` |
 | `error_code` | A failed job's code (listed below); otherwise `null` |
 | `queue_position` | Optional. While `queued`, how many queued jobs will be claimed before this one (0 when it is next); `null` in every other state |
-| `progress` | Optional. While `running`, `{"done": d, "total": t}`: the documents this attempt has solved out of those it has to; `null` in every other state, and while running until the attempt has recorded its first count |
+| `progress` | Optional. While `running`, `{"done": d, "total": t}`: the documents this attempt has solved out of those it has to; `null` in every other state, while running until the attempt has recorded its first count, and on a poll that could not read the count |
 | `workers` | Optional. `{"busy": b, "total": t}`: the workers alive now and how many of them hold a job; `null` when the service cannot read them |
 
 The three optional fields came with #978 and did not change the version. A page that reads only
-`job_id`, `status` and `error_code` (`adviceClient.ts`, `readJob`) reads what it did, and a page
-that knows the fields treats each one as possibly absent, since an older service sends none of
-them. This service always sends the three keys, `null` where a field does not apply.
+`job_id`, `status` and `error_code` reads what it did, and a page that knows the fields
+(`adviceClient.ts`, `readJob`) treats each one as possibly absent, since an older service sends
+none of them. This service always sends the three keys, `null` where a field does not apply.
 
 - **The place in line** is counted on the claim order: oldest arrival first, the job id breaking
   ties (`queue_contracts.claim_order`, the key the queue's scan sorts by and `claim` takes the

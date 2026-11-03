@@ -383,21 +383,16 @@ describe("a selection nobody published, with the service answering", () => {
       adviceIssue: "not-listed",
       computeService: "ready",
     });
-    try {
-      await pressCompute();
-      await waitFor(
-        () => {
-          const echoes = [...container.querySelectorAll("[aria-live]")].map(
-            (node) => node.textContent,
-          );
-          expect(echoes).toContain(copy.computeEcho(said));
-        },
-        { timeout: 4000 },
-      );
-    } finally {
-      // The wait is still open: it must not be picked up by the next test's page.
-      sessionStorage.clear();
-    }
+    await pressCompute();
+    await waitFor(
+      () => {
+        const echoes = [...container.querySelectorAll("[aria-live]")].map(
+          (node) => node.textContent,
+        );
+        expect(echoes).toContain(copy.computeEcho(said));
+      },
+      { timeout: 4000 },
+    );
   });
 
   it.each([false, true])(
@@ -428,7 +423,10 @@ describe("a selection nobody published, with the service answering", () => {
         computeService: "ready",
       });
       expect(read).not.toHaveBeenCalled();
-      expect(container).toHaveTextContent(copy.computeQueued);
+      // The service has said nothing yet, so neither does the page, beyond leaving it open.
+      expect(container).not.toHaveTextContent(copy.computeQueued);
+      expect(container).not.toHaveTextContent(copy.computeRunning);
+      expect(container).not.toHaveTextContent(copy.computeEcho(copy.computeEchoStates.queued));
       expect(container).toHaveTextContent(computeCopy.leaveOpen);
       await waitFor(() => expect(container).toHaveTextContent(copy.computeDone), { timeout: 4000 });
       if (!missing) expect(client.polls).toEqual(["advice-0123456789abcdef-1"]);

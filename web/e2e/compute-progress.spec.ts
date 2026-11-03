@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 
 import { COMPUTE_COPY } from "../src/features/league/advice/computeCopy";
 import { mockEntrySquadEnvelopes } from "../src/fixtures/league";
@@ -88,8 +88,21 @@ async function askForPlan(page: Page, language: Language, view: object) {
   const settings = page.getByRole("region", { name: copy.planTitle });
   await settings.getByRole("radio", { name: /^5 / }).click();
   await settings.getByRole("radio", { name: "20", exact: true }).click();
+  await expect(settings.getByRole("radio", { name: /^5 / })).toBeChecked();
+  await expect(settings.getByRole("radio", { name: "20", exact: true })).toBeChecked();
+  await expect(page).toHaveURL(/window=5.*top100=20/);
   await settings.getByRole("button", { name: copy.computeButton, exact: true }).click();
   return { dock: page.locator("[data-compute-dock]"), job };
+}
+
+/** The boxes of the bar, its fill and its stage in hand, read at one moment: an answer redraws. */
+function parts(bar: Locator) {
+  return bar.evaluate((node) =>
+    [node, ...node.children].map((part) => {
+      const { x, width } = part.getBoundingClientRect();
+      return { x, width };
+    }),
+  );
 }
 
 async function noSidewaysScroll(page: Page): Promise<boolean> {
@@ -138,12 +151,10 @@ for (const language of ["tr", "en"] as const) {
     ).toBeVisible();
 
     // A third of the bar is solved, and the next third is the stage in hand.
-    const track = (await bar.boundingBox())!;
-    const solved = (await bar.locator("span").first().boundingBox())!;
-    const inHand = (await bar.locator("[data-stage-now]").boundingBox())!;
-    expect(solved.width).toBeCloseTo(track.width / 3, 0);
-    expect(inHand.width).toBeCloseTo(track.width / 3, 0);
-    expect(inHand.x).toBeCloseTo(track.x + track.width / 3, 0);
+    const [track, solved, inHand] = await parts(bar);
+    expect(solved!.width).toBeCloseTo(track!.width / 3, 0);
+    expect(inHand!.width).toBeCloseTo(track!.width / 3, 0);
+    expect(inHand!.x).toBeCloseTo(track!.x + track!.width / 3, 0);
 
     expect(await noSidewaysScroll(page)).toBe(true);
     expect((await dock.boundingBox())!.height).toBeLessThanOrEqual(667 * 0.45 + 1);
@@ -168,9 +179,9 @@ for (const language of ["tr", "en"] as const) {
         .locator("main")
         .getByText(copy.computeEcho(copy.computeEchoStates.running), { exact: true }),
     ).toBeVisible();
-    const track = (await bar.boundingBox())!;
-    const inHand = (await bar.locator("[data-stage-now]").boundingBox())!;
-    expect(inHand.width).toBeCloseTo(track.width, 0);
+    const [track, solved, inHand] = await parts(bar);
+    expect(solved!.width).toBe(0);
+    expect(inHand!.width).toBeCloseTo(track!.width, 0);
   });
 }
 
@@ -216,7 +227,34 @@ test("under reduced motion no pulse runs, and the fill and the count stay", asyn
   const first = await inHand.evaluateHandle((node) => node);
   await page.waitForFunction((node) => !node?.isConnected, first, { timeout: 7000 });
   expect(await inHand.evaluate((node) => node.getAnimations({ subtree: true }).length)).toBe(0);
-  const bar = dock.getByRole("progressbar");
-  const solved = (await bar.locator("span").first().boundingBox())!;
-  expect(solved.width).toBeCloseTo((await bar.boundingBox())!.width / 3, 0);
+  const [track, solved] = await parts(dock.getByRole("progressbar"));
+  expect(solved!.width).toBeCloseTo(track!.width / 3, 0);
+});
+
+test("under reduced motion a job with nothing to count draws no bar", async ({ page }) => {
+  test.skip(!apiOrigin, NO_SERVICE);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  const { dock, job } = await askForPlan(page, "tr", { status: "running" });
+  await expect(
+    dock.getByText(MESSAGES.tr.leagueMembers.computeRunning, { exact: true }),
+  ).toBeVisible();
+  await expect(dock.getByRole("progressbar")).toHaveCount(0);
+  job.says = RUNNING_ONE_OF_THREE;
+  await expect(dock.getByRole("progressbar")).toBeVisible();
+});
+
+test("a contrast theme keeps the bar's outline and its fill", async ({ page }) => {
+  test.skip(!apiOrigin, NO_SERVICE);
+  await page.emulateMedia({ forcedColors: "active" });
+  const { dock } = await askForPlan(page, "tr", RUNNING_ONE_OF_THREE);
+  const drawn = await dock.getByRole("progressbar").evaluate((node) => {
+    const track = getComputedStyle(node);
+    return {
+      outline: track.borderTopStyle,
+      trackInk: track.backgroundColor,
+      fillInk: getComputedStyle(node.firstElementChild!).backgroundColor,
+    };
+  });
+  expect(drawn.outline).toBe("solid");
+  expect(drawn.fillInk).not.toBe(drawn.trackInk);
 });

@@ -142,12 +142,16 @@ describe.each(["tr", "en"] as const)("where a waiting job stands in %s", (langua
     expect(workers("queued", 0, 3)).toBe(copy.workersBusy(0, 3));
   });
 
-  it("counts a running job's own worker even when the count is a few seconds behind", () => {
-    const line = jobWorkersLine(copy, { status: "running", workers: { busy: 0, total: 1 } });
-    expect(line).toBe(copy.workersBusy(1, 1));
+  it("names no worker for a running job the service counts none busy on", () => {
+    expect(jobWorkersLine(copy, { status: "running", workers: { busy: 0, total: 1 } })).toBeNull();
     expect(jobWorkersLine(copy, { status: "running", workers: { busy: 2, total: 3 } })).toBe(
       copy.workersBusy(2, 3),
     );
+  });
+
+  it("says nothing of a wait the service has not spoken about", () => {
+    expect(jobStanding(copy, { status: null })).toBeNull();
+    expect(jobWorkersLine(copy, { status: null })).toBeNull();
   });
 
   it("prints no percentage", () => {

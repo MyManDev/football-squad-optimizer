@@ -73,7 +73,8 @@ export interface WaitingPhase {
   phase: "waiting";
   request: AdviceRequest;
   jobId: string;
-  status: "queued" | "running";
+  /** Where the job stands, as the service said it; null until it has, after a reload. */
+  status: "queued" | "running" | null;
   fallback: LeagueViewEnvelope<EntryAdvice> | null;
   earlier?: EarlierAnswer | null;
   /** The job's place in line while it is queued; absent until the service says it. */
@@ -251,7 +252,7 @@ export function useAdviceJob(
       };
       setState(
         resumed
-          ? { phase: "waiting", request, jobId: resumed.jobId, status: "queued", fallback: null }
+          ? { phase: "waiting", request, jobId: resumed.jobId, status: null, fallback: null }
           : { phase: "requesting", request },
       );
 
@@ -261,6 +262,7 @@ export function useAdviceJob(
           const options = { signal };
           let jobId: string;
           let startedAt: number;
+          let status: WaitingPhase["status"] = null;
           if (resumed) {
             ({ jobId, startedAt } = resumed);
           } else {
@@ -291,6 +293,7 @@ export function useAdviceJob(
               return;
             }
             jobId = outcome.jobId;
+            status = outcome.status ?? "queued";
             startedAt = Date.now();
             rememberJob(request, { jobId, startedAt });
           }
@@ -317,17 +320,24 @@ export function useAdviceJob(
             fallback = null; // the wait is just quieter
           }
           if (!alive()) return;
-          setState({ phase: "waiting", request, jobId, status: "queued", fallback });
+          setState({ phase: "waiting", request, jobId, status, fallback });
 
+          // A wait picked up after a reload has heard nothing yet, so it asks at once.
+          let askNow = resumed !== null;
           let answers = 0;
+          let attempt: number | undefined;
+          let progress: AdviceJobProgress | undefined;
           while (Date.now() - startedAt < patience) {
-            const waited = Date.now() - startedAt;
-            await cancellableDelay(
-              waited < SLOW_POLL_AFTER_MS ? POLL_INTERVAL_MS : SLOW_POLL_INTERVAL_MS,
-              signal,
-            );
-            signal.throwIfAborted();
-            if (!alive()) return;
+            if (!askNow) {
+              const waited = Date.now() - startedAt;
+              await cancellableDelay(
+                waited < SLOW_POLL_AFTER_MS ? POLL_INTERVAL_MS : SLOW_POLL_INTERVAL_MS,
+                signal,
+              );
+              signal.throwIfAborted();
+              if (!alive()) return;
+            }
+            askNow = false;
             let job;
             try {
               job = await client.readJob(jobId, options);
@@ -377,6 +387,11 @@ export function useAdviceJob(
               return;
             }
             answers += 1;
+            // A poll that could not read the count does not take it back: `done` only goes up
+            // within an attempt, and a new attempt starts again.
+            const sameRun = job.status === "running" && job.attempt === attempt;
+            progress = job.progress ?? (sameRun ? progress : undefined);
+            attempt = job.attempt;
             setState({
               phase: "waiting",
               request,
@@ -384,7 +399,7 @@ export function useAdviceJob(
               status: job.status,
               fallback,
               queuePosition: job.queuePosition,
-              progress: job.progress,
+              progress,
               workers: job.workers,
               answers,
             });

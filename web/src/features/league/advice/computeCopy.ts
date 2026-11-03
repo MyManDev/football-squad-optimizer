@@ -158,15 +158,18 @@ export function jobStanding(
   return progress !== undefined && progress.total > 1 ? `${progress.done}/${progress.total}` : null;
 }
 
-/** The line about the workers; null where the service has not said or counts none alive. */
+/**
+ * The line about the workers; null where the service has not said or counts none alive. A
+ * running job with no worker busy has none either: the count is a few seconds behind, or the
+ * job's worker has died and the service has not put it back in the queue yet.
+ */
 export function jobWorkersLine(
   copy: ComputeCopy,
   { status, workers }: Pick<WaitingPhase, "status" | "workers">,
 ): string | null {
   if (workers === undefined || workers.total === 0) return null;
-  // A running job's own worker holds it, though the count can be a few seconds behind.
-  const busy = status === "running" ? Math.max(workers.busy, 1) : workers.busy;
-  return copy.workersBusy(busy, workers.total);
+  if (status === "running" && workers.busy === 0) return null;
+  return copy.workersBusy(workers.busy, workers.total);
 }
 
 /**

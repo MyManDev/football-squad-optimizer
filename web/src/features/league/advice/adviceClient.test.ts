@@ -140,7 +140,11 @@ describe("HttpAdviceClient", () => {
     try {
       const client = new HttpAdviceClient("https://api.example");
       expect((await client.readAdvice(REQUEST)).kind).toBe("advice");
-      expect(await client.requestAdvice(REQUEST)).toEqual({ kind: "job", jobId: "job-1" });
+      expect(await client.requestAdvice(REQUEST)).toEqual({
+        kind: "job",
+        jobId: "job-1",
+        status: "queued",
+      });
       expect(await client.readJob("job-1")).toEqual({ jobId: "job-1", status: "completed" });
       expect(browserFetch).toHaveBeenCalledTimes(3);
     } finally {

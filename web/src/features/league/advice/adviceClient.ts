@@ -56,7 +56,8 @@ export type AdviceReadResult =
 
 export type AdviceRequestResult =
   | { kind: "advice"; envelope: LeagueViewEnvelope<EntryAdvice>; source: AdviceSource }
-  | { kind: "job"; jobId: string }
+  /** `status` is the job's word when the answer says it: a press can join a running job. */
+  | { kind: "job"; jobId: string; status?: "queued" | "running" }
   /** `reason` is a service code when a configured service refused or could not be reached. */
   | { kind: "unavailable"; reason?: string | null };
 
@@ -94,6 +95,8 @@ export interface AdviceJobStatus {
   status: "queued" | "running" | "completed" | "failed";
   /** The service's coded reason for a failed job; never its text. */
   errorCode?: string | null;
+  /** The attempt on the job, from 1; a new attempt starts its count again. */
+  attempt?: number;
   /** While queued: how many queued jobs will be claimed first, 0 when this one is next. */
   queuePosition?: number;
   /** While running: the documents this attempt has solved out of those it has to solve. */
@@ -366,11 +369,15 @@ export class HttpAdviceClient implements AdviceClient {
         }),
       });
       if (response.status === 202) {
-        const body = (await response.json()) as { job_id: string };
+        const body = (await response.json()) as { job_id: string; status?: unknown };
         if (typeof body?.job_id !== "string" || !body.job_id.trim()) {
           throw new AdviceResponseError("Accepted advice request has no job identity.");
         }
-        return { kind: "job", jobId: body.job_id };
+        return {
+          kind: "job",
+          jobId: body.job_id,
+          ...(body.status === "queued" || body.status === "running" ? { status: body.status } : {}),
+        };
       }
       if (!response.ok) throw await apiError(response);
       const envelope = checkedAdvice(await response.json(), request);
@@ -389,6 +396,7 @@ export class HttpAdviceClient implements AdviceClient {
         job_id: string;
         status: AdviceJobStatus["status"];
         error_code?: unknown;
+        attempt?: unknown;
         queue_position?: unknown;
         progress?: unknown;
         workers?: unknown;
@@ -404,6 +412,7 @@ export class HttpAdviceClient implements AdviceClient {
           ? body.error_code
           : null;
       // How the wait is going never decides the job: what cannot be read is simply not said.
+      const attempt = jobCount(body.attempt);
       const queuePosition = body.status === "queued" ? jobCount(body.queue_position) : null;
       const progress = body.status === "running" ? jobProgress(body.progress) : null;
       const workers = jobWorkers(body.workers);
@@ -411,6 +420,7 @@ export class HttpAdviceClient implements AdviceClient {
         jobId: body.job_id,
         status: body.status,
         ...(errorCode === null ? {} : { errorCode }),
+        ...(attempt === null ? {} : { attempt }),
         ...(queuePosition === null ? {} : { queuePosition }),
         ...(progress === null ? {} : { progress }),
         ...(workers === null ? {} : { workers }),
