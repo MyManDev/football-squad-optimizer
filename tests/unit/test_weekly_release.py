@@ -426,7 +426,7 @@ def test_the_host_hook_hands_root_one_request_naming_files_and_reports_its_resul
         f"backend: asked root to move to site-2026-27-gw10-fix1 from capture {CAPTURE}",
         *lines,
     ]
-    assert not list(spool.glob("*.partial"))
+    assert [path.name for path in spool.iterdir()] == [f"{FRIDAY}.json"]
 
 
 def test_the_host_hook_passes_on_roots_failure_and_stops_when_no_result_comes(

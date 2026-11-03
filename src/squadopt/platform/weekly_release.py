@@ -64,6 +64,8 @@ from pathlib import Path
 from typing import Final
 
 from squadopt.contracts.run_logs import LOG_ROOT_NAME
+from squadopt.data.atomic import write_document_once
+from squadopt.data.errors import AtomicWriteError
 from squadopt.platform.weekly_journal import WeeklyJournalError, held_run
 from squadopt.platform.weekly_publish import WEEKLY_RUNS
 
@@ -327,9 +329,9 @@ def move_backend_on_this_host(
 ) -> int:
     """Hand the release to root's ``squadopt-backend-release`` on this host and wait for it.
 
-    The request is written under a name the path unit ignores and renamed when complete. The
-    result's lines go into the release log; its code is the hook's, and 124 when no result
-    came within `minutes`.
+    The request is written once, through a temporary the path unit ignores; a different
+    request already waiting for the run is refused. The result's lines go into the release
+    log; its code is the hook's, and 124 when no result came within `minutes`.
     """
 
     try:
@@ -342,9 +344,11 @@ def move_backend_on_this_host(
         say(f"backend: refused: {result} exists, so this run was moved before")
         return 2
     spool.mkdir(parents=True, exist_ok=True)
-    partial = spool / f"{release.run_id}.json.partial"
-    partial.write_text(json.dumps(request, indent=2) + "\n", encoding="utf-8")
-    os.replace(partial, spool / f"{release.run_id}.json")
+    try:
+        write_document_once(request, spool / f"{release.run_id}.json")
+    except AtomicWriteError as error:
+        say(f"backend: refused: another request for this run waits in {spool} ({error})")
+        return 2
     say(f"backend: asked root to move to {tag} from capture {release.capture}")
     for _ in range(minutes * 4):
         if result.is_file():
