@@ -14,7 +14,7 @@ import { CLUB_COLOURS } from "../../lib/clubs";
 import { loadFixtures } from "./data";
 import { FIXTURES_COPY } from "./fixturesCopy";
 import { FixturesPage } from "./FixturesPage";
-import { GameweekFixtures } from "./GameweekFixtures";
+import { FixtureMatrix } from "./FixtureMatrix";
 import { fixtureDay, fixtureTime } from "./kickoff";
 import { TeamFixtures } from "./TeamFixtures";
 import type { Fixture, FixturesPayload } from "./types";
@@ -47,10 +47,6 @@ const SEASON_CODES = [
   "SUN",
   "TOT",
 ];
-
-/** The page's stylesheet without its comments. */
-const stylesheet = () =>
-  readFileSync(join(__dirname, "Fixtures.module.css"), "utf-8").replace(/\/\*[\s\S]*?\*\//g, "");
 
 const team = (team_id: number, name: string, short_name: string) => ({ team_id, name, short_name });
 const ARS = team(1, "Arsenal", "ARS");
@@ -115,7 +111,7 @@ function payload(current: number | null = 3): FixturesPayload {
   };
 }
 
-/** Seven weeks ahead, each with one fixture: the open week, the next one, and five more. */
+/** Seven weeks ahead, each with one fixture but the first: more than the matrix shows. */
 function longRun(): FixturesPayload {
   const base = payload();
   return {
@@ -171,6 +167,12 @@ const atClock = (iso: string) => vi.spyOn(Date, "now").mockReturnValue(Date.pars
 /** The matrix, once the page has drawn it. */
 const findMatrix = () => screen.findByRole("table", { name: FIXTURES_COPY.en.generalView });
 
+/** What the matrix's column heads print, in order. */
+const columnsOf = (matrix: HTMLElement) =>
+  within(matrix)
+    .getAllByRole("columnheader")
+    .map((node) => node.textContent);
+
 /** The cells of one club's line of the matrix, found by its code. */
 const lineOf = (matrix: HTMLElement, code: string) =>
   within(
@@ -184,12 +186,6 @@ const optionsOf = (group: HTMLElement) =>
   within(group)
     .getAllByRole("radio")
     .map((radio) => radio.closest("label")!.textContent);
-
-/** The region the fixtures page gives one gameweek, found by its heading. */
-async function gameweekRegion(name: string) {
-  const heading = await screen.findByRole("heading", { level: 2, name });
-  return heading.closest("section")!;
-}
 
 beforeEach(() => {
   vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-09-18T10:00:00Z"));
@@ -246,12 +242,7 @@ describe("the fixtures page", () => {
     await screen.findByRole("heading", { level: 1, name: "Fixtures" });
     expect(screen.getByRole("radio", { name: FIXTURES_COPY.en.generalView })).toBeChecked();
     expect(screen.getByRole("radio", { name: FIXTURES_COPY.en.teamView })).not.toBeChecked();
-    const matrix = await findMatrix();
-    expect(
-      within(matrix)
-        .getAllByRole("columnheader")
-        .map((node) => node.textContent),
-    ).toEqual([FIXTURES_COPY.en.clubLegend, "GW3", "GW4"]);
+    expect(columnsOf(await findMatrix())).toEqual([FIXTURES_COPY.en.clubLegend, "GW3", "GW4"]);
     expect(screen.getByTestId("surface")).toHaveTextContent(FIXTURES_COPY.en.unscheduledCount(1));
     expect(FIXTURES_COPY.en).not.toHaveProperty("pastTitle");
     expect(FIXTURES_COPY.tr).not.toHaveProperty("pastTitle");
@@ -272,35 +263,6 @@ describe("the fixtures page", () => {
     serve(body);
     render(surface(<FixturesPage />, "en", "/fixtures"));
     expect(await screen.findByText(FIXTURES_COPY.en.notPublished)).toBeInTheDocument();
-  });
-
-  it("shows the last week left as its list, with no matrix and no choice of weeks", async () => {
-    atClock("2026-09-22T12:00:00Z");
-    serve(published(payload(4)));
-    render(surface(<FixturesPage />, "en", "/fixtures"));
-    await gameweekRegion("Gameweek 4");
-    expect(headings()).toEqual(["Gameweek 4"]);
-    expect(screen.queryByRole("table")).toBeNull();
-    expect(screen.queryByRole("group", { name: FIXTURES_COPY.en.weekLegend })).toBeNull();
-    expect(screen.getByRole("radio", { name: FIXTURES_COPY.en.teamView })).toBeInTheDocument();
-  });
-
-  it("keeps a week whose deadline has passed while its matches are still to come", async () => {
-    atClock("2026-09-19T12:00:00Z");
-    // The capture is what names gameweek 4 as current: its deadline is the first still open.
-    serve(published({ ...payload(4), captured_at_utc: "2026-09-19T11:00:00Z" }));
-    render(surface(<FixturesPage />, "en", "/fixtures"));
-    expect(
-      optionsOf(await screen.findByRole("group", { name: FIXTURES_COPY.en.weekLegend })),
-    ).toEqual(["2 weeks", "GW3", "GW4"]);
-  });
-
-  it("reads on past the last deadline while a match of the season is still to come", async () => {
-    atClock("2026-09-26T11:00:00Z");
-    serve(published({ ...payload(null), captured_at_utc: "2026-09-26T10:30:00Z" }));
-    render(surface(<FixturesPage />, "en", "/fixtures"));
-    await gameweekRegion("Gameweek 4");
-    expect(headings()).toEqual(["Gameweek 4"]);
   });
 
   it.each(["tr", "en"] as const)(
@@ -353,24 +315,92 @@ describe("the fixtures page", () => {
   });
 });
 
-describe("the matrix", () => {
+describe("the matrix's window", () => {
   it("has a line for each club and a column for each of the next five gameweeks", async () => {
     serve(published(longRun()));
     render(surface(<FixturesPage />, "en", "/fixtures"));
     const matrix = await findMatrix();
-    expect(
-      within(matrix)
-        .getAllByRole("columnheader")
-        .map((node) => node.textContent),
-    ).toEqual([FIXTURES_COPY.en.clubLegend, "GW3", "GW4", "GW5", "GW6", "GW7"]);
+    expect(columnsOf(matrix)).toEqual([
+      FIXTURES_COPY.en.clubLegend,
+      "GW3",
+      "GW4",
+      "GW5",
+      "GW6",
+      "GW7",
+    ]);
     expect(
       within(matrix)
         .getAllByRole("rowheader")
         .map((node) => node.getAttribute("title")),
     ).toEqual(["Arsenal", "Aston Villa", "Brentford", "Chelsea"]);
+  });
+
+  it("rolls on by itself as the weeks pass, always five while five are left", async () => {
+    // Gameweek 3 is behind by the 22nd and gameweek 4 by the 27th.
+    atClock("2026-09-27T12:00:00Z");
+    serve(published(longRun()));
+    render(surface(<FixturesPage />, "en", "/fixtures"));
+    expect(columnsOf(await findMatrix())).toEqual([
+      FIXTURES_COPY.en.clubLegend,
+      "GW5",
+      "GW6",
+      "GW7",
+      "GW8",
+      "GW9",
+    ]);
+  });
+
+  it("offers no choice of weeks, by any address", async () => {
+    serve(published(longRun()));
+    render(surface(<FixturesPage />, "en", "/fixtures?week=5"));
+    const matrix = await findMatrix();
+    expect(within(matrix).getAllByRole("columnheader")).toHaveLength(6);
+    expect(screen.getAllByRole("radio").map((radio) => radio.getAttribute("name"))).toEqual([
+      "fixture-view",
+      "fixture-view",
+    ]);
+    expect(screen.queryByRole("heading", { level: 2 })).toBeNull();
     expect(screen.queryByRole("list")).toBeNull();
   });
 
+  it("narrows to the weeks left near the season's end, down to the last one", async () => {
+    atClock("2026-09-22T12:00:00Z");
+    serve(published(payload()));
+    render(surface(<FixturesPage />, "en", "/fixtures"));
+    expect(columnsOf(await findMatrix())).toEqual([FIXTURES_COPY.en.clubLegend, "GW4"]);
+  });
+
+  it("leaves a week the calendar does not list missing, and does not reach past the five", async () => {
+    const view = longRun();
+    view.gameweeks = view.gameweeks.filter((week) => week.gameweek !== 5);
+    serve(published(view));
+    render(surface(<FixturesPage />, "en", "/fixtures"));
+    expect(columnsOf(await findMatrix())).toEqual([
+      FIXTURES_COPY.en.clubLegend,
+      "GW3",
+      "GW4",
+      "GW6",
+      "GW7",
+    ]);
+  });
+
+  it("keeps a week whose deadline has passed while its matches are still to come", async () => {
+    atClock("2026-09-19T12:00:00Z");
+    // The capture is what names gameweek 4 as current: its deadline is the first still open.
+    serve(published({ ...payload(4), captured_at_utc: "2026-09-19T11:00:00Z" }));
+    render(surface(<FixturesPage />, "en", "/fixtures"));
+    expect(columnsOf(await findMatrix())).toEqual([FIXTURES_COPY.en.clubLegend, "GW3", "GW4"]);
+  });
+
+  it("reads on past the last deadline while a match of the season is still to come", async () => {
+    atClock("2026-09-26T11:00:00Z");
+    serve(published({ ...payload(null), captured_at_utc: "2026-09-26T10:30:00Z" }));
+    render(surface(<FixturesPage />, "en", "/fixtures"));
+    expect(columnsOf(await findMatrix())).toEqual([FIXTURES_COPY.en.clubLegend, "GW4"]);
+  });
+});
+
+describe("the matrix's cells", () => {
   it("gives each club's week its opponent and its venue, from that club's side", async () => {
     serve(published(payload()));
     render(surface(<FixturesPage />, "en", "/fixtures"));
@@ -421,89 +451,22 @@ describe("the matrix", () => {
     expect(week3!.querySelector("[data-venue]")).toHaveAttribute("data-behind");
     expect(week3).not.toHaveTextContent(MESSAGES.en.leagueMembers.fixtureNone);
   });
-});
 
-describe("the general view's choice of weeks", () => {
-  const weekChoice = () => screen.findByRole("group", { name: FIXTURES_COPY.en.weekLegend });
-
-  it("offers the next five gameweeks, and the matrix of them first", async () => {
-    serve(published(longRun()));
-    render(surface(<FixturesPage />, "en", "/fixtures"));
-    expect(optionsOf(await weekChoice())).toEqual(["5 weeks", "GW3", "GW4", "GW5", "GW6", "GW7"]);
-    expect(screen.getByRole("radio", { name: "5 weeks" })).toBeChecked();
-    expect(await findMatrix()).toBeInTheDocument();
-    expect(screen.getByTestId("address")).toHaveTextContent(/^\/fixtures$/);
-  });
-
-  it("shows one week's list when it is chosen, and keeps the choice in the address", async () => {
-    serve(published(longRun()));
-    render(surface(<FixturesPage />, "en", "/fixtures"));
-    await weekChoice();
-
-    fireEvent.click(screen.getByRole("radio", { name: "GW5" }));
-    expect(screen.getByRole("radio", { name: "GW5" })).toBeChecked();
-    expect(headings()).toEqual(["Gameweek 5"]);
-    expect(screen.queryByRole("table")).toBeNull();
-    expect(screen.getByTestId("address")).toHaveTextContent("/fixtures?week=5");
-
-    fireEvent.click(screen.getByRole("radio", { name: "5 weeks" }));
-    expect(screen.getByRole("table")).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { level: 2 })).toBeNull();
-    expect(screen.getByTestId("address")).toHaveTextContent(/^\/fixtures$/);
-  });
-
-  it("opens on the week the address names", async () => {
-    serve(published(longRun()));
-    render(surface(<FixturesPage />, "en", "/fixtures?week=6"));
-    await weekChoice();
-    expect(screen.getByRole("radio", { name: "GW6" })).toBeChecked();
-    expect(headings()).toEqual(["Gameweek 6"]);
-  });
-
-  it.each(["1", "8", "0", "-3", "4.5", "soon"])(
-    "shows the matrix when the address names week %s, which it does not offer",
-    async (week) => {
-      serve(published(longRun()));
-      render(surface(<FixturesPage />, "en", `/fixtures?week=${week}`));
-      await weekChoice();
-      expect(screen.getByRole("radio", { name: "5 weeks" })).toBeChecked();
-      expect(await findMatrix()).toBeInTheDocument();
-    },
-  );
-
-  it("leaves a week the calendar does not list missing, and does not reach past the five", async () => {
-    const view = longRun();
-    view.gameweeks = view.gameweeks.filter((week) => week.gameweek !== 5);
-    serve(published(view));
-    render(surface(<FixturesPage />, "en", "/fixtures"));
-    expect(optionsOf(await weekChoice())).toEqual(["4 weeks", "GW3", "GW4", "GW6", "GW7"]);
-    expect(within(await findMatrix()).getAllByRole("columnheader")).toHaveLength(5);
-  });
-});
-
-describe("a week's list", () => {
-  it("shows a finished fixture's score and an unfinished one's kickoff, never a score", async () => {
+  it("prints no score and no kickoff: those are not what a line is read for", async () => {
     serve(published(payload()));
-    render(surface(<FixturesPage />, "en", "/fixtures?week=3"));
-    const week = await gameweekRegion("Gameweek 3");
-    const [finished, scheduled] = within(week).getAllByRole("listitem");
-
-    expect(finished).toHaveTextContent("CHE1 - 2ARS");
-    expect(within(scheduled!).getByText(/^\d{2}:\d{2}$/)).toHaveAttribute(
-      "datetime",
-      "2026-09-20T13:00:00Z",
-    );
-    expect(scheduled).not.toHaveTextContent(/\d - \d/);
+    const { container } = render(surface(<FixturesPage />, "en", "/fixtures"));
+    await findMatrix();
+    expect(container.querySelector("time")).toBeNull();
+    expect(container.textContent).not.toMatch(/\d - \d/);
   });
 
-  it("labels a fixture with no kickoff from the copy and prints no time for it", async () => {
+  it("names a club on its line by code and by name, for the two widths that print one", async () => {
     serve(published(payload()));
-    render(surface(<FixturesPage />, "en", "/fixtures?week=3"));
-    const week = await gameweekRegion("Gameweek 3");
-    expect(within(week).getByText(FIXTURES_COPY.en.unscheduled)).toBeInTheDocument();
-    const row = within(week).getAllByRole("listitem")[2]!;
-    expect(row).toHaveTextContent("ARSvBRE");
-    expect(row.querySelector("time")).toBeNull();
+    render(surface(<FixturesPage />, "en", "/fixtures"));
+    const header = within(await findMatrix()).getByRole("rowheader", { name: /^BRE/ });
+    expect(header.querySelector(".clubCode")).toHaveTextContent("BRE");
+    expect(header.querySelector(".clubName")).toHaveTextContent("Brentford");
+    expect(header).toHaveAttribute("title", "Brentford");
   });
 });
 
@@ -513,7 +476,7 @@ describe("the team view", () => {
       "listitem",
     );
 
-  it("opens on the first club and offers no choice of weeks", async () => {
+  it("opens on the first club, with no matrix", async () => {
     serve(published(payload()));
     render(surface(<FixturesPage />, "en", "/fixtures"));
     fireEvent.click(await screen.findByRole("radio", { name: FIXTURES_COPY.en.teamView }));
@@ -528,8 +491,15 @@ describe("the team view", () => {
     ]);
     expect(screen.getByRole("radio", { name: "ARS Arsenal" })).toBeChecked();
     expect(headings()).toEqual(["Arsenal"]);
-    expect(screen.queryByRole("group", { name: FIXTURES_COPY.en.weekLegend })).toBeNull();
     expect(screen.queryByRole("table")).toBeNull();
+  });
+
+  it("goes back to the matrix from the view's own choice", async () => {
+    serve(published(payload()));
+    render(surface(<FixturesPage />, "en", "/fixtures?view=team"));
+    fireEvent.click(await screen.findByRole("radio", { name: FIXTURES_COPY.en.generalView }));
+    expect(await findMatrix()).toBeInTheDocument();
+    expect(screen.getByTestId("address")).toHaveTextContent(/^\/fixtures$/);
   });
 
   it("says each match's week, venue, opponent, date and time, and nothing else", async () => {
@@ -587,7 +557,7 @@ describe("the team view", () => {
     expect(cells[0]).toHaveAttribute("data-venue", "none");
   });
 
-  it("gives a double week two cells and runs on past the general view's five", async () => {
+  it("gives a double week two cells and runs on past the matrix's five", async () => {
     const view = longRun();
     view.gameweeks
       .find((week) => week.gameweek === 9)!
@@ -651,19 +621,19 @@ describe("the team view", () => {
     expect(headings()).toEqual(["Arsenal"]);
   });
 
-  it("keeps the chosen club and the chosen week while the view changes", async () => {
+  it("keeps the chosen club while the view changes", async () => {
     serve(published(longRun()));
-    render(surface(<FixturesPage />, "en", "/fixtures?week=5"));
+    render(surface(<FixturesPage />, "en", "/fixtures"));
     fireEvent.click(await screen.findByRole("radio", { name: FIXTURES_COPY.en.teamView }));
     fireEvent.click(screen.getByRole("radio", { name: "CHE Chelsea" }));
     expect(headings()).toEqual(["Chelsea"]);
 
     fireEvent.click(screen.getByRole("radio", { name: FIXTURES_COPY.en.generalView }));
-    expect(headings()).toEqual(["Gameweek 5"]);
+    expect(await findMatrix()).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("radio", { name: FIXTURES_COPY.en.teamView }));
     expect(screen.getByRole("radio", { name: "CHE Chelsea" })).toBeChecked();
-    expect(screen.getByTestId("address")).toHaveTextContent("/fixtures?week=5&team=CHE&view=team");
+    expect(screen.getByTestId("address")).toHaveTextContent("/fixtures?team=CHE&view=team");
   });
 
   it("offers all twenty clubs of the shipped calendar, each with its code, colours and name", () => {
@@ -701,11 +671,11 @@ describe("the team view", () => {
 
 describe("what the fixtures page leaves out", () => {
   it.each(["tr", "en"] as const)(
-    "prints no capture time and no deadline on any week in %s",
+    "prints no capture time and no deadline in either view in %s",
     async (language) => {
       serve(published(payload()));
-      render(surface(<FixturesPage />, language, "/fixtures?week=3"));
-      await gameweekRegion(MESSAGES[language].common.gameweek(3));
+      const first = render(surface(<FixturesPage />, language, "/fixtures"));
+      await screen.findByRole("table", { name: FIXTURES_COPY[language].generalView });
       // The calendar file's button names the deadlines and prints none of them; the rest of
       // the page does not name them at all.
       const calendar = screen
@@ -713,14 +683,17 @@ describe("what the fixtures page leaves out", () => {
         .querySelector('[data-mark="deadline-calendar"]')!;
       expect(calendar).toHaveTextContent(FIXTURES_COPY[language].calendarAction);
       expect(calendar.textContent).not.toMatch(/\d/);
-      const text = (screen.getByTestId("surface").textContent ?? "").replace(
-        calendar.textContent ?? "",
-        "",
+      const words = () =>
+        (screen.getByTestId("surface").textContent ?? "").replace(calendar.textContent ?? "", "");
+      expect(words()).not.toMatch(/tarihli kayda göre|As recorded on|Son tarih|Deadline/);
+      first.unmount();
+
+      serve(published(payload()));
+      render(surface(<FixturesPage />, language, "/fixtures?view=team"));
+      await screen.findByRole("group", { name: FIXTURES_COPY[language].clubLegend });
+      expect(screen.getByTestId("surface").textContent).not.toMatch(
+        /tarihli kayda göre|As recorded on|Son tarih/,
       );
-      expect(text).not.toMatch(/tarihli kayda göre|As recorded on|Son tarih|Deadline/);
-      // No week heading carries an aside of its own.
-      for (const heading of screen.getAllByRole("heading", { level: 2 }))
-        if (heading.closest("section")) expect(heading.parentElement!.children).toHaveLength(1);
       expect(FIXTURES_COPY[language]).not.toHaveProperty("capturedAt");
       expect(FIXTURES_COPY[language]).not.toHaveProperty("deadline");
     },
@@ -747,11 +720,7 @@ describe("what the fixtures page leaves out", () => {
 
   describe("prints the fixtures and the choices, and not one word more", () => {
     const quiet = () => ({ ...payload(), unscheduled_count: 0 });
-    const [played, kickoff, later] = [
-      "2026-08-22T14:00:00Z",
-      "2026-09-20T13:00:00Z",
-      "2026-09-26T14:00:00Z",
-    ] as const;
+    const [kickoff, later] = ["2026-09-20T13:00:00Z", "2026-09-26T14:00:00Z"] as const;
     const day = (iso: string) => fixtureDay(iso, "en-GB");
     const time = (iso: string) => fixtureTime(iso, "en-GB");
     const copy = FIXTURES_COPY.en;
@@ -767,7 +736,6 @@ describe("what the fixtures page leaves out", () => {
       copy.generalView,
       copy.teamView,
     ];
-    const weeks = [copy.weekLegend, "2 weeks", "GW3", "GW4"];
 
     it("in the matrix", async () => {
       serve(published(quiet()));
@@ -776,26 +744,11 @@ describe("what the fixtures page leaves out", () => {
       expect(screen.getByTestId("surface").textContent).toBe(
         [
           ...above,
-          ...weeks,
           ...[copy.generalView, copy.clubLegend, "GW3", "GW4"],
           ...["ARSArsenal", away("CHE"), home("BRE"), away("BRE")],
           ...["AVLAston Villa", home("BRE"), none],
           ...["BREBrentford", away("AVL"), away("ARS"), home("ARS")],
           ...["CHEChelsea", home("ARS"), none],
-        ].join(""),
-      );
-    });
-
-    it("in a week's list", async () => {
-      serve(published(quiet()));
-      render(surface(<FixturesPage />, "en", "/fixtures?week=3"));
-      await gameweekRegion("Gameweek 3");
-      expect(screen.getByTestId("surface").textContent).toBe(
-        [
-          ...above,
-          ...weeks,
-          ...["Gameweek 3", day(played), "CHE1 - 2ARS"],
-          ...[day(kickoff), `AVL${time(kickoff)}BRE`, copy.unscheduled, "ARSvBRE"],
         ].join(""),
       );
     });
@@ -817,20 +770,20 @@ describe("what the fixtures page leaves out", () => {
       );
     });
   });
-
-  it("draws no rule between the days of a fixture list", () => {
-    const css = stylesheet();
-    const day = css.match(/(^|\n)\.day\s*\{([^}]*)\}/)?.[2];
-    expect(day).toBeDefined();
-    expect(day).not.toMatch(/border/);
-    // Nothing else in the page's stylesheet draws a rule either; space keeps the days apart.
-    expect(css).not.toMatch(/border/);
-    expect(css.match(/\.days\s*\{([^}]*)\}/)?.[1]).toMatch(/gap:\s*var\(--space-4\)/);
-  });
 });
 
-describe("the two club colours in a fixture list", () => {
+describe("the two club colours in the matrix", () => {
   const week = shipped.payload.gameweeks[0]!;
+  const matrixOf = (gameweek: FixturesPayload["gameweeks"][number], language: Language) =>
+    surface(
+      <FixtureMatrix
+        payload={{ ...shipped.payload, gameweeks: [gameweek] }}
+        weeks={[gameweek]}
+        copy={FIXTURES_COPY[language]}
+      />,
+      language,
+      "/fixtures",
+    );
 
   it("covers all twenty clubs of the season in the shipped first gameweek", () => {
     const codes = week.fixtures.flatMap((fixture) => [
@@ -841,62 +794,40 @@ describe("the two club colours in a fixture list", () => {
   });
 
   it.each(["tr", "en"] as const)(
-    "draws both colours beside every club, facing the middle, with the code printed (%s)",
+    "draws both colours beside every club and opponent, with the code printed (%s)",
     (language) => {
-      render(
-        <GameweekFixtures
-          week={week}
-          locale={language === "tr" ? "tr-TR" : "en-GB"}
-          copy={FIXTURES_COPY[language]}
-        />,
-      );
-      const rows = screen.getAllByRole("listitem");
-      expect(rows).toHaveLength(week.fixtures.length);
-      const seen: string[] = [];
-      rows.forEach((row, index) => {
-        const fixture = week.fixtures[index]!;
-        const [home, , away] = [...row.children] as HTMLElement[];
-        const sides = [
-          { side: home!, team: fixture.home, mark: home!.lastElementChild, code: home!.firstChild },
-          { side: away!, team: fixture.away, mark: away!.firstElementChild, code: away!.lastChild },
-        ];
-        for (const { side, team, mark, code } of sides) {
-          // The code is printed beside the mark, and the full name stays on the side.
-          expect(side.textContent).toBe(team.short_name);
-          expect(code!.textContent).toBe(team.short_name);
-          expect(side).toHaveAttribute("title", team.name);
-          expect(side.querySelectorAll("[aria-hidden='true']")).toHaveLength(1);
-          const swatch = mark as HTMLElement;
-          expect(swatch).toHaveAttribute("aria-hidden", "true");
-          expect(swatch.textContent).toBe("");
-          expect(swatch.style.getPropertyValue("--club-primary")).toBe(
-            CLUB_COLOURS[team.short_name]!.primary,
-          );
-          expect(swatch.style.getPropertyValue("--club-secondary")).toBe(
-            CLUB_COLOURS[team.short_name]!.secondary,
-          );
-          seen.push(team.short_name);
-        }
-      });
-      expect(seen.sort()).toEqual(SEASON_CODES);
+      render(matrixOf(week, language));
+      const painted = (holder: Element, code: string) => {
+        const swatch = holder.querySelector<HTMLElement>("[aria-hidden='true']")!;
+        expect(swatch.textContent).toBe("");
+        expect(swatch.style.getPropertyValue("--club-primary")).toBe(CLUB_COLOURS[code]!.primary);
+        expect(swatch.style.getPropertyValue("--club-secondary")).toBe(
+          CLUB_COLOURS[code]!.secondary,
+        );
+      };
+      const rows = screen.getAllByRole("rowheader");
+      const clubs = rows.map((row) => row.querySelector(".clubCode")!.textContent!);
+      expect(clubs).toEqual(SEASON_CODES);
+      rows.forEach((row, index) => painted(row, clubs[index]!));
+
+      const matches = [...document.querySelectorAll("[data-venue]")];
+      const opponents = matches.map((match) => match.querySelector(".opponent")!.textContent!);
+      expect([...opponents].sort()).toEqual(SEASON_CODES);
+      matches.forEach((match, index) => painted(match, opponents[index]!));
     },
   );
 
   it("prints a club it has no colours for by its code alone", () => {
-    render(
-      <GameweekFixtures
-        week={{
-          gameweek: 1,
-          deadline_utc: "2026-08-21T17:30:00Z",
-          fixtures: [upcoming(1, team(90, "Northport", "NPT"), ARS, "2026-08-22T14:00:00Z")],
-        }}
-        locale="en-GB"
-        copy={FIXTURES_COPY.en}
-      />,
-    );
-    const row = screen.getByRole("listitem");
-    expect(row).toHaveTextContent(/^NPT\d{2}:\d{2}ARS$/);
-    expect(row.querySelectorAll("[aria-hidden='true']")).toHaveLength(1);
+    const gameweek = {
+      gameweek: 1,
+      deadline_utc: "2026-08-21T17:30:00Z",
+      fixtures: [upcoming(1, team(90, "Northport", "NPT"), ARS, "2026-08-22T14:00:00Z")],
+    };
+    render(matrixOf(gameweek, "en"));
+    const match = lineOf(screen.getByRole("table"), "ARS")[0]!.querySelector("[data-venue]")!;
+    expect(match.textContent).toBe(`NPTA${FIXTURES_COPY.en.away}`);
+    // The venue letter is the only thing here hidden from assistive technology.
+    expect(match.querySelectorAll("[aria-hidden='true']")).toHaveLength(1);
   });
 });
 

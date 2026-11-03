@@ -80,31 +80,15 @@ const rgb = (hex: string) => {
   return `rgb(${r}, ${g}, ${b})`;
 };
 
-/**
- * Every day heading's bottom rule and every fixture side's two-colour mark: the code printed
- * beside it and the colours the browser actually paints.
- */
-const dayRulesAndMarks = () => {
-  const rows = [...document.querySelectorAll("main li")];
-  return {
-    rules: [...document.querySelectorAll('main [class*="_day_"]')].map(
-      (day) => getComputedStyle(day).borderBottomStyle,
-    ),
-    marks: rows.map((row) =>
-      [...row.querySelectorAll<HTMLElement>("[aria-hidden='true']")]
-        .filter(
-          (mark) =>
-            mark.style.getPropertyValue("--club-primary") !== "" &&
-            mark.style.getPropertyValue("--club-secondary") !== "" &&
-            mark.getBoundingClientRect().width === 10,
-        )
-        .map((mark) => ({
-          code: mark.parentElement!.textContent!.trim(),
-          painted: getComputedStyle(mark).backgroundImage.match(/rgba?\([^)]*\)/g) ?? [],
-        })),
-    ),
-  };
-};
+/** Every cell's two-colour mark: the code printed beside it and the colours the browser paints. */
+const cellMarks = () =>
+  [...document.querySelectorAll("main td [data-venue]")].map((match) => ({
+    code: match.querySelector('[class*="_opponent_"]')!.textContent,
+    painted:
+      getComputedStyle(match.querySelector("[aria-hidden='true']")!).backgroundImage.match(
+        /rgba?\([^)]*\)/g,
+      ) ?? [],
+  }));
 
 for (const width of [1280, 1600])
   test(`a ${width}px screen keeps the page beside the sidebar, with no league-wide rail`, async ({
@@ -144,33 +128,17 @@ for (const width of [1280, 1600])
     await expect(matrix.getByRole("rowheader")).toHaveCount(fixtureClubs(calendar).length);
     expect(await page.evaluate(scrollsSideways)).toBe(false);
 
-    // The first week alone carries every fixture the shipped list names for it.
-    const first = run[0]!;
-    if (run.length > 1) {
-      await page
-        .getByRole("main")
-        .getByRole("radio", { name: `OH${first.gameweek}`, exact: true })
-        .click();
+    // Every fixture of the window has its two sides in it, and each mark paints the opponent's
+    // two colours, the primary first, and never one colour twice.
+    const marks = await page.evaluate(cellMarks);
+    expect(marks).toHaveLength(run.reduce((sides, week) => sides + 2 * week.fixtures.length, 0));
+    for (const { code, painted } of marks) {
+      const colours = CLUB_COLOURS[code!];
+      expect(colours, code!).toBeDefined();
+      expect(painted, code!).toEqual([rgb(colours!.primary), rgb(colours!.secondary)]);
+      expect(painted[0], code!).not.toBe(painted[1]);
     }
-    await expect(page.getByRole("main").getByRole("heading", { level: 2 })).toHaveText(
-      `Oyun haftası ${first.gameweek}`,
-    );
-    await expect(page.getByRole("main").getByRole("listitem")).toHaveCount(first.fixtures.length);
-
-    // No rule between the days, no deadline and no capture time, and every club in every
-    // fixture carries its two colours.
-    const drawn = await page.evaluate(dayRulesAndMarks);
-    expect(drawn.rules.length).toBeGreaterThan(0);
-    expect(new Set(drawn.rules)).toEqual(new Set(["none"]));
-    expect(drawn.marks.length).toBeGreaterThan(0);
-    expect(new Set(drawn.marks.map((row) => row.length))).toEqual(new Set([2]));
-    // Each mark paints the club's two colours, the primary first, and never one colour twice.
-    for (const { code, painted } of drawn.marks.flat()) {
-      const colours = CLUB_COLOURS[code];
-      expect(colours, code).toBeDefined();
-      expect(painted, code).toEqual([rgb(colours!.primary), rgb(colours!.secondary)]);
-      expect(painted[0], code).not.toBe(painted[1]);
-    }
+    // No deadline and no capture time.
     await expect(page.getByRole("main")).not.toContainText(/Son tarih|tarihli kayda göre/);
     await expect(
       page.getByRole("navigation").getByRole("link", { name: "Fikstür", exact: true }),
@@ -216,10 +184,10 @@ for (const language of ["tr", "en"] as const)
     [390, 844],
     [320, 640],
   ] as const)
-    test(`at ${width}px in ${language} a visitor reads the matrix, a week and a club, with nothing cut`, async ({
+    test(`at ${width}px in ${language} a visitor reads the matrix and a club, with nothing cut`, async ({
       page,
     }) => {
-      test.skip(run.length < 2, "The shipped calendar has no week left to choose among.");
+      test.skip(run.length === 0, "The shipped season is over: the page lists no week.");
       await page.setViewportSize({ width, height });
       await page.clock.setFixedTime(new Date(CLOCK));
       await page.addInitScript(
@@ -240,10 +208,14 @@ for (const language of ["tr", "en"] as const)
       };
       await expect(page.getByRole("heading", { level: 1 })).toHaveText(copy.pageTitle);
 
-      // The matrix: the widest label of the week choice is chosen here, in its heavier weight.
+      // The matrix, with no choice of weeks.
       const matrix = main.getByRole("table", { name: copy.generalView });
       await expect(matrix.getByRole("rowheader")).toHaveCount(fixtureClubs(calendar).length);
-      await expect(matrix.getByRole("columnheader")).toHaveCount(run.length + 1);
+      await expect(matrix.getByRole("columnheader")).toHaveText([
+        copy.clubLegend,
+        ...run.map((week) => common.gameweekShort(week.gameweek)),
+      ]);
+      await expect(main.getByRole("radio")).toHaveCount(2);
       await expect(main).not.toContainText(
         language === "tr" ? "Geçmiş haftalar" : "Past gameweeks",
       );
@@ -252,16 +224,6 @@ for (const language of ["tr", "en"] as const)
       expect(await page.evaluate(clippedCells)).toEqual([]);
       expect(await page.evaluate(crossedLabels)).toEqual([]);
       await everyTargetFits();
-
-      // One week alone, by its short name.
-      const last = run.at(-1)!.gameweek;
-      await main.getByRole("radio", { name: common.gameweekShort(last), exact: true }).click();
-      await expect(page).toHaveURL(`/fixtures?week=${last}`);
-      await expect(main.getByRole("heading", { level: 2 })).toHaveText(common.gameweek(last));
-      await expect(matrix).toHaveCount(0);
-      await settled();
-      expect(await page.evaluate(scrollsSideways)).toBe(false);
-      expect(await page.evaluate(crossedLabels)).toEqual([]);
 
       // The other view, by its name, and a club of it.
       await main.getByRole("radio", { name: copy.teamView, exact: true }).click();
@@ -302,7 +264,7 @@ for (const [width, top] of [
   test(`at ${width}px the week numbers stay in view while the matrix scrolls under them`, async ({
     page,
   }) => {
-    test.skip(run.length < 2, "The shipped calendar has no matrix to scroll.");
+    test.skip(run.length === 0, "The shipped season is over: there is no matrix to scroll.");
     await page.setViewportSize({ width, height: 420 });
     await page.clock.setFixedTime(new Date(CLOCK));
     await page.goto("/fixtures");

@@ -97,8 +97,8 @@ function fixture(
 
 /**
  * The open calendar every league spec uses, filled so /fixtures draws each thing it can: the
- * open week with a score, kickoff times and a fixture with no date yet, the week after it, and
- * the note about a postponed fixture. The mocked league's week
+ * open week with a match played, kickoff times and a fixture with no date yet, the week after
+ * it, and the note about a postponed fixture. The mocked league's week
  * stays the open one, with its deadline far in the future, so nothing moves with the clock.
  */
 function fixturesCalendar() {
@@ -212,19 +212,16 @@ for (const language of ["tr", "en"] as const) {
       await expect(main.getByText(copy.unscheduledCount(1), { exact: false })).toBeVisible();
       expect(await blockingSummary(page), `${language} /fixtures`).toEqual([]);
 
-      // The open week alone, with a result, kickoff times and a fixture with no date, then a
-      // club's grid with a match at home, one away and a blank week.
-      await main.getByRole("group", { name: copy.weekLegend }).getByRole("radio").nth(1).click();
-      await expect(main.getByRole("listitem")).toHaveCount(4);
-      await expect(main.getByText("2 - 1", { exact: true })).toBeVisible();
-      await expect(main.locator("time")).toHaveCount(2);
-      await expect(main.getByText(copy.unscheduled, { exact: true })).toBeVisible();
-      expect(await blockingSummary(page), `${language} /fixtures, one week`).toEqual([]);
+      // A club's grid with a match at home and one away, one with no date, and a blank week.
       await main.getByRole("radio", { name: copy.teamView, exact: true }).click();
       await main.getByRole("radio", { name: /^BRE / }).click();
       await expect(main.locator("[data-venue='home']")).toHaveCount(1);
       await expect(main.locator("[data-venue='away']")).toHaveCount(1);
+      await expect(main.locator("time")).toHaveCount(2);
       expect(await blockingSummary(page), `${language} /fixtures, a club`).toEqual([]);
+      await main.getByRole("radio", { name: /^FUL / }).click();
+      await expect(main.getByText(copy.unscheduled, { exact: true })).toBeVisible();
+      expect(await blockingSummary(page), `${language} /fixtures, no date`).toEqual([]);
       await main.getByRole("radio", { name: /^EVE / }).click();
       await expect(main.getByText(MESSAGES[language].leagueMembers.fixtureNone)).toBeVisible();
       expect(await blockingSummary(page), `${language} /fixtures, a blank week`).toEqual([]);

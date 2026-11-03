@@ -1,6 +1,8 @@
-/* The matrix: one panel, so the page's scene never runs behind its small type. The columns stay
-   narrow on a wide screen, since a club's run is easier to follow across a short line. On the
-   narrowest phone a column is 48 px, and a cell's 2 px gaps keep its three parts inside that. */
+/* The matrix: one panel, so the page's scene never runs behind its small type. The clubs and
+   the week numbers stand on the board fill, with a line down the side of the clubs, so the eye
+   never takes a club for an opponent. The columns stay narrow on a wide screen, since a club's
+   run is easier to follow across a short line. On the narrowest phone a column is 48 px, and a
+   cell's 2 px gaps keep its three parts inside that. */
 .matrix {
   width: 100%;
   max-width: 44rem;
@@ -13,7 +15,7 @@
 }
 
 .corner {
-  width: 2.75rem;
+  width: 2.875rem;
   border-top-left-radius: var(--radius-s);
 }
 
@@ -29,8 +31,13 @@
   top: 0;
   z-index: 1;
   padding: var(--space-1) 2px;
-  border-bottom: 1px solid var(--color-line);
-  background: var(--color-surface);
+  background: var(--color-board);
+  color: var(--color-board-text);
+}
+
+.corner,
+.club {
+  border-right: 2px solid var(--color-mark);
 }
 
 @media (max-width: 599.98px) {
@@ -41,7 +48,6 @@
 }
 
 .week {
-  color: var(--color-text-muted);
   font-size: var(--step--2);
   font-weight: 600;
   text-align: center;
@@ -59,16 +65,27 @@ tbody tr:last-child .cell {
 }
 
 .club {
-  padding-inline: var(--space-1);
+  padding-inline: 3px;
+  background: var(--color-board);
+  color: var(--color-board-text);
   font-size: var(--step--2);
   font-weight: 600;
   text-align: left;
 }
 
+tbody tr:last-child .club {
+  border-bottom-left-radius: var(--radius-s);
+}
+
+/* On the board fill a club's colours need a light outline to keep their dark halves. */
+.clubLabel [aria-hidden="true"] {
+  outline-color: var(--color-board-text);
+}
+
 .clubLabel {
   display: flex;
   align-items: center;
-  gap: var(--space-1);
+  gap: 3px;
   min-width: 0;
 }
 
@@ -80,6 +97,14 @@ tbody tr:last-child .cell {
 @media (min-width: 700px) {
   .corner {
     width: 9rem;
+  }
+
+  .club {
+    padding-inline: var(--space-1);
+  }
+
+  .clubLabel {
+    gap: var(--space-1);
   }
 
   .clubCode {

@@ -2,7 +2,7 @@
 
 import type { Fixture, FixtureGameweek, FixtureTeam, FixturesPayload } from "./types";
 
-/** How many gameweeks the general view offers: the upcoming one and the four after it. */
+/** How many gameweeks the matrix shows: the upcoming one and the four after it. */
 const GENERAL_WEEKS = 5;
 
 /**
@@ -35,7 +35,10 @@ export function weeksAhead(payload: FixturesPayload, now = Date.now()): FixtureG
   return first < 0 ? [] : weeks.slice(first);
 }
 
-/** The run of the general view. A number the calendar does not list stays missing. */
+/**
+ * The matrix's window, which rolls on by itself as `weeksAhead` does. A number the calendar does
+ * not list stays missing.
+ */
 export function generalWeeks(ahead: readonly FixtureGameweek[]): FixtureGameweek[] {
   const first = ahead[0]?.gameweek ?? 0;
   return ahead.filter((week) => week.gameweek < first + GENERAL_WEEKS);

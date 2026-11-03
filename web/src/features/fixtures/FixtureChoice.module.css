@@ -10,8 +10,7 @@
 .segments {
   display: grid;
   grid-auto-flow: column;
-  /* Equal where they fit; a longer label takes what it needs, so none is ever cut. */
-  grid-auto-columns: minmax(max-content, 1fr);
+  grid-auto-columns: minmax(0, 1fr);
   max-width: 36rem;
   border: 1px solid var(--color-line);
   border-radius: var(--radius-s);
@@ -64,18 +63,6 @@
   display: flex;
   align-items: center;
   gap: 5px;
-}
-
-/* The focus ring runs 4 px inside the cell, so a label keeps clear of it. */
-.segment .label {
-  padding-inline: var(--space-1);
-}
-
-/* The narrowest phones need the smaller type for six labels and their clearance in a row. */
-@media (max-width: 339.98px) {
-  .segment {
-    font-size: var(--step--1);
-  }
 }
 
 .segment input,

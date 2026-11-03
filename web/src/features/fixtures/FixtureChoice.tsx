@@ -10,11 +10,11 @@ export interface FixtureOption<T> {
 }
 
 /**
- * One of the fixture page's choices, as radios: joined segments for a few short options, and
- * a grid of separate cells for the clubs. The group's name is for assistive technology; what
- * the options say is enough to see.
+ * One of the fixture page's choices, as radios: joined segments for the two views, and a grid
+ * of separate cells for the clubs. The group's name is for assistive technology; what the
+ * options say is enough to see.
  */
-export function FixtureChoice<T extends string | number>({
+export function FixtureChoice<T extends string>({
   legend,
   name,
   options,

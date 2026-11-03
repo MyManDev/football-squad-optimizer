@@ -177,9 +177,9 @@ Source: the owner's review of 2 November, #1298.
 
 ## 2026-11-03: /fixtures shows only what is still to come
 
-Decision: `/fixtures` lists no played gameweek. It opens on the general fixtures, a matrix of
-every club over the next five gameweeks, or one of those weeks alone with its days and kickoffs.
-Beside them it offers team fixtures: one club's matches to the end of the season, as a grid of
+Decision: `/fixtures` lists no played gameweek and no week by itself. It opens on the general
+fixtures, a matrix of every club over the next five gameweeks that rolls on as the weeks pass.
+Beside it, it offers team fixtures: one club's matches to the end of the season, as a grid of
 weeks. The page prints no sentence beyond the postponed-fixture note.
 
 Reason: the owner wants the page to serve looking ahead. The results of played weeks are not what

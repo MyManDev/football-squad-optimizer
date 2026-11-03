@@ -26,8 +26,9 @@ function Match({ match, copy }: { match: ClubFixture; copy: FixturesCopy }) {
 
 /**
  * The weeks ahead as a matrix: a line for each club and a column for each gameweek, so a club's
- * run reads across and a week's opponents read down. A cell is the opponent, its colours and
- * the venue, with a home match filled and an away match outlined as on the member's rail. A
+ * run reads across and a week's opponents read down. The clubs and the week numbers stand apart
+ * from the cells, so a club is never taken for an opponent. A cell is the opponent, its colours
+ * and the venue, with a home match filled and an away match outlined as on the member's rail. A
  * double week holds two, a blank week says so, and a match already behind the club stays in
  * its cell in a quieter tone, so that it is not read as a blank week.
  */

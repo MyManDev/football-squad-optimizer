@@ -1,69 +1,12 @@
-/* A week's list on /fixtures: the schedule and the results, nothing else. Days are set apart
-   by space and their muted heading, with no rule between them, side by side where the column
-   holds them. Each keeps a readable width, so a row never stretches across the page. */
-.day,
-.empty,
+/* The frame of /fixtures: its title, the calendar file's button and its one quiet sentence. */
 .kicker,
 .lede {
   color: var(--color-text-muted);
   font-size: var(--step--1);
 }
 
-.empty,
 .lede {
   margin: 0;
-}
-
-.days {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr));
-  align-items: start;
-  gap: var(--space-4) var(--space-6);
-}
-
-.day {
-  padding-bottom: var(--space-1);
-  font-weight: 600;
-}
-
-.rows {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  align-items: baseline;
-  gap: var(--space-2);
-  padding: var(--space-1) 0;
-  font-size: var(--step--1);
-}
-
-/* Each club's code with its two colours on the side facing the middle. */
-.home,
-.away {
-  display: flex;
-  align-items: baseline;
-  gap: 5px;
-  min-width: 0;
-  font-weight: 600;
-}
-
-.home {
-  justify-content: flex-end;
-}
-
-.when {
-  color: var(--color-text-muted);
-  text-align: center;
-}
-
-.score {
-  font-weight: 600;
-  text-align: center;
-  white-space: nowrap;
 }
 
 .page {
