@@ -355,6 +355,60 @@ describe("a selection nobody published, with the service answering", () => {
     expect(screen.queryByText(PLAN_SHOWN)).toBeNull();
   });
 
+  it.each<[string, AdviceJobStatus, string]>([
+    [
+      "its place in line",
+      { jobId: "job-1", status: "queued", queuePosition: 2, workers: { busy: 1, total: 1 } },
+      `${copy.computeEchoStates.queued}, ${computeCopy.queueAhead(2)}`,
+    ],
+    [
+      "that it is next",
+      { jobId: "job-1", status: "queued", queuePosition: 0 },
+      `${copy.computeEchoStates.queued}, ${computeCopy.queueNext}`,
+    ],
+    [
+      "how much is solved",
+      { jobId: "job-1", status: "running", progress: { done: 1, total: 3 } },
+      `${copy.computeEchoStates.running}, %33`,
+    ],
+    [
+      "only its word for one stage",
+      { jobId: "job-1", status: "running", progress: { done: 0, total: 1 } },
+      copy.computeEchoStates.running,
+    ],
+  ])("says %s beside the result while it waits", async (_name, view, said) => {
+    const client = new RecordingClient(() => ({ kind: "job", jobId: "job-1" }));
+    vi.spyOn(client, "readJob").mockResolvedValue(view);
+    const { container } = renderView(link, client, {
+      adviceIssue: "not-listed",
+      computeService: "ready",
+    });
+    await pressCompute();
+    await waitFor(
+      () => {
+        const echoes = [...container.querySelectorAll("[aria-live]")].map(
+          (node) => node.textContent,
+        );
+        expect(echoes).toContain(copy.computeEcho(said));
+      },
+      { timeout: 4000 },
+    );
+  });
+
+  it("stops offering a press on the missing plan's card once one has been made", async () => {
+    const client = new RecordingClient(() => ({ kind: "job", jobId: "job-1" }));
+    vi.spyOn(client, "readPublished").mockResolvedValue({ kind: "not-computed" });
+    vi.spyOn(client, "readJob").mockResolvedValue({ jobId: "job-1", status: "running" });
+    const { container } = renderView("mode=saf-puan&window=1", client, {
+      adviceIssue: "published-missing",
+      computeService: "ready",
+    });
+    await waitFor(() => expect(container).toHaveTextContent(copy.adviceRequestHint));
+    await pressCompute();
+    await waitFor(() => expect(container).toHaveTextContent(computeCopy.leaveOpen));
+    expect(container).not.toHaveTextContent(copy.adviceRequestHint);
+  });
+
   it.each([false, true])(
     "resumes a remembered job before reading the cache (missing: %s)",
     async (missing) => {
@@ -383,7 +437,10 @@ describe("a selection nobody published, with the service answering", () => {
         computeService: "ready",
       });
       expect(read).not.toHaveBeenCalled();
-      expect(container).toHaveTextContent(copy.computeQueued);
+      // The service has said nothing yet, so neither does the page, beyond leaving it open.
+      expect(container).not.toHaveTextContent(copy.computeQueued);
+      expect(container).not.toHaveTextContent(copy.computeRunning);
+      expect(container).not.toHaveTextContent(copy.computeEcho(copy.computeEchoStates.queued));
       expect(container).toHaveTextContent(computeCopy.leaveOpen);
       await waitFor(() => expect(container).toHaveTextContent(copy.computeDone), { timeout: 4000 });
       if (!missing) expect(client.polls).toEqual(["advice-0123456789abcdef-1"]);

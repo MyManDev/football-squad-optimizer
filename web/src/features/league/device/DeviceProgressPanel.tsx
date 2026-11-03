@@ -2,7 +2,7 @@
  * The device solve at work, in the middle of the screen: how many of the run's stages are
  * done, and a bar that follows them. The count is of those stages, never of elapsed time, so
  * it moves in steps: one solve reports nothing until it ends. It is written as a count
- * ("2/7"), never as a percentage, because member pages carry no percentages.
+ * ("2/7").
  *
  * It covers the whole screen with the page's background, so nothing of the page shows
  * while the run counts. It is drawn into the document's body, so a closed drawer or a

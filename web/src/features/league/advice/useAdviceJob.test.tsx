@@ -68,6 +68,7 @@ function Harness({
   return (
     <div>
       <output data-testid="phase">{describePhase(state)}</output>
+      <output data-testid="standing">{describeStanding(state)}</output>
       <button type="button" onClick={reset}>
         reset
       </button>
@@ -91,6 +92,14 @@ function describePhase(state: ComputePhase): string {
       return state.phase;
   }
 }
+
+function describeStanding(state: ComputePhase): string {
+  if (state.phase !== "waiting") return "";
+  const { queuePosition, progress, workers, answers } = state;
+  return JSON.stringify({ queuePosition, progress, workers, answers });
+}
+
+const standing = () => JSON.parse(screen.getByTestId("standing").textContent || "null");
 
 describe("useAdviceJob", () => {
   it("reset and unmount abort the actual request", async () => {
@@ -187,6 +196,126 @@ describe("useAdviceJob", () => {
       await vi.advanceTimersByTimeAsync(2100);
     });
     expect(screen.getByTestId("phase").textContent).toBe("done:api-cache");
+  });
+
+  it("follows what the service last said about the wait, and counts its answers", async () => {
+    const client = new ScriptedClient();
+    const views: Omit<AdviceJobStatus, "jobId">[] = [
+      { status: "queued", queuePosition: 2, workers: { busy: 1, total: 1 } },
+      { status: "queued", queuePosition: 0, workers: { busy: 1, total: 1 } },
+      { status: "running", progress: { done: 1, total: 3 }, workers: { busy: 1, total: 1 } },
+      { status: "running" },
+    ];
+    client.readJob = async (jobId) => ({ jobId, ...(views.shift() ?? { status: "completed" }) });
+    render(<Harness client={client} />);
+
+    await act(async () => {
+      screen.getByRole("button", { name: "go" }).click();
+      await Promise.resolve();
+    });
+    expect(standing()).toEqual({});
+
+    const nextAnswer = () =>
+      act(async () => {
+        await vi.advanceTimersByTimeAsync(2100);
+      });
+    await nextAnswer();
+    expect(standing()).toEqual({ queuePosition: 2, workers: { busy: 1, total: 1 }, answers: 1 });
+    expect(screen.getByTestId("phase").textContent).toBe("waiting:queued:with-fallback");
+
+    await nextAnswer();
+    expect(standing()).toEqual({ queuePosition: 0, workers: { busy: 1, total: 1 }, answers: 2 });
+
+    await nextAnswer();
+    expect(standing()).toEqual({
+      progress: { done: 1, total: 3 },
+      workers: { busy: 1, total: 1 },
+      answers: 3,
+    });
+    expect(screen.getByTestId("phase").textContent).toBe("waiting:running:with-fallback");
+
+    // What the service stops saying is not kept, but for the count of the attempt running.
+    await nextAnswer();
+    expect(standing()).toEqual({ progress: { done: 1, total: 3 }, answers: 4 });
+
+    await nextAnswer();
+    expect(screen.getByTestId("phase").textContent).toBe("done:api-cache");
+    expect(screen.getByTestId("standing").textContent).toBe("");
+  });
+
+  it("keeps the count through a poll that could not read it, for the same attempt", async () => {
+    const client = new ScriptedClient();
+    const views: Omit<AdviceJobStatus, "jobId">[] = [
+      { status: "running", attempt: 1, progress: { done: 2, total: 3 } },
+      { status: "running", attempt: 1 },
+      { status: "running", attempt: 2 },
+      { status: "running", attempt: 2, progress: { done: 0, total: 3 } },
+      { status: "queued", attempt: 2 },
+      { status: "running", attempt: 2 },
+    ];
+    client.readJob = async (jobId) => ({ jobId, ...views.shift()! });
+    render(<Harness client={client} />);
+    await act(async () => {
+      screen.getByRole("button", { name: "go" }).click();
+      await Promise.resolve();
+    });
+    const said = async () => {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2100);
+      });
+      return standing().progress;
+    };
+    expect(await said()).toEqual({ done: 2, total: 3 });
+    expect(await said()).toEqual({ done: 2, total: 3 });
+    // A new attempt starts again, and a job back in the queue has no count.
+    expect(await said()).toBeUndefined();
+    expect(await said()).toEqual({ done: 0, total: 3 });
+    expect(await said()).toBeUndefined();
+    expect(await said()).toBeUndefined();
+  });
+
+  it("takes a job's first word from the answer that accepted it", async () => {
+    const client = new ScriptedClient();
+    client.requestAdvice = async () => ({ kind: "job", jobId: "job-1", status: "running" });
+    client.statuses = ["running"];
+    render(<Harness client={client} />);
+    await act(async () => {
+      screen.getByRole("button", { name: "go" }).click();
+      await Promise.resolve();
+    });
+    expect(screen.getByTestId("phase").textContent).toBe("waiting:running:with-fallback");
+  });
+
+  it("a poll with no answer changes nothing about the wait", async () => {
+    const client = new ScriptedClient();
+    let reachable = true;
+    client.readJob = async (jobId) => {
+      if (!reachable) throw new TypeError("Failed to fetch");
+      return { jobId, status: "running", progress: { done: 1, total: 3 } };
+    };
+    render(<Harness client={client} />);
+
+    await act(async () => {
+      screen.getByRole("button", { name: "go" }).click();
+      await Promise.resolve();
+    });
+    const nextPoll = () =>
+      act(async () => {
+        await vi.advanceTimersByTimeAsync(2100);
+      });
+    await nextPoll();
+    const said = { progress: { done: 1, total: 3 }, answers: 1 };
+    expect(standing()).toEqual(said);
+
+    reachable = false;
+    await nextPoll();
+    await nextPoll();
+    expect(standing()).toEqual(said);
+    expect(screen.getByTestId("phase").textContent).toBe("waiting:running:with-fallback");
+
+    reachable = true;
+    await nextPoll();
+    expect(standing()).toEqual({ ...said, answers: 2 });
   });
 
   it("a failed job is a failed phase, not a spinner", async () => {
