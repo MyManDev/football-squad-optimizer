@@ -15,7 +15,7 @@ import type { DevicePlan } from "../device/useDevicePlan";
 import { AdviceRequestPanel, type ComputeService } from "./AdviceRequestPanel";
 import type { AdviceRequest } from "./adviceClient";
 import { COMPUTE_COPY } from "./computeCopy";
-import type { AdviceJob, ComputePhase, EarlierAnswer } from "./useAdviceJob";
+import type { AdviceJob, ComputePhase, EarlierAnswer, WaitingPhase } from "./useAdviceJob";
 
 afterEach(cleanup);
 
@@ -97,6 +97,132 @@ describe("with a solve on the member's device", () => {
   });
 });
 
+describe("a job at the service", () => {
+  const waiting = (said: Partial<WaitingPhase>): ComputePhase => ({
+    phase: "waiting",
+    request: REQUEST,
+    jobId: "job-1",
+    status: "queued",
+    fallback: null,
+    ...said,
+  });
+  const show = (said: Partial<WaitingPhase>, language: Language = "tr") =>
+    renderPanel({ service: "ready", computable: true, state: waiting(said) }, language);
+  const bar = () => screen.getByRole("progressbar", { name: messages.computeRunning });
+  const stageInHand = (container: HTMLElement) => container.querySelector("[data-stage-now]");
+
+  it("says its place in line and the workers at work, with no bar, while queued", () => {
+    const { container } = show({ queuePosition: 2, workers: { busy: 3, total: 3 } });
+    expect(container).toHaveTextContent(messages.computeQueued);
+    expect(container).toHaveTextContent(tr.queueAhead(2));
+    expect(container).toHaveTextContent(tr.workersBusy(3, 3));
+    expect(screen.queryByRole("progressbar")).toBeNull();
+  });
+
+  it("says when it is next", () => {
+    const { container } = show({ queuePosition: 0 });
+    expect(container).toHaveTextContent(tr.queueNext);
+    expect(container).not.toHaveTextContent(tr.queueAhead(0));
+    expect(screen.queryByRole("progressbar")).toBeNull();
+  });
+
+  it("counts its stages and says who is at work while it runs", () => {
+    const { container } = show({
+      status: "running",
+      progress: { done: 1, total: 3 },
+      workers: { busy: 1, total: 1 },
+    });
+    expect(container).toHaveTextContent(messages.computeRunning);
+    expect(container).toHaveTextContent("1/3");
+    expect(container).toHaveTextContent(tr.workersBusy(1, 1));
+    expect(container).not.toHaveTextContent(messages.computeQueued);
+    expect(bar()).toHaveAttribute("aria-valuemin", "0");
+    expect(bar()).toHaveAttribute("aria-valuenow", "1");
+    expect(bar()).toHaveAttribute("aria-valuemax", "3");
+    expect(bar()).toHaveAttribute("aria-valuetext", "1/3");
+    expect(stageInHand(container)).not.toBeNull();
+  });
+
+  it("has no stage in hand once every stage is solved", () => {
+    const { container } = show({ status: "running", progress: { done: 3, total: 3 } });
+    expect(container).toHaveTextContent("3/3");
+    expect(bar()).toHaveAttribute("aria-valuenow", "3");
+    expect(stageInHand(container)).toBeNull();
+  });
+
+  it("shows a job of one stage as the bar alone, with no count and no value", () => {
+    const { container } = show({ status: "running", progress: { done: 0, total: 1 } });
+    expect(container).not.toHaveTextContent("0/1");
+    expect(bar()).not.toHaveAttribute("aria-valuenow");
+    expect(bar()).not.toHaveAttribute("aria-valuemax");
+    expect(bar()).not.toHaveAttribute("aria-valuetext");
+    expect(stageInHand(container)).not.toBeNull();
+  });
+
+  it("leaves the word alone with a service that says nothing, and the bar while it runs", () => {
+    const queued = show({});
+    expect(queued.container).toHaveTextContent(messages.computeQueued);
+    expect(queued.container).not.toHaveTextContent(tr.workersBusy(0, 0).split(":")[0]!);
+    expect(screen.queryByRole("progressbar")).toBeNull();
+    queued.unmount();
+
+    const { container } = show({ status: "running" });
+    expect(container).toHaveTextContent(messages.computeRunning);
+    expect(container).not.toHaveTextContent(tr.workersBusy(0, 0).split(":")[0]!);
+    expect(container).not.toHaveTextContent("/");
+    expect(bar()).not.toHaveAttribute("aria-valuenow");
+    expect(stageInHand(container)).not.toBeNull();
+  });
+
+  it("leaves out the workers when the service counts none alive", () => {
+    const { container } = show({ status: "running", workers: { busy: 0, total: 0 } });
+    expect(container).not.toHaveTextContent(tr.workersBusy(0, 0));
+  });
+
+  it("starts the stage in hand over at each answer from the service, and only then", () => {
+    const panel = (answers: number) => (
+      <LanguageProvider initialLanguage="tr">
+        <AdviceRequestPanel
+          request={REQUEST}
+          job={{
+            state: waiting({ status: "running", progress: { done: 1, total: 3 }, answers }),
+            compute: vi.fn(),
+            reset: vi.fn(),
+          }}
+          service="ready"
+          computable
+        />
+      </LanguageProvider>
+    );
+    const view = render(panel(1));
+    const first = stageInHand(view.container);
+    view.rerender(panel(1));
+    expect(stageInHand(view.container)).toBe(first);
+    view.rerender(panel(2));
+    expect(stageInHand(view.container)).not.toBeNull();
+    expect(stageInHand(view.container)).not.toBe(first);
+  });
+
+  it("prints no percentage and no longer repeats that the plan will come", () => {
+    const { container } = show({
+      status: "running",
+      progress: { done: 2, total: 3 },
+      workers: { busy: 2, total: 3 },
+    });
+    expect(container).not.toHaveTextContent("%");
+    expect(container.querySelector("[data-compute-dock]")).not.toHaveTextContent(tr.leaveOpen);
+    expect(container).toHaveTextContent(tr.leaveOpen);
+  });
+
+  it("speaks the member's language", () => {
+    const english = COMPUTE_COPY.en;
+    const { container } = show({ queuePosition: 1, workers: { busy: 2, total: 3 } }, "en");
+    expect(container).toHaveTextContent(MESSAGES.en.leagueMembers.computeQueued);
+    expect(container).toHaveTextContent(english.queueAhead(1));
+    expect(container).toHaveTextContent(english.workersBusy(2, 3));
+  });
+});
+
 describe("with no compute service", () => {
   it("says nothing while a configured service has not answered yet", () => {
     const { button } = renderPanel({ pending: true });
@@ -160,7 +286,7 @@ describe("with the selection's earlier answer kept on the page", () => {
   };
   const published = mockEntryAdviceEnvelope(REQUEST.entryId, "saf-puan", 1);
 
-  it("says only that the answer will come while this computes", () => {
+  it("says only that the plan will come while this computes", () => {
     const { container } = renderPanel({
       service: "ready",
       computable: true,
@@ -173,7 +299,7 @@ describe("with the selection's earlier answer kept on the page", () => {
         earlier,
       },
     });
-    expect(container).toHaveTextContent(messages.computeWaiting);
+    expect(container).toHaveTextContent(tr.leaveOpen);
   });
 
   it.each(["SERVICE_UNREACHABLE", "CHIP_NOT_HELD", null] as const)(

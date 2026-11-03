@@ -1,5 +1,6 @@
 import type { Language } from "../../../i18n/messages";
 import type { WindowSize } from "../../../lib/decisionVocabulary";
+import type { WaitingPhase } from "./useAdviceJob";
 
 /**
  * The compute service's copy, in both languages.
@@ -9,8 +10,9 @@ import type { WindowSize } from "../../../lib/decisionVocabulary";
  * (`i18n/messagesNoProbability.test.ts`) walks it entry by entry, functions called.
  *
  * What it may say: that a selection can be computed now, about how long a computation took
- * when it was measured, that the page can be left open, and, when something fails, what
- * happened in a sentence the member can act on. A duration is "about". A failure is said
+ * when it was measured, that the page can be left open, where a waiting job stands, and, when
+ * something fails, what happened in a sentence the member can act on. A duration is "about",
+ * and a job's stages are a count ("1/3"), never a percentage. A failure is said
  * from the service's stable code, or in the general sentence where a code gives the member
  * nothing to do; the code itself and the service's own text are never shown.
  */
@@ -19,6 +21,11 @@ export interface ComputeCopy {
   notComputable: string;
   duration: Record<WindowSize, string>;
   leaveOpen: string;
+  /** A queued job's place in line, said after the word for queued. */
+  queueNext: string;
+  queueAhead: (count: number) => string;
+  /** The workers at work out of those alive. */
+  workersBusy: (busy: number, total: number) => string;
   /** The service is down and nothing is published here, but the member's device solves it. */
   serviceUnreachableDevice: string;
   /** The gameweek this page advises on has closed. */
@@ -36,6 +43,10 @@ const en: ComputeCopy = {
     5: "A 5-week pure points plan takes about three and a half minutes to compute.",
   },
   leaveOpen: "You can leave this page open; the plan appears here when the computation finishes.",
+  queueNext: "yours is next",
+  queueAhead: (count) =>
+    count === 1 ? "1 computation ahead of yours" : `${count} computations ahead of yours`,
+  workersBusy: (busy, total) => `Workers busy: ${busy}/${total}`,
   serviceUnreachableDevice: "This selection can be computed on this device.",
   deadlinePassedTitle: "This gameweek's deadline has passed",
   rateLimitedFor: (seconds) =>
@@ -87,6 +98,9 @@ const tr: ComputeCopy = {
     5: "5 haftalık saf puan planının hesabı yaklaşık üç buçuk dakika sürer.",
   },
   leaveOpen: "Sayfayı açık bırakabilirsin; hesap bitince plan burada görünür.",
+  queueNext: "sıradaki hesap senin",
+  queueAhead: (count) => `önünde ${count} hesap var`,
+  workersBusy: (busy, total) => `Çalışan işçi: ${busy}/${total}`,
   serviceUnreachableDevice: "Bu seçim bu cihazda hesaplanabilir.",
   deadlinePassedTitle: "Bu oyun haftasının son tarihi geçti",
   rateLimitedFor: (seconds) =>
@@ -127,6 +141,33 @@ const tr: ComputeCopy = {
 };
 
 export const COMPUTE_COPY: Record<Language, ComputeCopy> = { tr, en };
+
+/**
+ * What goes beside a waiting job's word: its place in line, or how many of its stages are
+ * done. Null where the service has not said. A job of one stage has nothing to count: "0/1"
+ * would only stand still until it ends.
+ */
+export function jobStanding(
+  copy: ComputeCopy,
+  { status, queuePosition, progress }: Pick<WaitingPhase, "status" | "queuePosition" | "progress">,
+): string | null {
+  if (status === "queued") {
+    if (queuePosition === undefined) return null;
+    return queuePosition === 0 ? copy.queueNext : copy.queueAhead(queuePosition);
+  }
+  return progress !== undefined && progress.total > 1 ? `${progress.done}/${progress.total}` : null;
+}
+
+/** The line about the workers; null where the service has not said or counts none alive. */
+export function jobWorkersLine(
+  copy: ComputeCopy,
+  { status, workers }: Pick<WaitingPhase, "status" | "workers">,
+): string | null {
+  if (workers === undefined || workers.total === 0) return null;
+  // A running job's own worker holds it, though the count can be a few seconds behind.
+  const busy = status === "running" ? Math.max(workers.busy, 1) : workers.busy;
+  return copy.workersBusy(busy, workers.total);
+}
 
 /**
  * The sentence for a failure. A code with no sentence of its own, one this page does not

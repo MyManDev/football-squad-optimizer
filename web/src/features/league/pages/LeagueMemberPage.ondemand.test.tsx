@@ -355,6 +355,51 @@ describe("a selection nobody published, with the service answering", () => {
     expect(screen.queryByText(PLAN_SHOWN)).toBeNull();
   });
 
+  it.each<[string, AdviceJobStatus, string]>([
+    [
+      "its place in line",
+      { jobId: "job-1", status: "queued", queuePosition: 2, workers: { busy: 1, total: 1 } },
+      `${copy.computeEchoStates.queued}, ${computeCopy.queueAhead(2)}`,
+    ],
+    [
+      "that it is next",
+      { jobId: "job-1", status: "queued", queuePosition: 0 },
+      `${copy.computeEchoStates.queued}, ${computeCopy.queueNext}`,
+    ],
+    [
+      "its count of stages",
+      { jobId: "job-1", status: "running", progress: { done: 1, total: 3 } },
+      `${copy.computeEchoStates.running}, 1/3`,
+    ],
+    [
+      "only its word for one stage",
+      { jobId: "job-1", status: "running", progress: { done: 0, total: 1 } },
+      copy.computeEchoStates.running,
+    ],
+  ])("says %s beside the result while it waits", async (_name, view, said) => {
+    const client = new RecordingClient(() => ({ kind: "job", jobId: "job-1" }));
+    vi.spyOn(client, "readJob").mockResolvedValue(view);
+    const { container } = renderView(link, client, {
+      adviceIssue: "not-listed",
+      computeService: "ready",
+    });
+    try {
+      await pressCompute();
+      await waitFor(
+        () => {
+          const echoes = [...container.querySelectorAll("[aria-live]")].map(
+            (node) => node.textContent,
+          );
+          expect(echoes).toContain(copy.computeEcho(said));
+        },
+        { timeout: 4000 },
+      );
+    } finally {
+      // The wait is still open: it must not be picked up by the next test's page.
+      sessionStorage.clear();
+    }
+  });
+
   it.each([false, true])(
     "resumes a remembered job before reading the cache (missing: %s)",
     async (missing) => {

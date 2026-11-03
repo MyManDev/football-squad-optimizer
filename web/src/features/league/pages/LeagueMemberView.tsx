@@ -12,7 +12,7 @@ import { useLanguage } from "../../../i18n/context";
 import { clubCodesFromFixtures } from "../../../lib/clubs";
 import { AdviceRequestPanel } from "../advice/AdviceRequestPanel";
 import { ChipTimingCard } from "../advice/ChipTimingCard";
-import { COMPUTE_COPY } from "../advice/computeCopy";
+import { COMPUTE_COPY, jobStanding, type ComputeCopy } from "../advice/computeCopy";
 import { gameweekDeadline } from "../advice/deadline";
 import { MemberDecisionControls } from "../advice/MemberDecisionControls";
 import { deviceEndedWithoutPlan } from "../device/useDevicePlan";
@@ -63,10 +63,15 @@ type MemberCopy = ReturnType<typeof useLanguage>["messages"]["leagueMembers"];
 
 /**
  * The state of a request for this page's plan as one quiet line, for the decision heading:
- * it stays beside the result, while the settings sit further down the page. Nothing while
- * no request was made, nor when the service could not be reached: the panel says that.
+ * it stays beside the result, while the settings sit further down the page. A waiting job's
+ * place in line or count of stages goes with its word. Nothing while no request was made, nor
+ * when the service could not be reached: the panel says that.
  */
-function computeEcho(copy: MemberCopy, state: AdviceJob["state"]): string | null {
+function computeEcho(
+  copy: MemberCopy,
+  computeCopy: ComputeCopy,
+  state: AdviceJob["state"],
+): string | null {
   const states = copy.computeEchoStates;
   const word =
     state.phase === "requesting"
@@ -82,7 +87,9 @@ function computeEcho(copy: MemberCopy, state: AdviceJob["state"]): string | null
             : state.phase === "unavailable"
               ? states.unavailable
               : null;
-  return word === null ? null : copy.computeEcho(word);
+  if (word === null) return null;
+  const standing = state.phase === "waiting" ? jobStanding(computeCopy, state) : null;
+  return copy.computeEcho(standing === null ? word : `${word}, ${standing}`);
 }
 
 /** A closed section of the page's secondary tools, read one click away. */
@@ -208,7 +215,7 @@ function LeagueMemberContent({
   ]
     .filter(Boolean)
     .join(" · ");
-  const echo = computeEcho(copy, job.state);
+  const echo = computeEcho(copy, COMPUTE_COPY[language], job.state);
   const codes = useMemo(() => clubCodesFromFixtures(fixtures), [fixtures]);
   // The member's latest finished week, from the scoreboard and their history; null leaves
   // the page without the card.

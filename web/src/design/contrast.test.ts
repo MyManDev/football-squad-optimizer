@@ -190,6 +190,10 @@ describe("the colour tokens", () => {
     },
   );
 
+  it("draws a job's bar so its fill reads over its track, at 3:1 for a graphic", () => {
+    expect(contrast(hex("--color-primary"), hex("--color-line"))).toBeGreaterThanOrEqual(3);
+  });
+
   it("computes the WCAG ratio the header quotes", () => {
     expect(contrast("#000000", "#ffffff")).toBeCloseTo(21, 5);
     expect(contrast(hex("--color-text"), hex("--color-bg"))).toBeCloseTo(16, 0);
@@ -229,6 +233,10 @@ describe("the night palette", () => {
       expect(ratio).toBeLessThan(AA);
     },
   );
+
+  it("draws a job's bar so its fill reads over its track, at 3:1 for a graphic", () => {
+    expect(contrast(night("--color-primary"), night("--color-line"))).toBeGreaterThanOrEqual(3);
+  });
 
   it("computes the ratios the header quotes", () => {
     expect(contrast(night("--color-text"), night("--color-bg"))).toBeCloseTo(15.7, 1);

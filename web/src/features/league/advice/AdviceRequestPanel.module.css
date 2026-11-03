@@ -59,6 +59,43 @@
   color: var(--color-text);
 }
 
+/* A running job's stages. Nothing here follows the clock: the fill is what is solved, and the
+   stage in hand carries one pulse for each answer from the service. Under reduced motion no
+   pulse shows, and the fill and the count say how far it is. */
+.stages {
+  display: flex;
+  block-size: 8px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--color-line);
+}
+
+.stagesDone {
+  background: var(--color-primary);
+  transition: inline-size var(--motion-data) var(--motion-ease);
+}
+
+.stageNow {
+  overflow: hidden;
+}
+
+.stageNow::after {
+  content: "";
+  display: block;
+  inline-size: 40%;
+  block-size: 100%;
+  border-radius: 4px;
+  background: var(--color-primary);
+  transform: translateX(-105%);
+  animation: stage-pulse calc(var(--motion-data) * 3) var(--motion-ease);
+}
+
+@keyframes stage-pulse {
+  to {
+    transform: translateX(250%);
+  }
+}
+
 @media (max-width: 1179.98px) {
   .compute {
     min-height: 48px;

@@ -13,14 +13,21 @@
  *
  * Patience follows the window asked for, the wait is polled less often after its first
  * minute, a failure keeps the service's coded reason so the panel can say what happened,
- * and the job id is remembered for the tab so a reload resumes the wait.
+ * and the job id is remembered for the tab so a reload resumes the wait. While it waits, the
+ * state carries how the wait is going, each part as the service last said it.
  */
 
 import { cancellableDelay, withRequestDeadline } from "../../../data/request";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { WindowSize } from "../../../lib/decisionVocabulary";
-import type { AdviceClient, AdviceRequest, AdviceSource } from "./adviceClient";
+import type {
+  AdviceClient,
+  AdviceJobProgress,
+  AdviceJobWorkers,
+  AdviceRequest,
+  AdviceSource,
+} from "./adviceClient";
 import { AdviceApiError, newIdempotencyKey } from "./adviceClient";
 import {
   adviceRequestKey,
@@ -62,17 +69,27 @@ export interface EarlierAnswer {
   source: AdviceSource;
 }
 
+export interface WaitingPhase {
+  phase: "waiting";
+  request: AdviceRequest;
+  jobId: string;
+  status: "queued" | "running";
+  fallback: LeagueViewEnvelope<EntryAdvice> | null;
+  earlier?: EarlierAnswer | null;
+  /** The job's place in line while it is queued; absent until the service says it. */
+  queuePosition?: number;
+  /** The documents solved while it runs; absent until the service says it. */
+  progress?: AdviceJobProgress;
+  /** The workers at work; absent until the service says it. */
+  workers?: AdviceJobWorkers;
+  /** How many times the service has answered this wait, so the page can mark each answer. */
+  answers?: number;
+}
+
 export type ComputePhase =
   | { phase: "idle" }
   | { phase: "requesting"; request: AdviceRequest; earlier?: EarlierAnswer | null }
-  | {
-      phase: "waiting";
-      request: AdviceRequest;
-      jobId: string;
-      status: "queued" | "running";
-      fallback: LeagueViewEnvelope<EntryAdvice> | null;
-      earlier?: EarlierAnswer | null;
-    }
+  | WaitingPhase
   | {
       phase: "done";
       request: AdviceRequest;
@@ -302,6 +319,7 @@ export function useAdviceJob(
           if (!alive()) return;
           setState({ phase: "waiting", request, jobId, status: "queued", fallback });
 
+          let answers = 0;
           while (Date.now() - startedAt < patience) {
             const waited = Date.now() - startedAt;
             await cancellableDelay(
@@ -358,7 +376,18 @@ export function useAdviceJob(
               fail(undefined, job.errorCode ?? undefined);
               return;
             }
-            setState({ phase: "waiting", request, jobId, status: job.status, fallback });
+            answers += 1;
+            setState({
+              phase: "waiting",
+              request,
+              jobId,
+              status: job.status,
+              fallback,
+              queuePosition: job.queuePosition,
+              progress: job.progress,
+              workers: job.workers,
+              answers,
+            });
           }
           if (alive()) {
             forgetJob(request);
