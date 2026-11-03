@@ -188,3 +188,16 @@ publishing a probability stands. This narrows the rule on #978 and #954 against 
 a member page for this one display.
 
 Source: the owner's answer of 3 November, [the shape on #978](https://github.com/MyManDev/football-squad-optimizer/issues/978#issuecomment-6570843186), #1303.
+
+## 2026-11-03: /fixtures lists no played gameweek
+
+Decision: `/fixtures` lists no played gameweek and no week by itself. It opens on the general
+fixtures, a matrix of every club over the next five gameweeks that rolls on as the weeks pass;
+a match already played in the open week stays in its cell. Beside it, it offers team fixtures:
+one club's matches to the end of the season, as a grid of weeks. Apart from its empty states and
+the postponed-fixture note, the page prints no sentence.
+
+Reason: the owner wants the page to serve looking ahead. The results of played weeks are not what
+a manager reads it for.
+
+Source: the owner's message of 3 November, #1302.

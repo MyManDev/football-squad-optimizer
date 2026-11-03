@@ -45,7 +45,6 @@ const en = {
   },
   common: {
     loading: "Loading…",
-    gameweek: (gameweek: number) => `Gameweek ${gameweek}`,
     gameweekShort: (gameweek: number) => `GW${gameweek}`,
     pageFailed: "This page could not be drawn.",
     pageFailedBody: "Reloading fetches the current version.",
@@ -596,7 +595,6 @@ const tr: MessageSchema<typeof en> = {
   },
   common: {
     loading: "Yükleniyor…",
-    gameweek: (gameweek) => `Oyun haftası ${gameweek}`,
     gameweekShort: (gameweek) => `OH${gameweek}`,
     pageFailed: "Bu sayfa çizilemedi.",
     pageFailedBody: "Yeniden yüklemek güncel sürümü getirir.",
