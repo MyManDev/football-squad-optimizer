@@ -6,9 +6,11 @@
 #
 # A tick decides; at most once a UTC morning and once a gameweek it starts a weekly run, which
 # ends at its site pull request. That can take hours, so the tick has no start timeout, and
-# while it runs the timer starts no second one. The gate runs without --release: D1 on #1243
-# releases a run only after its preview and a yes, by
-# `python -m squadopt.platform.weekly_release --run-id <id>`.
+# while it runs the timer starts no second one. Here the gate runs without --release: D1 on
+# #1243 released a run only after its preview and a yes, by
+# `python -m squadopt.platform.weekly_release --run-id <id>`. From GW11 (#1243, 6605005485)
+# the drop-in release.conf sets WEEKLY_RELEASE, so a run that exits 0 releases itself and the
+# backend follows it on this host; dry-run.conf's command leaves the variable out.
 [Unit]
 Description=SquadOpt weekly schedule: one tick of the deadline gate
 Wants=network-online.target
@@ -27,7 +29,10 @@ Environment=PYTHONUNBUFFERED=1
 # One solver worker per core. A Cloud VPS 4 has 4; provision.sh writes the host's own count
 # into the drop-in workers.conf, which overrides this line.
 Environment=WEEKLY_WORKERS=4
-ExecStart=/srv/squadopt/weekly/.venv/bin/python -m squadopt.platform.weekly_schedule --workspace /srv/squadopt/weekly --workers ${WEEKLY_WORKERS}
+# Empty: no release in the tick. release.conf gives the gate's two release options; unbraced,
+# systemd splits the value into words, and an empty one into none.
+Environment=WEEKLY_RELEASE=
+ExecStart=/srv/squadopt/weekly/.venv/bin/python -m squadopt.platform.weekly_schedule --workspace /srv/squadopt/weekly --workers ${WEEKLY_WORKERS} $WEEKLY_RELEASE
 TimeoutStartSec=infinity
 # The gate reads its run's peak memory from this unit's cgroup (memory.peak), and a worker the
 # kernel kills for memory fails the run, which the gate reports on #1093, instead of stopping
