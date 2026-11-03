@@ -115,18 +115,21 @@ describe.each(["tr", "en"] as const)("where a waiting job stands in %s", (langua
     expect(jobStanding(copy, { status: "queued" })).toBeNull();
   });
 
-  it("counts its stages while it runs, where there are stages to count", () => {
+  it("says how much is solved while it runs, where there are stages to count", () => {
     const running = (done: number, total: number) =>
       jobStanding(copy, { status: "running", progress: { done, total } });
-    expect(running(0, 3)).toBe("0/3");
-    expect(running(1, 3)).toBe("1/3");
-    expect(running(3, 3)).toBe("3/3");
+    const percent = (share: number) => (language === "tr" ? `%${share}` : `${share}%`);
+    expect(running(0, 3)).toBe(percent(0));
+    expect(running(1, 3)).toBe(percent(33));
+    expect(running(2, 3)).toBe(percent(67));
+    expect(running(3, 3)).toBe(percent(100));
+    expect(running(1, 2)).toBe(percent(50));
     expect(running(0, 1)).toBeNull();
     expect(running(1, 1)).toBeNull();
     expect(jobStanding(copy, { status: "running" })).toBeNull();
   });
 
-  it("says nothing of a place in line once it runs, nor of a count while it is queued", () => {
+  it("says nothing of a place in line once it runs, nor of a share while it is queued", () => {
     expect(jobStanding(copy, { status: "running", queuePosition: 2 })).toBeNull();
     expect(jobStanding(copy, { status: "queued", progress: { done: 1, total: 3 } })).toBeNull();
   });
@@ -154,7 +157,7 @@ describe.each(["tr", "en"] as const)("where a waiting job stands in %s", (langua
     expect(jobWorkersLine(copy, { status: null })).toBeNull();
   });
 
-  it("prints no percentage", () => {
+  it("carries no per cent sign in its catalogue, nor anything read as a chance", () => {
     for (const text of [copy.queueNext, copy.queueAhead(2), copy.workersBusy(2, 3)]) {
       expect(text).not.toContain("%");
       expect(text).not.toMatch(AS_A_CHANCE);

@@ -1,5 +1,6 @@
 import type { Language } from "../../../i18n/messages";
 import type { WindowSize } from "../../../lib/decisionVocabulary";
+import type { AdviceJobProgress } from "./adviceClient";
 import type { WaitingPhase } from "./useAdviceJob";
 
 /**
@@ -12,11 +13,13 @@ import type { WaitingPhase } from "./useAdviceJob";
  * What it may say: that a selection can be computed now, about how long a computation took
  * when it was measured, that the page can be left open, where a waiting job stands, and, when
  * something fails, what happened in a sentence the member can act on. A duration is "about",
- * and a job's stages are a count ("1/3"), never a percentage. A failure is said
- * from the service's stable code, or in the general sentence where a code gives the member
- * nothing to do; the code itself and the service's own text are never shown.
+ * and a job's progress is the share of its stages solved, never a guess from the clock. A
+ * failure is said from the service's stable code, or in the general sentence where a code
+ * gives the member nothing to do; the code itself and the service's own text are never shown.
  */
 export interface ComputeCopy {
+  /** How these words write a number. */
+  locale: string;
   notPrecomputed: string;
   notComputable: string;
   duration: Record<WindowSize, string>;
@@ -35,6 +38,7 @@ export interface ComputeCopy {
 }
 
 const en: ComputeCopy = {
+  locale: "en-GB",
   notPrecomputed: "You can compute it now.",
   notComputable: "Change the selection to use Compute.",
   duration: {
@@ -90,6 +94,7 @@ const en: ComputeCopy = {
 };
 
 const tr: ComputeCopy = {
+  locale: "tr-TR",
   notPrecomputed: "Şimdi hesaplatabilirsin.",
   notComputable: "Hesapla için seçimi değiştir.",
   duration: {
@@ -143,9 +148,19 @@ const tr: ComputeCopy = {
 export const COMPUTE_COPY: Record<Language, ComputeCopy> = { tr, en };
 
 /**
- * What goes beside a waiting job's word: its place in line, or how many of its stages are
- * done. Null where the service has not said. A job of one stage has nothing to count: "0/1"
- * would only stand still until it ends.
+ * How much of a running job is solved: the owner's decision of 2026-11-03 (docs/decisions.md).
+ * The service counts documents, so this moves in steps. It is a share of the work and no
+ * chance of anything, so it is written here and never in a catalogue, which stays held to the
+ * guard against a chance on a page (`testSupport/honesty.ts`).
+ */
+export function jobPercent(copy: ComputeCopy, { done, total }: AdviceJobProgress): string {
+  return new Intl.NumberFormat(copy.locale, { style: "percent" }).format(done / total);
+}
+
+/**
+ * What goes beside a waiting job's word: its place in line, or how much of it is solved. Null
+ * where the service has not said. A job of one stage has nothing to count: "%0" would only
+ * stand still until it ends.
  */
 export function jobStanding(
   copy: ComputeCopy,
@@ -155,7 +170,7 @@ export function jobStanding(
     if (queuePosition === undefined) return null;
     return queuePosition === 0 ? copy.queueNext : copy.queueAhead(queuePosition);
   }
-  return progress !== undefined && progress.total > 1 ? `${progress.done}/${progress.total}` : null;
+  return progress !== undefined && progress.total > 1 ? jobPercent(copy, progress) : null;
 }
 
 /**

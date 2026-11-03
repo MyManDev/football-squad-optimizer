@@ -128,33 +128,33 @@ describe("a job at the service", () => {
     expect(screen.queryByRole("progressbar")).toBeNull();
   });
 
-  it("counts its stages and says who is at work while it runs", () => {
+  it("says how much is solved and who is at work while it runs", () => {
     const { container } = show({
       status: "running",
       progress: { done: 1, total: 3 },
       workers: { busy: 1, total: 1 },
     });
     expect(container).toHaveTextContent(messages.computeRunning);
-    expect(container).toHaveTextContent("1/3");
+    expect(container).toHaveTextContent("%33");
     expect(container).toHaveTextContent(tr.workersBusy(1, 1));
     expect(container).not.toHaveTextContent(messages.computeQueued);
     expect(bar()).toHaveAttribute("aria-valuemin", "0");
-    expect(bar()).toHaveAttribute("aria-valuenow", "1");
-    expect(bar()).toHaveAttribute("aria-valuemax", "3");
-    expect(bar()).toHaveAttribute("aria-valuetext", "1/3");
+    expect(bar()).toHaveAttribute("aria-valuenow", "33");
+    expect(bar()).toHaveAttribute("aria-valuemax", "100");
+    expect(bar()).toHaveAttribute("aria-valuetext", "%33");
     expect(stageInHand(container)).not.toBeNull();
   });
 
   it("has no stage in hand once every stage is solved", () => {
     const { container } = show({ status: "running", progress: { done: 3, total: 3 } });
-    expect(container).toHaveTextContent("3/3");
-    expect(bar()).toHaveAttribute("aria-valuenow", "3");
+    expect(container).toHaveTextContent("%100");
+    expect(bar()).toHaveAttribute("aria-valuenow", "100");
     expect(stageInHand(container)).toBeNull();
   });
 
-  it("shows a job of one stage as the bar alone, with no count and no value", () => {
+  it("shows a job of one stage as the bar alone, with no percentage and no value", () => {
     const { container } = show({ status: "running", progress: { done: 0, total: 1 } });
-    expect(container).not.toHaveTextContent("0/1");
+    expect(container).not.toHaveTextContent("%");
     expect(bar()).not.toHaveAttribute("aria-valuenow");
     expect(bar()).not.toHaveAttribute("aria-valuemax");
     expect(bar()).not.toHaveAttribute("aria-valuetext");
@@ -171,7 +171,7 @@ describe("a job at the service", () => {
     const { container } = show({ status: "running" });
     expect(container).toHaveTextContent(messages.computeRunning);
     expect(container).not.toHaveTextContent(workersLabel);
-    expect(container).not.toHaveTextContent("/");
+    expect(container).not.toHaveTextContent("%");
     expect(bar()).not.toHaveAttribute("aria-valuenow");
     expect(stageInHand(container)).not.toBeNull();
   });
@@ -194,9 +194,9 @@ describe("a job at the service", () => {
     expect(container).toHaveTextContent(tr.leaveOpen);
   });
 
-  it("has the bar say the count to a screen reader, and the line say a place in line", () => {
+  it("has the bar say the share to a screen reader, and the line say a place in line", () => {
     const running = show({ status: "running", progress: { done: 1, total: 3 } });
-    expect(screen.getByText("1/3")).toHaveAttribute("aria-hidden", "true");
+    expect(screen.getByText("%33")).toHaveAttribute("aria-hidden", "true");
     running.unmount();
     show({ queuePosition: 2 });
     expect(screen.getByText(tr.queueAhead(2))).not.toHaveAttribute("aria-hidden");
@@ -226,23 +226,26 @@ describe("a job at the service", () => {
     expect(stageInHand(view.container)).not.toBe(first);
   });
 
-  it("says only its word and its count on the state line, and no percentage", () => {
+  it("says only its word and its share on the state line", () => {
     const { container } = show({
       status: "running",
       progress: { done: 2, total: 3 },
       workers: { busy: 2, total: 3 },
     });
-    expect(container).not.toHaveTextContent("%");
-    expect(stateLine(container)).toHaveTextContent(new RegExp(`^${messages.computeRunning} 2/3$`));
+    expect(stateLine(container)).toHaveTextContent(new RegExp(`^${messages.computeRunning} %67$`));
     expect(container).toHaveTextContent(tr.leaveOpen);
   });
 
   it("speaks the member's language", () => {
     const english = COMPUTE_COPY.en;
-    const { container } = show({ queuePosition: 1, workers: { busy: 2, total: 3 } }, "en");
+    const view = show({ queuePosition: 1, workers: { busy: 2, total: 3 } }, "en");
+    const { container } = view;
     expect(container).toHaveTextContent(MESSAGES.en.leagueMembers.computeQueued);
     expect(container).toHaveTextContent(english.queueAhead(1));
     expect(container).toHaveTextContent(english.workersBusy(2, 3));
+    view.unmount();
+    const running = show({ status: "running", progress: { done: 1, total: 3 } }, "en");
+    expect(running.container).toHaveTextContent("33%");
   });
 });
 

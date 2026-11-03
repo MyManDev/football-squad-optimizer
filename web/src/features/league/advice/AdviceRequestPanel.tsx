@@ -3,8 +3,9 @@
  *
  * The request comes from the page's shared selection and squad context. Every state is a
  * short sentence the member can act on, or a mark that the plan is ready: queued, running,
- * done, failed. A job at the service also says how the wait is going: its place in line, its
- * stages as a count and a bar, and the workers at work, each only where the service says it.
+ * done, failed. A job at the service also says how the wait is going: its place in line, how
+ * much is solved as a percentage and a bar, and the workers at work, each only where the
+ * service says it.
  *
  * The job itself belongs to the page: the panel asks for a computation and reports its
  * state, and the page hands the finished answer to the advice card beside it.
@@ -44,26 +45,36 @@ import styles from "./AdviceRequestPanel.module.css";
 export type ComputeService = "static" | "ready" | "unreachable" | "other-capture";
 
 /**
- * A running job's stages as one bar, filled by what is solved, as on the device card. A solve
+ * A running job's stages as one bar, filled by what is solved. A solve
  * reports nothing until it ends and nothing here follows the clock, so the only thing that
  * moves is one pulse across the stage in hand, each time the service answers that the job is
  * still going. A job of one stage, or one that has not counted yet, is that stage alone.
  */
-function JobStages({ state, label }: { state: WaitingPhase; label: string }) {
+function JobStages({
+  state,
+  label,
+  value,
+}: {
+  state: WaitingPhase;
+  label: string;
+  /** The share solved in words; null when there is nothing to count. */
+  value: string | null;
+}) {
   const done = state.progress?.done ?? 0;
   const total = state.progress?.total ?? 1;
-  const counted = total > 1;
+  const share = (done / total) * 100;
+  const counted = value !== null;
   return (
     <div
       className={styles.stages}
       role="progressbar"
       aria-label={label}
       aria-valuemin={counted ? 0 : undefined}
-      aria-valuemax={counted ? total : undefined}
-      aria-valuenow={counted ? done : undefined}
-      aria-valuetext={counted ? `${done}/${total}` : undefined}
+      aria-valuemax={counted ? 100 : undefined}
+      aria-valuenow={counted ? Math.round(share) : undefined}
+      aria-valuetext={value ?? undefined}
     >
-      <span className={styles.stagesDone} style={{ inlineSize: `${(done / total) * 100}%` }} />
+      <span className={styles.stagesDone} style={{ inlineSize: `${share}%` }} />
       {done < total ? (
         <span
           key={state.answers ?? 0}
@@ -91,10 +102,10 @@ function JobState({ state }: { state: WaitingPhase }) {
     <>
       <p className={styles.state}>
         <Badge tone="accent">{word}</Badge>{" "}
-        {/* While it runs the bar says the count to a screen reader, as on the device card. */}
+        {/* While it runs the bar says the percentage to a screen reader. */}
         {standing === null ? null : <span aria-hidden={running || undefined}>{standing}</span>}
       </p>
-      {running ? <JobStages state={state} label={word} /> : null}
+      {running ? <JobStages state={state} label={word} value={standing} /> : null}
       {workers === null ? null : <p className={styles.note}>{workers}</p>}
     </>
   );

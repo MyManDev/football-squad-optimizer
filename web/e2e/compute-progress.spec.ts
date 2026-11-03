@@ -114,6 +114,7 @@ async function noSidewaysScroll(page: Page): Promise<boolean> {
 for (const language of ["tr", "en"] as const) {
   const copy = MESSAGES[language].leagueMembers;
   const computeCopy = COMPUTE_COPY[language];
+  const third = language === "tr" ? "%33" : "33%";
 
   test(`a waiting computation follows its place in line and its stages in ${language}`, async ({
     page,
@@ -139,15 +140,16 @@ for (const language of ["tr", "en"] as const) {
 
     job.says = RUNNING_ONE_OF_THREE;
     const bar = dock.getByRole("progressbar", { name: copy.computeRunning });
-    await expect(bar).toHaveAttribute("aria-valuenow", "1");
-    await expect(bar).toHaveAttribute("aria-valuemax", "3");
-    await expect(bar).toHaveAttribute("aria-valuetext", "1/3");
+    await expect(bar).toHaveAttribute("aria-valuenow", "33");
+    await expect(bar).toHaveAttribute("aria-valuemax", "100");
+    await expect(bar).toHaveAttribute("aria-valuetext", third);
     await expect(dock.getByText(copy.computeRunning, { exact: true })).toBeVisible();
-    await expect(dock.getByText("1/3", { exact: false })).toBeVisible();
+    await expect(dock.getByText(third, { exact: true })).toBeVisible();
     await expect(dock.getByText(computeCopy.workersBusy(3, 3), { exact: true })).toBeVisible();
-    await expect(dock).not.toContainText("%");
     await expect(
-      main.getByText(copy.computeEcho(`${copy.computeEchoStates.running}, 1/3`), { exact: true }),
+      main.getByText(copy.computeEcho(`${copy.computeEchoStates.running}, ${third}`), {
+        exact: true,
+      }),
     ).toBeVisible();
 
     // A third of the bar is solved, and the next third is the stage in hand.
@@ -173,7 +175,7 @@ for (const language of ["tr", "en"] as const) {
     const bar = dock.getByRole("progressbar", { name: copy.computeRunning });
     await expect(bar).toBeVisible();
     await expect(bar).not.toHaveAttribute("aria-valuenow");
-    await expect(dock).not.toContainText("/");
+    await expect(dock).not.toContainText("%");
     await expect(
       page
         .locator("main")
@@ -223,7 +225,7 @@ test("under reduced motion no pulse runs, and the fill and the count stay", asyn
   const { dock } = await askForPlan(page, "tr", RUNNING_ONE_OF_THREE);
   const inHand = dock.locator("[data-stage-now]");
   await expect(inHand).toBeAttached();
-  await expect(dock).toContainText("1/3");
+  await expect(dock).toContainText("%33");
   const first = await inHand.evaluateHandle((node) => node);
   await page.waitForFunction((node) => !node?.isConnected, first, { timeout: 7000 });
   expect(await inHand.evaluate((node) => node.getAnimations({ subtree: true }).length)).toBe(0);

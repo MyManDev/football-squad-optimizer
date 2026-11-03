@@ -367,9 +367,9 @@ describe("a selection nobody published, with the service answering", () => {
       `${copy.computeEchoStates.queued}, ${computeCopy.queueNext}`,
     ],
     [
-      "its count of stages",
+      "how much is solved",
       { jobId: "job-1", status: "running", progress: { done: 1, total: 3 } },
-      `${copy.computeEchoStates.running}, 1/3`,
+      `${copy.computeEchoStates.running}, %33`,
     ],
     [
       "only its word for one stage",
