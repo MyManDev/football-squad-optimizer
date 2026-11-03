@@ -41,8 +41,8 @@ const en: FixturesCopy = {
   notPublished: "No fixture list has been published yet.",
   unscheduledCount: (count) =>
     count === 1
-      ? "1 postponed fixture has no new gameweek yet and is not listed."
-      : `${count} postponed fixtures have no new gameweek yet and are not listed.`,
+      ? "1 postponed fixture has no new gameweek yet."
+      : `${count} postponed fixtures have no new gameweek yet.`,
   calendarAction: "Add deadlines to your calendar",
   calendarSummary: (gameweek) => `FPL GW${gameweek} deadline`,
   calendarDescription: (link) => `Open SquadOpt before the deadline: ${link}`,
@@ -58,8 +58,7 @@ const tr: FixturesCopy = {
   pastTitle: "Geçmiş haftalar",
   noPast: "Henüz oynanmış bir oyun haftası yok.",
   notPublished: "Henüz yayımlanmış bir fikstür yok.",
-  unscheduledCount: (count) =>
-    `Ertelenen ${count} maçın yeni oyun haftası henüz belli değil; listede yer almıyor.`,
+  unscheduledCount: (count) => `Ertelenen ${count} maçın yeni oyun haftası henüz belli değil.`,
   calendarAction: "Deadline'ları takvime ekle",
   calendarSummary: (gameweek) => `FPL ${gameweek}. hafta son tarihi`,
   calendarDescription: (link) => `Deadline'dan önce SquadOpt'u açın: ${link}`,

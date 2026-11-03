@@ -1,13 +1,11 @@
 /*
  * The decision: the gain strip as its headline, the fourth official's substitution boards
- * (the one dark object on the page besides the grass), the captain line, the chosen chip
- * and the proof stamp.
+ * (the one dark object on the page besides the grass), the captain line and the chosen chip.
  *
  * Contrast on the board (WCAG formula): white is 5.6:1 on the red panel and 5.3:1 on the
  * green one; lime and board-muted are 13.5:1 and 11.9:1 on the board; ink is 9.8:1 on the
  * second bar segment and white 5.4:1 on the first. Uppercase and letter-spacing are used
- * here only because these are broadcast elements: the board words and DEĞİŞİKLİK. The proof
- * stamp keeps its capitals but is drawn as a tag.
+ * here only because these are broadcast elements: the board words and DEĞİŞİKLİK.
  */
 
 /* ---- Substitution boards ---- */
@@ -189,6 +187,18 @@
   text-align: center;
 }
 
+/* A move whose share was not published has no figure here, so the panels take the width. */
+.led:empty {
+  display: none;
+}
+
+.board:has(.led:empty) {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    "head"
+    "panels";
+}
+
 .ledValue {
   color: var(--color-mark);
   font-family: var(--font-mono);
@@ -197,8 +207,7 @@
   line-height: 32px;
 }
 
-.ledLabel,
-.ledUnknown {
+.ledLabel {
   color: var(--color-board-muted);
   font-size: var(--step--2);
   line-height: 16px;
@@ -230,11 +239,6 @@
   .ledValue {
     font-size: 22px;
     line-height: 28px;
-  }
-
-  .ledUnknown {
-    max-width: 16ch;
-    padding: 4px 0;
   }
 
   .boardHead {
@@ -585,111 +589,25 @@
   font-size: var(--step--1);
 }
 
-/* ---- Proof stamp, beside the decision heading ---- */
-
-.stamp {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: var(--space-1);
-  max-width: 320px;
-}
-
-/* Where the heading row has the room, a tag (example data, a computed plan) stands beside
-   the stamp rather than on a line of its own. */
-@media (min-width: 600px) {
-  .stamp {
-    display: grid;
-    grid-template-columns: auto auto;
-    grid-template-areas: "tags box";
-    align-items: center;
-    justify-content: end;
-    justify-items: end;
-    gap: var(--space-1) var(--space-2);
-    max-width: 440px;
-  }
-
-  .stampTags {
-    grid-area: tags;
-  }
-
-  .stampBox {
-    grid-area: box;
-  }
-}
-
-.stampTags {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: var(--space-1);
-  margin: 0;
-}
-
-.stampTags:empty {
-  display: none;
-}
-
-/* The proof is a state of the plan, not something to press: it wears the house tag
-   (Badge.module.css, the good tone) with its tick, small and outlined in its own green, and
-   never the ink box an outlined button draws. */
-.stampBox {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  min-height: 20px;
-  margin: 0;
-  padding: 1px 6px;
-  border: 1px solid currentColor;
-  border-radius: var(--radius-s);
-  background: var(--color-surface);
-  color: var(--color-good);
-  font-size: var(--step--2);
-  font-weight: 600;
-  line-height: 16px;
-  white-space: nowrap;
-}
-
-.stampBox svg {
-  flex: none;
-  width: 12px;
-  height: 12px;
-}
-
 /* On a phone the decision reads as D-Phone-Bu-Hafta draws it, under its headline (the
    gain figure with the number of changes, then its bar, in the document's order): the
-   boards, the captain line and the chip, the proof stamp beside the week's transfer facts,
-   then the boards' shared reason and the sentences that qualify the plan. LeagueMemberPage.module.css makes the decision a two-column grid there; the
-   boards' wrapper, the gain strip and the stamp step aside (display: contents) so each of
-   their parts takes its own place in that grid, in the order below. */
+   boards, the captain line and the chip, the week's transfer facts, then the boards' shared
+   reason and the sentences that qualify the plan. LeagueMemberPage.module.css makes the
+   decision a grid there; the boards' wrapper and the gain strip step aside (display: contents)
+   so each of their parts takes its own place in that grid, in the order below. */
 @media (max-width: 599.98px) {
   .boards,
   .gain,
-  .gainTop,
-  .stamp {
+  .gainTop {
     display: contents;
-  }
-
-  .grid,
-  .reason,
-  .noMove,
-  .missing,
-  .captain,
-  .headline,
-  .bar,
-  .gainList,
-  .facts,
-  .stampTags,
-  .states {
-    grid-column: 1 / -1;
   }
 
   .grid {
     gap: var(--space-2);
   }
 
-  /* The phone's headline figure and stamp keep the artboard's size; wider screens draw them
-     a little tighter to keep the laptop budget (LeagueMemberPage.module.css). */
+  /* The phone's headline figure keeps the artboard's size; wider screens draw it a little
+     tighter to keep the laptop budget (LeagueMemberPage.module.css). */
   .gainFigure {
     font-size: 36px;
     line-height: 40px;
@@ -712,41 +630,11 @@
     gap: var(--space-1);
   }
 
-  .stampTags {
-    order: 4;
-    justify-content: flex-start;
-  }
-
-  /* The stamp stands in the first column, the transfer facts beside it; with no stamp
-     the facts take the whole row. */
-  .stampBox {
-    order: 5;
-    grid-column: 1;
-    justify-self: start;
-    align-self: center;
-  }
-
   .facts {
     order: 6;
-    align-self: center;
   }
 
-  :global([data-mark="decision"]):has([data-stamp]) .facts {
-    grid-column: 2;
-  }
-
-  /* Under 390 px the stamp leaves the facts a column too narrow for one line each, so
-     they take the row under it, side by side. */
-  @media (max-width: 389.98px) {
-    :global([data-mark="decision"]):has([data-stamp]) .facts {
-      grid-column: 1 / -1;
-      flex-direction: row;
-      flex-wrap: wrap;
-      column-gap: var(--space-3);
-    }
-  }
-
-  /* The reason shared by every board follows the stamp, with the plan's other sentences;
+  /* The reason shared by every board follows the facts, with the plan's other sentences;
      a board with a reason of its own keeps it under that board. */
   .reason {
     order: 8;

@@ -1,13 +1,12 @@
 /**
- * A chip the member chose, on the advice card: which chip, what the chip week is expected
- * to score above the member's own plan without it, signed, and the sentence saying that is
- * one gameweek's difference and not advice to play the chip now. No price line: a gain is
- * never worded as something given up. A Triple Captain or Bench Boost week names the basis
- * it scores on. A document for another chip is not shown, and nothing can be computed
- * while a chip is chosen.
+ * A chip the member chose, on the advice card: which chip, and what the chip week is
+ * expected to score above the member's own plan without it, signed, with no caveat under
+ * it. No price line: a gain is never worded as something given up. A chip week's total is
+ * bare expected points. A document for another chip is not shown, and nothing can be
+ * computed while a chip is chosen.
  */
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -80,7 +79,12 @@ function section(container: HTMLElement): string {
   return container.querySelector('[data-testid="chip-choice"]')?.textContent ?? "";
 }
 
-/** The proof sentences a FEASIBLE plan or control used to carry; none is on the page now. */
+/** The decision's line that names the chosen chip, found by that name. */
+function chipLine(container: HTMLElement, name: string): HTMLElement | null {
+  return within(container).getByText(name, { selector: "strong" }).closest("p");
+}
+
+/** Wording about a proof, which the page never uses, whichever status a plan or control has. */
 const PROOF_WORDING = {
   tr: /kanıt|ispat/i,
   en: /proof|proven/i,
@@ -121,9 +125,11 @@ describe("a chosen chip on the advice card", () => {
       "mode=saf-puan&window=1&chip=bboost",
     );
     const text = section(container);
+    expect(chipLine(container, "Bench Boost")).toHaveTextContent(
+      MESSAGES.tr.leagueMembers.chipLabel,
+    );
     expect(text).toContain(CHIP_COPY.tr.title);
-    expect(text).toContain(CHIP_COPY.tr.chosen("Bench Boost"));
-    expect(text).toContain(CHIP_COPY.tr.gain("+8,3"));
+    expect(text).toContain("Bu hafta ~+8,3 beklenen puan.");
     expect(text).not.toMatch(/tavsiyesi değildir|ölçülmedi/);
     expect(text).not.toContain(CHIP_COPY.tr.freeHit);
     // The plan's published limits are not listed on the page.
@@ -140,8 +146,8 @@ describe("a chosen chip on the advice card", () => {
       "mode=saf-puan&window=1&chip=freehit",
     );
     const text = section(container);
-    expect(text).toContain(CHIP_COPY.en.chosen("Free Hit"));
-    expect(text).toContain(CHIP_COPY.en.gain("+3.5"));
+    expect(chipLine(container, "Free Hit")).toHaveTextContent(MESSAGES.en.leagueMembers.chipLabel);
+    expect(text).toContain("~+3.5 expected points this gameweek.");
     expect(text).not.toMatch(/not advice to play it now|is not measured/);
     expect(text).toContain(CHIP_COPY.en.freeHit);
     const page = container.textContent ?? "";

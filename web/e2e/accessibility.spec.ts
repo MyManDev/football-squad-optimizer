@@ -1,21 +1,44 @@
+import { join } from "node:path";
+
 import AxeBuilder from "@axe-core/playwright";
 import { atRest } from "./atRest";
-import { expect, test } from "@playwright/test";
+import { expect, test as base, type Locator, type Page } from "@playwright/test";
 
+import { shippedClaim } from "./identity";
 import { installLeagueMocks, openCalendar } from "./leagueMocks";
 import { FIXTURES_COPY } from "../src/features/fixtures/fixturesCopy";
+import deviceInstances from "../src/fixtures/device-plan/instances.json" with { type: "json" };
+import { mockEntrySquadEnvelopes } from "../src/fixtures/league";
 import { MESSAGES } from "../src/i18n/messages";
+import { shippedTrees } from "../src/testSupport/shippedTrees";
+
+const DAY = ["day", "light"] as const;
+const NIGHT = ["night", "dark"] as const;
+
+/**
+ * The site has two palettes (tokens.css) and every colour axe reads changes between them, so
+ * a test here that runs axe runs in both unless it names its own; one that never runs axe
+ * calls `base` and stays in the day. The night comes from the system's preference, as it does
+ * for a visitor who has chosen neither.
+ */
+function test(
+  title: string,
+  check: (fixtures: { page: Page }) => Promise<void>,
+  palettes: readonly (typeof DAY | typeof NIGHT)[] = [DAY, NIGHT],
+) {
+  for (const [palette, colorScheme] of palettes) {
+    base(`${title} (${palette})`, async ({ page }) => {
+      await page.emulateMedia({ colorScheme });
+      await check({ page });
+    });
+  }
+}
 
 const ROUTES = [
   "/",
-  "/gw/2026-27/1",
-  "/moves",
-  "/rivals",
   "/league/352490",
   "/league/352490/members",
   "/league/352490/members/35249001?mode=saf-puan&window=3",
-  "/admin",
-  "/status",
 ] as const;
 const BLOCKING_IMPACTS = new Set(["critical", "serious"]);
 
@@ -117,76 +140,265 @@ function fixturesCalendar() {
   };
 }
 
-// The site has one palette (direction D is light only), so every route is checked in it,
-// in both languages. The mocked visitor has said who they are, so the league and system
+// Every route is checked in both languages, and the night in Turkish alone: it changes the
+// colours and not the words. The mocked visitor has said who they are, so the league and system
 // pages are drawn; the picker in front of them is checked on its own.
 for (const language of ["tr", "en"] as const) {
-  test(`axe has no critical or serious violations in ${language}`, async ({ page }) => {
-    test.setTimeout(60_000);
-    await installLeagueMocks(page);
-    await page.addInitScript((selectedLanguage) => {
-      localStorage.setItem("squadopt.language", selectedLanguage);
-    }, language);
+  const palettes = language === "tr" ? [DAY, NIGHT] : [DAY];
 
-    for (const route of ROUTES) {
-      await page.goto(route);
-      await waitForPage(page);
-      if (route.includes("mode=saf-puan&window=3")) {
-        await expect(page.locator('[aria-labelledby="entry-advice-title"]')).toBeVisible();
-        const plan = page.getByRole("region", {
-          name: MESSAGES[language].leagueMembers.windowTitle(3),
-        });
-        await expect(plan).toBeVisible();
-        await expect(plan.locator("tbody tr")).toHaveCount(3);
+  test(
+    `axe has no critical or serious violations in ${language}`,
+    async ({ page }) => {
+      base.setTimeout(60_000);
+      await installLeagueMocks(page);
+      await page.addInitScript((selectedLanguage) => {
+        localStorage.setItem("squadopt.language", selectedLanguage);
+      }, language);
+
+      for (const route of ROUTES) {
+        await page.goto(route);
+        await waitForPage(page);
+        if (route.includes("mode=saf-puan&window=3")) {
+          await expect(page.locator('[aria-labelledby="entry-advice-title"]')).toBeVisible();
+          const plan = page.getByRole("region", {
+            name: MESSAGES[language].leagueMembers.windowTitle(3),
+          });
+          await expect(plan).toBeVisible();
+          await expect(plan.locator("tbody tr")).toHaveCount(3);
+        }
+        expect(await blockingSummary(page), `${language} ${route}`).toEqual([]);
       }
-      expect(await blockingSummary(page), `${language} ${route}`).toEqual([]);
-    }
-  });
+    },
+    palettes,
+  );
 
-  test(`axe has no critical or serious violations on the member picker in ${language}`, async ({
-    page,
-  }) => {
-    await installLeagueMocks(page, { claim: null });
-    await page.addInitScript((selectedLanguage) => {
-      localStorage.setItem("squadopt.language", selectedLanguage);
-    }, language);
-    await page.goto("/league/352490/members");
-    await expect(
-      page.getByRole("group", { name: MESSAGES[language].memberPicker.legend }),
-    ).toBeVisible();
-    expect(await blockingSummary(page), `${language} picker`).toEqual([]);
-    await page.locator("[data-member-picker] li button").first().focus();
-    expect(await blockingSummary(page), `${language} picker with a name in focus`).toEqual([]);
-  });
+  test(
+    `axe has no critical or serious violations on the member picker in ${language}`,
+    async ({ page }) => {
+      await installLeagueMocks(page, { claim: null });
+      await page.addInitScript((selectedLanguage) => {
+        localStorage.setItem("squadopt.language", selectedLanguage);
+      }, language);
+      await page.goto("/league/352490/members");
+      await expect(
+        page.getByRole("group", { name: MESSAGES[language].memberPicker.legend }),
+      ).toBeVisible();
+      expect(await blockingSummary(page), `${language} picker`).toEqual([]);
+      await page.locator("[data-member-picker] li button").first().focus();
+      expect(await blockingSummary(page), `${language} picker with a name in focus`).toEqual([]);
+      await page.locator("[data-member-picker] li button").nth(1).hover();
+      expect(
+        await blockingSummary(page),
+        `${language} picker with a name under the pointer`,
+      ).toEqual([]);
+    },
+    palettes,
+  );
 
-  test(`axe has no critical or serious violations on /fixtures in ${language}`, async ({
-    page,
-  }) => {
-    await installLeagueMocks(page);
-    // Routes registered later win, so this calendar replaces the empty open one.
-    await page.route("**/data/fixtures.json", (route) =>
-      route.fulfill({ contentType: "application/json", body: JSON.stringify(fixturesCalendar()) }),
-    );
-    await page.addInitScript((selectedLanguage) => {
-      localStorage.setItem("squadopt.language", selectedLanguage);
-    }, language);
-    await page.goto("/fixtures");
+  test(
+    `axe has no critical or serious violations on /fixtures in ${language}`,
+    async ({ page }) => {
+      await installLeagueMocks(page);
+      // Routes registered later win, so this calendar replaces the empty open one.
+      await page.route("**/data/fixtures.json", (route) =>
+        route.fulfill({
+          contentType: "application/json",
+          body: JSON.stringify(fixturesCalendar()),
+        }),
+      );
+      await page.addInitScript((selectedLanguage) => {
+        localStorage.setItem("squadopt.language", selectedLanguage);
+      }, language);
+      await page.goto("/fixtures");
 
-    const copy = FIXTURES_COPY[language];
-    const main = page.getByRole("main");
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText(copy.pageTitle);
-    // Every state the page draws is on it before axe reads it: the eight fixtures, a result,
-    // kickoff times, the fixture with no date and the postponed-fixture note.
-    await expect(main.getByRole("listitem")).toHaveCount(8);
-    await expect(main.getByText("2 - 1", { exact: true })).toBeVisible();
-    await expect(main.locator("time")).toHaveCount(4);
-    await expect(main.getByText(copy.unscheduled, { exact: true })).toBeVisible();
-    await expect(main.getByText(copy.unscheduledCount(1), { exact: false })).toBeVisible();
-    expect(await blockingSummary(page), `${language} /fixtures`).toEqual([]);
+      const copy = FIXTURES_COPY[language];
+      const main = page.getByRole("main");
+      await expect(page.getByRole("heading", { level: 1 })).toHaveText(copy.pageTitle);
+      // Every state the page draws is on it before axe reads it: the eight fixtures, a result,
+      // kickoff times, the fixture with no date and the postponed-fixture note.
+      await expect(main.getByRole("listitem")).toHaveCount(8);
+      await expect(main.getByText("2 - 1", { exact: true })).toBeVisible();
+      await expect(main.locator("time")).toHaveCount(4);
+      await expect(main.getByText(copy.unscheduled, { exact: true })).toBeVisible();
+      await expect(main.getByText(copy.unscheduledCount(1), { exact: false })).toBeVisible();
+      expect(await blockingSummary(page), `${language} /fixtures`).toEqual([]);
+    },
+    palettes,
+  );
+}
+
+const ENTRY = 35249001;
+const COPY = MESSAGES.tr.leagueMembers;
+
+/**
+ * The example member's week with the parity fixture's inputs, so the device really solves it.
+ * The inputs are held back until `released` settles, and the run's cover stands until then.
+ */
+async function serveDeviceInputs(page: Page, released: Promise<void> = Promise.resolve()) {
+  const squad = mockEntrySquadEnvelopes[ENTRY]!;
+  await page.route(/\/data\/league\/entries\/35249001\.json(?:\?.*)?$/, (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        ...squad,
+        payload: {
+          ...squad.payload,
+          source_snapshot_id: deviceInstances.document.source_snapshot_id,
+          device_plan: deviceInstances.members[2]!.entry,
+        },
+      }),
+    }),
+  );
+  await page.route(/\/data\/league\/device-plan\.json(?:\?.*)?$/, async (route) => {
+    await released;
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        contract_version: "provisional_league_ui_v1",
+        generated_at_utc: "2026-10-03T00:00:00Z",
+        source_kind: "live",
+        payload: { ...deviceInstances.document, league_id: squad.payload.league_id },
+      }),
+    });
   });
 }
 
-test("language controls satisfy label-in-name and remain keyboard operable", async ({ page }) => {
+/** A control on the mark is ringed in the mark's ink: at night the focus colour is the mark's. */
+async function expectRingInItsInk(control: Locator) {
+  await control.focus();
+  // Reached from the keyboard, whatever the page was last touched with.
+  await control.page().keyboard.press("Shift+Tab");
+  await control.page().keyboard.press("Tab");
+  await expect(control).toBeFocused();
+  await expect(control).toHaveCSS("outline-style", "solid");
+  const ink = await control.evaluate((element) => getComputedStyle(element).color);
+  await expect(control).toHaveCSS("outline-color", ink);
+}
+
+// The shipped league, whose scoreboard draws the race, so the viewer has a row of their own in
+// the table and in the points-gap list. At 320 px the chart and its table scroll sideways.
+for (const width of [320, 1280]) {
+  test(`axe has no critical or serious violations on the viewer's own rows at ${width} px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 800 });
+    await installLeagueMocks(page, { claim: shippedClaim() });
+    await page.route("**/data/league/members.json", (route) =>
+      route.fulfill({ path: join(shippedTrees()[0]!.root, "members.json") }),
+    );
+    await page.goto("/league/352490/members");
+    const row = page.locator("tbody tr[aria-current]");
+    await expect(row).toBeVisible();
+    await expect(page.locator("ol li[aria-current]")).toBeVisible();
+    expect(await blockingSummary(page)).toEqual([]);
+    await expectRingInItsInk(row.getByRole("link"));
+  });
+}
+
+test("axe has no critical or serious violations on a changed row of the what-if squad", async ({
+  page,
+}) => {
+  await installLeagueMocks(page);
+  await serveDeviceInputs(page);
+  await page.goto(`/league/352490/members/${ENTRY}?mode=saf-puan&window=1`);
+  await page.getByRole("button", { name: COPY.deviceButton }).click();
+  await expect(page.locator("[data-device-state='done']")).toBeVisible({ timeout: 60_000 });
+  await expect(page.locator("[data-device-progress]")).toHaveCount(0, { timeout: 30_000 });
+
+  // The what-if is a page of its own; the sidebar's link keeps the plan the device solved.
+  await page
+    .locator("#sidebar nav")
+    .getByRole("link", { name: MESSAGES.tr.shell.whatIf, exact: true })
+    .click();
+  const tool = page.getByRole("region", { name: COPY.whatIfTitle });
+  await tool.getByRole("button", { name: COPY.whatIfStart }).click();
+  const points = tool.locator("dt", { hasText: COPY.whatIfPoints }).locator("xpath=../dd");
+  await expect(points).not.toHaveText(/^-/, { timeout: 30_000 });
+  // One out and another in: the newcomer's row carries the mark.
+  await tool.getByRole("button", { name: COPY.whatIfRemove }).first().click();
+  await tool.getByLabel(COPY.whatIfAdd).selectOption({ index: 1 });
+  await tool.getByRole("button", { name: COPY.whatIfAddButton, exact: true }).click();
+  const row = tool.locator("li[data-changed]");
+  await expect(row).toHaveCount(1);
+  expect(await blockingSummary(page)).toEqual([]);
+  await expectRingInItsInk(row.getByRole("button"));
+});
+
+for (const width of [390, 1440]) {
+  test(`the device solve's cover keeps focus and gives it back at ${width} px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 844 });
+    await installLeagueMocks(page);
+    let release = () => {};
+    await serveDeviceInputs(
+      page,
+      new Promise<void>((resolve) => {
+        release = resolve;
+      }),
+    );
+    await page.goto(`/league/352490/members/${ENTRY}?mode=saf-puan&window=1`);
+    const button = page.getByRole("button", { name: COPY.deviceButton });
+    await button.focus();
+    await page.keyboard.press("Enter");
+
+    // Over the page, all of it inert, a phone's fixture sheet with it; Tab stays in the card.
+    await expect(page.getByRole("region", { name: COPY.deviceSolving })).toBeFocused();
+    await expect(page.locator("#root")).toHaveAttribute("inert", "");
+    await expect(page.locator("body > :not([inert], [data-device-progress])")).toHaveCount(0);
+    for (let step = 0; step < 6; step += 1) {
+      await page.keyboard.press("Tab");
+      const inside = await page.evaluate(() => {
+        const active = document.activeElement;
+        return active === document.body || !!active?.closest("[data-device-progress]");
+      });
+      expect(inside, `focus after ${step + 1} tabs`).toBe(true);
+    }
+    expect(await blockingSummary(page)).toEqual([]);
+
+    release();
+    await expect(page.locator("[data-device-progress]")).toHaveCount(0, { timeout: 60_000 });
+    await expect(page.locator("body > [inert]")).toHaveCount(0);
+    await expect(button).toBeFocused();
+    // The state line is a live region, and the button that takes focus back says how it ended.
+    await expect(page.getByRole("status").filter({ hasText: COPY.computeDone })).toBeVisible();
+    await expect(button).toHaveAccessibleDescription(new RegExp(COPY.computeDone));
+  });
+}
+
+// A page that holds only a state still has a heading, the state's title. axe rates its absence
+// below the impacts the checks above fail on, so this asks for that one rule by name.
+const STATE_PAGES: { path: string; unpublished?: string }[] = [
+  { path: "/moves" },
+  { path: "/status" },
+  { path: "/admin" },
+  { path: "/gw/2026-27/5" },
+  { path: "/rivals" },
+  { path: "/rivals/2026-27/38" },
+  { path: "/league/352490/members/not-a-member" },
+  { path: "/league/352490/members/35249001/not-a-tool" },
+  { path: "/league/352490/members/not-a-member/history" },
+  { path: "/league/352490/members/1" },
+  { path: "/league/352490/members/1/history" },
+  { path: "/fixtures", unpublished: "**/data/fixtures.json" },
+];
+
+for (const { path, unpublished } of STATE_PAGES) {
+  base(`${path} has its heading when it holds only a state`, async ({ page }) => {
+    await installLeagueMocks(page);
+    if (unpublished)
+      await page.route(unpublished, (route) =>
+        route.fulfill({ status: 404, contentType: "application/json", body: "{}" }),
+      );
+    await page.goto(path);
+    const state = page.getByRole("main").getByRole("status");
+    await expect(state.getByRole("heading", { level: 1 })).toBeVisible();
+    const results = await new AxeBuilder({ page }).withRules(["page-has-heading-one"]).analyze();
+    expect(results.violations.map((violation) => violation.id)).toEqual([]);
+  });
+}
+
+base("language controls satisfy label-in-name and remain keyboard operable", async ({ page }) => {
   await page.goto("/");
   const turkish = page.getByRole("button", { name: /^TR/ });
   const english = page.getByRole("button", { name: /^EN/ });
@@ -199,7 +411,7 @@ test("language controls satisfy label-in-name and remain keyboard operable", asy
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
 });
 
-test("language buttons are 44 px touch targets below 1180 px wide", async ({ page }) => {
+base("language buttons are 44 px touch targets below 1180 px wide", async ({ page }) => {
   // Desktop keeps D's compact 30 px control; every narrower width is treated as touch.
   // On a phone the switch lives in the sidebar drawer, so the menu is opened first; the
   // tablet's icon rail stacks TR over EN.
@@ -224,7 +436,7 @@ test("language buttons are 44 px touch targets below 1180 px wide", async ({ pag
   }
 });
 
-test("skip link and the sidebar's controls take keyboard focus in order", async ({ page }) => {
+base("skip link and the sidebar's controls take keyboard focus in order", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/");
   await page.keyboard.press("Tab");
@@ -256,43 +468,44 @@ test("skip link and the sidebar's controls take keyboard focus in order", async 
   }
 });
 
-test("once the visitor has said who they are, Değiştir comes before the league's links", async ({
-  page,
-}) => {
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await installLeagueMocks(page);
-  await page.goto("/fixtures");
-  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-  await page.keyboard.press("Tab");
-  await expect(page.getByRole("link", { name: "İçeriğe geç" })).toBeFocused();
-  const sidebar = page.locator("#sidebar");
-  const navigation = page.getByRole("navigation");
-  const order = [
-    sidebar.getByRole("button", { name: "Kenar çubuğunu kapat" }),
-    sidebar.getByRole("button", { name: "Değiştir" }),
-    navigation.getByRole("link", { name: "Bu hafta", exact: true }),
-    navigation.getByRole("link", { name: "Lig", exact: true }),
-    ...[
-      "Şu anki kadron",
-      "Kadroyu kendin dene",
-      "Rakiple yan yana",
-      "Çipler ve transferler",
-      "Kadro kartı",
-      "Haftalık geçmiş",
-    ].map((name) => navigation.getByRole("link", { name, exact: true })),
-    navigation.getByRole("link", { name: "Fikstür", exact: true }),
-    ...(process.env.VITE_ADVICE_API_ORIGIN
-      ? [navigation.getByRole("link", { name: "Katkıda bulun", exact: true })]
-      : []),
-    sidebar.getByRole("button", { name: /^TR/ }),
-    sidebar.getByRole("button", { name: /^EN/ }),
-  ];
-  for (const control of order) {
+base(
+  "once the visitor has said who they are, Değiştir comes before the league's links",
+  async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await installLeagueMocks(page);
+    await page.goto("/fixtures");
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     await page.keyboard.press("Tab");
-    await expect(control).toBeFocused();
-    await expect(control).toHaveCSS("outline-style", "solid");
-  }
-});
+    await expect(page.getByRole("link", { name: "İçeriğe geç" })).toBeFocused();
+    const sidebar = page.locator("#sidebar");
+    const navigation = page.getByRole("navigation");
+    const order = [
+      sidebar.getByRole("button", { name: "Kenar çubuğunu kapat" }),
+      sidebar.getByRole("button", { name: "Değiştir" }),
+      navigation.getByRole("link", { name: "Bu hafta", exact: true }),
+      navigation.getByRole("link", { name: "Lig", exact: true }),
+      ...[
+        "Şu anki kadron",
+        "Kadroyu kendin dene",
+        "Rakiple yan yana",
+        "Çipler ve transferler",
+        "Kadro kartı",
+        "Haftalık geçmiş",
+      ].map((name) => navigation.getByRole("link", { name, exact: true })),
+      navigation.getByRole("link", { name: "Fikstür", exact: true }),
+      ...(process.env.VITE_ADVICE_API_ORIGIN
+        ? [navigation.getByRole("link", { name: "Katkıda bulun", exact: true })]
+        : []),
+      sidebar.getByRole("button", { name: /^TR/ }),
+      sidebar.getByRole("button", { name: /^EN/ }),
+    ];
+    for (const control of order) {
+      await page.keyboard.press("Tab");
+      await expect(control).toBeFocused();
+      await expect(control).toHaveCSS("outline-style", "solid");
+    }
+  },
+);
 
 test("the phone menu is a modal drawer that keeps focus and gives it back", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });

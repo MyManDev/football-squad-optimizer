@@ -9,7 +9,7 @@ import type { EntryAdvice } from "../types";
 
 afterEach(cleanup);
 it.each(["tr", "en"] as const)(
-  "explains scenario bounds without inventing arrival odds in %s",
+  "says what a first action leaves, without scenario bounds or arrival odds, in %s",
   (language) => {
     const data = view();
     data.information_review!.comparison = {
@@ -42,8 +42,11 @@ it.each(["tr", "en"] as const)(
       </LanguageProvider>,
     );
     const comparison = screen.getByTestId("policy-comparison");
-    expect(comparison).toHaveTextContent("110");
-    expect(comparison).toHaveTextContent("130");
+    expect(comparison).toHaveTextContent(
+      language === "tr" ? "Bu ilk hamleden sonra: 2 ücretsiz" : "After this first action: 2 free",
+    );
+    expect(comparison).not.toHaveTextContent("110");
+    expect(comparison).not.toHaveTextContent("130");
     expect(comparison).not.toHaveTextContent(
       language === "tr" ? "güven aralığı değildir" : "not a confidence interval",
     );
@@ -66,7 +69,7 @@ function view(): EntryAdvice {
   return { ...base, information_review: mockInformationReview() };
 }
 
-it("shows conditional news, base points and hold without presenting future moves as certain", () => {
+it("shows conditional news and hold without presenting future moves as certain", () => {
   render(
     <LanguageProvider initialLanguage="tr">
       <InformationReview view={view()} />
@@ -74,29 +77,33 @@ it("shows conditional news, base points and hold without presenting future moves
   );
   const region = screen.getByRole("region", { name: "Haber gelince plan nasıl değişir?" });
   expect(region).toHaveTextContent("FPL oynama değeri: 75/100");
+  expect(region).toHaveTextContent("Sonraki karar haftası: 3");
+  expect(region).toHaveTextContent("Başlangıç planı");
   expect(region).not.toHaveTextContent("%");
   expect(region).toHaveTextContent("Bu hafta transfer yapma");
   expect(region).not.toHaveTextContent("kesin gelecek transfer tahmini değildir");
   expect(region).not.toHaveTextContent("Top100 ağırlığı puan kazancı değildir");
-  expect(region).toHaveTextContent("Puanlar temel futbol tahmininden gelir");
+  expect(region).not.toHaveTextContent("Puanlar temel futbol tahmininden gelir");
+  expect(region).not.toHaveTextContent("Bilginin kaydedildiği an");
   expect(within(region).getByText("Oynayamaz bilgisi gelirse")).toBeInTheDocument();
   expect(region).toHaveTextContent("2 ücretsiz transfer");
 });
-it("explains missing team components without showing an invented estimate", () => {
-  const data = view();
-  data.information_review!.status = "baseline_retained";
-  data.information_review!.reason = "conditional_team_components_unavailable";
-  data.information_review!.candidates = [];
-  render(
-    <LanguageProvider initialLanguage="tr">
-      <InformationReview view={data} />
-    </LanguageProvider>,
-  );
-  expect(screen.getByTestId("information-review")).toHaveTextContent(
-    "Toplam puanlardan sakatlık senaryosu çıkarılmadı",
-  );
-  expect(screen.queryByText("Seçilen ilk hamle")).not.toBeInTheDocument();
-});
+it.each(["conditional_team_components_unavailable", "no_distinct_alternative", "incomplete_x"])(
+  "draws no section where no comparison was completed (%s)",
+  (reason) => {
+    const data = view();
+    data.information_review!.status = "baseline_retained";
+    data.information_review!.reason = reason;
+    data.information_review!.candidates = [];
+    expect(isAdvicePayload(data)).toBe(true);
+    render(
+      <LanguageProvider initialLanguage="en">
+        <InformationReview view={data} />
+      </LanguageProvider>,
+    );
+    expect(screen.queryByTestId("information-review")).not.toBeInTheDocument();
+  },
+);
 it("does not relabel a missing weighted rescore as zero points", () => {
   const data = view();
   data.information_review!.candidates[0]!.expected_net_points = null;
@@ -120,22 +127,6 @@ it("rejects malformed conditional branches before rendering", () => {
   expect(isAdvicePayload(malformed)).toBe(false);
   data.information_review!.source_playing_chance_percent = 150;
   expect(isAdvicePayload(data)).toBe(false);
-});
-
-it("distinguishes no alternative found from a completed comparison", () => {
-  const data = view();
-  data.information_review!.status = "baseline_retained";
-  data.information_review!.reason = "no_distinct_alternative";
-  data.information_review!.candidates = [];
-  render(
-    <LanguageProvider initialLanguage="en">
-      <InformationReview view={data} />
-    </LanguageProvider>,
-  );
-  expect(screen.getByTestId("information-review")).toHaveTextContent(
-    "No distinct feasible first action was found",
-  );
-  expect(screen.queryByText("Selected first action")).not.toBeInTheDocument();
 });
 
 it("shows the first vice and bench order when alternatives differ only in lineup decisions", () => {

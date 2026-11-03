@@ -208,12 +208,12 @@ describe.each(["tr", "en"] as const)("league entry in %s", (language) => {
 });
 
 describe("the form in place", () => {
-  function openInPlace(address: string, stay: boolean) {
+  function openInPlace(address: string) {
     return render(
       <LanguageProvider initialLanguage="tr">
         <MemoryRouter initialEntries={[address]}>
           <Routes>
-            <Route path="*" element={<LeagueEntryPage inPlace stay={stay} />} />
+            <Route path="*" element={<LeagueEntryPage inPlace />} />
             <Route path="/league/:leagueId/members/:entryId" element={<h1>Member page</h1>} />
           </Routes>
           <LocationProbe />
@@ -224,7 +224,7 @@ describe("the form in place", () => {
 
   it("rewrites an address from before the number, asking the member step there", async () => {
     legacySite();
-    openInPlace("/league/members/35249002", false);
+    openInPlace("/league/members/35249002");
     const user = userEvent.setup();
     await user.type(screen.getByLabelText(MESSAGES.tr.leagueEntry.label), String(LEAGUE));
     await user.click(screen.getByRole("button", { name: MESSAGES.tr.leagueEntry.submit }));
@@ -236,16 +236,5 @@ describe("the form in place", () => {
     // The gate at the new address chooses the league; a choice made here first would let
     // the gate rewrite the old address itself, dropping the step state.
     expect(readChosenLeague()).toBeNull();
-  });
-
-  it("keeps a system page's address with `stay`, asking the member step there", async () => {
-    legacySite();
-    openInPlace("/moves", true);
-    const user = userEvent.setup();
-    await user.type(screen.getByLabelText(MESSAGES.tr.leagueEntry.label), String(LEAGUE));
-    await user.click(screen.getByRole("button", { name: MESSAGES.tr.leagueEntry.submit }));
-    const location = screen.getByTestId("location");
-    await waitFor(() => expect(location.dataset.state).toBe(JSON.stringify(PICK_HERE)));
-    expect(location).toHaveTextContent("/moves");
   });
 });

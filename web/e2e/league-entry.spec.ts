@@ -56,9 +56,7 @@ for (const language of ["tr", "en"] as const) {
     response = "missing";
     await submit.click();
     await expect(page.getByRole("status")).toHaveText(
-      language === "tr"
-        ? "Yayımlanmış lig belgesi şu anda mevcut değil. Daha sonra yeniden dene."
-        : "The published league document is unavailable. Try again later.",
+      language === "tr" ? "Daha sonra yeniden dene." : "Try again later.",
     );
     response = "failed";
     await submit.click();

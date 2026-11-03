@@ -195,20 +195,6 @@ function expectedAnswer(
     },
     selection_top100_weight: 20,
     information_review: review,
-    participation_evidence: {
-      version: "football_participation_evidence_v1",
-      as_of: review.captured_at_utc,
-      gameweek: answer.payload.gameweek,
-      applied_player_count: 1,
-      unapplied_statement_count: 1,
-      captured_percentage_count: 2,
-      manager_statement_count: 2,
-      assumptions: [
-        "source_eligibility_only",
-        "no_start_or_minutes_reestimate",
-        "no_external_calibration",
-      ],
-    },
     stated_limits: [
       "Complete plans are compared using expected automatic substitutions and vice-captain recovery. The limited search does not prove the best possible plan or future performance.",
     ],
@@ -280,59 +266,31 @@ for (const [window, width, modelVersion] of [
     );
     const region = page.getByTestId("information-review");
     await expect(region).toBeVisible();
-    await expect(region).not.toContainText("kesin gelecek transfer tahmini değildir");
-    await expect(region).not.toContainText("Top100 ağırlığı puan kazancı değildir");
-    await expect(region).toContainText("Puanlar temel futbol tahmininden gelir");
     const selected = region.locator(":scope > details[open]");
     const comparison = selected.getByTestId("policy-comparison");
     const format = (value: number) => value.toFixed(1).replace(".", ",");
     const expectedComparison = answer.payload.information_review!.comparison!.candidates[0]!;
     await expect(region).toContainText("FPL oynama değeri: 50/100");
-    await expect(comparison).toContainText(
-      `Hesaplanan haber senaryolarındaki puan aralığı: ${format(expectedComparison.scenario_min)} – ${format(expectedComparison.scenario_max)}`,
+    await expect(comparison).toHaveText(
+      `Bu ilk hamleden sonra: ${expectedComparison.first_state.free_transfers} ücretsiz transfer sonraki haftaya · banka: ${format(expectedComparison.first_state.bank_tenths / 10)}`,
     );
-    await expect(comparison).toContainText("Başlangıç planına göre senaryo farkı: 0,0 – 0,0");
-    await expect(comparison).not.toContainText("maç sonucu için bir güven aralığı değildir");
-    await expect(comparison).not.toContainText("Haberin ne zaman geleceğine olasılık atanmadı");
-    await expect(comparison).not.toContainText("banka ve kalan transfere ek puan yazılmadı");
     await expect(page.getByTestId("official-injuries")).toHaveCount(0);
     const selectedUrl = page.url();
     const breakdown = page.getByTestId("lineup-expectation");
-    await expect(breakdown).toContainText("İlk 11: 43,0");
-    await expect(breakdown).toContainText("Otomatik değişikliklerden gelen puan: 1,0");
-    await expect(breakdown).toContainText("Kaptanın ek puanı: 3,0");
-    await expect(breakdown).toContainText("yardımcısının ek puanı: 2,0");
-    await expect(breakdown).toContainText("Ceza sonrası beklenen puan: 49,0");
+    await expect(breakdown.locator("p")).toHaveText("Ceza sonrası beklenen puan: 49,0");
     await expect(breakdown.locator("summary")).toHaveCount(0);
-    await expect(breakdown).not.toContainText("ikinci kez uygulanmaz");
-    const participation = page.getByTestId("participation-evidence");
-    await participation.locator(":scope > summary").click();
-    await expect(participation).toContainText("Kontrol edilen FPL oynayabilirlik kaydı: 2");
-    await expect(participation).toContainText("Değerlendirilen hoca açıklaması: 2");
-    await expect(participation).toContainText("Doğrulanmış haberin uygulandığı oyuncu: 1");
-    await expect(participation.locator("time")).toHaveAttribute(
-      "datetime",
-      answer.payload.participation_evidence!.as_of!,
-    );
-    await expect(participation).toContainText("Uygulanamayan açıklama: 1");
-    const role = participation.getByTestId("role-forecast");
+    const role = page.getByTestId("role-forecast");
     await role.locator(":scope > summary").click();
     await expect(role).toContainText("Beklenen dakika: 34,0");
-    await expect(role).toContainText("geçmiş maçlardaki ilk 11");
-    await expect(role).not.toContainText("kesinleşmiş bir ilk 11 değildir");
     await expect(role).not.toContainText("%");
-    await expect(role).not.toContainText("FPL oynayabilirliği bir kez uygulanır");
-    await expect(role).not.toContainText("Bağımsız doğruluk ölçümü henüz tamamlanmış değildir");
-    await expect(role).toContainText("İlk 11 bilgisi için yeterli kayıt yok");
     await expect(role).toContainText("Beklenen dakika: 60,0");
     const rolePoints = role.getByTestId("role-point-components");
     await expect(rolePoints).not.toHaveAttribute("open");
     await rolePoints.locator(":scope > summary").focus();
     await page.keyboard.press("Enter");
     await expect(rolePoints).toHaveAttribute("open", "");
+    await expect(rolePoints).toContainText("Diğer katkılar: 0,90");
     await expect(rolePoints).toContainText("Toplam oyuncu puanı: 3,00");
-    await expect(rolePoints).toContainText("Kaptan çarpanı ve Top100 ağırlığı öncesidir");
-    await expect(rolePoints).not.toContainText("Oynayabilirlik zaten bir kez uygulanmıştır");
     const nominal = page.getByRole("region", { name: `${window} haftalık pencere`, exact: true });
     const weeks = answer.payload.plan_weeks!;
     for (const [index, week] of weeks.entries()) {

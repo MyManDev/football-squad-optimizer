@@ -2,7 +2,6 @@ import { useLanguage } from "../../../i18n/context";
 import { deadlineLong, deadlineShort } from "../../../lib/format";
 import type { FixturesPayload } from "../../fixtures/types";
 import { gameweekDeadline, minutesLeft } from "../advice/deadline";
-import { ExampleDataBadge } from "../components/ExampleDataBadge";
 import type { EntrySquad, EntryView, LeagueViewEnvelope } from "../types";
 import { scoreBugCells, type ScoreCell } from "./scoreBug";
 import styles from "./LeagueMemberPage.module.css";
@@ -40,11 +39,8 @@ export function MemberTopBar({
   const humans = members.filter((member) => member.member_kind === "human").length;
   const cells = scoreBugCells(entry, humans, view, locale, copy);
   return (
-    <header className={styles.topBar}>
-      <div className={styles.topIdentity}>
-        <h1 className={styles.teamName}>{entry.team_name ?? copy.unknownTeam}</h1>
-        <ExampleDataBadge sourceKind={squad.source_kind} />
-      </div>
+    <header className={styles.topBar} data-closed={deadlinePassed !== null ? "" : undefined}>
+      <h1 className={styles.teamName}>{entry.team_name ?? copy.unknownTeam}</h1>
       <TopWeek
         gameweek={view.gameweek}
         deadline={deadline}

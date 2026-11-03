@@ -44,10 +44,6 @@ export const LEGACY_TREE_PATH = "league";
 
 export const DIRECTORY_CONTRACT_VERSION = "league_directory_v1";
 
-export function leagueTreePath(leagueId: number): string {
-  return `leagues/${leagueId}`;
-}
-
 function fetchJson(relative: string, options?: RequestOptions): Promise<unknown> {
   return fetchPublishedJson(`${import.meta.env.BASE_URL}data/`, relative, options);
 }

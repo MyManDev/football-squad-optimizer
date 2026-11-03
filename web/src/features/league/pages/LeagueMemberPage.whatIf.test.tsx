@@ -87,8 +87,10 @@ describe("the what-if page", () => {
       fireEvent.click(screen.getByRole("button", { name: COPY.whatIfStart }));
     });
     expect(loadDocument).toHaveBeenCalledTimes(1);
-    // The example plan's players are not on the synthetic table, so the page says so.
-    expect(await screen.findByText(COPY.whatIfOtherCapture)).toBeInTheDocument();
+    // The example plan's players are not on the synthetic table, so the page says the list
+    // could not be read and offers to start again.
+    expect(await screen.findByText(COPY.whatIfFailed)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: COPY.whatIfRetry })).toBeInTheDocument();
   });
 
   it("is not offered without the member's device block", () => {

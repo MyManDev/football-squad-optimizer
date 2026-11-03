@@ -6,6 +6,9 @@ import { mockLeagueMembersEnvelope } from "../src/fixtures/league";
 import { MESSAGES } from "../src/i18n/messages";
 import { AS_A_CHANCE } from "../src/testSupport/honesty";
 
+/** The dash the table prints for a figure it does not know. */
+const UNKNOWN = "\u2014";
+
 for (const language of ["en", "tr"] as const) {
   test(`captured movement keeps missing and unchanged ranks distinct in ${language}`, async ({
     page,
@@ -41,21 +44,26 @@ for (const language of ["en", "tr"] as const) {
     );
     await page.goto("/league/352490/members");
     const copy = MESSAGES[language].leagueMembers;
+    // Movement is the second column, after the rank.
+    const movement = (index: number) =>
+      page
+        .getByRole("row")
+        .filter({ has: page.getByRole("link", { name: `Movement member ${index}`, exact: true }) })
+        .getByRole("cell")
+        .nth(1);
     for (const [index, [words, mark]] of [
       [copy.movementLabel("up", 1), "1"],
       [copy.movementLabel("down", 3), "3"],
       [copy.movementLabel("same", 0), "="],
-      [copy.noPreviousRank, "—"],
     ].entries()) {
-      const row = page
-        .getByRole("row")
-        .filter({ has: page.getByRole("link", { name: `Movement member ${index}`, exact: true }) });
-      // Movement is the second column, after the rank: the words are the cell's name and
-      // the eye reads an arrow and the places, '=' or a dash.
-      const cell = row.getByRole("cell").nth(1);
+      // The words are the cell's name and the eye reads an arrow and the places, or '='.
+      const cell = movement(index);
       await expect(cell).toHaveAccessibleName(words!);
       await expect(cell.locator('[aria-hidden="true"]').first()).toHaveText(mark!);
     }
+    // A rank with nothing to compare it to is a dash, for the eye and a screen reader alike.
+    await expect(movement(3)).toHaveAccessibleName(UNKNOWN);
+    await expect(movement(3)).toHaveText(UNKNOWN);
     expect(await page.locator("main").textContent()).not.toMatch(AS_A_CHANCE);
     await atRest(page);
     expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
@@ -74,12 +82,8 @@ for (const language of ["en", "tr"] as const) {
     }));
     expect(fit.table).toBeLessThanOrEqual(fit.column);
     expect(fit.overflow).toBe("visible");
-    await page
-      .getByRole("cell", { name: copy.noPreviousRank, exact: true })
-      .scrollIntoViewIfNeeded();
-    await expect(
-      page.getByRole("cell", { name: copy.noPreviousRank, exact: true }),
-    ).toBeInViewport();
+    await movement(3).scrollIntoViewIfNeeded();
+    await expect(movement(3)).toBeInViewport();
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({ path: testInfo.outputPath("movement-mobile.png"), fullPage: true });
   });

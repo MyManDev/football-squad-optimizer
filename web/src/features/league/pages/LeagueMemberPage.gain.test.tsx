@@ -8,7 +8,8 @@
  * gain against holding the squad, and a figure that rounds to zero is never given a sign.
  *
  * In direction D a move is a substitution board whose LED figure is its share, and the
- * plan's gain is the gain strip's figure with the sentence that names its basis beside it.
+ * plan's gain is the gain strip's figure, with a sentence beside it where the week's transfer
+ * cost is not yet deducted.
  */
 
 import { cleanup, render, screen, within } from "@testing-library/react";
@@ -127,19 +128,20 @@ describe("the card states one basis for the rows, the total and the gain", () =>
 
   it("prints no gain sentence where the producer measured none", () => {
     // Both pay a hit, so a measured gain would carry its sentence; these print none.
+    const sentence = COPY.gainCaptionBeforeCost("4.0");
     const unmeasured = withPayload({
       moves: [move("m1", null)],
       expected_gain_vs_hold: null,
       transfer_hit_points: 4,
     });
 
-    expect(renderAdvice(unmeasured)).not.toContain("over making no transfer");
+    expect(renderAdvice(unmeasured)).not.toContain(sentence);
 
     cleanup();
     const absent = withPayload({ moves: [move("m1", 1.2)], transfer_hit_points: 4 });
     delete (absent.payload as { expected_gain_vs_hold?: number | null }).expected_gain_vs_hold;
 
-    expect(renderAdvice(absent)).not.toContain("over making no transfer");
+    expect(renderAdvice(absent)).not.toContain(sentence);
 
     cleanup();
     const measured = withPayload({
@@ -147,17 +149,14 @@ describe("the card states one basis for the rows, the total and the gain", () =>
       expected_gain_vs_hold: 1.2,
       transfer_hit_points: 4,
     });
-    expect(renderAdvice(measured)).toContain("over making no transfer");
+    expect(renderAdvice(measured)).toContain(sentence);
   });
 
-  it("says a row's share was not published rather than printing it as zero", () => {
-    const text = renderAdvice(
-      withPayload({ moves: [move("m1", null)], expected_gain_vs_hold: null }),
-    );
+  it("prints no figure for a row whose share was not published, never a zero", () => {
+    renderAdvice(withPayload({ moves: [move("m1", null)], expected_gain_vs_hold: null }));
 
-    expect(text).toContain(COPY.projectedGainUnknown);
     const [board] = boards();
-    expect(within(board!).getByText(COPY.projectedGainUnknown)).toBeInTheDocument();
+    expect(board!.querySelector('[class*="ledValue"]')).toBeNull();
     expect(within(board!).queryByText(COPY.boardGainLabel)).toBeNull();
     expect(board!.textContent).not.toMatch(/[+−-]?0[.,]0\b/);
   });
@@ -170,9 +169,9 @@ describe("the card states one basis for the rows, the total and the gain", () =>
     delete (legacy.payload as { expected_gain_vs_hold?: number | null }).expected_gain_vs_hold;
     const text = renderAdvice(legacy);
 
-    expect(text).toContain(COPY.projectedGainUnknown);
     expect(text).not.toContain("+2.5");
     const [board] = boards();
+    expect(board!.querySelector('[class*="ledValue"]')).toBeNull();
     expect(within(board!).queryByText(COPY.boardGainLabel)).toBeNull();
   });
 

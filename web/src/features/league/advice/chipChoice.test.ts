@@ -2,7 +2,7 @@
  * The chip in the URL, and what the selection makes of it: a chip is read only where the
  * index names its file for this member, on the plain one-week pure-points plan, with the
  * manager's word off and the Top 100 influence at 0. Anything else shows the plan without
- * a chip and says so.
+ * a chip.
  */
 
 import { describe, expect, it } from "vitest";
@@ -115,7 +115,7 @@ describe("the chip selection", () => {
     expect(rival.chip.chip).toBeNull();
   });
 
-  it("shows the plan without a chip for one the member cannot be shown, and says so", () => {
+  it("shows the plan without a chip for one the member cannot be shown", () => {
     for (const asked of ["freehit", "limitless", ""]) {
       const selection = resolve(`mode=saf-puan&window=1&chip=${asked}`);
       expect(selection.path).toBe(`advice/${ENTRY}/saf-puan/1.json`);

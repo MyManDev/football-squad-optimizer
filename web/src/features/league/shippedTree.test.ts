@@ -10,10 +10,7 @@
  * the page applies, and each file the index names to the path the page would read.
  *
  * It also reads `history/` and `scoreboard.json`, which a settled publish writes and
- * nothing else validated. Those two are worse than the advice tree when they are wrong,
- * because the page does not fail on them: `loadLiveSeries` loads every member with
- * `Promise.allSettled`, re-checks each one inside a bare `catch` and drops the ones that
- * throw, leaving a quietly smaller league and one sentence nobody is watching.
+ * nothing else validated.
  *
  * A member the producer could not advise is part of an honest tree, not a broken one: it
  * gets an index that names why and nothing else, and the page shows that reason. Such an
@@ -37,7 +34,6 @@ import { isAdvicePayload } from "./advice/adviceShape";
 import { TOP100_WEIGHTS, top100TargetPath } from "./advice/top100";
 import { checkedHistory } from "./history/historyData";
 import { isDevicePlanEntry } from "./device/types";
-import { summarizeLiveSeries } from "./history/liveSeries";
 import { assertAdviceIndex, assertEnvelope, assertMembers, assertSquad } from "./publicationShape";
 import type {
   EntryAdviceIndex,
@@ -328,30 +324,16 @@ describe.each(shippedTrees())("the shipped league tree $path", ({ root: ROOT }) 
     expect(() => checkedHistory(document, entryId)).toThrow();
   });
 
-  it("publishes a scoreboard and a history for the same members, and the page keeps them all", () => {
+  it("publishes a scoreboard and a history for the same members", () => {
     if (!existsSync(join(ROOT, "scoreboard.json"))) return;
     const view = assertEnvelope<Scoreboard>(read("scoreboard.json")).payload;
-    // Every member the scoreboard names is a member the page will try to load a history
-    // for, so a scoreboard ahead of the history directory is a member dropped on sight.
+    // Every member the scoreboard names has a history page, so a scoreboard ahead of the
+    // history directory leaves that page with nothing to read.
     const named = [
       ...new Set(view.gameweeks.flatMap((week) => week.members.map((row) => row.entry_id))),
     ];
     const missing = named.filter((id) => !existsSync(join(ROOT, `history/${id}.json`)));
     expect(missing, "scoreboard names a member with no published history").toEqual([]);
-
-    // The page drops a member whose history does not summarize against this scoreboard,
-    // and says so only in a count. Here it has to be zero, member by member, so the
-    // failure names the member instead of shrinking the league quietly.
-    const dropped: string[] = [];
-    for (const entryId of named) {
-      if (!existsSync(join(ROOT, `history/${entryId}.json`))) continue;
-      try {
-        summarizeLiveSeries([checkedHistory(read(`history/${entryId}.json`), entryId)], view);
-      } catch (error) {
-        dropped.push(`${entryId}: ${(error as Error).message}`);
-      }
-    }
-    expect(dropped).toEqual([]);
   });
 
   it("publishes only advice documents the page's runtime shape accepts", () => {

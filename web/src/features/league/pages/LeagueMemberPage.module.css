@@ -1,9 +1,8 @@
 /*
  * The member page in direction D: a top bar pinned at the top of the main column, the
  * decision as the page's leading card (heading row, gain strip, boards, captain line), the
- * squad on the pitch, how it was worked out, then the plan settings with Hesapla in one
- * visible card, and the secondary tools as closed sections. The fixture rail is a column of
- * its own from 1180 px.
+ * squad on the pitch, then the plan settings with Hesapla in one visible card, and the
+ * secondary tools as closed sections. The fixture rail is a column of its own from 1180 px.
  */
 
 .page {
@@ -19,21 +18,21 @@
    them) and its width cap while the member page is in it. */
 
 @media (min-width: 1180px) {
-  :global(#main):has(.layout[data-rail="column"]) {
+  :global(#main):has(.layout[data-rail="column"] > aside) {
     max-width: none;
     padding-top: 0;
     padding-right: 0;
     padding-bottom: 0;
   }
 
-  .layout[data-rail="column"] {
+  .layout[data-rail="column"]:has(> aside) {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 340px;
     align-items: start;
     column-gap: var(--space-6);
   }
 
-  .layout[data-rail="column"] > .page {
+  .layout[data-rail="column"]:has(> aside) > .page {
     gap: var(--space-4);
     padding: var(--space-5) 0 var(--space-7);
   }
@@ -88,14 +87,8 @@
   }
 }
 
-.topIdentity {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 0;
-}
-
 .teamName {
+  min-width: 0;
   margin: 0;
   font-family: var(--font-display);
   font-size: 24px;
@@ -216,8 +209,8 @@
 }
 
 /* The phone's compact strip, as D-Phone-Bu-Hafta draws it: a sidebar-green band right
-   under the phone bar. The team, the week and the short deadline share the first line,
-   always: the week and the deadline keep their width and a team name that does not fit in
+   under the phone bar. In an open week the team, the week and the short deadline share the
+   first line: the week and the deadline keep their width and a team name that does not fit in
    what is left ends in an ellipsis (the sidebar's member block prints it whole). A 390 px
    phone has under a pixel to spare for a 17-letter name, so a wrap here would depend on
    how each system draws the fonts, and it cost 26 px of the first screen. The score bug
@@ -239,19 +232,22 @@
 
   /* A zero basis keeps the name from pushing the week to a second line; it then grows into
      the room the week leaves, up to its own width, so the week still follows it. */
-  .topIdentity {
+  .teamName {
     flex: 1 1 0;
     max-width: max-content;
-  }
-
-  .teamName {
-    min-width: 0;
     overflow: hidden;
     font-size: 18px;
     line-height: 22px;
     text-overflow: ellipsis;
     white-space: nowrap;
     overflow-wrap: normal;
+  }
+
+  /* A closed week's label and date leave a name too little, and on a rival's page this is
+     the only place the team is named: there the name keeps its width and the week follows
+     it, on the next line where they do not fit together. */
+  .topBar[data-closed] .teamName {
+    flex: 0 1 auto;
   }
 
   .topWeek {
@@ -476,32 +472,15 @@
   margin-top: var(--space-2);
 }
 
-/* ---- Notices that change how the page reads ---- */
+/* ---- The notice that changes how the page reads: the week's deadline has passed ---- */
 
-.notice {
+.deadlineNotice {
   margin: 0;
   max-width: var(--measure);
-  color: var(--color-text-muted);
-}
-
-section.notice {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  color: var(--color-text);
-}
-
-section.notice p {
-  margin: 0;
-}
-
-.noticeTitle {
-  margin: 0;
+  font-family: var(--font-display);
   font-size: var(--step-1);
-}
-
-.notice a {
-  color: var(--color-text);
+  font-weight: 700;
+  line-height: 1.2;
 }
 
 /* ---- The decision ---- */
@@ -543,8 +522,8 @@ section.notice p {
 
 /* The decision leads the page as a card of its own, lifted off the page by its surface. Its
    rhythm is tight (8 px between its parts, 12 px inside its edge above and below), so on a
-   laptop the decision, the pitch and the honesty block still share one screen
-   (member-pitch.spec.ts); a phone sets its own below. */
+   laptop the decision and the pitch still share one screen (member-pitch.spec.ts); a phone
+   sets its own below. */
 .decision {
   container: decision / inline-size;
   display: flex;
@@ -565,9 +544,9 @@ section.notice p {
   gap: var(--space-2) var(--space-4);
 }
 
-/* From 600 px the stamp keeps the right-hand column however long the heading's summary
-   is: the summary wraps under the heading rather than pushing the stamp to a line of its
-   own, where its right-aligned parts would stand out of line. */
+/* From 600 px the way to the game keeps the right-hand column however long the heading's
+   summary is: the summary wraps under the heading rather than pushing the link to a line of
+   its own. */
 @media (min-width: 600px) {
   .headingRow {
     display: grid;
@@ -609,40 +588,29 @@ section.notice p {
   font-size: var(--step--2);
 }
 
-/* On a phone the proof stamp leaves the heading row for its place after the gain strip,
-   as the phone artboard draws it (MemberDecision.module.css orders the parts), and the
-   rhythm tightens so the headline, the boards and the captain line come up first. */
+/* On a phone the rhythm tightens so the headline, the boards and the captain line come up
+   first. */
 @media (max-width: 599.98px) {
   .page {
     gap: var(--space-4);
   }
 
-  /* Two columns, so the proof stamp can stand beside the transfer facts; everything else
-     takes the whole row (MemberDecision.module.css places and orders the parts). The card
-     runs edge to edge, so the boards and the captain line keep the column's whole width
-     (at 360 px the captain line has none to spare). */
+  /* One column, its parts ordered by MemberDecision.module.css. The card runs edge to edge,
+     so the boards and the captain line keep the column's whole width (at 360 px the captain
+     line has none to spare). */
   .decision {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
-    gap: var(--space-2) var(--space-3);
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-2);
     margin-inline: calc(-1 * var(--space-4));
     padding: var(--space-3) var(--space-4);
     border-inline: 0;
     border-radius: 0;
   }
 
-  .decision > *,
-  .headingRow > * {
-    grid-column: 1 / -1;
-  }
-
   .headingRow {
     display: contents;
   }
-
-  /* The phone reads the decision and then what to make of it, as D-Phone-Bu-Hafta draws
-     it; the squad ('Kadro' in the menu) follows. LeagueMemberView places the honesty block
-     there in the document itself, not with `order`, so the tab order matches the screen. */
 }
 
 .echo {
@@ -653,18 +621,15 @@ section.notice p {
   line-height: 16px;
 }
 
-/* FPL'de uygula, the primary action, with what the member does there beside it. Where the
-   decision is 760 px wide it closes the heading row beside the proof stamp, button over
-   hint, and the row keeps the two lines its heading takes there, so the decision, the
-   pitch and the honesty block still share a laptop's screen; a narrower decision gives it
-   the row's next line. On a phone LeagueMemberView places it at the end of the decision,
-   after the plan's last sentence (MemberDecision.module.css orders the parts up to 9). */
+/* FPL'de uygula, the primary action. Where the decision is 760 px wide it closes the heading
+   row, and the row keeps the two lines its heading takes there, so the decision and the pitch
+   still share a laptop's screen; a narrower decision gives it the row's next line. On a phone
+   LeagueMemberView places it at the end of the decision, after the plan's last sentence
+   (MemberDecision.module.css orders the parts up to 9). */
 .apply {
   grid-column: 1 / -1;
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-2) var(--space-3);
 }
 
 .applyLink {
@@ -686,15 +651,8 @@ section.notice p {
   color: var(--color-board-text);
 }
 
-.applyHint {
-  flex: 1 1 16ch;
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: var(--step--2);
-  line-height: 16px;
-}
-
-/* With a pointer beside the sidebar the button is no taller than the stamp's line. */
+/* With a pointer beside the sidebar the button needs no thumb's height, and the heading row
+   keeps its two lines. */
 @media (min-width: 1180px) {
   .applyLink {
     min-height: 32px;
@@ -704,19 +662,8 @@ section.notice p {
 /* 720px, not wider: the decision's content box is what the query measures, and a decision
    drawn as a padded card leaves about 736px of it at 1440px. */
 @container decision (min-width: 720px) {
-  .headingRow:has(> .apply) {
-    grid-template-columns: minmax(0, 1fr) auto auto;
-  }
-
   .apply {
     grid-column: auto;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 2px;
-  }
-
-  .applyHint {
-    flex: none;
   }
 }
 
@@ -726,99 +673,18 @@ section.notice p {
   }
 }
 
-/* ---- How it was worked out: the disclosure and the history link ---- */
-
-.honestyBlock {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-2) var(--space-4);
-  padding-top: var(--space-2);
-  border-top: 1px solid var(--color-line);
-}
-
-.how {
-  flex: 0 1 auto;
-}
-
-.how[open] {
-  flex-basis: 100%;
-  order: 3;
-}
-
-.howSummary {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: 32px;
-  padding: 0 var(--space-3);
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-s);
-  background: var(--color-surface);
-  font-size: var(--step--1);
-  font-weight: 600;
-  cursor: pointer;
-  list-style: none;
-}
-
-.howSummary::-webkit-details-marker {
-  display: none;
-}
-
-.howBody {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  max-width: var(--measure);
-  padding-top: var(--space-3);
-  color: var(--color-text-muted);
-  font-size: var(--step--1);
-}
-
-.howBody p {
-  margin: 0;
-}
-
-.howTitle {
-  margin: var(--space-2) 0 0;
-  color: var(--color-text);
-  font-size: var(--step-0);
-}
+/* ---- The way to the member's weekly history ---- */
 
 .historyLink {
-  flex: none;
-  order: 4;
-  align-self: center;
   margin: 0;
   font-size: var(--step--1);
 }
 
 @media (max-width: 1179.98px) {
-  .howSummary {
-    min-height: 44px;
-  }
-
   .historyLink a {
     display: inline-flex;
     align-items: center;
     min-height: 44px;
-  }
-}
-
-/* On a phone the disclosure reads as the artboard draws it, a quiet underlined line with
-   its icon rather than a box, so it and the history link share one row. */
-@media (max-width: 599.98px) {
-  .honestyBlock {
-    column-gap: var(--space-5);
-  }
-
-  .howSummary {
-    padding: 0;
-    border: 0;
-    background: transparent;
-    text-decoration: underline;
-    text-underline-offset: 2px;
   }
 }
 
@@ -992,22 +858,14 @@ section.notice p {
   font-size: var(--step--1);
 }
 
-.notice,
-.honesty {
-  max-width: var(--measure);
-}
-
 .honesty {
   margin: 0 0 var(--space-3);
+  max-width: var(--measure);
 }
 
 .planCost {
   margin: 0 0 var(--space-3);
   max-width: var(--measure);
-}
-
-.planCost span {
-  color: var(--color-text-muted);
 }
 
 .lineup {

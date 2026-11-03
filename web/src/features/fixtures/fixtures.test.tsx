@@ -164,7 +164,7 @@ describe("fixtures in the shell", () => {
             <p>page</p>
           </PageShell>,
           language,
-          "/gw/2026-27/1",
+          "/league/352490",
         ),
       );
       const copy = FIXTURES_COPY[language];
@@ -213,7 +213,9 @@ describe("the fixtures page", () => {
   it("says so when no fixture list is published", async () => {
     serve("Not found", 404);
     render(surface(<FixturesPage />, "tr", "/fixtures"));
-    expect(await screen.findByText(FIXTURES_COPY.tr.notPublished)).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { level: 1, name: FIXTURES_COPY.tr.notPublished }),
+    ).toBeInTheDocument();
   });
 
   it.each([

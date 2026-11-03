@@ -1,5 +1,3 @@
-import { useId } from "react";
-
 import { useLanguage } from "../../../i18n/context";
 import { ExternalIcon } from "../components/memberIcons";
 import type { EntryAdvice, EntrySquad } from "../types";
@@ -17,7 +15,6 @@ const FPL_PICK_TEAM = "https://fantasy.premierleague.com/my-team";
  */
 export function ApplyOnFpl({ plan, squad }: { plan: EntryAdvice; squad: EntrySquad }) {
   const copy = useLanguage().messages.leagueMembers;
-  const hintId = useId();
   const held = squad.starting_xi.find((player) => player.is_captain)?.player_id;
   const transfers = plan.moves.length > 0;
   if (!transfers && (!plan.captain || plan.captain.player_id === held)) return null;
@@ -28,14 +25,10 @@ export function ApplyOnFpl({ plan, squad }: { plan: EntryAdvice; squad: EntrySqu
         href={transfers ? FPL_TRANSFERS : FPL_PICK_TEAM}
         target="_blank"
         rel="noopener noreferrer"
-        aria-describedby={hintId}
       >
         {copy.applyOnFpl}
         <ExternalIcon />
       </a>
-      <p className={styles.applyHint} id={hintId}>
-        {transfers ? copy.applyTransfersHint : copy.applyCaptainHint}
-      </p>
     </div>
   );
 }
