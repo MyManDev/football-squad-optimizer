@@ -9,9 +9,9 @@ Absent is not zero. A fixture the payload gives no score for publishes null scor
 fixture with no kickoff publishes a null kickoff, and a fixture with no gameweek (a
 postponement awaiting a new date) is counted and not listed, since no gameweek holds it.
 
-The page reads ``current_gameweek`` for the week about to be played, the one after it for
-next week, and everything before it as the archive. Nothing here keeps state between
-publishes: a later capture names a later ``current_gameweek`` and the three shift.
+``current_gameweek`` is the first deadline the capture had not reached. The page reads the
+weeks still to come from their own deadlines and kickoffs, since the week before that one can
+still have matches to play. Nothing here keeps state between publishes.
 """
 
 import json
@@ -111,7 +111,7 @@ class FixtureView(_View):
     finished: bool
     home_score: int | None
     """Null unless the payload states both scores. Before full time it is the score at the
-    capture, which is why a page shows one only beside ``finished``."""
+    capture, so only ``finished`` makes it a result."""
     away_score: int | None
 
 

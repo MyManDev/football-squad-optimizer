@@ -7,37 +7,42 @@ import type { Language } from "../../i18n/messages";
  * not with every first visit. The honesty sweep (`i18n/messagesNoProbability.test.ts`)
  * walks it entry by entry, functions called.
  *
- * What it may say: who plays whom, when, and what the score was, and how to take the
- * deadlines into a calendar. It names no favourite, no difficulty and no expectation about a
- * match.
+ * What it may say: who plays whom and when, and how to take the deadlines into a calendar.
+ * It names no favourite, no difficulty and no expectation about a match.
  */
 export interface FixturesCopy {
-  thisWeek: string;
-  nextWeek: string;
-  versus: string;
+  generalView: string;
+  teamView: string;
+  /** The names of the page's two choices, for assistive technology. */
+  viewLegend: string;
+  clubLegend: string;
+  /** A club's match at home or away, in words, where the page prints a letter. */
+  atHome: string;
+  away: string;
+  kickedOff: string;
   unscheduled: string;
-  noFixtures: string;
   pageTitle: string;
-  pastTitle: string;
-  noPast: string;
+  noneAhead: string;
   notPublished: string;
   unscheduledCount: (count: number) => string;
-  /** The calendar file of the upcoming deadlines: its button, the sentence beside it and
-   * the words each event carries in the calendar. */
+  /** The calendar file of the upcoming deadlines: its button and the words each event
+   * carries in the calendar. */
   calendarAction: string;
   calendarSummary: (gameweek: number) => string;
   calendarDescription: (link: string) => string;
 }
 
 const en: FixturesCopy = {
-  thisWeek: "Upcoming gameweek",
-  nextWeek: "Following gameweek",
-  versus: "v",
+  generalView: "General fixtures",
+  teamView: "Team fixtures",
+  viewLegend: "Fixtures view",
+  clubLegend: "Club",
+  atHome: "at home",
+  away: "away",
+  kickedOff: "kicked off",
   unscheduled: "TBC",
-  noFixtures: "No fixtures in this gameweek.",
   pageTitle: "Fixtures",
-  pastTitle: "Past gameweeks",
-  noPast: "No gameweek has been played yet.",
+  noneAhead: "No fixtures left to play.",
   notPublished: "No fixture list has been published yet.",
   unscheduledCount: (count) =>
     count === 1
@@ -49,14 +54,16 @@ const en: FixturesCopy = {
 };
 
 const tr: FixturesCopy = {
-  thisWeek: "Oynanacak hafta",
-  nextWeek: "Gelecek hafta",
-  versus: "-",
+  generalView: "Genel fikstür",
+  teamView: "Takım fikstürü",
+  viewLegend: "Fikstür görünümü",
+  clubLegend: "Takım",
+  atHome: "Ev",
+  away: "Deplasman",
+  kickedOff: "başladı",
   unscheduled: "Belli değil",
-  noFixtures: "Bu oyun haftasında maç yok.",
   pageTitle: "Fikstür",
-  pastTitle: "Geçmiş haftalar",
-  noPast: "Henüz oynanmış bir oyun haftası yok.",
+  noneAhead: "Oynanacak maç kalmadı.",
   notPublished: "Henüz yayımlanmış bir fikstür yok.",
   unscheduledCount: (count) => `Ertelenen ${count} maçın yeni oyun haftası henüz belli değil.`,
   calendarAction: "Deadline'ları takvime ekle",
