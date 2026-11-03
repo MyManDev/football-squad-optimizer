@@ -72,8 +72,16 @@ class SlowClient implements AdviceClient {
   };
 }
 
-function Harness({ client, request = REQUEST }: { client: AdviceClient; request?: AdviceRequest }) {
-  const { state, compute, resume } = useAdviceJob(client, false);
+function Harness({
+  client,
+  request = REQUEST,
+  allowBaseline = false,
+}: {
+  client: AdviceClient;
+  request?: AdviceRequest;
+  allowBaseline?: boolean;
+}) {
+  const { state, compute, resume } = useAdviceJob(client, allowBaseline);
   return (
     <div>
       <output data-testid="phase">{describePhase(state)}</output>
@@ -250,6 +258,22 @@ describe("a reload", () => {
     await act(async () => answer({ jobId: "advice-feedfacefeedface-2", status: "running" }));
     expect(phase()).toBe("waiting:running:advice-feedfacefeedface-2");
     expect(client.keys).toEqual([]); // no POST
+  });
+
+  it("asks about a remembered job once, even when the baseline's read uses up its patience", async () => {
+    rememberJob(REQUEST, {
+      jobId: "advice-feedfacefeedface-2",
+      startedAt: Date.now() - (PATIENCE_MS[1] - 2000),
+    });
+    const client = new SlowClient();
+    client.readPublished = () =>
+      new Promise((resolve) => setTimeout(() => resolve({ kind: "not-computed" }), 3000));
+    client.job = "completed";
+    render(<Harness client={client} allowBaseline />);
+    await click("resume");
+    await act(async () => vi.advanceTimersByTimeAsync(3100));
+    expect(client.polls).toHaveLength(1);
+    expect(phase()).toBe("done");
   });
 
   it("stays silent about a remembered job while the service does not answer", async () => {

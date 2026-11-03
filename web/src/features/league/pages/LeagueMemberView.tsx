@@ -528,8 +528,15 @@ function LeagueMemberContent({
                       ? onRetryAdvice
                       : undefined
                 }
-                // With no service to ask, Hesapla only reads this same document again.
-                canCompute={computeAvailable && !closed && computeService !== "static"}
+                // With no service to ask, Hesapla only reads this same document again, and a
+                // press being answered is not offered again.
+                canCompute={
+                  computeAvailable &&
+                  !closed &&
+                  computeService !== "static" &&
+                  job.state.phase !== "requesting" &&
+                  job.state.phase !== "waiting"
+                }
                 // The address the sidebar's own link lands on with no selection.
                 defaultPlan={closed ? memberAddress(leagueId, entryId) : undefined}
               />

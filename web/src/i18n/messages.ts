@@ -187,7 +187,7 @@ const en = {
     computeStaticFallback: "The compute service could not be reached.",
     computeFailed: "The computation did not finish.",
     adviceBaselineWhileComputing:
-      "This is the published pure-points, one-week plan; the requested combination is still computing.",
+      "This is the published pure-points, one-week plan; the requested combination is not ready yet.",
     adviceRequestHint: "You can ask for it with Compute in the plan.",
     viewerYouBadge: "you",
     strategyLegend: "Strategy",
@@ -726,7 +726,7 @@ const tr: MessageSchema<typeof en> = {
     computeStaticFallback: "Hesaplama servisine ulaşılamadı.",
     computeFailed: "Hesap tamamlanamadı.",
     adviceBaselineWhileComputing:
-      "Bu, yayınlanmış saf puan / 1 hafta planı; istenen kombinasyon hâlâ hesaplanıyor.",
+      "Bu, yayınlanmış saf puan / 1 hafta planı; istenen kombinasyon henüz hazır değil.",
     adviceRequestHint: "Plandaki Hesapla ile isteyebilirsin.",
     viewerYouBadge: "sen",
     strategyLegend: "Strateji",

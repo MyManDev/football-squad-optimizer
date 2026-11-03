@@ -322,12 +322,13 @@ export function useAdviceJob(
           if (!alive()) return;
           setState({ phase: "waiting", request, jobId, status, fallback });
 
-          // A wait picked up after a reload has heard nothing yet, so it asks at once.
+          // A wait picked up after a reload has heard nothing yet: its first question takes no
+          // delay, and it is asked even if the baseline's read has used up the patience.
           let askNow = resumed !== null;
           let answers = 0;
           let attempt: number | undefined;
           let progress: AdviceJobProgress | undefined;
-          while (Date.now() - startedAt < patience) {
+          while (askNow || Date.now() - startedAt < patience) {
             if (!askNow) {
               const waited = Date.now() - startedAt;
               await cancellableDelay(

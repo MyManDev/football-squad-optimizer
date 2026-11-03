@@ -227,7 +227,7 @@ failure text, and which does not change.
 | `contract_version` | `advice_job_view_v1` |
 | `job_id`, `status`, `created_at_utc`, `updated_at_utc`, `attempt` | As the job record has them; `status` is `queued`, `running`, `completed` or `failed` |
 | `error_code` | A failed job's code (listed below); otherwise `null` |
-| `queue_position` | Optional. While `queued`, how many queued jobs will be claimed before this one (0 when it is next); `null` in every other state |
+| `queue_position` | Optional. While `queued`, how many queued jobs will be claimed before this one (0 when it is next); `null` in every other state, and while queued when the service could not read the queue |
 | `progress` | Optional. While `running`, `{"done": d, "total": t}`: the documents this attempt has solved out of those it has to; `null` in every other state, while running until the attempt has recorded its first count, and on a poll that could not read the count |
 | `workers` | Optional. `{"busy": b, "total": t}`: the workers alive now and how many of them hold a job; `null` when the service cannot read them |
 

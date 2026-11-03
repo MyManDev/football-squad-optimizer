@@ -395,6 +395,20 @@ describe("a selection nobody published, with the service answering", () => {
     );
   });
 
+  it("stops offering a press on the missing plan's card once one has been made", async () => {
+    const client = new RecordingClient(() => ({ kind: "job", jobId: "job-1" }));
+    vi.spyOn(client, "readPublished").mockResolvedValue({ kind: "not-computed" });
+    vi.spyOn(client, "readJob").mockResolvedValue({ jobId: "job-1", status: "running" });
+    const { container } = renderView("mode=saf-puan&window=1", client, {
+      adviceIssue: "published-missing",
+      computeService: "ready",
+    });
+    await waitFor(() => expect(container).toHaveTextContent(copy.adviceRequestHint));
+    await pressCompute();
+    await waitFor(() => expect(container).toHaveTextContent(computeCopy.leaveOpen));
+    expect(container).not.toHaveTextContent(copy.adviceRequestHint);
+  });
+
   it.each([false, true])(
     "resumes a remembered job before reading the cache (missing: %s)",
     async (missing) => {

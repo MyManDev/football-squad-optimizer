@@ -185,7 +185,7 @@ for (const language of ["tr", "en"] as const) {
   });
 }
 
-// The dock's bar reads over the card in both palettes; a scan takes it at rest.
+// The waiting dock raises nothing in either palette; a scan takes it at rest.
 for (const colorScheme of ["light", "dark"] as const) {
   test(`the waiting dock raises nothing in the ${colorScheme} palette`, async ({ page }) => {
     test.skip(!apiOrigin, NO_SERVICE);
