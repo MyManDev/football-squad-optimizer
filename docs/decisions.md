@@ -186,4 +186,4 @@ the postponed-fixture note, the page prints no sentence.
 Reason: the owner wants the page to serve looking ahead. The results of played weeks are not what
 a manager reads it for.
 
-Source: the owner's message of 3 November.
+Source: the owner's message of 3 November, #1302.
