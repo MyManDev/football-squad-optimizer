@@ -357,6 +357,55 @@ describe("choosing the replacement", () => {
   });
 });
 
+describe("searching by name", () => {
+  it("narrows the add list to players whose name matches, and restores it when cleared", async () => {
+    await started();
+    const list = () => screen.getByLabelText(COPY.whatIfAdd);
+    const options = () =>
+      [...list().querySelectorAll("option")].filter((option) => option.value !== "");
+    const before = options().length;
+
+    const advisedSet = new Set(ADVISED);
+    const target = document.players.find((player) => !advisedSet.has(player.id))!;
+    const shown = target.short_name || target.name;
+    const matches = (player: (typeof document.players)[number]) =>
+      `${player.short_name} ${player.name}`
+        .toLocaleLowerCase("tr")
+        .includes(shown.toLocaleLowerCase("tr"));
+
+    fireEvent.change(screen.getByLabelText(COPY.whatIfSearch), { target: { value: shown } });
+    const after = options();
+    expect(after.length).toBe(
+      document.players.filter((player) => !advisedSet.has(player.id) && matches(player)).length,
+    );
+    expect(after.length).toBeLessThan(before);
+    expect(after.map((option) => option.value)).toContain(String(target.id));
+
+    fireEvent.change(screen.getByLabelText(COPY.whatIfSearch), { target: { value: "" } });
+    expect(options().length).toBe(before);
+  });
+
+  it("adds the found player only on the add button", async () => {
+    await started();
+    const advisedSet = new Set(ADVISED);
+    const target = document.players.find((player) => !advisedSet.has(player.id))!;
+    const shown = target.short_name || target.name;
+
+    fireEvent.change(screen.getByLabelText(COPY.whatIfSearch), { target: { value: shown } });
+    expect(figure(COPY.whatIfTransfers)).toBe("1");
+    fireEvent.change(screen.getByLabelText(COPY.whatIfAdd), {
+      target: { value: String(target.id) },
+    });
+    fireEvent.click(screen.getByRole("button", { name: COPY.whatIfAddButton }));
+    await settled();
+    expect(
+      screen.getByRole("button", {
+        name: COPY.whatIfRemoveLabel(target.short_name || target.name),
+      }),
+    ).toBeInTheDocument();
+  });
+});
+
 describe("with the keyboard and a screen reader", () => {
   it("adds nothing while the member moves through the list; only the add button adds", async () => {
     await started();
