@@ -3,7 +3,9 @@
  *
  * The request comes from the page's shared selection and squad context. Every state is a
  * short sentence the member can act on, or a mark that the plan is ready: queued, running,
- * done, failed.
+ * done, failed. A job at the service also says how the wait is going: its place in line, how
+ * much is solved as a percentage and a bar, and the workers at work, each only where the
+ * service says it.
  *
  * The job itself belongs to the page: the panel asks for a computation and reports its
  * state, and the page hands the finished answer to the advice card beside it.
@@ -29,10 +31,10 @@ import { Badge } from "../../../design/components/Badge";
 import { useLanguage } from "../../../i18n/context";
 import type { AdviceRequest } from "./adviceClient";
 import { canComputeAdvice } from "./adviceSelection";
-import { COMPUTE_COPY, failureSentence } from "./computeCopy";
+import { COMPUTE_COPY, failureSentence, jobStanding, jobWorkersLine } from "./computeCopy";
 import { DeviceProgressPanel } from "../device/DeviceProgressPanel";
 import { deviceEndedWithoutPlan, type DevicePlan } from "../device/useDevicePlan";
-import type { AdviceJob } from "./useAdviceJob";
+import type { AdviceJob, WaitingPhase } from "./useAdviceJob";
 import styles from "./AdviceRequestPanel.module.css";
 
 /**
@@ -41,6 +43,73 @@ import styles from "./AdviceRequestPanel.module.css";
  * answering (`unreachable`), or answering from another data capture (`other-capture`).
  */
 export type ComputeService = "static" | "ready" | "unreachable" | "other-capture";
+
+/**
+ * A running job's stages as one bar, filled by what is solved. A solve
+ * reports nothing until it ends and nothing here follows the clock, so the only thing that
+ * moves is one pulse across the stage in hand, each time the service answers that the job is
+ * still going. A job of one stage, or one that has not counted yet, is that stage alone.
+ */
+function JobStages({
+  state,
+  label,
+  value,
+}: {
+  state: WaitingPhase;
+  label: string;
+  /** The share solved in words; null when there is nothing to count. */
+  value: string | null;
+}) {
+  const done = state.progress?.done ?? 0;
+  const total = state.progress?.total ?? 1;
+  const share = (done / total) * 100;
+  const counted = value !== null;
+  return (
+    <div
+      className={styles.stages}
+      role="progressbar"
+      aria-label={label}
+      aria-valuemin={counted ? 0 : undefined}
+      aria-valuemax={counted ? 100 : undefined}
+      aria-valuenow={counted ? Math.round(share) : undefined}
+      aria-valuetext={value ?? undefined}
+    >
+      <span className={styles.stagesDone} style={{ inlineSize: `${share}%` }} />
+      {done < total ? (
+        <span
+          key={state.answers ?? 0}
+          className={styles.stageNow}
+          data-stage-now
+          style={{ inlineSize: `${100 / total}%` }}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+/** Where a job at the service stands: its word, then what the service says about the wait. */
+function JobState({ state }: { state: WaitingPhase }) {
+  const { language, messages } = useLanguage();
+  const copy = messages.leagueMembers;
+  const computeCopy = COMPUTE_COPY[language];
+  // A wait picked up after a reload names no word until the service has said one.
+  if (state.status === null) return null;
+  const running = state.status === "running";
+  const word = running ? copy.computeRunning : copy.computeQueued;
+  const standing = jobStanding(computeCopy, state);
+  const workers = jobWorkersLine(computeCopy, state);
+  return (
+    <>
+      <p className={styles.state}>
+        <Badge tone="accent">{word}</Badge>{" "}
+        {/* While it runs the bar says the percentage to a screen reader. */}
+        {standing === null ? null : <span aria-hidden={running || undefined}>{standing}</span>}
+      </p>
+      {running ? <JobStages state={state} label={word} value={standing} /> : null}
+      {workers === null ? null : <p className={styles.note}>{workers}</p>}
+    </>
+  );
+}
 
 /** Where the device solve stands; nothing while nothing was asked of it. */
 function DeviceState({ id, state }: { id: string; state: DevicePlan["state"] }) {
@@ -175,14 +244,7 @@ export function AdviceRequestPanel({
         {state.phase === "requesting" ? (
           <p className={styles.state}>{copy.computeRequesting}</p>
         ) : null}
-        {state.phase === "waiting" ? (
-          <p className={styles.state}>
-            <Badge tone="accent">
-              {state.status === "queued" ? copy.computeQueued : copy.computeRunning}
-            </Badge>{" "}
-            {copy.computeWaiting}
-          </p>
-        ) : null}
+        {state.phase === "waiting" ? <JobState state={state} /> : null}
         {state.phase === "done" && state.source !== "static-fallback" ? (
           <p className={styles.state}>
             <Badge tone="good">{copy.computeDone}</Badge>

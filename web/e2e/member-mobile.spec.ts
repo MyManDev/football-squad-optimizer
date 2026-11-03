@@ -344,7 +344,7 @@ for (const language of ["tr", "en"] as const) {
     await settings.getByRole("button", { name: copy.computeButton, exact: true }).click();
     const dock = page.locator("[data-compute-dock]");
     await expect(dock.getByText(copy.computeRunning, { exact: true })).toBeVisible();
-    await expect(dock.getByText(copy.computeWaiting, { exact: false })).toBeVisible();
+    await expect(dock.getByRole("progressbar", { name: copy.computeRunning })).toBeVisible();
     // The published plan stays on the page during the wait, and says that it is the baseline.
     await expect(
       page

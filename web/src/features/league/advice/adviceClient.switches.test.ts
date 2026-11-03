@@ -134,7 +134,7 @@ describe("the request on the wire", () => {
       const signal = new AbortController().signal;
       const accepted = client.requestAdvice(PLAIN, { signal, idempotencyKey: "click-2" });
       await vi.advanceTimersByTimeAsync(4100);
-      await expect(accepted).resolves.toEqual({ kind: "job", jobId: "job-9" });
+      await expect(accepted).resolves.toEqual({ kind: "job", jobId: "job-9", status: "queued" });
       expect(calls.map(sentKey)).toEqual(["click-2", "click-2", "click-2"]);
 
       const down = recorder(() =>
@@ -202,6 +202,7 @@ describe("a refusal", () => {
         contract_version: "advice_job_view_v1",
         job_id: "job-1",
         status: "failed",
+        created_at_utc: "2026-11-02T08:05:00Z",
         attempt: 3,
         error_code: "TOO_MANY_ATTEMPTS",
       }),
@@ -209,6 +210,7 @@ describe("a refusal", () => {
     expect(await client.readJob("job-1")).toEqual({
       jobId: "job-1",
       status: "failed",
+      attempt: 3,
       errorCode: "TOO_MANY_ATTEMPTS",
     });
   });
