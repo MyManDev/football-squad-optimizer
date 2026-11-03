@@ -59,7 +59,7 @@
 }
 
 .headline dd {
-  color: var(--color-lime);
+  color: var(--color-mark);
 }
 
 .breaks {
@@ -93,8 +93,11 @@
   transition: background-color var(--motion-ui) var(--motion-ease);
 }
 
+/* The focus colour is the mark's at night, so a ring on this row takes the mark's ink. */
 .player[data-changed] {
-  background: var(--color-lime);
+  --color-focus: var(--color-mark-text);
+  background: var(--color-mark);
+  color: var(--color-mark-text);
 }
 
 .position {
@@ -132,6 +135,13 @@
   color: var(--color-text);
   font: inherit;
   cursor: pointer;
+}
+
+/* What names its own colour above takes the mark's ink on a changed row. */
+.player[data-changed] .meta,
+.player[data-changed] .remove {
+  border-color: var(--color-mark-text);
+  color: var(--color-mark-text);
 }
 
 .add {

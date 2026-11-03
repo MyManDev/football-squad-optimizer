@@ -56,9 +56,7 @@ for (const language of ["tr", "en"] as const) {
     response = "missing";
     await submit.click();
     await expect(page.getByRole("status")).toHaveText(
-      language === "tr"
-        ? "Yayımlanmış lig belgesi şu anda mevcut değil. Daha sonra yeniden dene."
-        : "The published league document is unavailable. Try again later.",
+      language === "tr" ? "Daha sonra yeniden dene." : "Try again later.",
     );
     response = "failed";
     await submit.click();
@@ -130,3 +128,41 @@ for (const language of ["tr", "en"] as const) {
     await expect(help).not.toHaveAttribute("open");
   });
 }
+
+for (const viewport of [
+  { width: 1440, height: 900 },
+  { width: 390, height: 844 },
+  { width: 320, height: 568 },
+]) {
+  test(`the form stands alone in the middle of a ${viewport.width} x ${viewport.height} screen`, async ({
+    page,
+  }) => {
+    const entry = MESSAGES.tr.leagueEntry;
+    await page.addInitScript(() => sessionStorage.setItem("squadopt.openingShown", "1"));
+    await page.setViewportSize(viewport);
+    await page.goto("/");
+    const title = page.getByRole("heading", { level: 1, name: entry.title });
+    const submit = page.getByRole("button", { name: entry.submit, exact: true });
+    await expect(submit).toBeVisible();
+    await expect(page.locator("[data-match-scene]")).toBeHidden();
+
+    const heading = (await title.boundingBox())!;
+    const action = (await submit.boundingBox())!;
+    const column = (await page.locator("#main").boundingBox())!;
+    expect(Math.abs(heading.x + heading.width / 2 - (column.x + column.width / 2))).toBeLessThan(2);
+    const middle = (heading.y + action.y + action.height) / 2;
+    expect(Math.abs(middle - viewport.height / 2)).toBeLessThan(viewport.height * 0.08);
+    expect(action.y + action.height).toBeLessThanOrEqual(viewport.height);
+
+    const size = await title.evaluate((node) => parseFloat(getComputedStyle(node).fontSize));
+    expect(size).toBeGreaterThanOrEqual(48);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(viewport.width);
+  });
+}
+
+test("the match scene stands behind the next page", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.locator("[data-match-scene]")).toBeHidden();
+  await page.goto("/fixtures");
+  await expect(page.locator("[data-match-scene]")).toBeVisible();
+});

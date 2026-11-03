@@ -50,10 +50,12 @@ test.describe("the sidebar before and after the two steps", () => {
       }
       await expect(sidebar.getByRole("button", { name: TR.shell.changeMember })).toHaveCount(0);
       const buttons = sidebar.getByRole("button");
-      await expect(buttons).toHaveCount(3);
+      await expect(buttons).toHaveCount(5);
       await expect(buttons.nth(0)).toHaveAccessibleName(TR.shell.collapseSidebar);
       await expect(buttons.nth(1)).toHaveAccessibleName(/^TR/);
       await expect(buttons.nth(2)).toHaveAccessibleName(/^EN/);
+      await expect(buttons.nth(3)).toHaveAccessibleName(TR.colourScheme.light);
+      await expect(buttons.nth(4)).toHaveAccessibleName(TR.colourScheme.dark);
     });
   });
 
@@ -468,24 +470,24 @@ test("with reduced motion the picker and the drawer do not move", async ({ page 
   expect(drawer).toBe(true);
 });
 
-test.describe("the system's own pages behind the same two steps", () => {
+test.describe("the addresses that name no league behind the same two steps", () => {
   test.describe("with no league entered", () => {
     test.use({ storageState: NO_LEAGUE });
 
-    test("the moves page asks for the number, then who you are, in place", async ({ page }) => {
+    test("the league page asks for the number, then who you are, in place", async ({ page }) => {
       await installLeagueMocks(page, { claim: null });
       await page.route("**/data/league/members.json", (route) =>
         route.fulfill({ json: { ...mockLeagueMembersEnvelope, source_kind: "live" } }),
       );
-      await page.goto("/moves");
+      await page.goto("/league");
       await expect(page.getByRole("heading", { level: 1 })).toHaveText(TR.leagueEntry.title);
       await page.getByLabel(TR.leagueEntry.label).fill(String(LEAGUE));
       await page.getByRole("button", { name: TR.leagueEntry.submit, exact: true }).click();
-      await expect(page).toHaveURL("/moves");
+      await expect(page).toHaveURL(`/league/${LEAGUE}`);
       await expect(pickerHeading(page)).toBeFocused();
       await pickMember(page, exampleMember(35249002));
-      await expect(page).toHaveURL("/moves");
-      await expect(page.getByRole("heading", { level: 1 })).toHaveText(TR.moves.title);
+      await expect(page).toHaveURL(`/league/${LEAGUE}`);
+      await expect(page.getByRole("heading", { level: 1 })).toHaveText(TR.league.title);
     });
 
     for (const [address, numbered] of [
@@ -508,22 +510,5 @@ test.describe("the system's own pages behind the same two steps", () => {
         await expect(pickerHeading(page)).toBeFocused();
       });
     }
-  });
-
-  test("the rivals page and the gameweek page ask who you are before reading anything", async ({
-    page,
-  }) => {
-    await installLeagueMocks(page, { claim: null });
-    const reads: string[] = [];
-    page.on("request", (request) => {
-      const path = new URL(request.url()).pathname;
-      if (/^\/data\/\d{4}-\d{2}\//.test(path)) reads.push(path);
-    });
-    for (const address of ["/rivals", "/gw/2026-27/1"]) {
-      await page.goto(address);
-      await expect(pickerHeading(page)).toBeVisible();
-      await expect(page).toHaveURL(address);
-    }
-    expect(reads).toEqual([]);
   });
 });

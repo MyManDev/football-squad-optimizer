@@ -11,7 +11,6 @@ import { ClubMark } from "../components/ClubMark";
 import { MemberBench, MemberPitch, type PitchPlayer } from "../components/MemberPitch";
 import { PlayerDetails } from "../components/PlayerDetails";
 import { PointsUnit } from "../components/PointsUnit";
-import { expectedLineupLabel } from "../advice/expectedLineupLabel";
 import { modelChangeOf, popChanged, releasePop } from "../advice/modelSwitch";
 import type { EntryAdvice, EntrySquad, EntrySquadPlayer } from "../types";
 import { finite, heldBench, type SquadOnPitch } from "./squadOnPitch";
@@ -47,7 +46,7 @@ export function MemberSquad({
   held?: EntrySquad;
   fixtures?: FixturesPayload | null;
 }) {
-  const { language, locale, messages } = useLanguage();
+  const { locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
   const titleId = useId();
   const [view, setView] = useState<"pitch" | "list">("pitch");
@@ -98,7 +97,7 @@ export function MemberSquad({
         <h2 className={styles.title} id={titleId}>
           {copy.memberSquad}
         </h2>
-        <EmptyState title={copy.emptySquad}>{copy.emptySquadBody}</EmptyState>
+        <EmptyState title={copy.emptySquad} />
       </section>
     );
   }
@@ -113,11 +112,7 @@ export function MemberSquad({
   // does not say it twice.
   const line = [
     formation(onPitch.eleven),
-    own !== null && !(hasList && view === "list")
-      ? plan?.lineup_expectation
-        ? expectedLineupLabel(figure(own, locale), language)
-        : copy.squadOwnPoints(figure(own, locale))
-      : null,
+    own !== null && !(hasList && view === "list") ? copy.squadOwnPoints(figure(own, locale)) : null,
   ]
     .filter(Boolean)
     .join(" · ");

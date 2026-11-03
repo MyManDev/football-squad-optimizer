@@ -118,9 +118,9 @@
 
 /* On /fixtures itself the button reads as the current place, like the active nav item. */
 .phoneFixtures[aria-current="page"] .phoneFixturesFace {
-  border-color: var(--color-text);
-  background: var(--color-text);
-  color: var(--color-lime);
+  border-color: var(--color-board);
+  background: var(--color-board);
+  color: var(--color-mark);
 }
 
 /* A jump to an id (the skip link, the squad) lands under the sticky phone bar, not behind it. */
@@ -244,18 +244,10 @@
   overscroll-behavior: contain;
 }
 
-.who,
-.plan {
-  flex: none;
-}
-
-.plan:empty {
-  display: none;
-}
-
 /* The identity block: the league, the member and Değiştir. It sits on the sidebar's
    surface, so its quiet lines are ink2, never ink3. */
 .who {
+  flex: none;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -310,12 +302,6 @@
   background: var(--color-bg);
 }
 
-.plan {
-  margin-top: var(--space-2);
-  padding-top: var(--space-2);
-  border-top: 1px solid var(--color-line);
-}
-
 .nav {
   flex: none;
   display: flex;
@@ -323,8 +309,8 @@
   margin: var(--space-1) calc(-1 * var(--space-2)) 0;
 }
 
-/* 34 px beside the page, where a pointer uses it and the plan under it has to keep Hesapla
-   above a small laptop's fold; the rail and the drawer make them 44 px targets. */
+/* 34 px beside the page, where a pointer uses it; the rail and the drawer make them 44 px
+   targets. */
 .navItem {
   display: flex;
   align-items: center;
@@ -346,20 +332,13 @@
 
 /* The active item: ink with a lime label, the one place lime marks where you are. */
 .navItem[aria-current="page"] {
-  background: var(--color-text);
-  color: var(--color-lime);
+  background: var(--color-board);
+  color: var(--color-mark);
   font-weight: 600;
 }
 
 .navIcon {
   flex: none;
-}
-
-.planRail {
-  flex: none;
-  margin-top: var(--space-2);
-  padding-top: var(--space-2);
-  border-top: 1px solid var(--color-line);
 }
 
 .railButton {
@@ -378,11 +357,9 @@
   padding: var(--space-2) 0;
 }
 
-/* Beside the page (open or as the rail), in a window tall enough to hold the plan with
-   Hesapla above it, the footer stays at the sidebar's foot: the notes under Hesapla scroll
-   under it, and the language switch is never cut off by the window's edge. In a shorter
-   window it stays in the flow after the notes, so it can never cover Hesapla. The drawer
-   keeps it in the flow too, because Hesapla is what stays pinned there. */
+/* Beside the page (open or as the rail), in a tall enough window, the footer stays at the
+   sidebar's foot, so the language switch is never cut off by the window's edge. In a shorter
+   window, and in the drawer, it stays in the flow. */
 @media (min-height: 800px) {
   .sidebar:not([data-mode="drawer"]) .footer {
     position: sticky;
@@ -418,12 +395,6 @@
 .sidebar[data-mode="rail"] .body {
   align-items: center;
   padding: 0;
-}
-
-/* The plan slot stays mounted for the page that fills it; the rail shows its icon instead.
-   The identity block is drawn as its own icon there (.whoRail), so it is not hidden here. */
-.sidebar[data-mode="rail"] .plan {
-  display: none;
 }
 
 /* The identity block's face in the rail: one 44 px icon over the navigation, ruled off

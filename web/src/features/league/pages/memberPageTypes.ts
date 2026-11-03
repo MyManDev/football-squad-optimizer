@@ -2,7 +2,7 @@ import type { MemberTool } from "../../../lib/leagueAddresses";
 import type { FixturesPayload } from "../../fixtures/types";
 import type { ComputeService } from "../advice/AdviceRequestPanel";
 import type { AdviceCapabilities } from "../advice/adviceCapabilities";
-import type { AdviceClient, AdviceSource } from "../advice/adviceClient";
+import type { AdviceClient } from "../advice/adviceClient";
 import type { PublishedAdviceStatus } from "../advice/adviceSelection";
 import type { DeviceRivalReads } from "../device/computable";
 import type { DevicePlanDependencies } from "../device/useDevicePlan";
@@ -29,8 +29,7 @@ export type AdviceIssue =
 /** What the advice card shows and where it came from. */
 export interface ShownAdvice {
   envelope: LeagueViewEnvelope<EntryAdvice>;
-  origin: "computed" | "published" | "published-while-computing" | "baseline-while-computing";
-  source?: AdviceSource;
+  origin: "computed" | "published" | "baseline-while-computing";
 }
 
 export interface LeagueMemberViewProps {
@@ -40,11 +39,9 @@ export interface LeagueMemberViewProps {
   coachNews?: LeagueViewEnvelope<EntryAdvice> | null;
   adviceIssue?: AdviceIssue;
   adviceLoading?: boolean;
-  membersIssue?: "missing" | "unavailable";
   onRetryAdvice?: () => void;
   onRetryIndex?: () => void;
   members?: EntryView[];
-  outcomeFreshness?: { publishedAt: string; scoredGameweek: number | null };
   index?: EntryAdviceIndex | null;
   client?: AdviceClient;
   /** What the compute service answers for this page; absent or null on a static build. */
@@ -78,11 +75,8 @@ export interface LeagueMemberViewProps {
   rivalSquad?: LeagueViewEnvelope<EntrySquad> | null;
   /** The entry document of the rival `?duel=` names (#1133); null while none is named or read. */
   duelSquad?: LeagueViewEnvelope<EntrySquad> | null;
-  /**
-   * Why a named duel rival has no document yet: still being read, not in the week's
-   * publication, or a read that failed.
-   */
-  duelIssue?: "loading" | "missing" | "unreadable";
+  /** Why a named duel rival has no document yet: still being read, or a read that failed. */
+  duelIssue?: "loading" | "unreadable";
   /**
    * The published fixture calendar the page already reads for the deadline: the open
    * deadline in the top bar and the clubs' next three gameweeks on the boards come from it.

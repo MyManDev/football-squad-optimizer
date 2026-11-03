@@ -8,14 +8,20 @@ is the payload ``render_member`` produced for the same member from the same inpu
 
 import json
 from dataclasses import replace
+from itertools import combinations
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
 import tests.unit.test_advice_variants as variants_module
 from tests.unit.test_advice_variants import RIVAL
+from tests.unit.test_league_views import _Provider
 from tests.unit.test_member_windows import ENTRY, LEAGUE, SEASON
 from tests.unit.test_top100_weight import _words
 
+import squadopt.application.advice as advice_module
+import squadopt.application.advice_menu as menu
+import squadopt.application.advice_variants as advice_variants
 from squadopt.application.advice import AdviseEntryRequest, advise_entry
 from squadopt.application.advice_capabilities import (
     TOP100_WEIGHTS,
@@ -30,10 +36,14 @@ from squadopt.application.advice_menu import (
     MenuInputUnavailable,
     MenuRequest,
     advise_menu_entry,
+    documents_to_solve,
+    menu_documents,
 )
 from squadopt.application.entries import EntryError
 from squadopt.application.league_views import MemberRenderTask, render_member
 from squadopt.application.top100_weight import TOP100_WEIGHTS as PRODUCER_WEIGHTS
+from squadopt.contracts.preferences import DecisionPreferences
+from squadopt.live.rules import ChipWindow
 
 window_world = variants_module.window_world  # re-register the fixtures in this module
 world = variants_module._world
@@ -239,13 +249,9 @@ def test_every_variant_address_is_the_batchs_payload(world: dict[str, Any]) -> N
         assert got == payload, weight
 
 
-def test_a_prerequisite_read_back_from_stored_bytes_changes_nothing(
-    world: dict[str, Any],
-) -> None:
-    """A caller that keeps answers hands back JSON, not the dict that was serialised."""
+def _stored(rendered: Any) -> dict[MenuRequest, str]:
+    """Every plain document the batch rendered, as a caller that keeps answers holds it."""
 
-    rendered = _rendered(world)
-    collaborators = _collaborators(world)
     stored: dict[MenuRequest, str] = {
         _request(window=window): json.dumps(payload) for window, payload in rendered.window_payloads
     }
@@ -256,6 +262,17 @@ def test_a_prerequisite_read_back_from_stored_bytes_changes_nothing(
             stored[_request(strategy=strategy, window=window, rival_entry_id=rival)] = json.dumps(
                 payload
             )
+    return stored
+
+
+def test_a_prerequisite_read_back_from_stored_bytes_changes_nothing(
+    world: dict[str, Any],
+) -> None:
+    """A caller that keeps answers hands back JSON, not the dict that was serialised."""
+
+    rendered = _rendered(world)
+    collaborators = _collaborators(world)
+    stored = _stored(rendered)
     asked: list[MenuRequest] = []
 
     def lookup(address: MenuRequest) -> dict[str, Any] | None:
@@ -320,3 +337,283 @@ def test_the_word_and_the_pair_are_the_batchs_payloads(world: dict[str, Any]) ->
     assert set(by_address) == {(50, False), (50, True)}
     assert ask(top100_weight=50) == by_address[(50, False)]
     assert ask(top100_weight=50, managers_word=True) == by_address[(50, True)]
+
+
+# -- counting what is solved --------------------------------------------------------------
+#
+# A job's progress is the documents it has solved out of those it has to. ``menu_documents``
+# names them before anything is solved and ``on_document`` is told as each one is, so the
+# two must agree for every kind of request, whatever the caller already holds.
+
+#: Every kind of request the menu dispatches, with the number of documents it needs when
+#: nothing is held: the asked one, plus what it is priced or compared against at 0.
+_EVERY_KIND: dict[str, tuple[dict[str, Any], bool, int]] = {
+    "plain week": ({}, False, 1),
+    "plain window": ({"window": 5}, False, 1),
+    "plain rival week": ({"strategy": "ortak-koru", "rival_entry_id": RIVAL}, False, 1),
+    "rival window": ({"strategy": "fark-yarat", "window": 3, "rival_entry_id": RIVAL}, False, 2),
+    "rival window under a setting": (
+        {"strategy": "ortak-koru", "window": 5, "rival_entry_id": RIVAL, "top100_weight": 50},
+        False,
+        3,
+    ),
+    "rival week under a setting": (
+        {"strategy": "fark-yarat", "rival_entry_id": RIVAL, "top100_weight": 20},
+        False,
+        2,
+    ),
+    "window under a setting": ({"window": 3, "top100_weight": 50}, False, 2),
+    "week under a setting": ({"top100_weight": 10}, False, 1),
+    "the word": ({"managers_word": True}, False, 1),
+    "the word under a setting": ({"managers_word": True, "top100_weight": 50}, False, 1),
+    "a chip this week": ({"chip": "wildcard"}, False, 1),
+    "a chip over a window": ({"chip": "bboost", "window": 3}, False, 1),
+    "a chip under a setting": ({"chip": "3xc", "top100_weight": 20}, False, 1),
+    "preferences": ({"window": 3, "preferences": DecisionPreferences(no_hits=True)}, False, 1),
+    "football window under a setting": ({"window": 5, "top100_weight": 20}, True, 1),
+    "football rival window under a setting": (
+        {"strategy": "ortak-koru", "window": 3, "rival_entry_id": RIVAL, "top100_weight": 20},
+        True,
+        3,
+    ),
+}
+
+
+def _stub_producers(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Every producer the menu dispatches to answers at once, so only the dispatch is tested."""
+
+    def document(name: str) -> Any:
+        return lambda *_args, **_kwargs: {"producer": name, "stated_limits": []}
+
+    def advice(name: str) -> Any:
+        return lambda *_args, **_kwargs: SimpleNamespace(
+            payload={"producer": name}, word_payload={"producer": name}, word_unavailable=None
+        )
+
+    for name in ("advise_entry", "advise_chip_strategy", "advise_with_managers_word"):
+        monkeypatch.setattr(menu, name, document(name))
+    for name in (
+        "advise_with_chip",
+        "advise_window_with_top100",
+        "advise_with_top100",
+        "advise_rival_window",
+        "advise_rival_with_top100",
+    ):
+        monkeypatch.setattr(menu, name, advice(name))
+    for name in ("solve_member_control", "solve_pricing_control", "held_squad_from_picks"):
+        monkeypatch.setattr(menu, name, lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(menu, "held_member_chips", lambda *_args, **_kwargs: ("wildcard",))
+
+
+def _projection(world: dict[str, Any], *, football: bool) -> Any:
+    if not football:
+        return world["projection"]
+    diagnostics = {**world["projection"].diagnostics, "model_name": "fixture_football_candidate"}
+    return replace(world["projection"], diagnostics=diagnostics)
+
+
+@pytest.mark.parametrize("kind", sorted(_EVERY_KIND))
+def test_every_kind_of_request_tells_exactly_the_documents_it_was_counted_for(
+    world: dict[str, Any], monkeypatch: pytest.MonkeyPatch, kind: str
+) -> None:
+    """Cold, warm and every mix in between: one call per document counted, in order."""
+
+    selection, football, needed = _EVERY_KIND[kind]
+    _stub_producers(monkeypatch)
+    projection = _projection(world, football=football)
+    request = _request(**selection)
+    named = menu_documents(request, projection=projection)
+    assert len(named) == needed and named[-1] == request
+    first = named[:-1]
+    # What it is priced or compared against is a plain document at setting 0, each once.
+    assert all(address.is_plain and address != request for address in first)
+    assert len(set(first)) == len(first)
+
+    for size in range(len(first) + 1):
+        for held in combinations(first, size):
+
+            def lookup(address: MenuRequest, held: tuple[MenuRequest, ...] = held) -> Any:
+                return {"held": address.strategy} if address in held else None
+
+            told: list[MenuRequest] = []
+            advise_menu_entry(
+                request,
+                **{**_collaborators(world), "projection": projection},
+                top100_counts=world["counts"],
+                manager_words=_words(1),
+                prerequisite=lookup,
+                on_document=told.append,
+            )
+            counted = documents_to_solve(request, projection=projection, prerequisite=lookup)
+            assert told == list(counted), (kind, held)
+            assert len(counted) == needed - size
+
+
+def test_counting_changes_no_payload_and_real_solves_tell_what_was_counted(
+    world: dict[str, Any],
+) -> None:
+    """The batch's own addresses, solved for real with nothing held and with all of it held."""
+
+    rendered = _rendered(world)
+    collaborators = _collaborators(world)
+    stored = _stored(rendered)
+
+    def warm(address: MenuRequest) -> Any:
+        held = stored.get(address)
+        return None if held is None else json.loads(held)
+
+    for strategy, window, rival, weight, payload in rendered.variant_payloads:
+        request = _request(
+            strategy=strategy, window=window, rival_entry_id=rival, top100_weight=weight
+        )
+        for lookup in (None, warm):
+            told: list[MenuRequest] = []
+            got = advise_menu_entry(
+                request,
+                **collaborators,
+                top100_counts=world["counts"],
+                prerequisite=lookup,
+                on_document=told.append,
+            )
+            assert got == payload, (strategy, window, rival, weight)
+            counted = documents_to_solve(
+                request, projection=world["projection"], prerequisite=lookup
+            )
+            assert told == list(counted), (strategy, window, rival, weight, lookup)
+        # Held whole, only the asked document is left to solve.
+        assert told == [request]
+
+
+def test_a_request_that_fails_tells_only_what_it_solved_before_failing(
+    world: dict[str, Any],
+) -> None:
+    another_week = replace(_words(1), gameweek=3)
+    told: list[MenuRequest] = []
+    with pytest.raises(ManagersWordNotSolved):
+        advise_menu_entry(
+            _request(top100_weight=50, managers_word=True),
+            **_collaborators(world),
+            top100_counts=world["counts"],
+            manager_words=another_week,
+            on_document=told.append,
+        )
+    assert told == []
+
+
+# -- one call solves each document once ---------------------------------------------------
+
+#: The producers ``advise_menu_entry`` dispatches to; each call makes one document.
+PRODUCERS = (
+    "advise_entry",
+    "advise_window_with_top100",
+    "advise_rival_window",
+    "advise_rival_with_top100",
+    "advise_with_top100",
+    "advise_with_managers_word",
+    "advise_with_chip",
+    "advise_chip_strategy",
+)
+
+#: A rival strategy against the world's rival, the address the switches are added to.
+AGAINST: dict[str, Any] = {"strategy": "ortak-koru", "rival_entry_id": RIVAL}
+
+
+def _chips_held(world: dict[str, Any]) -> dict[str, Any]:
+    """The same world with every chip held, so a chip request reaches its producer."""
+
+    picks = world["provider"].picks(ENTRY, SEASON, 1)
+    rules = replace(
+        world["rules"],
+        chips=tuple(
+            ChipWindow(name, 1, start, stop, "team")
+            for name in ("3xc", "bboost", "wildcard", "freehit")
+            for start, stop in ((1, 19), (20, 38))
+        ),
+    )
+    held = {ENTRY: replace(picks, chips_used={}), RIVAL: world["provider"].picks(RIVAL, SEASON, 1)}
+    return {**world, "rules": rules, "provider": _Provider(held)}
+
+
+@pytest.mark.parametrize(
+    ("selection", "documents", "windows"),
+    [
+        ({}, 1, 0),
+        ({"window": 3}, 1, 1),
+        (AGAINST, 1, 0),
+        ({"window": 3, "top100_weight": 50}, 2, 2),
+        ({"top100_weight": 50}, 1, 0),
+        ({"managers_word": True}, 1, 0),
+        ({"top100_weight": 50, "managers_word": True}, 1, 0),
+        ({**AGAINST, "top100_weight": 50}, 2, 0),
+        ({**AGAINST, "window": 3}, 2, 2),
+        # The pure-points window at 0 prices this document and the strategy's window at 0
+        # it is compared with: one solve, not one per dependent.
+        ({**AGAINST, "window": 3, "top100_weight": 50}, 3, 3),
+        ({**AGAINST, "strategy": "fark-yarat", "window": 5, "top100_weight": 20}, 3, 3),
+        ({"chip": "bboost"}, 1, 0),
+        ({"chip": "3xc", "window": 3, "top100_weight": 20}, 1, 0),
+    ],
+)
+def test_a_cold_call_solves_each_document_once(
+    world: dict[str, Any],
+    monkeypatch: pytest.MonkeyPatch,
+    selection: dict[str, Any],
+    documents: int,
+    windows: int,
+) -> None:
+    """Nothing held: every document the address needs is solved once, in one call."""
+
+    if "chip" in selection:
+        world = _chips_held(world)
+    solved: list[tuple[str, str, int, int | None, int]] = []
+    window_solves: list[int] = []
+    for name in PRODUCERS:
+        producer = getattr(menu, name)
+
+        def counted(*args: Any, _name: str = name, _producer: Any = producer, **kwargs: Any) -> Any:
+            request = args[0]
+            weight = kwargs.get("weight", kwargs.get("top100_weight", 0))
+            solved.append((_name, request.strategy, request.window, request.rival_entry_id, weight))
+            return _producer(*args, **kwargs)
+
+        monkeypatch.setattr(menu, name, counted)
+    for module in (advice_module, advice_variants):
+        window_plan = module.solve_window_plan
+
+        def counted_window(*args: Any, _solve: Any = window_plan, **kwargs: Any) -> Any:
+            window_solves.append(1)
+            return _solve(*args, **kwargs)
+
+        monkeypatch.setattr(module, "solve_window_plan", counted_window)
+    asked: list[MenuRequest] = []
+
+    def nothing_held(address: MenuRequest) -> None:
+        asked.append(address)
+
+    request = _request(**selection)
+    captain = int(world["provider"].picks(ENTRY, SEASON, 1).captain)
+    collaborators = {
+        **_collaborators(world),
+        "top100_counts": world["counts"],
+        "manager_words": _words(captain),
+    }
+    told: list[MenuRequest] = []
+    got = advise_menu_entry(
+        request, **collaborators, prerequisite=nothing_held, on_document=told.append
+    )
+    assert len(set(solved)) == documents, solved
+    assert len(solved) == documents, solved
+    assert len(window_solves) == windows
+    # Each document solved is told once, and they are the ones counted before the call.
+    to_solve = documents_to_solve(request, projection=world["projection"])
+    assert told == list(to_solve) and len(told) == documents
+    # The caller's lookup is asked for each dependency once, as it is solved once.
+    assert len(asked) == len(set(asked)) == documents - 1
+    if not asked:
+        return
+    # The same address with every dependency solved in a call of its own and handed back:
+    # a document reused inside the call is the document solved on its own, byte for byte.
+    held = {address: advise_menu_entry(address, **collaborators) for address in asked}
+    expected = advise_menu_entry(request, **collaborators, prerequisite=held.get)
+    assert got == expected
+    assert json.dumps(got) == json.dumps(expected)

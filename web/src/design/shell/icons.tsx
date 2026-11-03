@@ -166,25 +166,7 @@ export function PersonIcon() {
   );
 }
 
-/** Two sliders: the plan's settings. */
-export function PlanIcon() {
-  return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 18 18"
-      aria-hidden="true"
-      focusable="false"
-      {...STROKE}
-    >
-      <path d="M2.5 5h7M13.5 5h2M2.5 13h2M8.5 13h7" />
-      <circle cx="11.5" cy="5" r="2" />
-      <circle cx="6.5" cy="13" r="2" />
-    </svg>
-  );
-}
-
-/** A pulse line: the service's operating state. */
+/** A calendar page: the phone bar's way to the fixtures. */
 export function CalendarIcon() {
   return (
     <svg
@@ -197,6 +179,42 @@ export function CalendarIcon() {
     >
       <path strokeWidth={1.5} d="M2 6.5h12M5.5 1.5v3M10.5 1.5v3" />
       <rect strokeWidth={1.5} x="2" y="3" width="12" height="11" rx="1.5" />
+    </svg>
+  );
+}
+
+/** A sun: the day palette. */
+export function SunIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      aria-hidden="true"
+      focusable="false"
+      {...STROKE}
+    >
+      <circle strokeWidth={1.5} cx="8" cy="8" r="3" />
+      <path
+        strokeWidth={1.5}
+        d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M3.4 12.6l1.1-1.1M11.5 4.5l1.1-1.1"
+      />
+    </svg>
+  );
+}
+
+/** A crescent moon: the night palette. */
+export function MoonIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      aria-hidden="true"
+      focusable="false"
+      {...STROKE}
+    >
+      <path strokeWidth={1.5} d="M13.5 9.5A5.5 5.5 0 1 1 6.5 2.5a4.5 4.5 0 0 0 7 7z" />
     </svg>
   );
 }

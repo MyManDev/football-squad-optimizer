@@ -7,9 +7,9 @@
  * attack stand at mirrored distances from it, and the keeper stands at the own goal.
  * Every plate is centred on its point, so a line is symmetric about the pitch's axis.
  *
- * Nothing small is written on the grass: names, codes, figures and the direction of
- * attack sit on white plates (ink 16.3:1, ink2 7.6:1 on white). The grass's stripes are
- * the one pattern the page allows, and they are only on the grass, in the two grass tokens.
+ * Nothing small is written on the grass: names, codes and figures sit on white plates
+ * (ink 16.3:1, ink2 7.6:1 on white). The grass's stripes are the one pattern the page
+ * allows, and they are only on the grass, in the two grass tokens.
  *
  * Each player wears a shirt in their club's colours (ClubShirt.tsx). It
  * stands above the plate only where the lines are far enough apart for it: the shirt and
@@ -315,14 +315,18 @@
 
 .new {
   padding: 0 4px;
-  background: var(--color-lime);
+  background: var(--color-mark);
+  color: var(--color-mark-text);
   letter-spacing: 0.04em;
   text-transform: uppercase;
+  /* Placed from the plate's centre, it may only use half the plate: the word stays whole. */
+  white-space: nowrap;
 }
 
 .mark {
   width: 16px;
-  background: var(--color-lime);
+  background: var(--color-mark);
+  color: var(--color-mark-text);
   /* The armband lands on its plate a beat after the plate appears (weekArrival.ts): it grows
      from the plate's edge in the data time, whenever a plate takes the captaincy. */
   transform-origin: 50% 100%;
@@ -371,34 +375,6 @@
   }
 }
 
-/* The direction of attack: under the first defender's plate, left-aligned with it. */
-.attack {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  z-index: 1;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 20px;
-  padding: 0 6px;
-  border-radius: var(--radius-s);
-  background: var(--color-chip);
-  color: var(--color-chip-muted);
-  font-size: var(--step--2);
-  line-height: 16px;
-  white-space: nowrap;
-}
-
-.arrow {
-  flex: none;
-  transform: rotate(-90deg);
-}
-
-.attack[data-at="last"] {
-  display: none;
-}
-
 /* ---- Across: 640 px and wider ---- */
 
 @container pitch (min-width: 640px) {
@@ -410,10 +386,6 @@
       var(--color-pitch) 0 9.0909%,
       var(--color-pitch-2) 9.0909% 18.1818%
     );
-  }
-
-  .wrap[data-grass="checks"] .field {
-    background-size: 18.1818% 40%;
   }
 
   .descAcross {
@@ -621,23 +593,6 @@
   .plate:has(.new) .mark {
     transform: none;
   }
-
-  .attack {
-    left: 50%;
-    transform: translateX(-50%);
-  }
-
-  .arrow {
-    transform: none;
-  }
-
-  .wrap[data-def-crowded] .attack[data-at="first"] {
-    display: none;
-  }
-
-  .wrap[data-def-crowded] .attack[data-at="last"] {
-    display: inline-flex;
-  }
 }
 
 /* ---- The bench, in the published order ---- */
@@ -798,7 +753,7 @@
    data time; the ring itself never moves. The bench item carries the same ring. */
 .token[data-model-changed] .plate,
 .benchItem[data-model-changed] .benchName {
-  outline: 2px solid var(--color-lime);
+  outline: 2px solid var(--color-mark);
   outline-offset: 1px;
   box-shadow:
     0 0 0 1px var(--color-text),

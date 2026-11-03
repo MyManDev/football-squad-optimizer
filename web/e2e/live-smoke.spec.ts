@@ -5,9 +5,7 @@ import { MESSAGES } from "../src/i18n/messages";
 import { pickMember } from "./identity";
 import { figure } from "../src/lib/format";
 
-// Documents whose 404 is absence: the league directory on a site from before it, and the
-// series horizon, which publish_series_horizon in application/weekly_suggestion_eval.py
-// omits until the settled series supports a horizon (added once the tree is known).
+// Documents whose 404 is absence: the league directory on a site from before it.
 const OPTIONAL_DOCUMENTS = new Set(["/data/leagues.json"]);
 
 // Normal offline smoke discovery skips this file; only the live config runs it.
@@ -83,7 +81,6 @@ test("published league and member journey works without submitting a solve", asy
     };
     tree = directory.payload.leagues[0]!.path;
   } else expect(directoryResponse.status()).toBe(404);
-  OPTIONAL_DOCUMENTS.add(`/data/${tree}/series-horizon.json`);
   const membersResponse = await page.request.get(`/data/${tree}/members.json`);
   expect(membersResponse.status()).toBe(200);
   const members = (await membersResponse.json()) as {
@@ -107,47 +104,26 @@ test("published league and member journey works without submitting a solve", asy
   const advice = (await published.json()) as LeagueViewEnvelope<EntryAdvice>;
   expect(advice.payload.starting_xi).toHaveLength(11);
 
-  const pendingDocuments = new Set([
-    `/data/${tree}/series-horizon.json`,
-    ...members.payload.members
-      .filter((entry) => entry.member_kind === "human")
-      .map((entry) => `/data/${tree}/history/${entry.entry_id}.json`),
-  ]);
-  // Every league page stands behind "Sen kimsin?": the visitor says they are this member
-  // first. The navigation below loads the site again, so every document is read again.
+  // Each member's own page and history page read this document; the journey opens one member's.
+  for (const entry of members.payload.members.filter((row) => row.member_kind === "human")) {
+    const response = await page.request.get(`/data/${tree}/history/${entry.entry_id}.json`);
+    expect(response.status(), `history of ${entry.entry_id}`).toBe(200);
+    const { payload } = (await response.json()) as { payload: { weeks: unknown[] } };
+    expect(payload.weeks, `history of ${entry.entry_id}`).toBeDefined();
+  }
+
+  // Every league page stands behind "Sen kimsin?": the visitor says they are this member first.
   await page.goto(`/league/${league}/members`);
   await pickMember(page, { managerName: member!.manager_name, teamName: member!.team_name }, "en");
   await expect(page.locator("[data-member-picker]")).toHaveCount(0);
-  // Register before navigation; a fast table must not hide late document failures.
-  const documentReads = [...pendingDocuments].map(async (path) => {
-    const response = await page.waitForResponse((item) => item.url() === `${origin}${path}`, {
-      timeout: 0,
-    });
-    if (!(OPTIONAL_DOCUMENTS.has(path) && response.status() === 404)) {
-      expect(response.status(), path).toBe(200);
-      expect(await response.finished(), path).toBeNull();
-    }
-    pendingDocuments.delete(path);
-  });
-  let documentTimer: ReturnType<typeof setTimeout> | undefined;
-  try {
-    await Promise.race([
-      Promise.all([page.goto(`/league/${league}`), ...documentReads]),
-      new Promise<never>((_, reject) => {
-        documentTimer = setTimeout(
-          () =>
-            reject(
-              new Error(`League documents did not complete: ${[...pendingDocuments].join(", ")}`),
-            ),
-          30_000,
-        );
-      }),
-    ]);
-  } finally {
-    clearTimeout(documentTimer);
-  }
+  await page.goto(`/league/${league}`);
   await expect(page.locator("main h1")).toBeVisible();
-  await expect(page.locator("main table").first()).toBeVisible();
+  // The scoreboard is the page's one table, and it stands once a week has finished.
+  await expect(
+    page
+      .locator("main table")
+      .or(page.getByText(MESSAGES.en.leagueScoreboard.noGameweek, { exact: true })),
+  ).toBeVisible();
   await page.goto(`/league/${league}/members/${entryId}`);
   await expect(page).toHaveURL(new RegExp(`/league/${league}/members/${entryId}$`));
   const plan = page.locator('[aria-labelledby="entry-advice-title"]');
@@ -226,9 +202,9 @@ test("published league and member journey works without submitting a solve", asy
       console.log(`backend cache hit matches published capture: ${cacheRead}`);
     }
   }
-  // The member's history is linked from the page (beside the honesty block, and by the last
-  // finished week's card when the member has one) and from the sidebar, which a phone keeps
-  // in a closed drawer. Any link the visitor can see lands on the same page.
+  // The member's history is linked from the page (under the squad, and by the last finished
+  // week's card when the member has one) and from the sidebar, which a phone keeps in a
+  // closed drawer. Any link the visitor can see lands on the same page.
   await page
     .locator(`a[href="/league/${league}/members/${entryId}/history"]`)
     .filter({ visible: true })

@@ -24,7 +24,6 @@ export function summarizeHistory(weeks: readonly WeekReview[]) {
     });
   return {
     rows,
-    compared,
     suggested: compared ? suggested : null,
     actual: compared ? actual : null,
     difference: compared ? difference : null,

@@ -1,13 +1,20 @@
-/* SquadOpt design tokens: direction D, "Saha Kenarı".
+/* SquadOpt design tokens: direction D, "Saha Kenarı" by day and "Gece Maçı" by night.
 
-   The page is pale green paper, and it has one palette. There is no dark theme and no
-   theme switch: the colours below sit on bare :root, and the operating system's colour
-   preference is not followed (color-scheme: light).
+   By day the page is white paper with pale yellow and orange beside it; by night it is navy
+   under floodlights, with stadium yellow where the day has lime. The day palette sits on bare :root. The night palette
+   follows the operating system's dark preference unless the viewer chose the day, and
+   applies wherever the viewer chose the night (data-theme on <html>, colourScheme.ts).
+   Only colours change between the two; type, spacing, radii and motion are shared.
 
-   Ink and the page greens carry the page. The only dark objects on the paper are the
+   Ink carries the page. Behind it stands one passing move (MatchScene.tsx), in
+   --color-scene and --color-scene-far, close enough to the page that every text colour
+   that sits on the page still reads over a player. The only dark objects on the paper are the
    substitution boards and the grass. Red and green belong to the boards and their
-   ÇIKAN / GİREN tags; lime is a small fill only (YENİ, the captain badge, the active nav
-   item, the viewer's own row, LED digits), always with ink text on it. The one shadow is
+   ÇIKAN / GİREN tags; the mark (--color-mark, lime by day, yellow by night) is a small fill
+   only (YENİ, the captain badge, the active nav item, the viewer's own row, LED digits),
+   always with --color-mark-text on it. A fill that is dark in both palettes, such as a
+   pressed control or the active nav item, is --color-board with --color-board-text, never
+   the text colour, which turns light at night. The one shadow is
    the drawer and sheet shadow. Radii are 4 px on controls, chips and tags, 6 px on
    boards and panels; there are no pills.
 
@@ -15,18 +22,23 @@
    codes and figures. Body is 14 px and nothing is set under 12 px (--step--2). Plex Sans
    is loaded at 400, 500 and 600 and Plex Mono at 500 and 600, so text never asks for 700.
 
-   Contrast, WCAG formula: ink (--color-text) 14.1:1 on the page, ink2 (--color-text-muted)
-   6.7:1, ink3 (--color-text-faint) 4.78:1 on the page and 5.17:1 on panels but only
-   4.36:1 on the sidebar (--color-surface-2), so ink3 is for labels and never sits on
-   --color-surface-2. --color-good is 4.33:1 on --color-surface-2 for the same reason, and
-   --color-warn is 4.77:1 there. Links (--color-accent) are 10.3:1 on the page. White is
+   Contrast, WCAG formula: ink (--color-text) 16:1 on the page, ink2 (--color-text-muted)
+   8.8:1, ink3 (--color-text-faint) 6:1 on the page, 5.8:1 on panels and 5.5:1 on the
+   sidebar (--color-surface-2). --color-good is 4.9:1 on --color-surface-2 and 4.5:1 or more
+   on a player, --color-warn 5.4:1 there. Links (--color-accent) are 11.7:1 on the page. White is
    5.6:1 on --color-out-panel and 5.3:1 on --color-in-panel; lime and --color-board-muted
-   are 13.5:1 and 11.9:1 on the board; ink is 9.8:1 on --color-seg2 and 13.5:1 on lime.
+   are 13.5:1 and 12.2:1 on the board; ink is 9.8:1 on --color-seg2 and 13.5:1 on lime.
    No small text sits directly on the grass (white 3.98:1, ink 4.02:1): it goes on the
-   white plates (--color-chip, ink2 on them 7.6:1). A player's shirt is drawn in their
+   white plates (--color-chip, ink2 on them 8.8:1). A player's shirt is drawn in their
    club's fill with ink or white at 4.5:1 or more (clubPlate.ts), held per club by
    contrast.test.ts, and every goalkeeper's in --color-keeper, a pink no club
    wears, so the keepers read at a glance; its ink initials are 5.6:1.
+
+   Night, same formula: ink 15.7:1 on the page and 14.2:1 on panels, ink2 7.6:1 and ink3
+   5.7:1 at their lowest, and every status colour above 6.6:1 on all three surfaces. Ink3 is
+   4.56:1 on a player. Yellow links are 11.1:1 on
+   the page and mark text 11.3:1 on the mark; ink is 1.4:1 there, so only mark text stands
+   on it. contrast.test.ts holds both palettes.
 
    Motion (#1136): every transition and animation takes its duration and easing from the
    tokens below, never a literal of its own, and src/design/motion.ts mirrors them for the
@@ -63,15 +75,16 @@
 
   --measure: 62ch;
 
-  --color-bg: #ecf3e6;
-  --color-surface: #f7fbf3;
-  --color-surface-2: #ddebd4;
-  --color-line: #c3d8b8;
+  --color-bg: #ffffff;
+  --color-scene: #ffe8c6;
+  --color-scene-far: #fff4cf;
+  --color-surface: #fffaf0;
+  --color-surface-2: #fff3dc;
+  --color-line: #f0dcb4;
   --color-text: #10261a;
-  --color-text-muted: #3d5a47;
-  --color-text-faint: #56705f;
+  --color-text-muted: #4f4a3e;
+  --color-text-faint: #6a6250;
   --color-accent: #17402a;
-  --color-accent-text: #ffffff;
   --color-primary: #17402a;
   --color-primary-text: #ffffff;
   --color-good: #1c7a3e;
@@ -84,13 +97,15 @@
   --color-pitch-line: rgba(255, 255, 255, 0.85);
   --color-chip: #ffffff;
   --color-chip-text: #10261a;
-  --color-chip-muted: #3d5a47;
+  --color-chip-muted: #4f4a3e;
 
   --color-board: #10261a;
-  --color-board-muted: #cfe3d3;
+  --color-board-muted: #ebe4d3;
+  --color-board-text: #ffffff;
   --color-out-panel: #c62828;
   --color-in-panel: #1e7b45;
-  --color-lime: #c6ff3d;
+  --color-mark: #c6ff3d;
+  --color-mark-text: #10261a;
   --color-seg2: #a8db45;
   --color-keeper: #f06ba8;
 
@@ -105,23 +120,102 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Gece Maçı. The two blocks below carry the same values (contrast.test.ts holds them
+   equal): the first is the system's dark preference where the viewer has not chosen the
+   day, the second the viewer's own choice of the night. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
+    --color-bg: #0d1320;
+    --color-scene: #1f2f4a;
+    --color-scene-far: #172337;
+    --color-surface: #151d2d;
+    --color-surface-2: #111827;
+    --color-line: #27324a;
+    --color-text: #e7ecf5;
+    --color-text-muted: #a3afc4;
+    --color-text-faint: #8b97ad;
+    --color-accent: #f2c230;
+    --color-primary: #f2c230;
+    --color-primary-text: #14100a;
+    --color-good: #4cc38a;
+    --color-bad: #ff7a6e;
+    --color-warn: #e9b04f;
+    --color-focus: #f2c230;
+
+    --color-pitch: #1d5a39;
+    --color-pitch-2: #226441;
+    --color-pitch-line: rgba(255, 255, 255, 0.7);
+    --color-chip: #e3e9f2;
+    --color-chip-text: #0d1320;
+    --color-chip-muted: #3b4660;
+
+    --color-board: #060a12;
+    --color-board-muted: #c3cddc;
+    --color-board-text: #ffffff;
+    --color-out-panel: #c62828;
+    --color-in-panel: #1e7b45;
+    --color-mark: #f2c230;
+    --color-mark-text: #14100a;
+    --color-seg2: #c79a1e;
+    --color-keeper: #f06ba8;
+
+    --color-scrim: rgba(0, 0, 0, 0.6);
+    --shadow-drawer: 0 12px 32px rgba(0, 0, 0, 0.55);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --color-bg: #0d1320;
+  --color-scene: #1f2f4a;
+  --color-scene-far: #172337;
+  --color-surface: #151d2d;
+  --color-surface-2: #111827;
+  --color-line: #27324a;
+  --color-text: #e7ecf5;
+  --color-text-muted: #a3afc4;
+  --color-text-faint: #8b97ad;
+  --color-accent: #f2c230;
+  --color-primary: #f2c230;
+  --color-primary-text: #14100a;
+  --color-good: #4cc38a;
+  --color-bad: #ff7a6e;
+  --color-warn: #e9b04f;
+  --color-focus: #f2c230;
+
+  --color-pitch: #1d5a39;
+  --color-pitch-2: #226441;
+  --color-pitch-line: rgba(255, 255, 255, 0.7);
+  --color-chip: #e3e9f2;
+  --color-chip-text: #0d1320;
+  --color-chip-muted: #3b4660;
+
+  --color-board: #060a12;
+  --color-board-muted: #c3cddc;
+  --color-board-text: #ffffff;
+  --color-out-panel: #c62828;
+  --color-in-panel: #1e7b45;
+  --color-mark: #f2c230;
+  --color-mark-text: #14100a;
+  --color-seg2: #c79a1e;
+  --color-keeper: #f06ba8;
+
+  --color-scrim: rgba(0, 0, 0, 0.6);
+  --shadow-drawer: 0 12px 32px rgba(0, 0, 0, 0.55);
+}
+
 *,
 *::before,
 *::after {
   box-sizing: border-box;
 }
 
-/* The page is mown grass seen from the touchline: 112 px bands, every other one 4 % pitch.
-   At 4 % the faintest text still reads (ink3 4.58:1 and --color-good 4.55:1 on the darker
-   band); panels, cards and the bars keep their own fills, so only bare page shows them. */
 body {
   margin: 0;
-  background-color: var(--color-bg);
-  background-image: repeating-linear-gradient(
-    90deg,
-    color-mix(in srgb, var(--color-pitch) 4%, transparent) 0 56px,
-    transparent 56px 112px
-  );
+  background: var(--color-bg);
   color: var(--color-text);
   font-family: var(--font-body);
   font-size: var(--step-0);
@@ -139,7 +233,6 @@ h4 {
 }
 
 /* Emphasis in running text is Plex Sans 600, the heaviest weight the page loads for it. */
-b,
 strong,
 th {
   font-weight: 600;
@@ -151,9 +244,7 @@ small {
 }
 
 /* Codes read in Plex Mono like every other code and figure, not the system monospace. */
-code,
-kbd,
-samp {
+code {
   font-family: var(--font-mono);
 }
 
@@ -186,10 +277,6 @@ a:hover {
 
 .num {
   font-variant-numeric: tabular-nums;
-}
-
-.mono {
-  font-family: var(--font-mono);
 }
 
 .visually-hidden {

@@ -2,12 +2,12 @@
  * What the price tag on a rival strategy is allowed to say.
  *
  * A price tag is the difference between two solved plans. Where both proofs finished it
- * is the cost, and the page says so in the words it always used. Where only the priced
- * plan's proof is missing, the producer publishes the price as a ceiling, the most the
- * strategy can cost, and the page must state that instead, in both languages. Where the
- * pure-points plan it is measured against is unproven, nothing bounds the price and the
- * page prints none. And because a constrained plan can never beat the unconstrained one,
- * no figure the page prints may read as a giveaway.
+ * is the cost, and the page states it as one. Where only the priced plan's proof is
+ * missing, the producer publishes the price as a ceiling, the most the strategy can cost,
+ * and the page must state that instead, in both languages. Where the pure-points plan it
+ * is measured against is unproven, nothing bounds the price and the page prints none. And
+ * because a constrained plan can never beat the unconstrained one, no figure the page
+ * prints may read as a giveaway.
  */
 
 import { cleanup, render } from "@testing-library/react";
@@ -60,16 +60,16 @@ function renderText(language: Language, advice: LeagueViewEnvelope<EntryAdvice>)
 }
 
 describe("a proven price reads as an exact cost", () => {
-  it("keeps the sentence and the figure the page has always shown, in English", () => {
+  it("states the cost with its figure, in English", () => {
     const text = renderText("en", rivalAdvice({}));
-    expect(text).toMatch(/gives up ~0\.8 expected points against the pure-points pick/);
-    expect(text).not.toMatch(/gives up at most|cost at most/);
+    expect(text).toMatch(/gives up ~0\.8 expected points\./);
+    expect(text).not.toMatch(/gives up at most/);
   });
 
-  it("keeps the sentence and the figure the page has always shown, in Turkish", () => {
+  it("states the cost with its figure, in Turkish", () => {
     const text = renderText("tr", rivalAdvice({}));
-    expect(text).toMatch(/~0,8 beklenen puandan vazgeçiyor/);
-    expect(text).not.toMatch(/en fazla [\d,.]+ beklenen puandan vazgeçiyor|maliyet en fazla/);
+    expect(text).toMatch(/~0,8 beklenen puandan vazgeçiyor\./);
+    expect(text).not.toMatch(/en fazla [\d,.]+ beklenen puandan vazgeçiyor/);
   });
 });
 
@@ -95,17 +95,14 @@ describe("a price whose own plan is unproven reads as a ceiling", () => {
 
   it("states the most it can cost, in English", () => {
     const text = renderText("en", found);
-    expect(text).toMatch(/gives up at most 2\.3 expected points against the pure-points pick/);
+    expect(text).toMatch(/gives up at most 2\.3 expected points\./);
     expect(text).not.toMatch(/gives up ~2\.3/);
-    // The plan itself, and the candidate beside it, both under the same bound.
-    expect(text).toMatch(/at most 7\.9 expected points against pure points/);
   });
 
   it("states the most it can cost, in Turkish", () => {
     const text = renderText("tr", found);
-    expect(text).toMatch(/en fazla 2,3 beklenen puandan vazgeçiyor/);
+    expect(text).toMatch(/en fazla 2,3 beklenen puandan vazgeçiyor\./);
     expect(text).not.toMatch(/~2,3 beklenen puandan vazgeçiyor/);
-    expect(text).toMatch(/maliyet en fazla 7,9 beklenen puan/);
   });
 
   it("says nothing about the proof behind the plan", () => {
@@ -140,7 +137,6 @@ describe("a price against an unproven pure-points plan is not printed", () => {
     const text = renderText("en", older);
     expect(text).toContain("Your gameweek");
     expect(text).not.toMatch(/gives up/);
-    expect(text).not.toMatch(/expected points against pure points/);
     expect(text).not.toMatch(/2\.3|7\.9|6\.4/);
     expect(text).not.toMatch(/it bounds no price and no price is stated/);
     expect(text).not.toMatch(/planner objective/);
@@ -150,7 +146,7 @@ describe("a price against an unproven pure-points plan is not printed", () => {
     const text = renderText("tr", older);
     expect(text).toContain("Bu haftaki kadron");
     expect(text).not.toMatch(/vazgeçiyor/);
-    expect(text).not.toMatch(/maliyet en fazla|2,3|7,9|6,4/);
+    expect(text).not.toMatch(/2,3|7,9|6,4/);
     expect(text).not.toMatch(/bu yüzden fiyat belirtilmiyor/);
     expect(text).not.toMatch(/planlayıcı amaç değeri/);
   });

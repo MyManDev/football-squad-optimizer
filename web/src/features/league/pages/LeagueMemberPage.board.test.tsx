@@ -1,12 +1,8 @@
 /**
  * Direction D's member page: the top bar with the team as the one heading and the score
- * bug, the decision as substitution boards with the gain strip, the captain
- * line and the proof stamp, the two honesty lines with their disclosure, and the tools
- * that wait closed. Every figure is a published one; what is absent is left out.
+ * bug, the decision as substitution boards with the gain strip and the captain line, and
+ * the tools that wait closed. Every figure is a published one; what is absent is left out.
  */
-
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
@@ -33,7 +29,7 @@ import type {
   LeagueViewEnvelope,
 } from "../types";
 import { LeagueMemberView } from "./LeagueMemberPage";
-import { AdviceCard } from "./MemberAdviceCard";
+import { AdviceDecision, AdviceDetails } from "./MemberAdviceCard";
 import type { LeagueMemberViewProps } from "./memberPageTypes";
 import { forgetIdentity, withLeague } from "../../../testSupport/league";
 
@@ -306,6 +302,8 @@ describe("the substitution boards", () => {
     expect(within(first!).getByText("+2,36")).toBeInTheDocument();
     expect(within(second!).getByText("+0,65")).toBeInTheDocument();
     expect(within(first!).getByText("beklenen puan")).toBeInTheDocument();
+    // The LED figure, which a board without a published share leaves out.
+    expect(within(first!).getByText("+2,36").className).toMatch(/ledValue/);
     cleanup();
     show("en", {
       advice: twoMoves({
@@ -328,14 +326,15 @@ describe("the substitution boards", () => {
     expect(boards()[0]).not.toHaveTextContent(/BOU E/);
   });
 
-  it("says the move's share was not published instead of a number", () => {
+  it("prints no number for a move whose share was not published", () => {
     const advice = twoMoves({ moves: [move("gw-1", PALMER, FERNANDES, null)] });
     show("tr", { advice });
     const [board] = boards();
-    expect(
-      within(board!).getByText(MESSAGES.tr.leagueMembers.projectedGainUnknown),
-    ).toBeInTheDocument();
+    expect(board!.querySelector('[class*="ledValue"]')).toBeNull();
     expect(within(board!).queryByText("beklenen puan")).toBeNull();
+    // Nothing at all: the stylesheet drops the cell's column by `:empty`. The width itself
+    // is checked in a browser (member-pitch.spec.ts).
+    expect(board!.querySelector('[class*="led"]')).toBeEmptyDOMElement();
   });
 
   it("keeps today's sentence in the board area when the plan has no move", () => {
@@ -457,43 +456,12 @@ describe("the gain strip and the captain line", () => {
   });
 });
 
-describe("the proof stamp", () => {
-  it("says EN İYİ PLAN · KANITLANDI only for a proven plan", () => {
-    show("tr");
-    // Turkish capitals: the dotted İ, never the English I.
-    expect(MESSAGES.tr.leagueMembers.stampOptimal).toBe("EN İYİ PLAN · KANITLANDI");
-    expect(screen.getByText(MESSAGES.tr.leagueMembers.stampOptimal)).toBeInTheDocument();
-    // The stamp is the whole statement; no sentence under it.
-    const box = screen.getByText(MESSAGES.tr.leagueMembers.stampOptimal).closest("p")!;
-    expect(box).toHaveAttribute("data-stamp");
-    expect(box.nextElementSibling).toBeNull();
-  });
-
-  it("reads as the plan's state, a tag with its tick, and never as a control", () => {
-    show("tr");
-    const stamp = screen.getByText(MESSAGES.tr.leagueMembers.stampOptimal);
-    expect(stamp.tagName).toBe("P");
-    expect(stamp.closest("button, a, [role='button'], [tabindex]")).toBeNull();
-    expect(stamp.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
-    // Drawn as the house tag in its good tone (Badge.module.css), not the ink box an
-    // outlined button draws.
-    const css = readFileSync(join(__dirname, "MemberDecision.module.css"), "utf-8").replace(
-      /\/\*[\s\S]*?\*\//g,
-      "",
-    );
-    const rule = css.match(/\n\.stampBox \{([^}]*)\}/)?.[1] ?? "";
-    expect(rule).toContain("color: var(--color-good);");
-    expect(rule).toContain("border: 1px solid currentColor;");
-    expect(rule).toContain("font-size: var(--step--2);");
-    expect(rule).not.toMatch(/cursor|--color-text\b|2px solid/);
-  });
-
-  it("shows neither the stamp nor a proof caveat for a plan found without a proof", () => {
+describe("what the page says about a plan's proof", () => {
+  it("shows neither a proof claim nor a proof caveat for a plan found without a proof", () => {
     const { container } = show("tr", {
       advice: twoMoves({ solver_status: "FEASIBLE", optimality_gap: 1.3 }),
     });
-    const copy = MESSAGES.tr.leagueMembers;
-    expect(screen.queryByText(copy.stampOptimal)).toBeNull();
+    expect(container.textContent).not.toMatch(/KANITLANDI/);
     expect(screen.queryByText("Kanıt tamamlanamadı")).toBeNull();
     expect(screen.queryByText(/kanıtı tamamlayamadı/)).toBeNull();
     expect(container.textContent).not.toMatch(/en iyisi olduğu gösterilmiş/);
@@ -502,16 +470,18 @@ describe("the proof stamp", () => {
   it("claims nothing for a status that is neither", () => {
     const advice = twoMoves();
     delete (advice.payload as { solver_status?: string }).solver_status;
-    show("en", { advice });
-    expect(screen.queryByText(MESSAGES.en.leagueMembers.stampOptimal)).toBeNull();
+    const { container } = show("en", { advice });
+    expect(container.textContent).not.toMatch(/PROVEN/);
     expect(screen.queryByText("Proof incomplete")).toBeNull();
   });
 });
 
 describe("the decision heading", () => {
   it("names the selection beside the heading", () => {
+    // The list's system row has no entry id, and a plan with no rival must not read as facing it.
+    expect(MEMBERS.some((member) => member.entry_id === null)).toBe(true);
     show("tr", {}, `/league/352490/members/${ENTRY}?window=1`);
-    expect(screen.getByTestId("member-selection-summary")).toHaveTextContent(
+    expect(screen.getByTestId("member-selection-summary").textContent).toBe(
       "En çok puan · 1 hafta",
     );
   });
@@ -539,24 +509,6 @@ describe("the decision heading", () => {
 });
 
 describe("honesty and the tools", () => {
-  it("keeps how it was worked out one click away, with no sentences in front of it", () => {
-    const { container } = show("tr");
-    const copy = MESSAGES.tr.leagueMembers;
-    expect(container.querySelector('[data-mark="honesty"]')!.firstElementChild!.tagName).toBe(
-      "DETAILS",
-    );
-    const how = screen.getByText(copy.howComputed).closest("details")!;
-    expect(how).not.toHaveAttribute("open");
-    for (const sentence of [copy.independentAdviceRule, copy.lineupRule, copy.diagnosticOnly]) {
-      expect(within(how).getByText(sentence)).not.toBeVisible();
-    }
-    // The caveat sentences that used to open and close the disclosure are gone.
-    expect(within(how).queryByText(/kanıtın kapsamını belirtir/)).toBeNull();
-    expect(within(how).queryByText(/tahmini yenilemez/)).toBeNull();
-    // The week's hit charge is said once, in the disclosure.
-    expect(within(how).getAllByText(/beklenen puan maliyeti/)).toHaveLength(1);
-  });
-
   it("keeps the advanced settings closed, with their own controls inside", () => {
     const { container } = show("tr");
     const copy = MESSAGES.tr.leagueMembers;
@@ -599,9 +551,13 @@ describe("honesty and the tools", () => {
 
   it("draws a tool the address names as its own page, open, in place of the decision", () => {
     const copy = MESSAGES.tr.leagueMembers;
-    show("tr", { tool: "chips" });
+    const known: LeagueViewEnvelope<EntrySquad> = structuredClone(SQUAD);
+    known.payload.free_transfers_known = true;
+    known.payload.free_transfers = 2;
+    show("tr", { tool: "chips", squad: known });
     const chips = screen.getByRole("region", { name: copy.chipsAndTransfers });
     expect(within(chips).getByText(MESSAGES.tr.memberResources.transfersTitle)).toBeVisible();
+    expect(within(chips).getByText(MESSAGES.tr.memberResources.chipsTitle)).toBeVisible();
     expect(screen.queryByRole("region", { name: copy.decisionTitle })).toBeNull();
     expect(screen.queryByRole("region", { name: copy.planTitle })).toBeNull();
   });
@@ -625,6 +581,23 @@ describe("honesty and the tools", () => {
     fireEvent.click(within(presets).getByRole("button", { name: /^Farkı koru/ }));
     expect(within(settings).getByRole("radio", { name: /^Farkı koru/ })).toBeChecked();
     expect(within(settings).getByRole("radio", { name: "1 hafta" })).toBeChecked();
+  });
+
+  it("names a saved template's rival from the league's members, with no number", () => {
+    const rival = 35249002;
+    window.localStorage.setItem(
+      "squadopt.templates",
+      JSON.stringify([
+        { id: "own:derbi", name: "Derbi", strategy: "fark-yarat", window: 1, rival },
+      ]),
+    );
+    show("tr");
+    window.localStorage.removeItem("squadopt.templates");
+    const copy = MESSAGES.tr.leagueMembers;
+    const presets = screen.getByRole("group", { name: copy.templatesTitle });
+    const saved = within(presets).getByRole("button", { name: /Derbi.*Farkı kapat/ });
+    expect(saved).toHaveTextContent("Mert Işık");
+    expect(saved).not.toHaveTextContent(String(rival));
   });
 
   it("keeps the experimental model with the advanced settings, not beside the plan", () => {
@@ -655,7 +628,7 @@ describe("honesty and the tools", () => {
 
 describe("a chip strategy the service planned", () => {
   it.each(["tr", "en"] as const)(
-    "names the Top 100 setting as a weight and its holding values in %s",
+    "names its holding values and prints no percent in %s",
     (language) => {
       const base = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 3);
       const advice: LeagueViewEnvelope<EntryAdvice> = {
@@ -690,7 +663,7 @@ describe("a chip strategy the service planned", () => {
       const { container } = render(
         <LanguageProvider initialLanguage={language}>
           <MemoryRouter>
-            <AdviceCard
+            <AdviceDetails
               shown={{ envelope: advice, origin: "computed" }}
               squad={SQUAD}
               rivalSquad={null}
@@ -704,7 +677,6 @@ describe("a chip strategy the service planned", () => {
         within(section as HTMLElement).getByRole("heading", { name: copy.title }),
       ).toBeTruthy();
       expect(section).toHaveTextContent(copy.holdingValue);
-      expect(section).toHaveTextContent(MESSAGES[language].leagueMembers.top100Weight(20));
       expect(section.textContent).not.toContain("%");
     },
   );
@@ -753,7 +725,8 @@ describe("the decision card", () => {
     const { container } = render(
       <LanguageProvider initialLanguage="tr">
         <MemoryRouter>
-          <AdviceCard
+          <AdviceDecision shown={{ envelope: advice, origin: "published" }} squad={SQUAD} />
+          <AdviceDetails
             shown={{ envelope: advice, origin: "published" }}
             squad={SQUAD}
             rivalSquad={null}
@@ -765,7 +738,6 @@ describe("the decision card", () => {
     expect(line).toHaveTextContent(copy.chipLabel);
     const link = within(line).getByRole("link", { name: copy.storyDetail });
     const detail = container.querySelector(link.getAttribute("href")!)!;
-    expect(detail).toHaveTextContent(CHIP_COPY.tr.chosen(chip));
     expect(detail).toHaveTextContent(CHIP_COPY.tr.gain("+6,4"));
     cleanup();
     // A chip the document names without the member choosing it gets no line.

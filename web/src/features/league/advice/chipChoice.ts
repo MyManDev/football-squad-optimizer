@@ -12,8 +12,7 @@ export const CHIP_PARAMETER = "chip";
  * 2026-09-25, H3): the planner's holding value is built from the window's own weeks, so it
  * never beats the window's best week and spends the chip inside the window however much
  * of the season is left. The backend refuses `chip=auto` as well. Offer it again only once
- * the holding value comes from the captured season calendar (fixture counts and doubles),
- * and put the Automatic sentence back in `chipStrategy.note` (i18n/messages.ts) with it.
+ * the holding value comes from the captured season calendar (fixture counts and doubles).
  *
  * Named chips over 3 and 5 weeks and a chip with a Top 100 setting stay offered: they
  * force the named chip this week and carry no holding value.

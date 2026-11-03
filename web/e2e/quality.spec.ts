@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 import { installLeagueMocks } from "./leagueMocks";
 import { mockLeagueMembersEnvelope } from "../src/fixtures/league";
@@ -9,11 +9,7 @@ const CONTRIBUTE = process.env.VITE_ADVICE_API_ORIGIN ? ["/contribute"] : [];
 const PAGES = [
   { heading: "Ligini bul", path: "/" },
   { heading: LEAGUE_NAME, path: "/league/352490/members" },
-  { heading: /Oyun haftası/, path: "/gw/2026-27/1" },
-  { heading: "Önerilen Hamleler", path: "/moves" },
-  { heading: "Rakip Analizi", path: "/rivals" },
   { heading: "Lig Analizi", path: "/league/352490" },
-  { heading: "Yönetim", path: "/admin" },
 ] as const;
 
 test.describe("a visitor who has said who they are", () => {
@@ -49,43 +45,6 @@ test.describe("a visitor who has said who they are", () => {
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("North Stand Notes");
   });
 
-  for (const language of ["tr", "en"] as const) {
-    test(`the unlisted ${language} admin page does not link to the archive or fetch system data`, async ({
-      page,
-    }) => {
-      await page.addInitScript(
-        (value) => localStorage.setItem("squadopt.language", value),
-        language,
-      );
-      const systemDataRequests: string[] = [];
-      page.on("request", (request) => {
-        // The shell's fixture list is the game's schedule, not a view of the system squad.
-        const path = new URL(request.url()).pathname;
-        if (path.startsWith("/data/") && path !== "/data/fixtures.json") {
-          systemDataRequests.push(request.url());
-        }
-      });
-
-      await page.goto("/admin");
-      await expect(page.getByRole("heading", { level: 1 })).toHaveText(
-        language === "tr" ? "Yönetim" : "Admin",
-      );
-      await expect(page.locator('#sidebar a[href="/admin"], header a[href="/admin"]')).toHaveCount(
-        0,
-      );
-      await expect(page.locator('a[href="/league/352490"]')).toHaveCount(0);
-      expect(systemDataRequests).toEqual([]);
-
-      // The measurement archive is not served from the member origin: its documents are the
-      // laboratory's record, in the laboratory's vocabulary, and they were reachable here.
-      await expect(
-        page.getByRole("link", {
-          name: language === "tr" ? "Ölçüm arşivi" : "Measurement archive",
-        }),
-      ).toHaveCount(0);
-    });
-  }
-
   test("a member page's sidebar opens the league part for the claimed member", async ({ page }) => {
     await page.goto("/league/352490/members/35249001");
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("North Stand Notes");
@@ -115,42 +74,64 @@ test.describe("a visitor who has said who they are", () => {
     expect(await page.evaluate(() => localStorage.getItem("squadopt.viewer"))).toBeNull();
   });
 
-  test("the page applies its one light palette", async ({ page }) => {
-    await page.goto("/");
-
-    const palette = await page.locator("body").evaluate((body) => {
+  // Day: page #FFFFFF, ink #10261A. Night: page #0D1320, ink #E7ECF5.
+  const DAY = { background: "rgb(255, 255, 255)", color: "rgb(16, 38, 26)", scheme: "light" };
+  const NIGHT = { background: "rgb(13, 19, 32)", color: "rgb(231, 236, 245)", scheme: "dark" };
+  const palette = (page: Page) =>
+    page.locator("body").evaluate((body) => {
       const style = getComputedStyle(body);
-      return { background: style.backgroundColor, color: style.color };
+      return {
+        background: style.backgroundColor,
+        color: style.color,
+        scheme: getComputedStyle(document.documentElement).colorScheme,
+      };
     });
-    // Page #ECF3E6, ink #10261A.
-    expect(palette).toEqual({ background: "rgb(236, 243, 230)", color: "rgb(16, 38, 26)" });
-    expect(await page.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe(
-      "light",
-    );
-  });
 
-  for (const scheme of ["dark", "light"] as const) {
-    test(`a stored theme and a ${scheme} system preference leave the light palette in place`, async ({
+  for (const [system, expected] of [
+    ["light", DAY],
+    ["dark", NIGHT],
+  ] as const) {
+    test(`a ${system} system preference opens the ${expected.scheme === "dark" ? "night" : "day"} palette`, async ({
       page,
     }) => {
-      // An older visit may have stored a dark choice; the site has no dark theme any more.
-      await page.emulateMedia({ colorScheme: scheme });
+      // An older visit may have stored a choice under the retired key; it means nothing now.
+      await page.emulateMedia({ colorScheme: system });
       await page.addInitScript(() => localStorage.setItem("squadopt.theme", "dark"));
       await page.goto("/");
       await expect(page.getByRole("heading", { level: 1 })).toHaveText("Ligini bul");
 
       await expect(page.locator("html")).not.toHaveAttribute("data-theme");
-      const palette = await page.locator("body").evaluate((body) => {
-        const style = getComputedStyle(body);
-        return { background: style.backgroundColor, color: style.color };
-      });
-      expect(palette).toEqual({ background: "rgb(236, 243, 230)", color: "rgb(16, 38, 26)" });
-      // The stale value is removed on load, so nothing reads it later, and no control
-      // offers a theme.
+      expect(await palette(page)).toEqual(expected);
       expect(await page.evaluate(() => localStorage.getItem("squadopt.theme"))).toBeNull();
-      await expect(page.getByRole("button", { name: /temaya geç|theme/i })).toHaveCount(0);
+      expect(await page.evaluate(() => localStorage.getItem("squadopt.scheme"))).toBeNull();
     });
   }
+
+  test("the viewer's choice holds against the system and across a reload", async ({ page }) => {
+    await page.emulateMedia({ colorScheme: "dark" });
+    await page.goto("/");
+    const colours = page.getByRole("group", { name: "Renkler" });
+    await expect(colours.getByRole("button", { name: "Gece" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+
+    await colours.getByRole("button", { name: "Gündüz" }).click();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+    expect(await palette(page)).toEqual(DAY);
+
+    await page.reload();
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Ligini bul");
+    expect(await palette(page)).toEqual(DAY);
+
+    await page.emulateMedia({ colorScheme: "light" });
+    await page
+      .getByRole("group", { name: "Renkler" })
+      .getByRole("button", { name: "Gece" })
+      .click();
+    expect(await palette(page)).toEqual(NIGHT);
+    expect(await page.evaluate(() => localStorage.getItem("squadopt.scheme"))).toBe("dark");
+  });
 
   test("reduced-motion preference disables animation and transitions", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
@@ -175,12 +156,16 @@ test.describe("a visitor who has said who they are", () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.addInitScript(() => localStorage.setItem("squadopt.language", "tr"));
 
+    // The shell clips what overflows it, so the main column is read as well as the document.
     for (const destination of PAGES) {
       await page.goto(destination.path);
       await expect(page.getByRole("heading", { level: 1 })).toHaveText(destination.heading);
       const dimensions = await page.evaluate(() => ({
         clientWidth: document.documentElement.clientWidth,
-        scrollWidth: document.documentElement.scrollWidth,
+        scrollWidth: Math.max(
+          document.documentElement.scrollWidth,
+          document.querySelector("main")!.scrollWidth,
+        ),
       }));
       expect(dimensions.scrollWidth, `${destination.path} overflows at 390px`).toBeLessThanOrEqual(
         dimensions.clientWidth,
@@ -198,7 +183,10 @@ test.describe("a visitor who has said who they are", () => {
       await expect(page.getByRole("heading", { level: 1 })).toHaveText(destination.heading);
       const dimensions = await page.evaluate(() => ({
         clientWidth: document.documentElement.clientWidth,
-        scrollWidth: document.documentElement.scrollWidth,
+        scrollWidth: Math.max(
+          document.documentElement.scrollWidth,
+          document.querySelector("main")!.scrollWidth,
+        ),
       }));
       expect(dimensions.scrollWidth, `${destination.path} overflows at 390px`).toBeLessThanOrEqual(
         dimensions.clientWidth,

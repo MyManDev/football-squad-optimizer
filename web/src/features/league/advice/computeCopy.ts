@@ -1,97 +1,60 @@
 import type { Language } from "../../../i18n/messages";
 import type { WindowSize } from "../../../lib/decisionVocabulary";
+import type { AdviceJobProgress } from "./adviceClient";
+import type { WaitingPhase } from "./useAdviceJob";
 
 /**
  * The compute service's copy, in both languages.
  *
- * It lives beside the panel and the controls that read it, like the manager's-word and
- * Top 100 copy, so it loads with the member page and not with every first visit. The
- * honesty sweep (`i18n/messagesNoProbability.test.ts`) walks it entry by entry, functions
- * called.
+ * It lives beside the panel that reads it, like the manager's-word and Top 100 copy, so it
+ * loads with the member page and not with every first visit. The honesty sweep
+ * (`i18n/messagesNoProbability.test.ts`) walks it entry by entry, functions called.
  *
- * What it may say: that a selection was not computed ahead of time and can be computed
- * now, about how long a computation took when it was measured, that the page can be left
- * open, and, when something fails, what happened in a sentence the member can act on. A
- * duration is "about". A failure is said from the service's stable code; the code itself
- * and the service's own text are never shown.
+ * What it may say: that a selection can be computed now, about how long a computation took
+ * when it was measured, that the page can be left open, where a waiting job stands, and, when
+ * something fails, what happened in a sentence the member can act on. A duration is "about",
+ * and a job's progress is the share of its stages solved, never a guess from the clock. A
+ * failure is said from the service's stable code, or in the general sentence where a code
+ * gives the member nothing to do; the code itself and the service's own text are never shown.
  */
 export interface ComputeCopy {
+  /** How these words write a number. */
+  locale: string;
   notPrecomputed: string;
   notComputable: string;
-  chipUnavailable: string;
   duration: Record<WindowSize, string>;
-  durationNote: string;
   leaveOpen: string;
-  serviceUnreachable: string;
-  serviceUnreachablePublished: string;
-  serviceUnreachableAbsent: string;
+  /** A queued job's place in line, said after the word for queued. */
+  queueNext: string;
+  queueAhead: (count: number) => string;
+  /** The workers at work out of those alive. */
+  workersBusy: (busy: number, total: number) => string;
   /** The service is down and nothing is published here, but the member's device solves it. */
   serviceUnreachableDevice: string;
-  otherCapture: string;
-  /** The gameweek this page advises on has closed; `when` is the formatted deadline. */
+  /** The gameweek this page advises on has closed. */
   deadlinePassedTitle: string;
-  deadlinePassedCompute: string;
-  controlsNote: string;
-  wordComputable: string;
-  top100Computable: string;
-  rivalComputable: string;
   rateLimitedFor: (seconds: number) => string;
-  /** Said while a computation runs and the same selection's earlier answer is on the page. */
-  waitingWithEarlier: string;
-  /** What stays on the page after an attempt that did not finish. */
-  publishedRemains: string;
-  earlierRemains: string;
   failures: Record<string, string> & { unknown: string };
 }
 
-/** The failures after which the page says what remains readable. */
-const REMAINS_AFTER = new Set([
-  "QUEUE_INTEGRITY_ERROR",
-  "ADVICE_BACKEND_DISABLED",
-  "INTERNAL_ERROR",
-  "SERVICE_UNREACHABLE",
-  "ADVICE_FAILED",
-  "PLAN_NOT_FOUND",
-  "unknown",
-]);
-
 const en: ComputeCopy = {
-  notPrecomputed:
-    "This selection was not computed ahead of time for this publish. You can compute it now.",
-  notComputable:
-    "The service does not compute this selection right now. Change the selection to use Compute.",
-  chipUnavailable:
-    "The service cannot confirm this chip is available for this selection. The published plan, if any, remains available to read.",
+  locale: "en-GB",
+  notPrecomputed: "You can compute it now.",
+  notComputable: "Change the selection to use Compute.",
   duration: {
     1: "A one-week plan takes between a few seconds and half a minute to compute; a rival strategy and the settings you switch on make it longer.",
     3: "A 3-week plan takes about a minute and a half to compute, and up to two and a half minutes for a rival strategy.",
     5: "A 5-week pure points plan takes about three and a half minutes to compute.",
   },
-  durationNote: "If another calculation is queued ahead of yours, the wait is longer.",
-  leaveOpen:
-    "You can leave this page open; the plan appears here when the computation finishes. If you reload, the wait picks up where it was.",
-  serviceUnreachable:
-    "The compute service could not be reached. The published plan for this selection could not be confirmed. Retry reading the published plan or try again when the service is available.",
-  serviceUnreachablePublished:
-    "The compute service could not be reached. The published plan for this selection is on the page. Try computing again when the service is available.",
-  serviceUnreachableAbsent:
-    "The compute service could not be reached. No plan has been published for this selection. Choose another published option or try again when the service is available.",
-  serviceUnreachableDevice:
-    "The compute service could not be reached. This selection can be computed on this device.",
-  otherCapture:
-    "The compute service is working from a different data capture than this page, so only the published plans are shown.",
+  leaveOpen: "You can leave this page open; the plan appears here when the computation finishes.",
+  queueNext: "yours is next",
+  queueAhead: (count) =>
+    count === 1 ? "1 computation ahead of yours" : `${count} computations ahead of yours`,
+  workersBusy: (busy, total) => `Workers busy: ${busy}/${total}`,
+  serviceUnreachableDevice: "This selection can be computed on this device.",
   deadlinePassedTitle: "This gameweek's deadline has passed",
-  deadlinePassedCompute: "Nothing is computed for a gameweek whose deadline has passed.",
-  controlsNote: "A selection that was not published can still be chosen; Compute works it out now.",
-  wordComputable: "Not solved in this publish. Switch it on and Compute works it out now.",
-  top100Computable: "A setting with no published plan is worked out now with Compute.",
-  rivalComputable: "Any member can be chosen; a pair that was not published is computed now.",
   rateLimitedFor: (seconds) =>
     `Too many requests arrived in a short time. Try again in about ${seconds} seconds.`,
-  waitingWithEarlier:
-    "The answer this selection already received stays on the page while this computes.",
-  publishedRemains: "The published plan, if any, remains available to read.",
-  earlierRemains: "The answer this selection already received stays on the page.",
   failures: {
     UNSUPPORTED_ADVICE_REQUEST: "The service does not compute this selection.",
     VALIDATION_FAILED: "The service does not compute this selection.",
@@ -101,9 +64,7 @@ const en: ComputeCopy = {
       "The service has no club news for this gameweek. Switch the manager's word off and try again.",
     CHIP_NOT_HELD:
       "This member cannot play the chosen chip this gameweek. Choose another chip or no chip.",
-    CHIP_HISTORY_UNKNOWN: "The service could not confirm which chips this member holds.",
     UNKNOWN_ENTRY: "The service could not find this member or this rival in the league.",
-    LEAGUE_NOT_CONNECTED: "This league is not connected to the compute service.",
     UNKNOWN_STRATEGY: "The service does not compute this strategy.",
     NOT_COMPUTED:
       "The computation finished but its result was not found. You can press Compute again.",
@@ -118,63 +79,37 @@ const en: ComputeCopy = {
     NOT_READY: "The compute service is not ready yet. Try again in a little while.",
     QUEUE_UNAVAILABLE:
       "The queue could not take the request just now. Try again in a little while.",
-    QUEUE_INTEGRITY_ERROR: "The compute service cannot answer right now.",
-    ADVICE_BACKEND_DISABLED: "The compute service cannot answer right now.",
-    INTERNAL_ERROR: "The compute service cannot answer right now.",
     SERVICE_UNREACHABLE: "The compute service could not be reached.",
-    ADVICE_FAILED: "The service could not solve this plan.",
-    CONTEXT_UNAVAILABLE:
-      "The service's data capture changed while this was computing. Reload the page and try again.",
-    ENTRY_NOT_IN_CAPTURE: "The service's data capture has no squad for this member or this rival.",
-    TOO_MANY_ATTEMPTS: "The service tried this computation several times and could not finish it.",
+    CONTEXT_UNAVAILABLE: "Reload the page and try again.",
+    ENTRY_NOT_IN_CAPTURE: "No squad for this member or this rival.",
     PLAN_NOT_FOUND: "The service found no plan for this selection.",
     SWITCH_INPUTS_CHANGED:
       "The Top 100 selections or the club news were refreshed while this was computing. Press Compute again.",
     REQUEST_UNREADABLE: "The service could not read the request. You can press Compute again.",
-    DETERMINISM_DEFECT: "The service could not confirm this result, so it is not shown.",
     PATIENCE_EXHAUSTED:
       "The computation took longer than this page waits. If the service has finished since, pressing Compute again brings the result at once.",
-    ANSWER_UNREADABLE: "The computation finished but its answer could not be read.",
-    ANSWER_MISMATCH: "The returned answer does not match this selection, so it is not shown.",
-    ANSWER_OTHER_CAPTURE:
-      "The service computed this from a different data capture than this page shows, so it is not shown. Reload the page and try again.",
+    ANSWER_OTHER_CAPTURE: "Reload the page and try again.",
     unknown: "The computation did not complete.",
   },
 };
 
 const tr: ComputeCopy = {
-  notPrecomputed: "Bu seçim bu yayın için önceden hesaplanmadı. Şimdi hesaplatabilirsin.",
-  notComputable: "Servis bu seçimi şu an hesaplamıyor. Hesapla için seçimi değiştir.",
-  chipUnavailable:
-    "Servis bu seçim için çipin kullanılabilir olduğunu doğrulayamıyor. Yayımlanmış plan varsa okunabilir.",
+  locale: "tr-TR",
+  notPrecomputed: "Şimdi hesaplatabilirsin.",
+  notComputable: "Hesapla için seçimi değiştir.",
   duration: {
     1: "Bir haftalık planın hesabı birkaç saniye ile yarım dakika arasında sürer; rakip stratejisi ve açtığın ayarlar süreyi uzatır.",
     3: "3 haftalık planın hesabı yaklaşık bir buçuk dakika, rakip stratejisinde iki buçuk dakikaya kadar sürer.",
     5: "5 haftalık saf puan planının hesabı yaklaşık üç buçuk dakika sürer.",
   },
-  durationNote: "Sırada senden önce başka hesap varsa bekleme uzar.",
-  leaveOpen:
-    "Sayfayı açık bırakabilirsin; hesap bitince plan burada görünür. Sayfayı yenilersen bekleme kaldığı yerden sürer.",
-  serviceUnreachable:
-    "Hesaplama servisine ulaşılamadı. Bu seçim için yayımlanmış plan doğrulanamadı. Yayımlanmış planı okumayı veya servis erişilebilir olduğunda hesaplamayı yeniden deneyebilirsin.",
-  serviceUnreachablePublished:
-    "Hesaplama servisine ulaşılamadı. Bu seçim için yayımlanmış plan sayfada okunabilir. Servis erişilebilir olduğunda hesaplamayı yeniden deneyebilirsin.",
-  serviceUnreachableAbsent:
-    "Hesaplama servisine ulaşılamadı. Bu seçim için yayımlanmış plan yok. Yayımlanmış başka bir seçeneği seç veya servis erişilebilir olduğunda yeniden dene.",
-  serviceUnreachableDevice: "Hesaplama servisine ulaşılamadı. Bu seçim bu cihazda hesaplanabilir.",
-  otherCapture:
-    "Hesaplama servisi şu an bu sayfadakinden farklı bir veri kaydıyla çalışıyor; bu yüzden yalnız yayınlanmış planlar gösteriliyor.",
+  leaveOpen: "Sayfayı açık bırakabilirsin; hesap bitince plan burada görünür.",
+  queueNext: "sıradaki hesap senin",
+  queueAhead: (count) => `önünde ${count} hesap var`,
+  workersBusy: (busy, total) => `Çalışan işçi: ${busy}/${total}`,
+  serviceUnreachableDevice: "Bu seçim bu cihazda hesaplanabilir.",
   deadlinePassedTitle: "Bu oyun haftasının son tarihi geçti",
-  deadlinePassedCompute: "Son tarihi geçmiş bir oyun haftası için hesap yapılmaz.",
-  controlsNote: "Yayınlanmamış bir seçimi de seçebilirsin; Hesapla onu şimdi hesaplar.",
-  wordComputable: "Bu yayında çözülmedi. Açarsan Hesapla onu şimdi hesaplar.",
-  top100Computable: "Yayınlanmış planı olmayan bir ayarı Hesapla şimdi hesaplar.",
-  rivalComputable: "Her üye seçilebilir; yayınlanmamış bir eşleşme şimdi hesaplanır.",
   rateLimitedFor: (seconds) =>
     `Kısa sürede çok fazla istek geldi. Yaklaşık ${seconds} saniye sonra yeniden dene.`,
-  waitingWithEarlier: "Hesap sürerken bu seçimin daha önce aldığı cevap sayfada kalıyor.",
-  publishedRemains: "Yayınlanmış plan, varsa, okunabilir.",
-  earlierRemains: "Bu seçimin daha önce aldığı cevap sayfada kalıyor.",
   failures: {
     UNSUPPORTED_ADVICE_REQUEST: "Servis bu seçimi hesaplamıyor.",
     VALIDATION_FAILED: "Servis bu seçimi hesaplamıyor.",
@@ -183,9 +118,7 @@ const tr: ComputeCopy = {
     MANAGERS_WORD_UNAVAILABLE:
       "Serviste bu hafta için kulüp haberi yok. Hocanın sözünü kapatıp yeniden dene.",
     CHIP_NOT_HELD: "Bu üye seçilen çipi bu hafta oynayamıyor. Başka bir çip seç ya da çipi kapat.",
-    CHIP_HISTORY_UNKNOWN: "Servis bu üyenin hangi çiplere sahip olduğunu doğrulayamadı.",
     UNKNOWN_ENTRY: "Servis bu üyeyi ya da bu rakibi ligde bulamadı.",
-    LEAGUE_NOT_CONNECTED: "Bu lig hesaplama servisine bağlı değil.",
     UNKNOWN_STRATEGY: "Servis bu stratejiyi hesaplamıyor.",
     NOT_COMPUTED: "Hesap bitti ama sonucu bulunamadı. Yeniden Hesapla'ya basabilirsin.",
     NOT_FOUND: "Servis bu hesabı artık tanımıyor. Yeniden Hesapla'ya basabilirsin.",
@@ -198,26 +131,16 @@ const tr: ComputeCopy = {
       "Bu oyun haftasının son tarihi geçti. Önceden hesaplanan planlara erişebilirsin.",
     NOT_READY: "Hesaplama servisi henüz hazır değil. Biraz sonra yeniden dene.",
     QUEUE_UNAVAILABLE: "Hesap sırası isteği şu an alamadı. Biraz sonra yeniden dene.",
-    QUEUE_INTEGRITY_ERROR: "Hesaplama servisi şu an cevap veremiyor.",
-    ADVICE_BACKEND_DISABLED: "Hesaplama servisi şu an cevap veremiyor.",
-    INTERNAL_ERROR: "Hesaplama servisi şu an cevap veremiyor.",
     SERVICE_UNREACHABLE: "Hesaplama servisine ulaşılamadı.",
-    ADVICE_FAILED: "Servis bu planı çözemedi.",
-    CONTEXT_UNAVAILABLE:
-      "Hesap sürerken servisin veri kaydı değişti. Sayfayı yenileyip yeniden dene.",
-    ENTRY_NOT_IN_CAPTURE: "Servisin veri kaydında bu üyenin ya da bu rakibin kadrosu yok.",
-    TOO_MANY_ATTEMPTS: "Servis bu hesabı birkaç kez denedi ve bitiremedi.",
+    CONTEXT_UNAVAILABLE: "Sayfayı yenileyip yeniden dene.",
+    ENTRY_NOT_IN_CAPTURE: "Bu üyenin ya da bu rakibin kadrosu yok.",
     PLAN_NOT_FOUND: "Servis bu seçim için plan bulamadı.",
     SWITCH_INPUTS_CHANGED:
       "Hesap sürerken Top 100 seçimleri ya da kulüp haberleri yenilendi. Yeniden Hesapla'ya bas.",
     REQUEST_UNREADABLE: "Servis isteği okuyamadı. Yeniden Hesapla'ya basabilirsin.",
-    DETERMINISM_DEFECT: "Servis bu sonucu doğrulayamadı; bu yüzden gösterilmiyor.",
     PATIENCE_EXHAUSTED:
       "Hesap bu sayfanın beklediğinden uzun sürdü. Servis o arada bitirdiyse, yeniden Hesapla'ya basınca sonuç hemen gelir.",
-    ANSWER_UNREADABLE: "Hesap bitti ama cevabı okunamadı.",
-    ANSWER_MISMATCH: "Dönen cevap bu seçimle eşleşmiyor; bu yüzden gösterilmiyor.",
-    ANSWER_OTHER_CAPTURE:
-      "Servis bunu bu sayfadakinden farklı bir veri kaydıyla hesapladı; bu yüzden gösterilmiyor. Sayfayı yenileyip yeniden dene.",
+    ANSWER_OTHER_CAPTURE: "Sayfayı yenileyip yeniden dene.",
     unknown: "Hesap tamamlanamadı.",
   },
 };
@@ -225,26 +148,58 @@ const tr: ComputeCopy = {
 export const COMPUTE_COPY: Record<Language, ComputeCopy> = { tr, en };
 
 /**
- * The sentence for a failure. A code this page does not know says only that the
- * computation did not complete; nothing the service sent is ever printed.
- *
- * What the sentence says remains on the page is what the page shows: the published plan
- * after the failures that leave only it, or, when the same selection's earlier answer is
- * kept, that answer, after every failure.
+ * How much of a running job is solved: the owner's decision of 2026-11-03 (docs/decisions.md).
+ * The service counts documents, so this moves in steps. It is a share of the work and no
+ * chance of anything, so it is written here and never in a catalogue, which stays held to the
+ * guard against a chance on a page (`testSupport/honesty.ts`).
+ */
+export function jobPercent(copy: ComputeCopy, { done, total }: AdviceJobProgress): string {
+  return new Intl.NumberFormat(copy.locale, { style: "percent" }).format(done / total);
+}
+
+/**
+ * What goes beside a waiting job's word: its place in line, or how much of it is solved. Null
+ * where the service has not said. A job of one stage has nothing to count: "%0" would only
+ * stand still until it ends.
+ */
+export function jobStanding(
+  copy: ComputeCopy,
+  { status, queuePosition, progress }: Pick<WaitingPhase, "status" | "queuePosition" | "progress">,
+): string | null {
+  if (status === "queued") {
+    if (queuePosition === undefined) return null;
+    return queuePosition === 0 ? copy.queueNext : copy.queueAhead(queuePosition);
+  }
+  return progress !== undefined && progress.total > 1 ? jobPercent(copy, progress) : null;
+}
+
+/**
+ * The line about the workers; null where the service has not said or counts none alive. A
+ * running job with no worker busy has none either: the count is a few seconds behind, or the
+ * job's worker has died and the service has not put it back in the queue yet.
+ */
+export function jobWorkersLine(
+  copy: ComputeCopy,
+  { status, workers }: Pick<WaitingPhase, "status" | "workers">,
+): string | null {
+  if (workers === undefined || workers.total === 0) return null;
+  if (status === "running" && workers.busy === 0) return null;
+  return copy.workersBusy(workers.busy, workers.total);
+}
+
+/**
+ * The sentence for a failure. A code with no sentence of its own, one this page does not
+ * know among them, says only that the computation did not complete; nothing the service
+ * sent is ever printed.
  */
 export function failureSentence(
   copy: ComputeCopy,
   reason: string | null | undefined,
   retryAfterSeconds?: number | null,
-  kept: "published" | "earlier" = "published",
 ): string {
   if (reason === "RATE_LIMITED" && retryAfterSeconds != null && retryAfterSeconds > 0) {
-    return kept === "earlier"
-      ? `${copy.rateLimitedFor(retryAfterSeconds)} ${copy.earlierRemains}`
-      : copy.rateLimitedFor(retryAfterSeconds);
+    return copy.rateLimitedFor(retryAfterSeconds);
   }
   const known = reason != null && Object.hasOwn(copy.failures, reason) ? reason : "unknown";
-  const sentence = copy.failures[known] ?? copy.failures.unknown;
-  if (kept === "earlier") return `${sentence} ${copy.earlierRemains}`;
-  return REMAINS_AFTER.has(known) ? `${sentence} ${copy.publishedRemains}` : sentence;
+  return copy.failures[known] ?? copy.failures.unknown;
 }

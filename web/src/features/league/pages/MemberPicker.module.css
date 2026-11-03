@@ -61,16 +61,18 @@
   cursor: pointer;
 }
 
-/* Ink on lime (13.5:1), as the visitor's own row in the league table. */
+/* The mark with its own ink (13.5:1 by day, 11.3:1 at night), as the visitor's own row in the
+   league table. */
 .option:hover,
 .option:focus-visible {
-  background: var(--color-lime);
+  background: var(--color-mark);
+  color: var(--color-mark-text);
   border-color: var(--color-text);
 }
 
 .option:hover .team,
 .option:focus-visible .team {
-  color: var(--color-text);
+  color: var(--color-mark-text);
 }
 
 .option:focus-visible {

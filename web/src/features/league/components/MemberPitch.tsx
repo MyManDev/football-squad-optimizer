@@ -40,34 +40,9 @@ function lineSpan(count: number): number {
   return count <= 1 ? 40 : (count - 1) * lineStep(count) + 40;
 }
 
-/**
- * The height of the horizontal pitch: 256 px as drawn for up to four in a line, taller
- * for a line of five, and taller again when the defence is too crowded for the direction
- * of attack to sit under its first player and it has to sit under the whole line.
- */
-function horizontalHeight(counts: readonly number[], defenders: number): number {
-  const widest = Math.max(1, ...counts);
-  return Math.max(256, lineSpan(widest) + 48, defenders >= 4 ? lineSpan(defenders) + 76 : 0);
-}
-
-function ArrowIcon() {
-  return (
-    <svg
-      className={styles.arrow}
-      width="18"
-      height="10"
-      viewBox="0 0 18 10"
-      aria-hidden="true"
-      focusable="false"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.6}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M1 5h15M12.5 1.5L16 5l-3.5 3.5" />
-    </svg>
-  );
+/** The horizontal pitch's height: 256 px as drawn for up to four in a line, taller for five. */
+function horizontalHeight(counts: readonly number[]): number {
+  return Math.max(256, lineSpan(Math.max(1, ...counts)) + 48);
 }
 
 /** A plate's parts that depend on the plan shown before it (#1131). */
@@ -168,16 +143,6 @@ function Plate({
   );
 }
 
-function AttackLabel({ at }: { at: "first" | "last" }) {
-  const copy = useLanguage().messages.leagueMembers;
-  return (
-    <span className={styles.attack} data-at={at} aria-hidden="true">
-      {copy.attackDirection}
-      <ArrowIcon />
-    </span>
-  );
-}
-
 /**
  * The eleven on a marked pitch.
  *
@@ -187,9 +152,7 @@ function AttackLabel({ at }: { at: "first" | "last" }) {
  * with a container query, and the description names the direction for a screen reader.
  *
  * The midfield is centred on the halfway line in both drawings, the defence and the attack
- * stand at mirrored distances from it, and the keeper stands at the own goal. The direction
- * of attack is written on a white plate directly under the first defender in the published
- * order; where the defence is too crowded for that across the pitch, under the whole line.
+ * stand at mirrored distances from it, and the keeper stands at the own goal.
  */
 export function MemberPitch({
   players,
@@ -216,18 +179,11 @@ export function MemberPitch({
     position,
     players: players.filter((player) => player.position === position),
   }));
-  const defenders = lines[1]!.players.length;
-  const height = horizontalHeight(
-    lines.map((line) => line.players.length),
-    defenders,
-  );
-  // With no defender the direction of attack stands under the keeper instead.
-  const labelLine = defenders > 0 ? "DEF" : "GK";
+  const height = horizontalHeight(lines.map((line) => line.players.length));
   return (
     <div
       className={styles.wrap}
       data-mark="pitch"
-      data-def-crowded={defenders >= 4 ? "true" : undefined}
       style={{ "--hh": `${height}px` } as CSSProperties}
     >
       <p id={describedBy} className="visually-hidden">
@@ -287,10 +243,6 @@ export function MemberPitch({
                         onSelectPlayer={onSelectPlayer}
                       />
                     </div>
-                    {line.position === labelLine && index === 0 ? <AttackLabel at="first" /> : null}
-                    {line.position === "DEF" && defenders >= 4 && index === defenders - 1 ? (
-                      <AttackLabel at="last" />
-                    ) : null}
                   </div>
                 ))}
               </div>

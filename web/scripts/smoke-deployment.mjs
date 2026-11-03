@@ -20,12 +20,9 @@ export const ABSENT_ASSET = `${ABSENT_ASSET_PREFIX}${randomBytes(4).toString("he
 
 export const SMOKE_CHECKS = [
   { path: "/", kind: "html" },
-  { path: "/moves", kind: "html" },
-  { path: "/rivals", kind: "html" },
   { path: "/league", kind: "html" },
   // A nested client-side route is the first thing a path-scoped not-found rule would break.
   { path: "/league/members/0", kind: "html" },
-  { path: "/status", kind: "html" },
   { path: "/fixtures", kind: "html" },
   { path: "/data/index.json", kind: "json", revalidates: true },
   { path: ABSENT_ASSET, kind: "absent", uncacheable: true },

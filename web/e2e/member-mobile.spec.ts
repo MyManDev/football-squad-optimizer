@@ -24,13 +24,17 @@ const ENTRY = 35249001;
 /**
  * A calendar for the mocked member's week and the two after it, in which every club of
  * the example squad and plan plays: at home in the first week, away in the second, and
- * the first club twice in the third (a double week).
+ * the first club twice in the third (a double week). `alsoPlaying` adds clubs from outside
+ * the eleven.
  */
-function calendar() {
+function calendar(alsoPlaying: readonly string[] = []) {
   const squad = mockEntrySquadEnvelopes[ENTRY]!.payload;
   const plan = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1).payload;
   const clubs = [
-    ...new Set([...squad.starting_xi, ...(plan.starting_xi ?? [])].map((p) => p.team)),
+    ...new Set([
+      ...[...squad.starting_xi, ...(plan.starting_xi ?? [])].map((p) => p.team),
+      ...alsoPlaying,
+    ]),
   ];
   const side = (name: string, index: number) => ({
     team_id: index + 1,
@@ -81,6 +85,25 @@ function calendar() {
   };
 }
 
+test("a bench row cut on the narrowest phone ends in an ellipsis", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 812 });
+  await installLeagueMocks(page);
+  await page.addInitScript(() => localStorage.setItem("squadopt.language", "en"));
+  await page.goto(`/league/352490/members/${ENTRY}/current-squad`);
+  await expect(
+    page.getByRole("heading", { level: 2, name: MESSAGES.en.leagueMembers.memberSquad }),
+  ).toBeVisible();
+  // The longest of the mock's clubs beside the longest position word runs past its column.
+  const ends = await page
+    .locator("[class*='heldMeta']")
+    .evaluateAll((rows) =>
+      rows
+        .filter((row) => row.scrollWidth > row.clientWidth)
+        .map((row) => getComputedStyle(row).textOverflow),
+    );
+  expect(new Set(ends)).toEqual(new Set(["ellipsis"]));
+});
+
 for (const language of ["tr", "en"] as const) {
   test(`member page fits a phone, with all primary plan settings on the page, in ${language}`, async ({
     page,
@@ -100,23 +123,20 @@ for (const language of ["tr", "en"] as const) {
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({ path: testInfo.outputPath(`member-top-${language}.png`) });
 
-    // What explains the plan and the advanced settings wait closed, on a phone as on a
-    // desktop, and neither widens the page when opened. The tools are pages of their own.
-    const closedSections = [members.howComputed, members.advancedSettings];
+    // The advanced settings wait closed, on a phone as on a desktop, and do not widen the
+    // page when opened. The tools are pages of their own.
     for (const title of [members.memberSquad, members.chipsAndTransfers]) {
       await expect(page.locator("main summary", { hasText: title })).toHaveCount(0);
     }
-    for (const title of closedSections) {
-      const detail = page
-        .locator("main details")
-        .filter({ has: page.locator("summary", { hasText: title }) });
-      await expect(detail).toHaveCount(1);
-      await expect(detail).not.toHaveAttribute("open");
-      await detail.locator(":scope > summary").click();
-      await expect(detail).toHaveAttribute("open", "");
-      expect(await noSidewaysScroll(page)).toBe(true);
-      await detail.locator(":scope > summary").click();
-    }
+    const advanced = page
+      .locator("main details")
+      .filter({ has: page.locator("summary", { hasText: members.advancedSettings }) });
+    await expect(advanced).toHaveCount(1);
+    await expect(advanced).not.toHaveAttribute("open");
+    await advanced.locator(":scope > summary").click();
+    await expect(advanced).toHaveAttribute("open", "");
+    expect(await noSidewaysScroll(page)).toBe(true);
+    await advanced.locator(":scope > summary").click();
     // The squad section draws the plan's eleven upright on a phone, with the bench under it.
     const pitch = page.getByRole("list", { name: copy.squad.pitchLabel });
     await pitch.scrollIntoViewIfNeeded();
@@ -171,11 +191,7 @@ for (const language of ["tr", "en"] as const) {
     await expect(
       page.getByRole("button", { name: members.computeButton, exact: true }),
     ).toHaveCount(1);
-    for (const title of closedSections) {
-      await expect(
-        page.locator("main details").filter({ has: page.locator("summary", { hasText: title }) }),
-      ).not.toHaveAttribute("open");
-    }
+    await expect(advanced).not.toHaveAttribute("open");
   });
 
   test(`each of the member's tool pages fits a phone, in ${language}`, async ({ page }) => {
@@ -195,6 +211,47 @@ for (const language of ["tr", "en"] as const) {
       await page.goto(`/league/352490/members/35249001/${tool}?mode=saf-puan&window=1`);
       await expect(page.getByRole("heading", { level: 2, name: title })).toBeVisible();
       expect(await noSidewaysScroll(page)).toBe(true);
+    }
+  });
+
+  test(`the sheet's transfer rows cut no name on a phone under 390 px in ${language}`, async ({
+    page,
+  }) => {
+    const plan = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1);
+    // The mock's own names fit any row; beside the tag at 360 px this one would be cut.
+    const moves = mockEntryAdviceEnvelope(ENTRY, "agresif", 1).payload.moves.map((move) => ({
+      ...move,
+      player_in: { ...move.player_in!, short_name: "Szoboszlai" },
+    }));
+    await installLeagueMocks(page);
+    await page.route(`**/data/league/advice/${ENTRY}/saf-puan/1.json`, (route) =>
+      route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({ ...plan, payload: { ...plan.payload, moves } }),
+      }),
+    );
+    // Every moved player's club is in the calendar, so each row prints its three-letter code.
+    const moved = moves.flatMap((move) => [move.player_out!.team, move.player_in.team]);
+    await page.route("**/data/fixtures.json", (route) =>
+      route.fulfill({ contentType: "application/json", body: JSON.stringify(calendar(moved)) }),
+    );
+    await page.addInitScript((lang) => localStorage.setItem("squadopt.language", lang), language);
+    await page.setViewportSize({ width: 320, height: 664 });
+    await page.goto(`/league/352490/members/${ENTRY}`);
+    const copy = MESSAGES[language];
+    await page.getByRole("banner").getByRole("button", { name: copy.shell.fixtures }).click();
+    const sheet = page.getByRole("dialog", { name: copy.shell.fixtures });
+    const transfers = sheet.getByRole("region", { name: copy.leagueMembers.railTransfers });
+    await expect(transfers.locator("tbody tr").first().locator("td")).toHaveCount(3);
+    const names = transfers.locator("[class*='name']");
+    await expect(names).toHaveCount(moves.length * 2);
+
+    for (const width of [320, 340, 360, 375]) {
+      await page.setViewportSize({ width, height: 664 });
+      const cut = await names.evaluateAll((all) =>
+        all.filter((name) => name.scrollWidth > name.clientWidth).map((name) => name.textContent),
+      );
+      expect(cut, `the names cut at ${width} px`).toEqual([]);
     }
   });
 
@@ -287,7 +344,13 @@ for (const language of ["tr", "en"] as const) {
     await settings.getByRole("button", { name: copy.computeButton, exact: true }).click();
     const dock = page.locator("[data-compute-dock]");
     await expect(dock.getByText(copy.computeRunning, { exact: true })).toBeVisible();
-    await expect(dock.getByText(copy.computeWaitingWithFallback, { exact: false })).toBeVisible();
+    await expect(dock.getByRole("progressbar", { name: copy.computeRunning })).toBeVisible();
+    // The published plan stays on the page during the wait, and says that it is the baseline.
+    await expect(
+      page
+        .locator('[data-mark="decision"]')
+        .getByText(copy.adviceBaselineWhileComputing, { exact: true }),
+    ).toBeVisible();
     expect(submissions).toEqual([expect.objectContaining({ window: 5, top100_weight: 20 })]);
     await settings.screenshot({
       path: testInfo.outputPath(`member-selected-settings-${language}.png`),

@@ -31,7 +31,7 @@ import {
   DEVICE_SOLVE_CEILING_SECONDS,
 } from "./solve/ceiling";
 import type { DevicePlanReply, DevicePlanRequest } from "./deviceSolver.worker";
-import { deviceSelection, offeredDeviceSelection, rivalFromSquad } from "./selection";
+import { offeredDeviceSelection, rivalFromSquad } from "./selection";
 import { heldChips } from "./chipForecast/member";
 import {
   isDevicePlanEntry,
@@ -40,8 +40,6 @@ import {
   type DevicePlanDocument,
   type DevicePlanEntry,
 } from "./types";
-
-export { deviceChip, deviceSelection } from "./selection";
 
 /**
  * How far a run has come, in the stages it passes: its inputs read, the solver loaded, the
@@ -54,8 +52,6 @@ export interface DeviceProgress {
   /** Stages finished, of `total`. */
   done: number;
   total: number | null;
-  /** With the plain plan: the held chips tried so far, of how many. */
-  chips?: { done: number; total: number };
 }
 
 /** The stages before the chips: inputs, solver and plan. */
@@ -68,7 +64,6 @@ export type DevicePlanPhase =
   | {
       phase: "done";
       envelope: LeagueViewEnvelope<EntryAdvice>;
-      seconds: number;
       /**
        * With the plain plan: what the chip timing reads, solved in the same run after the
        * plan. Null until the gains arrive, and where none were asked for or none came.
@@ -89,7 +84,6 @@ function withoutProgress(state: DevicePlanDone): DevicePlanDone {
   return {
     phase: "done",
     envelope: state.envelope,
-    seconds: state.seconds,
     ...(state.chipTiming !== undefined ? { chipTiming: state.chipTiming } : {}),
   };
 }
@@ -107,7 +101,7 @@ export interface DeviceChipTiming {
 /**
  * Whether the device's last run ended without a plan: it failed, refused the selection,
  * found inputs from another capture or found none. The page then stops offering the
- * device as the way to this selection and says what it would say without it.
+ * device as the way to this selection.
  */
 export function deviceEndedWithoutPlan(state: DevicePlanPhase): boolean {
   return (
@@ -285,11 +279,6 @@ function createWorker(): DeviceSolver {
   }) as unknown as DeviceSolver;
 }
 
-/** Whether this request is one the device solves from the published inputs. */
-export function deviceSolvable(request: AdviceRequest, squad: Pick<EntrySquad, "chips">): boolean {
-  return deviceSelection(request, squad) !== null;
-}
-
 export function useDevicePlan(
   squad: EntrySquad,
   request: AdviceRequest,
@@ -465,10 +454,7 @@ export function useDevicePlan(
       const chipGains =
         selection.kind === "plain" ? (heldChips(squad.chips, document.gameweek) ?? []) : [];
       const total = STAGES_BEFORE_CHIPS + chipGains.length;
-      // The chips the run will try, known from here, so the count names them from the start.
-      const tried = (done: number) =>
-        chipGains.length > 0 ? { chips: { done, total: chipGains.length } } : {};
-      setState({ phase: "loading", progress: { step: "solver", done: 1, total, ...tried(0) } });
+      setState({ phase: "loading", progress: { step: "solver", done: 1, total } });
       // A worker that cannot be created, load or evaluate answers as a failure, and the
       // next press creates a fresh one rather than reusing a dead worker.
       let worker: DeviceSolver;
@@ -484,7 +470,6 @@ export function useDevicePlan(
       const planDone = (answer: DevicePlanAnswer): DevicePlanDone => ({
         phase: "done",
         envelope: deviceAdviceEnvelope(document, squad, answer, now(), tree.league.leagueId),
-        seconds: answer.seconds,
         chipTiming: null,
       });
       // With chip gains asked for, the plain plan the worker posts first, shown at once.
@@ -517,10 +502,7 @@ export function useDevicePlan(
             timing.measure("load", "posted", "ready");
             if (pending.current?.settle === settle) watch(DEVICE_SOLVE_CEILING_SECONDS);
             if (alive()) {
-              setState({
-                phase: "solving",
-                progress: { step: "plan", done: 2, total, ...tried(0) },
-              });
+              setState({ phase: "solving", progress: { step: "plan", done: 2, total } });
             }
             return;
           }
@@ -532,7 +514,7 @@ export function useDevicePlan(
             if (alive()) {
               setState({
                 ...early.shown,
-                progress: { step: "chips", done: STAGES_BEFORE_CHIPS, total, ...tried(0) },
+                progress: { step: "chips", done: STAGES_BEFORE_CHIPS, total },
               });
             }
             return;
@@ -542,12 +524,7 @@ export function useDevicePlan(
             if (alive() && early.shown !== null) {
               setState({
                 ...early.shown,
-                progress: {
-                  step: "chips",
-                  done: STAGES_BEFORE_CHIPS + done,
-                  total,
-                  ...tried(done),
-                },
+                progress: { step: "chips", done: STAGES_BEFORE_CHIPS + done, total },
               });
             }
             return;

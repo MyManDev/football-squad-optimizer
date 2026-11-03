@@ -77,7 +77,6 @@ export const NO_IDENTITY: ShellIdentity = { leagueId: null, member: null };
 export interface Place {
   pathname: string;
   search: string;
-  hash: string;
 }
 
 const MEMBER_PAGE = /^\/league\/(\d+)\/members\/(\d+)$/;

@@ -237,14 +237,24 @@ false. It does not present an empty cache as a computed absence. The last two do
 advice routes: with no live worker a POST is still accepted and its job waits for one.
 Readiness reports that, and the `Backend uptime` workflow raises it as an issue.
 
-Each worker rewrites `workers/worker-<pid>.json` (its pid and the time) at the top of every
-round of its loop, and every 30 s while a round holds a job, so a long solve does not read as a
-stopped worker. The longest gap a live loop leaves is the 60 s cap on its error backoff plus one
+Each worker rewrites `workers/worker-<host>-<pid>.json` (its host name, its pid, the job it
+holds or `null`, and the time) at the top of every round of its loop, when it takes a job and
+when the round ends, and every 30 s while a round holds a job, so a long solve does not read as
+a stopped worker. The host name is in the name because every worker container under Docker
+gives its worker the same pid; documents named `worker-<pid>.json` by a worker from before that
+change are still read, counted (never as busy) and pruned. The longest gap a live loop leaves is the 60 s cap on its error backoff plus one
 round's queue-lock waits (5 s each), inside the 120 s bound. A worker that stops cleanly removes
 its document; one whose process is ended from outside leaves it to go stale, and the next worker
 to start removes documents nobody has rewritten for a day. The api reads the documents and the
-queue at most once every 5 s, however often `/ready` is asked. The bounds are stated in
-`src/squadopt/platform/worker_heartbeat.py`.
+queue at most once every 5 s, however often `/ready` or a job's status is asked. From that same
+look the job view counts the live workers and the busy ones, and each queued job's place in
+line. The bounds are stated in `src/squadopt/platform/worker_heartbeat.py`.
+
+A running job also has `jobs/<job_id>.progress` beside its record while its attempt runs: the
+attempt, and how many of its documents it has solved out of how many. It is a few bytes, written
+only by the attempt that owns the claim, and removed when recovery walks the job back or when the
+job finishes. A leftover one (after a crash between those steps) names an older attempt and is
+ignored.
 
 The tree and the capture are published separately, so one can be a week ahead of the other
 while both stay readable. When they disagree the advice routes answer `503 NOT_READY` and the

@@ -17,7 +17,7 @@ import { useSearchParams } from "react-router";
 
 import { useLanguage } from "../../../i18n/context";
 import { isPlayMode } from "../../../lib/decisionVocabulary";
-import { isMemberStrategy, type AdviceStrategy } from "../types";
+import { isMemberStrategy, type AdviceStrategy, type EntryView } from "../types";
 import {
   builtinTemplates,
   LocalTemplateStore,
@@ -28,10 +28,23 @@ import styles from "./TemplatePicker.module.css";
 
 const DEFAULT_STORE = new LocalTemplateStore();
 
+/** A saved rival's name in the league's list; null where the list has no name for them. */
+function memberName(members: readonly EntryView[], entryId: number): string | null {
+  const member = members.find((candidate) => candidate.entry_id === entryId);
+  // `entry-<id>` is what the producer publishes for a member with no readable name
+  // (`_entry_stand_in` in league_views.py): a number, so it is no name to print.
+  const named = (name: string | null | undefined) =>
+    name && name !== `entry-${entryId}` ? name : null;
+  return named(member?.manager_name) ?? named(member?.team_name);
+}
+
 export function TemplatePicker({
+  members,
   store = DEFAULT_STORE,
   canApply,
 }: {
+  /** The league's list, where a saved template's rival finds the name it is printed by. */
+  members: readonly EntryView[];
   store?: TemplateStore;
   canApply?: (selection: URLSearchParams) => boolean;
 }) {
@@ -122,7 +135,7 @@ export function TemplatePicker({
                         template.window,
                         template.rival === "nearest_above"
                           ? copy.computeRivalNearest
-                          : `#${template.rival}`,
+                          : memberName(members, template.rival),
                       )}
                 </span>
               </button>
