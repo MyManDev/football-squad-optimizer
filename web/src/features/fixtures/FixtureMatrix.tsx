@@ -18,7 +18,10 @@ function Match({ match, copy }: { match: ClubFixture; copy: FixturesCopy }) {
       <span className={styles.opponent}>{match.opponent.short_name}</span>
       <span className={styles.venue}>
         <span aria-hidden="true">{match.home ? members.fixtureHome : members.fixtureAway}</span>
-        <span className="visually-hidden">{match.home ? copy.atHome : copy.away}</span>
+        <span className="visually-hidden">
+          {match.home ? copy.atHome : copy.away}
+          {match.behind ? `, ${copy.kickedOff}` : ""}
+        </span>
       </span>
     </span>
   );
@@ -30,20 +33,22 @@ function Match({ match, copy }: { match: ClubFixture; copy: FixturesCopy }) {
  * from the cells, so a club is never taken for an opponent. A cell is the opponent, its colours
  * and the venue, with a home match filled and an away match outlined as on the member's rail. A
  * double week holds two, a blank week says so, and a match already behind the club stays in
- * its cell in a quieter tone, so that it is not read as a blank week.
+ * its cell in a quieter tone, with a word to hear, so that it is not read as a blank week.
  */
 export function FixtureMatrix({
   payload,
   weeks,
   copy,
+  now,
 }: {
   payload: FixturesPayload;
   weeks: readonly FixtureGameweek[];
   copy: FixturesCopy;
+  now?: number;
 }) {
   const { messages } = useLanguage();
   return (
-    <table className={styles.matrix} data-mark="fixture-matrix">
+    <table className={styles.matrix}>
       <caption className="visually-hidden">{copy.generalView}</caption>
       <thead>
         <tr>
@@ -58,7 +63,7 @@ export function FixtureMatrix({
         </tr>
       </thead>
       <tbody>
-        {clubMatrix(payload, weeks).map(({ club, cells }) => (
+        {clubMatrix(payload, weeks, now).map(({ club, cells }) => (
           <tr key={club.short_name}>
             <th scope="row" className={styles.club} title={club.name}>
               <span className={styles.clubLabel}>

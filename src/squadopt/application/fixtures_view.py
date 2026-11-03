@@ -111,7 +111,7 @@ class FixtureView(_View):
     finished: bool
     home_score: int | None
     """Null unless the payload states both scores. Before full time it is the score at the
-    capture, which is why a page shows one only beside ``finished``."""
+    capture, so only ``finished`` makes it a result."""
     away_score: int | None
 
 

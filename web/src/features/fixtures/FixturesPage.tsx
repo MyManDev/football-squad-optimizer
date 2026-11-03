@@ -2,6 +2,7 @@ import { useSearchParams } from "react-router";
 
 import { EmptyState } from "../../design/components/EmptyState";
 import { useLanguage } from "../../i18n/context";
+import { useMinuteClock } from "../../lib/useMinuteClock";
 import { useFixtures } from "./data";
 import { DeadlineCalendar } from "./DeadlineCalendar";
 import { FixtureChoice } from "./FixtureChoice";
@@ -23,6 +24,7 @@ export function FixturesPage() {
   const copy = FIXTURES_COPY[language];
   const { data, isPending } = useFixtures();
   const [searchParams, setSearchParams] = useSearchParams();
+  const now = useMinuteClock();
   if (isPending) return <EmptyState title={messages.common.loading} />;
   if (!data) return <EmptyState page title={copy.notPublished} />;
 
@@ -37,7 +39,7 @@ export function FixturesPage() {
       { replace: true },
     );
 
-  const ahead = weeksAhead(data);
+  const ahead = weeksAhead(data, now);
   const clubs = fixtureClubs(data);
   const club = clubs.find((team) => team.short_name === searchParams.get("team")) ?? clubs[0];
   const view = searchParams.get("view") === "team" ? "team" : "general";
@@ -70,9 +72,10 @@ export function FixturesPage() {
               club={club}
               onChoose={(code) => choose("team", code)}
               copy={copy}
+              now={now}
             />
           ) : (
-            <FixtureMatrix payload={data} weeks={generalWeeks(ahead)} copy={copy} />
+            <FixtureMatrix payload={data} weeks={generalWeeks(ahead)} copy={copy} now={now} />
           )}
         </>
       ) : data.unscheduled_count === 0 ? (

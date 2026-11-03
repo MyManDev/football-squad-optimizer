@@ -19,13 +19,14 @@ export interface FixturesCopy {
   /** A club's match at home or away, in words, where the page prints a letter. */
   atHome: string;
   away: string;
+  kickedOff: string;
   unscheduled: string;
   pageTitle: string;
   noneAhead: string;
   notPublished: string;
   unscheduledCount: (count: number) => string;
-  /** The calendar file of the upcoming deadlines: its button, the sentence beside it and
-   * the words each event carries in the calendar. */
+  /** The calendar file of the upcoming deadlines: its button and the words each event
+   * carries in the calendar. */
   calendarAction: string;
   calendarSummary: (gameweek: number) => string;
   calendarDescription: (link: string) => string;
@@ -38,6 +39,7 @@ const en: FixturesCopy = {
   clubLegend: "Club",
   atHome: "at home",
   away: "away",
+  kickedOff: "kicked off",
   unscheduled: "TBC",
   pageTitle: "Fixtures",
   noneAhead: "No fixtures left to play.",
@@ -56,8 +58,9 @@ const tr: FixturesCopy = {
   teamView: "Takım fikstürü",
   viewLegend: "Fikstür görünümü",
   clubLegend: "Takım",
-  atHome: "evinde",
-  away: "deplasmanda",
+  atHome: "Ev",
+  away: "Deplasman",
+  kickedOff: "başladı",
   unscheduled: "Belli değil",
   pageTitle: "Fikstür",
   noneAhead: "Oynanacak maç kalmadı.",

@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { MemoryRouter, useLocation } from "react-router";
+import { Link, MemoryRouter, useLocation } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PageShell } from "../../design/components/PageShell";
@@ -214,7 +214,7 @@ describe("fixtures in the shell", () => {
       const shell = MESSAGES[language].shell;
 
       // The two margin rails and the closed list under the page are gone: the member page
-      // carries its own fixtures, and /fixtures carries the whole list.
+      // carries its own fixtures, and /fixtures carries the matches still to come.
       expect(screen.queryByRole("complementary", { name: copy.pageTitle })).toBeNull();
       expect(
         screen.getAllByRole("complementary").map((node) => node.getAttribute("aria-label")),
@@ -258,7 +258,14 @@ describe("the fixtures page", () => {
 
   it.each([
     ["the host's HTML shell", "<!doctype html><html><body></body></html>"],
-    ["another contract", JSON.stringify({ contract_version: "ui_view_v1", payload: {} })],
+    [
+      "another contract",
+      JSON.stringify({
+        contract_version: "ui_view_v1",
+        generated_at_utc: "now",
+        payload: payload(),
+      }),
+    ],
   ])("treats %s as no fixture list, not as an error", async (_label, body) => {
     serve(body);
     render(surface(<FixturesPage />, "en", "/fixtures"));
@@ -307,11 +314,75 @@ describe("the fixtures page", () => {
     expect(screen.queryByRole("table")).toBeNull();
   });
 
-  it("says nothing but schedule and result", async () => {
+  it("carries no wording of chance", async () => {
     serve(published(payload()));
     render(surface(<FixturesPage />, "tr", "/fixtures"));
     await screen.findByRole("table", { name: FIXTURES_COPY.tr.generalView });
     expect(screen.getByTestId("surface").textContent).not.toMatch(AS_A_CHANCE);
+  });
+
+  it("opens the matrix on a view it does not know", async () => {
+    serve(published(payload()));
+    render(surface(<FixturesPage />, "en", "/fixtures?view=xyz"));
+    await screen.findByRole("heading", { level: 1, name: "Fixtures" });
+    expect(screen.getByRole("radio", { name: FIXTURES_COPY.en.generalView })).toBeChecked();
+    expect(columnsOf(await findMatrix())).toEqual([FIXTURES_COPY.en.clubLegend, "GW3", "GW4"]);
+  });
+
+  it.each([
+    ["en", "3 postponed fixtures have no new gameweek yet."],
+    ["tr", "Ertelenen 3 maçın yeni oyun haftası henüz belli değil."],
+  ] as const)("counts several postponed fixtures in %s", async (language, sentence) => {
+    serve(published({ ...payload(), unscheduled_count: 3 }));
+    render(surface(<FixturesPage />, language, "/fixtures"));
+    expect(await screen.findByText(sentence)).toBeInTheDocument();
+  });
+
+  it("says it is loading, not that nothing is published, while the document is on its way", () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => new Promise<Response>(() => {})),
+    );
+    render(surface(<FixturesPage />, "tr", "/fixtures"));
+    expect(screen.getByText(MESSAGES.tr.common.loading)).toBeInTheDocument();
+    expect(screen.queryByText(FIXTURES_COPY.tr.notPublished)).not.toBeInTheDocument();
+  });
+
+  it("moves the radios when a link changes the address", async () => {
+    serve(published(longRun()));
+    render(
+      surface(
+        <>
+          <Link to="/fixtures">out</Link>
+          <FixturesPage />
+        </>,
+        "en",
+        "/fixtures",
+      ),
+    );
+    fireEvent.click(await screen.findByRole("radio", { name: FIXTURES_COPY.en.teamView }));
+    fireEvent.click(screen.getByRole("link", { name: "out" }));
+    expect(screen.getByTestId("address")).toHaveTextContent(/^\/fixtures$/);
+    expect(screen.getByRole("radio", { name: FIXTURES_COPY.en.generalView })).toBeChecked();
+    expect(screen.getByRole("radio", { name: FIXTURES_COPY.en.teamView })).not.toBeChecked();
+  });
+
+  it("rolls on by itself in a tab left open", async () => {
+    const clock = atClock("2026-09-18T10:00:00Z");
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+    try {
+      serve(published(longRun()));
+      render(surface(<FixturesPage />, "en", "/fixtures"));
+      const matrix = await findMatrix();
+      expect(columnsOf(matrix).slice(1)).toEqual(["GW3", "GW4", "GW5", "GW6", "GW7"]);
+      clock.mockReturnValue(Date.parse("2026-09-28T10:00:00Z"));
+      act(() => {
+        vi.advanceTimersByTime(60_000);
+      });
+      expect(columnsOf(matrix).slice(1)).toEqual(["GW5", "GW6", "GW7", "GW8", "GW9"]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
@@ -354,7 +425,14 @@ describe("the matrix's window", () => {
     serve(published(longRun()));
     render(surface(<FixturesPage />, "en", "/fixtures?week=5"));
     const matrix = await findMatrix();
-    expect(within(matrix).getAllByRole("columnheader")).toHaveLength(6);
+    expect(columnsOf(matrix)).toEqual([
+      FIXTURES_COPY.en.clubLegend,
+      "GW3",
+      "GW4",
+      "GW5",
+      "GW6",
+      "GW7",
+    ]);
     expect(screen.getAllByRole("radio").map((radio) => radio.getAttribute("name"))).toEqual([
       "fixture-view",
       "fixture-view",
@@ -429,6 +507,7 @@ describe("the matrix's cells", () => {
   });
 
   it("holds both matches of a double week, and marks the one already behind the club", async () => {
+    const errors = vi.spyOn(console, "error");
     serve(published(payload()));
     render(surface(<FixturesPage />, "en", "/fixtures"));
     // Arsenal has played at Chelsea this week, and still has Brentford with no date.
@@ -438,6 +517,12 @@ describe("the matrix's cells", () => {
     expect(played).toHaveAttribute("data-behind");
     expect(toCome!.textContent).toMatch(/^BRE/);
     expect(toCome).not.toHaveAttribute("data-behind");
+    // A word to hear, for what the quieter tone says to the eye.
+    expect(played!.querySelector(".venue .visually-hidden")).toHaveTextContent(
+      FIXTURES_COPY.en.kickedOff,
+    );
+    expect(toCome).not.toHaveTextContent(FIXTURES_COPY.en.kickedOff);
+    expect(errors).not.toHaveBeenCalled();
   });
 
   it("keeps a match past its kickoff in its cell, though the capture has no result yet", async () => {
@@ -512,10 +597,14 @@ describe("the team view", () => {
       `GW3${MESSAGES.en.leagueMembers.fixtureHome}${FIXTURES_COPY.en.atHome}BRE Brentford` +
         `${fixtureDay(kickoff, "en-GB")}${fixtureTime(kickoff, "en-GB")}`,
     );
-    expect(within(match!).getByText(fixtureTime(kickoff, "en-GB"))).toHaveAttribute(
-      "datetime",
-      kickoff,
-    );
+    const time = match!.querySelector("time")!;
+    expect(time).toHaveTextContent(fixtureTime(kickoff, "en-GB"));
+    expect(time).toHaveAttribute("datetime", kickoff);
+    const opponent = match!.querySelector(".opponent")!;
+    expect(opponent).toHaveAttribute("title", "Brentford");
+    const swatch = opponent.querySelector<HTMLElement>("[aria-hidden='true']")!;
+    expect(swatch.style.getPropertyValue("--club-primary")).toBe(CLUB_COLOURS.BRE!.primary);
+    expect(swatch.style.getPropertyValue("--club-secondary")).toBe(CLUB_COLOURS.BRE!.secondary);
     // A letter to see and the word to hear.
     expect(match).toHaveAttribute("data-venue", "home");
     expect(match!.querySelector('.venue [aria-hidden="true"]')).toHaveTextContent(
@@ -557,7 +646,37 @@ describe("the team view", () => {
     expect(cells[0]).toHaveAttribute("data-venue", "none");
   });
 
+  it("leaves out a match past its kickoff since the capture, though the week is still on", async () => {
+    atClock("2026-09-20T15:00:00Z");
+    // A later match keeps gameweek 3 on the page after Aston Villa's has kicked off.
+    const view = payload();
+    view.gameweeks[2]!.fixtures.push(upcoming(9, CHE, BRE, "2026-09-21T13:00:00Z"));
+    serve(published(view));
+    render(surface(<FixturesPage />, "en", "/fixtures?view=team&team=AVL"));
+    await screen.findByRole("heading", { level: 2, name: "Aston Villa" });
+    expect(cellsOf("Aston Villa").map((cell) => cell.textContent)).toEqual([
+      `GW4${MESSAGES.en.leagueMembers.fixtureNone}`,
+    ]);
+  });
+
+  it("prints a date in the visitor's language", async () => {
+    serve(published(payload()));
+    render(surface(<FixturesPage />, "tr", "/fixtures?view=team&team=AVL"));
+    await screen.findByRole("heading", { level: 2, name: "Aston Villa" });
+    expect(cellsOf("Aston Villa")[0]).toHaveTextContent("20 Eyl Paz");
+  });
+
+  it("gives each week a club does not play a cell of its own", async () => {
+    const errors = vi.spyOn(console, "error");
+    serve(published(longRun()));
+    render(surface(<FixturesPage />, "en", "/fixtures?view=team&team=AVL"));
+    await screen.findByRole("heading", { level: 2, name: "Aston Villa" });
+    expect(cellsOf("Aston Villa")).toHaveLength(7);
+    expect(errors).not.toHaveBeenCalled();
+  });
+
   it("gives a double week two cells and runs on past the matrix's five", async () => {
+    const errors = vi.spyOn(console, "error");
     const view = longRun();
     view.gameweeks
       .find((week) => week.gameweek === 9)!
@@ -567,6 +686,7 @@ describe("the team view", () => {
     await screen.findByRole("heading", { level: 2, name: "Arsenal" });
     const printed = cellsOf("Arsenal").map((cell) => cell.querySelector(".week")!.textContent);
     expect(printed).toEqual(["GW3", "GW4", "GW5", "GW6", "GW7", "GW8", "GW9", "GW9"]);
+    expect(errors).not.toHaveBeenCalled();
   });
 
   it("leaves no cell of one club in another's grid, through a week it does not play", async () => {
@@ -614,7 +734,7 @@ describe("the team view", () => {
     expect(within(region).queryByRole("list")).toBeNull();
   });
 
-  it.each(["XYZ", "ars", ""])("falls back to the first club for the unknown %j", async (team) => {
+  it.each(["XYZ", "bre", ""])("falls back to the first club for the unknown %j", async (team) => {
     serve(published(payload()));
     render(surface(<FixturesPage />, "en", `/fixtures?view=team&team=${team}`));
     expect(await screen.findByRole("radio", { name: "ARS Arsenal" })).toBeChecked();
@@ -740,15 +860,20 @@ describe("what the fixtures page leaves out", () => {
     it("in the matrix", async () => {
       serve(published(quiet()));
       render(surface(<FixturesPage />, "en", "/fixtures"));
-      await findMatrix();
+      const matrix = await findMatrix();
+      expect(matrix.querySelector("caption")).toHaveClass("visually-hidden");
+      expect(within(matrix).getAllByRole("columnheader")[0]!.firstElementChild).toHaveClass(
+        "visually-hidden",
+      );
+      expect(screen.getByTestId("surface").querySelector("legend")).toHaveClass("visually-hidden");
       expect(screen.getByTestId("surface").textContent).toBe(
         [
           ...above,
           ...[copy.generalView, copy.clubLegend, "GW3", "GW4"],
-          ...["ARSArsenal", away("CHE"), home("BRE"), away("BRE")],
+          ...["ARSArsenal", `${away("CHE")}, ${copy.kickedOff}`, home("BRE"), away("BRE")],
           ...["AVLAston Villa", home("BRE"), none],
           ...["BREBrentford", away("AVL"), away("ARS"), home("ARS")],
-          ...["CHEChelsea", home("ARS"), none],
+          ...["CHEChelsea", `${home("ARS")}, ${copy.kickedOff}`, none],
         ].join(""),
       );
     });
@@ -825,7 +950,7 @@ describe("the two club colours in the matrix", () => {
     };
     render(matrixOf(gameweek, "en"));
     const match = lineOf(screen.getByRole("table"), "ARS")[0]!.querySelector("[data-venue]")!;
-    expect(match.textContent).toBe(`NPTA${FIXTURES_COPY.en.away}`);
+    expect(match.textContent).toBe(`NPTA${FIXTURES_COPY.en.away}, ${FIXTURES_COPY.en.kickedOff}`);
     // The venue letter is the only thing here hidden from assistive technology.
     expect(match.querySelectorAll("[aria-hidden='true']")).toHaveLength(1);
   });
@@ -855,6 +980,7 @@ describe("the fixture document", () => {
     const view = payload();
     view.gameweeks.push({ gameweek: 5, deadline_utc: "2026-10-03T10:00:00Z", fixtures: [] });
     expect(numbers(weeksAhead(view, instant("2026-09-28T10:00:00Z")))).toEqual([5]);
+    expect(numbers(weeksAhead(view, instant("2026-10-03T10:00:00Z")))).toEqual([]);
   });
 
   it("lets a fixture with no date hold no week open", () => {
@@ -868,7 +994,10 @@ describe("the fixture document", () => {
     const behind = instant("2026-08-01T00:00:00Z");
     expect(clubWeeksAhead(payload(), "AVL", behind)[0]!.matches).toHaveLength(1);
     const underway = { ...payload(), captured_at_utc: "2026-09-20T13:30:00Z" };
-    expect(clubWeeksAhead(underway, "AVL", behind).map((week) => week.matches)).toEqual([[]]);
+    underway.gameweeks[2]!.fixtures.push(upcoming(9, CHE, BRE, "2026-09-21T13:00:00Z"));
+    expect(numbers(clubWeeksAhead(underway, "AVL", behind))).toEqual([4]);
+    const [week3] = clubMatrix(underway, weeksAhead(underway, behind), behind)[1]!.cells;
+    expect(week3!.map((match) => match.behind)).toEqual([true]);
   });
 
   it("goes by the device's clock when the capture's instant cannot be read", () => {
@@ -896,7 +1025,8 @@ describe("the fixture document", () => {
   });
 
   it("names every club once, in the order of their codes", () => {
-    expect(fixtureClubs(payload()).map((club) => club.short_name)).toEqual([
+    const reversed = { ...payload(), gameweeks: payload().gameweeks.reverse() };
+    expect(fixtureClubs(reversed).map((club) => club.short_name)).toEqual([
       "ARS",
       "AVL",
       "BRE",
@@ -916,6 +1046,21 @@ describe("the fixture document", () => {
       [4, 0],
     ]);
     expect(week("AVL", "2026-09-21T10:00:00Z")).toEqual([[4, 0]]);
+    expect(week("AVL", "2026-09-20T13:00:00Z")).toEqual([[4, 0]]);
+  });
+
+  it("reads a finished match as behind, whatever its kickoff says", () => {
+    const clock = instant("2026-09-22T12:00:00Z");
+    const withThird = (fixture: Fixture) => {
+      const view = payload();
+      view.gameweeks[2]!.fixtures = [fixture];
+      return view;
+    };
+    const dated = withThird({ ...played(3), kickoff_utc: "2026-09-25T13:00:00Z" });
+    expect(numbers(weeksAhead(dated, clock))).toEqual([4]);
+    const undated = withThird({ ...played(3), kickoff_utc: null });
+    const [arsenal] = clubMatrix(undated, undated.gameweeks.slice(2, 3), clock);
+    expect(arsenal!.cells[0]!.map((match) => match.behind)).toEqual([true]);
   });
 
   it("lines each club up over the weeks asked for, from its own side", () => {
@@ -956,6 +1101,31 @@ describe("the fixture document", () => {
     expect(await loadFixtures()).toBeNull();
     const broken = payload();
     (broken.gameweeks[0]!.fixtures[0] as { home_score: unknown }).home_score = "3";
+    serve(published(broken));
+    expect(await loadFixtures()).toBeNull();
+  });
+
+  type Row = {
+    current_gameweek: unknown;
+    gameweeks: { gameweek: unknown; deadline_utc: unknown; fixtures: Record<string, unknown>[] }[];
+  };
+  it.each<[string, (doc: Row) => void]>([
+    [
+      "a club's code",
+      (doc) => void (doc.gameweeks[0]!.fixtures[0]!.home = { name: "Arsenal", short_name: 1 }),
+    ],
+    ["a fixture's id", (doc) => void (doc.gameweeks[0]!.fixtures[0]!.fixture_id = "1")],
+    ["a kickoff", (doc) => void (doc.gameweeks[0]!.fixtures[0]!.kickoff_utc = 1)],
+    ["the home side", (doc) => void (doc.gameweeks[0]!.fixtures[0]!.home = null)],
+    ["the away side", (doc) => void (doc.gameweeks[0]!.fixtures[0]!.away = null)],
+    ["the finished flag", (doc) => void (doc.gameweeks[0]!.fixtures[0]!.finished = "yes")],
+    ["the away score", (doc) => void (doc.gameweeks[0]!.fixtures[0]!.away_score = "0")],
+    ["a gameweek number", (doc) => void (doc.gameweeks[0]!.gameweek = "1")],
+    ["a deadline", (doc) => void (doc.gameweeks[0]!.deadline_utc = null)],
+    ["the current gameweek", (doc) => void (doc.current_gameweek = "3")],
+  ])("is absent when %s is malformed", async (_field, breakIt) => {
+    const broken = payload();
+    breakIt(broken as unknown as Row);
     serve(published(broken));
     expect(await loadFixtures()).toBeNull();
   });

@@ -210,6 +210,15 @@ for (const language of ["tr", "en"] as const) {
       await expect(main.getByRole("table", { name: copy.generalView })).toBeVisible();
       await expect(main.getByRole("rowheader")).toHaveCount(6);
       await expect(main.getByText(copy.unscheduledCount(1), { exact: false })).toBeVisible();
+      const fillOf = (cell: string) =>
+        main
+          .locator(`td ${cell}`)
+          .first()
+          .evaluate((match) => getComputedStyle(match).backgroundColor);
+      const none = "rgba(0, 0, 0, 0)";
+      expect(await fillOf('[data-venue="away"]:not([data-behind])')).toBe(none);
+      expect(await fillOf('[data-venue="home"]:not([data-behind])')).not.toBe(none);
+      expect(await fillOf('[data-venue="home"][data-behind]')).toBe(none);
       expect(await blockingSummary(page), `${language} /fixtures`).toEqual([]);
 
       // A club's grid with a match at home and one away, one with no date, and a blank week.

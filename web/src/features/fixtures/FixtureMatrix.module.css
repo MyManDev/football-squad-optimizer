@@ -1,26 +1,26 @@
 /* The matrix: one panel, so the page's scene never runs behind its small type. The clubs and
    the week numbers stand on the board fill, with a line down the side of the clubs, so the eye
    never takes a club for an opponent. The columns stay narrow on a wide screen, since a club's
-   run is easier to follow across a short line. On the narrowest phone a column is 48 px, and a
-   cell's 2 px gaps keep its three parts inside that. */
+   run is easier to follow across a short line. On the narrowest phone a column is 48 px; its cell
+   gives up side padding to hold the three parts on one line, and a narrower cell wraps them. */
 .matrix {
   width: 100%;
   max-width: 44rem;
   border-collapse: separate;
   border-spacing: 0;
   border: 1px solid var(--color-line);
-  border-radius: var(--radius-s);
+  border-radius: var(--radius-m);
   background: var(--color-surface);
   table-layout: fixed;
 }
 
 .corner {
   width: 2.875rem;
-  border-top-left-radius: var(--radius-s);
+  border-top-left-radius: var(--radius-m);
 }
 
 .week:last-child {
-  border-top-right-radius: var(--radius-s);
+  border-top-right-radius: var(--radius-m);
 }
 
 /* A week's number stays in view while a long table scrolls under it: below the phone bar on a
@@ -59,6 +59,13 @@
   border-bottom: 1px solid var(--color-line);
 }
 
+/* The narrowest phones take the room from the cell's sides, so the line keeps its gaps. */
+@media (max-width: 339.98px) {
+  .cell {
+    padding-inline: 1px;
+  }
+}
+
 tbody tr:last-child .club,
 tbody tr:last-child .cell {
   border-bottom: 0;
@@ -66,6 +73,7 @@ tbody tr:last-child .cell {
 
 .club {
   padding-inline: 3px;
+  padding-right: 0;
   background: var(--color-board);
   color: var(--color-board-text);
   font-size: var(--step--2);
@@ -74,7 +82,7 @@ tbody tr:last-child .cell {
 }
 
 tbody tr:last-child .club {
-  border-bottom-left-radius: var(--radius-s);
+  border-bottom-left-radius: var(--radius-m);
 }
 
 /* On the board fill a club's colours need a light outline to keep their dark halves. */
@@ -85,8 +93,13 @@ tbody tr:last-child .club {
 .clubLabel {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 3px;
   min-width: 0;
+}
+
+.clubCode {
+  font-family: var(--font-mono);
 }
 
 .clubName {
@@ -128,6 +141,7 @@ tbody tr:last-child .club {
 }
 
 .match {
+  flex-wrap: wrap;
   border: 1px solid var(--color-line);
   border-radius: var(--radius-s);
   font-family: var(--font-mono);
@@ -167,6 +181,15 @@ tbody tr:last-child .club {
 
 .venue {
   color: var(--color-text-muted);
+}
+
+/* High contrast takes the fills and the tone away, and losing the box says it in every palette. */
+@media (forced-colors: active) {
+  .match[data-behind],
+  .match[data-behind] .venue {
+    border-color: Canvas;
+    color: GrayText;
+  }
 }
 
 .blank {

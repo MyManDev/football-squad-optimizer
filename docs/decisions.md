@@ -175,12 +175,13 @@ Reason: the owner went through the site's words row by row and took these pages 
 
 Source: the owner's review of 2 November, #1298.
 
-## 2026-11-03: /fixtures shows only what is still to come
+## 2026-11-03: /fixtures lists no played gameweek
 
 Decision: `/fixtures` lists no played gameweek and no week by itself. It opens on the general
-fixtures, a matrix of every club over the next five gameweeks that rolls on as the weeks pass.
-Beside it, it offers team fixtures: one club's matches to the end of the season, as a grid of
-weeks. The page prints no sentence beyond the postponed-fixture note.
+fixtures, a matrix of every club over the next five gameweeks that rolls on as the weeks pass;
+a match already played in the open week stays in its cell. Beside it, it offers team fixtures:
+one club's matches to the end of the season, as a grid of weeks. Apart from its empty states and
+the postponed-fixture note, the page prints no sentence.
 
 Reason: the owner wants the page to serve looking ahead. The results of played weeks are not what
 a manager reads it for.

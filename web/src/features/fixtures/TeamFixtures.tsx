@@ -52,19 +52,21 @@ function MatchCell({
  */
 export function TeamFixtures({
   payload,
+  now,
   clubs,
   club,
   onChoose,
   copy,
 }: {
   payload: FixturesPayload;
+  now?: number;
   clubs: readonly FixtureTeam[];
   club: FixtureTeam;
   onChoose: (code: string) => void;
   copy: FixturesCopy;
 }) {
   const { messages } = useLanguage();
-  const weeks = clubWeeksAhead(payload, club.short_name);
+  const weeks = clubWeeksAhead(payload, club.short_name, now);
   return (
     <>
       <FixtureChoice

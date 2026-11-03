@@ -55,6 +55,7 @@
   border: 1px solid var(--color-line);
   border-radius: var(--radius-s);
   background: var(--color-surface);
+  font-family: var(--font-mono);
   font-size: var(--step--1);
   font-weight: 600;
 }
@@ -83,6 +84,12 @@
   font-weight: 600;
 }
 
+/* On the chosen fill a club's colours need an outline in the fill's own ink to keep their dark
+   halves. */
+.club:has(input:checked) [aria-hidden="true"] {
+  outline-color: var(--color-primary-text);
+}
+
 .segment:has(input:focus-visible),
 .club:has(input:focus-visible) {
   outline: 2px solid var(--color-focus);
@@ -95,10 +102,12 @@
 }
 
 /* High contrast takes the fills away, and the radio itself is not drawn, so the chosen option
-   takes the system's own pair. */
+   takes the system's own pair. With the adjust left on, the browser paints a Canvas plate behind
+   the text, and HighlightText is Canvas's own colour. */
 @media (forced-colors: active) {
   .segment:has(input:checked),
   .club:has(input:checked) {
+    forced-color-adjust: none;
     background: Highlight;
     color: HighlightText;
   }

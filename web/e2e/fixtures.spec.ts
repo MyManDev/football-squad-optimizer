@@ -44,9 +44,9 @@ const clubCells = (code: string) =>
     matches.length === 0 ? [gameweek] : matches.map(() => gameweek),
   );
 
-/** Every cell of the matrix or the grid that does not hold what it prints. */
+/** Every cell of the matrix or the grid, and every club head, that does not hold what it prints. */
 const clippedCells = () =>
-  [...document.querySelectorAll("main td, main td > span, main li, main li > span")]
+  [...document.querySelectorAll("main td, main td > span, main li, main li > span, main tbody th")]
     .filter((cell) => cell.scrollWidth > cell.clientWidth + 1)
     .map((cell) => cell.textContent);
 
@@ -94,19 +94,15 @@ for (const width of [1280, 1600])
   test(`a ${width}px screen keeps the page beside the sidebar, with no league-wide rail`, async ({
     page,
   }) => {
-    test.skip(run.length === 0, "The shipped season is over: the page lists no week.");
     await page.setViewportSize({ width, height: 900 });
     await page.clock.setFixedTime(new Date(CLOCK));
     await page.goto(LEAGUE_PAGE);
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("Lig Analizi");
 
     // The two margin rails and the closed list under the page are gone: a member's page
-    // carries its own fixtures, and /fixtures carries the whole list.
-    await expect(page.getByRole("complementary", { name: "Oynanacak hafta" })).toHaveCount(0);
-    await expect(page.getByRole("complementary", { name: "Gelecek hafta" })).toHaveCount(0);
-    await expect(
-      page.locator("details", { hasText: "Fikstür: bu hafta ve gelecek hafta" }),
-    ).toHaveCount(0);
+    // carries its own fixtures, and /fixtures carries the matches still to come.
+    await expect(page.getByRole("complementary")).toHaveCount(1);
+    await expect(page.locator("details", { hasText: "Fikstür" })).toHaveCount(0);
 
     const sidebar = (await page.locator("#sidebar").boundingBox())!;
     const main = (await page.getByRole("main").boundingBox())!;
@@ -119,6 +115,10 @@ for (const width of [1280, 1600])
     await page.getByRole("navigation").getByRole("link", { name: "Fikstür", exact: true }).click();
     await expect(page).toHaveURL("/fixtures");
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("Fikstür");
+    await expect(
+      page.getByRole("navigation").getByRole("link", { name: "Fikstür", exact: true }),
+    ).toHaveAttribute("aria-current", "page");
+    test.skip(run.length === 0, "The shipped season is over: the page lists no week.");
     // A line for each club and a column for each week ahead.
     const matrix = page.getByRole("main").getByRole("table", { name: "Genel fikstür" });
     await expect(matrix.getByRole("columnheader")).toHaveText([
@@ -140,23 +140,17 @@ for (const width of [1280, 1600])
     }
     // No deadline and no capture time.
     await expect(page.getByRole("main")).not.toContainText(/Son tarih|tarihli kayda göre/);
-    await expect(
-      page.getByRole("navigation").getByRole("link", { name: "Fikstür", exact: true }),
-    ).toHaveAttribute("aria-current", "page");
   });
 
 test("a phone reaches the fixture list from its bar and never scrolls sideways", async ({
   page,
 }) => {
-  test.skip(run.length === 0, "The shipped season is over: the page lists no week.");
   await page.setViewportSize({ width: 400, height: 800 });
   await page.clock.setFixedTime(new Date(CLOCK));
   await page.goto(LEAGUE_PAGE);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Lig Analizi");
-  await expect(page.getByRole("complementary", { name: "Oynanacak hafta" })).toHaveCount(0);
-  await expect(
-    page.locator("details", { hasText: "Fikstür: bu hafta ve gelecek hafta" }),
-  ).toHaveCount(0);
+  await expect(page.getByRole("complementary")).toHaveCount(0);
+  await expect(page.locator("details", { hasText: "Fikstür" })).toHaveCount(0);
   expect(await page.evaluate(scrollsSideways)).toBe(false);
 
   const bar = page.getByRole("banner");
@@ -166,6 +160,7 @@ test("a phone reaches the fixture list from its bar and never scrolls sideways",
   await bar.getByRole("link", { name: "Fikstür", exact: true }).click();
   await expect(page).toHaveURL("/fixtures");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Fikstür");
+  test.skip(run.length === 0, "The shipped season is over: the page lists no week.");
   await expect(
     page.getByRole("main").getByRole("table", { name: "Genel fikstür" }).getByRole("rowheader"),
   ).toHaveCount(fixtureClubs(calendar).length);
@@ -211,6 +206,10 @@ for (const language of ["tr", "en"] as const)
       // The matrix, with no choice of weeks.
       const matrix = main.getByRole("table", { name: copy.generalView });
       await expect(matrix.getByRole("rowheader")).toHaveCount(fixtureClubs(calendar).length);
+      await expect(matrix.getByRole("rowheader")).toHaveText(
+        fixtureClubs(calendar).map((club) => (width < 700 ? club.short_name : club.name)),
+        { useInnerText: true },
+      );
       await expect(matrix.getByRole("columnheader")).toHaveText([
         copy.clubLegend,
         ...run.map((week) => common.gameweekShort(week.gameweek)),
@@ -243,7 +242,7 @@ for (const language of ["tr", "en"] as const)
       await everyTargetFits();
 
       // A further choice leaves the page where it is, on a screen short enough to scroll.
-      await page.setViewportSize({ width, height: 400 });
+      await page.setViewportSize({ width, height: 250 });
       await page.evaluate(() => window.scrollTo(0, 100));
       await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(100);
       await main.getByRole("radio", { name: /^ARS / }).click();
@@ -298,6 +297,40 @@ test("the chosen club stands apart from the others, by day, at night and in high
 
   await page.emulateMedia({ forcedColors: "active" });
   expect(await fill("checked")).not.toBe(await fill("not(:checked)"));
+  await expect(page.locator('main label:has(input[name="fixture-club"]:checked) > span')).toHaveCSS(
+    "forced-color-adjust",
+    "none",
+  );
+});
+
+test("the clubs stand apart from the cells, by day and at night", async ({ page }) => {
+  test.skip(run.length === 0, "The shipped season is over: the page lists no week.");
+  await page.clock.setFixedTime(new Date(CLOCK));
+  await page.goto("/fixtures");
+  const main = page.getByRole("main");
+  const table = main.getByRole("table", { name: "Genel fikstür" });
+  await expect(table).toBeVisible();
+  for (const colorScheme of ["light", "dark"] as const) {
+    await page.emulateMedia({ colorScheme });
+    const surface = await table.evaluate((el) => getComputedStyle(el).backgroundColor);
+    for (const head of [
+      main.getByRole("rowheader").first(),
+      main.getByRole("columnheader").first(),
+    ]) {
+      const { width, line, fill } = await head.evaluate((el) => {
+        const style = getComputedStyle(el);
+        return {
+          width: style.borderRightWidth,
+          line: style.borderRightColor,
+          fill: style.backgroundColor,
+        };
+      });
+      expect(width, colorScheme).toBe("2px");
+      expect(fill, colorScheme).not.toBe(surface);
+      expect(fill, colorScheme).not.toBe("rgba(0, 0, 0, 0)");
+      expect(contrastRatio(hexOf(line), hexOf(fill)), colorScheme).toBeGreaterThanOrEqual(3);
+    }
+  }
 });
 
 test("the keyboard moves through the choices and stays on them, and Back leaves the page", async ({

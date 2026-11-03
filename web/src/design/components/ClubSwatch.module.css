@@ -5,9 +5,17 @@
   flex: none;
   width: 10px;
   height: 10px;
-  outline: 1px solid var(--color-board);
+  outline: 1px solid var(--color-text);
 }
 
 .split {
   background: linear-gradient(135deg, var(--club-primary) 50%, var(--club-secondary) 50%);
+}
+
+/* High contrast takes a swatch's colours away, and the empty square left beside the code reads as
+   an unticked checkbox. With no colours it draws nothing, as for a code with no colours. */
+@media (forced-colors: active) {
+  .swatch {
+    display: none;
+  }
 }

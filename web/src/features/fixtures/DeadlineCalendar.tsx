@@ -38,7 +38,7 @@ export function DeadlineCalendar({
   };
 
   return (
-    <div className={styles.calendar} data-mark="deadline-calendar">
+    <div data-mark="deadline-calendar">
       <button type="button" className={styles.action} onClick={download}>
         {copy.calendarAction}
       </button>

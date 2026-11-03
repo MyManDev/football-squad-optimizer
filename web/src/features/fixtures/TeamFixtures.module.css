@@ -1,5 +1,5 @@
-/* One club's run as a grid of weeks: four cells across on a phone, ten or so on a wide screen,
-   so the season fits a screen or two and reads across like the matrix. */
+/* One club's run as a grid of weeks: three or four cells across on a phone, ten or so on a wide
+   screen, so the season fits a screen or two and reads across like the matrix. */
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(5.25rem, 1fr));
@@ -60,6 +60,7 @@
 
 .opponent {
   display: flex;
+  font-family: var(--font-mono);
   align-items: center;
   gap: 5px;
   font-size: var(--step-0);
