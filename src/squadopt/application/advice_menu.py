@@ -28,6 +28,7 @@ of windows on ``AdviceCapability``, a per-capture input handed in as a keyword t
 captured history and needs no separate artifact.
 """
 
+import copy
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
 
@@ -270,8 +271,9 @@ class _ReportOnce:
     """Passes an address to ``on_document`` the first time a document is solved for it.
 
     A rival window under a setting asks for the pure-points window at 0, and so does the
-    rival window at 0 it is compared with. When neither is held, both solve it; it is one
-    document, and it is told once.
+    rival window at 0 it is compared with. ``_SolvedInThisCall`` has the second need read
+    what the first one solved, so it is solved once; this keeps it told once as well,
+    should a document ever be solved twice in one call.
     """
 
     __slots__ = ("_on_document", "_told")
@@ -284,6 +286,31 @@ class _ReportOnce:
         if address not in self._told:
             self._told.add(address)
             self._on_document(address)
+
+
+class _SolvedInThisCall:
+    """The caller's lookup, plus every prerequisite one ``advise_menu_entry`` call solved.
+
+    A rival window under a setting depends on the pure-points window at 0 twice: it is
+    priced against it, and so is the strategy's window at 0 it is compared with, which a
+    nested call answers. The nested call is handed this same lookup, so the second need
+    reads the document the first one solved instead of solving the window again. Each
+    reader gets its own copy. It lives for one call: what is kept across calls is the
+    caller's lookup alone.
+    """
+
+    def __init__(self, caller: PrerequisiteLookup | None) -> None:
+        self._caller = caller
+        self._solved: dict[MenuRequest, dict[str, object]] = {}
+
+    def __call__(self, address: MenuRequest) -> Mapping[str, object] | None:
+        solved = self._solved.get(address)
+        if solved is not None:
+            return copy.deepcopy(solved)
+        return self._caller(address) if self._caller is not None else None
+
+    def keep(self, address: MenuRequest, payload: Mapping[str, object]) -> None:
+        self._solved[address] = copy.deepcopy(dict(payload))
 
 
 def _require_capture(
@@ -328,13 +355,13 @@ def advise_menu_entry(
     hand back a document this one is priced or compared against (the pure-points window
     at 0, the strategy's own document at 0) rather than have it solved again; it must
     have been computed from these same inputs, and anything it does not hold is solved
-    here.
+    here, once per call however many parts of the request depend on it.
 
     ``on_document`` is told the address of each document solved here, once per address:
     each one this is priced or compared against as it is solved (not one ``prerequisite``
-    handed back), then the asked one, just before it is returned. These are the documents
-    ``documents_to_solve`` names for the same lookup. A request that fails tells nothing
-    more after the failure.
+    handed back, nor one this call already solved), then the asked one, just before it is
+    returned. These are the documents ``documents_to_solve`` names for the same lookup. A
+    request that fails tells nothing more after the failure.
     """
 
     report = (
@@ -461,22 +488,31 @@ def _advise_menu_entry(
         except EntryError as error:
             raise TransferPlanningError(str(error)) from error
 
-    def at_zero(address: MenuRequest) -> dict[str, object]:
-        """A document this one depends on: taken from the caller when held, else solved."""
+    # A nested call is handed the lookup its outer call made, so the whole call shares it.
+    lookup = (
+        prerequisite
+        if isinstance(prerequisite, _SolvedInThisCall)
+        else _SolvedInThisCall(prerequisite)
+    )
 
-        held = prerequisite(address) if prerequisite is not None else None
+    def at_zero(address: MenuRequest) -> dict[str, object]:
+        """A document this one depends on: taken from the lookup when held, else solved."""
+
+        held = lookup(address)
         if held is not None:
             return dict(held)
-        return advise_menu_entry(
+        solved = advise_menu_entry(
             address,
             provider=provider,
             inputs=inputs,
             projection=projection,
             rules=rules,
             horizon_builder=horizon_builder,
-            prerequisite=prerequisite,
+            prerequisite=lookup,
             on_document=report,
         )
+        lookup.keep(address, solved)
+        return solved
 
     supported = advice_capabilities().get(request.strategy)
     if request.is_plain and supported is not None and request.window in supported.windows:

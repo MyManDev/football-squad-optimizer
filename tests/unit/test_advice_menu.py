@@ -15,10 +15,13 @@ from typing import Any
 import pytest
 import tests.unit.test_advice_variants as variants_module
 from tests.unit.test_advice_variants import RIVAL
+from tests.unit.test_league_views import _Provider
 from tests.unit.test_member_windows import ENTRY, LEAGUE, SEASON
 from tests.unit.test_top100_weight import _words
 
+import squadopt.application.advice as advice_module
 import squadopt.application.advice_menu as menu
+import squadopt.application.advice_variants as advice_variants
 from squadopt.application.advice import AdviseEntryRequest, advise_entry
 from squadopt.application.advice_capabilities import (
     TOP100_WEIGHTS,
@@ -40,6 +43,7 @@ from squadopt.application.entries import EntryError
 from squadopt.application.league_views import MemberRenderTask, render_member
 from squadopt.application.top100_weight import TOP100_WEIGHTS as PRODUCER_WEIGHTS
 from squadopt.contracts.preferences import DecisionPreferences
+from squadopt.live.rules import ChipWindow
 
 window_world = variants_module.window_world  # re-register the fixtures in this module
 world = variants_module._world
@@ -494,3 +498,122 @@ def test_a_request_that_fails_tells_only_what_it_solved_before_failing(
             on_document=told.append,
         )
     assert told == []
+
+
+# -- one call solves each document once ---------------------------------------------------
+
+#: The producers ``advise_menu_entry`` dispatches to; each call makes one document.
+PRODUCERS = (
+    "advise_entry",
+    "advise_window_with_top100",
+    "advise_rival_window",
+    "advise_rival_with_top100",
+    "advise_with_top100",
+    "advise_with_managers_word",
+    "advise_with_chip",
+    "advise_chip_strategy",
+)
+
+#: A rival strategy against the world's rival, the address the switches are added to.
+AGAINST: dict[str, Any] = {"strategy": "ortak-koru", "rival_entry_id": RIVAL}
+
+
+def _chips_held(world: dict[str, Any]) -> dict[str, Any]:
+    """The same world with every chip held, so a chip request reaches its producer."""
+
+    picks = world["provider"].picks(ENTRY, SEASON, 1)
+    rules = replace(
+        world["rules"],
+        chips=tuple(
+            ChipWindow(name, 1, start, stop, "team")
+            for name in ("3xc", "bboost", "wildcard", "freehit")
+            for start, stop in ((1, 19), (20, 38))
+        ),
+    )
+    held = {ENTRY: replace(picks, chips_used={}), RIVAL: world["provider"].picks(RIVAL, SEASON, 1)}
+    return {**world, "rules": rules, "provider": _Provider(held)}
+
+
+@pytest.mark.parametrize(
+    ("selection", "documents", "windows"),
+    [
+        ({}, 1, 0),
+        ({"window": 3}, 1, 1),
+        (AGAINST, 1, 0),
+        ({"window": 3, "top100_weight": 50}, 2, 2),
+        ({"top100_weight": 50}, 1, 0),
+        ({"managers_word": True}, 1, 0),
+        ({"top100_weight": 50, "managers_word": True}, 1, 0),
+        ({**AGAINST, "top100_weight": 50}, 2, 0),
+        ({**AGAINST, "window": 3}, 2, 2),
+        # The pure-points window at 0 prices this document and the strategy's window at 0
+        # it is compared with: one solve, not one per dependent.
+        ({**AGAINST, "window": 3, "top100_weight": 50}, 3, 3),
+        ({**AGAINST, "strategy": "fark-yarat", "window": 5, "top100_weight": 20}, 3, 3),
+        ({"chip": "bboost"}, 1, 0),
+        ({"chip": "3xc", "window": 3, "top100_weight": 20}, 1, 0),
+    ],
+)
+def test_a_cold_call_solves_each_document_once(
+    world: dict[str, Any],
+    monkeypatch: pytest.MonkeyPatch,
+    selection: dict[str, Any],
+    documents: int,
+    windows: int,
+) -> None:
+    """Nothing held: every document the address needs is solved once, in one call."""
+
+    if "chip" in selection:
+        world = _chips_held(world)
+    solved: list[tuple[str, str, int, int | None, int]] = []
+    window_solves: list[int] = []
+    for name in PRODUCERS:
+        producer = getattr(menu, name)
+
+        def counted(*args: Any, _name: str = name, _producer: Any = producer, **kwargs: Any) -> Any:
+            request = args[0]
+            weight = kwargs.get("weight", kwargs.get("top100_weight", 0))
+            solved.append((_name, request.strategy, request.window, request.rival_entry_id, weight))
+            return _producer(*args, **kwargs)
+
+        monkeypatch.setattr(menu, name, counted)
+    for module in (advice_module, advice_variants):
+        window_plan = module.solve_window_plan
+
+        def counted_window(*args: Any, _solve: Any = window_plan, **kwargs: Any) -> Any:
+            window_solves.append(1)
+            return _solve(*args, **kwargs)
+
+        monkeypatch.setattr(module, "solve_window_plan", counted_window)
+    asked: list[MenuRequest] = []
+
+    def nothing_held(address: MenuRequest) -> None:
+        asked.append(address)
+
+    request = _request(**selection)
+    captain = int(world["provider"].picks(ENTRY, SEASON, 1).captain)
+    collaborators = {
+        **_collaborators(world),
+        "top100_counts": world["counts"],
+        "manager_words": _words(captain),
+    }
+    told: list[MenuRequest] = []
+    got = advise_menu_entry(
+        request, **collaborators, prerequisite=nothing_held, on_document=told.append
+    )
+    assert len(set(solved)) == documents, solved
+    assert len(solved) == documents, solved
+    assert len(window_solves) == windows
+    # Each document solved is told once, and they are the ones counted before the call.
+    to_solve = documents_to_solve(request, projection=world["projection"])
+    assert told == list(to_solve) and len(told) == documents
+    # The caller's lookup is asked for each dependency once, as it is solved once.
+    assert len(asked) == len(set(asked)) == documents - 1
+    if not asked:
+        return
+    # The same address with every dependency solved in a call of its own and handed back:
+    # a document reused inside the call is the document solved on its own, byte for byte.
+    held = {address: advise_menu_entry(address, **collaborators) for address in asked}
+    expected = advise_menu_entry(request, **collaborators, prerequisite=held.get)
+    assert got == expected
+    assert json.dumps(got) == json.dumps(expected)
