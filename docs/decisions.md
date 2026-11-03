@@ -175,6 +175,20 @@ Reason: the owner went through the site's words row by row and took these pages 
 
 Source: the owner's review of 2 November, #1298.
 
+## 2026-11-03: A waiting job shows how much is solved as a percentage
+
+Decision: while a job at the service runs, the member page shows the share of its documents
+solved as a percentage ("%33") beside a bar. A job of one document shows no percentage, because
+nothing inside a solve is counted. The service still serves a count, and the device run's card
+still shows one ("2/7").
+
+Reason: the owner asked for a percentage on 1 November, saw the count on #1303 and chose the
+percentage. It is a share of work and no chance of anything, so the standing rule against
+publishing a probability stands. This narrows the rule on #978 and #954 against a percentage on
+a member page for this one display.
+
+Source: the owner's answer of 3 November, [the shape on #978](https://github.com/MyManDev/football-squad-optimizer/issues/978#issuecomment-6570843186), #1303.
+
 ## 2026-11-03: /fixtures lists no played gameweek
 
 Decision: `/fixtures` lists no played gameweek and no week by itself. It opens on the general

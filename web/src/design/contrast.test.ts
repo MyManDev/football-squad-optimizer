@@ -194,6 +194,10 @@ describe("the colour tokens", () => {
     },
   );
 
+  it("draws a job's bar so its fill reads over its track, at 3:1 for a graphic", () => {
+    expect(contrast(hex("--color-primary"), hex("--color-line"))).toBeGreaterThanOrEqual(3);
+  });
+
   it.each(BESIDE_THE_CHOSEN)("a chosen option's fill stands apart from %s", (beside) => {
     expect(contrast(hex("--color-primary"), hex(beside))).toBeGreaterThanOrEqual(STATE_APART);
   });
@@ -237,6 +241,10 @@ describe("the night palette", () => {
       expect(ratio).toBeLessThan(AA);
     },
   );
+
+  it("draws a job's bar so its fill reads over its track, at 3:1 for a graphic", () => {
+    expect(contrast(night("--color-primary"), night("--color-line"))).toBeGreaterThanOrEqual(3);
+  });
 
   it.each(BESIDE_THE_CHOSEN)("a chosen option's fill stands apart from %s", (beside) => {
     expect(contrast(night("--color-primary"), night(beside))).toBeGreaterThanOrEqual(STATE_APART);
