@@ -118,6 +118,10 @@ const NIGHT_KEPT_APART: readonly (readonly [string, string])[] = [
   ["--color-focus", "--color-mark"],
 ];
 
+/** What a chosen option's primary fill stands beside: a state needs 3:1 against both. */
+const BESIDE_THE_CHOSEN = ["--color-surface", "--color-bg"];
+const STATE_APART = 3;
+
 const colour = (token: string, block = ROOT) =>
   token.startsWith("#") ? token : tokenHex(block, token);
 
@@ -190,6 +194,10 @@ describe("the colour tokens", () => {
     },
   );
 
+  it.each(BESIDE_THE_CHOSEN)("a chosen option's fill stands apart from %s", (beside) => {
+    expect(contrast(hex("--color-primary"), hex(beside))).toBeGreaterThanOrEqual(STATE_APART);
+  });
+
   it("computes the WCAG ratio the header quotes", () => {
     expect(contrast("#000000", "#ffffff")).toBeCloseTo(21, 5);
     expect(contrast(hex("--color-text"), hex("--color-bg"))).toBeCloseTo(16, 0);
@@ -229,6 +237,10 @@ describe("the night palette", () => {
       expect(ratio).toBeLessThan(AA);
     },
   );
+
+  it.each(BESIDE_THE_CHOSEN)("a chosen option's fill stands apart from %s", (beside) => {
+    expect(contrast(night("--color-primary"), night(beside))).toBeGreaterThanOrEqual(STATE_APART);
+  });
 
   it("computes the ratios the header quotes", () => {
     expect(contrast(night("--color-text"), night("--color-bg"))).toBeCloseTo(15.7, 1);

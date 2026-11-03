@@ -96,9 +96,9 @@ function fixture(
 }
 
 /**
- * The open calendar every league spec uses, filled so /fixtures draws each thing it can: a
- * played week with its scores, the open week with kickoff times and a fixture with no date
- * yet, the week after it, and the note about a postponed fixture. The mocked league's week
+ * The open calendar every league spec uses, filled so /fixtures draws each thing it can: the
+ * open week with a match played, kickoff times and a fixture with no date yet, the week after
+ * it, and the note about a postponed fixture. The mocked league's week
  * stays the open one, with its deadline far in the future, so nothing moves with the clock.
  */
 function fixturesCalendar() {
@@ -111,17 +111,9 @@ function fixturesCalendar() {
       unscheduled_count: 1,
       gameweeks: [
         {
-          gameweek: open.gameweek - 1,
-          deadline_utc: "2026-08-21T17:30:00Z",
-          fixtures: [
-            fixture(1, ARS, AVL, "2026-08-22T11:30:00Z", [2, 1]),
-            fixture(2, BRE, CHE, "2026-08-22T14:00:00Z", [0, 0]),
-            fixture(3, EVE, FUL, "2026-08-23T15:30:00Z", [1, 3]),
-          ],
-        },
-        {
           ...open,
           fixtures: [
+            fixture(1, ARS, AVL, "2026-08-22T11:30:00Z", [2, 1]),
             fixture(4, AVL, BRE, "2999-01-02T12:30:00Z"),
             fixture(5, CHE, EVE, "2999-01-02T15:00:00Z"),
             fixture(6, FUL, ARS, null),
@@ -214,14 +206,34 @@ for (const language of ["tr", "en"] as const) {
       const copy = FIXTURES_COPY[language];
       const main = page.getByRole("main");
       await expect(page.getByRole("heading", { level: 1 })).toHaveText(copy.pageTitle);
-      // Every state the page draws is on it before axe reads it: the eight fixtures, a result,
-      // kickoff times, the fixture with no date and the postponed-fixture note.
-      await expect(main.getByRole("listitem")).toHaveCount(8);
-      await expect(main.getByText("2 - 1", { exact: true })).toBeVisible();
-      await expect(main.locator("time")).toHaveCount(4);
-      await expect(main.getByText(copy.unscheduled, { exact: true })).toBeVisible();
+      // The matrix, with the postponed-fixture note under it.
+      await expect(main.getByRole("table", { name: copy.generalView })).toBeVisible();
+      await expect(main.getByRole("rowheader")).toHaveCount(6);
       await expect(main.getByText(copy.unscheduledCount(1), { exact: false })).toBeVisible();
+      const fillOf = (cell: string) =>
+        main
+          .locator(`td ${cell}`)
+          .first()
+          .evaluate((match) => getComputedStyle(match).backgroundColor);
+      const none = "rgba(0, 0, 0, 0)";
+      expect(await fillOf('[data-venue="away"]:not([data-behind])')).toBe(none);
+      expect(await fillOf('[data-venue="home"]:not([data-behind])')).not.toBe(none);
+      expect(await fillOf('[data-venue="home"][data-behind]')).toBe(none);
       expect(await blockingSummary(page), `${language} /fixtures`).toEqual([]);
+
+      // A club's grid with a match at home and one away, one with no date, and a blank week.
+      await main.getByRole("radio", { name: copy.teamView, exact: true }).click();
+      await main.getByRole("radio", { name: /^BRE / }).click();
+      await expect(main.locator("[data-venue='home']")).toHaveCount(1);
+      await expect(main.locator("[data-venue='away']")).toHaveCount(1);
+      await expect(main.locator("time")).toHaveCount(2);
+      expect(await blockingSummary(page), `${language} /fixtures, a club`).toEqual([]);
+      await main.getByRole("radio", { name: /^FUL / }).click();
+      await expect(main.getByText(copy.unscheduled, { exact: true })).toBeVisible();
+      expect(await blockingSummary(page), `${language} /fixtures, no date`).toEqual([]);
+      await main.getByRole("radio", { name: /^EVE / }).click();
+      await expect(main.getByText(MESSAGES[language].leagueMembers.fixtureNone)).toBeVisible();
+      expect(await blockingSummary(page), `${language} /fixtures, a blank week`).toEqual([]);
     },
     palettes,
   );
