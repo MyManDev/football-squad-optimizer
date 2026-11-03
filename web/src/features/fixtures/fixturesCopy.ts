@@ -12,14 +12,20 @@ import type { Language } from "../../i18n/messages";
  * match.
  */
 export interface FixturesCopy {
-  thisWeek: string;
-  nextWeek: string;
+  generalView: string;
+  teamView: string;
+  /** The names of the page's three choices, for assistive technology. */
+  viewLegend: string;
+  weekLegend: string;
+  clubLegend: string;
+  /** A club's match at home or away, in words, where the page prints a letter. */
+  atHome: string;
+  away: string;
   versus: string;
   unscheduled: string;
   noFixtures: string;
   pageTitle: string;
-  pastTitle: string;
-  noPast: string;
+  noneAhead: string;
   notPublished: string;
   unscheduledCount: (count: number) => string;
   /** The calendar file of the upcoming deadlines: its button, the sentence beside it and
@@ -30,14 +36,18 @@ export interface FixturesCopy {
 }
 
 const en: FixturesCopy = {
-  thisWeek: "Upcoming gameweek",
-  nextWeek: "Following gameweek",
+  generalView: "General fixtures",
+  teamView: "Team fixtures",
+  viewLegend: "Fixtures view",
+  weekLegend: "Gameweek",
+  clubLegend: "Club",
+  atHome: "at home",
+  away: "away",
   versus: "v",
   unscheduled: "TBC",
   noFixtures: "No fixtures in this gameweek.",
   pageTitle: "Fixtures",
-  pastTitle: "Past gameweeks",
-  noPast: "No gameweek has been played yet.",
+  noneAhead: "No fixtures left to play.",
   notPublished: "No fixture list has been published yet.",
   unscheduledCount: (count) =>
     count === 1
@@ -49,14 +59,18 @@ const en: FixturesCopy = {
 };
 
 const tr: FixturesCopy = {
-  thisWeek: "Oynanacak hafta",
-  nextWeek: "Gelecek hafta",
+  generalView: "Genel fikstür",
+  teamView: "Takım fikstürü",
+  viewLegend: "Fikstür görünümü",
+  weekLegend: "Oyun haftası",
+  clubLegend: "Takım",
+  atHome: "evinde",
+  away: "deplasmanda",
   versus: "-",
   unscheduled: "Belli değil",
   noFixtures: "Bu oyun haftasında maç yok.",
   pageTitle: "Fikstür",
-  pastTitle: "Geçmiş haftalar",
-  noPast: "Henüz oynanmış bir oyun haftası yok.",
+  noneAhead: "Oynanacak maç kalmadı.",
   notPublished: "Henüz yayımlanmış bir fikstür yok.",
   unscheduledCount: (count) => `Ertelenen ${count} maçın yeni oyun haftası henüz belli değil.`,
   calendarAction: "Deadline'ları takvime ekle",

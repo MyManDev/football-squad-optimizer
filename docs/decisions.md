@@ -174,3 +174,15 @@ Reason: the owner went through the site's words row by row and took these pages 
 `/rivals` had no link anywhere and still showed week 5.
 
 Source: the owner's review of 2 November, #1298.
+
+## 2026-11-03: /fixtures shows only what is still to come
+
+Decision: `/fixtures` lists no played gameweek. It opens on the general fixtures, a matrix of
+every club over the next five gameweeks, or one of those weeks alone with its days and kickoffs.
+Beside them it offers team fixtures: one club's matches to the end of the season, as a grid of
+weeks. The page prints no sentence beyond the postponed-fixture note.
+
+Reason: the owner wants the page to serve looking ahead. The results of played weeks are not what
+a manager reads it for.
+
+Source: the owner's message of 3 November.

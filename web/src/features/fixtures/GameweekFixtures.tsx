@@ -1,25 +1,15 @@
 import { ClubSwatch } from "../../design/components/ClubSwatch";
+import { fixtureDay, fixtureTime } from "./kickoff";
 import type { FixturesCopy } from "./fixturesCopy";
 import type { Fixture, FixtureGameweek } from "./types";
 import styles from "./Fixtures.module.css";
-
-function day(iso: string, locale: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return iso;
-  return date.toLocaleDateString(locale, { weekday: "short", day: "numeric", month: "short" });
-}
-
-function time(iso: string, locale: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit", hour12: false });
-}
 
 /** Consecutive fixtures sharing a local day; the producer already sorted them by kickoff. */
 function byDay(fixtures: Fixture[], locale: string, unscheduled: string) {
   const groups: { label: string; fixtures: Fixture[] }[] = [];
   for (const fixture of fixtures) {
-    const label = fixture.kickoff_utc === null ? unscheduled : day(fixture.kickoff_utc, locale);
+    const label =
+      fixture.kickoff_utc === null ? unscheduled : fixtureDay(fixture.kickoff_utc, locale);
     const last = groups[groups.length - 1];
     if (last && last.label === label) last.fixtures.push(fixture);
     else groups.push({ label, fixtures: [fixture] });
@@ -47,7 +37,7 @@ function Middle({
   if (fixture.kickoff_utc === null) return <span className={styles.when}>{copy.versus}</span>;
   return (
     <time className={`${styles.when} num`} dateTime={fixture.kickoff_utc}>
-      {time(fixture.kickoff_utc, locale)}
+      {fixtureTime(fixture.kickoff_utc, locale)}
     </time>
   );
 }
@@ -55,7 +45,7 @@ function Middle({
 /**
  * One gameweek's fixtures grouped by local day. Each club is printed by its code with its
  * two colours beside it, on the side facing the middle, so a row reads the same from both
- * ends.
+ * ends. The days stand side by side where the column holds them.
  */
 export function GameweekFixtures({
   week,

@@ -1,0 +1,153 @@
+/* The matrix: one panel, so the page's scene never runs behind its small type. The columns stay
+   narrow on a wide screen, since a club's run is easier to follow across a short line. On the
+   narrowest phone a column is 48 px, and a cell's 2 px gaps keep its three parts inside that. */
+.matrix {
+  width: 100%;
+  max-width: 44rem;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-s);
+  background: var(--color-surface);
+  table-layout: fixed;
+}
+
+.corner {
+  width: 2.75rem;
+  border-top-left-radius: var(--radius-s);
+}
+
+.week:last-child {
+  border-top-right-radius: var(--radius-s);
+}
+
+/* A week's number stays in view while a long table scrolls under it: below the phone bar on a
+   phone, at the top of the window elsewhere. */
+.corner,
+.week {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: var(--space-1) 2px;
+  border-bottom: 1px solid var(--color-line);
+  background: var(--color-surface);
+}
+
+@media (max-width: 599.98px) {
+  .corner,
+  .week {
+    top: 56px;
+  }
+}
+
+.week {
+  color: var(--color-text-muted);
+  font-size: var(--step--2);
+  font-weight: 600;
+  text-align: center;
+}
+
+.club,
+.cell {
+  padding: 2px;
+  border-bottom: 1px solid var(--color-line);
+}
+
+tbody tr:last-child .club,
+tbody tr:last-child .cell {
+  border-bottom: 0;
+}
+
+.club {
+  padding-inline: var(--space-1);
+  font-size: var(--step--2);
+  font-weight: 600;
+  text-align: left;
+}
+
+.clubLabel {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.clubName {
+  display: none;
+}
+
+/* Where the column holds it, a line starts with the club's name instead of its code. */
+@media (min-width: 700px) {
+  .corner {
+    width: 9rem;
+  }
+
+  .clubCode {
+    display: none;
+  }
+
+  .clubName {
+    display: inline;
+    overflow-wrap: anywhere;
+  }
+}
+
+.match,
+.blank {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: 24px;
+  white-space: nowrap;
+}
+
+.match {
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-s);
+  font-family: var(--font-mono);
+  font-size: var(--step--2);
+}
+
+.match + .match {
+  margin-top: 2px;
+}
+
+/* From a usual phone up the cell has room to set its code and venue apart. */
+@media (min-width: 380px) {
+  .match {
+    gap: var(--space-1);
+  }
+}
+
+.match[data-venue="home"] {
+  border-color: var(--color-surface-2);
+  background: var(--color-surface-2);
+}
+
+/* A match behind the club: still in its cell, with no fill to say it is one to plan for. */
+.match[data-behind] {
+  border-color: transparent;
+  background: transparent;
+  color: var(--color-text-muted);
+}
+
+.match[data-behind] .opponent {
+  font-weight: 400;
+}
+
+.opponent {
+  font-weight: 600;
+}
+
+.venue {
+  color: var(--color-text-muted);
+}
+
+.blank {
+  color: var(--color-text-muted);
+  font-size: var(--step--2);
+  line-height: 14px;
+  text-align: center;
+  white-space: normal;
+}
