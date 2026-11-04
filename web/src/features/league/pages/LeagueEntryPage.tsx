@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useLocation, useNavigate } from "react-router";
 
 import { useLanguage } from "../../../i18n/context";
+import { crossfade } from "../../../design/viewTransition";
 import {
   FIND_YOURSELF,
   legacyLeagueAddress,
@@ -45,10 +46,12 @@ export function LeagueEntryPage({
   // The number the last lookup asked for, named in the answer that it is not published.
   const [asked, setAsked] = useState(unpublishedLeagueId ?? 0);
   const active = useRef(true);
+  const arrived = useRef<(() => void) | null>(null);
   useEffect(() => {
     active.current = true;
     return () => {
       active.current = false;
+      arrived.current?.();
     };
   }, []);
 
@@ -67,21 +70,29 @@ export function LeagueEntryPage({
       const result = await lookupPublishedLeague(leagueId);
       if (!active.current) return;
       if (result.status === "connected") {
-        const here = inPlace ? legacyLeagueAddress(location.pathname, leagueId) : null;
-        if (here !== null) {
-          // An address from before the number, rewritten with it: the member step is asked
-          // there, and its state puts focus on the picker as on the other path. The
-          // gate at the new address chooses the league it names, as it does for any league
-          // reached by its address. Choosing it here first would let the gate rewrite the
-          // old address on its own before this navigation lands, without the step state.
-          navigate(`${here}${location.search}${location.hash}`, {
-            replace: true,
-            state: PICK_HERE,
-          });
-          return;
-        }
-        chooseLeague(leagueId);
-        navigate(membersAddress(leagueId), { replace: inPlace, state: FIND_YOURSELF });
+        const arrival = new Promise<void>((resolve) => {
+          arrived.current = resolve;
+        });
+        crossfade(
+          () => {
+            const here = inPlace ? legacyLeagueAddress(location.pathname, leagueId) : null;
+            if (here !== null) {
+              // An address from before the number, rewritten with it: the member step is asked
+              // there, and its state puts focus on the picker as on the other path. The
+              // gate at the new address chooses the league it names, as it does for any league
+              // reached by its address. Choosing it here first would let the gate rewrite the
+              // old address on its own before this navigation lands, without the step state.
+              navigate(`${here}${location.search}${location.hash}`, {
+                replace: true,
+                state: PICK_HERE,
+              });
+              return;
+            }
+            chooseLeague(leagueId);
+            navigate(membersAddress(leagueId), { replace: inPlace, state: FIND_YOURSELF });
+          },
+          () => arrival,
+        );
       } else setState("unsupported");
     } catch (error) {
       if (active.current) setState(error instanceof LeagueDataMissing ? "missing" : "failed");
@@ -100,6 +111,7 @@ export function LeagueEntryPage({
           id="league-id"
           name="leagueId"
           inputMode="numeric"
+          enterKeyHint="go"
           autoComplete="off"
           value={value}
           onChange={(event) => {

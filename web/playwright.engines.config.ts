@@ -11,6 +11,8 @@ export default defineConfig({
     "**/what-if.spec.ts",
     "**/member-picker.spec.ts",
     "**/fixtures.spec.ts",
+    "**/navigation-viewport.spec.ts",
+    "**/player-details.spec.ts",
   ],
   projects: [
     { name: "chromium", use: { ...devices["Desktop Chrome"] } },

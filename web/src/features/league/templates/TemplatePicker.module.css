@@ -99,6 +99,10 @@
 
 /* Touch targets on the member page below 1180 px, where the page is used by finger. */
 @media (max-width: 1179.98px) {
+  .nameInput {
+    font-size: 16px;
+  }
+
   .template,
   .templateActive,
   .nameInput,

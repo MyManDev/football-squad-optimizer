@@ -160,6 +160,13 @@
   font-size: var(--step--1);
 }
 
+@media (max-width: 599.98px) {
+  .rivalField select,
+  .rivalField input {
+    font-size: 16px;
+  }
+}
+
 /* The window: three real radios drawn as one segmented control. */
 .segments {
   display: grid;

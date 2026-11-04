@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "react-router";
 
 import { EmptyState } from "../../../design/components/EmptyState";
+import { PageLoading } from "../../../design/components/PageLoading";
 import { useLanguage } from "../../../i18n/context";
 import { arrivedToPick } from "../../../lib/leagueAddresses";
 import { LeagueDataMissing } from "../data";
@@ -32,6 +33,7 @@ export function MemberPicker({
   const listCopy = messages.leagueMembers;
   const location = useLocation();
   const heading = useRef<HTMLHeadingElement>(null);
+  const [selected, setSelected] = useState<number | null>(null);
 
   const sorted = useMemo(() => {
     const collator = new Intl.Collator(locale, { sensitivity: "base" });
@@ -49,11 +51,11 @@ export function MemberPicker({
   // question. Only a new arrival moves it, so the effect follows the location's key.
   const arrived = arrivedToPick(location.state);
   useEffect(() => {
-    if (arrived) heading.current?.focus();
+    if (arrived) heading.current?.focus({ preventScroll: true });
   }, [location.key, arrived]);
 
   let body;
-  if (members.isPending) body = <EmptyState title={listCopy.loading} />;
+  if (members.isPending) body = <PageLoading label={listCopy.loading} />;
   else if (members.isError) {
     const missing = members.error instanceof LeagueDataMissing;
     body = (
@@ -75,7 +77,15 @@ export function MemberPicker({
         <ul className={styles.list}>
           {sorted.map((row) => (
             <li key={row.entryId}>
-              <button type="button" className={styles.option} onClick={() => onConfirm(row)}>
+              <button
+                type="button"
+                className={styles.option}
+                data-selected={selected === row.entryId || undefined}
+                onClick={() => {
+                  setSelected(row.entryId);
+                  onConfirm(row);
+                }}
+              >
                 <span className={styles.names}>
                   <span className={styles.manager}>
                     {row.managerName ?? listCopy.unknownMember}
