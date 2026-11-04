@@ -76,6 +76,12 @@
   margin-left: var(--space-1);
 }
 
+/* The sticky controls already sit above the page's anchor padding. */
+.phoneBar :is(button, a) {
+  scroll-margin-top: -104px;
+  scroll-margin-bottom: 8px;
+}
+
 .phoneWordmark {
   font-family: var(--font-display);
   font-size: 20px;
@@ -303,10 +309,28 @@
 }
 
 .nav {
+  position: relative;
+  isolation: isolate;
   flex: none;
   display: flex;
   flex-direction: column;
   margin: var(--space-1) calc(-1 * var(--space-2)) 0;
+}
+
+.navMarker {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: -1;
+  border-radius: var(--radius-s);
+  background: var(--color-board);
+  pointer-events: none;
+  transition:
+    transform var(--motion-ui) var(--motion-ease),
+    height var(--motion-ui) var(--motion-ease);
+}
+
+.navMarker[hidden] {
+  display: none;
 }
 
 /* 34 px beside the page, where a pointer uses it; the rail and the drawer make them 44 px
@@ -332,9 +356,13 @@
 
 /* The active item: ink with a lime label, the one place lime marks where you are. */
 .navItem[aria-current="page"] {
-  background: var(--color-board);
+  background: transparent;
   color: var(--color-mark);
   font-weight: 600;
+}
+
+.navItem[aria-current="page"]:hover {
+  background: transparent;
 }
 
 .navIcon {
@@ -450,6 +478,7 @@
 
 .sidebar[data-mode="drawer"] .body {
   padding: var(--space-2) var(--space-4) 0;
+  overscroll-behavior-y: contain;
 }
 
 /* One column, as the open sidebar: two columns left a long label such as "Kadroyu kendin

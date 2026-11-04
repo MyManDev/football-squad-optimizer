@@ -1,5 +1,6 @@
-import { useEffect, useId, useRef } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
+import { motionDuration } from "../../../design/motion";
 import { useLanguage } from "../../../i18n/context";
 import { clubCode, type ClubCodes } from "../../../lib/clubs";
 import { figure, utcShort } from "../../../lib/format";
@@ -57,13 +58,32 @@ export function PlayerDetails({
   const copy = COPY[language];
   const titleId = useId();
   const dialog = useRef<HTMLDialogElement>(null);
+  const [closing, setClosing] = useState(false);
+  const dismissTimer = useRef<number | undefined>(undefined);
+  const outsidePress = useRef(false);
+  const dismiss = () => {
+    if (dismissTimer.current !== undefined) return;
+    const duration = motionDuration("ui");
+    if (duration === 0) {
+      onClose();
+      return;
+    }
+    setClosing(true);
+    dismissTimer.current = window.setTimeout(onClose, duration);
+  };
   useEffect(() => {
     const element = dialog.current!;
     const trigger = document.activeElement;
+    const root = document.documentElement;
+    const overflow = root.style.overflow;
+    root.style.overflow = "hidden";
     element.showModal();
     return () => {
+      window.clearTimeout(dismissTimer.current);
+      root.style.overflow = overflow;
       element.close();
-      if (trigger instanceof HTMLElement && trigger.isConnected) trigger.focus();
+      if (trigger instanceof HTMLElement && trigger.isConnected)
+        trigger.focus({ preventScroll: true });
     };
   }, []);
   const basis = plan ?? held;
@@ -105,6 +125,32 @@ export function PlayerDetails({
       ref={dialog}
       className={styles.dialog}
       aria-labelledby={titleId}
+      data-closing={closing || undefined}
+      onCancel={(event) => {
+        event.preventDefault();
+        dismiss();
+      }}
+      onPointerDown={(event) => {
+        const box = event.currentTarget.getBoundingClientRect();
+        outsidePress.current =
+          event.target === event.currentTarget &&
+          (event.clientX < box.left ||
+            event.clientX > box.right ||
+            event.clientY < box.top ||
+            event.clientY > box.bottom);
+      }}
+      onClick={(event) => {
+        const box = event.currentTarget.getBoundingClientRect();
+        if (
+          outsidePress.current &&
+          (event.clientX < box.left ||
+            event.clientX > box.right ||
+            event.clientY < box.top ||
+            event.clientY > box.bottom)
+        )
+          dismiss();
+        outsidePress.current = false;
+      }}
       // A browser fires close from a queued task. StrictMode's development replay of the effect
       // above closes and reopens the dialog, so that close arrives while it is open again: only
       // a dialog that is really closed ends the selection.
@@ -119,7 +165,7 @@ export function PlayerDetails({
             {player.team} · {position}
           </p>
         </div>
-        <button type="button" onClick={onClose}>
+        <button type="button" onClick={dismiss}>
           {copy.close}
         </button>
       </header>

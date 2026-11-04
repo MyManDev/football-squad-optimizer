@@ -255,6 +255,18 @@ textarea {
   font: inherit;
 }
 
+:where(button, a, input, select, textarea) {
+  -webkit-tap-highlight-color: transparent;
+}
+
+:where(button:not(:disabled), a[href]) {
+  touch-action: manipulation;
+}
+
+:where(button:not(:disabled)):active {
+  filter: brightness(0.94);
+}
+
 /* A native radio or checkbox a component leaves as it is still wears the palette: an ink
    dot and tick, never the browser's blue. */
 input[type="radio"],
