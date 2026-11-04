@@ -22,7 +22,11 @@ export function usePageViewport(focusPage: () => void) {
   useLayoutEffect(() => {
     const before = current.current;
     current.current = location;
-    const saved = navigation === "POP" ? positions.current.get(location.key) : undefined;
+    // Native hash links can reuse history.state.key; their anchor owns the scroll.
+    const saved =
+      navigation === "POP" && location.key !== before.key
+        ? positions.current.get(location.key)
+        : undefined;
     let id = "";
     try {
       id = decodeURIComponent(location.hash.slice(1));
