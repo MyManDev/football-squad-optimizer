@@ -615,6 +615,8 @@ def test_the_host_units_tick_the_gate_by_its_module_on_a_workspace() -> None:
         assert ("$WEEKLY_RELEASE" in arguments) == (not dry), command
         # One solver worker per core, from the unit or provision.sh's workers.conf.
         assert " --workers ${WEEKLY_WORKERS}" in command
+        # The host's measured times (#1243, 2026-11-04), the same for a dry run as a real one.
+        assert " --final-lead-hours 8 --run-hours 7" in command
         workspaces.add(workspace)
     (workspace,) = workspaces
     # The drop-in clears the unit's command before it gives its own.

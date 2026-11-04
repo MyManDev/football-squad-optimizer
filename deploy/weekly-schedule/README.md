@@ -31,9 +31,13 @@ deadlines from the public bootstrap and starts at most one weekly run
 - **A morning run** once a UTC day from 02:00Z for the open gameweek, with no club news, so no
   model call (D3), and no manager's word: it passes no `--rotation`, so its index says
   `no_evidence_this_run` and its pages offer no word. It is skipped when the final run would
-  start before it could finish.
-- **The final run** once a gameweek, 4 h before the deadline, with club news (D2), which its
-  manager's word reads (`--rotation --rotation-capture <its capture>`).
+  start before it could finish, and late after 7 h (`--run-hours 7`): the run itself, then,
+  from GW11, its release and the backend's move in the same tick.
+- **The final run** once a gameweek, with club news, which its manager's word reads
+  (`--rotation --rotation-capture <its capture>`). It starts 8 h before the deadline on this
+  host (`--final-lead-hours 8`). D2 chose 4 h, but the first run here, on 2026-11-04, took
+  4 h 29 min and its release 1 h 40 min; with the backend's move after it, 4 h does not reach
+  the deadline (#1243, 2026-11-04).
 - **A fixture gap** (D4): while the next deadline is more than 9 days away at the morning time
   (`LEAD_WINDOW_DAYS`, `--lead-window-days`), one morning run starts, the first once the
   gameweek before is finished and checked, and publishes its settled view; the other mornings

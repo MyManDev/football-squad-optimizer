@@ -32,7 +32,11 @@ Environment=WEEKLY_WORKERS=4
 # Empty: no release in the tick. release.conf gives the gate's two release options; unbraced,
 # systemd splits the value into words, and an empty one into none.
 Environment=WEEKLY_RELEASE=
-ExecStart=/srv/squadopt/weekly/.venv/bin/python -m squadopt.platform.weekly_schedule --workspace /srv/squadopt/weekly --workers ${WEEKLY_WORKERS} $WEEKLY_RELEASE
+# On a Cloud VPS 4 the morning run of 2026-11-04 took 4 h 29 min and its release 1 h 40 min,
+# so the final run starts 8 h before the deadline, and a morning run is given 7 h: with the
+# release in the same tick and the backend's move after it (#1243, 2026-11-04). dry-run.conf's
+# command takes the same two.
+ExecStart=/srv/squadopt/weekly/.venv/bin/python -m squadopt.platform.weekly_schedule --workspace /srv/squadopt/weekly --workers ${WEEKLY_WORKERS} --final-lead-hours 8 --run-hours 7 $WEEKLY_RELEASE
 TimeoutStartSec=infinity
 # The gate reads its run's peak memory from this unit's cgroup (memory.peak), and a worker the
 # kernel kills for memory fails the run, which the gate reports on #1093, instead of stopping
