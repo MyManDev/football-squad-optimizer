@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import "@fontsource/allura/latin-400.css";
 
 import { MOTION_MS, prefersReducedMotion } from "../motion";
 import styles from "./OpeningMark.module.css";
@@ -28,7 +29,7 @@ function shouldOpen(): boolean {
 /**
  * The brand's opening, once per tab: the two bars stand side by side, red on the left and
  * green on the right, then turn a quarter clockwise into the SquadOpt mark (red over green)
- * under the word SquadOpt, and the cover fades off the page.
+ * beside SquadOpt. The maker's signature sits in the lower right as the cover fades.
  *
  * It is decoration only: hidden from assistive technology, inert, and transparent to the
  * pointer, so the page under it can be used from the first frame. Under the reduced-motion
@@ -58,11 +59,17 @@ export function OpeningMark() {
         if (event.target === event.currentTarget) setOpen(false);
       }}
     >
-      <span className={styles.word}>SquadOpt</span>
-      <svg className={styles.mark} width="64" height="80" viewBox="0 0 16 20">
-        <rect x="0" y="0" width="16" height="9" rx="2" data-bar="out" />
-        <rect x="0" y="11" width="16" height="9" rx="2" data-bar="in" />
-      </svg>
+      <div className={styles.signature}>
+        <span className={styles.signatureName}>MyManDev</span>
+        <span className={styles.signatureLine}>Still Building</span>
+      </div>
+      <div className={styles.brand}>
+        <svg className={styles.mark} width="40" height="50" viewBox="0 0 16 20">
+          <rect x="0" y="0" width="16" height="9" rx="2" data-bar="out" />
+          <rect x="0" y="11" width="16" height="9" rx="2" data-bar="in" />
+        </svg>
+        <span className={styles.word}>SquadOpt</span>
+      </div>
     </div>
   );
 }

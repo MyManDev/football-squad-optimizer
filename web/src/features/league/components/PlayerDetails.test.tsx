@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { StrictMode } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
@@ -132,14 +132,14 @@ function open() {
   return trigger;
 }
 
-it("opens the chosen player's published points, fixture and minutes, then restores focus", () => {
+it("opens the chosen player's published points, fixture and minutes, then restores focus", async () => {
   render(view());
   const trigger = open();
   expect(screen.getByRole("dialog", { name: player.name })).toBeVisible();
   expect(screen.getByText("Beklenen dakika: 67,5")).toBeVisible();
   expect(screen.getByText("Visitors")).toBeVisible();
   fireEvent.click(screen.getByRole("button", { name: "Kapat" }));
-  expect(screen.queryByRole("dialog")).toBeNull();
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   expect(trigger).toHaveFocus();
 });
 

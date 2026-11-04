@@ -71,6 +71,7 @@ for (const [language, width] of [
     await page.keyboard.press("Enter");
     const dialog = page.getByRole("dialog", { name: PLAYER.name });
     await expect(dialog).toBeVisible();
+    await expect(page.locator("html")).toHaveCSS("overflow", "hidden");
     await expect(dialog).toContainText(
       language === "tr" ? "Beklenen dakika: 67,5" : "Expected minutes: 67.5",
     );
@@ -78,9 +79,16 @@ for (const [language, width] of [
     expect(await dialog.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
     // The site's opening covers the page for its first seconds, so the picture waits it out.
     await atRest(page);
+    if (width < 600) {
+      const panel = await dialog.boundingBox();
+      expect(panel!.x).toBe(0);
+      expect(panel!.width).toBe(width);
+      expect(Math.abs(panel!.y + panel!.height - 900)).toBeLessThan(2);
+    }
     await page.screenshot({ path: testInfo.outputPath(`player-${language}.png`) });
     await page.keyboard.press("Escape");
     await expect(dialog).toHaveCount(0);
+    await expect(page.locator("html")).not.toHaveCSS("overflow", "hidden");
     await expect(trigger).toBeFocused();
     await trigger.click();
     await expect(dialog).toBeVisible();

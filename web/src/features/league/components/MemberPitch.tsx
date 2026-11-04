@@ -77,7 +77,10 @@ function Plate({
           type="button"
           className={styles.playerButton}
           aria-label={`${player.name}: ${language === "tr" ? "Oyuncu ayrıntıları" : "Player details"}`}
-          onClick={() => onSelectPlayer(player.playerId)}
+          onClick={(event) => {
+            event.currentTarget.focus({ preventScroll: true });
+            onSelectPlayer(player.playerId);
+          }}
         />
       ) : null}
       <span className={styles.name} title={player.name}>
@@ -353,7 +356,10 @@ export function MemberBench({
                     type="button"
                     className={styles.playerButton}
                     aria-label={`${player.name}: ${language === "tr" ? "Oyuncu ayrıntıları" : "Player details"}`}
-                    onClick={() => onSelectPlayer(player.playerId)}
+                    onClick={(event) => {
+                      event.currentTarget.focus({ preventScroll: true });
+                      onSelectPlayer(player.playerId);
+                    }}
                   />
                 ) : null}
               </li>

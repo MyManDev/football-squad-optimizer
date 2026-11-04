@@ -30,6 +30,8 @@ describe("the brand's opening", () => {
     expect(cover()).not.toBeNull();
     expect(cover()).toHaveAttribute("aria-hidden", "true");
     expect(cover()).toHaveTextContent("SquadOpt");
+    expect(cover()).toHaveTextContent("MyManDev");
+    expect(cover()).toHaveTextContent("Still Building");
     expect(window.sessionStorage.getItem(OPENING_STORAGE_KEY)).toBe("1");
     act(() => vi.advanceTimersByTime(OPENING_MS));
     expect(cover()).not.toBeNull();
