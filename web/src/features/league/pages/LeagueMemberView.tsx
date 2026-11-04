@@ -19,6 +19,7 @@ import { deviceEndedWithoutPlan } from "../device/useDevicePlan";
 import { isDevicePlanEntry } from "../device/types";
 import { advisedFifteen } from "../device/whatIf";
 import { WhatIfPanel } from "../device/WhatIfPanel";
+import { whatIfBasis } from "../device/whatIfDraft";
 import { DecisionPreferencesPanel } from "../advice/DecisionPreferencesPanel";
 import { EVIDENCE_COPY } from "../advice/evidenceCopy";
 import { coachAbsences } from "../advice/coachAbsences";
@@ -388,7 +389,12 @@ function LeagueMemberContent({
       title: copy.whatIfTitle,
       body:
         advised !== null && isDevicePlanEntry(view.device_plan) ? (
-          <WhatIfPanel squad={view} advised={advised} dependencies={whatIfDependencies} />
+          <WhatIfPanel
+            key={whatIfBasis(view, advised)}
+            squad={view}
+            advised={advised}
+            dependencies={whatIfDependencies}
+          />
         ) : null,
     },
     duel: {
