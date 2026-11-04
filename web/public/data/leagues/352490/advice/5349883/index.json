@@ -1,24 +1,16 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-10-30T08:03:14Z",
+  "generated_at_utc": "2026-11-04T06:28:27Z",
   "source_kind": "live",
   "payload": {
     "league_id": 352490,
     "season": "2026-27",
-    "gameweek": 9,
+    "gameweek": 10,
     "entry_id": 5349883,
     "window": 1,
     "evidence": {
-      "available": true,
-      "path": "advice/5349883/saf-puan/1/hoca-sozu.json",
-      "applied_count": 0,
-      "source_kind": "club_news_capture",
-      "source_label": "club-news-20261030T070011Z-cb49583067b6",
-      "clubs_covered": [
-        "Newcastle"
-      ],
-      "rule_version": "managers_word_rule_v3",
-      "binding": false
+      "available": false,
+      "reason": "no_evidence_this_run"
     },
     "top100": {
       "available": true,
@@ -40,14 +32,7 @@
         "40": "advice/5349883/saf-puan/1/top100-40.json",
         "50": "advice/5349883/saf-puan/1/top100-50.json"
       },
-      "word_paths": {
-        "5": "advice/5349883/saf-puan/1/top100-5-hoca-sozu.json",
-        "10": "advice/5349883/saf-puan/1/top100-10-hoca-sozu.json",
-        "20": "advice/5349883/saf-puan/1/top100-20-hoca-sozu.json",
-        "30": "advice/5349883/saf-puan/1/top100-30-hoca-sozu.json",
-        "40": "advice/5349883/saf-puan/1/top100-40-hoca-sozu.json",
-        "50": "advice/5349883/saf-puan/1/top100-50-hoca-sozu.json"
-      },
+      "word_paths": {},
       "unavailable": [],
       "documents": [
         {
@@ -388,19 +373,22 @@
         }
       ],
       "source": {
-        "cohort_snapshot_id": "fpl-top100-20261030T070023Z-59306b9ebd52",
-        "picks_snapshot_id": "fpl-elite-picks-20261030T070040Z-b114c859f532",
-        "table_sha256": "dd0d5e4175ca161a4307f295e955ec1491019b97067267bcace1fc40a063e195",
-        "picks_gameweek": 8
+        "cohort_snapshot_id": "fpl-top100-20261104T020027Z-beb6e318e07c",
+        "picks_snapshot_id": "fpl-elite-picks-20261104T020036Z-d078b34cdec4",
+        "table_sha256": "5a678111ed1cc336cb0367fb63fc6dc18167267c36a3502d959575bb88c68c2e",
+        "picks_gameweek": 9
       }
     },
     "chips": {
       "available": true,
       "paths": {
-        "wildcard": "advice/5349883/saf-puan/1/chip-wildcard.json",
         "freehit": "advice/5349883/saf-puan/1/chip-freehit.json"
       },
       "unavailable": [
+        {
+          "chip": "wildcard",
+          "reason": "already_played"
+        },
         {
           "chip": "bboost",
           "reason": "already_played"
@@ -411,7 +399,6 @@
         }
       ],
       "held": [
-        "wildcard",
         "freehit"
       ]
     },
@@ -419,56 +406,41 @@
       "season": "2026-27",
       "league_id": 352490,
       "entry_id": 5349883,
-      "gameweek": 9,
-      "source_snapshot_id": "fpl-live-20261030T070058Z-8b2a93c0babe",
+      "gameweek": 10,
+      "source_snapshot_id": "fpl-live-20261104T020046Z-eaadfd3e9143",
       "squad_player_ids": [
-        204936,
-        466075,
+        433969,
         469142,
-        191866,
-        487676,
-        153682,
-        184029,
-        215413,
-        474120,
+        483067,
+        199798,
+        509416,
+        244850,
+        249231,
+        248875,
+        201658,
         223094,
         219168,
-        67089,
-        437730,
-        106760,
+        485055,
+        198869,
+        83299,
         475168
       ],
       "bench_player_ids": [
-        67089,
-        437730,
-        106760,
+        485055,
+        198869,
+        83299,
         475168
       ],
       "status": "available",
       "reason": null,
       "forecast": {
         "contract_version": "chip_forecast_v1",
-        "decision_gameweek": 9,
+        "decision_gameweek": 10,
         "threshold_policy": "decaying",
         "reserve": false,
         "later_week_basis": "this_week_projection_scaled_by_relative_fixture_count_v1",
         "players_without_fixture_this_week": [],
         "chips": [
-          {
-            "name": "wildcard",
-            "window": {
-              "first_gameweek": 2,
-              "last_gameweek": 19
-            },
-            "holding_value": 12.0,
-            "verdict": "hold",
-            "hold_reason": "gain_not_above_threshold",
-            "gain_this_week": 2.05878954915503,
-            "threshold_this_week": 7.0588235294117645,
-            "reservation_allows_this_week": true,
-            "points_at_gameweek": null,
-            "structured_gameweeks": null
-          },
           {
             "name": "freehit",
             "window": {
@@ -478,8 +450,8 @@
             "holding_value": 15.0,
             "verdict": "hold",
             "hold_reason": "gain_not_above_threshold",
-            "gain_this_week": 2.05878954915503,
-            "threshold_this_week": 8.823529411764707,
+            "gain_this_week": 1.3872748379045703,
+            "threshold_this_week": 7.9411764705882355,
             "reservation_allows_this_week": true,
             "points_at_gameweek": null,
             "structured_gameweeks": []
@@ -495,7 +467,7 @@
       },
       "calendar_has_structure": false,
       "calendar_range": {
-        "first_gameweek": 10,
+        "first_gameweek": 11,
         "last_gameweek": 19
       }
     },
@@ -542,10 +514,10 @@
       "rule_id": "gap_and_weeks_strategy_rule_v1",
       "band": "level",
       "rival_entry_id": 8883467,
-      "points_ahead_of_rival": -4,
-      "scored_gameweek": 8,
-      "gameweeks_remaining": 30,
-      "band_edge_points": 116.1
+      "points_ahead_of_rival": -8,
+      "scored_gameweek": 9,
+      "gameweeks_remaining": 29,
+      "band_edge_points": 114.2
     },
     "computed": [
       {
