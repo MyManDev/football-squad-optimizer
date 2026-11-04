@@ -59,11 +59,15 @@
   font: inherit;
   text-align: start;
   cursor: pointer;
+  transition:
+    background-color var(--motion-ui-fast),
+    border-color var(--motion-ui-fast);
 }
 
 /* The mark with its own ink (13.5:1 by day, 11.3:1 at night), as the visitor's own row in the
    league table. */
 .option:hover,
+.option[data-selected],
 .option:focus-visible {
   background: var(--color-mark);
   color: var(--color-mark-text);
@@ -71,6 +75,7 @@
 }
 
 .option:hover .team,
+.option[data-selected] .team,
 .option:focus-visible .team {
   color: var(--color-mark-text);
 }
