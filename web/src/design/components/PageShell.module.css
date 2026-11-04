@@ -76,12 +76,6 @@
   margin-left: var(--space-1);
 }
 
-/* The sticky controls already sit above the page's anchor padding. */
-.phoneBar :is(button, a) {
-  scroll-margin-top: -104px;
-  scroll-margin-bottom: 8px;
-}
-
 .phoneWordmark {
   font-family: var(--font-display);
   font-size: 20px;

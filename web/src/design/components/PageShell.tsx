@@ -229,7 +229,10 @@ export function PageShell({
   };
   const onToggle = () => {
     if (layout === "desktop") setDesktopCollapsed(!collapsed);
-    else setDrawerOpen(!drawerOpen);
+    else {
+      if (!drawerOpen) toggleRef.current?.focus({ preventScroll: true });
+      setDrawerOpen(!drawerOpen);
+    }
   };
   const openWho = () => {
     if (layout === "desktop") {
@@ -405,7 +408,10 @@ export function PageShell({
               aria-controls="sidebar"
               aria-expanded={drawerOpen}
               aria-haspopup="dialog"
-              onClick={() => setDrawerOpen(true)}
+              onClick={(event) => {
+                event.currentTarget.focus({ preventScroll: true });
+                setDrawerOpen(true);
+              }}
             >
               <MenuIcon />
             </button>
@@ -420,7 +426,10 @@ export function PageShell({
                 aria-controls={FIXTURE_SHEET_ID}
                 aria-expanded={sheetOpen}
                 aria-haspopup="dialog"
-                onClick={() => setSheetOpen(true)}
+                onClick={(event) => {
+                  event.currentTarget.focus({ preventScroll: true });
+                  setSheetOpen(true);
+                }}
               >
                 {fixturesFace}
               </button>

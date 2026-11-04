@@ -41,12 +41,17 @@ export function usePageViewport(focusPage: () => void) {
     let observer: MutationObserver | undefined;
     let resize: ResizeObserver | undefined;
     let timer = 0;
+    let frame = 0;
+    let stopped = false;
     const stop = () => {
+      stopped = true;
       observer?.disconnect();
       resize?.disconnect();
       window.clearTimeout(timer);
+      window.cancelAnimationFrame(frame);
       window.removeEventListener("wheel", stop);
       window.removeEventListener("touchstart", stop);
+      window.removeEventListener("pointerdown", stop);
       window.removeEventListener("keydown", stop);
     };
     const reveal = () => {
@@ -58,9 +63,9 @@ export function usePageViewport(focusPage: () => void) {
       target?.scrollIntoView?.({ block: "start" });
       return target !== null;
     };
-    if (reveal()) return;
+    if (reveal() && saved === undefined) return;
     const retry = () => {
-      if (reveal()) stop();
+      if (reveal() && saved === undefined) stop();
     };
     observer = new MutationObserver(retry);
     observer.observe(document.body, { childList: true, subtree: true });
@@ -69,8 +74,24 @@ export function usePageViewport(focusPage: () => void) {
       resize.observe(document.body);
     }
     timer = window.setTimeout(stop, 5000);
+    if (saved !== undefined) {
+      // WebKit can anchor the page again while its arrival motion settles.
+      let quietFrames = 0;
+      const settle = () => {
+        if (stopped) return;
+        const reached = reveal();
+        const moving = (document.getAnimations?.() ?? []).some(
+          (animation) => animation.playState === "running",
+        );
+        quietFrames = reached && !moving ? quietFrames + 1 : 0;
+        if (quietFrames >= 2) stop();
+        else frame = window.requestAnimationFrame(settle);
+      };
+      frame = window.requestAnimationFrame(settle);
+    }
     window.addEventListener("wheel", stop, { passive: true });
     window.addEventListener("touchstart", stop, { passive: true });
+    window.addEventListener("pointerdown", stop, { passive: true });
     window.addEventListener("keydown", stop);
     return stop;
   }, [location, navigation, focusPage]);

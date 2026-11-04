@@ -15,11 +15,18 @@ for (const width of [320, 390, 1280]) {
     const original = await page.evaluate(() => window.scrollY);
     expect(original).toBeGreaterThan(100);
     if (width < 600) {
-      await page.getByRole("button", { name: "Menüyü aç", exact: true }).click();
+      // Tap the already-visible sticky control without the runner's scrollIntoView step.
+      const menu = await page.getByRole("button", { name: "Menüyü aç", exact: true }).boundingBox();
+      await page.mouse.click(menu!.x + menu!.width / 2, menu!.y + menu!.height / 2);
       await expect(page.getByRole("dialog", { name: "Menü", exact: true })).toBeVisible();
       expect(await page.evaluate(() => window.scrollY)).toBe(original);
     }
-    await page.locator("#sidebar").getByRole("link", { name: "Fikstür", exact: true }).click();
+    const fixtures = page.locator("#sidebar").getByRole("link", { name: "Fikstür", exact: true });
+    if (width < 600) {
+      await atRest(page);
+      const link = await fixtures.boundingBox();
+      await page.mouse.click(link!.x + link!.width / 2, link!.y + link!.height / 2);
+    } else await fixtures.click();
     await expect(page).toHaveURL(/\/fixtures$/);
     await atRest(page);
     await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
