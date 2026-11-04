@@ -55,6 +55,20 @@ describe("the crossfade", () => {
     expect(update).toHaveBeenCalledOnce();
   });
 
+  it.each([
+    ["AppleWebKit/605.1.15 Version/26.5 Safari/605.1.15", false],
+    ["AppleWebKit/605.1.15 CriOS/144.0 Mobile Safari/604.1", false],
+    ["AppleWebKit/537.36 Chrome/144.0.0.0 Safari/537.36", true],
+    ["Gecko/20100101 Firefox/146.0", true],
+  ])("keeps navigation working for %s", async (userAgent, native) => {
+    const { document, started } = transitions();
+    const update = vi.fn();
+    crossfade(update, undefined, { ...media(false), navigator: { userAgent } }, document);
+    await started[0];
+    expect(update).toHaveBeenCalledOnce();
+    expect(document.startViewTransition).toHaveBeenCalledTimes(native ? 1 : 0);
+  });
+
   it("takes the new picture once the page says it is drawn", async () => {
     const { document, started } = transitions();
     let drawn: () => void = () => {};

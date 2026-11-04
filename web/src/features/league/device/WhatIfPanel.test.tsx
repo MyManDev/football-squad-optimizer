@@ -77,7 +77,11 @@ function envelope(payload: DevicePlanDocument): LeagueViewEnvelope<DevicePlanDoc
   };
 }
 
-function show(dependencies: Partial<WhatIfDependencies> = {}, squad: EntrySquad = SQUAD) {
+function show(
+  dependencies: Partial<WhatIfDependencies> = {},
+  squad: EntrySquad = SQUAD,
+  advised: readonly number[] = ADVISED,
+) {
   const worker = new InProcessSolver();
   const loadDocument = vi.fn(async () => envelope(document));
   const view = render(
@@ -85,7 +89,7 @@ function show(dependencies: Partial<WhatIfDependencies> = {}, squad: EntrySquad 
       {withLeague(
         <WhatIfPanel
           squad={squad}
-          advised={ADVISED}
+          advised={advised}
           dependencies={{ loadDocument, createSolver: () => worker, ...dependencies }}
         />,
       )}
@@ -358,6 +362,34 @@ describe("choosing the replacement", () => {
 });
 
 describe("searching by name", () => {
+  it.each([
+    ["Alexander Isak", "Isak", "isak"],
+    ["Alexander Isak", "Isak", "İSAK"],
+    ["Alex Iwobi", "Iwobi", "ıwobı"],
+    ["İlkay Gündoğan", "Gündoğan", "ilkay gundogan"],
+    ["João Pedro", "João Pedro", "  JOAO   PEDRO "],
+    ["Martin Ødegaard", "Ødegaard", "odegaard"],
+    ["Çağlar Söyüncü", "Söyüncü", "caglar soyuncu"],
+  ])("finds %s with the spelling %s searched as %s", async (name, short_name, query) => {
+    const target = document.players.find((player) => !ADVISED.includes(player.id))!;
+    show({
+      loadDocument: async () =>
+        envelope({
+          ...document,
+          players: document.players.map((p) =>
+            p.id === target.id ? { ...p, name, short_name } : p,
+          ),
+        }),
+    });
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: COPY.whatIfStart })));
+    fireEvent.change(await screen.findByLabelText(COPY.whatIfSearch), { target: { value: query } });
+    const options = [...screen.getByLabelText(COPY.whatIfAdd).querySelectorAll("option")];
+    expect(options.filter((o) => o.value).map((o) => o.value)).toEqual([String(target.id)]);
+    expect(options.find((o) => o.value)?.textContent).toContain(short_name);
+    add(target.id);
+    expect(screen.getByRole("button", { name: COPY.whatIfRemoveLabel(short_name) })).toBeVisible();
+  });
+
   it("narrows the add list to players whose name matches, and restores it when cleared", async () => {
     await started();
     const list = () => screen.getByLabelText(COPY.whatIfAdd);
@@ -403,6 +435,53 @@ describe("searching by name", () => {
         name: COPY.whatIfRemoveLabel(target.short_name || target.name),
       }),
     ).toBeInTheDocument();
+  });
+});
+
+describe("returning to a tried squad", () => {
+  it("discards saved player ids that are no longer in the table", async () => {
+    const first = await started();
+    first.unmount();
+    const slot = Object.keys(sessionStorage).find((key) => key.startsWith("squadopt.what-if."))!;
+    const saved = JSON.parse(sessionStorage.getItem(slot)!);
+    sessionStorage.setItem(slot, JSON.stringify({ ...saved, players: [Number.MAX_SAFE_INTEGER] }));
+    show();
+    await waitFor(() => expect(figure(COPY.whatIfPoints)).toContain("74,39"));
+    expect(screen.getAllByRole("button", { name: /^Kadrodan çıkar/ })).toHaveLength(15);
+    expect(screen.getByRole("button", { name: COPY.whatIfReset })).toBeDisabled();
+  });
+
+  it("restores the edits after the panel leaves and recalculates their points", async () => {
+    const first = await started();
+    remove("160");
+    add(152);
+    await settled();
+    first.unmount();
+    const restored = show();
+    await waitFor(() => expect(figure(COPY.whatIfPoints)).toContain("66,38"));
+    expect(screen.getByRole("button", { name: COPY.whatIfRemoveLabel("152") })).toBeVisible();
+    expect(screen.queryByRole("button", { name: COPY.whatIfRemoveLabel("160") })).toBeNull();
+    expect(restored.loadDocument).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: COPY.whatIfReset }));
+    await settled();
+    restored.unmount();
+    show();
+    await waitFor(() => expect(figure(COPY.whatIfPoints)).toContain("74,39"));
+    expect(screen.getByRole("button", { name: COPY.whatIfReset })).toBeDisabled();
+  });
+
+  it.each([
+    ["member", { ...SQUAD, entry: { ...SQUAD.entry, entry_id: 999 } }, ADVISED],
+    ["capture", { ...SQUAD, source_snapshot_id: "new-capture" }, ADVISED],
+    ["advice", SQUAD, ADVISED.map((id) => (id === 160 ? 152 : id))],
+    ["account", { ...SQUAD, device_plan: { ...SQUAD.device_plan!, bank_tenths: 999 } }, ADVISED],
+  ])("does not restore a draft for a different %s", async (_, squad, advised) => {
+    const first = await started();
+    remove("160");
+    first.unmount();
+    const next = show({}, squad as EntrySquad, advised);
+    expect(screen.getByRole("button", { name: COPY.whatIfStart })).toBeVisible();
+    expect(next.loadDocument).not.toHaveBeenCalled();
   });
 });
 

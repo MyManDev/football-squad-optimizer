@@ -11,6 +11,18 @@ import styles from "./WhatIfPanel.module.css";
 
 const POSITIONS = ["GK", "DEF", "MID", "FWD"] as const;
 
+// Player names keep their spelling on screen; searches accept either keyboard's letters.
+const searchKey = (value: string) =>
+  value
+    .normalize("NFKD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase()
+    .replace(/ı/g, "i")
+    .replace(/ø/g, "o")
+    .replace(/ł/g, "l")
+    .trim()
+    .replace(/\s+/g, " ");
+
 function isPosition(code: string): code is (typeof POSITIONS)[number] {
   return (POSITIONS as readonly string[]).includes(code);
 }
@@ -119,9 +131,9 @@ export function WhatIfPanel({
       : null;
   const changed =
     whatIf.squad.length !== advised.length || whatIf.squad.some((id) => !advisedSet.has(id));
-  const needle = query.trim().toLocaleLowerCase("tr");
+  const needle = searchKey(query);
   const matches = (player: DevicePlanPlayer) =>
-    needle === "" || `${player.short_name} ${player.name}`.toLocaleLowerCase("tr").includes(needle);
+    needle === "" || searchKey(`${player.short_name} ${player.name}`).includes(needle);
   const offered = POSITIONS.filter((code) => only === "" || code === only)
     .map((code) => ({
       code,

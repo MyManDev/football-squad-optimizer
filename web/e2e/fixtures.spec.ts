@@ -297,10 +297,10 @@ test("the chosen club stands apart from the others, by day, at night and in high
 
   await page.emulateMedia({ forcedColors: "active" });
   expect(await fill("checked")).not.toBe(await fill("not(:checked)"));
-  await expect(page.locator('main label:has(input[name="fixture-club"]:checked) > span')).toHaveCSS(
-    "forced-color-adjust",
-    "none",
-  );
+  if (await page.evaluate(() => CSS.supports("forced-color-adjust", "none")))
+    await expect(
+      page.locator('main label:has(input[name="fixture-club"]:checked) > span'),
+    ).toHaveCSS("forced-color-adjust", "none");
 });
 
 test("the clubs stand apart from the cells, by day and at night", async ({ page }) => {
