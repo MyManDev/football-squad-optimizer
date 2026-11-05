@@ -644,7 +644,7 @@ test("the collapsed desktop rail opens the sidebar on Değiştir", async ({ page
 
   await icon.click();
   await expect(sidebar).toHaveAttribute("data-mode", "open");
-  expect((await sidebar.boundingBox())!.width).toBe(264);
+  await expect(sidebar).toHaveCSS("width", "264px");
   await expect(sidebar.getByText("Deniz Aral")).toBeVisible();
   await expect(sidebar.getByRole("button", { name: "Değiştir", exact: true })).toBeFocused();
 });
@@ -657,7 +657,7 @@ test("the desktop sidebar collapses to the rail and stays so after a reload", as
 
   await page.getByRole("button", { name: "Kenar çubuğunu kapat" }).click();
   await expect(page.getByRole("button", { name: "Kenar çubuğunu aç" })).toBeFocused();
-  expect((await sidebar.boundingBox())!.width).toBe(72);
+  await expect(sidebar).toHaveCSS("width", "72px");
   await page.reload();
   await expect(page.getByRole("button", { name: "Kenar çubuğunu aç" })).toBeVisible();
   expect((await sidebar.boundingBox())!.width).toBe(72);

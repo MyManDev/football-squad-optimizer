@@ -358,3 +358,9 @@ the #980 forwarder is built on Cloudflare.
 
 - [Frozen football window totals](research/football_window_totals.md): paired 1/3/5-week player sums from saved development forecasts; no model promotion.
 - [Planner policy chain protocol](research/planner_policy_chain_prereg.md): a prospective, stateful comparison of the routed multi-week planner, the full-window solver it replaced and the one-week path on realized points, over constructed squads with known purchase lots; read after GW20 (interim, no verdict) and GW38 (final); no record yet.
+
+## Operational acceptance
+
+| Artifact | Finding | Issue |
+| --- | --- | --- |
+| [GW8 club-news join counts](research/club_news_join_counts_gw8.md) ([record](research/club_news_join_counts_gw8.json); [protocol](research/club_news_join_counts_gw8_prereg.md)) | Offline replay at the clean export commit reproduces the published table. Five unique player joins, zero no-match or ambiguous identities; three absence/doubt statements unapplied because fixture scope is unverified. Frozen verdict `statements_lost`, routing #1006 items 3, 7, 4 and 10. No new model call or prediction claim. | #524, #1006, #1140 |
