@@ -1,0 +1,10 @@
+# 23:30Z every night: no weekly run writes then (the morning run starts at 02:00Z).
+[Unit]
+Description=SquadOpt: the nightly backup
+
+[Timer]
+OnCalendar=*-*-* 23:30:00 UTC
+Persistent=true
+
+[Install]
+WantedBy=timers.target

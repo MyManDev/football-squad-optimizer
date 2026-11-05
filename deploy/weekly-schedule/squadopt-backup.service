@@ -1,0 +1,15 @@
+# The nightly backup to R2 (#1294): /usr/local/sbin/squadopt-backup says what it covers. Its
+# settings, all private, are /etc/squadopt/backup.env; the alert's are /etc/squadopt/alert.env.
+[Unit]
+Description=SquadOpt: back the host's data up to R2
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/squadopt/backup.env
+EnvironmentFile=-/etc/squadopt/alert.env
+ExecStart=/usr/local/sbin/squadopt-backup
+Nice=10
+IOSchedulingClass=idle
+TimeoutStartSec=2h

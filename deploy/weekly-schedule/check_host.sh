@@ -18,6 +18,7 @@ readonly BACKEND=/root/squadopt
 readonly TUNNEL_CONFIG=/etc/cloudflared/config.yml
 readonly TUNNEL_UNIT=cloudflared-squadopt.service
 readonly RECEIVE=/usr/local/sbin/squadopt-receive
+readonly BACKUP_STAMP=/var/lib/squadopt/backup/last-success
 readonly STORES=(
   data/snapshots data/entries data/ledger data/handoffs data/advice_records data/raw/vaastav-fpl
   artifacts/phase_b artifacts/rotation artifacts/football
@@ -196,6 +197,25 @@ else
   absent "$TUNNEL_UNIT active with $TUNNEL_CONFIG"
 fi
 if [ -x "$RECEIVE" ]; then ok "$RECEIVE"; else absent "$RECEIVE (bash backend.sh)"; fi
+
+section "Backups and alerts (#1294)"
+for file in /etc/squadopt/alert.env /etc/squadopt/backup.env /etc/squadopt/restic-password; do
+  if [ -f "$file" ] && [ "$(stat -c '%a %U' "$file")" = "600 root" ]; then
+    ok "$file (mode 600, root)"
+  else
+    absent "$file with mode 600, owner root"
+  fi
+done
+for timer in squadopt-watch.timer squadopt-backup.timer; do
+  if systemctl is-active --quiet "$timer" 2>/dev/null; then ok "$timer active"; else absent "$timer active"; fi
+done
+if [ -s "$BACKUP_STAMP" ]; then
+  done_at="$(cut -d' ' -f1 "$BACKUP_STAMP")"
+  age=$(( ($(date +%s) - $(date -d "$done_at" +%s)) / 3600 ))
+  if [ "$age" -le 36 ]; then ok "the newest backup is $age h old"; else note "the newest backup is $age h old"; fi
+else
+  absent "a successful backup ($BACKUP_STAMP)"
+fi
 
 section "Access"
 if ufw status 2>/dev/null | grep -q '^Status: active'; then

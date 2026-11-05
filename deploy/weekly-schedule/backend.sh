@@ -25,6 +25,11 @@ readonly ORIGINS=https://squadopt.mymandev.com,https://squadopt.pages.dev
 readonly TUNNEL_CONFIG=/etc/cloudflared/config.yml
 readonly TUNNEL_UNIT=cloudflared-squadopt.service
 readonly RECEIVE=/usr/local/sbin/squadopt-receive
+# The backup and the alerts (#1294): three commands, their units and two private settings files.
+readonly WATCH_COMMANDS=(squadopt-alert squadopt-backup squadopt-watch)
+readonly WATCH_UNITS=(squadopt-backup.service squadopt-backup.timer squadopt-watch.service squadopt-watch.timer)
+readonly ALERT_ENV=/etc/squadopt/alert.env
+readonly BACKUP_ENV=/etc/squadopt/backup.env
 
 say() { printf '\n== %s\n' "$*"; }
 refuse() {
@@ -49,7 +54,8 @@ write_if_changed() {
 preflight() {
   [ "$(id -u)" -eq 0 ] || refuse "run as root: bash backend.sh"
   local file
-  for file in squadopt-receive "$TUNNEL_UNIT" cloudflared.example.yml; do
+  for file in squadopt-receive "$TUNNEL_UNIT" cloudflared.example.yml "${WATCH_COMMANDS[@]}" \
+    "${WATCH_UNITS[@]}"; do
     [ -f "$SOURCE/$file" ] || refuse "no $SOURCE/$file: run provision.sh first"
   done
 }
@@ -143,6 +149,39 @@ receive_command() {
   ls -l "$RECEIVE"
 }
 
+backups_and_alerts() {
+  say "The backup to R2 and the alerts through ntfy (#1294)"
+  apt-get install -y -q restic
+  local file changed=no
+  for file in "${WATCH_COMMANDS[@]}"; do
+    write_if_changed "/usr/local/sbin/$file" 0755 <"$SOURCE/$file" || true
+  done
+  for file in "${WATCH_UNITS[@]}"; do
+    if write_if_changed "/etc/systemd/system/$file" 0644 <"$SOURCE/$file"; then
+      changed=yes
+    fi
+  done
+  if [ "$changed" = yes ]; then
+    systemctl daemon-reload
+  fi
+  install -d -m 0755 /var/lib/squadopt/backup /var/lib/squadopt/watch
+  # Each timer starts once a person has written its private settings (README, "Backups and
+  # alerts"); until then it is installed and stays off.
+  if [ -s "$ALERT_ENV" ]; then
+    systemctl enable --now squadopt-watch.timer >/dev/null
+    systemctl is-active squadopt-watch.timer
+  else
+    echo "No $ALERT_ENV yet: the watch is installed and stays off."
+  fi
+  if [ -s "$BACKUP_ENV" ]; then
+    systemctl enable --now squadopt-backup.timer >/dev/null
+    systemctl is-active squadopt-backup.timer
+  else
+    echo "No $BACKUP_ENV yet: the backup is installed and stays off."
+  fi
+  restic version
+}
+
 steps_left() {
   cat <<STEPS
 
@@ -166,6 +205,7 @@ main() {
   release_layout
   tunnel_unit
   receive_command
+  backups_and_alerts
   steps_left
 }
 
