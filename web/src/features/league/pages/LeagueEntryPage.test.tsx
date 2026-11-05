@@ -180,6 +180,8 @@ describe.each(["tr", "en"] as const)("league entry in %s", (language) => {
     const fetcher = legacySite();
     open(language);
     const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: copy.entryMode }));
+    expect(screen.queryByLabelText(copy.label)).toBeNull();
     await user.type(screen.getByLabelText(copy.entryLabel), "4012");
     await user.click(screen.getByRole("button", { name: copy.entrySubmit }));
     expect(await screen.findByRole("heading", { name: "Team destination" })).toBeInTheDocument();
@@ -191,6 +193,7 @@ describe.each(["tr", "en"] as const)("league entry in %s", (language) => {
     const fetcher = legacySite();
     open(language);
     const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: copy.entryMode }));
     await user.type(screen.getByLabelText(copy.entryLabel), "40.12");
     await user.click(screen.getByRole("button", { name: copy.entrySubmit }));
     expect(await screen.findByText(copy.entryInvalid)).toBeInTheDocument();

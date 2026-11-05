@@ -205,3 +205,22 @@ test("/entry/<id> opens one team on its own with a device plan", async ({ page }
   expect(asked).toEqual([`/api/v1/fpl/entry/${ENTRY}/bundle?gw=${TABLE.gameweek}`]);
   await expect(page.getByRole("link", { name: copy.forwarded.backToLeague })).toHaveCount(0);
 });
+
+test("a phone opens a team by ID and keeps the plan and navigation usable", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await serveSite(page, "up");
+  await page.goto("/");
+  await page.getByRole("button", { name: copy.leagueEntry.entryMode, exact: true }).click();
+  await page.getByLabel(copy.leagueEntry.entryLabel, { exact: true }).fill(String(ENTRY));
+  await page.getByRole("button", { name: copy.leagueEntry.entrySubmit, exact: true }).click();
+  await expect(page).toHaveURL(`/entry/${ENTRY}`);
+  await expectDevicePlan(page);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.getByRole("button", { name: copy.shell.openMenu, exact: true }).click();
+  await page
+    .locator("#sidebar")
+    .getByRole("link", { name: copy.shell.fixtures, exact: true })
+    .click();
+  await expect(page).toHaveURL("/fixtures");
+  await expect(page.getByRole("button", { name: copy.shell.openMenu, exact: true })).toBeVisible();
+});

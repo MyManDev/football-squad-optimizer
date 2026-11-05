@@ -47,8 +47,8 @@ function idIn(value: string): number | null {
  * The league number, the first of the two steps in front of every league page. A
  * connected league opens its members list, where the second step asks who the visitor is
  * and then opens their own page. A league the site does not publish opens at its own
- * address, where the league gate reads it from the FPL forwarder (#983 step 4). Under it,
- * a team number opens that one team's page on its own.
+ * address, where the league gate reads it from the FPL forwarder (#983 step 4). Team mode
+ * opens one team's page on its own.
  *
  * `inPlace`: the gate rendered this form at a league address. A connected league then
  * opens the page the address named under that league (an address from before the number
@@ -73,6 +73,7 @@ export function LeagueEntryPage({
 }) {
   const { messages } = useLanguage();
   const copy = messages.leagueEntry;
+  const [mode, setMode] = useState<"league" | "entry">("league");
   const navigate = useNavigate();
   const location = useLocation();
   const { leagueId: remembered, chooseLeague } = useLeagueIdentity();
@@ -175,81 +176,89 @@ export function LeagueEntryPage({
 
   return (
     <div className={styles.page} data-no-match-scene="">
-      <h1 className={styles.title}>{copy.title}</h1>
-      <form onSubmit={submit} className={styles.form} aria-busy={state === "loading"}>
-        <label htmlFor="league-id">{copy.label}</label>
-        <p id="league-entry-hint" className={styles.hint}>
-          {copy.hint}
-        </p>
-        <input
-          id="league-id"
-          name="leagueId"
-          inputMode="numeric"
-          enterKeyHint="go"
-          autoComplete="off"
-          value={value}
-          onChange={(event) => {
-            setValue(event.target.value);
-            setState("idle");
-          }}
-          disabled={state === "loading"}
-          aria-invalid={state === "invalid"}
-          aria-describedby="league-entry-hint league-entry-status"
-        />
-        {/* Where the number is found, folded right under the field that asks for it, so a
+      <h1 className={styles.title}>{mode === "league" ? copy.title : copy.entryTitle}</h1>
+      <div className={styles.modeSwitch}>
+        <button type="button" aria-pressed={mode === "league"} onClick={() => setMode("league")}>
+          {copy.leagueMode}
+        </button>
+        <button type="button" aria-pressed={mode === "entry"} onClick={() => setMode("entry")}>
+          {copy.entryMode}
+        </button>
+      </div>
+      {mode === "league" ? (
+        <form onSubmit={submit} className={styles.form} aria-busy={state === "loading"}>
+          <label htmlFor="league-id">{copy.label}</label>
+          <p id="league-entry-hint" className={styles.hint}>
+            {copy.hint}
+          </p>
+          <input
+            id="league-id"
+            name="leagueId"
+            inputMode="numeric"
+            enterKeyHint="go"
+            autoComplete="off"
+            value={value}
+            onChange={(event) => {
+              setValue(event.target.value);
+              setState("idle");
+            }}
+            disabled={state === "loading"}
+            aria-invalid={state === "invalid"}
+            aria-describedby="league-entry-hint league-entry-status"
+          />
+          {/* Where the number is found, folded right under the field that asks for it, so a
               visitor who does not know it looks no further than the field. */}
-        <FplIdHelp />
-        <button type="submit" disabled={state === "loading"}>
-          {copy.submit}
-        </button>
-        <p id="league-entry-status" className={styles.status} role="status">
-          {status}
-        </p>
-        {/* A forwarder that could not answer: the same league again, or a listed one. */}
-        {state === "cannotOpen" && onRetry !== undefined ? (
-          <button type="button" className={styles.secondary} onClick={onRetry}>
-            {copy.retry}
+          <FplIdHelp />
+          <button type="submit" disabled={state === "loading"}>
+            {copy.submit}
           </button>
-        ) : null}
-        {state === "cannotOpen" && others.length > 0 ? (
-          <nav aria-labelledby="league-entry-listed" className={styles.listed}>
-            <h2 id="league-entry-listed" className={styles.listedTitle}>
-              {copy.listedLeagues}
-            </h2>
-            <ul>
-              {others.map((league) => (
-                <li key={league.leagueId}>
-                  <Link to={leagueAddress(league.leagueId)}>{league.leagueName}</Link>
-                </li>
-              ))}
-            </ul>
-          </nav>
-        ) : null}
-      </form>
-      {/* One team on its own, by its number. A page that needs a league asks for one only. */}
-      <form onSubmit={submitEntry} className={`${styles.form} ${styles.entryForm}`}>
-        <label htmlFor="entry-id">{copy.entryLabel}</label>
-        <input
-          id="entry-id"
-          name="entryId"
-          inputMode="numeric"
-          enterKeyHint="go"
-          autoComplete="off"
-          value={entry}
-          onChange={(event) => {
-            setEntry(event.target.value);
-            setEntryInvalid(false);
-          }}
-          aria-invalid={entryInvalid}
-          aria-describedby="entry-id-status"
-        />
-        <button type="submit" className={styles.secondary}>
-          {copy.entrySubmit}
-        </button>
-        <p id="entry-id-status" aria-live="polite">
-          {entryInvalid ? copy.entryInvalid : ""}
-        </p>
-      </form>
+          <p id="league-entry-status" className={styles.status} role="status">
+            {status}
+          </p>
+          {/* A forwarder that could not answer: the same league again, or a listed one. */}
+          {state === "cannotOpen" && onRetry !== undefined ? (
+            <button type="button" className={styles.secondary} onClick={onRetry}>
+              {copy.retry}
+            </button>
+          ) : null}
+          {state === "cannotOpen" && others.length > 0 ? (
+            <nav aria-labelledby="league-entry-listed" className={styles.listed}>
+              <h2 id="league-entry-listed" className={styles.listedTitle}>
+                {copy.listedLeagues}
+              </h2>
+              <ul>
+                {others.map((league) => (
+                  <li key={league.leagueId}>
+                    <Link to={leagueAddress(league.leagueId)}>{league.leagueName}</Link>
+                  </li>
+                ))}
+              </ul>
+            </nav>
+          ) : null}
+        </form>
+      ) : (
+        <form onSubmit={submitEntry} className={styles.form}>
+          <label htmlFor="entry-id">{copy.entryLabel}</label>
+          <input
+            id="entry-id"
+            name="entryId"
+            inputMode="numeric"
+            enterKeyHint="go"
+            autoComplete="off"
+            value={entry}
+            onChange={(event) => {
+              setEntry(event.target.value);
+              setEntryInvalid(false);
+            }}
+            aria-invalid={entryInvalid}
+            aria-describedby="entry-id-status"
+          />
+          <button type="submit">{copy.entrySubmit}</button>
+          <p id="entry-id-status" className={styles.status} aria-live="polite">
+            {entryInvalid ? copy.entryInvalid : ""}
+          </p>
+        </form>
+      )}
     </div>
   );
 }
