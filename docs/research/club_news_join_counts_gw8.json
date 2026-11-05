@@ -1,0 +1,178 @@
+{
+  "acquisition_log": {
+    "budget_stopped_clubs": [],
+    "call_failed_clubs": [],
+    "coding_refusal_lines": 0,
+    "model_call_budget": 3,
+    "model_calls_attempted": 3,
+    "nothing_selected_clubs": [],
+    "raw_claims_printed": 5,
+    "read_refusal_lines": 0,
+    "refused_before_call_clubs": []
+  },
+  "checks": {
+    "checkout_at_export_commit": true,
+    "claims_accounted": true,
+    "log_capture_id_matches": true,
+    "log_outcomes_match_capture": true,
+    "log_raw_claims_match": true,
+    "news_capture_precedes_decision_capture": true,
+    "replay_matches_manifest": true,
+    "replay_matches_published_table": true,
+    "replay_table_sha256": "bae4ff02e761c3f6e5a7b1e34de2201e0f768ecf76a39ff7782f6d7915f037b1",
+    "source_kind": "capture"
+  },
+  "claims": {
+    "ambiguous": 0,
+    "conflicting_player_claims": 0,
+    "identical_repeats": 0,
+    "in_refused_responses": 0,
+    "joined_to_one_player": 5,
+    "no_match": 0,
+    "other_club_source": 0,
+    "placed": 5,
+    "raw": 5,
+    "raw_per_coded_club": 5,
+    "reached_join": 5,
+    "unknown_team": 0,
+    "unresolved_by_reason": {},
+    "unverifiable_citation_other_club": 0,
+    "unverifiable_citation_own_club": 0,
+    "unverified_club_source": 0
+  },
+  "clubs": {
+    "covered_in_capture": [
+      "Crystal Palace",
+      "Liverpool",
+      "Newcastle"
+    ],
+    "covered_in_table": [
+      "Crystal Palace",
+      "Liverpool",
+      "Newcastle"
+    ],
+    "declared": [
+      "Crystal Palace",
+      "Example FC",
+      "Liverpool",
+      "Newcastle"
+    ],
+    "partially_covered_in_capture": [],
+    "read_not_coded": []
+  },
+  "deadline_timestamp_utc": "2026-10-23T17:30:00Z",
+  "documents": {
+    "by_club": {
+      "Crystal Palace": 11,
+      "Liverpool": 11,
+      "Newcastle": 11
+    },
+    "retained": 33,
+    "with_verified_publication": 30
+  },
+  "hosts": {
+    "answered": 3,
+    "answered_hosts": [
+      "https://www.cpfc.co.uk",
+      "https://www.liverpoolfc.com",
+      "https://www.newcastleunited.com"
+    ],
+    "asked": 3,
+    "asked_hosts": [
+      "https://www.cpfc.co.uk",
+      "https://www.liverpoolfc.com",
+      "https://www.newcastleunited.com"
+    ],
+    "refused": 0,
+    "refused_hosts": [],
+    "registered": 3
+  },
+  "inputs": {
+    "club_news_capture_id": "club-news-20261023T110354Z-dd37130a1a4a",
+    "club_news_captured_at_utc": "2026-10-23T11:03:54.760247Z",
+    "club_news_log_file": "2026-27-gw08-friday-20261023T1058Z.club-news.log",
+    "decision_capture_id": "fpl-live-20261023T111647Z-a2cd55fde426",
+    "decision_captured_at_utc": "2026-10-23T11:16:47.162538Z",
+    "model_identifier": "gemini-3.6-flash",
+    "model_version": "gemini-3.6-flash",
+    "prompt_sha256": "9504baf3778869b9de28f4a0f0e6a0e1e6b20e4d821bfb26a751dd4a551bdd81",
+    "provider": "gemini",
+    "registry_file": "club_news_sources.json",
+    "registry_sha256": "b373f68a6197c0d58e52115507f803f5d31bfdc65ab0b3890f7d7911b6262570",
+    "rotation_export_repository_commit": "f69e68a8fb4e67cfedac369ba50ae40b3b142104",
+    "rotation_table_file": "rotation_evidence_v4_2026-27_gw08_dd37130a1a4a_decision_a2cd55fde426.csv",
+    "rotation_table_sha256": "bae4ff02e761c3f6e5a7b1e34de2201e0f768ecf76a39ff7782f6d7915f037b1"
+  },
+  "loss": {
+    "calls_attempted_and_failed": 0,
+    "excluded_from_lost_unapplied": {
+      "next_match_before_target": 0,
+      "other_competition": 0,
+      "past": 0
+    },
+    "issue_1006": "route_items_3_7_4_10",
+    "lost": 3,
+    "lost_before_table": 0,
+    "lost_unapplied": 3,
+    "lost_unapplied_by_cause": {
+      "publication_day_precision": 0,
+      "publication_not_before_fetch": 0,
+      "publication_unverified": 0,
+      "scope_unverified": 3
+    },
+    "lost_unapplied_scope_unverified_by_scope": {
+      "ambiguous": 2,
+      "unspecified": 1
+    },
+    "responses_without_claims_list": 0,
+    "verdict": "statements_lost"
+  },
+  "protocol": "docs/research/club_news_join_counts_gw8_prereg.md",
+  "reader": {
+    "absence_or_doubt_not_applied_by_scope": {
+      "ambiguous": 2,
+      "unspecified": 1
+    },
+    "absence_or_doubt_statements": 3,
+    "constraining_statements": 0,
+    "double_gameweek_reason": 0,
+    "excluded_not_captain": 0,
+    "excluded_not_starting": 0,
+    "source_check": "cited_documents_held",
+    "statements_read": 5,
+    "words_unresolved": 0,
+    "words_withheld": 0
+  },
+  "record_version": "club_news_join_counts_v2",
+  "registered_pages": {
+    "asked": 3,
+    "read": 3
+  },
+  "reporter": "scripts/report_club_news_join_counts.py",
+  "repository_commit": "f69e68a8fb4e67cfedac369ba50ae40b3b142104",
+  "repository_dirty": false,
+  "responses": {
+    "distinct": 3,
+    "refused_clubs": [],
+    "refused_whole": 0,
+    "refused_without_claims_list": 0,
+    "reused_from_earlier_capture": 0,
+    "stored": 3
+  },
+  "season": "2026-27",
+  "table": {
+    "players_not_addressed": 663,
+    "players_with_conflicting_claims": 0,
+    "players_with_statement": 5,
+    "players_with_unverifiable_citation": 0,
+    "roster_size": 668,
+    "rows": 668,
+    "statements_by_disposition": {
+      "no_statement": 1,
+      "stated_expected_absent": 2,
+      "stated_returning_from_injury": 1,
+      "stated_rotation_risk": 1
+    }
+  },
+  "target_gameweek": 8
+}
