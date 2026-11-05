@@ -10,6 +10,9 @@ Type=oneshot
 EnvironmentFile=/etc/squadopt/backup.env
 EnvironmentFile=-/etc/squadopt/alert.env
 ExecStart=/usr/local/sbin/squadopt-backup
+# restic keeps its index cache here; without a home it would read the whole index from R2 each night.
+Environment=RESTIC_CACHE_DIR=/var/cache/squadopt-restic
+CacheDirectory=squadopt-restic
 Nice=10
 IOSchedulingClass=idle
 TimeoutStartSec=2h

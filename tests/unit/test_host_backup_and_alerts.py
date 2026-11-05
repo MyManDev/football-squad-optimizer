@@ -229,6 +229,7 @@ def test_the_units_start_the_two_commands_at_their_times() -> None:
     assert ("ExecStart", "/usr/local/sbin/squadopt-backup") in backup
     assert ("EnvironmentFile", "/etc/squadopt/backup.env") in backup
     assert ("EnvironmentFile", "-/etc/squadopt/alert.env") in backup
+    assert ("Environment", "RESTIC_CACHE_DIR=/var/cache/squadopt-restic") in backup
     assert ("OnCalendar", "*-*-* 23:30:00 UTC") in _directives(HOST_FILES / "squadopt-backup.timer")
     watch = _directives(HOST_FILES / "squadopt-watch.service")
     assert ("ExecStart", "/usr/local/sbin/squadopt-watch") in watch
