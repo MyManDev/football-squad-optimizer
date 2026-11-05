@@ -183,7 +183,7 @@ test.describe("a return visit", () => {
       await expect(page.getByRole("heading", { level: 1, name: picker.title })).toBeVisible();
       await expect(page).toHaveURL(numbered);
       await expect(page.getByRole("heading", { name: entry.title })).toHaveCount(0);
-      // Onayla keeps the address, its plan included.
+      // Choosing a name keeps the address, its plan included.
       await pickMember(page, exampleMember(member.entry_id!), language);
       await expect(page.getByRole("heading", { level: 1, name: member.team_name! })).toBeVisible();
       await expect(page).toHaveURL(numbered);

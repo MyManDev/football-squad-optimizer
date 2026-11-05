@@ -79,7 +79,7 @@ results, and `--expected-at <UTC instant>` additionally evaluates missed complet
 | top100 | `scripts.capture_top100_cohort`, `scripts.capture_elite_picks`, `scripts.export_player_evidence` | before the deadline; target gameweek ≥ 2 | `fpl-top100-*` and `fpl-elite-picks-*` snapshots; `artifacts/phase_b/player_evidence_v1_<season>_gw<NN>_top100.{csv,manifest.json}` |
 | capture | `squadopt.platform.fpl_capture.capture` with the entry registry and the league list | `data/entries/registry.json` (`scripts.seed_entry_registry`) | `data/snapshots/fpl-live-<utc>-<hash>/` with bootstrap, fixtures, every played event-live document from GW1, every member's three documents, every member's transfers list and, for a member whose history starts at GW1, the GW1 picks (these two are read after the others, and one the source still refuses after the retries is left out with a `missed` line rather than failing the capture), and the standings page |
 | settled outcomes | `application.settled_outcomes.export_settled_outcomes` | stored captures no newer than the selected capture; an earlier week with both pre-deadline and finished/checked captures | immutable table/manifest pairs under `artifacts/rotation`, plus per-run reports; unavailable pairs are stated, never filled with zero outcomes |
-| rotation | `scripts.export_rotation_evidence --snapshot <capture> --deadline-utc …` (only with `--rotation`) | the capture above, and either the committed synthetic fixture or the real club-news capture selected by `--rotation-capture` | `artifacts/rotation/rotation_evidence_v4_<season>_gw<NN>_<news hash>_decision_<decision hash>.{csv,manifest.json}` for a real club-news capture; `rotation_evidence_v4_<season>_gw<NN>_<decision hash>.{csv,manifest.json}` — one row per roster player in that capture, one categorical claim field, and the citation carried as a document digest plus a byte span rather than as text. Written exactly once per capture; a pair already on disk for it is reused rather than remade. With `--rotation`, the league stage also receives this table and its source, and solves every member one-week pure-points plan with the manager word switched on: `advice/<id>/saf-puan/1/hoca-sozu.json` beside the baseline, the index saying `evidence.available` and where the words came from, the site showing the switch, and an example-data label on every surface while the source is the fixture. Without `--rotation` the index says `no_evidence_this_run`, the switch is disabled with that reason, and a `hoca-sozu.json` an earlier publish left is removed (printed by `scripts.build_league_site`, and recorded under the league stage's `removed` in the run's receipt, with every member note under `member_notes`). **So a publish that should keep the switch must pass `--rotation`** (`--rotation` alone reads the fixture; `--rotation-capture <id>` reads a real club-news capture, which the registered hosts can now produce; `scripts\weekly_run.ps1 -Kind friday` always acquires that capture first, using `-ClubNewsSettings <private file>` or the `SQUADOPT_CLUB_NEWS_SETTINGS` setting; it refuses missing configuration or a failed acquisition before starting the weekly decision. The acquisition receipt stays in `data/logs/weekly/<run id>.club-news.log`, separately from the weekly command log). A quote whose words carry wording the site never publishes is withheld and the page says so; the constraint still applies |
+| rotation | `scripts.export_rotation_evidence --snapshot <capture> --deadline-utc …` (only with `--rotation`) | the capture above, and either the committed synthetic fixture or the real club-news capture selected by `--rotation-capture` | `artifacts/rotation/rotation_evidence_v4_<season>_gw<NN>_<news hash>_decision_<decision hash>.{csv,manifest.json}` for a real club-news capture; `rotation_evidence_v4_<season>_gw<NN>_<decision hash>.{csv,manifest.json}`: one row per roster player in that capture, one categorical claim field, and the citation carried as a document digest plus a byte span rather than as text. Written exactly once per capture; a pair already on disk for it is reused rather than remade. With `--rotation`, the league stage also receives this table and its source, and solves every member one-week pure-points plan with the manager word switched on: `advice/<id>/saf-puan/1/hoca-sozu.json` beside the baseline, the index saying `evidence.available` and where the words came from, and the site showing the switch. The page marks no source as example data, so the index is the only place that says the source is the fixture. Without `--rotation` the index says `no_evidence_this_run`, the switch is disabled with no reason beside it, and a `hoca-sozu.json` an earlier publish left is removed (printed by `scripts.build_league_site`, and recorded under the league stage's `removed` in the run's receipt, with every member note under `member_notes`). **So a publish that should keep the switch must pass `--rotation`** (`--rotation` alone reads the fixture; `--rotation-capture <id>` reads a real club-news capture, which the registered hosts can now produce; `scripts\weekly_run.ps1 -Kind friday` always acquires that capture first, using `-ClubNewsSettings <private file>` or the `SQUADOPT_CLUB_NEWS_SETTINGS` setting; it refuses missing configuration or a failed acquisition before starting the weekly decision. The acquisition receipt stays in `data/logs/weekly/<run id>.club-news.log`, separately from the weekly command log). A quote whose words carry wording the site never publishes is withheld, which leaves the player and the role on the page; the constraint still applies |
 | handoff | `scripts.build_projection_handoff --snapshot-id <capture> --evidence-table … --evidence-manifest …` | the capture above and the evidence | `data/handoffs/<season>-gw<NN>.json` — the Phase C component projection with the bounded Top-100 uplift on top (`phase-c-component-elite-top100-v1`); `--projection component-only` leaves the uplift out; without settled live history the producer falls back to the legacy blend and says so |
 | decide | `squadopt.application.commands.decide`, in-process (only with `--decide`; `--chip` as `squadopt gameweek decide` takes it) | the capture and the handoff, each verified at its own stage; a ledger that holds the previous gameweek, and — with `--chip` — an open, unspent chip window, both checked **before** the first capture, so a week the ledger cannot start refuses without spending one. The mode is derived, never asserted: `live` only when this run took the capture and the clock is still before its deadline; a reused `--snapshot-id`, or a run past the deadline, is recorded `replay`. A gameweek the ledger already holds is skipped rather than refused, so a run that died after the decision can rebuild the rest of the week | `data/ledger/<season>/gw<NN>/` — decision, projections, report, manifest; the report is printed |
 | league | `scripts.build_league_site --workers N` | the capture and the handoff | `<preview>/data/leagues/<league id>/**` (and `<preview>/data/leagues.json`, the directory that lists every published league with its tree): `members.json`, `entries/<id>.json`, `advice/<id>/saf-puan/1.json`, `advice/<id>/saf-puan/3.json` and `5.json` (the week-1 projection repeated over the calendar, published with its stated limits), `advice/<id>/<strategy>/1.json` (the standings neighbour), `advice/<id>/<strategy>/1/vs-<rival>.json`, `advice/<id>/index.json` (`windows` names what solved per strategy; a window that did not is in `unavailable` with its reason). Without `--publish` or `--record-advice` this is a local preview and writes no advice record. Either option makes this step write this checkout's `data/advice_records/<season>/gw<NN>/entry-<id>/<snapshot id>/` from the same solve, before `history/<id>.json` reads it, unless `--publish --no-advice-record` turns the record off; the records the season already held are declared as this stage's inputs, so a week whose records moved between two runs shows in the journal |
@@ -215,9 +215,9 @@ what lets the Top-100 column be **net**: the Overall standings publish `event_to
 gross of the week's transfer cost, so a mean over the standings alone is not on the
 members' basis. The picks documents carry each member's own `entry_history`, so when the
 capture covers all hundred of that week the mean is `points - event_transfers_cost` per
-member. Without one — `--skip-top100`, or a picks capture that missed a member — the mean
-is published **gross**, labelled gross, and the card says it does not compare with the
-net columns beside it.
+member. Without one (`--skip-top100`, or a picks capture that missed a member) the mean
+is published **gross**. `top100.basis` in `scoreboard.json` says so, but the page prints
+the figure with no mark beside the net columns, so read the document before comparing them.
 
 ## Timing
 
@@ -460,45 +460,48 @@ squadopt gameweek settle --season 2026-27 --gameweek 4 --snapshot-id <fpl-live i
 python -m scripts.run_week ... --snapshot-id <that id> --skip-top100     # or --publish
 ```
 
-Settling regenerates `docs/season_ledger_2026-27.md` and the scoreboard's row of ours
-fills in on the next site build. Settle stays a separate command on purpose: it needs a
-capture the decision run cannot have taken.
+Settling regenerates `docs/season_ledger_2026-27.md` and the row of ours in
+`scoreboard.json` fills in on the next site build; no page draws that row. Settle stays a
+separate command on purpose: it needs a capture the decision run cannot have taken.
 
 ## What is on the site afterwards
 
-For every member: their squad, the pure-points plan, and — against every other member —
+For every member: their squad, the pure-points plan and, against every other member,
 the two rival strategies the catalogue computes (`ortak-koru`, `fark-yarat`), each with
 captain, vice-captain, eleven, bench order, chip, the expected-points price of the
 constraint net of hits, the overlap and the expected gap. The page reads the index to
-know what exists; a pair no plan could satisfy is listed with its reason, not hidden.
+know what exists. A pair no plan could satisfy stays listed in the index with its reason;
+the page only disables that rival.
 
-The `/league` page carries the weekly scoreboard: per finished gameweek, our paper
-ledger's figure (labelled with its mode), the league members' mean net, the Top-100 mean
-with the basis it is on, the game's average and its highest score, with a cumulative row
-that names the weeks each figure covers. A member's net is their gross week minus the
-transfer cost, read from their own history, and the Top-100 mean is netted the same way
-when the week's picks capture covers the cohort.
+`/league/<id>` carries the weekly scoreboard: per finished gameweek, the league members'
+mean net, the Top-100 mean, the game's average and its highest score, with a cumulative
+row. A member's net is their gross week minus the transfer cost, read from their own
+history, and the Top-100 mean is netted the same way when the week's picks capture covers
+the cohort.
 
-The league table at `/league/<id>/members` no longer draws the system's record beside
-the members; the scoreboard, with its bases, modes and provisional weeks, is on
-`/league/<id>`.
+`scoreboard.json` holds more than the page draws: our paper ledger's row with its mode and
+scoring basis (`ours`), the basis of each Top-100 mean (`top100.basis`), which weeks the
+running totals cover (`cumulative`) and whether a week was data-checked (`data_checked`).
+None of it is on `/league/<id>` or on the league table at `/league/<id>/members`.
 
-Our own figure is not FPL's net and the card says so in both languages: it is the eleven
-the decision named, scored as named. The game's automatic substitutions are not applied,
-and the frozen decision names no vice-captain, so a captain who did not play is not
-recovered. Neither correction is computable from what the ledger holds — the decision
-records its bench as a set, not in the order autosubs walk it — and both would only add
-points, so the row reads low against a real entry. In GW1 the named starters Watkins and
-Mukiele both played nought minutes while the bench held two defenders who played ninety
-and scored 4 and 1, so the published 26 is roughly five short of what that squad would
-have scored as an FPL entry.
+Our own figure in that document is not FPL's net: it is the eleven the decision named,
+scored as named. The game's automatic substitutions are not applied, and the frozen
+decision names no vice-captain, so a captain who did not play is not recovered. Neither
+correction is computable from what the ledger holds (the decision records its bench as a
+set, not in the order autosubs walk it), and both would only add points, so the row reads
+low against a real entry. In GW1 the named starters Watkins and Mukiele both played nought
+minutes while the bench held two defenders who played ninety and scored 4 and 1, so the
+published 26 is roughly five short of what that squad would have scored as an FPL entry.
 
-A gameweek that has finished but has not been data-checked in the capture is marked
-provisional: bonus points land fixture by fixture, so its scores can still move.
+A gameweek that has finished but has not been data-checked in the capture carries
+`data_checked: false` in the document, and the page draws it like any finished week: bonus
+points land fixture by fixture, so its scores can still move.
 
 The member page offers the one-, three- and five-week windows named by the published
-index or the on-demand capabilities. An unavailable selection has a reason; a window
-plan is not a fresh prediction for every later week.
+index or the on-demand capabilities. An unavailable selection keeps its reason in the
+index. The page names the reason only for a chip; anything else it disables, or says in
+general that no plan could be produced. A window plan is not a fresh prediction for every
+later week.
 
 ## From a recorded preview to a release
 

@@ -9,7 +9,8 @@ type TransitionDocument = Document & {
   startViewTransition?: (update: () => Promise<void> | void) => StartedTransition | undefined;
 };
 
-type MediaSource = Pick<Window, "matchMedia"> | undefined;
+type MediaSource =
+  (Pick<Window, "matchMedia"> & { navigator?: Pick<Navigator, "userAgent"> }) | undefined;
 
 /**
  * A page change as one short crossfade (#1131): the View Transitions API snapshots the page
@@ -32,10 +33,18 @@ export function crossfade(
   source: MediaSource = globalThis.window,
   document: TransitionDocument | undefined = globalThis.document,
 ): void {
+  // WebKit's native snapshots can stall or crash these SPA route updates. Use the same
+  // immediate navigation as reduced motion until the engine passes the route regressions.
+  const agent = source?.navigator?.userAgent ?? "";
+  const webkit =
+    /AppleWebKit\//.test(agent) &&
+    /Safari\//.test(agent) &&
+    !/(?:Chrome|Chromium|Edg)\//.test(agent);
   if (
     !document ||
     typeof document.startViewTransition !== "function" ||
-    prefersReducedMotion(source)
+    prefersReducedMotion(source) ||
+    webkit
   ) {
     update();
     return;

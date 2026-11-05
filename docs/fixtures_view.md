@@ -32,8 +32,8 @@ about a match.
 
 A fixture without a kickoff publishes a null `kickoff_utc`. Scores are null unless the
 payload states both; a goalless draw is `0` and `0`, an unplayed match is null and null.
-Before full time a stated score is the score at the capture, so the page shows a score
-only beside `finished`.
+Before full time a stated score is the score at the capture, so only `finished` makes it a
+result. The page prints no score.
 
 A capture without the bootstrap or the fixtures payload publishes no file. So does a
 capture of another season, whose week numbers would sit wrongly beside this season's
@@ -42,14 +42,17 @@ writes the week's other views as usual. Nothing is backfilled from an older capt
 
 ## The page
 
-`/fixtures` lists the upcoming gameweek (`current_gameweek`, or the next week whose
-deadline or kickoffs are still ahead), the gameweek after it, and then every earlier
-gameweek, newest first. It is reached from the sidebar's 'Fikstür' item on every screen
+`/fixtures` shows no played week, no score and no capture date, in two views whose choice
+stays in the address (`?view=team&team=LIV`). The general view is a matrix with a line per
+club and a column per gameweek, over the five gameweeks from the first with its deadline open
+or a fixture still to kick off. A match already behind the clock stays in its cell in a
+quieter tone. The team view is one club's matches still to come, to the end of the season, as
+a grid with day and time. It is reached from the sidebar's 'Fikstür' item on every screen
 and, on a phone, from the 'Fikstür' button in the phone bar. The shell itself reads no
 document: the league-wide lists it used to show in the page margins are gone, and a
-member's own fixtures belong to the member page. None of this keeps state: when a later
-capture names a later `current_gameweek`, next week becomes this week, a new week appears
-as next, and the week that was current joins the archive.
+member's own fixtures belong to the member page. None of this keeps state: the window is read
+from the weeks' own deadlines and kickoffs and the clock, not from `current_gameweek`, since
+the week before that one can still have matches to play, so it rolls on by itself.
 
 A published tree with no `data/fixtures.json` shows the page's "not published yet" line
 and no error.

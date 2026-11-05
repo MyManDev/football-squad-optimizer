@@ -123,8 +123,7 @@ const STATES: Array<[string, LeagueViewEnvelope<EntryAdvice>]> = [
     withAdvice({ data_quality: "partial", missing_fields: ["free_transfers"], moves: [] }),
   ],
   ["legacy document without solver fields", withAdvice({})],
-  // The multi-week window: the per-week table, the stated limits and the found-not-proven
-  // badge, all in expected points and plain sentences.
+  // The multi-week window: the per-week table, in expected points and plain sentences.
   ["three-week window", mockEntryAdviceEnvelope(35249001, "saf-puan", 3)],
   ["five-week window", mockEntryAdviceEnvelope(35249001, "saf-puan", 5)],
 ];
@@ -157,7 +156,6 @@ function mockScoreboardEnvelope(state: "net" | "gross" | "empty"): LeagueViewEnv
       xi: 26,
       hits: 0,
       projected: 56.1,
-      mode: "replay",
       scoring_basis: "named_eleven_no_autosubs",
       vice_captain_named: false,
     },
@@ -167,8 +165,6 @@ function mockScoreboardEnvelope(state: "net" | "gross" | "empty"): LeagueViewEnv
             gameweek: 3,
             basis: "net",
             mean_score: 68.75,
-            hit_points: 4,
-            picks_snapshot_id: "fpl-elite-picks-test",
             cohort_size: 100,
             final: true,
           }
@@ -176,8 +172,6 @@ function mockScoreboardEnvelope(state: "net" | "gross" | "empty"): LeagueViewEnv
             gameweek: 3,
             basis: "gross",
             mean_score: 68.79,
-            hit_points: null,
-            picks_snapshot_id: null,
             cohort_size: 100,
             final: true,
           },
@@ -196,18 +190,11 @@ function mockScoreboardEnvelope(state: "net" | "gross" | "empty"): LeagueViewEnv
       captured_at_utc: "2026-09-07T13:14:14Z",
       cohort_snapshot_id: "fpl-top100-test",
       cohort_picks_snapshot_id: state === "net" ? "fpl-elite-picks-test" : null,
-      registered_members: 15,
-      histories_held: 15,
       gameweeks: [week],
       cumulative: {
         through_gameweek: state === "empty" ? null : 3,
         gameweeks: state === "empty" ? [] : [3],
-        ours_net: state === "empty" ? null : 26,
-        ours_gameweeks: state === "empty" ? [] : [3],
-        ours_basis: state === "empty" ? null : "official_autosub_captain_v2",
-        ours_excluded_gameweeks: [],
         members_mean_total_points: state === "empty" ? null : 199.2,
-        members_gameweeks: state === "empty" ? [] : [3],
         members_counted: state === "empty" ? 0 : 15,
         average_entry_score: state === "empty" ? null : 182,
       },
@@ -275,8 +262,8 @@ describe("a move card claims only what the payload carries", () => {
       transfer_hit_points: 4,
     });
     for (const [language, needle] of [
-      ["en", /expected-point cost/g],
-      ["tr", /beklenen puan maliyeti/g],
+      ["en", /4 hit points/g],
+      ["tr", /4 ceza puanı/g],
     ] as const) {
       const text = renderState(language, advice);
       expect(text.match(needle)).toHaveLength(1);
@@ -286,7 +273,7 @@ describe("a move card claims only what the payload carries", () => {
   it("says nothing about a hit on a document published without the week's charge", () => {
     const legacy = withAdvice({ moves: [MOVE] });
     delete (legacy.payload as { transfer_hit_points?: number }).transfer_hit_points;
-    expect(renderState("en", legacy)).not.toMatch(/expected-point cost/);
+    expect(renderState("en", legacy)).not.toMatch(/\d hit points/);
   });
 
   it("does not caption a one-week plan with a longer window", () => {

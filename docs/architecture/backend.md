@@ -172,7 +172,7 @@ The API version and a document's contract version are different:
 
 - route version `v1` controls HTTP compatibility;
 - `backend_api_v1` controls command/run/error document fields;
-- `ui_view_v1` controls read payloads rendered by the web application.
+- `ui_view_v1` controls the published read payloads; no page reads them.
 
 Breaking a document shape requires a new contract. Breaking route semantics requires a new
 route version. Adding an optional endpoint without changing existing documents does neither.
@@ -197,9 +197,7 @@ The query adapter reads validated application views or their checked artifacts. 
 raw ledger files, snapshot payloads, arbitrary filesystem content, pandas records, NaN, or
 provider credentials. A missing season/gameweek/view is `404`, not an empty success document.
 
-The initial frontend may continue using committed `/data` JSON while these endpoints stabilize.
-Pages migrate one at a time; static JSON and HTTP must validate against the same `ui_view_v1`
-schema during that transition.
+Static JSON and HTTP must validate against the same `ui_view_v1` schema.
 
 ## Implemented advice commands and jobs
 
@@ -209,13 +207,57 @@ schema during that transition.
 | `GET /api/v1/leagues/{league_id}/capabilities` | `league_capabilities_v1`: strategies, windows, available switch inputs and each member's held chips |
 | `GET /api/v1/leagues/{league_id}/entries/{entry_id}/advice` | Cache lookup for strategy, window, optional rival and switches; never starts a solve |
 | `POST /api/v1/leagues/{league_id}/entries/{entry_id}/advice` | Cached answer (`200`) or accepted job (`202`) |
-| `GET /api/v1/advice-jobs/{job_id}` | Public job state: queued, running, completed or failed |
+| `GET /api/v1/advice-jobs/{job_id}` | `advice_job_view_v1`: queued, running, completed or failed, with the job's place in line, the documents it has solved and the workers busy ([the job view](#the-job-view)) |
 | `GET /ready` | Injected readiness checks, or static data-root readiness in the default app |
 | `GET /metrics` | Advice metrics when configured; otherwise `404` |
 
 Advice routes return `503 ADVICE_BACKEND_DISABLED` when their required injected service is
 absent. A missing current capture context is a readiness failure; a valid context with no
 cached answer is a cache miss. These are different states.
+
+### The job view
+
+`GET /api/v1/advice-jobs/{job_id}` answers `advice_job_view_v1`
+(`AdviceSubmitService.public_job_view`). It names the fields it serves rather than serving the
+stored `backend_jobs_v1` record, which carries the client's idempotency key and the worker's
+failure text, and which does not change.
+
+| Field | Value |
+| --- | --- |
+| `contract_version` | `advice_job_view_v1` |
+| `job_id`, `status`, `created_at_utc`, `updated_at_utc`, `attempt` | As the job record has them; `status` is `queued`, `running`, `completed` or `failed` |
+| `error_code` | A failed job's code (listed below); otherwise `null` |
+| `queue_position` | Optional. While `queued`, how many queued jobs will be claimed before this one (0 when it is next); `null` in every other state, and while queued when the service could not read the queue |
+| `progress` | Optional. While `running`, `{"done": d, "total": t}`: the documents this attempt has solved out of those it has to; `null` in every other state, while running until the attempt has recorded its first count, and on a poll that could not read the count |
+| `workers` | Optional. `{"busy": b, "total": t}`: the workers alive now and how many of them hold a job; `null` when the service cannot read them |
+
+The three optional fields came with #978 and did not change the version. A page that reads only
+`job_id`, `status` and `error_code` reads what it did, and a page that knows the fields
+(`adviceClient.ts`, `readJob`) treats each one as possibly absent, since an older service sends
+none of them. This service always sends the three keys, `null` where a field does not apply.
+
+- **The place in line** is counted on the claim order: oldest arrival first, the job id breaking
+  ties (`queue_contracts.claim_order`, the key the queue's scan sorts by and `claim` takes the
+  first queued job from). A waiting job's place only goes down, except by one when a worker dies
+  and recovery puts its job back where it arrived, ahead of the jobs that came after it.
+- **The count** is of documents, never of time, and no percentage is served. `total` is the
+  asked document plus the documents it is priced or compared against that the cache does not
+  hold when the attempt starts (`advice_menu.documents_to_solve`): one for most requests; two
+  for a window or a rival week under a Top 100 setting, and for a rival window; three for a
+  rival window under a setting. It is at least 1 and fixed for the attempt, and `done` only goes
+  up. A solve is not divided further. The worker records the count in `jobs/<job_id>.progress`
+  with the attempt it belongs to, under the queue's lock and after the same ownership check as
+  the claim's heartbeat. Recovery removes it when it walks the job back, so the next attempt
+  counts from 0, and the terminal cleanup removes it when the job finishes. A document another
+  job puts in the cache after the count started is read rather than solved, so a job can finish
+  short of its total; a finished job serves no count.
+- **The workers** are counted from the heartbeat documents by the `/ready` rule (rewritten in the
+  last 120 s). A worker is busy while its document names a job: from the start of its compute
+  to the end of the round.
+
+`queue_position` and `workers` come from the look `/ready` holds for 5 s
+(`READINESS_RECHECK_SECONDS`), because the queue scan holds the queue's lock and every waiting
+member polls; they can be up to 5 s older than `status`. `progress` is read on each poll.
 
 The POST body contains `strategy`, `window`, optional `rival_entry_id`, and the two optional
 switches of the member menu: `top100_weight` (one of 0, 5, 10, 20, 30, 40, 50; default 0) and
@@ -273,7 +315,7 @@ says which of them each strategy computes. Strategy registration differs from ex
 support; only wired constraints can produce a plan. The current public advice envelope
 contains expected-point trade-offs, not member-facing probability claims.
 
-The frontend's general pages still use `StaticDataClient`. The member advice client optionally
+The frontend's pages read the published static files. The member advice client optionally
 uses `VITE_ADVICE_API_ORIGIN` and can fall back to the published static answer. The member page
 renders returned advice and retains compute controls when published advice is absent.
 
@@ -294,17 +336,21 @@ Which selections may request a computation is decided in one place, the selectio
   setting wherever the plan may be asked, the word on the one-week pure-points plan only.
 
 Capabilities that fail to load, fail validation, or name another league, season, gameweek or
-`capture_snapshot_id` than the squad on screen are no capabilities: the page is the static
-page with one notice in the compute panel. The client sends an `Idempotency-Key` per click,
-keeps the job id in `sessionStorage` so a reload resumes the wait, waits 3, 6 and 10 minutes
-for windows 1, 3 and 5, and turns the error codes below into sentences; a code it does not
-know gets a general sentence, and the service's `message` is never shown. The legacy play
-modes are displayed from the published tree only and are not aliases for the member strategies.
+`capture_snapshot_id` than the squad on screen are no capabilities: the page keeps to the
+published tree and says nothing about a mismatch, and on another capture the compute button is
+disabled. To see a mismatch, compare `capture_snapshot_id` in the capabilities document with
+`source_snapshot_id` in a member's squad document. `/ready` cannot show it: its
+`league_tree_matches_capture` compares season and gameweek only. The client sends an
+`Idempotency-Key` per click, keeps the job id in `sessionStorage` so a reload resumes the wait,
+waits 3, 6 and 10 minutes for windows 1, 3 and 5, and turns the error codes below into
+sentences; a code it does not know gets a general sentence, and the service's `message` is never
+shown. The legacy play modes are displayed from the published tree only and are not aliases for
+the member strategies.
 
 Advice responses must match the selected league, member, mode, window and displayed season/week.
-A refreshed squad invalidates earlier jobs and results. Static answers are labelled published
-plans, and request rejections are not turned into successful static computations. Enabling an
-origin still requires a deployment of the worker and capture-context assembly described above.
+A refreshed squad invalidates earlier jobs and results. Request rejections are not turned into
+successful static computations. Enabling an origin still requires a deployment of the worker
+and capture-context assembly described above.
 
 ## Planned operator HTTP commands
 

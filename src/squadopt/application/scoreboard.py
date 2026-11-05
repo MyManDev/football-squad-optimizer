@@ -54,7 +54,7 @@ Where each number comes from, and what it is:
     ``event_total``, which is **before** the transfer cost (in the 2026-09-07 capture,
     entry 7018833's standings row reads ``event_total 78`` while its own history reads
     ``points 78, event_transfers_cost 4``). A gross mean is not comparable with the net
-    columns, and the card says so rather than letting it sit beside them unmarked.
+    columns. ``basis`` is where that is said: the page prints the figure with no mark.
 """
 
 import json

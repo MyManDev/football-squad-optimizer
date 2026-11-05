@@ -133,7 +133,6 @@ export function ContributePage() {
       })) as { id?: unknown; status?: unknown };
       if (result?.status !== "pending" || !Number.isInteger(result.id))
         throw new Error("unavailable");
-      return result;
     },
     onSuccess: () => {
       setBody("");
@@ -168,8 +167,8 @@ export function ContributePage() {
         <div role="alert">
           <p>
             {tr
-              ? "Katkı servisine şu an ulaşılamıyor. Yorum gönderilmedi."
-              : "The contribution service is unavailable. No comment was submitted."}
+              ? "Katkı servisine şu an ulaşılamıyor."
+              : "The contribution service is unavailable."}
           </p>
           <button onClick={() => void players.refetch()}>{tr ? "Yeniden dene" : "Retry"}</button>
         </div>
@@ -304,9 +303,8 @@ export function ContributePage() {
               {submit.isSuccess && (
                 <p role="status">
                   {tr
-                    ? "Yorumun kaydedildi; yönetici onayı bekliyor. Henüz herkese açık değil."
-                    : "Your comment was saved and awaits moderation. It is not public yet."}{" "}
-                  #{String(submit.data.id)}
+                    ? "Yorumun kaydedildi; yönetici onayı bekliyor."
+                    : "Your comment was saved and awaits moderation."}
                 </p>
               )}
               {submit.isError && (
@@ -358,13 +356,6 @@ export function ContributePage() {
                         )}
                       </article>
                     ))}
-                    {feed.data?.length === 50 && (
-                      <p>
-                        {tr
-                          ? "En son 50 onaylı yorum gösteriliyor."
-                          : "Showing the latest 50 approved comments."}
-                      </p>
-                    )}
                   </>
                 )}
               </section>

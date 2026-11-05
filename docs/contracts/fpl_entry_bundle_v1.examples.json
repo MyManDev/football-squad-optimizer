@@ -1,0 +1,709 @@
+{
+  "free_hit_walk_back": {
+    "contract_version": "fpl_entry_bundle_v1",
+    "entry_id": 101,
+    "gameweek": 10,
+    "source_time": "2026-10-19T17:30:00.000Z",
+    "entry": {
+      "id": 101,
+      "name": "Synthetic XI",
+      "started_event": 1
+    },
+    "history": {
+      "current": [
+        {
+          "event": 1,
+          "event_transfers": 0,
+          "event_transfers_cost": 0,
+          "bank": 5
+        },
+        {
+          "event": 2,
+          "event_transfers": 1,
+          "event_transfers_cost": 0,
+          "bank": 5
+        },
+        {
+          "event": 3,
+          "event_transfers": 0,
+          "event_transfers_cost": 0,
+          "bank": 5
+        },
+        {
+          "event": 4,
+          "event_transfers": 0,
+          "event_transfers_cost": 0,
+          "bank": 5
+        },
+        {
+          "event": 5,
+          "event_transfers": 1,
+          "event_transfers_cost": 0,
+          "bank": 5
+        },
+        {
+          "event": 6,
+          "event_transfers": 0,
+          "event_transfers_cost": 0,
+          "bank": 5
+        },
+        {
+          "event": 7,
+          "event_transfers": 0,
+          "event_transfers_cost": 0,
+          "bank": 5
+        },
+        {
+          "event": 8,
+          "event_transfers": 0,
+          "event_transfers_cost": 0,
+          "bank": 5
+        },
+        {
+          "event": 9,
+          "event_transfers": 1,
+          "event_transfers_cost": 0,
+          "bank": 5
+        }
+      ],
+      "chips": [
+        {
+          "name": "wildcard",
+          "event": 4
+        },
+        {
+          "name": "freehit",
+          "event": 9
+        }
+      ]
+    },
+    "transfers": [
+      {
+        "entry": 101,
+        "event": 2,
+        "time": "2026-08-23T17:30:00.000Z",
+        "element_in": 120,
+        "element_in_cost": 55,
+        "element_out": 114,
+        "element_out_cost": 55
+      },
+      {
+        "entry": 101,
+        "event": 5,
+        "time": "2026-09-12T17:30:00.000Z",
+        "element_in": 121,
+        "element_in_cost": 55,
+        "element_out": 115,
+        "element_out_cost": 55
+      },
+      {
+        "entry": 101,
+        "event": 9,
+        "time": "2026-10-10T17:30:00.000Z",
+        "element_in": 301,
+        "element_in_cost": 55,
+        "element_out": 101,
+        "element_out_cost": 55
+      }
+    ],
+    "picks": [
+      {
+        "active_chip": null,
+        "automatic_subs": [],
+        "entry_history": {
+          "event": 1,
+          "bank": 5,
+          "value": 995
+        },
+        "picks": [
+          {
+            "element": 101,
+            "position": 1,
+            "multiplier": 1,
+            "is_captain": false,
+            "is_vice_captain": false
+          },
+          {
+            "element": 102,
+            "position": 2,
+            "multiplier": 1,
+            "is_captain": false,
+            "is_vice_captain": false
+          },
+          {
+            "element": 103,
+            "position": 3,
+            "multiplier": 1,
+            "is_captain": false,
+            "is_vice_captain": false
+          },
+          {
+            "element": 104,
+            "position": 4,
+            "multiplier": 1,
+            "is_captain": false,
+            "is_vice_captain": false
+          },
+          {
+            "element": 105,
+            "position": 5,
+            "multiplier": 1,
+            "is_captain": false,
+            "is_vice_captain": false
+          },
+          {
+            "element": 106,
+            "position": 6,
+            "multiplier": 1,
+            "is_captain": false,
+            "is_vice_captain": false
+          },
+          {
+            "element": 107,
+            "position": 7,
+            "multiplier": 1,
+            "is_captain": false,
+            "is_vice_captain": false
+          },
+          {
+            "element": 108,
+            "position": 8,
+            "multiplier": 1,
+            "is_captain": false,
+            "is_vice_captain": false
+          },
+          {
+            "element": 109,
+            "position": 9,
+            "multiplier": 1,
+            "is_captain": false,
+            "is_vice_captain": false
+          },
+          {
+            "element": 110,
+            "position": 10,
+            "multiplier": 2,
+            "is_captain": true,
+            "is_vice_captain": false
+          },
+          {
+            "element": 111,
+            "position": 11,
+            "multiplier": 1,
+            "is_captain": false,
+            "is_vice_captain": true
+          },
+          {
+            "element": 112,
+            "position": 12,
+            "multiplier": 0,
+            "is_captain": false,
+            "is_vice_captain": false
+          },
+          {
+            "element": 113,
+            "position": 13,
+            "multiplier": 0,
+            "is_captain": false,
+            "is_vice_captain": false
+          },
+          {
+            "element": 114,
+            "position": 14,
+            "multiplier": 0,
+            "is_captain": false,
+            "is_vice_captain": false
+          },
+          {
+            "element": 115,
+            "position": 15,
+            "multiplier": 0,
+            "is_captain": false,
+            "is_vice_captain": false
+          }
+        ]
+      },
+      {
+        "active_chip": null,
+        "automatic_subs": [],
+        "entry_history": {
+          "event": 8,
+          "bank": 5,
+          "value": 1003
+        },
+        "picks": [
+          {
+            "element": 101,
+            "position": 1,
+            "multiplier": 1,
+            "is_captain": false,
+            "is_vice_captain": false
+          },
+          {
+            "element": 102,
+            "position": 2,
+            "multiplier": 1,
+            "is_captain": false,
+            "is_vice_captain": false
+          },
+          {
+            "element": 103,
+            "position": 3,
+            "multiplier": 1,
+            "is_captain": false,
+            "is_vice_captain": false
+          },
+          {
+            "element": 104,
+            "position": 4,
+            "multiplier": 1,
+            "is_captain": false,
+            "is_vice_captain": false
+          },
+          {
+            "element": 105,
+            "position": 5,
+            "multiplier": 1,
+            "is_captain": false,
+            "is_vice_captain": false
+          },
+          {
+            "element": 106,
+            "position": 6,
+            "multiplier": 1,
+            "is_captain": false,
+            "is_vice_captain": false
+          },
+          {
+            "element": 107,
+            "position": 7,
+            "multiplier": 1,
+            "is_captain": false,
+            "is_vice_captain": false
+          },
+          {
+            "element": 108,
+            "position": 8,
+            "multiplier": 1,
+            "is_captain": false,
+            "is_vice_captain": false
+          },
+          {
+            "element": 109,
+            "position": 9,
+            "multiplier": 1,
+            "is_captain": false,
+            "is_vice_captain": false
+          },
+          {
+            "element": 110,
+            "position": 10,
+            "multiplier": 2,
+            "is_captain": true,
+            "is_vice_captain": false
+          },
+          {
+            "element": 111,
+            "position": 11,
+            "multiplier": 1,
+            "is_captain": false,
+            "is_vice_captain": true
+          },
+          {
+            "element": 112,
+            "position": 12,
+            "multiplier": 0,
+            "is_captain": false,
+            "is_vice_captain": false
+          },
+          {
+            "element": 113,
+            "position": 13,
+            "multiplier": 0,
+            "is_captain": false,
+            "is_vice_captain": false
+          },
+          {
+            "element": 120,
+            "position": 14,
+            "multiplier": 0,
+            "is_captain": false,
+            "is_vice_captain": false
+          },
+          {
+            "element": 121,
+            "position": 15,
+            "multiplier": 0,
+            "is_captain": false,
+            "is_vice_captain": false
+          }
+        ]
+      },
+      {
+        "active_chip": "freehit",
+        "automatic_subs": [],
+        "entry_history": {
+          "event": 9,
+          "bank": 5,
+          "value": 1003
+        },
+        "picks": [
+          {
+            "element": 301,
+            "position": 1,
+            "multiplier": 1,
+            "is_captain": false,
+            "is_vice_captain": false
+          },
+          {
+            "element": 302,
+            "position": 2,
+            "multiplier": 1,
+            "is_captain": false,
+            "is_vice_captain": false
+          },
+          {
+            "element": 303,
+            "position": 3,
+            "multiplier": 1,
+            "is_captain": false,
+            "is_vice_captain": false
+          },
+          {
+            "element": 304,
+            "position": 4,
+            "multiplier": 1,
+            "is_captain": false,
+            "is_vice_captain": false
+          },
+          {
+            "element": 305,
+            "position": 5,
+            "multiplier": 2,
+            "is_captain": true,
+            "is_vice_captain": false
+          },
+          {
+            "element": 306,
+            "position": 6,
+            "multiplier": 1,
+            "is_captain": false,
+            "is_vice_captain": true
+          },
+          {
+            "element": 307,
+            "position": 7,
+            "multiplier": 1,
+            "is_captain": false,
+            "is_vice_captain": false
+          },
+          {
+            "element": 308,
+            "position": 8,
+            "multiplier": 1,
+            "is_captain": false,
+            "is_vice_captain": false
+          },
+          {
+            "element": 309,
+            "position": 9,
+            "multiplier": 1,
+            "is_captain": false,
+            "is_vice_captain": false
+          },
+          {
+            "element": 310,
+            "position": 10,
+            "multiplier": 1,
+            "is_captain": false,
+            "is_vice_captain": false
+          },
+          {
+            "element": 311,
+            "position": 11,
+            "multiplier": 1,
+            "is_captain": false,
+            "is_vice_captain": false
+          },
+          {
+            "element": 312,
+            "position": 12,
+            "multiplier": 0,
+            "is_captain": false,
+            "is_vice_captain": false
+          },
+          {
+            "element": 313,
+            "position": 13,
+            "multiplier": 0,
+            "is_captain": false,
+            "is_vice_captain": false
+          },
+          {
+            "element": 314,
+            "position": 14,
+            "multiplier": 0,
+            "is_captain": false,
+            "is_vice_captain": false
+          },
+          {
+            "element": 315,
+            "position": 15,
+            "multiplier": 0,
+            "is_captain": false,
+            "is_vice_captain": false
+          }
+        ]
+      }
+    ],
+    "current_week": {
+      "entry_id": 101,
+      "gameweek": 9,
+      "pick_order": [
+        301,
+        302,
+        303,
+        304,
+        305,
+        306,
+        307,
+        308,
+        309,
+        310,
+        311,
+        312,
+        313,
+        314,
+        315
+      ],
+      "captain": 305,
+      "vice": 306,
+      "active_chip": "freehit",
+      "transfer_cost": 0,
+      "entry_history_points": 72
+    }
+  },
+  "late_joiner": {
+    "contract_version": "fpl_entry_bundle_v1",
+    "entry_id": 202,
+    "gameweek": 10,
+    "source_time": "2026-10-19T17:30:00.000Z",
+    "entry": {
+      "id": 202,
+      "name": "Late Synthetic",
+      "started_event": 4
+    },
+    "history": {
+      "current": [
+        {
+          "event": 4,
+          "event_transfers": 0,
+          "event_transfers_cost": 0,
+          "bank": 5
+        },
+        {
+          "event": 5,
+          "event_transfers": 0,
+          "event_transfers_cost": 0,
+          "bank": 5
+        },
+        {
+          "event": 6,
+          "event_transfers": 1,
+          "event_transfers_cost": 0,
+          "bank": 5
+        },
+        {
+          "event": 7,
+          "event_transfers": 0,
+          "event_transfers_cost": 0,
+          "bank": 5
+        },
+        {
+          "event": 8,
+          "event_transfers": 0,
+          "event_transfers_cost": 0,
+          "bank": 5
+        },
+        {
+          "event": 9,
+          "event_transfers": 1,
+          "event_transfers_cost": 4,
+          "bank": 5
+        }
+      ],
+      "chips": []
+    },
+    "transfers": [
+      {
+        "entry": 202,
+        "event": 6,
+        "time": "2026-09-20T17:30:00.000Z",
+        "element_in": 220,
+        "element_in_cost": 55,
+        "element_out": 215,
+        "element_out_cost": 55
+      },
+      {
+        "entry": 202,
+        "event": 9,
+        "time": "2026-10-10T17:30:00.000Z",
+        "element_in": 214,
+        "element_in_cost": 55,
+        "element_out": 216,
+        "element_out_cost": 55
+      }
+    ],
+    "picks": [
+      {
+        "active_chip": null,
+        "automatic_subs": [
+          {
+            "entry": 202,
+            "event": 9,
+            "element_in": 213,
+            "element_out": 203
+          }
+        ],
+        "entry_history": {
+          "event": 9,
+          "bank": 5,
+          "value": 1003
+        },
+        "picks": [
+          {
+            "element": 201,
+            "position": 1,
+            "multiplier": 1,
+            "is_captain": false,
+            "is_vice_captain": false
+          },
+          {
+            "element": 202,
+            "position": 2,
+            "multiplier": 1,
+            "is_captain": false,
+            "is_vice_captain": false
+          },
+          {
+            "element": 213,
+            "position": 3,
+            "multiplier": 1,
+            "is_captain": false,
+            "is_vice_captain": false
+          },
+          {
+            "element": 204,
+            "position": 4,
+            "multiplier": 1,
+            "is_captain": false,
+            "is_vice_captain": false
+          },
+          {
+            "element": 205,
+            "position": 5,
+            "multiplier": 2,
+            "is_captain": true,
+            "is_vice_captain": false
+          },
+          {
+            "element": 206,
+            "position": 6,
+            "multiplier": 1,
+            "is_captain": false,
+            "is_vice_captain": true
+          },
+          {
+            "element": 207,
+            "position": 7,
+            "multiplier": 1,
+            "is_captain": false,
+            "is_vice_captain": false
+          },
+          {
+            "element": 208,
+            "position": 8,
+            "multiplier": 1,
+            "is_captain": false,
+            "is_vice_captain": false
+          },
+          {
+            "element": 209,
+            "position": 9,
+            "multiplier": 1,
+            "is_captain": false,
+            "is_vice_captain": false
+          },
+          {
+            "element": 210,
+            "position": 10,
+            "multiplier": 1,
+            "is_captain": false,
+            "is_vice_captain": false
+          },
+          {
+            "element": 211,
+            "position": 11,
+            "multiplier": 1,
+            "is_captain": false,
+            "is_vice_captain": false
+          },
+          {
+            "element": 212,
+            "position": 12,
+            "multiplier": 0,
+            "is_captain": false,
+            "is_vice_captain": false
+          },
+          {
+            "element": 203,
+            "position": 13,
+            "multiplier": 0,
+            "is_captain": false,
+            "is_vice_captain": false
+          },
+          {
+            "element": 214,
+            "position": 14,
+            "multiplier": 0,
+            "is_captain": false,
+            "is_vice_captain": false
+          },
+          {
+            "element": 220,
+            "position": 15,
+            "multiplier": 0,
+            "is_captain": false,
+            "is_vice_captain": false
+          }
+        ]
+      }
+    ],
+    "current_week": {
+      "entry_id": 202,
+      "gameweek": 9,
+      "pick_order": [
+        201,
+        202,
+        203,
+        204,
+        205,
+        206,
+        207,
+        208,
+        209,
+        210,
+        211,
+        212,
+        213,
+        214,
+        220
+      ],
+      "captain": 205,
+      "vice": 206,
+      "active_chip": null,
+      "transfer_cost": 4,
+      "entry_history_points": 47
+    }
+  }
+}

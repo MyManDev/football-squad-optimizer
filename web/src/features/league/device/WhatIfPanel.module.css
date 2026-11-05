@@ -59,7 +59,7 @@
 }
 
 .headline dd {
-  color: var(--color-lime);
+  color: var(--color-mark);
 }
 
 .breaks {
@@ -93,8 +93,11 @@
   transition: background-color var(--motion-ui) var(--motion-ease);
 }
 
+/* The focus colour is the mark's at night, so a ring on this row takes the mark's ink. */
 .player[data-changed] {
-  background: var(--color-lime);
+  --color-focus: var(--color-mark-text);
+  background: var(--color-mark);
+  color: var(--color-mark-text);
 }
 
 .position {
@@ -134,11 +137,24 @@
   cursor: pointer;
 }
 
+/* What names its own colour above takes the mark's ink on a changed row. */
+.player[data-changed] .meta,
+.player[data-changed] .remove {
+  border-color: var(--color-mark-text);
+  color: var(--color-mark-text);
+}
+
 .add {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+  font-weight: 600;
+}
+
+.field {
   display: grid;
   gap: var(--space-1);
   min-width: 0;
-  font-weight: 600;
 }
 
 .addRow {
@@ -153,4 +169,15 @@
   min-width: 0;
   min-height: 44px;
   font: inherit;
+}
+
+.add input[type="search"] {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-s);
+  background: var(--color-surface-2);
+  color: var(--color-text);
 }

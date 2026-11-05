@@ -13,14 +13,21 @@
  *
  * Patience follows the window asked for, the wait is polled less often after its first
  * minute, a failure keeps the service's coded reason so the panel can say what happened,
- * and the job id is remembered for the tab so a reload resumes the wait.
+ * and the job id is remembered for the tab so a reload resumes the wait. While it waits, the
+ * state carries how the wait is going, each part as the service last said it.
  */
 
 import { cancellableDelay, withRequestDeadline } from "../../../data/request";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { WindowSize } from "../../../lib/decisionVocabulary";
-import type { AdviceClient, AdviceRequest, AdviceSource } from "./adviceClient";
+import type {
+  AdviceClient,
+  AdviceJobProgress,
+  AdviceJobWorkers,
+  AdviceRequest,
+  AdviceSource,
+} from "./adviceClient";
 import { AdviceApiError, newIdempotencyKey } from "./adviceClient";
 import {
   adviceRequestKey,
@@ -62,17 +69,28 @@ export interface EarlierAnswer {
   source: AdviceSource;
 }
 
+export interface WaitingPhase {
+  phase: "waiting";
+  request: AdviceRequest;
+  jobId: string;
+  /** Where the job stands, as the service said it; null until it has, after a reload. */
+  status: "queued" | "running" | null;
+  fallback: LeagueViewEnvelope<EntryAdvice> | null;
+  earlier?: EarlierAnswer | null;
+  /** The job's place in line while it is queued; absent until the service says it. */
+  queuePosition?: number;
+  /** The documents solved while it runs; absent until the service says it. */
+  progress?: AdviceJobProgress;
+  /** The workers at work; absent until the service says it. */
+  workers?: AdviceJobWorkers;
+  /** How many times the service has answered this wait, so the page can mark each answer. */
+  answers?: number;
+}
+
 export type ComputePhase =
   | { phase: "idle" }
   | { phase: "requesting"; request: AdviceRequest; earlier?: EarlierAnswer | null }
-  | {
-      phase: "waiting";
-      request: AdviceRequest;
-      jobId: string;
-      status: "queued" | "running";
-      fallback: LeagueViewEnvelope<EntryAdvice> | null;
-      earlier?: EarlierAnswer | null;
-    }
+  | WaitingPhase
   | {
       phase: "done";
       request: AdviceRequest;
@@ -234,7 +252,7 @@ export function useAdviceJob(
       };
       setState(
         resumed
-          ? { phase: "waiting", request, jobId: resumed.jobId, status: "queued", fallback: null }
+          ? { phase: "waiting", request, jobId: resumed.jobId, status: null, fallback: null }
           : { phase: "requesting", request },
       );
 
@@ -244,6 +262,7 @@ export function useAdviceJob(
           const options = { signal };
           let jobId: string;
           let startedAt: number;
+          let status: WaitingPhase["status"] = null;
           if (resumed) {
             ({ jobId, startedAt } = resumed);
           } else {
@@ -274,6 +293,7 @@ export function useAdviceJob(
               return;
             }
             jobId = outcome.jobId;
+            status = outcome.status ?? "queued";
             startedAt = Date.now();
             rememberJob(request, { jobId, startedAt });
           }
@@ -300,16 +320,25 @@ export function useAdviceJob(
             fallback = null; // the wait is just quieter
           }
           if (!alive()) return;
-          setState({ phase: "waiting", request, jobId, status: "queued", fallback });
+          setState({ phase: "waiting", request, jobId, status, fallback });
 
-          while (Date.now() - startedAt < patience) {
-            const waited = Date.now() - startedAt;
-            await cancellableDelay(
-              waited < SLOW_POLL_AFTER_MS ? POLL_INTERVAL_MS : SLOW_POLL_INTERVAL_MS,
-              signal,
-            );
-            signal.throwIfAborted();
-            if (!alive()) return;
+          // A wait picked up after a reload has heard nothing yet: its first question takes no
+          // delay, and it is asked even if the baseline's read has used up the patience.
+          let askNow = resumed !== null;
+          let answers = 0;
+          let attempt: number | undefined;
+          let progress: AdviceJobProgress | undefined;
+          while (askNow || Date.now() - startedAt < patience) {
+            if (!askNow) {
+              const waited = Date.now() - startedAt;
+              await cancellableDelay(
+                waited < SLOW_POLL_AFTER_MS ? POLL_INTERVAL_MS : SLOW_POLL_INTERVAL_MS,
+                signal,
+              );
+              signal.throwIfAborted();
+              if (!alive()) return;
+            }
+            askNow = false;
             let job;
             try {
               job = await client.readJob(jobId, options);
@@ -358,7 +387,23 @@ export function useAdviceJob(
               fail(undefined, job.errorCode ?? undefined);
               return;
             }
-            setState({ phase: "waiting", request, jobId, status: job.status, fallback });
+            answers += 1;
+            // A poll that could not read the count does not take it back: `done` only goes up
+            // within an attempt, and a new attempt starts again.
+            const sameRun = job.status === "running" && job.attempt === attempt;
+            progress = job.progress ?? (sameRun ? progress : undefined);
+            attempt = job.attempt;
+            setState({
+              phase: "waiting",
+              request,
+              jobId,
+              status: job.status,
+              fallback,
+              queuePosition: job.queuePosition,
+              progress,
+              workers: job.workers,
+              answers,
+            });
           }
           if (alive()) {
             forgetJob(request);

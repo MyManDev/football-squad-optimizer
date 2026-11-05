@@ -1,0 +1,132 @@
+/**
+ * The device solve at work in the middle of the screen: it counts the run's stages done of all,
+ * never as a percentage, and goes once nothing counts.
+ */
+
+import { cleanup, render, screen, within } from "@testing-library/react";
+import { afterEach, describe, expect, it } from "vitest";
+
+import { LanguageProvider } from "../../../i18n/LanguageProvider";
+import { MESSAGES } from "../../../i18n/messages";
+import { AS_A_CHANCE } from "../../../testSupport/honesty";
+import { DeviceProgressPanel } from "./DeviceProgressPanel";
+import { progressShare } from "./progress";
+import type { DevicePlanPhase } from "./useDevicePlan";
+
+afterEach(cleanup);
+
+function show(state: DevicePlanPhase, language: "tr" | "en" = "tr") {
+  return render(
+    <LanguageProvider initialLanguage={language}>
+      <DeviceProgressPanel state={state} />
+    </LanguageProvider>,
+  );
+}
+
+const DONE = {
+  phase: "done",
+  envelope: {} as never,
+  chipTiming: null,
+} as const satisfies DevicePlanPhase;
+
+describe("the share of a device run", () => {
+  it("is nothing before the inputs say how much there is, then the stages done of all", () => {
+    expect(progressShare({ step: "inputs", done: 0, total: null })).toBe(0);
+    expect(progressShare({ step: "plan", done: 2, total: 7 })).toBeCloseTo(2 / 7);
+    expect(progressShare({ step: "chips", done: 7, total: 7 })).toBe(1);
+  });
+});
+
+describe("the progress card", () => {
+  it("stands over the page with the count and a progress bar, and lists no stages", () => {
+    const copy = MESSAGES.tr.leagueMembers;
+    show({ phase: "solving", progress: { step: "plan", done: 2, total: 7 } });
+    const card = screen.getByRole("region", { name: copy.deviceSolving });
+    // Drawn into the body, outside the component's own place.
+    expect(card.closest("[data-device-progress]")?.parentElement).toBe(document.body);
+    const bar = within(card).getByRole("progressbar", { name: copy.deviceSolving });
+    expect(bar).toHaveAttribute("aria-valuenow", "29");
+    expect(card).toHaveTextContent("2/7");
+    expect(bar.getAttribute("aria-valuetext")).toBe("2/7");
+    // The card is drawn into the body, so the member-page rule is read over the whole body.
+    expect(document.body.textContent).not.toMatch(AS_A_CHANCE);
+    expect(bar.getAttribute("aria-valuetext")).not.toMatch(AS_A_CHANCE);
+    expect(within(card).queryAllByRole("listitem")).toEqual([]);
+  });
+
+  it("keeps counting after the plan is shown", () => {
+    show({ ...DONE, progress: { step: "chips", done: 5, total: 7 } }, "en");
+    expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "71");
+    expect(document.body.textContent).not.toMatch(AS_A_CHANCE);
+    expect(screen.getByRole("progressbar").getAttribute("aria-valuetext")).not.toMatch(AS_A_CHANCE);
+  });
+
+  it("draws no count before the inputs say how many stages there are", () => {
+    show({ phase: "loading", progress: { step: "inputs", done: 0, total: null } });
+    const bar = screen.getByRole("progressbar");
+    expect(bar).toHaveAttribute("aria-valuenow", "0");
+    expect(bar.getAttribute("aria-valuetext")).toBeNull();
+    expect(document.querySelector("[data-device-progress]")?.textContent).not.toMatch(/\d+\/\d+/);
+  });
+
+  it("makes the page behind inert with focus on the card, and gives both back when it goes", () => {
+    const copy = MESSAGES.tr.leagueMembers;
+    const button = document.body.appendChild(document.createElement("button"));
+    const closed = document.body.appendChild(document.createElement("div"));
+    closed.setAttribute("inert", "");
+    const returnFocus = { current: button };
+    const card = (state: DevicePlanPhase) => (
+      <LanguageProvider initialLanguage="tr">
+        <DeviceProgressPanel state={state} returnFocus={returnFocus} />
+      </LanguageProvider>
+    );
+    const { container, rerender, unmount } = render(
+      card({ phase: "loading", progress: { step: "inputs", done: 0, total: null } }),
+    );
+    expect(screen.getByRole("region", { name: copy.deviceSolving })).toHaveFocus();
+    expect(container).toHaveAttribute("inert");
+    expect(button).toHaveAttribute("inert");
+    // The card itself stays reachable.
+    expect(document.querySelector("[data-device-progress]")).not.toHaveAttribute("inert");
+
+    // The run moves on under the same cover: focus stays where it is.
+    rerender(card({ phase: "solving", progress: { step: "plan", done: 2, total: 3 } }));
+    expect(screen.getByRole("region", { name: copy.deviceSolving })).toHaveFocus();
+    expect(container).toHaveAttribute("inert");
+
+    rerender(card(DONE));
+    expect(container).not.toHaveAttribute("inert");
+    expect(button).not.toHaveAttribute("inert");
+    expect(button).toHaveFocus();
+    // What was inert before the cover stays so: it was not the cover's to give back.
+    expect(closed).toHaveAttribute("inert");
+
+    unmount();
+    button.remove();
+    closed.remove();
+  });
+
+  it("gives the page back if it is taken away while counting", () => {
+    const { container, unmount } = show({
+      phase: "loading",
+      progress: { step: "inputs", done: 0, total: null },
+    });
+    expect(container).toHaveAttribute("inert");
+    unmount();
+    expect(container).not.toHaveAttribute("inert");
+  });
+
+  it("is gone once nothing is counting", () => {
+    for (const state of [
+      { phase: "idle" },
+      { phase: "loading" },
+      DONE,
+      { phase: "failed" },
+      { phase: "refused", status: "Infeasible" },
+    ] satisfies DevicePlanPhase[]) {
+      const view = show(state);
+      expect(document.querySelector("[data-device-progress]")).toBeNull();
+      view.unmount();
+    }
+  });
+});

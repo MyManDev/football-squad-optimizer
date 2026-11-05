@@ -2,12 +2,14 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
 import { App } from "./app/App";
+import { applyStoredColourScheme } from "./design/colourScheme";
 import { forgetRetiredTheme } from "./design/retiredTheme";
 import "./design/fonts.css";
 import "./design/tokens.css";
 import "./design/transitions.css";
 
 forgetRetiredTheme();
+applyStoredColourScheme();
 
 // A tab left open across a deploy asks for route chunks the new build renamed. Reload once
 // to fetch the current build; a second failure in the same tab is left to the page's own

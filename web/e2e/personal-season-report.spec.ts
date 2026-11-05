@@ -54,9 +54,9 @@ for (const language of ["tr", "en"] as const) {
     await expect(report).toContainText(/22[,.]0.*20[,.]0.*8[,.]0/);
     await expect(report).toContainText(/Captain.*6[,.]0/);
     await expect(report).toContainText(/Former two → Arrival two.*0[,.]0/);
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
-      true,
-    );
+    expect(
+      await page.locator("main").evaluate((element) => element.scrollWidth <= element.clientWidth),
+    ).toBe(true);
     await atRest(page);
     expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
     await report.screenshot({ path: testInfo.outputPath("personal-report-mobile.png") });

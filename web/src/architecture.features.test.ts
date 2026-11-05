@@ -10,10 +10,8 @@
  * all say the importing feature needs the other one, so all three count here, unlike a
  * module-level load cycle where an erased type edge cannot close a loop.
  *
- * One-way composition is allowed (the league pages show the fixtures feature's list, the
- * moves page reads the league's published members). A loop is not: vocabulary two features
- * share belongs in a lower zone, as the play modes and planning windows do in
- * `lib/decisionVocabulary.ts`.
+ * One-way composition is allowed (the league pages show the fixtures feature's list). A loop
+ * is not: vocabulary two features share belongs in a lower zone.
  */
 import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -138,7 +136,7 @@ describe("web feature boundaries", () => {
     // The reader sees the one-way compositions that exist today, so an empty cycle list
     // below is a finding and not a reader that found no edges at all.
     const pairs = new Set(EDGES.map(({ from, to }) => `${from} -> ${to}`));
-    expect(pairs).toContain("moves -> league");
+    expect(pairs).toContain("league -> fixtures");
   });
 
   it("has no import cycle between features", () => {
@@ -148,10 +146,5 @@ describe("web feature boundaries", () => {
         ({ from, to, at }) => `${at} (${from} -> ${to})`,
       );
     expect(cycles.map((group) => ({ features: group, edges: inside(group) }))).toEqual([]);
-  });
-
-  it("keeps the league feature free of the moves page", () => {
-    const edges = EDGES.filter(({ from, to }) => from === "league" && to === "moves");
-    expect(edges.map(({ at }) => at)).toEqual([]);
   });
 });

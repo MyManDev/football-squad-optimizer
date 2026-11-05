@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { StrictMode } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
@@ -132,17 +132,40 @@ function open() {
   return trigger;
 }
 
-it("opens the chosen player's published points, fixture, minutes and transfer reason, then restores focus", () => {
+it("opens the chosen player's published points, fixture and minutes, then restores focus", async () => {
   render(view());
   const trigger = open();
   expect(screen.getByRole("dialog", { name: player.name })).toBeVisible();
   expect(screen.getByText("Beklenen dakika: 67,5")).toBeVisible();
   expect(screen.getByText("Visitors")).toBeVisible();
-  expect(screen.getByText("Bu haftanın beklenen puanına göre önerildi.")).toBeVisible();
   fireEvent.click(screen.getByRole("button", { name: "Kapat" }));
-  expect(screen.queryByRole("dialog")).toBeNull();
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   expect(trigger).toHaveFocus();
 });
+
+it.each([
+  ["manager_word", "Kulübün sayfasının dediği için planda."],
+  ["top100_preference", "Top 100 etkisi nedeniyle planda."],
+] as const)("states why a move with reason %s is in the plan", (reason_code, said) => {
+  const advice = plan();
+  advice.moves[0]!.reason_code = reason_code;
+  render(view(advice));
+  open();
+  expect(screen.getByRole("heading", { name: "Bu transfer neden?" })).toBeVisible();
+  expect(screen.getByText(said)).toBeVisible();
+});
+
+it.each(["points_gain", "window_value", "mode_tradeoff"] as const)(
+  "has no reason section for a move with reason %s",
+  (reason_code) => {
+    const advice = plan();
+    advice.moves[0]!.reason_code = reason_code;
+    render(view(advice));
+    open();
+    expect(screen.getByRole("dialog", { name: player.name })).toBeVisible();
+    expect(screen.queryByRole("heading", { name: "Bu transfer neden?" })).toBeNull();
+  },
+);
 
 it.each(["missing", "stale", "other-season"])(
   "does not invent a fixture or minutes from a %s calendar",

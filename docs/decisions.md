@@ -1,7 +1,7 @@
 # Product and operations decisions
 
 This file is maintained by hand and versioned in Git. Record each decision with its date,
-reason and issue or PR. The website links here; it does not write to this file.
+reason and issue or PR. The website does not write to this file.
 
 ## 2026-09-14 — An unlisted admin entry point
 
@@ -138,3 +138,66 @@ the work that is closed and the conditions for later development.
 Source: [Issue #1005](https://github.com/MyManDev/football-squad-optimizer/issues/1005),
 [the owner's names](https://github.com/MyManDev/football-squad-optimizer/issues/1005#issuecomment-6044633550)
 and [the program](https://github.com/MyManDev/football-squad-optimizer/issues/1012).
+
+## 2026-11-01: The second league goes live at GW11, and 352490 follows at GW12
+
+Decision:
+
+1. League 755941 (77 members, rehearsed on #981 in comment 6327708004) is the second
+   league. It goes live with `menu: device` in the GW11 run. This replaces the 20 to 50
+   members of decision 4 of 2026-10-07.
+2. League 352490 moves to the device menu in the GW12 run, one week after 755941. This
+   replaces decision 2 of 2026-10-07, and #981 step 8 lands with it. The server keeps
+   one baseline record per entry (#982).
+3. The readings that read 352490's full-menu advice records keep their dates and lose
+   the weeks from GW12 on. The price honesty reading at GW9 is unchanged, and the one at
+   GW15 pools GW4 to GW11 and lists GW12 to GW15 as not read. The Top 100 readings at
+   GW12 and GW20 read the player level as registered, and their plan level ends at GW11.
+   The protocols stay as written; each record states its shortened input.
+
+Reason: the owner handed the program to İbo on 31 October, and İbo brought step 8 forward
+on 1 November so that 352490 stops being solved on the server once a second league has
+run a live week on the device.
+
+Source: [the handover](https://github.com/MyManDev/football-squad-optimizer/issues/978#issuecomment-6548175771),
+[the decisions on #981](https://github.com/MyManDev/football-squad-optimizer/issues/981#issuecomment-6559338892)
+and [the readings calendar](https://github.com/MyManDev/football-squad-optimizer/issues/1122).
+
+## 2026-11-02: The /gw, /moves, /status, /admin and /rivals pages are removed
+
+Decision: `/gw/:season/:gameweek`, `/moves`, `/status`, `/admin` and `/rivals` (with
+`/rivals/:season/:gameweek`) are not routes, and their pages and copy are deleted. This replaces
+what the 2026-09-14 and 2026-09-26 entries say about `/admin` and `/status`. The documents those
+pages read stay published.
+
+Reason: the owner went through the site's words row by row and took these pages off the site.
+`/rivals` had no link anywhere and still showed week 5.
+
+Source: the owner's review of 2 November, #1298.
+
+## 2026-11-03: A waiting job shows how much is solved as a percentage
+
+Decision: while a job at the service runs, the member page shows the share of its documents
+solved as a percentage ("%33") beside a bar. A job of one document shows no percentage, because
+nothing inside a solve is counted. The service still serves a count, and the device run's card
+still shows one ("2/7").
+
+Reason: the owner asked for a percentage on 1 November, saw the count on #1303 and chose the
+percentage. It is a share of work and no chance of anything, so the standing rule against
+publishing a probability stands. This narrows the rule on #978 and #954 against a percentage on
+a member page for this one display.
+
+Source: the owner's answer of 3 November, [the shape on #978](https://github.com/MyManDev/football-squad-optimizer/issues/978#issuecomment-6570843186), #1303.
+
+## 2026-11-03: /fixtures lists no played gameweek
+
+Decision: `/fixtures` lists no played gameweek and no week by itself. It opens on the general
+fixtures, a matrix of every club over the next five gameweeks that rolls on as the weeks pass;
+a match already played in the open week stays in its cell. Beside it, it offers team fixtures:
+one club's matches to the end of the season, as a grid of weeks. Apart from its empty states and
+the postponed-fixture note, the page prints no sentence.
+
+Reason: the owner wants the page to serve looking ahead. The results of played weeks are not what
+a manager reads it for.
+
+Source: the owner's message of 3 November, #1302.

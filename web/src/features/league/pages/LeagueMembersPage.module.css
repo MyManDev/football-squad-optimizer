@@ -27,8 +27,10 @@
   align-items: start;
 }
 
+/* The column beside the table stands when the viewer has something to put in it, or may have
+   once their squad is read. */
 @container league-page (min-width: 940px) {
-  .columns {
+  .columns:has(> .side) {
     grid-template-columns: minmax(0, 1fr) clamp(280px, 50cqw - 180px, 440px);
     column-gap: var(--space-7);
   }
@@ -88,6 +90,17 @@
 
 .table tbody tr {
   border-bottom: 1px solid var(--color-line);
+  /* The rows come in one after another when the table is drawn, at most twelve steps apart,
+     each in the card time; under reduced motion every token is zero and they stand at once. */
+  animation: row-in var(--motion-ui) var(--motion-ease) backwards;
+  animation-delay: calc(min(var(--row, 0), 12) * var(--motion-ui-fast) / 6);
+}
+
+@keyframes row-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
 }
 
 .table tbody td {
@@ -210,10 +223,13 @@ td.total {
   text-decoration: underline;
 }
 
-/* The viewer's own row: a lime fill with ink on it (13.5:1), nothing else changes. */
+/* The viewer's own row: the mark with its own ink on it (13.5:1 by day, 11.3:1 at night),
+   nothing else changes. The focus colour is the mark's at night, so a ring here takes the
+   ink. */
 .viewerRow td {
-  background: var(--color-lime);
-  color: var(--color-text);
+  --color-focus: var(--color-mark-text);
+  background: var(--color-mark);
+  color: var(--color-mark-text);
 }
 
 .viewerRow td:first-child {
@@ -228,64 +244,7 @@ td.total {
 .viewerRow .manager,
 .viewerRow td.week,
 .viewerRow td.gap {
-  color: var(--color-text);
-}
-
-.note {
-  margin: 0;
-  max-width: var(--measure);
-  color: var(--color-text-muted);
-  font-size: var(--step--1);
-}
-
-/* ---- About the table, closed ---- */
-
-.about {
-  border-top: 1px solid var(--color-line);
-}
-
-.aboutSummary {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: 40px;
-  font-size: var(--step--1);
-  font-weight: 600;
-  cursor: pointer;
-  list-style: none;
-}
-
-.aboutSummary::-webkit-details-marker {
-  display: none;
-}
-
-.aboutIcon {
-  flex: none;
-  transition: transform var(--motion-ui-fast) var(--motion-ease);
-}
-
-.about[open] .aboutIcon {
-  transform: rotate(90deg);
-}
-
-.aboutBody {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  max-width: var(--measure);
-  padding-bottom: var(--space-4);
-  color: var(--color-text-muted);
-  font-size: var(--step--1);
-}
-
-.aboutBody p {
-  margin: 0;
-}
-
-.aboutTitle {
-  margin: var(--space-2) 0 0;
-  color: var(--color-text);
-  font-size: var(--step-0);
+  color: var(--color-mark-text);
 }
 
 /* ---- Beside the table ---- */
@@ -311,10 +270,6 @@ td.total {
 /* ---- Touch: every control is at least 44 px under 1180 px ---- */
 
 @media (max-width: 1179.98px) {
-  .aboutSummary {
-    min-height: 44px;
-  }
-
   .table tbody td {
     height: 52px;
   }
