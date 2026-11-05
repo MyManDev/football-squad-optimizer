@@ -1,6 +1,6 @@
 import { flushSync } from "react-dom";
 
-import { MOTION_MS, prefersReducedMotion } from "./motion";
+import { MOTION_MS, MOTION_ROUTE_EASE, REDUCED_MOTION_QUERY, prefersReducedMotion } from "./motion";
 
 /** What a started transition hands back: three promises the browser may reject. */
 type StartedTransition = Partial<Pick<ViewTransition, "ready" | "finished" | "updateCallbackDone">>;
@@ -12,14 +12,51 @@ type TransitionDocument = Document & {
 type MediaSource =
   (Pick<Window, "matchMedia"> & { navigator?: Pick<Navigator, "userAgent"> }) | undefined;
 
+function canSnapshotPage(source: MediaSource, document: TransitionDocument | undefined) {
+  const agent = source?.navigator?.userAgent ?? "";
+  const webkit =
+    /AppleWebKit\//.test(agent) &&
+    /Safari\//.test(agent) &&
+    !/(?:Chrome|Chromium|Edg)\//.test(agent);
+  return typeof document?.startViewTransition === "function" && !webkit;
+}
+
+/** Called before paint where native snapshots are unsafe or unavailable.
+ * Cancelling this live-DOM arrival never blocks navigation or input. */
+export function arriveWithoutSnapshot(
+  main: HTMLElement | null,
+  source: MediaSource = globalThis.window,
+  document: TransitionDocument | undefined = globalThis.document,
+): (() => void) | undefined {
+  if (canSnapshotPage(source, document) || prefersReducedMotion(source) || !main?.animate) return;
+  const animation = main.animate(
+    [
+      { opacity: 0.25, transform: "translateY(6px)" },
+      { opacity: 1, transform: "none" },
+    ],
+    { duration: MOTION_MS.page, easing: `cubic-bezier(${MOTION_ROUTE_EASE.join(", ")})` },
+  );
+  const preference = source?.matchMedia?.(REDUCED_MOTION_QUERY);
+  const stopIfReduced = (event: MediaQueryListEvent) => {
+    if (event.matches) animation.cancel();
+  };
+  const unwatch = () => preference?.removeEventListener?.("change", stopIfReduced);
+  preference?.addEventListener?.("change", stopIfReduced);
+  void animation.finished.then(unwatch, unwatch);
+  return () => {
+    unwatch();
+    animation.cancel();
+  };
+}
+
 /**
  * A page change as one short crossfade (#1131): the View Transitions API snapshots the page
  * as it is, `update` runs and is committed at once, and the browser fades the old picture
- * into the new one in the motion tokens' card time (`transitions.css`). Where `ready` is
+ * into the new one in the motion tokens' page time (`transitions.css`). Where `ready` is
  * given, the new picture is taken once it resolves, or after the data time at the latest,
  * so a step that draws its page a moment later fades into that page and not into a
  * loading screen. A browser without the API, or a viewer who asked for reduced motion,
- * gets the change at once: that is the fallback, not an error.
+ * gets the change at once. PageShell adds a live-DOM arrival where motion is allowed.
  *
  * The transition is kept so its three promises are handled. A browser skips a transition
  * when another starts before it is drawn and rejects its `ready` with an AbortError, though
@@ -33,23 +70,12 @@ export function crossfade(
   source: MediaSource = globalThis.window,
   document: TransitionDocument | undefined = globalThis.document,
 ): void {
-  // WebKit's native snapshots can stall or crash these SPA route updates. Use the same
-  // immediate navigation as reduced motion until the engine passes the route regressions.
-  const agent = source?.navigator?.userAgent ?? "";
-  const webkit =
-    /AppleWebKit\//.test(agent) &&
-    /Safari\//.test(agent) &&
-    !/(?:Chrome|Chromium|Edg)\//.test(agent);
-  if (
-    !document ||
-    typeof document.startViewTransition !== "function" ||
-    prefersReducedMotion(source) ||
-    webkit
-  ) {
+  // Keep WebKit's snapshot guard: its route updates can stall or crash the engine.
+  if (!document || !canSnapshotPage(source, document) || prefersReducedMotion(source)) {
     update();
     return;
   }
-  const transition: StartedTransition | undefined = document.startViewTransition(async () => {
+  const transition: StartedTransition | undefined = document.startViewTransition!(async () => {
     flushSync(update);
     if (ready) {
       await Promise.race([
