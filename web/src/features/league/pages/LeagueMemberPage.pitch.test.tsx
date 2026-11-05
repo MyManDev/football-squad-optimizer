@@ -273,42 +273,11 @@ describe("the squad after the transfers, on the pitch", () => {
     expect(plateOf(SZOBOSZLAI.name)).not.toHaveTextContent(new RegExp(`${unit}|\\d`));
   });
 
-  it("writes the direction of attack under the first defender in the published order", () => {
-    const { container } = show("tr");
-    const labels = screen.getAllByText(MESSAGES.tr.leagueMembers.attackDirection);
-    // Three defenders leave room between their plates: one label, under Guéhi.
-    expect(labels).toHaveLength(1);
-    expect(labels[0]).toHaveAttribute("aria-hidden", "true");
-    expect(within(labels[0]!.parentElement!).getByTitle(GUEHI.name)).toBeInTheDocument();
-    // The direction is also in the pitch's description, for both ways it can be drawn.
+  it("says the direction of attack in the pitch's description, for both ways it can be drawn", () => {
+    show("tr");
     expect(pitch()).toHaveAccessibleDescription(
       `${MESSAGES.tr.leagueMembers.pitchHorizontal}${MESSAGES.tr.leagueMembers.pitchVertical}`,
     );
-    expect(container.querySelector("[data-def-crowded]")).toBeNull();
-  });
-
-  it("adds a place under the whole defence when four or more stand in it", () => {
-    const back4 = [
-      MARTIN,
-      GUEHI,
-      CALAFIORI,
-      CUYPER,
-      { ...BENCH[3]!, position: "DEF" as const },
-      FERNANDES,
-      ROGERS,
-      GROSS,
-      HAALAND,
-      BROBBEY,
-      LEWIN,
-    ];
-    const { container } = show("en", { advice: week({ starting_xi: back4 }) });
-    const labels = screen.getAllByText(MESSAGES.en.leagueMembers.attackDirection);
-    // Under the first defender where the pitch is drawn upright, under the last across it
-    // (the stylesheet shows the one that fits).
-    expect(labels.map((label) => label.getAttribute("data-at"))).toEqual(["first", "last"]);
-    expect(within(labels[0]!.parentElement!).getByTitle(GUEHI.name)).toBeInTheDocument();
-    expect(within(labels[1]!.parentElement!).getByTitle(BENCH[3]!.name)).toBeInTheDocument();
-    expect(container.querySelector("[data-def-crowded]")).not.toBeNull();
   });
 
   it("lists the bench under the pitch in the published order", () => {
@@ -341,20 +310,16 @@ describe("the squad after the transfers, on the pitch", () => {
     expect(screen.queryByRole("region", { name: copy.lineupTitle })).toBeNull();
   });
 
-  it("keeps the squad held before the transfers in a closed section of its own", () => {
+  it("keeps the squad held before the transfers on a page of its own", () => {
     show("tr");
     const copy = MESSAGES.tr.leagueMembers;
-    const held = screen
-      .getByText(copy.memberSquad, { selector: "summary span" })
-      .closest("details")!;
-    expect(held).not.toHaveAttribute("open");
+    expect(screen.queryByRole("region", { name: copy.memberSquad })).toBeNull();
+    cleanup();
+    show("tr", { tool: "current-squad" });
+    const held = screen.getByRole("region", { name: copy.memberSquad });
     expect(within(held).getAllByRole("listitem")).toHaveLength(
       SQUAD.payload.starting_xi.length + SQUAD.payload.bench.length,
     );
-    // The pitch's list label stays unique on the page.
-    expect(
-      screen.getAllByRole("list", { name: MESSAGES.tr.squad.pitchLabel, hidden: true }),
-    ).toHaveLength(1);
   });
 
   it("draws a partial squad as far as it goes, with no formation made up", () => {
@@ -480,18 +445,22 @@ describe("the fixture rail", () => {
     },
   );
 
-  it("says so quietly, and shows nothing member-specific, without the calendar", () => {
-    show("tr", { fixtures: null });
-    const aside = rail();
-    expect(aside).toHaveTextContent(MESSAGES.tr.leagueMembers.railNoCalendar);
-    expect(within(aside).queryByRole("table")).toBeNull();
+  it.each<[string, FixturesPayload | null]>([
+    ["without the calendar", null],
+    ["for a calendar that lists none of these weeks", { ...CALENDAR, gameweeks: [] }],
+  ])("draws no rail, and none of its member-specific blocks, %s", (_case, fixtures) => {
+    show("tr", { fixtures });
+    const copy = MESSAGES.tr.leagueMembers;
+    expect(screen.queryByRole("complementary", { name: MESSAGES.tr.shell.fixtures })).toBeNull();
+    expect(screen.queryByRole("region", { name: copy.railTransfers })).toBeNull();
+    expect(screen.queryByRole("region", { name: copy.railXi })).toBeNull();
   });
 
-  it("says the calendar is being read, not that it failed, while it loads", () => {
+  it("says only that the calendar is being read while it loads", () => {
     show("tr", { fixtures: null, fixturesPending: true });
     const aside = rail();
     expect(aside).toHaveTextContent(MESSAGES.tr.leagueMembers.railLoading);
-    expect(aside).not.toHaveTextContent(MESSAGES.tr.leagueMembers.railNoCalendar);
+    expect(within(aside).queryByRole("table")).toBeNull();
   });
 
   it("leaves out the weeks the calendar does not list", () => {
@@ -555,6 +524,19 @@ describe("the fixture sheet on a phone", () => {
     // Focus goes back to the button that opened it.
     expect(open).toHaveFocus();
   });
+
+  it("offers no sheet from the phone bar without the calendar", () => {
+    phone();
+    render(
+      <LanguageProvider initialLanguage="tr">
+        <MemoryRouter initialEntries={[`/league/352490/members/${ENTRY}`]}>
+          <PageShell>{withLeague(<LeagueMemberView {...view({ fixtures: null })} />)}</PageShell>
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+    expect(screen.queryByRole("button", { name: MESSAGES.tr.shell.fixtures })).toBeNull();
+    expect(document.getElementById(FIXTURE_SHEET_ID)).toBeNull();
+  });
 });
 
 describe("the reading order around the squad", () => {
@@ -562,36 +544,30 @@ describe("the reading order around the squad", () => {
   const before = (first: Element, second: Element) =>
     Boolean(first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING);
   const parts = () => {
-    const copy = MESSAGES.tr.leagueMembers;
+    const copy = MESSAGES.tr;
     return {
       decision: document.querySelector('[data-mark="decision"]')!,
-      how: screen.getByText(copy.howComputed).closest("summary")!,
-      toggle: screen.getByRole("button", { name: copy.viewPitch }),
+      toggle: screen.getByRole("button", { name: copy.leagueMembers.viewPitch }),
+      history: screen.getByRole("link", { name: copy.suggestionHistory.title }),
     };
   };
 
-  it("reads the decision, then what to make of it, then the squad on a phone", () => {
+  it("reads the decision, then the squad, then the way to the history on a phone", () => {
     phone();
     show("tr");
-    const { decision, how, toggle } = parts();
-    expect(document.querySelectorAll('[data-mark="honesty"]')).toHaveLength(1);
-    expect(before(decision, how)).toBe(true);
-    expect(before(how, toggle)).toBe(true);
+    const { decision, toggle, history } = parts();
+    expect(before(decision, toggle)).toBe(true);
+    expect(before(toggle, history)).toBe(true);
   });
 
-  it("keeps the squad before the honesty block where the squad is drawn first", () => {
+  it("reads the decision, then the squad, then the way to the history on a wider screen", () => {
     show("tr");
-    const { decision, how, toggle } = parts();
-    expect(document.querySelectorAll('[data-mark="honesty"]')).toHaveLength(1);
+    const { decision, toggle, history } = parts();
     expect(before(decision, toggle)).toBe(true);
-    expect(before(toggle, how)).toBe(true);
+    expect(before(toggle, history)).toBe(true);
   });
 });
 
-/**
- * A viewport whose width can change under the page: every media query list answers from the
- * current width, and `resize` fires the change listeners the shell layout subscribed with.
- */
 function resizableViewport(initialWidth: number) {
   let width = initialWidth;
   const listeners = new Set<() => void>();
@@ -616,47 +592,36 @@ function resizableViewport(initialWidth: number) {
     });
 }
 
-describe("the honesty block across the phone breakpoint", () => {
-  // A phone turned to landscape, a resized window or a zoomed page crosses 600 px. The block
-  // changes place in the document, but it stays the same element: an open "Nasıl
-  // hesaplandı?" stays open and keeps the focus a keyboard user gave its summary.
+describe("the page across the phone breakpoint", () => {
   it.each([
-    ["from a phone to a tablet", 390, 844, false],
-    ["from a tablet to a phone", 844, 390, false],
-    ["from a phone to a tablet, inside the shell", 390, 844, true],
-    ["from a tablet to a phone, inside the shell", 844, 390, true],
-  ] as const)("keeps the open disclosure %s", async (_case, from, to, inShell) => {
+    ["from a phone to a tablet", 390, 844],
+    ["from a tablet to a phone", 844, 390],
+  ] as const)("follows the new layout %s and keeps the squad's elements", (_case, from, to) => {
     const resize = resizableViewport(from);
-    const user = userEvent.setup();
-    const page = withLeague(<LeagueMemberView {...view()} />);
     render(
       <LanguageProvider initialLanguage="tr">
         <MemoryRouter initialEntries={[`/league/352490/members/${ENTRY}`]}>
-          {inShell ? <PageShell>{page}</PageShell> : page}
+          <PageShell>{withLeague(<LeagueMemberView {...view()} />)}</PageShell>
         </MemoryRouter>
       </LanguageProvider>,
     );
-    const block = document.querySelector<HTMLElement>('[data-mark="honesty"]')!;
-    const details = block.querySelector("details")!;
-    const summary = within(block)
-      .getByText(MESSAGES.tr.leagueMembers.howComputed)
-      .closest("summary")!;
-    await user.click(summary);
-    expect(details.open).toBe(true);
-    expect(summary).toHaveFocus();
-
+    const copy = MESSAGES.tr.leagueMembers;
+    const expectLayout = (width: number) => {
+      expect(document.querySelector("[data-rail]")).toHaveAttribute(
+        "data-rail",
+        width < 600 ? "sheet" : "flow",
+      );
+      const apply = screen.getByRole("link", { name: copy.applyOnFpl });
+      const board = screen.getAllByRole("article")[0]!;
+      expect(Boolean(apply.compareDocumentPosition(board) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(
+        width >= 600,
+      );
+    };
+    expectLayout(from);
+    const toggle = screen.getByRole("button", { name: copy.viewPitch });
     resize(to);
-
-    expect(document.querySelectorAll('[data-mark="honesty"]')).toHaveLength(1);
-    expect(document.querySelector('[data-mark="honesty"]')).toBe(block);
-    expect(block.querySelector("details")).toBe(details);
-    expect(details.open).toBe(true);
-    // The reading order still follows the new layout.
-    const toggle = screen.getByRole("button", { name: MESSAGES.tr.leagueMembers.viewPitch });
-    const honestyFirst = Boolean(
-      block.compareDocumentPosition(toggle) & Node.DOCUMENT_POSITION_FOLLOWING,
-    );
-    expect(honestyFirst).toBe(to < 600);
+    expectLayout(to);
+    expect(screen.getByRole("button", { name: copy.viewPitch })).toBe(toggle);
   });
 });
 

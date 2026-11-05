@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useLocation, useNavigate } from "react-router";
 
-import { Card } from "../../../design/components/Card";
 import { useLanguage } from "../../../i18n/context";
+import { crossfade } from "../../../design/viewTransition";
 import {
   FIND_YOURSELF,
   legacyLeagueAddress,
   membersAddress,
   PICK_HERE,
 } from "../../../lib/leagueAddresses";
+import { FplIdHelp } from "../components/FplIdHelp";
 import { LeagueDataMissing, lookupPublishedLeague } from "../data";
 import { useLeagueIdentity } from "../identity/useLeagueIdentity";
 import styles from "./LeagueEntryPage.module.css";
@@ -24,16 +25,14 @@ type State = "idle" | "invalid" | "loading" | "unsupported" | "missing" | "faile
  * opens the page the address named under that league (an address from before the number
  * is rewritten with it), or the members list where the address named another league.
  *
- * `stay` (with `inPlace`): the gate rendered this form in front of a page whose address
- * names no league. A connected league keeps the address, and the member step follows there.
+ * It is the one thing to do here, so it stands alone in the middle of the screen in large
+ * type, and the match scene behind the other pages stays away (`data-no-match-scene`).
  */
 export function LeagueEntryPage({
   inPlace = false,
-  stay = false,
   unpublishedLeagueId = null,
 }: {
   inPlace?: boolean;
-  stay?: boolean;
   unpublishedLeagueId?: number | null;
 }) {
   const { messages } = useLanguage();
@@ -47,10 +46,12 @@ export function LeagueEntryPage({
   // The number the last lookup asked for, named in the answer that it is not published.
   const [asked, setAsked] = useState(unpublishedLeagueId ?? 0);
   const active = useRef(true);
+  const arrived = useRef<(() => void) | null>(null);
   useEffect(() => {
     active.current = true;
     return () => {
       active.current = false;
+      arrived.current?.();
     };
   }, []);
 
@@ -69,26 +70,29 @@ export function LeagueEntryPage({
       const result = await lookupPublishedLeague(leagueId);
       if (!active.current) return;
       if (result.status === "connected") {
-        const here = inPlace && !stay ? legacyLeagueAddress(location.pathname, leagueId) : null;
-        if (here !== null) {
-          // An address from before the number, rewritten with it: the member step is asked
-          // there, and its state puts focus on the picker as on the other two paths. The
-          // gate at the new address chooses the league it names, as it does for any league
-          // reached by its address. Choosing it here first would let the gate rewrite the
-          // old address on its own before this navigation lands, without the step state.
-          navigate(`${here}${location.search}${location.hash}`, {
-            replace: true,
-            state: PICK_HERE,
-          });
-          return;
-        }
-        chooseLeague(leagueId);
-        if (inPlace && stay)
-          navigate(
-            { pathname: location.pathname, search: location.search, hash: location.hash },
-            { replace: true, state: PICK_HERE },
-          );
-        else navigate(membersAddress(leagueId), { replace: inPlace, state: FIND_YOURSELF });
+        const arrival = new Promise<void>((resolve) => {
+          arrived.current = resolve;
+        });
+        crossfade(
+          () => {
+            const here = inPlace ? legacyLeagueAddress(location.pathname, leagueId) : null;
+            if (here !== null) {
+              // An address from before the number, rewritten with it: the member step is asked
+              // there, and its state puts focus on the picker as on the other path. The
+              // gate at the new address chooses the league it names, as it does for any league
+              // reached by its address. Choosing it here first would let the gate rewrite the
+              // old address on its own before this navigation lands, without the step state.
+              navigate(`${here}${location.search}${location.hash}`, {
+                replace: true,
+                state: PICK_HERE,
+              });
+              return;
+            }
+            chooseLeague(leagueId);
+            navigate(membersAddress(leagueId), { replace: inPlace, state: FIND_YOURSELF });
+          },
+          () => arrival,
+        );
       } else setState("unsupported");
     } catch (error) {
       if (active.current) setState(error instanceof LeagueDataMissing ? "missing" : "failed");
@@ -96,47 +100,38 @@ export function LeagueEntryPage({
   }
 
   return (
-    <div className={styles.page}>
+    <div className={styles.page} data-no-match-scene="">
       <h1 className={styles.title}>{copy.title}</h1>
-      {/* A first visitor lands here with nothing to go on, so the page says what the site
-          does before it asks for a number. */}
-      <p className={styles.intro}>{copy.intro}</p>
-      <Card>
-        <form onSubmit={submit} className={styles.form} aria-busy={state === "loading"}>
-          <label htmlFor="league-id">{copy.label}</label>
-          <p id="league-entry-hint" className={styles.hint}>
-            {copy.hint}
-          </p>
-          <input
-            id="league-id"
-            name="leagueId"
-            inputMode="numeric"
-            autoComplete="off"
-            value={value}
-            onChange={(event) => {
-              setValue(event.target.value);
-              setState("idle");
-            }}
-            disabled={state === "loading"}
-            aria-invalid={state === "invalid"}
-            aria-describedby="league-entry-hint league-entry-status"
-          />
-          <button type="submit" disabled={state === "loading"}>
-            {copy.submit}
-          </button>
-          <p id="league-entry-status" role="status">
-            {state === "idle"
-              ? ""
-              : state === "unsupported"
-                ? copy.unsupported(asked)
-                : copy[state]}
-          </p>
-        </form>
-      </Card>
-      <details className={styles.help}>
-        <summary>{copy.helpTitle}</summary>
-        <p>{copy.help}</p>
-      </details>
+      <form onSubmit={submit} className={styles.form} aria-busy={state === "loading"}>
+        <label htmlFor="league-id">{copy.label}</label>
+        <p id="league-entry-hint" className={styles.hint}>
+          {copy.hint}
+        </p>
+        <input
+          id="league-id"
+          name="leagueId"
+          inputMode="numeric"
+          enterKeyHint="go"
+          autoComplete="off"
+          value={value}
+          onChange={(event) => {
+            setValue(event.target.value);
+            setState("idle");
+          }}
+          disabled={state === "loading"}
+          aria-invalid={state === "invalid"}
+          aria-describedby="league-entry-hint league-entry-status"
+        />
+        {/* Where the number is found, folded right under the field that asks for it, so a
+            visitor who does not know it looks no further than the field. */}
+        <FplIdHelp />
+        <button type="submit" disabled={state === "loading"}>
+          {copy.submit}
+        </button>
+        <p id="league-entry-status" className={styles.status} role="status">
+          {state === "idle" ? "" : state === "unsupported" ? copy.unsupported(asked) : copy[state]}
+        </p>
+      </form>
     </div>
   );
 }

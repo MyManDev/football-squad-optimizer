@@ -16,10 +16,10 @@ import { describe, expect, it } from "vitest";
 import {
   MOTION_EASE,
   MOTION_MS,
-  MOTION_RANGES,
   REDUCED_MOTION_QUERY,
   motionDuration,
   prefersReducedMotion,
+  type MotionKind,
 } from "./motion";
 
 const SRC = join(__dirname, "..");
@@ -27,6 +27,12 @@ const TOKENS = readFileSync(join(__dirname, "tokens.css"), "utf-8").replace(
   /\/\*[\s\S]*?\*\//g,
   "",
 );
+/** The ranges #1136 sets: buttons and cards, then pitch and data transitions. */
+const MOTION_RANGES: Record<MotionKind, readonly [number, number]> = {
+  uiFast: [150, 250],
+  ui: [150, 250],
+  data: [300, 500],
+};
 const TOKEN_NAMES = {
   uiFast: "--motion-ui-fast",
   ui: "--motion-ui",

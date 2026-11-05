@@ -75,17 +75,19 @@ word.
 
 ## League and site publication
 
-The static JSON trees the website reads: the per-member league trees and the season site.
+The static JSON trees the site publishes: the per-member league trees, which the league pages
+read, and the season site, of which a page reads only `fixtures.json`.
 
 | Module | What it does |
 | --- | --- |
 | `league_publication.py` | Assembles a member publication from an explicit capture. |
 | `league_views.py` | Renders the per-member league views: the JSON tree the league pages read. |
+| `player_names.py` | The short name a published player record shows: the game's own `web_name`, matched on the player's code. |
 | `league.py` | The league view: our season against everyone else playing the same game. |
 | `league_tree_identity.py` | Records the complete protected league set after a normal writer finishes. |
 | `publication_history.py` | Explicit historical inputs for prospective current-season publication. |
 | `site_publication.py` | Assembles the static site from ledger state and an optional pinned capture. |
-| `site.py` | Writes the static JSON tree a frontend renders. |
+| `site.py` | Writes the season site's static JSON tree. |
 | `build.py` | Builds `ui_view_v1` view models from the live path's records. |
 | `views.py` | The view models of the `ui_view_v1` contract. |
 | `contract.py` | The `ui_view_v1` contract: what the static JSON tree promises a frontend. |

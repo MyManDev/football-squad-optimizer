@@ -19,11 +19,13 @@ its header.
 | [0009](0009-advice-backend-hosting-options.md) | Where the advice backend runs, five options compared for the owner's decision | 2026-09-25 | Proposed | None |
 | [0010](0010-clean-architecture-rings-and-repository-layout.md) | Clean-architecture rings and the repository layout | 2026-10-13 | Accepted (owner, 2026-10-13) | [0011](0011-storage-ports-and-platform-split.md) amends two triggers of the deferred moves and answers open questions 1, 2 and 4 |
 | [0011](0011-storage-ports-and-platform-split.md) | Storage ports, a named data vocabulary and the platform split by deployment unit | 2026-10-13 | Accepted (owner, 2026-10-13) | None |
+| [0012](0012-fpl-forwarder.md) | The FPL forwarder, a separate Worker at /api/v1/fpl/* | 2026-11-01 | Accepted (İbo, 2026-11-01) | None |
 
 ADR 0004's own revisit condition led to ADR 0006, which keeps the static site and adds the
 backend beside it. ADR 0010 builds on ADRs 0001 and 0008 and leaves their decisions standing.
 ADR 0011 decides the remedies ADR 0010 deferred, and is the record ADR 0010 said the `platform`
-split needs.
+split needs. ADR 0012 takes up the same-origin Worker ADR 0004 left as an option, with
+the Pages site still static, and records the terms note the forwarder ships under.
 
 ## Decided without an ADR yet
 

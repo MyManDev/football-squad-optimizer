@@ -1,15 +1,18 @@
 import { useId, type CSSProperties } from "react";
 
 import { useLanguage } from "../../../i18n/context";
-import { clubCode, clubSwatch, type ClubCodes } from "../../../lib/clubs";
+import { clubCode, type ClubCodes } from "../../../lib/clubs";
 import { figure } from "../../../lib/format";
 import type { CoachAbsence } from "../advice/coachAbsences";
 import type { ModelChange } from "../advice/modelSwitch";
+import { ClubShirt } from "./ClubShirt";
 import { CoachNewsMark } from "./CoachNews";
 import styles from "./MemberPitch.module.css";
-import { clubPlate, usePitchLook } from "./pitchLook";
 
-/** One player as the pitch draws them: a name plate on the grass, white or in club colours. */
+/**
+ * One player as the pitch draws them: a name plate on the grass, white or in club colours,
+ * with the player's shirt in their club's colours on it or above it.
+ */
 export interface PitchPlayer {
   playerId: number;
   name: string;
@@ -37,34 +40,9 @@ function lineSpan(count: number): number {
   return count <= 1 ? 40 : (count - 1) * lineStep(count) + 40;
 }
 
-/**
- * The height of the horizontal pitch: 256 px as drawn for up to four in a line, taller
- * for a line of five, and taller again when the defence is too crowded for the direction
- * of attack to sit under its first player and it has to sit under the whole line.
- */
-function horizontalHeight(counts: readonly number[], defenders: number): number {
-  const widest = Math.max(1, ...counts);
-  return Math.max(256, lineSpan(widest) + 48, defenders >= 4 ? lineSpan(defenders) + 76 : 0);
-}
-
-function ArrowIcon() {
-  return (
-    <svg
-      className={styles.arrow}
-      width="18"
-      height="10"
-      viewBox="0 0 18 10"
-      aria-hidden="true"
-      focusable="false"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.6}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M1 5h15M12.5 1.5L16 5l-3.5 3.5" />
-    </svg>
-  );
+/** The horizontal pitch's height: 256 px as drawn for up to four in a line, taller for five. */
+function horizontalHeight(counts: readonly number[]): number {
+  return Math.max(256, lineSpan(Math.max(1, ...counts)) + 48);
 }
 
 /** A plate's parts that depend on the plan shown before it (#1131). */
@@ -74,7 +52,6 @@ function Plate({
   player,
   codes,
   changed,
-  clubColours,
   news,
   onSelectPlayer,
 }: {
@@ -82,43 +59,38 @@ function Plate({
   codes: ClubCodes;
   /** Brought in by a switch of prediction model: said in the plate's text, as 'New' is. */
   changed: boolean;
-  clubColours: boolean;
   news?: CoachAbsence;
   onSelectPlayer?: (id: number) => void;
 }) {
   const { language, locale, messages } = useLanguage();
   const code = clubCode(player.team, codes);
-  const swatch = clubSwatch(code);
-  // In club colours the plate takes its club's fill and one readable text colour (#1136).
-  const club = clubColours ? clubPlate(code) : null;
+  const keeper = player.position === "GK";
   const shortName = player.shortName.trim() || player.name;
+  // The shirt is drawn three ways and the stylesheet shows the one the pitch has room for:
+  // large above the plate where an upright pitch is tall enough for it, otherwise small in
+  // the plate where the club swatch stood, before the name across and before the code
+  // upright. It is in club colours on the white plate.
   return (
-    <div
-      className={styles.plate}
-      data-plate=""
-      data-club={club?.colour}
-      style={
-        club
-          ? ({ "--plate-fill": club.fill, "--plate-text": club.text } as CSSProperties)
-          : undefined
-      }
-    >
+    <div className={styles.plate} data-plate="">
       {onSelectPlayer ? (
         <button
           type="button"
           className={styles.playerButton}
           aria-label={`${player.name}: ${language === "tr" ? "Oyuncu ayrıntıları" : "Player details"}`}
-          onClick={() => onSelectPlayer(player.playerId)}
+          onClick={(event) => {
+            event.currentTarget.focus({ preventScroll: true });
+            onSelectPlayer(player.playerId);
+          }}
         />
       ) : null}
       <span className={styles.name} title={player.name}>
-        {swatch ? (
-          <span
-            className={`${styles.swatch} ${styles.swatchAcross}`}
-            style={{ background: swatch }}
-            aria-hidden="true"
-          />
-        ) : null}
+        <ClubShirt
+          code={code}
+          name={player.name}
+          keeper={keeper}
+          size="small"
+          className={styles.shirtAcross}
+        />
         <span className={styles.nameText} aria-hidden={shortName !== player.name || undefined}>
           {shortName}
         </span>
@@ -128,13 +100,13 @@ function Plate({
         <span className="visually-hidden"> {messages.leagueMembers.modelChangedMark}</span>
       ) : null}
       <span className={styles.code}>
-        {swatch ? (
-          <span
-            className={`${styles.swatch} ${styles.swatchUpright}`}
-            style={{ background: swatch }}
-            aria-hidden="true"
-          />
-        ) : null}
+        <ClubShirt
+          code={code}
+          name={player.name}
+          keeper={keeper}
+          size="small"
+          className={styles.shirtUpright}
+        />
         <span className={styles.codeText}>{code ?? player.team}</span>
       </span>
       {news || (player.expectedPoints !== null && Number.isFinite(player.expectedPoints)) ? (
@@ -162,17 +134,15 @@ function Plate({
           {messages.leagueMembers.viceMark}
         </span>
       ) : null}
+      {/* Last, so the plate's text still starts with the name. */}
+      <ClubShirt
+        code={code}
+        name={player.name}
+        keeper={keeper}
+        size="large"
+        className={styles.shirtAbove}
+      />
     </div>
-  );
-}
-
-function AttackLabel({ at }: { at: "first" | "last" }) {
-  const copy = useLanguage().messages.leagueMembers;
-  return (
-    <span className={styles.attack} data-at={at} aria-hidden="true">
-      {copy.attackDirection}
-      <ArrowIcon />
-    </span>
   );
 }
 
@@ -185,9 +155,7 @@ function AttackLabel({ at }: { at: "first" | "last" }) {
  * with a container query, and the description names the direction for a screen reader.
  *
  * The midfield is centred on the halfway line in both drawings, the defence and the attack
- * stand at mirrored distances from it, and the keeper stands at the own goal. The direction
- * of attack is written on a white plate directly under the first defender in the published
- * order; where the defence is too crowded for that across the pitch, under the whole line.
+ * stand at mirrored distances from it, and the keeper stands at the own goal.
  */
 export function MemberPitch({
   players,
@@ -210,24 +178,15 @@ export function MemberPitch({
   const { messages } = useLanguage();
   const copy = messages.leagueMembers;
   const describedBy = useId();
-  const [look] = usePitchLook();
   const lines = LINES.map((position) => ({
     position,
     players: players.filter((player) => player.position === position),
   }));
-  const defenders = lines[1]!.players.length;
-  const height = horizontalHeight(
-    lines.map((line) => line.players.length),
-    defenders,
-  );
-  // With no defender the direction of attack stands under the keeper instead.
-  const labelLine = defenders > 0 ? "DEF" : "GK";
+  const height = horizontalHeight(lines.map((line) => line.players.length));
   return (
     <div
       className={styles.wrap}
       data-mark="pitch"
-      data-grass={look.grass}
-      data-def-crowded={defenders >= 4 ? "true" : undefined}
       style={{ "--hh": `${height}px` } as CSSProperties}
     >
       <p id={describedBy} className="visually-hidden">
@@ -282,16 +241,11 @@ export function MemberPitch({
                       <Plate
                         player={player}
                         codes={codes}
-                        clubColours={look.clubColours}
                         news={news?.get(player.playerId)}
                         changed={modelChange?.changed.has(player.playerId) ?? false}
                         onSelectPlayer={onSelectPlayer}
                       />
                     </div>
-                    {line.position === labelLine && index === 0 ? <AttackLabel at="first" /> : null}
-                    {line.position === "DEF" && defenders >= 4 && index === defenders - 1 ? (
-                      <AttackLabel at="last" />
-                    ) : null}
                   </div>
                 ))}
               </div>
@@ -346,7 +300,6 @@ export function MemberBench({
         <ol className={styles.benchList}>
           {players.map((player) => {
             const code = clubCode(player.team, codes);
-            const swatch = clubSwatch(code);
             const shortName = player.shortName.trim() || player.name;
             const changed = modelChange?.changed.has(player.playerId) ?? false;
             return (
@@ -367,13 +320,12 @@ export function MemberBench({
                   ) : null}
                 </strong>
                 <span className={styles.benchMeta}>
-                  {swatch ? (
-                    <span
-                      className={styles.swatch}
-                      style={{ background: swatch }}
-                      aria-hidden="true"
-                    />
-                  ) : null}
+                  <ClubShirt
+                    code={code}
+                    name={player.name}
+                    keeper={player.position === "GK"}
+                    size="small"
+                  />
                   <span className={code ? styles.benchCode : undefined}>{code ?? player.team}</span>
                   {Object.hasOwn(messages.positions, player.position) ? (
                     <span>
@@ -404,7 +356,10 @@ export function MemberBench({
                     type="button"
                     className={styles.playerButton}
                     aria-label={`${player.name}: ${language === "tr" ? "Oyuncu ayrıntıları" : "Player details"}`}
-                    onClick={() => onSelectPlayer(player.playerId)}
+                    onClick={(event) => {
+                      event.currentTarget.focus({ preventScroll: true });
+                      onSelectPlayer(player.playerId);
+                    }}
                   />
                 ) : null}
               </li>

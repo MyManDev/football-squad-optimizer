@@ -63,11 +63,7 @@ async function expectPageDrawn(page: Page, path: string) {
 
 const PAGES = [
   "/",
-  "/moves",
-  "/rivals",
-  "/gw/2026-27/1",
   "/fixtures",
-  "/status",
   league,
   `${league}/members`,
   `${league}/members/${member.entry_id}`,
@@ -86,7 +82,6 @@ for (const path of PAGES) {
 const REFUSALS: { reader: string; path: string; unpublish?: string }[] = [
   { reader: "the league directory", path: `${league}/members`, unpublish: "**/data/leagues.json" },
   { reader: "a league document", path: `${league}/members/1` },
-  { reader: "the site data client", path: "/gw/2026-27/38" },
   { reader: "the fixture list", path: "/fixtures", unpublish: "**/data/fixtures.json" },
 ];
 

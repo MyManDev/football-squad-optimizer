@@ -410,25 +410,6 @@ export interface AdviceLineupExpectation {
   assumptions: string[];
 }
 
-export interface AdviceParticipationEvidence {
-  version: "football_participation_evidence_v1";
-  statement_outcomes?: {
-    player_id: number;
-    disposition: string;
-    applied: boolean;
-    reason: string;
-    source_url: string | null;
-    source_published_at: string | null;
-  }[];
-  as_of: string | null;
-  gameweek: number | null;
-  applied_player_count: number;
-  unapplied_statement_count: number;
-  captured_percentage_count: number;
-  manager_statement_count: number;
-  assumptions: string[];
-}
-
 export interface AdviceLineup<Player = AdvicePlayer> {
   starting_xi: Player[];
   captain: Player;
@@ -616,7 +597,6 @@ export interface EntryAdvice {
   /** Expected official scoring on the base forecast, including autosubs and vice recovery. */
   lineup_expectation?: AdviceLineupExpectation;
   captain?: AdvicePlayer | null;
-  participation_evidence?: AdviceParticipationEvidence;
   official_information?: OfficialInformation;
   official_injuries?: OfficialInjuryFacts;
   decision_information?: DecisionInformation;
@@ -700,7 +680,8 @@ export interface EntryAdvice {
  * The weekly scoreboard (`data/league/scoreboard.json`), written by
  * `scripts/build_scoreboard.py` from one live capture, the registry, the ledger and an
  * optional Top-100 capture. Every field is what a file on disk says; `null` is "the file
- * does not say", never a zero standing in for an absence.
+ * does not say", never a zero standing in for an absence. The file holds more fields than
+ * these types name.
  */
 export interface ScoreboardOurs {
   /** The ledger's settled net (named eleven, captain, chip, minus hits); null until settled. */
@@ -708,8 +689,6 @@ export interface ScoreboardOurs {
   xi: number | null;
   hits: number;
   projected: number;
-  /** `live`: decided before the deadline; `replay`: recorded afterwards from a pre-deadline capture. */
-  mode: "live" | "replay" | null;
   /**
    * Which rule produced `net`: legacy named-eleven scoring, or settlement using a recorded
    * bench order and vice. Null exactly when `net` is null, because a basis describes a
@@ -718,7 +697,6 @@ export interface ScoreboardOurs {
    */
   scoring_basis: "named_eleven_no_autosubs" | "official_autosub_captain_v2" | null;
   vice_captain_named: boolean;
-  diagnostics?: ScoreboardDiagnostics;
   outcome_snapshot_id?: string | null;
 }
 
@@ -732,10 +710,6 @@ export interface ScoreboardTop100 {
    */
   mean_score: number;
   basis: "net" | "gross";
-  /** The transfer cost taken off across the cohort; null when the mean is gross. */
-  hit_points: number | null;
-  /** The elite-picks capture the net was read from; null when the mean is gross. */
-  picks_snapshot_id: string | null;
   cohort_size: number;
   /** True only when that gameweek was finished and checked in the cohort capture's bootstrap. */
   final: boolean;
@@ -763,40 +737,12 @@ export interface ScoreboardGameweek {
   members: ScoreboardMember[];
   members_mean_net: number | null;
   members_counted: number;
-  /** Additive extension; absent on older publications. */
-  comparisons?: ScoreboardComparison[];
 }
 
 export interface ScoreboardCumulative {
   through_gameweek: number | null;
   gameweeks: number[];
-  /**
-   * Our running total, kept on the single basis `ours_basis` names. Weeks scored under a
-   * different rule are different measurements and are not added in; see
-   * `ours_excluded_gameweeks`. Null when no finished week sits on that basis, which means
-   * there is nothing to total and never that the total is zero.
-   */
-  ours_net: number | null;
-  /** The gameweeks `ours_net` covers; a subset of `gameweeks` until the ledger catches up. */
-  ours_gameweeks: number[];
-  /** The basis `ours_net` is on; null exactly when `ours_net` is null. */
-  ours_basis: "named_eleven_no_autosubs" | "official_autosub_captain_v2" | null;
-  /**
-   * Finished weeks left out of `ours_net` because they were scored on another basis, each
-   * named with the basis that produced it. Their own rows stay published; the reason they
-   * are not in the total is published too, rather than the weeks quietly going missing.
-   */
-  ours_excluded_gameweeks: {
-    gameweek: number;
-    scoring_basis: "named_eleven_no_autosubs" | "official_autosub_captain_v2";
-  }[];
   members_mean_total_points: number | null;
-  /**
-   * The gameweeks `members_mean_total_points` covers. It is a running total at
-   * `through_gameweek`, so it spans every week played up to it, finished or not — a
-   * superset of `gameweeks` whenever the finished weeks run with a gap.
-   */
-  members_gameweeks: number[];
   members_counted: number;
   average_entry_score: number | null;
 }
@@ -809,23 +755,6 @@ export interface Scoreboard {
   cohort_snapshot_id: string | null;
   /** The elite-picks capture the builder was handed, whether or not it netted the cohort. */
   cohort_picks_snapshot_id: string | null;
-  registered_members: number;
-  histories_held: number;
   gameweeks: ScoreboardGameweek[];
   cumulative: ScoreboardCumulative;
-}
-
-export interface ScoreboardDiagnostics {
-  zero_minute_starters: number | null;
-  minutes_shortfall: number | null;
-  captain_shortfall: number | null;
-  autosub_recovery: number | null;
-}
-
-export interface ScoreboardComparison {
-  kind: "system" | "base" | "elite_xi" | "ownership_template" | "league_mean" | "game_mean";
-  net: number | null;
-  scoring_basis: string | null;
-  source_snapshot_id: string | null;
-  diagnostics: ScoreboardDiagnostics;
 }

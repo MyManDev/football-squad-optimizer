@@ -177,6 +177,30 @@ def test_acquisition_requires_success_and_keeps_its_own_receipt(
     assert "Weekly run output" not in news_log.read_text(encoding="utf-8-sig")
 
 
+def test_a_warning_on_stderr_is_kept_in_the_receipt_and_does_not_refuse(tmp_path: Path) -> None:
+    # A real native command, because only a native command's stderr becomes an error record
+    # under 2>&1, which the script's 'Stop' would otherwise turn into a refusal.
+    (tmp_path / "data" / "snapshots" / "fpl-live-held").mkdir(parents=True)
+    fake = tmp_path / "fake-python.cmd"
+    fake.write_text(
+        "@echo off\r\n"
+        "echo a warning on stderr 1>&2\r\n"
+        'if "%3"=="--check-config" ( echo Configuration valid & exit /b 0 )\r\n'
+        "echo Capture       club-news-held\r\n"
+        "exit /b 0\r\n",
+        encoding="ascii",
+    )
+    log = tmp_path / "club-news.log"
+    out = _powershell(
+        f"try {{ Acquire-WeeklyNews '{fake}' '{tmp_path}' '' '{log}' }} "
+        "catch { Write-Output ('refused: ' + $_.Exception.Message) }",
+    )
+    assert out == "club-news-held"
+    receipt = log.read_text(encoding="utf-8-sig")
+    assert receipt.count("a warning on stderr") == 2
+    assert "Configuration valid" in receipt
+
+
 def test_missing_configuration_stops_before_any_page_is_requested(tmp_path: Path) -> None:
     log = tmp_path / "club-news.log"
     out = _powershell(

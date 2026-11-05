@@ -8,7 +8,8 @@ source words and a link to the club page.
 
 Each plate has a named button with a touch target at least 44 px high. Enter opens it,
 Escape or Close dismisses it, and focus returns to the button. The source link remains a
-separate control.
+separate control. A plan that no longer draws the player, or another member or capture, closes
+the details, and they stay closed until the player is chosen again.
 
 When another plan arrives, retained players move from their actual previous screen positions
 for 400 ms. The existing shared motion tokens and Web Animations API handle this without

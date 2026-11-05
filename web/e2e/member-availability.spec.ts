@@ -50,7 +50,6 @@ for (const language of ["tr", "en"] as const) {
     );
     const region = page.getByRole("region", { name: copy.rivalPlayersTitle });
     await expect(region.getByText(copy.rivalPlayerGroups.shared)).toBeVisible();
-    await expect(region.locator("p")).toHaveCount(0);
     const plan = mockEntryAdviceEnvelope(ENTRY, "ortak-koru", 1, row.rival_entry_id).payload;
     const rival = mockEntrySquadEnvelopes[row.rival_entry_id]!.payload;
     const held = new Set(rival.starting_xi.map((player) => player.player_id));
@@ -101,13 +100,11 @@ test("an unsupported saved template and direct URL cannot fetch an unlisted pair
   await expect(
     page.getByText(MESSAGES.tr.leagueMembers.publicationStates["not-listed"].title),
   ).toBeVisible();
-  // The templates are among the advanced settings, closed until asked for.
-  await page
-    .locator("main details summary", { hasText: MESSAGES.tr.leagueMembers.advancedSettings })
-    .click();
-  await expect(
-    page.getByRole("button", { name: /^Unavailable saved plan Farkı kapat/ }),
-  ).toBeDisabled();
+  // The templates head the plan settings as presets, on the page without opening anything.
+  const saved = page.getByRole("button", { name: /^Unavailable saved plan Farkı kapat/ });
+  await expect(saved).toBeDisabled();
+  // A rival the league's list does not hold is left out, never printed as a number.
+  await expect(saved).not.toContainText("99999999");
   await expect(page.getByRole("button", { name: "Hesapla" })).toBeDisabled();
   expect(reads).toEqual([]);
 });
@@ -176,9 +173,6 @@ for (const [state, language] of (["tr", "en"] as const).flatMap((language) =>
     await expect(page.getByRole("button", { name: copy.computeButton })).toBeDisabled();
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     if (state === "declared") {
-      await expect(
-        page.getByText(copy.publicationStates["declared-unavailable"].body),
-      ).toBeVisible();
       await expect(page.getByText("Raw producer diagnostic: probability 97% chance")).toHaveCount(
         0,
       );

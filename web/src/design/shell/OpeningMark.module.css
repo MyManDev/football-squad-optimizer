@@ -1,0 +1,173 @@
+/* The brand's opening (OpeningMark.tsx). One clock for every part: each animation runs the
+   same ten data-motion lengths, and the keyframe stops stage the parts on it. The bars
+   open along their length while the mark is still turned a quarter back, so they stand
+   upright with red on the left and green on the right; the mark then turns into place,
+   the word comes in beside it, and the cover fades off the page. The global reduced-motion
+   rule stops all of it, and the component does not render under that preference. */
+
+.cover {
+  --opening-length: calc(var(--motion-data) * 10);
+
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-6);
+  background: var(--color-bg);
+  pointer-events: none;
+  animation: cover-off var(--opening-length) var(--motion-ease) both;
+}
+
+.word {
+  font-family: var(--font-display);
+  font-size: clamp(36px, 8vw, 48px);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  color: var(--color-text);
+  animation: word-in var(--opening-length) var(--motion-ease) both;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.signature {
+  position: absolute;
+  right: max(24px, env(safe-area-inset-right));
+  bottom: max(28px, env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: max-content;
+  padding: 8px;
+  font-family: "Allura", cursive;
+  font-weight: 400;
+  line-height: 1;
+  transform: rotate(-6deg);
+  filter: drop-shadow(0 0 8px rgb(99 75 255 / 0.18));
+}
+
+.signatureName,
+.signatureLine {
+  display: block;
+  padding-inline: 6px;
+  background: linear-gradient(110deg, #168cff 8%, #7652ff 52%, #b34fff 92%);
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: #7652ff;
+}
+
+.signatureName {
+  font-size: clamp(34px, 5vw, 44px);
+  white-space: nowrap;
+  animation: signature-write var(--opening-length) var(--motion-ease) both;
+}
+
+.signatureLine {
+  align-self: flex-end;
+  margin-top: 0;
+  margin-right: 8px;
+  padding-bottom: 5px;
+  font-size: clamp(17px, 2.4vw, 21px);
+  animation: signature-finish var(--opening-length) var(--motion-ease) both;
+}
+
+@keyframes signature-write {
+  0% {
+    opacity: 0;
+    clip-path: inset(-20% 100% -20% -10%);
+  }
+  8% {
+    opacity: 1;
+  }
+  42%,
+  100% {
+    opacity: 1;
+    clip-path: inset(-20% -10% -20% -10%);
+  }
+}
+
+@keyframes signature-finish {
+  0%,
+  28% {
+    opacity: 0;
+    clip-path: inset(-20% 100% -20% -10%);
+  }
+  58%,
+  100% {
+    opacity: 1;
+    clip-path: inset(-20% -10% -20% -10%);
+  }
+}
+
+.mark {
+  overflow: visible;
+  animation: mark-turn var(--opening-length) var(--motion-ease) both;
+}
+
+.mark rect {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: bar-open var(--opening-length) var(--motion-ease) both;
+}
+
+.mark [data-bar="out"] {
+  fill: var(--color-out-panel);
+}
+
+.mark [data-bar="in"] {
+  fill: var(--color-in-panel);
+}
+
+/* Turned a quarter back, the mark's top bar is on the left and its bottom bar on the right. */
+@keyframes mark-turn {
+  0%,
+  30% {
+    transform: rotate(-90deg);
+  }
+  60%,
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+/* Along the bar's length, which stands upright while the mark is turned back. */
+@keyframes bar-open {
+  0% {
+    transform: scaleX(0);
+  }
+  22%,
+  100% {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes word-in {
+  0%,
+  45% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  65%,
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes cover-off {
+  0%,
+  88% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}

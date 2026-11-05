@@ -6,7 +6,7 @@ import { mockEntryAdviceEnvelope, mockEntrySquadEnvelopes } from "../../../fixtu
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import type { EntryAdvice, LeagueViewEnvelope } from "../types";
 import { TOP100_COPY } from "../advice/top100Copy";
-import { AdviceCard } from "./MemberAdviceCard";
+import { AdviceDetails } from "./MemberAdviceCard";
 
 afterEach(() => {
   cleanup();
@@ -38,7 +38,7 @@ function card(
   return (
     <LanguageProvider initialLanguage={language}>
       <MemoryRouter>
-        <AdviceCard
+        <AdviceDetails
           shown={{ envelope: selected, origin: "computed" }}
           squad={mockEntrySquadEnvelopes[ENTRY]}
           rivalSquad={null}

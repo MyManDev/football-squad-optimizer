@@ -133,15 +133,16 @@ second H1 policy hiding inside the evidence batch.
 ## Public evidence boundary
 
 `squadopt.application.load_public_horizon_evidence(...)` is the only route from a batch
-manifest into the static UI. It verifies the manifest and child fingerprints, path
+manifest into the published site data. It verifies the manifest and child fingerprints, path
 containment, lineage, and the H1 decision against the immutable ledger. Squad, XI,
 captain, bench order, transfers, projected score, model, and snapshot must agree. The
 sanitized `public_horizon_evidence_v1` block exposes solver status and proof status only;
 it never exposes H3/H5 actions or turns a research shadow into advice.
 
 `scripts.build_site --horizon-manifest <path>` attaches this block to the matching
-recommendation metadata. Omitting the option preserves the existing site output. A
-mismatch is a hard build failure rather than a warning.
+recommendation metadata; no page reads it since the decision controls were removed. Omitting
+the option preserves the existing site output. A mismatch is a hard build failure rather than
+a warning.
 
 ## What this contract does not claim
 

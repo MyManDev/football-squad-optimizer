@@ -115,7 +115,10 @@ describe("the duel of two elevens", () => {
     const picker = screen.getByRole("group", { name: MESSAGES.tr.leagueMembers.duelPick });
     const buttons = within(picker).getAllByRole("button");
     expect(buttons.map((button) => button.textContent)).toEqual(
-      CANDIDATES.map((member) => member.team_name ?? member.manager_name ?? `#${member.entry_id}`),
+      CANDIDATES.map(
+        (member) =>
+          member.team_name ?? member.manager_name ?? MESSAGES.tr.leagueMembers.unknownTeam,
+      ),
     );
     expect(within(picker).getByRole("button", { name: "Half Space" })).toHaveAttribute(
       "aria-pressed",
@@ -125,7 +128,15 @@ describe("the duel of two elevens", () => {
     expect(onSelect).toHaveBeenCalledWith(35249003);
   });
 
-  it("says when the rival is being read, cannot be read, is not published or is from another capture", () => {
+  it("names a rival with neither a team nor a manager as an unnamed team, never by number", () => {
+    const copy = MESSAGES.tr.leagueMembers;
+    const unnamed = { ...SECOND.payload.entry, team_name: null, manager_name: null };
+    show({ candidates: [unnamed], selected: null, rival: null });
+    expect(screen.getByRole("button", { name: copy.unknownTeam })).toBeInTheDocument();
+    expect(screen.queryByText(/#\d/)).toBeNull();
+  });
+
+  it("says when the rival is being read, cannot be read or is from another capture", () => {
     const copy = MESSAGES.tr.leagueMembers;
     show({ rival: null, issue: "loading" });
     expect(screen.getByText(copy.duelLoading)).toBeInTheDocument();
@@ -133,18 +144,39 @@ describe("the duel of two elevens", () => {
     show({ rival: null, issue: "unreadable" });
     expect(screen.getByText(copy.duelUnreadable)).toBeInTheDocument();
     cleanup();
-    show({ rival: null, issue: "missing" });
-    expect(screen.getByText(copy.duelMissing)).toBeInTheDocument();
-    cleanup();
     const { container } = show({
       rival: {
         ...SECOND,
         payload: { ...SECOND.payload, source_snapshot_id: "example-post-deadline-gw03" },
       },
     });
-    expect(screen.getByText(copy.duelMissing)).toBeInTheDocument();
+    expect(screen.getByText(copy.duelUnreadable)).toBeInTheDocument();
     expect(container.querySelector("[data-duel]")).toBeNull();
   });
+
+  it.each(["tr", "en"] as const)(
+    "leads each row with the position's short code and gives a screen reader the word (%s)",
+    (language) => {
+      show({}, language);
+      const codes = MESSAGES[language].positionCodes;
+      const words = MESSAGES[language].positions;
+      for (const team of ["North Stand Notes", "Half Space"]) {
+        for (const row of rows(team)) {
+          const lead = row.children[0]!;
+          const [shown, spoken] = [...lead.children];
+          // The code's column is 2.5rem: a word such as "goalkeeper" ran into the name.
+          expect(Object.values(codes)).toContain(shown!.textContent);
+          expect(shown!.getAttribute("aria-hidden")).toBe("true");
+          expect(Object.values(words)).toContain(spoken!.textContent);
+          expect(spoken!.className).toBe("visually-hidden");
+          const position = Object.keys(codes).find(
+            (key) => codes[key as keyof typeof codes] === shown!.textContent,
+          ) as keyof typeof words;
+          expect(spoken!.textContent).toBe(words[position]);
+        }
+      }
+    },
+  );
 
   it("shows only the picker until a rival is named", () => {
     const { container } = show({ selected: null, rival: null });

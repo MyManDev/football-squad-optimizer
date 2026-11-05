@@ -8,8 +8,8 @@ The domain calculation and the public `backend_jobs_v1` record are unchanged.
 
 Short metadata transactions use a permanent OS-locked `.queue.lock` file. A process exit
 releases the lock; the file is never deleted or replaced. Solving happens outside the lock.
-Recovery, claiming, heartbeat, terminal writes and cache publication all check the persisted
-attempt under that same lock. An old attempt cannot refresh or remove a replacement claim,
+Recovery, claiming, heartbeat, progress records, terminal writes and cache publication all
+check the persisted attempt under that same lock. An old attempt cannot refresh or remove a replacement claim,
 write its result, or publish cache bytes before the ownership check.
 
 | Interrupted prefix | Recovery |
@@ -17,6 +17,7 @@ write its result, or publish cache bytes before the ownership check.
 | Open-key intent, no job document | Publish the exact queued job carried by the intent |
 | Claim marker, still queued | Remove the incomplete claim; no worker received a running job |
 | Requeued document, old claim marker | Remove the marker without incrementing the attempt twice |
+| Requeued document, old progress record | Remove it with the marker; one left over names the older attempt and is never read as the new attempt's count |
 | Cache bytes, still running | Recover after lease expiry; identical recomputation remains idempotent |
 | Terminal document, index/claim left over | Complete cleanup without rewriting the terminal outcome |
 

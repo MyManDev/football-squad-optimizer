@@ -124,6 +124,9 @@ for (const language of ["tr", "en"] as const) {
         failure.startsWith("list-") ? "/league/352490/members" : `/league/352490/members/${ENTRY}`,
       );
       await expect(page.getByText(expected, { exact: true })).toBeVisible();
+      // With the list or the squad gone, the state is all the page holds: it is its heading.
+      if (failure.startsWith("list-") || failure.startsWith("member-"))
+        await expect(page.getByRole("heading", { level: 1 })).toHaveText(expected);
       if (
         failure.startsWith("index-") ||
         failure.startsWith("listed-") ||
@@ -145,7 +148,6 @@ for (const language of ["tr", "en"] as const) {
         await expect(page.getByText(copy.adviceNotComputed)).toHaveCount(0);
       }
       if (failure === "declared-unavailable") {
-        await expect(page.getByText(copy.publicationReasonUnknown)).toBeVisible();
         await expect(page.locator("main")).not.toContainText("__proto__");
       }
       expect(browserErrors).toEqual([]);

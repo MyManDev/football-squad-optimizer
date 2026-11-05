@@ -3,20 +3,13 @@ import { lazy, Suspense } from "react";
 import { BrowserRouter, Route, Routes } from "react-router";
 
 import { EmptyState } from "../design/components/EmptyState";
+import { PageLoading } from "../design/components/PageLoading";
+import { OpeningMark } from "../design/shell/OpeningMark";
 import { useLanguage } from "../i18n/context";
 import { LanguageProvider } from "../i18n/LanguageProvider";
 import { IdentifiedShell } from "./IdentifiedShell";
 import { RouteErrorBoundary } from "./RouteErrorBoundary";
 
-const SquadPage = lazy(() =>
-  import("../features/squad/pages/SquadPage").then((m) => ({ default: m.SquadPage })),
-);
-const MovesPage = lazy(() =>
-  import("../features/moves/pages/MovesPage").then((m) => ({ default: m.MovesPage })),
-);
-const RivalsPage = lazy(() =>
-  import("../features/rivals/pages/RivalsPage").then((m) => ({ default: m.RivalsPage })),
-);
 const LeagueEntryPage = lazy(() =>
   import("../features/league/pages/LeagueEntryPage").then((m) => ({ default: m.LeagueEntryPage })),
 );
@@ -36,16 +29,10 @@ const LeagueMemberPage = lazy(() =>
     default: m.LeagueMemberPage,
   })),
 );
-const StatusPage = lazy(() =>
-  import("../features/status/pages/StatusPage").then((m) => ({ default: m.StatusPage })),
-);
 const LeagueMemberHistoryPage = lazy(() =>
   import("../features/league/pages/LeagueMemberHistoryPage").then((m) => ({
     default: m.LeagueMemberHistoryPage,
   })),
-);
-const AdminPage = lazy(() =>
-  import("../features/admin/pages/AdminPage").then((m) => ({ default: m.AdminPage })),
 );
 
 const FixturesPage = lazy(() =>
@@ -63,6 +50,7 @@ export function App() {
   return (
     <LanguageProvider>
       <LocalizedApp basename={import.meta.env.BASE_URL} />
+      <OpeningMark />
     </LanguageProvider>
   );
 }
@@ -75,41 +63,9 @@ function LocalizedApp({ basename }: { basename: string }) {
         {/* The shell reads the visitor's league and member through the identity module. */}
         <IdentifiedShell>
           <RouteErrorBoundary>
-            <Suspense fallback={<EmptyState title={messages.common.loading} />}>
+            <Suspense fallback={<PageLoading label={messages.common.loading} />}>
               <Routes>
                 <Route path="/" element={<LeagueEntryPage />} />
-                {/* The system's own pages name no league; they stand behind the same two
-                    steps as the league pages, for the visitor's current league. */}
-                <Route
-                  path="/gw/:season/:gameweek"
-                  element={
-                    <LeagueGate source="visitor">
-                      <SquadPage />
-                    </LeagueGate>
-                  }
-                />
-                {["/moves", "/moves/:season/:gameweek"].map((path) => (
-                  <Route
-                    key={path}
-                    path={path}
-                    element={
-                      <LeagueGate source="visitor">
-                        <MovesPage />
-                      </LeagueGate>
-                    }
-                  />
-                ))}
-                {["/rivals", "/rivals/:season/:gameweek"].map((path) => (
-                  <Route
-                    key={path}
-                    path={path}
-                    element={
-                      <LeagueGate source="visitor">
-                        <RivalsPage />
-                      </LeagueGate>
-                    }
-                  />
-                ))}
                 {/* Every league address names its league; the old shape without the
                     number goes through the gate, which rewrites it to the current league.
                     The gate then asks who the visitor is before the page is drawn. */}
@@ -135,7 +91,14 @@ function LocalizedApp({ basename }: { basename: string }) {
                     }
                   />
                 ))}
-                {["/league/members/:entryId", "/league/:leagueId/members/:entryId"].map((root) => (
+                {/* A member's page and each of their tools: one route with the tool as an
+                    optional last segment, so moving between them keeps the page mounted and
+                    a plan the device computed stays. The history's own address ranks above
+                    it, as a fixed segment does over a parameter. */}
+                {[
+                  "/league/members/:entryId/:tool?",
+                  "/league/:leagueId/members/:entryId/:tool?",
+                ].map((root) => (
                   <Route
                     key={root}
                     path={root}
@@ -164,9 +127,7 @@ function LocalizedApp({ basename }: { basename: string }) {
                 {import.meta.env.VITE_ADVICE_API_ORIGIN && (
                   <Route path="/contribute" element={<ContributePage />} />
                 )}
-                <Route path="/status" element={<StatusPage />} />
-                <Route path="/admin" element={<AdminPage />} />
-                <Route path="*" element={<EmptyState title={messages.shell.notFound} />} />
+                <Route path="*" element={<EmptyState page title={messages.shell.notFound} />} />
               </Routes>
             </Suspense>
           </RouteErrorBoundary>

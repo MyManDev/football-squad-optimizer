@@ -66,10 +66,9 @@ from squadopt.live.recommendation import infer_season
 CONTRACT_VERSION = "weekly_suggestion_history_v1"
 SUPPORTED_LEAGUE_ID = 352490
 
-# The horizon handoff, specified in docs/contracts/member_week_horizon_v1.md. The reader
-# rejects the whole document when any one of these disagrees with the scoreboard it is shown
-# beside, and reports no reason for the rejection, so each constant is the contract's own
-# spelling rather than a description of it.
+# The horizon handoff, specified in docs/contracts/member_week_horizon_v1.md. A reader has
+# to reject the whole document when any one of these disagrees with the scoreboard, so each
+# constant is the contract's own spelling rather than a description of it.
 MEMBER_WEEK_HORIZON_CONTRACT_VERSION: Final = "member_week_horizon_v1"
 SERIES_HORIZON_FILE: Final = "series-horizon.json"
 # The contract fixes these two. They are promises about what produced the numbers, so the
@@ -79,7 +78,7 @@ CONTRACT_SCORING_BASIS: Final = ScoringPolicy.OFFICIAL_AUTOSUB_CAPTAIN_V2.value
 CONTRACT_POPULATION: Final = "recorded_member_suggestions_vs_actual"
 _MEASUREMENT_ARTIFACT = re.compile(r"docs/[a-z0-9_-]+\.json")
 # A recorded advice digest is a lowercase sha256 hexdigest. Checking it here rather than
-# trusting it keeps a malformed key out of a set the reader compares for exact equality.
+# trusting it keeps a malformed key out of a set a reader has to compare for exact equality.
 _SHA256_HEX = re.compile(r"[0-9a-f]{64}")
 
 
@@ -798,8 +797,8 @@ def settled_member_week_comparisons(
     contribute nothing. An unknown actual score is not a difference of zero.
 
     The same filter decides what is measured and what is named, so the published key set and
-    the measured rows are one list rather than two that could drift. The reader applies the
-    matching filter to the histories it loaded; a week either enters both sides or neither.
+    the measured rows are one list rather than two that could drift. A reader has to apply
+    the matching filter to the histories it loads; a week enters both sides or neither.
     """
     comparisons = []
     for entry_id, weeks in reviews.items():
@@ -848,14 +847,13 @@ def series_horizon_document(
 
     None is the whole answer to a refusal. The reading refuses below two settled weeks,
     below any within-week replication and on a record with no variation, and it carries no
-    correlation to publish in those states. The page already renders "not yet" for an absent
-    document, so the true statement is the absent document; a document built from a
-    substituted correlation would be a claim, and zero, the only substitution available, is
-    the most optimistic one there is.
+    correlation to publish in those states. The true statement is the absent document; a
+    document built from a substituted correlation would be a claim, and zero, the only
+    substitution available, is the most optimistic one there is.
 
     ``required_week_clusters`` is floored at the instrument's own two-week minimum. A
     clustered reading does not exist below two settled weeks, so an arithmetic target of one
-    is not a count anyone could measure at, and the reader refuses anything under two. The
+    is not a count anyone could measure at, and the contract refuses anything under two. The
     floor applies to the published target only; the estimator's arithmetic is unchanged.
     """
     if scoring_basis != CONTRACT_SCORING_BASIS or population != CONTRACT_POPULATION:
@@ -878,14 +876,13 @@ def series_horizon_document(
         "league_id": league_id,
         "scoring_basis": scoring_basis,
         "population": population,
-        # The committed record the target effect and the two error rates come from. The
-        # reader validates the path and never fetches it, so the producer is what stands
-        # behind it being a real, indexed measurement.
+        # The committed record the target effect and the two error rates come from. Nothing
+        # after this fetches the path, so the producer is what stands behind it being a real,
+        # indexed measurement.
         "measurement_artifact": measurement_artifact,
         # Published although nothing renders it: it is the entire distance between this
         # target and the one an independence assumption would have produced, and it cannot be
-        # recovered later from a record that has since grown. Dropping it also pins the page
-        # at "unknown" with no visible cause, because the reader rejects the whole document.
+        # recovered later from a record that has since grown.
         "within_week_correlation": reading.within_week_correlation,
         "required_week_clusters": max(MINIMUM_WEEKS_FOR_CORRELATION, horizon.total_weeks),
         "member_week_keys": list(reading.member_week_keys),
@@ -905,9 +902,9 @@ def publish_series_horizon(
 ) -> Path | None:
     """Write the horizon handoff, or remove a stale one and publish nothing.
 
-    A previous week's document names a key set this publication no longer measures, which the
-    reader would reject anyway; removing it keeps a target that nothing supports from sitting
-    on disk beside the histories that replaced it.
+    A previous week's document names a key set this publication no longer measures; removing
+    it keeps a target that nothing supports from sitting on disk beside the histories that
+    replaced it.
     """
     path = out_dir / SERIES_HORIZON_FILE
     document = series_horizon_document(
@@ -1045,10 +1042,9 @@ def publish_suggestion_histories(
     """Publish member-safe derived documents from existing verified, bounded captures.
 
     Two documents come out of one walk: each member's history, and the horizon those same
-    member-weeks can support. They are published together because the reader compares the
-    horizon's key set against the keys it builds from these very histories, and two separate
-    walks could return two sets that no reader could reconcile. A record that supports no
-    horizon publishes histories and no horizon file.
+    member-weeks can support. They are published together because the horizon's key set names
+    these very histories, and two separate walks could return two sets that no reader could
+    reconcile. A record that supports no horizon publishes histories and no horizon file.
 
     ``published`` is what the tree these documents join says each member was shown
     (:func:`published_advice_captures`), and it is required: a history shows a week as what

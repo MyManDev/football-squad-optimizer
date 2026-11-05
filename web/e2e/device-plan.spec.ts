@@ -53,9 +53,7 @@ test.afterEach(async ({ page }, testInfo) => {
   await printDeviceTimings(page, testInfo);
 });
 
-test("a member's plan is solved on the device and drawn as a computation result", async ({
-  page,
-}) => {
+test("a member's plan is solved on the device and drawn on the page", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await installLeagueMocks(page);
   const squad = mockEntrySquadEnvelopes[ENTRY]!;
@@ -105,7 +103,9 @@ test("a member's plan is solved on the device and drawn as a computation result"
   pressed = true;
   await button.click();
   await expect(page.locator("[data-device-state='done']")).toBeVisible({ timeout: 60_000 });
-  await expect(page.getByText("Hesap sonucu")).toBeVisible();
+  await expect(page.locator("[data-device-state='done']")).toHaveText("Plan hazır");
+  // The progress card stood over the page while the run counted, and is gone now it is done.
+  await expect(page.locator("[data-device-progress]")).toHaveCount(0, { timeout: 30_000 });
   // The transfers the server's reference names, by the names the document gives them.
   const names = new Map(fixture.document.players.map((p) => [p.id, p.name]));
   for (const move of member.reference.moves) {
@@ -161,13 +161,18 @@ for (const publishedChip of [true, false]) {
             }),
           }),
     );
+    // The published answer is on the entry's capture; the page refuses one from another.
+    const chip = mockEntryAdviceChipEnvelope(ENTRY, "3xc");
     await page.route(
       /\/data\/league\/advice\/35249001\/saf-puan\/1\/chip-3xc\.json(?:\?.*)?$/,
       (route) =>
         route.fulfill({
           status: 200,
           contentType: "application/json",
-          body: JSON.stringify(mockEntryAdviceChipEnvelope(ENTRY, "3xc")),
+          body: JSON.stringify({
+            ...chip,
+            payload: { ...chip.payload, source_snapshot_id: fixture.document.source_snapshot_id },
+          }),
         }),
     );
     await page.route(/\/data\/league\/device-plan\.json(?:\?.*)?$/, (route) =>
@@ -190,18 +195,19 @@ for (const publishedChip of [true, false]) {
     });
     await page.goto(`/league/352490/members/${ENTRY}?mode=saf-puan&window=1&chip=3xc`);
     await expect(page.locator('input[name="chip"][value="3xc"]')).toBeChecked();
-    if (publishedChip)
-      await expect(page.locator("main")).toContainText("Triple Captain bu hafta oynanıyor");
+    await expect(page.getByTestId("member-selection-summary")).toContainText("Triple Captain");
+    // The summary prints the address's chip; the chip section comes only from a document.
+    if (publishedChip) await expect(page.getByTestId("chip-choice")).toBeVisible();
+    else await expect(page.getByTestId("chip-choice")).toHaveCount(0);
     const button = page.getByRole("button", { name: "Bu cihazda hesapla" });
     await expect(button).toBeVisible();
     await button.click();
     await expect(page.locator("[data-device-state='done']")).toBeVisible({ timeout: 60_000 });
-    await expect(page.getByText("Hesap sonucu")).toBeVisible();
     // The captain tripled: the reference's captain scores once more than the plain plan,
     // and the chip section states the gain the device measured against that plan.
     const names = new Map(fixture.document.players.map((p) => [p.id, p.name]));
     await expect(page.getByText(names.get(member.reference.captain)!).first()).toBeVisible();
-    await expect(page.locator("main")).toContainText(/Çipsiz kendi planına göre bu hafta ~\+/);
+    await expect(page.locator("main")).toContainText(/Bu hafta ~\+\S+ beklenen puan\./);
     if (!publishedChip) expect(chipReads).toEqual([]);
   });
 }
@@ -279,8 +285,7 @@ for (const weight of [0, 50]) {
     await expect(button).toBeVisible();
     await button.click();
     await expect(page.locator("[data-device-state='done']")).toBeVisible({ timeout: 60_000 });
-    await expect(page.getByText("Hesap sonucu")).toBeVisible();
-    // The band's account, as the service publishes it: the overlap, the cap and the price.
+    // The band's account, as the service publishes it: the overlap and the price.
     const cases =
       weight === 0 ? world.cases : world.weighted_cases.filter((c) => c.weight === weight);
     const reference = cases.find(
@@ -289,11 +294,10 @@ for (const weight of [0, 50]) {
     await expect(page.locator("main")).toContainText(
       `rakibin on birinden ${reference.overlap_count} tanesi senin on beşinde`,
     );
-    await expect(page.locator("main")).toContainText(
-      `istenen ortak oyuncu sınırı ${reference.overlap_target}`,
-    );
     if (weight !== 0) {
-      await expect(page.locator("main")).toContainText(`Ayar: ${weight} (senin seçimin).`);
+      await expect(page.getByTestId("top100-influence")).toContainText(
+        "Bu ayar planını değiştirdi.",
+      );
       await expect(page.locator("main")).toContainText(
         `~${reference.expected_points_cost!.toFixed(1).replace(".", ",")} beklenen puan`,
       );
@@ -340,12 +344,11 @@ test("a Top 100 weight is solved on the device and priced on the base points", a
   await expect(button).toBeVisible();
   await button.click();
   await expect(page.locator("[data-device-state='done']")).toBeVisible({ timeout: 60_000 });
-  await expect(page.getByText("Hesap sonucu")).toBeVisible();
   const reference = world.top100_cases.find(
     (c) => c.entry_id === 102 && c.weight === 50,
   )!.reference;
   expect(reference.changed).toBe(true);
-  await expect(page.locator("main")).toContainText("Ayar: 50 (senin seçimin).");
+  await expect(page.getByTestId("top100-influence")).toContainText("Bu ayar planını değiştirdi.");
   // The price on base points, in the sentence the setting documents print it in.
   await expect(page.locator("main")).toContainText(
     `~${reference.expected_points_cost.toFixed(1).replace(".", ",")} beklenen puan`,
@@ -464,7 +467,6 @@ async function solveOnDevice(page: Page): Promise<string[]> {
   pressed = true;
   await button.click();
   await expect(page.locator("[data-device-state='done']")).toBeVisible({ timeout: 60_000 });
-  await expect(page.getByText("Hesap sonucu")).toBeVisible();
   const names = new Map(fixture.document.players.map((p) => [p.id, p.name]));
   for (const move of member.reference.moves) {
     await expect(page.getByText(names.get(move.in!)!).first()).toBeVisible();
