@@ -50,6 +50,14 @@ function open(path: string) {
 const sidebar = () => within(screen.getByRole("complementary", { name: TR.sidebar }));
 
 describe("the identified shell", () => {
+  it("keeps a standalone team free of another league's saved identity and tools", () => {
+    claimIn();
+    open("/entry/123");
+    expect(sidebar().queryByText("Deniz Aral")).toBeNull();
+    expect(sidebar().queryByRole("link", { name: TR.thisWeek })).toBeNull();
+    expect(sidebar().getByRole("link", { name: TR.findLeague })).toHaveAttribute("href", "/");
+    expect(readMemberClaim()?.entryId).toBe(35249001);
+  });
   it("shows the claimed member in the sidebar and opens the league part of it", () => {
     claimIn();
     open("/fixtures");

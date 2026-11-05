@@ -7,9 +7,11 @@ are [`fpl_entry_bundle_v1.examples.json`](fpl_entry_bundle_v1.examples.json).
 The FPL forwarder ([ADR 0012](../architecture/decisions/0012-fpl-forwarder.md)) answers
 `GET /api/v1/fpl/entry/{entry}/bundle?gw={table gameweek}` with this document: what the device's
 entry readers take for one entry, read from FPL on the visitor's request, and the member's
-current week. One member costs one request to the Worker. It is never FPL's own JSON. No reader
-in the site takes it yet; #983 step 3 does, with its identity rule (the picks gameweek is the
-table gameweek minus 1, and the history covers it).
+current week. One member costs one request to the Worker. It is never FPL's own JSON. The site
+reads it through #983 step 3's client and identity rule (the picks gameweek is the table
+gameweek minus 1, and the history covers it): for the live week on a published member's page,
+and since step 4 for the whole member page of a team the site does not publish
+(`web/src/features/league/forwarded/`).
 
 ## Which weeks it holds
 

@@ -29,6 +29,16 @@ const LeagueMemberPage = lazy(() =>
     default: m.LeagueMemberPage,
   })),
 );
+const ForwardedLeaguePage = lazy(() =>
+  import("../features/league/forwarded/ForwardedLeaguePage").then((m) => ({
+    default: m.ForwardedLeaguePage,
+  })),
+);
+const ForwardedMemberPage = lazy(() =>
+  import("../features/league/forwarded/ForwardedMemberPage").then((m) => ({
+    default: m.ForwardedMemberPage,
+  })),
+);
 const LeagueMemberHistoryPage = lazy(() =>
   import("../features/league/pages/LeagueMemberHistoryPage").then((m) => ({
     default: m.LeagueMemberHistoryPage,
@@ -68,13 +78,15 @@ function LocalizedApp({ basename }: { basename: string }) {
                 <Route path="/" element={<LeagueEntryPage />} />
                 {/* Every league address names its league; the old shape without the
                     number goes through the gate, which rewrites it to the current league.
-                    The gate then asks who the visitor is before the page is drawn. */}
+                    The gate then asks who the visitor is before the page is drawn. A
+                    classic league the site does not publish opens from the FPL forwarder
+                    instead, as its standings (#983 step 4). */}
                 {["/league", "/league/:leagueId"].map((root) => (
                   <Route
                     key={root}
                     path={root}
                     element={
-                      <LeagueGate>
+                      <LeagueGate forwarded={<ForwardedLeaguePage />}>
                         <LeaguePage />
                       </LeagueGate>
                     }
@@ -85,7 +97,7 @@ function LocalizedApp({ basename }: { basename: string }) {
                     key={root}
                     path={root}
                     element={
-                      <LeagueGate>
+                      <LeagueGate forwarded={<ForwardedLeaguePage />}>
                         <LeagueMembersPage />
                       </LeagueGate>
                     }
@@ -103,7 +115,7 @@ function LocalizedApp({ basename }: { basename: string }) {
                     key={root}
                     path={root}
                     element={
-                      <LeagueGate>
+                      <LeagueGate forwarded={<ForwardedMemberPage />}>
                         <LeagueMemberPage />
                       </LeagueGate>
                     }
@@ -123,6 +135,9 @@ function LocalizedApp({ basename }: { basename: string }) {
                     }
                   />
                 ))}
+                {/* One FPL team on its own, from the forwarder's bundle: no league, so no
+                    gate and no member step. */}
+                <Route path="/entry/:entryId" element={<ForwardedMemberPage />} />
                 <Route path="/fixtures" element={<FixturesPage />} />
                 {import.meta.env.VITE_ADVICE_API_ORIGIN && (
                   <Route path="/contribute" element={<ContributePage />} />

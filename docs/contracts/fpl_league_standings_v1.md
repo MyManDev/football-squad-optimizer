@@ -7,8 +7,9 @@ examples are [`fpl_league_standings_v1.examples.json`](fpl_league_standings_v1.e
 The FPL forwarder ([ADR 0012](../architecture/decisions/0012-fpl-forwarder.md)) answers
 `GET /api/v1/fpl/standings/{league}?page={page}` with this document: one page of one classic
 league, read from FPL's `leagues-classic/{league}/standings/?page_standings={page}` on the
-visitor's request and trimmed to the fields below. It is never FPL's own JSON. No reader in the
-site takes it yet; #983 step 4 does.
+visitor's request and trimmed to the fields below. It is never FPL's own JSON. Since #983 step 4
+the site reads it for a league its directory does not list (`web/src/features/league/forwarded/`):
+page 1 when the league's address is opened, and each next page as the visitor scrolls.
 
 ## Fields
 
