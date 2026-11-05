@@ -188,8 +188,23 @@ A bundle that passes is read through the entry-state readers unchanged (`bundleE
 `web/src/features/league/forwarder/entryState.ts`): `readEntry`, `readHistory`,
 `readTransfers`, `readPicks` for each week it holds, and the held squad from `heldSquadBasis`
 over those weeks, so a Free Hit week's basis is the week before it. A part a reader refuses
-makes the whole bundle unreadable. Building the member block from it is #983 step 4's; until
-then nothing the device solves comes from a forwarded bundle.
+makes the whole bundle unreadable.
+
+Since #983 step 4 a bundle that passes builds the member's entry document on the device
+(`forwardedMemberSquad` in `web/src/features/league/forwarded/memberSquad.ts`) for a team the
+site does not publish: one opened from a forwarded league's standings, or at `/entry/<id>`. The
+table is the newest capture table any directory line names (the latest season and gameweek,
+the later capture on a tie), and the bundle is asked for that table's gameweek. The document is
+built as the weekly run builds it from a capture: the squad, armbands and bank of the held
+week (the week before a Free Hit), the free transfers from the history under
+`rules.max_free_transfers`, the purchase prices replayed from the transfers where the replay
+holds (`rebuildPurchasePrices`, with each gameweek's deadline from the site's
+`/data/fixtures.json`), else the current prices capped by the picks' stated worth, and the
+device block after the spending-power rule. The table does not carry the season's squad budget
+or sell-on fee, so the device holds them by season (`SEASON_TERMS`, 1000 and 0.5 for 2026-27,
+as the capture's bootstrap states them); a season it does not name replays nothing and takes
+that fallback. A bundle the identity rule refuses, or a held player the table does not price,
+builds nothing, and the page says the plan cannot be computed for that team this week.
 
 ## What the device answers
 
