@@ -187,7 +187,7 @@ describe("the top bar between member pages", () => {
     ]);
     const steps = css(join(SRC, "design/transitions.css"));
     expect(steps).toMatch(
-      /::view-transition-group\(member-bar\),\s*::view-transition-old\(member-bar\),\s*::view-transition-new\(member-bar\)\s*\{[^}]*animation-duration: var\(--motion-ui\);/,
+      /::view-transition-group\(member-bar\),\s*::view-transition-old\(member-bar\),\s*::view-transition-new\(member-bar\)\s*\{[^}]*animation-duration: var\(--motion-page\);/,
     );
     for (const name of ["shell-sidebar", "shell-bar"]) {
       expect(steps).toContain(`::view-transition-group(${name})`);

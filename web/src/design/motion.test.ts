@@ -15,6 +15,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   MOTION_EASE,
+  MOTION_ROUTE_EASE,
   MOTION_MS,
   REDUCED_MOTION_QUERY,
   motionDuration,
@@ -27,16 +28,20 @@ const TOKENS = readFileSync(join(__dirname, "tokens.css"), "utf-8").replace(
   /\/\*[\s\S]*?\*\//g,
   "",
 );
-/** The ranges #1136 sets: buttons and cards, then pitch and data transitions. */
+/** #1136's UI/data ranges, plus #1319's page and panel timing. */
 const MOTION_RANGES: Record<MotionKind, readonly [number, number]> = {
   uiFast: [150, 250],
   ui: [150, 250],
   data: [300, 500],
+  page: [300, 400],
+  panel: [250, 350],
 };
 const TOKEN_NAMES = {
   uiFast: "--motion-ui-fast",
   ui: "--motion-ui",
   data: "--motion-data",
+  page: "--motion-page",
+  panel: "--motion-panel",
 } as const;
 
 function rootBlock(css: string): string {
@@ -87,6 +92,9 @@ describe("the motion tokens", () => {
       expect(MOTION_MS[kind]).toBeLessThanOrEqual(high);
     }
     expect(token(root, "--motion-ease")).toBe(`cubic-bezier(${MOTION_EASE.join(", ")})`);
+    expect(token(root, "--motion-route-ease")).toBe(
+      `cubic-bezier(${MOTION_ROUTE_EASE.join(", ")})`,
+    );
   });
 
   it("are all zero under the reduced-motion preference, beside the global stop", () => {

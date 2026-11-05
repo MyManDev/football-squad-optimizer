@@ -44,6 +44,7 @@
    tokens below, never a literal of its own, and src/design/motion.ts mirrors them for the
    few places that time a change in script. Buttons, cards and icons move in --motion-ui-fast
    or --motion-ui (150 to 250 ms); the pitch and data move in --motion-data (300 to 500 ms).
+   Pages and panels have their own slower timing and easing (#1319).
    Nothing moves without an event behind it, and under prefers-reduced-motion every duration
    is zero, so each change is instant. */
 
@@ -115,7 +116,10 @@
   --motion-ui-fast: 150ms;
   --motion-ui: 200ms;
   --motion-data: 400ms;
+  --motion-page: 360ms;
+  --motion-panel: 280ms;
   --motion-ease: cubic-bezier(0.2, 0, 0, 1);
+  --motion-route-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
 
   font-variant-numeric: tabular-nums;
 }
@@ -323,6 +327,8 @@ a.visually-hidden:focus-visible {
     --motion-ui-fast: 0ms;
     --motion-ui: 0ms;
     --motion-data: 0ms;
+    --motion-page: 0ms;
+    --motion-panel: 0ms;
   }
 
   *,

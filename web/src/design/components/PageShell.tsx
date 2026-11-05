@@ -33,7 +33,7 @@ import {
 import { FIXTURE_SHEET_ID, ShellContext, type ShellContextValue } from "../shell/ShellContext";
 import { readSidebarCollapsed, writeSidebarCollapsed } from "../shell/sidebarPreference";
 import { usePageViewport } from "../shell/usePageViewport";
-import { crossfade } from "../viewTransition";
+import { arriveWithoutSnapshot, crossfade } from "../viewTransition";
 import { MatchScene } from "./MatchScene";
 import styles from "./PageShell.module.css";
 import { ThemeToggle } from "./ThemeToggle";
@@ -253,6 +253,7 @@ export function PageShell({
   // latest. The drawer closes inside the update and fades out with the page it stood over.
   // A link to the page already open, or a click for a new tab, is left to the link.
   const navigate = useNavigate();
+  useLayoutEffect(() => arriveWithoutSnapshot(mainRef.current), [location.pathname]);
   const landed = useRef<(() => void) | null>(null);
   useEffect(() => {
     landed.current?.();
@@ -543,9 +544,12 @@ export function PageShell({
         <main id="main" ref={mainRef} tabIndex={-1} className={styles.main} inert={overlay}>
           {children}
         </main>
-        {overlay ? (
-          <div className={styles.scrim} aria-hidden="true" onClick={closeOverlays} />
-        ) : null}
+        <div
+          className={styles.scrim}
+          data-open={overlay || undefined}
+          aria-hidden="true"
+          onClick={closeOverlays}
+        />
       </div>
     </ShellContext.Provider>
   );
