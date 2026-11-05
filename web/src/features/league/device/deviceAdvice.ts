@@ -31,8 +31,8 @@ function advicePlayer(player: DevicePlanPlayer): AdvicePlayer {
 
 /**
  * The advice envelope for a plan the member's device solved. `generatedAt` is the
- * instant the device finished, which the panel prints as the result's date. `leagueId` is
- * the league whose tree the page reads: the capture's table names no league.
+ * instant the device finished. `leagueId` is the league whose tree the page reads: the
+ * capture's table names no league.
  */
 export function deviceAdviceEnvelope(
   document: DevicePlanDocument,
@@ -115,7 +115,6 @@ export function deviceAdviceEnvelope(
     // the price carries its ceiling and the control its proof.
     const rival = answer.rival;
     payload.rival_entry_id = rival.rival_entry_id;
-    payload.rival_label = `entry-${rival.rival_entry_id}`;
     payload.expected_points_cost = rival.expected_points_cost;
     payload.expected_points_cost_ceiling = rival.expected_points_cost_ceiling;
     payload.overlap_count = rival.overlap_count;

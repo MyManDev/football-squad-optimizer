@@ -97,6 +97,40 @@ function placeBefore(member: HumanEntryView): number | null {
   return null;
 }
 
+/** A member's place and total after the latest settled week, and the points to each neighbour. */
+export interface RaceGap {
+  entryId: number;
+  place: number;
+  total: number;
+  /** Points behind the member just ahead; null for the leader. */
+  ahead: number | null;
+  /** Points ahead of the member just behind; null for the last. */
+  behind: number | null;
+}
+
+/**
+ * Each member's gap to the member just ahead and the member just behind after the latest
+ * settled week, from the totals the scoreboard publishes for that week, in the race's order
+ * for it. A member without a row that week has no total and is left out. Equal totals are a
+ * gap of 0. Where the order puts a higher total behind a lower one (places not ordered by
+ * these totals), there is no distance to state, and that gap is null rather than negative.
+ */
+export function neighbourGaps(race: LeagueRace): RaceGap[] {
+  const last = race.gameweeks.length - 1;
+  const standing = race.lines.flatMap(({ entryId, ranks, totals }) => {
+    const place = ranks[last];
+    const total = totals[last];
+    return place == null || total == null ? [] : [{ entryId, place, total }];
+  });
+  const gap = (higher: { total: number } | undefined, lower: { total: number } | undefined) =>
+    higher && lower && higher.total >= lower.total ? higher.total - lower.total : null;
+  return standing.map((member, index) => ({
+    ...member,
+    ahead: gap(standing[index - 1], member),
+    behind: gap(member, standing[index + 1]),
+  }));
+}
+
 /** Places gained in the week at `index` against the week before; negative when lost. */
 export function placesMoved(line: RaceLine, index: number): number | null {
   if (index < 1) return null;

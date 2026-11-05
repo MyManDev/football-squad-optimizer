@@ -11,12 +11,29 @@ import styles from "./WhatIfPanel.module.css";
 
 const POSITIONS = ["GK", "DEF", "MID", "FWD"] as const;
 
+// Player names keep their spelling on screen; searches accept either keyboard's letters.
+const searchKey = (value: string) =>
+  value
+    .normalize("NFKD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase()
+    .replace(/ı/g, "i")
+    .replace(/ø/g, "o")
+    .replace(/ł/g, "l")
+    .trim()
+    .replace(/\s+/g, " ");
+
+function isPosition(code: string): code is (typeof POSITIONS)[number] {
+  return (POSITIONS as readonly string[]).includes(code);
+}
+
 /**
  * The what-if mode (#1132): the member starts from the advised fifteen, removes players
  * and adds others from the capture's table, and reads at once the bank, the expected
  * points and the difference to the advice, net of each side's hit. A rule the fifteen
  * breaks is said in words beside it, never refused in silence, and one button returns to
- * the advised fifteen. Every number is the device solve's own reading of the squad.
+ * the advised fifteen. Removing a player narrows the add list to his position, so the
+ * replacement is chosen from a short list; the position list widens it again. Every number is the device solve's own reading of the squad.
  */
 export function WhatIfPanel({
   squad,
@@ -31,11 +48,17 @@ export function WhatIfPanel({
   const { locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
   const addId = useId();
+  const positionId = useId();
+  const searchId = useId();
   const whatIf = useWhatIf(squad, advised, dependencies);
   const { phase, document, account, advisedAccount, points } = whatIf;
   // The player chosen in the list; only the add button adds, so moving through the list
   // with the keyboard changes nothing.
   const [pick, setPick] = useState("");
+  // The name the add list is filtered by, or "" for every player.
+  const [query, setQuery] = useState("");
+  // The position the add list shows, or "" for every position.
+  const [only, setOnly] = useState<"" | (typeof POSITIONS)[number]>("");
   // Where focus goes after a removal unmounts the row that held it: the next row's remove
   // button, the row before it, or the add list when the group is empty.
   const removeButtons = useRef(new Map<number, HTMLButtonElement>());
@@ -52,10 +75,8 @@ export function WhatIfPanel({
     const said = {
       idle: null,
       loading: copy.whatIfLoading,
-      unpublished: copy.whatIfUnpublished,
       failed: copy.whatIfFailed,
       "solver-failed": copy.whatIfSolverFailed,
-      "other-capture": copy.whatIfOtherCapture,
       ready: null,
     }[phase];
     return (
@@ -110,18 +131,25 @@ export function WhatIfPanel({
       : null;
   const changed =
     whatIf.squad.length !== advised.length || whatIf.squad.some((id) => !advisedSet.has(id));
-  const offered = POSITIONS.map((code) => ({
-    code,
-    players: document.players
-      .filter((player) => player.position === code && !chosen.has(player.id))
-      .sort((a, b) => b.expected_points - a.expected_points || a.id - b.id),
-  }));
+  const needle = searchKey(query);
+  const matches = (player: DevicePlanPlayer) =>
+    needle === "" || searchKey(`${player.short_name} ${player.name}`).includes(needle);
+  const offered = POSITIONS.filter((code) => only === "" || code === only)
+    .map((code) => ({
+      code,
+      players: document.players
+        .filter((player) => player.position === code && !chosen.has(player.id) && matches(player))
+        .sort((a, b) => b.expected_points - a.expected_points || a.id - b.id),
+    }))
+    .filter((group) => needle === "" || group.players.length > 0);
 
   const removeFrom = (player: DevicePlanPlayer, group: DevicePlanPlayer[]) => {
     const at = group.indexOf(player);
     const neighbour = group[at + 1] ?? group[at - 1];
     focusNext.current = neighbour ? neighbour.id : "add";
     whatIf.remove(player.id);
+    if (isPosition(player.position)) setOnly(player.position);
+    setPick("");
   };
   const summary = copy.whatIfSummary(
     money(account.bankTenths, locale),
@@ -222,41 +250,83 @@ export function WhatIfPanel({
       })}
 
       <div className={styles.add}>
-        <label htmlFor={addId}>{copy.whatIfAdd}</label>
-        <div className={styles.addRow}>
+        <div className={styles.field}>
+          <label htmlFor={searchId}>{copy.whatIfSearch}</label>
+          <input
+            id={searchId}
+            type="search"
+            value={query}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setPick("");
+            }}
+          />
+        </div>
+        <div className={styles.field}>
+          <label htmlFor={positionId}>{copy.whatIfPosition}</label>
           <select
-            id={addId}
-            ref={addList}
-            value={chosen.has(Number(pick)) ? "" : pick}
-            onChange={(event) => setPick(event.target.value)}
-          >
-            <option value="">{copy.whatIfChoose}</option>
-            {offered.map(({ code, players }) => (
-              <optgroup key={code} label={messages.positions[code]}>
-                {players.map((player) => (
-                  <option key={player.id} value={player.id}>
-                    {`${name(player)} · ${player.team} · ${money(price(player), locale)} · ${figure(player.expected_points, locale)}`}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
-          <button
-            type="button"
-            className={styles.action}
-            disabled={pick === "" || chosen.has(Number(pick))}
-            onClick={() => {
-              const id = Number(pick);
-              if (Number.isSafeInteger(id) && id > 0) whatIf.add(id);
+            id={positionId}
+            value={only}
+            onChange={(event) => {
+              const code = event.target.value;
+              setOnly(isPosition(code) ? code : "");
               setPick("");
             }}
           >
-            {copy.whatIfAddButton}
-          </button>
+            <option value="">{copy.whatIfAllPositions}</option>
+            {POSITIONS.map((code) => (
+              <option key={code} value={code}>
+                {messages.positions[code]}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className={styles.field}>
+          <label htmlFor={addId}>{copy.whatIfAdd}</label>
+          <div className={styles.addRow}>
+            <select
+              id={addId}
+              ref={addList}
+              value={chosen.has(Number(pick)) ? "" : pick}
+              onChange={(event) => setPick(event.target.value)}
+            >
+              <option value="">{copy.whatIfChoose}</option>
+              {offered.map(({ code, players }) => (
+                <optgroup key={code} label={messages.positions[code]}>
+                  {players.map((player) => (
+                    <option key={player.id} value={player.id}>
+                      {`${name(player)} · ${player.team} · ${money(price(player), locale)} · ${figure(player.expected_points, locale)}`}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+            <button
+              type="button"
+              className={styles.action}
+              disabled={pick === "" || chosen.has(Number(pick))}
+              onClick={() => {
+                const id = Number(pick);
+                if (Number.isSafeInteger(id) && id > 0) whatIf.add(id);
+                setPick("");
+              }}
+            >
+              {copy.whatIfAddButton}
+            </button>
+          </div>
         </div>
       </div>
 
-      <button type="button" className={styles.action} disabled={!changed} onClick={whatIf.reset}>
+      <button
+        type="button"
+        className={styles.action}
+        disabled={!changed}
+        onClick={() => {
+          whatIf.reset();
+          setOnly("");
+          setPick("");
+        }}
+      >
         {copy.whatIfReset}
       </button>
     </div>

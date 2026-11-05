@@ -227,18 +227,18 @@ describe("the published Free Hit squad basis", () => {
 });
 
 /**
- * The two documents disagreeing is not the same fact as neither of them saying anything,
- * and the card is not allowed to render them the same way. A member whose squad really is
- * a pre-Free-Hit squad would otherwise read a blank card as "nothing to report", which is
- * the silence the rotation evidence contract keeps its own column to avoid asserting.
+ * A wrong week is worse than no week: where the two documents name different squads, or the
+ * entry names none, the plan stands on the page and no week is stated.
  */
 describe("a squad basis the two documents disagree about", () => {
-  const UNCONFIRMED = {
-    en: "The squad this advice stands on could not be confirmed: the squad document and the advice document name different ones. Check the fifteen on this page against your own team before using these moves.",
-    tr: "Bu önerinin dayandığı kadro doğrulanamadı: kadro belgesi ile öneri belgesi farklı kadro gösteriyor. Bu hamleleri kullanmadan önce bu sayfadaki on beş oyuncuyu kendi takımınla karşılaştır.",
-  } as const;
+  /** The plan's own heading over the pitch, drawn only while the plan is the page's answer. */
+  const planOnPage = (language: "tr" | "en") =>
+    screen.getByRole("heading", {
+      level: 2,
+      name: MESSAGES[language].leagueMembers.squadAfterTitle,
+    });
 
-  it.each(["en", "tr"] as const)("says so, and names neither week, in %s", (language) => {
+  it.each(["en", "tr"] as const)("keeps the plan and names neither week, in %s", (language) => {
     const advice = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1);
     const squad = structuredClone(mockEntrySquadEnvelopes[ENTRY]!);
     squad.payload.squad_basis = "pre_free_hit_gw02";
@@ -247,8 +247,7 @@ describe("a squad basis the two documents disagree about", () => {
       language,
       squad,
     );
-    // Neither week, and no other number that could be read as one: the sentence has no digit.
-    expect(screen.getByText(UNCONFIRMED[language]).textContent).not.toMatch(/\d/);
+    expect(planOnPage(language)).toBeInTheDocument();
     expect(screen.queryByText(/Free Hit played;|Free Hit oynadın;/)).not.toBeInTheDocument();
   });
 
@@ -260,7 +259,7 @@ describe("a squad basis the two documents disagree about", () => {
       const squad = structuredClone(mockEntrySquadEnvelopes[ENTRY]!);
       squad.payload.squad_basis = basis;
       renderAdvice({ ...base, payload }, "en", squad);
-      expect(screen.getByText(UNCONFIRMED.en)).toBeInTheDocument();
+      expect(planOnPage("en")).toBeInTheDocument();
       expect(screen.queryByText(/Free Hit played;/)).not.toBeInTheDocument();
     },
   );
@@ -278,7 +277,7 @@ describe("a squad basis the two documents disagree about", () => {
       delete squad.payload.squad_basis;
       squad.payload.active_chip = "wildcard";
       renderAdvice({ ...base, payload }, language, squad);
-      expect(screen.queryByText(UNCONFIRMED[language])).not.toBeInTheDocument();
+      expect(planOnPage(language)).toBeInTheDocument();
       expect(screen.queryByText(/Free Hit played;|Free Hit oynadın;/)).not.toBeInTheDocument();
       openList(language);
       const lineup = language === "en" ? "Your gameweek" : "Bu haftaki kadron";

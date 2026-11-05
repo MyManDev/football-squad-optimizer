@@ -14,10 +14,6 @@ const COPY = {
     captain: "Kaptan",
     transfers: "Transferlerim",
     none: "Transfer yok",
-    scoreBasis: "İki kadronun da kesinleşmiş hafta puanı, transfer kesintisi sonrası.",
-    captainBasis: "Kaptan çarpanı dahil, kadroya yazılan puan.",
-    transferBasis:
-      "Gelen oyuncunun o hafta kadroya yazılan puanı. Kesinti haftanın toplamından düşülür.",
   },
   en: {
     title: "My season report",
@@ -28,10 +24,6 @@ const COPY = {
     captain: "Captain",
     transfers: "My transfers",
     none: "No transfers",
-    scoreBasis: "Both squads' settled gameweek points, after transfer hits.",
-    captainBasis: "Points counted for the squad, including the captain multiplier.",
-    transferBasis:
-      "The incoming player's points counted for the squad that week. Hits are deducted from the week's total.",
   },
 };
 
@@ -75,7 +67,6 @@ export function PersonalSeasonReport({ history }: { history: SuggestionHistory }
                   <dd>{points(actual.transfer_hit_points, 1, locale)}</dd>
                 </div>
               </dl>
-              <p className={styles.basis}>{copy.scoreBasis}</p>
               {detail ? (
                 <>
                   <h3>{copy.captain}</h3>
@@ -83,7 +74,6 @@ export function PersonalSeasonReport({ history }: { history: SuggestionHistory }
                     <strong>{detail.captain.name}</strong>
                     <span>{points(detail.captain.counted_points, 1, locale)}</span>
                   </p>
-                  <p className={styles.basis}>{copy.captainBasis}</p>
                   <h3>{copy.transfers}</h3>
                   {detail.transfers.length ? (
                     <ul className={styles.moves}>
@@ -99,7 +89,6 @@ export function PersonalSeasonReport({ history }: { history: SuggestionHistory }
                   ) : (
                     <p>{copy.none}</p>
                   )}
-                  <p className={styles.basis}>{copy.transferBasis}</p>
                 </>
               ) : null}
             </section>

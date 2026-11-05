@@ -32,7 +32,7 @@ describe("the route error boundary", () => {
     );
     const copy = MESSAGES.tr.common;
     expect(screen.getByText("Menü")).toBeInTheDocument();
-    expect(screen.getByText(copy.pageFailed)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: copy.pageFailed })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: copy.reload })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("link", { name: "Menü" }));
     expect(screen.getByText("Sayfa")).toBeInTheDocument();

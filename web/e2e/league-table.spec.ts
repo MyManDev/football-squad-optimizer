@@ -1,9 +1,10 @@
 import AxeBuilder from "@axe-core/playwright";
 import { atRest } from "./atRest";
-import { expect, test } from "@playwright/test";
+import { expect, test, type Locator, type Page, type Route } from "@playwright/test";
 
+import { EXAMPLE_CLAIM } from "./identity";
 import { installLeagueMocks } from "./leagueMocks";
-import { mockLeagueMembersEnvelope } from "../src/fixtures/league";
+import { mockEntrySquadEnvelopes, mockLeagueMembersEnvelope } from "../src/fixtures/league";
 import { MESSAGES } from "../src/i18n/messages";
 
 const copy = MESSAGES.tr.leagueMembers;
@@ -13,7 +14,46 @@ const humans = mockLeagueMembersEnvelope.payload.members.filter(
 // The mocked visitor has said they are the first member (e2e/identity.ts).
 const first = humans[0]!;
 const second = humans[1]!;
+// The league's last row, whose squad has no chips and who has no one behind them.
+const last = humans.at(-1)!;
 const LEAGUE_NAME = mockLeagueMembersEnvelope.payload.league_name;
+
+function claimLast(page: Page) {
+  return page.addInitScript(
+    (claim) => sessionStorage.setItem("squadopt.member", JSON.stringify(claim)),
+    {
+      ...EXAMPLE_CLAIM,
+      entryId: last.entry_id,
+      managerName: last.manager_name,
+      teamName: last.team_name,
+    },
+  );
+}
+
+/** Claims the last member and holds the read of their squad; the function returned ends it. */
+async function holdLastSquad(page: Page, answer: (route: Route) => Promise<void>) {
+  await claimLast(page);
+  let release!: () => void;
+  const released = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route(
+    new RegExp(`/data/league/entries/${last.entry_id}\\.json(?:\\?.*)?$`),
+    async (route) => {
+      await released;
+      await answer(route);
+    },
+  );
+  return release;
+}
+
+/** How much of the columns' width the table's own column leaves to the one beside it. */
+function widthLeft(table: Locator) {
+  return table.evaluate(
+    (element) =>
+      element.parentElement!.parentElement!.clientWidth - element.parentElement!.clientWidth,
+  );
+}
 
 test.beforeEach(async ({ page }) => {
   await installLeagueMocks(page);
@@ -56,6 +96,66 @@ test("at 1440 the table and the viewer's chips share one screen", async ({ page 
   await atRest(page);
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
 });
+
+for (const width of [1280, 1440, 1920]) {
+  test(`at ${width} the table takes the whole width when the viewer has nothing beside it`, async ({
+    page,
+  }) => {
+    await claimLast(page);
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/league/352490/members");
+    const table = page.locator("#league-member-list");
+    await expect(table.locator('tr[aria-current="true"]')).toContainText(last.team_name!);
+    await expect(
+      page.getByRole("heading", { name: MESSAGES.tr.memberResources.chipsTitle }),
+    ).toHaveCount(0);
+    await expect(page.getByText(copy.followerLabel)).toHaveCount(0);
+    // Once the squad is read: until then the column beside the table waits for its chips.
+    await expect.poll(() => widthLeft(table)).toBe(0);
+  });
+}
+
+for (const width of [1280, 1440]) {
+  test(`at ${width} the table keeps its width while the last member's squad is read`, async ({
+    page,
+  }) => {
+    // The real last place has chips, though the mocked one does not.
+    const squad = structuredClone(mockEntrySquadEnvelopes[last.entry_id!]!);
+    squad.payload.chips = mockEntrySquadEnvelopes[first.entry_id!]!.payload.chips;
+    const release = await holdLastSquad(page, (route) => route.fulfill({ json: squad }));
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/league/352490/members");
+    const table = page.locator("#league-member-list");
+    await expect(table.locator('tr[aria-current="true"]')).toContainText(last.team_name!);
+
+    const held = await widthLeft(table);
+    expect(held).toBeGreaterThan(0);
+    release();
+    await expect(
+      page.getByRole("heading", { name: MESSAGES.tr.memberResources.chipsTitle }),
+    ).toBeVisible();
+    expect(await widthLeft(table)).toBe(held);
+  });
+}
+
+for (const [ending, answer] of [
+  ["finds no chips", (route: Route) => route.fallback()],
+  ["fails", (route: Route) => route.fulfill({ status: 500, json: {} })],
+] as const) {
+  test(`the table takes the whole width once the last member's read ${ending}`, async ({
+    page,
+  }) => {
+    const release = await holdLastSquad(page, answer);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/league/352490/members");
+    const table = page.locator("#league-member-list");
+    await expect(table.locator('tr[aria-current="true"]')).toContainText(last.team_name!);
+
+    expect(await widthLeft(table)).toBeGreaterThan(0);
+    release();
+    await expect.poll(() => widthLeft(table)).toBe(0);
+  });
+}
 
 for (const width of [390, 820, 1179]) {
   test(`at ${width} the table fits without scrolling sideways`, async ({ page }) => {

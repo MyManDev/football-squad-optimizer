@@ -10,10 +10,98 @@
   color: var(--color-text);
   box-shadow: var(--shadow-drawer);
   overflow-wrap: anywhere;
+  overscroll-behavior: contain;
+  animation: player-enter calc(var(--motion-ui) * 1.2) var(--motion-ease) both;
 }
 
 .dialog::backdrop {
   background: var(--color-scrim);
+  animation: backdrop-enter var(--motion-ui) var(--motion-ease) both;
+}
+
+.dialog[data-closing] {
+  animation: player-leave var(--motion-ui) var(--motion-ease) both;
+}
+
+.dialog[data-closing]::backdrop {
+  animation: backdrop-leave var(--motion-ui) var(--motion-ease) both;
+}
+
+@keyframes player-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+}
+
+@keyframes player-leave {
+  to {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+}
+
+@keyframes backdrop-enter {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes backdrop-leave {
+  to {
+    opacity: 0;
+  }
+}
+
+@media (max-width: 599.98px) {
+  .dialog {
+    width: 100%;
+    max-width: none;
+    max-height: calc(100dvh - 56px - env(safe-area-inset-top));
+    margin: auto 0 0;
+    padding: var(--space-4) max(var(--space-4), env(safe-area-inset-right))
+      calc(var(--space-5) + env(safe-area-inset-bottom))
+      max(var(--space-4), env(safe-area-inset-left));
+    border-bottom: 0;
+    border-radius: 16px 16px 0 0;
+    animation-name: sheet-enter;
+  }
+
+  .dialog[data-closing] {
+    animation-name: sheet-leave;
+  }
+
+  .dialog::before {
+    content: "";
+    display: block;
+    width: 32px;
+    height: 4px;
+    margin: 0 auto var(--space-4);
+    border-radius: 2px;
+    background: var(--color-line);
+  }
+
+  .head {
+    position: sticky;
+    top: calc(-1 * var(--space-4));
+    z-index: 1;
+    padding-block: var(--space-2);
+    background: var(--color-surface);
+  }
+}
+
+@keyframes sheet-enter {
+  from {
+    opacity: 0.5;
+    transform: translateY(48px);
+  }
+}
+
+@keyframes sheet-leave {
+  to {
+    opacity: 0;
+    transform: translateY(48px);
+  }
 }
 
 .head {

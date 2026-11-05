@@ -15,12 +15,20 @@ a second plan at setting 0.
 A plain request, no setting and no word, on a combination ``advise_entry`` answers is
 ``advise_entry``'s own payload, byte for byte.
 
+**Counting what is solved.** ``menu_documents`` names, without solving anything, the
+documents a request needs: what it is priced or compared against at setting 0, then the
+asked one. ``documents_to_solve`` leaves out the ones a lookup already holds, and
+``advise_menu_entry`` tells ``on_document`` about exactly those, once each, as it solves
+them. A caller can therefore say "one of three" before the first solve and count up from
+there, with nothing estimated from time.
+
 **Adding a switch.** A switch is a field on ``MenuRequest`` with an off default, a tuple
 of windows on ``AdviceCapability``, a per-capture input handed in as a keyword that may be
 ``None``, and one more branch in ``advise_menu_entry``. A chosen chip reads the member's
 captured history and needs no separate artifact.
 """
 
+import copy
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
 
@@ -66,11 +74,14 @@ from squadopt.planning import TransferPlanningError
 __all__ = [
     "MANAGER_WORDS_INPUT",
     "TOP100_COUNTS_INPUT",
+    "DocumentSolved",
     "ManagersWordNotSolved",
     "MenuInputUnavailable",
     "MenuRequest",
     "PrerequisiteLookup",
     "advise_menu_entry",
+    "documents_to_solve",
+    "menu_documents",
 ]
 
 TOP100_COUNTS_INPUT = "top100_counts"
@@ -190,6 +201,117 @@ def held_member_squad(
 #: it returns that document's payload as computed from these same inputs, or ``None``.
 PrerequisiteLookup = Callable[[MenuRequest], Mapping[str, object] | None]
 
+#: Told the address of a document ``advise_menu_entry`` has just solved.
+DocumentSolved = Callable[[MenuRequest], None]
+
+
+def _one_budget_window(request: MenuRequest, projection: Projection) -> bool:
+    """An experimental football window under a setting: one budget, nothing at setting 0."""
+
+    return (
+        projection.diagnostics.get("model_name") == "fixture_football_candidate"
+        and request.strategy == COMPUTED_MODE
+        and request.window in (3, 5)
+        and request.top100_weight > 0
+    )
+
+
+def menu_documents(request: MenuRequest, *, projection: Projection) -> tuple[MenuRequest, ...]:
+    """The documents ``advise_menu_entry`` produces for ``request``, in the order it solves them.
+
+    The ones it is priced or compared against come first, each at setting 0, and the asked
+    one last. That is the asked one alone, except for a window under a setting (the same
+    window at 0 first), a rival window (the pure-points window at 0 first, then, under a
+    setting, the rival window at 0) and a rival week under a setting (the rival week at 0
+    first). So there are at most three. Nothing is solved or read: the request and which
+    model ``projection`` is decide it, in the same order ``advise_menu_entry`` dispatches.
+    """
+
+    if (
+        _one_budget_window(request, projection)
+        or request.preferences.active
+        or request.chip is not None
+    ):
+        return (request,)
+    supported = advice_capabilities().get(request.strategy)
+    if request.is_plain and supported is not None and request.window in supported.windows:
+        return (request,)
+    if request.strategy == COMPUTED_MODE:
+        if request.window != COMPUTED_WINDOW:
+            return (replace(request, top100_weight=0), request)
+        return (request,)
+    if request.window != COMPUTED_WINDOW:
+        control = replace(request, strategy=COMPUTED_MODE, rival_entry_id=None, top100_weight=0)
+        if not request.top100_weight:
+            return (control, request)
+        return (control, replace(request, top100_weight=0), request)
+    return (replace(request, top100_weight=0), request)
+
+
+def documents_to_solve(
+    request: MenuRequest,
+    *,
+    projection: Projection,
+    prerequisite: PrerequisiteLookup | None = None,
+) -> tuple[MenuRequest, ...]:
+    """``menu_documents`` without the ones ``prerequisite`` holds now: what will be solved.
+
+    Handed the same lookup, ``advise_menu_entry`` tells ``on_document`` about exactly these,
+    once each. The asked document is always among them, since it is never looked up.
+    """
+
+    *before, asked = menu_documents(request, projection=projection)
+    return (
+        *(address for address in before if prerequisite is None or prerequisite(address) is None),
+        asked,
+    )
+
+
+class _ReportOnce:
+    """Passes an address to ``on_document`` the first time a document is solved for it.
+
+    A rival window under a setting asks for the pure-points window at 0, and so does the
+    rival window at 0 it is compared with. ``_SolvedInThisCall`` has the second need read
+    what the first one solved, so it is solved once; this keeps it told once as well,
+    should a document ever be solved twice in one call.
+    """
+
+    __slots__ = ("_on_document", "_told")
+
+    def __init__(self, on_document: DocumentSolved) -> None:
+        self._on_document = on_document
+        self._told: set[MenuRequest] = set()
+
+    def __call__(self, address: MenuRequest) -> None:
+        if address not in self._told:
+            self._told.add(address)
+            self._on_document(address)
+
+
+class _SolvedInThisCall:
+    """The caller's lookup, plus every prerequisite one ``advise_menu_entry`` call solved.
+
+    A rival window under a setting depends on the pure-points window at 0 twice: it is
+    priced against it, and so is the strategy's window at 0 it is compared with, which a
+    nested call answers. The nested call is handed this same lookup, so the second need
+    reads the document the first one solved instead of solving the window again. Each
+    reader gets its own copy. It lives for one call: what is kept across calls is the
+    caller's lookup alone.
+    """
+
+    def __init__(self, caller: PrerequisiteLookup | None) -> None:
+        self._caller = caller
+        self._solved: dict[MenuRequest, dict[str, object]] = {}
+
+    def __call__(self, address: MenuRequest) -> Mapping[str, object] | None:
+        solved = self._solved.get(address)
+        if solved is not None:
+            return copy.deepcopy(solved)
+        return self._caller(address) if self._caller is not None else None
+
+    def keep(self, address: MenuRequest, payload: Mapping[str, object]) -> None:
+        self._solved[address] = copy.deepcopy(dict(payload))
+
 
 def _require_capture(
     request: MenuRequest, inputs: RecommendationInputs, rules: SeasonRules
@@ -223,6 +345,7 @@ def advise_menu_entry(
     manager_words: ManagerWords | None = None,
     prerequisite: PrerequisiteLookup | None = None,
     chip_forecast_source: ForecastSource | None = None,
+    on_document: DocumentSolved | None = None,
 ) -> dict[str, object]:
     """Compute one document of the member menu from the member's own picks.
 
@@ -232,8 +355,53 @@ def advise_menu_entry(
     hand back a document this one is priced or compared against (the pure-points window
     at 0, the strategy's own document at 0) rather than have it solved again; it must
     have been computed from these same inputs, and anything it does not hold is solved
-    here.
+    here, once per call however many parts of the request depend on it.
+
+    ``on_document`` is told the address of each document solved here, once per address:
+    each one this is priced or compared against as it is solved (not one ``prerequisite``
+    handed back, nor one this call already solved), then the asked one, just before it is
+    returned. These are the documents ``documents_to_solve`` names for the same lookup. A
+    request that fails tells nothing more after the failure.
     """
+
+    report = (
+        on_document
+        if on_document is None or isinstance(on_document, _ReportOnce)
+        else _ReportOnce(on_document)
+    )
+    payload = _advise_menu_entry(
+        request,
+        provider=provider,
+        inputs=inputs,
+        projection=projection,
+        rules=rules,
+        horizon_builder=horizon_builder,
+        top100_counts=top100_counts,
+        manager_words=manager_words,
+        prerequisite=prerequisite,
+        chip_forecast_source=chip_forecast_source,
+        report=report,
+    )
+    if report is not None:
+        report(request)
+    return payload
+
+
+def _advise_menu_entry(
+    request: MenuRequest,
+    *,
+    provider: EntryPicksProvider,
+    inputs: RecommendationInputs,
+    projection: Projection,
+    rules: SeasonRules,
+    horizon_builder: HorizonBuilder | None,
+    top100_counts: Top100Counts | None,
+    manager_words: ManagerWords | None,
+    prerequisite: PrerequisiteLookup | None,
+    chip_forecast_source: ForecastSource | None,
+    report: DocumentSolved | None,
+) -> dict[str, object]:
+    """``advise_menu_entry`` itself; ``report`` hears of each document this one solves first."""
 
     validate_advice_selection(
         strategy=request.strategy,
@@ -259,12 +427,7 @@ def advise_menu_entry(
         )
     _require_capture(request, inputs, rules)
     plain = request.entry_request()
-    football_weighted_window = (
-        projection.diagnostics.get("model_name") == "fixture_football_candidate"
-        and request.strategy == COMPUTED_MODE
-        and request.window in (3, 5)
-        and request.top100_weight > 0
-    )
+    football_weighted_window = _one_budget_window(request, projection)
     if (
         football_weighted_window
         or request.preferences.active
@@ -325,21 +488,31 @@ def advise_menu_entry(
         except EntryError as error:
             raise TransferPlanningError(str(error)) from error
 
-    def at_zero(address: MenuRequest) -> dict[str, object]:
-        """A document this one depends on: taken from the caller when held, else solved."""
+    # A nested call is handed the lookup its outer call made, so the whole call shares it.
+    lookup = (
+        prerequisite
+        if isinstance(prerequisite, _SolvedInThisCall)
+        else _SolvedInThisCall(prerequisite)
+    )
 
-        held = prerequisite(address) if prerequisite is not None else None
+    def at_zero(address: MenuRequest) -> dict[str, object]:
+        """A document this one depends on: taken from the lookup when held, else solved."""
+
+        held = lookup(address)
         if held is not None:
             return dict(held)
-        return advise_menu_entry(
+        solved = advise_menu_entry(
             address,
             provider=provider,
             inputs=inputs,
             projection=projection,
             rules=rules,
             horizon_builder=horizon_builder,
-            prerequisite=prerequisite,
+            prerequisite=lookup,
+            on_document=report,
         )
+        lookup.keep(address, solved)
+        return solved
 
     supported = advice_capabilities().get(request.strategy)
     if request.is_plain and supported is not None and request.window in supported.windows:
@@ -416,13 +589,12 @@ def advise_menu_entry(
     assert top100_counts is not None
     picks = _requested_picks(plain, request.entry_id, provider=provider, inputs=inputs)
     control = solve_member_control(picks, inputs, projection, rules)
-    held_reference = (
-        prerequisite(replace(request, top100_weight=0)) if prerequisite is not None else None
-    )
-    reference = (
-        dict(held_reference)
-        if held_reference is not None
-        else advise_entry(
+    reference_address = replace(request, top100_weight=0)
+    held_reference = prerequisite(reference_address) if prerequisite is not None else None
+    if held_reference is not None:
+        reference = dict(held_reference)
+    else:
+        reference = advise_entry(
             plain,
             provider=provider,
             inputs=inputs,
@@ -430,7 +602,8 @@ def advise_menu_entry(
             rules=rules,
             control=control,
         )
-    )
+        if report is not None:
+            report(reference_address)
     prices = {
         int(str(row["player_id"])): int(str(row["price_tenths"]))
         for _, row in inputs.players.iterrows()

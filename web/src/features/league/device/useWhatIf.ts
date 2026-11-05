@@ -9,12 +9,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { LeagueDataMissing } from "../dataErrors";
 import type { EntrySquad, LeagueViewEnvelope } from "../types";
 import { useLeague } from "../useLeague";
 import { isDevicePlanEntry, type DevicePlanDocument, type DevicePlanEntry } from "./types";
 import type { WhatIfReply, WhatIfRequest } from "./whatIf.worker";
 import { whatIfAccount, whatIfDocument, type WhatIfAccount } from "./whatIf";
+import { readWhatIfDraft, whatIfBasis, whatIfSlot, writeWhatIfDraft } from "./whatIfDraft";
 
 /** A worker-shaped solver: the real worker, or a test double answering in process. */
 export interface WhatIfSolver {
@@ -31,12 +31,11 @@ export interface WhatIfDependencies {
 }
 
 /**
- * Where the mode stands: `failed` is a table that could not be read, `solver-failed` a
- * solver that could not read a fifteen. From any phase but `loading` and `ready` the member
- * can start again.
+ * Where the mode stands: `failed` is a table that could not be read or does not fit the
+ * capture on screen, `solver-failed` a solver that could not read a fifteen. From any phase
+ * but `loading` and `ready` the member can start again.
  */
-export type WhatIfPhase =
-  "idle" | "loading" | "ready" | "other-capture" | "unpublished" | "failed" | "solver-failed";
+export type WhatIfPhase = "idle" | "loading" | "ready" | "failed" | "solver-failed";
 
 export interface WhatIf {
   phase: WhatIfPhase;
@@ -73,10 +72,11 @@ export function useWhatIf(
   dependencies: WhatIfDependencies = {},
 ): WhatIf {
   const { tree } = useLeague();
-  const {
-    loadDocument = (signal: AbortSignal) => tree.devicePlan(squad.source_snapshot_id, { signal }),
-    createSolver = createWorker,
-  } = dependencies;
+  const readTable = useCallback(
+    (signal: AbortSignal) => tree.devicePlan(squad.source_snapshot_id, { signal }),
+    [tree, squad.source_snapshot_id],
+  );
+  const { loadDocument = readTable, createSolver = createWorker } = dependencies;
   const entry: DevicePlanEntry | null = isDevicePlanEntry(squad.device_plan)
     ? squad.device_plan
     : null;
@@ -87,10 +87,15 @@ export function useWhatIf(
     () => (advisedKey === "" ? [] : advisedKey.split(",").map(Number)),
     [advisedKey],
   );
-  const [phase, setPhase] = useState<WhatIfPhase>("idle");
+  const basis = whatIfBasis(squad, advised);
+  const slot = whatIfSlot(squad);
+  const saved = useMemo(() => readWhatIfDraft(slot, basis), [slot, basis]);
+  const [phase, setPhase] = useState<WhatIfPhase>(saved === null ? "idle" : "loading");
   const [document, setDocument] = useState<DevicePlanDocument | null>(null);
   // The tried fifteen, keyed by the advice it started from: new advice starts it again.
-  const [tried, setTried] = useState<{ key: string; squad: readonly number[] } | null>(null);
+  const [tried, setTried] = useState<{ key: string; squad: readonly number[] } | null>(() =>
+    saved === null ? null : { key: advisedKey, squad: saved },
+  );
   const current = tried?.key === advisedKey ? tried.squad : advisedIds;
   const [answer, setAnswer] = useState<{
     squad: readonly number[];
@@ -110,9 +115,8 @@ export function useWhatIf(
     setPhase("solver-failed");
   }, []);
 
-  const start = useCallback(() => {
-    if (entry === null || phase === "loading" || phase === "ready") return;
-    setPhase("loading");
+  const read = useCallback(() => {
+    if (entry === null) return;
     reading.current?.abort();
     const read = new AbortController();
     reading.current = read;
@@ -126,9 +130,10 @@ export function useWhatIf(
           table.source_snapshot_id !== squad.source_snapshot_id ||
           !advisedIds.every((id) => known.has(id))
         ) {
-          setPhase("other-capture");
+          setPhase("failed");
           return;
         }
+        if (saved !== null && !saved.every((id) => known.has(id))) setTried(null);
         // A worker that cannot be created answers as a failure, as the device's does.
         try {
           solver.current ??= createSolver();
@@ -140,20 +145,36 @@ export function useWhatIf(
         setDocument(table);
         setPhase("ready");
       },
-      (error: unknown) => {
+      () => {
         if (read.signal.aborted) return;
-        setPhase(error instanceof LeagueDataMissing ? "unpublished" : "failed");
+        setPhase("failed");
       },
     );
   }, [
     entry,
-    phase,
     loadDocument,
     createSolver,
     solverFailed,
     squad.source_snapshot_id,
     advisedIds,
+    saved,
   ]);
+
+  const start = useCallback(() => {
+    if (entry === null || phase === "loading" || phase === "ready") return;
+    setPhase("loading");
+    read();
+  }, [entry, phase, read]);
+
+  useEffect(() => {
+    if (saved === null) return;
+    read();
+    return () => reading.current?.abort();
+  }, [saved, read]);
+
+  useEffect(() => {
+    if (phase === "ready") writeWhatIfDraft(slot, basis, current);
+  }, [phase, slot, basis, current]);
 
   // Each fifteen tried asks the worker for its points beside the advised one's; only the
   // last question's answer is kept.
@@ -210,7 +231,7 @@ export function useWhatIf(
   const reset = useCallback(() => setTried(null), []);
 
   return {
-    phase: entry === null ? "unpublished" : phase,
+    phase: entry === null ? "failed" : phase,
     document,
     squad: current,
     account,

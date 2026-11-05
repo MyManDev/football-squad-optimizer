@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# Receive the weekly run's data stores from the PC on stdin and put them in the weekly
+# checkout as the service user's. backend.sh installs it as /usr/local/sbin/squadopt-receive,
+# and the PC runs it over SSH from its checkout's root (README, step 6):
+#
+#   tar -czf - data/snapshots data/handoffs ... artifacts/football |
+#     ssh root@<host> /usr/local/sbin/squadopt-receive
+#
+# Only data/ and artifacts/ are taken, and nothing is taken when the archive holds anything
+# else. The backend does not read these stores: it serves the release packages of
+# scripts/release/vm_football_release.py under /root/squadopt.
+set -euo pipefail
+
+readonly SERVICE_USER="${SQUADOPT_SERVICE_USER:-squadopt}"
+readonly WEEKLY="${SQUADOPT_WEEKLY:-/srv/squadopt/weekly}"
+
+[ -d "$WEEKLY/.git" ] || {
+  echo "Refused: no weekly checkout at $WEEKLY" >&2
+  exit 1
+}
+group="$(id -gn "$SERVICE_USER")"
+stage="$(mktemp -d "$(dirname "$WEEKLY")/incoming.XXXXXX")"
+trap 'rm -rf "$stage"' EXIT
+tar -xzf - -C "$stage" --no-same-owner --no-same-permissions
+for entry in "$stage"/* "$stage"/.[!.]*; do
+  [ -e "$entry" ] || continue
+  case "$(basename "$entry")" in
+    data | artifacts) ;;
+    *)
+      echo "Refused: the archive holds $(basename "$entry"); only data/ and artifacts/ are taken" >&2
+      exit 1
+      ;;
+  esac
+done
+for top in data artifacts; do
+  if [ -d "$stage/$top" ]; then
+    install -d -m 0700 -o "$SERVICE_USER" -g "$group" "$WEEKLY/$top"
+    rsync -a "$stage/$top/" "$WEEKLY/$top/"
+    chown -R "$SERVICE_USER:$group" "$WEEKLY/$top"
+    chmod -R go-rwx "$WEEKLY/$top"
+  fi
+done
+echo "received at $(date -u +%FT%TZ):"
+du -sh "$WEEKLY/data" "$WEEKLY/artifacts" 2>/dev/null || true

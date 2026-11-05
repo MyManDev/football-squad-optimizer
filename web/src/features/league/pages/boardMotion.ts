@@ -2,27 +2,31 @@ import { MOTION_EASE, motionDuration } from "../../../design/motion";
 
 /**
  * The substitution board's one short motion (#1131): when a board first shows a transfer
- * pair, the outgoing panel steps back and returns while the incoming one arrives, both in
- * the data time of the motion tokens, and the gain appears once they have finished. Only
- * `transform` and `opacity` move. It runs once per change of the pair on a board's slot,
+ * pair, its panels turn into view from the top edge as the fourth official's board does,
+ * the outgoing one first and the incoming one a beat later, each in the data time of the
+ * motion tokens, and the gain appears once both have landed. Only `transform` and
+ * `opacity` move. It runs once per change of the pair on a board's slot,
  * never on a re-render or a scroll, and under the reduced-motion preference it does not
  * run at all, so the board is shown in its end state at once.
  */
 
 export const BOARD_EASE = `cubic-bezier(${MOTION_EASE.join(", ")})`;
 
-/** The incoming player arrives from a little to the right. */
-export const INCOMING: Keyframe[] = [
-  { opacity: 0, transform: "translateX(12px)" },
+/** A panel turns down into view about its top edge, a little past flat, then settles. */
+const TURN: Keyframe[] = [
+  { opacity: 0.2, transform: "perspective(600px) rotateX(-90deg)" },
+  { opacity: 1, transform: "perspective(600px) rotateX(10deg)", offset: 0.7 },
   { opacity: 1, transform: "none" },
 ];
 
-/** The outgoing player steps back and returns: he stays on the board. */
-export const OUTGOING: Keyframe[] = [
-  { opacity: 1, transform: "none" },
-  { opacity: 0.6, transform: "translateX(-6px) scale(0.98)", offset: 0.5 },
-  { opacity: 1, transform: "none" },
-];
+/** The outgoing player's panel turns first. */
+export const OUTGOING: Keyframe[] = TURN.map((frame) => ({ ...frame }));
+
+/** The incoming player's panel turns a beat after it. */
+export const INCOMING: Keyframe[] = TURN.map((frame) => ({ ...frame }));
+
+/** How far behind the outgoing panel the incoming one starts, as a share of the data time. */
+export const INCOMING_LAG = 0.35;
 
 /** The gain comes up once the players have moved. */
 export const GAIN: Keyframe[] = [{ opacity: 0 }, { opacity: 1 }];
@@ -42,10 +46,16 @@ export function playBoard(parts: BoardParts, source?: MediaSource): Animation[] 
   const { outgoing, incoming, gain } = parts;
   if (data === 0 || !outgoing || !incoming || !gain || typeof incoming.animate !== "function")
     return [];
+  const lag = Math.round(data * INCOMING_LAG);
   return [
     outgoing.animate(OUTGOING, { duration: data, easing: BOARD_EASE }),
-    incoming.animate(INCOMING, { duration: data, easing: BOARD_EASE, fill: "backwards" }),
-    gain.animate(GAIN, { duration: ui, delay: data, easing: BOARD_EASE, fill: "backwards" }),
+    incoming.animate(INCOMING, {
+      duration: data,
+      delay: lag,
+      easing: BOARD_EASE,
+      fill: "backwards",
+    }),
+    gain.animate(GAIN, { duration: ui, delay: data + lag, easing: BOARD_EASE, fill: "backwards" }),
   ];
 }
 

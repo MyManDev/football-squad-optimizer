@@ -346,7 +346,7 @@ export function createLeagueTree(league: LeagueRef): LeagueTree {
     if (!Array.isArray(envelope.payload?.gameweeks))
       throw new LeagueDataError("Missing scoreboard weeks.");
     for (const week of envelope.payload.gameweeks) {
-      const rows = [week.ours, ...(week.comparisons ?? [])];
+      const rows = [week.ours];
       for (const row of rows) {
         if (
           row?.net != null &&

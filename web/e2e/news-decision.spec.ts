@@ -20,7 +20,7 @@ for (const [window, top100, width] of [
     const latest = {
       version: "football_decision_information_v1" as const,
       revision: "b".repeat(64),
-      source_snapshot_id: squad.source_snapshot_id,
+      source_snapshot_id: squad.source_snapshot_id!,
       observed_at: "2026-10-02T00:00:00Z",
       coach_news_bound: true,
       minute_components_bound: true,
@@ -39,7 +39,7 @@ for (const [window, top100, width] of [
         version: "fpl_information_v1",
         season: squad.season,
         gameweek: squad.gameweek,
-        source_snapshot_id: squad.source_snapshot_id,
+        source_snapshot_id: latest.source_snapshot_id,
         observed_at: latest.observed_at,
         revision: "c".repeat(64),
         source_url: "https://fantasy.premierleague.com/",
@@ -59,17 +59,6 @@ for (const [window, top100, width] of [
         ],
       },
       decision_information: { ...latest, revision: "d".repeat(64), coach_news_bound: false },
-      participation_evidence: {
-        version: "football_participation_evidence_v1",
-        as_of: latest.observed_at,
-        gameweek: squad.gameweek,
-        applied_player_count: 0,
-        unapplied_statement_count: 0,
-        captured_percentage_count: 1,
-        manager_statement_count: 0,
-        assumptions: ["no_external_calibration"],
-        statement_outcomes: [],
-      },
     };
     expect(isAdvicePayload(answer.payload)).toBe(true);
     let submitted = 0;
@@ -93,30 +82,6 @@ for (const [window, top100, width] of [
         });
         if (top100) expect(request.postDataJSON()).toMatchObject({ top100_weight: top100 });
         answer.payload.decision_information = latest;
-        answer.payload.participation_evidence = {
-          ...answer.payload.participation_evidence!,
-          applied_player_count: 1,
-          manager_statement_count: 2,
-          unapplied_statement_count: 1,
-          statement_outcomes: [
-            {
-              player_id: player.player_id,
-              disposition: "stated_full_match_unavailable",
-              applied: true,
-              reason: "explicit_full_match_restriction",
-              source_url: "https://www.liverpoolfc.com/news/team-update",
-              source_published_at: "2026-10-01T18:00:00Z",
-            },
-            {
-              player_id: player.player_id,
-              disposition: "stated_minutes_managed",
-              applied: false,
-              reason: "upcoming_league_scope_unverified",
-              source_url: null,
-              source_published_at: null,
-            },
-          ],
-        };
         expect(isAdvicePayload(answer.payload)).toBe(true);
       }
       const body = request.url().endsWith("/capabilities")
@@ -143,38 +108,23 @@ for (const [window, top100, width] of [
     await page.goto(
       `/league/352490/members/35249001?mode=saf-puan&window=${window}&top100=${top100}&model=football`,
     );
-    await expect(page.getByTestId("new-information-notice")).toContainText(
-      "karar girdileri değişmiş",
-    );
-    await expect(page.getByTestId("new-information-notice")).not.toContainText(
-      "kendiliğinden değiştirilmedi",
+    await expect(page.getByTestId("new-information-notice")).toHaveText(
+      "Yeni bilgilerle hesaplamak için Hesapla düğmesini kullanabilirsin.",
     );
     const facts = page.getByTestId("official-information");
     await facts.locator(":scope > summary").click();
-    await expect(facts).toContainText("20/20");
     await expect(facts).toContainText("75/100");
-    await expect(facts.locator("time")).toHaveCount(2);
+    await expect(facts.locator("time")).toHaveCount(1);
     expect(submitted).toBe(0);
-    const evidence = page.getByTestId("participation-evidence");
-    await evidence.locator(":scope > summary").click();
-    // Zero statements read is said as that, not as "none applied".
-    await expect(evidence).toContainText("Bu hafta değerlendirilecek hoca açıklaması okunmadı.");
-    await expect(evidence).not.toContainText("Bu tahmine uygulanmış hoca açıklaması yok");
     await page.getByRole("button", { name: "Hesapla", exact: true }).click();
     await expect(page.getByTestId("new-information-notice")).toHaveCount(0);
-    await expect(page.getByTestId("statement-outcomes")).toContainText(
-      "Tam maç süresi kısıtı uygulandı",
-    );
-    await expect(page.getByTestId("statement-outcomes")).toContainText(
-      "Haberin bu lig maçına ait olduğu doğrulanamadı",
-    );
     expect(submitted).toBe(1);
     await expect(
       page.getByRole("region", { name: `${window} haftalık pencere`, exact: true }),
     ).toBeVisible();
     await expect(facts).toContainText("75/100");
-    expect(
-      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
-    ).toBe(true);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
   });
 }

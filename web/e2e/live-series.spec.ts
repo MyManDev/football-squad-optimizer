@@ -6,10 +6,13 @@ import { mockSuggestionOverview } from "../src/fixtures/weeklySuggestionOverview
 import type { Scoreboard } from "../src/features/league/types";
 import { MESSAGES } from "../src/i18n/messages";
 
+// What the card draws for a figure its document leaves empty.
+const NO_FIGURE = "\u2014";
+
 for (const language of ["en", "tr"] as const) {
-  test(`the live series groups member weeks and names the basis in ${language}`, async ({
+  test(`the weekly scoreboard draws its five columns and fits a 390 px phone in ${language}`, async ({
     page,
-  }, testInfo) => {
+  }) => {
     const history = mockSuggestionOverview();
     history.payload.weeks = history.payload.weeks.slice(0, 2);
     const view: Scoreboard = {
@@ -19,8 +22,6 @@ for (const language of ["en", "tr"] as const) {
       captured_at_utc: history.generated_at_utc,
       cohort_snapshot_id: null,
       cohort_picks_snapshot_id: null,
-      registered_members: 1,
-      histories_held: 1,
       gameweeks: history.payload.weeks.map((week) => ({
         gameweek: week.gameweek,
         deadline_utc: week.deadline_utc!,
@@ -33,16 +34,9 @@ for (const language of ["en", "tr"] as const) {
           xi: 26,
           hits: 0,
           projected: 50,
-          mode: "live",
           scoring_basis:
             week.gameweek === 4 ? "named_eleven_no_autosubs" : "official_autosub_captain_v2",
           vice_captain_named: week.gameweek !== 4,
-          diagnostics: {
-            zero_minute_starters: 0,
-            minutes_shortfall: -12,
-            captain_shortfall: 2.5,
-            autosub_recovery: week.gameweek === 4 ? null : 3,
-          },
         },
         top100: null,
         members: [
@@ -60,10 +54,7 @@ for (const language of ["en", "tr"] as const) {
       cumulative: {
         through_gameweek: 5,
         gameweeks: [4, 5],
-        ours_net: 52,
-        ours_gameweeks: [4, 5],
         members_mean_total_points: null,
-        members_gameweeks: [4, 5],
         members_counted: 1,
         average_entry_score: null,
       },
@@ -80,26 +71,29 @@ for (const language of ["en", "tr"] as const) {
         },
       }),
     );
-    await page.route("**/data/league/history/101.json", (route) =>
-      route.fulfill({ json: history }),
-    );
-    await page.route("**/data/league/series-horizon.json", (route) =>
-      route.fulfill({ status: 404 }),
-    );
     await page.goto("/league/352490");
     const copy = MESSAGES[language];
-    await expect(page.getByText(copy.liveSeries.accumulated(2, 2))).toBeVisible();
-    await expect(page.getByText(copy.liveSeries.unknown)).toBeVisible();
-    await expect(page.getByText(copy.scoreboardComparisons.missing)).toBeVisible();
     const scoreboard = page.getByRole("table", { name: copy.leagueScoreboard.caption });
-    await expect(scoreboard.getByRole("columnheader")).toHaveCount(10);
-    const card = page
-      .locator("section")
-      .filter({ has: page.getByRole("heading", { name: copy.liveSeries.title, exact: true }) });
-    await expect(card.getByRole("link", { name: "101", exact: true })).toHaveCount(2);
+    await expect(scoreboard.getByRole("columnheader")).toHaveText([
+      copy.leagueScoreboard.gameweek,
+      copy.leagueScoreboard.members,
+      copy.leagueScoreboard.top100,
+      copy.leagueScoreboard.average,
+      copy.leagueScoreboard.highest,
+    ]);
+    await expect(scoreboard.getByRole("rowheader")).toHaveText([
+      "4",
+      "5",
+      copy.leagueScoreboard.cumulative(5),
+    ]);
+    await expect(scoreboard.locator("tbody tr").first().locator("td")).toHaveText([
+      language === "tr" ? "22,0" : "22.0",
+      NO_FIGURE,
+      NO_FIGURE,
+      NO_FIGURE,
+    ]);
     await atRest(page);
     expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
-    await card.screenshot({ path: testInfo.outputPath("series-desktop.png") });
     await page.setViewportSize({ width: 390, height: 844 });
     const scrollRegion = page.getByRole("region", { name: copy.leagueScoreboard.caption });
     // Resizing returns before the responsive layout and focus scrolling settle.
@@ -107,53 +101,12 @@ for (const language of ["en", "tr"] as const) {
     await expect(scrollRegion).toBeInViewport();
     await expect
       .poll(() => scrollRegion.evaluate((region) => region.scrollWidth - region.clientWidth))
-      .toBeGreaterThan(0);
-    await scrollRegion.focus();
-    await expect(scrollRegion).toBeFocused();
-    await page.keyboard.press("ArrowRight");
-    await expect
-      .poll(() => scrollRegion.evaluate((region) => region.scrollLeft))
-      .toBeGreaterThan(0);
+      .toBe(0);
+    await expect(scoreboard.getByRole("columnheader").last()).toBeInViewport();
     await atRest(page);
     expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
-    const summaryWidth = await card
-      .getByRole("table")
-      .first()
-      .evaluate((table) => table.getBoundingClientRect().width);
-    expect(summaryWidth).toBeLessThan(390);
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
     ).toBe(true);
-    await card.screenshot({ path: testInfo.outputPath("series-mobile.png") });
-    await page.route("**/data/league/series-horizon.json", (route) =>
-      route.fulfill({
-        json: {
-          contract_version: "member_week_horizon_v1",
-          season: view.season,
-          league_id: 352490,
-          scoring_basis: "official_autosub_captain_v2",
-          population: "recorded_member_suggestions_vs_actual",
-          measurement_artifact: "docs/member_week_measurement.json",
-          within_week_correlation: 0.3,
-          required_week_clusters: 12,
-          member_week_keys: history.payload.weeks.map(
-            (week) => `101:${week.gameweek}:${week.advice_sha256}:${week.outcome_snapshot_id}`,
-          ),
-        },
-      }),
-    );
-    await page.reload();
-    await expect(page.getByText(copy.liveSeries.remaining(10))).toBeVisible();
-    for (const week of view.gameweeks) delete week.ours!.diagnostics;
-    await page.reload();
-    await expect(page.getByText(copy.scoreboardComparisons.missing)).toBeVisible();
-    for (const row of await scoreboard.locator("tbody tr, tfoot tr").all()) {
-      const cells = await row.locator("td").allTextContents();
-      expect(cells.slice(-4)).toEqual(["—", "—", "—", "—"]);
-    }
-    await page.setViewportSize({ width: 1280, height: 900 });
-    await scoreboard
-      .locator("..")
-      .screenshot({ path: testInfo.outputPath("scoreboard-missing.png") });
   });
 }

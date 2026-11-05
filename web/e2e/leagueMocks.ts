@@ -79,7 +79,7 @@ export async function installLeagueMocks(
 ) {
   if (claim !== null) await claimMember(page, claim);
   // Registered first, so every route below wins over it: a document the example league
-  // does not carry (the scoreboard, the histories, the series, the device inputs) is the
+  // does not carry (the scoreboard, the histories, the device inputs) is the
   // shipped tree's, read from wherever the site publishes it. Before the directory these
   // were the files under data/league/ themselves.
   const example = mockLeagueMembersEnvelope.payload.league_id;

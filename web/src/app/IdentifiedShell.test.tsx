@@ -57,10 +57,6 @@ describe("the identified shell", () => {
     expect(sidebar().getByText("Deniz Aral")).toBeInTheDocument();
     expect(sidebar().getByText("North Stand Notes")).toBeInTheDocument();
     expect(sidebar().getByRole("link", { name: TR.league })).toHaveAttribute("href", MEMBERS);
-    expect(sidebar().getByRole("link", { name: TR.squad })).toHaveAttribute(
-      "href",
-      `${MEMBERS}/35249001#kadro`,
-    );
     expect(sidebar().getByRole("link", { name: TR.thisWeek })).toHaveAttribute(
       "href",
       `${MEMBERS}/35249001`,
@@ -113,6 +109,6 @@ describe("the identified shell", () => {
     open("/fixtures");
     expect(sidebar().getByRole("link", { name: TR.findLeague })).toHaveAttribute("href", MEMBERS);
     expect(sidebar().queryByRole("link", { name: TR.league })).toBeNull();
-    expect(sidebar().queryByRole("link", { name: TR.squad })).toBeNull();
+    expect(sidebar().queryByRole("link", { name: TR.thisWeek })).toBeNull();
   });
 });

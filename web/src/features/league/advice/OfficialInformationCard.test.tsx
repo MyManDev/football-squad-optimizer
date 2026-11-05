@@ -1,6 +1,7 @@
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, expect, it } from "vitest";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
+import { MESSAGES } from "../../../i18n/messages";
 import { mockEntryAdviceEnvelope } from "../../../fixtures/league";
 import { OfficialInformationCard, NewInformationNotice } from "./OfficialInformationCard";
 import {
@@ -55,19 +56,22 @@ const view = {
   decision_information: decision,
 };
 
-it.each(["tr", "en"] as const)("shows source date separately from check time in %s", (language) => {
+it.each(["tr", "en"] as const)("shows the flagged player and the news date in %s", (language) => {
   render(
     <LanguageProvider initialLanguage={language}>
       <OfficialInformationCard view={view} />
     </LanguageProvider>,
   );
   const card = screen.getByTestId("official-information");
-  expect(card).toHaveTextContent("20/20");
   expect(card).toHaveTextContent("75/100");
   expect(card).toHaveTextContent("Bukayo Saka");
-  expect(card.querySelectorAll("time")).toHaveLength(2);
-  expect(card.querySelector("a")).toHaveAttribute("href", information.source_url);
-  expect(card).toHaveTextContent(
+  expect(card).toHaveTextContent(language === "tr" ? "Arsenal · Şüpheli" : "Arsenal · Doubtful");
+  expect(card).toHaveTextContent(language === "tr" ? "Haberin tarihi:" : "News date:");
+  expect(card.querySelectorAll("time")).toHaveLength(1);
+  expect(card.querySelector("time")).toHaveAttribute("datetime", "2026-10-01T16:00:00Z");
+  expect(card.querySelector("a")).toBeNull();
+  expect(card).not.toHaveTextContent("20/20");
+  expect(card).not.toHaveTextContent(
     language === "tr" ? "Bu değerler FPL kaydından gelir." : "These values come from FPL.",
   );
   expect(card).not.toHaveTextContent(
@@ -77,6 +81,85 @@ it.each(["tr", "en"] as const)("shows source date separately from check time in 
     language === "tr" ? "Sunucunun çalışıyor olması" : "A healthy server",
   );
   expect(isAdvicePayload(view)).toBe(true);
+});
+
+it("leaves out what the source did not state, and the note about a cleared story", () => {
+  const silent = {
+    ...view,
+    official_information: {
+      ...information,
+      players: [
+        {
+          ...information.players[0]!,
+          status: "x",
+          source_chance_percent: null,
+          source_added_at: null,
+          news_state: "cleared" as const,
+        },
+      ],
+    },
+  };
+  render(
+    <LanguageProvider initialLanguage="tr">
+      <OfficialInformationCard view={silent} />
+    </LanguageProvider>,
+  );
+  const row = screen.getByTestId("official-information").querySelector("li")!;
+  expect(row).toHaveTextContent(/^Bukayo Saka · Arsenal$/);
+  expect(row.querySelector("time")).toBeNull();
+});
+
+it("says there is nothing to flag when no player in the plan is flagged", () => {
+  const clear = { ...view, official_information: { ...information, players: [] } };
+  render(
+    <LanguageProvider initialLanguage="tr">
+      <OfficialInformationCard view={clear} />
+    </LanguageProvider>,
+  );
+  expect(screen.getByTestId("official-information")).toHaveTextContent(
+    "Bu plandaki oyuncular için gösterilecek FPL uyarısı yok.",
+  );
+});
+
+it("does not list a fit player for a story that has been cleared", () => {
+  const cleared = {
+    ...view,
+    official_information: {
+      ...information,
+      players: [
+        {
+          ...information.players[0]!,
+          status: "a",
+          source_chance_percent: 100,
+          news_state: "cleared" as const,
+        },
+      ],
+    },
+  };
+  render(
+    <LanguageProvider initialLanguage="tr">
+      <OfficialInformationCard view={cleared} />
+    </LanguageProvider>,
+  );
+  const card = screen.getByTestId("official-information");
+  expect(card).not.toHaveTextContent("Bukayo Saka");
+  expect(card).toHaveTextContent("Bu plandaki oyuncular için gösterilecek FPL uyarısı yok.");
+});
+
+it("keeps a fit player while FPL still has a story on them", () => {
+  const present = {
+    ...view,
+    official_information: {
+      ...information,
+      players: [{ ...information.players[0]!, status: "a", source_chance_percent: 100 }],
+    },
+  };
+  render(
+    <LanguageProvider initialLanguage="tr">
+      <OfficialInformationCard view={present} />
+    </LanguageProvider>,
+  );
+  expect(screen.getByTestId("official-information")).toHaveTextContent("Bukayo Saka");
 });
 
 it("accepts zero and missing source value separately, rejects invalid and leaking payloads", () => {
@@ -98,16 +181,25 @@ it("accepts zero and missing source value separately, rejects invalid and leakin
   ).toBe(false);
 });
 
-it("announces changed decision information without replacing the shown plan or computing", () => {
-  render(
-    <LanguageProvider initialLanguage="tr">
-      <NewInformationNotice view={view} latest={{ ...decision, revision: "d".repeat(64) }} />
-    </LanguageProvider>,
-  );
-  expect(screen.getByRole("status")).toHaveTextContent("Hesapla");
-  expect(screen.getByRole("status")).toHaveTextContent("karar girdileri değişmiş");
-  expect(screen.getByRole("status")).not.toHaveTextContent("kendiliğinden değiştirilmedi");
-});
+it.each(["tr", "en"] as const)(
+  "announces changed decision information in one sentence, without changing or computing the plan, in %s",
+  (language) => {
+    const original = JSON.stringify(view);
+    render(
+      <LanguageProvider initialLanguage={language}>
+        <NewInformationNotice view={view} latest={{ ...decision, revision: "d".repeat(64) }} />
+      </LanguageProvider>,
+    );
+    const status = screen.getByRole("status");
+    // The button the sentence sends the member to, by the name it has on the page.
+    expect(status).toHaveTextContent(MESSAGES[language].leagueMembers.computeButton);
+    expect(status).not.toHaveTextContent(language === "tr" ? "karar girdileri" : "Decision inputs");
+    expect(status).not.toHaveTextContent("kendiliğinden değiştirilmedi");
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(JSON.stringify(view)).toBe(original);
+  },
+);
 
 it("does not announce unchanged information or another capture as this plan's update", () => {
   const { rerender } = render(
@@ -124,87 +216,15 @@ it("does not announce unchanged information or another capture as this plan's up
   expect(screen.queryByRole("status")).toBeNull();
 });
 
-it.each(["tr", "en"] as const)(
-  "compares actual source bindings without changing or recalculating the displayed plan in %s",
-  (language) => {
-    const original = JSON.stringify(view);
-    const latest: DecisionInformation = {
-      ...decision,
-      revision: "d".repeat(64),
-      observed_at: "2026-10-02T01:00:00Z",
-      coach_news_bound: true,
-      minute_components_bound: false,
-    };
-    render(
-      <LanguageProvider initialLanguage={language}>
-        <NewInformationNotice view={view} latest={latest} />
-      </LanguageProvider>,
-    );
-    const detail = screen.getByTestId("information-binding-differences");
-    expect(detail).not.toHaveAttribute("open");
-    fireEvent.click(detail.querySelector("summary")!);
-    expect(detail).toHaveAttribute("open");
-    const rows = within(detail).getAllByRole("row");
-    expect(
-      within(rows[2]!)
-        .getAllByRole("cell")
-        .map((cell) => cell.textContent),
-    ).toEqual(language === "tr" ? ["Bağlı değil", "Bağlı"] : ["Not bound", "Bound"]);
-    expect(
-      within(rows[3]!)
-        .getAllByRole("cell")
-        .map((cell) => cell.textContent),
-    ).toEqual(language === "tr" ? ["Bağlı", "Bağlı değil"] : ["Bound", "Not bound"]);
-    expect([...detail.querySelectorAll("time")].map((node) => node.dateTime)).toEqual([
-      decision.observed_at,
-      latest.observed_at,
-    ]);
-    expect(detail).not.toHaveTextContent(
-      language === "tr"
-        ? "bir açıklamanın uygulandığı veya puanların değiştiği anlamına gelmez"
-        : "does not mean a statement was applied or points changed",
-    );
-    expect(detail).not.toHaveTextContent(
-      language === "tr" ? "gösterilen plan korunur" : "displayed plan is retained",
-    );
-    expect(detail).not.toHaveTextContent(decision.revision);
-    expect(detail).not.toHaveTextContent(latest.revision);
-    expect(screen.queryByRole("button")).not.toBeInTheDocument();
-    expect(JSON.stringify(view)).toBe(original);
-  },
-);
-
-it("does not invent a visible source change from a revision change alone", () => {
-  render(
-    <LanguageProvider initialLanguage="en">
-      <NewInformationNotice view={view} latest={{ ...decision, revision: "d".repeat(64) }} />
-    </LanguageProvider>,
-  );
-  expect(screen.getByTestId("information-binding-differences")).toHaveTextContent(
-    "these summary fields are unchanged",
-  );
-});
-
-it("keeps an absent previous revision and missing check time distinct from an unbound source", () => {
+it("says the same sentence for a plan that carries no information revision", () => {
   const legacy = { ...view };
   delete (legacy as { decision_information?: DecisionInformation }).decision_information;
   render(
-    <LanguageProvider initialLanguage="en">
-      <NewInformationNotice view={legacy} latest={{ ...decision, observed_at: null }} />
+    <LanguageProvider initialLanguage="tr">
+      <NewInformationNotice view={legacy} latest={decision} />
     </LanguageProvider>,
   );
-  const detail = screen.getByTestId("information-binding-differences");
-  fireEvent.click(detail.querySelector("summary")!);
-  const rows = within(detail).getAllByRole("row");
-  expect(
-    within(rows[1]!)
-      .getAllByRole("cell")
-      .map((cell) => cell.textContent),
-  ).toEqual(["Not recorded", "Not recorded"]);
-  expect(
-    within(rows[2]!)
-      .getAllByRole("cell")
-      .map((cell) => cell.textContent),
-  ).toEqual(["Not recorded", "Not bound"]);
-  expect(detail.querySelector("time")).toBeNull();
+  expect(screen.getByRole("status")).toHaveTextContent(
+    /^Yeni bilgilerle hesaplamak için Hesapla düğmesini kullanabilirsin\.$/,
+  );
 });

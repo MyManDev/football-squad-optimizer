@@ -10,9 +10,10 @@ import { installLeagueMocks } from "./leagueMocks";
 
 // The league race (#1135) on the narrowest phones of the matrix, with a manager name of 64
 // characters, the longest a published name may be: the card stays inside its column, so every
-// place-change count is on screen. A shorter name fits a 360 px column without the card's width
-// rules, so only the longest one holds them at both widths. The shell clips sideways overflow,
-// so the page's own scroll width cannot show a card that runs past it; the card's can.
+// place-change count and every gap to a neighbour is on screen. A shorter name fits a 360 px
+// column without the card's width rules, so only the longest one holds them at both widths.
+// The shell clips sideways overflow, so the page's own scroll width cannot show a card that
+// runs past it; the card's can.
 const LONG = "Abdurrahman Alparslan Karamanoğlu Sezgin Büyükkaraağaçlıoğulları";
 
 for (const width of [320, 360]) {
@@ -42,7 +43,10 @@ for (const width of [320, 360]) {
     }));
     expect(sizes.scroll).toBe(sizes.client);
     const card = (await race.boundingBox())!;
-    for (const count of await race.locator("li[data-move] span:last-child").all()) {
+    // The long name is the viewer's, so it sits in the gap row the card emphasises.
+    await expect(race.locator("li[aria-current]")).toContainText(LONG);
+    expect(await race.locator("[data-gap]").count()).toBeGreaterThan(0);
+    for (const count of await race.locator("li[data-move] span:last-child, [data-gap]").all()) {
       const box = (await count.boundingBox())!;
       expect(box.x + box.width).toBeLessThanOrEqual(card.x + card.width + 0.5);
     }

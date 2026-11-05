@@ -14,7 +14,6 @@ import { deviceRequestFor, memberSelection } from "../pages/memberSelection";
 import type { EntryAdviceIndex, EntrySquad } from "../types";
 import type { AdviceCapabilities } from "./adviceCapabilities";
 import { resolvePublishedAdvice } from "./adviceSelection";
-import { COMPUTE_COPY } from "./computeCopy";
 import { MemberDecisionControls } from "./MemberDecisionControls";
 import { TOP100_COPY } from "./top100Copy";
 
@@ -269,43 +268,34 @@ describe("a rejected advice index beside the device's choices", () => {
   });
 });
 
-describe("the Top 100 note beside a device weight", () => {
+describe("a device weight in the Top 100 row", () => {
   it.each([
     ["tr", "no index", null],
     ["en", "no index", null],
     ["tr", "the device index", DEVICE_INDEX],
     ["en", "the device index", DEVICE_INDEX],
-  ] as const)(
-    "names the checked device weight as computable in %s with %s",
-    (language, _name, index) => {
-      render(
-        <LanguageProvider initialLanguage={language}>
-          <MemoryRouter
-            initialEntries={[`/league/352490/members/${ENTRY}?mode=saf-puan&top100=20`]}
-          >
-            <MemberDecisionControls
-              entryId={ENTRY}
-              members={MEMBERS}
-              index={index}
-              onDevice={DEVICE}
-              part="top100"
-            />
-          </MemoryRouter>
-        </LanguageProvider>,
-      );
-      expect(
-        document.querySelector<HTMLInputElement>('input[name="top100"][value="20"]'),
-      ).toBeChecked();
-      const fieldset = document.querySelector("fieldset")!;
-      expect(fieldset).toHaveTextContent(COMPUTE_COPY[language].top100Computable);
-      for (const sentence of Object.values(TOP100_COPY[language].unavailableReasons)) {
-        expect(fieldset).not.toHaveTextContent(sentence);
-      }
-    },
-  );
+  ] as const)("is the checked one in %s with %s", (language, _name, index) => {
+    render(
+      <LanguageProvider initialLanguage={language}>
+        <MemoryRouter initialEntries={[`/league/352490/members/${ENTRY}?mode=saf-puan&top100=20`]}>
+          <MemberDecisionControls
+            entryId={ENTRY}
+            members={MEMBERS}
+            index={index}
+            onDevice={DEVICE}
+            part="top100"
+          />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+    expect(
+      document.querySelector<HTMLInputElement>('input[name="top100"][value="20"]'),
+    ).toBeChecked();
+    expect(document.querySelector("fieldset")).toHaveTextContent(TOP100_COPY[language].help);
+  });
 });
 
-describe("the Top 100 note where the link leaves the device's weight out", () => {
+describe("a link that leaves the device's weight out", () => {
   // The service with the word and no Top 100 setting of its own.
   const SERVICE: AdviceCapabilities = {
     leagueId: DEVICE_INDEX.league_id,
@@ -326,42 +316,22 @@ describe("the Top 100 note where the link leaves the device's weight out", () =>
     ["model=football", "the service", DEVICE_INDEX, SERVICE],
     [PREFERENCES, "no index", null, null],
     [PREFERENCES, "the service", DEVICE_INDEX, SERVICE],
-  ] as const)("still says only 0 is available with %s and %s", (query, _name, index, service) => {
-    for (const language of ["tr", "en"] as const) {
-      render(
-        <LanguageProvider initialLanguage={language}>
-          <MemoryRouter initialEntries={[`/league/352490/members/${ENTRY}?mode=saf-puan&${query}`]}>
-            <MemberDecisionControls
-              entryId={ENTRY}
-              members={MEMBERS}
-              index={index}
-              capabilities={service}
-              onDevice={DEVICE}
-              part="top100"
-            />
-          </MemoryRouter>
-        </LanguageProvider>,
-      );
-      // Even a link that names the weight does not ask the device for it here.
-      const params = new URLSearchParams(`mode=saf-puan&${query}&top100=20`);
-      const selected = resolvePublishedAdvice(
-        params,
-        index?.league_id ?? 0,
-        ENTRY,
-        MEMBERS,
-        index,
-        undefined,
-        service,
-        DEVICE,
-      );
-      expect(deviceSelection(deviceRequestFor(selected), SQUAD)).not.toEqual({
-        kind: "top100",
-        weight: 20,
-      });
-      const fieldset = document.querySelector("fieldset")!;
-      expect(fieldset).not.toHaveTextContent(COMPUTE_COPY[language].top100Computable);
-      expect(fieldset).toHaveTextContent(TOP100_COPY[language].unavailableReasons.unknown);
-      cleanup();
-    }
+  ] as const)("does not ask the device for it with %s and %s", (query, _name, index, service) => {
+    // Even a link that names the weight does not ask the device for it here.
+    const params = new URLSearchParams(`mode=saf-puan&${query}&top100=20`);
+    const selected = resolvePublishedAdvice(
+      params,
+      index?.league_id ?? 0,
+      ENTRY,
+      MEMBERS,
+      index,
+      undefined,
+      service,
+      DEVICE,
+    );
+    expect(deviceSelection(deviceRequestFor(selected), SQUAD)).not.toEqual({
+      kind: "top100",
+      weight: 20,
+    });
   });
 });

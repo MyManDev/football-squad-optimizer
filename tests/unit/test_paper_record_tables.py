@@ -284,7 +284,7 @@ def _write(root: Path, records: dict[str, Any]) -> None:
     for record, document in records.items():
         path = root / record
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(document, indent=1), encoding="utf-8")
+        path.write_text(json.dumps(document, indent=1), encoding="utf-8", newline="\n")
 
 
 def _read_csv(path: Path) -> list[dict[str, str]]:

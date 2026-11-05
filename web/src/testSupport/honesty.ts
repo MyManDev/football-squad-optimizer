@@ -17,7 +17,10 @@ import words from "../../../docs/contracts/honesty_words.json" with { type: "jso
 //   percent A per cent sign is a violation unless it belongs to an ownership share. The game
 //           itself publishes ownership, so quoting it is a fact rather than a claim of ours.
 //           The exception is spelled as ownership wording within forty characters on either
-//           side of the sign; a per cent sign in any other company still matches.
+//           side of the sign; a per cent sign in any other company still matches. One
+//           number on a member page stands outside this guard: a running job's share of work
+//           solved (`jobPercent`, docs/decisions.md 2026-11-03). It is no chance of anything,
+//           and it is formatted where it is drawn, so no catalogue carries a sign for it.
 const OWNERSHIP = "owned|ownership|sahipli";
 const PERCENT_NOT_OWNERSHIP = `(?<!(?:${OWNERSHIP})[\\s\\S]{0,40})%(?![\\s\\S]{0,40}(?:${OWNERSHIP}))`;
 

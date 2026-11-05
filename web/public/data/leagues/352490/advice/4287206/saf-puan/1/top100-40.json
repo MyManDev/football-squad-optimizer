@@ -1,78 +1,97 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-10-16T07:13:49Z",
+  "generated_at_utc": "2026-11-04T06:28:27Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
-    "gameweek": 7,
+    "gameweek": 10,
     "entry_id": 4287206,
     "league_id": 352490,
     "mode": "saf-puan",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20261016T060154Z-b1702d00c8cd",
+    "source_snapshot_id": "fpl-live-20261104T020046Z-eaadfd3e9143",
     "moves": [
       {
-        "move_id": "gw07-1",
+        "move_id": "gw10-1",
         "player_out": {
-          "player_id": 223827,
-          "name": "Daniel Ballard",
-          "short_name": "Ballard",
-          "position": "DEF",
-          "team": "Sunderland"
+          "player_id": 466052,
+          "name": "Rayan Cherki",
+          "short_name": "Cherki",
+          "position": "MID",
+          "team": "Man City"
         },
         "player_in": {
-          "player_id": 465730,
-          "name": "Maxim De Cuyper",
-          "short_name": "Cuyper",
-          "position": "DEF",
-          "team": "Brighton"
+          "player_id": 201658,
+          "name": "Marcus Tavernier",
+          "short_name": "Tavernier",
+          "position": "MID",
+          "team": "Bournemouth"
         },
-        "expected_points_delta": 2.3033576659331487,
+        "expected_points_delta": 1.134119371748234,
         "reason_code": "top100_preference"
       },
       {
-        "move_id": "gw07-2",
+        "move_id": "gw10-2",
         "player_out": {
-          "player_id": 513545,
-          "name": "Mamadou Sangar\u00e9",
-          "short_name": "Sangar\u00e9",
-          "position": "MID",
-          "team": "Brentford"
+          "player_id": 466075,
+          "name": "Riccardo Calafiori",
+          "short_name": "Calafiori",
+          "position": "DEF",
+          "team": "Arsenal"
         },
         "player_in": {
-          "player_id": 60307,
-          "name": "Pascal Gro\u00df",
-          "short_name": "Gro\u00df",
-          "position": "MID",
-          "team": "Brighton"
+          "player_id": 226597,
+          "name": "Gabriel dos Santos Magalh\u00e3es",
+          "short_name": "Gabriel",
+          "position": "DEF",
+          "team": "Arsenal"
         },
-        "expected_points_delta": 1.2764403730367917,
+        "expected_points_delta": 1.6886115396511698,
         "reason_code": "top100_preference"
+      },
+      {
+        "move_id": "gw10-3",
+        "player_out": {
+          "player_id": 475168,
+          "name": "Jo\u00e3o Pedro Junqueira de Jesus",
+          "short_name": "Jo\u00e3o Pedro",
+          "position": "FWD",
+          "team": "Chelsea"
+        },
+        "player_in": {
+          "player_id": 517052,
+          "name": "Nicolas Jackson",
+          "short_name": "N.Jackson",
+          "position": "FWD",
+          "team": "Aston Villa"
+        },
+        "expected_points_delta": 2.0225365697916686,
+        "reason_code": "points_gain"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 3.5797980389699404,
-    "expected_points_cost": 0.4705087958826937,
+    "expected_gain_vs_hold": 4.8452674811910725,
+    "expected_points_cost": 0.2417524530116566,
     "rival_label": null,
     "solver_status": "OPTIMAL",
     "optimality_gap": null,
     "wall_clock_stopped_the_search": false,
-    "expected_own_points": 55.390866024890784,
+    "expected_own_points": 54.55127067251333,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
       "short_name": "Haaland",
       "position": "FWD",
       "team": "Man City",
-      "expected_points": 8.35545188174385
+      "expected_points": 7.950379595632534
     },
     "vice_captain": {
-      "player_id": 244851,
-      "name": "Cole Palmer",
-      "short_name": "Palmer",
-      "position": "MID",
-      "team": "Chelsea",
-      "expected_points": 4.960279398950454
+      "player_id": 226597,
+      "name": "Gabriel dos Santos Magalh\u00e3es",
+      "short_name": "Gabriel",
+      "position": "DEF",
+      "team": "Arsenal",
+      "expected_points": 4.994433716715129
     },
     "starting_xi": [
       {
@@ -81,31 +100,31 @@
         "short_name": "Kinsk\u00fd",
         "position": "GK",
         "team": "Spurs",
-        "expected_points": 2.8965147454274516
+        "expected_points": 2.707245782540948
+      },
+      {
+        "player_id": 226597,
+        "name": "Gabriel dos Santos Magalh\u00e3es",
+        "short_name": "Gabriel",
+        "position": "DEF",
+        "team": "Arsenal",
+        "expected_points": 4.994433716715129
       },
       {
         "player_id": 465730,
         "name": "Maxim De Cuyper",
-        "short_name": "Cuyper",
+        "short_name": "De Cuyper",
         "position": "DEF",
         "team": "Brighton",
-        "expected_points": 3.7099911306959767
+        "expected_points": 3.6846304929766673
       },
       {
-        "player_id": 466075,
-        "name": "Riccardo Calafiori",
-        "short_name": "Calafiori",
+        "player_id": 487838,
+        "name": "Lewis Hall",
+        "short_name": "Hall",
         "position": "DEF",
-        "team": "Arsenal",
-        "expected_points": 3.45141576840743
-      },
-      {
-        "player_id": 455084,
-        "name": "Leif Davis",
-        "short_name": "Davis",
-        "position": "DEF",
-        "team": "Ipswich Town",
-        "expected_points": 2.590615382532553
+        "team": "Newcastle",
+        "expected_points": 3.0689322641119734
       },
       {
         "player_id": 244851,
@@ -113,23 +132,7 @@
         "short_name": "Palmer",
         "position": "MID",
         "team": "Chelsea",
-        "expected_points": 4.960279398950454
-      },
-      {
-        "player_id": 60307,
-        "name": "Pascal Gro\u00df",
-        "short_name": "Gro\u00df",
-        "position": "MID",
-        "team": "Brighton",
-        "expected_points": 4.658321948335153
-      },
-      {
-        "player_id": 466052,
-        "name": "Rayan Cherki",
-        "short_name": "Cherki",
-        "position": "MID",
-        "team": "Man City",
-        "expected_points": 4.6328600123123
+        "expected_points": 4.798651443301852
       },
       {
         "player_id": 244850,
@@ -137,7 +140,23 @@
         "short_name": "Rogers",
         "position": "MID",
         "team": "Chelsea",
-        "expected_points": 4.396159996403696
+        "expected_points": 4.290942097915604
+      },
+      {
+        "player_id": 201658,
+        "name": "Marcus Tavernier",
+        "short_name": "Tavernier",
+        "position": "MID",
+        "team": "Bournemouth",
+        "expected_points": 3.7054679353668485
+      },
+      {
+        "player_id": 184029,
+        "name": "Martin \u00d8degaard",
+        "short_name": "\u00d8degaard",
+        "position": "MID",
+        "team": "Arsenal",
+        "expected_points": 3.5900427560157366
       },
       {
         "player_id": 223094,
@@ -145,15 +164,15 @@
         "short_name": "Haaland",
         "position": "FWD",
         "team": "Man City",
-        "expected_points": 8.35545188174385
+        "expected_points": 7.950379595632534
       },
       {
-        "player_id": 475168,
-        "name": "Jo\u00e3o Pedro Junqueira de Jesus",
-        "short_name": "Jesus",
+        "player_id": 517052,
+        "name": "Nicolas Jackson",
+        "short_name": "N.Jackson",
         "position": "FWD",
-        "team": "Chelsea",
-        "expected_points": 3.7922402069442094
+        "team": "Aston Villa",
+        "expected_points": 4.295304555601727
       },
       {
         "player_id": 177815,
@@ -161,7 +180,7 @@
         "short_name": "Calvert-Lewin",
         "position": "FWD",
         "team": "Leeds",
-        "expected_points": 3.59156367139386
+        "expected_points": 3.514860436701776
       }
     ],
     "bench": [
@@ -171,31 +190,31 @@
         "short_name": "Petrovi\u0107",
         "position": "GK",
         "team": "Bournemouth",
-        "expected_points": 2.484365886701771
+        "expected_points": 2.745059697702
       },
       {
-        "player_id": 184029,
-        "name": "Martin \u00d8degaard",
-        "short_name": "\u00d8degaard",
+        "player_id": 513545,
+        "name": "Mamadou Sangar\u00e9",
+        "short_name": "M.Sangar\u00e9",
         "position": "MID",
-        "team": "Arsenal",
-        "expected_points": 3.3818815752983595
+        "team": "Brentford",
+        "expected_points": 2.272767985810061
+      },
+      {
+        "player_id": 455084,
+        "name": "Leif Davis",
+        "short_name": "Davis",
+        "position": "DEF",
+        "team": "Ipswich Town",
+        "expected_points": 2.2518903115910094
       },
       {
         "player_id": 451284,
         "name": "Milan van Ewijk",
-        "short_name": "Ewijk",
+        "short_name": "van Ewijk",
         "position": "DEF",
         "team": "Coventry City",
-        "expected_points": 1.4066334647628316
-      },
-      {
-        "player_id": 500040,
-        "name": "Cristhian Mosquera",
-        "short_name": "Mosquera",
-        "position": "DEF",
-        "team": "Arsenal",
-        "expected_points": 0.20216939969503564
+        "expected_points": 2.109582914726093
       }
     ],
     "chip": null,
@@ -207,17 +226,17 @@
     "data_quality": "complete",
     "missing_fields": [],
     "squad_basis": "captured",
-    "expected_points_cost_ceiling": 0.4705087958826937,
+    "expected_points_cost_ceiling": 0.2417524530116566,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0,
     "top100": {
       "weight": 40,
       "changed": true,
       "price_basis": "base_model_pure_points_v1",
-      "cohort_snapshot_id": "fpl-top100-20261016T060118Z-ae3db8c93137",
-      "picks_snapshot_id": "fpl-elite-picks-20261016T060136Z-8b4c3667de56",
-      "table_sha256": "2818a2e18bb44ede2d2baa84576d374ea81f0c3b4f9ba8a9ece1068a577408e5",
-      "picks_gameweek": 6
+      "cohort_snapshot_id": "fpl-top100-20261104T020027Z-beb6e318e07c",
+      "picks_snapshot_id": "fpl-elite-picks-20261104T020036Z-d078b34cdec4",
+      "table_sha256": "5a678111ed1cc336cb0367fb63fc6dc18167267c36a3502d959575bb88c68c2e",
+      "picks_gameweek": 9
     }
   }
 }

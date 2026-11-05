@@ -1,0 +1,88 @@
+/*
+ * The member page's skeleton (MemberPageSkeleton.tsx): the page's own top bar holds the
+ * blocks, so it stands where the bar will; the decision and the pitch keep the page's sizes.
+ * Every block is the quiet surface tone on the page's ground, and nothing in it moves.
+ */
+
+.bone {
+  display: block;
+  max-inline-size: 100%;
+  border-radius: var(--radius-s);
+  background: var(--color-surface-2);
+}
+
+/* A phone draws its top bar in the surface tone itself, so the bar's blocks take the line's. */
+.bar .bone {
+  background: var(--color-line);
+}
+
+.team {
+  inline-size: 200px;
+  block-size: 28px;
+}
+
+.week {
+  inline-size: 120px;
+  block-size: 26px;
+}
+
+.label {
+  inline-size: 48px;
+  block-size: 12px;
+  margin-block-end: var(--space-1);
+}
+
+.figure {
+  inline-size: 36px;
+  block-size: 20px;
+}
+
+.decision {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.heading {
+  inline-size: 240px;
+  block-size: 24px;
+}
+
+.line {
+  inline-size: 60%;
+  block-size: 14px;
+}
+
+.board {
+  block-size: 152px;
+  border-radius: var(--radius-m);
+}
+
+/* The pitch as MemberPitch draws it: upright in a column under 640 px, across from there,
+   with its halfway line. */
+.pitchArea {
+  container: skeleton-pitch / inline-size;
+}
+
+.pitch {
+  display: block;
+  max-inline-size: 540px;
+  min-block-size: 420px;
+  aspect-ratio: 540 / 604;
+  border-radius: var(--radius-m);
+  background:
+    linear-gradient(var(--color-line), var(--color-line)) center / 100% 2px no-repeat,
+    var(--color-surface-2);
+}
+
+@container skeleton-pitch (min-width: 640px) {
+  .pitch {
+    max-inline-size: none;
+    min-block-size: 0;
+    block-size: 320px;
+    aspect-ratio: auto;
+    background:
+      linear-gradient(var(--color-line), var(--color-line)) center / 2px 100% no-repeat,
+      var(--color-surface-2);
+  }
+}

@@ -1,8 +1,7 @@
 # SquadOpt member website
 
 React + TypeScript + Vite front end for the published league-member views. It reads the
-static `ui_view_v1` data tree that `python -m scripts.build_site` (a thin CLI over
-`squadopt.application.site_publication`) writes under `public/`, and, when an advice
+static data tree the publication writes under `public/data/`, and, when an advice
 backend is configured, requests advice from it. A member's one-week plan is solved on the
 member's own device, in a Web Worker running HiGHS, from the published device-plan table.
 
@@ -12,11 +11,11 @@ To the Python system the website is one deliverable of the outer ring, R5
 ([architecture overview](../ARCHITECTURE.md#2-rings)). Inside it, `src/` is divided into zones,
 and dependencies point from the outer zones to the inner ones, the same rule the rings follow.
 
-| Zone                                                | Holds                                                                                                                         | Role                                                                  |
-| --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| `src/design/`, `src/lib/`, `src/i18n/`, `src/data/` | Design tokens and shared components, pure helpers and shared vocabulary, messages, the data client and generated schema types | Inner zones: vocabulary, presentation primitives and the HTTP adapter |
-| `src/features/<feature>/`                           | One feature each: league and member pages, the device solver, fixtures, status and the others                                 | Features: one use case each, with its views                           |
-| `src/app/`, `src/main.tsx`                          | The routes and the entry point                                                                                                | Composition: wires the features into routes                           |
+| Zone                                                | Holds                                                                                                                             | Role                                                                  |
+| --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `src/design/`, `src/lib/`, `src/i18n/`, `src/data/` | Design tokens and shared components, pure helpers and shared vocabulary, messages, the request helpers and generated schema types | Inner zones: vocabulary, presentation primitives and the HTTP adapter |
+| `src/features/<feature>/`                           | One feature each: league and member pages, the device solver, fixtures and the others                                             | Features: one use case each, with its views                           |
+| `src/app/`, `src/main.tsx`                          | The routes and the entry point                                                                                                    | Composition: wires the features into routes                           |
 
 Two tests read the source with the TypeScript compiler and hold these rules at zero:
 `src/architecture.test.ts` keeps the inner zones free of any import from `features/` or
@@ -59,6 +58,7 @@ order, after `npm ci` and a Python `.[api,dev]` install for the last step:
 | Typecheck                                     | `npm run typecheck`                                                    |
 | Unit tests                                    | `npx vitest run`                                                       |
 | FPL probe worker tests                        | the `node --test` run below, from the repository root                  |
+| FPL forwarder worker tests                    | the second `node --test` run below, from the repository root           |
 | Build                                         | `npm run build`                                                        |
 | Deployment assets                             | `npm run check:deployment`                                             |
 | Bundle budget                                 | `npm run size`                                                         |
@@ -69,6 +69,12 @@ The FPL probe row runs the Worker's own suites ([FPL forwarder probe](../docs/fp
 
 ```sh
 node --test workers/fpl-probe/test/probe.test.mjs workers/fpl-probe/test/deploy-steps.test.mjs
+```
+
+The FPL forwarder row runs its own suites ([ADR 0012](../docs/architecture/decisions/0012-fpl-forwarder.md)):
+
+```sh
+node --test workers/fpl-proxy/test/proxy.test.mjs workers/fpl-proxy/test/worker.test.mjs workers/fpl-proxy/test/deploy-steps.test.mjs
 ```
 
 The last row runs, with `SQUADOPT_PUBLICATION_CONTRACT=1` and `SQUADOPT_BROWSER_SMOKE=1` set:
