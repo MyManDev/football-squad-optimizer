@@ -7,8 +7,8 @@ import styles from "./OpeningMark.module.css";
 /** Set once the opening has played in this tab, so a reload or a new page does not replay it. */
 export const OPENING_STORAGE_KEY = "squadopt.openingShown";
 
-/** The opening's one clock: five data-motion lengths, as `--opening-length` in the stylesheet. */
-export const OPENING_MS = MOTION_MS.data * 5;
+/** The opening's one clock: ten data-motion lengths, as `--opening-length` in the stylesheet. */
+export const OPENING_MS = MOTION_MS.data * 10;
 
 /**
  * When the clock takes the cover off: a beat after its animations end, so they finish rather

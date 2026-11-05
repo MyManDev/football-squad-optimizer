@@ -1,12 +1,12 @@
 /* The brand's opening (OpeningMark.tsx). One clock for every part: each animation runs the
-   same five data-motion lengths, and the keyframe stops stage the parts on it. The bars
+   same ten data-motion lengths, and the keyframe stops stage the parts on it. The bars
    open along their length while the mark is still turned a quarter back, so they stand
    upright with red on the left and green on the right; the mark then turns into place,
    the word comes in beside it, and the cover fades off the page. The global reduced-motion
    rule stops all of it, and the component does not render under that preference. */
 
 .cover {
-  --opening-length: calc(var(--motion-data) * 5);
+  --opening-length: calc(var(--motion-data) * 10);
 
   position: fixed;
   inset: 0;
@@ -164,7 +164,7 @@
 
 @keyframes cover-off {
   0%,
-  82% {
+  88% {
     opacity: 1;
   }
   100% {
