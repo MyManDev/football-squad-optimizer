@@ -229,9 +229,6 @@ export function LeagueEntryPage({
       {/* One team on its own, by its number. A page that needs a league asks for one only. */}
       <form onSubmit={submitEntry} className={`${styles.form} ${styles.entryForm}`}>
         <label htmlFor="entry-id">{copy.entryLabel}</label>
-        <p id="entry-id-hint" className={styles.hint}>
-          {copy.entryHint}
-        </p>
         <input
           id="entry-id"
           name="entryId"
@@ -244,7 +241,7 @@ export function LeagueEntryPage({
             setEntryInvalid(false);
           }}
           aria-invalid={entryInvalid}
-          aria-describedby="entry-id-hint entry-id-status"
+          aria-describedby="entry-id-status"
         />
         <button type="submit" className={styles.secondary}>
           {copy.entrySubmit}

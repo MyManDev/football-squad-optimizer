@@ -134,7 +134,6 @@ async function typeLeague(page: Page, league: number) {
 /** The device's plan on the page: the real worker solved it, and its moves are named. */
 async function expectDevicePlan(page: Page) {
   await expect(page.locator("[data-device-state='done']")).toBeVisible({ timeout: 60_000 });
-  await expect(page.getByText(copy.leagueMembers.adviceComputedBadge)).toBeVisible();
   const names = new Map(TABLE.players.map((player) => [player.id, player.name]));
   for (const move of member.reference.moves) {
     await expect(page.getByText(names.get(move.in!)!).first()).toBeVisible();

@@ -33,6 +33,7 @@ export interface MemberLive {
 
 /** What a refresh reads the live points against: the member's week and the table. */
 interface Held {
+  identity: string;
   member: MemberWeek;
   table: DevicePlanDocument;
 }
@@ -59,6 +60,7 @@ export function useMemberLiveScore(
 ): MemberLive {
   const { tree } = useLeague();
   const capture = squad.source_snapshot_id ?? null;
+  const identity = JSON.stringify([squad.entry.entry_id, squad.season, squad.gameweek, capture]);
   // The reads and the calendar as this render has them, for reads that start later.
   const latest = {
     forwarder: dependencies.forwarder ?? siteForwarder,
@@ -70,10 +72,18 @@ export function useMemberLiveScore(
   useEffect(() => {
     sources.current = latest;
   });
-  const [state, setState] = useState<{ shown: MemberLiveScore | null; refreshing: boolean }>({
+  const [state, setState] = useState<{
+    identity: string;
+    shown: MemberLiveScore | null;
+    refreshing: boolean;
+  }>({
+    identity,
     shown: null,
     refreshing: false,
   });
+  if (state.identity !== identity) {
+    setState({ identity, shown: null, refreshing: false });
+  }
   const held = useRef<Held | null>(null);
   // The read in flight, the page's first or a refresh, ended when the page leaves.
   const reading = useRef<AbortController | null>(null);
@@ -81,12 +91,14 @@ export function useMemberLiveScore(
   const entryId = squad.entry.entry_id;
   const gameweek = squad.gameweek;
   useEffect(() => {
+    reading.current?.abort();
+    held.current = null;
     const read = new AbortController();
     reading.current = read;
     const { forwarder, loadTable } = sources.current;
     const first = async () => {
       const bundle = await forwarder.entryBundle(entryId, gameweek, { signal: read.signal });
-      if (!bundle.ok || bundle.document.current_week === null) return;
+      if (read.signal.aborted || !bundle.ok || bundle.document.current_week === null) return;
       const member = bundle.document.current_week;
       const [live, table] = await Promise.all([
         forwarder.liveWeek(member.gameweek, { signal: read.signal }),
@@ -96,18 +108,18 @@ export function useMemberLiveScore(
         ),
       ]);
       if (read.signal.aborted || !live.ok || table === null) return;
-      held.current = { member, table };
+      held.current = { identity, member, table };
       const shown = scored(live.document, held.current, sources.current.fixtures);
-      if (shown !== null) setState({ shown, refreshing: false });
+      if (shown !== null) setState({ identity, shown, refreshing: false });
     };
     // The client answers every failure as a refusal; anything else also shows nothing.
     first().catch(() => undefined);
     return () => read.abort();
-  }, [entryId, gameweek, capture]);
+  }, [entryId, gameweek, capture, identity]);
 
   const refresh = useCallback(() => {
     const inputs = held.current;
-    if (inputs === null) return;
+    if (inputs === null || inputs.identity !== identity) return;
     reading.current?.abort();
     const read = new AbortController();
     reading.current = read;
@@ -119,13 +131,18 @@ export function useMemberLiveScore(
         if (read.signal.aborted) return;
         // A refresh the source does not answer leaves no card, as the first read does.
         setState({
+          identity,
           shown: live?.ok ? scored(live.document, inputs, sources.current.fixtures) : null,
           refreshing: false,
         });
       });
-  }, []);
+  }, [identity]);
 
   useEffect(() => () => reading.current?.abort(), []);
 
-  return { shown: state.shown, refreshing: state.refreshing, refresh };
+  return {
+    shown: state.identity === identity ? state.shown : null,
+    refreshing: state.identity === identity && state.refreshing,
+    refresh,
+  };
 }

@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { mockEntrySquadEnvelopes } from "../../../fixtures/league";
@@ -222,3 +222,38 @@ describe("refresh", () => {
     await waitFor(() => expect(container).toBeEmptyDOMElement());
   });
 });
+
+it.each(["entry", "capture"] as const)(
+  "drops the previous score and ignores its pending refresh when the %s changes",
+  async (changed) => {
+    const forwarder = forwarderAnswering(okBundle(), okLive("in_progress"));
+    const dependencies = { forwarder, loadTable: tableLoader() };
+    const draw = (squad: typeof SQUAD) => (
+      <LanguageProvider initialLanguage="tr">
+        {withLeague(
+          <MemberLiveWeek squad={squad} fixtures={CALENDAR} dependencies={dependencies} />,
+        )}
+      </LanguageProvider>
+    );
+    const view = render(draw(SQUAD));
+    await screen.findByText("Bonus bekleniyor");
+    let finishRefresh!: (value: Awaited<ReturnType<ForwarderClient["liveWeek"]>>) => void;
+    forwarder.liveWeek.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishRefresh = resolve;
+        }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Yenile" }));
+    forwarder.entryBundle.mockResolvedValueOnce({ ok: false, reason: "upstream_unavailable" });
+    const next =
+      changed === "entry"
+        ? { ...SQUAD, entry: { ...SQUAD.entry, entry_id: ENTRY + 1 } }
+        : { ...SQUAD, source_snapshot_id: CAPTURE + "-next" };
+    view.rerender(draw(next));
+    expect(view.container).toBeEmptyDOMElement();
+    await act(async () => finishRefresh(okLive("finished")));
+    expect(view.container).toBeEmptyDOMElement();
+    expect(forwarder.entryBundle).toHaveBeenCalledTimes(2);
+  },
+);

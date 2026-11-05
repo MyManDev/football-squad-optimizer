@@ -16,7 +16,7 @@ import { forwarder } from "../forwarder/client";
 import type { FplStandingRow } from "../forwarder/documents";
 import { MemberLiveWeek } from "../live/MemberLiveWeek";
 import type { MemberLiveDependencies } from "../live/useMemberLiveScore";
-import { AdviceDecision, AdviceStamp, PlanLineup } from "../pages/MemberAdviceCard";
+import { AdviceDecision, PlanLineup } from "../pages/MemberAdviceCard";
 import { MemberPageSkeleton } from "../pages/MemberPageSkeleton";
 import { MemberSquad } from "../pages/MemberSquad";
 import type { ShownAdvice } from "../pages/memberPageTypes";
@@ -195,18 +195,14 @@ export function ForwardedMemberPage({
 function deviceLine(
   copy: ReturnType<typeof useLanguage>["messages"]["leagueMembers"],
   state: ReturnType<typeof useDevicePlan>["state"],
-  locale: string,
 ): string {
   switch (state.phase) {
     case "idle":
     case "loading":
-      return copy.deviceLoading;
     case "solving":
       return copy.deviceSolving;
     case "done":
-      return copy.deviceDone(
-        new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(state.seconds),
-      );
+      return "";
     case "refused":
       return copy.deviceRefused;
     default:
@@ -228,7 +224,7 @@ export function ForwardedMemberView({
   fixtures: FixturesPayload | null;
   dependencies?: ForwardedMemberDependencies;
 }) {
-  const { language, locale, messages } = useLanguage();
+  const { language, messages } = useLanguage();
   const copy = messages.leagueMembers;
   const view = squad.payload;
   const now = useMinuteClock(dependencies.clock);
@@ -252,9 +248,7 @@ export function ForwardedMemberView({
     if (!closed && available && state.phase === "idle") run();
   }, [closed, available, state.phase, run]);
   const shown: ShownAdvice | null =
-    state.phase === "done"
-      ? { envelope: state.envelope, origin: "computed", source: "device" }
-      : null;
+    state.phase === "done" ? { envelope: state.envelope, origin: "computed" } : null;
   const plan = shown?.envelope.payload ?? null;
   const codes = useMemo(() => clubCodesFromFixtures(fixtures), [fixtures]);
   const onPitch = squadOnPitch(plan, view);
@@ -281,18 +275,21 @@ export function ForwardedMemberView({
           ) : null}
         </>
       ) : (
-        <section aria-labelledby="entry-advice-title" className={page.adviceSection}>
+        <section
+          aria-labelledby="entry-advice-title"
+          className={page.adviceSection}
+          data-device-state={state.phase}
+        >
           <div className={page.decision} data-mark="decision">
             <div className={page.headingRow}>
               <div className={page.headingText}>
                 <h2 className={page.decisionTitle} id="entry-advice-title">
                   {copy.decisionTitle}
                 </h2>
-                <p className={page.echo} aria-live="polite" data-device-state={state.phase}>
-                  {available ? deviceLine(copy, state, locale) : copy.deviceFailed}
+                <p className={page.echo} aria-live="polite">
+                  {available ? deviceLine(copy, state) : copy.deviceFailed}
                 </p>
               </div>
-              {shown ? <AdviceStamp shown={shown} /> : null}
             </div>
             {shown ? (
               <AdviceDecision shown={shown} squad={squad} fixtures={fixtures} />

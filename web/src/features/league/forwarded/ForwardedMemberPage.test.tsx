@@ -221,7 +221,9 @@ describe.each(["tr", "en"] as const)("a team through the forwarder in %s", (lang
     const solver = new CannedSolver();
     open(language, `/entry/${ENTRY}`, { device: { createSolver: () => solver } });
     expect(await screen.findByRole("heading", { name: "Synthetic XI", level: 1 })).toBeVisible();
-    expect(await screen.findByText(copy.adviceComputedBadge)).toBeInTheDocument();
+    await waitFor(() =>
+      expect(document.querySelector('[data-device-state="done"]')).not.toBeNull(),
+    );
     // The transfers the server's reference names, by the names the table gives them.
     const names = new Map(TABLE.players.map((player) => [player.id, player.name]));
     for (const move of member.reference.moves) {
@@ -266,7 +268,9 @@ describe.each(["tr", "en"] as const)("a team through the forwarder in %s", (lang
       "href",
       "/league/314",
     );
-    expect(await screen.findByText(copy.adviceComputedBadge)).toBeInTheDocument();
+    await waitFor(() =>
+      expect(document.querySelector('[data-device-state="done"]')).not.toBeNull(),
+    );
   });
 
   it("says the plan cannot be computed when the bundle holds another week's picks", async () => {
@@ -305,7 +309,9 @@ describe.each(["tr", "en"] as const)("a team through the forwarder in %s", (lang
     expect(await screen.findByText(words.teamUnavailable)).toBeInTheDocument();
     down = false;
     await userEvent.setup().click(screen.getByRole("button", { name: words.retry }));
-    expect(await screen.findByText(copy.adviceComputedBadge)).toBeInTheDocument();
+    await waitFor(() =>
+      expect(document.querySelector('[data-device-state="done"]')).not.toBeNull(),
+    );
   });
 
   it("refuses an address that is not a team number", async () => {
