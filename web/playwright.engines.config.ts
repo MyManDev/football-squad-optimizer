@@ -13,6 +13,8 @@ export default defineConfig({
     "**/fixtures.spec.ts",
     "**/navigation-viewport.spec.ts",
     "**/player-details.spec.ts",
+    "**/forwarded-league.spec.ts",
+    "**/member-live-score.spec.ts",
   ],
   projects: [
     { name: "chromium", use: { ...devices["Desktop Chrome"] } },

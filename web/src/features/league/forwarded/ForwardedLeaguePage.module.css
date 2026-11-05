@@ -1,0 +1,121 @@
+/*
+ * A forwarded league's standings: the league's name, then the table as the page's one focal
+ * point, drawn as the published league table draws its rows. The table never scrolls
+ * sideways: the team cell narrows and wraps.
+ */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 28px;
+  overflow-wrap: anywhere;
+}
+
+.table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+
+.table th,
+.table td {
+  padding: 0 var(--space-2);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.table th:first-child,
+.table td:first-child {
+  padding-left: var(--space-3);
+}
+
+.table th:last-child,
+.table td:last-child {
+  padding-right: var(--space-3);
+}
+
+.table thead th {
+  height: 32px;
+  border-bottom: 1px solid var(--color-text-muted);
+  color: var(--color-text-faint);
+  font-size: var(--step--2);
+  font-weight: 400;
+  line-height: 16px;
+}
+
+.table tbody tr {
+  border-bottom: 1px solid var(--color-line);
+}
+
+.table tbody td {
+  height: 44px;
+  padding-block: 2px;
+}
+
+th.rank {
+  width: 64px;
+}
+
+th.total {
+  width: 88px;
+}
+
+.total {
+  text-align: right;
+}
+
+.table th.total {
+  text-align: right;
+}
+
+.teamCell {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.teamName {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.manager {
+  color: var(--color-text-muted);
+  font-size: var(--step--1);
+  overflow-wrap: anywhere;
+}
+
+.more {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-2);
+}
+
+.note {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.moreButton {
+  min-height: 44px;
+  padding: var(--space-2) var(--space-5);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-s);
+  color: inherit;
+  background: var(--color-surface);
+  font: inherit;
+  cursor: pointer;
+}
+
+.moreButton:disabled {
+  cursor: wait;
+}

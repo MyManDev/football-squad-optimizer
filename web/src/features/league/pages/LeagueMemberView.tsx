@@ -19,6 +19,7 @@ import { deviceEndedWithoutPlan } from "../device/useDevicePlan";
 import { isDevicePlanEntry } from "../device/types";
 import { advisedFifteen } from "../device/whatIf";
 import { WhatIfPanel } from "../device/WhatIfPanel";
+import { MemberLiveWeek } from "../live/MemberLiveWeek";
 import { whatIfBasis } from "../device/whatIfDraft";
 import { DecisionPreferencesPanel } from "../advice/DecisionPreferencesPanel";
 import { EVIDENCE_COPY } from "../advice/evidenceCopy";
@@ -122,6 +123,7 @@ function LeagueMemberContent({
   computePending = false,
   deviceDependencies,
   whatIfDependencies,
+  liveDependencies,
   deviceRivals,
   rivalSquad = null,
   duelSquad = null,
@@ -470,6 +472,12 @@ function LeagueMemberContent({
           <p className={styles.deadlineNotice} role="status" data-testid="deadline-passed">
             {COMPUTE_COPY[language].deadlinePassedTitle}
           </p>
+        ) : null}
+        {/* The week being played (#1008), beside the notice that its deadline has passed. A
+            closed week leaves the plan's settings out, so the card adds nothing to the open
+            week's page. It needs the calendar for each club's id. */}
+        {deadlinePassed !== null && fixtures !== null && view.league_id === leagueId ? (
+          <MemberLiveWeek squad={view} fixtures={fixtures} dependencies={liveDependencies} />
         ) : null}
 
         {/* What the member's last finished week came to, before what this week decides. */}

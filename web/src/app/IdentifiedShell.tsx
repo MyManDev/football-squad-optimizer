@@ -2,7 +2,7 @@ import { useCallback, useMemo, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router";
 
 import { PageShell } from "../design/components/PageShell";
-import type { ShellIdentity } from "../design/shell/nav";
+import { NO_IDENTITY, type ShellIdentity } from "../design/shell/nav";
 import { useLeagueIdentity } from "../features/league/identity/useLeagueIdentity";
 import { useLanguage } from "../i18n/context";
 import { FIND_YOURSELF, leagueIdInAddress, membersAddress } from "../lib/leagueAddresses";
@@ -17,21 +17,27 @@ export function IdentifiedShell({ children }: { children: ReactNode }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { leagueId, member, change } = useLeagueIdentity(leagueIdInAddress(location.pathname));
+  const standalone = location.pathname.startsWith("/entry/");
 
   const identity = useMemo<ShellIdentity>(
-    () => ({
-      leagueId,
-      member:
-        member === null
-          ? null
-          : {
-              entryId: member.entryId,
-              league: member.leagueName ?? messages.leagueMembers.leagueNumber(member.leagueId),
-              name: member.managerName ?? member.teamName ?? messages.leagueMembers.unknownMember,
-              team: member.managerName !== null ? member.teamName : null,
-            },
-    }),
-    [leagueId, member, messages],
+    () =>
+      standalone
+        ? NO_IDENTITY
+        : {
+            leagueId,
+            member:
+              member === null
+                ? null
+                : {
+                    entryId: member.entryId,
+                    league:
+                      member.leagueName ?? messages.leagueMembers.leagueNumber(member.leagueId),
+                    name:
+                      member.managerName ?? member.teamName ?? messages.leagueMembers.unknownMember,
+                    team: member.managerName !== null ? member.teamName : null,
+                  },
+          },
+    [leagueId, member, messages, standalone],
   );
 
   // Değiştir drops the claim and asks again in the same league; the next pick opens that

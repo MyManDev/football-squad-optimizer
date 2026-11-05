@@ -5,21 +5,19 @@
 [![CI](https://github.com/MyManDev/football-squad-optimizer/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/MyManDev/football-squad-optimizer/actions/workflows/ci.yml)
 [![MIT license](https://img.shields.io/badge/license-MIT-17402a)](LICENSE)
 
-SquadOpt is the app we're building for our Fantasy Premier League mini-league.
-It helps us plan the next gameweek, compare transfers and keep up with the league.
+SquadOpt helps Fantasy Premier League managers plan the next gameweek, compare transfers
+and keep up with their team.
 
-**[Open SquadOpt](https://squadopt.mymandev.com)**: enter league **352490**, then choose your name.
-
-For now, the site serves this one league. We plan to open it to other FPL managers and
-classic leagues as well.
+**[Open SquadOpt](https://squadopt.mymandev.com)**: enter your classic league or FPL team number.
+Our mini-league is **352490**.
 
 The member page puts your squad on the pitch, with transfer suggestions, captain choices
-and upcoming fixtures. You can follow the league race and save a squad card to share.
-Supported one-week plans can also be calculated on your own device.
+and upcoming fixtures. One-week plans run on your device. After the deadline, the live score
+includes captain points, automatic substitutions and transfer hits.
 
 The app is built with Python, React and TypeScript, with HiGHS for device calculations.
-The [product roadmap](docs/product/roadmap.md#current-position) covers the current limits
-and the work towards wider access.
+See the [web guide](web/README.md) for how it works and the
+[product roadmap](docs/product/roadmap.md#current-position) for the project record.
 
 ## Run locally
 
