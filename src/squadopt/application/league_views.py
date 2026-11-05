@@ -97,6 +97,7 @@ from squadopt.application.entries import (
 )
 from squadopt.application.manager_words import MANAGERS_WORD_FILE, ManagerWords
 from squadopt.application.mode_selection import (
+    MODE_SLUGS,
     ModeSelectionError,
     choose_rival,
     rival_squad_from_picks,
@@ -1849,7 +1850,7 @@ def build_league_views(
                 *(
                     path
                     for path in member_directory.glob(f"*/{COMPUTED_WINDOW}.json")
-                    if path.parent.name != COMPUTED_MODE
+                    if path.parent.name not in MODE_SLUGS.values()
                 ),
             }
             for stale_file in sorted(candidates):
