@@ -110,10 +110,10 @@ SCOPES_NOT_THE_DECISION: Final = frozenset({"other_competition", "past"})
 #: A not-applied absence or doubt statement labelled ``upcoming_premier_league`` on a page
 #: whose publication the reader verifies to an instant at or before the decision capture,
 #: when the decision capture's calendar, read as the reader reads it, gives the club one
-#: dated target-gameweek fixture kicking off after the capture and no undated fixture that
-#: may come before it, and the club's first dated league fixture after that instant kicks
-#: off before the target fixture: like ``past``, its words name a match that is not the
-#: decision's (``next_match_before_target``).
+#: dated target-gameweek fixture kicking off after the capture, no other club fixture at the
+#: same kickoff and no undated fixture that may come before it, and the club's first dated
+#: league fixture after that instant kicks off before the target fixture: like ``past``, its
+#: words name a match that is not the decision's (``next_match_before_target``).
 NEXT_MATCH_BEFORE_TARGET: Final = "next_match_before_target"
 
 #: Why a not-applied absence or doubt statement is left out of ``lost_unapplied``, each
@@ -410,22 +410,26 @@ def next_match_before_target(
     Only for a statement labelled ``upcoming_premier_league`` on a page whose publication the
     reader verifies to an instant at or before the decision capture. The decision capture's
     calendar is read as the reader reads it (``basis``): it must give the club exactly one
-    dated fixture in the target gameweek, kicking off after the capture, and no undated
-    fixture that may come before it (one in no gameweek or in a gameweek up to the target),
-    and the club's first dated league fixture after the publication instant must kick off
-    before that target fixture. The earlier match may kick off before or after the capture.
+    dated fixture in the target gameweek, kicking off after the capture, no other club fixture
+    at the same kickoff and no undated fixture that may come before it (one in no gameweek or
+    in a gameweek up to the target), and the club's first dated league fixture after the
+    publication instant must kick off before that target fixture. The earlier match may kick
+    off before or after the capture.
 
     Both calendar questions are put to the rule's own binding, ``claim_targets_next_fixture``,
     which takes the club's first dated fixture after a publication instant. Asked at the last
-    second before the target kickoff, it binds exactly when the calendar has that shape. It is
-    not asked at the capture instant for this, because a club match between the capture and
-    the target makes it bind nothing there, and that calendar qualifies. Asked as the reader
-    asked it, at the statement's own instant with the capture as the cutoff, it does not bind
-    the statement, so the first dated club fixture after publication is an earlier one.
+    second before the target kickoff, with the cutoff there too, it binds exactly when the
+    club has one dated target-gameweek fixture, no other club fixture at the same kickoff and
+    no undated fixture that may come before it; the target kickoff and the publication instant
+    are compared with the capture directly. It is not asked at the capture instant for this,
+    because a club match between the capture and the target makes it bind nothing there, and
+    that calendar qualifies. Asked as the reader asked it, at the statement's own instant with
+    the capture as the cutoff, it does not bind the statement, so the first dated club fixture
+    after publication is an earlier one.
 
-    An undated, blank or double target week, a target fixture that kicked off by the capture
-    and a page published after the capture do not qualify: each stays a loss under its own
-    cause.
+    An undated, blank or double target week, another club fixture at the target kickoff, a
+    target fixture that kicked off by the capture and a page published after the capture do
+    not qualify: each stays a loss under its own cause.
     """
 
     if (
