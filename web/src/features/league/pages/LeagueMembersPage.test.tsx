@@ -69,29 +69,27 @@ describe("league member points", () => {
       );
       const copy = MESSAGES[language].leagueMembers;
       // Movement is the second column, after the rank: an arrow and the places, '=' for
-      // no change, a dash for an unknown previous rank. Each cell's words are its name.
+      // no change, a dash for an unknown previous rank. Each cell's words are its name, and
+      // the dash names its own cell.
       const cells = [...container.querySelectorAll("tbody tr")].map(
         (row) => row.querySelectorAll("td")[1]!,
       );
       const words = [
-        copy.noPreviousRank,
+        cells[0]!.querySelector("[data-movement]")!.textContent!,
         copy.movementLabel("same", 0),
         copy.movementLabel("up", 2),
         copy.movementLabel("down", 3),
       ];
       expect(cells).toHaveLength(words.length);
       cells.forEach((cell, index) => expect(cell).toHaveAccessibleName(words[index]));
-      expect(cells.map((cell) => cell.querySelector('[aria-hidden="true"]')?.textContent)).toEqual([
+      expect(cells.map((cell) => cell.querySelector("[data-movement]")?.textContent)).toEqual([
         "—",
         "=",
         "2",
         "3",
       ]);
       expect(cells[2]!.querySelector("svg path")).not.toBeNull();
-      expect(screen.getByText(copy.movementNote)).toBeInTheDocument();
       for (const text of [
-        copy.noPreviousRank,
-        copy.movementNote,
         copy.movementLabel("same", 0),
         copy.movementLabel("up", 2),
         copy.movementLabel("down", 3),
@@ -168,21 +166,6 @@ describe("league member points", () => {
     const cells = screen.getAllByRole("row").slice(1);
     expect(cells[0].textContent).not.toContain("78");
     expect(cells[0].textContent).toContain("—");
-  });
-
-  it("says why the column is empty rather than leaving it blank", () => {
-    // A column of dashes with no explanation reads as "everyone scored nothing".
-    const noWeek = membersWith({
-      scored_gameweek: null,
-      members: mockLeagueMembersEnvelope.payload.members.map((member) => ({
-        ...member,
-        gameweek_points: null,
-        total_points: null,
-      })),
-    });
-    renderPage(<LeagueMembersView envelope={noWeek} />);
-
-    expect(screen.getByText(/Henüz kesinleşmiş oyun haftası yok/)).toBeInTheDocument();
   });
 
   it("shows a measured zero as zero, and an unproven score as a dash", () => {
@@ -289,31 +272,6 @@ describe("league member surfaces", () => {
     },
   );
 
-  it.each(["tr", "en"] as const)(
-    "names the column's basis, because it is not the one the FPL site shows, in %s",
-    (language) => {
-      const copy = MESSAGES[language];
-      renderPage(<LeagueMembersView envelope={mockLeagueMembersEnvelope} />, undefined, language);
-
-      expect(screen.getByText(copy.leagueMembers.gameweekNetNote)).toBeInTheDocument();
-    },
-  );
-
-  it("keeps the basis note when no row of ours is in the column", () => {
-    // The basis belongs to the column, not to our presence in it: a member reading only
-    // other members still sees numbers that differ from the ones on the FPL site.
-    renderPage(
-      <LeagueMembersView
-        envelope={membersWith({
-          members: mockLeagueMembersEnvelope.payload.members.filter(
-            (member) => member.member_kind !== "system",
-          ),
-        })}
-      />,
-    );
-    expect(screen.getByText(MESSAGES.tr.leagueMembers.gameweekNetNote)).toBeInTheDocument();
-  });
-
   it("excludes a published virtual system row from both the visitor list and its count", () => {
     renderPage(<LeagueMembersView envelope={mockLeagueMembersEnvelope} />);
 
@@ -324,14 +282,15 @@ describe("league member surfaces", () => {
     expect(screen.queryByText(/SquadOpt · /)).not.toBeInTheDocument();
   });
 
-  it("renders member standings, the public-data notice and an example badge", () => {
+  it("renders member standings, with no example badge and no notice under the table", () => {
     renderPage(<LeagueMembersView envelope={mockLeagueMembersEnvelope} />);
 
     expect(
       screen.getByRole("heading", { level: 1, name: "SquadOpt Classic League" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("örnek veri")).toBeInTheDocument();
-    expect(screen.getByText(/son tarihinden sonra herkese açık FPL verisidir/)).toBeInTheDocument();
+    expect(screen.queryByText("örnek veri")).toBeNull();
+    expect(screen.queryByText(/herkese açık FPL verisidir/)).toBeNull();
+    expect(screen.queryByText("Tablo hakkında")).toBeNull();
     expect(screen.getAllByRole("row")).toHaveLength(11);
     expect(screen.getByRole("link", { name: "Deniz Aral" })).toHaveAttribute(
       "href",
@@ -340,7 +299,7 @@ describe("league member surfaces", () => {
     expect(screen.queryByRole("link", { name: "SquadOpt" })).not.toBeInTheDocument();
   });
 
-  it("shows point-cost labels and no probability percentage on member advice", () => {
+  it("shows the chosen plan and no probability percentage on member advice", () => {
     const entryId = 35249001;
     const advice = mockEntryAdviceEnvelope(entryId, "ortak-koru", 1);
     const { container } = renderPage(
@@ -352,23 +311,32 @@ describe("league member surfaces", () => {
       `/league/352490/members/${entryId}?mode=ortak-koru&window=1`,
     );
 
-    expect(screen.getAllByText("örnek veri").length).toBeGreaterThan(0);
     expect(screen.getByDisplayValue("ortak-koru")).toBeChecked();
     expect(screen.getByRole("radio", { name: /1 hafta/ })).toBeChecked();
-    expect(screen.getAllByText(/beklenen puan maliyeti/).length).toBeGreaterThan(0);
-    expect(screen.getByText(/Önerin senin kadrondan/)).toBeInTheDocument();
-    const transferCard = screen
-      .getByRole("heading", { name: "Ücretsiz transfer hakkı" })
-      .closest("section");
-    expect(transferCard).toHaveTextContent("Bilinmiyor");
-    expect(transferCard).not.toHaveTextContent("banka edilmiş ikinci transfer");
     // The member page carries the squad and the plan; the public-data notices left it.
     expect(screen.queryByText(/Satın alma fiyatları/)).toBeNull();
     expect(screen.queryByText(/herkese açık FPL verisidir/)).toBeNull();
     expect(container.textContent).not.toContain("%");
+    cleanup();
+
+    // The free transfers are on the chips page of their own, and this document does not
+    // know them: no card, and no word in place of the count.
+    const chips = renderPage(
+      <LeagueMemberView
+        index={mockEntryAdviceIndex(entryId).payload}
+        squad={mockEntrySquadEnvelopes[entryId]!}
+        advice={advice}
+        tool="chips"
+      />,
+      `/league/352490/members/${entryId}/chips?mode=ortak-koru&window=1`,
+    );
+    expect(screen.queryByRole("heading", { name: "Ücretsiz transfer hakkı" })).toBeNull();
+    expect(screen.getByRole("heading", { name: "Çipler" })).toBeInTheDocument();
+    expect(chips.container).not.toHaveTextContent("banka edilmiş ikinci transfer");
+    expect(chips.container.textContent).not.toContain("%");
   });
 
-  it("prices the competitive plan against a real rival, and saf-puan carries no price line", () => {
+  it("prices the competitive plan, and saf-puan carries no price line", () => {
     const entryId = 35249001;
     renderPage(
       <LeagueMemberView
@@ -379,7 +347,6 @@ describe("league member surfaces", () => {
       `/league/352490/members/${entryId}?mode=ortak-koru`,
     );
     expect(screen.getByText(/beklenen puandan vazgeçiyor/)).toBeInTheDocument();
-    expect(screen.getByText(/kadrosuna göre fiyatlandı/)).toBeInTheDocument();
 
     cleanup();
     renderPage(
@@ -405,11 +372,6 @@ describe("league member surfaces", () => {
     );
 
     expect(screen.getByText("Bu üye için kadro bulunmuyor.")).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        "Bu kayıt, transfersiz bir öneri olduğunu doğrulayacak kadar plan bilgisi içermiyor.",
-      ),
-    ).toBeInTheDocument();
     expect(
       screen.queryByRole("list", { name: "Pozisyona göre ilk on bir" }),
     ).not.toBeInTheDocument();
@@ -466,22 +428,5 @@ describe.each(["tr", "en"] as const)("published overlap bounds in %s", (language
     expect(
       screen.queryByText((text) => text.includes(copy.overlapLine(5))),
     ).not.toBeInTheDocument();
-    const paragraph = screen.getByText(
-      language === "tr" ? /istenen ortak oyuncu sınırı 5/ : /requested overlap bound 5/,
-    );
-    expect(paragraph).toHaveTextContent(
-      language === "tr" ? "uygulanan ortak oyuncu sınırı 5" : "applied overlap bound 5",
-    );
-    expect(paragraph).not.toHaveTextContent(
-      /reached|reachable|ulaş|still came out ahead|önde çıktı/i,
-    );
-    if (kind === "within_free_transfers")
-      expect(paragraph).toHaveTextContent(
-        language === "tr" ? "transfer cezası 0 puan" : "transfer penalties 0 points",
-      );
-    // The hits are the plan's own, whether a publish or the member's device solved it.
-    expect(paragraph).not.toHaveTextContent(/published|yayımlanan/i);
-    if (solver === "FEASIBLE")
-      expect(paragraph).toHaveTextContent(language === "tr" ? "maliyet en fazla" : "cost at most");
   });
 });

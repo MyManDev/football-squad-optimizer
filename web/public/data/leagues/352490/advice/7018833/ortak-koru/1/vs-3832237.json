@@ -1,81 +1,43 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-10-23T12:40:33Z",
+  "generated_at_utc": "2026-11-04T06:28:27Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
-    "gameweek": 8,
+    "gameweek": 10,
     "entry_id": 7018833,
     "league_id": 352490,
     "mode": "ortak-koru",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20261023T111647Z-a2cd55fde426",
+    "source_snapshot_id": "fpl-live-20261104T020046Z-eaadfd3e9143",
     "moves": [
       {
-        "move_id": "gw08-1",
+        "move_id": "gw10-1",
         "player_out": {
-          "player_id": 97032,
-          "name": "Virgil van Dijk",
-          "short_name": "Dijk",
+          "player_id": 209036,
+          "name": "Marc Gu\u00e9hi",
+          "short_name": "Gu\u00e9hi",
           "position": "DEF",
-          "team": "Liverpool"
+          "team": "Man City"
         },
         "player_in": {
           "player_id": 226597,
           "name": "Gabriel dos Santos Magalh\u00e3es",
-          "short_name": "Magalh\u00e3es",
+          "short_name": "Gabriel",
           "position": "DEF",
           "team": "Arsenal"
         },
-        "expected_points_delta": 0.5339465035483499,
+        "expected_points_delta": 3.0820478079929714,
         "reason_code": "mode_tradeoff"
       },
       {
-        "move_id": "gw08-2",
+        "move_id": "gw10-2",
         "player_out": {
-          "player_id": 204936,
-          "name": "Gianluigi Donnarumma",
-          "short_name": "Donnarumma",
-          "position": "GK",
-          "team": "Man City"
-        },
-        "player_in": {
-          "player_id": 154561,
-          "name": "David Raya Mart\u00edn",
-          "short_name": "Mart\u00edn",
-          "position": "GK",
-          "team": "Arsenal"
-        },
-        "expected_points_delta": 0.6580415605526326,
-        "reason_code": "mode_tradeoff"
-      },
-      {
-        "move_id": "gw08-3",
-        "player_out": {
-          "player_id": 466525,
-          "name": "Anton Stach",
-          "short_name": "Stach",
-          "position": "MID",
-          "team": "Leeds"
-        },
-        "player_in": {
-          "player_id": 84450,
-          "name": "Granit Xhaka",
-          "short_name": "Xhaka",
-          "position": "MID",
-          "team": "Sunderland"
-        },
-        "expected_points_delta": -0.10688164642255771,
-        "reason_code": "mode_tradeoff"
-      },
-      {
-        "move_id": "gw08-4",
-        "player_out": {
-          "player_id": 475168,
-          "name": "Jo\u00e3o Pedro Junqueira de Jesus",
-          "short_name": "Jesus",
+          "player_id": 216646,
+          "name": "Yoane Wissa",
+          "short_name": "Wissa",
           "position": "FWD",
-          "team": "Chelsea"
+          "team": "Newcastle"
         },
         "player_in": {
           "player_id": 169432,
@@ -84,11 +46,49 @@
           "position": "FWD",
           "team": "Hull City"
         },
-        "expected_points_delta": -0.7305752671585068,
+        "expected_points_delta": 1.0738215806117424,
         "reason_code": "mode_tradeoff"
       },
       {
-        "move_id": "gw08-5",
+        "move_id": "gw10-3",
+        "player_out": {
+          "player_id": 244850,
+          "name": "Morgan Rogers",
+          "short_name": "Rogers",
+          "position": "MID",
+          "team": "Chelsea"
+        },
+        "player_in": {
+          "player_id": 84450,
+          "name": "Granit Xhaka",
+          "short_name": "Xhaka",
+          "position": "MID",
+          "team": "Sunderland"
+        },
+        "expected_points_delta": -1.200421782398557,
+        "reason_code": "mode_tradeoff"
+      },
+      {
+        "move_id": "gw10-4",
+        "player_out": {
+          "player_id": 475168,
+          "name": "Jo\u00e3o Pedro Junqueira de Jesus",
+          "short_name": "Jo\u00e3o Pedro",
+          "position": "FWD",
+          "team": "Chelsea"
+        },
+        "player_in": {
+          "player_id": 502500,
+          "name": "Igor Thiago Nascimento Rodrigues",
+          "short_name": "Thiago",
+          "position": "FWD",
+          "team": "Brentford"
+        },
+        "expected_points_delta": 1.635817854960628,
+        "reason_code": "mode_tradeoff"
+      },
+      {
+        "move_id": "gw10-5",
         "player_out": {
           "player_id": 494595,
           "name": "Florian Wirtz",
@@ -103,82 +103,66 @@
           "position": "MID",
           "team": "Man Utd"
         },
-        "expected_points_delta": 0.7891150524384969,
+        "expected_points_delta": 0.7679664897837597,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 1.143646202958415,
-    "expected_points_cost": 1.6212688166811304,
+    "expected_gain_vs_hold": 5.359231950950544,
+    "expected_points_cost": 1.9286240678753543,
     "rival_label": "entry-3832237",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
     "wall_clock_stopped_the_search": false,
-    "expected_own_points": 54.25021845152868,
+    "expected_own_points": 53.871882269272554,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
       "short_name": "Haaland",
       "position": "FWD",
       "team": "Man City",
-      "expected_points": 8.11765453618748
+      "expected_points": 7.950379595632534
     },
     "vice_captain": {
-      "player_id": 446008,
-      "name": "Bryan Mbeumo",
-      "short_name": "Mbeumo",
-      "position": "MID",
-      "team": "Man Utd",
-      "expected_points": 4.6615011141503295
+      "player_id": 226597,
+      "name": "Gabriel dos Santos Magalh\u00e3es",
+      "short_name": "Gabriel",
+      "position": "DEF",
+      "team": "Arsenal",
+      "expected_points": 4.994433716715129
     },
     "starting_xi": [
       {
-        "player_id": 154561,
-        "name": "David Raya Mart\u00edn",
-        "short_name": "Mart\u00edn",
+        "player_id": 489639,
+        "name": "Bart Verbruggen",
+        "short_name": "Verbruggen",
         "position": "GK",
-        "team": "Arsenal",
-        "expected_points": 3.8753293988407767
+        "team": "Brighton",
+        "expected_points": 3.406491380255187
       },
       {
         "player_id": 226597,
         "name": "Gabriel dos Santos Magalh\u00e3es",
-        "short_name": "Magalh\u00e3es",
+        "short_name": "Gabriel",
         "position": "DEF",
         "team": "Arsenal",
-        "expected_points": 4.423923916856849
+        "expected_points": 4.994433716715129
       },
       {
         "player_id": 465730,
         "name": "Maxim De Cuyper",
-        "short_name": "Cuyper",
+        "short_name": "De Cuyper",
         "position": "DEF",
         "team": "Brighton",
-        "expected_points": 3.6085520469470964
+        "expected_points": 3.6846304929766673
       },
       {
-        "player_id": 209036,
-        "name": "Marc Gu\u00e9hi",
-        "short_name": "Gu\u00e9hi",
+        "player_id": 97032,
+        "name": "Virgil van Dijk",
+        "short_name": "Virgil",
         "position": "DEF",
-        "team": "Man City",
-        "expected_points": 3.393374652690792
-      },
-      {
-        "player_id": 446008,
-        "name": "Bryan Mbeumo",
-        "short_name": "Mbeumo",
-        "position": "MID",
-        "team": "Man Utd",
-        "expected_points": 4.6615011141503295
-      },
-      {
-        "player_id": 244850,
-        "name": "Morgan Rogers",
-        "short_name": "Rogers",
-        "position": "MID",
-        "team": "Chelsea",
-        "expected_points": 4.588260940007448
+        "team": "Liverpool",
+        "expected_points": 3.521560722659742
       },
       {
         "player_id": 204480,
@@ -186,15 +170,15 @@
         "short_name": "Rice",
         "position": "MID",
         "team": "Arsenal",
-        "expected_points": 4.381445465355306
+        "expected_points": 4.420798518903328
       },
       {
-        "player_id": 540324,
-        "name": "Mohamed Belloumi",
-        "short_name": "Belloumi",
+        "player_id": 446008,
+        "name": "Bryan Mbeumo",
+        "short_name": "Mbeumo",
         "position": "MID",
-        "team": "Hull City",
-        "expected_points": 3.1192405124554683
+        "team": "Man Utd",
+        "expected_points": 4.397598069519702
       },
       {
         "player_id": 84450,
@@ -202,7 +186,15 @@
         "short_name": "Xhaka",
         "position": "MID",
         "team": "Sunderland",
-        "expected_points": 2.9772999797493505
+        "expected_points": 3.0905203155170424
+      },
+      {
+        "player_id": 540324,
+        "name": "Mohamed Belloumi",
+        "short_name": "Belloumi",
+        "position": "MID",
+        "team": "Hull City",
+        "expected_points": 2.903231141495071
       },
       {
         "player_id": 223094,
@@ -210,7 +202,15 @@
         "short_name": "Haaland",
         "position": "FWD",
         "team": "Man City",
-        "expected_points": 8.11765453618748
+        "expected_points": 7.950379595632534
+      },
+      {
+        "player_id": 502500,
+        "name": "Igor Thiago Nascimento Rodrigues",
+        "short_name": "Thiago",
+        "position": "FWD",
+        "team": "Brentford",
+        "expected_points": 4.296033773175558
       },
       {
         "player_id": 169432,
@@ -218,41 +218,41 @@
         "short_name": "McBurnie",
         "position": "FWD",
         "team": "Hull City",
-        "expected_points": 2.985981352100305
+        "expected_points": 3.2558249467900593
       }
     ],
     "bench": [
       {
-        "player_id": 489639,
-        "name": "Bart Verbruggen",
-        "short_name": "Verbruggen",
+        "player_id": 204936,
+        "name": "Gianluigi Donnarumma",
+        "short_name": "Donnarumma",
         "position": "GK",
-        "team": "Brighton",
-        "expected_points": 3.0938051044078216
+        "team": "Man City",
+        "expected_points": 2.8400791581437046
+      },
+      {
+        "player_id": 466525,
+        "name": "Anton Stach",
+        "short_name": "Stach",
+        "position": "MID",
+        "team": "Leeds",
+        "expected_points": 2.660215918214928
       },
       {
         "player_id": 231416,
         "name": "Ferdi Kad\u0131o\u011flu",
-        "short_name": "Kad\u0131o\u011flu",
+        "short_name": "F.Kad\u0131o\u011flu",
         "position": "DEF",
         "team": "Brighton",
-        "expected_points": 2.819532847858138
-      },
-      {
-        "player_id": 216646,
-        "name": "Yoane Wissa",
-        "short_name": "Wissa",
-        "position": "FWD",
-        "team": "Newcastle",
-        "expected_points": 2.800075748204037
+        "expected_points": 1.2013813693333657
       },
       {
         "player_id": 441164,
         "name": "Pedro Porro Sauceda",
-        "short_name": "Sauceda",
+        "short_name": "Pedro Porro",
         "position": "DEF",
         "team": "Spurs",
-        "expected_points": 0.0
+        "expected_points": 1.1140924942698274
       }
     ],
     "chip": null,
@@ -264,6 +264,7 @@
     "missing_fields": [],
     "squad_basis": "captured",
     "rival_entry_id": 3832237,
+    "expected_points_cost_ceiling": 1.9286240678753543,
     "overlap_count": 6,
     "transfer_cap": 5,
     "overlap_target": 9,
@@ -273,11 +274,12 @@
       "kind": "with_hits",
       "overlap_applied": 9,
       "transfer_hit_points": 12.0,
-      "expected_points_cost": 15.981994843662207
+      "expected_points_cost": 15.772385166596735,
+      "expected_points_cost_ceiling": 15.772385166596735
     },
-    "expected_gap_vs_rival": 18.648512072632116,
+    "expected_gap_vs_rival": 17.524053240912785,
     "captain_agreement": false,
-    "control_solver_status": "FEASIBLE",
-    "control_optimality_gap": 4.574999999999996
+    "control_solver_status": "OPTIMAL",
+    "control_optimality_gap": 0.0
   }
 }

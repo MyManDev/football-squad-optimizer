@@ -5,6 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import pytest
 from pandas.testing import assert_frame_equal
@@ -35,12 +36,18 @@ from squadopt.live import (
     read_season_rules,
 )
 from squadopt.live import transfers as live_transfers
-from squadopt.optimization import SolverStatus
+from squadopt.optimization import (
+    OptimizationConfig,
+    SolverStatus,
+    wall_clock_stopped_the_search,
+)
 from squadopt.planning import (
+    ChipAvailability,
     FirstWeekExclusion,
     FirstWeekOverlap,
     ProjectionHorizon,
     TransferPlanningValidationError,
+    TransferPlanResult,
 )
 
 
@@ -614,11 +621,16 @@ def test_live_repurchase_uses_new_basis_and_chip_restore(
     solve = live_transfers.optimize_transfer_plan
 
     def restricted(*args, **kwargs):
+        # A named chip's seeds pass their own squads through this seam too; every solve
+        # of the window is held to the same squads, so the seeds and the search agree.
         return solve(
             *args,
-            **kwargs,
-            fixed_week_squads={
-                w: held.squad_player_ids if w == 3 else alternate for w in horizon.target_gameweeks
+            **{
+                **kwargs,
+                "fixed_week_squads": {
+                    w: held.squad_player_ids if w == 3 else alternate
+                    for w in horizon.target_gameweeks
+                },
             },
         )
 
@@ -678,3 +690,193 @@ def test_acquisition_accounting_keeps_window_weight_and_user_constraints(tmp_pat
         assert week.selected_squad.loc[
             week.selected_squad.player_id.eq(chosen), "expected_points"
         ].item() == pytest.approx(original_points * (1 + weight / 100))
+
+
+def _crowded(horizon: ProjectionHorizon, extra: int = 200) -> ProjectionHorizon:
+    """The capture's horizon with a market of stronger players added at fixed prices.
+
+    The replay squad is weak beside them, so a Wildcard has much to gain and its search
+    much to look through: enough that two deterministic units stop it early, while the
+    plan without the chip, one move a week, is proved inside the same two units.
+    """
+
+    rng = np.random.default_rng(0)
+    positions = sorted(set(horizon.table.position))
+    rows = []
+    for index in range(extra):
+        price = int(rng.integers(40, 120))
+        quality = price / 20 + rng.normal(0, 1.0)
+        for gameweek in horizon.target_gameweeks:
+            rows.append(
+                {
+                    "gameweek": gameweek,
+                    "player_id": 900_000 + index,
+                    "name": f"Player {900_000 + index}",
+                    "team_id": f"T{index % 20}",
+                    "position": positions[index % len(positions)],
+                    "price_tenths": price,
+                    "expected_points": float(max(0.0, quality + rng.normal(0, 1.5))),
+                    "fixture_count": 1,
+                    "home_fixture_count": int(rng.integers(0, 2)),
+                }
+            )
+    table = pd.concat([horizon.table, pd.DataFrame(rows)], ignore_index=True)
+    return replace(horizon, table=table)
+
+
+@pytest.fixture(scope="module")
+def crowded_window(tmp_path_factory: pytest.TempPathFactory) -> tuple[object, ...]:
+    inputs, horizon, held, rules = _inputs(tmp_path_factory.mktemp("crowded"), tuple(range(2, 7)))
+    horizon = _crowded(horizon)
+    settings = OptimizationConfig(
+        solver_time_limit_seconds=600.0, solver_deterministic_time_limit=2.0
+    )
+    without, _ = plan_transfer_horizon(
+        inputs,
+        horizon,
+        held,
+        rules,
+        optimization=settings,
+        chips=ChipAvailability(),
+        linearization_level=2,
+    )
+    return inputs, horizon, held, rules, settings, without
+
+
+def _named(window: tuple[object, ...], chip: str) -> TransferPlanResult:
+    inputs, horizon, held, rules, settings, _without = window
+    plan, _ = plan_transfer_horizon(
+        inputs,
+        horizon,
+        held,
+        rules,
+        optimization=settings,
+        chips=ChipAvailability(available={chip: frozenset({2})}, forced={2: chip}),
+        linearization_level=2,
+    )
+    return plan
+
+
+@pytest.mark.parametrize("chip", ["wildcard", "bboost", "3xc", "freehit"])
+def test_a_named_chip_window_is_not_served_below_the_plan_without_it(crowded_window, chip):
+    """The GW9 Wildcard window: a stopped chip search was served below the chip-less plan.
+
+    Two deterministic units prove the five-week plan without the chip here. Without the
+    seeds they stopped the Wildcard and the Bench Boost searches on incumbents worth well
+    under half of it, as the live five-week Wildcard search stopped sixteen points below
+    its chip-less window. A Wildcard, a Bench Boost and a Triple Captain keep every squad
+    of that plan, so their window may not bring less. A Free Hit squad reverts the next
+    week, so it is held to its best seed: the chip-less moves made a week late after the
+    Free Hit, or the hold.
+    """
+
+    without = crowded_window[-1]
+    assert without.solver_status is SolverStatus.OPTIMAL
+    plan = _named(crowded_window, chip)
+    assert dict(plan.chips_played) == {2: chip}
+    if chip != "freehit":
+        assert plan.objective_value >= without.objective_value - 1e-9
+    seeds = plan.diagnostics["named_chip_seed"]
+    assert seeds["without_chip"]["objective_value"] == pytest.approx(without.objective_value)
+    candidates = {row["seed"]: row["objective_value"] for row in seeds["candidates"]}
+    expected = {"hold", "without_chip"} | (
+        {"without_chip_after_free_hit"} if chip == "freehit" else set()
+    )
+    assert set(candidates) == expected
+    best = max(value for value in candidates.values() if value is not None)
+    assert candidates[seeds["selected"]] == best
+    assert plan.objective_value >= best - 1e-9
+    assert best > candidates["hold"]
+    # The search started from that seed and kept or improved it on its own.
+    assert seeds["seed_retained"] is False
+    assert not wall_clock_stopped_the_search(plan.solver_status, plan.diagnostics)
+
+
+def test_a_stopped_chip_search_below_its_seed_serves_the_seed(crowded_window, monkeypatch):
+    """The certificate values a Bench Boost seed without its boost, so it guards less.
+
+    A chip search that stops between that value and the seed's own would otherwise be
+    served. Here the search is made to stop on the hold, below its seed.
+    """
+
+    _, horizon, held, _, _, without = crowded_window
+    solve = live_transfers.optimize_transfer_plan
+
+    def stopped_below(*args, **kwargs):
+        if not kwargs.get("protect_incumbent"):
+            return solve(*args, **kwargs)
+        kwargs = {
+            k: v for k, v in kwargs.items() if k not in {"incumbent_plan", "protect_incumbent"}
+        }
+        hold = {week: held.squad_player_ids for week in horizon.target_gameweeks}
+        worse = solve(*args, **kwargs, fixed_week_squads=hold)
+        return replace(
+            worse,
+            solver_status=SolverStatus.FEASIBLE,
+            diagnostics={
+                **worse.diagnostics,
+                "solver_status_name": "FEASIBLE",
+                "deterministic_time_budget_exhausted": True,
+            },
+        )
+
+    monkeypatch.setattr(live_transfers, "optimize_transfer_plan", stopped_below)
+    plan = _named(crowded_window, "bboost")
+    seeds = plan.diagnostics["named_chip_seed"]
+    assert seeds["selected"] == "without_chip"
+    assert seeds["seed_retained"] is True
+    chosen = {row["seed"]: row["objective_value"] for row in seeds["candidates"]}
+    assert plan.objective_value == pytest.approx(chosen["without_chip"])
+    assert plan.solver_status is SolverStatus.FEASIBLE
+    assert plan.diagnostics["solver_status_name"] == "FEASIBLE"
+    assert plan.diagnostics["absolute_optimality_gap"] is None
+    assert dict(plan.chips_played) == {2: "bboost"}
+    assert not wall_clock_stopped_the_search(plan.solver_status, plan.diagnostics)
+    for week, replayed in zip(plan.weeks, without.weeks, strict=True):
+        assert set(week.selected_squad.player_id) == set(replayed.selected_squad.player_id)
+
+
+def test_only_a_named_chip_window_is_seeded(tmp_path, monkeypatch):
+    """No chip, offered chips, a chip forced outside the horizon and the automatic
+    strategy all plan as before: one solve with the hold probe, or the strategy's own."""
+
+    from squadopt.live import chip_availability_for
+
+    inputs, horizon, held, rules = _inputs(tmp_path, (2, 3, 4))
+    calls = []
+    solve = live_transfers.optimize_transfer_plan
+
+    def recorded(*args, **kwargs):
+        calls.append(kwargs)
+        return solve(*args, **kwargs)
+
+    monkeypatch.setattr(live_transfers, "optimize_transfer_plan", recorded)
+    offered = chip_availability_for(rules, (2, 3, 4), used=held.chips_used)
+    elsewhere = ChipAvailability(available={"bboost": frozenset({9})}, forced={9: "bboost"})
+    for chips in (None, ChipAvailability(), offered, elsewhere):
+        calls.clear()
+        plan, _ = plan_transfer_horizon(inputs, horizon, held, rules, chips=chips)
+        assert "named_chip_seed" not in plan.diagnostics
+        assert len(calls) == 1
+        assert calls[0]["chips"] is chips
+        assert calls[0]["protect_hold"] is True
+        assert "incumbent_plan" not in calls[0]
+
+    class Automatic(Exception):
+        pass
+
+    def automatic(*_args, **_kwargs):
+        raise Automatic
+
+    monkeypatch.setattr(live_transfers, "optimize_chip_strategy", automatic)
+    calls.clear()
+    with pytest.raises(Automatic):
+        plan_transfer_horizon(
+            inputs,
+            horizon,
+            held,
+            rules,
+            chips=ChipAvailability(available={"bboost": frozenset({2})}, forced={2: "bboost"}),
+            chip_strategy=True,
+        )
+    assert calls == []

@@ -1,15 +1,22 @@
 /** Templates: named selections, applied through the URL, stored where the viewer is. */
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, useSearchParams } from "react-router";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { mockLeagueMembersEnvelope } from "../../../fixtures/league";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
+import { MESSAGES, type Language } from "../../../i18n/messages";
+import type { EntryView } from "../types";
 import { TemplatePicker } from "./TemplatePicker";
-import { builtinTemplates, LocalTemplateStore } from "./templateStore";
+import { builtinTemplates, LocalTemplateStore, type GameTemplate } from "./templateStore";
 
 afterEach(cleanup);
 beforeEach(() => window.localStorage.clear());
+
+const MEMBERS = mockLeagueMembersEnvelope.payload.members;
+/** Mert Işık of Half Space, in the example league's list. */
+const RIVAL = 35249002;
 
 function Selection() {
   const [params] = useSearchParams();
@@ -20,11 +27,15 @@ function Selection() {
   );
 }
 
-function renderPicker(initial = "/league/352490/members/1") {
+function renderPicker(
+  initial = "/league/352490/members/1",
+  members: readonly EntryView[] = MEMBERS,
+  language: Language = "tr",
+) {
   return render(
-    <LanguageProvider initialLanguage="tr">
+    <LanguageProvider initialLanguage={language}>
       <MemoryRouter initialEntries={[initial]}>
-        <TemplatePicker />
+        <TemplatePicker members={members} />
         <Selection />
       </MemoryRouter>
     </LanguageProvider>,
@@ -68,14 +79,20 @@ describe("the picker", () => {
   it("shows one builtin per member strategy and applies through the URL", () => {
     renderPicker();
 
-    fireEvent.click(screen.getByRole("button", { name: /Farkı koru/ }));
+    // One compact row of chips, named like a field and not a card with a heading of its own.
+    const row = screen.getByRole("group", { name: "Oyun şablonları" });
+    expect(screen.queryByRole("heading")).toBeNull();
+    const keep = within(row).getByRole("button", { name: /Farkı koru/ });
+    // A builtin is named by its strategy, so the chip adds only its window.
+    expect(within(keep).getByText("1 hafta")).toBeInTheDocument();
+    fireEvent.click(keep);
 
     // The standings neighbour is the producer's default: no rival parameter.
     expect(screen.getByTestId("selection").textContent).toBe("ortak-koru/1/-");
   });
 
   it("applies and saves a named rival with the template", () => {
-    renderPicker("/league/352490/members/1?mode=fark-yarat&window=1&rival=42");
+    renderPicker(`/league/352490/members/1?mode=fark-yarat&window=1&rival=${RIVAL}`);
 
     fireEvent.change(screen.getByLabelText("Bu kombinasyonu adlandır"), {
       target: { value: "Derbi" },
@@ -84,13 +101,13 @@ describe("the picker", () => {
     expect(new LocalTemplateStore().list()[0]).toMatchObject({
       strategy: "fark-yarat",
       window: 1,
-      rival: 42,
+      rival: RIVAL,
     });
 
     fireEvent.click(screen.getByRole("button", { name: /En çok puan/ }));
     expect(screen.getByTestId("selection").textContent).toBe("saf-puan/1/-");
-    fireEvent.click(screen.getByRole("button", { name: /Derbi.*#42/ }));
-    expect(screen.getByTestId("selection").textContent).toBe("fark-yarat/1/42");
+    fireEvent.click(screen.getByRole("button", { name: /Derbi.*Mert Işık/ }));
+    expect(screen.getByTestId("selection").textContent).toBe(`fark-yarat/1/${RIVAL}`);
   });
 
   it("saves the current selection under a name and can remove it again", () => {
@@ -113,5 +130,69 @@ describe("the picker", () => {
     expect(names.map((t) => t.strategy)).toEqual(["saf-puan", "ortak-koru", "fark-yarat"]);
     expect(new Set(names.map((t) => t.window))).toEqual(new Set([1]));
     expect(new Set(names.map((t) => t.rival))).toEqual(new Set(["nearest_above"]));
+  });
+});
+
+describe.each([
+  ["tr", "Farkı kapat · 1h"],
+  ["en", "Close the gap · 1w"],
+] as const)("a saved template's rival in %s", (language, meta) => {
+  /** What the saved template's chip says, its name and then its selection. */
+  function savedChip(rival: GameTemplate["rival"], members: readonly EntryView[] = MEMBERS) {
+    new LocalTemplateStore().save({
+      id: "own:derbi",
+      name: "Derbi",
+      strategy: "fark-yarat",
+      window: 1,
+      rival,
+    });
+    renderPicker(undefined, members, language);
+    return screen.getByRole("button", { name: new RegExp(`Derbi.*${meta}`) }).textContent;
+  }
+
+  /** The league's list with the rival's names as given. */
+  const namedAs = (manager_name: string | null, team_name: string | null): EntryView[] =>
+    MEMBERS.map((member) =>
+      member.entry_id === RIVAL ? { ...member, manager_name, team_name } : member,
+    );
+
+  it("is the member's name from the list, with no number", () => {
+    expect(savedChip(RIVAL)).toBe(`Derbi${meta} · Mert Işık`);
+  });
+
+  it("is the team's name where the list holds no manager's", () => {
+    expect(savedChip(RIVAL, namedAs(null, "Half Space"))).toBe(`Derbi${meta} · Half Space`);
+  });
+
+  it("is left out where the list does not hold the member", () => {
+    expect(savedChip(99999999)).toBe(`Derbi${meta}`);
+  });
+
+  it("is left out where the list holds the member with no name", () => {
+    expect(savedChip(RIVAL, namedAs(null, null))).toBe(`Derbi${meta}`);
+  });
+
+  it("is the team's name where the list holds the manager under the entry stand-in", () => {
+    expect(savedChip(RIVAL, namedAs(`entry-${RIVAL}`, "Half Space"))).toBe(
+      `Derbi${meta} · Half Space`,
+    );
+  });
+
+  it("is left out where the list holds only the entry stand-in", () => {
+    expect(savedChip(RIVAL, namedAs(`entry-${RIVAL}`, `entry-${RIVAL}`))).toBe(`Derbi${meta}`);
+  });
+
+  it("is the team's name where the list holds an empty manager's name", () => {
+    expect(savedChip(RIVAL, namedAs("", "Half Space"))).toBe(`Derbi${meta} · Half Space`);
+  });
+
+  it("is left out where the list holds an empty name", () => {
+    expect(savedChip(RIVAL, namedAs("", null))).toBe(`Derbi${meta}`);
+  });
+
+  it("stays the standings neighbour's label for the neighbour", () => {
+    expect(savedChip("nearest_above")).toBe(
+      `Derbi${meta} · ${MESSAGES[language].leagueMembers.computeRivalNearest}`,
+    );
   });
 });

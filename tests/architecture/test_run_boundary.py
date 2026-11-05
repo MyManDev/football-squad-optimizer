@@ -53,6 +53,7 @@ PRODUCT_ENTRY_POINTS = (
     "squadopt.platform.advice_worker",
     "squadopt.platform.weekly_operations",
     "squadopt.platform.weekly_publish",
+    "squadopt.platform.weekly_schedule",
     "squadopt.platform.cli",
     "squadopt.application",
 )

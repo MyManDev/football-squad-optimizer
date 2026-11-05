@@ -1,5 +1,6 @@
-import { useEffect, useId, useRef } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
+import { motionDuration } from "../../../design/motion";
 import { useLanguage } from "../../../i18n/context";
 import { clubCode, type ClubCodes } from "../../../lib/clubs";
 import { figure, utcShort } from "../../../lib/format";
@@ -21,9 +22,6 @@ const COPY = {
     home: "Ev",
     away: "Deplasman",
     reason: "Bu transfer neden?",
-    points_gain: "Bu haftanın beklenen puanına göre önerildi.",
-    window_value: "Seçilen haftaların toplam puanı için önerildi.",
-    mode_tradeoff: "Seçtiğin rakip ve oyun tarzına göre önerildi.",
     blank: "Bu hafta maç yok.",
   },
   en: {
@@ -34,9 +32,6 @@ const COPY = {
     home: "Home",
     away: "Away",
     reason: "Why this transfer?",
-    points_gain: "Recommended for this week's expected points.",
-    window_value: "Recommended for the total points across your selected weeks.",
-    mode_tradeoff: "Recommended for your selected rival and playing style.",
     blank: "No fixture this week.",
   },
 };
@@ -63,13 +58,32 @@ export function PlayerDetails({
   const copy = COPY[language];
   const titleId = useId();
   const dialog = useRef<HTMLDialogElement>(null);
+  const [closing, setClosing] = useState(false);
+  const dismissTimer = useRef<number | undefined>(undefined);
+  const outsidePress = useRef(false);
+  const dismiss = () => {
+    if (dismissTimer.current !== undefined) return;
+    const duration = motionDuration("ui");
+    if (duration === 0) {
+      onClose();
+      return;
+    }
+    setClosing(true);
+    dismissTimer.current = window.setTimeout(onClose, duration);
+  };
   useEffect(() => {
     const element = dialog.current!;
     const trigger = document.activeElement;
+    const root = document.documentElement;
+    const overflow = root.style.overflow;
+    root.style.overflow = "hidden";
     element.showModal();
     return () => {
+      window.clearTimeout(dismissTimer.current);
+      root.style.overflow = overflow;
       element.close();
-      if (trigger instanceof HTMLElement && trigger.isConnected) trigger.focus();
+      if (trigger instanceof HTMLElement && trigger.isConnected)
+        trigger.focus({ preventScroll: true });
     };
   }, []);
   const basis = plan ?? held;
@@ -86,13 +100,13 @@ export function PlayerDetails({
     (teamCode !== null && team.short_name === teamCode);
   const matches = week?.fixtures.filter((match) => sameTeam(match.home) || sameTeam(match.away));
   const move = plan?.moves.find((row) => row.player_in?.player_id === player.playerId);
-  const reason = !move
-    ? null
-    : move.reason_code === "manager_word"
+  // Said only of a move the club's page or the Top 100 setting put in the plan.
+  const reason =
+    move?.reason_code === "manager_word"
       ? EVIDENCE_COPY[language].moveReason
-      : move.reason_code === "top100_preference"
+      : move?.reason_code === "top100_preference"
         ? TOP100_COPY[language].moveReason
-        : copy[move.reason_code];
+        : null;
   const roleRows =
     plan?.role_forecast?.rows.filter(
       (row) =>
@@ -111,6 +125,32 @@ export function PlayerDetails({
       ref={dialog}
       className={styles.dialog}
       aria-labelledby={titleId}
+      data-closing={closing || undefined}
+      onCancel={(event) => {
+        event.preventDefault();
+        dismiss();
+      }}
+      onPointerDown={(event) => {
+        const box = event.currentTarget.getBoundingClientRect();
+        outsidePress.current =
+          event.target === event.currentTarget &&
+          (event.clientX < box.left ||
+            event.clientX > box.right ||
+            event.clientY < box.top ||
+            event.clientY > box.bottom);
+      }}
+      onClick={(event) => {
+        const box = event.currentTarget.getBoundingClientRect();
+        if (
+          outsidePress.current &&
+          (event.clientX < box.left ||
+            event.clientX > box.right ||
+            event.clientY < box.top ||
+            event.clientY > box.bottom)
+        )
+          dismiss();
+        outsidePress.current = false;
+      }}
       // A browser fires close from a queued task. StrictMode's development replay of the effect
       // above closes and reopens the dialog, so that close arrives while it is open again: only
       // a dialog that is really closed ends the selection.
@@ -125,7 +165,7 @@ export function PlayerDetails({
             {player.team} · {position}
           </p>
         </div>
-        <button type="button" onClick={onClose}>
+        <button type="button" onClick={dismiss}>
           {copy.close}
         </button>
       </header>

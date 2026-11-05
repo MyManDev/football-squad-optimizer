@@ -72,8 +72,8 @@
 }
 
 .markCaptain {
-  background: var(--color-lime);
-  color: var(--color-text);
+  background: var(--color-mark);
+  color: var(--color-mark-text);
 }
 
 .markVice {
@@ -154,8 +154,8 @@
 .new {
   padding: 0 4px;
   border-radius: var(--radius-s);
-  background: var(--color-lime);
-  color: var(--color-text);
+  background: var(--color-mark);
+  color: var(--color-mark-text);
   font-family: var(--font-display);
   font-weight: 800;
   letter-spacing: 0.04em;

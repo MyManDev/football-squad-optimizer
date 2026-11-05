@@ -1,10 +1,9 @@
 /**
  * The switched-on document shows the club's own words beside the plan: the role the
- * declared rule gave each player, the words cut from the captured bytes (or why they are
- * not shown), who said them and when, a link to the source, whether the word changed the
- * plan, and what applying it costs against the pure-points pick. Example data says so on
- * the section itself. A document that disagrees with the switch is not shown as the plan.
- * Nothing on any of it reads as a probability.
+ * declared rule gave each player, the words cut from the captured bytes (or the name and the
+ * role alone where they are not shown), who said them and when, a link to the source, whether
+ * the word changed the plan, and what applying it costs. A document that disagrees with the
+ * switch is not shown as the plan. Nothing on any of it reads as a probability.
  */
 
 import { cleanup, render, screen, within } from "@testing-library/react";
@@ -132,8 +131,6 @@ describe("the manager's word on the advice card", () => {
     expect(text).toContain(EVIDENCE_COPY.tr.speakers.manager);
     expect(text).not.toContain("manager,");
     expect(text).toContain(EVIDENCE_COPY.tr.changed);
-    expect(text).toContain(EVIDENCE_COPY.tr.intro(2));
-    expect(text).toContain(MESSAGES.tr.leagueMembers.exampleData);
     const link = section?.querySelector("a[href='https://club.example/arsenal/news']");
     expect(link?.getAttribute("rel")).toBe("noopener noreferrer");
     expect(container.textContent).toContain(EVIDENCE_COPY.tr.cost("1,3"));
@@ -176,9 +173,9 @@ describe("the manager's word on the advice card", () => {
     }
   });
 
-  it("does not point at a price it does not print when the word changed the plan", () => {
+  it("prints no price for a word that changed the plan against an unproven pure-points plan", () => {
     // A binding word priced against a pure-points plan found without a proof carries no
-    // ceiling, so no price is printed above, and the section may not say one is.
+    // ceiling, so no price is printed; the section still says the word changed the plan.
     const advice = switchedOn([item()], {
       control_solver_status: "FEASIBLE",
       control_optimality_gap: 2.5,
@@ -192,11 +189,10 @@ describe("the manager's word on the advice card", () => {
       const { container, unmount } = renderPage(language, advice);
       const section = sectionText(container);
       const text = container.textContent ?? "";
-      expect(section).toContain(EVIDENCE_COPY[language].changedNoPrice);
-      expect(section).not.toContain(EVIDENCE_COPY[language].changed);
+      expect(section).toContain(EVIDENCE_COPY[language].changed);
       expect(text).not.toContain(EVIDENCE_COPY[language].cost(price));
       expect(text).not.toContain(EVIDENCE_COPY[language].costAtMost(price));
-      // The page no longer explains the missing price with the control's proof gap.
+      // The missing price is not explained with the control's proof gap.
       expect(text).not.toMatch(
         language === "en" ? /was not proven optimal/ : /en iyi diye kanıtlanamadı/,
       );
@@ -204,12 +200,16 @@ describe("the manager's word on the advice card", () => {
     }
   });
 
-  it("withholds a quote the producer withheld, and says why", () => {
-    const withheld = item({ words: null, words_status: "withheld_figure", role: "not_captain" });
+  it("withholds a quote the producer withheld, and keeps the name and the role", () => {
+    const withheld = item({
+      words: "Havertz will not travel.",
+      words_status: "withheld_figure",
+      role: "not_captain",
+    });
     const { container } = renderPage("tr", switchedOn([withheld]));
     const text = sectionText(container);
-    expect(text).toContain(EVIDENCE_COPY.tr.wordsWithheld);
-    expect(text).not.toContain(EVIDENCE_COPY.tr.wordsUnresolved);
+    expect(container.querySelector('[data-testid="managers-word"] blockquote')).toBeNull();
+    expect(text).toContain("Kai Havertz");
     expect(text).toContain(EVIDENCE_COPY.tr.roles.not_captain);
   });
 
@@ -229,13 +229,6 @@ describe("the manager's word on the advice card", () => {
     expect(text).not.toContain("00:00");
   });
 
-  it("labels a real club-news read as such, without the example badge", () => {
-    const { container } = renderPage("tr", switchedOn([item()], {}, "club_news_capture"));
-    const text = sectionText(container);
-    expect(text).toContain(EVIDENCE_COPY.tr.sourceCapture);
-    expect(text).not.toContain(MESSAGES.tr.leagueMembers.exampleData);
-  });
-
   it.each(["tr", "en"] as const)(
     "names only the declared covered clubs, including a read with no player statement, in %s",
     (language) => {
@@ -251,8 +244,6 @@ describe("the manager's word on the advice card", () => {
           .getAllByRole("listitem")
           .map((item) => item.textContent),
       ).toEqual(["Liverpool", "Newcastle"]);
-      expect(section).toHaveTextContent(copy.intro(2));
-      expect(section).not.toHaveTextContent(copy.noCoveredClubs);
       expect(section).not.toHaveTextContent("Arsenal");
       expect(section.querySelector("blockquote")).toBeNull();
     },
@@ -268,8 +259,8 @@ describe("the manager's word on the advice card", () => {
       const section = screen.getByTestId("managers-word");
       const copy = EVIDENCE_COPY[language];
       expect(within(section).queryByRole("list", { name: copy.coveredClubs })).toBeNull();
-      expect(section).toHaveTextContent(copy.noCoveredClubs);
-      expect(section).toHaveTextContent(copy.intro(0));
+      expect(section).not.toHaveTextContent(copy.coveredClubs);
+      expect(section).not.toHaveTextContent("Arsenal");
     },
   );
 
@@ -312,8 +303,9 @@ describe("the manager's word on the advice card", () => {
     const spelled = item({ words: "He is fifty per cent fit.", words_status: "shown" });
     const { container } = renderPage("en", switchedOn([spelled]));
     const text = sectionText(container);
-    expect(text).toContain(EVIDENCE_COPY.en.wordsWithheld);
+    expect(container.querySelector('[data-testid="managers-word"] blockquote')).toBeNull();
     expect(text).not.toContain("per cent");
+    expect(text).toContain("Kai Havertz");
   });
 
   it("does not show a plan without evidence as the switched-on plan", () => {
@@ -349,7 +341,12 @@ describe("the manager's word and the rest of the page", () => {
   });
 
   it("offers no computation while the club's word is switched on", () => {
-    const { container } = renderPage("en", switchedOn());
-    expect(container.textContent).toContain(MESSAGES.en.leagueMembers.computeUnsupportedSelection);
+    const compute = { name: MESSAGES.en.leagueMembers.computeButton };
+    renderPage("en", switchedOn());
+    expect(screen.getByRole("button", compute)).toBeDisabled();
+    cleanup();
+    // The same selection with the word off is one Compute can be asked for.
+    renderPage("en", mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1), "mode=saf-puan&window=1");
+    expect(screen.getByRole("button", compute)).toBeEnabled();
   });
 });

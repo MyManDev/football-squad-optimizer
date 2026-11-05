@@ -33,6 +33,7 @@ describe.each(["tr", "en"] as const)("member live score in %s", (language) => {
     expect(
       screen.getByText(language === "tr" ? "Bonus bekleniyor" : "Bonus pending"),
     ).toBeInTheDocument();
+    expect(screen.getByText(language === "tr" ? "Güncellendi" : "Updated")).toBeInTheDocument();
     expect(container.querySelector("time")).toHaveAttribute("datetime", score.source_time);
     expect(container.textContent).not.toMatch(AS_A_CHANCE);
     expect(container.textContent).not.toMatch(AS_A_CAVEAT);

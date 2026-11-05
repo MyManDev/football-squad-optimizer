@@ -58,8 +58,6 @@ export interface RecordedPlan {
   moves: { player_out: string | null; player_in: string | null }[];
   top100_weight?: number;
   managers_word?: true;
-  expected_points_cost?: number;
-  expected_points_cost_ceiling?: number;
 }
 
 export interface WeekReview {
@@ -235,8 +233,6 @@ export function checkedHistory(
         requireThat(plan.chip === null || isMemberChip(plan.chip));
         requireThat(plan.captain === null || text(plan.captain));
         requireThat(plan.managers_word === undefined || plan.managers_word === true);
-        for (const key of ["expected_points_cost", "expected_points_cost_ceiling"])
-          requireThat(plan[key] === undefined || number(plan[key]));
         requireThat(Array.isArray(plan.moves));
         for (const value of plan.moves) {
           const move = object(value);

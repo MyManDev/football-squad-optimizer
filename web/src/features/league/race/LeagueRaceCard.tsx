@@ -1,8 +1,9 @@
 import { useEffect, useId, useRef, useState } from "react";
 
 import { useLanguage } from "../../../i18n/context";
+import { points } from "../../../lib/format";
 import type { EntryView } from "../types";
-import { placesMoved, type LeagueRace, type RaceLine } from "./leagueRace";
+import { neighbourGaps, placesMoved, type LeagueRace, type RaceLine } from "./leagueRace";
 import styles from "./LeagueRaceCard.module.css";
 
 /** Every place has its own row this many pixels apart, whatever the league's size. */
@@ -39,22 +40,28 @@ const signed = (moved: number) => `${moved > 0 ? "+" : "−"}${Math.abs(moved)}`
  * line, one row per place and one column per gameweek, so a league of fifty keeps its lines
  * apart and a long season scrolls sideways inside the chart rather than the page. Tapping a
  * line, or choosing the member, brings that line forward with its weeks marked where a place
- * was gained or lost; stepping through the gameweeks lists whose place changed.
+ * was gained or lost; stepping through the gameweeks lists whose place changed. Under it,
+ * each member's points to the member just ahead and just behind after the latest settled
+ * week, the viewer's own row emphasised.
  */
 export function LeagueRaceCard({
   race,
   members,
   initialEntry = null,
+  viewer = null,
 }: {
   race: LeagueRace;
   members: readonly EntryView[];
   /** The member to bring forward first, the viewer where the page knows one. */
   initialEntry?: number | null;
+  /** The claimed member, whose own gaps are emphasised; none when the page knows no viewer. */
+  viewer?: number | null;
 }) {
-  const { messages } = useLanguage();
+  const { locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
   const titleId = useId();
   const memberId = useId();
+  const gapsId = useId();
   const chart = useRef<HTMLDivElement>(null);
   const [chosen, setChosen] = useState<number | null>(null);
   const [weekIndex, setWeekIndex] = useState(race.gameweeks.length - 1);
@@ -73,10 +80,10 @@ export function LeagueRaceCard({
   const names = new Map(
     members.map((member) => [
       member.entry_id,
-      member.manager_name ?? member.team_name ?? `#${member.entry_id}`,
+      member.manager_name ?? member.team_name ?? copy.unknownMember,
     ]),
   );
-  const name = (entryId: number) => names.get(entryId) ?? `#${entryId}`;
+  const name = (entryId: number) => names.get(entryId) ?? copy.unknownMember;
   const width = LEFT + (race.gameweeks.length - 1) * RACE_COLUMN + RIGHT;
   const height = TOP + (race.places - 1) * RACE_ROW + BOTTOM;
   const moves = race.lines
@@ -86,6 +93,8 @@ export function LeagueRaceCard({
     )
     .sort((a, b) => (a.line.ranks[week] ?? 0) - (b.line.ranks[week] ?? 0));
   const others = race.lines.filter((line) => line !== highlighted);
+  const gaps = neighbourGaps(race);
+  const count = (value: number) => points(value, 0, locale);
 
   return (
     <section className={styles.race} aria-labelledby={titleId}>
@@ -133,7 +142,13 @@ export function LeagueRaceCard({
         </div>
       </div>
 
-      <div className={styles.chart} ref={chart}>
+      <div
+        className={styles.chart}
+        ref={chart}
+        tabIndex={0}
+        role="region"
+        aria-label={copy.raceChart(name(highlighted.entryId))}
+      >
         <svg
           width={width}
           height={height}
@@ -195,27 +210,33 @@ export function LeagueRaceCard({
         </svg>
       </div>
 
-      <div className={styles.week}>
-        <h3 className={styles.weekTitle}>{copy.raceMoved}</h3>
-        {week === 0 ? (
-          <p className={styles.quiet}>{copy.raceFirstWeek}</p>
-        ) : moves.length === 0 ? (
-          <p className={styles.quiet}>{copy.raceNoMoves}</p>
-        ) : (
-          <ul className={styles.moves}>
-            {moves.map(({ line, moved }) => (
-              <li key={line.entryId} data-move={moved > 0 ? "gained" : "lost"}>
-                <span>
-                  {copy.raceMove(name(line.entryId), line.ranks[week - 1]!, line.ranks[week]!)}
-                </span>
-                <span className={`${styles.moved} num`}>{signed(moved)}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+      {/* The first settled week has no week before it for a place to change from. */}
+      {week === 0 ? null : (
+        <div className={styles.week}>
+          <h3 className={styles.weekTitle}>{copy.raceMoved}</h3>
+          {moves.length === 0 ? (
+            <p className={styles.quiet}>{copy.raceNoMoves}</p>
+          ) : (
+            <ul className={styles.moves}>
+              {moves.map(({ line, moved }) => (
+                <li key={line.entryId} data-move={moved > 0 ? "gained" : "lost"}>
+                  <span>
+                    {copy.raceMove(name(line.entryId), line.ranks[week - 1]!, line.ranks[week]!)}
+                  </span>
+                  <span className={`${styles.moved} num`}>{signed(moved)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
-      <div className={styles.table}>
+      <div
+        className={styles.table}
+        tabIndex={0}
+        role="region"
+        aria-label={name(highlighted.entryId)}
+      >
         <table>
           <caption>{name(highlighted.entryId)}</caption>
           <thead>
@@ -248,6 +269,46 @@ export function LeagueRaceCard({
           </tbody>
         </table>
       </div>
+
+      {/* The latest settled week's gaps, whichever week the stepper is on; a lone member
+          has no neighbour to measure against. */}
+      {gaps.length > 1 ? (
+        <div className={styles.week}>
+          <h3 className={styles.weekTitle} id={gapsId}>
+            {copy.raceGaps(race.gameweeks[race.gameweeks.length - 1]!)}
+          </h3>
+          <ol className={styles.gaps} aria-labelledby={gapsId}>
+            {gaps.map((gap) => {
+              const own = gap.entryId === viewer;
+              return (
+                <li key={gap.entryId} aria-current={own ? "true" : undefined}>
+                  <span className={`${styles.gapPlace} num`}>{gap.place}</span>
+                  <span className={styles.gapName}>
+                    {name(gap.entryId)}
+                    {own ? ` · ${copy.viewerYouBadge}` : null}
+                  </span>
+                  <span className={styles.gapFigures}>
+                    {gap.ahead !== null ? (
+                      <span data-gap="ahead">
+                        {gap.ahead === 0
+                          ? copy.raceLevelAhead
+                          : copy.raceGapAhead(count(gap.ahead))}
+                      </span>
+                    ) : null}
+                    {gap.behind !== null ? (
+                      <span data-gap="behind">
+                        {gap.behind === 0
+                          ? copy.raceLevelBehind
+                          : copy.raceGapBehind(count(gap.behind))}
+                      </span>
+                    ) : null}
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
+        </div>
+      ) : null}
     </section>
   );
 }

@@ -1,0 +1,132 @@
+name: Deploy FPL forwarder
+
+# The FPL forwarder Worker (workers/fpl-proxy, ADR 0012) reads FPL on a visitor's request and
+# answers with trimmed, versioned documents under /api/v1/fpl/ on the site's host. It is
+# dispatched by hand only, from the default branch, into the cloudflare-workers environment with
+# the Workers token. The Pages token and the cloudflare-pages environment are never used here,
+# and the Pages site is not touched: it stays static.
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: deploy the forwarder, or delete it
+        required: true
+        type: choice
+        options:
+          - deploy
+          - delete
+        default: deploy
+
+permissions:
+  contents: read
+
+jobs:
+  reject_untrusted_dispatch:
+    name: reject non-default dispatch
+    if: github.ref != format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-24.04
+    steps:
+      - run: |
+          echo "::error::The FPL forwarder must be dispatched from the default branch."
+          exit 1
+
+  forwarder:
+    name: ${{ inputs.action }} FPL forwarder
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: cloudflare-workers
+    concurrency:
+      group: cloudflare-workers-fpl-proxy
+      queue: max
+    permissions:
+      contents: read
+    steps:
+      - name: Require the Workers credentials
+        env:
+          CLOUDFLARE_WORKERS_API_TOKEN: ${{ secrets.CLOUDFLARE_WORKERS_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        shell: bash
+        run: |
+          missing=""
+          if [[ -z "$CLOUDFLARE_WORKERS_API_TOKEN" ]]; then missing="$missing CLOUDFLARE_WORKERS_API_TOKEN"; fi
+          if [[ -z "$CLOUDFLARE_ACCOUNT_ID" ]]; then missing="$missing CLOUDFLARE_ACCOUNT_ID"; fi
+          if [[ -n "$missing" ]]; then
+            echo "::error::The cloudflare-workers environment has no secret named:$missing. Add them to that environment as docs/fpl_forwarder_probe.md describes."
+            exit 1
+          fi
+
+      - name: Checkout the forwarder
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+
+      # The same files as the CI step in ci.yml; deploy-steps.test.mjs checks both lists against
+      # the test directory.
+      - name: Test the forwarder before it ships
+        if: inputs.action == 'deploy'
+        run: |
+          node --test \
+            workers/fpl-proxy/test/proxy.test.mjs \
+            workers/fpl-proxy/test/worker.test.mjs \
+            workers/fpl-proxy/test/deploy-steps.test.mjs
+
+      # The step may fail because the Worker is already gone; the check after it decides.
+      # --force skips wrangler's check for dependent Workers, which this one has none of.
+      - name: Delete the forwarder Worker
+        id: delete_worker
+        if: inputs.action == 'delete'
+        continue-on-error: true
+        uses: cloudflare/wrangler-action@953926a2e2182532811c01a25e53647d93bf07c0 # v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_WORKERS_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: "4.123.0"
+          command: delete --name squadopt-fpl-proxy --force
+
+      - name: Confirm the forwarder no longer answers
+        id: confirm_gone
+        if: inputs.action == 'delete'
+        run: node workers/fpl-proxy/scripts/deploy-steps.mjs confirm-gone
+
+      - name: Deploy the forwarder Worker
+        id: deploy
+        if: inputs.action == 'deploy'
+        uses: cloudflare/wrangler-action@953926a2e2182532811c01a25e53647d93bf07c0 # v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_WORKERS_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: "4.123.0"
+          workingDirectory: workers/fpl-proxy
+          command: deploy
+
+      # Asks one path under the route that is none of the three routes, so FPL is asked nothing:
+      # it passes only when the Worker answers it with its JSON 404 and its marker header.
+      - name: Smoke the forwarder
+        id: smoke
+        if: steps.deploy.outcome == 'success'
+        run: node workers/fpl-proxy/scripts/deploy-steps.mjs smoke
+
+      - name: Report the result
+        if: always()
+        env:
+          ACTION: ${{ inputs.action }}
+          DEPLOY_OUTCOME: ${{ steps.deploy.outcome }}
+          SMOKE_OUTCOME: ${{ steps.smoke.outcome }}
+          DELETE_WORKER_OUTCOME: ${{ steps.delete_worker.outcome }}
+          CONFIRM_GONE_OUTCOME: ${{ steps.confirm_gone.outcome }}
+        run: |
+          echo "## FPL forwarder: $ACTION" >> "$GITHUB_STEP_SUMMARY"
+          if [[ "$ACTION" == "deploy" ]]; then
+            echo "- Deploy: ${DEPLOY_OUTCOME:-not-run}" >> "$GITHUB_STEP_SUMMARY"
+            echo "- Smoke: ${SMOKE_OUTCOME:-not-run}" >> "$GITHUB_STEP_SUMMARY"
+            echo "- Routes: https://squadopt.mymandev.com/api/v1/fpl/" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "- Worker delete: ${DELETE_WORKER_OUTCOME:-not-run}" >> "$GITHUB_STEP_SUMMARY"
+            echo "- Worker gone: ${CONFIRM_GONE_OUTCOME:-not-run}" >> "$GITHUB_STEP_SUMMARY"
+          fi

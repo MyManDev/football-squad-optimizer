@@ -1,0 +1,32 @@
+# The FPL forwarder: three GET routes that read FPL on a visitor's request and answer with
+# trimmed, versioned documents (docs/architecture/decisions/0012-fpl-forwarder.md). It is
+# deployed and deleted only by .github/workflows/deploy-fpl-proxy.yml. The Pages site is not
+# part of this: it stays static, with no functions/ and no _worker.js.
+
+name = "squadopt-fpl-proxy"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+
+# One address only: the route below. No workers.dev subdomain and no preview addresses.
+workers_dev = false
+preview_urls = false
+
+# Every path under /api/v1/fpl/ on the site's host, with any query string, reaches this Worker,
+# and the Worker answers only its three routes (everything else gets its JSON 404). The site
+# has nothing under that prefix, and the probe's route, /api/v1/fpl-probe*, does not overlap it.
+# The zone's /api/v1/ rate-limit rule (50 requests per 10 s per IP) applies in front of it.
+# Publishing the route looks the zone up by name, so the token needs Zone Read on it.
+routes = [
+  { pattern = "squadopt.mymandev.com/api/v1/fpl/*", zone_name = "mymandev.com" },
+]
+
+# No KV, no cron, no secret: the copies the Worker keeps live in each data centre's Cache API.
+
+# The Worker's own console lines (an upstream failure, a cache error) are kept in Workers Logs;
+# the per-request invocation logs, which would record every visitor's entry and league ids, are
+# not.
+[observability]
+enabled = true
+
+[observability.logs]
+invocation_logs = false

@@ -12,8 +12,6 @@ import type { EntrySquad, EntryView } from "../types";
 import { deviceChip, rivalFromSquad } from "./selection";
 import { DEVICE_CHIPS, isDevicePlanEntry, RIVAL_STRATEGIES } from "./types";
 
-export type { DeviceComputable } from "../advice/adviceSelection";
-
 type RivalSquad = Pick<EntrySquad, "entry" | "source_snapshot_id" | "starting_xi">;
 
 /** What the page has read of the other members' entry documents. */

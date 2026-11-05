@@ -33,7 +33,6 @@ test("member list links to point-labelled advice and preserves its URL state", a
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(
     mockLeagueMembersEnvelope.payload.league_name,
   );
-  await expect(page.getByText("örnek veri")).toBeVisible();
   await expect(page.getByText("SquadOpt · sistem takımı")).toHaveCount(0);
 
   await page.getByRole("link", { name: "Deniz Aral" }).click();
@@ -55,11 +54,8 @@ test("member list links to point-labelled advice and preserves its URL state", a
   await expect(rival).toBeVisible();
   await rival.selectOption({ index: 1 });
   await expect(page).toHaveURL(/rival=\d+/);
-  // The week's hit is a fact beside the gain; the sentences behind it are in the disclosure.
+  // The week's hit is a fact beside the gain.
   await expect(page.getByText("0 ceza puanı")).toBeVisible();
-  await page.locator("main details summary", { hasText: "Nasıl hesaplandı?" }).click();
-  await expect(page.getByText(/beklenen puan maliyeti/).first()).toBeVisible();
-  await expect(page.getByText(/Önerin senin kadrondan/)).toBeVisible();
   await expect(page.getByRole("heading", { name: "Kaydedilen puan farkı" })).toHaveCount(0);
   await expect(page.getByText(/rakibe karşı beklenen fark/)).toBeVisible();
   await expect(page.locator('[aria-labelledby="entry-advice-title"]')).not.toContainText("%");

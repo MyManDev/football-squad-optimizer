@@ -1,18 +1,18 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-10-23T12:40:33Z",
+  "generated_at_utc": "2026-11-04T06:28:27Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
-    "gameweek": 8,
+    "gameweek": 10,
     "entry_id": 6880255,
     "league_id": 352490,
     "mode": "saf-puan",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20261023T111647Z-a2cd55fde426",
+    "source_snapshot_id": "fpl-live-20261104T020046Z-eaadfd3e9143",
     "moves": [
       {
-        "move_id": "gw08-1",
+        "move_id": "gw10-1",
         "player_out": {
           "player_id": 67089,
           "name": "Martin Dubravka",
@@ -21,17 +21,17 @@
           "team": "Spurs"
         },
         "player_in": {
-          "player_id": 433969,
-          "name": "Zion Suzuki",
-          "short_name": "Suzuki",
+          "player_id": 432720,
+          "name": "James Trafford",
+          "short_name": "Trafford",
           "position": "GK",
-          "team": "Aston Villa"
+          "team": "Leeds"
         },
-        "expected_points_delta": 3.153259447565077,
+        "expected_points_delta": 3.229540548627689,
         "reason_code": "points_gain"
       },
       {
-        "move_id": "gw08-2",
+        "move_id": "gw10-2",
         "player_out": {
           "player_id": 106760,
           "name": "Luke Shaw",
@@ -40,17 +40,36 @@
           "team": "Man Utd"
         },
         "player_in": {
-          "player_id": 610799,
-          "name": "Luka Vu\u0161kovi\u0107",
-          "short_name": "Vu\u0161kovi\u0107",
+          "player_id": 199798,
+          "name": "Ezri Konsa Ngoyo",
+          "short_name": "Konsa",
           "position": "DEF",
-          "team": "Brighton"
+          "team": "Arsenal"
         },
-        "expected_points_delta": 3.6999755500286966,
+        "expected_points_delta": 3.7558255348348126,
         "reason_code": "points_gain"
       },
       {
-        "move_id": "gw08-3",
+        "move_id": "gw10-3",
+        "player_out": {
+          "player_id": 141746,
+          "name": "Bruno Borges Fernandes",
+          "short_name": "B.Fernandes",
+          "position": "MID",
+          "team": "Man Utd"
+        },
+        "player_in": {
+          "player_id": 244850,
+          "name": "Morgan Rogers",
+          "short_name": "Rogers",
+          "position": "MID",
+          "team": "Chelsea"
+        },
+        "expected_points_delta": -0.5765258805654412,
+        "reason_code": "points_gain"
+      },
+      {
+        "move_id": "gw10-4",
         "player_out": {
           "player_id": 449434,
           "name": "Anthony Elanga",
@@ -59,17 +78,17 @@
           "team": "Newcastle"
         },
         "player_in": {
-          "player_id": 56979,
-          "name": "Jordan Henderson",
-          "short_name": "Henderson",
+          "player_id": 446008,
+          "name": "Bryan Mbeumo",
+          "short_name": "Mbeumo",
           "position": "MID",
-          "team": "Chelsea"
+          "team": "Man Utd"
         },
-        "expected_points_delta": 3.2061581722293795,
+        "expected_points_delta": 3.079677470339348,
         "reason_code": "points_gain"
       },
       {
-        "move_id": "gw08-4",
+        "move_id": "gw10-5",
         "player_out": {
           "player_id": 508395,
           "name": "Yehor Yarmoliuk",
@@ -78,64 +97,72 @@
           "team": "Brentford"
         },
         "player_in": {
-          "player_id": 480457,
-          "name": "Jack Rudoni",
-          "short_name": "Rudoni",
+          "player_id": 509416,
+          "name": "Yasin Ayari",
+          "short_name": "Ayari",
           "position": "MID",
-          "team": "Coventry City"
+          "team": "Brighton"
         },
-        "expected_points_delta": 3.0485653132662875,
+        "expected_points_delta": 3.0626640780050494,
         "reason_code": "points_gain"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 13.10795848308944,
+    "expected_gain_vs_hold": 12.551181751241458,
     "expected_points_cost": 0.0,
     "rival_label": null,
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
     "wall_clock_stopped_the_search": false,
-    "expected_own_points": 62.43733871400944,
+    "expected_own_points": 66.3591430905683,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
       "short_name": "Haaland",
       "position": "FWD",
       "team": "Man City",
-      "expected_points": 8.11765453618748
+      "expected_points": 7.950379595632534
     },
     "vice_captain": {
-      "player_id": 141746,
-      "name": "Bruno Borges Fernandes",
-      "short_name": "Fernandes",
-      "position": "MID",
-      "team": "Man Utd",
-      "expected_points": 5.660179884785022
+      "player_id": 226597,
+      "name": "Gabriel dos Santos Magalh\u00e3es",
+      "short_name": "Gabriel",
+      "position": "DEF",
+      "team": "Arsenal",
+      "expected_points": 4.994433716715129
     },
     "starting_xi": [
       {
-        "player_id": 433969,
-        "name": "Zion Suzuki",
-        "short_name": "Suzuki",
+        "player_id": 432720,
+        "name": "James Trafford",
+        "short_name": "Trafford",
         "position": "GK",
-        "team": "Aston Villa",
-        "expected_points": 3.235320214369735
+        "team": "Leeds",
+        "expected_points": 3.311601315432338
       },
       {
         "player_id": 226597,
         "name": "Gabriel dos Santos Magalh\u00e3es",
-        "short_name": "Magalh\u00e3es",
+        "short_name": "Gabriel",
         "position": "DEF",
         "team": "Arsenal",
-        "expected_points": 4.423923916856849
+        "expected_points": 4.994433716715129
+      },
+      {
+        "player_id": 199798,
+        "name": "Ezri Konsa Ngoyo",
+        "short_name": "Konsa",
+        "position": "DEF",
+        "team": "Arsenal",
+        "expected_points": 3.7558255348348126
       },
       {
         "player_id": 469142,
         "name": "Jan Paul van Hecke",
-        "short_name": "Hecke",
+        "short_name": "Van Hecke",
         "position": "DEF",
         "team": "Spurs",
-        "expected_points": 3.0499596004453253
+        "expected_points": 3.396265487736452
       },
       {
         "player_id": 219924,
@@ -143,7 +170,7 @@
         "short_name": "Diop",
         "position": "DEF",
         "team": "Ipswich Town",
-        "expected_points": 2.4570219766484747
+        "expected_points": 2.3942975713221504
       },
       {
         "player_id": 167512,
@@ -151,15 +178,23 @@
         "short_name": "O'Nien",
         "position": "DEF",
         "team": "Sunderland",
-        "expected_points": 0.290300332118716
+        "expected_points": 2.167401908791809
       },
       {
-        "player_id": 141746,
-        "name": "Bruno Borges Fernandes",
-        "short_name": "Fernandes",
+        "player_id": 446008,
+        "name": "Bryan Mbeumo",
+        "short_name": "Mbeumo",
         "position": "MID",
         "team": "Man Utd",
-        "expected_points": 5.660179884785022
+        "expected_points": 4.397598069519702
+      },
+      {
+        "player_id": 244850,
+        "name": "Morgan Rogers",
+        "short_name": "Rogers",
+        "position": "MID",
+        "team": "Chelsea",
+        "expected_points": 4.290942097915604
       },
       {
         "player_id": 184029,
@@ -167,23 +202,7 @@
         "short_name": "\u00d8degaard",
         "position": "MID",
         "team": "Arsenal",
-        "expected_points": 3.7050117630130073
-      },
-      {
-        "player_id": 56979,
-        "name": "Jordan Henderson",
-        "short_name": "Henderson",
-        "position": "MID",
-        "team": "Chelsea",
-        "expected_points": 3.2061581722293795
-      },
-      {
-        "player_id": 480457,
-        "name": "Jack Rudoni",
-        "short_name": "Rudoni",
-        "position": "MID",
-        "team": "Coventry City",
-        "expected_points": 3.048565313266284
+        "expected_points": 3.5900427560157366
       },
       {
         "player_id": 223094,
@@ -191,7 +210,7 @@
         "short_name": "Haaland",
         "position": "FWD",
         "team": "Man City",
-        "expected_points": 8.11765453618748
+        "expected_points": 7.950379595632534
       },
       {
         "player_id": 219168,
@@ -199,7 +218,7 @@
         "short_name": "Isak",
         "position": "FWD",
         "team": "Liverpool",
-        "expected_points": 4.374702258586186
+        "expected_points": 4.802665943850242
       }
     ],
     "bench": [
@@ -209,31 +228,31 @@
         "short_name": "Verbruggen",
         "position": "GK",
         "team": "Brighton",
-        "expected_points": 3.0938051044078216
+        "expected_points": 3.406491380255187
       },
       {
-        "player_id": 610799,
-        "name": "Luka Vu\u0161kovi\u0107",
-        "short_name": "Vu\u0161kovi\u0107",
-        "position": "DEF",
+        "player_id": 509416,
+        "name": "Yasin Ayari",
+        "short_name": "Ayari",
+        "position": "MID",
         "team": "Brighton",
-        "expected_points": 3.699975550028694
+        "expected_points": 3.629354288638803
       },
       {
         "player_id": 514254,
         "name": "Diego G\u00f3mez Amarilla",
-        "short_name": "Amarilla",
+        "short_name": "G\u00f3mez",
         "position": "MID",
         "team": "Brighton",
-        "expected_points": 3.0669208782006234
+        "expected_points": 3.260990333811655
       },
       {
         "player_id": 551466,
         "name": "Gonzalo Garc\u00eda",
-        "short_name": "Garc\u00eda",
+        "short_name": "Gonzalo",
         "position": "FWD",
         "team": "Fulham",
-        "expected_points": 2.8901846766783668
+        "expected_points": 3.060473494463606
       }
     ],
     "chip": "bboost",
@@ -244,11 +263,11 @@
     "data_quality": "complete",
     "missing_fields": [],
     "squad_basis": "captured",
-    "control_solver_status": "FEASIBLE",
-    "control_optimality_gap": 5.567999999999998,
+    "control_solver_status": "OPTIMAL",
+    "control_optimality_gap": 0.0,
     "chip_choice": {
       "chip": "bboost",
-      "gain_vs_no_chip": 7.554979364665606,
+      "gain_vs_no_chip": 9.899460068219831,
       "basis": "one_week_expected_points_v1",
       "windows_left": {
         "first_half": {
