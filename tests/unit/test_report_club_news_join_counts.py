@@ -21,6 +21,7 @@ from tests.fixtures.synthetic_rotation_capture import (
     DECISION_SOURCE,
     SEASON,
     TARGET_GAMEWEEK,
+    TARGET_KICKOFF,
     bootstrap_payload,
     fixtures_payload,
 )
@@ -36,6 +37,7 @@ from squadopt.data.sources.club_news_coding import (
     coding_prompt_sha256,
 )
 from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD
+from squadopt.features.rotation_evidence import build_rotation_evidence_table
 from squadopt.features.rotation_evidence_artifact import read_rotation_evidence_artifact
 from squadopt.platform.club_news_coverage import CodingStageReport, format_coding_stage
 
@@ -678,7 +680,7 @@ def test_statements_not_applied_are_counted_by_the_first_condition_they_fail(
     undated = ("Martinelli will miss the next Premier League match.",)
     day = ("White will miss the next Premier League match.",)
     lines = ARSENAL_LINES
-    pages = [
+    pages: list[dict[str, Any]] = [
         {"url": ARSENAL, "published_at_utc": PUBLISHED, "published_precision": "instant"},
         {"url": ARSENAL_UNDATED, "published_at_utc": None, "published_precision": "unknown"},
         {"url": ARSENAL_DAY, "published_at_utc": "2026-09-12", "published_precision": "day"},
@@ -1057,6 +1059,16 @@ _LATER = "2026-09-15T19:00:00Z"
             "upcoming_premier_league",
             id="published_after_the_capture",
         ),
+        pytest.param(
+            {
+                "calendar": _calendar(
+                    added=(_league_fixture(502, None, "Man Utd", "Fulham", TARGET_KICKOFF),)
+                )
+            },
+            "scope_unverified",
+            "upcoming_premier_league",
+            id="another_club_fixture_at_the_target_kickoff",
+        ),
     ],
 )
 def test_a_statement_outside_that_condition_stays_a_loss_under_its_own_cause(
@@ -1153,7 +1165,7 @@ def test_a_replay_whose_counts_differ_from_the_manifest_refuses(
     """Code that changes a count and no row passes the digest; the manifest catches it."""
 
     root, _news, table = _mixed_week(tmp_path)
-    build = report.build_rotation_evidence_table
+    build = build_rotation_evidence_table
 
     def recounted(**arguments: Any) -> Any:
         replay = build(**arguments)

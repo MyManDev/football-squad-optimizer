@@ -16,8 +16,10 @@ still before any GW8 data existed: see the next section.
 
 Made after this protocol merged (#1213), on İbrahim's review there and the owner's decisions
 in reply (comment 6342002217). No GW8 club-news capture, decision capture, model response,
-rotation pair or record existed when it was made, so no GW8 number informed it. It merges
-before the Friday run, so the commit the run's rotation manifest names carries it.
+rotation pair or record existed when it was made, so no GW8 number informed it. The
+reporter amendment landed before the Friday run. The wording and test follow-up in #1227
+was reviewed before GW8 and completed on 2026-11-05; it changes no counted condition or
+record version. GW8 replay still uses the commit named by its rotation manifest.
 
 - **A next-match statement made before an intervening club match is not a loss.** A
   statement labelled `upcoming_premier_league`, on a page whose publication the reader
