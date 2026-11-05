@@ -13,11 +13,13 @@ for (const width of [320, 1280]) {
     await page.goto("/");
     const opening = page.locator("[data-opening-mark]");
     await expect(opening).toBeAttached();
-    await opening.evaluate((node) => {
+    const duration = await opening.evaluate((node) => {
+      const duration = Number(node.getAnimations()[0]?.effect?.getTiming().duration);
       node.getAnimations({ subtree: true }).forEach((animation) => {
         animation.pause();
-        animation.currentTime = 1500;
+        animation.currentTime = duration * 0.75;
       });
+      return duration;
     });
     await page.evaluate(() => document.fonts.ready);
     const signature = opening.getByText("MyManDev", { exact: true });
@@ -32,7 +34,7 @@ for (const width of [320, 1280]) {
     await expect(opening.getByText("Still Building", { exact: true })).toBeVisible();
     await expect(opening).toHaveAttribute("inert");
     await page.screenshot({ path: testInfo.outputPath(`signature-${width}.png`) });
-    await page.clock.runFor(2300);
+    await page.clock.runFor(duration + 300);
     await expect(opening).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Ligi bul", exact: true })).toBeEnabled();
   });
